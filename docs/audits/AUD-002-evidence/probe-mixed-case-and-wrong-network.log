@@ -1,0 +1,10 @@
+Detected input format: english.
+mnemocode: mixed-case string not allowed
+exit=1
+Detected input format: english.
+mnemocode: Unknown letter "0". Allowed: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz
+exit=1
+Detected input format: english.
+Checked 30/30 candidate dates; found 0 matches.
+No candidate with a valid BIP39 checksum was found.
+exit=0

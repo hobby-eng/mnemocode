@@ -10,7 +10,29 @@ function contains(parent: string, child: string): boolean {
 
 async function effectiveOutputPath(path: string): Promise<string> {
   const absolute = resolve(path);
-  return resolve(await realpath(dirname(absolute)), basename(absolute));
+  let ancestor = dirname(absolute);
+  const missing: string[] = [];
+  while (true) {
+    try {
+      return resolve(await realpath(ancestor), ...missing.reverse(), basename(absolute));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw new Error('The output path could not be resolved safely.');
+      }
+      const parent = dirname(ancestor);
+      if (parent === ancestor) throw new Error('The output path could not be resolved safely.');
+      missing.push(basename(ancestor));
+      ancestor = parent;
+    }
+  }
+}
+
+async function effectiveSourcePath(path: string, key: string): Promise<string> {
+  try {
+    return await realpath(resolve(path));
+  } catch {
+    throw new Error(`--${key} could not be read.`);
+  }
 }
 
 /** Files and folders must not shadow one another or overwrite an input. */
@@ -32,7 +54,7 @@ export async function validateOutputPaths(args: ParsedArguments): Promise<void> 
     for (const key of ['mnemonic-file', 'input-file', 'share-file', 'share-qr']) {
       for (const source of values(args, key)) {
         if (source === '-') continue;
-        const effectiveSource = await realpath(resolve(source));
+        const effectiveSource = await effectiveSourcePath(source, key);
         if (contains(left.path, effectiveSource) || contains(effectiveSource, left.path))
           throw new Error(`--${left.key} must not overlap --${key}.`);
       }
@@ -55,7 +77,14 @@ export async function preflightFileDestination(
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
   const parent = dirname(resolve(path));
-  if (!(await stat(parent)).isDirectory())
-    throw new Error('The output parent must be a directory.');
-  await access(parent, constants.W_OK);
+  try {
+    if (!(await stat(parent)).isDirectory())
+      throw new Error('The output parent must be a directory.');
+    await access(parent, constants.W_OK);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'The output parent must be a directory.') {
+      throw error;
+    }
+    throw new Error('The output parent must be an existing writable directory.');
+  }
 }

@@ -1,0 +1,15 @@
+{
+  "name": "dependency-audit-json",
+  "command": "pnpm audit --json",
+  "cwd": "/home/user/Documents/bip_tools/mnemocode",
+  "startedAtUtc": "2026-09-27T16:15:17Z",
+  "completedAtUtc": "2026-09-27T16:15:18Z",
+  "exitCode": 0,
+  "log": "dependency-audit-json.log",
+  "logSha256": "a1d2095dc184de0e138588085ed78063c7815567ada4520009d5ab33a671b2b2",
+  "runtime": {
+    "node": "v26.10.0",
+    "pnpm": "10.19.0 via corepack 0.36.0",
+    "platform": "Linux x86_64 Ubuntu 26.04.1"
+  }
+}

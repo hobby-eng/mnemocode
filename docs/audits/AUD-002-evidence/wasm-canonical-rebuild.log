@@ -1,0 +1,42 @@
+UTC start 2026-09-27T16:21:17Z
+cargo: cargo 1.98.1 (797e8a9bc 2026-08-05)
+rustc: rustc 1.98.1 (48a229cea 2026-09-01)
+wasm-bindgen: wasm-bindgen 0.2.128
+clang: Ubuntu clang version 21.1.8 (6ubuntu1)
+source hashes (must equal vendor/sskr/integrity.json):
+30183caf38b73d578604427c774d5f2ba7f84365800160c9600636bf1fb37270  /home/user/Documents/bip_tools/multi-chain-wallet-tools/packages/recovery-sskr-wasm/rust/src/lib.rs
+4cf55f961fb8e75a2991fac0e3c2d1a42bc320064e300db0c7a27a8365d921df  /home/user/Documents/bip_tools/multi-chain-wallet-tools/packages/recovery-sskr-wasm/rust/Cargo.lock
+4767d571aa702db2cfcdaa989c44d19dccde3e6376a73afc1f11afb039dc556f  /home/user/Documents/bip_tools/multi-chain-wallet-tools/packages/recovery-sskr-wasm/rust/Cargo.toml
+== cargo build ==
+   Compiling bc-ur v0.19.2
+   Compiling bc-tags v0.12.0
+   Compiling sskr v0.12.0
+   Compiling recovery-sskr-wasm v0.1.5 (/home/user/Documents/bip_tools/multi-chain-wallet-tools/packages/recovery-sskr-wasm/rust)
+    Finished `release` profile [optimized] target(s) in 16.73s
+cargo exit=0
+-rwxrwxr-x 2 user user 745801 Sep 27 19:21 /home/user/Documents/bip_tools/multi-chain-wallet-tools/packages/recovery-sskr-wasm/rust/target/wasm32-unknown-unknown/release/recovery_sskr_wasm.wasm
+== wasm-bindgen ==
+total 404
+drwxrwxr-x 2 user user    120 Sep 27 19:21 .
+drwx------ 3 user user    380 Sep 27 19:21 ..
+-rw-rw-r-- 1 user user   2625 Sep 27 19:21 recovery_sskr_wasm.d.ts
+-rw-rw-r-- 1 user user  12462 Sep 27 19:21 recovery_sskr_wasm.js
+-rw-rw-r-- 1 user user 389084 Sep 27 19:21 recovery_sskr_wasm_bg.wasm
+-rw-rw-r-- 1 user user   1170 Sep 27 19:21 recovery_sskr_wasm_bg.wasm.d.ts
+== hashes: rebuilt ==
+30e314a4cfd21c9f6632e326414d206bfc25b7fa6998ceb1bca16aae481fbac0  /tmp/claude-1000/-home-user--copilot-repos-copilot-worktrees-derivationtool-hobby-eng-studious-tribble/5f8c77d4-1167-4c80-a0ff-da342f97d980/scratchpad/wasm-out/recovery_sskr_wasm_bg.wasm
+04dc98dce7d00bdf696b6adb1e880c833b6f2095cd2f02b45e5c7ac338a50934  /tmp/claude-1000/-home-user--copilot-repos-copilot-worktrees-derivationtool-hobby-eng-studious-tribble/5f8c77d4-1167-4c80-a0ff-da342f97d980/scratchpad/wasm-out/recovery_sskr_wasm.js
+657e877e4965e31379a74b50b5cd020496645d4cc21d6dcacd6c66c4ca084851  /tmp/claude-1000/-home-user--copilot-repos-copilot-worktrees-derivationtool-hobby-eng-studious-tribble/5f8c77d4-1167-4c80-a0ff-da342f97d980/scratchpad/wasm-out/recovery_sskr_wasm.d.ts
+cc2ee127e34314277045824041ec7ca30611be950a8cccf97872b7b7c55d1c87  /tmp/claude-1000/-home-user--copilot-repos-copilot-worktrees-derivationtool-hobby-eng-studious-tribble/5f8c77d4-1167-4c80-a0ff-da342f97d980/scratchpad/wasm-out/recovery_sskr_wasm_bg.wasm.d.ts
+== hashes: committed vendor/sskr/generated ==
+0d6f8e75f3522f7e17f936c851b136e2f76f3a3bcf62a678d40f65f79480deec  /home/user/Documents/bip_tools/mnemocode/vendor/sskr/generated/recovery_sskr_wasm_bg.wasm
+1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04  /home/user/Documents/bip_tools/mnemocode/vendor/sskr/generated/recovery_sskr_wasm_bg.wasm.d.ts
+d42b75d874a5974b79e8460ef72a7b1461f191df4530f5993696ff89747cab40  /home/user/Documents/bip_tools/mnemocode/vendor/sskr/generated/recovery_sskr_wasm.d.ts
+d8e1a56795e40df65db0ef655ad7c128e56d72dd24877887a1a56ec47aecc0e8  /home/user/Documents/bip_tools/mnemocode/vendor/sskr/generated/recovery_sskr_wasm.js
+== byte comparison of the WASM binary ==
+/tmp/claude-1000/-home-user--copilot-repos-copilot-worktrees-derivationtool-hobby-eng-studious-tribble/5f8c77d4-1167-4c80-a0ff-da342f97d980/scratchpad/wasm-out/recovery_sskr_wasm_bg.wasm /home/user/Documents/bip_tools/mnemocode/vendor/sskr/generated/recovery_sskr_wasm_bg.wasm differ: byte 497, line 1
+WASM_DIFFERS
+producers section:
+['scratchpad', 'wasm-out', 'recovery_sskr_wasm_bg.wasm'] size 389084 producers-tail: b'producers..processed-by..walrus.0.26.5.wasm-bindgen.0.2.128'
+['sskr', 'generated', 'recovery_sskr_wasm_bg.wasm'] size 394954 producers-tail: b'producers..processed-by..walrus.0.26.5.wasm-bindgen.0.2.128'
+UTC end 2026-09-27T16:21:34Z

@@ -1,0 +1,15 @@
+{
+  "name": "probe-output-overlap",
+  "command": "mkdir -p /tmp/mnemocode-aud-002-QuXG/out; echo 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' > /tmp/mnemocode-aud-002-QuXG/out/mnemonic.txt; node dist/mnemocode.js encode --mode direct --mnemonic-file /tmp/mnemocode-aud-002-QuXG/out/mnemonic.txt --format 5 --cards-dir /tmp/mnemocode-aud-002-QuXG/out/cards --pdf /tmp/mnemocode-aud-002-QuXG/out/cards/all.pdf; echo exit=$?; node dist/mnemocode.js encode --mode direct --mnemonic-file /tmp/mnemocode-aud-002-QuXG/out/mnemonic.txt --output /tmp/mnemocode-aud-002-QuXG/out/mnemonic.txt; echo exit=$?; cat /tmp/mnemocode-aud-002-QuXG/out/mnemonic.txt; node dist/mnemocode.js encode --mode direct --mnemonic-file /tmp/mnemocode-aud-002-QuXG/out/mnemonic.txt --output /tmp/mnemocode-aud-002-QuXG/out/../out/mnemonic.txt; echo exit=$?; cat /tmp/mnemocode-aud-002-QuXG/out/mnemonic.txt; node dist/mnemocode.js encode --mode direct --mnemonic-file /tmp/mnemocode-aud-002-QuXG/out/missing.txt --output /tmp/mnemocode-aud-002-QuXG/out/record.txt; echo exit=$?",
+  "cwd": "/home/user/Documents/bip_tools/mnemocode",
+  "startedAtUtc": "2026-09-27T16:22:07Z",
+  "completedAtUtc": "2026-09-27T16:22:08Z",
+  "exitCode": 0,
+  "log": "probe-output-overlap.log",
+  "logSha256": "2489c4cb31199b56bf91daf2f2133cb0566f761490db2b32a3045f81e43f370d",
+  "runtime": {
+    "node": "v26.10.0",
+    "pnpm": "10.19.0 via corepack 0.36.0",
+    "platform": "Linux x86_64 Ubuntu 26.04.1"
+  }
+}

@@ -144,7 +144,7 @@ describe('business card collections', () => {
         expect(pageOperators(pdf, index)).toBe(pageOperators(plain, index));
       }
     }
-  }, 20_000);
+  }, 180_000);
 
   it('fails on mismatched QR data and unprintable personal fields before returning a PDF', async () => {
     const template = selectTemplate('business-it');

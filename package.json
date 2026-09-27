@@ -42,6 +42,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage --testTimeout=180000",
     "verify": "pnpm format:check && pnpm check && pnpm build && pnpm test",
     "dev": "tsx src/mnemocode.ts"
   },
@@ -60,6 +61,7 @@
     "@types/node": "26.6.3",
     "@types/pngjs": "6.0.5",
     "@types/qrcode": "1.5.6",
+    "@vitest/coverage-v8": "5.0.2",
     "prettier": "3.9.9",
     "tsx": "4.23.15",
     "typescript": "7.0.2",

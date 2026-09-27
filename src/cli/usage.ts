@@ -1,4 +1,5 @@
 import { cardTemplates } from '../export/templates.js';
+import { MNEMOCODE_VERSION } from '../version.js';
 export function printUsage(): void {
   const color = process.stdout.isTTY === true && process.env.NO_COLOR === undefined;
   const paint = (code: number, text: string): string =>
@@ -9,7 +10,7 @@ export function printUsage(): void {
   const mode = (text: string): string => paint(1, paint(32, text));
   const flag = (text: string): string => paint(36, text);
 
-  console.log(`${title('MnemoCode')}
+  console.log(`${title(`MnemoCode ${MNEMOCODE_VERSION}`)}
 Offline reversible representations for English BIP39 mnemonics
 
 ${section('USAGE')}
@@ -26,6 +27,7 @@ ${section('USAGE')}
   mnemocode table (--index N | --word WORD | --unicode HEX | --all)
   mnemocode preview (--list | --pdf PATH | --cards-dir PATH) [--template ID | --all]
   mnemocode self-test
+  mnemocode --version
 
   mnemocode encode --sskr --threshold 2 --shares 3 \\
     (--ask-secrets | --mnemonic "..." | --mnemonic-file PATH) [OPTIONS]

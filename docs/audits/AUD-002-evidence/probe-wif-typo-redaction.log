@@ -1,0 +1,5 @@
+Detected input format: english.
+mnemocode: Invalid checksum
+exit=1
+--- does stderr above contain the damaged WIF? ---
+0

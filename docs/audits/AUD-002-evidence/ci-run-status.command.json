@@ -1,0 +1,15 @@
+{
+  "name": "ci-run-status",
+  "command": "gh run view 36331656864 -R hobby-eng/mnemocode --json conclusion,headSha,url,createdAt,status; gh run list -R hobby-eng/mnemocode --limit 3 --json conclusion,headSha,displayTitle",
+  "cwd": "/home/user/Documents/bip_tools/mnemocode",
+  "startedAtUtc": "2026-09-27T16:37:36Z",
+  "completedAtUtc": "2026-09-27T16:37:39Z",
+  "exitCode": 0,
+  "log": "ci-run-status.log",
+  "logSha256": "473d4f8303ab04fcc0ba394b0fad2f5d9113a7bfec2f7ffabb2166dd4056f3b8",
+  "runtime": {
+    "node": "v26.10.0",
+    "pnpm": "10.19.0 via corepack 0.36.0",
+    "platform": "Linux x86_64 Ubuntu 26.04.1"
+  }
+}

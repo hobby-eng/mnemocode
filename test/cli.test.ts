@@ -22,6 +22,7 @@ async function run(arguments_: readonly string[], environment?: NodeJS.ProcessEn
 describe('CLI records', () => {
   it('documents every transformation and recovery profile with runnable examples', async () => {
     const help = await run(['--help']);
+    expect(help.stdout).toContain('MnemoCode 0.1.0');
     expect(help.stdout).toContain('seedshift-legacy-valid');
     expect(help.stdout).toContain('--legacy-valid-last-word');
     expect(help.stdout).toContain('wool abuse actual');
@@ -35,9 +36,20 @@ describe('CLI records', () => {
       expect(help.stdout).toContain(flag);
   });
 
+  it('reports the package version through both CLI forms', async () => {
+    for (const argument of ['--version', 'version']) {
+      const result = await run([argument]);
+      expect(result.stdout).toBe('mnemocode 0.1.0\n');
+      expect(result.stderr).toBe('');
+    }
+    await expect(run(['--version', 'extra'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('--version does not accept arguments.'),
+    });
+  });
+
   it('runs the extended self-test and reports its coverage', async () => {
     const result = await run(['self-test']);
-    expect(result.stdout).toContain('MnemoCode self-test');
+    expect(result.stdout).toContain('MnemoCode 0.1.0 self-test');
     expect(result.stdout).toContain('Public vectors');
     expect(result.stdout).toContain('Representation matrix');
     expect(result.stdout).toContain('QR adapter');

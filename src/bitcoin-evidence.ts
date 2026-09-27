@@ -165,6 +165,14 @@ function extendedMetadata(value: string): {
   return metadata;
 }
 
+function parseExtendedPublicKey(value: string, versions: Versions): HDKey {
+  try {
+    return HDKey.fromExtendedKey(value.trim(), versions);
+  } catch {
+    throw new Error('The extended public key is not valid.');
+  }
+}
+
 function sameExtendedKey(left: HDKey, right: HDKey): boolean {
   return (
     left.depth === right.depth &&
@@ -216,7 +224,12 @@ function matchingWif(
   if (derivedKey === null) throw new Error('Unable to derive the private key for WIF comparison.');
   const network = evidence.location.network === 'mainnet' ? NETWORK : TEST_NETWORK;
   const coder = WIF(network);
-  const expected = coder.decode(evidence.value.trim());
+  let expected: Uint8Array;
+  try {
+    expected = coder.decode(evidence.value.trim());
+  } catch {
+    throw new Error(`The WIF is not valid for Bitcoin ${evidence.location.network}.`);
+  }
   try {
     return equalBytes(derivedKey, expected) ? coder.encode(derivedKey) : undefined;
   } finally {
@@ -232,7 +245,7 @@ function matchingAccountKey(
   if (metadata.network !== evidence.location.network) {
     throw new Error('The extended-key prefix and --network disagree.');
   }
-  const expected = HDKey.fromExtendedKey(evidence.value.trim(), metadata.versions);
+  const expected = parseExtendedPublicKey(evidence.value, metadata.versions);
   try {
     return sameExtendedKey(node, expected) ? node.publicExtendedKey : undefined;
   } finally {
@@ -251,7 +264,12 @@ function matchDerivedNode(
       const derived = paymentAddress(profile, node.publicKey, evidence.location.network);
       const network = evidence.location.network === 'mainnet' ? NETWORK : TEST_NETWORK;
       const address = Address(network);
-      const expected = address.encode(address.decode(evidence.value.trim()));
+      let expected: string;
+      try {
+        expected = address.encode(address.decode(evidence.value.trim()));
+      } catch {
+        throw new Error(`The address is not valid for Bitcoin ${evidence.location.network}.`);
+      }
       return derived === expected ? derived : undefined;
     }
     case 'compressed-public-key': {
@@ -275,7 +293,7 @@ export function matchBitcoinEvidence(
     const metadata = extendedMetadata(evidence.value);
     if (metadata.network !== evidence.network)
       throw new Error('The extended-key prefix and --network disagree.');
-    const expected = HDKey.fromExtendedKey(evidence.value.trim(), metadata.versions);
+    const expected = parseExtendedPublicKey(evidence.value, metadata.versions);
     const root = rootForMnemonic(mnemonic, passphrase, evidence.network);
     try {
       return {

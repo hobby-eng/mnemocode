@@ -1,0 +1,172 @@
+UTC start 2026-09-27T16:26:03Z
+client 29.8.1 server 29.8.0
+source commit 76cce41077a05307cbe06dd63b8d2d1da192eb23 dirty=false
+#12 163.6   Downloaded cc v1.4.6
+#12 163.7   Downloaded js-sys v0.3.105
+#12 163.8   Downloaded wasip2 v1.0.4+wasi-0.2.12
+#12 163.9   Downloaded unicode-normalization v0.1.25
+#12 163.9   Downloaded futures-util v0.3.34
+#12 163.9   Downloaded hkdf v0.12.4
+#12 164.0   Downloaded dcbor v0.25.2
+#12 164.1   Downloaded syn v1.0.109
+#12 164.1   Downloaded curve25519-dalek v4.1.3
+#12 164.2   Downloaded fiat-crypto v0.2.9
+#12 164.8   Downloaded secp256k1-sys v0.11.0
+#12 164.9     Updating crates.io index
+#12 167.7  Downloading crates ...
+#12 168.2   Downloaded smallvec v1.16.1
+#12 168.3   Downloaded zerofrom-derive v0.1.8
+#12 168.3   Downloaded synstructure v0.14.0
+#12 168.3   Downloaded yoke-derive v0.8.3
+#12 168.4   Downloaded rand_core v0.9.5
+#12 168.4   Downloaded miniz_oxide v0.8.9
+#12 168.4   Downloaded serde_json v1.0.149
+#12 168.7   Downloaded bc-envelope v0.43.0
+#12 168.8   Downloaded bc-components v0.31.1
+#12 168.8   Downloaded known-values v0.15.5
+#12 DONE 169.0s
+
+#13 [dependencies 4/4] RUN mkdir -p /tmp/committed-generated/dash /tmp/committed-generated/shamir /tmp/committed-generated/codex32 /tmp/committed-generated/sskr /tmp/committed-generated/envelope     && cp -a packages/dash-shielded-wasm/generated/. /tmp/committed-generated/dash/     && cp -a packages/recovery-shamir-wasm/generated/. /tmp/committed-generated/shamir/     && cp -a packages/recovery-codex32-wasm/generated/. /tmp/committed-generated/codex32/     && cp -a packages/recovery-sskr-wasm/generated/. /tmp/committed-generated/sskr/     && cp -a packages/recovery-envelope-wasm/generated/. /tmp/committed-generated/envelope/     && cp tooling/wasm-canonical-manifest.json /tmp/committed-generated/wasm-canonical-manifest.json
+#13 DONE 0.3s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 37.1s done
+#14 exporting manifest sha256:14e41013633297e6c7668702184295d946a56cf2a7e9742e332fa63c3de8e615 0.0s done
+#14 exporting config sha256:5eac0c4680c6a16c8af81d6eda6a7ee2a13e5f44e3d3c49bf762c8ce0390fb69 0.0s done
+#14 exporting attestation manifest sha256:2a2b8b019e0ea9493b154c9d0637442759d3858f3a91cb31ba27528a74f3c256
+#14 exporting attestation manifest sha256:2a2b8b019e0ea9493b154c9d0637442759d3858f3a91cb31ba27528a74f3c256 0.0s done
+#14 exporting manifest list sha256:e1a2c31d766fcf4eb3f77fae78ccaf41bdc97259485151976b3bb31ef8d83245 0.0s done
+#14 naming to docker.io/library/mnemocode-aud-002-canonical-deps:latest done
+#14 unpacking to docker.io/library/mnemocode-aud-002-canonical-deps:latest
+#14 unpacking to docker.io/library/mnemocode-aud-002-canonical-deps:latest 14.1s done
+#14 DONE 51.5s
+docker build exit=0
+container 672aba42a5d12718230ecd9ba91ace6274b15c83805ec060203031bda5a0f734
+container rustc: rustc 1.98.1 (48a229cea 2026-09-01)
+container cargo: cargo 1.98.1 (797e8a9bc 2026-08-05)
+container wasm-bindgen: wasm-bindgen 0.2.128
+container clang: Ubuntu clang version 18.1.3 (1ubuntu1)
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling wasm-bindgen-shared v0.2.128
+   Compiling rustversion v1.0.23
+   Compiling cfg-if v1.0.4
+   Compiling bumpalo v3.20.3
+   Compiling once_cell v1.21.4
+   Compiling pin-project-lite v0.2.17
+   Compiling futures-task v0.3.34
+   Compiling slab v0.4.12
+   Compiling futures-core v0.3.34
+   Compiling version_check v0.9.5
+   Compiling typenum v1.20.1
+   Compiling subtle v2.6.1
+   Compiling zerocopy v0.8.57
+   Compiling autocfg v1.5.1
+   Compiling getrandom v0.3.4
+   Compiling semver v1.0.28
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.12
+   Compiling thiserror v2.0.20
+   Compiling futures-util v0.3.34
+   Compiling hex v0.4.3
+   Compiling rand_core v0.6.4
+   Compiling siphasher v1.0.3
+   Compiling generic-array v0.14.7
+   Compiling cc v1.4.6
+   Compiling rustc_version v0.4.1
+   Compiling rand v0.8.8
+   Compiling opaque-debug v0.3.1
+   Compiling phf_shared v0.11.3
+   Compiling base64ct v1.8.3
+   Compiling paste v1.0.15
+   Compiling crc32fast v1.5.2
+   Compiling signature v2.2.0
+   Compiling bitcoin-private v0.1.0
+   Compiling num-traits v0.2.19
+   Compiling ed25519 v2.2.3
+   Compiling lazy_static v1.5.0
+   Compiling tinyvec v1.13.3
+   Compiling minicbor v0.19.1
+   Compiling curve25519-dalek v4.1.3
+   Compiling crc-catalog v2.5.0
+   Compiling crc v3.4.0
+   Compiling wasm-bindgen v0.2.128
+   Compiling phf_generator v0.11.3
+   Compiling bitcoin_hashes v0.12.0
+   Compiling unicode-normalization v0.1.25
+   Compiling syn v3.0.5
+   Compiling syn v2.0.119
+   Compiling block-buffer v0.10.4
+   Compiling inout v0.1.4
+   Compiling secp256k1-sys v0.11.0
+   Compiling wasm-bindgen-macro-support v0.2.128
+   Compiling zeroize_derive v1.5.0
+   Compiling zerocopy-derive v0.8.57
+   Compiling phf_macros v0.11.3
+   Compiling thiserror-impl v2.0.20
+   Compiling zeroize v1.8.2
+   Compiling phf v0.11.3
+   Compiling wasm-bindgen-macro v0.2.128
+   Compiling ppv-lite86 v0.2.21
+   Compiling half v2.7.1
+   Compiling js-sys v0.3.105
+   Compiling rand_core v0.9.3
+   Compiling rand_chacha v0.9.0
+   Compiling rand_xoshiro v0.7.0
+   Compiling rand v0.9.5
+   Compiling secp256k1 v0.31.1
+   Compiling bc-rand v0.5.0
+   Compiling getrandom v0.2.17
+   Compiling chrono v0.4.45
+   Compiling crypto-common v0.1.7
+   Compiling password-hash v0.5.0
+   Compiling rand_xoshiro v0.6.0
+   Compiling digest v0.10.7
+   Compiling cipher v0.4.4
+   Compiling universal-hash v0.5.1
+   Compiling aead v0.5.2
+   Compiling poly1305 v0.8.0
+   Compiling ur v0.4.1
+   Compiling salsa20 v0.10.2
+   Compiling chacha20 v0.9.1
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling blake2 v0.10.6
+   Compiling chacha20poly1305 v0.10.1
+   Compiling pbkdf2 v0.12.2
+   Compiling hkdf v0.12.4
+   Compiling scrypt v0.11.0
+   Compiling argon2 v0.5.3
+   Compiling dcbor v0.25.2
+   Compiling x25519-dalek v2.0.1
+   Compiling ed25519-dalek v2.2.0
+   Compiling bc-crypto v0.14.0
+   Compiling bc-ur v0.19.2
+   Compiling bc-tags v0.12.0
+   Compiling bc-shamir v0.13.0
+   Compiling sskr v0.12.0
+   Compiling recovery-sskr-wasm v0.1.5 (/workspace/packages/recovery-sskr-wasm/rust)
+    Finished `release` profile [optimized] target(s) in 22.22s
+Generated pinned Blockchain Commons sskr browser WASM.
+d42b75d874a5974b79e8460ef72a7b1461f191df4530f5993696ff89747cab40  packages/recovery-sskr-wasm/generated/recovery_sskr_wasm.d.ts
+d8e1a56795e40df65db0ef655ad7c128e56d72dd24877887a1a56ec47aecc0e8  packages/recovery-sskr-wasm/generated/recovery_sskr_wasm.js
+0d6f8e75f3522f7e17f936c851b136e2f76f3a3bcf62a678d40f65f79480deec  packages/recovery-sskr-wasm/generated/recovery_sskr_wasm_bg.wasm
+1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04  packages/recovery-sskr-wasm/generated/recovery_sskr_wasm_bg.wasm.d.ts
+container exit=0
+== canonical-container rebuilt hashes ==
+0d6f8e75f3522f7e17f936c851b136e2f76f3a3bcf62a678d40f65f79480deec  /tmp/claude-1000/-home-user--copilot-repos-copilot-worktrees-derivationtool-hobby-eng-studious-tribble/5f8c77d4-1167-4c80-a0ff-da342f97d980/scratchpad/docker-wasm-out/recovery_sskr_wasm_bg.wasm
+1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04  /tmp/claude-1000/-home-user--copilot-repos-copilot-worktrees-derivationtool-hobby-eng-studious-tribble/5f8c77d4-1167-4c80-a0ff-da342f97d980/scratchpad/docker-wasm-out/recovery_sskr_wasm_bg.wasm.d.ts
+d42b75d874a5974b79e8460ef72a7b1461f191df4530f5993696ff89747cab40  /tmp/claude-1000/-home-user--copilot-repos-copilot-worktrees-derivationtool-hobby-eng-studious-tribble/5f8c77d4-1167-4c80-a0ff-da342f97d980/scratchpad/docker-wasm-out/recovery_sskr_wasm.d.ts
+d8e1a56795e40df65db0ef655ad7c128e56d72dd24877887a1a56ec47aecc0e8  /tmp/claude-1000/-home-user--copilot-repos-copilot-worktrees-derivationtool-hobby-eng-studious-tribble/5f8c77d4-1167-4c80-a0ff-da342f97d980/scratchpad/docker-wasm-out/recovery_sskr_wasm.js
+== committed vendor/sskr/generated hashes ==
+0d6f8e75f3522f7e17f936c851b136e2f76f3a3bcf62a678d40f65f79480deec  /home/user/Documents/bip_tools/mnemocode/vendor/sskr/generated/recovery_sskr_wasm_bg.wasm
+1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04  /home/user/Documents/bip_tools/mnemocode/vendor/sskr/generated/recovery_sskr_wasm_bg.wasm.d.ts
+d42b75d874a5974b79e8460ef72a7b1461f191df4530f5993696ff89747cab40  /home/user/Documents/bip_tools/mnemocode/vendor/sskr/generated/recovery_sskr_wasm.d.ts
+d8e1a56795e40df65db0ef655ad7c128e56d72dd24877887a1a56ec47aecc0e8  /home/user/Documents/bip_tools/mnemocode/vendor/sskr/generated/recovery_sskr_wasm.js
+IDENTICAL recovery_sskr_wasm_bg.wasm
+IDENTICAL recovery_sskr_wasm.js
+IDENTICAL recovery_sskr_wasm.d.ts
+IDENTICAL recovery_sskr_wasm_bg.wasm.d.ts
+UTC end 2026-09-27T16:35:51Z

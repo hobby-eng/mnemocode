@@ -722,47 +722,47 @@
   "remediation": [
     {
       "id": "AUD-001-SEC001",
-      "status": "open",
+      "status": "fixed",
       "fixCommit": null,
       "verificationCommit": null,
       "evidence": [
-        "Original finding evidence; not remediated."
+        "remediation-2026-09-27.md"
       ]
     },
     {
       "id": "AUD-001-SEC002",
-      "status": "open",
+      "status": "verified",
       "fixCommit": null,
       "verificationCommit": null,
       "evidence": [
-        "Original finding evidence; not remediated."
+        "remediation-2026-09-27.md"
       ]
     },
     {
       "id": "AUD-001-FUN001",
-      "status": "open",
+      "status": "verified",
       "fixCommit": null,
       "verificationCommit": null,
       "evidence": [
-        "Original finding evidence; not remediated."
+        "remediation-2026-09-27.md"
       ]
     },
     {
       "id": "AUD-001-FUN002",
-      "status": "open",
+      "status": "verified",
       "fixCommit": null,
       "verificationCommit": null,
       "evidence": [
-        "Original finding evidence; not remediated."
+        "remediation-2026-09-27.md"
       ]
     },
     {
       "id": "AUD-001-API001",
-      "status": "open",
+      "status": "verified",
       "fixCommit": null,
       "verificationCommit": null,
       "evidence": [
-        "Original finding evidence; not remediated."
+        "remediation-2026-09-27.md"
       ]
     },
     {
@@ -772,16 +772,17 @@
       "verificationCommit": null,
       "evidence": [
         "installed-verify.command.json",
-        "installed-verify.log"
+        "installed-verify.log",
+        "remediation-2026-09-27.md"
       ]
     },
     {
       "id": "AUD-001-DOC001",
-      "status": "open",
+      "status": "verified",
       "fixCommit": null,
       "verificationCommit": null,
       "evidence": [
-        "Original finding evidence; not remediated."
+        "remediation-2026-09-27.md"
       ]
     }
   ],
@@ -794,7 +795,7 @@
     "No physical print/phone-scanner validation, exhaustive visual page inspection, resource-exhaustion testing, or exhaustive fault injection.",
     "The initial sandbox suite had 22 failures, many due to subprocess EPERM/empty output. The unchanged host rerun is the authoritative baseline: 3 failures. Both logs are retained.",
     "Initial full render matrix hit the 300-second harness limit with no completed aggregate evidence. The checkpointed retry completed all 128 cases. This was an audit harness timeout, not a reproduced application crash.",
-    "Six desired regression contracts remain marked it.fails, visibly linked to open findings. Vitest counts those as passed; this report does not count them as corrected behavior.",
+    "At the audited snapshot, six desired regression contracts were marked it.fails and were not counted as corrected behavior. The dated remediation record supersedes that disposition.",
     "The existing tree was dirty and had no Git remote. HEAD alone does not describe the audited source; use the scoped manifest/source archive. Production was unchanged during authorized test remediation.",
     "Temporary harnesses and screenshot artifacts are evidence, not production inputs. Initial cache/output inventory was narrowed before publication; ignored user output contents are excluded."
   ],
@@ -831,7 +832,7 @@
     },
     "assessment": "Good core arithmetic and SSKR negative coverage, insufficient for unconditional release acceptance. The number of vectors alone is not the criterion. Separate independent expected values, same-implementation regression fixtures and same-implementation round trips.",
     "remainingPriorities": [
-      "Fix open functional/file-protection findings and turn six expected-failure tests into ordinary passing regressions.",
+      "Historical priority, completed by the dated follow-up: fix the functional/file-protection findings and turn six expected-failure tests into ordinary passing regressions.",
       "Validate required public catalogue coverage and pin its upstream provenance; add independent known answers beyond a single direct/legacy 12-word fixture. Current checksum-valid Seedshift has one fixed vector at each of five lengths; only direct-12 includes both fingerprints.",
       "Add local Bitcoin evidence coverage across native SegWit/Taproot/legacy/nested profiles, mainnet/testnet and path/passphrase boundaries, including case and malformed-address rules.",
       "Failure injection for RNG unavailable, partially completed image exports, renderer timeout, full disk and interrupted input; bounded malformed/large image/text tests.",
@@ -1097,7 +1098,7 @@
   },
   "releaseAssessment": {
     "ready": false,
-    "reason": "Open recovery/file-protection defects, failing dependency gate and native/platform evidence gaps; expected failures are not fixes."
+    "reason": "Historical snapshot assessment: open recovery/file-protection defects, a failing dependency gate and native/platform evidence gaps. The dated follow-up fixes the product/dependency issues locally; remote CI and original platform limits remain."
   },
   "externalSources": [
     {

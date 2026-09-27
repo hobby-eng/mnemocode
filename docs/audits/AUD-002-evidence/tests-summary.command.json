@@ -1,0 +1,15 @@
+{
+  "name": "tests-summary",
+  "command": "pnpm test",
+  "cwd": "/home/user/Documents/bip_tools/mnemocode",
+  "startedAtUtc": "2026-09-27T16:15:38Z",
+  "completedAtUtc": "2026-09-27T16:15:58Z",
+  "exitCode": 1,
+  "log": "tests-summary.log",
+  "logSha256": "786ee6a88bb113da580faa6ddab7eab0a2d20d3fec601bb5b956bf8f6785f253",
+  "runtime": {
+    "node": "v26.10.0",
+    "pnpm": "10.19.0 via corepack 0.36.0",
+    "platform": "Linux x86_64 Ubuntu 26.04.1"
+  }
+}

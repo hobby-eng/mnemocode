@@ -1,0 +1,11 @@
+{
+  "name": "wasm-canonical-docker",
+  "command": "docker build --platform linux/amd64 --target dependencies -f Dockerfile.reproducible (multi-chain-wallet-tools 76cce41, clean) ; docker run --network none node tooling/build-recovery-sskr-wasm.mjs ; compare generated files with vendor/sskr/generated",
+  "cwd": "/home/user/Documents/bip_tools/multi-chain-wallet-tools",
+  "startedAtUtc": "2026-09-27T16:26:03Z",
+  "completedAtUtc": "2026-09-27T16:35:51Z",
+  "exitCode": 0,
+  "log": "wasm-canonical-docker.log",
+  "logSha256": "38514b4054a797187a0db6fc04d535569ba26ddcae90005b1b89957c224555fd",
+  "note": "exitCode 1 for the host rebuild records the byte difference, not a tool failure; see log"
+}

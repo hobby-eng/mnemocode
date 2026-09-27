@@ -1,0 +1,15 @@
+{
+  "name": "probe-sskr-threshold-cli",
+  "command": "for tc in '1 3' '2 17' '3 2' '2 2' '16 16' '0 3' '2 1.5'; do set -- $tc; echo \"--- threshold $1 shares $2\"; node dist/mnemocode.js encode --sskr --threshold $1 --shares $2 --mnemonic 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' --output /tmp/mnemocode-aud-002-QuXG/t-$1-$2.txt >/dev/null; echo exit=$?; done; wc -l /tmp/mnemocode-aud-002-QuXG/t-2-2.txt /tmp/mnemocode-aud-002-QuXG/t-16-16.txt",
+  "cwd": "/home/user/Documents/bip_tools/mnemocode",
+  "startedAtUtc": "2026-09-27T16:22:08Z",
+  "completedAtUtc": "2026-09-27T16:22:09Z",
+  "exitCode": 0,
+  "log": "probe-sskr-threshold-cli.log",
+  "logSha256": "cd5810952fc4229bd572829ac12086eab1e02807eeeaba8be330eb07e4f5278e",
+  "runtime": {
+    "node": "v26.10.0",
+    "pnpm": "10.19.0 via corepack 0.36.0",
+    "platform": "Linux x86_64 Ubuntu 26.04.1"
+  }
+}
