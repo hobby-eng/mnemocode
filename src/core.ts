@@ -7,9 +7,10 @@ export {
   type EncodedResult,
   type DecodedResult,
   type MappingRow,
+  type MissingWordCandidate,
   type DatePattern,
 } from './core/types.js';
-export { unicodeHex, mappingRow, allMappingRows } from './core/words.js';
+export { unicodeHex, mappingRow, allMappingRows, recoverMissingWord } from './core/words.js';
 export {
   maximumDates,
   isLeapYear,
@@ -19,6 +20,10 @@ export {
   sortDates,
   deriveShifts,
   parseDatePattern,
+  datePatternCandidates,
+  datePatternCandidateCount,
+  datePatternCombinationCount,
+  datePatternCombinations,
   expandDatePattern,
 } from './core/dates.js';
 export {

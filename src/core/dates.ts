@@ -71,65 +71,122 @@ export function deriveShifts(dates: readonly DateShiftDate[], wordCount: Bip39Wo
 
 export function parseDatePattern(value: string): DatePattern {
   const text = value.trim();
-  const dayMonthYear = /^(\d{2}|\?{2})-(\d{2}|\?{2})-(\d{4}|\?{4})$/u.exec(text);
-  const yearMonthDay = /^(\d{4}|\?{4})-(\d{2}|\?{2})-(\d{2}|\?{2})$/u.exec(text);
+  const dayMonthYear = /^([0-9?]{2})-([0-9?]{2})-([0-9?]{4})$/u.exec(text);
+  const yearMonthDay = /^([0-9?]{4})-([0-9?]{2})-([0-9?]{2})$/u.exec(text);
   if (dayMonthYear === null && yearMonthDay === null) {
-    throw new Error('Invalid date pattern. Use DD-MM-YYYY and ? for one unknown part.');
+    throw new Error(
+      'Invalid date pattern. Use DD-MM-YYYY and replace each forgotten digit with ?.',
+    );
   }
+  if (!text.includes('?')) throw new Error('A recovery pattern must contain at least one ? digit.');
   const match = dayMonthYear ?? yearMonthDay!;
-  const pattern =
+  const masks =
     dayMonthYear === null
       ? {
-          year: match[1] === '????' ? null : Number(match[1]),
-          month: match[2] === '??' ? null : Number(match[2]),
-          day: match[3] === '??' ? null : Number(match[3]),
+          year: match[1]!,
+          month: match[2]!,
+          day: match[3]!,
         }
       : {
-          year: match[3] === '????' ? null : Number(match[3]),
-          month: match[2] === '??' ? null : Number(match[2]),
-          day: match[1] === '??' ? null : Number(match[1]),
+          year: match[3]!,
+          month: match[2]!,
+          day: match[1]!,
         };
-  if ([pattern.year, pattern.month, pattern.day].filter((part) => part === null).length !== 1) {
-    throw new Error('A recoverable date pattern must have exactly one unknown component.');
-  }
-  if (pattern.year !== null && (pattern.year < 1 || pattern.year > 9999))
-    throw new Error('The date year must be from 0001 through 9999.');
-  if (pattern.month !== null && (pattern.month < 1 || pattern.month > 12))
-    throw new Error('The date month must be from 01 through 12.');
-  if (pattern.day !== null) {
-    // An unknown year may be a leap year; 2000 supplies the largest February.
-    const maximumDay =
-      pattern.month === null ? 31 : daysInMonth(pattern.year ?? 2000, pattern.month);
-    if (pattern.day < 1 || pattern.day > maximumDay)
-      throw new Error('The date pattern day cannot occur in the selected calendar month.');
-  }
+  const pattern: DatePattern = {
+    key: `${masks.year}-${masks.month}-${masks.day}`,
+    years: matchingDateParts(masks.year, 1, 9999),
+    months: matchingDateParts(masks.month, 1, 12),
+    days: matchingDateParts(masks.day, 1, 31),
+  };
+  if (pattern.years.length === 0) throw new Error('The date pattern cannot match a valid year.');
+  if (pattern.months.length === 0) throw new Error('The date pattern cannot match a valid month.');
+  if (pattern.days.length === 0) throw new Error('The date pattern cannot match a valid day.');
+  if (datePatternCandidateCount(pattern) === 0)
+    throw new Error('The date pattern cannot match a real calendar date.');
   return pattern;
 }
 
-export function expandDatePattern(pattern: DatePattern): DateShiftDate[] {
-  const dates: DateShiftDate[] = [];
-  const years =
-    pattern.year === null ? Array.from({ length: 9999 }, (_, index) => index + 1) : [pattern.year];
-  for (const year of years) {
-    const months =
-      pattern.month === null
-        ? Array.from({ length: 12 }, (_, index) => index + 1)
-        : [pattern.month];
-    for (const month of months) {
-      const days =
-        pattern.day === null
-          ? Array.from({ length: daysInMonth(year, month) }, (_, index) => index + 1)
-          : [pattern.day];
-      for (const day of days) {
-        const date = { year, month, day };
-        try {
-          assertCalendarDate(date);
-          dates.push(date);
-        } catch {
-          /* omit impossible dates */
-        }
+function matchingDateParts(mask: string, minimum: number, maximum: number): number[] {
+  const expression = new RegExp(`^${mask.replaceAll('?', '[0-9]')}$`, 'u');
+  return Array.from({ length: maximum - minimum + 1 }, (_, index) => index + minimum).filter(
+    (part) => expression.test(String(part).padStart(mask.length, '0')),
+  );
+}
+
+export function* datePatternCandidates(pattern: DatePattern): Generator<DateShiftDate> {
+  for (const year of pattern.years) {
+    for (const month of pattern.months) {
+      const maximumDay = daysInMonth(year, month);
+      for (const day of pattern.days) {
+        if (day <= maximumDay) yield { year, month, day };
       }
     }
   }
-  return dates;
+}
+
+export function datePatternCandidateCount(pattern: DatePattern): number {
+  let count = 0;
+  for (const year of pattern.years)
+    for (const month of pattern.months) {
+      const maximumDay = daysInMonth(year, month);
+      count += pattern.days.filter((day) => day <= maximumDay).length;
+    }
+  return count;
+}
+
+export function datePatternCombinationCount(
+  patterns: readonly DatePattern[],
+  stopAfter = Number.MAX_SAFE_INTEGER,
+): number {
+  const groups = new Map<string, { readonly pattern: DatePattern; count: number }>();
+  for (const pattern of patterns) {
+    const group = groups.get(pattern.key);
+    groups.set(pattern.key, { pattern, count: (group?.count ?? 0) + 1 });
+  }
+  let total = 1n;
+  const limit = BigInt(stopAfter);
+  for (const { pattern, count } of groups.values()) {
+    const candidateCount = datePatternCandidateCount(pattern);
+    if (candidateCount === 0) return 0;
+    let combinations = 1n;
+    for (let index = 1; index <= count; index += 1) {
+      combinations =
+        (combinations * BigInt(candidateCount + index - 1)) / BigInt(index);
+    }
+    total *= combinations;
+    if (total > limit) return stopAfter + 1;
+  }
+  return Number(total);
+}
+
+export function* datePatternCombinations(
+  patterns: readonly DatePattern[],
+  index = 0,
+  selected: readonly DateShiftDate[] = [],
+): Generator<readonly DateShiftDate[]> {
+  if (index === patterns.length) {
+    yield selected;
+    return;
+  }
+  let previousMatchingIndex = -1;
+  for (let candidateIndex = index - 1; candidateIndex >= 0; candidateIndex -= 1) {
+    if (patterns[candidateIndex]!.key === patterns[index]!.key) {
+      previousMatchingIndex = candidateIndex;
+      break;
+    }
+  }
+  const previousMatchingDate =
+    previousMatchingIndex === -1 ? undefined : selected[previousMatchingIndex];
+  for (const date of datePatternCandidates(patterns[index]!)) {
+    if (previousMatchingDate !== undefined && compareDates(date, previousMatchingDate) < 0) continue;
+    yield* datePatternCombinations(patterns, index + 1, [...selected, date]);
+  }
+}
+
+function compareDates(left: DateShiftDate, right: DateShiftDate): number {
+  return left.year - right.year || left.month - right.month || left.day - right.day;
+}
+
+export function expandDatePattern(pattern: DatePattern): DateShiftDate[] {
+  return [...datePatternCandidates(pattern)];
 }

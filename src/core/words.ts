@@ -1,7 +1,12 @@
 import { validateMnemonic } from '@scure/bip39';
 import { wordlist as englishWordlist } from '@scure/bip39/wordlists/english.js';
 import { wordlist as traditionalChineseWordlist } from '@scure/bip39/wordlists/traditional-chinese.js';
-import { BIP39_WORD_COUNTS, type Bip39WordCount, type MappingRow } from './types.js';
+import {
+  BIP39_WORD_COUNTS,
+  type Bip39WordCount,
+  type MappingRow,
+  type MissingWordCandidate,
+} from './types.js';
 export { englishWordlist, traditionalChineseWordlist };
 
 export const BIP39_INDEX_BITS = 11;
@@ -64,4 +69,39 @@ export function mappingRow(index: number): MappingRow {
 
 export function allMappingRows(): MappingRow[] {
   return Array.from({ length: BIP39_DICTIONARY_SIZE }, (_, index) => mappingRow(index + 1));
+}
+
+export function recoverMissingWord(value: string): MissingWordCandidate[] {
+  const words = value.normalize('NFKD').trim().toLowerCase().split(/\s+/u).filter(Boolean);
+  if (!WORD_COUNT_SET.has(words.length)) {
+    throw new Error('Enter 12, 15, 18, 21, or 24 English BIP39 words with one ? placeholder.');
+  }
+  const missing = words.flatMap((word, index) => (word === '?' ? [index] : []));
+  if (missing.length !== 1)
+    throw new Error('Enter exactly one ? placeholder for the forgotten BIP39 word.');
+  for (const [position, word] of words.entries()) {
+    if (word !== '?' && !ENGLISH_INDEX.has(word))
+      throw new Error(`Unknown English BIP39 word at position ${position + 1}.`);
+  }
+  const missingIndex = missing[0]!;
+  const checksumLength = words.length / 3;
+  const candidates: MissingWordCandidate[] = [];
+  for (const [word, index] of englishWordlist.entries()) {
+    const candidateWords = [...words];
+    candidateWords[missingIndex] = word;
+    const mnemonic = candidateWords.join(' ');
+    if (!validateMnemonic(mnemonic, englishWordlist)) continue;
+    const indexes = candidateWords.map((candidate) => ENGLISH_INDEX.get(candidate)!);
+    const bitStream = indexes
+      .map((candidate) => candidate.toString(2).padStart(BIP39_INDEX_BITS, '0'))
+      .join('');
+    candidates.push({
+      position: missingIndex + 1,
+      word,
+      wordIndex: index + 1,
+      mnemonic,
+      checksumBits: bitStream.slice(-checksumLength),
+    });
+  }
+  return candidates;
 }

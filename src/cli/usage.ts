@@ -24,6 +24,9 @@ ${section('USAGE')}
   mnemocode recover-date [--mode MODE] \\
     (--ask-secrets | --input "..." | --input-file PATH | --qr-file PATH) [OPTIONS]
 
+  mnemocode recover-word \\
+    (--ask-secrets | --mnemonic "... ? ..." | --mnemonic-file PATH) [OPTIONS]
+
   mnemocode table (--index N | --word WORD | --unicode HEX | --all)
   mnemocode preview (--list | --pdf PATH | --cards-dir PATH) [--template ID | --all]
   mnemocode self-test
@@ -199,11 +202,26 @@ ${cardTemplates.map((template, index) => `    ${index + 1}  ${template.id.padEnd
   No template for Unicode cards with dates is currently installed.
   The terminal prompts for missing event labels; scripts must supply them.
 
+${section('WORD RECOVERY')}
+
+  Put exactly one ? in place of a forgotten English BIP39 word. MnemoCode
+  checks all 2,048 words locally and displays every checksum-valid replacement:
+
+    mnemocode recover-word --ask-secrets
+    mnemocode recover-word --mnemonic "abandon ... ?" --master-fingerprint 73c5da0a
+
+  Every row includes the replacement word, its 1-based BIP39 index, the exact
+  checksum bits, and the complete candidate mnemonic. Optional Bitcoin evidence
+  marks matching rows without hiding the other checksum-valid candidates.
+
 ${section('DATE RECOVERY')}
 
-  Use exactly one unknown component:
+  Replace each forgotten digit with ?. One to three dates may be incomplete:
 
-    ??-07-1963       10-??-1963       10-07-????
+    ?3-09-2026       10-0?-1963       ??-??-2026       ????-??-??
+
+  The default search limit is 1,000,000 date combinations. Increase it explicitly
+  for a larger intentional search; the hard safety limit is 10,000,000.
 
   Exact legacy mode can use BIP39 checksum as a weak filter. Checksum-valid
   seedshift and legacy-valid records require an independent identifier because
@@ -217,6 +235,7 @@ ${section('DATE RECOVERY')}
   ${flag('--wif-file PATH')}             expected WIF read from a local file
   ${flag('--bip39-passphrase-file PATH')} optional passphrase for evidence checks
   ${flag('--max-results N')}             displayed candidate limit (default 100)
+  ${flag('--max-candidates N')}          attempted combinations (default 1000000; max 10000000)
   ${flag('--progress-every N')}          progress interval (default 1000)
 
   Bitcoin defaults: mainnet, profile auto, account 0, branch 0, index 0.

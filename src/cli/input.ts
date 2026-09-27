@@ -241,6 +241,8 @@ export function promptedRecoveryInputs(
     );
   }
   const encoded = askSecret('Encoded record:');
-  const dateLine = askSecret('Date list with one unknown part (for example ??-07-1963):');
+  const dateLine = askSecret(
+    'Date list with ? for each forgotten digit (one to three incomplete dates):',
+  );
   return { encoded, dateValues: dateLine.split(/\s+/u).filter(Boolean) };
 }
