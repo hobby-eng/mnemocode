@@ -35,8 +35,17 @@ export interface MappingRow {
   readonly unicodeHex: string;
 }
 
+export interface MissingWordCandidate {
+  readonly position: number;
+  readonly word: string;
+  readonly wordIndex: number;
+  readonly mnemonic: string;
+  readonly checksumBits: string;
+}
+
 export interface DatePattern {
-  readonly year: number | null;
-  readonly month: number | null;
-  readonly day: number | null;
+  readonly key: string;
+  readonly years: readonly number[];
+  readonly months: readonly number[];
+  readonly days: readonly number[];
 }

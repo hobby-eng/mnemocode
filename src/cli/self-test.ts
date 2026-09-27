@@ -15,6 +15,7 @@ import {
   encodeMnemonicLegacy,
   formatEncoded,
   parseDate,
+  recoverMissingWord,
   representMnemonic,
   type OutputFormat,
 } from '../core.js';
@@ -147,6 +148,12 @@ function runCoreChecks(): void {
     PUBLIC_MNEMONIC,
     'Direct Unicode round trip',
   );
+  const recoveredWords = recoverMissingWord(PUBLIC_MNEMONIC.replace(/about$/u, '?'));
+  equal(recoveredWords.length, 128, 'Forgotten-word candidate count');
+  const recoveredAbout = recoveredWords.find((candidate) => candidate.word === 'about');
+  equal(recoveredAbout?.wordIndex, 4, 'Forgotten-word BIP39 index');
+  equal(recoveredAbout?.checksumBits, '0011', 'Forgotten-word checksum bits');
+  equal(recoveredAbout?.mnemonic, PUBLIC_MNEMONIC, 'Forgotten-word public vector');
 
   const shifted = encodeMnemonic(PUBLIC_MNEMONIC, CHECKSUM_VALID_DATE);
   equal(
