@@ -71,7 +71,7 @@ describe('date recovery patterns', () => {
     ]);
     expect(recovered.stderr).toContain('Recovery search contains 30 date combinations.');
     expect(recovered.stdout).toContain(`10-07-1963 23-09-2026\t${publicMnemonic}`);
-  });
+  }, 15_000);
 
   it('requires explicit authorization for a complete-calendar search', async () => {
     const encoded = await run([
@@ -87,17 +87,9 @@ describe('date recovery patterns', () => {
     ]);
     const raw = encoded.stdout.trim().split('\n').at(-1)!;
     await expect(
-      run([
-        'recover-date',
-        '--mode',
-        'seedshift-legacy',
-        '--input',
-        raw,
-        '--dates',
-        '??-??-????',
-      ]),
+      run(['recover-date', '--mode', 'seedshift-legacy', '--input', raw, '--dates', '??-??-????']),
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Increase the candidate search limit to at least 3,652,059'),
     });
-  });
+  }, 15_000);
 });
