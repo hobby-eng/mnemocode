@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "dist/mnemocode.js",
+    "encode",
+    "--mode",
+    "seedshift",
+    "--mnemonic-file",
+    "/tmp/mnemocode-aud-001/alias-probe/real/input.txt",
+    "--dates",
+    "23-09-2026",
+    "--output",
+    "/tmp/mnemocode-aud-001/alias-probe/alias/input.txt"
+  ],
+  "initial": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+  "after": "MNC1:seedshift:english:wool abuse actual wool abuse actual wool abuse actual wool abuse congress\n",
+  "sourceOverwritten": true,
+  "stdout": "Shifted English BIP39 words:\nwool abuse actual wool abuse actual wool abuse actual wool abuse congress\n"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "output-alias",
+  "argv": ["node", "audit-output-alias.mjs"],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:40:40.883882+00:00",
+  "end": "2026-09-27T12:40:41.249245+00:00",
+  "exitCode": 0,
+  "log": "output-alias.log",
+  "sha256": "77ad063e0565d8117fe8a93baab6d7166af22b2ed2849329570ea897f6535c11",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}

@@ -1,0 +1,10 @@
+business-full: 2 page(s), exact QR round-trip at 200 dpi
+business-fragment: 2 page(s), exact QR round-trip at 200 dpi
+business-sskr: 2 page(s), exact QR round-trip at 200 dpi
+material-full: 2 page(s), exact QR round-trip at 200 dpi
+material-fragment: 2 page(s), exact QR round-trip at 200 dpi
+glass-four: 2 page(s), exact QR round-trip at 200 dpi
+glass-six: 1 page(s), exact QR round-trip at 200 dpi
+glass-eight: 1 page(s), exact QR round-trip at 200 dpi
+glass-eight-sskr: 1 page(s), exact QR round-trip at 200 dpi
+Export checks completed; no full test suite executed.

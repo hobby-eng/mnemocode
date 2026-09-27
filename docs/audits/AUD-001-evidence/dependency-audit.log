@@ -1,0 +1,39 @@
+{
+  "advisories": {
+    "1139528": {
+      "findings": [
+        {
+          "version": "3.2.4",
+          "paths": [
+            ".>vitest"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1139528,
+      "title": "When Vitest UI server is listening, arbitrary file can be read and executed",
+      "module_name": "vitest",
+      "vulnerable_versions": "<3.2.6",
+      "patched_versions": ">=3.2.6",
+      "severity": "critical",
+      "cwe": "CWE-22, CWE-862",
+      "github_advisory_id": "GHSA-5xrq-8626-4rwp",
+      "url": "https://github.com/advisories/GHSA-5xrq-8626-4rwp"
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 2,
+      "high": 0,
+      "critical": 1
+    },
+    "dependencies": 45,
+    "devDependencies": 137,
+    "optionalDependencies": 79,
+    "totalDependencies": 182
+  }
+}

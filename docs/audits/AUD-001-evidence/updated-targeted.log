@@ -1,0 +1,45 @@
+
+ RUN  v3.2.4 /tmp/mnemocode-aud-001/test-update
+
+ ✓ test/private-file.test.ts (2 tests) 31ms
+ ✓ test/error-redaction.test.ts (4 tests) 6ms
+ ✓ test/known-audit-defects.test.ts (4 tests) 90ms
+ ✓ test/card-qr.test.ts (4 tests) 246ms
+ ✓ test/sskr-thresholds.test.ts (120 tests) 313ms
+ ❯ test/export.test.ts (5 tests | 1 failed) 71ms
+   ✓ export infrastructure > ships sixteen approved templates with individual export 3ms
+   × export infrastructure > preserves page content and removes private metadata in preview and saved PDFs 40ms
+     → expected 'pdf-lib (https://github.com/Hopding/p…' to be '' // Object.is equality
+   ✓ export infrastructure > merges all renderers into a single PDF with unchanged page dimensions 12ms
+   ✓ export infrastructure > rejects empty jobs and wrong card types, and preserves multi-page collections 13ms
+   ✓ export infrastructure > keeps date and label lists in entered order and validates the number of labels 2ms
+ ✓ test/business-cards.test.ts (9 tests) 12381ms
+   ✓ business card collections > renders both designs with real fonts/artwork, custom fields and both raw QR formats  12115ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/export.test.ts > export infrastructure > preserves page content and removes private metadata in preview and saved PDFs
+AssertionError: expected 'pdf-lib (https://github.com/Hopding/p…' to be '' // Object.is equality
+
+- Expected
++ Received
+
++ pdf-lib (https://github.com/Hopding/pdf-lib)
+
+ ❯ verify test/export.test.ts:50:186
+     48|       expect(document.getPage(0).getSize()).toEqual(original.getPage(0…
+     49|       expect(pageOperators(document, 0)).toBe(pageOperators(original, …
+     50|       for (const value of [document.getTitle(), document.getAuthor(), …
+       |                                                                                                                                                                                          ^
+     51|     };
+     52|     verify(preview);
+ ❯ test/export.test.ts:52:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 6 passed (7)
+      Tests  1 failed | 147 passed (148)
+   Start at  15:36:13
+   Duration  13.23s (transform 543ms, setup 0ms, collect 1.93s, tests 13.14s, environment 2ms, prepare 630ms)
+

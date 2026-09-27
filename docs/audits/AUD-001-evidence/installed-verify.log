@@ -1,0 +1,75 @@
+
+> mnemocode@0.1.0 verify
+> npm run check && npm run build && npm test
+
+
+> mnemocode@0.1.0 check
+> tsc --noEmit
+
+
+> mnemocode@0.1.0 build
+> npm run clean && tsc -p tsconfig.json
+
+
+> mnemocode@0.1.0 clean
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})"
+
+
+> mnemocode@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.4 /home/sergio/.copilot/repos/mnemocode
+
+ ✓ test/private-file.test.ts (2 tests) 31ms
+ ✓ test/secret-input.test.ts (6 tests) 10ms
+ ✓ test/sskr.test.ts (13 tests) 103ms
+ ✓ test/sskr-vectors.test.ts (15 tests) 114ms
+ ✓ test/card-copy.test.ts (13 tests) 23ms
+ ✓ test/error-redaction.test.ts (4 tests) 11ms
+ ✓ test/card-qr.test.ts (4 tests) 468ms
+ ✓ test/sskr-thresholds.test.ts (120 tests) 529ms
+ ✓ test/export.test.ts (5 tests) 101ms
+ ✓ test/known-audit-defects.test.ts (5 tests) 859ms
+   ✓ Open AUD-001 regressions (expected failures, not release acceptance) > AUD-001-SEC002: protects input through an alias of its parent directory  756ms
+ ✓ test/material-cards.test.ts (8 tests) 570ms
+ ✓ test/core-boundaries.test.ts (27 tests) 1657ms
+   ✓ Core independent entropy and calendar boundaries > exhausts every entropy tail for 128 bits against independent modular arithmetic and SHA256  864ms
+   ✓ Core independent entropy and calendar boundaries > exhausts every entropy tail for 160 bits against independent modular arithmetic and SHA256  386ms
+ ✓ test/core.test.ts (67 tests) 1908ms
+   ✓ legacy checksum-word replacement > offers a valid replacement and enumerates 128 candidates for 12 words  421ms
+   ✓ legacy checksum-word replacement > offers a valid replacement and enumerates 64 candidates for 15 words  326ms
+   ✓ legacy checksum-word replacement > offers a valid replacement and enumerates 32 candidates for 18 words  314ms
+   ✓ legacy checksum-word replacement > offers a valid replacement and enumerates 16 candidates for 21 words  314ms
+   ✓ legacy checksum-word replacement > offers a valid replacement and enumerates 8 candidates for 24 words  322ms
+ ✓ test/sskr-cli-export.test.ts (3 tests) 3384ms
+   ✓ integrated SSKR CLI > shares transformed entropy once and reverses the dates with a quorum  1618ms
+   ✓ integrated SSKR CLI > rejects unsupported and orphan options before secret input  1358ms
+   ✓ integrated SSKR CLI > keeps terminal color swatches plain when redirected  405ms
+ ✓ test/self-test-integrity.test.ts (2 tests) 5766ms
+   ✓ Installed self-test integrity > fails before encoding when the pinned word-list expectation is damaged  668ms
+   ✓ Installed self-test integrity > AUD-001-FUN002: refuses an empty public-vector catalogue  5096ms
+ ✓ test/business-cards.test.ts (9 tests) 14548ms
+   ✓ business card collections > renders both designs with real fonts/artwork, custom fields and both raw QR formats  14188ms
+ ✓ test/cli.test.ts (17 tests) 21110ms
+   ✓ CLI records > documents every transformation and recovery profile with runnable examples  605ms
+   ✓ CLI records > runs the extended self-test and reports its coverage  5103ms
+   ✓ CLI records > writes a self-describing record and decodes it without mode or format flags  775ms
+   ✓ CLI records > always prints encode output and rejects a bare --output option  676ms
+   ✓ CLI records > lists approved collections and validates preview arguments  798ms
+   ✓ CLI records > rejects unknown or unavailable templates before prompting or creating files  1078ms
+   ✓ CLI records > stores only the raw encoded representation in a generated QR  830ms
+   ✓ CLI records > keeps legacy raw records readable with explicit mode and format  658ms
+   ✓ CLI records > auto-detects every representation that encode can produce  4918ms
+   ✓ CLI records > keeps an explicit raw format authoritative  582ms
+   ✓ CLI records > rejects explicit mode and format values that conflict with an MNC1 header  835ms
+   ✓ CLI records > trusts an MNC1 format header only after the declared payload parser validates it  461ms
+   ✓ CLI records > auto-detects the raw representation in recover-date as well as decode  596ms
+   ✓ CLI records > shows a legacy checksum-word suggestion and self-describes an applied replacement  2107ms
+   ✓ hidden CLI input > uses systemd-ask-password for encode and recover-date  574ms
+
+ Test Files  17 passed (17)
+      Tests  320 passed (320)
+   Start at  15:44:03
+   Duration  21.66s (transform 1.55s, setup 0ms, collect 6.07s, tests 51.19s, environment 4ms, prepare 1.81s)
+

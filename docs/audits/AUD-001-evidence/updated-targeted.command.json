@@ -1,0 +1,24 @@
+{
+  "name": "updated-targeted",
+  "argv": [
+    "node",
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "test/export.test.ts",
+    "test/business-cards.test.ts",
+    "test/error-redaction.test.ts",
+    "test/private-file.test.ts",
+    "test/card-qr.test.ts",
+    "test/sskr-thresholds.test.ts",
+    "test/known-audit-defects.test.ts"
+  ],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:36:13.714815+00:00",
+  "end": "2026-09-27T12:36:27.316626+00:00",
+  "exitCode": 1,
+  "log": "updated-targeted.log",
+  "sha256": "6331b813ffb9d3347ae9c7763e8bca502b413db2438b5502634a9298f8a672ef",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}

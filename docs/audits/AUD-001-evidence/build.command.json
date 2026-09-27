@@ -1,0 +1,13 @@
+{
+  "name": "build",
+  "argv": ["npm", "run", "build"],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:17:10.748006+00:00",
+  "end": "2026-09-27T12:17:13.471059+00:00",
+  "exitCode": 0,
+  "log": "build.log",
+  "sha256": "a50d71439956b02fe60294739cf06fdbe46c75c77de494837c36d75c29a4d173",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}

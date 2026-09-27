@@ -1,0 +1,11 @@
+MnemoCode self-test
+────────────────────────────────────────────────────────────────────────
+✓ Core integrity           word list and fixed forward/reverse vectors (6.9 ms)
+✓ SSKR integrity           pinned WASM, official grouped vector and color transport (21.3 ms)
+✓ Public vectors           versioned JSON file (88.3 ms)
+✓ Representation matrix    all lengths, formats, and modes (59.1 ms)
+✓ Date ordering            deterministic sorting (1.2 ms)
+✓ QR adapter               PNG write and local read (186.2 ms)
+✓ Card export assets       approved templates, fonts, artwork and A6 PDF (5647.9 ms)
+────────────────────────────────────────────────────────────────────────
+PASS  7 public vectors; 75 representation round trips; 6014.0 ms total.

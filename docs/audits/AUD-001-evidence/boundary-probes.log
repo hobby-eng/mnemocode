@@ -1,0 +1,10 @@
+{"name":"unknown parseInput format","result":{"accepted":true,"value":"<undefined>"}}
+{"name":"unknown formatEncoded format","result":{"accepted":true,"value":"<undefined>"}}
+{"name":"unknown record mode","result":{"accepted":true,"value":"MNC1:mistyped:english:abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"}}
+{"name":"unknown record format","result":{"accepted":true,"value":"MNC1:direct:mistyped:abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"}}
+{"name":"invalid maximumDates word count","result":{"accepted":true,"value":4.333333333333333}}
+{"name":"invalid deriveShifts word count","result":{"accepted":true,"value":[2000,1,1,2000,1,1,2000,1,1,2000,1,1,2000]}}
+{"name":"SSKR supported threshold matrix","result":{"settings":120,"validQuorums":240,"insufficientQuorums":120}}
+{"name":"SSKR invalid threshold/count","result":10}
+{"name":"WASM wrong RNG seed lengths rejected","result":5}
+{"name":"all-zero/all-high/alternating entropy","result":300}

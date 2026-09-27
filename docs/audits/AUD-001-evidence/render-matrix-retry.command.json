@@ -1,0 +1,13 @@
+{
+  "name": "render-matrix-retry",
+  "argv": ["node", "audit-render-matrix.mjs"],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:30:09.384073+00:00",
+  "end": "2026-09-27T12:35:57.419483+00:00",
+  "exitCode": 0,
+  "log": "render-matrix-retry.log",
+  "sha256": "b15d5fbdd5802f3060929bc6ef8a3b73ee55ad06351d37df60cef6cc9226c916",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}

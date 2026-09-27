@@ -1,0 +1,13 @@
+{
+  "name": "qr-render",
+  "argv": ["node", "scripts/check-card-output.mjs", "/tmp/mnemocode-aud-001/evidence/qr-render"],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:21:04.372048+00:00",
+  "end": "2026-09-27T12:21:22.702643+00:00",
+  "exitCode": 0,
+  "log": "qr-render.log",
+  "sha256": "ecc6de678c8d8d0b3982472bfc59c566b7e45be03d0c604efa5c5e300e3d61ab",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}
