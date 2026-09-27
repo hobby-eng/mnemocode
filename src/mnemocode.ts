@@ -6,6 +6,7 @@ import { assertAllowedArguments, assertFlag, parseArguments } from './cli/argume
 import { runDecode } from './cli/decode-command.js';
 import { runEncode } from './cli/encode-command.js';
 import { runRecoverDate } from './cli/recover-date-command.js';
+import { runRecoverWord } from './cli/recover-word-command.js';
 import { assertCoreSelfTest, runSelfTest } from './cli/self-test.js';
 import { runTable } from './cli/table-command.js';
 import { terminalFailure } from './cli/terminal.js';
@@ -135,11 +136,33 @@ async function main(): Promise<void> {
         'index',
         'bip39-passphrase-file',
         'max-results',
+        'max-candidates',
         'progress-every',
       ]);
       assertFlag(arguments_, 'ask-secrets');
       assertCoreSelfTest();
       return runRecoverDate(arguments_);
+    case 'recover-word':
+      assertAllowedArguments(arguments_, command, [
+        'mnemonic',
+        'mnemonic-file',
+        'ask-secrets',
+        'bitcoin-address',
+        'master-xpub',
+        'account-xpub',
+        'compressed-public-key',
+        'master-fingerprint',
+        'wif-file',
+        'network',
+        'bitcoin-profile',
+        'account',
+        'branch',
+        'index',
+        'bip39-passphrase-file',
+      ]);
+      assertFlag(arguments_, 'ask-secrets');
+      assertCoreSelfTest();
+      return runRecoverWord(arguments_);
     case 'preview':
       assertAllowedArguments(arguments_, command, [
         'list',
