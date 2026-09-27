@@ -1,0 +1,86 @@
+name: Bug report
+description: Report a reproducible MnemoCode defect using public or synthetic data.
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve MnemoCode. Never include a real mnemonic, passphrase, private key, WIF, SSKR share, recovery date, or private wallet export. Use a public test vector or synthetic data.
+
+        If the problem could expose, alter, or incorrectly recover secret material, report it privately through [GitHub private vulnerability reporting](https://github.com/hobby-eng/mnemocode/security/advisories/new) instead of opening a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include `mnemocode --version`, the release tag, or the full commit SHA.
+      placeholder: 0.1.0 or 0123456789abcdef...
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - Command-line program
+        - TypeScript library
+        - PDF or image export
+        - SSKR
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Node.js version, pnpm version, and relevant local tools such as Poppler.
+      placeholder: Ubuntu 26.04; Node.js 26.10.0; pnpm 10.19.0
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest complete reproduction. Redact secrets and use only public or synthetic test data.
+      placeholder: |
+        1. Build with ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include exact non-secret error text when useful. Do not attach secret-bearing screenshots, records, QR codes, cards, or logs.
+    validations:
+      required: true
+  - type: textarea
+    id: public_data
+    attributes:
+      label: Public test data
+      description: Identify the public vector or synthetic input used, and link its source when applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add redacted logs, screenshots, or related issue links only if they contain no recovery material.
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I searched existing issues and reproduced this on the stated version or commit.
+          required: true
+        - label: This report contains no real wallet secret or private recovery material.
+          required: true
+        - label: This is suitable for a public issue and does not describe an unpatched vulnerability.
+          required: true
