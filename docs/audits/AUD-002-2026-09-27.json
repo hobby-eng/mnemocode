@@ -797,9 +797,9 @@
   "remediation": [
     {
       "id": "AUD-002-BLD001",
-      "status": "fixed",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "status": "verified",
+      "fixCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -807,8 +807,8 @@
     {
       "id": "AUD-002-SEC001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -816,8 +816,8 @@
     {
       "id": "AUD-002-API001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -825,8 +825,8 @@
     {
       "id": "AUD-002-API002",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -834,8 +834,8 @@
     {
       "id": "AUD-002-API003",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -843,8 +843,8 @@
     {
       "id": "AUD-002-DOC001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -852,8 +852,8 @@
     {
       "id": "AUD-002-DOC002",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -861,24 +861,24 @@
     {
       "id": "AUD-002-DOC003",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
     },
     {
       "id": "AUD-001-SEC001",
-      "status": "fixed",
+      "status": "verified",
       "fixCommit": "b4f334f982044ef586002c9b9816646631b3751e",
-      "verificationCommit": null,
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "dependency-audit.log",
         "dependency-audit-json.log",
         "frozen-install.log",
         "remediation-2026-09-27.md"
       ],
-      "note": "The follow-up working tree passes the full local test/build gate and a fresh registry audit. Remote CI has not run on the uncommitted remediation."
+      "note": "The follow-up passes local gates, a fresh registry audit and GitHub Actions run 36338523182."
     },
     {
       "id": "AUD-001-SEC002",
@@ -895,7 +895,7 @@
       "id": "AUD-001-FUN001",
       "status": "verified",
       "fixCommit": "b4f334f982044ef586002c9b9816646631b3751e",
-      "verificationCommit": null,
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "tests-full.log",
         "probe-uppercase-address-cli.log",
@@ -903,7 +903,7 @@
         "probe-malformed-address-cli.log",
         "remediation-2026-09-27.md"
       ],
-      "note": "The follow-up adds BIP86, different-valid-address, checksum, mixed-case and wrong-network regression coverage. No verification commit is claimed because the remediation is uncommitted."
+      "note": "Commit 5547c9e6f47c719c7caef691807b097d40c06bfb adds BIP86, different-valid-address, checksum, mixed-case and wrong-network regression coverage and passes GitHub CI."
     },
     {
       "id": "AUD-001-FUN002",
@@ -1045,7 +1045,7 @@
   },
   "releaseAssessment": {
     "ready": false,
-    "reason": "Historical snapshot assessment: AUD-002-BLD001 kept pnpm test, pnpm verify and CI red. The dated follow-up fixes every finding and passes all local gates; remote CI and original platform/physical/fault-injection limits remain."
+    "reason": "Historical snapshot assessment: AUD-002-BLD001 kept pnpm test, pnpm verify and CI red. Commit 5547c9e6f47c719c7caef691807b097d40c06bfb verifies every finding with all local gates and GitHub Actions run 36338523182; original platform/physical/fault-injection limits remain."
   },
   "externalSources": [
     {

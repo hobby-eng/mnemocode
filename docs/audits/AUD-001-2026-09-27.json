@@ -722,9 +722,9 @@
   "remediation": [
     {
       "id": "AUD-001-SEC001",
-      "status": "fixed",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "status": "verified",
+      "fixCommit": "b4f334f982044ef586002c9b9816646631b3751e",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -732,8 +732,8 @@
     {
       "id": "AUD-001-SEC002",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "b4f334f982044ef586002c9b9816646631b3751e",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -741,8 +741,8 @@
     {
       "id": "AUD-001-FUN001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "b4f334f982044ef586002c9b9816646631b3751e",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -750,8 +750,8 @@
     {
       "id": "AUD-001-FUN002",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "b4f334f982044ef586002c9b9816646631b3751e",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -759,8 +759,8 @@
     {
       "id": "AUD-001-API001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "b4f334f982044ef586002c9b9816646631b3751e",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -768,8 +768,8 @@
     {
       "id": "AUD-001-BLD001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "b4f334f982044ef586002c9b9816646631b3751e",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "installed-verify.command.json",
         "installed-verify.log",
@@ -779,8 +779,8 @@
     {
       "id": "AUD-001-DOC001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "b4f334f982044ef586002c9b9816646631b3751e",
+      "verificationCommit": "5547c9e6f47c719c7caef691807b097d40c06bfb",
       "evidence": [
         "remediation-2026-09-27.md"
       ]
@@ -1098,7 +1098,7 @@
   },
   "releaseAssessment": {
     "ready": false,
-    "reason": "Historical snapshot assessment: open recovery/file-protection defects, a failing dependency gate and native/platform evidence gaps. The dated follow-up fixes the product/dependency issues locally; remote CI and original platform limits remain."
+    "reason": "Historical snapshot assessment: open recovery/file-protection defects, a failing dependency gate and native/platform evidence gaps. Commit 5547c9e6f47c719c7caef691807b097d40c06bfb verifies the product/dependency fixes locally and in GitHub CI; original platform limits remain."
   },
   "externalSources": [
     {
