@@ -74,8 +74,9 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
     );
   }
   if (candidateCount > maxCandidates) {
+    const formattedCandidateCount = candidateCount.toLocaleString('en-US');
     throw new Error(
-      `The date patterns produce ${candidateCount.toLocaleString('en-US')} combinations. Increase the candidate search limit to at least that value to continue.`,
+      `The date patterns produce ${formattedCandidateCount} combinations. Increase the candidate search limit to at least ${formattedCandidateCount} to continue.`,
     );
   }
   const knownDates = dateValues.filter((item) => !item.includes('?')).map(parseDate);
@@ -95,7 +96,8 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
   );
   if (candidateCount >= 100_000)
     terminalNotice('This is a large local search and may take hours. Progress will be reported.');
-  const found: { readonly dates: string; readonly mnemonic: string; readonly evidence?: string }[] = [];
+  const found: { readonly dates: string; readonly mnemonic: string; readonly evidence?: string }[] =
+    [];
   const foundKeys = new Set<string>();
   let checked = 0;
   let foundCount = 0;
