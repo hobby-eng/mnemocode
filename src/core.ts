@@ -10,7 +10,13 @@ export {
   type MissingWordCandidate,
   type DatePattern,
 } from './core/types.js';
-export { unicodeHex, mappingRow, allMappingRows, recoverMissingWord } from './core/words.js';
+export {
+  unicodeHex,
+  mappingRow,
+  allMappingRows,
+  recoverMissingWord,
+  recoverLegacyValidLastWords,
+} from './core/words.js';
 export {
   maximumDates,
   isLeapYear,

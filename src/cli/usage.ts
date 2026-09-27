@@ -209,10 +209,14 @@ ${section('WORD RECOVERY')}
 
     mnemocode recover-word --ask-secrets
     mnemocode recover-word --mnemonic "abandon ... ?" --master-fingerprint 73c5da0a
+    mnemocode recover-word --legacy-valid-last-word --mnemonic "old legacy phrase ..."
 
   Every row includes the replacement word, its 1-based BIP39 index, the exact
   checksum bits, and the complete candidate mnemonic. Optional Bitcoin evidence
   marks matching rows without hiding the other checksum-valid candidates.
+  ${flag('--legacy-valid-last-word')} accepts a complete exact-legacy shifted phrase,
+  ignores its checksum-invalid final word for enumeration, and marks the one
+  valid replacement that preserves the old word's entropy-bearing bits.
 
 ${section('DATE RECOVERY')}
 
