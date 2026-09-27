@@ -84,9 +84,13 @@ export function recoverMissingWord(value: string): MissingWordCandidate[] {
       throw new Error(`Unknown English BIP39 word at position ${position + 1}.`);
   }
   const missingIndex = missing[0]!;
+  return recoverWordAt(words, missingIndex);
+}
+
+function recoverWordAt(words: readonly string[], missingIndex: number): MissingWordCandidate[] {
   const checksumLength = words.length / 3;
   const candidates: MissingWordCandidate[] = [];
-  for (const [word, index] of englishWordlist.entries()) {
+  for (const [index, word] of englishWordlist.entries()) {
     const candidateWords = [...words];
     candidateWords[missingIndex] = word;
     const mnemonic = candidateWords.join(' ');
@@ -104,4 +108,24 @@ export function recoverMissingWord(value: string): MissingWordCandidate[] {
     });
   }
   return candidates;
+}
+
+/**
+ * Enumerates checksum-valid replacement containers for an old exact-legacy
+ * shifted phrase. The supplied final word may have an invalid BIP39 checksum;
+ * it is retained only to identify the one replacement that preserves its
+ * entropy-bearing high bits.
+ */
+export function recoverLegacyValidLastWords(value: string): MissingWordCandidate[] {
+  const words = canonicalEnglishWords(value);
+  const finalPosition = words.length - 1;
+  const checksumLength = words.length / 3;
+  const finalIndex = ENGLISH_INDEX.get(words[finalPosition]!)!;
+  const legacyEntropyTail = finalIndex >> checksumLength;
+  const incomplete = [...words];
+  incomplete[finalPosition] = '?';
+  return recoverWordAt(incomplete, finalPosition).map((candidate) => ({
+    ...candidate,
+    preservesLegacyEntropy: (candidate.wordIndex - 1) >> checksumLength === legacyEntropyTail,
+  }));
 }

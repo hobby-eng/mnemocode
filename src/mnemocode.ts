@@ -147,6 +147,7 @@ async function main(): Promise<void> {
         'mnemonic',
         'mnemonic-file',
         'ask-secrets',
+        'legacy-valid-last-word',
         'bitcoin-address',
         'master-xpub',
         'account-xpub',
@@ -161,6 +162,7 @@ async function main(): Promise<void> {
         'bip39-passphrase-file',
       ]);
       assertFlag(arguments_, 'ask-secrets');
+      assertFlag(arguments_, 'legacy-valid-last-word');
       assertCoreSelfTest();
       return runRecoverWord(arguments_);
     case 'preview':

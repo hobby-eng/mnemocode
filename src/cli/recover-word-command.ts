@@ -1,4 +1,4 @@
-import { recoverMissingWord } from '../core.js';
+import { recoverLegacyValidLastWords, recoverMissingWord } from '../core.js';
 import { matchBitcoinEvidence } from '../bitcoin-evidence.js';
 import { type ParsedArguments, value } from './arguments.js';
 import { bip39Passphrase, bitcoinEvidence } from './bitcoin-options.js';
@@ -6,6 +6,7 @@ import { askSecret, textInput } from './input.js';
 import { terminalNotice, terminalResultHeader } from './terminal.js';
 
 export function runRecoverWord(arguments_: ParsedArguments): void {
+  const recoverLegacyReplacement = arguments_['legacy-valid-last-word'] === true;
   let mnemonic: string;
   if (arguments_['ask-secrets'] === true) {
     if (
@@ -16,12 +17,18 @@ export function runRecoverWord(arguments_: ParsedArguments): void {
         'Hidden input cannot be combined with direct mnemonic text or a mnemonic file.',
       );
     }
-    mnemonic = askSecret('BIP39 mnemonic with ? for the forgotten word:');
+    mnemonic = askSecret(
+      recoverLegacyReplacement
+        ? 'Exact legacy Seedshift phrase with its old final word:'
+        : 'BIP39 mnemonic with ? for the forgotten word:',
+    );
   } else {
     mnemonic = textInput(arguments_, 'mnemonic');
   }
 
-  const candidates = recoverMissingWord(mnemonic);
+  const candidates = recoverLegacyReplacement
+    ? recoverLegacyValidLastWords(mnemonic)
+    : recoverMissingWord(mnemonic);
   const evidence = bitcoinEvidence(arguments_);
   const passphrase = bip39Passphrase(arguments_);
   const results = candidates.map((candidate) => {
@@ -37,12 +44,25 @@ export function runRecoverWord(arguments_: ParsedArguments): void {
     ['Position', String(candidates[0]!.position)],
     ['Checksum-valid candidates', String(candidates.length)],
   ];
+  if (recoverLegacyReplacement) {
+    headerRows.unshift(['Mode', 'Legacy final-word replacement']);
+    headerRows.push([
+      'Entropy-preserving replacement',
+      candidates.find((candidate) => candidate.preservesLegacyEntropy)?.word ?? 'unavailable',
+    ]);
+  }
   if (evidence !== undefined) headerRows.push(['Evidence matches', String(matched)]);
   terminalResultHeader('MISSING WORD RECOVERY', headerRows);
   console.log(
-    evidence === undefined
-      ? 'candidate\tword\tword-index\tchecksum-bits\tmnemonic'
-      : 'candidate\tword\tword-index\tchecksum-bits\tevidence\tmnemonic',
+    [
+      'candidate',
+      'word',
+      'word-index',
+      'checksum-bits',
+      ...(recoverLegacyReplacement ? ['legacy-tail'] : []),
+      ...(evidence === undefined ? [] : ['evidence']),
+      'mnemonic',
+    ].join('\t'),
   );
   for (const [index, { candidate, match }] of results.entries()) {
     const fields = [
@@ -51,15 +71,22 @@ export function runRecoverWord(arguments_: ParsedArguments): void {
       String(candidate.wordIndex),
       candidate.checksumBits,
     ];
+    if (recoverLegacyReplacement) {
+      fields.push(candidate.preservesLegacyEntropy ? 'preserved' : 'alternative');
+    }
     if (match !== undefined) {
-      fields.push(match.matched ? `matched at ${match.path ?? 'requested evidence'}` : 'not matched');
+      fields.push(
+        match.matched ? `matched at ${match.path ?? 'requested evidence'}` : 'not matched',
+      );
     }
     fields.push(candidate.mnemonic);
     console.log(fields.join('\t'));
   }
 
   terminalNotice(
-    `Displayed every checksum-valid replacement after checking all 2048 English BIP39 words. The checksum column contains the mnemonic's BIP39 checksum bits.`,
+    recoverLegacyReplacement
+      ? `Displayed every checksum-valid final-word replacement for the exact legacy phrase. The row marked preserved retains the entropy-bearing bits of the supplied old final word.`
+      : `Displayed every checksum-valid replacement after checking all 2048 English BIP39 words. The checksum column contains the mnemonic's BIP39 checksum bits.`,
   );
   if (evidence === undefined) {
     terminalNotice(
@@ -73,5 +100,11 @@ export function runRecoverWord(arguments_: ParsedArguments): void {
     );
     const warning = results.find(({ match }) => match?.warning !== undefined)?.match?.warning;
     if (warning !== undefined) terminalNotice(warning, 'warning');
+  }
+  if (recoverLegacyReplacement && evidence !== undefined) {
+    terminalNotice(
+      'Evidence was compared with the checksum-valid replacement containers, not with original phrases recovered after reversing legacy Seedshift.',
+      'warning',
+    );
   }
 }
