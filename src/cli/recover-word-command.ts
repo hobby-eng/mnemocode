@@ -29,6 +29,14 @@ export function runRecoverWord(arguments_: ParsedArguments): void {
   const candidates = recoverLegacyReplacement
     ? recoverLegacyValidLastWords(mnemonic)
     : recoverMissingWord(mnemonic);
+  if (candidates.length === 0) {
+    terminalResultHeader('MISSING WORD RECOVERY', [['Checksum-valid candidates', '0']]);
+    terminalNotice(
+      'No checksum-valid BIP39 phrase matches the supplied known words. Check the other words, their order, and the placeholder position.',
+      'warning',
+    );
+    return;
+  }
   const evidence = bitcoinEvidence(arguments_);
   const passphrase = bip39Passphrase(arguments_);
   const results = candidates.map((candidate) => {
