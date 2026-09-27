@@ -1,0 +1,14 @@
+xpub661MyMwAqRbcFkPH
+Detected input format: english.
+Checked 30/30 candidate dates; found 1 matches.
+23-09-2026	abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about	matched at m
+Each displayed candidate matched the requested master-xpub locally.
+exit=0
+Detected input format: english.
+Checked 30/30 candidate dates; found 1 matches.
+23-09-2026	abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about	matched at m/84'/0'/0'
+Each displayed candidate matched the requested account-xpub locally.
+exit=0
+Detected input format: english.
+mnemocode: Invalid checksum
+exit=1

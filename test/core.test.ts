@@ -29,12 +29,17 @@ import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist as englishWordlist } from '@scure/bip39/wordlists/english.js';
 import { parseRecord, serializeRecord } from '../src/record.js';
 import { assertCoreSelfTest } from '../src/cli/self-test.js';
+import { MNEMOCODE_VERSION } from '../src/index.js';
 
 const source = 'oppose duck hello neglect reveal key humor mosquito road evoke flock hedgehog';
 const dates = ['10-07-1963', '27-04-1956', '31-01-1994'].map(parseDate);
 const expected = 'mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital';
 
 describe('startup core self-test', () => {
+  it('exports the package version', () => {
+    expect(MNEMOCODE_VERSION).toBe('0.1.0');
+  });
+
   it('accepts the bundled word list and fixed forward/reverse vectors', () => {
     expect(() => assertCoreSelfTest()).not.toThrow();
   });
@@ -340,7 +345,7 @@ describe('local Bitcoin recovery evidence', () => {
     'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
   const location = { network: 'mainnet' as const, account: 0, branch: 0, index: 0 };
 
-  it('matches a documented BIP84 receiving address and rejects a different address', () => {
+  it('matches a documented BIP84 receiving address and rejects a different valid address', () => {
     expect(
       matchBitcoinEvidence(vectorMnemonic, {
         kind: 'address',
@@ -352,11 +357,52 @@ describe('local Bitcoin recovery evidence', () => {
     expect(
       matchBitcoinEvidence(vectorMnemonic, {
         kind: 'address',
-        value: 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyq',
+        value: 'bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g',
         profiles: ['native-segwit'],
         location,
       }).matched,
     ).toBe(false);
+  });
+
+  it('rejects checksum-invalid Bitcoin addresses instead of treating them as non-matches', () => {
+    expect(() =>
+      matchBitcoinEvidence(vectorMnemonic, {
+        kind: 'address',
+        value: 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyq',
+        profiles: ['native-segwit'],
+        location,
+      }),
+    ).toThrow('The address is not valid for Bitcoin mainnet.');
+  });
+
+  it('normalizes an uppercase BIP86 address and rejects mixed case', () => {
+    expect(
+      matchBitcoinEvidence(vectorMnemonic, {
+        kind: 'address',
+        value: 'BC1P5CYXNUXMEUWUVKWFEM96LQZSZD02N6XDCJRS20CAC6YQJJWUDPXQKEDRCR',
+        profiles: ['taproot'],
+        location,
+      }).matched,
+    ).toBe(true);
+    expect(() =>
+      matchBitcoinEvidence(vectorMnemonic, {
+        kind: 'address',
+        value: 'bc1P5CYXNUXMEUWUVKWFEM96LQZSZD02N6XDCJRS20CAC6YQJJWUDPXQKEDRCR',
+        profiles: ['taproot'],
+        location,
+      }),
+    ).toThrow('The address is not valid for Bitcoin mainnet.');
+  });
+
+  it('rejects an address for a different Bitcoin network with a stable error', () => {
+    expect(() =>
+      matchBitcoinEvidence(vectorMnemonic, {
+        kind: 'address',
+        value: 'tb1qfm7ydz3n82zjh8m223yr6y6un0arn82u8w7a4r',
+        profiles: ['native-segwit'],
+        location,
+      }),
+    ).toThrow('The address is not valid for Bitcoin mainnet.');
   });
 
   it('treats the known BIP39 master fingerprint as a matchable but weak filter', () => {

@@ -24,6 +24,7 @@ import { PDFDocument } from 'pdf-lib';
 import { cardTemplates } from '../export/templates.js';
 import { indexesToColors } from '../core.js';
 import { assertSskrSelfTest } from '../sskr/self-test.js';
+import { MNEMOCODE_VERSION } from '../version.js';
 
 const PUBLIC_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
@@ -373,7 +374,7 @@ export async function runSelfTest(): Promise<void> {
     'approved templates, fonts, artwork and A6 PDF',
   );
 
-  console.log(terminalPaint('stdout', '1;36', 'MnemoCode self-test'));
+  console.log(terminalPaint('stdout', '1;36', `MnemoCode ${MNEMOCODE_VERSION} self-test`));
   console.log('────────────────────────────────────────────────────────────────────────');
   for (const [name, detail] of rows)
     console.log(

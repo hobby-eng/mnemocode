@@ -1,0 +1,15 @@
+{
+  "name": "probe-recover-year-unknown-timing",
+  "command": "time node dist/mnemocode.js recover-date --mode seedshift --input 'wool abuse actual wool abuse actual wool abuse actual wool abuse congress' --dates '23-09-????' --master-fingerprint 73c5da0a --max-results 5 --progress-every 2000; echo exit=$?",
+  "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+  "startedAtUtc": "2026-09-27T16:27:27Z",
+  "completedAtUtc": "2026-09-27T16:29:07Z",
+  "exitCode": 0,
+  "log": "probe-recover-year-unknown-timing.log",
+  "logSha256": "5a864bc8567997191f1255c2f6836baecd65b225ca6325f9e5a6822aa87cf764",
+  "runtime": {
+    "node": "v26.10.0",
+    "pnpm": "10.19.0 via corepack 0.36.0",
+    "platform": "Linux x86_64 Ubuntu 26.04.1"
+  }
+}

@@ -26,10 +26,17 @@ function readBoundedStdin(): string {
   return Buffer.concat(chunks, total).toString('utf8');
 }
 
-function readBoundedTextFile(path: string): string {
-  if (statSync(path).size > MAX_TEXT_INPUT_BYTES)
-    throw new Error('Text input exceeds the 1 MiB safety limit.');
-  return readFileSync(path, 'utf8');
+export function readBoundedTextFile(path: string, inputName = 'Text input'): string {
+  try {
+    if (statSync(path).size > MAX_TEXT_INPUT_BYTES)
+      throw new Error(`${inputName} exceeds the 1 MiB safety limit.`);
+    return readFileSync(path, 'utf8');
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('exceeds the 1 MiB safety limit')) {
+      throw error;
+    }
+    throw new Error(`${inputName} could not be read.`);
+  }
 }
 
 export function textInput(arguments_: ParsedArguments, key: 'input' | 'mnemonic'): string {
@@ -38,7 +45,9 @@ export function textInput(arguments_: ParsedArguments, key: 'input' | 'mnemonic'
   if ((direct === undefined) === (path === undefined)) {
     throw new Error(`Provide exactly one of --${key} or --${key}-file.`);
   }
-  return direct ?? (path === '-' ? readBoundedStdin() : readBoundedTextFile(path!));
+  return (
+    direct ?? (path === '-' ? readBoundedStdin() : readBoundedTextFile(path!, `--${key}-file`))
+  );
 }
 
 export async function encodedInput(arguments_: ParsedArguments): Promise<string> {

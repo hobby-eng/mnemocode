@@ -1,3 +1,4 @@
+export * from './version.js';
 export * from './core.js';
 export * from './bitcoin-evidence.js';
 export * from './record.js';

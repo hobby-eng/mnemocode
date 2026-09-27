@@ -1,0 +1,5 @@
+
+> mnemocode@0.1.0 check:toolchain /home/sergio/Documents/bip_tools/mnemocode
+> node scripts/verify-toolchain.mjs
+
+Toolchain pins agree: Node.js 26.10.0; pnpm@10.19.0.

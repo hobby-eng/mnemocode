@@ -1,0 +1,48 @@
+--- threshold 1 shares 3
+mnemocode: SSKR requires 2 <= threshold <= shares <= 16.
+exit=1
+--- threshold 2 shares 17
+mnemocode: SSKR requires 2 <= threshold <= shares <= 16.
+exit=1
+--- threshold 3 shares 2
+mnemocode: SSKR requires 2 <= threshold <= shares <= 16.
+exit=1
+--- threshold 2 shares 2
+Saved SSKR records: /tmp/mnemocode-aud-002-QuXG/t-2-2.txt (one complete share per line; this file contains all supplied shares).
+SSKR: 2 of 2 shares required. Mode: direct.
+SSKR share 1 — Compact UR:
+SSKR share 2 — Compact UR:
+Original BIP32 master fingerprint (empty BIP39 passphrase): 73c5da0a
+Encoded BIP32 master fingerprint (empty BIP39 passphrase): 73c5da0a
+exit=0
+--- threshold 16 shares 16
+Saved SSKR records: /tmp/mnemocode-aud-002-QuXG/t-16-16.txt (one complete share per line; this file contains all supplied shares).
+SSKR: 16 of 16 shares required. Mode: direct.
+SSKR share 1 — Compact UR:
+SSKR share 2 — Compact UR:
+SSKR share 3 — Compact UR:
+SSKR share 4 — Compact UR:
+SSKR share 5 — Compact UR:
+SSKR share 6 — Compact UR:
+SSKR share 7 — Compact UR:
+SSKR share 8 — Compact UR:
+SSKR share 9 — Compact UR:
+SSKR share 10 — Compact UR:
+SSKR share 11 — Compact UR:
+SSKR share 12 — Compact UR:
+SSKR share 13 — Compact UR:
+SSKR share 14 — Compact UR:
+SSKR share 15 — Compact UR:
+SSKR share 16 — Compact UR:
+Original BIP32 master fingerprint (empty BIP39 passphrase): 73c5da0a
+Encoded BIP32 master fingerprint (empty BIP39 passphrase): 73c5da0a
+exit=0
+--- threshold 0 shares 3
+mnemocode: --threshold requires a positive integer.
+exit=1
+--- threshold 2 shares 1.5
+mnemocode: --shares requires a positive integer.
+exit=1
+   2 /tmp/mnemocode-aud-002-QuXG/t-2-2.txt
+  16 /tmp/mnemocode-aud-002-QuXG/t-16-16.txt
+  18 total

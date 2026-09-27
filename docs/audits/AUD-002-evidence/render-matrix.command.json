@@ -1,0 +1,15 @@
+{
+  "name": "render-matrix",
+  "command": "node docs/audits/AUD-002-evidence/harnesses/render-matrix.mjs",
+  "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+  "startedAtUtc": "2026-09-27T16:22:48Z",
+  "completedAtUtc": "2026-09-27T16:27:27Z",
+  "exitCode": 0,
+  "log": "render-matrix.log",
+  "logSha256": "7d319a257539f7212f9aa13eb1e95540804b9de9b6d3040f38b71682b1091ecd",
+  "runtime": {
+    "node": "v26.10.0",
+    "pnpm": "10.19.0 via corepack 0.36.0",
+    "platform": "Linux x86_64 Ubuntu 26.04.1"
+  }
+}

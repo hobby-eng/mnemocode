@@ -1,0 +1,15 @@
+{
+  "name": "typecheck-explain",
+  "command": "./node_modules/.bin/tsc --noEmit -p tsconfig.json --explainFiles | grep -B1 -A3 '@types/node/index.d.ts$' | head -12; echo '--- tsconfig types field:'; grep -c '\"types\"' tsconfig.json || true",
+  "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+  "startedAtUtc": "2026-09-27T16:37:33Z",
+  "completedAtUtc": "2026-09-27T16:37:34Z",
+  "exitCode": 0,
+  "log": "typecheck-explain.log",
+  "logSha256": "97f57ff6384c4fb12d8751ad80f4de2cb30ae4efa37ddd535790d26354ce4871",
+  "runtime": {
+    "node": "v26.10.0",
+    "pnpm": "10.19.0 via corepack 0.36.0",
+    "platform": "Linux x86_64 Ubuntu 26.04.1"
+  }
+}

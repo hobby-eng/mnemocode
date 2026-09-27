@@ -1,0 +1,349 @@
+
+ RUN  v5.0.2 /home/sergio/Documents/bip_tools/mnemocode
+
+ ✓ test/private-file.test.ts > Private export replacement > replaces a destination symlink without modifying its target 11ms
+ ✓ test/private-file.test.ts > Private export replacement > retains an existing directory and removes staging files after a failed rename 7ms
+ ✓ test/card-copy.test.ts > export-level card presentation > keeps the deduplicated union and the complete independent text pools 4ms
+ ✓ test/card-copy.test.ts > export-level card presentation > draws sheet copy independently without changing the business-card identity 4ms
+ ✓ test/card-copy.test.ts > export-level card presentation > resolves once across validation and multiple export destinations 2ms
+ ✓ test/card-copy.test.ts > export-level card presentation > preserves overrides and supports deliberately hiding optional copy 1ms
+ ✓ test/card-copy.test.ts > export-level card presentation > rejects invalid optional copy "" 1ms
+ ✓ test/card-copy.test.ts > export-level card presentation > rejects invalid optional copy " " 0ms
+ ✓ test/card-copy.test.ts > export-level card presentation > rejects invalid optional copy "Two\nlines" 0ms
+ ✓ test/card-copy.test.ts > export-level card presentation > rejects invalid optional copy "Hidden​text" 1ms
+ ✓ test/card-copy.test.ts > export-level card presentation > rejects invalid optional copy "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" 0ms
+ ✓ test/card-copy.test.ts > export-level card presentation > refuses an invalid injected random choice -1 1ms
+ ✓ test/card-copy.test.ts > export-level card presentation > refuses an invalid injected random choice 37 1ms
+ ✓ test/card-copy.test.ts > export-level card presentation > refuses an invalid injected random choice 0.5 0ms
+ ✓ test/card-copy.test.ts > export-level card presentation > refuses an invalid injected random choice NaN 0ms
+ ✓ test/sskr.test.ts > Standalone SSKR > recovers every pair of a 2-of-3 set for 16-byte entropy 81ms
+ ✓ test/sskr.test.ts > Standalone SSKR > recovers every pair of a 2-of-3 set for 20-byte entropy 11ms
+ ✓ test/sskr.test.ts > Standalone SSKR > recovers every pair of a 2-of-3 set for 24-byte entropy 13ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-2 requires a quorum and recovers either end of the set 61ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-3 requires a quorum and recovers either end of the set 5ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-3 requires a quorum and recovers either end of the set 7ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-4 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-4 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-4 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-5 requires a quorum and recovers either end of the set 6ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-5 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-5 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-5 requires a quorum and recovers either end of the set 7ms
+ ✓ test/card-qr.test.ts > Printable card QR > decodes exact data from the rectangles actually drawn at 200 dpi 0 136ms
+ ✓ test/sskr.test.ts > Standalone SSKR > recovers every pair of a 2-of-3 set for 28-byte entropy 6ms
+ ✓ test/sskr.test.ts > Standalone SSKR > recovers every pair of a 2-of-3 set for 32-byte entropy 12ms
+ ✓ test/sskr.test.ts > Standalone SSKR > recovers the independent official grouped vector 3ms
+ ✓ test/sskr.test.ts > Standalone SSKR > rejects duplicate, mixed, corrupted, truncated and reordered records 6ms
+ ✓ test/sskr.test.ts > Standalone SSKR > rejects threshold 1 / count 3 0ms
+ ✓ test/sskr.test.ts > Standalone SSKR > rejects threshold 3 / count 2 1ms
+ ✓ test/sskr.test.ts > Standalone SSKR > rejects threshold 2 / count 17 0ms
+ ✓ test/sskr.test.ts > Standalone SSKR > rejects threshold 2.5 / count 3 0ms
+ ✓ test/sskr.test.ts > Standalone SSKR > rejects threshold NaN / count 3 0ms
+ ✓ test/sskr.test.ts > Standalone SSKR > rejects an invalid BIP39 source and restores a date-shifted source in two stages 7ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > matches independently computed transport bytes and RGB codes in both directions 5ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > recovers all 30 minimal official grouped quorums and tagged Bytewords 174ms
+ ✓ test/error-redaction.test.ts > Errors identify the position without echoing unrecognized input > does not disclose an invalid mnemonic token 0 7ms
+ ✓ test/error-redaction.test.ts > Errors identify the position without echoing unrecognized input > does not disclose an invalid mnemonic token 1 4ms
+ ✓ test/error-redaction.test.ts > Errors identify the position without echoing unrecognized input > does not disclose an invalid mnemonic token 2 1ms
+ ✓ test/error-redaction.test.ts > Errors identify the position without echoing unrecognized input > does not echo an unmapped Unicode value 2ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-6 requires a quorum and recovers either end of the set 9ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-6 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-6 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-6 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-6 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-7 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-7 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-7 requires a quorum and recovers either end of the set 5ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-7 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-7 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-7 requires a quorum and recovers either end of the set 5ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-8 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-8 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-8 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-8 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-8 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-8 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 8-of-8 requires a quorum and recovers either end of the set 6ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-9 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-9 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-9 requires a quorum and recovers either end of the set 7ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-9 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-9 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-9 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 8-of-9 requires a quorum and recovers either end of the set 5ms
+ ✓ test/secret-input.test.ts > hidden input controlling terminal > keeps prompts on a real TTY and secrets in a private pipe 8ms
+ ✓ test/secret-input.test.ts > hidden input controlling terminal > fails immediately without a controlling terminal instead of invoking an agent 2ms
+ ✓ test/secret-input.test.ts > hidden input controlling terminal > closes the terminal on input failure 1ms
+ ✓ test/secret-input.test.ts > hidden input controlling terminal > closes the terminal on input failure 1ms
+ ✓ test/secret-input.test.ts > hidden input controlling terminal > closes the terminal on input failure 0ms
+ ✓ test/secret-input.test.ts > hidden input controlling terminal > closes the terminal on input failure 0ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > rejects an invalid official quorum 0 6ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > rejects an invalid official quorum 0 1ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > rejects an invalid official quorum 0 3ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > locks exact creation and every pair: bip39-128-2-of-3 10ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > locks exact creation and every pair: bip39-160-2-of-3 3ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > locks exact creation and every pair: bip39-192-2-of-3 3ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > locks exact creation and every pair: bip39-224-2-of-3 3ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > locks exact creation and every pair: bip39-256-2-of-3 3ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > rejects bad CBOR metadata even with an intact CRC 2ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > rejects nonzero padding, unknown versions, trailing colors and invalid Bytewords 1ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > rejects tampered share data after transport checksum is recomputed 1ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > supports the maximal 16-of-16 threshold and refuses 15 members 5ms
+ ✓ test/sskr-vectors.test.ts > Published SSKR v1 vectors > rejects metadata conflicts before native reconstruction 1ms
+ ✓ test/self-test-integrity.test.ts > Installed self-test integrity > fails before encoding when the pinned word-list expectation is damaged 501ms
+ ✓ test/card-qr.test.ts > Printable card QR > decodes exact data from the rectangles actually drawn at 200 dpi 1 82ms
+ ✓ test/card-qr.test.ts > Printable card QR > decodes exact data from the rectangles actually drawn at 200 dpi 2 80ms
+ ✓ test/cli.test.ts > CLI records > documents every transformation and recovery profile with runnable examples 451ms
+ ✓ test/card-qr.test.ts > Printable card QR > rejects undersized or out-of-page codes before drawing anything 13ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 9-of-9 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-10 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-10 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-10 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-10 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-10 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-10 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 8-of-10 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 9-of-10 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 10-of-10 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-11 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-11 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-11 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-11 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-11 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-11 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 8-of-11 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 9-of-11 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 10-of-11 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 11-of-11 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-12 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-12 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-12 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-12 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-12 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-12 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 8-of-12 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 9-of-12 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 10-of-12 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 11-of-12 requires a quorum and recovers either end of the set 4ms
+ ✓ test/export.test.ts > export infrastructure > ships sixteen approved templates with individual export 3ms
+ ✓ test/export.test.ts > export infrastructure > preserves page content and removes private metadata in preview and saved PDFs 33ms
+ ✓ test/export.test.ts > export infrastructure > merges all renderers into a single PDF with unchanged page dimensions 10ms
+ ✓ test/export.test.ts > export infrastructure > rejects empty jobs and wrong card types, and preserves multi-page collections 14ms
+ ✓ test/export.test.ts > export infrastructure > keeps date and label lists in entered order and validates the number of labels 1ms
+ ✓ test/material-cards.test.ts > material selection cards > selects approved real finishes deterministically, with names tied to their photographs 26ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 12-of-12 requires a quorum and recovers either end of the set 7ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-13 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-13 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-13 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-13 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-13 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-13 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 8-of-13 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 9-of-13 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 10-of-13 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 11-of-13 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 12-of-13 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 13-of-13 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-14 requires a quorum and recovers either end of the set 2ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-14 requires a quorum and recovers either end of the set 2ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-14 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-14 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-14 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-14 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 8-of-14 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 9-of-14 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 10-of-14 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 11-of-14 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 12-of-14 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 13-of-14 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 14-of-14 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-15 requires a quorum and recovers either end of the set 2ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-15 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-15 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-15 requires a quorum and recovers either end of the set 3ms
+ ✓ test/known-audit-defects.test.ts > AUD-001 regression contracts > AUD-001-SEC002: protects input through an alias of its parent directory 495ms
+ ✓ test/material-cards.test.ts > material selection cards > honors both orientations for wallet 156ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-15 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-15 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 8-of-15 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 9-of-15 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 10-of-15 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 11-of-15 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 12-of-15 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 13-of-15 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 14-of-15 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 15-of-15 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 2-of-16 requires a quorum and recovers either end of the set 2ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 3-of-16 requires a quorum and recovers either end of the set 2ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 4-of-16 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 5-of-16 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 6-of-16 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 7-of-16 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 8-of-16 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 9-of-16 requires a quorum and recovers either end of the set 3ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 10-of-16 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 11-of-16 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 12-of-16 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 13-of-16 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 14-of-16 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 15-of-16 requires a quorum and recovers either end of the set 4ms
+ ✓ test/sskr-thresholds.test.ts > Every supported single-group SSKR threshold > 16-of-16 requires a quorum and recovers either end of the set 4ms
+ ✓ test/known-audit-defects.test.ts > AUD-001 regression contracts > AUD-001-FUN001: accepts a valid uppercase BIP84 address 80ms
+ ✓ test/known-audit-defects.test.ts > AUD-001 regression contracts > AUD-001-API001: rejects an unknown input format at the JavaScript boundary 1ms
+ ✓ test/known-audit-defects.test.ts > AUD-001 regression contracts > AUD-001-API001: rejects an unknown output format at the JavaScript boundary 2ms
+ ✓ test/known-audit-defects.test.ts > AUD-001 regression contracts > AUD-001-API001: cannot serialize an unreadable record format 1ms
+ ✓ test/material-cards.test.ts > material selection cards > honors both orientations for business 63ms
+ ✓ test/material-cards.test.ts > material selection cards > honors both orientations for a6 54ms
+ ✓ test/material-cards.test.ts > material selection cards > honors both orientations for a4 36ms
+ ✓ test/self-test-integrity.test.ts > Installed self-test integrity > AUD-001-FUN002: refuses an empty public-vector catalogue 366ms
+ ✓ test/material-cards.test.ts > material selection cards > prints all exact ordered references and real finish names, replaces the studio, and confines QR to the back 71ms
+ ✓ test/material-cards.test.ts > material selection cards > uses the resolved studio and exposes only one reference in an individual fragment, without QR 16ms
+ ✓ test/material-cards.test.ts > material selection cards > rejects mismatched QR data and invalid fragment indices 2ms
+ ✓ test/core.test.ts > startup core self-test > accepts the bundled word list and fixed forward/reverse vectors 8ms
+ ✓ test/core.test.ts > original Seedshift compatibility mode > rejects a source phrase whose words exist but whose BIP39 checksum is invalid 1ms
+ ✓ test/core.test.ts > original Seedshift compatibility mode > rejects a source word outside the English BIP39 list 0ms
+ ✓ test/core.test.ts > original Seedshift compatibility mode > rejects a non-English lookalike character inside a BIP39 word 0ms
+ ✓ test/core.test.ts > original Seedshift compatibility mode > reproduces the documented Seedshift example 1ms
+ ✓ test/core.test.ts > original Seedshift compatibility mode > recovers the original words from the documented Seedshift example 0ms
+ ✓ test/core.test.ts > original Seedshift compatibility mode > round-trips the continuous Unicode code-point representation 1ms
+ ✓ test/core.test.ts > original Seedshift compatibility mode > keeps a date’s order independent of command-line order 1ms
+ ✓ test/core.test.ts > legacy checksum-word replacement > offers a valid replacement and enumerates 128 candidates for 12 words 305ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > exhausts every entropy tail for 128 bits against independent modular arithmetic and SHA256 713ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > exhausts every entropy tail for 160 bits against independent modular arithmetic and SHA256 173ms
+ ✓ test/core.test.ts > legacy checksum-word replacement > offers a valid replacement and enumerates 64 candidates for 15 words 271ms
+ ✓ test/sskr-cli-export.test.ts > integrated SSKR CLI > shares transformed entropy once and reverses the dates with a quorum 1243ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > exhausts every entropy tail for 192 bits against independent modular arithmetic and SHA256 92ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > exhausts every entropy tail for 224 bits against independent modular arithmetic and SHA256 48ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > exhausts every entropy tail for 256 bits against independent modular arithmetic and SHA256 24ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > rejects impossible date 29-02-1900 1ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > rejects impossible date 29-02-2100 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > rejects impossible date 31-04-2026 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > rejects impossible date 00-01-2026 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > rejects impossible date 01-00-2026 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > rejects impossible date 01-13-2026 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > rejects impossible date 01-01-0000 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > rejects impossible date 01-01-10000 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > retains valid boundary 29-02-2000 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > retains valid boundary 29-02-2400 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > retains valid boundary 01-01-0001 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > retains valid boundary 31-12-9999 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > enforces date limit for 12 words and does not mutate order 1ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > enforces date limit for 15 words and does not mutate order 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > enforces date limit for 18 words and does not mutate order 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > enforces date limit for 21 words and does not mutate order 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > enforces date limit for 24 words and does not mutate order 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > validates structured API dates {"year":null,"month":1,"day":1} 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > validates structured API dates {"year":2026.5,"month":1,"day":1} 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > validates structured API dates {"year":2026,"month":2,"day":29} 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > validates structured API dates {"year":2026,"month":1.5,"day":1} 0ms
+ ✓ test/core-boundaries.test.ts > Core independent entropy and calendar boundaries > pins both word lists and the known zero-entropy master fingerprint 41ms
+ ✓ test/core.test.ts > legacy checksum-word replacement > offers a valid replacement and enumerates 32 candidates for 18 words 257ms
+ ✓ test/core.test.ts > legacy checksum-word replacement > offers a valid replacement and enumerates 16 candidates for 21 words 287ms
+ ✓ test/core.test.ts > legacy checksum-word replacement > offers a valid replacement and enumerates 8 candidates for 24 words 266ms
+ ✓ test/core.test.ts > checksum-valid Seedshift mode > reproduces the explained twelve-word checksum-valid example 1ms
+ ✓ test/core.test.ts > checksum-valid Seedshift mode > always emits a valid BIP39 phrase and wrong dates yield a different valid phrase 2ms
+ ✓ test/core.test.ts > direct representation mode > round-trips a mnemonic through the Unicode code-point representation without dates 1ms
+ ✓ test/core.test.ts > direct representation mode > round-trips a mnemonic through the color representation without dates 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 12 words in english for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 12 words in indexes for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 12 words in unicode for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 12 words in colors for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 12 words in colors-unicode for direct and seedshift modes 2ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 15 words in english for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 15 words in indexes for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 15 words in unicode for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 15 words in colors for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 15 words in colors-unicode for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 18 words in english for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 18 words in indexes for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 18 words in unicode for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 18 words in colors for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 18 words in colors-unicode for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 21 words in english for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 21 words in indexes for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 21 words in unicode for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 21 words in colors for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 21 words in colors-unicode for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 24 words in english for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 24 words in indexes for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 24 words in unicode for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 24 words in colors for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > all standard BIP39 lengths and representations > round-trips 24 words in colors-unicode for direct and seedshift modes 1ms
+ ✓ test/core.test.ts > raw input format detection > recognizes english without a format flag 0ms
+ ✓ test/core.test.ts > raw input format detection > ignores surrounding whitespace while recognizing english 0ms
+ ✓ test/core.test.ts > raw input format detection > recognizes indexes without a format flag 0ms
+ ✓ test/core.test.ts > raw input format detection > ignores surrounding whitespace while recognizing indexes 0ms
+ ✓ test/core.test.ts > raw input format detection > recognizes unicode without a format flag 0ms
+ ✓ test/core.test.ts > raw input format detection > ignores surrounding whitespace while recognizing unicode 0ms
+ ✓ test/core.test.ts > raw input format detection > recognizes colors without a format flag 0ms
+ ✓ test/core.test.ts > raw input format detection > ignores surrounding whitespace while recognizing colors 0ms
+ ✓ test/core.test.ts > raw input format detection > recognizes colors-unicode without a format flag 0ms
+ ✓ test/core.test.ts > raw input format detection > ignores surrounding whitespace while recognizing colors-unicode 0ms
+ ✓ test/core.test.ts > raw input format detection > returns no candidate for empty, truncated, or malformed data 0ms
+ ✓ test/core.test.ts > raw input format detection > reports every strict match instead of guessing an ambiguous numeric input 0ms
+ ✓ test/core.test.ts > raw input format detection > does not treat alternate JavaScript number syntax as recorded indexes 1ms
+ ✓ test/core.test.ts > versioned records > carries mode and format while preserving the raw payload 1ms
+ ✓ test/core.test.ts > versioned records > rejects unsupported and malformed record headers 0ms
+ ✓ test/core.test.ts > versioned records > accepts file whitespace around a record but preserves its payload exactly 0ms
+ ✓ test/core.test.ts > date patterns > expands a forgotten day only across that calendar month 1ms
+ ✓ test/core.test.ts > BIP39Colors-compatible representation > reproduces the documented twelve-word color vector 0ms
+ ✓ test/core.test.ts > BIP39Colors-compatible representation > accepts RGB codes separated, concatenated, or as one fixed-width stream 0ms
+ ✓ test/core.test.ts > BIP39Colors-compatible representation > rejects incomplete continuous RGB values 0ms
+ ✓ test/core.test.ts > BIP39Colors-compatible representation > round-trips the MnemoCode Unicode representation without depending on a font 0ms
+ ✓ test/core.test.ts > BIP39Colors-compatible representation > extends the reversible color packing to intermediate BIP39 word counts 0ms
+ ✓ test/core.test.ts > palette QR input adapter > recovers the complete color payload from a locally generated PNG 48ms
+ × test/core.test.ts > local Bitcoin recovery evidence > matches a documented BIP84 receiving address and rejects a different address 61ms
+   → Invalid checksum in bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyq
+ ✓ test/core.test.ts > local Bitcoin recovery evidence > treats the known BIP39 master fingerprint as a matchable but weak filter 10ms
+ ✓ test/business-cards.test.ts > business card collections > uses defaults only for omitted fields and validates Latin names 6ms
+ ✓ test/business-cards.test.ts > business card collections > rejects silent fallbacks for invalid or repeated options and requires a PDF 4ms
+ ✓ test/business-cards.test.ts > business card collections > fits 8 samples on A6 and paginates full-size A4 without overlap 7ms
+ ✓ test/business-cards.test.ts > business card collections > fits 10 samples on A6 and paginates full-size A4 without overlap 6ms
+ ✓ test/business-cards.test.ts > business card collections > fits 12 samples on A6 and paginates full-size A4 without overlap 8ms
+ ✓ test/business-cards.test.ts > business card collections > fits 14 samples on A6 and paginates full-size A4 without overlap 5ms
+ ✓ test/business-cards.test.ts > business card collections > fits 16 samples on A6 and paginates full-size A4 without overlap 6ms
+ ✓ test/sskr-cli-export.test.ts > integrated SSKR CLI > rejects unsupported and orphan options before secret input 1165ms
+ ✓ test/sskr-cli-export.test.ts > integrated SSKR CLI > keeps terminal color swatches plain when redirected 319ms
+ ✓ test/cli.test.ts > CLI records > runs the extended self-test and reports its coverage 3957ms
+ ✓ test/cli.test.ts > CLI records > writes a self-describing record and decodes it without mode or format flags 581ms
+ ✓ test/cli.test.ts > CLI records > always prints encode output and rejects a bare --output option 536ms
+ ✓ test/cli.test.ts > CLI records > lists approved collections and validates preview arguments 729ms
+ ✓ test/cli.test.ts > CLI records > rejects unknown or unavailable templates before prompting or creating files 950ms
+ ✓ test/cli.test.ts > CLI records > stores only the raw encoded representation in a generated QR 731ms
+ ✓ test/cli.test.ts > CLI records > keeps legacy raw records readable with explicit mode and format 597ms
+ ✓ test/business-cards.test.ts > business card collections > renders both designs with real fonts/artwork, custom fields and both raw QR formats 12231ms
+ ✓ test/business-cards.test.ts > business card collections > fails on mismatched QR data and unprintable personal fields before returning a PDF 191ms
+ ✓ test/cli.test.ts > CLI records > auto-detects every representation that encode can produce 4379ms
+ ✓ test/cli.test.ts > CLI records > keeps an explicit raw format authoritative 548ms
+ ✓ test/cli.test.ts > CLI records > does not guess an unknown representation in a non-interactive process 225ms
+ ✓ test/cli.test.ts > CLI records > does not guess between multiple valid raw representations in a non-interactive process 234ms
+ ✓ test/cli.test.ts > CLI records > rejects explicit mode and format values that conflict with an MNC1 header 712ms
+ ✓ test/cli.test.ts > CLI records > trusts an MNC1 format header only after the declared payload parser validates it 445ms
+ ✓ test/cli.test.ts > CLI records > auto-detects the raw representation in recover-date as well as decode 483ms
+ ✓ test/cli.test.ts > CLI records > shows a legacy checksum-word suggestion and self-describes an applied replacement 1976ms
+ ✓ test/cli.test.ts > hidden CLI input > uses systemd-ask-password for encode and recover-date 529ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/core.test.ts > local Bitcoin recovery evidence > matches a documented BIP84 receiving address and rejects a different address
+Error: Invalid checksum in bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyq
+ ❯ Object.decode node_modules/.pnpm/@scure+base@2.4.0/node_modules/@scure/base/index.js:921:19
+ ❯ Object.decode node_modules/.pnpm/@scure+btc-signer@2.4.1/node_modules/@scure/btc-signer/payment.js:1251:35
+ ❯ matchDerivedNode src/bitcoin-evidence.ts:254:47
+    252|       const network = evidence.location.network === 'mainnet' ? NETWOR…
+    253|       const address = Address(network);
+    254|       const expected = address.encode(address.decode(evidence.value.tr…
+       |                                               ^
+    255|       return derived === expected ? derived : undefined;
+    256|     }
+ ❯ matchBitcoinEvidence src/bitcoin-evidence.ts:322:25
+ ❯ test/core.test.ts:353:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 16 passed (17)
+      Tests  1 failed | 319 passed (320)
+   Start at  19:15:19
+   Duration  18.40s (tests 88%, transform 7%, import 5%)
+

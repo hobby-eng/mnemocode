@@ -1,0 +1,7 @@
+mnemocode: Text input exceeds the 1 MiB safety limit.
+exit=1
+mnemocode: Text input exceeds the 1 MiB safety limit.
+exit=1
+mnemocode: Enter 12, 15, 18, 21, or 24 English BIP39 words.
+
+exit=0

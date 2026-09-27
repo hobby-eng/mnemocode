@@ -1,0 +1,36 @@
+
+> mnemocode@0.1.0 test /home/sergio/Documents/bip_tools/mnemocode
+> vitest run
+
+
+ RUN  v5.0.2 /home/sergio/Documents/bip_tools/mnemocode
+
+ ❯ test/core.test.ts (67 tests | 1 failed) 1824ms
+   ❯ local Bitcoin recovery evidence (2)
+     × matches a documented BIP84 receiving address and rejects a different address 74ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/core.test.ts > local Bitcoin recovery evidence > matches a documented BIP84 receiving address and rejects a different address
+Error: Invalid checksum in bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyq
+ ❯ Object.decode node_modules/.pnpm/@scure+base@2.4.0/node_modules/@scure/base/index.js:921:19
+ ❯ Object.decode node_modules/.pnpm/@scure+btc-signer@2.4.1/node_modules/@scure/btc-signer/payment.js:1251:35
+ ❯ matchDerivedNode src/bitcoin-evidence.ts:254:47
+    252|       const network = evidence.location.network === 'mainnet' ? NETWOR…
+    253|       const address = Address(network);
+    254|       const expected = address.encode(address.decode(evidence.value.tr…
+       |                                               ^
+    255|       return derived === expected ? derived : undefined;
+    256|     }
+ ❯ matchBitcoinEvidence src/bitcoin-evidence.ts:322:25
+ ❯ test/core.test.ts:353:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 16 passed (17)
+      Tests  1 failed | 319 passed (320)
+   Start at  19:15:38
+   Duration  19.98s (tests 88%, transform 6%, import 5%)
+
+ ELIFECYCLE  Test failed. See above for more details.

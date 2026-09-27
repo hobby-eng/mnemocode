@@ -1,0 +1,15 @@
+{
+  "name": "frozen-install",
+  "command": "pnpm install --frozen-lockfile",
+  "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+  "startedAtUtc": "2026-09-27T16:15:09Z",
+  "completedAtUtc": "2026-09-27T16:15:10Z",
+  "exitCode": 0,
+  "log": "frozen-install.log",
+  "logSha256": "5c676f3dfbb9f94d3a8945bdb46d4b782c9006a879979909932cf862cfdc5ec5",
+  "runtime": {
+    "node": "v26.10.0",
+    "pnpm": "10.19.0 via corepack 0.36.0",
+    "platform": "Linux x86_64 Ubuntu 26.04.1"
+  }
+}
