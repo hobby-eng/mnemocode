@@ -41,6 +41,7 @@ export interface MissingWordCandidate {
   readonly wordIndex: number;
   readonly mnemonic: string;
   readonly checksumBits: string;
+  readonly preservesLegacyEntropy?: boolean;
 }
 
 export interface DatePattern {

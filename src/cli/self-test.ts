@@ -15,6 +15,7 @@ import {
   encodeMnemonicLegacy,
   formatEncoded,
   parseDate,
+  recoverLegacyValidLastWords,
   recoverMissingWord,
   representMnemonic,
   type OutputFormat,
@@ -154,6 +155,14 @@ function runCoreChecks(): void {
   equal(recoveredAbout?.wordIndex, 4, 'Forgotten-word BIP39 index');
   equal(recoveredAbout?.checksumBits, '0011', 'Forgotten-word checksum bits');
   equal(recoveredAbout?.mnemonic, PUBLIC_MNEMONIC, 'Forgotten-word public vector');
+
+  const legacyLastWords = recoverLegacyValidLastWords(LEGACY_ENGLISH);
+  equal(legacyLastWords.length, 128, 'Legacy final-word candidate count');
+  equal(
+    legacyLastWords.filter((candidate) => candidate.preservesLegacyEntropy).length,
+    1,
+    'Legacy entropy-preserving final-word count',
+  );
 
   const shifted = encodeMnemonic(PUBLIC_MNEMONIC, CHECKSUM_VALID_DATE);
   equal(
