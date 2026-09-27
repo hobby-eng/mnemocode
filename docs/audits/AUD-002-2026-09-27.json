@@ -305,17 +305,17 @@
     }
   ],
   "remediation": [
-    { "id": "AUD-002-BLD001", "status": "fixed", "fixCommit": null, "verificationCommit": null, "evidence": ["remediation-2026-09-27.md"] },
-    { "id": "AUD-002-SEC001", "status": "verified", "fixCommit": null, "verificationCommit": null, "evidence": ["remediation-2026-09-27.md"] },
-    { "id": "AUD-002-API001", "status": "verified", "fixCommit": null, "verificationCommit": null, "evidence": ["remediation-2026-09-27.md"] },
-    { "id": "AUD-002-API002", "status": "verified", "fixCommit": null, "verificationCommit": null, "evidence": ["remediation-2026-09-27.md"] },
-    { "id": "AUD-002-API003", "status": "verified", "fixCommit": null, "verificationCommit": null, "evidence": ["remediation-2026-09-27.md"] },
-    { "id": "AUD-002-DOC001", "status": "verified", "fixCommit": null, "verificationCommit": null, "evidence": ["remediation-2026-09-27.md"] },
-    { "id": "AUD-002-DOC002", "status": "verified", "fixCommit": null, "verificationCommit": null, "evidence": ["remediation-2026-09-27.md"] },
-    { "id": "AUD-002-DOC003", "status": "verified", "fixCommit": null, "verificationCommit": null, "evidence": ["remediation-2026-09-27.md"] },
-    { "id": "AUD-001-SEC001", "status": "fixed", "fixCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "verificationCommit": null, "evidence": ["dependency-audit.log", "dependency-audit-json.log", "frozen-install.log", "remediation-2026-09-27.md"], "note": "The follow-up working tree passes the full local test/build gate and a fresh registry audit. Remote CI has not run on the uncommitted remediation." },
+    { "id": "AUD-002-BLD001", "status": "verified", "fixCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["remediation-2026-09-27.md"] },
+    { "id": "AUD-002-SEC001", "status": "verified", "fixCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["remediation-2026-09-27.md"] },
+    { "id": "AUD-002-API001", "status": "verified", "fixCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["remediation-2026-09-27.md"] },
+    { "id": "AUD-002-API002", "status": "verified", "fixCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["remediation-2026-09-27.md"] },
+    { "id": "AUD-002-API003", "status": "verified", "fixCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["remediation-2026-09-27.md"] },
+    { "id": "AUD-002-DOC001", "status": "verified", "fixCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["remediation-2026-09-27.md"] },
+    { "id": "AUD-002-DOC002", "status": "verified", "fixCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["remediation-2026-09-27.md"] },
+    { "id": "AUD-002-DOC003", "status": "verified", "fixCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["remediation-2026-09-27.md"] },
+    { "id": "AUD-001-SEC001", "status": "verified", "fixCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["dependency-audit.log", "dependency-audit-json.log", "frozen-install.log", "remediation-2026-09-27.md"], "note": "The follow-up passes local gates, a fresh registry audit and GitHub Actions run 36338523182." },
     { "id": "AUD-001-SEC002", "status": "verified", "fixCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "verificationCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "evidence": ["tests-full.log", "probe-output-overlap.log"], "note": "Disposition at this snapshot." },
-    { "id": "AUD-001-FUN001", "status": "verified", "fixCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "verificationCommit": null, "evidence": ["tests-full.log", "probe-uppercase-address-cli.log", "probe-mixed-case-and-wrong-network.log", "probe-malformed-address-cli.log", "remediation-2026-09-27.md"], "note": "The follow-up adds BIP86, different-valid-address, checksum, mixed-case and wrong-network regression coverage. No verification commit is claimed because the remediation is uncommitted." },
+    { "id": "AUD-001-FUN001", "status": "verified", "fixCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "verificationCommit": "b71aff4a5a1d3f5fcd07d6f0197df6e3729ebe55", "evidence": ["tests-full.log", "probe-uppercase-address-cli.log", "probe-mixed-case-and-wrong-network.log", "probe-malformed-address-cli.log", "remediation-2026-09-27.md"], "note": "Commit b71aff4 adds BIP86, different-valid-address, checksum, mixed-case and wrong-network regression coverage and passes GitHub CI." },
     { "id": "AUD-001-FUN002", "status": "verified", "fixCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "verificationCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "evidence": ["tests-full.log", "self-test.log"], "note": "Disposition at this snapshot." },
     { "id": "AUD-001-API001", "status": "verified", "fixCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "verificationCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "evidence": ["tests-full.log"], "note": "Disposition at this snapshot." },
     { "id": "AUD-001-DOC001", "status": "verified", "fixCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "verificationCommit": "7b059c73411663b7e45088b32adef99baecc96b0", "evidence": ["package-dry-run.log"], "note": "Disposition at this snapshot." },
@@ -368,7 +368,7 @@
   },
   "releaseAssessment": {
     "ready": false,
-    "reason": "Historical snapshot assessment: AUD-002-BLD001 kept pnpm test, pnpm verify and CI red. The dated follow-up fixes every finding and passes all local gates; remote CI and original platform/physical/fault-injection limits remain."
+    "reason": "Historical snapshot assessment: AUD-002-BLD001 kept pnpm test, pnpm verify and CI red. Commit b71aff4 verifies every finding with all local gates and GitHub Actions run 36338523182; original platform/physical/fault-injection limits remain."
   },
   "externalSources": [
     { "url": "https://github.com/hobby-eng/mnemocode/actions/runs/36331656864", "use": "CI failure on the reviewed commit (AUD-002-BLD001)" },
