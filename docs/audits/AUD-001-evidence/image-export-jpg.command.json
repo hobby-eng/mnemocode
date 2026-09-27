@@ -1,0 +1,32 @@
+{
+  "name": "image-export-jpg",
+  "argv": [
+    "node",
+    "dist/mnemocode.js",
+    "preview",
+    "--template",
+    "material-kitchen",
+    "--words",
+    "12",
+    "--page-size",
+    "wallet",
+    "--card-qr",
+    "--images-dir",
+    "/tmp/mnemocode-aud-001/evidence/jpg-pages",
+    "--image-format",
+    "jpg",
+    "--card-name",
+    "Alex Morgan",
+    "--studio-name",
+    "Orven Studio"
+  ],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:40:54.515692Z",
+  "end": "2026-09-27T12:40:55.131657Z",
+  "exitCode": 0,
+  "log": "image-export-jpg.log",
+  "sha256": "33515db66fb501bbd272c69bb8a089f2914d31d33fa74586e308fe22880fd3f0",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}

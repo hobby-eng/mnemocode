@@ -1,0 +1,18 @@
+{
+  "name": "tests-host",
+  "argv": [
+    "npm",
+    "test",
+    "--",
+    "--reporter=verbose"
+  ],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:19:43.088257Z",
+  "end": "2026-09-27T12:20:14.319512Z",
+  "exitCode": 1,
+  "log": "tests-host.log",
+  "sha256": "e546404709a5da1c97345f3171182343001cb54309e46c3e182e34a528ea5b62",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}

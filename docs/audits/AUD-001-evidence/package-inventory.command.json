@@ -1,0 +1,21 @@
+{
+  "name": "package-inventory",
+  "argv": [
+    "env",
+    "npm_config_cache=/tmp/mnemocode-aud-001/npm-cache",
+    "npm",
+    "pack",
+    "--dry-run",
+    "--json",
+    "--ignore-scripts"
+  ],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:23:03.506485Z",
+  "end": "2026-09-27T12:23:04.524629Z",
+  "exitCode": 0,
+  "log": "package-inventory.log",
+  "sha256": "bda530b7c08426fc0588af7d090780f059a7d40c326c121b2ab29132c87f883c",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}

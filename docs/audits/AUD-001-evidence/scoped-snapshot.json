@@ -1,0 +1,15 @@
+{
+  "sourceFiles": 127,
+  "sourceFingerprint": "246be716f8a2eede878186b15d55cc6292d176b6f5c50f43932337664b1db8b9",
+  "excluded": [
+    ".git",
+    "node_modules",
+    "dist",
+    "goldens",
+    "__pycache__",
+    ".pnpm-store",
+    "tmp",
+    "output"
+  ],
+  "note": "The initial inventory included ignored local cache/output paths. This narrowed source manifest is the audit/reproduction snapshot; no user output contents are retained in the report."
+}

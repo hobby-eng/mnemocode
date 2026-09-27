@@ -1,0 +1,16 @@
+{
+  "name": "static-review",
+  "argv": [
+    "node",
+    "audit-static.mjs"
+  ],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:23:49.598533Z",
+  "end": "2026-09-27T12:23:51.768889Z",
+  "exitCode": 0,
+  "log": "static-review.log",
+  "sha256": "8b0ece6c495a19f2ebae44b3c6d1c3ea40521db90f015398db2872b9633b8a93",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}

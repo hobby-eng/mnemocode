@@ -1,0 +1,17 @@
+{
+  "name": "self-test",
+  "argv": [
+    "node",
+    "dist/mnemocode.js",
+    "self-test"
+  ],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:17:58.899752Z",
+  "end": "2026-09-27T12:18:05.341337Z",
+  "exitCode": 0,
+  "log": "self-test.log",
+  "sha256": "455a96626241c9d0859c98833ab15980a5ab08d085f8e6ac4585d622d4ee5c5b",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}

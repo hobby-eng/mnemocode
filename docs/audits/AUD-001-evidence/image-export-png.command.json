@@ -1,0 +1,36 @@
+{
+  "name": "image-export-png",
+  "argv": [
+    "node",
+    "dist/mnemocode.js",
+    "preview",
+    "--template",
+    "business-glass-6in1",
+    "--words",
+    "12",
+    "--page-size",
+    "business",
+    "--card-qr",
+    "--cards-dir",
+    "/tmp/mnemocode-aud-001/evidence/png-cards",
+    "--image-format",
+    "png",
+    "--card-name",
+    "Alex Morgan",
+    "--card-company",
+    "VECTOR SYSTEMS",
+    "--card-role",
+    "Senior DevOps Engineer",
+    "--studio-name",
+    "Orven Studio"
+  ],
+  "cwd": "isolated workspace copied from source manifest",
+  "start": "2026-09-27T12:40:47.365620Z",
+  "end": "2026-09-27T12:40:49.585034Z",
+  "exitCode": 0,
+  "log": "image-export-png.log",
+  "sha256": "f237ba687004833cf872fa7bdda13edaa856ed7b21b9ea5b0aab3f43079ff135",
+  "environment": {
+    "NO_COLOR": "1"
+  }
+}
