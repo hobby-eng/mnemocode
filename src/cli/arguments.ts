@@ -59,6 +59,33 @@ export function values(arguments_: ParsedArguments, key: string): string[] {
   return [];
 }
 
+export interface IntegerOptionBounds {
+  defaultValue?: number;
+  min: number;
+  max: number;
+}
+
+/** Parse a canonical base-10 integer without accepting JavaScript numeric syntax. */
+export function integerOption(
+  arguments_: ParsedArguments,
+  key: string,
+  bounds: IntegerOptionBounds,
+): number {
+  const raw = value(arguments_, key);
+  if (raw === undefined) {
+    if (bounds.defaultValue !== undefined) return bounds.defaultValue;
+    throw new Error(`Missing required option --${key}.`);
+  }
+  if (!/^(?:0|[1-9][0-9]*)$/u.test(raw)) {
+    throw new Error(`--${key} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`);
+  }
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < bounds.min || parsed > bounds.max) {
+    throw new Error(`--${key} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`);
+  }
+  return parsed;
+}
+
 export function assertAllowedArguments(
   arguments_: ParsedArguments,
   command: string,

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import {
   bitcoinProfiles,
   type BitcoinEvidence,
@@ -6,21 +5,8 @@ import {
   type BitcoinProfile,
   type DerivationLocation,
 } from '../bitcoin-evidence.js';
-import { type ParsedArguments, value } from './arguments.js';
-
-function nonNegativeInteger(
-  arguments_: ParsedArguments,
-  key: string,
-  defaultValue: number,
-): number {
-  const raw = value(arguments_, key);
-  if (raw === undefined) return defaultValue;
-  const parsed = Number(raw);
-  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed >= 0x80000000) {
-    throw new Error(`--${key} must be an integer from 0 through 2147483647.`);
-  }
-  return parsed;
-}
+import { integerOption, type ParsedArguments, value } from './arguments.js';
+import { readBoundedTextFile } from './input.js';
 
 function bitcoinProfilesFrom(arguments_: ParsedArguments): readonly BitcoinProfile[] {
   const requested = value(arguments_, 'bitcoin-profile') ?? 'auto';
@@ -55,15 +41,28 @@ export function bitcoinEvidence(arguments_: ParsedArguments): BitcoinEvidence | 
   if (supplied.length !== 1)
     throw new Error('Select exactly one Bitcoin recovery-evidence option.');
   const [kind, rawValue] = supplied[0]!;
-  const value_ = kind === 'wif' ? readFileSync(rawValue!, 'utf8').trim() : rawValue!.trim();
+  const value_ =
+    kind === 'wif' ? readBoundedTextFile(rawValue!, '--wif-file').trim() : rawValue!.trim();
   const network = bitcoinNetwork(arguments_);
   if (kind === 'master-xpub' || kind === 'master-fingerprint')
     return { kind, value: value_, network };
   const location: DerivationLocation = {
     network,
-    account: nonNegativeInteger(arguments_, 'account', 0),
-    branch: nonNegativeInteger(arguments_, 'branch', 0),
-    index: nonNegativeInteger(arguments_, 'index', 0),
+    account: integerOption(arguments_, 'account', {
+      defaultValue: 0,
+      min: 0,
+      max: 0x7fffffff,
+    }),
+    branch: integerOption(arguments_, 'branch', {
+      defaultValue: 0,
+      min: 0,
+      max: 0x7fffffff,
+    }),
+    index: integerOption(arguments_, 'index', {
+      defaultValue: 0,
+      min: 0,
+      max: 0x7fffffff,
+    }),
   };
   return {
     kind,
@@ -75,5 +74,7 @@ export function bitcoinEvidence(arguments_: ParsedArguments): BitcoinEvidence | 
 
 export function bip39Passphrase(arguments_: ParsedArguments): string {
   const path = value(arguments_, 'bip39-passphrase-file');
-  return path === undefined ? '' : readFileSync(path, 'utf8').replace(/\r?\n$/, '');
+  return path === undefined
+    ? ''
+    : readBoundedTextFile(path, '--bip39-passphrase-file').replace(/\r?\n$/, '');
 }

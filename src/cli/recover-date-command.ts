@@ -12,7 +12,7 @@ import {
 } from '../core.js';
 import { matchBitcoinEvidence } from '../bitcoin-evidence.js';
 import { parseRecord } from '../record.js';
-import { type ParsedArguments, value, values } from './arguments.js';
+import { integerOption, type ParsedArguments, values } from './arguments.js';
 import { bip39Passphrase, bitcoinEvidence } from './bitcoin-options.js';
 import {
   encodedInput,
@@ -22,12 +22,16 @@ import {
 } from './input.js';
 
 export async function runRecoverDate(arguments_: ParsedArguments): Promise<void> {
-  const maxResults = Number(value(arguments_, 'max-results') ?? '100');
-  const progressEvery = Number(value(arguments_, 'progress-every') ?? '1000');
-  if (!Number.isSafeInteger(maxResults) || maxResults < 1)
-    throw new Error('--max-results must be a positive integer.');
-  if (!Number.isSafeInteger(progressEvery) || progressEvery < 1)
-    throw new Error('--progress-every must be a positive integer.');
+  const maxResults = integerOption(arguments_, 'max-results', {
+    defaultValue: 100,
+    min: 1,
+    max: Number.MAX_SAFE_INTEGER,
+  });
+  const progressEvery = integerOption(arguments_, 'progress-every', {
+    defaultValue: 1000,
+    min: 1,
+    max: Number.MAX_SAFE_INTEGER,
+  });
   const prompted = promptedRecoveryInputs(arguments_);
   const rawEncoded = prompted?.encoded ?? (await encodedInput(arguments_));
   const record = parseRecord(rawEncoded);

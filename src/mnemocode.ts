@@ -11,6 +11,7 @@ import { runTable } from './cli/table-command.js';
 import { terminalFailure } from './cli/terminal.js';
 import { runPreview } from './cli/preview-command.js';
 import { printUsage } from './cli/usage.js';
+import { MNEMOCODE_VERSION } from './version.js';
 import {
   runSskrSplit,
   runSskrCombine,
@@ -23,6 +24,11 @@ async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
   if (command === undefined || command === '--help' || command === 'help') {
     printUsage();
+    return;
+  }
+  if (command === '--version' || command === 'version') {
+    if (rest.length > 0) throw new Error(`${command} does not accept arguments.`);
+    console.log(`mnemocode ${MNEMOCODE_VERSION}`);
     return;
   }
   const arguments_ = parseArguments(rest);

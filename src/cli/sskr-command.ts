@@ -7,15 +7,16 @@ import {
   terminalResultHeader,
   terminalStatus,
 } from './terminal.js';
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { preflightFileDestination } from './output-paths.js';
-import { value, values, type ParsedArguments } from './arguments.js';
+import { integerOption, value, values, type ParsedArguments } from './arguments.js';
 import {
   askSecret,
   encodeFormat,
   encodedOutputLabel,
   dates,
   promptedEncodeInputs,
+  readBoundedTextFile,
   textInput,
   transformMode,
 } from './input.js';
@@ -46,13 +47,6 @@ function singleOptions(args: ParsedArguments, repeatable: readonly string[] = []
     if (!repeatable.includes(key) && Array.isArray(val))
       throw new Error(`--${key} must be supplied once.`);
   }
-}
-
-function integer(args: ParsedArguments, key: string): number {
-  const raw = value(args, key);
-  if (raw === undefined || !/^[1-9][0-9]*$/u.test(raw))
-    throw new Error(`--${key} requires a positive integer.`);
-  return Number(raw);
 }
 
 function exportOptions(args: ParsedArguments): SskrExportOptions | undefined {
@@ -165,8 +159,14 @@ async function destinations(args: ParsedArguments, options?: SskrExportOptions):
 
 export async function runSskrSplit(args: ParsedArguments, integrated = false): Promise<void> {
   singleOptions(args, ['date']);
-  const threshold = integer(args, 'threshold');
-  const count = integer(args, 'shares');
+  const threshold = integerOption(args, 'threshold', {
+    min: 1,
+    max: Number.MAX_SAFE_INTEGER,
+  });
+  const count = integerOption(args, 'shares', {
+    min: 1,
+    max: Number.MAX_SAFE_INTEGER,
+  });
   validateThreshold(threshold, count);
   if (integrated) {
     for (const key of ['cards', 'qr', 'event', 'legacy-valid-last-word', 'title'])
@@ -249,7 +249,9 @@ export async function readShares(args: ParsedArguments): Promise<string[]> {
   for (const path of values(args, 'share-file')) {
     // Text files contain one complete UR or RGB share per non-empty line.
     const text =
-      path === '-' ? textInput({ 'input-file': '-' }, 'input') : await readFile(path, 'utf8');
+      path === '-'
+        ? textInput({ 'input-file': '-' }, 'input')
+        : readBoundedTextFile(path, '--share-file');
     shares.push(
       ...text
         .split(/\r?\n/u)

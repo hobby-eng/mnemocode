@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const nodeVersion = readFileSync(new URL('../.node-version', import.meta.url), 'utf8').trim();
 const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+const versionSource = readFileSync(new URL('../src/version.ts', import.meta.url), 'utf8');
 
 const expectedEngine = `>=${nodeVersion}`;
 if (packageJson.engines?.node !== expectedEngine) {
@@ -21,4 +22,11 @@ if (/\n\s+version:\s+\d+\.\d+\.\d+\s*$/mu.test(workflow)) {
   throw new Error('CI must read pnpm from package.json packageManager');
 }
 
-console.log(`Toolchain pins agree: Node.js ${nodeVersion}; ${packageJson.packageManager}.`);
+const sourceVersion = versionSource.match(/MNEMOCODE_VERSION = '([^']+)'/u)?.[1];
+if (sourceVersion !== packageJson.version) {
+  throw new Error('src/version.ts MNEMOCODE_VERSION must match package.json version');
+}
+
+console.log(
+  `Version and toolchain pins agree: MnemoCode ${sourceVersion}; Node.js ${nodeVersion}; ${packageJson.packageManager}.`,
+);
