@@ -13,6 +13,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./cards": {
+      "types": "./dist/cards.d.ts",
+      "import": "./dist/cards.js"
+    },
     "./sskr": {
       "types": "./dist/sskr/index.d.ts",
       "import": "./dist/sskr/index.js"
@@ -40,7 +44,7 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "pnpm clean && tsc -p tsconfig.json",
     "check:toolchain": "node scripts/verify-toolchain.mjs",
-    "check": "pnpm check:toolchain && tsc --noEmit",
+    "check": "pnpm check:toolchain && tsc --noEmit && tsc --noEmit -p tsconfig.cards.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

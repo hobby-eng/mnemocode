@@ -1,7 +1,7 @@
 import { resolveIdentityFor, sectorForTemplate } from './card-identities.js';
 import { fit, text, clipCard } from './business-render-primitives.js';
 import { businessFields, physicalStyle } from './business-designs.js';
-import { readFile } from 'node:fs/promises';
+import { readRenderAsset } from './platform.js';
 import fontkit from '@pdf-lib/fontkit';
 import {
   PDFDocument,
@@ -84,10 +84,9 @@ export async function renderBusinessCards(
   const profile = resolveIdentityFor(content, sectorForTemplate(style));
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  const font = await doc.embedFont(
-    await readFile(new URL('../../assets/fonts/DejaVuSans-UI.ttf', import.meta.url)),
-    { subset: true },
-  );
+  const font = await doc.embedFont(await readRenderAsset('fonts/DejaVuSans-UI.ttf'), {
+    subset: true,
+  });
   const presentation = resolvePresentationFor(content);
   clearDocumentMetadata(doc);
   const fieldColor = (dark: boolean | undefined, index: number) => {

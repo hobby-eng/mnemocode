@@ -1,3 +1,5 @@
+import './export/platform-node.js';
+
 export * from './version.js';
 export * from './core.js';
 export * from './bitcoin-evidence.js';

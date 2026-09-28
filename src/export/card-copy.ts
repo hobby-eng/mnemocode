@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { renderPlatform } from './platform.js';
 import {
   validateProfile,
   type CardProfile,
@@ -142,7 +142,7 @@ function copyValue(value: string | undefined, fallback: () => string, label: str
 export function resolveCardPresentation(
   supplied: CardProfile = {},
   copy: CardCopyOverrides = {},
-  choose: UniformChoice = randomInt,
+  choose: UniformChoice = (upperExclusive) => renderPlatform().randomInt(upperExclusive),
 ): ResolvedCardPresentation {
   const profile = validateProfile(supplied);
   return {

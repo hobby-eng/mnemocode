@@ -5,6 +5,7 @@ import { writeRenderedDocument, exportPageImages, type ImageFormat } from './ima
 import { renderMaterialCard } from './material-cards.js';
 import { renderGlassCards } from './glass-cards.js';
 import { materialArtwork, type MaterialStyle } from './material-artwork.js';
+import './platform-node.js';
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { businessStyles } from './business-designs.js';
 import { PDFDocument } from 'pdf-lib';

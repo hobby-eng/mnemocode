@@ -1,5 +1,5 @@
 import { materialPageLayout, materialGridLayout } from './material-layout.js';
-import { readFile } from 'node:fs/promises';
+import { readRenderAsset } from './platform.js';
 import fontkit from '@pdf-lib/fontkit';
 import {
   PDFDocument,
@@ -131,13 +131,10 @@ async function createRenderContext(
   const profile = resolveIdentityFor(content);
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  const font = await doc.embedFont(
-    await readFile(new URL('../../assets/fonts/DejaVuSans-UI.ttf', import.meta.url)),
-    { subset: true },
-  );
-  const image = await doc.embedJpg(
-    await readFile(new URL(`../../assets/images/material-${style}.jpg`, import.meta.url)),
-  );
+  const font = await doc.embedFont(await readRenderAsset('fonts/DejaVuSans-UI.ttf'), {
+    subset: true,
+  });
+  const image = await doc.embedJpg(await readRenderAsset(`images/material-${style}.jpg`));
   const ink = artwork.dark ? rgb(0.94, 0.92, 0.87) : rgb(0.15, 0.16, 0.16);
   const muted = artwork.dark ? rgb(0.73, 0.72, 0.67) : rgb(0.38, 0.38, 0.35);
   clearDocumentMetadata(doc);
