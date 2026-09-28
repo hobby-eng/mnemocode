@@ -104,7 +104,8 @@ describe('single-page design studies', () => {
       await renderSskrPdf(shares, {
         style: 'it',
         layout: 'collection',
-        pageSize: 'business',
+        // A collection sheet needs a sheet size; a card size would give separate cards.
+        pageSize: 'a6',
         orientation: 'landscape',
         cardQr: true,
         presentation,
@@ -117,7 +118,8 @@ describe('single-page design studies', () => {
     );
     const labels = textSpy.mock.calls.map(([label]) => label);
     expect(labels.filter((label) => label === 'REVIEW STUDIO')).toHaveLength(3);
-    expect(new Set(labels.filter((label) => label.startsWith('Series '))).size).toBe(3);
+    // The footer line carries the slogan, the series of the share and the footer text.
+    expect(new Set(labels.filter((label) => label.includes('Series '))).size).toBe(3);
   }, 30_000);
 
   it.each(['business-it', 'material-kitchen', 'business-glass-8in1'])(
