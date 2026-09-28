@@ -67,7 +67,7 @@ export async function businessArtwork(
   const out = new PNG({ width: base.width, height: base.height });
   base.data.copy(out.data);
   for (let p = 0; p < out.data.length; p += 4) {
-    const [h, s, v] = hsv(base.data[p]! / 255, base.data[p + 1]! / 255, base.data[p + 2]! / 255);
+    const [h, s, v] = hsv(out.data[p]! / 255, out.data[p + 1]! / 255, out.data[p + 2]! / 255);
     if (s < 0.2 || v < 0.08) continue; // Black paper, white lettering/icons, and highlights stay neutral.
     const hue = (((h + target[0] - hueOrigins[style]) % 1) + 1) % 1;
     const sat =

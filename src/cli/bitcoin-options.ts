@@ -14,7 +14,7 @@ function bitcoinProfilesFrom(arguments_: ParsedArguments): readonly BitcoinProfi
   const profiles = requested.split(',').map((item) => item.trim()) as BitcoinProfile[];
   if (profiles.length === 0 || profiles.some((profile) => !bitcoinProfiles.includes(profile))) {
     throw new Error(
-      `--bitcoin-profile must be auto or a comma-separated list of: ${bitcoinProfiles.join(', ')}.`,
+      `The Bitcoin address profile must be auto or a comma-separated list of: ${bitcoinProfiles.join(', ')}.`,
     );
   }
   return profiles;
@@ -23,7 +23,7 @@ function bitcoinProfilesFrom(arguments_: ParsedArguments): readonly BitcoinProfi
 function bitcoinNetwork(arguments_: ParsedArguments): BitcoinNetworkName {
   const network = value(arguments_, 'network') ?? 'mainnet';
   if (network !== 'mainnet' && network !== 'testnet')
-    throw new Error('--network must be mainnet or testnet.');
+    throw new Error('The Bitcoin network must be mainnet or testnet.');
   return network;
 }
 
@@ -42,7 +42,7 @@ export function bitcoinEvidence(arguments_: ParsedArguments): BitcoinEvidence | 
     throw new Error('Select exactly one Bitcoin recovery-evidence option.');
   const [kind, rawValue] = supplied[0]!;
   const value_ =
-    kind === 'wif' ? readBoundedTextFile(rawValue!, '--wif-file').trim() : rawValue!.trim();
+    kind === 'wif' ? readBoundedTextFile(rawValue!, 'The WIF file').trim() : rawValue!.trim();
   const network = bitcoinNetwork(arguments_);
   if (kind === 'master-xpub' || kind === 'master-fingerprint')
     return { kind, value: value_, network };
@@ -76,5 +76,5 @@ export function bip39Passphrase(arguments_: ParsedArguments): string {
   const path = value(arguments_, 'bip39-passphrase-file');
   return path === undefined
     ? ''
-    : readBoundedTextFile(path, '--bip39-passphrase-file').replace(/\r?\n$/, '');
+    : readBoundedTextFile(path, 'The BIP39 passphrase file').replace(/\r?\n$/, '');
 }

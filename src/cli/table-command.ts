@@ -21,7 +21,7 @@ export function runTable(arguments_: ParsedArguments): void {
   const unicode = value(arguments_, 'unicode');
   if ([indexValue, word, unicode].filter((item) => item !== undefined).length !== 1) {
     throw new Error(
-      'Provide exactly one of --index, --word, or --unicode; use --all for the full table.',
+      'Choose exactly one lookup value: a word index, a BIP39 word, or a Unicode value. Request the full table instead when no lookup is needed.',
     );
   }
   if (indexValue !== undefined)

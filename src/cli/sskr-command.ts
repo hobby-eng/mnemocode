@@ -33,6 +33,7 @@ import {
 } from '../export/sskr-cards.js';
 import { requireNewCardDirectory } from '../export/individual-cards.js';
 import { decodeQrPngFile } from './qr-input.js';
+import { optionLabel } from './option-copy.js';
 
 export const sskrExportOptions = [
   'cards-dir',
@@ -45,7 +46,7 @@ export const sskrInputOptions = ['share', 'share-file', 'share-qr', 'ask-secrets
 function singleOptions(args: ParsedArguments, repeatable: readonly string[] = []): void {
   for (const [key, val] of Object.entries(args)) {
     if (!repeatable.includes(key) && Array.isArray(val))
-      throw new Error(`--${key} must be supplied once.`);
+      throw new Error(`Provide only one value for the ${optionLabel(key)} setting.`);
   }
 }
 
@@ -56,21 +57,24 @@ function exportOptions(args: ParsedArguments): SskrExportOptions | undefined {
   if (!directory && !pdf && !images) {
     if (sskrExportOptions.some((key) => args[key] !== undefined))
       throw new Error(
-        'SSKR card options require --cards-dir PATH, --pdf PATH, or --images-dir PATH.',
+        'SSKR card settings require an individual-card output folder, a PDF file, or an image output folder.',
       );
     return undefined;
   }
   if (directory !== undefined && !directory.trim())
-    throw new Error('--cards-dir requires a non-empty folder path.');
+    throw new Error('The individual-card output folder path must not be empty.');
   const template = value(args, 'template') ?? 'business-it';
   const entries = Object.entries(allTemplateStyles);
   const style =
     entries.find(([id]) => id === template)?.[1] ??
     (/^[1-9][0-9]*$/u.test(template) ? entries[Number(template) - 1]?.[1] : undefined);
-  if (!style) throw new Error('Unknown business-card template. Use preview --list.');
+  if (!style)
+    throw new Error(
+      'The selected business-card template is not available. View the template list to choose a supported design.',
+    );
   const layout = value(args, 'card-layout') ?? 'collection';
   if (layout !== 'qr' && layout !== 'collection' && layout !== 'individual')
-    throw new Error('--card-layout must be qr, collection, or individual.');
+    throw new Error('The card layout must be qr, collection, or individual.');
   return {
     ...businessOptions(args, template),
     style,
@@ -84,7 +88,7 @@ function shareFormat(args: ParsedArguments): 'ur' | 'colors' {
   const format = value(args, 'format') ?? 'ur';
   if (format !== 'ur' && format !== 'colors')
     throw new Error(
-      'SSKR --format must be ur or colors. These are share formats, not BIP39 representations.',
+      'The SSKR share format must be ur or colors. These are share formats, not BIP39 representations.',
     );
   return format;
 }
@@ -172,7 +176,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
     for (const key of ['cards', 'qr', 'event', 'legacy-valid-last-word', 'title'])
       if (args[key] !== undefined)
         throw new Error(
-          `--${key} is not supported with --sskr. Use --pdf or --cards-dir for share exports.`,
+          `The ${optionLabel(key)} setting is not available in SSKR mode. Export shares to a PDF file or an individual-card output folder instead.`,
         );
   }
   const representation = integrated ? encodeFormat(value(args, 'format')) : undefined;
@@ -183,7 +187,9 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
   await destinations(args, options);
   const mode = transformMode(args);
   if (mode !== 'direct' && mode !== 'seedshift')
-    throw new Error('SSKR split supports direct or checksum-valid seedshift, not legacy modes.');
+    throw new Error(
+      'SSKR share creation supports direct mode and checksum-valid Seedshift, but not legacy modes.',
+    );
   const prompted = promptedEncodeInputs(args, mode);
   const dateValues = prompted?.dates ?? dates(args);
   if (mode === 'direct' && dateValues.length) throw new Error('Direct mode does not accept dates.');
@@ -238,7 +244,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
 export async function readShares(args: ParsedArguments): Promise<string[]> {
   if (args['ask-secrets'] === true) {
     if (['share', 'share-file', 'share-qr'].some((key) => args[key] !== undefined))
-      throw new Error('--ask-secrets cannot be combined with other share input options.');
+      throw new Error('Hidden input cannot be combined with another share-input source.');
     return askSecret('SSKR shares (separate complete shares with a semicolon):')
       .split(';')
       .map(normalizeShare);
@@ -251,7 +257,7 @@ export async function readShares(args: ParsedArguments): Promise<string[]> {
     const text =
       path === '-'
         ? textInput({ 'input-file': '-' }, 'input')
-        : readBoundedTextFile(path, '--share-file');
+        : readBoundedTextFile(path, 'The share file');
     shares.push(
       ...text
         .split(/\r?\n/u)
@@ -262,7 +268,7 @@ export async function readShares(args: ParsedArguments): Promise<string[]> {
   for (const path of values(args, 'share-qr')) shares.push(await decodeQrPngFile(path));
   if (!shares.length)
     throw new Error(
-      'Provide --share, --share-file, --share-qr, or --ask-secrets. Repeat input options for additional shares.',
+      'Provide at least one complete share as text, in a text file, in a QR image, or through hidden input. Additional share sources may be repeated.',
     );
   return shares.map(normalizeShare);
 }
@@ -271,7 +277,7 @@ export async function runSskrCombine(args: ParsedArguments): Promise<void> {
   singleOptions(args, ['share', 'share-file', 'share-qr', 'date']);
   const mode = transformMode(args);
   if (mode !== 'direct' && mode !== 'seedshift')
-    throw new Error('SSKR combine supports direct or checksum-valid seedshift.');
+    throw new Error('SSKR share recovery supports direct mode or checksum-valid Seedshift.');
   const dateValues = dates(args);
   if (mode === 'direct' && dateValues.length) throw new Error('Direct mode does not accept dates.');
   if (mode === 'seedshift' && !dateValues.length && args['ask-secrets'] !== true)

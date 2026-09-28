@@ -2,6 +2,7 @@ import { constants } from 'node:fs';
 import { access, lstat, realpath, stat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { value, values, type ParsedArguments } from './arguments.js';
+import { optionLabel } from './option-copy.js';
 
 function contains(parent: string, child: string): boolean {
   const relation = relative(resolve(parent), resolve(child));
@@ -31,7 +32,9 @@ async function effectiveSourcePath(path: string, key: string): Promise<string> {
   try {
     return await realpath(resolve(path));
   } catch {
-    throw new Error(`--${key} could not be read.`);
+    throw new Error(
+      `The ${optionLabel(key)} could not be read. Check that the file exists and is readable.`,
+    );
   }
 }
 
@@ -48,7 +51,7 @@ export async function validateOutputPaths(args: ParsedArguments): Promise<void> 
     for (const right of effectiveOutputs.slice(index + 1)) {
       if (contains(left.path, right.path) || contains(right.path, left.path))
         throw new Error(
-          `--${left.key} and --${right.key} must use separate, non-overlapping paths.`,
+          `The ${optionLabel(left.key)} and ${optionLabel(right.key)} must use separate, non-overlapping paths.`,
         );
     }
     for (const key of ['mnemonic-file', 'input-file', 'share-file', 'share-qr']) {
@@ -56,7 +59,7 @@ export async function validateOutputPaths(args: ParsedArguments): Promise<void> 
         if (source === '-') continue;
         const effectiveSource = await effectiveSourcePath(source, key);
         if (contains(left.path, effectiveSource) || contains(effectiveSource, left.path))
-          throw new Error(`--${left.key} must not overlap --${key}.`);
+          throw new Error(`The ${optionLabel(left.key)} must not overlap the ${optionLabel(key)}.`);
       }
     }
   }
@@ -79,12 +82,15 @@ export async function preflightFileDestination(
   const parent = dirname(resolve(path));
   try {
     if (!(await stat(parent)).isDirectory())
-      throw new Error('The output parent must be a directory.');
+      throw new Error('The folder containing the output file is not a directory.');
     await access(parent, constants.W_OK);
   } catch (error) {
-    if (error instanceof Error && error.message === 'The output parent must be a directory.') {
+    if (
+      error instanceof Error &&
+      error.message === 'The folder containing the output file is not a directory.'
+    ) {
       throw error;
     }
-    throw new Error('The output parent must be an existing writable directory.');
+    throw new Error('The folder containing the output file must already exist and be writable.');
   }
 }

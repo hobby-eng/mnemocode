@@ -7,8 +7,14 @@ const MIN_MODULE_MM = 0.4;
 
 /** Physical size includes a white quiet zone on all four sides. */
 export function qrSizeMm(payload: string, minimum = 28): number {
+  return qrSizeForModuleMm(payload, minimum, MIN_MODULE_MM);
+}
+
+export function qrSizeForModuleMm(payload: string, minimum: number, moduleMm: number): number {
+  if (!Number.isFinite(moduleMm) || moduleMm <= 0)
+    throw new Error('The QR module size must be a positive physical measurement.');
   const qr = QRCode.create(payload, { errorCorrectionLevel: 'M' });
-  return Math.max(minimum, (qr.modules.size + QUIET_MODULES * 2) * MIN_MODULE_MM);
+  return Math.max(minimum, (qr.modules.size + QUIET_MODULES * 2) * moduleMm);
 }
 
 /** Draw exact data as vector modules, never as part of a decorative bitmap. */
@@ -18,10 +24,11 @@ export function drawCollectionQr(
   x: number,
   top: number,
   size: number,
+  minimumModuleMm = MIN_MODULE_MM,
 ): void {
   const qr = QRCode.create(payload, { errorCorrectionLevel: 'M' });
   const totalModules = qr.modules.size + QUIET_MODULES * 2;
-  if (size / totalModules < MIN_MODULE_MM - 1e-8)
+  if (size / totalModules < minimumModuleMm - 1e-8)
     throw new Error('The QR is too small for this payload; use a larger page.');
   if (
     x < 0 ||

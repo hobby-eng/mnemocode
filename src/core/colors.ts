@@ -102,36 +102,53 @@ export function colorsToIndexes(colors: readonly string[]): number[] {
 const COLOR_UNICODE_BASE = 0xe000;
 
 const COLOR_UNICODE_WIDTH = 0x1900;
+const COLOR_UNICODE_CODE_POINT_DIGITS = 4;
 
-/** MnemoCode-defined lossless representation: two Private Use Unicode scalars per CSS RGB color. */
+/** Portable text form: two four-digit Private Use code points per CSS RGB color. */
 export function colorsToUnicode(colors: readonly string[]): string {
   return colors
     .map((color) => {
       if (!/^#[0-9A-F]{6}$/u.test(color))
         throw new Error('Each color must use uppercase #RRGGBB form.');
       const value = Number.parseInt(color.slice(1), 16);
-      return String.fromCodePoint(
+      return [
         COLOR_UNICODE_BASE + Math.floor(value / COLOR_UNICODE_WIDTH),
         COLOR_UNICODE_BASE + (value % COLOR_UNICODE_WIDTH),
-      );
+      ]
+        .map((point) =>
+          point.toString(16).toUpperCase().padStart(COLOR_UNICODE_CODE_POINT_DIGITS, '0'),
+        )
+        .join('');
     })
     .join('');
 }
 
 export function unicodeToColors(value: string): string[] {
-  const points = Array.from(value)
-    .filter((point) => !/\s/u.test(point))
-    .map((point) => point.codePointAt(0)!);
+  const compact = value.replace(/[\s,;]+/gu, '');
+  const points =
+    /^[0-9A-F]+$/iu.test(compact) && compact.length % COLOR_UNICODE_CODE_POINT_DIGITS === 0
+      ? Array.from({ length: compact.length / COLOR_UNICODE_CODE_POINT_DIGITS }, (_, index) =>
+          Number.parseInt(
+            compact.slice(
+              index * COLOR_UNICODE_CODE_POINT_DIGITS,
+              index * COLOR_UNICODE_CODE_POINT_DIGITS + COLOR_UNICODE_CODE_POINT_DIGITS,
+            ),
+            16,
+          ),
+        )
+      : Array.from(value)
+          .filter((point) => !/\s/u.test(point))
+          .map((point) => point.codePointAt(0)!);
   if (![16, 20, 24, 28, 32].includes(points.length))
     throw new Error(
-      'Color Unicode must contain two symbols per CSS color: 16, 20, 24, 28, or 32 symbols.',
+      'Color Unicode must contain two code points per CSS color: 16, 20, 24, 28, or 32 code points.',
     );
   if (
     points.some(
       (point) => point < COLOR_UNICODE_BASE || point >= COLOR_UNICODE_BASE + COLOR_UNICODE_WIDTH,
     )
   ) {
-    throw new Error('Color Unicode uses only MnemoCode Private Use Area symbols.');
+    throw new Error('Color Unicode uses only MnemoCode Private Use Area code points.');
   }
   return Array.from({ length: points.length / 2 }, (_, index) => {
     const color =

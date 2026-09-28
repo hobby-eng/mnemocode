@@ -150,8 +150,7 @@ export function datePatternCombinationCount(
     if (candidateCount === 0) return 0;
     let combinations = 1n;
     for (let index = 1; index <= count; index += 1) {
-      combinations =
-        (combinations * BigInt(candidateCount + index - 1)) / BigInt(index);
+      combinations = (combinations * BigInt(candidateCount + index - 1)) / BigInt(index);
     }
     total *= combinations;
     if (total > limit) return stopAfter + 1;
@@ -178,7 +177,8 @@ export function* datePatternCombinations(
   const previousMatchingDate =
     previousMatchingIndex === -1 ? undefined : selected[previousMatchingIndex];
   for (const date of datePatternCandidates(patterns[index]!)) {
-    if (previousMatchingDate !== undefined && compareDates(date, previousMatchingDate) < 0) continue;
+    if (previousMatchingDate !== undefined && compareDates(date, previousMatchingDate) < 0)
+      continue;
     yield* datePatternCombinations(patterns, index + 1, [...selected, date]);
   }
 }

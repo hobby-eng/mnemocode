@@ -140,12 +140,12 @@ ${section('REPRESENTATIONS')}
   5  colors          reversible #RRGGBB values, separated or concatenated.
                      BIP39Colors-compatible for 12/24 words; MnemoCode also
                      supports 15, 18, and 21
-  6  colors-unicode  the same lossless colour data, encoded as two MnemoCode
-                     Private Use Unicode symbols per RGB value; all five lengths
+  6  colors-unicode  the same lossless colour data as two visible four-digit
+                     Private Use Unicode code points per RGB value; all five lengths
 
   Format 3 uses the Traditional Chinese BIP39 mapping but prints only code
-  points. Format 6 is MnemoCode-specific and may appear as blank glyphs in fonts
-  without Private Use symbols. Both are reversible representations, not encryption.
+  points. Format 6 is MnemoCode-specific portable hexadecimal text; its legacy
+  Private Use symbol form remains readable. Both are representations, not encryption.
 
 ${section('TERMINAL AND FILE OUTPUT')}
 
@@ -171,8 +171,8 @@ ${cardTemplates.map((template, index) => `    ${index + 1}  ${template.id.padEnd
   ${flag('--orientation VALUE')}    portrait or landscape
   Glass variants: business-glass-4in1, business-glass-6in1, business-glass-8in1.
   Each groups 4, 6 or 8 consecutive references; the last card may contain fewer.
-  Compact glass QR is inline only when readable at the actual printed size.
-  Reduced collections use a reverse QR; individual QR never includes other cards.
+  Collections use one corner QR outside the sketches on the same study page.
+  Individual business, material and glass cards remain QR-free.
   ${flag('--card-name TEXT')}        name in Latin letters (random unless supplied)
   ${flag('--card-role TEXT')}        role (random, compatible with the company)
   ${flag('--card-company TEXT')}     employer name
@@ -181,10 +181,11 @@ ${cardTemplates.map((template, index) => `    ${index + 1}  ${template.id.padEnd
   ${flag('--card-website TEXT')}     website (default: generated company domain)
   ${flag('--card-location TEXT')}    location (default: International)
 
-  A4 uses 90 x 50 mm samples: eight per portrait page or six per landscape page.
-  Business A6 collections fit one front page; enabled collection QR uses the back.
-  Material selections use a front with exact references; --card-qr adds a QR reverse.
-  QR is optional. Collection QR holds the full representation; inline glass QR holds its own fragment.
+  Every collection is one design-study page with numbered variants and review copy.
+  A4/A6 show larger sketches; wallet/business are compact selection sheets, not cutting templates.
+  --card-qr adds one corner QR on the same page, clear of artwork and exact references.
+  Compact material studies omit decorative finish names; A6/A4 retain them.
+  QR is optional and applies only to the complete collection representation.
   Preview accepts the same personal fields and ${flag('--words 12|15|18|21|24')}.
   Omitted personal fields use demonstration values; they never affect encoding.
 

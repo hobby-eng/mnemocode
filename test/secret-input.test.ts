@@ -38,7 +38,7 @@ describe('hidden input controlling terminal', () => {
     [{ status: 1, stdout: '' }, 'cancelled or failed'],
     [{ status: null, signal: 'SIGINT', stdout: '' }, 'cancelled or failed'],
     [{ status: 0, stdout: '\n' }, 'must not be empty'],
-    [{ error: new Error('ENOENT') }, 'Could not start'],
+    [{ error: new Error('ENOENT') }, 'could not be started'],
   ])('closes the terminal on input failure', (result, message) => {
     terminal.spawn.mockReturnValue(result);
     expect(() => askSecret('Mnemonic:')).toThrow(message);

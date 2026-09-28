@@ -178,6 +178,17 @@ describe('direct representation mode', () => {
     expect(decoded.recoveredMnemonic).toBe(source);
     expect(decoded.checksumValid).toBe(true);
   });
+
+  it('prints portable color Unicode code points and still reads legacy Private Use symbols', () => {
+    const portable = formatEncoded(representMnemonic(source), 'colors-unicode');
+    expect(portable).toMatch(/^(?:[0-9A-F]{4})+$/u);
+    const legacySymbols = portable
+      .match(/.{4}/gu)!
+      .map((point) => String.fromCodePoint(Number.parseInt(point, 16)))
+      .join('');
+    expect(decodeInputDirect(portable, 'colors-unicode').recoveredMnemonic).toBe(source);
+    expect(decodeInputDirect(legacySymbols, 'colors-unicode').recoveredMnemonic).toBe(source);
+  });
 });
 
 describe('all standard BIP39 lengths and representations', () => {

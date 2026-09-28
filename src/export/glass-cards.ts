@@ -10,11 +10,17 @@ import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, rgb, type PDFPage, type PDFFont } from 'pdf-lib';
 import { colorsToIndexes, unicodeToColors } from '../core.js';
 import { colorsToShare } from '../sskr/transport.js';
-import { drawCollectionQr, qrSizeMm } from './card-qr.js';
 import { resolvePresentationFor } from './card-copy.js';
 import { clearDocumentMetadata } from './document-metadata.js';
 import { parsePageSize, type CardProfile, type CardPresentation } from './card-settings.js';
 import { glassArtwork } from './glass-artwork.js';
+import {
+  collectionSheetLayout,
+  drawStudyCaption,
+  drawStudyFrame,
+  drawStudyShadow,
+  studyCaptionWidth,
+} from './collection-sheet.js';
 import type { CardContent } from './templates.js';
 import type { SskrCardContent } from './sskr-content.js';
 
@@ -31,7 +37,6 @@ const COMPACT_REFERENCES = {
   textOffset: 3.3,
   fontSize: 6.6,
 } as const;
-const INLINE_QR = { minimum: 20, maximum: 22, rightInset: 23.5, bottomInset: 23.5 } as const;
 const ink = rgb(0.1, 0.12, 0.13);
 export const GLASS_REFERENCES_PER_CARD = 4;
 export const glassCardCount = (referenceCount: number, referencesPerCard: 4 | 6 | 8 = 4): number =>
@@ -228,26 +233,7 @@ function drawCompactLabels(
   }
 }
 
-function drawQrBack(context: RenderContext, layout: GlassPageLayout, payload: string): void {
-  const { doc, font, profile, content } = context;
-  const qrSize = qrSizeMm(payload, 28);
-  const available = Math.min(layout.width - 10, layout.height - 18);
-  if (qrSize > available)
-    throw new Error('The QR code does not fit this card size. Choose A6 or A4.');
-  const page = doc.addPage([layout.width * MM, layout.height * MM]);
-  drawSheetIdentity(context, page, layout);
-  if (!layout.studioSheet)
-    write(page, font, profile.company, 5, 3, fit(font, profile.company, 8, layout.width - 10));
-  const top = (layout.height - qrSize) / 2;
-  drawCollectionQr(page, payload, (layout.width - qrSize) / 2, top, qrSize);
-  const caption =
-    content.kind === 'sskr'
-      ? `Collection reference ${content.collectionReference}`
-      : 'Collection reference';
-  write(page, font, caption, 5, layout.height - (layout.studioSheet ? 11 : 6), 5.5);
-}
-
-/** Four ordered references per card. Optional QR is never reduced to a decorative thumbnail. */
+/** Ordered references per card. QR belongs only to a collection study. */
 export async function renderGlassCards(
   content: CardContent | SskrCardContent,
   individualIndex?: number,
@@ -256,7 +242,7 @@ export async function renderGlassCards(
   validateContent(content);
   const wholeShareQr = content.kind === 'sskr' && content.qrCard === true;
   if (![4, 6, 8].includes(referencesPerCard)) throw new Error('Glass capacity must be 4, 6 or 8.');
-  const count = wholeShareQr ? 1 : glassCardCount(content.colors.length, referencesPerCard);
+  const count = glassCardCount(content.colors.length, referencesPerCard);
   const cardWidth = referencesPerCard === 4 || content.pageSize === 'business' ? 90 : 85.6;
   const cardHeight = referencesPerCard === 4 || content.pageSize === 'business' ? 50 : 54;
   if (
@@ -282,6 +268,11 @@ export async function renderGlassCards(
     profile: resolveIdentityFor(content, undefined),
     presentation: resolvePresentationFor(content),
   };
+  if (individualIndex === undefined || wholeShareQr) {
+    await drawGlassStudy(context);
+    clearDocumentMetadata(doc);
+    return doc.save();
+  }
   const layout = glassPageLayout(
     content,
     individualIndex !== undefined,
@@ -289,37 +280,80 @@ export async function renderGlassCards(
     cardHeight,
     count,
   );
-  const selected =
-    individualIndex === undefined ? Array.from({ length: count }, (_, i) => i) : [individualIndex];
-  let needsQrBack = Boolean(content.cardQr || wholeShareQr);
-  const inlinePayloads = selected.map((index) =>
-    wholeShareQr ? content.payload : referencesFor(content, index, referencesPerCard).join(' '),
-  );
-  const inlineQr =
-    needsQrBack &&
-    referencesPerCard !== 4 &&
-    layout.scale >= 1 &&
-    inlinePayloads.every((payload) => qrSizeMm(payload, INLINE_QR.minimum) <= INLINE_QR.maximum);
-  if (inlineQr) needsQrBack = false;
-  await drawGlassPages(context, layout, selected, inlineQr);
-  if (needsQrBack) {
-    const payload =
-      individualIndex !== undefined && !wholeShareQr
-        ? referencesFor(content, individualIndex, referencesPerCard).join(' ')
-        : content.payload;
-    drawQrBack(context, layout, payload);
-  }
+  await drawGlassPages(context, layout, [individualIndex]);
   clearDocumentMetadata(doc);
   return doc.save();
+}
+
+async function drawGlassStudy(context: RenderContext): Promise<void> {
+  const {
+    doc,
+    font,
+    content,
+    profile,
+    presentation,
+    count,
+    referencesPerCard,
+    cardWidth,
+    cardHeight,
+  } = context;
+  const payload = content.cardQr || context.wholeShareQr ? content.payload : undefined;
+  const captions = Array.from({ length: count }, (_, index) => {
+    const refs = referencesFor(content, index, referencesPerCard);
+    const lines: string[] = [];
+    for (let offset = 0; offset < refs.length; offset += 2)
+      lines.push(
+        refs
+          .slice(offset, offset + 2)
+          .map(
+            (ref, i) =>
+              `${String(index * referencesPerCard + offset + i + 1).padStart(2, '0')} ${ref.slice(1).toUpperCase()}`,
+          )
+          .join('   '),
+      );
+    return lines;
+  });
+  const layout = collectionSheetLayout(
+    content,
+    count,
+    cardWidth / cardHeight,
+    Math.ceil(referencesPerCard / 2),
+    payload,
+    studyCaptionWidth(font, captions.flat()),
+  );
+  const page = doc.addPage([layout.width * MM, layout.height * MM]);
+  drawStudyFrame(
+    page,
+    font,
+    layout,
+    presentation,
+    content.title ?? presentation.studioName,
+    content.kind === 'sskr' ? content.collectionReference : '01',
+    profile.name,
+    payload,
+  );
+  for (const box of layout.cards) {
+    drawStudyShadow(page, box);
+    // The photograph is a design sketch; exact ordered references remain independent vector text.
+    const refs = referencesFor(content, box.index, referencesPerCard);
+    const bytes = await glassArtwork(refs, referencesPerCard);
+    const artwork = referencesPerCard === 4 ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+    page.drawImage(artwork, {
+      x: box.x * MM,
+      y: page.getHeight() - (box.y + box.height) * MM,
+      width: box.width * MM,
+      height: box.height * MM,
+    });
+    drawStudyCaption(page, font, layout, box, captions[box.index]!);
+  }
 }
 
 async function drawGlassPages(
   context: RenderContext,
   layout: GlassPageLayout,
   selected: readonly number[],
-  inlineQr: boolean,
 ): Promise<void> {
-  const { doc, content, cardWidth, cardHeight, wholeShareQr, referencesPerCard } = context;
+  const { doc, cardWidth, cardHeight } = context;
   const capacity = layout.columns * layout.rows;
   for (let start = 0; start < selected.length; start += capacity) {
     const indices = selected.slice(start, start + capacity);
@@ -339,19 +373,6 @@ async function drawGlassPages(
       const top =
         layout.top + (layout.bottom - layout.top - gridHeight) / 2 + row * (ch + CARD.gap);
       await drawCard(context, page, index, x, top, layout.scale);
-      if (inlineQr) {
-        const payload = wholeShareQr
-          ? content.payload
-          : referencesFor(content, index, referencesPerCard).join(' ');
-        const qrSize = qrSizeMm(payload, INLINE_QR.minimum);
-        drawCollectionQr(
-          page,
-          payload,
-          x + cardWidth - INLINE_QR.rightInset,
-          top + cardHeight - INLINE_QR.bottomInset,
-          qrSize,
-        );
-      }
     }
   }
 }

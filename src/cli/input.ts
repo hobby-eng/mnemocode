@@ -26,7 +26,7 @@ function readBoundedStdin(): string {
   return Buffer.concat(chunks, total).toString('utf8');
 }
 
-export function readBoundedTextFile(path: string, inputName = 'Text input'): string {
+export function readBoundedTextFile(path: string, inputName = 'The text input'): string {
   try {
     if (statSync(path).size > MAX_TEXT_INPUT_BYTES)
       throw new Error(`${inputName} exceeds the 1 MiB safety limit.`);
@@ -35,7 +35,7 @@ export function readBoundedTextFile(path: string, inputName = 'Text input'): str
     if (error instanceof Error && error.message.includes('exceeds the 1 MiB safety limit')) {
       throw error;
     }
-    throw new Error(`${inputName} could not be read.`);
+    throw new Error(`${inputName} could not be read. Check that the file exists and is readable.`);
   }
 }
 
@@ -43,10 +43,20 @@ export function textInput(arguments_: ParsedArguments, key: 'input' | 'mnemonic'
   const direct = value(arguments_, key);
   const path = value(arguments_, `${key}-file`);
   if ((direct === undefined) === (path === undefined)) {
-    throw new Error(`Provide exactly one of --${key} or --${key}-file.`);
+    throw new Error(
+      key === 'mnemonic'
+        ? 'Provide the mnemonic either as direct text or in a file, but not both.'
+        : 'Provide the encoded input either as direct text or in a file, but not both.',
+    );
   }
   return (
-    direct ?? (path === '-' ? readBoundedStdin() : readBoundedTextFile(path!, `--${key}-file`))
+    direct ??
+    (path === '-'
+      ? readBoundedStdin()
+      : readBoundedTextFile(
+          path!,
+          key === 'mnemonic' ? 'The mnemonic file' : 'The encoded input file',
+        ))
   );
 }
 
@@ -54,7 +64,7 @@ export async function encodedInput(arguments_: ParsedArguments): Promise<string>
   const qrPath = value(arguments_, 'qr-file');
   if (qrPath === undefined) return textInput(arguments_, 'input');
   if (value(arguments_, 'input') !== undefined || value(arguments_, 'input-file') !== undefined) {
-    throw new Error('Provide --qr-file or one --input source, not both.');
+    throw new Error('Choose one encoded input source: a QR image, direct text, or a text file.');
   }
   return decodeQrPngFile(qrPath);
 }
@@ -71,7 +81,7 @@ export function inputFormat(value_: string): EncodedFormat {
   const format = aliases[value_] ?? value_;
   const supported = ['english', 'indexes', 'unicode', 'colors', 'colors-unicode'];
   if (!supported.includes(format))
-    throw new Error(`--format must be one of: ${supported.join(', ')}.`);
+    throw new Error(`The representation format must be one of: ${supported.join(', ')}.`);
   return format as EncodedFormat;
 }
 
@@ -79,11 +89,11 @@ async function chooseInputFormat(candidates: readonly EncodedFormat[]): Promise<
   if (process.stdin.isTTY !== true || process.stderr.isTTY !== true) {
     if (candidates.length === 0) {
       throw new Error(
-        'Could not detect the input representation. Specify --format explicitly and check the recorded data.',
+        'The input representation could not be detected. Choose the recorded format explicitly and check the source data.',
       );
     }
     throw new Error(
-      `Input format is ambiguous (${candidates.join(', ')}). Specify --format explicitly.`,
+      `The input matches several formats (${candidates.join(', ')}). Choose the recorded format explicitly.`,
     );
   }
   const numbers: Readonly<Record<EncodedFormat, string>> = {
@@ -122,7 +132,7 @@ export async function recordedInputFormat(
   if (record !== undefined) {
     if (explicit !== undefined && inputFormat(explicit) !== record.format) {
       throw new Error(
-        `--format ${inputFormat(explicit)} conflicts with the record format ${record.format}.`,
+        `The selected format (${inputFormat(explicit)}) conflicts with the format stored in the record (${record.format}).`,
       );
     }
     return record.format;
@@ -148,11 +158,13 @@ export function transformMode(
     !['direct', 'seedshift', 'seedshift-legacy', 'seedshift-legacy-valid'].includes(explicit)
   ) {
     throw new Error(
-      '--mode must be direct, seedshift, seedshift-legacy, or seedshift-legacy-valid.',
+      'The transformation mode must be direct, seedshift, seedshift-legacy, or seedshift-legacy-valid.',
     );
   }
   if (explicit !== undefined && embedded !== undefined && explicit !== embedded) {
-    throw new Error(`--mode ${explicit} conflicts with the record mode ${embedded}.`);
+    throw new Error(
+      `The selected transformation mode (${explicit}) conflicts with the mode stored in the record (${embedded}).`,
+    );
   }
   if (explicit !== undefined) return explicit as TransformMode;
   if (embedded !== undefined) return embedded;
@@ -171,7 +183,7 @@ export function encodedOutputLabel(format: EncodedFormat, mode: TransformMode): 
     case 'colors':
       return `${shifted}BIP39Colors RGB hexadecimal codes`;
     case 'colors-unicode':
-      return `${shifted}MnemoCode Private Use Unicode color symbols`;
+      return `${shifted}MnemoCode color Unicode code points`;
   }
 }
 
@@ -187,7 +199,7 @@ export function askSecret(prompt: string): string {
     terminal = openSync('/dev/tty', 'r+');
   } catch {
     throw new Error(
-      '--ask-secrets requires an interactive terminal. Run this command in a terminal, or use a file/stdin input option.',
+      'Hidden input requires an interactive terminal. Run the command in a terminal, or read the secret from a file or standard input.',
     );
   }
   try {
@@ -196,7 +208,9 @@ export function askSecret(prompt: string): string {
       stdio: [terminal, 'pipe', terminal],
     });
     if (result.error !== undefined)
-      throw new Error(`Could not start systemd-ask-password: ${result.error.message}`);
+      throw new Error(
+        'The secure hidden-input prompt could not be started. Ensure that systemd-ask-password is installed and available.',
+      );
     if (result.status !== 0) throw new Error('Secret input was cancelled or failed.');
     const secret = result.stdout.trim();
     if (secret.length === 0) throw new Error('Secret input must not be empty.');
@@ -217,7 +231,7 @@ export function promptedEncodeInputs(
     values(arguments_, 'date').length > 0
   ) {
     throw new Error(
-      '--ask-secrets cannot be combined with --mnemonic, --mnemonic-file, or --dates.',
+      'Hidden input cannot be combined with a mnemonic supplied on the command line, a mnemonic file, or command-line dates.',
     );
   }
   const mnemonic = askSecret('BIP39 mnemonic:');
@@ -237,7 +251,7 @@ export function promptedRecoveryInputs(
     values(arguments_, 'date').length > 0
   ) {
     throw new Error(
-      '--ask-secrets cannot be combined with --input, --input-file, --qr-file, or --dates.',
+      'Hidden input cannot be combined with direct encoded text, an encoded input file, a QR input file, or command-line dates.',
     );
   }
   const encoded = askSecret('Encoded record:');

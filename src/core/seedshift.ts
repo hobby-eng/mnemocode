@@ -132,7 +132,7 @@ export function decodeIndexes(
   const containerMnemonic = indexes.map((index) => englishWordlist[index]!).join(' ');
   if (!validateMnemonic(containerMnemonic, englishWordlist)) {
     throw new Error(
-      'The checksum-valid Seedshift container has an invalid BIP39 checksum. Check the recorded data or use --mode seedshift-legacy for an original Seedshift record.',
+      'The checksum-valid Seedshift record has an invalid BIP39 checksum. Check the recorded data or select the original Seedshift compatibility mode.',
     );
   }
   const entropyBits = bytesToBits(mnemonicToEntropy(containerMnemonic, englishWordlist));

@@ -64,7 +64,16 @@ export function businessFields(
     minimum: label === 'Name' ? 6 : 4,
     dark,
   });
-  if (style === 'architect' || style === 'it')
+  if (style === 'it')
+    return [
+      field('Company', p.company, 0.17, 0.115, 0.36, 7.8),
+      field('Name', p.name, 0.08, 0.265, 0.43, 10),
+      field('Role', p.role, 0.08, 0.355, 0.41, 6),
+      field('Email', p.email, 0.16, 0.535, 0.32, 6.2),
+      field('Website', p.website, 0.16, 0.68, 0.34, 6.2),
+      field('Location', p.location, 0.16, 0.825, 0.37, 6.2),
+    ];
+  if (style === 'architect')
     return [
       field('Company', p.company, 0.17, 0.14, 0.36, 7.8),
       field('Name', p.name, 0.08, 0.29, 0.43, 10),
@@ -120,15 +129,4 @@ export function businessFields(
     field('Email', p.email, 0.23, 0.645, 0.52, 6.5, true),
     field('Website', p.website, 0.23, 0.73, 0.52, 6.5, true),
   ];
-}
-/** Keep the QR away from contact text. */
-export function businessQrBox(style: PhysicalBusinessStyle): {
-  x: number;
-  y: number;
-  size: number;
-} {
-  if (style === 'contact') return { x: 7, y: 3, size: 22 };
-  if (style === 'curves') return { x: 5, y: 20, size: 26 };
-  if (style === 'facets') return { x: 2, y: 25, size: 17 };
-  return { x: 58, y: 17, size: 27 };
 }

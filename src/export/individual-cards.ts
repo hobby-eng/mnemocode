@@ -14,7 +14,7 @@ export async function requireNewCardDirectory(path: string): Promise<string> {
     throw error;
   }
   throw new Error(
-    'The card folder already exists. Choose a new --cards-dir path to avoid mixing collections.',
+    'The card folder already exists. Choose a new folder to avoid mixing separate card collections.',
   );
 }
 

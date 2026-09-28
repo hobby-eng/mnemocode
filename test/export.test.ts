@@ -5,10 +5,17 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { renderCards, exportCards } from '../src/export/pdf.js';
-import { cardTemplates, type CardContent, type CardTemplate } from '../src/export/templates.js';
+import {
+  cardTemplates,
+  selectTemplate,
+  type CardContent,
+  type CardTemplate,
+} from '../src/export/templates.js';
 import { parseArguments, values } from '../src/cli/arguments.js';
 import { completeEventLabels } from '../src/cli/card-options.js';
-import { parseDate } from '../src/core.js';
+import { indexesToColors, parseDate } from '../src/core.js';
+import { resolveCardPresentation } from '../src/export/card-copy.js';
+import { resolveProfile } from '../src/export/card-settings.js';
 
 // Blank PDF fixture tests the export transport only. It is never a registered design.
 async function fixture(pageCount = 1) {
@@ -26,12 +33,63 @@ async function fixture(pageCount = 1) {
   return doc.save();
 }
 const content: CardContent = { kind: 'colors', colors: [], payload: 'public test' };
+const fragmentColors = indexesToColors(Array.from({ length: 12 }, (_, index) => index));
+
+// Identity and sheet copy are chosen randomly per export; pin them so paired
+// renders can differ only through the setting under test.
+const fixedIdentity = {
+  presentation: resolveCardPresentation({}, {}, () => 0).presentation,
+  profile: resolveProfile('it', { name: 'Alex Morgan' }),
+};
 
 describe('export infrastructure', () => {
   it('ships sixteen approved templates with individual export', () => {
     expect(cardTemplates).toHaveLength(16);
     expect(new Set(cardTemplates.map((t) => t.id)).size).toBe(16);
     for (const template of cardTemplates) expect(template.renderIndividual).toBeTypeOf('function');
+  });
+
+  it.each([
+    'material-vehicle',
+    'material-enclosure',
+    'material-tile',
+    'material-switch',
+    'material-kitchen',
+    'business-glass-4in1',
+    'business-glass-6in1',
+    'business-glass-8in1',
+  ])('keeps an enabled collection QR off the individual %s front', async (id) => {
+    const template = selectTemplate(id);
+    for (const pageSize of ['wallet', 'business'] as const) {
+      const withQr = await PDFDocument.load(
+        await template.renderIndividual!(
+          {
+            kind: 'colors',
+            colors: fragmentColors,
+            payload: fragmentColors.join(' '),
+            cardQr: true,
+            pageSize,
+            ...fixedIdentity,
+          },
+          0,
+        ),
+      );
+      const withoutQr = await PDFDocument.load(
+        await template.renderIndividual!(
+          {
+            kind: 'colors',
+            colors: fragmentColors,
+            payload: fragmentColors.join(' '),
+            cardQr: false,
+            pageSize,
+            ...fixedIdentity,
+          },
+          0,
+        ),
+      );
+      expect(withQr.getPageCount()).toBe(1);
+      expect(pageOperators(withQr, 0)).toBe(pageOperators(withoutQr, 0));
+    }
   });
 
   it('preserves page content and removes private metadata in preview and saved PDFs', async () => {

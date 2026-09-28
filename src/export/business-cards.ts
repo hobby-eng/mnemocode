@@ -11,7 +11,6 @@ import {
   type PDFImage,
   popGraphicsState,
 } from 'pdf-lib';
-import { drawCollectionQr, qrSizeMm } from './card-qr.js';
 export { drawCollectionQr } from './card-qr.js';
 import { clearDocumentMetadata } from './document-metadata.js';
 import { resolvePresentationFor } from './card-copy.js';
@@ -20,17 +19,21 @@ import type { CardContent } from './templates.js';
 import type { SskrCardContent } from './sskr-content.js';
 import { colorsToShare } from '../sskr/transport.js';
 import { businessArtwork } from './business-artwork.js';
-import { businessPages, MM, type CardBox, type BusinessPage } from './business-layout.js';
+import { MM, type CardBox } from './business-layout.js';
+import {
+  collectionSheetLayout,
+  drawStudyCaption,
+  drawStudyFrame,
+  drawStudyShadow,
+} from './collection-sheet.js';
 import {
   parsePageSize,
   type BusinessStyle,
   type CardProfile,
-  type CardPageSize,
   type CardPresentation,
 } from './card-settings.js';
 
 const ink = rgb(0.12, 0.13, 0.14);
-const muted = rgb(0.4, 0.42, 0.44);
 const white = rgb(1, 1, 1);
 
 type BusinessContent = Exclude<CardContent, { readonly kind: 'unicode' }> | SskrCardContent;
@@ -56,7 +59,6 @@ function validateContent(
 }
 
 const CARD = { width: 90, height: 50 } as const;
-const COLORS = { ink, muted, white, page: rgb(0.965, 0.968, 0.971) } as const;
 type FittedField = ReturnType<typeof businessFields>[number] & { size: number };
 interface RenderContext {
   doc: PDFDocument;
@@ -64,7 +66,6 @@ interface RenderContext {
   content: BusinessContent;
   style: BusinessStyle;
   styleOffset: number;
-  size: CardPageSize;
   artwork: (index: number, code: string) => Promise<PDFImage>;
   profile: Required<CardProfile>;
   presentation: CardPresentation;
@@ -79,7 +80,7 @@ export async function renderBusinessCards(
   styleOffset = 0,
 ): Promise<Uint8Array> {
   validateContent(content);
-  const size = parsePageSize(content.pageSize);
+  parsePageSize(content.pageSize);
   const profile = resolveIdentityFor(content, sectorForTemplate(style));
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
@@ -117,13 +118,13 @@ export async function renderBusinessCards(
     content,
     style,
     styleOffset,
-    size,
     profile,
     presentation,
     fieldsFor,
     fieldColor,
   };
-  if (individualIndex !== undefined) await renderSingle(context, individualIndex);
+  if (individualIndex !== undefined && !(content.kind === 'sskr' && content.qrCard))
+    await renderSingle(context, individualIndex);
   else await renderCollection(context);
   return doc.save();
 }
@@ -149,18 +150,7 @@ function buildFields(
 }
 
 async function renderSingle(context: RenderContext, individualIndex: number): Promise<void> {
-  const {
-    doc,
-    font,
-    content,
-    style,
-    styleOffset,
-    size,
-    profile,
-    presentation,
-    fieldsFor,
-    fieldColor,
-  } = context;
+  const { doc, font, content, style, styleOffset, presentation, fieldsFor, fieldColor } = context;
   const share = content.kind === 'sskr';
   if (
     !Number.isInteger(individualIndex) ||
@@ -190,75 +180,68 @@ async function renderSingle(context: RenderContext, individualIndex: number): Pr
       field.size,
       fieldColor(field.dark, individualIndex),
     );
-  const wholeShareQr = share && content.qrCard === true;
-  const reference = wholeShareQr
-    ? content.collectionReference
-    : share
-      ? `${String(individualIndex + 1).padStart(2, '0')} / ${content.colors.length}  ${code.slice(1)}  |  ${content.collectionReference}`
-      : code.slice(1);
+  const reference = share
+    ? `${String(individualIndex + 1).padStart(2, '0')} / ${content.colors.length}  ${code.slice(1)}  |  ${content.collectionReference}`
+    : code.slice(1);
   const referenceText = `${presentation.referenceLabel} ${reference}`.trim();
   const design = physicalStyle(style, individualIndex + styleOffset);
+  const referenceSize = fit(
+    font,
+    referenceText,
+    design === 'contact' ? 4.6 : 6.3,
+    4.2,
+    76 * MM,
+    'Reference',
+  );
+  const referenceX =
+    design === 'it' ? 55.5 - font.widthOfTextAtSize(referenceText, referenceSize) / MM : 7.2;
   text(
     page,
     font,
     referenceText,
-    7.2,
+    referenceX,
     46,
-    fit(font, referenceText, design === 'contact' ? 4.6 : 6.3, 4.2, 76 * MM, 'Reference'),
+    referenceSize,
     ['contact', 'facets'].includes(design) ? ink : rgb(0.84, 0.86, 0.88),
   );
   resizeSinglePage(page, content);
-  if (content.cardQr || wholeShareQr) {
-    // Ordinary individual files contain this fragment only, never the complete secret.
-    drawQrBack(
-      context,
-      page.getWidth() / MM,
-      page.getHeight() / MM,
-      wholeShareQr ? content.payload : code,
-      share ? content.collectionReference : '',
-    );
-  }
 }
 
 async function renderCollection(context: RenderContext): Promise<void> {
-  const {
-    doc,
-    font,
-    content,
-    style,
-    styleOffset,
-    size,
-    profile,
-    presentation,
-    fieldsFor,
-    fieldColor,
-  } = context;
+  const { doc, font, content, profile, presentation, style } = context;
   const share = content.kind === 'sskr';
-  const small = size === 'wallet' || size === 'business';
-  const pages = businessPages(content.colors.length, size, content.orientation, share);
-  for (const [pageNumber, layout] of pages.entries()) {
-    const page = doc.addPage([layout.width * MM, layout.height * MM]);
-    page.drawRectangle({
-      x: 0,
-      y: 0,
-      width: page.getWidth(),
-      height: page.getHeight(),
-      color: COLORS.page,
-    });
-    drawCollectionHeader(context, page, layout, small);
-    for (const box of layout.cards) {
-      await drawCard(context, page, box, small);
-    }
-    drawFooter(context, page, layout, pageNumber, pages.length, small);
-  }
-  if (content.cardQr || (share && content.qrCard)) {
-    const lastLayout = pages[pages.length - 1]!;
-    drawQrBack(
-      context,
-      lastLayout.width,
-      lastLayout.height,
-      content.payload,
-      share ? content.collectionReference : '',
+  const studyTheme = style === 'it' ? 'noir' : 'cool';
+  const payload = content.cardQr || (share && content.qrCard) ? content.payload : undefined;
+  const layout = collectionSheetLayout(
+    content,
+    content.colors.length,
+    CARD.width / CARD.height,
+    1,
+    payload,
+  );
+  const page = doc.addPage([layout.width * MM, layout.height * MM]);
+  drawStudyFrame(
+    page,
+    font,
+    layout,
+    presentation,
+    content.title ?? presentation.studioName,
+    share ? content.collectionReference : '01',
+    profile.name,
+    payload,
+    studyTheme,
+  );
+  for (const box of layout.cards) {
+    await drawCard(context, page, box, studyTheme);
+    drawStudyCaption(
+      page,
+      font,
+      layout,
+      box,
+      [
+        `${String(box.index + 1).padStart(2, '0')}  ${content.colors[box.index]!.slice(1).toUpperCase()}`,
+      ],
+      studyTheme,
     );
   }
 }
@@ -267,22 +250,12 @@ async function drawCard(
   context: RenderContext,
   page: PDFPage,
   box: CardBox,
-  small: boolean,
+  studyTheme: 'cool' | 'noir',
 ): Promise<void> {
-  const { doc, font, content, style, styleOffset, size, fieldsFor, fieldColor, presentation } =
-    context;
-  const share = content.kind === 'sskr';
+  const { font, content, fieldsFor, fieldColor } = context;
   const code = content.colors[box.index]!.toUpperCase();
   const artwork = await context.artwork(box.index, code);
-  if (size === 'a6')
-    page.drawRectangle({
-      x: (box.x + 0.3) * MM,
-      y: page.getHeight() - (box.y + box.height + 0.4) * MM,
-      width: box.width * MM,
-      height: box.height * MM,
-      color: rgb(0.8, 0.81, 0.82),
-      opacity: 0.4,
-    });
+  drawStudyShadow(page, box, studyTheme);
   clipCard(page, box);
   page.drawImage(artwork, {
     x: box.x * MM,
@@ -302,162 +275,6 @@ async function drawCard(
       field.size * scale,
       fieldColor(field.dark, box.index),
     );
-  const ref = `${small || !presentation.referenceLabel ? '' : presentation.referenceLabel + ' '}${share ? String(box.index + 1).padStart(2, '0') + ' ' : ''}${code.slice(1)}`;
-  const refSize = small ? 6 : size === 'a6' ? 4.7 : 7;
-  text(
-    page,
-    font,
-    ref,
-    box.x + (box.width - font.widthOfTextAtSize(ref, refSize) / MM) / 2,
-    box.y + box.height + 0.9,
-    refSize,
-  );
-}
-
-function drawFooter(
-  context: RenderContext,
-  page: PDFPage,
-  layout: BusinessPage,
-  pageNumber: number,
-  pageCount: number,
-  small: boolean,
-): void {
-  if (small) return;
-  const { font, content, size, presentation } = context;
-  const lineY = layout.height - 8;
-  page.drawLine({
-    start: { x: 4 * MM, y: page.getHeight() - lineY * MM },
-    end: { x: (layout.width - 4) * MM, y: page.getHeight() - lineY * MM },
-    color: muted,
-    thickness: 0.3,
-  });
-  const footerSize = fit(
-    font,
-    presentation.footer,
-    size === 'a6' ? 4.6 : 7,
-    4.2,
-    (layout.width / 2 - 8) * MM,
-    'Footer',
-  );
-  text(page, font, presentation.footer, 4, lineY + 2, footerSize, muted);
-  if (content.kind === 'sskr') {
-    const caption = `${presentation.referenceLabel} ${content.collectionReference}`.trim();
-    const captionSize = fit(
-      font,
-      caption,
-      size === 'a6' ? 4.5 : 7,
-      4.2,
-      (layout.width / 2 - 8) * MM,
-      'Reference',
-    );
-    text(
-      page,
-      font,
-      caption,
-      layout.width - 4 - font.widthOfTextAtSize(caption, captionSize) / MM,
-      lineY + 2,
-      captionSize,
-      muted,
-    );
-  }
-  if (size === 'a4')
-    text(page, font, `${pageNumber + 1} / ${pageCount}`, 12, layout.height - 26, 7, muted);
-}
-
-/** Full-payload QR gets its own physical area; decorative cards are never shrunk around it. */
-function drawQrBack(
-  context: RenderContext,
-  width: number,
-  height: number,
-  payload: string,
-  reference: string,
-): void {
-  const { doc, font, profile, presentation } = context;
-  const qrSize = qrSizeMm(payload);
-  if (qrSize > Math.min(width - 10, height - 16))
-    throw new Error('The QR does not fit legibly; choose a larger page size.');
-  const page = doc.addPage([width * MM, height * MM]);
-  const headingSize = fit(font, profile.company, 8, 4.2, (width - 10) * MM, 'Company');
-  text(
-    page,
-    font,
-    profile.company,
-    (width - font.widthOfTextAtSize(profile.company, headingSize) / MM) / 2,
-    3,
-    headingSize,
-  );
-  drawCollectionQr(page, payload, (width - qrSize) / 2, (height - qrSize) / 2, qrSize);
-  const caption = reference ? `${presentation.referenceLabel} ${reference}`.trim() : '';
-  if (caption) {
-    const captionSize = fit(font, caption, 6, 4.2, (width - 10) * MM, 'Reference');
-    text(
-      page,
-      font,
-      caption,
-      (width - font.widthOfTextAtSize(caption, captionSize) / MM) / 2,
-      height - 6,
-      captionSize,
-      muted,
-    );
-  }
-}
-
-function drawCollectionHeader(
-  context: RenderContext,
-  page: PDFPage,
-  layout: BusinessPage,
-  small: boolean,
-): void {
-  const { content, presentation, font, size } = context;
-  const pageTitle = content.title ?? presentation.studioName;
-  const headingSize = fit(
-    font,
-    pageTitle,
-    small ? 7 : size === 'a6' ? 11 : 17,
-    small ? 5 : size === 'a6' ? 7 : 10,
-    (layout.width - 12) * MM,
-    'Title',
-  );
-  const headingX = (layout.width - font.widthOfTextAtSize(pageTitle, headingSize) / MM) / 2;
-  text(page, font, pageTitle, headingX, small ? 2 : size === 'a6' ? 2.5 : 7, headingSize);
-  const subtitle = presentation.subtitle;
-  const subtitleSize = fit(
-    font,
-    subtitle,
-    size === 'a6' ? 5.5 : 9,
-    4.2,
-    (layout.width - 12) * MM,
-    'Subtitle',
-  );
-  if (!small)
-    text(
-      page,
-      font,
-      subtitle,
-      (layout.width - font.widthOfTextAtSize(subtitle, subtitleSize) / MM) / 2,
-      size === 'a6' ? 8 : 15,
-      subtitleSize,
-      muted,
-    );
-  if (!small && presentation.slogan) {
-    const sloganSize = fit(
-      font,
-      presentation.slogan,
-      size === 'a6' ? 4.8 : 7,
-      4.2,
-      (layout.width - 12) * MM,
-      'Slogan',
-    );
-    text(
-      page,
-      font,
-      presentation.slogan,
-      (layout.width - font.widthOfTextAtSize(presentation.slogan, sloganSize) / MM) / 2,
-      size === 'a6' ? 10.7 : 20,
-      sloganSize,
-      muted,
-    );
-  }
 }
 
 function resizeSinglePage(page: PDFPage, content: BusinessContent): void {

@@ -116,8 +116,8 @@ describe('AUD-002-SEC001 bounded secret-bearing files', () => {
 
   it('returns a stable option-specific error for an unreadable text file', () => {
     const missing = join(tmpdir(), 'mnemocode-file-that-does-not-exist');
-    expect(() => readBoundedTextFile(missing, '--wif-file')).toThrow(
-      '--wif-file could not be read.',
+    expect(() => readBoundedTextFile(missing, 'The WIF file')).toThrow(
+      'The WIF file could not be read. Check that the file exists and is readable.',
     );
   });
 });
@@ -189,7 +189,9 @@ describe('AUD-002-API002 stable validation errors and paths', () => {
           output: join(directory, 'result.txt'),
           'mnemonic-file': join(directory, 'missing.txt'),
         }),
-      ).rejects.toThrow('--mnemonic-file could not be read.');
+      ).rejects.toThrow(
+        'The mnemonic file could not be read. Check that the file exists and is readable.',
+      );
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

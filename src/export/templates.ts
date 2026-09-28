@@ -90,7 +90,7 @@ export const cardTemplates: readonly CardTemplate[] = [
     kind: 'colors',
     name: `${style[0]!.toUpperCase()}${style.slice(1)} finish selection`,
     description:
-      'Photographic material samples with finish names and exact references; optional QR. All page sizes and individual fragments.',
+      'Photographic material samples with finish names and exact references; optional collection QR. All page sizes and individual fragments.',
     render: (content) => renderMaterialCard(style, content),
     renderIndividual: (content, individualIndex) =>
       renderMaterialCard(style, content, { individualIndex }),
@@ -99,7 +99,7 @@ export const cardTemplates: readonly CardTemplate[] = [
     id: `business-glass-${referencesPerCard}in1`,
     kind: 'colors',
     name: `Frosted glass / ${referencesPerCard}-reference palette`,
-    description: `${referencesPerCard} ordered references per card; all page sizes and individual files. Optional fragment QR contains only its own references.`,
+    description: `${referencesPerCard} ordered references per card; all page sizes and individual files. Optional QR is reserved for the collection study.`,
     referencesPerCard,
     render: (content) => renderGlassCards(content, undefined, referencesPerCard),
     renderIndividual: (content, index) => renderGlassCards(content, index, referencesPerCard),
@@ -118,6 +118,8 @@ export function selectTemplate(id?: string, kind?: CardKind): CardTemplate {
     selected = available[Number(id) - 1];
   }
   if (selected === undefined)
-    throw new Error(`Unknown or incompatible template: ${id}. Use preview --list.`);
+    throw new Error(
+      `The card template “${id}” is unknown or incompatible. List the available preview templates and choose one of them.`,
+    );
   return selected;
 }

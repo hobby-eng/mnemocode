@@ -28,7 +28,8 @@ async function main(): Promise<void> {
     return;
   }
   if (command === '--version' || command === 'version') {
-    if (rest.length > 0) throw new Error(`${command} does not accept arguments.`);
+    if (rest.length > 0)
+      throw new Error('The version command does not accept additional arguments.');
     console.log(`mnemocode ${MNEMOCODE_VERSION}`);
     return;
   }
