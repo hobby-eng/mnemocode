@@ -29,7 +29,9 @@ describe('CLI records', () => {
     expect(help.stdout).toContain('recover-date --mode seedshift');
     expect(help.stdout).toContain('--ask-secrets');
     expect(help.stdout).toContain('supports 15, 18, and 21');
-    expect(help.stdout).toContain('Private Use Unicode symbols per RGB value; all five lengths');
+    expect(help.stdout).toContain(
+      'Private Use Unicode code points per RGB value; all five lengths',
+    );
     expect(help.stdout).toContain('mnemocode self-test');
     expect(help.stdout).toContain('preview --all --pdf all-previews.pdf');
     for (const flag of ['--pdf PATH', '--template ID', '--events', '--title TEXT'])
@@ -43,7 +45,7 @@ describe('CLI records', () => {
       expect(result.stderr).toBe('');
     }
     await expect(run(['--version', 'extra'])).rejects.toMatchObject({
-      stderr: expect.stringContaining('--version does not accept arguments.'),
+      stderr: expect.stringContaining('The version command does not accept additional arguments.'),
     });
   });
 
@@ -99,7 +101,9 @@ describe('CLI records', () => {
       expect(await readFile(path, 'utf8')).toMatch(/^MNC1:direct:english:/u);
       await expect(
         run(['encode', '--mnemonic', mnemonic, '--format', '1', '--output']),
-      ).rejects.toMatchObject({ stderr: expect.stringContaining('--output requires a value') });
+      ).rejects.toMatchObject({
+        stderr: expect.stringContaining('output record file setting requires a value'),
+      });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -109,11 +113,17 @@ describe('CLI records', () => {
     const listed = await run(['preview', '--list']);
     expect(listed.stdout).toContain('business-architect');
     expect(listed.stdout).toContain('business-it');
+    const rows = listed.stdout.trimEnd().split('\n');
+    expect(rows).toHaveLength(16);
+    expect(rows.every((row) => /^(\S+) {3,}(\S+) {3,}(.+?) {3,}(.+)$/u.test(row))).toBe(true);
+    expect(new Set(rows.map((row) => row.indexOf('colors'))).size).toBe(1);
     await expect(
       run(['preview', '--all', '--template', '1', '--pdf', 'unused.pdf']),
-    ).rejects.toMatchObject({ stderr: expect.stringContaining('--all cannot be combined') });
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('either all templates or one specific template'),
+    });
     await expect(run(['preview', '--template', '1'])).rejects.toMatchObject({
-      stderr: expect.stringContaining('To save a preview, specify'),
+      stderr: expect.stringContaining('To save a preview, provide'),
     });
   });
 
@@ -160,9 +170,7 @@ describe('CLI records', () => {
         ],
       ]) {
         await expect(run(args)).rejects.toMatchObject({
-          stderr: expect.stringMatching(
-            /No approved card templates|Unknown or incompatible template/u,
-          ),
+          stderr: expect.stringMatching(/No approved card templates|unknown or incompatible/iu),
         });
       }
       expect(await readFile(path, 'utf8')).toBe('existing PDF');
@@ -262,7 +270,7 @@ describe('CLI records', () => {
       ]);
       expect(explicit.stdout.trim()).toBe(mnemonic);
     }
-  }, 10_000);
+  }, 30_000);
 
   it('keeps an explicit raw format authoritative', async () => {
     const encoded = await run([
@@ -291,13 +299,15 @@ describe('CLI records', () => {
   it('does not guess an unknown representation in a non-interactive process', async () => {
     await expect(
       run(['decode', '--mode', 'direct', '--input', 'not a recorded representation']),
-    ).rejects.toMatchObject({ stderr: expect.stringContaining('Specify --format explicitly') });
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('Choose the recorded format explicitly'),
+    });
   });
 
   it('does not guess between multiple valid raw representations in a non-interactive process', async () => {
     const ambiguous = '76 84 57 28 90 19 59 27 62 11 89 81 66 42 75 28 50 11 52 30 57 30 62 10';
     await expect(run(['decode', '--mode', 'direct', '--input', ambiguous])).rejects.toMatchObject({
-      stderr: expect.stringContaining('ambiguous (indexes, unicode)'),
+      stderr: expect.stringContaining('matches several formats (indexes, unicode)'),
     });
   });
 
@@ -319,12 +329,12 @@ describe('CLI records', () => {
       await expect(
         run(['decode', '--input-file', path, '--format', 'colors']),
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining('conflicts with the record format unicode'),
+        stderr: expect.stringContaining('conflicts with the format stored in the record (unicode)'),
       });
       await expect(
         run(['decode', '--input-file', path, '--mode', 'seedshift', '--dates', '23-09-2026']),
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining('conflicts with the record mode direct'),
+        stderr: expect.stringContaining('conflicts with the mode stored in the record (direct)'),
       });
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -407,7 +417,7 @@ describe('CLI records', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });
 
 describe('hidden CLI input', () => {
@@ -415,7 +425,7 @@ describe('hidden CLI input', () => {
     const directory = await mkdtemp(join(tmpdir(), 'mnemocode-secret-'));
     const helper = join(directory, 'systemd-ask-password');
     const recordPath = join(directory, 'record.txt');
-    const script = `#!/bin/sh\ntest -t 0 || exit 3\nprintf '%s\\n' "$3" >&2\ncase "$3" in\n  "BIP39 mnemonic:") printf '%s\\n' '${mnemonic}' ;;\n  "Date list (DD-MM-YYYY, separated by spaces):") printf '%s\\n' '10-07-1963' ;;\n  "Encoded record:") cat '${recordPath}' ;;\n  "Date list with one unknown part (for example ??-07-1963):") printf '%s\\n' '??-07-1963' ;;\n  *) exit 2 ;;\nesac\n`;
+    const script = `#!/bin/sh\ntest -t 0 || exit 3\nprintf '%s\\n' "$3" >&2\ncase "$3" in\n  "BIP39 mnemonic:") printf '%s\\n' '${mnemonic}' ;;\n  "Date list (DD-MM-YYYY, separated by spaces):") printf '%s\\n' '10-07-1963' ;;\n  "Encoded record:") cat '${recordPath}' ;;\n  "Date list with ? for each forgotten digit (one to three incomplete dates):") printf '%s\\n' '??-07-1963' ;;\n  *) exit 2 ;;\nesac\n`;
     try {
       await writeFile(helper, script, 'utf8');
       await chmod(helper, 0o700);

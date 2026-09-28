@@ -40,7 +40,7 @@ export async function requireNewImageDirectory(path: string): Promise<string> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return target;
     throw error;
   }
-  throw new Error('The image folder already exists. Choose a new --images-dir path.');
+  throw new Error('The image folder already exists. Choose a new folder for the exported images.');
 }
 
 /** Emits the unchanged PDF renderer's pages. Multipage documents get numbered image files. */

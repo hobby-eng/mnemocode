@@ -24,6 +24,7 @@ import { requireNewCardDirectory } from '../export/individual-cards.js';
 import { runSskrSplit } from './sskr-command.js';
 import { printEncodeResult } from './encode-report.js';
 import { saveEncodeResult } from './encode-export.js';
+import { optionLabel } from './option-copy.js';
 
 export interface EncodeOutcome {
   readonly mode: TransformMode;
@@ -42,16 +43,21 @@ async function validateEncodeOptions(
   args: ParsedArguments,
 ): Promise<{ mode: TransformMode; format: EncodedFormat }> {
   for (const key of ['threshold', 'shares', 'share-format', 'card-layout']) {
-    if (args[key] !== undefined) throw new Error(`--${key} requires --sskr.`);
+    if (args[key] !== undefined)
+      throw new Error(`The ${optionLabel(key)} setting is available only in SSKR mode.`);
   }
   const mode = transformMode(args);
   const format = encodeFormat(value(args, 'format'));
   if (mode === 'seedshift-legacy-valid')
-    throw new Error('Use --mode seedshift-legacy --legacy-valid-last-word when encoding.');
+    throw new Error(
+      'To create a legacy checksum-valid record, select legacy Seedshift and enable the checksum-word replacement.',
+    );
   if (args['legacy-valid-last-word'] === true && mode !== 'seedshift-legacy')
-    throw new Error('--legacy-valid-last-word requires --mode seedshift-legacy.');
+    throw new Error(
+      'The legacy checksum-word replacement is available only in legacy Seedshift mode.',
+    );
   if (args.cards === true && format !== 'colors' && format !== 'colors-unicode')
-    throw new Error('Terminal color cards require --format colors (5) or colors-unicode (6).');
+    throw new Error('Terminal color cards are available only for RGB color formats 5 and 6.');
   validateCardOptions(args, format, mode);
   // Validate all destinations before prompting or reading a mnemonic.
   await validateImageOptions(args);
@@ -82,7 +88,7 @@ function createOutcome(
   const prompted = promptedEncodeInputs(args, mode);
   const enteredDates = prompted?.dates ?? dates(args);
   if (mode === 'direct' && enteredDates.length > 0)
-    throw new Error('--dates cannot be used with --mode direct.');
+    throw new Error('Dates cannot be used in direct mode.');
   if (mode !== 'direct' && enteredDates.length === 0)
     throw new Error(`${mode} requires at least one date.`);
   const mnemonic = prompted?.mnemonic ?? textInput(args, 'mnemonic');

@@ -79,7 +79,7 @@ describe('integrated SSKR CLI', () => {
     ]) {
       const result = cli(['encode', '--ask-secrets', ...extras]);
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('requires --sskr');
+      expect(result.stderr).toContain('available only in SSKR mode');
     }
     const result = cli([
       'encode',
@@ -93,7 +93,7 @@ describe('integrated SSKR CLI', () => {
       'x.png',
     ]);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('not supported with --sskr');
+    expect(result.stderr).toContain('not available in SSKR mode');
   });
   it('keeps terminal color swatches plain when redirected', () => {
     const result = cli(['encode', '--mnemonic', mnemonic, '--format', '5', '--cards']);
