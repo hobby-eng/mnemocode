@@ -44,7 +44,8 @@ const TYPE_LAYOUT = {
   ownerTop: 8.7,
   labelsHeight: 4.5,
   referenceOffset: 0.3,
-  finishOffset: 2.3,
+  // Leaves a visible gap below the 5.5 pt reference line, which is 1.94 mm tall.
+  finishOffset: 2.6,
   footerInset: 3.2,
   minimumFont: 3.8,
 } as const;

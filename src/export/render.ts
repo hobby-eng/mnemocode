@@ -1,5 +1,6 @@
 import { resolveIdentityFor, sectorForTemplate } from './card-identities.js';
 import { resolvePresentationFor } from './card-copy.js';
+import { isCardPageSize } from './card-settings.js';
 import { clearDocumentMetadata } from './document-metadata.js';
 import { PDFDocument } from 'pdf-lib';
 import type { CardContent, CardTemplate } from './templates.js';
@@ -15,7 +16,10 @@ export interface RenderedCard {
   readonly bytes: Uint8Array;
 }
 
-/** Preview and encode share this path; no simplified preview renderer exists. */
+/**
+ * Preview and encode share this path; no simplified preview renderer exists.
+ * A sheet size gives one page per template. A card size gives one page per card.
+ */
 export async function renderCards(jobs: readonly CardJob[]): Promise<Uint8Array> {
   if (jobs.length === 0) throw new Error('No approved card templates are installed yet.');
   const presentation = resolvePresentationFor(jobs[0]!.content);
@@ -24,12 +28,22 @@ export async function renderCards(jobs: readonly CardJob[]): Promise<Uint8Array>
   for (const { template, content } of jobs) {
     if (template.kind !== content.kind)
       throw new Error(`Template ${template.id} does not support ${content.kind}.`);
-    const bytes = await template.render({
+    const resolved: CardContent = {
       ...content,
       presentation: content.presentation ?? presentation,
       profile: { ...profile, ...content.profile },
       cardQr: content.cardQr === true,
-    });
+    };
+    if (resolved.kind === 'colors' && isCardPageSize(resolved.pageSize)) {
+      if (resolved.cardQr)
+        throw new Error(
+          'A QR code is printed on a sheet only. Use --page-size a6 or a4 with --card-qr; separate cards never carry a QR code.',
+        );
+      for (const card of await renderIndividualCards(template, resolved)) pages.push(card.bytes);
+      continue;
+    }
+    // Without a page size every template uses the A6 sheet.
+    const bytes = await template.render({ ...resolved, pageSize: resolved.pageSize ?? 'a6' });
     const source = await PDFDocument.load(bytes);
     if (source.getPageCount() === 0)
       throw new Error(`Template ${template.id} rendered an empty document.`);

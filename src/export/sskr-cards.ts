@@ -14,11 +14,12 @@ import { shareInfo, shareToColors, urToTransport, validateShareSet } from '../ss
 import { renderBusinessCards } from './business-cards.js';
 import { requireNewCardDirectory } from './individual-cards.js';
 import type { BusinessStyle, CardSettings } from './card-settings.js';
-import type { SskrCardContent, SskrCardLayout } from './sskr-content.js';
+import { resolveSskrLayout, type SskrCardContent, type SskrCardLayout } from './sskr-content.js';
 
 export interface SskrExportOptions extends CardSettings {
   readonly style: BusinessStyle | MaterialStyle | 'glass-4in1' | 'glass-6in1' | 'glass-8in1';
-  readonly layout: SskrCardLayout;
+  /** Omitted: decided by the page size. */
+  readonly layout?: SskrCardLayout;
   readonly directory: string;
   readonly imageFormat?: ImageFormat;
 }
@@ -30,8 +31,12 @@ function glassReferencesPerCard(style: SskrExportOptions['style']): 4 | 6 | 8 | 
   return undefined;
 }
 
+type ResolvedOptions = Omit<SskrExportOptions, 'directory' | 'layout'> & {
+  readonly layout: SskrCardLayout;
+};
+
 async function renderMember(
-  options: Omit<SskrExportOptions, 'directory'>,
+  options: ResolvedOptions,
   content: SskrCardContent,
   index: number,
   member: number,
@@ -55,9 +60,19 @@ async function renderMember(
   );
 }
 
-function prepareMembers(records: readonly string[], options: Omit<SskrExportOptions, 'directory'>) {
-  if (!['qr', 'collection', 'individual'].includes(options.layout))
+function prepareMembers(
+  records: readonly string[],
+  requested: Omit<SskrExportOptions, 'directory'>,
+) {
+  if (
+    requested.layout !== undefined &&
+    !['qr', 'collection', 'individual'].includes(requested.layout)
+  )
     throw new Error('Card layout must be qr, collection, or individual.');
+  const options: ResolvedOptions = {
+    ...requested,
+    layout: resolveSskrLayout(requested.layout, requested.pageSize),
+  };
   if (
     options.style !== 'mixed' &&
     glassReferencesPerCard(options.style) === undefined &&
@@ -88,7 +103,15 @@ function prepareMembers(records: readonly string[], options: Omit<SskrExportOpti
     // A fragment contains only its own consecutive references; grouping restarts per member.
     const fragmentCount = Math.ceil(colors.length / referencesPerCard);
     const count = options.layout === 'individual' ? fragmentCount : 1;
-    return { id, memberIndex: info.memberIndex, content, colors, referencesPerCard, count };
+    return {
+      id,
+      memberIndex: info.memberIndex,
+      content,
+      colors,
+      referencesPerCard,
+      count,
+      options,
+    };
   });
 }
 
@@ -103,12 +126,13 @@ export async function exportSskrCards(
   const staging = await mkdtemp(join(dirname(target), '.sskr-cards-'));
   let files = 0;
   try {
-    for (const { id, memberIndex, content, colors, referencesPerCard, count } of members) {
-      const fragments = options.layout === 'individual';
+    for (const member of members) {
+      const { id, memberIndex, content, colors, referencesPerCard, count } = member;
+      const fragments = member.options.layout === 'individual';
       const folder = fragments ? join(staging, `collection-${id}`) : staging;
       if (fragments) await mkdir(folder);
       for (let i = 0; i < count; i++) {
-        const bytes = await renderMember(options, content, i, memberIndex);
+        const bytes = await renderMember(member.options, content, i, memberIndex);
         const file = fragments
           ? `${String(i + 1).padStart(2, '0')}-${colors[i * referencesPerCard]!.slice(1)}`
           : `collection-${id}`;
@@ -135,9 +159,10 @@ export async function renderSskrPdf(
 ): Promise<Uint8Array> {
   const members = prepareMembers(records, options);
   const combined = await PDFDocument.create();
-  for (const { content, memberIndex, count } of members) {
+  for (const member of members) {
+    const { content, memberIndex, count } = member;
     for (let index = 0; index < count; index++) {
-      const bytes = await renderMember(options, content, index, memberIndex);
+      const bytes = await renderMember(member.options, content, index, memberIndex);
       const source = await PDFDocument.load(bytes);
       for (const page of await combined.copyPages(source, source.getPageIndices()))
         combined.addPage(page);

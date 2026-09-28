@@ -179,9 +179,11 @@ async function renderSingle(context: RenderContext, individualIndex: number): Pr
       field.size,
       fieldColor(field.dark, individualIndex),
     );
+  // Every separate card shows its number and the size of the set, so a missing card is noticed.
+  const position = `${String(individualIndex + 1).padStart(2, '0')} / ${String(content.colors.length).padStart(2, '0')}`;
   const reference = share
     ? `${String(individualIndex + 1).padStart(2, '0')} / ${content.colors.length}  ${code.slice(1)}  |  ${content.collectionReference}`
-    : code.slice(1);
+    : `${position}  ${code.slice(1)}`;
   const referenceText = `${presentation.referenceLabel} ${reference}`.trim();
   const design = physicalStyle(style, individualIndex + styleOffset);
   const referenceSize = fit(

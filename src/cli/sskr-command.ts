@@ -1,5 +1,6 @@
 import { imageFormat, validateImageOptions } from './image-options.js';
 import { allTemplateStyles } from '../export/templates.js';
+import { resolveSskrLayout } from '../export/sskr-content.js';
 import {
   terminalColor,
   terminalNotice,
@@ -72,13 +73,20 @@ function exportOptions(args: ParsedArguments): SskrExportOptions | undefined {
     throw new Error(
       'The selected business-card template is not available. View the template list to choose a supported design.',
     );
-  const layout = value(args, 'card-layout') ?? 'collection';
-  if (layout !== 'qr' && layout !== 'collection' && layout !== 'individual')
+  const requested = value(args, 'card-layout');
+  if (
+    requested !== undefined &&
+    requested !== 'qr' &&
+    requested !== 'collection' &&
+    requested !== 'individual'
+  )
     throw new Error('The card layout must be qr, collection, or individual.');
+  const settings = businessOptions(args, template);
   return {
-    ...businessOptions(args, template),
+    ...settings,
     style,
-    layout,
+    // Resolved here so that the messages below describe what is actually written.
+    layout: resolveSskrLayout(requested, settings.pageSize),
     directory: directory ?? '',
     imageFormat: args['image-format'] === undefined ? undefined : imageFormat(args),
   };
