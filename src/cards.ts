@@ -27,6 +27,7 @@ export {
   type RenderedCard,
 } from './export/render.js';
 export {
+  isCardPageSize,
   parseOrientation,
   parsePageSize,
   profileFields,

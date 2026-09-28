@@ -55,9 +55,11 @@ ${section('SHAMIR SHARES (SSKR)')}
 
   ${flag('--pdf NEW_FILE')}  All shares in one multi-page PDF.
   ${flag('--cards-dir NEW_FOLDER')}  Export separate PDFs; existing folders are never overwritten.
-  ${flag('--card-layout qr')}          One complete-share QR document; selected size and design.
-  ${flag('--card-layout collection')}  Default: one color collection document per share.
-  ${flag('--card-layout individual')}  One folder per share with numbered fragments; selected size.
+  The page size decides the layout: a6 or a4 gives one collection sheet per share,
+  wallet or business gives separate numbered cards for each share.
+  ${flag('--card-layout qr')}          One QR document per share, in any size.
+  ${flag('--card-layout collection')}  One color collection sheet per share (a6 or a4).
+  ${flag('--card-layout individual')}  Separate numbered cards (wallet or business).
     In individual mode ALL cards in a folder are needed to reconstruct ONE share.
   ${flag('--template ID')}  Any installed design; use preview --list.
     Existing card-name, card-company, card-role, card-email, card-phone, card-website and
@@ -167,8 +169,9 @@ ${section('TERMINAL AND FILE OUTPUT')}
   Templates:
 ${cardTemplates.map((template, index) => `    ${index + 1}  ${template.id.padEnd(22)} ${template.name}`).join('\n')}
   ${flag('--page-size a4|a6|wallet|business')}
-    A4, A6, credit-card size 85.6 x 54 mm, or business-card size 90 x 50 mm.
-    Defaults: A6 business collections; wallet material selections.
+    a6, a4        one sheet with the whole collection (a6 is the default)
+    wallet        separate numbered cards of 85.6 x 54 mm, one card per page
+    business      separate numbered cards of 90 x 50 mm, one card per page
   ${flag('--orientation VALUE')}    portrait or landscape
   Glass variants: business-glass-4in1, business-glass-6in1, business-glass-8in1.
   Each groups 4, 6 or 8 consecutive references; the last card may contain fewer.
@@ -182,11 +185,10 @@ ${cardTemplates.map((template, index) => `    ${index + 1}  ${template.id.padEnd
   ${flag('--card-website TEXT')}     website (default: generated company domain)
   ${flag('--card-location TEXT')}    location (default: International)
 
-  Every collection is one design-study page with numbered variants and review copy.
-  A4/A6 show larger sketches; wallet/business are compact selection sheets, not cutting templates.
-  --card-qr adds one corner QR on the same page, clear of artwork and exact references.
-  Compact material studies omit decorative finish names; A6/A4 retain them.
-  QR is optional and applies only to the complete collection representation.
+  A sheet is one design-study page with numbered variants and review copy.
+  A card size gives real cards: --pdf holds one card per page, --images-dir one
+  image per card, and --cards-dir one file per card.
+  --card-qr adds one corner QR to a sheet. Separate cards never carry a QR.
   Preview accepts the same personal fields and ${flag('--words 12|15|18|21|24')}.
   Omitted personal fields use demonstration values; they never affect encoding.
 

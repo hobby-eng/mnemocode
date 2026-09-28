@@ -43,6 +43,14 @@ export function parsePageSize(value: string | undefined): CardPageSize {
   return value as CardPageSize;
 }
 
+/**
+ * Wallet and business sizes are the sizes of real cards, so every card becomes its own
+ * numbered page. A6 and A4 are sheets that hold the whole collection on one page.
+ */
+export function isCardPageSize(size: CardPageSize | undefined): size is 'wallet' | 'business' {
+  return size === 'wallet' || size === 'business';
+}
+
 export function parseOrientation(value: string | undefined): CardOrientation | undefined {
   if (value === undefined || value === 'portrait' || value === 'landscape') return value;
   throw new Error('Orientation must be portrait or landscape.');
