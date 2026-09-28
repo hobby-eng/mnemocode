@@ -1,5 +1,5 @@
-import { resolveIdentityFor, sectorForTemplate } from './card-identities.js';
-import { resolvePresentationFor } from './card-copy.js';
+import './platform-node.js';
+import { renderIndividualCards } from './render.js';
 import { writeRenderedDocument, type DocumentFormat } from './image-export.js';
 import { lstat, mkdir, mkdtemp, rename, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -28,29 +28,15 @@ export async function exportIndividualCards(
   if (content.kind !== 'colors' || !template.renderIndividual)
     throw new Error('This template does not support individual business cards.');
   if (!content.colors.length) throw new Error('The card collection is empty.');
-  const resolvedContent: CardContent = {
-    ...content,
-    presentation: resolvePresentationFor(content),
-    profile: resolveIdentityFor(content, sectorForTemplate(template.id)),
-    cardQr: content.cardQr === true,
-  };
   const target = await requireNewCardDirectory(directory);
+  // Every card is rendered before anything is written.
+  const cards = await renderIndividualCards(template, content);
   await mkdir(dirname(target), { recursive: true });
   const staging = await mkdtemp(join(dirname(target), '.card-collection-'));
-  const perCard = template.referencesPerCard ?? 1;
-  const count = Math.ceil(content.colors.length / perCard);
   let files = 0;
   try {
-    for (let i = 0; i < count; i++) {
-      const code = content.colors[i * perCard]!.replace(/^#/u, '').toUpperCase();
-      if (!/^[0-9A-F]{6}$/u.test(code)) throw new Error('Invalid RGB reference.');
-      const bytes = await template.renderIndividual(resolvedContent, i);
-      files += await writeRenderedDocument(
-        bytes,
-        join(staging, `${String(i + 1).padStart(2, '0')}-${code}`),
-        format,
-      );
-    }
+    for (const card of cards)
+      files += await writeRenderedDocument(card.bytes, join(staging, card.name), format);
     await requireNewCardDirectory(target);
     await rename(staging, target);
   } catch (error) {

@@ -5,14 +5,14 @@ import {
   type GlassPageLayout,
 } from './glass-layout.js';
 import { resolveIdentityFor } from './card-identities.js';
-import { readFile } from 'node:fs/promises';
+import { readRenderAsset } from './platform.js';
 import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, rgb, type PDFPage, type PDFFont } from 'pdf-lib';
 import { colorsToIndexes, unicodeToColors } from '../core.js';
 import { colorsToShare } from '../sskr/transport.js';
 import { resolvePresentationFor } from './card-copy.js';
 import { clearDocumentMetadata } from './document-metadata.js';
-import { parsePageSize, type CardProfile, type CardPresentation } from './card-settings.js';
+import type { CardProfile, CardPresentation } from './card-settings.js';
 import { glassArtwork } from './glass-artwork.js';
 import {
   collectionSheetLayout,
@@ -252,10 +252,9 @@ export async function renderGlassCards(
     throw new Error('Invalid glass card index.');
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  const font = await doc.embedFont(
-    await readFile(new URL('../../assets/fonts/DejaVuSans-UI.ttf', import.meta.url)),
-    { subset: true },
-  );
+  const font = await doc.embedFont(await readRenderAsset('fonts/DejaVuSans-UI.ttf'), {
+    subset: true,
+  });
   const context: RenderContext = {
     doc,
     font,

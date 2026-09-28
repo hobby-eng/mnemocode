@@ -1,18 +1,22 @@
-import { readFile } from 'node:fs/promises';
-import { PNG } from 'pngjs';
+import {
+  createRasterImage,
+  readRenderAsset,
+  renderPlatform,
+  type RasterImage,
+} from './platform.js';
 import { hueOrigins, type PhysicalBusinessStyle } from './business-designs.js';
 
 // Cache decoded/resampled bundled images only, never a caller's recolored references.
-const sources = new Map<PhysicalBusinessStyle, Promise<PNG>>();
+const sources = new Map<PhysicalBusinessStyle, Promise<RasterImage>>();
 
-async function source(style: PhysicalBusinessStyle): Promise<PNG> {
+async function source(style: PhysicalBusinessStyle): Promise<RasterImage> {
   let cached = sources.get(style);
   if (!cached) {
-    cached = readFile(new URL(`../../assets/images/business-${style}-v1.png`, import.meta.url))
+    cached = readRenderAsset(`images/business-${style}-v1.png`)
       .then((data) => {
-        const original = PNG.sync.read(data);
+        const original = renderPlatform().decodePng(data);
         // 254 dpi at 90 x 50 mm; smooth sampling preserves the approved photo detail.
-        const out = new PNG({ width: 900, height: 500 });
+        const out = createRasterImage(900, 500);
         // Pixel-center bilinear sampling; retain this arithmetic order for identical output.
         for (let y = 0; y < out.height; y++)
           for (let x = 0; x < out.width; x++) {
@@ -64,8 +68,8 @@ export async function businessArtwork(
     parseInt(hex.slice(3, 5), 16),
     parseInt(hex.slice(5, 7), 16),
   );
-  const out = new PNG({ width: base.width, height: base.height });
-  base.data.copy(out.data);
+  const out = createRasterImage(base.width, base.height);
+  out.data.set(base.data);
   for (let p = 0; p < out.data.length; p += 4) {
     const [h, s, v] = hsv(out.data[p]! / 255, out.data[p + 1]! / 255, out.data[p + 2]! / 255);
     if (s < 0.2 || v < 0.08) continue; // Black paper, white lettering/icons, and highlights stay neutral.
@@ -96,5 +100,5 @@ export async function businessArtwork(
                 : [c, 0, x];
     for (let j = 0; j < 3; j++) out.data[p + j] = Math.round((rgb[j]! + m) * 255);
   }
-  return PNG.sync.write(out, { deflateLevel: 6 });
+  return renderPlatform().encodePng(out, 6);
 }

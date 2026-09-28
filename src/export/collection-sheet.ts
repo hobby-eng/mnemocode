@@ -137,7 +137,7 @@ export function collectionSheetLayout(
     lineHeight,
     compact,
     cards,
-    qr,
+    ...(qr === undefined ? {} : { qr }),
   };
 }
 

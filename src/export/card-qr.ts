@@ -1,4 +1,4 @@
-import QRCode from 'qrcode';
+import { renderPlatform } from './platform.js';
 import { rgb, type PDFPage } from 'pdf-lib';
 import { MM } from './business-layout.js';
 
@@ -13,8 +13,8 @@ export function qrSizeMm(payload: string, minimum = 28): number {
 export function qrSizeForModuleMm(payload: string, minimum: number, moduleMm: number): number {
   if (!Number.isFinite(moduleMm) || moduleMm <= 0)
     throw new Error('The QR module size must be a positive physical measurement.');
-  const qr = QRCode.create(payload, { errorCorrectionLevel: 'M' });
-  return Math.max(minimum, (qr.modules.size + QUIET_MODULES * 2) * moduleMm);
+  const qr = renderPlatform().qrModules(payload);
+  return Math.max(minimum, (qr.size + QUIET_MODULES * 2) * moduleMm);
 }
 
 /** Draw exact data as vector modules, never as part of a decorative bitmap. */
@@ -26,8 +26,8 @@ export function drawCollectionQr(
   size: number,
   minimumModuleMm = MIN_MODULE_MM,
 ): void {
-  const qr = QRCode.create(payload, { errorCorrectionLevel: 'M' });
-  const totalModules = qr.modules.size + QUIET_MODULES * 2;
+  const qr = renderPlatform().qrModules(payload);
+  const totalModules = qr.size + QUIET_MODULES * 2;
   if (size / totalModules < minimumModuleMm - 1e-8)
     throw new Error('The QR is too small for this payload; use a larger page.');
   if (
@@ -46,12 +46,12 @@ export function drawCollectionQr(
     height: size * MM,
     color: rgb(1, 1, 1),
   });
-  for (let row = 0; row < qr.modules.size; row++) {
-    for (let col = 0; col < qr.modules.size; col++) {
-      if (!qr.modules.get(row, col)) continue;
+  for (let row = 0; row < qr.size; row++) {
+    for (let col = 0; col < qr.size; col++) {
+      if (!qr.get(row, col)) continue;
       page.drawRectangle({
         x: x * MM + (col + QUIET_MODULES) * pitch,
-        y: bottom + (qr.modules.size + QUIET_MODULES - 1 - row) * pitch,
+        y: bottom + (qr.size + QUIET_MODULES - 1 - row) * pitch,
         width: pitch,
         height: pitch,
         color: rgb(0, 0, 0),
