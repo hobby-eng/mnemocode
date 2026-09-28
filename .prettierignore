@@ -5,3 +5,4 @@ vendor/
 vectors/
 goldens/
 docs/audits/
+src/export/world-map-data.ts

@@ -3,6 +3,8 @@ import { MM, type CardBox } from './business-layout.js';
 import { fit, text } from './business-render-primitives.js';
 import { drawCollectionQr, qrSizeForModuleMm } from './card-qr.js';
 import { parsePageSize, type CardSettings, type CardPresentation } from './card-settings.js';
+import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from './world-map.js';
+import { WORLD_MAP_LAND } from './world-map-data.js';
 
 export interface StudyBox extends CardBox {
   readonly captionTop: number;
@@ -61,7 +63,7 @@ export function collectionSheetLayout(
   const compact = size === 'wallet' || size === 'business';
   const large = size === 'a4';
   const margin = compact ? 3 : large ? 10 : 5;
-  const header = compact ? 11 : large ? 30 : 21;
+  const header = compact ? 11 : large ? 33 : 23;
   const footer = compact ? 4.5 : large ? 13 : 9;
   const fontSize = compact ? 4.3 : large ? 8 : 6;
   const lineHeight = compact ? 2.1 : large ? 4 : 3;
@@ -81,8 +83,11 @@ export function collectionSheetLayout(
   if (qr) {
     if (qr.x < margin || qr.y + qr.size + lineHeight >= height - footer)
       throw new Error('The QR cannot fit on the design study; choose a larger page size.');
-    if (width >= height) availableWidth -= qrSize + gap * 2;
-    else {
+    if (compact && width >= height) {
+      // A card-sized page is too low to place the cards below the QR code; they sit beside it.
+      availableWidth -= qrSize + gap * 2;
+    } else {
+      // The cards start below the QR code, so they stay centred under the heading.
       contentTop = Math.max(header, qr.y + qrSize + lineHeight + gap);
       availableHeight = height - contentTop - footer;
     }
@@ -141,6 +146,48 @@ export function collectionSheetLayout(
   };
 }
 
+/** Colours of the sheet. The page and the map are the same for every theme; only the ink differs. */
+const SHEET = {
+  background: rgb(0.043, 0.047, 0.059),
+  land: rgb(0.155, 0.165, 0.19),
+  coast: rgb(0.22, 0.235, 0.265),
+  grid: rgb(0.5, 0.53, 0.58),
+  /** The grid is meant to be felt rather than seen. */
+  gridOpacity: 0.07,
+  plate: rgb(0.075, 0.082, 0.1),
+  plateBorder: rgb(0.3, 0.33, 0.38),
+} as const;
+const GRATICULE_STEP_DEGREES = 30;
+const GRATICULE = graticule(GRATICULE_STEP_DEGREES);
+
+/** Draws the grey world map, as wide as the page allows and centred a little below the middle. */
+function drawWorldMap(page: PDFPage, width: number, height: number, margin: number): void {
+  const mapWidth = (width - margin) * MM;
+  const scale = mapWidth / WORLD_MAP_WIDTH;
+  const mapHeight = WORLD_MAP_HEIGHT * scale;
+  const x = (page.getWidth() - mapWidth) / 2;
+  // pdf-lib places the top left corner of an SVG path here and draws downwards from it.
+  const y = page.getHeight() / 2 + mapHeight / 2 - height * 0.045 * MM;
+  for (const path of GRATICULE)
+    page.drawSvgPath(path, {
+      x,
+      y,
+      scale,
+      borderColor: SHEET.grid,
+      borderWidth: 0.35,
+      borderOpacity: SHEET.gridOpacity,
+    });
+  for (const path of WORLD_MAP_LAND)
+    page.drawSvgPath(path, {
+      x,
+      y,
+      scale,
+      color: SHEET.land,
+      borderColor: SHEET.coast,
+      borderWidth: 0.3,
+    });
+}
+
 /** A restrained proposal frame surrounds the existing artwork without altering it. */
 export function drawStudyFrame(
   page: PDFPage,
@@ -154,113 +201,84 @@ export function drawStudyFrame(
   theme: StudyTheme = 'cool',
 ): void {
   const { width, height, margin, compact, fontSize } = layout;
-  const noir = theme === 'noir';
   const warm = theme === 'warm';
-  const frameInk = warm ? rgb(0.95, 0.91, 0.84) : rgb(0.91, 0.94, 0.97);
-  const frameMuted = warm ? rgb(0.66, 0.57, 0.46) : rgb(0.54, 0.61, 0.67);
-  const background = noir
-    ? rgb(0.012, 0.016, 0.021)
-    : warm
-      ? rgb(0.045, 0.035, 0.028)
-      : rgb(0.032, 0.042, 0.052);
-  const panel = noir
-    ? rgb(0.055, 0.067, 0.082)
-    : warm
-      ? rgb(0.11, 0.085, 0.06)
-      : rgb(0.085, 0.105, 0.125);
-  const border = noir ? rgb(0.27, 0.33, 0.4) : warm ? rgb(0.43, 0.32, 0.21) : rgb(0.28, 0.36, 0.43);
-  const glow = noir ? rgb(0.09, 0.15, 0.22) : warm ? rgb(0.32, 0.19, 0.09) : rgb(0.1, 0.2, 0.29);
+  const frameInk = warm ? rgb(0.95, 0.91, 0.84) : rgb(0.93, 0.95, 0.97);
+  const frameMuted = warm ? rgb(0.66, 0.6, 0.52) : rgb(0.56, 0.61, 0.67);
   page.drawRectangle({
     x: 0,
     y: 0,
     width: page.getWidth(),
     height: page.getHeight(),
-    color: background,
+    color: SHEET.background,
   });
-  page.drawRectangle({
-    x: margin * MM,
-    y: layout.footer * MM,
-    width: (width - 2 * margin) * MM,
-    height: (height - layout.footer - margin) * MM,
-    color: panel,
-    borderColor: border,
-    borderWidth: 0.45,
-    opacity: 0.72,
-    borderOpacity: 0.5,
-  });
-  page.drawEllipse({
-    x: width * 0.13 * MM,
-    y: height * 0.88 * MM,
-    xScale: width * 0.5 * MM,
-    yScale: height * 0.38 * MM,
-    color: glow,
-    opacity: noir ? 0.24 : 0.2,
-  });
-  page.drawEllipse({
-    x: width * 0.9 * MM,
-    y: height * 0.08 * MM,
-    xScale: width * 0.42 * MM,
-    yScale: height * 0.34 * MM,
-    color: glow,
-    opacity: 0.11,
-  });
-  page.drawLine({
-    start: { x: margin * MM, y: (height - (compact ? 9 : 18)) * MM },
-    end: { x: (width - margin) * MM, y: (height - (compact ? 9 : 18)) * MM },
-    color: frameMuted,
-    thickness: 0.45,
-    opacity: 0.34,
-  });
-  const grid = compact ? 4 : 8;
-  for (let x = margin; x < width - margin; x += grid)
-    page.drawLine({
-      start: { x: x * MM, y: layout.footer * MM },
-      end: { x: x * MM, y: (height - layout.header) * MM },
-      color: frameMuted,
-      thickness: 0.2,
-      opacity: 0.1,
-    });
-  for (let y = layout.header; y < height - layout.footer; y += grid)
-    page.drawLine({
-      start: { x: margin * MM, y: (height - y) * MM },
-      end: { x: (width - margin) * MM, y: (height - y) * MM },
-      color: frameMuted,
-      thickness: 0.2,
-      opacity: 0.1,
-    });
-  const label = (value: string, y: number, preferred = fontSize, color = frameMuted) =>
-    text(
-      page,
-      font,
-      value,
-      margin,
-      y,
-      fit(font, value, preferred, compact ? 4 : 4.5, (width - 2 * margin) * MM, 'Study heading'),
-      color,
-    );
-  label(title, compact ? 1.6 : 3, compact ? 8 : width > 200 ? 18 : 12, frameInk);
-  label('DESIGN STUDY / FOR SELECTION', compact ? 5.2 : 9.5);
-  label(
+  drawWorldMap(page, width, height, margin);
+
+  // A QR code occupies the top right corner. On a sheet the heading stays centred on the page
+  // and clear of the code on both sides; a card-sized page only has room beside the code.
+  const reserved = layout.qr === undefined ? 0 : layout.qr.size + margin;
+  const headingWidth = width - 2 * margin - (compact ? reserved : 2 * reserved);
+  const headingCentre = compact ? margin + headingWidth / 2 : width / 2;
+  const centred = (value: string, top: number, preferred: number, color = frameMuted) => {
+    const size = fit(font, value, preferred, compact ? 4 : 4.5, headingWidth * MM, 'Study heading');
+    const left = headingCentre - font.widthOfTextAtSize(value, size) / MM / 2;
+    text(page, font, value, left, top, size, color);
+  };
+  // Heading positions are in millimetres from the top edge; an A4 sheet is laid out larger.
+  const large = width > 200 || height > 200;
+  const rows = compact
+    ? { title: 1.8, kind: 5.4, subtitle: 7.5, rule: 0 }
+    : large
+      ? { title: 9, kind: 18.5, subtitle: 23.5, rule: 28 }
+      : { title: 5.5, kind: 12, subtitle: 15.4, rule: 19.4 };
+  centred(title, rows.title, compact ? 8 : large ? 19 : 13, frameInk);
+  centred('DESIGN STUDY / FOR SELECTION', rows.kind, compact ? fontSize : fontSize * 0.95);
+  centred(
     compact ? presentation.subtitle : `${presentation.subtitle}  Prepared for ${preparedFor}`,
-    compact ? 7.3 : 13,
-    compact ? 4.3 : fontSize,
+    rows.subtitle,
+    compact ? 4.3 : fontSize * 0.95,
   );
-  if (!compact && presentation.slogan) label(presentation.slogan, 16.3, fontSize * 0.9);
-  const footer = `Series ${series} / 01${presentation.footer ? '  |  ' + presentation.footer : ''}`;
-  label(footer, height - (compact ? 3 : 5), fontSize);
+  if (!compact) {
+    const ruleWidth = Math.min(40, headingWidth * 0.4);
+    page.drawLine({
+      start: { x: ((width - ruleWidth) / 2) * MM, y: (height - rows.rule) * MM },
+      end: { x: ((width + ruleWidth) / 2) * MM, y: (height - rows.rule) * MM },
+      color: frameMuted,
+      thickness: 0.4,
+      opacity: 0.55,
+    });
+  }
+  // The slogan shares the footer line, where nothing crosses it.
+  const footer = [compact ? '' : presentation.slogan, `Series ${series} / 01`, presentation.footer]
+    .filter((part) => part !== '')
+    .join('   |   ');
+  const footerSize = fit(
+    font,
+    footer,
+    // A card-sized page already uses the smallest legible size.
+    compact ? fontSize : fontSize * 0.9,
+    compact ? 4 : 4.5,
+    (width - 2 * margin) * MM,
+    'Study footer',
+  );
+  text(
+    page,
+    font,
+    footer,
+    (width - font.widthOfTextAtSize(footer, footerSize) / MM) / 2,
+    height - (compact ? 3 : large ? 7.5 : 5.2),
+    footerSize,
+    frameMuted,
+  );
   if (payload !== undefined) {
     if (!layout.qr) throw new Error('Missing design study QR area.');
     const { x, y, size } = layout.qr;
-    const plate = {
+    page.drawRectangle({
       x: (x - 0.6) * MM,
       y: (height - y - size - 0.6) * MM,
       width: (size + 1.2) * MM,
       height: (size + 1.2) * MM,
-    };
-    page.drawRectangle({
-      ...plate,
-      color: panel,
-      borderColor: border,
+      color: SHEET.plate,
+      borderColor: SHEET.plateBorder,
       borderWidth: 0.4,
       opacity: 0.94,
       borderOpacity: 0.62,
