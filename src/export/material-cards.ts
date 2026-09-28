@@ -17,9 +17,15 @@ import { colorsToShare } from '../sskr/transport.js';
 import type { CardContent } from './templates.js';
 import type { SskrCardContent } from './sskr-content.js';
 import { resolveIdentityFor } from './card-identities.js';
-import { drawCollectionQr, qrSizeMm } from './card-qr.js';
 import { resolvePresentationFor } from './card-copy.js';
 import { clearDocumentMetadata } from './document-metadata.js';
+import {
+  collectionSheetLayout,
+  drawStudyCaption,
+  drawStudyFrame,
+  drawStudyShadow,
+  studyCaptionWidth,
+} from './collection-sheet.js';
 import {
   chooseMaterialFinish,
   materialArtwork,
@@ -75,15 +81,15 @@ function drawSample(
 
 type MaterialRenderContext = Awaited<ReturnType<typeof createRenderContext>>;
 
-/** Front: ordered exact references. An explicitly requested QR uses a separate reverse. */
+/** Front: ordered exact references. QR belongs only to a collection study. */
 export async function renderMaterialCard(
   style: MaterialStyle,
   content: CardContent | SskrCardContent,
   options: MaterialCardOptions = {},
 ): Promise<Uint8Array> {
   const context = await createRenderContext(style, content, options);
-  drawMaterialFront(context);
-  if (context.includeQr) drawMaterialReverse(context);
+  if (context.individual === undefined) drawMaterialStudy(context);
+  else drawMaterialFront(context);
   return context.doc.save();
 }
 
@@ -175,6 +181,8 @@ async function createRenderContext(
   };
   return {
     doc,
+    font,
+    size,
     content,
     individual,
     style,
@@ -279,50 +287,40 @@ function drawMaterialFront(context: MaterialRenderContext): void {
   );
 }
 
-function drawMaterialReverse(context: MaterialRenderContext): void {
-  const {
-    content,
-    individual,
-    width,
-    height,
-    scale,
-    artwork,
+function drawMaterialStudy(context: MaterialRenderContext): void {
+  const { doc, font, content, size, style, image, presentation, profile, includeQr } = context;
+  const payload = includeQr ? content.payload : undefined;
+  const compact = size === 'wallet' || size === 'business';
+  // Compact studies prioritize exact recovery references over decorative finish names.
+  const captions = content.colors.map((code, index) => [
+    `${String(index + 1).padStart(2, '0')}  ${code.slice(1).toUpperCase()}`,
+    ...(compact ? [] : [chooseMaterialFinish(style, code).name]),
+  ]);
+  const layout = collectionSheetLayout(
+    { ...content, pageSize: size },
+    content.colors.length,
+    1.45,
+    compact ? 1 : 2,
+    payload,
+    studyCaptionWidth(font, captions.flat()),
+  );
+  const page = doc.addPage([layout.width * MM, layout.height * MM]);
+  drawStudyFrame(
+    page,
+    font,
+    layout,
     presentation,
-    profile,
-    drawText,
-    makePage,
-  } = context;
-  // A fragment never inherits the full collection payload, even when QR is explicitly enabled.
-  const qrPayload = individual === undefined ? content.payload : content.colors[individual]!;
-  const back = makePage();
-  drawText(
-    back,
-    presentation.studioName.toUpperCase(),
-    3.5 * scale,
-    8,
-    width - 8 * scale,
-    width / 2,
+    content.title ?? presentation.studioName,
+    content.kind === 'sskr' ? content.collectionReference : '01',
+    profile.name,
+    payload,
+    'warm',
   );
-  drawText(back, artwork.title, 8 * scale, 4.8, width - 8 * scale, width / 2, true);
-  const qrSize = qrSizeMm(qrPayload, Math.max(28, 30 * scale));
-  if (qrSize > width - 6 * scale || qrSize > height - 22 * scale) {
-    throw new Error('The requested QR cannot fit safely on this card; choose a larger page size.');
+  for (const box of layout.cards) {
+    const code = content.colors[box.index]!.toUpperCase();
+    const finish = chooseMaterialFinish(style, code);
+    drawStudyShadow(page, box);
+    drawSample(page, image, finish, box.x, box.y, box.width, box.height);
+    drawStudyCaption(page, font, layout, box, captions[box.index]!);
   }
-  drawCollectionQr(
-    back,
-    qrPayload,
-    (width - qrSize) / 2,
-    (height - qrSize) / 2 + 2 * scale,
-    qrSize,
-  );
-  drawText(back, presentation.subtitle, height - 6.5 * scale, 4.8, width - 8 * scale, width / 2);
-  drawText(
-    back,
-    `Prepared for ${profile.name}`,
-    height - 3.5 * scale,
-    4.5,
-    width - 8 * scale,
-    width / 2,
-    true,
-  );
 }

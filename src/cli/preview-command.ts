@@ -39,39 +39,45 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
       args.words !== undefined ||
       businessOptionNames.some((key) => args[key] !== undefined)
     ) {
-      throw new Error('--list cannot be combined with preview output options.');
+      throw new Error('Template listing cannot be combined with preview output settings.');
     }
     terminalResultHeader('CARD TEMPLATES', [['Installed', String(cardTemplates.length)]]);
     if (!cardTemplates.length)
       console.log(
         'No approved card templates are installed yet. Each design will be added after individual approval.',
       );
-    for (const template of cardTemplates)
-      console.log(`${template.id}\t${template.kind}\t${template.name}\t${template.description}`);
+    const idWidth = Math.max(...cardTemplates.map((template) => template.id.length));
+    const kindWidth = Math.max(...cardTemplates.map((template) => template.kind.length));
+    const nameWidth = Math.max(...cardTemplates.map((template) => template.name.length));
+    for (const template of cardTemplates) {
+      console.log(
+        `${template.id.padEnd(idWidth)}   ${template.kind.padEnd(kindWidth)}   ${template.name.padEnd(nameWidth)}   ${template.description}`,
+      );
+    }
     return;
   }
   if (!path && !directory && !images)
     throw new Error(
-      'To save a preview, specify --pdf PATH, --images-dir PATH, or --cards-dir PATH. To list templates, use --list.',
+      'To save a preview, provide a PDF file, an image output folder, or an individual-card output folder. To inspect the available designs, request the template list.',
     );
   await validateImageOptions(args);
   if (path !== undefined) await preflightFileDestination(path, true);
   if (directory !== undefined) {
     if (args.all === true)
-      throw new Error('For individual-card previews, select one --template per folder.');
+      throw new Error('An individual-card preview folder can contain only one selected template.');
     validateCardOptions(args, 'colors', 'direct');
     await requireNewCardDirectory(directory);
   }
   if (args.all === true && id !== undefined)
-    throw new Error('--all cannot be combined with --template.');
+    throw new Error('Choose either all templates or one specific template, not both.');
   const selected = args.all === true ? cardTemplates : [selectTemplate(id)];
   if (!selected.length) selectTemplate();
   const settings = businessOptions(args);
   if (args.words !== undefined && typeof args.words !== 'string')
-    throw new Error('--words must be supplied once.');
+    throw new Error('Provide the mnemonic word count only once.');
   const words = value(args, 'words') ?? '12';
   if (!['12', '15', '18', '21', '24'].includes(words))
-    throw new Error('Preview --words must be 12, 15, 18, 21, or 24.');
+    throw new Error('The preview mnemonic must contain 12, 15, 18, 21, or 24 words.');
   const mnemonic =
     words === '12'
       ? MNEMONIC

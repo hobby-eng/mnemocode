@@ -75,7 +75,7 @@ export function printEncodeResult(outcome: EncodeOutcome): void {
         `Optional checksum-valid legacy phrase: ${legacyAlternative!.shiftedEnglish.join(' ')}`,
       );
       console.error(
-        'Using that replacement discards the original shifted final word. Run the command again with --legacy-valid-last-word to record this replacement for recovery. Decoding that record lists possible original phrases.',
+        'Using that replacement discards the original shifted final word. Run the command again with the legacy checksum-word replacement enabled to record this choice for recovery. Decoding that record lists possible original phrases.',
       );
     } else {
       console.error(

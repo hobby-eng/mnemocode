@@ -13,11 +13,12 @@ export function validateCardOptions(
   const pdf = value(args, 'pdf') ?? value(args, 'images-dir');
   const directory = value(args, 'cards-dir');
   if (args['cards-dir'] !== undefined && typeof args['cards-dir'] !== 'string')
-    throw new Error('--cards-dir must be supplied once with a folder path.');
+    throw new Error('Provide the individual-card output folder once, using a non-empty path.');
   if (directory !== undefined) {
-    if (!directory.trim()) throw new Error('--cards-dir requires a non-empty folder path.');
+    if (!directory.trim())
+      throw new Error('The individual-card output folder path must not be empty.');
     if (!['colors', 'colors-unicode'].includes(format))
-      throw new Error('Individual cards require --format 5 or 6.');
+      throw new Error('Individual cards are available only for RGB color formats 5 and 6.');
     if (!selectTemplate(value(args, 'template'), 'colors').renderIndividual)
       throw new Error('This template does not support individual cards.');
   }
@@ -29,7 +30,7 @@ export function validateCardOptions(
       businessOptionNames.some((name) => args[name] !== undefined)
     ) {
       throw new Error(
-        '--template, --title, --events, --page-size, and --card-* require --pdf PATH, --images-dir PATH, or --cards-dir PATH.',
+        'Card design settings require a PDF file, an image output folder, or an individual-card output folder.',
       );
     }
     return;
@@ -41,10 +42,10 @@ export function validateCardOptions(
       'To export a card with dates, select a Seedshift mode. The dates will be visible on the card.',
     );
   if (format !== 'unicode' && values(args, 'event').length)
-    throw new Error('--events apply only to Unicode dated cards.');
+    throw new Error('Event labels apply only to dated Unicode cards.');
   businessOptions(args);
   if (format === 'unicode' && businessOptionNames.some((name) => args[name] !== undefined))
-    throw new Error('--page-size and --card-* currently apply only to business-card collections.');
+    throw new Error('Page and business-card settings do not apply to dated Unicode cards.');
   selectTemplate(value(args, 'template'), format === 'unicode' ? 'unicode' : 'colors');
 }
 
@@ -58,7 +59,7 @@ export async function completeEventLabels(
   if (labels.some((label) => !label)) throw new Error('Card entry labels must not be empty.');
   if (labels.length === dates.length) return labels;
   if (!process.stdin.isTTY || !process.stderr.isTTY)
-    throw new Error('To export a card with dates, provide one --events label for each date.');
+    throw new Error('To export a dated card, provide one event label for every date.');
   const terminal = createInterface({ input: process.stdin, output: process.stderr });
   try {
     for (let i = labels.length; i < dates.length; i += 1) {

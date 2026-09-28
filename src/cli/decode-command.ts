@@ -32,7 +32,7 @@ export async function runDecode(arguments_: ParsedArguments): Promise<void> {
       values(arguments_, 'date').length > 0
     ) {
       throw new Error(
-        '--ask-secrets cannot be combined with --input, --input-file, --qr-file, or --dates.',
+        'Hidden input cannot be combined with direct encoded text, an encoded input file, a QR input file, or command-line dates.',
       );
     }
     rawEncoded = askSecret('Encoded record:');
@@ -52,7 +52,7 @@ export async function runDecode(arguments_: ParsedArguments): Promise<void> {
   const mode = transformMode(arguments_, record?.mode);
   const enteredDates = promptedDates ?? dates(arguments_);
   if (mode === 'direct' && enteredDates.length > 0)
-    throw new Error('--dates cannot be used with --mode direct.');
+    throw new Error('Dates cannot be used in direct mode.');
   if (mode !== 'direct' && enteredDates.length === 0)
     throw new Error(`${mode} requires at least one date.`);
   const encoded = record?.payload ?? rawEncoded;

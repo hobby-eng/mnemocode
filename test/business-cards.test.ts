@@ -4,7 +4,7 @@ import { pageOperators } from './helpers/pdf-content.js';
 import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { indexesToColors, representMnemonic, colorsToUnicode } from '../src/core.js';
-import { businessPages, MM } from '../src/export/business-layout.js';
+import { MM } from '../src/export/business-layout.js';
 import { resolveProfile, validateProfile, parsePageSize } from '../src/export/card-settings.js';
 import { selectTemplate } from '../src/export/templates.js';
 import { renderCards } from '../src/export/pdf.js';
@@ -37,10 +37,10 @@ describe('business card collections', () => {
     expect(parsePageSize('business')).toBe('business');
     expect(() =>
       businessOptions(parseArguments(['--card-name', 'One', '--card-name', 'Two'])),
-    ).toThrow('exactly once');
+    ).toThrow('Provide exactly one value for the card name setting.');
     expect(() =>
       validateCardOptions(parseArguments(['--card-email', 'me@example.com']), 'colors', 'direct'),
-    ).toThrow('require --pdf');
+    ).toThrow('require a PDF file');
     expect(() =>
       validateCardOptions(
         parseArguments(['--pdf', 'a.pdf', '--page-size', 'a3']),
@@ -49,35 +49,6 @@ describe('business card collections', () => {
       ),
     ).toThrow('Page size');
   });
-
-  it.each([8, 10, 12, 14, 16])(
-    'fits %i samples on A6 and paginates full-size A4 without overlap',
-    (count) => {
-      for (const size of ['a6', 'a4'] as const) {
-        const pages = businessPages(count, size);
-        expect(pages).toHaveLength(size === 'a6' ? 1 : Math.ceil(count / 8));
-        expect(pages.flatMap((p) => p.cards.map((b) => b.index))).toEqual(
-          Array.from({ length: count }, (_, i) => i),
-        );
-        for (const page of pages)
-          for (const box of page.cards) {
-            expect(box.x).toBeGreaterThan(0);
-            expect(box.y).toBeGreaterThan(10);
-            expect(box.x + box.width).toBeLessThan(page.width);
-            expect(box.y + box.height + 3).toBeLessThan(size === 'a6' ? 87 : 269);
-            if (size === 'a4') expect([box.width, box.height]).toEqual([90, 50]);
-            for (const other of page.cards.filter((b) => b.index !== box.index)) {
-              expect(
-                box.x + box.width <= other.x ||
-                  other.x + other.width <= box.x ||
-                  box.y + box.height + 3 <= other.y ||
-                  other.y + other.height + 3 <= box.y,
-              ).toBe(true);
-            }
-          }
-      }
-    },
-  );
 
   it('renders both designs with real fonts/artwork, custom fields and both raw QR formats', async () => {
     for (const [id, size, payload] of [
@@ -107,42 +78,13 @@ describe('business card collections', () => {
         },
       ]);
       const pdf = await PDFDocument.load(bytes);
-      expect(pdf.getPageCount()).toBe(size === 'a6' ? 2 : 3);
+      expect(pdf.getPageCount()).toBe(1);
       for (const page of pdf.getPages()) {
         expect(page.getWidth()).toBeCloseTo((size === 'a6' ? 148 : 210) * MM, 3);
         expect(page.getHeight()).toBeCloseTo((size === 'a6' ? 105 : 297) * MM, 3);
       }
       expect(pdf.getTitle() ?? '').toBe('');
-      // Enabling QR may append a reverse side, but must not alter any front.
-      // Count-free comparison: decorative fills are unrelated to QR presence.
-      const plain = await PDFDocument.load(
-        await renderCards([
-          {
-            template: selectTemplate(id),
-            content: {
-              kind: 'colors',
-              colors,
-              payload,
-              pageSize: size,
-              cardQr: false,
-              presentation: resolveCardPresentation({}, {}, () => 0).presentation,
-              profile: {
-                name: 'Alex Morgan',
-                email: 'me@example.com',
-                company: 'VECTOR SYSTEMS',
-                role: 'IT SOLUTIONS DIRECTOR',
-                website: 'vector.com',
-                phone: '+1 202 555 0148',
-                location: 'International',
-              },
-            },
-          },
-        ]),
-      );
-      expect(pdf.getPageCount()).toBe(plain.getPageCount() + 1);
-      for (let index = 0; index < plain.getPageCount(); index++) {
-        expect(pageOperators(pdf, index)).toBe(pageOperators(plain, index));
-      }
+      expect((pageOperators(pdf, 0).match(/\nf\n/gu) ?? []).length).toBeGreaterThan(100);
     }
   }, 180_000);
 
@@ -156,5 +98,47 @@ describe('business card collections', () => {
     await expect(
       template.render({ ...content, profile: { email: 'x'.repeat(95) } }),
     ).rejects.toThrow('too long');
+  });
+
+  it.each([
+    'business-architect',
+    'business-it',
+    'business-estate',
+    'business-diagonal',
+    'business-contact',
+    'business-curves',
+    'business-facets',
+    'business-mixed',
+  ])('keeps an individual %s card QR-free and visually unchanged', async (id) => {
+    const template = selectTemplate(id);
+    // Identity and sheet copy are chosen randomly per export; pin them so the two
+    // renders can differ only through the QR setting under test.
+    const content = {
+      kind: 'colors' as const,
+      colors,
+      payload: colors.join(' '),
+      presentation: resolveCardPresentation({}, {}, () => 0).presentation,
+      profile: resolveProfile('it', { name: 'Alex Morgan' }),
+    };
+    const withQr = await PDFDocument.load(
+      await template.renderIndividual!(
+        {
+          ...content,
+          cardQr: true,
+        },
+        0,
+      ),
+    );
+    const withoutQr = await PDFDocument.load(
+      await template.renderIndividual!(
+        {
+          ...content,
+          cardQr: false,
+        },
+        0,
+      ),
+    );
+    expect(withQr.getPageCount()).toBe(1);
+    expect(pageOperators(withQr, 0)).toBe(pageOperators(withoutQr, 0));
   });
 });

@@ -243,7 +243,7 @@ function matchingAccountKey(
 ): string | undefined {
   const metadata = extendedMetadata(evidence.value);
   if (metadata.network !== evidence.location.network) {
-    throw new Error('The extended-key prefix and --network disagree.');
+    throw new Error('The extended-key prefix does not match the selected Bitcoin network.');
   }
   const expected = parseExtendedPublicKey(evidence.value, metadata.versions);
   try {
@@ -292,7 +292,7 @@ export function matchBitcoinEvidence(
   if (evidence.kind === 'master-xpub') {
     const metadata = extendedMetadata(evidence.value);
     if (metadata.network !== evidence.network)
-      throw new Error('The extended-key prefix and --network disagree.');
+      throw new Error('The extended-key prefix does not match the selected Bitcoin network.');
     const expected = parseExtendedPublicKey(evidence.value, metadata.versions);
     const root = rootForMnemonic(mnemonic, passphrase, evidence.network);
     try {

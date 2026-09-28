@@ -1,3 +1,5 @@
+import { optionLabel, optionSubject, optionValue } from './option-copy.js';
+
 export type ParsedArguments = Record<string, string | boolean | string[]>;
 
 export function parseArguments(items: readonly string[]): ParsedArguments {
@@ -14,7 +16,9 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
   for (let index = 0; index < items.length; index += 1) {
     const item = items[index]!;
     if (!item.startsWith('--'))
-      throw new Error('Unexpected positional argument. Pass values through their named options.');
+      throw new Error(
+        'This command does not accept an unnamed value. Use the appropriate named option.',
+      );
     const key = item.slice(2);
     if (key === 'dates' || key === 'events') {
       const dateValues: string[] = [];
@@ -23,7 +27,7 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
         index += 1;
       }
       if (dateValues.length === 0)
-        throw new Error(`--${key} must be followed by at least one value.`);
+        throw new Error(`${optionSubject(key)} needs at least one value.`);
       const target = key === 'dates' ? 'date' : 'event';
       const existing = parsed[target];
       parsed[target] =
@@ -34,7 +38,7 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
     }
     const next = items[index + 1];
     if (next === undefined || next.startsWith('--')) {
-      if (!booleanOptions.has(key)) throw new Error(`--${key} requires a value.`);
+      if (!booleanOptions.has(key)) throw new Error(`${optionSubject(key)} requires a value.`);
       parsed[key] = true;
       continue;
     }
@@ -74,14 +78,18 @@ export function integerOption(
   const raw = value(arguments_, key);
   if (raw === undefined) {
     if (bounds.defaultValue !== undefined) return bounds.defaultValue;
-    throw new Error(`Missing required option --${key}.`);
+    throw new Error(`${optionValue(key)} is required.`);
   }
   if (!/^(?:0|[1-9][0-9]*)$/u.test(raw)) {
-    throw new Error(`--${key} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`);
+    throw new Error(
+      `${optionValue(key)} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`,
+    );
   }
   const parsed = Number(raw);
   if (!Number.isSafeInteger(parsed) || parsed < bounds.min || parsed > bounds.max) {
-    throw new Error(`--${key} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`);
+    throw new Error(
+      `${optionValue(key)} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`,
+    );
   }
   return parsed;
 }
@@ -94,15 +102,19 @@ export function assertAllowedArguments(
   const repeatable = new Set(['date', 'event', 'share', 'share-file', 'share-qr']);
   for (const [key, entry] of Object.entries(arguments_)) {
     if (Array.isArray(entry) && !repeatable.has(key))
-      throw new Error(`--${key} must be supplied once.`);
+      throw new Error(`Provide only one value for the ${optionLabel(key)} setting.`);
   }
   const allowedSet = new Set(allowed);
   const unknown = Object.keys(arguments_).filter((key) => !allowedSet.has(key));
   if (unknown.length > 0)
-    throw new Error(`Unknown or unsupported option for ${command}: --${unknown[0]}.`);
+    throw new Error(
+      `The ${command} command does not support the ${optionLabel(unknown[0]!)} setting.`,
+    );
 }
 
 export function assertFlag(arguments_: ParsedArguments, key: string): void {
   if (arguments_[key] !== undefined && arguments_[key] !== true)
-    throw new Error(`--${key} does not take a value.`);
+    throw new Error(
+      `${optionSubject(key)} is an on-or-off choice and does not accept a separate value.`,
+    );
 }

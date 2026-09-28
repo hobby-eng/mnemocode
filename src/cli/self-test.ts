@@ -150,7 +150,7 @@ function runCoreChecks(): void {
     'Direct Unicode round trip',
   );
   const recoveredWords = recoverMissingWord(PUBLIC_MNEMONIC.replace(/about$/u, '?'));
-  equal(recoveredWords.length, 128, 'Forgotten-word candidate count');
+  equal(recoveredWords.length, 128, 'Forgotten final-word candidate count');
   const recoveredAbout = recoveredWords.find((candidate) => candidate.word === 'about');
   equal(recoveredAbout?.wordIndex, 4, 'Forgotten-word BIP39 index');
   equal(recoveredAbout?.checksumBits, '0011', 'Forgotten-word checksum bits');
@@ -315,7 +315,8 @@ async function checkCardExports(): Promise<void> {
       item.id.startsWith('material-') ||
       item.id.startsWith('business-glass-'),
   )) {
-    // Exercises local images, embedded font, QR drawing, and the production PDF renderer.
+    // Exercises local images, embedded font, individual-card QR suppression,
+    // and the production PDF renderer.
     const bytes = await template.render({
       kind: 'colors',
       colors,
@@ -341,7 +342,7 @@ async function checkCardExports(): Promise<void> {
       },
     });
     const pdf = await PDFDocument.load(bytes);
-    equal(pdf.getPageCount(), 2, `${template.id} A6 page count`);
+    equal(pdf.getPageCount(), 1, `${template.id} A6 page count`);
     if (Math.abs(pdf.getPage(0).getWidth() - (148 * 72) / 25.4) > 0.01)
       throw new Error(`${template.id} A6 dimensions mismatch.`);
   }
@@ -387,7 +388,7 @@ export async function runSelfTest(): Promise<void> {
   await step(
     'Card export assets',
     checkCardExports,
-    'approved templates, fonts, artwork and A6 PDF',
+    'approved templates, fonts, artwork and single-page A6 PDF',
   );
 
   console.log(terminalPaint('stdout', '1;36', `MnemoCode ${MNEMOCODE_VERSION} self-test`));

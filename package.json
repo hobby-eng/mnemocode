@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.19.0",
   "private": true,
-  "description": "Offline reversible representations and optional date-shift masking for BIP39 mnemonics",
+  "description": "Offline CLI and TypeScript library for reversible BIP39 mnemonic formats, checksum-valid Seedshift, SSKR shares, QR codes, and printable recovery cards",
   "type": "module",
   "bin": {
     "mnemocode": "./dist/mnemocode.js"
@@ -23,6 +23,7 @@
     "assets",
     "vectors",
     "README.md",
+    "SECURITY.md",
     "LICENSE",
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",

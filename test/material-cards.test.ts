@@ -11,7 +11,14 @@ const presentation = resolveCardPresentation(
   { studioName: 'NORTHLINE STUDIO' },
   () => 0,
 ).presentation;
-const content = { kind: 'colors' as const, colors, payload: colors.join(' '), presentation };
+// The recipient name is otherwise chosen randomly for every export.
+const content = {
+  kind: 'colors' as const,
+  colors,
+  payload: colors.join(' '),
+  presentation,
+  profile: { name: 'Alex Morgan' },
+};
 afterEach(() => vi.restoreAllMocks());
 function textSpy() {
   const spy = vi.spyOn(PDFPage.prototype, 'drawText');
@@ -72,27 +79,28 @@ describe('material selection cards', () => {
     },
   );
 
-  it('prints all exact ordered references and real finish names, replaces the studio, and confines QR to the back', async () => {
+  it('prints exact ordered references and finish names on the same study page as the QR', async () => {
     const texts = textSpy();
     const pdf = await PDFDocument.load(
       await renderMaterialCard('vehicle', {
         ...content,
         cardQr: true,
+        pageSize: 'a6',
         presentation: resolveCardPresentation({}, { studioName: 'AURORA STUDIO' }, () => 0)
           .presentation,
         profile: { name: 'John Smith' },
       }),
     );
     expect(texts()).toContain('AURORA STUDIO');
-    expect(texts()).toContain('Prepared for John Smith');
+    expect(texts().some((value) => value.includes('Prepared for John Smith'))).toBe(true);
     expect(texts()).not.toContain('NORTHLINE STUDIO');
     for (const [i, code] of colors.entries()) {
       expect(texts()).toContain(`${String(i + 1).padStart(2, '0')}  ${code.slice(1)}`);
       expect(texts()).toContain(chooseMaterialFinish('vehicle', code).name);
     }
     const streams = operators(pdf);
-    expect((streams[0].match(/\nf\n/gu) ?? []).length).toBeLessThan(10);
-    expect((streams[1].match(/\nf\n/gu) ?? []).length).toBeGreaterThan(100);
+    expect(streams).toHaveLength(1);
+    expect((streams[0].match(/\nf\n/gu) ?? []).length).toBeGreaterThan(100);
   });
 
   it('uses the resolved studio and exposes only one reference in an individual fragment, without QR', async () => {
@@ -107,6 +115,24 @@ describe('material selection cards', () => {
     ]);
     expect(texts()).not.toContain(content.payload);
     expect((operators(pdf)[0].match(/\nf\n/gu) ?? []).length).toBeLessThan(10);
+  });
+
+  it('keeps individual artwork unchanged when collection QR is requested', async () => {
+    const withQr = await PDFDocument.load(
+      await renderMaterialCard(
+        'switch',
+        { ...content, cardQr: true },
+        { individualIndex: 2, pageSize: 'business' },
+      ),
+    );
+    const withoutQr = await PDFDocument.load(
+      await renderMaterialCard('switch', content, {
+        individualIndex: 2,
+        pageSize: 'business',
+      }),
+    );
+    expect(withQr.getPageCount()).toBe(1);
+    expect(operators(withQr)).toEqual(operators(withoutQr));
   });
 
   it('rejects mismatched QR data and invalid fragment indices', async () => {
