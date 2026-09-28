@@ -20,6 +20,8 @@ export {
   type CardKind,
   type CardTemplate,
 } from './export/templates.js';
+export { createCardSession, type CardSession } from './export/card-session.js';
+export type { CardCopyOverrides } from './export/card-copy.js';
 export {
   renderCards,
   renderIndividualCards,
