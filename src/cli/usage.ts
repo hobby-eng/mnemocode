@@ -37,9 +37,10 @@ ${section('USAGE')}
   mnemocode sskr-combine --share "ur:sskr/..." --share "ur:sskr/..."
   mnemocode sskr-export --share-file PATH --cards-dir NEW_FOLDER [OPTIONS]
 
-${section('SSKR SHARES')}
+${section('SHAMIR SHARES (SSKR)')}
 
-  Create and recover Blockchain Commons SSKR shares offline.
+  Split a mnemonic into Shamir shares and recover it offline.
+  Shares use the Blockchain Commons SSKR format.
   ${flag('--threshold N --shares M')}  Require any N of M shares (2 <= N <= M <= 16).
   ${flag('--mode direct|seedshift')}  Direct is the default; dates imply Seedshift.
     Seedshift dates and the BIP39 passphrase are NOT stored in the shares.
@@ -62,7 +63,7 @@ ${section('SSKR SHARES')}
     Existing card-name, card-company, card-role, card-email, card-phone, card-website and
     card-location options apply. Page size and orientation are independent of the visual design.
     QR is off by default. --card-layout qr enables it explicitly; --card-qr
-    adds it to collection layout. Individual QR contains only that fragment’s references.
+    adds it to collection layout. Individual cards never contain a QR.
     Each enabled QR carries only its own share, represented as RGB codes.
 
   Read shares using repeatable ${flag('--share TEXT')}, ${flag('--share-file PATH')}, or
@@ -270,9 +271,9 @@ ${section('CARD IDENTITY AND COPY')}
   ${flag('--card-footer TEXT')}           Override the footer.
   ${flag('--card-reference-label TEXT')}  Reference label (default: Ref.).
   For these four optional copy fields, use - to hide the text.
-  ${flag('--card-qr')}                    Include QR; fragments encode only their own references.
-  Ordinary cards omit QR by default. SSKR --card-layout qr explicitly enables it.
-  Individual fragments never gain a QR containing the full collection or share.
+  ${flag('--card-qr')}                    Add one QR with the complete data to a collection sheet.
+  Ordinary cards omit QR by default. For Shamir shares, --card-layout qr enables it.
+  Individual cards never contain a QR.
 
 ${section('PNG AND JPEG EXPORT')}
 
@@ -286,7 +287,7 @@ ${section('PNG AND JPEG EXPORT')}
   PNG is lossless; JPEG uses quality 90. For exact text/QR preservation prefer PNG.
   Existing folders are refused. Without image options, exports remain PDF.
   Collection --pdf and --images-dir may be combined. Individual cards contain no
-  collection QR. SSKR QR cards still contain only their own complete share.
+  collection QR. Shamir share QR cards still contain only their own complete share.
 
   mnemocode preview --all --images-dir ./preview-images --image-format jpg
   mnemocode encode --ask-secrets --format 5 --template business-it \\

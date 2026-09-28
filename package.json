@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.19.0",
   "private": true,
-  "description": "Offline CLI and TypeScript library for reversible BIP39 mnemonic formats, checksum-valid Seedshift, SSKR shares, QR codes, and printable recovery cards",
+  "description": "Offline tool that writes a BIP39 mnemonic as numbers, Unicode codes or colors, masks it with dates you remember, splits it into Shamir shares, and prints QR codes and recovery cards",
   "type": "module",
   "bin": {
     "mnemocode": "./dist/mnemocode.js"
@@ -32,7 +32,8 @@
     "docs/card-designs.md",
     "docs/card-identities.md",
     "docs/ARCHITECTURE.md",
-    "docs/REVIEW.md",
+    "docs/SEEDSHIFT_CONSTRUCTION.md",
+    "docs/audits/README.md",
     "CHANGELOG.md"
   ],
   "scripts": {
