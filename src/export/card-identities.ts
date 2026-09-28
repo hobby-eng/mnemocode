@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { renderPlatform } from './platform.js';
 import { validateProfile, type CardProfile, type CardSettings } from './card-settings.js';
 
 export type CompanySector = 'it' | 'architecture' | 'property' | 'consulting';
@@ -172,7 +172,7 @@ function contactDomain(company: string): string {
 export function createCardIdentity(
   supplied: CardProfile = {},
   sectorHint?: CompanySector,
-  choose: Choice = randomInt,
+  choose: Choice = (upperExclusive) => renderPlatform().randomInt(upperExclusive),
 ): Required<CardProfile> {
   const profile = validateProfile(supplied);
   const sector = knownSector(profile) ?? sectorHint ?? pick(sectors, choose);

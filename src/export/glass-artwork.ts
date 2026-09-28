@@ -1,8 +1,12 @@
-import { readFile } from 'node:fs/promises';
-import { PNG } from 'pngjs';
+import {
+  createRasterImage,
+  readRenderAsset,
+  renderPlatform,
+  type RasterImage,
+} from './platform.js';
 
 // Caches hold only bundled public artwork. Per-export reference colors are never cached here.
-let source: Promise<PNG> | undefined;
+let source: Promise<RasterImage> | undefined;
 function hsv(r: number, g: number, b: number): [number, number, number] {
   const v = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -46,22 +50,22 @@ export async function glassArtwork(
   if (referencesPerCard !== 4) {
     let bytes = compactSources.get(referencesPerCard);
     if (!bytes) {
-      bytes = readFile(
-        new URL(`../../assets/images/business-glass-${referencesPerCard}in1.jpg`, import.meta.url),
-      ).catch((error) => {
-        compactSources.delete(referencesPerCard);
-        throw error;
-      });
+      bytes = readRenderAsset(`images/business-glass-${referencesPerCard}in1.jpg`).catch(
+        (error) => {
+          compactSources.delete(referencesPerCard);
+          throw error;
+        },
+      );
       compactSources.set(referencesPerCard, bytes);
     }
     return bytes;
   }
-  source ??= readFile(new URL('../../assets/images/business-glass-4in1.png', import.meta.url)).then(
-    (bytes) => PNG.sync.read(bytes),
+  source ??= readRenderAsset('images/business-glass-4in1.png').then((bytes) =>
+    renderPlatform().decodePng(bytes),
   );
   const base = await source;
-  const out = new PNG({ width: base.width, height: base.height });
-  base.data.copy(out.data);
+  const out = createRasterImage(base.width, base.height);
+  out.data.set(base.data);
   const targets = references.map((ref) =>
     hsv(
       ...([1, 3, 5].map((p) => parseInt(ref.slice(p, p + 2), 16) / 255) as [
@@ -148,5 +152,5 @@ export async function glassArtwork(
       }
     }
   }
-  return PNG.sync.write(out, { deflateLevel: 9 });
+  return renderPlatform().encodePng(out, 9);
 }

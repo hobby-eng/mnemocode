@@ -9,6 +9,7 @@ import jsQR from 'jsqr';
 import { indexesToColors, representMnemonic } from '../dist/core.js';
 import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
+import '../dist/export/platform-node.js';
 import { cardTemplates, selectTemplate } from '../dist/export/templates.js';
 import { shareToColors } from '../dist/sskr/transport.js';
 import { renderBusinessCards } from '../dist/export/business-cards.js';
