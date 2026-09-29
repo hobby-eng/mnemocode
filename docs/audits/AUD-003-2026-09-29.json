@@ -1,0 +1,584 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-003",
+  "auditNumber": 3,
+  "date": "2026-09-29",
+  "title": "Targeted review of secret handling, the card rendering interface and documentation",
+  "reviewer": {
+    "name": "Claude Code (Anthropic)",
+    "model": "claude-fable-5-1",
+    "reasoningEffort": null,
+    "note": "One reviewer, no delegated review. The reviewer also wrote the fixes."
+  },
+  "snapshot": {
+    "commit": "265b974b1e6ac221a72133dab56cf05d0afa4eac",
+    "commitComplete": true,
+    "commitSubject": "feat: keep the same invented details for one working session",
+    "commitNote": "Identifier on main on 2026-09-29. A rewrite of the history changes it; the source fingerprint stays.",
+    "workingTree": "Clean, apart from one untracked folder that is not part of the repository.",
+    "sourceFingerprint": "fae3fc2ae9823192282029c54e5a5333d702d81746d78691482afaf95539d70e",
+    "sourceFingerprintMethod": "git ls-tree -r COMMIT | grep -v '\\.md$' | sha256sum",
+    "fixedSourceFingerprint": "45d6234fc7d83a40b390b0d92c6bf73083fcef70fe5edc7868933d74a96f6a8f"
+  },
+  "procedure": {
+    "note": "The review followed the security review checklist of the shared procedure; this record was written afterwards in the layout of the procedure.",
+    "sha256": {
+      "FULL_AUDIT_GUIDE.md": "30fa6a1675892e2a3059bdbd6e97737f2959a74aca98a0a90e4f655ae12854a6",
+      "AUDIT_STANDARD.md": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f",
+      "AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+      "audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7"
+    }
+  },
+  "scope": {
+    "kind": "targeted review",
+    "included": [
+      "Date handling and the Seedshift transformation",
+      "The five representations and the MNC1 record",
+      "The card renderers and the mnemocode/cards entry point",
+      "Input limits, help text and documents"
+    ],
+    "excluded": [
+      "The Shamir share engine and its WASM build",
+      "Local Bitcoin recovery checks",
+      "Image export through Poppler",
+      "The reproducible build",
+      "Platforms other than Linux x64 with Node.js 26.10.0"
+    ],
+    "testData": "Public test vectors only"
+  },
+  "environment": {
+    "os": "Linux 7.0.0 x64",
+    "node": "26.10.0",
+    "pnpm": "10.19.0",
+    "poppler": "26.01.0"
+  },
+  "checks": {
+    "coverageLedger": [
+      {
+        "checkId": "CHECK-SEC-001",
+        "group": "SEC / Secret ownership",
+        "method": "`SECURITY.md` read against input, encoding and card code",
+        "outcome": "Performed in part",
+        "evidence": "No mismatch found; no runtime probe of prompts"
+      },
+      {
+        "checkId": "CHECK-SEC-002",
+        "group": "SEC / Vault, CSP, transport",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "A command-line program has no page or vault"
+      },
+      {
+        "checkId": "CHECK-SEC-003",
+        "group": "SEC / Network egress",
+        "method": "Source trace of the renderer platform interface",
+        "outcome": "Performed in part",
+        "evidence": "The five platform calls read files, draw and encode; none opens a connection"
+      },
+      {
+        "checkId": "CHECK-SEC-004",
+        "group": "SEC / Randomness",
+        "method": "Source trace",
+        "outcome": "Performed in part",
+        "evidence": "Card choices use `randomInt` of `node:crypto`; share generation not reviewed"
+      },
+      {
+        "checkId": "CHECK-SEC-005",
+        "group": "SEC / Secret lifecycle",
+        "method": "Error messages of 24 probes inspected",
+        "outcome": "Performed in part",
+        "evidence": "No message contains a word of the phrase or a date; memory clearing not reviewed"
+      },
+      {
+        "checkId": "CHECK-SEC-006",
+        "group": "SEC / Browser injection",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "No browser interface"
+      },
+      {
+        "checkId": "CHECK-SEC-007",
+        "group": "SEC / Availability bounds",
+        "method": "Limits in code compared with documents",
+        "outcome": "Performed in part",
+        "evidence": "AUD-003-DOC002"
+      },
+      {
+        "checkId": "CHECK-FUN-001",
+        "group": "FUN / BIP39 and entropy",
+        "method": "Shift arithmetic compared with the formal construction",
+        "outcome": "Performed in part",
+        "evidence": "Agrees, including the last block; AUD-003-FUN001 in date parsing"
+      },
+      {
+        "checkId": "CHECK-FUN-002",
+        "group": "FUN / HD derivation",
+        "method": "—",
+        "outcome": "Not run",
+        "evidence": "Recovery checks were out of scope"
+      },
+      {
+        "checkId": "CHECK-FUN-003",
+        "group": "FUN / BIP85, BIP38, messages",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "Not implemented"
+      },
+      {
+        "checkId": "CHECK-FUN-004",
+        "group": "FUN / Scripts and multisig",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "Not implemented"
+      },
+      {
+        "checkId": "CHECK-FUN-005",
+        "group": "FUN / Transactions and PSBT",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "Not implemented"
+      },
+      {
+        "checkId": "CHECK-FUN-006",
+        "group": "FUN / Recovery and backup",
+        "method": "Representations, record and automatic detection probed",
+        "outcome": "Performed in part",
+        "evidence": "No defect; Shamir shares not reviewed"
+      },
+      {
+        "checkId": "CHECK-FUN-007",
+        "group": "FUN / Discovery and providers",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "No network function"
+      },
+      {
+        "checkId": "CHECK-API-001",
+        "group": "API / Call contracts",
+        "method": "24 edge-case probes and 160 worst-case renders",
+        "outcome": "Performed",
+        "evidence": "AUD-003-API001, AUD-003-API002, AUD-003-FUN002"
+      },
+      {
+        "checkId": "CHECK-API-002",
+        "group": "API / Async state",
+        "method": "—",
+        "outcome": "Not run",
+        "evidence": "Out of scope"
+      },
+      {
+        "checkId": "CHECK-API-003",
+        "group": "API / Export schema",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "No monetary export"
+      },
+      {
+        "checkId": "CHECK-API-004",
+        "group": "API / Encoding interoperability",
+        "method": "Conflicts between a record and the requested mode and format",
+        "outcome": "Performed in part",
+        "evidence": "The record decides; a lower-case record header is refused"
+      },
+      {
+        "checkId": "CHECK-BLD-001",
+        "group": "BLD / Feature composition",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "One build"
+      },
+      {
+        "checkId": "CHECK-BLD-002",
+        "group": "BLD / Matrix depth",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "One build"
+      },
+      {
+        "checkId": "CHECK-BLD-003",
+        "group": "BLD / Lockfiles and provenance",
+        "method": "Release dates and advisories of the PDF libraries",
+        "outcome": "Performed in part",
+        "evidence": "See observations"
+      },
+      {
+        "checkId": "CHECK-BLD-004",
+        "group": "BLD / Canonical WASM",
+        "method": "—",
+        "outcome": "Not run",
+        "evidence": "Out of scope"
+      },
+      {
+        "checkId": "CHECK-BLD-005",
+        "group": "BLD / Artifacts and CI",
+        "method": "CI result of the fix snapshot",
+        "outcome": "Performed in part",
+        "evidence": "Success; release workflow not reviewed"
+      },
+      {
+        "checkId": "CHECK-UI-001",
+        "group": "UI / Real files and viewports",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "No browser interface; printed layout is covered by the renders under CHECK-API-001"
+      },
+      {
+        "checkId": "CHECK-UI-002",
+        "group": "UI / Navigation and state",
+        "method": "—",
+        "outcome": "Not applicable",
+        "evidence": "No browser interface"
+      },
+      {
+        "checkId": "CHECK-UI-003",
+        "group": "UI / Help and accessibility",
+        "method": "Help text compared with the option parser",
+        "outcome": "Performed in part",
+        "evidence": "AUD-003-DOC003"
+      },
+      {
+        "checkId": "CHECK-ARC-001",
+        "group": "ARC / Ownership and imports",
+        "method": "—",
+        "outcome": "Not run",
+        "evidence": "Out of scope"
+      },
+      {
+        "checkId": "CHECK-ARC-002",
+        "group": "ARC / Dead code and duplication",
+        "method": "Function lengths and repeated constants scanned",
+        "outcome": "Performed in part",
+        "evidence": "AUD-003-ARC001, AUD-003-ARC002"
+      },
+      {
+        "checkId": "CHECK-ARC-003",
+        "group": "ARC / Comments and tests",
+        "method": "—",
+        "outcome": "Not run",
+        "evidence": "Out of scope"
+      },
+      {
+        "checkId": "CHECK-DOC-001",
+        "group": "DOC / Capability descriptions",
+        "method": "README, `SECURITY.md` and `docs/` compared with code",
+        "outcome": "Performed in part",
+        "evidence": "Counts of templates and invented details agree with code; AUD-003-DOC002"
+      },
+      {
+        "checkId": "CHECK-DOC-002",
+        "group": "DOC / Commands and metadata",
+        "method": "Options in documents compared with the parser",
+        "outcome": "Performed in part",
+        "evidence": "AUD-003-DOC003"
+      },
+      {
+        "checkId": "CHECK-DOC-003",
+        "group": "DOC / Audit records",
+        "method": "Every commit cited in `docs/audits/` looked up on `main`",
+        "outcome": "Performed",
+        "evidence": "AUD-003-DOC001"
+      }
+    ],
+    "commands": [
+      {
+        "check": "Worst-case sheets: longest built-in texts, 24 words, A6 and A4, every orientation, with QR code",
+        "outcome": "Passed",
+        "counts": "96 renders, 0 failures",
+        "evidence": "Temporary script, not retained"
+      },
+      {
+        "check": "Worst-case separate cards: wallet and business size",
+        "outcome": "Passed",
+        "counts": "64 renders, 0 failures",
+        "evidence": "Temporary script, not retained"
+      },
+      {
+        "check": "Edge-case probes of encoding, decoding, date parsing and card requests",
+        "outcome": "Failed",
+        "counts": "24 probes; 19 behaved as documented, 5 showed the defects below",
+        "evidence": "AUD-003-FUN001, AUD-003-API001, AUD-003-API002"
+      },
+      {
+        "check": "`git merge-base --is-ancestor` for every commit cited in the audit records",
+        "outcome": "Failed",
+        "counts": "3 cited commits, none on `main`",
+        "evidence": "AUD-003-DOC001"
+      },
+      {
+        "check": "Page size of the default sheet (`pdfinfo`)",
+        "outcome": "Passed",
+        "counts": "A6 is 419.528 × 297.638 pt with 16 cards; A4 is 595.276 × 841.89 pt",
+        "evidence": "Confirms two different sheets"
+      },
+      {
+        "check": "`pnpm test` after the fixes",
+        "outcome": "Failed",
+        "counts": "27 files; 427 tests passed, 1 failed",
+        "evidence": "The failing test expected an old message and was corrected"
+      },
+      {
+        "check": "`vitest run test/render-platform.test.ts test/card-page-sizes.test.ts test/core.test.ts`",
+        "outcome": "Passed",
+        "counts": "3 files, 85 tests",
+        "evidence": "Run after the correction"
+      },
+      {
+        "check": "`vitest run` of the collection sheet, business card, material card and export tests",
+        "outcome": "Passed",
+        "counts": "4 files, 59 tests",
+        "evidence": "Run after the message change"
+      },
+      {
+        "check": "`mnemocode self-test`",
+        "outcome": "Passed",
+        "counts": "7 public vectors, 75 representation round trips",
+        "evidence": "Run on the fixed build"
+      },
+      {
+        "check": "GitHub CI (`pnpm check`, `build`, `test`, `audit`) for the fix snapshot",
+        "outcome": "Passed",
+        "counts": "Source fingerprint `45d6234f…6a8f`",
+        "evidence": "The full suite was not repeated locally after the last fix"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "AUD-003-FUN001",
+      "category": "FUN",
+      "kind": "finding",
+      "title": "A date with a short year is read as a year of the first century",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affected": "`src/core/dates.ts`; every command that takes dates, and every program that uses the core.",
+      "reproduction": "parse `23-09-26`, or `5-01-02`.",
+      "expected": "an error. The documents promise `DD-MM-YYYY` or `YYYY-MM-DD` with a four-digit year.",
+      "observed": "`23-09-26` was accepted as year 23, month 9, day 26, and `5-01-02` as year 5. The year of the second form could have one to four digits.",
+      "impact": "a person who types a short year gets a shift that differs from the one for the intended date, with no warning. The phrase can still be restored with the same short spelling, but not with the full date the person remembers.",
+      "evidence": "the probe output; `test/core.test.ts`, \"needs a four-digit year in both spellings\".",
+      "recommendedFix": "require four digits in both forms.",
+      "requiredVerification": "short years are refused; `0026` gives the year 26."
+    },
+    {
+      "id": "AUD-003-FUN002",
+      "category": "FUN",
+      "kind": "finding",
+      "title": "Invented email and website addresses can belong to a real company",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affected": "`src/export/card-identities.ts`, `src/export/card-settings.ts`; every business card with invented details.",
+      "reproduction": "export business cards without `--card-email` and `--card-website`.",
+      "expected": "invented contacts are decoration and point to nobody.",
+      "observed": "the addresses had the form `contact@<company>.com` and `<company>.com`. Some of these domains are registered by real companies.",
+      "impact": "a printed card could name the mailbox and website of a real company. No secret is involved. Details supplied by the person are printed as given.",
+      "evidence": "source inspection; `test/card-session.test.ts`, `test/business-cards.test.ts`.",
+      "recommendedFix": "use the `.example` domain, which RFC 2606 reserves for examples.",
+      "requiredVerification": "every invented address ends in `.example`; supplied addresses are unchanged."
+    },
+    {
+      "id": "AUD-003-API001",
+      "category": "API",
+      "kind": "finding",
+      "title": "A sheet size together with `--cards-dir` gives cards of the sheet size",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affected": "`src/export/render.ts`, `src/export/sskr-content.ts`; `renderIndividualCards` of the `mnemocode/cards` entry point.",
+      "reproduction": "ask for separate cards with the page size `a6`.",
+      "expected": "the page size decides the result: `wallet` and `business` give separate cards, `a6` and `a4` give one sheet. A request that contradicts this is refused.",
+      "observed": "eight separate cards were produced, each on a page of A6 size.",
+      "impact": "an unexpected result that no document describes. No data is lost.",
+      "evidence": "the probe output; `test/card-page-sizes.test.ts`, \"refuses separate cards of a sheet size\".",
+      "recommendedFix": "refuse separate cards for a sheet size. `--cards-dir` only names the folder for separate cards.",
+      "requiredVerification": "the request fails with a message that names the card sizes; a card size and no size still work."
+    },
+    {
+      "id": "AUD-003-API002",
+      "category": "API",
+      "kind": "finding",
+      "title": "Renderer errors name command-line options and the wrong text",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affected": "`src/export/render.ts`, `src/export/sskr-content.ts`, `src/export/collection-sheet.ts`.",
+      "reproduction": "from another program, ask for a QR code on separate cards; or supply a name of 100 characters.",
+      "expected": "a message that every host can show and that names the text which does not fit.",
+      "observed": "the first message advised `--page-size` and `--card-qr`, which a program with a form does not have. The second said that the \"Study heading\" is too long, although the supplied text was the name.",
+      "impact": "confusing messages outside the command line. No secret is involved.",
+      "evidence": "the probe output; `test/card-page-sizes.test.ts`, `test/render-platform.test.ts`.",
+      "recommendedFix": "word the renderer messages without option names, and pass a label for the text being fitted.",
+      "requiredVerification": "no renderer message contains `--`; the message for a long text names that text."
+    },
+    {
+      "id": "AUD-003-DOC001",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "Audit records cite commits that `main` no longer contains",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affected": "`docs/audits/README.md`, `AUD-001-2026-09-27.md`, `AUD-002-2026-09-27.md` and their JSON records.",
+      "reproduction": "look up the three commits cited in the records with `git merge-base --is-ancestor <commit> main`.",
+      "expected": "a reader can open the reviewed snapshot, or is told why not.",
+      "observed": "none of the three commits is on `main`. The history was rewritten so that every document exists in one version, which gave every commit a new identifier.",
+      "impact": "the records look broken, although the reviewed source is still in the history.",
+      "evidence": "the lookup result.",
+      "recommendedFix": "explain the rewrite in the index and in both reports. Leave the JSON records as they are, because they are retained evidence.",
+      "requiredVerification": "the index has the explanation and each report links to it."
+    },
+    {
+      "id": "AUD-003-DOC002",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The input size limits are not documented",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affected": "`README.md`; the limits are in `src/cli/input.ts` and `src/cli/qr-input.ts`.",
+      "reproduction": "search the documents for the limits.",
+      "expected": "the limits are stated once.",
+      "observed": "1 MiB for text and 16 MiB and 4096 pixels for a QR image were enforced but described nowhere, after the document that described them was removed.",
+      "impact": "a refusal of large input has no explanation in the documents.",
+      "evidence": "search result.",
+      "recommendedFix": "one paragraph in the README.",
+      "requiredVerification": "the README values equal the constants in code."
+    },
+    {
+      "id": "AUD-003-DOC003",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The help and the README omit recovery options",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affected": "`src/cli/usage.ts`, `README.md`.",
+      "reproduction": "compare the options known to the parser with the help and the README.",
+      "expected": "every option is described.",
+      "observed": "the help lacked `--network`, `--bitcoin-profile`, `--account`, `--branch` and `--index`; the README lacked `--max-results` and `--progress-every`.",
+      "impact": "the options work but cannot be discovered.",
+      "evidence": "comparison script output, not retained.",
+      "recommendedFix": "add them.",
+      "requiredVerification": "the comparison finds no undocumented option."
+    },
+    {
+      "id": "AUD-003-ARC001",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "Page sizes, the millimetre unit and a colour conversion are duplicated",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affected": "the layout and artwork modules under `src/export/`; `src/export/card-session.ts`.",
+      "reproduction": "search for the page dimensions, the `MM` constant and the `hsv` function.",
+      "expected": "one definition of each.",
+      "observed": "the table of page dimensions existed in four files, `MM` in three and `hsv` in two. The card session had one line that could never run.",
+      "impact": "a change of a page size must be repeated in four places; a missed place gives pages of different sizes.",
+      "evidence": "search result; `test/card-page-sizes.test.ts`, \"knows the size of every page in both orientations\".",
+      "recommendedFix": "`pageDimensions` in `card-settings.ts`, one `MM`, a shared `color-math.ts`; replace the dead line with an explicit check.",
+      "requiredVerification": "one definition remains and the renders are unchanged."
+    },
+    {
+      "id": "AUD-003-ARC002",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "The compact sheet layout cannot be reached through the program",
+      "severity": "low",
+      "status": "withdrawn",
+      "releaseBlocking": false,
+      "affected": "`src/export/collection-sheet.ts`.",
+      "reproduction": "follow the callers of `collectionSheetLayout` for the `wallet` and `business` sizes.",
+      "expected": "code that the program can reach, or no such code.",
+      "observed": "since card sizes give separate cards, `renderCards` never asks for a sheet of a card size. Only tests that call a template renderer directly reach the compact branch.",
+      "impact": "code that must be maintained and tested without being used.",
+      "evidence": "source inspection.",
+      "recommendedFix": "remove the compact branch and its tests, or state why it is kept.",
+      "requiredVerification": "the sheet tests pass without the branch.",
+      "correction": "2026-09-29. The finding was wrong. The QR card of one Shamir share is offered in every size, and in the business size it is printed as a compact sheet, for example with `--card-layout qr --page-size business`. The review followed the path of ordinary cards only. Nothing was removed; the code now names this use in a comment, and `test/card-page-sizes.test.ts`, \"prints the QR card of a share as a compact sheet of the business size\", proves it."
+    }
+  ],
+  "observations": [],
+  "informationalNotes": [
+    "The PDF libraries `pdf-lib` and `@pdf-lib/fontkit` had their last release in 2022. No advisory is known, and they only process files that MnemoCode itself creates. Watch for advisories.",
+    "The main function of the command-line program has 174 lines and the sheet layout 115. Splitting them would make them easier to read; no defect follows from their length."
+  ],
+  "remediation": [
+    {
+      "id": "AUD-003-FUN001",
+      "status": "verified",
+      "fixCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "fixCommitNote": null,
+      "verificationCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "evidence": "`test/core.test.ts`; `23-09-26` is refused on the command line; CI"
+    },
+    {
+      "id": "AUD-003-FUN002",
+      "status": "verified",
+      "fixCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "fixCommitNote": null,
+      "verificationCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "evidence": "`test/card-session.test.ts`, `test/business-cards.test.ts`; CI"
+    },
+    {
+      "id": "AUD-003-API001",
+      "status": "verified",
+      "fixCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "fixCommitNote": null,
+      "verificationCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "evidence": "`test/card-page-sizes.test.ts`; refusal seen on the command line; CI"
+    },
+    {
+      "id": "AUD-003-API002",
+      "status": "verified",
+      "fixCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "fixCommitNote": null,
+      "verificationCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "evidence": "`test/card-page-sizes.test.ts`, `test/render-platform.test.ts`; CI"
+    },
+    {
+      "id": "AUD-003-DOC001",
+      "status": "verified",
+      "fixCommit": null,
+      "fixCommitNote": "Documents",
+      "verificationCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "evidence": "`docs/audits/README.md` and the note at the top of AUD-001 and AUD-002"
+    },
+    {
+      "id": "AUD-003-DOC002",
+      "status": "verified",
+      "fixCommit": null,
+      "fixCommitNote": "Documents",
+      "verificationCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "evidence": "README, \"Secret input styles\"; values equal the constants"
+    },
+    {
+      "id": "AUD-003-DOC003",
+      "status": "verified",
+      "fixCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "fixCommitNote": null,
+      "verificationCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "evidence": "`src/cli/usage.ts`; README, date recovery"
+    },
+    {
+      "id": "AUD-003-ARC001",
+      "status": "verified",
+      "fixCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "fixCommitNote": null,
+      "verificationCommit": "fa71e8541d11e013409ef487d46c1a755c881025",
+      "evidence": "`test/card-page-sizes.test.ts`; sheet and card tests, 59 passed"
+    },
+    {
+      "id": "AUD-003-ARC002",
+      "status": "withdrawn",
+      "fixCommit": null,
+      "fixCommitNote": "Not needed",
+      "verificationCommit": null,
+      "evidence": "`test/card-page-sizes.test.ts`, named in the correction"
+    }
+  ],
+  "limitations": [
+    "The reviewed parts keep secrets out of error messages and open no connection. The defects found were a date that was accepted in a form the documents exclude, unclear results and messages at the edge of the card interface, and documents that lagged behind the code.",
+    "This record does not cover the Shamir share engine, the recovery checks, image export, the reproducible build, or other platforms. The probe scripts were temporary and are not retained, so the probes can be repeated only through the regression tests named above. The reviewer also wrote the fixes; no second reviewer checked them. This is not a security certification."
+  ]
+}
