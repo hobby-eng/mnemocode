@@ -119,7 +119,12 @@ describe('platform-neutral card rendering', () => {
       expect(calls.random).toBeGreaterThan(0);
       expect(calls.encode).toBeGreaterThan(0);
       expect(calls.qr).toBeGreaterThan(0);
-      const cards = await renderIndividualCards(template, { ...content, cardQr: false });
+      // Separate cards need a card size, not the sheet size used above.
+      const cards = await renderIndividualCards(template, {
+        ...content,
+        pageSize: 'business',
+        cardQr: false,
+      });
       expect(cards.map((card) => card.name)).toEqual(
         content.colors.map(
           (color, index) => `${String(index + 1).padStart(2, '0')}-${color.slice(1).toUpperCase()}`,

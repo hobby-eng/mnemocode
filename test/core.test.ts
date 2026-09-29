@@ -426,3 +426,15 @@ describe('local Bitcoin recovery evidence', () => {
     expect(result.warning).toContain('32 bits');
   });
 });
+
+describe('date spelling', () => {
+  it('needs a four-digit year in both spellings', () => {
+    expect(parseDate('23-09-2026')).toEqual({ year: 2026, month: 9, day: 23 });
+    expect(parseDate('2026-09-23')).toEqual({ year: 2026, month: 9, day: 23 });
+    // The year 26 is written with four digits.
+    expect(parseDate('23-09-0026')).toEqual({ year: 26, month: 9, day: 23 });
+    expect(parseDate('0026-09-23')).toEqual({ year: 26, month: 9, day: 23 });
+    for (const short of ['23-09-26', '5-01-02', '026-09-23', '26-09-23', '2026-9-23'])
+      expect(() => parseDate(short), short).toThrow('four-digit year');
+  });
+});

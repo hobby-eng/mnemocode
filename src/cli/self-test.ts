@@ -328,9 +328,9 @@ async function checkCardExports(): Promise<void> {
         name: 'Alex Morgan',
         role: 'Design Director',
         company: 'VECTOR STUDIO',
-        email: 'alex@vector.com',
+        email: 'alex@vector.example',
         phone: '+44 20 7946 0281',
-        website: 'vector.com',
+        website: 'vector.example',
         location: 'London',
       },
       presentation: {

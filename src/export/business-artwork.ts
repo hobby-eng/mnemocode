@@ -5,6 +5,7 @@ import {
   type RasterImage,
 } from './platform.js';
 import { hueOrigins, type PhysicalBusinessStyle } from './business-designs.js';
+import { hsv } from './color-math.js';
 
 // Cache decoded/resampled bundled images only, never a caller's recolored references.
 const sources = new Map<PhysicalBusinessStyle, Promise<RasterImage>>();
@@ -45,15 +46,6 @@ async function source(style: PhysicalBusinessStyle): Promise<RasterImage> {
     sources.set(style, cached);
   }
   return cached;
-}
-
-function hsv(r: number, g: number, b: number): [number, number, number] {
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const d = max - min;
-  const hue =
-    d === 0 ? 0 : max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return [hue / 6, max === 0 ? 0 : d / max, max];
 }
 
 /** Decorative hue follows the reference approximately. The printed HEX remains exact. */

@@ -2,7 +2,12 @@ import { rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import { MM, type CardBox } from './business-layout.js';
 import { fit, text } from './business-render-primitives.js';
 import { drawCollectionQr, qrSizeForModuleMm } from './card-qr.js';
-import { parsePageSize, type CardSettings, type CardPresentation } from './card-settings.js';
+import {
+  pageDimensions,
+  parsePageSize,
+  type CardSettings,
+  type CardPresentation,
+} from './card-settings.js';
 import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from './world-map.js';
 import { WORLD_MAP_LAND } from './world-map-data.js';
 
@@ -41,25 +46,12 @@ export function collectionSheetLayout(
   if (!Number.isInteger(count) || count < 1 || count > 16 || aspect <= 0 || captionLines < 1)
     throw new Error('Invalid design study layout.');
   const size = parsePageSize(settings.pageSize);
-  const dimensions =
-    size === 'a4'
-      ? [210, 297]
-      : size === 'a6'
-        ? [148, 105]
-        : size === 'wallet'
-          ? [85.6, 54]
-          : [90, 50];
   if (
     settings.orientation !== undefined &&
     !['portrait', 'landscape'].includes(settings.orientation)
   )
     throw new Error('Orientation must be portrait or landscape.');
-  if (
-    (settings.orientation === 'portrait' && dimensions[0]! > dimensions[1]!) ||
-    (settings.orientation === 'landscape' && dimensions[0]! < dimensions[1]!)
-  )
-    dimensions.reverse();
-  const [width, height] = dimensions as [number, number];
+  const [width, height] = pageDimensions(size, settings.orientation);
   const compact = size === 'wallet' || size === 'business';
   const large = size === 'a4';
   const margin = compact ? 3 : large ? 10 : 5;
@@ -218,8 +210,15 @@ export function drawStudyFrame(
   const reserved = layout.qr === undefined ? 0 : layout.qr.size + margin;
   const headingWidth = width - 2 * margin - (compact ? reserved : 2 * reserved);
   const headingCentre = compact ? margin + headingWidth / 2 : width / 2;
-  const centred = (value: string, top: number, preferred: number, color = frameMuted) => {
-    const size = fit(font, value, preferred, compact ? 4 : 4.5, headingWidth * MM, 'Study heading');
+  // The label names the text in the error message when it does not fit.
+  const centred = (
+    label: string,
+    value: string,
+    top: number,
+    preferred: number,
+    color = frameMuted,
+  ) => {
+    const size = fit(font, value, preferred, compact ? 4 : 4.5, headingWidth * MM, label);
     const left = headingCentre - font.widthOfTextAtSize(value, size) / MM / 2;
     text(page, font, value, left, top, size, color);
   };
@@ -230,9 +229,15 @@ export function drawStudyFrame(
     : large
       ? { title: 9, kind: 18.5, subtitle: 23.5, rule: 28 }
       : { title: 5.5, kind: 12, subtitle: 15.4, rule: 19.4 };
-  centred(title, rows.title, compact ? 8 : large ? 19 : 13, frameInk);
-  centred('DESIGN STUDY / FOR SELECTION', rows.kind, compact ? fontSize : fontSize * 0.95);
+  centred('The studio name or title', title, rows.title, compact ? 8 : large ? 19 : 13, frameInk);
   centred(
+    'Study heading',
+    'DESIGN STUDY / FOR SELECTION',
+    rows.kind,
+    compact ? fontSize : fontSize * 0.95,
+  );
+  centred(
+    'The line with the subtitle and the name',
     compact ? presentation.subtitle : `${presentation.subtitle}  Prepared for ${preparedFor}`,
     rows.subtitle,
     compact ? 4.3 : fontSize * 0.95,

@@ -1,4 +1,4 @@
-import type { CardPageSize, CardOrientation } from './card-settings.js';
+import { pageDimensions, type CardPageSize, type CardOrientation } from './card-settings.js';
 
 const WALLET = { width: 85.6, height: 54 } as const;
 const GRID = {
@@ -12,19 +12,10 @@ const GRID = {
 
 export function materialPageLayout(size: CardPageSize, orientation?: CardOrientation) {
   // Rotate the physical sheet, never stretch the photographed finishes.
-  const dimensions =
-    size === 'a4'
-      ? [297, 210]
-      : size === 'a6'
-        ? [148, 105]
-        : size === 'business'
-          ? [90, 50]
-          : [85.6, 54];
-  if (orientation === 'portrait') dimensions.reverse();
-  else if (orientation !== undefined && orientation !== 'landscape')
+  if (orientation !== undefined && orientation !== 'portrait' && orientation !== 'landscape')
     throw new Error('Orientation must be portrait or landscape.');
-  const width = dimensions[0]!;
-  const height = dimensions[1]!;
+  // Material sheets lie on their long side unless portrait is asked for.
+  const [width, height] = pageDimensions(size, orientation ?? 'landscape');
   const portrait = height > width;
   const scale = portrait
     ? Math.min(width / WALLET.height, height / WALLET.width)

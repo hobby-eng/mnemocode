@@ -27,6 +27,7 @@ import {
   drawStudyShadow,
 } from './collection-sheet.js';
 import {
+  pageDimensions,
   parsePageSize,
   type BusinessStyle,
   type CardProfile,
@@ -280,20 +281,7 @@ async function drawCard(
 
 function resizeSinglePage(page: PDFPage, content: BusinessContent): void {
   if (content.pageSize !== undefined || content.orientation !== undefined) {
-    const dimensions =
-      content.pageSize === 'a4'
-        ? [210, 297]
-        : content.pageSize === 'a6'
-          ? [148, 105]
-          : content.pageSize === 'wallet'
-            ? [85.6, 54]
-            : [90, 50];
-    if (
-      (content.orientation === 'portrait' && dimensions[0]! > dimensions[1]!) ||
-      (content.orientation === 'landscape' && dimensions[0]! < dimensions[1]!)
-    )
-      dimensions.reverse();
-    const [width, height] = dimensions as [number, number];
+    const [width, height] = pageDimensions(content.pageSize ?? 'business', content.orientation);
     const scale = Math.min(1, width / 90, height / 50);
     page.scaleContent(scale, scale);
     page.translateContent(((width - 90 * scale) * MM) / 2, ((height - 50 * scale) * MM) / 2);

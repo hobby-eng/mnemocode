@@ -1,3 +1,4 @@
+import { MM } from './business-layout.js';
 import { materialPageLayout, materialGridLayout } from './material-layout.js';
 import { readRenderAsset } from './platform.js';
 import fontkit from '@pdf-lib/fontkit';
@@ -37,7 +38,6 @@ export interface MaterialCardOptions {
   readonly pageSize?: MaterialPageSize;
   readonly individualIndex?: number;
 }
-const MM = 72 / 25.4;
 const TYPE_LAYOUT = {
   studioTop: 2.2,
   titleTop: 6,

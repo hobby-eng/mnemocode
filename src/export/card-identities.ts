@@ -157,7 +157,12 @@ function knownSector(profile: CardProfile): CompanySector | undefined {
   return sectors.find((sector) => sectorRoles[sector].some((name) => name.toLowerCase() === role));
 }
 
-/** Decorative contact defaults, not verified company domains or actual mailboxes. */
+/**
+ * Invented contacts end in .example. That domain is reserved for examples (RFC 2606),
+ * so an invented address can never be the mailbox or website of a real company.
+ */
+const INVENTED_DOMAIN_ENDING = '.example';
+
 function contactDomain(company: string): string {
   const label = company
     .normalize('NFKD')
@@ -165,7 +170,7 @@ function contactDomain(company: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]/gu, '')
     .slice(0, 63);
-  return `${label || 'company'}.com`;
+  return `${label || 'company'}${INVENTED_DOMAIN_ENDING}`;
 }
 
 /** Selection is independent of secret data; explicit values always win. */

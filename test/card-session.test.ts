@@ -34,8 +34,8 @@ describe('card session', () => {
     );
     expect(own.profile.name).toBe('John Smith');
     expect(own.profile.company).toBe('Example Systems');
-    expect(own.profile.email).toBe('contact@examplesystems.com');
-    expect(own.profile.website).toBe('examplesystems.com');
+    expect(own.profile.email).toBe('contact@examplesystems.example');
+    expect(own.profile.website).toBe('examplesystems.example');
     expect(own.profile.role).toBe(invented.profile.role);
     expect(own.presentation.studioName).toBe('AURORA STUDIO');
     expect(own.presentation.slogan).toBe(invented.presentation.slogan);
