@@ -242,11 +242,15 @@ ${section('DATE RECOVERY')}
   ${flag('--compressed-public-key HEX')} 33-byte compressed public key
   ${flag('--wif-file PATH')}             expected WIF read from a local file
   ${flag('--bip39-passphrase-file PATH')} optional passphrase for evidence checks
+  ${flag('--network mainnet|testnet')}   network of the address or key (default mainnet)
+  ${flag('--bitcoin-profile NAME')}      auto, or legacy, nested-segwit, native-segwit, taproot
+  ${flag('--account N')}                 account number (default 0)
+  ${flag('--branch N')}                  0 for receiving, 1 for change (default 0)
+  ${flag('--index N')}                   address number (default 0)
   ${flag('--max-results N')}             displayed candidate limit (default 100)
   ${flag('--max-candidates N')}          attempted combinations (default 1000000; max 10000000)
   ${flag('--progress-every N')}          progress interval (default 1000)
 
-  Bitcoin defaults: mainnet, profile auto, account 0, branch 0, index 0.
   All evidence checks are local and offline.
 
 ${section('SELF-TESTS')}

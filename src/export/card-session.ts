@@ -46,9 +46,10 @@ export function createCardSession(): CardSession {
         employment = { company: chosen.company, role: chosen.role };
         employments.set(key, employment);
       }
-      name ??= createCardIdentity({}, sector).name;
       presentation ??= resolveCardPresentation().presentation;
       const own = validateProfile(supplied);
+      // The name was chosen together with the first employment.
+      if (name === undefined) throw new Error('The card session has no name.');
       return {
         // Email and website follow the company that is finally printed.
         profile: createCardIdentity({ name, ...employment, ...own }, sector),

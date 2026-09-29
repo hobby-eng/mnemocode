@@ -1,4 +1,4 @@
-import { parsePageSize, type CardSettings } from './card-settings.js';
+import { pageDimensions, parsePageSize, type CardSettings } from './card-settings.js';
 export const GLASS_CARD = { width: 90, height: 50, gap: 5 } as const;
 export const GLASS_SHEET = { top: 20, bottom: 12, side: 5 } as const;
 const CARD = GLASS_CARD;
@@ -24,20 +24,7 @@ export function glassPageLayout(
     content.pageSize ?? (individual ? (cardWidth === 85.6 ? 'wallet' : 'business') : 'a6'),
   );
 
-  const dimensions =
-    size === 'a4'
-      ? [210, 297]
-      : size === 'a6'
-        ? [148, 105]
-        : size === 'wallet'
-          ? [85.6, 54]
-          : [90, 50];
-  if (
-    (content.orientation === 'portrait' && dimensions[0]! > dimensions[1]!) ||
-    (content.orientation === 'landscape' && dimensions[0]! < dimensions[1]!)
-  )
-    dimensions.reverse();
-  const [width, height] = dimensions as [number, number];
+  const [width, height] = pageDimensions(size, content.orientation);
   const small = size === 'wallet' || size === 'business';
   const studioSheet = !individual && !small;
   const columns =

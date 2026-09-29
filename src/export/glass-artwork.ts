@@ -4,17 +4,10 @@ import {
   renderPlatform,
   type RasterImage,
 } from './platform.js';
+import { hsv } from './color-math.js';
 
 // Caches hold only bundled public artwork. Per-export reference colors are never cached here.
 let source: Promise<RasterImage> | undefined;
-function hsv(r: number, g: number, b: number): [number, number, number] {
-  const v = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const d = v - min;
-  const h =
-    d === 0 ? 0 : v === r ? ((g - b) / d + 6) % 6 : v === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return [h / 6, v === 0 ? 0 : d / v, v];
-}
 function rgb(h: number, s: number, v: number): number[] {
   const sector = h * 6;
   const c = v * s;

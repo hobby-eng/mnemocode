@@ -43,6 +43,26 @@ export function parsePageSize(value: string | undefined): CardPageSize {
   return value as CardPageSize;
 }
 
+/** Width and height in millimetres, in the natural orientation of each size. */
+const PAGE_DIMENSIONS: Readonly<Record<CardPageSize, readonly [number, number]>> = {
+  a4: [210, 297],
+  a6: [148, 105],
+  wallet: [85.6, 54],
+  business: [90, 50],
+};
+
+/** Page width and height in millimetres; an orientation turns the page when it has to. */
+export function pageDimensions(
+  size: CardPageSize,
+  orientation?: CardOrientation,
+): [number, number] {
+  const [width, height] = PAGE_DIMENSIONS[size];
+  const turn =
+    (orientation === 'portrait' && width > height) ||
+    (orientation === 'landscape' && width < height);
+  return turn ? [height, width] : [width, height];
+}
+
 /**
  * Wallet and business sizes are the sizes of real cards, so every card becomes its own
  * numbered page. A6 and A4 are sheets that hold the whole collection on one page.
@@ -90,8 +110,8 @@ function defaultEmployer(
     return {
       role: 'ARCHITECT',
       company: 'VECTOR STUDIO',
-      email: 'alex@vector.com',
-      website: 'vector.com',
+      email: 'alex@vector.example',
+      website: 'vector.example',
       location: 'Remote / Worldwide',
     };
   }
@@ -99,16 +119,16 @@ function defaultEmployer(
     return {
       role: 'IT SOLUTIONS DIRECTOR',
       company: 'VECTOR SYSTEMS',
-      email: 'alex@vector.com',
-      website: 'vector.com',
+      email: 'alex@vector.example',
+      website: 'vector.example',
       location: 'Remote / Worldwide',
     };
   }
   return {
     role: 'Property Consultant',
     company: 'NORTHLINE',
-    email: 'alex@northline.com',
-    website: 'northline.com',
+    email: 'alex@northline.example',
+    website: 'northline.example',
     location: 'London / International',
   };
 }

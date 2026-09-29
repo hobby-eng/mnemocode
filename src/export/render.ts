@@ -37,7 +37,7 @@ export async function renderCards(jobs: readonly CardJob[]): Promise<Uint8Array>
     if (resolved.kind === 'colors' && isCardPageSize(resolved.pageSize)) {
       if (resolved.cardQr)
         throw new Error(
-          'A QR code is printed on a sheet only. Use --page-size a6 or a4 with --card-qr; separate cards never carry a QR code.',
+          'A QR code is printed on a sheet only. Choose the A6 or A4 size for a QR code; separate cards never carry one.',
         );
       for (const card of await renderIndividualCards(template, resolved)) pages.push(card.bytes);
       continue;
@@ -72,6 +72,10 @@ export async function renderIndividualCards(
   if (content.kind !== 'colors' || !template.renderIndividual)
     throw new Error('This template does not support individual business cards.');
   if (!content.colors.length) throw new Error('The card collection is empty.');
+  if (content.pageSize !== undefined && !isCardPageSize(content.pageSize))
+    throw new Error(
+      'Separate cards need a card size. Choose the wallet or business size, or leave the size out.',
+    );
   const resolvedContent: CardContent = {
     ...content,
     presentation: resolvePresentationFor(content),

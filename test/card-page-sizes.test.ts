@@ -48,6 +48,26 @@ describe('page size decides between a sheet and separate cards', () => {
     ]);
   });
 
+  it('refuses separate cards of a sheet size', async () => {
+    const { renderIndividualCards } = await import('../src/cards.js');
+    const template = selectTemplate('business-it', 'colors');
+    for (const pageSize of ['a6', 'a4'] as const)
+      await expect(renderIndividualCards(template, { ...content, pageSize })).rejects.toThrow(
+        'Separate cards need a card size.',
+      );
+    expect(await renderIndividualCards(template, { ...content })).toHaveLength(colors.length);
+  });
+
+  it('knows the size of every page in both orientations', async () => {
+    const { pageDimensions } = await import('../src/export/card-settings.js');
+    expect(pageDimensions('a4')).toEqual([210, 297]);
+    expect(pageDimensions('a4', 'landscape')).toEqual([297, 210]);
+    expect(pageDimensions('a6')).toEqual([148, 105]);
+    expect(pageDimensions('a6', 'portrait')).toEqual([105, 148]);
+    expect(pageDimensions('wallet', 'landscape')).toEqual([85.6, 54]);
+    expect(pageDimensions('business', 'portrait')).toEqual([50, 90]);
+  });
+
   it('refuses a QR code on separate cards', async () => {
     await expect(pages('business-it', { pageSize: 'business', cardQr: true })).rejects.toThrow(
       'A QR code is printed on a sheet only.',
