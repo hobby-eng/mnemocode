@@ -71,17 +71,20 @@ describe('page size decides between a sheet and separate cards', () => {
     expect(pageDimensions('business', 'portrait')).toEqual([50, 90]);
   });
 
-  it('gives a separate card rounded corners and paints nothing outside them', async () => {
-    const template = selectTemplate('business-it', 'colors');
-    const document = await PDFDocument.load(
-      await template.renderIndividual!({ ...content, pageSize: 'business' }, 0),
-    );
-    const operators = pageOperators(document, 0);
-    // Four curves form the corners of the clipping path; the artwork is drawn inside it.
-    expect(operators.match(/ c$/gmu)).toHaveLength(4);
-    expect(operators.indexOf('\nW\n')).toBeGreaterThan(-1);
-    expect(operators.indexOf('\nW\n')).toBeLessThan(operators.indexOf(' Do'));
-  });
+  it.each(['business-it', 'business-glass-4in1', 'business-glass-6in1', 'business-glass-8in1'])(
+    'gives a separate %s card rounded corners and paints nothing outside them',
+    async (id) => {
+      const template = selectTemplate(id, 'colors');
+      const document = await PDFDocument.load(
+        await template.renderIndividual!({ ...content, pageSize: 'business' }, 0),
+      );
+      const operators = pageOperators(document, 0);
+      // Four curves form the corners of the clipping path; the artwork is drawn inside it.
+      expect(operators.match(/ c$/gmu)).toHaveLength(4);
+      expect(operators.indexOf('\nW\n')).toBeGreaterThan(-1);
+      expect(operators.indexOf('\nW\n')).toBeLessThan(operators.indexOf(' Do'));
+    },
+  );
 
   it('refuses a QR code on separate cards', async () => {
     await expect(pages('business-it', { pageSize: 'business', cardQr: true })).rejects.toThrow(

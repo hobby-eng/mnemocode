@@ -9,6 +9,7 @@ import { renderSskrPdf } from '../src/export/sskr-cards.js';
 import { shareToColors } from '../src/sskr/transport.js';
 import * as qr from '../src/export/card-qr.js';
 import { MM } from '../src/export/business-layout.js';
+import { pageOperators } from './helpers/pdf-content.js';
 
 const colors = indexesToColors(Array.from({ length: 24 }, (_, index) => index * 73 + 1));
 const payload = colors.join(' ');
@@ -144,6 +145,21 @@ describe('single-page design studies', () => {
     },
     60_000,
   );
+
+  it('puts the light glass cards on a light sheet and every other card on the dark sheet', async () => {
+    // The first thing drawn on a sheet is its background, a rectangle over the whole page.
+    const background = async (id: string) => {
+      const template = cardTemplates.find((item) => item.id === id)!;
+      const document = await PDFDocument.load(
+        await template.render({ kind: 'colors', colors, payload, presentation, pageSize: 'a6' }),
+      );
+      return /^([\d.]+ [\d.]+ [\d.]+) rg$/mu.exec(pageOperators(document, 0))?.[1];
+    };
+    for (const id of ['business-glass-4in1', 'business-glass-6in1', 'business-glass-8in1'])
+      expect(await background(id), id).toBe('0.78 0.81 0.85');
+    for (const id of ['business-it', 'business-architect', 'material-tile'])
+      expect(await background(id), id).toBe('0.043 0.047 0.059');
+  }, 60_000);
 
   it('fails instead of creating a QR-only back when physical constraints cannot be met', () => {
     expect(() =>
