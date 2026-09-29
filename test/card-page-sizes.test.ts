@@ -122,4 +122,26 @@ describe('page size decides the layout of Shamir share cards', () => {
     const { width, height } = cards.getPage(0).getSize();
     expect([Math.round(width / MM), Math.round(height / MM)]).toEqual([90, 50]);
   });
+
+  it('prints the QR card of a share as a compact sheet of the business size', async () => {
+    const { splitSskrMnemonic } = await import('../src/sskr/shares.js');
+    const { renderSskrPdf } = await import('../src/export/sskr-cards.js');
+    const { collectionSheetLayout } = await import('../src/export/collection-sheet.js');
+    // Public BIP39 test vector; never a real wallet.
+    const shares = await splitSskrMnemonic(`${'abandon '.repeat(11)}about`, 2, 3);
+    const document = await PDFDocument.load(
+      await renderSskrPdf(shares, { style: 'it', pageSize: 'business', layout: 'qr' }),
+    );
+    // One page for every share, each with its QR code: this is the only use of the compact sheet.
+    expect(document.getPageCount()).toBe(shares.length);
+    for (const page of document.getPages()) {
+      const { width, height } = page.getSize();
+      expect([Math.round(width / MM), Math.round(height / MM)]).toEqual([90, 50]);
+      expect(pageOperators(document, document.getPages().indexOf(page))).toContain(' Do');
+    }
+    expect(collectionSheetLayout({ pageSize: 'business' }, 1, 1.8, 1, 'payload').compact).toBe(
+      true,
+    );
+    expect(collectionSheetLayout({ pageSize: 'a6' }, 1, 1.8, 1, 'payload').compact).toBe(false);
+  });
 });
