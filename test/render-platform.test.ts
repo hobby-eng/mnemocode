@@ -119,7 +119,7 @@ describe('platform-neutral card rendering', () => {
       expect(calls.random).toBeGreaterThan(0);
       expect(calls.encode).toBeGreaterThan(0);
       expect(calls.qr).toBeGreaterThan(0);
-      // Separate cards need a card size, not the sheet size used above.
+      // Separate cards have the business size, not the sheet size used above.
       const cards = await renderIndividualCards(template, {
         ...content,
         pageSize: 'business',

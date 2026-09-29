@@ -56,10 +56,10 @@ ${section('SHAMIR SHARES (SSKR)')}
   ${flag('--pdf NEW_FILE')}  All shares in one multi-page PDF.
   ${flag('--cards-dir NEW_FOLDER')}  Export separate PDFs; existing folders are never overwritten.
   The page size decides the layout: a6 or a4 gives one collection sheet per share,
-  wallet or business gives separate numbered cards for each share.
+  business gives separate numbered cards for each share.
   ${flag('--card-layout qr')}          One QR document per share, in any size.
   ${flag('--card-layout collection')}  One color collection sheet per share (a6 or a4).
-  ${flag('--card-layout individual')}  Separate numbered cards (wallet or business).
+  ${flag('--card-layout individual')}  Separate numbered cards (business).
     In individual mode ALL cards in a folder are needed to reconstruct ONE share.
   ${flag('--template ID')}  Any installed design; use preview --list.
     Existing card-name, card-company, card-role, card-email, card-phone, card-website and
@@ -168,9 +168,8 @@ ${section('TERMINAL AND FILE OUTPUT')}
 
   Templates:
 ${cardTemplates.map((template, index) => `    ${index + 1}  ${template.id.padEnd(22)} ${template.name}`).join('\n')}
-  ${flag('--page-size a4|a6|wallet|business')}
+  ${flag('--page-size a4|a6|business')}
     a6, a4        one sheet with the whole collection (a6 is the default)
-    wallet        separate numbered cards of 85.6 x 54 mm, one card per page
     business      separate numbered cards of 90 x 50 mm, one card per page
   ${flag('--orientation VALUE')}    portrait or landscape
   Glass variants: business-glass-4in1, business-glass-6in1, business-glass-8in1.
@@ -288,7 +287,8 @@ ${section('PNG AND JPEG EXPORT')}
   ${flag('--cards-dir NEW_FOLDER --image-format png')}  Individual card images.
 
   Image export uses the same approved PDF layout at 300 dpi, including all pages.
-  Local Poppler pdftoppm must be installed; no new npm package is required.
+  Local Poppler pdftocairo must be installed; no new npm package is required.
+  The rounded corners of a separate card are transparent in PNG and white in JPEG.
   A missing renderer is reported before requesting secrets. No online conversion.
   PNG is lossless; JPEG uses quality 90. For exact text/QR preservation prefer PNG.
   Existing folders are refused. Without image options, exports remain PDF.

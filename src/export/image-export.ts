@@ -13,20 +13,36 @@ import {
 } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { PDFDocument } from 'pdf-lib';
 
 export type ImageFormat = 'png' | 'jpg';
 export type DocumentFormat = 'pdf' | ImageFormat;
 const execute = promisify(execFile);
+const IMAGE_DPI = 300;
+const POINTS_PER_INCH = 72;
+
+// Both come with Poppler. pdftocairo can leave the paper transparent, which pdftoppm cannot.
+const IMAGE_RENDERER = 'pdftocairo';
+
+/**
+ * Whole pixels that a page covers completely.
+ *
+ * Poppler rounds the image size up, so the last row and column of pixels are covered only
+ * in part and show the paper as a thin line. Rounding down leaves them out.
+ */
+function coveredPixels(points: number): number {
+  return Math.max(1, Math.floor((points * IMAGE_DPI) / POINTS_PER_INCH));
+}
 let renderer: Promise<void> | undefined;
 
 /** Optional local Poppler adapter; never downloads a renderer or sends data online. */
 export function assertImageRenderer(): Promise<void> {
-  return (renderer ??= execute('pdftoppm', ['-v'], { timeout: 10_000, maxBuffer: 64 * 1024 })
+  return (renderer ??= execute(IMAGE_RENDERER, ['-v'], { timeout: 10_000, maxBuffer: 64 * 1024 })
     .then(() => undefined)
     .catch(() => {
       renderer = undefined;
       throw new Error(
-        'PNG/JPEG export requires the local Poppler pdftoppm program. Install Poppler before using image export, or export PDF instead.',
+        'PNG/JPEG export requires the local Poppler pdftocairo program. Install Poppler before using image export, or export PDF instead.',
       );
     }));
 }
@@ -59,17 +75,28 @@ export async function writeRenderedDocument(
   try {
     const input = join(temporary, 'document.pdf');
     await writeFile(input, bytes, { flag: 'wx', mode: 0o600 });
-    await execute(
-      'pdftoppm',
-      [
-        '-r',
-        '300',
-        ...(format === 'png' ? ['-png'] : ['-jpeg', '-jpegopt', 'quality=90']),
-        input,
-        join(temporary, 'page'),
-      ],
-      { timeout: 120_000, maxBuffer: 64 * 1024 },
-    );
+    const pages = (await PDFDocument.load(bytes)).getPages();
+    // Pages can differ in size, so each one is rendered with its own image size.
+    for (const [index, page] of pages.entries()) {
+      const number = String(index + 1);
+      await execute(
+        IMAGE_RENDERER,
+        [
+          '-r',
+          String(IMAGE_DPI),
+          ...['-f', number, '-l', number, '-singlefile'],
+          ...['-x', '0', '-y', '0'],
+          ...['-W', String(coveredPixels(page.getWidth()))],
+          ...['-H', String(coveredPixels(page.getHeight()))],
+          // Unpainted paper, such as the rounded corners of a separate card, stays
+          // transparent in PNG. JPEG has no transparency and shows it white.
+          ...(format === 'png' ? ['-png', '-transp'] : ['-jpeg', '-jpegopt', 'quality=90']),
+          input,
+          join(temporary, `page-${number}`),
+        ],
+        { timeout: 120_000, maxBuffer: 64 * 1024 },
+      );
+    }
     const files = (await readdir(temporary))
       .filter((file) => /^page-\d+\.(png|jpg)$/u.test(file))
       .sort((a, b) => Number(a.match(/\d+/u)![0]) - Number(b.match(/\d+/u)![0]));

@@ -3,6 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { isCardPageSize, renderCards, selectTemplate, type CardContent } from '../src/cards.js';
 import { indexesToColors } from '../src/core.js';
 import { MM } from '../src/export/business-layout.js';
+import { pageOperators } from './helpers/pdf-content.js';
 
 const colors = indexesToColors(Array.from({ length: 12 }, (_, index) => index * 7));
 const content: CardContent = { kind: 'colors', colors, payload: colors.join(' ') };
@@ -22,10 +23,10 @@ async function pages(template: string, settings: Partial<CardContent>) {
 }
 
 describe('page size decides between a sheet and separate cards', () => {
-  it('names only the wallet and business sizes as card sizes', () => {
+  it('names only the business size as a card size', () => {
     expect(
       [undefined, 'a6', 'a4', 'wallet', 'business'].map((size) => isCardPageSize(size as never)),
-    ).toEqual([false, false, false, true, true]);
+    ).toEqual([false, false, false, false, true]);
   });
 
   it('puts the whole collection on one A6 sheet when no size is given', async () => {
@@ -38,8 +39,11 @@ describe('page size decides between a sheet and separate cards', () => {
     expect(await pages('business-it', { pageSize: 'business' })).toEqual(
       colors.map(() => [90, 50]),
     );
-    expect(await pages('material-tile', { pageSize: 'wallet' })).toEqual(
-      colors.map(() => [85.6, 54]),
+    expect(await pages('material-tile', { pageSize: 'business' })).toEqual(
+      colors.map(() => [90, 50]),
+    );
+    await expect(pages('business-it', { pageSize: 'wallet' as never })).rejects.toThrow(
+      'a6, a4 or business',
     );
     // Four references share one glass card, so eight references need two cards.
     expect(await pages('business-glass-4in1', { pageSize: 'business' })).toEqual([
@@ -53,7 +57,7 @@ describe('page size decides between a sheet and separate cards', () => {
     const template = selectTemplate('business-it', 'colors');
     for (const pageSize of ['a6', 'a4'] as const)
       await expect(renderIndividualCards(template, { ...content, pageSize })).rejects.toThrow(
-        'Separate cards need a card size.',
+        'Separate cards have the business size.',
       );
     expect(await renderIndividualCards(template, { ...content })).toHaveLength(colors.length);
   });
@@ -64,8 +68,19 @@ describe('page size decides between a sheet and separate cards', () => {
     expect(pageDimensions('a4', 'landscape')).toEqual([297, 210]);
     expect(pageDimensions('a6')).toEqual([148, 105]);
     expect(pageDimensions('a6', 'portrait')).toEqual([105, 148]);
-    expect(pageDimensions('wallet', 'landscape')).toEqual([85.6, 54]);
     expect(pageDimensions('business', 'portrait')).toEqual([50, 90]);
+  });
+
+  it('gives a separate card rounded corners and paints nothing outside them', async () => {
+    const template = selectTemplate('business-it', 'colors');
+    const document = await PDFDocument.load(
+      await template.renderIndividual!({ ...content, pageSize: 'business' }, 0),
+    );
+    const operators = pageOperators(document, 0);
+    // Four curves form the corners of the clipping path; the artwork is drawn inside it.
+    expect(operators.match(/ c$/gmu)).toHaveLength(4);
+    expect(operators.indexOf('\nW\n')).toBeGreaterThan(-1);
+    expect(operators.indexOf('\nW\n')).toBeLessThan(operators.indexOf(' Do'));
   });
 
   it('refuses a QR code on separate cards', async () => {
@@ -81,13 +96,14 @@ describe('page size decides the layout of Shamir share cards', () => {
     expect(resolveSskrLayout(undefined, undefined)).toBe('collection');
     expect(resolveSskrLayout(undefined, 'a4')).toBe('collection');
     expect(resolveSskrLayout(undefined, 'business')).toBe('individual');
-    expect(resolveSskrLayout(undefined, 'wallet')).toBe('individual');
     expect(resolveSskrLayout('individual', undefined)).toBe('individual');
     // A QR card holds one whole share and exists in every size.
-    for (const size of [undefined, 'a6', 'wallet', 'business'] as const)
+    for (const size of [undefined, 'a6', 'business'] as const)
       expect(resolveSskrLayout('qr', size)).toBe('qr');
     expect(() => resolveSskrLayout('collection', 'business')).toThrow('gives separate cards');
-    expect(() => resolveSskrLayout('individual', 'a6')).toThrow('Separate cards need a card size');
+    expect(() => resolveSskrLayout('individual', 'a6')).toThrow(
+      'Separate cards have the business size',
+    );
   });
 
   it('prints one sheet per share on A6 and one page per card for a card size', async () => {

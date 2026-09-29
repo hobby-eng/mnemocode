@@ -33,7 +33,7 @@ describe('business card collections', () => {
   it('rejects silent fallbacks for invalid or repeated options and requires a PDF', () => {
     for (const name of ['', '  ', 'x\ny', '\x1b[0m', 'x'.repeat(101)])
       expect(() => validateProfile({ name })).toThrow();
-    expect(parsePageSize('wallet')).toBe('wallet');
+    expect(() => parsePageSize('wallet')).toThrow('a6, a4 or business');
     expect(parsePageSize('business')).toBe('business');
     expect(() =>
       businessOptions(parseArguments(['--card-name', 'One', '--card-name', 'Two'])),
