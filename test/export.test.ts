@@ -60,7 +60,7 @@ describe('export infrastructure', () => {
     'business-glass-8in1',
   ])('keeps an enabled collection QR off the individual %s front', async (id) => {
     const template = selectTemplate(id);
-    for (const pageSize of ['wallet', 'business'] as const) {
+    for (const pageSize of [undefined, 'business'] as const) {
       const withQr = await PDFDocument.load(
         await template.renderIndividual!(
           {

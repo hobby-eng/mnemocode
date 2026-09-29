@@ -55,29 +55,25 @@ describe('material selection cards', () => {
       expect(() => chooseMaterialFinish('vehicle', invalid)).toThrow();
   });
 
-  it.each(['wallet', 'business', 'a6', 'a4'] as const)(
-    'honors both orientations for %s',
-    async (size) => {
-      const expected: Record<MaterialPageSize, [number, number]> = {
-        wallet: [85.6, 54],
-        business: [90, 50],
-        a6: [148, 105],
-        a4: [297, 210],
-      };
-      for (const orientation of ['landscape', 'portrait'] as const) {
-        const pdf = await PDFDocument.load(
-          await renderMaterialCard('vehicle', { ...content, orientation }, { pageSize: size }),
-        );
-        const dimensions =
-          orientation === 'portrait' ? [...expected[size]].reverse() : expected[size];
-        expect(pdf.getPageCount()).toBe(1);
-        for (const page of pdf.getPages()) {
-          expect((page.getWidth() * 25.4) / 72).toBeCloseTo(dimensions[0], 3);
-          expect((page.getHeight() * 25.4) / 72).toBeCloseTo(dimensions[1], 3);
-        }
+  it.each(['business', 'a6', 'a4'] as const)('honors both orientations for %s', async (size) => {
+    const expected: Record<MaterialPageSize, [number, number]> = {
+      business: [90, 50],
+      a6: [148, 105],
+      a4: [297, 210],
+    };
+    for (const orientation of ['landscape', 'portrait'] as const) {
+      const pdf = await PDFDocument.load(
+        await renderMaterialCard('vehicle', { ...content, orientation }, { pageSize: size }),
+      );
+      const dimensions =
+        orientation === 'portrait' ? [...expected[size]].reverse() : expected[size];
+      expect(pdf.getPageCount()).toBe(1);
+      for (const page of pdf.getPages()) {
+        expect((page.getWidth() * 25.4) / 72).toBeCloseTo(dimensions[0], 3);
+        expect((page.getHeight() * 25.4) / 72).toBeCloseTo(dimensions[1], 3);
       }
-    },
-  );
+    }
+  });
 
   it('prints exact ordered references and finish names on the same study page as the QR', async () => {
     const texts = textSpy();

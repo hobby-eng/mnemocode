@@ -20,7 +20,7 @@ const presentation = resolveCardPresentation(
 afterEach(() => vi.restoreAllMocks());
 
 describe('single-page design studies', () => {
-  it.each(['business', 'wallet', 'a6', 'a4'] as const)(
+  it.each(['business', 'a6', 'a4'] as const)(
     'reserves non-overlapping artwork, captions and a corner QR for every %s orientation and count',
     (pageSize) => {
       for (const orientation of ['portrait', 'landscape'] as const)
@@ -126,7 +126,7 @@ describe('single-page design studies', () => {
     '%s keeps artwork and QR together at every supported size and orientation',
     async (id) => {
       const template = cardTemplates.find((item) => item.id === id)!;
-      for (const pageSize of ['business', 'wallet', 'a6', 'a4'] as const)
+      for (const pageSize of ['business', 'a6', 'a4'] as const)
         for (const orientation of ['landscape', 'portrait'] as const) {
           const document = await PDFDocument.load(
             await template.render({
