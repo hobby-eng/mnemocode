@@ -4,6 +4,7 @@ import {
   GLASS_SHEET as SHEET,
   type GlassPageLayout,
 } from './glass-layout.js';
+import { MM } from './business-layout.js';
 import { resolveIdentityFor } from './card-identities.js';
 import { readRenderAsset } from './platform.js';
 import fontkit from '@pdf-lib/fontkit';
@@ -24,7 +25,6 @@ import {
 import type { CardContent } from './templates.js';
 import type { SskrCardContent } from './sskr-content.js';
 
-const MM = 72 / 25.4;
 // Physical millimetres in the compact master; text remains vector and is never stretched.
 const COMPACT_REFERENCES = {
   left: 3,

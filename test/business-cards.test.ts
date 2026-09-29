@@ -25,7 +25,7 @@ describe('business card collections', () => {
     expect(() => validateProfile({ name: 'Сергей Иванов' })).toThrow('Latin letters only');
     expect(profile.role).toBe('ARCHITECT');
     expect(profile.email).toBe('me@example.com');
-    expect(profile.website).toBe('vector.com');
+    expect(profile.website).toBe('vector.example');
     expect(resolveProfile('it').name).toBe('Alex Morgan');
     expect(resolveProfile('it').role).toBe('IT SOLUTIONS DIRECTOR');
   });
@@ -70,7 +70,7 @@ describe('business card collections', () => {
               email: 'me@example.com',
               company: 'VECTOR SYSTEMS',
               role: 'IT SOLUTIONS DIRECTOR',
-              website: 'vector.com',
+              website: 'vector.example',
               phone: '+1 202 555 0148',
               location: 'International',
             },
