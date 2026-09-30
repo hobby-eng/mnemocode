@@ -242,8 +242,8 @@ describe('CLI records', () => {
       ['english', '1'],
       ['indexes', '2'],
       ['unicode', '3'],
+      ['colors-unicode', '4'],
       ['colors', '5'],
-      ['colors-unicode', '6'],
     ] as const;
     for (const [format, number] of formats) {
       const encoded = await run([
@@ -270,6 +270,11 @@ describe('CLI records', () => {
       ]);
       expect(explicit.stdout.trim()).toBe(mnemonic);
     }
+    await expect(
+      run(['encode', '--mode', 'direct', '--mnemonic', mnemonic, '--format', '6']),
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('The representation format must be one of'),
+    });
   }, 30_000);
 
   it('keeps an explicit raw format authoritative', async () => {

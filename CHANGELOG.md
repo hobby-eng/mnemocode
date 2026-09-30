@@ -4,6 +4,7 @@
 
 ### Formats
 
+- Numbered representations are now consecutive: `colors-unicode` uses `--format 4` instead of `--format 6`.
 - `colors-unicode` is written as four-digit codes instead of Private Use symbols, which many programs could not show. The symbol form can still be decoded.
 
 ### Recovery

@@ -21,7 +21,7 @@ The shares are always shown in the terminal. `--output NEW_FILE` also saves them
 
 | Option                      | Selects                                             |
 | --------------------------- | --------------------------------------------------- |
-| `--format 1\|2\|3\|5\|6`    | How the phrase is shown, as in an ordinary `encode` |
+| `--format 1\|2\|3\|4\|5`    | How the phrase is shown, as in an ordinary `encode` |
 | `--share-format ur\|colors` | How the shares are shown; the default is `ur`       |
 
 `sskr-split` is an older name for `encode --sskr`. In `sskr-split` and `sskr-export`, `--format ur|colors` selects the share format.

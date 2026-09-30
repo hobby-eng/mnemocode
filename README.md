@@ -189,8 +189,8 @@ node dist/mnemocode.js table --all
 | `english` / `1`        | English BIP39 words.                                                                                                                                                                                                                                                                              |
 | `indexes` / `2`        | The numbers of the words in the BIP39 list, from 1 through 2048, as in Seedshift.                                                                                                                                                                                                                 |
 | `unicode` / `3`        | Four-digit Unicode codes. Each word is replaced by the character with the same number in the Traditional Chinese BIP39 list, and only the code of that character is written. Codes may be separated by spaces or joined.                                                                          |
+| `colors-unicode` / `4` | The codes of format 5, each written as two four-digit codes from Unicode's Private Use Area.                                                                                                                                                                                                      |
 | `colors` / `5`         | Color codes such as `#01AB63`: 8, 10, 12, 14 or 16 codes for 12, 15, 18, 21 or 24 words. The 12- and 24-word forms are compatible with BIP39Colors. Codes may be separated, joined with their `#` signs, or joined as one `RRGGBB` line. They may be kept in any order, but every code is needed. |
-| `colors-unicode` / `6` | The codes of format 5, each written as two four-digit codes from Unicode's Private Use Area.                                                                                                                                                                                                      |
 
 `colors-unicode` is a MnemoCode format, not a Unicode standard. It is ordinary text of digits and letters and needs no special font. An earlier form written as Private Use symbols can still be decoded.
 
@@ -212,7 +212,7 @@ node dist/mnemocode.js decode --input-file shifted-colors.txt \
   --dates 23-09-2026 08-08-1988 07-11-1951
 ```
 
-Replace `--format 5` with `1`, `2`, `3` or `6` for the other forms.
+Replace `--format 5` with `1`, `2`, `3` or `4` for the other forms.
 
 The same forms work without dates:
 
@@ -229,7 +229,7 @@ MnemoCode can print the encoded phrase as material that looks like something els
 
 To anyone else the sheet is an ordinary set of design samples. For you, the printed codes are the whole value of the cards: `mnemocode decode` turns them back into the phrase. Photographs, printed colors, names, companies and contact details are decoration and are not needed for recovery.
 
-MnemoCode includes sixteen templates. `mnemocode preview --list` prints their names, and `mnemocode --help` describes every option. Cards need format 5 or 6. Terminal output and separate QR codes work with every format.
+MnemoCode includes sixteen templates. `mnemocode preview --list` prints their names, and `mnemocode --help` describes every option. Cards need format 4 or 5. Terminal output and separate QR codes work with every format.
 
 | Option                         | Result                                                 |
 | ------------------------------ | ------------------------------------------------------ |
