@@ -1,7 +1,0 @@
-{
-  "FULL_AUDIT_GUIDE.md": "085cbe2578e8f1e8ed7a9681fa89da53127380c0ce87701d0bfb2950d1125153",
-  "audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7",
-  "audits/AUDIT_STANDARD.md": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f",
-  "audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
-  "source": "multi-chain-wallet-tools clone at 76cce41077a05307cbe06dd63b8d2d1da192eb23; hashes identical to those recorded by AUD-001"
-}

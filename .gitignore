@@ -7,3 +7,6 @@ output/
 tmp/
 export-*/
 exports/
+
+# Audit evidence stays local; only the harness scripts are published (docs/audits/README.md).
+docs/audits/*-evidence/
