@@ -6,7 +6,8 @@ import { renderMaterialCard } from './material-cards.js';
 import { renderGlassCards } from './glass-cards.js';
 import { materialArtwork, type MaterialStyle } from './material-artwork.js';
 import './platform-node.js';
-import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises';
+import { publishNewPrivateFile } from './private-file.js';
 import { businessStyles } from './business-designs.js';
 import { PDFDocument } from 'pdf-lib';
 import { dirname, join } from 'node:path';
@@ -177,7 +178,7 @@ export async function exportSskrPdf(
   options: Omit<SskrExportOptions, 'directory'>,
   path: string,
 ): Promise<void> {
-  await writeFile(path, await renderSskrPdf(records, options), { flag: 'wx', mode: 0o600 });
+  await publishNewPrivateFile(path, await renderSskrPdf(records, options));
 }
 
 export async function exportSskrImages(

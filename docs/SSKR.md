@@ -103,7 +103,7 @@ MnemoCode refuses a damaged share, the same share given twice, shares from diffe
 
 ## Test data
 
-`vectors/sskr-v1.json` holds the test shares published by Blockchain Commons in [BCR-2020-011](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-011-sskr.md): the secret, all eight shares in the `ur` form and in Bytewords, the numbers of shares needed, and sets that do and do not restore the secret. The color codes of the first share were calculated separately from the published bytes with Python `zlib.crc32`.
+`vectors/sskr-v1.json` holds the test shares published by Blockchain Commons in [BCR-2020-011](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-011-sskr.md): the secret, all eight shares in the `ur` form, five of them, enough to restore the secret, also in Bytewords, the numbers of shares needed, and sets that do and do not restore the secret. The color codes of the first share were calculated separately from the published bytes with Python `zlib.crc32`.
 
 Five more test sets cover phrases of 12, 15, 18, 21 and 24 words. MnemoCode made them itself with fixed public random numbers, so they only show that nothing has changed. They are **not an independent check of the cryptography**. Real shares always use the random numbers of the operating system.
 

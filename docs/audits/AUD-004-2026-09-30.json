@@ -1,0 +1,814 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-004",
+  "auditNumber": 4,
+  "date": "2026-09-30",
+  "title": "Full-scope MnemoCode audit of the current working tree",
+  "reviewer": {
+    "name": "Codex",
+    "model": null,
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "d64ba4792c76d8ae4fe020f8413198aadff85580",
+    "workingTree": "M CHANGELOG.md\n M README.md\n M docs/SSKR.md\n M src/cli/card-options.ts\n M src/cli/encode-command.ts\n M src/cli/input.ts\n M src/cli/usage.ts\n M test/cli.test.ts",
+    "sourceFingerprint": "2a7b92b7b93938668d5505f2eccb7cb5b618ff0be4294348c0600852338deee7",
+    "commitComplete": false
+  },
+  "scope": {
+    "repository": "mnemocode",
+    "branch": "main",
+    "version": "0.1.0",
+    "supported": "Offline CLI, TypeScript library, five mnemonic representations, three transformation modes plus legacy-valid recovery, Bitcoin recovery evidence, SSKR, 16 card templates, QR/PDF/PNG/JPEG export",
+    "procedureHashes": {
+      "docs/FULL_AUDIT_GUIDE.md": "30fa6a1675892e2a3059bdbd6e97737f2959a74aca98a0a90e4f655ae12854a6",
+      "docs/audits/AUDIT_STANDARD.md": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f",
+      "docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+      "docs/audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7"
+    }
+  },
+  "checks": {
+    "coverage": [
+      {
+        "id": "CHECK-SEC-001",
+        "category": "SEC",
+        "group": "Threat model and secret ownership",
+        "outcome": "passed",
+        "evidence": "Traced CLI, JS strings, entropy buffers, SSKR WASM, file exports and error messages; host/terminal compromise explicitly outside assurance."
+      },
+      {
+        "id": "CHECK-SEC-002",
+        "category": "SEC",
+        "group": "Sandbox and transport",
+        "outcome": "not-applicable",
+        "evidence": "No standalone browser document, vault, message-port protocol or CSP. Reviewed host adapter boundaries; CLI is explicitly not an OS sandbox."
+      },
+      {
+        "id": "CHECK-SEC-003",
+        "category": "SEC",
+        "group": "Network egress",
+        "outcome": "passed",
+        "evidence": "No active first-party network APIs found in runtime source; fixed local asset allowlist and synchronous local WASM initialization. Package-manager audit traffic is separate."
+      },
+      {
+        "id": "CHECK-SEC-004",
+        "category": "SEC",
+        "group": "Randomness and construction",
+        "outcome": "passed",
+        "evidence": "CSPRNG production split path, all 120 supported threshold policies, 30 official grouped quorums, deterministic regression fixtures; date masking is expressly not encryption."
+      },
+      {
+        "id": "CHECK-SEC-005",
+        "category": "SEC",
+        "group": "Secret lifecycle and exceptional paths",
+        "outcome": "partial",
+        "evidence": "Owned entropy/seed buffers and Rust cleanup reviewed; immutable text/OS memory limitations remain. Synthetic partial file write exposes DOC001. No exhaustive WASM-memory forensic or OOM test."
+      },
+      {
+        "id": "CHECK-SEC-006",
+        "category": "SEC",
+        "group": "Injection/persistence and sensitive output",
+        "outcome": "passed",
+        "evidence": "No standalone DOM/storage runtime. Reviewed template asset allowlist, profile validation, error redaction, metadata and private file paths; 39 actual PDFs checked."
+      },
+      {
+        "id": "CHECK-SEC-007",
+        "category": "SEC",
+        "group": "Availability bounds",
+        "outcome": "finding",
+        "evidence": "Text/PNG limits, recovery search caps, SSKR metadata limits; finite FIFO reproduces SEC001. No broadcast or connected spending API exists."
+      },
+      {
+        "id": "CHECK-FUN-001",
+        "category": "FUN",
+        "group": "BIP39, entropy and seed interpretation",
+        "outcome": "passed",
+        "evidence": "Five phrase lengths, fixed word-list hashes, 744 independent entropy-tail/oracle cases and calendar boundaries; all 434 tests pass."
+      },
+      {
+        "id": "CHECK-FUN-002",
+        "category": "FUN",
+        "group": "HD derivation and profiles",
+        "outcome": "passed",
+        "evidence": "Reviewed BIP44/49/84/86, mainnet/testnet, xpub versions, local WIF/public-key/fingerprint comparisons; supported comparisons pass. Unknown runtime kind is API001."
+      },
+      {
+        "id": "CHECK-FUN-003",
+        "category": "FUN",
+        "group": "BIP85/BIP38/messages/Silent Payments",
+        "outcome": "not-applicable",
+        "evidence": "None of these functions is implemented or claimed."
+      },
+      {
+        "id": "CHECK-FUN-004",
+        "category": "FUN",
+        "group": "Scripts/descriptors/Miniscript/multisig",
+        "outcome": "not-applicable",
+        "evidence": "No descriptor or spending-script interface. Address constructors used for local evidence were reviewed under FUN002."
+      },
+      {
+        "id": "CHECK-FUN-005",
+        "category": "FUN",
+        "group": "Transactions and PSBT",
+        "outcome": "not-applicable",
+        "evidence": "No transaction creation, signing, PSBT or broadcasting."
+      },
+      {
+        "id": "CHECK-FUN-006",
+        "category": "FUN",
+        "group": "Recovery and backup formats",
+        "outcome": "passed",
+        "evidence": "Direct/Seedshift/legacy/legacy-valid, five representations, MNC1, missing-word/date searches, SSKR transport and thresholds; rendered SSKR QR quorum restores the public phrase."
+      },
+      {
+        "id": "CHECK-FUN-007",
+        "category": "FUN",
+        "group": "Discovery/providers/accounting",
+        "outcome": "not-applicable",
+        "evidence": "No provider requests, blockchain scanning, balances or history."
+      },
+      {
+        "id": "CHECK-API-001",
+        "category": "API",
+        "group": "Dependency/API call contracts",
+        "outcome": "finding",
+        "evidence": "Pinned APIs traced; malformed runtime Bitcoin discriminator reproduces API001. Typed supported calls remain green."
+      },
+      {
+        "id": "CHECK-API-002",
+        "category": "API",
+        "group": "Async state and cancellation",
+        "outcome": "partial",
+        "evidence": "Reviewed SSKR loader promise/reset and staged export cleanup; no browser async UI. Process cancellation at every write/Rust panic boundary was not exhaustively injected."
+      },
+      {
+        "id": "CHECK-API-003",
+        "category": "API",
+        "group": "Public export schemas",
+        "outcome": "passed",
+        "evidence": "MNC1 modes and named formats, CLI option allowlists, output alias and overwrite tests, private permission tests; numeric alias change explicitly recorded as API002 observation."
+      },
+      {
+        "id": "CHECK-API-004",
+        "category": "API",
+        "group": "Interoperability",
+        "outcome": "passed",
+        "evidence": "Published SSKR vectors, independent CRC malformed fixtures, mixed share transports, numeric/Unicode/color round trips and actual exported QR decoding."
+      },
+      {
+        "id": "CHECK-BLD-001",
+        "category": "BLD",
+        "group": "Manifest and composition",
+        "outcome": "passed",
+        "evidence": "17 installed direct pins match; 7 vendor hashes; 150 fresh dist files; cards entry type checks and runtime adapter tests."
+      },
+      {
+        "id": "CHECK-BLD-002",
+        "category": "BLD",
+        "group": "Runtime matrix",
+        "outcome": "partial",
+        "evidence": "434/434 tests on Linux, five lengths and 120 SSKR policies; all 16 templates sampled at A6 with ordinary/share payloads, 5 fragments, 2 compact recovery cards. No cross-OS or exhaustive visual-input product matrix."
+      },
+      {
+        "id": "CHECK-BLD-003",
+        "category": "BLD",
+        "group": "Lockfiles/provenance/licenses",
+        "outcome": "passed",
+        "evidence": "Pinned package/Cargo manifests and notices reviewed; npm advisory query returns no known vulnerabilities. No fresh frozen install or Rust advisory database scan."
+      },
+      {
+        "id": "CHECK-BLD-004",
+        "category": "BLD",
+        "group": "Canonical WASM bytes",
+        "outcome": "passed",
+        "evidence": "Fresh offline Cargo target in pinned Rust1.98.1/clang18.1.3/wasm-bindgen0.2.128 container; all 4 generated files match. Used an existing toolchain image; did not rebuild OS/toolchain image from scratch."
+      },
+      {
+        "id": "CHECK-BLD-005",
+        "category": "BLD",
+        "group": "Artifacts and CI",
+        "outcome": "finding",
+        "evidence": "npm dry-run package has 197 entries and all 21 assets, no local evidence/exports. Manual actual-PDF regression script fails before rendering (BLD001). No publish or remote CI execution."
+      },
+      {
+        "id": "CHECK-UI-001",
+        "category": "UI",
+        "group": "Real-file presentation",
+        "outcome": "passed",
+        "evidence": "39 PDF rasterizations at 200 dpi; 34 exact QR results and 5 QR-free fragments; representative business/material/glass pages visually inspected. Physical printing/scanning not performed."
+      },
+      {
+        "id": "CHECK-UI-002",
+        "category": "UI",
+        "group": "Inputs/state preservation",
+        "outcome": "passed",
+        "evidence": "CLI prompts/aliases/destination checks, supported option matrix and browser-neutral CardSession tests. No standalone button GUI exists in this repository."
+      },
+      {
+        "id": "CHECK-UI-003",
+        "category": "UI",
+        "group": "Secrets/help/QR/accessibility",
+        "outcome": "partial",
+        "evidence": "Prompt/redaction tests, help text, readable exact references, QR sizing and no full-collection QR on fragments verified. Actual systemd hidden terminal interaction and assistive/physical devices not exercised."
+      },
+      {
+        "id": "CHECK-ARC-001",
+        "category": "ARC",
+        "group": "Ownership/import seams",
+        "outcome": "passed",
+        "evidence": "Core transformations, CLI orchestration, host-neutral renderers and Node-only SSKR runtime are separated; import/type checks pass."
+      },
+      {
+        "id": "CHECK-ARC-002",
+        "category": "ARC",
+        "group": "Duplication/false positives",
+        "outcome": "passed",
+        "evidence": "Reviewed historical findings and intentional numeric aliases; no additional demonstrated production architecture defect. No claim that every decorative drawing statement received exhaustive analysis."
+      },
+      {
+        "id": "CHECK-ARC-003",
+        "category": "ARC",
+        "group": "Test and comment fidelity",
+        "outcome": "finding",
+        "evidence": "Existing independent math oracle reviewed and passed; stale manual script confirmed. Initial audit metadata assertion was corrected because PDFDocument.load itself rewrote producer metadata."
+      },
+      {
+        "id": "CHECK-DOC-001",
+        "category": "DOC",
+        "group": "Capability/safety descriptions",
+        "outcome": "finding",
+        "evidence": "Atomic publication promise and card-size description disagree with code (DOC001/DOC002). Threat-model and non-encryption caveats otherwise accurately qualified."
+      },
+      {
+        "id": "CHECK-DOC-002",
+        "category": "DOC",
+        "group": "Commands/metadata/legal",
+        "outcome": "finding",
+        "evidence": "Runnable CLI examples and provenance inspected; fixture prose overstates Bytewords count (DOC003). Notices exist, no legal certification asserted."
+      },
+      {
+        "id": "CHECK-DOC-003",
+        "category": "DOC",
+        "group": "Audit evidence consistency",
+        "outcome": "passed",
+        "evidence": "Historical reports read as historical snapshots; remediation tests pass. AUD004 source hashes, procedure hashes, local logs and script-backed findings are retained; schema validated before handoff."
+      }
+    ],
+    "commands": [
+      {
+        "label": "format",
+        "command": [
+          "pnpm",
+          "format:check"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:20:46.609126+00:00",
+        "endedAt": "2026-09-30T18:20:48.016097+00:00",
+        "exitCode": 0,
+        "logSha256": "987661d85a3675ec39dab24ff69f07ac20c93dd8a43ca2423b58c0fb61652a05"
+      },
+      {
+        "label": "types",
+        "command": [
+          "pnpm",
+          "check"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:20:48.043575+00:00",
+        "endedAt": "2026-09-30T18:20:48.782497+00:00",
+        "exitCode": 0,
+        "logSha256": "ce5e6ce64173a8216d0995c509896dae6affb17d7738ef120af609e97b0cfe2c"
+      },
+      {
+        "label": "build",
+        "command": [
+          "pnpm",
+          "build"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:20:48.808591+00:00",
+        "endedAt": "2026-09-30T18:20:49.388005+00:00",
+        "exitCode": 0,
+        "logSha256": "55c2ff9c5fa38028a0fa4af1616a3abca6153a0b1a18b3dd1f5c8dff754f95d7"
+      },
+      {
+        "label": "self-test",
+        "command": [
+          "node",
+          "dist/mnemocode.js",
+          "self-test"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:20:49.412470+00:00",
+        "endedAt": "2026-09-30T18:20:52.926780+00:00",
+        "exitCode": 0,
+        "logSha256": "b0054a9b5f0dba48729c003047ff36c918006d9293a73c7a4883adf8ee52f7bd"
+      },
+      {
+        "label": "unit-tests",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "--maxWorkers=1",
+          "--no-file-parallelism"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:20:52.962018+00:00",
+        "endedAt": "2026-09-30T18:23:41.536276+00:00",
+        "exitCode": 1,
+        "logSha256": "12e1ea9ef305df643bd0852d47b610be26fc880ae1bb4e006f71b30f41bd88b2"
+      },
+      {
+        "label": "unit-tests-unrestricted",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "--maxWorkers=1",
+          "--no-file-parallelism"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:24:51.883348+00:00",
+        "endedAt": "2026-09-30T18:29:15.515945+00:00",
+        "exitCode": 0,
+        "logSha256": "183579ec578afa61bf6e3f21f5026854fda4ba680a5a56292ed5992833eb8578"
+      },
+      {
+        "label": "dependencies",
+        "command": [
+          "pnpm",
+          "audit",
+          "--audit-level",
+          "high"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:25:42.232894+00:00",
+        "endedAt": "2026-09-30T18:26:52.541746+00:00",
+        "exitCode": 1,
+        "logSha256": "bd6b144fe638c3ada03c173faf6aee22c961b87b9361646d58145bc2ed2c5abc"
+      },
+      {
+        "label": "package",
+        "command": [
+          "npm",
+          "pack",
+          "--dry-run",
+          "--json",
+          "--ignore-scripts"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:25:43.399503+00:00",
+        "endedAt": "2026-09-30T18:25:43.898207+00:00",
+        "exitCode": 226,
+        "logSha256": "c9c4b230222b992ba9c1e07004156d234a100bfe704d26e4fbe67e4b3266cc49"
+      },
+      {
+        "label": "docker-images",
+        "command": [
+          "docker",
+          "image",
+          "ls",
+          "--format",
+          "{{.Repository}}:{{.Tag}} {{.ID}}"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:25:43.980153+00:00",
+        "endedAt": "2026-09-30T18:25:44.004837+00:00",
+        "exitCode": 1,
+        "logSha256": "d0527b91b88a4736c47893d33c0242b10f32454ed6cacf1081bc07594358dfc5"
+      },
+      {
+        "label": "package-unrestricted",
+        "command": [
+          "npm",
+          "pack",
+          "--dry-run",
+          "--json",
+          "--ignore-scripts"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:26:17.069049+00:00",
+        "endedAt": "2026-09-30T18:26:17.690505+00:00",
+        "exitCode": 0,
+        "logSha256": "7302e23e25d973f37a535a74e80c83a37017ca2fedcfe6a912576dab7c534cd4"
+      },
+      {
+        "label": "docker-images-unrestricted",
+        "command": [
+          "docker",
+          "image",
+          "ls",
+          "--format",
+          "{{.Repository}}:{{.Tag}} {{.ID}}"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:26:21.046757+00:00",
+        "endedAt": "2026-09-30T18:26:21.115989+00:00",
+        "exitCode": 0,
+        "logSha256": "9679deecbf1c9715e8bf8e7bcccddbc28093628dd8bd818085910fd31ee4425d"
+      },
+      {
+        "label": "file-input-probe",
+        "command": [
+          "python3",
+          "docs/audits/AUD-004-evidence/probe-input.py"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:27:06.176819+00:00",
+        "endedAt": "2026-09-30T18:27:08.548059+00:00",
+        "exitCode": 0,
+        "logSha256": "e4a02b8074861dad92680889349c2222da658ffea5e5302ab9ea0029f144580d"
+      },
+      {
+        "label": "dependencies-unrestricted",
+        "command": [
+          "pnpm",
+          "audit",
+          "--audit-level",
+          "high"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:27:23.588705+00:00",
+        "endedAt": "2026-09-30T18:27:25.076323+00:00",
+        "exitCode": 0,
+        "logSha256": "15950a68a7ed99c59779717acefdceb3f69cfd31bde67d2c954f2a3cea4d7955"
+      },
+      {
+        "label": "card-output-script",
+        "command": [
+          "node",
+          "scripts/check-card-output.mjs",
+          "docs/audits/AUD-004-evidence/manual-card-output"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:29:29.834236+00:00",
+        "endedAt": "2026-09-30T18:29:30.176059+00:00",
+        "exitCode": 1,
+        "logSha256": "23106e95772fbf0f89d4208a96a5922c07005c3755a771b5f0dd82ef63c326d9"
+      },
+      {
+        "label": "rendered-qr",
+        "command": [
+          "node",
+          "docs/audits/AUD-004-evidence/render-check.mjs"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:30:38.799521+00:00",
+        "endedAt": "2026-09-30T18:30:43.052840+00:00",
+        "exitCode": 1,
+        "logSha256": "a29012f999c08d7dc7f8d24f409bed2d268c58acacf320800fc7a8ff131ad379"
+      },
+      {
+        "label": "rendered-qr-corrected",
+        "command": [
+          "node",
+          "docs/audits/AUD-004-evidence/render-check.mjs"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:31:17.583302+00:00",
+        "endedAt": "2026-09-30T18:33:54.165211+00:00",
+        "exitCode": 0,
+        "logSha256": "4a771de81dc3eddb6c670cfa99cfed0435f7e40ee1d7844d40d7d2ec622d1ae8"
+      },
+      {
+        "label": "container-toolchain",
+        "command": [
+          "docker",
+          "run",
+          "--rm",
+          "--network",
+          "none",
+          "--read-only",
+          "--memory",
+          "512m",
+          "--cpus",
+          "1",
+          "--entrypoint",
+          "sh",
+          "audit6built:e6a6d6bc5ec6d38a1c6e1a1292c59a84d3f0796f",
+          "-c",
+          "rustc --version; cargo --version; clang --version; wasm-bindgen --version; printenv CARGO_HOME RUSTUP_HOME"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:31:36.792201+00:00",
+        "endedAt": "2026-09-30T18:31:37.649439+00:00",
+        "exitCode": 0,
+        "logSha256": "e32d32353631f1175482efc580f0ee870af56409ece14d78d7ba59bdae3dc8f7"
+      },
+      {
+        "label": "wasm-rebuild",
+        "command": [
+          "python3",
+          "docs/audits/AUD-004-evidence/rebuild.py"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:32:28.998479+00:00",
+        "endedAt": "2026-09-30T18:33:43.650976+00:00",
+        "exitCode": 0,
+        "logSha256": "ef286abde44a613d0b1274e7176f349cad9dee60f4285c6879dd1861b7bfa883"
+      },
+      {
+        "label": "public-api-probe",
+        "command": [
+          "node",
+          "--input-type=module",
+          "-e",
+          "import {matchBitcoinEvidence} from \"./dist/bitcoin-evidence.js\"; const phrase=\"abandon \".repeat(11)+\"about\"; const result=matchBitcoinEvidence(phrase,{kind:\"address-typo\",value:\"irrelevant\",profiles:[\"native-segwit\"],location:{network:\"mainnet\",account:0,branch:0,index:0}}); console.log(JSON.stringify(result)); if(result.matched!==false || result.kind!==\"address-typo\") process.exit(1);"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:32:55.515008+00:00",
+        "endedAt": "2026-09-30T18:32:55.687350+00:00",
+        "exitCode": 0,
+        "logSha256": "7267ff3e5d169bb28ac589090020495d2eacfc96b4ff18a88358992f9c8d0dcf"
+      },
+      {
+        "label": "integrity",
+        "command": [
+          "python3",
+          "docs/audits/AUD-004-evidence/integrity-check.py"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:33:37.824768+00:00",
+        "endedAt": "2026-09-30T18:33:37.906191+00:00",
+        "exitCode": 0,
+        "logSha256": "342f9f760800d8dc5f67d5d9e3ee16159450e1b770c72311ee20d99b12dca818"
+      },
+      {
+        "label": "partial-write-probe",
+        "command": [
+          "node",
+          "docs/audits/AUD-004-evidence/write-failure.mjs"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:34:43.662179+00:00",
+        "endedAt": "2026-09-30T18:34:47.723893+00:00",
+        "exitCode": 0,
+        "logSha256": "152d4f08797fdbbe0f86636bc90246a30b0ede2c081172511b1aa748c380e521"
+      },
+      {
+        "label": "fresh-bindings",
+        "command": [
+          "node",
+          "docs/audits/AUD-004-evidence/compare-bindings.mjs"
+        ],
+        "cwd": "/home/sergio/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-09-30T18:35:28.604824+00:00",
+        "endedAt": "2026-09-30T18:35:28.841810+00:00",
+        "exitCode": 0,
+        "logSha256": "d590021fe269e94bc0bd6ce8f120c8ed56e8711cc3846de68d6fcf83b563fee7"
+      }
+    ],
+    "summary": "434 tests passed; 39 actual PDFs passed; four fresh SSKR generated files match; six findings (one medium, five low); two informational observations."
+  },
+  "findings": [
+    {
+      "id": "AUD-004-SEC001",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "File-size guards do not bound the actual read",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/cli/input.ts:30-34",
+        "src/cli/qr-input.ts:41-44",
+        "README.md:126"
+      ],
+      "reproduction": "Run the public-data probe-input.py harness. It sends 2,097,245 bytes containing a valid public mnemonic followed by spaces through a finite FIFO, and compares a regular file with identical bytes.",
+      "expected": "The documented 1 MiB text-input limit must apply to bytes actually consumed, including non-regular files and changing files.",
+      "observed": "The regular file exits 1 with the size-limit error; the FIFO has stat.size=0 and exits 0 with a successfully encoded mnemonic. Both text and PNG readers use stat followed by an unbounded whole-file read; only the text case was exercised.",
+      "impact": "A user-selected FIFO/device or growing file can consume memory beyond the advertised bound or wait indefinitely. No remote input service, theft, or wrong recovery was demonstrated; the probe used only 2 MiB.",
+      "recommendedFix": "Open once and read at most limit+1 bytes, rejecting overflow; either reject unsupported non-regular inputs or enforce the same bounded reader on them. Apply the same approach to QR file bytes before decoding.",
+      "requiredVerification": "Test exactly limit, limit+1, a finite FIFO, file growth and PNG byte limits without intentionally exhausting memory.",
+      "evidence": [
+        "Local: AUD-004-evidence/file-input-probe.log",
+        "AUD-004-harnesses/probe-input.py"
+      ],
+      "releaseBlockingReason": "Limited to the stated boundary or documentation; no demonstrated failure of valid mnemonic or SSKR recovery."
+    },
+    {
+      "id": "AUD-004-API001",
+      "category": "API",
+      "kind": "finding",
+      "title": "Unknown Bitcoin evidence kinds silently become a recovery non-match",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/bitcoin-evidence.ts:329-348",
+        "src/bitcoin-evidence.ts:254-282"
+      ],
+      "reproduction": "Call matchBitcoinEvidence with the public abandon/about mnemonic, kind=\"address-typo\", profiles=[\"native-segwit\"], value=\"irrelevant\", and mainnet account/branch/index all zero. The exact executable command is in the Checks table and JSON command evidence.",
+      "expected": "An unsupported runtime discriminator should be rejected before derivation, rather than reported as a valid comparison that did not match.",
+      "observed": "The public JavaScript API returns {\"matched\":false,\"kind\":\"address-typo\"}. matchDerivedNode falls through and the outer function emits an ordinary negative result.",
+      "impact": "An untyped integration or deserialized configuration can mistake a programming error for evidence against the correct wallet. The CLI constructs supported kinds and was not shown vulnerable; valid supported comparisons pass existing tests.",
+      "recommendedFix": "Validate the evidence kind against the supported set at entry, before reading variant-specific fields; make an unsupported switch branch fail explicitly.",
+      "requiredVerification": "Unknown/missing discriminators fail with stable non-secret-bearing errors. Retain positive and negative address, key, WIF, xpub and fingerprint cases.",
+      "evidence": [
+        "Local: AUD-004-evidence/public-api-probe.log"
+      ],
+      "releaseBlockingReason": "Limited to the stated boundary or documentation; no demonstrated failure of valid mnemonic or SSKR recovery."
+    },
+    {
+      "id": "AUD-004-BLD001",
+      "category": "BLD",
+      "kind": "finding",
+      "title": "The manual PDF/QR regression script stops before checking any document",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "scripts/check-card-output.mjs:45",
+        "scripts/check-card-output.mjs:150-163",
+        "test/card-qr.test.ts:30-31"
+      ],
+      "reproduction": "After pnpm build, run node scripts/check-card-output.mjs docs/audits/AUD-004-evidence/manual-card-output.",
+      "expected": "The maintained manual export check should use supported options and reach its PDF/QR assertions.",
+      "observed": "Exit 1: \"Error: Page size must be a6, a4 or business.\" The base fixture uses removed pageSize=\"wallet\". A later CLI case also combines collection layout with business size, which the current API rejects.",
+      "impact": "The supplemental actual-PDF verification is unusable and the unit-test comment points readers to a broken check. This does not mean exported QR data is wrong: the separate current-API harness passed 39 documents.",
+      "recommendedFix": "Update all fixtures to the current page/layout contract and put at least one real PDF-to-image-to-QR smoke test in CI.",
+      "requiredVerification": "Run the entire repaired script through its final assertion, including ordinary sheets, fragments and SSKR exports.",
+      "evidence": [
+        "Local: AUD-004-evidence/card-output-script.log",
+        "Local: AUD-004-evidence/rendered-qr-corrected.log"
+      ],
+      "releaseBlockingReason": "Limited to the stated boundary or documentation; no demonstrated failure of valid mnemonic or SSKR recovery."
+    },
+    {
+      "id": "AUD-004-DOC001",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The unconditional atomic-publication promise excludes SSKR file writers",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "SECURITY.md:39",
+        "src/export/sskr-cards.ts:175-180",
+        "src/cli/sskr-command.ts:155-159"
+      ],
+      "reproduction": "Run write-failure.mjs. The audit-only adapter simulates ENOSPC after writing 16 bytes at the final SSKR PDF path; it restores the filesystem adapter and removes its public-data output afterwards.",
+      "expected": "SECURITY.md promises that a file appears under its final name only after it is complete.",
+      "observed": "The export rejects the simulated write error, but a 16-byte partial PDF remains at the final path with mode 0600. SSKR PDF and record outputs write directly with wx; ordinary record/PDF exports use private staging.",
+      "impact": "A failed export can leave an incomplete backup at the requested path, contrary to the blanket documentation promise. The command does report failure and permissions remain private; no successful corrupt backup or unauthorized disclosure is claimed.",
+      "recommendedFix": "Either implement complete-file publication for SSKR outputs while preserving exclusive no-overwrite behavior, or narrow the promise and document cleanup/retry behavior on partial writes.",
+      "requiredVerification": "Inject partial writes and cancellation; verify no final partial file under an atomic contract, preserve pre-existing destinations, and keep private permissions.",
+      "evidence": [
+        "Local: AUD-004-evidence/partial-write-probe.log",
+        "AUD-004-harnesses/write-failure.mjs"
+      ],
+      "releaseBlockingReason": "Limited to the stated boundary or documentation; no demonstrated failure of valid mnemonic or SSKR recovery."
+    },
+    {
+      "id": "AUD-004-DOC002",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The documented default size of six- and eight-reference cards is stale",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "README.md:339",
+        "src/export/glass-cards.ts:280-284"
+      ],
+      "reproduction": "Render individual cards using business-glass-6in1 and business-glass-8in1 with pageSize omitted; render-check.mjs measures the PDF media box.",
+      "expected": "Documentation should describe the dimensions actually generated for separate cards.",
+      "observed": "README says 85.6 x 54 mm without an explicit page size. Both generated individual cards measure 90 x 50 mm. The code intentionally uses businessShape when individualIndex is present.",
+      "impact": "Users can choose an unsuitable holder, print layout or cutting dimensions. No encoded reference is lost.",
+      "recommendedFix": "Describe individual cards as 90 x 50 mm; distinguish the proportions of decorative sheet artwork from physical separate-card dimensions.",
+      "requiredVerification": "Keep PDF media-box assertions for all three glass capacities with omitted and explicit page sizes.",
+      "evidence": [
+        "Local: AUD-004-evidence/rendered-qr-corrected.log",
+        "AUD-004-harnesses/render-check.mjs"
+      ],
+      "releaseBlockingReason": "Limited to the stated boundary or documentation; no demonstrated failure of valid mnemonic or SSKR recovery."
+    },
+    {
+      "id": "AUD-004-DOC003",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The SSKR fixture description overstates the Bytewords vector count",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "docs/SSKR.md:106",
+        "vectors/sskr-v1.json:20-35"
+      ],
+      "reproduction": "Count vectors/sskr-v1.json official.shares and official.bytewords.",
+      "expected": "The test-data description should distinguish the full UR set from the selected Bytewords quorum.",
+      "observed": "The file contains eight UR shares and five Bytewords shares; the prose describes all eight in both forms. The five Bytewords entries are a valid quorum and the recovery test passes.",
+      "impact": "Readers overestimate the breadth of the cross-representation fixture set. This is a documentation defect, not a cryptographic failure.",
+      "recommendedFix": "State eight UR shares and one five-share Bytewords quorum, or add the remaining independently sourced Bytewords fixtures.",
+      "requiredVerification": "Check the written counts against the JSON and retain recovery of the published quorum.",
+      "evidence": [
+        "vectors/sskr-v1.json",
+        "test/sskr-vectors.test.ts"
+      ],
+      "releaseBlockingReason": "Limited to the stated boundary or documentation; no demonstrated failure of valid mnemonic or SSKR recovery."
+    }
+  ],
+  "observations": [
+    {
+      "id": "AUD-004-API002",
+      "category": "API",
+      "kind": "observation",
+      "severity": "info",
+      "status": "accepted",
+      "releaseBlocking": false,
+      "title": "Numeric CLI format renumbering is an explicit compatibility change",
+      "evidence": [
+        "Pre-existing diff: src/cli/input.ts, src/cli/usage.ts, test/cli.test.ts, CHANGELOG.md; retained locally in AUD-004-evidence/baseline.diff"
+      ],
+      "reproduction": "Compare HEAD with the reviewed working tree: numeric 4 changes from unicode to colors-unicode; numeric 6 is removed.",
+      "expected": "Intentional interface changes are distinguished from accidental functional regressions.",
+      "observed": "All five named formats still work; format 3 remains unicode. MNC1 records store format names, so the numeric renumbering does not alter their interpretation.",
+      "impact": "Old scripts using --format 4 change output and --format 6 fail. This is not purely visual. The audit does not infer an accidental defect from an intentional pending change.",
+      "recommendedFix": "Before adopting the new numbering, confirm that saved commands are migrated; prefer stable named formats in automation. Keep the changelog notice.",
+      "requiredVerification": "Current CLI format matrix passes; if old numeric commands must remain compatible, define and test an explicit migration policy."
+    },
+    {
+      "id": "AUD-004-BLD002",
+      "category": "BLD",
+      "kind": "observation",
+      "severity": "info",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "title": "Extend automated presentation and platform coverage",
+      "evidence": [
+        ".github/workflows/ci.yml",
+        "Local: AUD-004-evidence/unit-tests-unrestricted.log"
+      ],
+      "reproduction": "Inspect the CI workflow and platform-conditional tests.",
+      "expected": "CI coverage should reflect the supported maintenance and export contracts.",
+      "observed": "CI runs Linux types/build/tests/dependency audit, but not format:check or the independent actual-PDF audit matrix. This audit executed Linux only.",
+      "impact": "Formatting, real rasterization and non-Linux regressions can escape the current gates; no additional platform failure was reproduced.",
+      "recommendedFix": "Add format checking, a small real PDF/QR smoke check, and a supported second-OS test job. Keep resource-intensive matrices separate.",
+      "requiredVerification": "Observe the added gates on the intended platforms; do not count this Linux audit as Windows/macOS validation."
+    }
+  ],
+  "remediation": [
+    {
+      "id": "AUD-004-SEC001",
+      "status": "fixed",
+      "fixCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "verificationCommit": null,
+      "evidence": "src/cli/bounded-read.ts opens once and reads at most limit+1 bytes for text files, standard input and QR PNG files. Tests cover exactly the limit, limit+1 and a FIFO; probe-input.py reports that the defect no longer reproduces. A growing file and the PNG limit were not tested separately."
+    },
+    {
+      "id": "AUD-004-API001",
+      "status": "verified",
+      "fixCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "verificationCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "evidence": "matchBitcoinEvidence rejects an unknown kind before any derivation ('Unsupported Bitcoin evidence kind.'); the derivation switch also fails explicitly. Regression test in test/known-audit-defects.test.ts; existing evidence tests pass."
+    },
+    {
+      "id": "AUD-004-BLD001",
+      "status": "verified",
+      "fixCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "verificationCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "evidence": "scripts/check-card-output.mjs uses the business page size and an A6 collection sheet; it ran to its final assertion (25 documents and the SSKR command, exact QR round trips) and now runs in CI."
+    },
+    {
+      "id": "AUD-004-DOC001",
+      "status": "fixed",
+      "fixCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "verificationCommit": null,
+      "evidence": "SSKR PDF and record files are published with publishNewPrivateFile: written privately in a staging folder, then hard-linked under the final name, which never replaces an existing file; FAT/exFAT reserve the name with an empty file first, and SECURITY.md says so. A test checks completeness, 0600 mode and no overwrite; an injected partial write into the staging file left nothing under the final name. Cancellation was not tested."
+    },
+    {
+      "id": "AUD-004-DOC002",
+      "status": "verified",
+      "fixCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "verificationCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "evidence": "README states 90 x 50 mm for individual cards with four, six or eight codes, as rendered."
+    },
+    {
+      "id": "AUD-004-DOC003",
+      "status": "verified",
+      "fixCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "verificationCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "evidence": "docs/SSKR.md states eight UR shares and five of them, a restoring quorum, in Bytewords, matching vectors/sskr-v1.json."
+    },
+    {
+      "id": "AUD-004-BLD002",
+      "status": "fixed",
+      "fixCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
+      "verificationCommit": null,
+      "evidence": "CI now runs pnpm format:check and the real PDF/QR round trip (scripts/check-card-output.mjs with Poppler). No second-OS job was added."
+    }
+  ],
+  "limitations": [
+    "Snapshot includes eight pre-existing uncommitted files. User reported concurrent visual work. Tracked files remained byte-identical to the initial captured snapshot before report creation; later changes require re-verification.",
+    "Linux x86_64 only. No Windows/macOS execution, actual hidden systemd prompt interaction, browser host application, physical print/scan or assistive-device testing.",
+    "The standalone package has no button GUI. Consumers embedding its card renderer are outside this repository audit.",
+    "Not every input/font/layout combination or every secret-memory exceptional path was exhausted. No production secrets and no intentional resource exhaustion were used.",
+    "Fresh Rust target and all four generated SSKR outputs were verified, using an existing pinned container image. No uncached base/toolchain-image rebuild, fresh pnpm installation, or RustSec advisory scan.",
+    "Initial sandbox run: 403 passed, 28 failed, 3 skipped; subprocess EPERM invalidated those CLI failures as product evidence. Unrestricted rerun: 434 passed with zero skips. Initial npm/Docker/network permission failures were kept separately.",
+    "First audit render harness failed because pdf-lib load default rewrote metadata. Corrected to updateMetadata:false; the unmodified production output then passed. This was an auditor-harness error, not a product finding.",
+    "No independent cryptographic certification, no release approval, no production fix, no commit/push/tag/release."
+  ]
+}

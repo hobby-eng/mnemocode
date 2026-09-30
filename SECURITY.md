@@ -36,7 +36,7 @@ When the library is built into another application, that application is responsi
 - MnemoCode does not collect, send or log your phrase. It clears its temporary copies of the phrase data, but text in JavaScript memory cannot be erased.
 - MnemoCode cannot control swap, crash dumps, terminal scrollback, screenshots, clipboard history, accessibility tools, browser extensions and malware.
 - Text records, QR codes, PDFs, images, Shamir shares, dates and printed cards can help someone recover the phrase. Treat each of them as a secret, even when it is not the whole phrase.
-- Exported files can be read only by your user account, where the system supports this. A file appears under its name only when it is complete. You are responsible for the permissions of the folder, backups, snapshots, cloud synchronization, removable media and later changes of permissions.
+- Exported files can be read only by your user account, where the system supports this. A file appears under its name only when it is complete; on file systems without hard links, such as FAT and exFAT, an empty file may appear under the name for a moment first. You are responsible for the permissions of the folder, backups, snapshots, cloud synchronization, removable media and later changes of permissions.
 - PNG and JPEG export runs the local program `pdftocairo` on a private temporary PDF. Use a trusted local installation of Poppler.
 - The files of the Shamir share library are loaded from the local disk and compared with fixed SHA-256 hashes before any secret is processed. The hashes show that the files have not changed. They do not prove that the library has no defects. The random numbers for shares come from Node.js `crypto.randomBytes`.
 
