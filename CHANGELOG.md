@@ -16,6 +16,8 @@
 ### Secret handling
 
 - MnemoCode clears its temporary copies of the phrase data after use.
+- A file with Shamir shares now appears under its name only when it is complete, as the other exports already did. MnemoCode writes it to a private temporary file first and then gives it its final name in one step, without ever replacing an existing file. On memory cards and USB sticks formatted with FAT or exFAT, which cannot give a file a second name, an empty file holds the name until the complete one replaces it, and is removed again if that fails.
+- Text, standard input and QR image files are read up to their size limit and no further, also when they come from a pipe or keep growing, instead of trusting the size the system reports.
 
 ### Card exports
 

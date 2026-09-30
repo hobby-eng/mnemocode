@@ -777,7 +777,7 @@
       "status": "fixed",
       "fixCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
       "verificationCommit": null,
-      "evidence": "SSKR PDF and record files are published with publishNewPrivateFile: written privately in a staging folder, then hard-linked under the final name, which never replaces an existing file; FAT/exFAT reserve the name with an empty file first, and SECURITY.md says so. A test checks completeness, 0600 mode and no overwrite; an injected partial write into the staging file left nothing under the final name. Cancellation was not tested."
+      "evidence": "SSKR PDF and record files are published with publishNewPrivateFile: written privately in a staging folder, then hard-linked under the final name, which never replaces an existing file; FAT/exFAT reserve the name with an empty file first, and SECURITY.md says so. A test checks completeness, 0600 mode and no overwrite; an injected partial write into the staging file left nothing under the final name. Cancellation was not tested. Follow-up: a review confirmed the fix under an injected write failure and four concurrent publications, and found that a failed final rename on the no-hard-link path left the empty reservation; it is now removed (test/private-file-fallback.test.ts)."
     },
     {
       "id": "AUD-004-DOC002",
@@ -798,7 +798,7 @@
       "status": "fixed",
       "fixCommit": "the commit that adds this record (parent d64ba4792c76d8ae4fe020f8413198aadff85580)",
       "verificationCommit": null,
-      "evidence": "CI now runs pnpm format:check and the real PDF/QR round trip (scripts/check-card-output.mjs with Poppler). No second-OS job was added."
+      "evidence": "CI now runs pnpm format:check and the real PDF/QR round trip (scripts/check-card-output.mjs with Poppler). No second-OS job was added. Poppler is installed before the tests, so the rasterizing card tests are not skipped."
     }
   ],
   "limitations": [
