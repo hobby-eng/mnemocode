@@ -46,7 +46,7 @@ ${section('SHAMIR SHARES (SSKR)')}
     Seedshift dates and the BIP39 passphrase are NOT stored in the shares.
     Recover shifted records with sskr-combine --mode seedshift --dates ...
 
-  ${flag('--format 1|2|3|5|6')}  Encoded mnemonic representation, as in ordinary encode.
+  ${flag('--format 1|2|3|4|5')}  Encoded mnemonic representation, as in ordinary encode.
   ${flag('--share-format ur|colors')}  Separate share output; default ur.
     Share RGB codes are a separate ordered format, not ordinary format 5.
     Both compact and space-separated RGB codes can be read back.
@@ -140,14 +140,14 @@ ${section('REPRESENTATIONS')}
   2  indexes         1-based BIP39 indexes from 1 through 2048
   3  unicode         four-digit code points obtained through corresponding
                      Traditional Chinese BIP39 entries; spaced or concatenated
+  4  colors-unicode  the same lossless colour data as two visible four-digit
+                     Private Use Unicode code points per RGB value; all five lengths
   5  colors          reversible #RRGGBB values, separated or concatenated.
                      BIP39Colors-compatible for 12/24 words; MnemoCode also
                      supports 15, 18, and 21
-  6  colors-unicode  the same lossless colour data as two visible four-digit
-                     Private Use Unicode code points per RGB value; all five lengths
 
   Format 3 uses the Traditional Chinese BIP39 mapping but prints only code
-  points. Format 6 is MnemoCode-specific portable hexadecimal text; its legacy
+  points. Format 4 is MnemoCode-specific portable hexadecimal text; its legacy
   Private Use symbol form remains readable. Both are representations, not encryption.
 
 ${section('TERMINAL AND FILE OUTPUT')}

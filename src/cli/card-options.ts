@@ -18,7 +18,7 @@ export function validateCardOptions(
     if (!directory.trim())
       throw new Error('The individual-card output folder path must not be empty.');
     if (!['colors', 'colors-unicode'].includes(format))
-      throw new Error('Individual cards are available only for RGB color formats 5 and 6.');
+      throw new Error('Individual cards are available only for RGB color formats 4 and 5.');
     if (!selectTemplate(value(args, 'template'), 'colors').renderIndividual)
       throw new Error('This template does not support individual cards.');
   }
@@ -36,7 +36,7 @@ export function validateCardOptions(
     return;
   }
   if (!['unicode', 'colors', 'colors-unicode'].includes(format))
-    throw new Error('PDF export requires format 3, 5, or 6.');
+    throw new Error('PDF export requires format 3, 4, or 5.');
   if (format === 'unicode' && mode === 'direct')
     throw new Error(
       'To export a card with dates, select a Seedshift mode. The dates will be visible on the card.',

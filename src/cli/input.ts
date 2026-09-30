@@ -65,9 +65,8 @@ export function inputFormat(value_: string): EncodedFormat {
     '1': 'english',
     '2': 'indexes',
     '3': 'unicode',
-    '4': 'unicode',
+    '4': 'colors-unicode',
     '5': 'colors',
-    '6': 'colors-unicode',
   };
   const format = aliases[value_] ?? value_;
   const supported = ['english', 'indexes', 'unicode', 'colors', 'colors-unicode'];
@@ -92,7 +91,7 @@ async function chooseInputFormat(candidates: readonly EncodedFormat[]): Promise<
     indexes: '2',
     unicode: '3',
     colors: '5',
-    'colors-unicode': '6',
+    'colors-unicode': '4',
   };
   const choices =
     candidates.length === 0 ? (Object.keys(numbers) as EncodedFormat[]) : [...candidates];

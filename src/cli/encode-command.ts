@@ -57,7 +57,7 @@ async function validateEncodeOptions(
       'The legacy checksum-word replacement is available only in legacy Seedshift mode.',
     );
   if (args.cards === true && format !== 'colors' && format !== 'colors-unicode')
-    throw new Error('Terminal color cards are available only for RGB color formats 5 and 6.');
+    throw new Error('Terminal color cards are available only for RGB color formats 4 and 5.');
   validateCardOptions(args, format, mode);
   // Validate all destinations before prompting or reading a mnemonic.
   await validateImageOptions(args);
