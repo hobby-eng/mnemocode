@@ -570,7 +570,7 @@
       "kind": "finding",
       "title": "File-size guards do not bound the actual read",
       "severity": "low",
-      "status": "fixed",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "src/cli/input.ts:30-34",
@@ -643,7 +643,7 @@
       "kind": "finding",
       "title": "The unconditional atomic-publication promise excludes SSKR file writers",
       "severity": "low",
-      "status": "fixed",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "SECURITY.md:39",
@@ -735,7 +735,7 @@
       "category": "BLD",
       "kind": "observation",
       "severity": "info",
-      "status": "fixed",
+      "status": "verified",
       "releaseBlocking": false,
       "title": "Extend automated presentation and platform coverage",
       "evidence": [
@@ -753,10 +753,10 @@
   "remediation": [
     {
       "id": "AUD-004-SEC001",
-      "status": "fixed",
+      "status": "verified",
       "fixCommit": "the commit that adds this record (parent 9c634d1ac058fa9c4744519f0e8f003c955b3653)",
-      "verificationCommit": null,
-      "evidence": "src/cli/bounded-read.ts opens once and reads at most limit+1 bytes for text files, standard input and QR PNG files. Tests cover exactly the limit, limit+1 and a FIFO; probe-input.py reports that the defect no longer reproduces. A growing file and the PNG limit were not tested separately."
+      "verificationCommit": "72e8fdd; b30ddf8 (CI run 36791444587 at b30ddf8)",
+      "evidence": "src/cli/bounded-read.ts opens once and reads at most limit+1 bytes for text files, standard input and QR PNG files. Tests cover exactly the limit, limit+1 and a FIFO; probe-input.py reports that the defect no longer reproduces. A growing file and the PNG limit were not tested separately. Follow-up (72e8fdd): /dev/zero, whose reported size is 0 and which never ends, and a file that another process keeps appending to never yield more than the limit; a QR PNG of 16 MiB + 1 bytes and /dev/zero as a PNG path are refused with the 16 MiB message before decoding. These tests pass on Linux, Windows and macOS in CI run 36791444587 at b30ddf8."
     },
     {
       "id": "AUD-004-API001",
@@ -774,10 +774,10 @@
     },
     {
       "id": "AUD-004-DOC001",
-      "status": "fixed",
+      "status": "verified",
       "fixCommit": "the commit that adds this record (parent 9c634d1ac058fa9c4744519f0e8f003c955b3653)",
-      "verificationCommit": null,
-      "evidence": "SSKR PDF and record files are published with publishNewPrivateFile: written privately in a staging folder, then hard-linked under the final name, which never replaces an existing file; FAT/exFAT reserve the name with an empty file first, and SECURITY.md says so. A test checks completeness, 0600 mode and no overwrite; an injected partial write into the staging file left nothing under the final name. Cancellation was not tested. Follow-up: a review confirmed the fix under an injected write failure and four concurrent publications, and found that a failed final rename on the no-hard-link path left the empty reservation; it is now removed (test/private-file-fallback.test.ts)."
+      "verificationCommit": "72e8fdd; b30ddf8 (CI run 36791444587 at b30ddf8)",
+      "evidence": "SSKR PDF and record files are published with publishNewPrivateFile: written privately in a staging folder, then hard-linked under the final name, which never replaces an existing file; FAT/exFAT reserve the name with an empty file first, and SECURITY.md says so. A test checks completeness, 0600 mode and no overwrite; an injected partial write into the staging file left nothing under the final name. Cancellation was not tested. Follow-up: a review confirmed the fix under an injected write failure and four concurrent publications, and found that a failed final rename on the no-hard-link path left the empty reservation; it is now removed (test/private-file-fallback.test.ts). Follow-up (72e8fdd): cancellation is tested by killing a publishing process with SIGKILL at a different moment in each of eight rounds of 32 publications of 1 MiB; at least six kills land while files are being published, and every file under a final name is complete. A forced stop can leave the private staging folder next to the file; SECURITY.md now says so. The test passes on Linux, Windows and macOS in CI run 36791444587 at b30ddf8."
     },
     {
       "id": "AUD-004-DOC002",
@@ -795,10 +795,10 @@
     },
     {
       "id": "AUD-004-BLD002",
-      "status": "fixed",
+      "status": "verified",
       "fixCommit": "the commit that adds this record (parent 9c634d1ac058fa9c4744519f0e8f003c955b3653)",
-      "verificationCommit": null,
-      "evidence": "CI now runs pnpm format:check and the real PDF/QR round trip (scripts/check-card-output.mjs with Poppler). No second-OS job was added. Poppler is installed before the tests, so the rasterizing card tests are not skipped."
+      "verificationCommit": "ff581ad, b30ddf8 (CI run 36791444587 at b30ddf8)",
+      "evidence": "CI now runs pnpm format:check and the real PDF/QR round trip (scripts/check-card-output.mjs with Poppler). No second-OS job was added. Poppler is installed before the tests, so the rasterizing card tests are not skipped. Follow-up: a portable CI job builds and tests on windows-2025 and macos-15 (ff581ad), with the Linux-only systemd-ask-password test skipped there and Poppler-based card tests left to the Linux job; all three systems pass in CI run 36791444587 at b30ddf8."
     }
   ],
   "limitations": [
