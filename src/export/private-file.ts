@@ -27,8 +27,8 @@ const NO_HARD_LINKS = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS']);
  * replace an existing file. The final name is made a hard link to the finished temporary file, which
  * fails if the name exists. On a file system without hard links, the name is first reserved with an
  * empty private file, which also fails if it exists, and the finished file then replaces that
- * reservation in one rename; an interruption can leave only the empty reservation, never part of
- * the contents.
+ * reservation in one rename. If that rename fails, the reservation is removed again; only a crash
+ * between the two steps can leave it, empty, never with part of the contents.
  */
 export async function publishNewPrivateFile(path: string, bytes: Uint8Array): Promise<void> {
   const destination = resolve(path);
@@ -41,7 +41,13 @@ export async function publishNewPrivateFile(path: string, bytes: Uint8Array): Pr
     } catch (error) {
       if (!NO_HARD_LINKS.has((error as NodeJS.ErrnoException).code ?? '')) throw error;
       await writeFile(destination, new Uint8Array(), { flag: 'wx', mode: 0o600 });
-      await rename(temporary, destination);
+      try {
+        await rename(temporary, destination);
+      } catch (renameError) {
+        // The reservation was created just above with 'wx', so it is this program's own empty file.
+        await rm(destination, { force: true });
+        throw renameError;
+      }
     }
   } finally {
     await rm(staging, { recursive: true, force: true });
