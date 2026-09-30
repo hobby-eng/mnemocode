@@ -4,10 +4,11 @@ import { parseInput, representMnemonic, formatEncoded, type OutputFormat } from 
 import { serializeRecord } from '../src/record.js';
 import { mkdtemp, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { readBoundedFile } from '../src/cli/bounded-read.js';
+import { decodeQrPngFile } from '../src/cli/qr-input.js';
 import { publishNewPrivateFile } from '../src/export/private-file.js';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const publicMnemonic = 'abandon '.repeat(11) + 'about';
@@ -107,6 +108,117 @@ describe('AUD-004 regression contracts', () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it('AUD-004-SEC001: stops endless and growing input at the limit', async () => {
+    const limit = 16;
+    if (process.platform !== 'win32') {
+      // /dev/zero reports size 0 and never ends: the strongest form of a file that keeps growing.
+      expect(() => readBoundedFile('/dev/zero', limit, 'too large')).toThrow('too large');
+    }
+    const directory = await mkdtemp(join(tmpdir(), 'mnemocode-growing-'));
+    const growing = join(directory, 'growing');
+    await writeFile(growing, '');
+    // Another process appends to the file while it is read. Whether the read meets the end of the
+    // file first or passes the limit depends on timing; either way it never returns more than the
+    // limit.
+    const writer = spawn(process.execPath, [
+      '-e',
+      `const fs = require('node:fs'); const end = Date.now() + 1500;
+       while (Date.now() < end) fs.appendFileSync(${JSON.stringify(growing)}, 'a'.repeat(4096));`,
+    ]);
+    try {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        try {
+          expect(readBoundedFile(growing, 64 * 1024, 'too large').length).toBeLessThanOrEqual(
+            64 * 1024,
+          );
+        } catch (error) {
+          expect(String(error)).toContain('too large');
+        }
+      }
+    } finally {
+      writer.kill();
+      await new Promise((done) => writer.once('close', done));
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('AUD-004-SEC001: refuses a QR PNG one byte over 16 MiB before decoding it', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mnemocode-png-limit-'));
+    try {
+      const large = join(directory, 'large.png');
+      await writeFile(large, new Uint8Array(16 * 1024 * 1024 + 1));
+      await expect(decodeQrPngFile(large)).rejects.toThrow('exceeds the 16 MiB safety limit');
+      if (process.platform !== 'win32') {
+        await expect(decodeQrPngFile('/dev/zero')).rejects.toThrow(
+          'exceeds the 16 MiB safety limit',
+        );
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('AUD-004-DOC001: a publication killed at any moment leaves no partial file under the final name', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mnemocode-killed-'));
+    // Thirty-two publications of 1 MiB last long enough for every kill to land inside one, and each
+    // round deletes its files, so the disk use stays small.
+    const size = 1024 * 1024;
+    const publications = 32;
+    const publisher = `
+      import { publishNewPrivateFile } from ${JSON.stringify(resolve('src/export/private-file.ts'))};
+      const bytes = new Uint8Array(${size}).fill(97);
+      for (let index = 0; index < ${publications}; index += 1) {
+        await publishNewPrivateFile(${JSON.stringify(directory)} + '/shares-' + index + '.txt', bytes);
+      }`;
+    let interrupted = 0;
+    try {
+      for (let round = 0; round < 8; round += 1) {
+        const child = spawn(process.execPath, [
+          '--import',
+          'tsx',
+          '--input-type=module',
+          '-e',
+          publisher,
+        ]);
+        let errors = '';
+        child.stderr.on('data', (chunk) => (errors += String(chunk)));
+        let running = true;
+        const ended = new Promise<number | null>((done) =>
+          child.once('close', (code) => {
+            running = false;
+            done(code);
+          }),
+        );
+        // Wait until the first file is published, so that the child is past its start-up, then
+        // kill it a different number of milliseconds later in each round.
+        while (running && !(await readdir(directory)).some((name) => name.startsWith('shares-'))) {
+          await new Promise((done) => setTimeout(done, 1));
+        }
+        await new Promise((done) => setTimeout(done, round * 2));
+        const killedWhileRunning = running;
+        child.kill('SIGKILL');
+        const code = await ended;
+        expect(code === 0 || code === null, errors).toBe(true);
+        const finals = (await readdir(directory)).filter((name) => name.startsWith('shares-'));
+        if (killedWhileRunning && finals.length < publications) interrupted += 1;
+        for (const name of finals) {
+          const bytes = await readFile(join(directory, name));
+          expect(bytes.length, name).toBe(size);
+          expect(
+            bytes.every((byte) => byte === 97),
+            name,
+          ).toBe(true);
+        }
+        await rm(directory, { recursive: true, force: true });
+        await mkdir(directory);
+      }
+      // Most kills must land while files are still being published, or the test proves nothing.
+      expect(interrupted).toBeGreaterThanOrEqual(6);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   it('AUD-004-DOC001: publishes a new private file whole and never replaces an existing one', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'mnemocode-publish-'));
