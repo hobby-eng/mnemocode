@@ -1,8 +1,0 @@
-
-> mnemocode@0.1.0 build
-> npm run clean && tsc -p tsconfig.json
-
-
-> mnemocode@0.1.0 clean
-> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})"
-

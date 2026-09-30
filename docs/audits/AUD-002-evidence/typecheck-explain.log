@@ -1,7 +1,0 @@
-   Referenced via 'zlib/iter.d.ts' from file 'node_modules/.pnpm/@types+node@26.6.3/node_modules/@types/node/index.d.ts'
-node_modules/.pnpm/@types+node@26.6.3/node_modules/@types/node/index.d.ts
-   Type library referenced via 'node' from file 'node_modules/.pnpm/@types+qrcode@1.5.6/node_modules/@types/qrcode/index.d.ts'
-   Type library referenced via 'node' from file 'node_modules/.pnpm/undici-types@8.9.0/node_modules/undici-types/formdata.d.ts'
-   Type library referenced via 'node' from file 'node_modules/.pnpm/undici-types@8.9.0/node_modules/undici-types/fetch.d.ts'
---- tsconfig types field:
-1

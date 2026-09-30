@@ -1,6 +1,0 @@
-
-> mnemocode@0.1.0 format:check /home/sergio/Documents/bip_tools/mnemocode
-> prettier --check .
-
-Checking formatting...
-All matched files use Prettier code style!
