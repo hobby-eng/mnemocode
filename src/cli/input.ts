@@ -1,8 +1,9 @@
 import { terminalNotice } from './terminal.js';
-import { closeSync, openSync, readFileSync, readSync, statSync } from 'node:fs';
+import { closeSync, openSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { detectInputFormats, parseDate, type DateShiftDate, type OutputFormat } from '../core.js';
+import { readBoundedDescriptor, readBoundedFile } from './bounded-read.js';
 import { decodeQrPngFile } from './qr-input.js';
 import { type MnemoCodeRecord, type RecordMode } from '../record.js';
 import { type ParsedArguments, value, values } from './arguments.js';
@@ -13,24 +14,14 @@ export type TransformMode = RecordMode;
 const MAX_TEXT_INPUT_BYTES = 1024 * 1024;
 
 function readBoundedStdin(): string {
-  const chunks: Buffer[] = [];
-  let total = 0;
-  while (true) {
-    const chunk = Buffer.allocUnsafe(Math.min(64 * 1024, MAX_TEXT_INPUT_BYTES + 1 - total));
-    const length = readSync(0, chunk, 0, chunk.length, null);
-    if (length === 0) break;
-    total += length;
-    if (total > MAX_TEXT_INPUT_BYTES) throw new Error('Text input exceeds the 1 MiB safety limit.');
-    chunks.push(chunk.subarray(0, length));
-  }
-  return Buffer.concat(chunks, total).toString('utf8');
+  const tooLarge = 'Text input exceeds the 1 MiB safety limit.';
+  return readBoundedDescriptor(0, MAX_TEXT_INPUT_BYTES, tooLarge).toString('utf8');
 }
 
 export function readBoundedTextFile(path: string, inputName = 'The text input'): string {
   try {
-    if (statSync(path).size > MAX_TEXT_INPUT_BYTES)
-      throw new Error(`${inputName} exceeds the 1 MiB safety limit.`);
-    return readFileSync(path, 'utf8');
+    const tooLarge = `${inputName} exceeds the 1 MiB safety limit.`;
+    return readBoundedFile(path, MAX_TEXT_INPUT_BYTES, tooLarge).toString('utf8');
   } catch (error) {
     if (error instanceof Error && error.message.includes('exceeds the 1 MiB safety limit')) {
       throw error;

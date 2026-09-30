@@ -280,8 +280,21 @@ function matchDerivedNode(
       return matchingWif(node, evidence);
     case 'account-xpub':
       return matchingAccountKey(node, evidence);
+    default:
+      // Unreachable for typed callers; matchBitcoinEvidence rejects other kinds first.
+      throw new Error('Unsupported Bitcoin evidence kind.');
   }
 }
+
+/** Every kind of evidence this module can compare. */
+const EVIDENCE_KINDS: ReadonlySet<string> = new Set<BitcoinEvidence['kind']>([
+  'address',
+  'compressed-public-key',
+  'wif',
+  'master-xpub',
+  'account-xpub',
+  'master-fingerprint',
+]);
 
 /** Compares a recovered mnemonic locally. It does not contact a node or a block explorer. */
 export function matchBitcoinEvidence(
@@ -289,6 +302,11 @@ export function matchBitcoinEvidence(
   evidence: BitcoinEvidence,
   passphrase = '',
 ): EvidenceMatch {
+  // A JavaScript caller or parsed configuration can pass any kind; an unknown one is an error, not
+  // a comparison that failed, which would read as evidence against the wallet.
+  if (!EVIDENCE_KINDS.has((evidence as { readonly kind?: unknown }).kind as string)) {
+    throw new Error('Unsupported Bitcoin evidence kind.');
+  }
   if (evidence.kind === 'master-xpub') {
     const metadata = extendedMetadata(evidence.value);
     if (metadata.network !== evidence.network)

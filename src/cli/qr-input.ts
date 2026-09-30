@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises';
+import { readBoundedFile } from './bounded-read.js';
 import jsQRModule from 'jsqr';
 import { PNG } from 'pngjs';
 
@@ -27,9 +27,7 @@ function assertPngDimensions(bytes: Uint8Array): void {
 export async function decodeQrPngFile(path: string): Promise<string> {
   let bytes: Buffer;
   try {
-    if ((await stat(path)).size > MAX_PNG_BYTES)
-      throw new Error('QR PNG input exceeds the 16 MiB safety limit.');
-    bytes = await readFile(path);
+    bytes = readBoundedFile(path, MAX_PNG_BYTES, 'QR PNG input exceeds the 16 MiB safety limit.');
   } catch (error) {
     if (error instanceof Error && error.message.includes('exceeds the 16 MiB safety limit'))
       throw error;

@@ -336,7 +336,7 @@ node dist/mnemocode.js preview --template material-vehicle --studio-name "AURORA
 
 Three templates put four, six or eight references on each card, so fewer cards are needed. With four per card, a 12-word phrase uses two cards and a 24-word phrase uses four. The last card can have fewer references. The references are numbered in order.
 
-Individual cards with four codes are 90 × 50 mm. Cards with six or eight codes are 85.6 × 54 mm unless `--page-size` is given.
+Individual cards are 90 × 50 mm, with four, six or eight codes.
 
 ### Collection-sheet identity
 

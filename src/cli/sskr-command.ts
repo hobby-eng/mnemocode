@@ -8,7 +8,7 @@ import {
   terminalResultHeader,
   terminalStatus,
 } from './terminal.js';
-import { writeFile } from 'node:fs/promises';
+import { publishNewPrivateFile } from '../export/private-file.js';
 import { preflightFileDestination } from './output-paths.js';
 import { integerOption, value, values, type ParsedArguments } from './arguments.js';
 import {
@@ -152,7 +152,7 @@ async function saveShares(
   }
   const output = value(args, 'output');
   if (output) {
-    await writeFile(output, shares.join('\n') + '\n', { flag: 'wx', mode: 0o600 });
+    await publishNewPrivateFile(output, new TextEncoder().encode(shares.join('\n') + '\n'));
     terminalNotice(
       `Saved SSKR records: ${output} (one complete share per line; this file contains all supplied shares).`,
       'success',
