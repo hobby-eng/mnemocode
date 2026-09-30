@@ -8,6 +8,7 @@ import { decodeQrPngFile } from '../src/cli/qr-input.js';
 import { publishNewPrivateFile } from '../src/export/private-file.js';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -166,7 +167,7 @@ describe('AUD-004 regression contracts', () => {
     const size = 1024 * 1024;
     const publications = 32;
     const publisher = `
-      import { publishNewPrivateFile } from ${JSON.stringify(resolve('src/export/private-file.ts'))};
+      import { publishNewPrivateFile } from ${JSON.stringify(pathToFileURL(resolve('src/export/private-file.ts')).href)};
       const bytes = new Uint8Array(${size}).fill(97);
       for (let index = 0; index < ${publications}; index += 1) {
         await publishNewPrivateFile(${JSON.stringify(directory)} + '/shares-' + index + '.txt', bytes);
