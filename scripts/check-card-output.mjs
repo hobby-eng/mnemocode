@@ -42,7 +42,7 @@ const base = {
     name: 'Alex Morgan',
     email: 'alex@vector.com',
   },
-  pageSize: 'wallet',
+  pageSize: 'business',
   cardQr: true,
 };
 const vector = JSON.parse(await readFile('vectors/sskr-v1.json', 'utf8'));
@@ -139,8 +139,9 @@ execFileSync(
     '--card-qr',
     '--template',
     'business-it',
+    // A collection sheet needs A6 or A4; business size gives separate cards.
     '--page-size',
-    'business',
+    'a6',
     '--orientation',
     'landscape',
     '--studio-name',

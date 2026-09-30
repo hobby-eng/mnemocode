@@ -19,6 +19,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      - run: pnpm format:check
       - run: pnpm build
       - run: pnpm test
+      # A real PDF-to-image-to-QR round trip of the card and SSKR exports, with public data only.
+      - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends poppler-utils
+      - run: node scripts/check-card-output.mjs output/card-output-check
       - run: pnpm audit --audit-level high
