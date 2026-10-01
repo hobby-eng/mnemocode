@@ -478,18 +478,18 @@ The public test data is in [`vectors/mnemocode-v1.json`](vectors/mnemocode-v1.js
 The TypeScript library exposes the same transformations used by the CLI:
 
 ```ts
-import { encodeMnemonic, decodeInput, masterFingerprint, parseDate } from 'mnemocode';
+import { encodeMnemonic, decodeInput, masterFingerprint, parseDate } from "mnemocode";
 
-const dates = ['10-07-1963', '31-01-4489'].map(parseDate);
+const dates = ["10-07-1963", "31-01-4489"].map(parseDate);
 const encoded = encodeMnemonic(mnemonic, dates);
-const recovered = decodeInput(encoded.unicodeCodePoints.join(''), 'unicode', dates);
+const recovered = decodeInput(encoded.unicodeCodePoints.join(""), "unicode", dates);
 console.log(masterFingerprint(mnemonic));
 
 // The same phrase in another form, without dates.
-import { representMnemonic, decodeInputDirect, formatEncoded } from 'mnemocode';
+import { representMnemonic, decodeInputDirect, formatEncoded } from "mnemocode";
 const direct = representMnemonic(mnemonic);
-const directUnicode = formatEncoded(direct, 'unicode');
-const sameMnemonic = decodeInputDirect(directUnicode, 'unicode');
+const directUnicode = formatEncoded(direct, "unicode");
+const sameMnemonic = decodeInputDirect(directUnicode, "unicode");
 ```
 
 Library exports are listed in `src/index.ts`. Shamir sharing has a separate `mnemocode/sskr` entry point.

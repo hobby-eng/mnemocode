@@ -1,4 +1,4 @@
-import { bytewords } from './bytewords-list.js';
+import { bytewords } from "./bytewords-list.js";
 
 const CHECKSUM_BYTES = 4;
 const MAX_TRANSPORT_BYTES = 128;
@@ -34,13 +34,13 @@ function crc32(bytes: Uint8Array): number {
 
 function validateTransportChecksum(bytes: Uint8Array): void {
   if (bytes.length < CHECKSUM_BYTES + 1 || bytes.length > MAX_TRANSPORT_BYTES) {
-    throw new Error('Invalid SSKR transport length.');
+    throw new Error("Invalid SSKR transport length.");
   }
   const checksumOffset = bytes.length - CHECKSUM_BYTES;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const recordedChecksum = view.getUint32(checksumOffset);
   if (crc32(bytes.subarray(0, checksumOffset)) !== recordedChecksum) {
-    throw new Error('SSKR transport checksum does not match.');
+    throw new Error("SSKR transport checksum does not match.");
   }
 }
 
@@ -58,7 +58,7 @@ function sharePayload(transport: Uint8Array): Uint8Array {
   let offset = 0;
   if (cbor[0] === CBOR_UINT16_TAG) {
     const tag = (cbor[1]! << 8) | cbor[2]!;
-    if (!SSKR_CBOR_TAGS.has(tag)) throw new Error('Not an SSKR CBOR tag.');
+    if (!SSKR_CBOR_TAGS.has(tag)) throw new Error("Not an SSKR CBOR tag.");
     offset = CBOR_TAG_BYTES;
   }
   const header = cbor[offset++]!;
@@ -69,7 +69,7 @@ function sharePayload(transport: Uint8Array): Uint8Array {
     payloadLength = cbor[offset++]!;
   }
   if (payloadLength !== cbor.length - offset || !SHARE_LENGTHS.has(payloadLength)) {
-    throw new Error('Invalid SSKR share byte string.');
+    throw new Error("Invalid SSKR share byte string.");
   }
   return cbor.subarray(offset);
 }
@@ -102,7 +102,7 @@ export function shareInfo(transport: Uint8Array): ShareInfo {
     info.groupThreshold > info.groupCount ||
     info.groupIndex >= info.groupCount
   ) {
-    throw new Error('Invalid SSKR share metadata.');
+    throw new Error("Invalid SSKR share metadata.");
   }
   return info;
 }
@@ -111,12 +111,12 @@ export function urToTransport(value: string): Uint8Array {
   const match = /^ur:sskr\/([a-z]+)$/iu.exec(value.trim());
   const body = match?.[1];
   if (!body || body.length % 2 !== 0 || body.length > MAX_TRANSPORT_BYTES * 2) {
-    throw new Error('Expected a single-part ur:sskr record.');
+    throw new Error("Expected a single-part ur:sskr record.");
   }
   const pairs = body.toLowerCase().match(/../gu)!;
   const bytes = Uint8Array.from(pairs, (pair) => {
     const byte = minimalBytewordValues.get(pair);
-    if (byte === undefined) throw new Error('Unknown Bytewords pair in SSKR record.');
+    if (byte === undefined) throw new Error("Unknown Bytewords pair in SSKR record.");
     return byte;
   });
   shareInfo(bytes);
@@ -130,7 +130,7 @@ export function transportToUr(bytes: Uint8Array): string {
     bytes[0] === CBOR_UINT16_TAG
       ? addTransportChecksum(bytes.subarray(CBOR_TAG_BYTES, -CHECKSUM_BYTES))
       : bytes;
-  const minimalText = Array.from(canonicalBytes, (byte) => minimalBytewords[byte]!).join('');
+  const minimalText = Array.from(canonicalBytes, (byte) => minimalBytewords[byte]!).join("");
   return `ur:sskr/${minimalText}`;
 }
 
@@ -139,10 +139,10 @@ export function bytewordsToUr(value: string): string {
     .trim()
     .toLowerCase()
     .split(/[\s-]+/u);
-  if (words.length > MAX_TRANSPORT_BYTES) throw new Error('SSKR record is too long.');
+  if (words.length > MAX_TRANSPORT_BYTES) throw new Error("SSKR record is too long.");
   const bytes = Uint8Array.from(words, (word) => {
     const byte = fullBytewordValues.get(word);
-    if (byte === undefined) throw new Error('Unknown SSKR Byteword.');
+    if (byte === undefined) throw new Error("Unknown SSKR Byteword.");
     return byte;
   });
   return transportToUr(bytes);
@@ -153,7 +153,7 @@ function paddedColorLength(payloadLength: number): number {
 }
 
 function colorHex(bytes: Uint8Array): string {
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
   return `#${hex.toUpperCase()}`;
 }
 
@@ -176,9 +176,9 @@ function parseColorBytes(value: string): Uint8Array {
   const prefixedCodes = /^(?:#[0-9a-f]{6}\s*)+$/iu.test(input);
   const plainCodes = /^(?:[0-9a-f]{6}\s*)+$/iu.test(input);
   if (!input || input.length > MAX_COLOR_TEXT_LENGTH || (!prefixedCodes && !plainCodes)) {
-    throw new Error('Invalid SSKR RGB codes. Preserve their printed order.');
+    throw new Error("Invalid SSKR RGB codes. Preserve their printed order.");
   }
-  const hex = input.replace(/[#\s]/gu, '');
+  const hex = input.replace(/[#\s]/gu, "");
   return Uint8Array.from(hex.match(/../gu)!, (pair) => parseInt(pair, 16));
 }
 
@@ -193,7 +193,7 @@ export function colorsToShare(value: string): string {
     bytes.length !== paddedColorLength(payloadLength) ||
     !paddingIsZero
   ) {
-    throw new Error('Unsupported or truncated SSKR color record.');
+    throw new Error("Unsupported or truncated SSKR color record.");
   }
   return transportToUr(bytes.subarray(COLOR_HEADER_BYTES, payloadEnd));
 }
@@ -212,14 +212,14 @@ function assertSameSet(info: ShareInfo, expected: ShareInfo): void {
     info.groupCount !== expected.groupCount ||
     info.secretLength !== expected.secretLength
   ) {
-    throw new Error('SSKR shares belong to different sets.');
+    throw new Error("SSKR shares belong to different sets.");
   }
 }
 
 /** Reject mixed sets and duplicate members before asking the cryptographic engine. */
 export function validateShareSet(records: readonly string[], requireQuorum = true): string[] {
   if (!records.length || records.length > MAX_SHARE_COUNT) {
-    throw new Error('Provide between 1 and 256 SSKR shares.');
+    throw new Error("Provide between 1 and 256 SSKR shares.");
   }
   const shares = records.map(normalizeShare);
   const infos = shares.map((share) => shareInfo(urToTransport(share)));
@@ -230,11 +230,11 @@ export function validateShareSet(records: readonly string[], requireQuorum = tru
     assertSameSet(info, first);
     const memberKey = `${info.groupIndex}:${info.memberIndex}`;
     if (seenMembers.has(memberKey))
-      throw new Error('The same SSKR member was supplied more than once.');
+      throw new Error("The same SSKR member was supplied more than once.");
     seenMembers.add(memberKey);
     const group = groups.get(info.groupIndex) ?? { threshold: info.memberThreshold, members: 0 };
     if (group.threshold !== info.memberThreshold)
-      throw new Error('Conflicting SSKR group thresholds.');
+      throw new Error("Conflicting SSKR group thresholds.");
     group.members += 1;
     groups.set(info.groupIndex, group);
   }
@@ -242,7 +242,7 @@ export function validateShareSet(records: readonly string[], requireQuorum = tru
     (group) => group.members >= group.threshold,
   ).length;
   if (requireQuorum && completeGroups < first.groupThreshold) {
-    throw new Error('Not enough SSKR shares to meet the recorded threshold.');
+    throw new Error("Not enough SSKR shares to meet the recorded threshold.");
   }
   return shares;
 }

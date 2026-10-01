@@ -1,6 +1,6 @@
 name: Bug report
 description: Report a reproducible MnemoCode defect using public or synthetic data.
-title: '[Bug]: '
+title: "[Bug]: "
 body:
   - type: markdown
     attributes:

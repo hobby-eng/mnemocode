@@ -1,9 +1,9 @@
-import { resolveIdentityFor, sectorForTemplate } from './card-identities.js';
-import { resolvePresentationFor } from './card-copy.js';
-import { isCardPageSize } from './card-settings.js';
-import { clearDocumentMetadata } from './document-metadata.js';
-import { PDFDocument } from 'pdf-lib';
-import type { CardContent, CardTemplate } from './templates.js';
+import { resolveIdentityFor, sectorForTemplate } from "./card-identities.js";
+import { resolvePresentationFor } from "./card-copy.js";
+import { isCardPageSize } from "./card-settings.js";
+import { clearDocumentMetadata } from "./document-metadata.js";
+import { PDFDocument } from "pdf-lib";
+import type { CardContent, CardTemplate } from "./templates.js";
 
 export interface CardJob {
   readonly template: CardTemplate;
@@ -21,7 +21,7 @@ export interface RenderedCard {
  * A sheet size gives one page per template. A card size gives one page per card.
  */
 export async function renderCards(jobs: readonly CardJob[]): Promise<Uint8Array> {
-  if (jobs.length === 0) throw new Error('No approved card templates are installed yet.');
+  if (jobs.length === 0) throw new Error("No approved card templates are installed yet.");
   const presentation = resolvePresentationFor(jobs[0]!.content);
   const profile = resolveIdentityFor(jobs[0]!.content, sectorForTemplate(jobs[0]!.template.id));
   const pages: Uint8Array[] = [];
@@ -34,16 +34,16 @@ export async function renderCards(jobs: readonly CardJob[]): Promise<Uint8Array>
       profile: { ...profile, ...content.profile },
       cardQr: content.cardQr === true,
     };
-    if (resolved.kind === 'colors' && isCardPageSize(resolved.pageSize)) {
+    if (resolved.kind === "colors" && isCardPageSize(resolved.pageSize)) {
       if (resolved.cardQr)
         throw new Error(
-          'A QR code is printed on a sheet only. Choose the A6 or A4 size for a QR code; separate cards never carry one.',
+          "A QR code is printed on a sheet only. Choose the A6 or A4 size for a QR code; separate cards never carry one.",
         );
       for (const card of await renderIndividualCards(template, resolved)) pages.push(card.bytes);
       continue;
     }
     // Without a page size every template uses the A6 sheet.
-    const bytes = await template.render({ ...resolved, pageSize: resolved.pageSize ?? 'a6' });
+    const bytes = await template.render({ ...resolved, pageSize: resolved.pageSize ?? "a6" });
     const source = await PDFDocument.load(bytes);
     if (source.getPageCount() === 0)
       throw new Error(`Template ${template.id} rendered an empty document.`);
@@ -69,12 +69,12 @@ export async function renderIndividualCards(
   template: CardTemplate,
   content: CardContent,
 ): Promise<RenderedCard[]> {
-  if (content.kind !== 'colors' || !template.renderIndividual)
-    throw new Error('This template does not support individual business cards.');
-  if (!content.colors.length) throw new Error('The card collection is empty.');
+  if (content.kind !== "colors" || !template.renderIndividual)
+    throw new Error("This template does not support individual business cards.");
+  if (!content.colors.length) throw new Error("The card collection is empty.");
   if (content.pageSize !== undefined && !isCardPageSize(content.pageSize))
     throw new Error(
-      'Separate cards have the business size. Choose the business size, or leave the size out.',
+      "Separate cards have the business size. Choose the business size, or leave the size out.",
     );
   const resolvedContent: CardContent = {
     ...content,
@@ -86,10 +86,10 @@ export async function renderIndividualCards(
   const count = Math.ceil(content.colors.length / perCard);
   const cards: RenderedCard[] = [];
   for (let index = 0; index < count; index++) {
-    const code = content.colors[index * perCard]!.replace(/^#/u, '').toUpperCase();
-    if (!/^[0-9A-F]{6}$/u.test(code)) throw new Error('Invalid RGB reference.');
+    const code = content.colors[index * perCard]!.replace(/^#/u, "").toUpperCase();
+    if (!/^[0-9A-F]{6}$/u.test(code)) throw new Error("Invalid RGB reference.");
     cards.push({
-      name: `${String(index + 1).padStart(2, '0')}-${code}`,
+      name: `${String(index + 1).padStart(2, "0")}-${code}`,
       bytes: await template.renderIndividual(resolvedContent, index),
     });
   }

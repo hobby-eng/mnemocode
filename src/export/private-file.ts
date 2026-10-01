@@ -1,5 +1,5 @@
-import { link, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { link, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 
 /**
  * Replace an export only after its complete contents have been written privately.
@@ -9,10 +9,10 @@ import { dirname, join, resolve } from 'node:path';
  */
 export async function replacePrivateFile(path: string, bytes: Uint8Array): Promise<void> {
   const destination = resolve(path);
-  const staging = await mkdtemp(join(dirname(destination), '.mnemocode-export-'));
+  const staging = await mkdtemp(join(dirname(destination), ".mnemocode-export-"));
   try {
-    const temporary = join(staging, 'document');
-    await writeFile(temporary, bytes, { flag: 'wx', mode: 0o600 });
+    const temporary = join(staging, "document");
+    await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
     await rename(temporary, destination);
   } finally {
     await rm(staging, { recursive: true, force: true });
@@ -20,7 +20,7 @@ export async function replacePrivateFile(path: string, bytes: Uint8Array): Promi
 }
 
 /** Errors of file systems that cannot make hard links, such as FAT and exFAT. */
-const NO_HARD_LINKS = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS']);
+const NO_HARD_LINKS = new Set(["EPERM", "ENOTSUP", "EOPNOTSUPP", "ENOSYS"]);
 
 /**
  * Create a new export only after its complete contents have been written privately, and never
@@ -32,15 +32,15 @@ const NO_HARD_LINKS = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS']);
  */
 export async function publishNewPrivateFile(path: string, bytes: Uint8Array): Promise<void> {
   const destination = resolve(path);
-  const staging = await mkdtemp(join(dirname(destination), '.mnemocode-export-'));
+  const staging = await mkdtemp(join(dirname(destination), ".mnemocode-export-"));
   try {
-    const temporary = join(staging, 'document');
-    await writeFile(temporary, bytes, { flag: 'wx', mode: 0o600 });
+    const temporary = join(staging, "document");
+    await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
     try {
       await link(temporary, destination);
     } catch (error) {
-      if (!NO_HARD_LINKS.has((error as NodeJS.ErrnoException).code ?? '')) throw error;
-      await writeFile(destination, new Uint8Array(), { flag: 'wx', mode: 0o600 });
+      if (!NO_HARD_LINKS.has((error as NodeJS.ErrnoException).code ?? "")) throw error;
+      await writeFile(destination, new Uint8Array(), { flag: "wx", mode: 0o600 });
       try {
         await rename(temporary, destination);
       } catch (renameError) {

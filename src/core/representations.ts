@@ -6,16 +6,16 @@ import {
   WORD_COUNT_SET,
   canonicalEnglishWords,
   unicodeHex,
-} from './words.js';
+} from "./words.js";
 import {
   colorsToIndexes,
   indexesToColors,
   parseColors,
   colorsToUnicode,
   unicodeToColors,
-} from './colors.js';
-import { formatDate } from './dates.js';
-import type { EncodedResult, OutputFormat, DateShiftDate } from './types.js';
+} from "./colors.js";
+import { formatDate } from "./dates.js";
+import type { EncodedResult, OutputFormat, DateShiftDate } from "./types.js";
 
 export function resultFromIndexes(
   words: readonly string[],
@@ -24,7 +24,7 @@ export function resultFromIndexes(
   shifts: readonly number[],
 ): EncodedResult {
   return {
-    sourceMnemonic: words.join(' '),
+    sourceMnemonic: words.join(" "),
     shiftedIndexes,
     shiftedEnglish: shiftedIndexes.map((index) => englishWordlist[index]!),
     unicodeCodePoints: shiftedIndexes.map((index) =>
@@ -35,29 +35,29 @@ export function resultFromIndexes(
   };
 }
 
-export function parseInput(value: string, format: Exclude<OutputFormat, 'json'>): number[] {
+export function parseInput(value: string, format: Exclude<OutputFormat, "json">): number[] {
   switch (format) {
-    case 'english':
+    case "english":
       return canonicalEnglishWords(value).map((word) => ENGLISH_INDEX.get(word)!);
-    case 'indexes': {
+    case "indexes": {
       const items = value
         .trim()
         .split(/[\s,]+/u)
         .filter(Boolean);
       if (items.some((item) => !/^\d+$/u.test(item))) {
-        throw new Error('Indexes must be decimal integers from 1 through 2048.');
+        throw new Error("Indexes must be decimal integers from 1 through 2048.");
       }
       const indexes = items.map((item) => Number(item));
       if (indexes.some((index) => !Number.isInteger(index) || index < 1 || index > 2048)) {
-        throw new Error('Indexes use Seedshift-compatible numbering from 1 through 2048.');
+        throw new Error("Indexes use Seedshift-compatible numbering from 1 through 2048.");
       }
       return indexes.map((index) => index - 1);
     }
-    case 'unicode': {
-      const compact = value.replace(/\s+/gu, '').toUpperCase();
+    case "unicode": {
+      const compact = value.replace(/\s+/gu, "").toUpperCase();
       if (!/^[0-9A-F]+$/u.test(compact) || compact.length % 4 !== 0) {
         throw new Error(
-          'Unicode input must be four-digit hexadecimal code points, separated by spaces or joined.',
+          "Unicode input must be four-digit hexadecimal code points, separated by spaces or joined.",
         );
       }
       return Array.from({ length: compact.length / 4 }, (_, index) =>
@@ -71,19 +71,19 @@ export function parseInput(value: string, format: Exclude<OutputFormat, 'json'>)
         return wordIndex;
       });
     }
-    case 'colors':
+    case "colors":
       return colorsToIndexes(parseColors(value));
-    case 'colors-unicode':
+    case "colors-unicode":
       return colorsToIndexes(unicodeToColors(value));
     default:
       throw new Error(`Unsupported input format: ${String(format)}.`);
   }
 }
 
-const DETECTABLE_FORMATS = ['english', 'indexes', 'unicode', 'colors', 'colors-unicode'] as const;
+const DETECTABLE_FORMATS = ["english", "indexes", "unicode", "colors", "colors-unicode"] as const;
 
 /** Returns every raw representation parser that accepts a complete standard-length record. */
-export function detectInputFormats(value: string): Array<Exclude<OutputFormat, 'json'>> {
+export function detectInputFormats(value: string): Array<Exclude<OutputFormat, "json">> {
   return DETECTABLE_FORMATS.filter((format) => {
     try {
       const indexes = parseInput(value, format);
@@ -96,25 +96,25 @@ export function detectInputFormats(value: string): Array<Exclude<OutputFormat, '
 
 export function formatEncoded(result: EncodedResult, format: OutputFormat): string {
   switch (format) {
-    case 'english':
-      return result.shiftedEnglish.join(' ');
-    case 'indexes':
-      return result.shiftedIndexes.map((index) => String(index + 1)).join(' ');
-    case 'unicode':
-      return result.unicodeCodePoints.join('');
-    case 'colors':
-      return indexesToColors(result.shiftedIndexes).join(' ');
-    case 'colors-unicode':
+    case "english":
+      return result.shiftedEnglish.join(" ");
+    case "indexes":
+      return result.shiftedIndexes.map((index) => String(index + 1)).join(" ");
+    case "unicode":
+      return result.unicodeCodePoints.join("");
+    case "colors":
+      return indexesToColors(result.shiftedIndexes).join(" ");
+    case "colors-unicode":
       return colorsToUnicode(indexesToColors(result.shiftedIndexes));
-    case 'json':
+    case "json":
       return JSON.stringify(
         {
-          algorithm: 'Seedshift-compatible date shift',
+          algorithm: "Seedshift-compatible date shift",
           dates: result.dates.map(formatDate),
           shifts: result.shifts,
           english: result.shiftedEnglish,
           indexes: result.shiftedIndexes.map((index) => index + 1),
-          unicodeCodePoints: result.unicodeCodePoints.join(''),
+          unicodeCodePoints: result.unicodeCodePoints.join(""),
         },
         null,
         2,

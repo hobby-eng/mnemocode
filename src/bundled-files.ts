@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import { getAsset, isSea } from 'node:sea';
+import { readFile } from "node:fs/promises";
+import { getAsset, isSea } from "node:sea";
 
 /**
  * Reads a file that ships with MnemoCode, such as card artwork, the SSKR engine or the public

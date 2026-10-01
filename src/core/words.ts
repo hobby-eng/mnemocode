@@ -1,12 +1,12 @@
-import { validateMnemonic } from '@scure/bip39';
-import { wordlist as englishWordlist } from '@scure/bip39/wordlists/english.js';
-import { wordlist as traditionalChineseWordlist } from '@scure/bip39/wordlists/traditional-chinese.js';
+import { validateMnemonic } from "@scure/bip39";
+import { wordlist as englishWordlist } from "@scure/bip39/wordlists/english.js";
+import { wordlist as traditionalChineseWordlist } from "@scure/bip39/wordlists/traditional-chinese.js";
 import {
   BIP39_WORD_COUNTS,
   type Bip39WordCount,
   type MappingRow,
   type MissingWordCandidate,
-} from './types.js';
+} from "./types.js";
 export { englishWordlist, traditionalChineseWordlist };
 
 export const BIP39_INDEX_BITS = 11;
@@ -15,9 +15,9 @@ export const BIP39_DICTIONARY_SIZE = 2 ** BIP39_INDEX_BITS;
 export function validatedEnglishWords(mnemonic: string): string[] {
   const words = canonicalEnglishWords(mnemonic);
   assertWordCount(words.length);
-  if (!validateMnemonic(words.join(' '), englishWordlist)) {
+  if (!validateMnemonic(words.join(" "), englishWordlist)) {
     throw new Error(
-      'The source mnemonic has an invalid BIP39 checksum. Check the words and their order before encoding.',
+      "The source mnemonic has an invalid BIP39 checksum. Check the words and their order before encoding.",
     );
   }
   return words;
@@ -33,9 +33,9 @@ export const UNICODE_INDEX = new Map(
 );
 
 export function canonicalEnglishWords(mnemonic: string): string[] {
-  const words = mnemonic.normalize('NFKD').trim().toLowerCase().split(/\s+/u).filter(Boolean);
+  const words = mnemonic.normalize("NFKD").trim().toLowerCase().split(/\s+/u).filter(Boolean);
   if (!WORD_COUNT_SET.has(words.length)) {
-    throw new Error('Enter 12, 15, 18, 21, or 24 English BIP39 words.');
+    throw new Error("Enter 12, 15, 18, 21, or 24 English BIP39 words.");
   }
   for (const [position, word] of words.entries()) {
     if (!ENGLISH_INDEX.has(word)) {
@@ -46,19 +46,19 @@ export function canonicalEnglishWords(mnemonic: string): string[] {
 }
 
 export function assertWordCount(count: number): asserts count is Bip39WordCount {
-  if (!WORD_COUNT_SET.has(count)) throw new Error('Expected 12, 15, 18, 21, or 24 word indexes.');
+  if (!WORD_COUNT_SET.has(count)) throw new Error("Expected 12, 15, 18, 21, or 24 word indexes.");
 }
 
 export function unicodeHex(symbol: string): string {
   const points = Array.from(symbol);
   if (points.length !== 1)
-    throw new Error('The selected mapped BIP39 character is not one Unicode scalar value.');
-  return points[0]!.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0');
+    throw new Error("The selected mapped BIP39 character is not one Unicode scalar value.");
+  return points[0]!.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0");
 }
 
 export function mappingRow(index: number): MappingRow {
   if (!Number.isInteger(index) || index < 1 || index > BIP39_DICTIONARY_SIZE)
-    throw new Error('A wordlist index must be from 1 through 2048.');
+    throw new Error("A wordlist index must be from 1 through 2048.");
   const zeroBased = index - 1;
   return {
     index,
@@ -72,15 +72,15 @@ export function allMappingRows(): MappingRow[] {
 }
 
 export function recoverMissingWord(value: string): MissingWordCandidate[] {
-  const words = value.normalize('NFKD').trim().toLowerCase().split(/\s+/u).filter(Boolean);
+  const words = value.normalize("NFKD").trim().toLowerCase().split(/\s+/u).filter(Boolean);
   if (!WORD_COUNT_SET.has(words.length)) {
-    throw new Error('Enter 12, 15, 18, 21, or 24 English BIP39 words with one ? placeholder.');
+    throw new Error("Enter 12, 15, 18, 21, or 24 English BIP39 words with one ? placeholder.");
   }
-  const missing = words.flatMap((word, index) => (word === '?' ? [index] : []));
+  const missing = words.flatMap((word, index) => (word === "?" ? [index] : []));
   if (missing.length !== 1)
-    throw new Error('Enter exactly one ? placeholder for the forgotten BIP39 word.');
+    throw new Error("Enter exactly one ? placeholder for the forgotten BIP39 word.");
   for (const [position, word] of words.entries()) {
-    if (word !== '?' && !ENGLISH_INDEX.has(word))
+    if (word !== "?" && !ENGLISH_INDEX.has(word))
       throw new Error(`Unknown English BIP39 word at position ${position + 1}.`);
   }
   const missingIndex = missing[0]!;
@@ -93,12 +93,12 @@ function recoverWordAt(words: readonly string[], missingIndex: number): MissingW
   for (const [index, word] of englishWordlist.entries()) {
     const candidateWords = [...words];
     candidateWords[missingIndex] = word;
-    const mnemonic = candidateWords.join(' ');
+    const mnemonic = candidateWords.join(" ");
     if (!validateMnemonic(mnemonic, englishWordlist)) continue;
     const indexes = candidateWords.map((candidate) => ENGLISH_INDEX.get(candidate)!);
     const bitStream = indexes
-      .map((candidate) => candidate.toString(2).padStart(BIP39_INDEX_BITS, '0'))
-      .join('');
+      .map((candidate) => candidate.toString(2).padStart(BIP39_INDEX_BITS, "0"))
+      .join("");
     candidates.push({
       position: missingIndex + 1,
       word,
@@ -123,7 +123,7 @@ export function recoverLegacyValidLastWords(value: string): MissingWordCandidate
   const finalIndex = ENGLISH_INDEX.get(words[finalPosition]!)!;
   const legacyEntropyTail = finalIndex >> checksumLength;
   const incomplete = [...words];
-  incomplete[finalPosition] = '?';
+  incomplete[finalPosition] = "?";
   return recoverWordAt(incomplete, finalPosition).map((candidate) => ({
     ...candidate,
     preservesLegacyEntropy: (candidate.wordIndex - 1) >> checksumLength === legacyEntropyTail,
