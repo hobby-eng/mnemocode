@@ -368,9 +368,11 @@ A collection sheet names a design studio. It is separate from the employer print
 
 ## Versioned records and legacy compatibility
 
-A file written with `--output PATH` starts with a header: `MNC1:<mode>:<format>:<data>`. The header records the mode (`direct`, `seedshift`, `seedshift-legacy` or `seedshift-legacy-valid`) and the format, so you do not have to remember them. Dates are never stored. If `--mode` or `--format` contradicts the header, MnemoCode stops.
+A file written by `encode --output PATH` starts with a header: `MNC1:<mode>:<format>:<data>`. The header records the mode (`direct`, `seedshift`, `seedshift-legacy` or `seedshift-legacy-valid`) and the format, so you do not have to remember them. Dates are never stored. If `--mode` or `--format` contradicts the header, MnemoCode stops.
 
 Terminal output, typed text and QR codes have no header. Give the original `--mode` when you decode them.
+
+`encode --sskr --output` writes no `MNC1` record: the file holds the SSKR shares themselves, one `ur:sskr/…` share per line. See [Shamir secret sharing (SSKR)](docs/SSKR.md).
 
 The library decodes text. Reading a QR image is a function of the command-line program.
 
