@@ -72,7 +72,7 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `iana-time-zone` | 0.1.65 | MIT OR Apache-2.0 |
 | `iana-time-zone-haiku` | 0.1.2 | MIT OR Apache-2.0 |
 | `inout` | 0.1.4 | MIT OR Apache-2.0 |
-| `js-sys` | 0.3.105 | MIT OR Apache-2.0 |
+| `js-sys` | 0.3.106 | MIT OR Apache-2.0 |
 | `lazy_static` | 1.5.0 | MIT OR Apache-2.0 |
 | `libc` | 0.2.189 | MIT OR Apache-2.0 |
 | `log` | 0.4.34 | MIT OR Apache-2.0 |
@@ -99,7 +99,7 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `rand` | 0.9.5 | MIT OR Apache-2.0 |
 | `rand_chacha` | 0.9.0 | MIT OR Apache-2.0 |
 | `rand_core` | 0.6.4 | MIT OR Apache-2.0 |
-| `rand_core` | 0.9.3 | MIT OR Apache-2.0 |
+| `rand_core` | 0.9.5 | MIT OR Apache-2.0 |
 | `rand_xoshiro` | 0.6.0 | MIT OR Apache-2.0 |
 | `rand_xoshiro` | 0.7.0 | MIT OR Apache-2.0 |
 | `recovery-sskr-wasm` | 0.1.5 | MIT OR Apache-2.0 (MIT text included in LICENSE) |
@@ -135,10 +135,10 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `version_check` | 0.9.5 | MIT OR Apache-2.0 |
 | `wasi` | 0.11.1+wasi-snapshot-preview1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | `wasip2` | 1.0.4+wasi-0.2.12 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
-| `wasm-bindgen` | 0.2.128 | MIT OR Apache-2.0 |
-| `wasm-bindgen-macro` | 0.2.128 | MIT OR Apache-2.0 |
-| `wasm-bindgen-macro-support` | 0.2.128 | MIT OR Apache-2.0 |
-| `wasm-bindgen-shared` | 0.2.128 | MIT OR Apache-2.0 |
+| `wasm-bindgen` | 0.2.129 | MIT OR Apache-2.0 |
+| `wasm-bindgen-macro` | 0.2.129 | MIT OR Apache-2.0 |
+| `wasm-bindgen-macro-support` | 0.2.129 | MIT OR Apache-2.0 |
+| `wasm-bindgen-shared` | 0.2.129 | MIT OR Apache-2.0 |
 | `windows-core` | 0.62.2 | MIT OR Apache-2.0 |
 | `windows-implement` | 0.60.2 | MIT OR Apache-2.0 |
 | `windows-interface` | 0.59.3 | MIT OR Apache-2.0 |
@@ -149,7 +149,7 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `x25519-dalek` | 2.0.1 | BSD-3-Clause |
 | `zerocopy` | 0.8.57 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | `zerocopy-derive` | 0.8.57 | BSD-2-Clause OR Apache-2.0 OR MIT |
-| `zeroize` | 1.8.2 | Apache-2.0 OR MIT |
+| `zeroize` | 1.9.0 | Apache-2.0 OR MIT |
 | `zeroize_derive` | 1.5.0 | MIT OR Apache-2.0 |
 
 ## Blockchain Commons BSD-2-Clause-Patent notice
