@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const terminal = vi.hoisted(() => ({ open: vi.fn(), close: vi.fn(), spawn: vi.fn() }));
 vi.mock('node:fs', async () => ({
   ...(await vi.importActual('node:fs')),
@@ -11,9 +11,17 @@ vi.mock('node:child_process', async () => ({
 }));
 import { askSecret } from '../src/cli/input.js';
 
+const realPlatform = process.platform;
+function reportPlatform(platform: NodeJS.Platform): void {
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+}
+
 describe('hidden input controlling terminal', () => {
+  afterEach(() => reportPlatform(realPlatform));
   beforeEach(() => {
     vi.resetAllMocks();
+    // The prompt program exists only on Linux; these cases test the Linux path on every system.
+    reportPlatform('linux');
     terminal.open.mockReturnValue(42);
     terminal.spawn.mockReturnValue({ status: 0, stdout: 'test-only\n' });
   });
@@ -44,4 +52,15 @@ describe('hidden input controlling terminal', () => {
     expect(() => askSecret('Mnemonic:')).toThrow(message);
     expect(terminal.close).toHaveBeenCalledWith(42);
   });
+  it.each(['win32', 'darwin'] as const)(
+    'AUD-005-UI001: says on %s that hidden input is Linux-only, before opening a terminal',
+    (platform) => {
+      reportPlatform(platform);
+      expect(() => askSecret('Mnemonic:')).toThrow(
+        'Hidden input (--ask-secrets) works on Linux only',
+      );
+      expect(terminal.open).not.toHaveBeenCalled();
+      expect(terminal.spawn).not.toHaveBeenCalled();
+    },
+  );
 });

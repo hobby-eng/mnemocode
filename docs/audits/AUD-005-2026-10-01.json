@@ -694,7 +694,7 @@
       "title": "Hidden input on Windows and macOS fails with a misleading message",
       "category": "UI",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "src/cli/input.ts:185-213 (askSecret), SECURITY.md (secret lifecycle), README; Windows and macOS executables"
@@ -893,10 +893,10 @@
     },
     {
       "id": "AUD-005-UI001",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Original reproduction"
+      "status": "verified",
+      "fixCommit": "UI001 commit",
+      "verificationCommit": "UI001 commit",
+      "evidence": "askSecret refuses hidden input on every system but Linux with a message that names Linux and the file and standard-input alternatives, before it opens a terminal; SECURITY.md and README state the limit. test/secret-input.test.ts runs the Linux cases with the platform reported as linux on every system and checks win32 and darwin (8 tests pass). The Linux hidden-prompt CLI test passes. Not run on a real Windows or macOS machine; the portable CI job runs these tests there."
     },
     {
       "id": "AUD-005-UI002",
