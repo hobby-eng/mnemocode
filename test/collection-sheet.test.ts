@@ -146,7 +146,7 @@ describe("single-page design studies", () => {
     60_000,
   );
 
-  it("puts the light glass cards on a light sheet and every other card on the dark sheet", async () => {
+  it("puts glass cards on a light sheet, business cards and enclosures on the dark one, other materials on their own backdrop", async () => {
     // The first thing drawn on a sheet is its background, a rectangle over the whole page.
     const background = async (id: string) => {
       const template = cardTemplates.find((item) => item.id === id)!;
@@ -157,8 +157,16 @@ describe("single-page design studies", () => {
     };
     for (const id of ["business-glass-4in1", "business-glass-6in1", "business-glass-8in1"])
       expect(await background(id), id).toBe("0.78 0.81 0.85");
-    for (const id of ["business-it", "business-architect", "material-tile"])
+    for (const id of ["business-it", "business-architect", "material-enclosure"])
       expect(await background(id), id).toBe("0.043 0.047 0.059");
+    // A showroom, a concrete wall, a tiled wall and an oak floor, each painted over its base colour.
+    const backdrops = {
+      "material-vehicle": "0.86 0.87 0.88",
+      "material-switch": "0.8 0.79 0.765",
+      "material-tile": "0.93 0.92 0.9",
+      "material-kitchen": "0.86 0.8 0.71",
+    };
+    for (const [id, base] of Object.entries(backdrops)) expect(await background(id), id).toBe(base);
   }, 60_000);
 
   it("fails instead of creating a QR-only back when physical constraints cannot be met", () => {

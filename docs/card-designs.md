@@ -5,9 +5,9 @@ Sixteen templates are included; `mnemocode preview --list` prints their names. T
 ## Collection sheets
 
 - A sheet shows the studio name and the line `DESIGN STUDY / FOR SELECTION` centred at the top, numbered samples with their references, and one line at the bottom with the slogan and the series reference.
-- A world map lies behind the samples. The page is dark; for light cards it is light.
+- Business cards lie on a dark page with a world map, light cards on a light one. Material samples lie on a backdrop of their own setting.
 - Each Shamir share has its own sheet and its own series reference.
-- Material sheets also show names of finishes, which are decoration.
+- Material sheets also show names of finishes, which are decoration. Two different codes never get the same sample on one sheet.
 
 ## QR code
 
@@ -17,7 +17,7 @@ Sixteen templates are included; `mnemocode preview --list` prints their names. T
 
 ## Artwork
 
-Backgrounds are pictures stored in the program. Text, reference codes and the QR code are drawn as shapes, not as pixels, so they stay sharp in print.
+Photographs of cards and materials are stored in the program; the colour of a material sample is laid over its photograph. Page backdrops, text, reference codes and the QR code are drawn as shapes, not as pixels, so they stay sharp in print.
 
 ## Example titles
 
