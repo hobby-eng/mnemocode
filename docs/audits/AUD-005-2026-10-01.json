@@ -384,6 +384,70 @@
         "logSha256": "1cf8bdb4592ccc3745671dd88135fa4597fa20822a273e317eb314b7b435844a"
       },
       {
+        "label": "fix-release-build-local",
+        "command": [
+          "node",
+          "scripts/build-executable.mjs",
+          "docs/audits/AUD-005-evidence/executable-fixed"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:43:10.003945Z",
+        "endedAt": "2026-10-01T11:43:15.552305Z",
+        "exitCode": 0,
+        "logSha256": "f1d6fcb0fddecfff666dfece2c5b471d17e6bbe31f426aa46162857b932746e9"
+      },
+      {
+        "label": "fix-release-build",
+        "command": [
+          "pnpm",
+          "build:executable"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:41:52.285359Z",
+        "endedAt": "2026-10-01T11:42:19.265154Z",
+        "exitCode": 0,
+        "logSha256": "2aee3ef8f24a8424761051eca1e75b71b4b04dc88fd3e207068cf5bca947c25a"
+      },
+      {
+        "label": "fix-release-licenses-linux",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/bundled-licenses.mjs",
+          "docs/audits/AUD-005-evidence/executable-fixed"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:43:46.739635Z",
+        "endedAt": "2026-10-01T11:43:47.141881Z",
+        "exitCode": 0,
+        "logSha256": "becd4c5b267ac23a7e3a251b0bb523f288b644ef805cf00cc2d16d24f00ae2f8"
+      },
+      {
+        "label": "fix-release-licenses",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/bundled-licenses.mjs",
+          "docs/audits/AUD-005-evidence/executable-fixed"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:43:37.169796Z",
+        "endedAt": "2026-10-01T11:43:37.494391Z",
+        "exitCode": 1,
+        "logSha256": "70a96b93cd1cbcafde8923026158d55ec1c4f8241ce2901504a9b99e740555ec"
+      },
+      {
+        "label": "fix-release-verify-local",
+        "command": [
+          "node",
+          "scripts/verify-executable.mjs",
+          "docs/audits/AUD-005-evidence/executable-fixed"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:43:15.627959Z",
+        "endedAt": "2026-10-01T11:43:37.104732Z",
+        "exitCode": 0,
+        "logSha256": "73cae2d29fc39e4eb4d0170c317f88ba89ce8d9a1821003aae2a67640bf93b6d"
+      },
+      {
         "label": "format",
         "command": [
           "pnpm",
@@ -605,7 +669,7 @@
       "title": "Executable releases carry no license notices for Node.js and the bundled packages",
       "category": "BLD",
       "severity": "low",
-      "status": "open",
+      "status": "fixed",
       "releaseBlocking": false,
       "affectedFiles": [
         "scripts/build-executable.mjs, .github/workflows/executable.yml (publishes only mnemocode-* and SHA256SUMS), every executable"
@@ -627,7 +691,7 @@
       "title": "The executable check fails when the release folder holds the other systems' files",
       "category": "BLD",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "scripts/verify-executable.mjs:16-24; pnpm build:executable"
@@ -865,17 +929,17 @@
     },
     {
       "id": "AUD-005-BLD002",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Original reproduction"
+      "status": "fixed",
+      "fixCommit": "release commit",
+      "verificationCommit": "release commit (Linux)",
+      "evidence": "scripts/build-executable.mjs writes mnemocode-<version>-<system>-<processor>-licenses.txt next to each executable (scripts/executable-notices.mjs): MnemoCode LICENSE, NOTICE and THIRD_PARTY_NOTICES, the Node.js LICENSE of the building runtime, the license files of all 18 bundled npm package versions (from the esbuild metafile; @pdf-lib/fontkit publishes none and is named with its declared MIT license, author and source), the SSKR notices and the font and map notices. Its hash joins SHA256SUMS and the release publishes it with the executable. On Linux: bundled-licenses.mjs passes (no gaps), verify-executable.mjs checks the file, and two builds wrote identical notices (ba2bcc6e…). Fixed, not verified: the Windows and macOS builds and a tagged release were not run; they depend on the Node.js LICENSE being next to the CI runtime."
     },
     {
       "id": "AUD-005-BLD003",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Original reproduction"
+      "status": "verified",
+      "fixCommit": "release commit",
+      "verificationCommit": "release commit",
+      "evidence": "verify-executable.mjs selects this system's executable in a folder by the name rule it now shares with the build (scripts/executable-files.mjs). With the macOS and Windows names present beside the Linux build, it passed all seven checks; pnpm build:executable passes in the same situation."
     },
     {
       "id": "AUD-005-BLD004",
