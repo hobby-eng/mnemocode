@@ -2,7 +2,7 @@
 // checkout, and checks that it works on its own: version, full self-test, a seedshift encoding,
 // a Shamir split and recovery, a card PDF and the help. Public test data only.
 //
-//   node scripts/verify-executable.mjs [executable or its folder]   (default dist/executable)
+//   node scripts/verify-executable.mjs [executable or its folder]   (default release)
 
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -24,7 +24,7 @@ function findExecutable(path) {
   return join(path, found[0]);
 }
 
-const executable = findExecutable(resolve(process.argv[2] ?? join(root, 'dist', 'executable')));
+const executable = findExecutable(resolve(process.argv[2] ?? join(root, 'release')));
 
 /** The public BIP39 test phrase, and its seedshift encoding with the date 23-09-2026. */
 const TEST_PHRASE =
