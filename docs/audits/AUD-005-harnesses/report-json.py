@@ -85,6 +85,9 @@ for block in re.split(r"\n#### ", section("### Findings", "### Remediation and f
 
 remediation = []
 for row in table_rows(section("### Remediation and follow-up", "### Informational observations")):
+    # The section also holds the table of final checks; only finding rows belong here.
+    if not row[0].startswith("AUD-005-"):
+        continue
     remediation.append(
         {
             "id": row[0],

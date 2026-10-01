@@ -359,6 +359,160 @@
         "logSha256": "70f51d16f261e9a4fed34574a959906554ef939fb253aba309d8703f06fdceea"
       },
       {
+        "label": "final-build",
+        "command": [
+          "pnpm",
+          "build"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:46:03.662694Z",
+        "endedAt": "2026-10-01T11:46:04.952721Z",
+        "exitCode": 0,
+        "logSha256": "55c2ff9c5fa38028a0fa4af1616a3abca6153a0b1a18b3dd1f5c8dff754f95d7"
+      },
+      {
+        "label": "final-card-output",
+        "command": [
+          "node",
+          "scripts/check-card-output.mjs",
+          "docs/audits/AUD-005-evidence/final-card-output"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:47:15.307847Z",
+        "endedAt": "2026-10-01T11:49:17.555009Z",
+        "exitCode": 0,
+        "logSha256": "568adc34e856d38f8f0a88f88c2eb6fd1f049edf0fba9a7d56debcd9c9f1bfc8"
+      },
+      {
+        "label": "final-defect-probes",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/defect-probes.mjs",
+          "--fixed"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:46:11.789750Z",
+        "endedAt": "2026-10-01T11:46:19.082597Z",
+        "exitCode": 0,
+        "logSha256": "4dd37cd4c80e88959d072a3f18c2589f7639a4a27b5de24648c0c149b1534684"
+      },
+      {
+        "label": "final-dependencies",
+        "command": [
+          "pnpm",
+          "audit",
+          "--audit-level",
+          "high"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:49:17.637120Z",
+        "endedAt": "2026-10-01T11:49:19.504152Z",
+        "exitCode": 0,
+        "logSha256": "15950a68a7ed99c59779717acefdceb3f69cfd31bde67d2c954f2a3cea4d7955"
+      },
+      {
+        "label": "final-format",
+        "command": [
+          "pnpm",
+          "format:check"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:45:59.211884Z",
+        "endedAt": "2026-10-01T11:46:02.100185Z",
+        "exitCode": 0,
+        "logSha256": "987661d85a3675ec39dab24ff69f07ac20c93dd8a43ca2423b58c0fb61652a05"
+      },
+      {
+        "label": "final-oracle",
+        "command": [
+          "python3",
+          "docs/audits/AUD-005-harnesses/seedshift-oracle.py"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:46:19.133809Z",
+        "endedAt": "2026-10-01T11:46:22.366928Z",
+        "exitCode": 0,
+        "logSha256": "0a553a0fcf02514e0e8a491d77e232478c3d1ede1f6dfd8a3aba6ab3b7d9109c"
+      },
+      {
+        "label": "final-readme-examples",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/readme-examples.mjs"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:46:22.415269Z",
+        "endedAt": "2026-10-01T11:47:11.752436Z",
+        "exitCode": 0,
+        "logSha256": "82a044dcbc6c62388ed9d837ae4f2c27ef86072caa9fa948e4d6f67728142fc2"
+      },
+      {
+        "label": "final-self-test-case-rerun",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "test/cli.test.ts",
+          "-t",
+          "extended self-test"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:52:18.421572Z",
+        "endedAt": "2026-10-01T11:52:28.403421Z",
+        "exitCode": 0,
+        "logSha256": "db7075c692cbf26ebdde6a8dddb1076071e29d149f72c736d16b331da636e2f2"
+      },
+      {
+        "label": "final-self-test",
+        "command": [
+          "node",
+          "dist/mnemocode.js",
+          "self-test"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:46:05.020644Z",
+        "endedAt": "2026-10-01T11:46:11.714708Z",
+        "exitCode": 0,
+        "logSha256": "81ab4b7f9214b3b6aacfebcaed7202265cb2c21bc0a154ab6c67e13d634a2854"
+      },
+      {
+        "label": "final-sskr-integrity",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/sskr-integrity.mjs"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:47:11.799549Z",
+        "endedAt": "2026-10-01T11:47:15.255484Z",
+        "exitCode": 0,
+        "logSha256": "db42e86c38bc501957e9614fe0275d65c6c9f43290f36f665bdf60afcc2d3908"
+      },
+      {
+        "label": "final-types",
+        "command": [
+          "pnpm",
+          "check"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:46:02.153330Z",
+        "endedAt": "2026-10-01T11:46:03.593614Z",
+        "exitCode": 0,
+        "logSha256": "ce5e6ce64173a8216d0995c509896dae6affb17d7738ef120af609e97b0cfe2c"
+      },
+      {
+        "label": "final-unit-tests",
+        "command": [
+          "pnpm",
+          "test"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:49:26.881184Z",
+        "endedAt": "2026-10-01T11:51:51.143297Z",
+        "exitCode": 1,
+        "logSha256": "777ec51c7bec23def122e8c33459aaaba37e4c6fbec01943575a771370dca77a"
+      },
+      {
         "label": "fix-api-oracle",
         "command": [
           "python3",
@@ -872,9 +1026,9 @@
       "evidence": [
         "See the Markdown report section of the same ID."
       ],
-      "reproduction": "`encode --output/--pdf/--qr` and `preview --pdf` replace an existing file through a private rename; the `encode` help says so. SSKR record and PDF exports refuse an existing file. Both behaviors are deliberate and documented in the help; the README examples say \"a new file\". Recorded as accepted design; the README now states the rule.",
+      "reproduction": "`encode --output/--pdf/--qr` and `preview --pdf` replace an existing file through a private rename; the `encode` help says so. SSKR record and PDF exports refuse an existing file. Both behaviors are the owner's documented design: the `encode --output` help says \"An existing file is replaced.\" and the SSKR help says \"An existing file is never replaced.\" (`src/cli/help-pages.ts`), so the status `accepted` rests on that text, not on the auditor's judgment. The README examples said \"a new file\"; the README now states the rule (`9a7f206`).",
       "expected": "Informational; no supported contract is broken.",
-      "observed": "`encode --output/--pdf/--qr` and `preview --pdf` replace an existing file through a private rename; the `encode` help says so. SSKR record and PDF exports refuse an existing file. Both behaviors are deliberate and documented in the help; the README examples say \"a new file\". Recorded as accepted design; the README now states the rule.",
+      "observed": "`encode --output/--pdf/--qr` and `preview --pdf` replace an existing file through a private rename; the `encode` help says so. SSKR record and PDF exports refuse an existing file. Both behaviors are the owner's documented design: the `encode --output` help says \"An existing file is replaced.\" and the SSKR help says \"An existing file is never replaced.\" (`src/cli/help-pages.ts`), so the status `accepted` rests on that text, not on the auditor's judgment. The README examples said \"a new file\"; the README now states the rule (`9a7f206`).",
       "impact": "No demonstrated defect.",
       "recommendedFix": "See the observation.",
       "requiredVerification": "None for this audit."
@@ -896,91 +1050,109 @@
       "impact": "No demonstrated defect.",
       "recommendedFix": "See the observation.",
       "requiredVerification": "None for this audit."
+    },
+    {
+      "id": "AUD-005-BLD007",
+      "category": "BLD",
+      "kind": "observation",
+      "title": "The self-test CLI case has a 15-second limit, a quarter of the suite's",
+      "severity": "info",
+      "status": "deferred",
+      "releaseBlocking": false,
+      "evidence": [
+        "See the Markdown report section of the same ID."
+      ],
+      "reproduction": "Found in the final remediation run, not in the baseline. `test/cli.test.ts` gives `runs the extended self-test and reports its coverage` its own limit of 15 seconds (since the first CLI commit `c8c1821906ff894bd391eedbd5197932cb4e70bd`), while `vitest.config.ts` sets 60 seconds because hosted runners are several times slower. The case renders eleven card templates; under a load average of about 13 it took 15,035 ms and failed, and alone it passed in 8.63 seconds. No product defect was shown.",
+      "expected": "Informational; no supported contract is broken.",
+      "observed": "Found in the final remediation run, not in the baseline. `test/cli.test.ts` gives `runs the extended self-test and reports its coverage` its own limit of 15 seconds (since the first CLI commit `c8c1821906ff894bd391eedbd5197932cb4e70bd`), while `vitest.config.ts` sets 60 seconds because hosted runners are several times slower. The case renders eleven card templates; under a load average of about 13 it took 15,035 ms and failed, and alone it passed in 8.63 seconds. No product defect was shown.",
+      "impact": "No demonstrated defect.",
+      "recommendedFix": "Raising or removing the limit would make a failing run pass, which the workspace rules do not allow an audit to do, so the test is unchanged and the choice is left to the maintainer; the decisions record names the options.",
+      "requiredVerification": "None for this audit."
     }
   ],
   "remediation": [
     {
       "id": "AUD-005-SEC001",
       "status": "verified",
-      "fixCommit": "SEC001 commit",
-      "verificationCommit": "SEC001 commit",
+      "fixCommit": "41f18d0",
+      "verificationCommit": "41f18d0; final checks at 9a7f206",
       "evidence": "src/export/sskr-cards.ts creates each share's folder with mode 0700. Regression test AUD-005-SEC001 (POSIX) checks 0700 for the share folder and the export folder; it failed with 0775 before the fix. SSKR export, CLI export and share tests (30) pass."
     },
     {
       "id": "AUD-005-API001",
       "status": "verified",
-      "fixCommit": "core commit",
-      "verificationCommit": "core commit",
+      "fixCommit": "2fe749b",
+      "verificationCommit": "2fe749b; final checks at 9a7f206",
       "evidence": "src/record.ts accepts only a version without leading zeros: MNC01, MNC0001 and MNC0 are malformed, MNC2 is unsupported, MNC1 records written by serializeRecord still parse. Regression test AUD-005-API001 in test/known-audit-defects.test.ts. Oracle log after the fix is byte-identical to the baseline (0a553a0f…), so no encoded output changed."
     },
     {
       "id": "AUD-005-API002",
       "status": "verified",
-      "fixCommit": "core commit",
-      "verificationCommit": "core commit",
+      "fixCommit": "2fe749b",
+      "verificationCommit": "2fe749b; final checks at 9a7f206",
       "evidence": "One index check (assertIndexRange in src/core/seedshift.ts) now runs in all three decoders before any word lookup; 2048, -1 and 1.5 give the index message. Regression test AUD-005-API002. 145 tests in the core, boundary, word-recovery, CLI and audit files pass; self-test and the oracle (6,000 comparisons) unchanged."
     },
     {
       "id": "AUD-005-BLD001",
       "status": "fixed",
-      "fixCommit": "CI commit",
+      "fixCommit": "d7fcb25",
       "verificationCommit": null,
       "evidence": "ci.yml can now be called (workflow_call); in executable.yml a tag runs it as job verify, and release needs [verify, build]. Each build job checks on a tag that GITHUB_REF_NAME is v plus the package.json version (simulated: v0.1.0 accepted, v0.2.0 refused). Both workflows parse as YAML and pass Prettier. Fixed, not verified: GitHub has not run the changed workflows; the first tag will show it."
     },
     {
       "id": "AUD-005-BLD002",
       "status": "fixed",
-      "fixCommit": "release commit",
-      "verificationCommit": "release commit (Linux)",
+      "fixCommit": "b1d7476",
+      "verificationCommit": "b1d7476, Linux only; final checks at 9a7f206",
       "evidence": "scripts/build-executable.mjs writes mnemocode-<version>-<system>-<processor>-licenses.txt next to each executable (scripts/executable-notices.mjs): MnemoCode LICENSE, NOTICE and THIRD_PARTY_NOTICES, the Node.js LICENSE of the building runtime, the license files of all 18 bundled npm package versions (from the esbuild metafile; @pdf-lib/fontkit publishes none and is named with its declared MIT license, author and source), the SSKR notices and the font and map notices. Its hash joins SHA256SUMS and the release publishes it with the executable. On Linux: bundled-licenses.mjs passes (no gaps), verify-executable.mjs checks the file, and two builds wrote identical notices (ba2bcc6e…). Fixed, not verified: the Windows and macOS builds and a tagged release were not run; they depend on the Node.js LICENSE being next to the CI runtime."
     },
     {
       "id": "AUD-005-BLD003",
       "status": "verified",
-      "fixCommit": "release commit",
-      "verificationCommit": "release commit",
+      "fixCommit": "b1d7476",
+      "verificationCommit": "b1d7476; final checks at 9a7f206",
       "evidence": "verify-executable.mjs selects this system's executable in a folder by the name rule it now shares with the build (scripts/executable-files.mjs). With the macOS and Windows names present beside the Linux build, it passed all seven checks; pnpm build:executable passes in the same situation."
     },
     {
       "id": "AUD-005-BLD004",
       "status": "verified",
-      "fixCommit": "BLD004 commit",
-      "verificationCommit": "BLD004 commit",
+      "fixCommit": "d848421",
+      "verificationCommit": "d848421; final checks at 9a7f206",
       "evidence": ".gitignore ignores goldens/, the default output folder of scripts/check-card-output.mjs and scripts/business-goldens.mjs; git check-ignore matches goldens/current and goldens/after. CI already writes to the ignored output/."
     },
     {
       "id": "AUD-005-BLD005",
       "status": "verified",
-      "fixCommit": "BLD005 commit",
-      "verificationCommit": "BLD005 commit",
+      "fixCommit": "e034bd5",
+      "verificationCommit": "e034bd5; final checks at 9a7f206",
       "evidence": "New test/sskr-integrity.test.ts: every integrity.json entry matches its file, the manifest names exactly the files under generated/ and rust/ (a Cargo target folder excepted), and a disposable installation with one changed byte in the WASM or in the bridge refuses sskr-combine with the integrity error and prints nothing. 3 tests pass. The manifest test also guards the coming vendor/sskr refresh."
     },
     {
       "id": "AUD-005-UI001",
       "status": "verified",
-      "fixCommit": "UI001 commit",
-      "verificationCommit": "UI001 commit",
+      "fixCommit": "26760d8",
+      "verificationCommit": "26760d8; final checks at 9a7f206",
       "evidence": "askSecret refuses hidden input on every system but Linux with a message that names Linux and the file and standard-input alternatives, before it opens a terminal; SECURITY.md and README state the limit. test/secret-input.test.ts runs the Linux cases with the platform reported as linux on every system and checks win32 and darwin (8 tests pass). The Linux hidden-prompt CLI test passes. Not run on a real Windows or macOS machine; the portable CI job runs these tests there."
     },
     {
       "id": "AUD-005-UI002",
       "status": "verified",
-      "fixCommit": "UI002 commit",
-      "verificationCommit": "UI002 commit",
+      "fixCommit": "4980471",
+      "verificationCommit": "4980471; final checks at 9a7f206",
       "evidence": "src/cli/usage.ts wraps the yellow safety line at the 80-column help width and paints each line. test/help.test.ts now checks that no line of the overview (four ways to ask for it) is wider than 80 columns; 6 help tests pass."
     },
     {
       "id": "AUD-005-DOC001",
       "status": "verified",
-      "fixCommit": "docs commit",
-      "verificationCommit": "docs commit",
+      "fixCommit": "9a7f206",
+      "verificationCommit": "9a7f206; final checks at 9a7f206",
       "evidence": "README Continuous integration now lists the format check, the whole suite, the PDF/QR round trip, the Windows and macOS runs and the executable workflow with its release gate, checked against ci.yml and executable.yml; CHANGELOG names Vitest 5.0.3 (package.json) and the AUD-005 changes; ARCHITECTURE has a Single executable section for bundled-files.ts and the build, notice and verify scripts. README also states which exports replace an existing file (observation API004). pnpm format:check passes."
     },
     {
       "id": "AUD-005-DOC002",
       "status": "verified",
-      "fixCommit": "docs commit",
-      "verificationCommit": "docs commit",
+      "fixCommit": "9a7f206",
+      "verificationCommit": "9a7f206; final checks at 9a7f206",
       "evidence": "SECURITY.md now separates the hash check of a source or package installation from the single executable, where the library and its hashes are inside the file and the release SHA256SUMS is the protection; matches src/sskr/runtime.ts and src/bundled-files.ts."
     }
   ],
