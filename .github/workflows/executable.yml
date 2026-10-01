@@ -21,6 +21,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A release needs the complete CI on the tagged commit, not only the smoke checks of the
+  # executable: types, format, tests, the PDF/QR round trip and the dependency audit.
+  verify:
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/ci.yml
+
   build:
     strategy:
       fail-fast: false
@@ -38,6 +44,10 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: The tag names the version in package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: test "$GITHUB_REF_NAME" = "v$(node -p "require('./package.json').version")"
       - run: node scripts/build-executable.mjs
       - name: Run the executable on its own system
         run: node scripts/verify-executable.mjs
@@ -51,7 +61,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [verify, build]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
