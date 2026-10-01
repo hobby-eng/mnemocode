@@ -647,7 +647,7 @@
       "title": "A version tag publishes executables without the test suite or a version check",
       "category": "BLD",
       "severity": "low",
-      "status": "open",
+      "status": "fixed",
       "releaseBlocking": false,
       "affectedFiles": [
         ".github/workflows/executable.yml (release needs only build), .github/workflows/ci.yml"
@@ -922,10 +922,10 @@
     },
     {
       "id": "AUD-005-BLD001",
-      "status": "open",
-      "fixCommit": null,
+      "status": "fixed",
+      "fixCommit": "CI commit",
       "verificationCommit": null,
-      "evidence": "Static review"
+      "evidence": "ci.yml can now be called (workflow_call); in executable.yml a tag runs it as job verify, and release needs [verify, build]. Each build job checks on a tag that GITHUB_REF_NAME is v plus the package.json version (simulated: v0.1.0 accepted, v0.2.0 refused). Both workflows parse as YAML and pass Prettier. Fixed, not verified: GitHub has not run the changed workflows; the first tag will show it."
     },
     {
       "id": "AUD-005-BLD002",
