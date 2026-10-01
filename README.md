@@ -20,7 +20,7 @@ MnemoCode builds on ideas from Seedshift and BIP39Colors; see [Provenance and li
 
 ### One executable file
 
-Each release has one file for Linux, Windows and macOS that runs without Node.js or anything else installed: `mnemocode-<version>-linux-x64`, `mnemocode-<version>-win-x64.exe` and `mnemocode-<version>-macos-arm64`. Compare its SHA-256 with the release's `SHA256SUMS` once after downloading, then run it as `mnemocode`:
+Each release has one file for Linux, Windows and macOS that runs without Node.js or anything else installed: `mnemocode-<version>-linux-x64`, `mnemocode-<version>-win-x64.exe` and `mnemocode-<version>-macos-arm64`. Next to each file is a file of the same name ending in `-licenses.txt`, for example `mnemocode-0.1.0-linux-x64-licenses.txt`, with the licenses of Node.js and of every library the file contains. Compare its SHA-256 with the release's `SHA256SUMS` once after downloading, then run it as `mnemocode`:
 
 ```bash
 sha256sum --check --ignore-missing SHA256SUMS
@@ -28,7 +28,7 @@ chmod +x mnemocode-0.1.0-linux-x64
 ./mnemocode-0.1.0-linux-x64 self-test
 ```
 
-The file holds Node.js, the program, the card artwork and fonts, and the SSKR engine. Making images from cards still needs Poppler's `pdftocairo`. `--ask-secrets` works only on Linux, where it uses `systemd-ask-password`; on Windows and macOS, read secrets from a file or standard input, as below. To build the file for your own computer from a checkout, run `corepack pnpm build:executable`; it writes the file to `release/`, which `pnpm build` leaves alone, and runs it once from an empty folder.
+The file holds Node.js, the program, the card artwork and fonts, and the SSKR engine. Making images from cards still needs Poppler's `pdftocairo`. `--ask-secrets` works only on Linux, where it uses `systemd-ask-password`; on Windows and macOS, read secrets from a file or standard input, as below. To build the file for your own computer from a checkout, run `corepack pnpm build:executable`; it writes the file and its license notices to `release/`, which `pnpm build` leaves alone, and runs it once from an empty folder.
 
 ### From source
 

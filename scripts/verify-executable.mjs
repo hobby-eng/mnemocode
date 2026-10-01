@@ -1,27 +1,37 @@
 // Runs a built executable (scripts/build-executable.mjs) from an empty folder, away from the
 // checkout, and checks that it works on its own: version, full self-test, a seedshift encoding,
-// a Shamir split and recovery, a card PDF and the help. Public test data only.
+// a Shamir split and recovery, a card PDF, the help and the license notices next to it. Public test
+// data only.
 //
 //   node scripts/verify-executable.mjs [executable or its folder]   (default release)
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { executableName, noticesName } from './executable-files.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 
-/** The executable itself, or the one executable in a folder written by build-executable.mjs. */
+/**
+ * The executable itself, or in a folder the executable of this computer, by the name that
+ * build-executable.mjs gives it; the folder may also hold the files of other systems.
+ */
 function findExecutable(path) {
   if (!statSync(path).isDirectory()) return path;
-  const found = readdirSync(path).filter(
-    (name) => name.startsWith('mnemocode-') && !name.endsWith('.sha256'),
-  );
-  if (found.length !== 1)
-    throw new Error(`Expected one executable in ${path}, found ${found.length}.`);
-  return join(path, found[0]);
+  const name = executableName(version);
+  if (!readdirSync(path).includes(name)) throw new Error(`There is no ${name} in ${path}.`);
+  return join(path, name);
 }
 
 const executable = findExecutable(resolve(process.argv[2] ?? join(root, 'release')));
@@ -81,6 +91,14 @@ try {
     'draws a card PDF with its embedded artwork',
   );
   check(run('encode', '--help').includes('Usage: mnemocode encode'), 'prints the help');
+  const notices = join(dirname(executable), noticesName(basename(executable)));
+  const text = existsSync(notices) ? readFileSync(notices, 'utf8') : '';
+  check(
+    ['MnemoCode', `Node.js ${process.version}`, 'npm package', 'SSKR engine'].every((part) =>
+      text.includes(part),
+    ),
+    'has its license notices next to it',
+  );
 } finally {
   rmSync(folder, { recursive: true, force: true });
 }
