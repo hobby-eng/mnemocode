@@ -803,7 +803,7 @@
       "title": "README, CHANGELOG and ARCHITECTURE predate the CI, executable and dependency changes",
       "category": "DOC",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "README.md:499-503 (Continuous integration), CHANGELOG.md (\"Vitest 5.0.2\"), docs/ARCHITECTURE.md (no bundled-files.ts, executable scripts or workflow)"
@@ -825,7 +825,7 @@
       "title": "SECURITY.md describes the SSKR file check only for a source installation",
       "category": "DOC",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "SECURITY.md (secret lifecycle, last item); src/sskr/runtime.ts:15-17"
@@ -971,17 +971,17 @@
     },
     {
       "id": "AUD-005-DOC001",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Source comparison"
+      "status": "verified",
+      "fixCommit": "docs commit",
+      "verificationCommit": "docs commit",
+      "evidence": "README Continuous integration now lists the format check, the whole suite, the PDF/QR round trip, the Windows and macOS runs and the executable workflow with its release gate, checked against ci.yml and executable.yml; CHANGELOG names Vitest 5.0.3 (package.json) and the AUD-005 changes; ARCHITECTURE has a Single executable section for bundled-files.ts and the build, notice and verify scripts. README also states which exports replace an existing file (observation API004). pnpm format:check passes."
     },
     {
       "id": "AUD-005-DOC002",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Source comparison"
+      "status": "verified",
+      "fixCommit": "docs commit",
+      "verificationCommit": "docs commit",
+      "evidence": "SECURITY.md now separates the hash check of a source or package installation from the single executable, where the library and its hashes are inside the file and the release SHA256SUMS is the protection; matches src/sskr/runtime.ts and src/bundled-files.ts."
     }
   ],
   "limitations": [

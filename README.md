@@ -260,7 +260,7 @@ MnemoCode includes sixteen templates. `mnemocode preview --list` prints their na
 | `--cards`                      | Color cards in the terminal                            |
 | `--qr PATH`                    | A separate QR code as a PNG image                      |
 
-A file is written into a folder that already exists. `--cards-dir` and `--images-dir` create their own new folder.
+A file is written into a folder that already exists. `--output`, `--pdf` and `--qr` replace a file that already has that name; files with Shamir shares never replace one. `--cards-dir` and `--images-dir` create their own new folder.
 
 The person and the company on the cards are invented; see [Card identity defaults](docs/card-identities.md). To print your own details, use `--card-name`, `--card-role`, `--card-company`, `--card-email`, `--card-phone`, `--card-website` and `--card-location`. Names must use Latin letters; spaces, apostrophes and hyphens are allowed. Other characters and text that does not fit are reported as errors.
 
@@ -498,7 +498,9 @@ Dependency versions are exact in `package.json`, and `pnpm-lock.yaml` records th
 
 ## Continuous integration
 
-GitHub Actions installs from the frozen lockfile, checks TypeScript, builds the CLI and the library, runs the fast test suite, and checks the dependencies for known high-severity vulnerabilities.
+GitHub Actions installs from the frozen lockfile, checks TypeScript and the formatting, builds the CLI and the library, runs the whole test suite, prints cards and Shamir share exports to PDF and reads their QR codes back from the rendered pages, and checks the dependencies for known high-severity vulnerabilities. The tests also run on Windows and macOS; the card tests that need Poppler run on Linux only.
+
+A second workflow builds the single executable on Linux, Windows and macOS and runs each one on its own system. A version tag publishes the executables, their license notices and `SHA256SUMS` only after the complete CI has passed and when the tag names the version in `package.json`.
 
 The tests encode and decode every phrase length in every mode and format. They also cover records with and without a header, hidden input, the self-tests, date recovery, QR input and the recovery checks.
 

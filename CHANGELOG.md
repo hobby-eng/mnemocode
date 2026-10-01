@@ -6,6 +6,7 @@
 
 - Each release has one executable file for Linux, Windows and macOS, with Node.js, the card artwork and the SSKR engine built in; `pnpm build:executable` builds it for the current computer.
 - `mnemocode <command> --help` explains every option of a command with examples; `-h` gives a short summary.
+- Each executable comes with a file of license notices for Node.js and every library it contains, and a release is published only after the complete CI has passed.
 
 ### Formats
 
@@ -17,12 +18,15 @@
 - `recover-date` accepts `?` for each forgotten digit and up to three incomplete dates. Identical patterns are not tried twice, and a limit stops a search that is too large before it starts.
 - Added `recover-word`. It lists every word that can replace one forgotten word and marks the candidates that match a known detail of the wallet. With `--legacy-valid-last-word` it lists the valid last words of a legacy phrase.
 - A date needs a four-digit year. `23-09-26` was read as the year 23 and is now an error.
+- A record header whose version is written with leading zeros, such as `MNC01:`, is refused instead of being read as `MNC1:`.
 
 ### Secret handling
 
 - MnemoCode clears its temporary copies of the phrase data after use.
 - A file with Shamir shares now appears under its name only when it is complete, as the other exports already did. MnemoCode writes it to a private temporary file first and then gives it its final name in one step, without ever replacing an existing file. On memory cards and USB sticks formatted with FAT or exFAT, which cannot give a file a second name, an empty file holds the name until the complete one replaces it, and is removed again if that fails.
 - Text, standard input and QR image files are read up to their size limit and no further, also when they come from a pipe or keep growing, instead of trusting the size the system reports.
+- `--ask-secrets` says on Windows and macOS that hidden input works only on Linux, instead of reporting a missing terminal or program.
+- The folder that holds the separate cards of one Shamir share can be read only by your user account, like the other export folders.
 
 ### Card exports
 
@@ -42,7 +46,7 @@
 ### Toolchain and dependencies
 
 - The development runtime is Node.js 26.10.0.
-- Updated the npm dependencies, including Vitest 5.0.2 with its V8 coverage provider, TypeScript 7.0.2, Prettier 3.9.9, tsx 4.23.15 and `@types/node` 26.6.3.
+- Updated the npm dependencies, including Vitest 5.0.3 with its V8 coverage provider, TypeScript 7.0.2, Prettier 3.9.9, tsx 4.23.15 and `@types/node` 26.6.3.
 - Pinned pnpm 10.19.0. A toolchain check makes CI read the Node.js version from `.node-version` and the pnpm version from `package.json`.
 - The npm package includes the guides for shares, cards and the source layout.
 
@@ -51,3 +55,4 @@
 - Fixed every AUD-002 finding: the address error that blocked the release, size limits for secret files, strict whole numbers in options, clear errors for wallet details and paths, checks of the PNG structure, the integrity of audit records, and outdated documentation.
 - Added regression tests for wallet details, numeric options, size limits of secret files, missing and nested paths, and malformed PNG files.
 - Added `pnpm test:coverage` for V8 coverage reports.
+- Fixed the AUD-005 findings; the decisions made without the maintainer are in `docs/audits/AUD-005-decisions.md`.

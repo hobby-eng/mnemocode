@@ -57,6 +57,12 @@ The renderers contain no Node.js code. They get bundled files, random choices, P
 
 `pdf.ts`, `individual-cards.ts` and `sskr-cards.ts` organize documents and destinations. `image-export.ts` converts those same PDFs to images with local Poppler. `private-file.ts` replaces file exports through a private staging directory on the same filesystem. Artwork derived from a user's references is cached only for the current document; shared caches contain fixed bundled artwork.
 
+## Single executable
+
+`bundled-files.ts` reads every file that ships with the program, such as card artwork, the SSKR engine and the public vectors, by its path from the package root: next to the code when MnemoCode runs from a checkout or an installed package, and from the embedded assets inside the single executable.
+
+`scripts/build-executable.mjs` bundles the CLI with esbuild into one CommonJS file and builds a Node.js single executable from it, with the bundled files as assets. It also writes the license notices of everything the executable contains (`scripts/executable-notices.mjs`) and the SHA-256 lines of both files. `scripts/verify-executable.mjs` runs the executable of this system from an empty folder. `.github/workflows/executable.yml` builds and checks it on Linux, Windows and macOS, and on a version tag publishes the files after the complete CI has passed.
+
 ## Maintenance checks
 
 Format the project's TypeScript and JavaScript with the checked-in Prettier configuration, then run `corepack pnpm check` and `corepack pnpm build`. Vendored and generated files are excluded from formatting.
