@@ -130,17 +130,22 @@ export function representMnemonic(mnemonic: string): EncodedResult {
   );
 }
 
+/** Every decoder accepts the same indexes: whole numbers from 0 through 2047. */
+function assertIndexRange(indexes: readonly number[]): void {
+  if (
+    indexes.some((index) => !Number.isInteger(index) || index < 0 || index >= BIP39_DICTIONARY_SIZE)
+  ) {
+    throw new Error('Every BIP39 index must be an integer from 0 through 2047.');
+  }
+}
+
 /** Subtract in the same per-chunk moduli used by encodeMnemonic. */
 export function decodeIndexes(
   indexes: readonly number[],
   dates: readonly DateShiftDate[],
 ): DecodedResult {
   assertWordCount(indexes.length);
-  if (
-    indexes.some((index) => !Number.isInteger(index) || index < 0 || index >= BIP39_DICTIONARY_SIZE)
-  ) {
-    throw new Error('Every BIP39 index must be an integer from 0 through 2047.');
-  }
+  assertIndexRange(indexes);
   const sortedDates = sortDates(dates);
   const shifts = deriveShifts(sortedDates, indexes.length);
   const containerMnemonic = indexes.map((index) => englishWordlist[index]!).join(' ');
@@ -183,11 +188,7 @@ export function decodeIndexesLegacy(
   dates: readonly DateShiftDate[],
 ): DecodedResult {
   assertWordCount(indexes.length);
-  if (
-    indexes.some((index) => !Number.isInteger(index) || index < 0 || index >= BIP39_DICTIONARY_SIZE)
-  ) {
-    throw new Error('Every BIP39 index must be an integer from 0 through 2047.');
-  }
+  assertIndexRange(indexes);
   const sortedDates = sortDates(dates);
   const shifts = deriveShifts(sortedDates, indexes.length);
   const recoveredIndexes = indexes.map((index, position) =>
@@ -213,6 +214,8 @@ export function decodeIndexesLegacyValid(
   dates: readonly DateShiftDate[],
 ): DecodedResult[] {
   assertWordCount(indexes.length);
+  // Checked before the word lookup, which would otherwise report a bad index as a bad checksum.
+  assertIndexRange(indexes);
   const containerMnemonic = indexes.map((index) => englishWordlist[index]!).join(' ');
   if (!validateMnemonic(containerMnemonic, englishWordlist)) {
     throw new Error('The legacy valid-last-word container has an invalid BIP39 checksum.');
