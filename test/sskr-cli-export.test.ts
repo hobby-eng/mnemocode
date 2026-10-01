@@ -41,6 +41,8 @@ describe("integrated SSKR CLI", () => {
       expect(split.stdout + split.stderr).not.toContain("\x1b");
       const records = readFileSync(path, "utf8").trim().split("\n");
       expect(records).toHaveLength(3);
+      // An SSKR file holds the shares themselves, one per line, with no MNC1 record header.
+      for (const record of records) expect(record).toMatch(/^ur:sskr\//u);
       const restored = cli([
         "sskr-combine",
         "--share",
