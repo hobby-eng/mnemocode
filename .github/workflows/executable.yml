@@ -1,0 +1,74 @@
+name: Executable
+
+# Builds MnemoCode as one executable file on Linux, Windows and macOS: a Node.js single executable
+# is made from the Node.js binary of the system that builds it, so each system builds its own
+# (scripts/build-executable.mjs). Each one is run on its own system from an empty folder
+# (scripts/verify-executable.mjs). A tag v<version> publishes the three files with SHA256SUMS as a
+# GitHub release.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: executable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build-executable.mjs dist/executable
+      - name: Run the executable on its own system
+        run: node scripts/verify-executable.mjs dist/executable
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: executable-${{ matrix.os }}
+          path: |
+            dist/executable/mnemocode-*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: executable-*
+          path: release
+          merge-multiple: true
+      - name: Publish the executables with SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd release
+          cat *.sha256 | sort -k 2 > SHA256SUMS
+          rm *.sha256
+          sha256sum --check SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "MnemoCode ${GITHUB_REF_NAME#v}" --notes-from-tag \
+            mnemocode-* SHA256SUMS

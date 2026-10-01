@@ -18,6 +18,20 @@ MnemoCode builds on ideas from Seedshift and BIP39Colors; see [Provenance and li
 
 ## Install and run
 
+### One executable file
+
+Each release has one file for Linux, Windows and macOS that runs without Node.js or anything else installed: `mnemocode-<version>-linux-x64`, `mnemocode-<version>-win-x64.exe` and `mnemocode-<version>-macos-arm64`. Compare its SHA-256 with the release's `SHA256SUMS` once after downloading, then run it as `mnemocode`:
+
+```bash
+sha256sum --check --ignore-missing SHA256SUMS
+chmod +x mnemocode-0.1.0-linux-x64
+./mnemocode-0.1.0-linux-x64 self-test
+```
+
+The file holds Node.js, the program, the card artwork and fonts, and the SSKR engine. Making images from cards still needs Poppler's `pdftocairo`, and `--ask-secrets` needs `systemd-ask-password`, as below. To build the file for your own computer from a checkout, run `corepack pnpm build:executable`; it writes the file to `dist/executable/` and runs it once from an empty folder.
+
+### From source
+
 Building from source requires Node.js 26.10.0 or newer and Corepack, which selects the pnpm version recorded in `package.json`.
 
 ```bash
