@@ -1,0 +1,905 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-005",
+  "auditNumber": 5,
+  "date": "2026-10-01",
+  "title": "Full-scope MnemoCode audit after the executable release work",
+  "reviewer": {
+    "name": "Claude Code (workspace maintainer subagent)",
+    "model": "claude-opus-5-5",
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "7e05adee3f4b25d7461cde6e6e86f2521d058e21",
+    "commitComplete": true,
+    "branch": "main",
+    "workingTree": "clean; only the audit's own untracked docs/audits/AUD-005-harnesses/",
+    "capturedAt": "2026-10-01T11:08:42Z",
+    "sourceFingerprint": "1866dc7f1d8472307e2089346755f72246f22573284d9cf95280be96e92c8460",
+    "sourceFingerprintWithoutDocuments": "4341e1579b394e4e25fef550780a9710a772a3b90ea013edb81cebf6274e3466",
+    "executableLinuxX64Sha256": "52af2f2b06edd2f1fbe8e2d8aa9640aedd79d45dc7d1a0f353f2e57390dbdd41"
+  },
+  "scope": {
+    "repository": "mnemocode",
+    "version": "0.1.0",
+    "supported": "Offline CLI and TypeScript library: five representations, direct/seedshift/legacy modes and legacy-valid recovery, MNC1 records, date and word recovery with local Bitcoin evidence, SSKR with color and Bytewords transport, 16 card templates, QR/PDF/PNG/JPEG export, single executable",
+    "procedureHashes": {
+      "docs/FULL_AUDIT_GUIDE.md": "30fa6a1675892e2a3059bdbd6e97737f2959a74aca98a0a90e4f655ae12854a6",
+      "docs/audits/AUDIT_STANDARD.md": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f",
+      "docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+      "docs/audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7"
+    },
+    "excluded": "Docker canonical rebuild (not authorized), Windows/macOS execution, remote CI and release runs"
+  },
+  "checks": {
+    "coverage": [
+      {
+        "id": "CHECK-SEC-001",
+        "group": "Threat model and secret ownership",
+        "outcome": "passed",
+        "evidence": "Traced phrase, dates, passphrase file, WIF file, shares and records from arguments, files, standard input and the hidden prompt to every consumer; entropy, seed and share buffers are cleared by their owners; JavaScript strings and terminal state remain outside control, as SECURITY.md says.",
+        "category": "SEC"
+      },
+      {
+        "id": "CHECK-SEC-002",
+        "group": "Sandbox and transport",
+        "outcome": "not-applicable",
+        "evidence": "No browser document, iframe vault, message port or CSP exists; the CLI is documented as not a sandbox.",
+        "category": "SEC"
+      },
+      {
+        "id": "CHECK-SEC-003",
+        "group": "Network egress",
+        "outcome": "passed",
+        "evidence": "No `http`, `https`, `net`, `dns`, `tls`, `fetch` or WebSocket use in `src/` or the generated SSKR glue; the only child processes are `systemd-ask-password` and `pdftocairo`.",
+        "category": "SEC"
+      },
+      {
+        "id": "CHECK-SEC-004",
+        "group": "Randomness and construction",
+        "outcome": "passed",
+        "evidence": "Share randomness is `crypto.randomBytes(32)` seeding ChaCha20 inside the WASM, cleared after use; card identity choices use `crypto.randomInt`; no test source reaches production. Date masking is documented as not encryption.",
+        "category": "SEC"
+      },
+      {
+        "id": "CHECK-SEC-005",
+        "group": "Secret lifecycle and exceptional paths",
+        "outcome": "passed",
+        "evidence": "Staged publication, cleanup on failure, private temporary raster folder; the AUD-004 kill and partial-write tests are in the passing suite. No WASM-memory forensic test.",
+        "category": "SEC"
+      },
+      {
+        "id": "CHECK-SEC-006",
+        "group": "Persistence and sensitive output",
+        "outcome": "failed",
+        "evidence": "SEC001: per-share fragment folders take the umask mode (0755 with umask 022). File modes are 0600; PDF title, author, creator and producer are blank; creation dates remain (observation in BLD006).",
+        "category": "SEC"
+      },
+      {
+        "id": "CHECK-SEC-007",
+        "group": "Availability bounds",
+        "outcome": "passed",
+        "evidence": "1 MiB text and 16 MiB / 4096 px PNG limits read-bounded; recovery search capped at 10,000,000; share count and color text bounded.",
+        "category": "SEC"
+      },
+      {
+        "id": "CHECK-FUN-001",
+        "group": "BIP39, entropy and seed interpretation",
+        "outcome": "passed",
+        "evidence": "Oracle: 7 vectors and 400 pseudo-random cases (all five lengths, all-zero and all-0xFF entropy, years 1, 2047–2049, 4095, 9999) in five formats and three modes, 6,000 library comparisons, 0 mismatches.",
+        "category": "FUN"
+      },
+      {
+        "id": "CHECK-FUN-002",
+        "group": "HD derivation and profiles",
+        "outcome": "passed",
+        "evidence": "README evidence examples matched at `m`, `m/84'/0'/0'/0/0`, `m/84'/0'/0'` and `m/86'/0'/0'/0/0`; evidence tests in the suite pass.",
+        "category": "FUN"
+      },
+      {
+        "id": "CHECK-FUN-003",
+        "group": "BIP85/BIP38/messages/Silent Payments",
+        "outcome": "not-applicable",
+        "evidence": "Not implemented or claimed.",
+        "category": "FUN"
+      },
+      {
+        "id": "CHECK-FUN-004",
+        "group": "Scripts/descriptors/multisig",
+        "outcome": "not-applicable",
+        "evidence": "No descriptor or script interface; address constructors covered under FUN-002.",
+        "category": "FUN"
+      },
+      {
+        "id": "CHECK-FUN-005",
+        "group": "Transactions and PSBT",
+        "outcome": "not-applicable",
+        "evidence": "No transaction creation, signing or PSBT.",
+        "category": "FUN"
+      },
+      {
+        "id": "CHECK-FUN-006",
+        "group": "Recovery and backup formats",
+        "outcome": "passed",
+        "evidence": "Direct, checksum-valid, legacy and legacy-valid (128 candidates for 12 words, original included); MNC1 records in five formats; QR round trip; SSKR 2-of-3 pairs, refusal of one share and of overwriting; official grouped quorum restores the published entropy.",
+        "category": "FUN"
+      },
+      {
+        "id": "CHECK-FUN-007",
+        "group": "Discovery/providers/accounting",
+        "outcome": "not-applicable",
+        "evidence": "No provider requests or balances.",
+        "category": "FUN"
+      },
+      {
+        "id": "CHECK-API-001",
+        "group": "Runtime call contracts",
+        "outcome": "failed",
+        "evidence": "API002: `decodeIndexesLegacyValid` skips the index validation of the other decoders. `matchBitcoinEvidence` without a location throws a TypeError; it rejects, so it is recorded only here.",
+        "category": "API"
+      },
+      {
+        "id": "CHECK-API-002",
+        "group": "Async state and cancellation",
+        "outcome": "passed",
+        "evidence": "SSKR loader resets its promise after failure; exports render completely before publication. No interactive UI state exists.",
+        "category": "API"
+      },
+      {
+        "id": "CHECK-API-003",
+        "group": "Export schemas",
+        "outcome": "passed",
+        "evidence": "MNC1 header, share files, QR payloads (no header, mode or dates), PDF metadata; observations API003 and API004.",
+        "category": "API"
+      },
+      {
+        "id": "CHECK-API-004",
+        "group": "Encoding interoperability",
+        "outcome": "failed",
+        "evidence": "API001: `MNC01:` and `MNC0001:` are accepted as version 1. Colors, color Unicode, Bytewords, UR and CRC transport otherwise round-trip and match the published vectors.",
+        "category": "API"
+      },
+      {
+        "id": "CHECK-BLD-001",
+        "group": "Manifest and composition",
+        "outcome": "passed",
+        "evidence": "Package exports and `files`; `npm pack --dry-run` lists 205 files, no evidence, release or export folder.",
+        "category": "BLD"
+      },
+      {
+        "id": "CHECK-BLD-002",
+        "group": "Runtime matrix",
+        "outcome": "passed",
+        "evidence": "Linux only: 446 tests in 30 files; Windows and macOS were not run locally and their CI results were not observed.",
+        "category": "BLD"
+      },
+      {
+        "id": "CHECK-BLD-003",
+        "group": "Lockfiles, provenance and licenses",
+        "outcome": "failed",
+        "evidence": "BLD002: the executable redistributes Node.js and 17 bundled packages without notices. `pnpm audit --audit-level high`: no known vulnerabilities. No fresh frozen install; no RustSec scan.",
+        "category": "BLD"
+      },
+      {
+        "id": "CHECK-BLD-004",
+        "group": "Canonical WASM bytes",
+        "outcome": "failed",
+        "evidence": "BLD005: the gate works (one changed byte in the WASM or the bridge is refused before any phrase is printed) but no test keeps it. All seven manifest hashes match and the manifest covers every file under `generated/` and `rust/`. No Docker rebuild (not authorized).",
+        "category": "BLD"
+      },
+      {
+        "id": "CHECK-BLD-005",
+        "group": "Artifacts, CI and release",
+        "outcome": "failed",
+        "evidence": "BLD001, BLD003, BLD004. Positive: the Linux executable is reproducible (two builds and an earlier one identical) and passes `scripts/verify-executable.mjs` when given its path. Workflows reviewed statically; no tag or remote run.",
+        "category": "BLD"
+      },
+      {
+        "id": "CHECK-UI-001",
+        "group": "Real-file presentation",
+        "outcome": "passed",
+        "evidence": "`scripts/check-card-output.mjs`: actual PDFs rasterized with Poppler, exact QR round trips for sheets, cards and the SSKR command. No physical print or scan.",
+        "category": "UI"
+      },
+      {
+        "id": "CHECK-UI-002",
+        "group": "Inputs and state",
+        "outcome": "passed",
+        "evidence": "Option allowlists per command, repeated-value refusal, destinations checked before secrets are asked for; preview listing and help dispatch.",
+        "category": "UI"
+      },
+      {
+        "id": "CHECK-UI-003",
+        "group": "Secrets, help, QR and accessibility",
+        "outcome": "failed",
+        "evidence": "UI001 and UI002. Colour rules (NO_COLOR, CLICOLOR_FORCE, TERM=dumb, CLICOLOR=0) and plain redirected output match the workspace style.",
+        "category": "UI"
+      },
+      {
+        "id": "CHECK-ARC-001",
+        "group": "Ownership and import seams",
+        "outcome": "passed",
+        "evidence": "Core, CLI, renderers, platform adapter, bundled-file reader and SSKR runtime are separated; core imports no CLI or renderer code.",
+        "category": "ARC"
+      },
+      {
+        "id": "CHECK-ARC-002",
+        "group": "Dead code and duplication",
+        "outcome": "passed",
+        "evidence": "Observation BLD006: the executable embeds every file of `assets/`, including the unused CJK font subset and the map source.",
+        "category": "ARC"
+      },
+      {
+        "id": "CHECK-ARC-003",
+        "group": "Comments and test fidelity",
+        "outcome": "passed",
+        "evidence": "Comments match behavior, including the executable note in `sskr/runtime.ts`; tests drive production entry points.",
+        "category": "ARC"
+      },
+      {
+        "id": "CHECK-DOC-001",
+        "group": "Capability and safety descriptions",
+        "outcome": "failed",
+        "evidence": "DOC002 and the documentation part of UI001; all other capability and limit statements checked against code and output.",
+        "category": "DOC"
+      },
+      {
+        "id": "CHECK-DOC-002",
+        "group": "Commands, metadata, links and legal",
+        "outcome": "failed",
+        "evidence": "DOC001. Every README command example that was run gave the documented result; identity and studio counts (20, 26, 60, 37, 30, 5, 6), QR module 0.30 mm and the 3,652,059-date search match the code.",
+        "category": "DOC"
+      },
+      {
+        "id": "CHECK-DOC-003",
+        "group": "Audit records",
+        "outcome": "passed",
+        "evidence": "AUD-001 to AUD-004 and the index are consistent; this report's JSON is schema-validated by `validate-report.py`.",
+        "category": "DOC"
+      }
+    ],
+    "commands": [
+      {
+        "label": "build",
+        "command": [
+          "pnpm",
+          "build"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:08:53.847813Z",
+        "endedAt": "2026-10-01T11:08:54.686957Z",
+        "exitCode": 0,
+        "logSha256": "55c2ff9c5fa38028a0fa4af1616a3abca6153a0b1a18b3dd1f5c8dff754f95d7"
+      },
+      {
+        "label": "bundled-licenses",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/bundled-licenses.mjs"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:25:27.432967Z",
+        "endedAt": "2026-10-01T11:25:27.704341Z",
+        "exitCode": 1,
+        "logSha256": "1cca297f035be107e17798321f614c2e674a66c6efb5217b6024bac3e80c0e4f"
+      },
+      {
+        "label": "card-output",
+        "command": [
+          "node",
+          "scripts/check-card-output.mjs"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:11:04.998439Z",
+        "endedAt": "2026-10-01T11:12:56.731475Z",
+        "exitCode": 0,
+        "logSha256": "981aadb76de882b4cf5c2868783d84b896f0b8cf229226f17f0c529ae3b137c9"
+      },
+      {
+        "label": "defect-probes",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/defect-probes.mjs"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:25:04.915155Z",
+        "endedAt": "2026-10-01T11:25:11.770514Z",
+        "exitCode": 0,
+        "logSha256": "413fd3c9db9abab2ae410691e7e8b87653acc2ac05ac0287ba292667ce3ff504"
+      },
+      {
+        "label": "dependencies",
+        "command": [
+          "pnpm",
+          "audit",
+          "--audit-level",
+          "high"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:11:03.666028Z",
+        "endedAt": "2026-10-01T11:11:04.967432Z",
+        "exitCode": 0,
+        "logSha256": "15950a68a7ed99c59779717acefdceb3f69cfd31bde67d2c954f2a3cea4d7955"
+      },
+      {
+        "label": "executable-build-1",
+        "command": [
+          "pnpm",
+          "build:executable"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:16:51.222328Z",
+        "endedAt": "2026-10-01T11:17:04.668398Z",
+        "exitCode": 1,
+        "logSha256": "36ff34c76828f17848e7311123e856a443399320ed9f419852beaa4eb62045ea"
+      },
+      {
+        "label": "executable-build-2",
+        "command": [
+          "pnpm",
+          "build:executable"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:17:04.809849Z",
+        "endedAt": "2026-10-01T11:17:11.735693Z",
+        "exitCode": 1,
+        "logSha256": "e89c44e4ba566feccf9b472bab63a064373eeb96762d40fe2797bd9e49d3a604"
+      },
+      {
+        "label": "executable-verify",
+        "command": [
+          "node",
+          "scripts/verify-executable.mjs",
+          "release/mnemocode-0.1.0-linux-x64"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:17:31.214836Z",
+        "endedAt": "2026-10-01T11:17:49.303397Z",
+        "exitCode": 0,
+        "logSha256": "70f51d16f261e9a4fed34574a959906554ef939fb253aba309d8703f06fdceea"
+      },
+      {
+        "label": "format",
+        "command": [
+          "pnpm",
+          "format:check"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:08:50.282472Z",
+        "endedAt": "2026-10-01T11:08:52.653093Z",
+        "exitCode": 0,
+        "logSha256": "987661d85a3675ec39dab24ff69f07ac20c93dd8a43ca2423b58c0fb61652a05"
+      },
+      {
+        "label": "package",
+        "command": [
+          "npm",
+          "pack",
+          "--dry-run",
+          "--json",
+          "--ignore-scripts"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:12:56.807804Z",
+        "endedAt": "2026-10-01T11:12:58.489220Z",
+        "exitCode": 0,
+        "logSha256": "51f94e7be154a77f8d01a00799de089bf9a4824ffad459ab44c45b46aaf7da75"
+      },
+      {
+        "label": "readme-examples-corrected",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/readme-examples.mjs"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:20:52.332274Z",
+        "endedAt": "2026-10-01T11:21:51.228883Z",
+        "exitCode": 0,
+        "logSha256": "3e89f48ec709afb5500ad490d43e72652ce2034946f42637b79e43183a70d460"
+      },
+      {
+        "label": "readme-examples",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/readme-examples.mjs"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:19:40.084658Z",
+        "endedAt": "2026-10-01T11:20:41.955818Z",
+        "exitCode": 1,
+        "logSha256": "702dceb7ce5f3feb5bcedeff7c084be90d66f9d600a91f08f7153b5d1b439ea2"
+      },
+      {
+        "label": "seedshift-oracle",
+        "command": [
+          "python3",
+          "docs/audits/AUD-005-harnesses/seedshift-oracle.py"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:18:56.376584Z",
+        "endedAt": "2026-10-01T11:19:01.468906Z",
+        "exitCode": 0,
+        "logSha256": "0a553a0fcf02514e0e8a491d77e232478c3d1ede1f6dfd8a3aba6ab3b7d9109c"
+      },
+      {
+        "label": "self-test",
+        "command": [
+          "node",
+          "dist/mnemocode.js",
+          "self-test"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:08:54.724677Z",
+        "endedAt": "2026-10-01T11:08:59.280541Z",
+        "exitCode": 0,
+        "logSha256": "a28ec6868aadce609cdcf87aa9c78c3f10013cb4e243e8f707cb6cb40efce448"
+      },
+      {
+        "label": "sskr-integrity-corrected",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/sskr-integrity.mjs"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:22:40.511338Z",
+        "endedAt": "2026-10-01T11:22:44.329855Z",
+        "exitCode": 0,
+        "logSha256": "db42e86c38bc501957e9614fe0275d65c6c9f43290f36f665bdf60afcc2d3908"
+      },
+      {
+        "label": "sskr-integrity",
+        "command": [
+          "node",
+          "docs/audits/AUD-005-harnesses/sskr-integrity.mjs"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:22:20.647589Z",
+        "endedAt": "2026-10-01T11:22:24.043340Z",
+        "exitCode": 1,
+        "logSha256": "3ee22683f2357a37d3ed3f27f1ee4d91e4ad33889ccbbdb2fe57215b27f8bb9d"
+      },
+      {
+        "label": "types",
+        "command": [
+          "pnpm",
+          "check"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:08:52.700298Z",
+        "endedAt": "2026-10-01T11:08:53.808487Z",
+        "exitCode": 0,
+        "logSha256": "ce5e6ce64173a8216d0995c509896dae6affb17d7738ef120af609e97b0cfe2c"
+      },
+      {
+        "label": "unit-tests",
+        "command": [
+          "pnpm",
+          "test"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:08:59.308927Z",
+        "endedAt": "2026-10-01T11:11:03.629105Z",
+        "exitCode": 0,
+        "logSha256": "9a05e48eafbcd99b4ad39543c2c14a463c52f84d6f9f6f5f86162569625c55b4"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "AUD-005-SEC001",
+      "kind": "finding",
+      "title": "SSKR fragment folders are created with the default folder mode",
+      "category": "SEC",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/export/sskr-cards.ts:134 (mkdir(folder)), all builds"
+      ],
+      "reproduction": "`sskr-export --share-file <one official share> --cards-dir NEW --page-size business` under `umask 022`; `defect-probes.mjs` checks the mode of `NEW/collection-…`.",
+      "expected": "Like every other export folder (staged with `mkdtemp`, mode 0700), the folder that holds one share's cards is private.",
+      "observed": "The per-share folder has mode 0755 (umask-dependent; 0775 under umask 002). Files inside are 0600.",
+      "impact": "Once a user moves a share folder out of its private parent, as the program advises (\"store different shares separately\"), other local accounts can list it. File names carry each card's first reference code, a few bytes of one share. No file content is exposed.",
+      "evidence": [
+        "Local: AUD-005-evidence/defect-probes.log",
+        "AUD-005-harnesses/defect-probes.mjs"
+      ],
+      "recommendedFix": "Create the folder with mode 0700.",
+      "requiredVerification": "A test checks mode 0700 of a share folder on POSIX; SSKR export tests stay green.",
+      "releaseBlockingReason": "the parent export folder is private, so no other account can reach the files while they stay inside it."
+    },
+    {
+      "id": "AUD-005-API001",
+      "kind": "finding",
+      "title": "The record header accepts non-canonical version numbers",
+      "category": "API",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/record.ts:27-28 (/^MNC(\\d+):…/, then Number(match[1]))"
+      ],
+      "reproduction": "`parseRecord('MNC01:direct:english:abandon … about')` and `parseRecord('MNC0001:…')`.",
+      "expected": "README documents the header `MNC1:<mode>:<format>:<data>`; the guide asks that malformed input is not silently normalized.",
+      "observed": "Both return a version-1 record.",
+      "impact": "A damaged or foreign header is read as a valid record instead of being reported. Decoding still validates the payload, so no wrong phrase was produced.",
+      "evidence": [
+        "Local: AUD-005-evidence/defect-probes.log"
+      ],
+      "recommendedFix": "Accept only a version number without leading zeros; keep `Unsupported MnemoCode record version` for other numbers.",
+      "requiredVerification": "`MNC01:` and `MNC0:` are malformed, `MNC2:` is unsupported, every record MnemoCode writes still parses; MNC1 output unchanged.",
+      "releaseBlockingReason": "MnemoCode writes only `MNC1:`."
+    },
+    {
+      "id": "AUD-005-API002",
+      "kind": "finding",
+      "title": "Legacy-valid decoding reports invalid indexes as a checksum failure",
+      "category": "API",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/core/seedshift.ts:211-219 (decodeIndexesLegacyValid), public library API"
+      ],
+      "reproduction": "`decodeIndexesLegacyValid([2048, 0, …], [01-01-2000])`; also -1 and 1.5.",
+      "expected": "As in `decodeIndexes` and `decodeIndexesLegacy`: `Every BIP39 index must be an integer from 0 through 2047.`",
+      "observed": "`The legacy valid-last-word container has an invalid BIP39 checksum.` The invalid index is looked up as `undefined` in the word list.",
+      "impact": "A library caller is sent to look for a damaged record instead of a programming error. The CLI parses indexes first and is not affected.",
+      "evidence": [
+        "Local: AUD-005-evidence/defect-probes.log"
+      ],
+      "recommendedFix": "Validate indexes in all three decoders through one shared check.",
+      "requiredVerification": "Regression test for 2048, -1 and 1.5; legacy-valid recovery vectors unchanged.",
+      "releaseBlockingReason": "the call is still refused."
+    },
+    {
+      "id": "AUD-005-BLD001",
+      "kind": "finding",
+      "title": "A version tag publishes executables without the test suite or a version check",
+      "category": "BLD",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        ".github/workflows/executable.yml (release needs only build), .github/workflows/ci.yml"
+      ],
+      "reproduction": "Static review. The tag push starts CI and Executable as separate workflows; `release` waits only for the three `build` jobs, which run `build-executable.mjs` and `verify-executable.mjs` (self-test and four smoke checks) but not `pnpm check`, `pnpm test`, the card round trip or `pnpm audit`. No step compares the tag with `package.json`.",
+      "expected": "The guide asks that mandatory verification cannot be bypassed by the normal release path, and that tag and version agree.",
+      "observed": "A tag on a commit whose test suite fails still publishes; a tag `v0.2.0` on version 0.1.0 publishes `mnemocode-0.1.0-*` files as \"MnemoCode 0.2.0\".",
+      "impact": "Release correctness depends on the publisher checking CI by hand.",
+      "evidence": [
+        ".github/workflows/executable.yml at the reviewed commit"
+      ],
+      "recommendedFix": "Make the CI workflow callable and require it, and a tag/version check, before `release`.",
+      "requiredVerification": "Workflow syntax check; the dependency is visible in the workflow; observed on a real tag only by the maintainer.",
+      "releaseBlockingReason": "it guards every future release."
+    },
+    {
+      "id": "AUD-005-BLD002",
+      "kind": "finding",
+      "title": "Executable releases carry no license notices for Node.js and the bundled packages",
+      "category": "BLD",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "scripts/build-executable.mjs, .github/workflows/executable.yml (publishes only mnemocode-* and SHA256SUMS), every executable"
+      ],
+      "reproduction": "`bundled-licenses.mjs` lists 17 npm packages bundled by esbuild (among them jsQR under Apache-2.0, pako, tslib, @noble/*, pdf-lib) and finds no notice file next to any executable. The executable also contains the Node.js runtime and the SSKR WASM built from BSD-2-Clause-Patent crates.",
+      "expected": "MIT, Apache-2.0 and BSD-2-Clause-Patent require their notices with binary redistribution; `THIRD_PARTY_NOTICES.md` covers neither Node.js nor several of these packages.",
+      "observed": "A release holds three executables and `SHA256SUMS` only.",
+      "impact": "Redistribution without the required notices; no effect on function or secrets.",
+      "evidence": [
+        "Local: AUD-005-evidence/bundled-licenses.log"
+      ],
+      "recommendedFix": "Build a notice file per executable from the bundled packages' own license files, Node.js's `LICENSE`, the project and SSKR notices, and publish it with the executable.",
+      "requiredVerification": "`bundled-licenses.mjs` passes on a fresh build; `verify-executable.mjs` checks the file.",
+      "releaseBlockingReason": "a legal-compliance gap, not a functional one."
+    },
+    {
+      "id": "AUD-005-BLD003",
+      "kind": "finding",
+      "title": "The executable check fails when the release folder holds the other systems' files",
+      "category": "BLD",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "scripts/verify-executable.mjs:16-24; pnpm build:executable"
+      ],
+      "reproduction": "`pnpm build:executable` with the three published executables in `release/` (the state this audit found); or `defect-probes.mjs` with three empty files.",
+      "expected": "The check tests the executable just built for this system.",
+      "observed": "`Error: Expected one executable in …/release, found 3.`; `pnpm build:executable` exits 1 after a successful build.",
+      "impact": "A maintainer who keeps a downloaded release set cannot verify a local build without moving files.",
+      "evidence": [
+        "Local: AUD-005-evidence/executable-build-1.log, executable-build-2.log, defect-probes.log"
+      ],
+      "recommendedFix": "In a folder, select this system's file by the same name rule as the build.",
+      "requiredVerification": "`pnpm build:executable` passes with the other systems' files present.",
+      "releaseBlockingReason": "CI builds one system per folder."
+    },
+    {
+      "id": "AUD-005-BLD004",
+      "kind": "finding",
+      "title": "The card check scripts write PDFs into a folder that Git does not ignore",
+      "category": "BLD",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "scripts/check-card-output.mjs:17, scripts/business-goldens.mjs:8 (default goldens/…), .gitignore"
+      ],
+      "reproduction": "`node scripts/check-card-output.mjs`; `git status` shows `?? goldens/`; `git check-ignore goldens/current/x.pdf` finds no rule.",
+      "expected": "Workspace and repository rules: generated cards go to ignored folders, and a new output folder gets an ignore rule.",
+      "observed": "29 PDFs, including an SSKR folder, appear as untracked files that `git add -A` would commit.",
+      "impact": "Risk of committing generated public-fixture cards; no secret is involved.",
+      "evidence": [
+        "Local: AUD-005-evidence/card-output.log, defect-probes.log"
+      ],
+      "recommendedFix": "Ignore `goldens/`.",
+      "requiredVerification": "`git check-ignore` matches; the script output no longer appears in `git status`.",
+      "releaseBlockingReason": ""
+    },
+    {
+      "id": "AUD-005-BLD005",
+      "kind": "finding",
+      "title": "No test covers the SSKR integrity gate or its manifest",
+      "category": "BLD",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/sskr/runtime.ts:18-27, vendor/sskr/integrity.json, test/"
+      ],
+      "reproduction": "`git grep 'SSKR dependency integrity' -- test` finds nothing; no test compares the five non-runtime manifest entries (Rust source, Cargo files, declarations) with their files.",
+      "expected": "The integrity gate the security guide relies on, and the manifest the vendoring rule compares against, are kept by tests; a vendored refresh that forgets the manifest fails.",
+      "observed": "The harness shows that the gate refuses a changed WASM or bridge and that all seven hashes match; nothing in the suite would notice if either stopped being true for the five files that are never loaded.",
+      "impact": "A regression of the gate or a stale manifest could pass CI.",
+      "evidence": [
+        "Local: AUD-005-evidence/sskr-integrity-corrected.log",
+        "AUD-005-harnesses/sskr-integrity.mjs"
+      ],
+      "recommendedFix": "A test that checks every manifest entry, the manifest's coverage of `generated/` and `rust/`, and the refusal of a damaged copy.",
+      "requiredVerification": "The new test passes and fails when a byte of a disposable copy changes.",
+      "releaseBlockingReason": "the gate works today."
+    },
+    {
+      "id": "AUD-005-UI001",
+      "kind": "finding",
+      "title": "Hidden input on Windows and macOS fails with a misleading message",
+      "category": "UI",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/cli/input.ts:185-213 (askSecret), SECURITY.md (secret lifecycle), README; Windows and macOS executables"
+      ],
+      "reproduction": "Static: `askSecret` opens `/dev/tty` and runs `systemd-ask-password` on every system. On Windows `/dev/tty` does not exist, so a user in a terminal reads `Hidden input requires an interactive terminal. Run the command in a terminal …`; on macOS the terminal opens and the message asks to install `systemd-ask-password`, which macOS does not have. `defect-probes.mjs` runs the CLI with the platform reported as Windows and shows that the message never mentions the platform.",
+      "expected": "The project ships Windows and macOS executables, and SECURITY.md recommends `--ask-secrets` for a real phrase without a platform limit; the program should say that hidden input is Linux-only and name the alternative.",
+      "observed": "Wrong cause in the message; SECURITY.md silent about the limit (README says \"On Linux\" once).",
+      "impact": "Users of the new Windows and macOS files can conclude their terminal is broken or install unrelated software; they may fall back to typing the phrase on the command line.",
+      "evidence": [
+        "Local: AUD-005-evidence/defect-probes.log",
+        "source"
+      ],
+      "recommendedFix": "Refuse hidden input on other systems with a message that names Linux and the file and standard-input alternatives; state the limit in SECURITY.md and README.",
+      "requiredVerification": "A test with the platform set to `win32` and `darwin` expects the new message before any terminal is opened.",
+      "releaseBlockingReason": "files and standard input remain available."
+    },
+    {
+      "id": "AUD-005-UI002",
+      "kind": "finding",
+      "title": "The safety line of the main help is not wrapped",
+      "category": "UI",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/cli/usage.ts:229-232"
+      ],
+      "reproduction": "`NO_COLOR=1 mnemocode --help`.",
+      "expected": "The shared terminal style (`mhfe` is the model) wraps the yellow safety line within the help width; every other help text here wraps at 80 columns.",
+      "observed": "One 101-column line.",
+      "impact": "The most important line of the help breaks mid-word in an 80-column terminal.",
+      "evidence": [
+        "Local: AUD-005-evidence/defect-probes.log"
+      ],
+      "recommendedFix": "Wrap it like the notes.",
+      "requiredVerification": "A help test: no line of the main help is wider than 80 columns.",
+      "releaseBlockingReason": ""
+    },
+    {
+      "id": "AUD-005-DOC001",
+      "kind": "finding",
+      "title": "README, CHANGELOG and ARCHITECTURE predate the CI, executable and dependency changes",
+      "category": "DOC",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "README.md:499-503 (Continuous integration), CHANGELOG.md (\"Vitest 5.0.2\"), docs/ARCHITECTURE.md (no bundled-files.ts, executable scripts or workflow)"
+      ],
+      "reproduction": "Compare with `.github/workflows/*.yml`, `package.json` and `src/bundled-files.ts`.",
+      "expected": "Documents describe the current gates, versions and modules.",
+      "observed": "The README calls CI a \"fast test suite\" with types, build and audit only; it also runs the format check, the PDF/QR round trip, Windows and macOS tests and the executable workflow. CHANGELOG names Vitest 5.0.2 (now 5.0.3). ARCHITECTURE does not mention how the program reads its bundled files or how the executable is built.",
+      "impact": "Readers underestimate the CI and cannot find the executable build.",
+      "evidence": [
+        "Source comparison"
+      ],
+      "recommendedFix": "Update the three documents.",
+      "requiredVerification": "Statements checked against the workflows and `package.json`.",
+      "releaseBlockingReason": ""
+    },
+    {
+      "id": "AUD-005-DOC002",
+      "kind": "finding",
+      "title": "SECURITY.md describes the SSKR file check only for a source installation",
+      "category": "DOC",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "SECURITY.md (secret lifecycle, last item); src/sskr/runtime.ts:15-17"
+      ],
+      "reproduction": "Read the statement against the executable path of `readBundledFile` and the runtime comment.",
+      "expected": "The security guide states what the check proves for each way of running the program.",
+      "observed": "It says the files are \"loaded from the local disk and compared with fixed SHA-256 hashes\". In the executable the WASM and the manifest are embedded copies from the same build and the bridge runs from the bundle, so the check only confirms the build's own consistency; the protection of the executable is its release checksum.",
+      "impact": "Overstates what the check proves for executable users.",
+      "evidence": [
+        "Source"
+      ],
+      "recommendedFix": "State both cases and point to SHA256SUMS.",
+      "requiredVerification": "Text matches `runtime.ts` and `bundled-files.ts`.",
+      "releaseBlockingReason": ""
+    }
+  ],
+  "observations": [
+    {
+      "id": "AUD-005-API003",
+      "category": "API",
+      "kind": "observation",
+      "title": "The JSON output names every result a date shift",
+      "severity": "info",
+      "status": "deferred",
+      "releaseBlocking": false,
+      "evidence": [
+        "See the Markdown report section of the same ID."
+      ],
+      "reproduction": "`formatEncoded(result, 'json')` writes `\"algorithm\": \"Seedshift-compatible date shift\"` for direct, checksum-valid and legacy results alike. The form is reachable only from the library. Changing the string would change an encoded output, which this remediation must not do, so it is deferred; a later format version could name the mode.",
+      "expected": "Informational; no supported contract is broken.",
+      "observed": "`formatEncoded(result, 'json')` writes `\"algorithm\": \"Seedshift-compatible date shift\"` for direct, checksum-valid and legacy results alike. The form is reachable only from the library. Changing the string would change an encoded output, which this remediation must not do, so it is deferred; a later format version could name the mode.",
+      "impact": "No demonstrated defect.",
+      "recommendedFix": "See the observation.",
+      "requiredVerification": "None for this audit."
+    },
+    {
+      "id": "AUD-005-API004",
+      "category": "API",
+      "kind": "observation",
+      "title": "Ordinary exports replace an existing file, Shamir exports never do",
+      "severity": "info",
+      "status": "accepted",
+      "releaseBlocking": false,
+      "evidence": [
+        "See the Markdown report section of the same ID."
+      ],
+      "reproduction": "`encode --output/--pdf/--qr` and `preview --pdf` replace an existing file through a private rename; the `encode` help says so. SSKR record and PDF exports refuse an existing file. Both behaviors are deliberate and documented in the help; the README examples say \"a new file\". Recorded as accepted design; the README now states the rule.",
+      "expected": "Informational; no supported contract is broken.",
+      "observed": "`encode --output/--pdf/--qr` and `preview --pdf` replace an existing file through a private rename; the `encode` help says so. SSKR record and PDF exports refuse an existing file. Both behaviors are deliberate and documented in the help; the README examples say \"a new file\". Recorded as accepted design; the README now states the rule.",
+      "impact": "No demonstrated defect.",
+      "recommendedFix": "See the observation.",
+      "requiredVerification": "None for this audit."
+    },
+    {
+      "id": "AUD-005-BLD006",
+      "category": "BLD",
+      "kind": "observation",
+      "title": "Workflow and asset hygiene",
+      "severity": "info",
+      "status": "deferred",
+      "releaseBlocking": false,
+      "evidence": [
+        "See the Markdown report section of the same ID."
+      ],
+      "reproduction": "`ci.yml` checks out with persisted credentials (the executable workflow does not); `executable.yml` pairs `upload-artifact` v7.0.1 with `download-artifact` v4.3.0. PDFs keep their creation and modification dates. The executable embeds every file under `assets/`, including the CJK font subset that no template uses yet and the map source of a generated module. None of this is a demonstrated defect; each is a candidate for a later cleanup.",
+      "expected": "Informational; no supported contract is broken.",
+      "observed": "`ci.yml` checks out with persisted credentials (the executable workflow does not); `executable.yml` pairs `upload-artifact` v7.0.1 with `download-artifact` v4.3.0. PDFs keep their creation and modification dates. The executable embeds every file under `assets/`, including the CJK font subset that no template uses yet and the map source of a generated module. None of this is a demonstrated defect; each is a candidate for a later cleanup.",
+      "impact": "No demonstrated defect.",
+      "recommendedFix": "See the observation.",
+      "requiredVerification": "None for this audit."
+    }
+  ],
+  "remediation": [
+    {
+      "id": "AUD-005-SEC001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original reproduction"
+    },
+    {
+      "id": "AUD-005-API001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original reproduction"
+    },
+    {
+      "id": "AUD-005-API002",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original reproduction"
+    },
+    {
+      "id": "AUD-005-BLD001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Static review"
+    },
+    {
+      "id": "AUD-005-BLD002",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original reproduction"
+    },
+    {
+      "id": "AUD-005-BLD003",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original reproduction"
+    },
+    {
+      "id": "AUD-005-BLD004",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original reproduction"
+    },
+    {
+      "id": "AUD-005-BLD005",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original reproduction"
+    },
+    {
+      "id": "AUD-005-UI001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original reproduction"
+    },
+    {
+      "id": "AUD-005-UI002",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original reproduction"
+    },
+    {
+      "id": "AUD-005-DOC001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Source comparison"
+    },
+    {
+      "id": "AUD-005-DOC002",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Source comparison"
+    }
+  ],
+  "limitations": [
+    "Linux x86_64 only. The Windows and macOS executables and the CI jobs were not run; their behavior is inferred from source and workflows.",
+    "No Docker: the canonical SSKR WASM rebuild was not repeated; hash equality with the AUD-004 rebuild is the evidence.",
+    "No real hidden-prompt session, physical print or scan, assistive technology, or RustSec scan.",
+    "The oracle's color and color-Unicode packing re-implements documented rules; only the BIP39 list and the Seedshift construction are fully independent of the code.",
+    "No release approval and no independent cryptographic certification."
+  ]
+}
