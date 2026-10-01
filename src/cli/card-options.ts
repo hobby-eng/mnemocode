@@ -36,7 +36,7 @@ export function validateCardOptions(
     return;
   }
   if (!['unicode', 'colors', 'colors-unicode'].includes(format))
-    throw new Error('PDF export requires format 3, 4, or 5.');
+    throw new Error('Card export requires format 3, 4, or 5.');
   if (format === 'unicode' && mode === 'direct')
     throw new Error(
       'To export a card with dates, select a Seedshift mode. The dates will be visible on the card.',
@@ -54,9 +54,9 @@ export async function completeEventLabels(
   supplied: readonly string[],
 ): Promise<string[]> {
   if (supplied.length > dates.length)
-    throw new Error('Provide exactly one entry label for every card date.');
+    throw new Error('Provide exactly one event label for every card date.');
   const labels = supplied.map((label) => label.trim());
-  if (labels.some((label) => !label)) throw new Error('Card entry labels must not be empty.');
+  if (labels.some((label) => !label)) throw new Error('Card event labels must not be empty.');
   if (labels.length === dates.length) return labels;
   if (!process.stdin.isTTY || !process.stderr.isTTY)
     throw new Error('To export a dated card, provide one event label for every date.');
@@ -64,7 +64,7 @@ export async function completeEventLabels(
   try {
     for (let i = labels.length; i < dates.length; i += 1) {
       const label = (await terminal.question(`Event label for ${formatDate(dates[i]!)}: `)).trim();
-      if (!label) throw new Error('Card entry labels must not be empty.');
+      if (!label) throw new Error('Card event labels must not be empty.');
       labels.push(label);
     }
   } finally {

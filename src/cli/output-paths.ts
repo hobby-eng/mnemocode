@@ -71,7 +71,9 @@ export async function preflightFileDestination(
   allowOverwrite: boolean,
 ): Promise<void> {
   if (!path.trim() || path === '-')
-    throw new Error('File export requires a new file path. Terminal output is always enabled.');
+    throw new Error(
+      'File export requires a file path; - and empty paths are not accepted. Results always appear in the terminal.',
+    );
   try {
     const existing = await lstat(path);
     if (!allowOverwrite) throw new Error('The output file already exists. Choose a new path.');

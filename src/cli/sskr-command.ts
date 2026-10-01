@@ -3,8 +3,8 @@ import { allTemplateStyles } from '../export/templates.js';
 import { resolveSskrLayout } from '../export/sskr-content.js';
 import {
   terminalColor,
+  terminalHint,
   terminalNotice,
-  terminalPaint,
   terminalResultHeader,
   terminalStatus,
 } from './terminal.js';
@@ -104,7 +104,7 @@ function shareFormat(args: ParsedArguments): 'ur' | 'colors' {
 function printShares(shares: readonly string[], format: 'ur' | 'colors'): void {
   for (const [index, share] of shares.entries()) {
     if (
-      !terminalResultHeader(`SSKR SHARE ${index + 1} / ${shares.length}`, [
+      !terminalResultHeader(`SSKR share ${index + 1} of ${shares.length}`, [
         ['Format', format === 'ur' ? 'Compact UR' : 'RGB hexadecimal codes (ordered)'],
       ])
     )
@@ -209,7 +209,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
   const shares = await splitSskrMnemonic(result.shiftedEnglish.join(' '), threshold, count);
   await saveShares(shares, args, options);
   if (
-    !terminalResultHeader('SSKR EXPORT', [
+    !terminalResultHeader('SSKR export', [
       ['Threshold', `${threshold} of ${count}`],
       ['Mode', mode],
       ['Layout', options?.layout ?? 'text'],
@@ -222,7 +222,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
     );
   if (representation !== undefined) {
     if (
-      !terminalResultHeader('ENCODED RESULT', [
+      !terminalResultHeader('Encoded result', [
         ['Mode', mode],
         ['Format', representation],
         ['Content', encodedOutputLabel(representation, mode)],
@@ -234,11 +234,9 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
   printShares(shares, format);
   if (terminalColor('stderr')) {
     console.error('');
-    terminalStatus('✓', 'Original fingerprint', masterFingerprint(result.sourceMnemonic));
-    terminalStatus('✓', 'Encoded fingerprint', masterFingerprint(result.shiftedEnglish.join(' ')));
-    console.error(
-      terminalPaint('stderr', '2', '  BIP32 fingerprints above use an empty BIP39 passphrase.'),
-    );
+    terminalStatus('Original fingerprint', masterFingerprint(result.sourceMnemonic));
+    terminalStatus('Encoded fingerprint', masterFingerprint(result.shiftedEnglish.join(' ')));
+    terminalHint('BIP32 fingerprints above use an empty BIP39 passphrase.');
   } else {
     console.error(
       `Original BIP32 master fingerprint (empty BIP39 passphrase): ${masterFingerprint(result.sourceMnemonic)}`,
@@ -303,7 +301,7 @@ export async function runSskrCombine(args: ParsedArguments): Promise<void> {
   const mnemonic =
     mode === 'direct' ? recovered : decodeInput(recovered, 'english', dateValues).recoveredMnemonic;
   if (
-    !terminalResultHeader('RECOVERED RESULT', [
+    !terminalResultHeader('Recovered result', [
       ['Mode', mode],
       ['Source', 'SSKR shares'],
       ['Content', 'English BIP39 mnemonic'],
@@ -312,7 +310,7 @@ export async function runSskrCombine(args: ParsedArguments): Promise<void> {
     console.log('Recovered English BIP39 mnemonic:');
   console.log(mnemonic);
   if (terminalColor('stderr')) {
-    terminalStatus('✓', 'Recovered fingerprint', masterFingerprint(mnemonic));
+    terminalStatus('Recovered fingerprint', masterFingerprint(mnemonic));
     terminalNotice('Fingerprint uses an empty BIP39 passphrase.');
   } else
     console.error(

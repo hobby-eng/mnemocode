@@ -33,13 +33,11 @@ export function readBoundedTextFile(path: string, inputName = 'The text input'):
 export function textInput(arguments_: ParsedArguments, key: 'input' | 'mnemonic'): string {
   const direct = value(arguments_, key);
   const path = value(arguments_, `${key}-file`);
-  if ((direct === undefined) === (path === undefined)) {
-    throw new Error(
-      key === 'mnemonic'
-        ? 'Provide the mnemonic either as direct text or in a file, but not both.'
-        : 'Provide the encoded input either as direct text or in a file, but not both.',
-    );
-  }
+  const subject = key === 'mnemonic' ? 'the mnemonic' : 'the encoded input';
+  if (direct !== undefined && path !== undefined)
+    throw new Error(`Provide ${subject} either as direct text or in a file, but not both.`);
+  if (direct === undefined && path === undefined)
+    throw new Error(`Provide ${subject} as direct text, in a file, or through hidden input.`);
   return (
     direct ??
     (path === '-'
@@ -69,9 +67,12 @@ export function inputFormat(value_: string): EncodedFormat {
     '5': 'colors',
   };
   const format = aliases[value_] ?? value_;
-  const supported = ['english', 'indexes', 'unicode', 'colors', 'colors-unicode'];
-  if (!supported.includes(format))
-    throw new Error(`The representation format must be one of: ${supported.join(', ')}.`);
+  if (!(Object.values(aliases) as string[]).includes(format)) {
+    const numbered = Object.entries(aliases).map(([number, name]) => `${number} ${name}`);
+    throw new Error(
+      `The representation format must be one of: ${numbered.join(', ')}. Use the number or the name.`,
+    );
+  }
   return format as EncodedFormat;
 }
 

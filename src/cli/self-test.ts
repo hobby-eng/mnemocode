@@ -1,5 +1,5 @@
 import { masterFingerprint } from '../bitcoin-evidence.js';
-import { terminalPaint } from './terminal.js';
+import { STYLE, terminalColor, terminalPaint } from './terminal.js';
 import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -391,18 +391,21 @@ export async function runSelfTest(): Promise<void> {
     'approved templates, fonts, artwork and single-page A6 PDF',
   );
 
-  console.log(terminalPaint('stdout', '1;36', `MnemoCode ${MNEMOCODE_VERSION} self-test`));
-  console.log('────────────────────────────────────────────────────────────────────────');
-  for (const [name, detail] of rows)
+  const summary = `${publicVectorCount} public vectors; ${roundTripCount} representation round trips; ${(performance.now() - started).toFixed(1)} ms total.`;
+  if (terminalColor('stdout')) {
+    // The terminal look of the bip_tools tools: a title line, a ✓ per check, grey details.
+    const paint = (code: string, text: string): string => terminalPaint('stdout', code, text);
     console.log(
-      `${terminalPaint('stdout', '1;32', '✓')} ${terminalPaint('stdout', '1', name.padEnd(24))} ${terminalPaint('stdout', '2', detail)}`,
+      `\n${paint(STYLE.heading, 'MnemoCode')} ${paint(STYLE.muted, '·')} ${paint(STYLE.strong, `Self-test ${MNEMOCODE_VERSION}`)}`,
     );
+    for (const [name, detail] of rows)
+      console.log(`${paint(STYLE.good, '✓')} ${name.padEnd(24)} ${paint(STYLE.muted, detail)}`);
+    console.log(`${paint(STYLE.good, '✓ Passed:')} ${summary}`);
+    return;
+  }
+  console.log(`MnemoCode ${MNEMOCODE_VERSION} self-test`);
   console.log('────────────────────────────────────────────────────────────────────────');
-  console.log(
-    terminalPaint(
-      'stdout',
-      '1;32',
-      `PASS  ${publicVectorCount} public vectors; ${roundTripCount} representation round trips; ${(performance.now() - started).toFixed(1)} ms total.`,
-    ),
-  );
+  for (const [name, detail] of rows) console.log(`✓ ${name.padEnd(24)} ${detail}`);
+  console.log('────────────────────────────────────────────────────────────────────────');
+  console.log(`PASS  ${summary}`);
 }
