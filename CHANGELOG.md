@@ -2,6 +2,11 @@
 
 ## 0.1.0 (unreleased)
 
+### Distribution
+
+- Each release has one executable file for Linux, Windows and macOS, with Node.js, the card artwork and the SSKR engine built in; `pnpm build:executable` builds it for the current computer.
+- `mnemocode <command> --help` explains every option of a command with examples; `-h` gives a short summary.
+
 ### Formats
 
 - Numbered representations are now consecutive: `colors-unicode` uses `--format 4` instead of `--format 6`.

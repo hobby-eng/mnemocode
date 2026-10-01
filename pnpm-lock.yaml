@@ -47,6 +47,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 5.0.2
         version: 5.0.2(vitest@5.0.2)
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       prettier:
         specifier: 3.9.9
         version: 3.9.9

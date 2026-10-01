@@ -1,7 +1,7 @@
 import { masterFingerprint } from '../bitcoin-evidence.js';
 import { STYLE, terminalColor, terminalPaint } from './terminal.js';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { entropyToMnemonic, validateMnemonic } from '@scure/bip39';
@@ -27,6 +27,7 @@ import { cardTemplates } from '../export/templates.js';
 import { indexesToColors } from '../core.js';
 import { assertSskrSelfTest } from '../sskr/self-test.js';
 import { MNEMOCODE_VERSION } from '../version.js';
+import { readBundledFile } from '../bundled-files.js';
 
 const PUBLIC_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
@@ -199,8 +200,9 @@ export function assertCoreSelfTest(): void {
 }
 
 async function loadPublicVectors(): Promise<readonly PublicVector[]> {
-  const path = new URL('../../vectors/mnemocode-v1.json', import.meta.url);
-  const parsed: unknown = JSON.parse(await readFile(path, 'utf8'));
+  const parsed: unknown = JSON.parse(
+    new TextDecoder().decode(await readBundledFile('vectors/mnemocode-v1.json')),
+  );
   if (!isObject(parsed) || parsed.version !== 1 || !Array.isArray(parsed.vectors))
     throw new Error('Public vector file has an unsupported structure.');
   const vectors = parsed.vectors.map(validateVector);
