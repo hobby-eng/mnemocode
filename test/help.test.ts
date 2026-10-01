@@ -38,6 +38,8 @@ describe('help', () => {
         expect(stdout).toContain(`  ${name}`);
       for (const topic of Object.keys(topicHelp)) expect(stdout).toContain(`help ${topic}`);
       expect(stdout).toContain('Recovery material:');
+      // AUD-005-UI002: the overview, including its safety line, fits the 80-column help width.
+      for (const line of stdout.split('\n')) expect(line.length, line).toBeLessThanOrEqual(80);
     }
   });
 

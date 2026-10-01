@@ -717,7 +717,7 @@
       "title": "The safety line of the main help is not wrapped",
       "category": "UI",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "src/cli/usage.ts:229-232"
@@ -900,10 +900,10 @@
     },
     {
       "id": "AUD-005-UI002",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Original reproduction"
+      "status": "verified",
+      "fixCommit": "UI002 commit",
+      "verificationCommit": "UI002 commit",
+      "evidence": "src/cli/usage.ts wraps the yellow safety line at the 80-column help width and paints each line. test/help.test.ts now checks that no line of the overview (four ways to ask for it) is wider than 80 columns; 6 help tests pass."
     },
     {
       "id": "AUD-005-DOC001",

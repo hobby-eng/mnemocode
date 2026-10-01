@@ -226,10 +226,13 @@ export function printUsage(): void {
     notes([
       'Use --ask-secrets for a real phrase: text typed in a command can stay in the shell history. Work on a trusted computer without a network connection. -h gives a short summary of a command, --help the full explanation.',
     ]),
-    paint(
-      STYLE.warning,
+    // The safety line wraps like every other text of the help, so that it stays whole.
+    wrapText(
       'Recovery material: a record, with its dates if it has any, restores the wallet; it is not encryption.',
-    ),
+      HELP_WIDTH,
+    )
+      .map((line) => paint(STYLE.warning, line))
+      .join('\n'),
   ];
   console.log(blocks.join('\n\n'));
 }
