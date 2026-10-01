@@ -1,0 +1,849 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-006",
+  "auditNumber": 6,
+  "date": "2026-10-01",
+  "title": "Full-scope MnemoCode audit after the executable release work",
+  "reviewer": {
+    "name": "GitHub Copilot",
+    "model": null,
+    "reasoningEffort": null,
+    "modelNote": "Exact model identifier was not retained in client metadata.",
+    "reasoningEffortNote": "The client did not retain the reasoning-effort setting.",
+    "phases": [
+      {
+        "phase": 1,
+        "scope": "Snapshot, prior audit reconciliation, full verification, README/oracle/SSKR probes, one card-output run, executable smoke, package/advisory checks, current SSKR WASM rebuild and report preparation.",
+        "model": null,
+        "reasoningEffort": null
+      }
+    ]
+  },
+  "snapshot": {
+    "commit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+    "commitComplete": true,
+    "commitSubject": "Release: curated notes from docs/releases instead of the tag message",
+    "branch": "main",
+    "upstream": "origin/main",
+    "aheadCommits": 17,
+    "workingTree": {
+      "baseline": "Clean at audit start.",
+      "completion": "Only docs/audits/AUD-006-harnesses/ and the AUD-006 Markdown/JSON/index records were changed. Generated card artifacts and the Linux executable are under ignored output/evidence directories; release/ files were not changed."
+    },
+    "sourceFingerprint": "git tree 6434dea1fef81ae8b8c5b8bd508de23236286cd9",
+    "packageVersion": "0.1.0",
+    "artifacts": {
+      "vectors/mnemocode-v1.json": "ba96fabfb53a02dfa4106df98d65ec72323ca2cf798500159eed935444829048",
+      "vectors/sskr-v1.json": "823d6d996769e68bce43cb6e40a13b7fc0f5cc5e3f53d9d5a79aecc0f1d6cd71",
+      "vendor/sskr/integrity.json": "b010c6d70268d10fa4687e18d34a77f4de9659d16758c9df23a7db3f1de1d379",
+      "vendor/sskr/generated/recovery_sskr_wasm_bg.wasm": "247763cb094849a4a2f4639bb55c2636f6998ea6c35e802345d3b33b6fc75809",
+      "localExecutable/mnemocode-0.1.0-linux-x64": "9b526eab985bd9a35b463297bea1b0b2e10a761c677e9837696c9bbc237ab9c5"
+    },
+    "artifactRelationship": "pnpm verify built current dist from the reviewed source. The Linux executable was built once into ignored audit evidence and narrowly smoke-tested. SSKR WASM and normalized JS/declarations were rebuilt in the pinned offline container into ignored evidence and matched vendored outputs. One card-output acceptance run produced ignored files before the user requested not to repeat it; no further card/PDF generation was run."
+  },
+  "procedure": {
+    "docs/FULL_AUDIT_GUIDE.md": "30fa6a1675892e2a3059bdbd6e97737f2959a74aca98a0a90e4f655ae12854a6",
+    "docs/audits/AUDIT_STANDARD.md": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f",
+    "docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+    "docs/audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7"
+  },
+  "scope": {
+    "kind": "full-scope audit of implemented MnemoCode CLI/library surfaces; browser/provider/transaction areas are not-applicable",
+    "included": [
+      "BIP39 validation, five representations, direct/checksum-valid/legacy transformations, MNC1 records, date and forgotten-word recovery, and local Bitcoin evidence",
+      "SSKR creation, recovery, thresholds, UR/Bytewords/color transport, vendored Rust/WASM, generated-file integrity and licenses",
+      "Card/PDF/PNG/JPEG/QR renderers and private file publication (one actual card-output run only)",
+      "CLI arguments, help, hidden/file/stdin secret input, bounded reads, single executable and executable notices",
+      "Dependencies, npm package contents, GitHub CI/release workflow sources, README/SECURITY/SSKR/Architecture/Changelog/release docs, and AUD-001 through AUD-005"
+    ],
+    "excluded": [
+      "Browser DOM, CSP, provider, wallet activity, transaction, PSBT and interactive application workflows, which are not implemented by this repository",
+      "Current Windows/macOS runs for local commits d7fcb25 and b1d7476; remote Actions runs exist only for older origin commits",
+      "Physical card printing/camera scanning and assistive-technology review",
+      "Full executable self-test and all-template PDF generation after the user's instruction not to repeat card/PDF generation",
+      "Full platform/build-container image rebuild from scratch and external cryptographic-specialist certification"
+    ],
+    "testData": "Published vectors and synthetic/public BIP39 test mnemonic only; no real wallet material or credentials."
+  },
+  "environment": {
+    "os": "Linux x86-64, kernel 7.0.0-34-generic",
+    "node": "26.10.0",
+    "pnpm": "10.19.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3",
+    "prettier": "3.9.9",
+    "python": "3.14.4",
+    "poppler": "26.01.0",
+    "rust": "1.98.1",
+    "cargo": "1.98.1",
+    "wasmBindgenHost": "0.2.129",
+    "wasmBindgenPinnedContainer": "0.2.128",
+    "cargoAudit": "0.22.2",
+    "docker": "29.8.1",
+    "jsonschema": "4.19.2",
+    "environmentVariables": {
+      "CARGO_HOME": "/home/sergio/Documents/bip_tools/workingspace/cargo",
+      "RUSTUP_HOME": "/home/sergio/Documents/bip_tools/workingspace/rustup"
+    },
+    "notes": "No browser runtime applies. The SSKR rebuild used the existing pinned container image audit6built:e6a6d6bc5ec6d38a1c6e1a1292c59a84d3f0796f, one CPU, 1536 MiB, network disabled, read-only vendor/cache mounts and output under ignored evidence."
+  },
+  "checks": {
+    "coverageLedger": [
+      {
+        "checkId": "CHECK-SEC-001",
+        "category": "SEC",
+        "group": "Secret ownership and lifecycle",
+        "toolScope": "CLI/library, records, SSKR, file exports",
+        "method": "Source trace, full suite, AUD-005 fixed-defect probes",
+        "outcome": "passed",
+        "evidence": "No real secrets used. Immutable JavaScript strings and OS memory remain outside control."
+      },
+      {
+        "checkId": "CHECK-SEC-002",
+        "category": "SEC",
+        "group": "Sandbox, CSP and transport",
+        "toolScope": "None",
+        "method": "Implementation and SECURITY.md reviewed",
+        "outcome": "not-applicable",
+        "evidence": "No browser document, server, iframe, CSP or message-port protocol; the process uses host OS permissions."
+      },
+      {
+        "checkId": "CHECK-SEC-003",
+        "category": "SEC",
+        "group": "Network egress",
+        "toolScope": "CLI/library runtime",
+        "method": "Runtime source/architecture review",
+        "outcome": "passed",
+        "evidence": "Application processing is local; dependency/package-manager and GitHub audit traffic is separate."
+      },
+      {
+        "checkId": "CHECK-SEC-004",
+        "category": "SEC",
+        "group": "Randomness and construction",
+        "toolScope": "Seedshift and SSKR",
+        "method": "Independent oracle, fixed vectors, secure-random source review and tests",
+        "outcome": "passed",
+        "evidence": "Production SSKR randomness uses Node crypto; oracle: 7 vectors, 400 deterministic cases, 6,000 comparisons, 0 failures."
+      },
+      {
+        "checkId": "CHECK-SEC-005",
+        "category": "SEC",
+        "group": "Exceptional paths and cleanup",
+        "toolScope": "Inputs, SSKR and file publication",
+        "method": "Full tests and existing bounded failure probes",
+        "outcome": "passed",
+        "evidence": "AUD-005 failure probes fixed; no exhaustive WASM-memory/OOM campaign."
+      },
+      {
+        "checkId": "CHECK-SEC-006",
+        "category": "SEC",
+        "group": "Injection, persistence and sensitive APIs",
+        "toolScope": "CLI/library/PDF exporters",
+        "method": "Source/test review and one actual PDF/QR acceptance run",
+        "outcome": "passed",
+        "evidence": "No DOM/storage API; outputs are local. One acceptance run only, per user limitation."
+      },
+      {
+        "checkId": "CHECK-SEC-007",
+        "category": "SEC",
+        "group": "Availability bounds",
+        "toolScope": "Text/PNG input, date recovery, SSKR",
+        "method": "Boundary tests and source review",
+        "outcome": "passed",
+        "evidence": "1 MiB text, 16 MiB/4096-pixel PNG and bounded date recovery; no host exhaustion attempted."
+      },
+      {
+        "checkId": "CHECK-FUN-001",
+        "category": "FUN",
+        "group": "BIP39 and Seedshift",
+        "toolScope": "All phrase lengths and five representations",
+        "method": "pnpm verify and independent oracle",
+        "outcome": "passed",
+        "evidence": "Official list, 7 vectors, 400 cases, 6,000 comparisons, no mismatches."
+      },
+      {
+        "checkId": "CHECK-FUN-002",
+        "category": "FUN",
+        "group": "HD evidence paths",
+        "toolScope": "Local Bitcoin recovery evidence",
+        "method": "Full suite, public-address/xpub/WIF matching tests and docs review",
+        "outcome": "passed",
+        "evidence": "No wallet scanning or account-discovery claim; current implementation only checks a selected path/location."
+      },
+      {
+        "checkId": "CHECK-FUN-003",
+        "category": "FUN",
+        "group": "BIP85/BIP38/messages/Silent Payments",
+        "toolScope": "None",
+        "method": "Supported feature inventory",
+        "outcome": "not-applicable",
+        "evidence": "Not implemented or claimed by MnemoCode."
+      },
+      {
+        "checkId": "CHECK-FUN-004",
+        "category": "FUN",
+        "group": "Scripts/descriptors/multisig",
+        "toolScope": "None",
+        "method": "Supported feature inventory",
+        "outcome": "not-applicable",
+        "evidence": "No script or descriptor API."
+      },
+      {
+        "checkId": "CHECK-FUN-005",
+        "category": "FUN",
+        "group": "Transactions/PSBT",
+        "toolScope": "None",
+        "method": "Supported feature inventory",
+        "outcome": "not-applicable",
+        "evidence": "No transaction or PSBT interface."
+      },
+      {
+        "checkId": "CHECK-FUN-006",
+        "category": "FUN",
+        "group": "Recovery and backup formats",
+        "toolScope": "Records, all transformations, recovery, SSKR, card QR",
+        "method": "Full tests, 30 README examples, vectors, integrity probe, one card-output run",
+        "outcome": "passed",
+        "evidence": "454 tests pass; SSKR vectors/integrity pass; card-output executed once only."
+      },
+      {
+        "checkId": "CHECK-FUN-007",
+        "category": "FUN",
+        "group": "Discovery/providers/accounting",
+        "toolScope": "None",
+        "method": "Supported feature inventory",
+        "outcome": "not-applicable",
+        "evidence": "No network provider, chain scan, balance or transaction accounting."
+      },
+      {
+        "checkId": "CHECK-API-001",
+        "category": "API",
+        "group": "Runtime contracts",
+        "toolScope": "CLI and TypeScript API",
+        "method": "Full tests, AUD-005 defect probes and executable public-vector smoke",
+        "outcome": "passed",
+        "evidence": "Old malformed record/index findings do not reproduce."
+      },
+      {
+        "checkId": "CHECK-API-002",
+        "category": "API",
+        "group": "Async state/cancellation",
+        "toolScope": "File operations and render/export promises",
+        "method": "Full tests and source review",
+        "outcome": "passed",
+        "evidence": "No interactive browser async state; publication/fallback tests pass."
+      },
+      {
+        "checkId": "CHECK-API-003",
+        "category": "API",
+        "group": "Public export schema",
+        "toolScope": "MNC1, SSKR and QR output",
+        "method": "Text-only public SSKR output shape probe and serializer path review",
+        "outcome": "failed",
+        "evidence": "AUD-006-DOC001: SSKR shares are emitted without MNC1 while the README's generic --output paragraph promises an MNC1 header."
+      },
+      {
+        "checkId": "CHECK-API-004",
+        "category": "API",
+        "group": "Encoding interoperability",
+        "toolScope": "Five formats and SSKR",
+        "method": "Independent oracle, published SSKR vector and current canonical WASM comparison",
+        "outcome": "passed",
+        "evidence": "Normalized offline bridge and four generated SSKR files match."
+      },
+      {
+        "checkId": "CHECK-BLD-001",
+        "category": "BLD",
+        "group": "Package/composition and toolchain pins",
+        "toolScope": "npm package and CLI/library",
+        "method": "pnpm verify, toolchain check, npm pack dry-run",
+        "outcome": "passed",
+        "evidence": "Exact package/Node/pnpm pins agree; 205 package entries; only audits README included."
+      },
+      {
+        "checkId": "CHECK-BLD-002",
+        "category": "BLD",
+        "group": "Platform runtime matrix",
+        "toolScope": "Linux, Windows and macOS",
+        "method": "Linux full suite; remote GitHub run history review",
+        "outcome": "passed",
+        "evidence": "Linux current snapshot 454/454; remote Windows/macOS evidence is from older commits, not current local head."
+      },
+      {
+        "checkId": "CHECK-BLD-003",
+        "category": "BLD",
+        "group": "Lockfiles, provenance and licensing",
+        "toolScope": "npm closure, SSKR Cargo lock and executable notices",
+        "method": "pnpm audit, cargo audit, package dry-run and bundled-license harness",
+        "outcome": "passed",
+        "evidence": "No npm advisory; RustSec warns on unmaintained paste 1.0.15; executable notice harness reports no gaps."
+      },
+      {
+        "checkId": "CHECK-BLD-004",
+        "category": "BLD",
+        "group": "Canonical SSKR WASM",
+        "toolScope": "Vendored SSKR Rust/WASM bridge",
+        "method": "Offline build with pinned Rust/clang image and wasm-bindgen 0.2.129; normalized output comparison",
+        "outcome": "passed",
+        "evidence": "WASM identical; generated JS/declaration boilerplate normalized exactly as existing offline bridge generator does; all four files match."
+      },
+      {
+        "checkId": "CHECK-BLD-005",
+        "category": "BLD",
+        "group": "Artifacts, CI and release workflows",
+        "toolScope": "npm package, Linux executable, GitHub workflows",
+        "method": "Package dry-run, local executable narrow smoke, static workflow review, GitHub run list",
+        "outcome": "not-run",
+        "evidence": "No current remote run for AUD-005 BLD001/002 fix commits; those two findings remain fixed, not verified. No tag/release created."
+      },
+      {
+        "checkId": "CHECK-UI-001",
+        "category": "UI",
+        "group": "Real-file presentation",
+        "toolScope": "PDF and QR output",
+        "method": "One actual card-output acceptance command before user limitation",
+        "outcome": "passed",
+        "evidence": "25 named output cases plus SSKR command; 59 ignored files generated. No repeat, physical print or scan."
+      },
+      {
+        "checkId": "CHECK-UI-002",
+        "category": "UI",
+        "group": "CLI input and state",
+        "toolScope": "Arguments, prompts, files, stdin and help",
+        "method": "Full tests and README examples",
+        "outcome": "passed",
+        "evidence": "30 documented examples pass; no real hidden-input interaction performed."
+      },
+      {
+        "checkId": "CHECK-UI-003",
+        "category": "UI",
+        "group": "Accessibility and graphical controls",
+        "toolScope": "No graphical interface",
+        "method": "Supported interface inventory",
+        "outcome": "not-applicable",
+        "evidence": "No browser/UI surface; physical/screen-reader tests not applicable to CLI/library."
+      },
+      {
+        "checkId": "CHECK-ARC-001",
+        "category": "ARC",
+        "group": "Ownership/import boundaries",
+        "toolScope": "Core, CLI, renderer and SSKR",
+        "method": "Current architecture and tests",
+        "outcome": "passed",
+        "evidence": "Core is separated from CLI/renderers; renderer platform seam is documented and tested."
+      },
+      {
+        "checkId": "CHECK-ARC-002",
+        "category": "ARC",
+        "group": "Dead code/duplication/readability",
+        "toolScope": "Substantive current diff",
+        "method": "Whitespace-insensitive code review, test marker scan",
+        "outcome": "passed",
+        "evidence": "No new production issue identified. One test fixture callback uses `any`; informational only."
+      },
+      {
+        "checkId": "CHECK-ARC-003",
+        "category": "ARC",
+        "group": "Comments and test fidelity",
+        "toolScope": "Current CLI/release/SSKR changes",
+        "method": "Source/test review and full suite",
+        "outcome": "passed",
+        "evidence": "No stale/unexplained comments found in substantive changes; no product comments needed beyond existing rationale."
+      },
+      {
+        "checkId": "CHECK-DOC-001",
+        "category": "DOC",
+        "group": "Capability/safety descriptions",
+        "toolScope": "README, SECURITY, SSKR and Architecture",
+        "method": "Compare text with production output paths and tests",
+        "outcome": "failed",
+        "evidence": "AUD-006-DOC001 only; other reviewed claims agree with source and 30 runnable examples."
+      },
+      {
+        "checkId": "CHECK-DOC-002",
+        "category": "DOC",
+        "group": "Commands, metadata and licensing",
+        "toolScope": "README, CHANGELOG, release notes, legal files",
+        "method": "30 README/SSKR examples, package dry-run and notice harness",
+        "outcome": "passed",
+        "evidence": "Current documented commands tested; bundle/package notice checks pass."
+      },
+      {
+        "checkId": "CHECK-DOC-003",
+        "category": "DOC",
+        "group": "Audit records",
+        "toolScope": "AUD-001 through AUD-006",
+        "method": "Historical register reconciliation and report schema validation",
+        "outcome": "passed",
+        "evidence": "Previous dispositions retained; AUD-006 pair validated at handoff."
+      }
+    ],
+    "commands": [
+      {
+        "command": "pnpm verify",
+        "outcome": "passed",
+        "counts": "31 files, 454 tests passed; format, check, build and full suite",
+        "evidence": "AUD-006-evidence/baseline-verify.log (local), sha256 e2194399443c7ab7e5707485b7689587f57e7cc1fa922e28a8f20c1eec2239c3"
+      },
+      {
+        "command": "pnpm audit --audit-level high",
+        "outcome": "passed",
+        "counts": "No known vulnerabilities",
+        "evidence": "AUD-006-evidence/npm-audit.log (local)"
+      },
+      {
+        "command": "npm pack --dry-run --json --ignore-scripts",
+        "outcome": "passed",
+        "counts": "205 files; only docs/audits/README.md included from audits; no release/output",
+        "evidence": "AUD-006-evidence/package-dry-run.log (local)"
+      },
+      {
+        "command": "node docs/audits/AUD-005-harnesses/readme-examples.mjs",
+        "outcome": "passed",
+        "counts": "30 examples, 0 failures",
+        "evidence": "AUD-006-evidence/readme-examples.log (local)"
+      },
+      {
+        "command": "python3 docs/audits/AUD-005-harnesses/seedshift-oracle.py",
+        "outcome": "passed",
+        "counts": "7 vectors, 400 deterministic cases, 6,000 comparisons, 0 mismatches",
+        "evidence": "AUD-006-evidence/seedshift-oracle.log (local)"
+      },
+      {
+        "command": "node docs/audits/AUD-005-harnesses/defect-probes.mjs --fixed",
+        "outcome": "passed",
+        "counts": "8 historical AUD-005 defects not reproduced",
+        "evidence": "AUD-006-evidence/prior-defect-probes.log (local)"
+      },
+      {
+        "command": "node docs/audits/AUD-005-harnesses/sskr-integrity.mjs",
+        "outcome": "passed",
+        "counts": "7 files pinned; intact recovery and damaged WASM/JS refusal",
+        "evidence": "AUD-006-evidence/sskr-integrity.log (local)"
+      },
+      {
+        "command": "node scripts/check-card-output.mjs output/aud-006-card-output",
+        "outcome": "passed",
+        "counts": "One run before the user's request; 25 named cases plus SSKR command, 59 ignored files. No repeat.",
+        "evidence": "AUD-006-evidence/card-output.log (local)"
+      },
+      {
+        "command": "node scripts/build-executable.mjs docs/audits/AUD-006-evidence/executable-linux",
+        "outcome": "passed",
+        "counts": "Linux executable and per-bundle notices built outside release/",
+        "evidence": "AUD-006-evidence/executable-build-linux.log (local)"
+      },
+      {
+        "command": "Executable --version, --help, encode --mode direct with public BIP39 test vector",
+        "outcome": "passed",
+        "counts": "Three narrow smoke commands; no self-test/PDF/card path",
+        "evidence": "AUD-006-evidence/executable-version.log, executable-help.log, executable-public-vector.log (local)"
+      },
+      {
+        "command": "node docs/audits/AUD-005-harnesses/bundled-licenses.mjs docs/audits/AUD-006-evidence/executable-linux",
+        "outcome": "passed",
+        "counts": "17 bundled npm packages, no notice gaps",
+        "evidence": "AUD-006-evidence/executable-license-notices.log (local)"
+      },
+      {
+        "command": "python3 docs/audits/AUD-006-harnesses/rebuild-sskr-wasm.py",
+        "outcome": "failed",
+        "counts": "Cargo build succeeded and WASM bytes matched; script exit 1 because raw wasm-bindgen 0.2.129 output includes generic async loader/declarations absent from the intentionally synchronous vendor glue",
+        "evidence": "AUD-006-evidence/canonical-sskr-wasm.log (local); raw output mismatch retained"
+      },
+      {
+        "command": "node docs/audits/AUD-006-harnesses/compare-sskr-bindings.mjs",
+        "outcome": "passed",
+        "counts": "All four normalized generated SSKR files match the vendored files byte-for-byte",
+        "evidence": "AUD-006-evidence/canonical-sskr-binding-compare.log (local)"
+      },
+      {
+        "command": "cargo audit --file vendor/sskr/rust/Cargo.lock",
+        "outcome": "passed",
+        "counts": "137 crates; one allowed unmaintained paste 1.0.15 warning (RUSTSEC-2024-0436)",
+        "evidence": "AUD-006-evidence/cargo-audit-sskr.log (local)"
+      },
+      {
+        "command": "gh run list --repo hobby-eng/mnemocode --workflow ci.yml --limit 8; executable.yml equivalent",
+        "outcome": "passed",
+        "counts": "Latest remote run is origin/main commit 8c427af; no current local HEAD run",
+        "evidence": "AUD-006-evidence/github-ci-history.log (local)"
+      },
+      {
+        "command": "gh run list --repo hobby-eng/mnemocode --workflow executable.yml --commit d7fcb25 --limit 10; repeat for b1d7476",
+        "outcome": "passed",
+        "counts": "No GitHub run returned for either local workflow fix commit",
+        "evidence": "AUD-006-evidence/executable-workflow-fix.log and executable-notices-fix.log (local)"
+      },
+      {
+        "command": "Public BIP39 phrase with encode --sskr --threshold 2 --shares 3 --output ignored output path",
+        "outcome": "passed",
+        "counts": "3 UR shares written, no MNC1 header",
+        "evidence": "AUD-006-evidence/sskr-output-format.log and sskr-output-shape.log (local)"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "AUD-006-DOC001",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "README implies SSKR --output files have an MNC1 record header",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "README.md",
+        "src/cli/encode-export.ts",
+        "src/cli/sskr-command.ts",
+        "docs/SSKR.md"
+      ],
+      "reproduction": "Read the generic --output paragraph and invoke encode --sskr --mnemonic <published abandon/about vector> --threshold 2 --shares 3 --output <new path>.",
+      "expected": "The paragraph scopes MNC1 headers to ordinary non-SSKR encode records or explicitly distinguishes the SSKR share-file format.",
+      "observed": "README states any file written with --output starts with MNC1. Ordinary encode uses serializeRecord; integrated SSKR writes shares.join newline. The new SSKR output contains three ur:sskr lines and no MNC1 header. docs/SSKR.md correctly says one share per line.",
+      "impact": "Readers can mistake SSKR output for an MNC1 record and mishandle a recovery file; both formats remain recoverable when read according to their specific guide.",
+      "evidence": "AUD-006-evidence/sskr-output-format.log and sskr-output-shape.log (local); source lines 28 in encode-export.ts and 155 in sskr-command.ts; README.md:371; docs/SSKR.md:20.",
+      "recommendedFix": "State that ordinary non-SSKR encode --output writes an MNC1 record and link to the SSKR guide for --sskr output.",
+      "requiredVerification": "Text-only public-vector assertions for ordinary MNC1 output and SSKR UR output; confirm each documented format matches the production entry point.",
+      "statusAtReview": "open"
+    }
+  ],
+  "observations": [],
+  "remediation": [
+    {
+      "id": "AUD-001-SEC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Prior remediation records plus current full suite and current SSKR integrity tests."
+    },
+    {
+      "id": "AUD-001-SEC002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Prior remediation records and current full suite."
+    },
+    {
+      "id": "AUD-001-FUN001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current oracle, vectors and full suite."
+    },
+    {
+      "id": "AUD-001-FUN002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Prior remediation records and current full suite."
+    },
+    {
+      "id": "AUD-001-API001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current full suite and strict runtime-boundary tests."
+    },
+    {
+      "id": "AUD-001-BLD001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current pinned offline SSKR WASM rebuild and normalized bindings comparison."
+    },
+    {
+      "id": "AUD-001-DOC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Prior remediation records and current documentation review."
+    },
+    {
+      "id": "AUD-002-BLD001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "AUD-002 follow-up verified the invalid-address evidence expectation; current full suite passes."
+    },
+    {
+      "id": "AUD-002-SEC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "AUD-002 follow-up verified bounded reads for secret files; current bounded input tests pass."
+    },
+    {
+      "id": "AUD-002-API001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "AUD-002 follow-up verified strict integer parsing; current CLI tests pass."
+    },
+    {
+      "id": "AUD-002-API002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "AUD-002 follow-up verified clear validation for malformed evidence and destinations; current tests pass."
+    },
+    {
+      "id": "AUD-002-API003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "AUD-002 follow-up verified PNG signature/IHDR validation; current QR input tests pass."
+    },
+    {
+      "id": "AUD-002-DOC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "AUD-002 record and README no longer present remediated AUD-001 findings as open."
+    },
+    {
+      "id": "AUD-002-DOC002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Toolchain and maintained documentation facts are checked by current scripts and reviewed against source."
+    },
+    {
+      "id": "AUD-002-DOC003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Historical report normalization preserved original evidence; current audit pair is schema-checked at handoff."
+    },
+    {
+      "id": "AUD-003-FUN001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current full tests and README examples."
+    },
+    {
+      "id": "AUD-003-FUN002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current full tests and README examples."
+    },
+    {
+      "id": "AUD-003-API001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current full suite and prior defect probes."
+    },
+    {
+      "id": "AUD-003-API002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current full suite and card-output acceptance run (one run only)."
+    },
+    {
+      "id": "AUD-003-DOC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Prior remediation records and current document/source review."
+    },
+    {
+      "id": "AUD-003-DOC002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Prior remediation records and current document/source review."
+    },
+    {
+      "id": "AUD-003-DOC003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Prior remediation records and current document/source review."
+    },
+    {
+      "id": "AUD-003-ARC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Prior source review and current type/build checks."
+    },
+    {
+      "id": "AUD-003-ARC002",
+      "status": "withdrawn",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "AUD-003 withdrew this allegation as incorrect; its immutable historical record is retained."
+    },
+    {
+      "id": "AUD-004-SEC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current AUD-005 defect probes, full suite and current file/card tests."
+    },
+    {
+      "id": "AUD-004-API001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current test suite rejects unsupported evidence kinds."
+    },
+    {
+      "id": "AUD-004-BLD001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current card-output run completes its assertions; it was run once only."
+    },
+    {
+      "id": "AUD-004-DOC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current SECURITY.md matches atomic publication implementation and residual staging-folder caveat."
+    },
+    {
+      "id": "AUD-004-DOC002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current README states separate card dimensions and page sizes."
+    },
+    {
+      "id": "AUD-004-DOC003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current SSKR vector description matches eight UR shares and a five-share Bytewords quorum."
+    },
+    {
+      "id": "AUD-004-API002",
+      "status": "accepted",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Owner-approved numeric CLI format compatibility change is retained in AUD-004; current docs and CLI agree."
+    },
+    {
+      "id": "AUD-004-BLD002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current CI source runs formatting, tests and card output on Linux; Windows/macOS jobs remain in workflow."
+    },
+    {
+      "id": "AUD-005-SEC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current eight-case defect probes and full suite pass."
+    },
+    {
+      "id": "AUD-005-API001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current defect probes and full suite pass."
+    },
+    {
+      "id": "AUD-005-API002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current defect probes and full suite pass."
+    },
+    {
+      "id": "AUD-005-BLD001",
+      "status": "fixed",
+      "fixCommit": "d7fcb25",
+      "verificationCommit": null,
+      "evidence": "Workflow source now requires reusable CI and checks tag/package version. GitHub has no run for the local commit; must remain fixed, not verified."
+    },
+    {
+      "id": "AUD-005-BLD002",
+      "status": "fixed",
+      "fixCommit": "b1d7476",
+      "verificationCommit": null,
+      "evidence": "Linux notice build and bundled-license harness pass; no Windows/macOS run exists for the local fix commit."
+    },
+    {
+      "id": "AUD-005-BLD003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current Linux executable build and narrow smoke; multi-system naming remains source-reviewed."
+    },
+    {
+      "id": "AUD-005-BLD004",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current ignored output paths and package dry-run."
+    },
+    {
+      "id": "AUD-005-BLD005",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current integrity test verifies every manifest entry and corruption refusal."
+    },
+    {
+      "id": "AUD-005-UI001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current cross-platform unit tests verify early refusal and alternatives; real hidden prompt not invoked."
+    },
+    {
+      "id": "AUD-005-UI002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current help tests and format check pass."
+    },
+    {
+      "id": "AUD-005-DOC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current README/changelog/architecture compared with package, scripts and workflows."
+    },
+    {
+      "id": "AUD-005-DOC002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": "b0cf0d779e50ceb9ceb82430b3c284243f1bf7d5",
+      "evidence": "Current SECURITY.md describes source and executable integrity scopes separately."
+    },
+    {
+      "id": "AUD-006-DOC001",
+      "status": "verified",
+      "fixCommit": "81168dce0e5c1097480fa5fdc82dc69b24494d0c",
+      "verificationCommit": "81168dce0e5c1097480fa5fdc82dc69b24494d0c",
+      "evidence": "README.md now says that encode --output writes an MNC1 record and that encode --sskr --output writes one ur:sskr share per line, linking docs/SSKR.md. test/cli.test.ts already requires MNC1 headers for ordinary --output; test/sskr-cli-export.test.ts now requires every line of an SSKR file to be a ur:sskr share (3 tests passed)."
+    }
+  ],
+  "limitations": {
+    "execution": "Full-scope audit of implemented CLI/library surfaces; browser/provider/transaction areas do not exist in this repository.",
+    "userConstraint": "One full card-output check completed before the user requested that large card/PDF generation not be repeated. It produced 59 ignored files under output/aud-006-card-output/, which the finalizer removes after preserving the log summary. No further card-output command or executable self-test that renders cards/PDFs was run.",
+    "remote": "AUD-005 BLD001/BLD002 fix commits are not on origin/main and have no GitHub runs; both remain fixed, not verified. Current GitHub runs on origin/main are successful but test an older snapshot.",
+    "platforms": "Current source was built/run locally on Linux only. Windows/macOS runs available from GitHub predate local AUD-005 release workflow fixes.",
+    "security": "Passing tests and WASM byte comparison are limited evidence, not a cryptographic proof or independent specialist certification.",
+    "reproducibility": "The offline SSKR build used a pre-existing pinned image and local crate cache; the image/base toolchain was not rebuilt from scratch."
+  },
+  "remediationUpdate": {
+    "date": "2026-10-02",
+    "reviewer": {
+      "name": "Claude Code (Anthropic)",
+      "model": "claude-opus-5-5",
+      "reasoningEffort": null
+    },
+    "commits": [
+      "81168dce0e5c1097480fa5fdc82dc69b24494d0c"
+    ],
+    "note": "Remediation after the report-only review; the reviewed snapshot b0cf0d7 and the finding text are unchanged. AUD-005-BLD001 and AUD-005-BLD002 stay fixed until GitHub runs their commits."
+  }
+}
