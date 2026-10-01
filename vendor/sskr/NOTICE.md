@@ -1,7 +1,7 @@
 # SSKR bridge
 
 MnemoCode includes the SSKR Rust source in `rust/src/lib.rs` and its generated
-JavaScript/WASM adapter. Source revision: `0f68444`; bridge package:
+JavaScript/WASM adapter. Source revision: `ef805a2` of multi-chain-wallet-tools (wasm-bindgen 0.2.129); bridge package:
 `recovery-sskr-wasm` 0.1.5. The retained bridge copyright and MIT terms are in
 [LICENSE](LICENSE). File hashes are in `integrity.json`.
 
