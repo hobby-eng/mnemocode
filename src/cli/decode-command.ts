@@ -19,7 +19,7 @@ import {
   type EncodedFormat,
   type TransformMode,
 } from './input.js';
-import { terminalColor, terminalPaint, terminalResultHeader, terminalStatus } from './terminal.js';
+import { terminalColor, terminalHint, terminalResultHeader, terminalStatus } from './terminal.js';
 
 export async function runDecode(arguments_: ParsedArguments): Promise<void> {
   let rawEncoded: string;
@@ -70,7 +70,7 @@ export async function runDecode(arguments_: ParsedArguments): Promise<void> {
     return;
   }
   const result = decodeByMode(encoded, format, enteredDates, mode);
-  terminalResultHeader('RECOVERED RESULT', [
+  terminalResultHeader('Recovered result', [
     ['Mode', mode],
     ['Input format', format],
     ['Words', String(result.recoveredIndexes.length)],
@@ -78,11 +78,11 @@ export async function runDecode(arguments_: ParsedArguments): Promise<void> {
   console.log(result.recoveredMnemonic);
   if (terminalColor('stderr')) {
     console.error('');
-    if (result.checksumValid) terminalStatus('✓', 'BIP39 checksum', 'valid');
-    else terminalStatus('!', 'BIP39 checksum', 'invalid - dates or input may be wrong', '33');
+    if (result.checksumValid) terminalStatus('BIP39 checksum', 'valid');
+    else terminalStatus('BIP39 checksum', 'invalid - dates or input may be wrong', false);
     if (result.checksumValid) {
-      terminalStatus('✓', 'Recovered fingerprint', masterFingerprint(result.recoveredMnemonic));
-      console.error(terminalPaint('stderr', '2', '  Fingerprint uses an empty BIP39 passphrase.'));
+      terminalStatus('Recovered fingerprint', masterFingerprint(result.recoveredMnemonic));
+      terminalHint('Fingerprint uses an empty BIP39 passphrase.');
     }
   } else {
     console.error(

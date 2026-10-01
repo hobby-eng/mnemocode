@@ -3,7 +3,7 @@ import { allMappingRows, mappingRow } from '../core.js';
 import { integerOption, type ParsedArguments, value } from './arguments.js';
 
 function printRow(row: ReturnType<typeof mappingRow>): void {
-  terminalResultHeader('WORD MAPPING', []);
+  terminalResultHeader('Word mapping', []);
   console.log(`index:       ${row.index}`);
   console.log(`english:     ${row.english}`);
   console.log(`unicode hex: ${row.unicodeHex}`);
@@ -25,7 +25,7 @@ export function runTable(arguments_: ParsedArguments): void {
     );
   }
   if (indexValue !== undefined)
-    return printRow(mappingRow(integerOption(arguments_, 'index', { min: 0, max: 2047 })));
+    return printRow(mappingRow(integerOption(arguments_, 'index', { min: 1, max: 2048 })));
   const row = allMappingRows().find(
     (item) => item.english === word || item.unicodeHex === unicode?.toUpperCase(),
   );

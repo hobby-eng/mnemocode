@@ -34,6 +34,8 @@ corepack pnpm dev -- encode --mnemonic "abandon abandon abandon abandon abandon 
 
 Once the package is installed, the same commands are available as `mnemocode`. The examples below use both spellings.
 
+`mnemocode --help` lists the commands. `mnemocode <command> --help`, for example `mnemocode encode --help`, explains every option of that command with examples; `-h` gives a short summary.
+
 ## Transformation modes
 
 `--mode` selects what happens to the phrase before it is written down.
@@ -121,9 +123,9 @@ Type the dates as one line, for example `23-09-2026 08-08-1988 07-11-1951`. In `
 
 Hidden input needs a terminal. The prompts appear in that terminal even when the output is sent to a file. Without a terminal the command stops at once.
 
-`--mnemonic-file PATH` and `--input-file PATH` read the secret from a local file instead.
+`--mnemonic-file PATH` and `--input-file PATH` read the secret from a local file instead; the path `-` reads standard input.
 
-Text input, from a prompt, a pipe or a file, may be up to 1 MiB. A QR image may be up to 16 MiB and 4096 pixels on a side. Larger input is refused before it is read.
+Text input, from a prompt, a pipe or a file, may be up to 1 MiB. A QR image may be up to 16 MiB and 4096 pixels on a side. MnemoCode stops reading at the limit and refuses larger input.
 
 ## Commands
 
@@ -229,7 +231,7 @@ MnemoCode can print the encoded phrase as material that looks like something els
 
 To anyone else the sheet is an ordinary set of design samples. For you, the printed codes are the whole value of the cards: `mnemocode decode` turns them back into the phrase. Photographs, printed colors, names, companies and contact details are decoration and are not needed for recovery.
 
-MnemoCode includes sixteen templates. `mnemocode preview --list` prints their names, and `mnemocode --help` describes every option. Cards need format 4 or 5. Terminal output and separate QR codes work with every format.
+MnemoCode includes sixteen templates. `mnemocode preview --list` prints their names, and `mnemocode encode --help` describes every card option. Cards need format 4 or 5. Terminal output and separate QR codes work with every format.
 
 | Option                         | Result                                                 |
 | ------------------------------ | ------------------------------------------------------ |

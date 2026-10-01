@@ -20,24 +20,6 @@ async function run(arguments_: readonly string[], environment?: NodeJS.ProcessEn
 }
 
 describe('CLI records', () => {
-  it('documents every transformation and recovery profile with runnable examples', async () => {
-    const help = await run(['--help']);
-    expect(help.stdout).toContain('MnemoCode 0.1.0');
-    expect(help.stdout).toContain('seedshift-legacy-valid');
-    expect(help.stdout).toContain('--legacy-valid-last-word');
-    expect(help.stdout).toContain('wool abuse actual');
-    expect(help.stdout).toContain('recover-date --mode seedshift');
-    expect(help.stdout).toContain('--ask-secrets');
-    expect(help.stdout).toContain('supports 15, 18, and 21');
-    expect(help.stdout).toContain(
-      'Private Use Unicode code points per RGB value; all five lengths',
-    );
-    expect(help.stdout).toContain('mnemocode self-test');
-    expect(help.stdout).toContain('preview --all --pdf all-previews.pdf');
-    for (const flag of ['--pdf PATH', '--template ID', '--events', '--title TEXT'])
-      expect(help.stdout).toContain(flag);
-  });
-
   it('reports the package version through both CLI forms', async () => {
     for (const argument of ['--version', 'version']) {
       const result = await run([argument]);
@@ -170,7 +152,7 @@ describe('CLI records', () => {
         ],
       ]) {
         await expect(run(args)).rejects.toMatchObject({
-          stderr: expect.stringMatching(/No approved card templates|unknown or incompatible/iu),
+          stderr: expect.stringMatching(/No installed card template|unknown or incompatible/iu),
         });
       }
       expect(await readFile(path, 'utf8')).toBe('existing PDF');

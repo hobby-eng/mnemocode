@@ -1,5 +1,5 @@
 import { masterFingerprint } from '../bitcoin-evidence.js';
-import { terminalColor, terminalPaint, terminalResultHeader, terminalStatus } from './terminal.js';
+import { terminalColor, terminalHint, terminalResultHeader, terminalStatus } from './terminal.js';
 import { encodedOutputLabel } from './input.js';
 import type { EncodeOutcome } from './encode-command.js';
 
@@ -18,7 +18,7 @@ export function printEncodeResult(outcome: EncodeOutcome): void {
   } = outcome;
   const displayedLabel = encodedOutputLabel(format, mode);
   if (
-    !terminalResultHeader('ENCODED RESULT', [
+    !terminalResultHeader('Encoded result', [
       ['Mode', recordMode],
       ['Format', format],
       ['Content', displayedLabel],
@@ -29,24 +29,17 @@ export function printEncodeResult(outcome: EncodeOutcome): void {
   console.log(encoded);
   if (terminalColor('stderr')) {
     console.error('');
-    terminalStatus('✓', 'Original fingerprint', masterFingerprint(result.sourceMnemonic));
+    terminalStatus('Original fingerprint', masterFingerprint(result.sourceMnemonic));
     if (mode === 'seedshift-legacy' && !useLegacyValid) {
       terminalStatus(
-        '!',
         'Encoded fingerprint',
         'unavailable: legacy output may have an invalid checksum',
-        '33',
+        false,
       );
     } else {
-      terminalStatus(
-        '✓',
-        'Encoded fingerprint',
-        masterFingerprint(result.shiftedEnglish.join(' ')),
-      );
+      terminalStatus('Encoded fingerprint', masterFingerprint(result.shiftedEnglish.join(' ')));
     }
-    console.error(
-      terminalPaint('stderr', '2', '  BIP32 fingerprints above use an empty BIP39 passphrase.'),
-    );
+    terminalHint('BIP32 fingerprints above use an empty BIP39 passphrase.');
   } else {
     console.error(
       `Original BIP32 master fingerprint (empty BIP39 passphrase): ${masterFingerprint(result.sourceMnemonic)}`,
