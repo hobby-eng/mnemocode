@@ -1,6 +1,6 @@
 name: Feature request
 description: Propose a MnemoCode improvement without including private wallet data.
-title: '[Feature]: '
+title: "[Feature]: "
 body:
   - type: markdown
     attributes:

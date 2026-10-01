@@ -1,76 +1,76 @@
-import { terminalNotice } from './terminal.js';
-import { closeSync, openSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { createInterface } from 'node:readline/promises';
-import { detectInputFormats, parseDate, type DateShiftDate, type OutputFormat } from '../core.js';
-import { readBoundedDescriptor, readBoundedFile } from './bounded-read.js';
-import { decodeQrPngFile } from './qr-input.js';
-import { type MnemoCodeRecord, type RecordMode } from '../record.js';
-import { type ParsedArguments, value, values } from './arguments.js';
+import { terminalNotice } from "./terminal.js";
+import { closeSync, openSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline/promises";
+import { detectInputFormats, parseDate, type DateShiftDate, type OutputFormat } from "../core.js";
+import { readBoundedDescriptor, readBoundedFile } from "./bounded-read.js";
+import { decodeQrPngFile } from "./qr-input.js";
+import { type MnemoCodeRecord, type RecordMode } from "../record.js";
+import { type ParsedArguments, value, values } from "./arguments.js";
 
-export type EncodedFormat = Exclude<OutputFormat, 'json'>;
+export type EncodedFormat = Exclude<OutputFormat, "json">;
 export type TransformMode = RecordMode;
 
 const MAX_TEXT_INPUT_BYTES = 1024 * 1024;
 
 function readBoundedStdin(): string {
-  const tooLarge = 'Text input exceeds the 1 MiB safety limit.';
-  return readBoundedDescriptor(0, MAX_TEXT_INPUT_BYTES, tooLarge).toString('utf8');
+  const tooLarge = "Text input exceeds the 1 MiB safety limit.";
+  return readBoundedDescriptor(0, MAX_TEXT_INPUT_BYTES, tooLarge).toString("utf8");
 }
 
-export function readBoundedTextFile(path: string, inputName = 'The text input'): string {
+export function readBoundedTextFile(path: string, inputName = "The text input"): string {
   try {
     const tooLarge = `${inputName} exceeds the 1 MiB safety limit.`;
-    return readBoundedFile(path, MAX_TEXT_INPUT_BYTES, tooLarge).toString('utf8');
+    return readBoundedFile(path, MAX_TEXT_INPUT_BYTES, tooLarge).toString("utf8");
   } catch (error) {
-    if (error instanceof Error && error.message.includes('exceeds the 1 MiB safety limit')) {
+    if (error instanceof Error && error.message.includes("exceeds the 1 MiB safety limit")) {
       throw error;
     }
     throw new Error(`${inputName} could not be read. Check that the file exists and is readable.`);
   }
 }
 
-export function textInput(arguments_: ParsedArguments, key: 'input' | 'mnemonic'): string {
+export function textInput(arguments_: ParsedArguments, key: "input" | "mnemonic"): string {
   const direct = value(arguments_, key);
   const path = value(arguments_, `${key}-file`);
-  const subject = key === 'mnemonic' ? 'the mnemonic' : 'the encoded input';
+  const subject = key === "mnemonic" ? "the mnemonic" : "the encoded input";
   if (direct !== undefined && path !== undefined)
     throw new Error(`Provide ${subject} either as direct text or in a file, but not both.`);
   if (direct === undefined && path === undefined)
     throw new Error(`Provide ${subject} as direct text, in a file, or through hidden input.`);
   return (
     direct ??
-    (path === '-'
+    (path === "-"
       ? readBoundedStdin()
       : readBoundedTextFile(
           path!,
-          key === 'mnemonic' ? 'The mnemonic file' : 'The encoded input file',
+          key === "mnemonic" ? "The mnemonic file" : "The encoded input file",
         ))
   );
 }
 
 export async function encodedInput(arguments_: ParsedArguments): Promise<string> {
-  const qrPath = value(arguments_, 'qr-file');
-  if (qrPath === undefined) return textInput(arguments_, 'input');
-  if (value(arguments_, 'input') !== undefined || value(arguments_, 'input-file') !== undefined) {
-    throw new Error('Choose one encoded input source: a QR image, direct text, or a text file.');
+  const qrPath = value(arguments_, "qr-file");
+  if (qrPath === undefined) return textInput(arguments_, "input");
+  if (value(arguments_, "input") !== undefined || value(arguments_, "input-file") !== undefined) {
+    throw new Error("Choose one encoded input source: a QR image, direct text, or a text file.");
   }
   return decodeQrPngFile(qrPath);
 }
 
 export function inputFormat(value_: string): EncodedFormat {
   const aliases: Readonly<Record<string, OutputFormat>> = {
-    '1': 'english',
-    '2': 'indexes',
-    '3': 'unicode',
-    '4': 'colors-unicode',
-    '5': 'colors',
+    "1": "english",
+    "2": "indexes",
+    "3": "unicode",
+    "4": "colors-unicode",
+    "5": "colors",
   };
   const format = aliases[value_] ?? value_;
   if (!(Object.values(aliases) as string[]).includes(format)) {
     const numbered = Object.entries(aliases).map(([number, name]) => `${number} ${name}`);
     throw new Error(
-      `The representation format must be one of: ${numbered.join(', ')}. Use the number or the name.`,
+      `The representation format must be one of: ${numbered.join(", ")}. Use the number or the name.`,
     );
   }
   return format as EncodedFormat;
@@ -80,31 +80,31 @@ async function chooseInputFormat(candidates: readonly EncodedFormat[]): Promise<
   if (process.stdin.isTTY !== true || process.stderr.isTTY !== true) {
     if (candidates.length === 0) {
       throw new Error(
-        'The input representation could not be detected. Choose the recorded format explicitly and check the source data.',
+        "The input representation could not be detected. Choose the recorded format explicitly and check the source data.",
       );
     }
     throw new Error(
-      `The input matches several formats (${candidates.join(', ')}). Choose the recorded format explicitly.`,
+      `The input matches several formats (${candidates.join(", ")}). Choose the recorded format explicitly.`,
     );
   }
   const numbers: Readonly<Record<EncodedFormat, string>> = {
-    english: '1',
-    indexes: '2',
-    unicode: '3',
-    colors: '5',
-    'colors-unicode': '4',
+    english: "1",
+    indexes: "2",
+    unicode: "3",
+    colors: "5",
+    "colors-unicode": "4",
   };
   const choices =
     candidates.length === 0 ? (Object.keys(numbers) as EncodedFormat[]) : [...candidates];
   console.error(
     candidates.length === 0
-      ? 'The input representation could not be identified. Choose the recorded format:'
-      : 'The input matches more than one representation:',
+      ? "The input representation could not be identified. Choose the recorded format:"
+      : "The input matches more than one representation:",
   );
   for (const candidate of choices) console.error(`  ${numbers[candidate]}  ${candidate}`);
   const terminal = createInterface({ input: process.stdin, output: process.stderr });
   try {
-    const answer = await terminal.question('Choose the recorded input format: ');
+    const answer = await terminal.question("Choose the recorded input format: ");
     const selected = inputFormat(answer.trim());
     if (candidates.length > 0 && !candidates.includes(selected))
       throw new Error(`The selected format ${selected} does not match the input.`);
@@ -119,7 +119,7 @@ export async function recordedInputFormat(
   encoded: string,
   record?: MnemoCodeRecord,
 ): Promise<EncodedFormat> {
-  const explicit = value(arguments_, 'format');
+  const explicit = value(arguments_, "format");
   if (record !== undefined) {
     if (explicit !== undefined && inputFormat(explicit) !== record.format) {
       throw new Error(
@@ -136,20 +136,20 @@ export async function recordedInputFormat(
 }
 
 export function encodeFormat(value_: string | undefined): EncodedFormat {
-  return value_ === undefined ? 'english' : inputFormat(value_);
+  return value_ === undefined ? "english" : inputFormat(value_);
 }
 
 export function transformMode(
   arguments_: ParsedArguments,
   embedded?: TransformMode,
 ): TransformMode {
-  const explicit = value(arguments_, 'mode');
+  const explicit = value(arguments_, "mode");
   if (
     explicit !== undefined &&
-    !['direct', 'seedshift', 'seedshift-legacy', 'seedshift-legacy-valid'].includes(explicit)
+    !["direct", "seedshift", "seedshift-legacy", "seedshift-legacy-valid"].includes(explicit)
   ) {
     throw new Error(
-      'The transformation mode must be direct, seedshift, seedshift-legacy, or seedshift-legacy-valid.',
+      "The transformation mode must be direct, seedshift, seedshift-legacy, or seedshift-legacy-valid.",
     );
   }
   if (explicit !== undefined && embedded !== undefined && explicit !== embedded) {
@@ -159,59 +159,59 @@ export function transformMode(
   }
   if (explicit !== undefined) return explicit as TransformMode;
   if (embedded !== undefined) return embedded;
-  return values(arguments_, 'date').length > 0 ? 'seedshift' : 'direct';
+  return values(arguments_, "date").length > 0 ? "seedshift" : "direct";
 }
 
 export function encodedOutputLabel(format: EncodedFormat, mode: TransformMode): string {
-  const shifted = mode === 'direct' ? '' : 'Shifted ';
+  const shifted = mode === "direct" ? "" : "Shifted ";
   switch (format) {
-    case 'english':
+    case "english":
       return `${shifted}English BIP39 words`;
-    case 'indexes':
+    case "indexes":
       return `${shifted}BIP39 word indexes (1-2048)`;
-    case 'unicode':
-      return 'Unicode code points';
-    case 'colors':
+    case "unicode":
+      return "Unicode code points";
+    case "colors":
       return `${shifted}BIP39Colors RGB hexadecimal codes`;
-    case 'colors-unicode':
+    case "colors-unicode":
       return `${shifted}MnemoCode color Unicode code points`;
   }
 }
 
 export function dates(arguments_: ParsedArguments): DateShiftDate[] {
-  return values(arguments_, 'date').map(parseDate);
+  return values(arguments_, "date").map(parseDate);
 }
 
 export function askSecret(prompt: string): string {
   // systemd-ask-password draws the hidden prompt and exists only on Linux. Elsewhere, say so
   // before touching the terminal, instead of blaming a missing terminal or program.
-  if (process.platform !== 'linux') {
+  if (process.platform !== "linux") {
     throw new Error(
-      'Hidden input (--ask-secrets) works on Linux only, where systemd-ask-password asks for the secret. On this system, read the secret from a protected local file (--mnemonic-file, --input-file or --share-file), or give the path - to read it from standard input.',
+      "Hidden input (--ask-secrets) works on Linux only, where systemd-ask-password asks for the secret. On this system, read the secret from a protected local file (--mnemonic-file, --input-file or --share-file), or give the path - to read it from standard input.",
     );
   }
   // A pipe or /dev/null makes systemd-ask-password fall back to a UI agent.
   // Use the controlling terminal even when CLI stdout/stderr are redirected.
   let terminal: number;
   try {
-    terminal = openSync('/dev/tty', 'r+');
+    terminal = openSync("/dev/tty", "r+");
   } catch {
     throw new Error(
-      'Hidden input requires an interactive terminal. Run the command in a terminal, or read the secret from a file or standard input.',
+      "Hidden input requires an interactive terminal. Run the command in a terminal, or read the secret from a file or standard input.",
     );
   }
   try {
-    const result = spawnSync('systemd-ask-password', ['--echo=no', '--', prompt], {
-      encoding: 'utf8',
-      stdio: [terminal, 'pipe', terminal],
+    const result = spawnSync("systemd-ask-password", ["--echo=no", "--", prompt], {
+      encoding: "utf8",
+      stdio: [terminal, "pipe", terminal],
     });
     if (result.error !== undefined)
       throw new Error(
-        'The secure hidden-input prompt could not be started. Ensure that systemd-ask-password is installed and available.',
+        "The secure hidden-input prompt could not be started. Ensure that systemd-ask-password is installed and available.",
       );
-    if (result.status !== 0) throw new Error('Secret input was cancelled or failed.');
+    if (result.status !== 0) throw new Error("Secret input was cancelled or failed.");
     const secret = result.stdout.trim();
-    if (secret.length === 0) throw new Error('Secret input must not be empty.');
+    if (secret.length === 0) throw new Error("Secret input must not be empty.");
     return secret;
   } finally {
     closeSync(terminal);
@@ -222,39 +222,39 @@ export function promptedEncodeInputs(
   arguments_: ParsedArguments,
   mode: TransformMode,
 ): { readonly mnemonic: string; readonly dates: DateShiftDate[] } | undefined {
-  if (arguments_['ask-secrets'] !== true) return undefined;
+  if (arguments_["ask-secrets"] !== true) return undefined;
   if (
-    value(arguments_, 'mnemonic') !== undefined ||
-    value(arguments_, 'mnemonic-file') !== undefined ||
-    values(arguments_, 'date').length > 0
+    value(arguments_, "mnemonic") !== undefined ||
+    value(arguments_, "mnemonic-file") !== undefined ||
+    values(arguments_, "date").length > 0
   ) {
     throw new Error(
-      'Hidden input cannot be combined with a mnemonic supplied on the command line, a mnemonic file, or command-line dates.',
+      "Hidden input cannot be combined with a mnemonic supplied on the command line, a mnemonic file, or command-line dates.",
     );
   }
-  const mnemonic = askSecret('BIP39 mnemonic:');
-  if (mode === 'direct') return { mnemonic, dates: [] };
-  const dateLine = askSecret('Date list (DD-MM-YYYY, separated by spaces):');
+  const mnemonic = askSecret("BIP39 mnemonic:");
+  if (mode === "direct") return { mnemonic, dates: [] };
+  const dateLine = askSecret("Date list (DD-MM-YYYY, separated by spaces):");
   return { mnemonic, dates: dateLine.split(/\s+/u).filter(Boolean).map(parseDate) };
 }
 
 export function promptedRecoveryInputs(
   arguments_: ParsedArguments,
 ): { readonly encoded: string; readonly dateValues: string[] } | undefined {
-  if (arguments_['ask-secrets'] !== true) return undefined;
+  if (arguments_["ask-secrets"] !== true) return undefined;
   if (
-    value(arguments_, 'input') !== undefined ||
-    value(arguments_, 'input-file') !== undefined ||
-    value(arguments_, 'qr-file') !== undefined ||
-    values(arguments_, 'date').length > 0
+    value(arguments_, "input") !== undefined ||
+    value(arguments_, "input-file") !== undefined ||
+    value(arguments_, "qr-file") !== undefined ||
+    values(arguments_, "date").length > 0
   ) {
     throw new Error(
-      'Hidden input cannot be combined with direct encoded text, an encoded input file, a QR input file, or command-line dates.',
+      "Hidden input cannot be combined with direct encoded text, an encoded input file, a QR input file, or command-line dates.",
     );
   }
-  const encoded = askSecret('Encoded record:');
+  const encoded = askSecret("Encoded record:");
   const dateLine = askSecret(
-    'Date list with ? for each forgotten digit (one to three incomplete dates):',
+    "Date list with ? for each forgotten digit (one to three incomplete dates):",
   );
   return { encoded, dateValues: dateLine.split(/\s+/u).filter(Boolean) };
 }

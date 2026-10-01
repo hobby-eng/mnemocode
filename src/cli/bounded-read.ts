@@ -1,4 +1,4 @@
-import { closeSync, openSync, readSync } from 'node:fs';
+import { closeSync, openSync, readSync } from "node:fs";
 
 /** Size of each read; small enough that a rejected input never occupies much more than its limit. */
 const CHUNK_BYTES = 64 * 1024;
@@ -24,7 +24,7 @@ export function readBoundedDescriptor(descriptor: number, limit: number, tooLarg
 
 /** Opens `path` once and reads it with the bound of `readBoundedDescriptor`. */
 export function readBoundedFile(path: string, limit: number, tooLarge: string): Buffer {
-  const descriptor = openSync(path, 'r');
+  const descriptor = openSync(path, "r");
   try {
     return readBoundedDescriptor(descriptor, limit, tooLarge);
   } finally {

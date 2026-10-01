@@ -1,8 +1,8 @@
-import { randomInt } from 'node:crypto';
-import { PNG } from 'pngjs';
-import QRCode from 'qrcode';
-import { readBundledFile } from '../bundled-files.js';
-import { configureRenderPlatform, type RenderPlatform } from './platform.js';
+import { randomInt } from "node:crypto";
+import { PNG } from "pngjs";
+import QRCode from "qrcode";
+import { readBundledFile } from "../bundled-files.js";
+import { configureRenderPlatform, type RenderPlatform } from "./platform.js";
 
 /** Node.js host: local files, the system random source, pngjs and qrcode. */
 export const nodeRenderPlatform: RenderPlatform = {
@@ -18,7 +18,7 @@ export const nodeRenderPlatform: RenderPlatform = {
     return PNG.sync.write(output, { deflateLevel });
   },
   qrModules: (payload) => {
-    const qr = QRCode.create(payload, { errorCorrectionLevel: 'M' });
+    const qr = QRCode.create(payload, { errorCorrectionLevel: "M" });
     return { size: qr.modules.size, get: (row, column) => Boolean(qr.modules.get(row, column)) };
   },
 };

@@ -1,34 +1,34 @@
-import { optionLabel, optionSubject, optionValue } from './option-copy.js';
+import { optionLabel, optionSubject, optionValue } from "./option-copy.js";
 
 export type ParsedArguments = Record<string, string | boolean | string[]>;
 
 export function parseArguments(items: readonly string[]): ParsedArguments {
   const parsed: ParsedArguments = {};
   const booleanOptions = new Set([
-    'card-qr',
-    'sskr',
-    'all',
-    'ask-secrets',
-    'cards',
-    'legacy-valid-last-word',
-    'list',
+    "card-qr",
+    "sskr",
+    "all",
+    "ask-secrets",
+    "cards",
+    "legacy-valid-last-word",
+    "list",
   ]);
   for (let index = 0; index < items.length; index += 1) {
     const item = items[index]!;
-    if (!item.startsWith('--'))
+    if (!item.startsWith("--"))
       throw new Error(
-        'This command does not accept an unnamed value. Use the appropriate named option.',
+        "This command does not accept an unnamed value. Use the appropriate named option.",
       );
     const key = item.slice(2);
-    if (key === 'dates' || key === 'events') {
+    if (key === "dates" || key === "events") {
       const dateValues: string[] = [];
-      while (items[index + 1] !== undefined && !items[index + 1]!.startsWith('--')) {
+      while (items[index + 1] !== undefined && !items[index + 1]!.startsWith("--")) {
         dateValues.push(items[index + 1]!);
         index += 1;
       }
       if (dateValues.length === 0)
         throw new Error(`${optionSubject(key)} needs at least one value.`);
-      const target = key === 'dates' ? 'date' : 'event';
+      const target = key === "dates" ? "date" : "event";
       const existing = parsed[target];
       parsed[target] =
         existing === undefined
@@ -37,7 +37,7 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
       continue;
     }
     const next = items[index + 1];
-    if (next === undefined || next.startsWith('--')) {
+    if (next === undefined || next.startsWith("--")) {
       if (!booleanOptions.has(key)) throw new Error(`${optionSubject(key)} requires a value.`);
       parsed[key] = true;
       continue;
@@ -53,13 +53,13 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
 
 export function value(arguments_: ParsedArguments, key: string): string | undefined {
   const result = arguments_[key];
-  return typeof result === 'string' ? result : undefined;
+  return typeof result === "string" ? result : undefined;
 }
 
 export function values(arguments_: ParsedArguments, key: string): string[] {
   const result = arguments_[key];
   if (Array.isArray(result)) return result;
-  if (typeof result === 'string') return [result];
+  if (typeof result === "string") return [result];
   return [];
 }
 
@@ -99,7 +99,7 @@ export function assertAllowedArguments(
   command: string,
   allowed: readonly string[],
 ): void {
-  const repeatable = new Set(['date', 'event', 'share', 'share-file', 'share-qr']);
+  const repeatable = new Set(["date", "event", "share", "share-file", "share-qr"]);
   for (const [key, entry] of Object.entries(arguments_)) {
     if (Array.isArray(entry) && !repeatable.has(key))
       throw new Error(`Provide only one value for the ${optionLabel(key)} setting.`);
