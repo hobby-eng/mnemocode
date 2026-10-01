@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { matchBitcoinEvidence } from '../src/bitcoin-evidence.js';
-import { parseInput, representMnemonic, formatEncoded, type OutputFormat } from '../src/core.js';
-import { serializeRecord } from '../src/record.js';
+import {
+  decodeIndexes,
+  decodeIndexesLegacy,
+  decodeIndexesLegacyValid,
+  parseDate,
+  parseInput,
+  representMnemonic,
+  formatEncoded,
+  type OutputFormat,
+} from '../src/core.js';
+import { parseRecord, serializeRecord } from '../src/record.js';
 import { mkdtemp, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { readBoundedFile } from '../src/cli/bounded-read.js';
 import { decodeQrPngFile } from '../src/cli/qr-input.js';
@@ -236,6 +245,32 @@ describe('AUD-004 regression contracts', () => {
       expect((await readdir(directory)).sort()).toEqual(['shares.txt']);
     } finally {
       await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('AUD-005 regression contracts', () => {
+  it('AUD-005-API001: reads only the canonical record version', () => {
+    const payload = `direct:english:${publicMnemonic}`;
+    expect(parseRecord(`MNC1:${payload}`)?.payload).toBe(publicMnemonic);
+    expect(parseRecord(serializeRecord('direct', 'english', publicMnemonic))?.version).toBe(1);
+    for (const header of ['MNC01', 'MNC0001', 'MNC0'])
+      expect(() => parseRecord(`${header}:${payload}`)).toThrow(
+        'Malformed MnemoCode record header.',
+      );
+    expect(() => parseRecord(`MNC2:${payload}`)).toThrow(
+      'Unsupported MnemoCode record version: 2.',
+    );
+  });
+
+  it('AUD-005-API002: every decoder reports an invalid index as an invalid index', () => {
+    const dates = [parseDate('01-01-2000')];
+    const message = 'Every BIP39 index must be an integer from 0 through 2047.';
+    for (const bad of [2048, -1, 1.5]) {
+      const indexes = [bad, ...Array.from({ length: 11 }, () => 0)];
+      expect(() => decodeIndexesLegacyValid(indexes, dates)).toThrow(message);
+      expect(() => decodeIndexesLegacy(indexes, dates)).toThrow(message);
+      expect(() => decodeIndexes(indexes, dates)).toThrow(message);
     }
   });
 });

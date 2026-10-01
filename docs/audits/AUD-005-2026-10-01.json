@@ -359,6 +359,31 @@
         "logSha256": "70f51d16f261e9a4fed34574a959906554ef939fb253aba309d8703f06fdceea"
       },
       {
+        "label": "fix-api-oracle",
+        "command": [
+          "python3",
+          "docs/audits/AUD-005-harnesses/seedshift-oracle.py"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:33:34.175986Z",
+        "endedAt": "2026-10-01T11:33:38.126051Z",
+        "exitCode": 0,
+        "logSha256": "0a553a0fcf02514e0e8a491d77e232478c3d1ede1f6dfd8a3aba6ab3b7d9109c"
+      },
+      {
+        "label": "fix-api-self-test",
+        "command": [
+          "node",
+          "dist/mnemocode.js",
+          "self-test"
+        ],
+        "cwd": "/home/user/Documents/bip_tools/mnemocode",
+        "startedAt": "2026-10-01T11:33:27.953591Z",
+        "endedAt": "2026-10-01T11:33:34.122576Z",
+        "exitCode": 0,
+        "logSha256": "1cf8bdb4592ccc3745671dd88135fa4597fa20822a273e317eb314b7b435844a"
+      },
+      {
         "label": "format",
         "command": [
           "pnpm",
@@ -514,7 +539,7 @@
       "title": "The record header accepts non-canonical version numbers",
       "category": "API",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "src/record.ts:27-28 (/^MNC(\\d+):…/, then Number(match[1]))"
@@ -536,7 +561,7 @@
       "title": "Legacy-valid decoding reports invalid indexes as a checksum failure",
       "category": "API",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "src/core/seedshift.ts:211-219 (decodeIndexesLegacyValid), public library API"
@@ -819,17 +844,17 @@
     },
     {
       "id": "AUD-005-API001",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Original reproduction"
+      "status": "verified",
+      "fixCommit": "core commit",
+      "verificationCommit": "core commit",
+      "evidence": "src/record.ts accepts only a version without leading zeros: MNC01, MNC0001 and MNC0 are malformed, MNC2 is unsupported, MNC1 records written by serializeRecord still parse. Regression test AUD-005-API001 in test/known-audit-defects.test.ts. Oracle log after the fix is byte-identical to the baseline (0a553a0f…), so no encoded output changed."
     },
     {
       "id": "AUD-005-API002",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Original reproduction"
+      "status": "verified",
+      "fixCommit": "core commit",
+      "verificationCommit": "core commit",
+      "evidence": "One index check (assertIndexRange in src/core/seedshift.ts) now runs in all three decoders before any word lookup; 2048, -1 and 1.5 give the index message. Regression test AUD-005-API002. 145 tests in the core, boundary, word-recovery, CLI and audit files pass; self-test and the oracle (6,000 comparisons) unchanged."
     },
     {
       "id": "AUD-005-BLD001",

@@ -24,8 +24,9 @@ const modes = new Set<RecordMode>([
   'seedshift-legacy',
   'seedshift-legacy-valid',
 ]);
+// The version is a number without leading zeros, so "MNC01:" is malformed rather than read as 1.
 const recordPattern =
-  /^MNC(\d+):(direct|seedshift|seedshift-legacy|seedshift-legacy-valid):([a-z-]+):([\s\S]+)$/u;
+  /^MNC([1-9][0-9]*):(direct|seedshift|seedshift-legacy|seedshift-legacy-valid):([a-z-]+):([\s\S]+)$/u;
 
 /** Wraps a raw representation with enough public metadata to select its decoder later. */
 export function serializeRecord(mode: RecordMode, format: RecordFormat, payload: string): string {
