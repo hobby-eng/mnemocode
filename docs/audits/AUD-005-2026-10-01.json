@@ -671,7 +671,7 @@
       "title": "No test covers the SSKR integrity gate or its manifest",
       "category": "BLD",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "src/sskr/runtime.ts:18-27, vendor/sskr/integrity.json, test/"
@@ -886,10 +886,10 @@
     },
     {
       "id": "AUD-005-BLD005",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Original reproduction"
+      "status": "verified",
+      "fixCommit": "BLD005 commit",
+      "verificationCommit": "BLD005 commit",
+      "evidence": "New test/sskr-integrity.test.ts: every integrity.json entry matches its file, the manifest names exactly the files under generated/ and rust/ (a Cargo target folder excepted), and a disposable installation with one changed byte in the WASM or in the bridge refuses sskr-combine with the integrity error and prints nothing. 3 tests pass. The manifest test also guards the coming vendor/sskr refresh."
     },
     {
       "id": "AUD-005-UI001",
