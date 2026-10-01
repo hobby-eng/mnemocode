@@ -71,7 +71,7 @@ describe("date recovery patterns", () => {
     ]);
     expect(recovered.stderr).toContain("Recovery search contains 30 date combinations.");
     expect(recovered.stdout).toContain(`10-07-1963 23-09-2026\t${publicMnemonic}`);
-  }, 15_000);
+  });
 
   it("requires explicit authorization for a complete-calendar search", async () => {
     const encoded = await run([
@@ -91,5 +91,5 @@ describe("date recovery patterns", () => {
     ).rejects.toMatchObject({
       stderr: expect.stringContaining("Increase the candidate search limit to at least 3,652,059"),
     });
-  }, 15_000);
+  });
 });
