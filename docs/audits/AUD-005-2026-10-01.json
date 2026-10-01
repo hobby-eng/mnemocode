@@ -516,7 +516,7 @@
       "title": "SSKR fragment folders are created with the default folder mode",
       "category": "SEC",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "src/export/sskr-cards.ts:134 (mkdir(folder)), all builds"
@@ -837,10 +837,10 @@
   "remediation": [
     {
       "id": "AUD-005-SEC001",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Original reproduction"
+      "status": "verified",
+      "fixCommit": "SEC001 commit",
+      "verificationCommit": "SEC001 commit",
+      "evidence": "src/export/sskr-cards.ts creates each share's folder with mode 0700. Regression test AUD-005-SEC001 (POSIX) checks 0700 for the share folder and the export folder; it failed with 0775 before the fix. SSKR export, CLI export and share tests (30) pass."
     },
     {
       "id": "AUD-005-API001",
