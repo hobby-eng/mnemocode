@@ -1,14 +1,12 @@
 import { randomInt } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import { PNG } from 'pngjs';
 import QRCode from 'qrcode';
+import { readBundledFile } from '../bundled-files.js';
 import { configureRenderPlatform, type RenderPlatform } from './platform.js';
-
-const assetRoot = new URL('../../assets/', import.meta.url);
 
 /** Node.js host: local files, the system random source, pngjs and qrcode. */
 export const nodeRenderPlatform: RenderPlatform = {
-  readAsset: (path) => readFile(new URL(path, assetRoot)),
+  readAsset: (path) => readBundledFile(`assets/${path}`),
   randomInt: (upperExclusive) => randomInt(upperExclusive),
   decodePng: (bytes) => {
     const image = PNG.sync.read(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
