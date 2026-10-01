@@ -89,8 +89,11 @@ and what is left for the maintainer. It belongs to [AUD-005](AUD-005-2026-10-01.
 - **BLD001 and BLD002 on GitHub.** Both are `fixed`, not `verified`: the changed workflows,
   the Windows and macOS builds and the notice files there run only on GitHub. The first tag
   will show whether the release waits for CI and publishes the notice files.
-- **BLD007.** Decide whether the 15-second limits in `test/cli.test.ts` and
-  `test/date-recovery-patterns.test.ts` should follow the 60-second suite setting.
+- **BLD007 — resolved (2026-10-01, main session for the owner).** The four end-to-end cases with
+  their own 15-second limit now use the suite's single 60-second limit. A limit is not an
+  assertion: these cases start the CLI, render PDFs or search dates, and their time follows the
+  machine's load (they passed alone and failed only beside Docker builds and an Argon2 replay);
+  every assertion stays as it was. The full suite then passed 454 of 454 under the same load.
 - **Hidden input on Windows and macOS.** Decide whether a native prompt is wanted (decision 10).
 - **API003.** The JSON output's `algorithm` field could name the mode in a later format
   version; it is unchanged because encoded outputs must not change.

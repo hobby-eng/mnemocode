@@ -39,7 +39,7 @@ describe("CLI records", () => {
     expect(result.stdout).toContain("QR adapter");
     expect(result.stdout).toContain("PASS");
     expect(result.stdout).toContain("Card export assets");
-  }, 15_000);
+  });
 
   it("writes a self-describing record and decodes it without mode or format flags", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-cli-"));
@@ -405,7 +405,7 @@ describe("CLI records", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  }, 15_000);
+  });
 });
 
 describe("hidden CLI input", () => {
