@@ -131,7 +131,8 @@ export async function exportSskrCards(
       const { id, memberIndex, content, colors, referencesPerCard, count } = member;
       const fragments = member.options.layout === 'individual';
       const folder = fragments ? join(staging, `collection-${id}`) : staging;
-      if (fragments) await mkdir(folder);
+      // Private like the staging folder: the card names carry the share's references.
+      if (fragments) await mkdir(folder, { mode: 0o700 });
       for (let i = 0; i < count; i++) {
         const bytes = await renderMember(member.options, content, i, memberIndex);
         const file = fragments

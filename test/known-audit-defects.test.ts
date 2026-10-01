@@ -15,6 +15,7 @@ import { mkdtemp, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from 
 import { readBoundedFile } from '../src/cli/bounded-read.js';
 import { decodeQrPngFile } from '../src/cli/qr-input.js';
 import { publishNewPrivateFile } from '../src/export/private-file.js';
+import { exportSskrCards } from '../src/export/sskr-cards.js';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -273,4 +274,27 @@ describe('AUD-005 regression contracts', () => {
       expect(() => decodeIndexes(indexes, dates)).toThrow(message);
     }
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'AUD-005-SEC001: the folder of one share is private, like the export folder',
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'mnemocode-share-folder-'));
+      try {
+        const vectors = JSON.parse(await readFile('vectors/sskr-v1.json', 'utf8'));
+        const target = join(directory, 'cards');
+        await exportSskrCards([vectors.official.shares[0]], {
+          style: 'it',
+          pageSize: 'business',
+          directory: target,
+        });
+        const [folder] = await readdir(target);
+        expect(folder).toMatch(/^collection-/u);
+        expect((await stat(join(target, folder!))).mode & 0o777).toBe(0o700);
+        expect((await stat(target)).mode & 0o777).toBe(0o700);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    },
+    60_000,
+  );
 });
