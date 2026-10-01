@@ -3,8 +3,8 @@ name: Executable
 # Builds MnemoCode as one executable file on Linux, Windows and macOS: a Node.js single executable
 # is made from the Node.js binary of the system that builds it, so each system builds its own
 # (scripts/build-executable.mjs). Each one is run on its own system from an empty folder
-# (scripts/verify-executable.mjs). A tag v<version> publishes the three files with SHA256SUMS as a
-# GitHub release.
+# (scripts/verify-executable.mjs). A tag v<version> publishes the three files, the license notices
+# written next to each of them and SHA256SUMS as a GitHub release.
 
 on:
   push:

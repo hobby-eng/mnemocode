@@ -4,7 +4,8 @@
 //
 //   node scripts/build-executable.mjs [output folder]   (default release)
 //
-// Writes mnemocode-<version>-<system>-<processor>[.exe] and its line of SHA256SUMS. A Node.js
+// Writes mnemocode-<version>-<system>-<processor>[.exe], its license notices
+// (mnemocode-<version>-<system>-<processor>-licenses.txt) and their lines of SHA256SUMS. A Node.js
 // single executable is built from the running Node.js binary, so each system builds its own:
 // CI builds Linux, Windows and macOS (.github/workflows/executable.yml).
 
@@ -20,20 +21,18 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { executableName, noticesName } from './executable-files.mjs';
+import { executableNotices } from './executable-notices.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const output = resolve(process.argv[2] ?? join(root, 'release'));
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 const nodeVersion = readFileSync(join(root, '.node-version'), 'utf8').trim();
 
-/** "linux-x64", "win-x64", "macos-arm64": the names Node.js uses for its own downloads. */
-const systemNames = { linux: 'linux', win32: 'win', darwin: 'macos' };
-const system = systemNames[process.platform];
-if (system === undefined) throw new Error(`No executable is built for ${process.platform}.`);
-const name = `mnemocode-${version}-${system}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`;
+const name = executableName(version);
 
 // The executable carries the running Node.js, so it must be the version the project is tested on.
 if (process.version !== `v${nodeVersion}`)
@@ -64,7 +63,8 @@ const work = mkdtempSync(join(tmpdir(), 'mnemocode-executable-build-'));
 
 // One CommonJS file: a Node.js single executable starts from a single script. The SSKR bridge is
 // bundled too; its WASM bytes and the other files come from the embedded assets.
-await build({
+const bundle = await build({
+  absWorkingDir: root,
   entryPoints: [join(root, 'src', 'mnemocode.ts')],
   outfile: join(work, 'mnemocode.cjs'),
   bundle: true,
@@ -75,6 +75,8 @@ await build({
   // Only bundled-files.ts reads it, on the path that the executable never takes.
   define: { 'import.meta.url': 'undefined' },
   logLevel: 'warning',
+  // The list of bundled files names the npm packages whose licenses travel with the executable.
+  metafile: true,
 });
 
 const assets = Object.fromEntries(bundledFiles().map((path) => [path, join(root, path)]));
@@ -105,6 +107,16 @@ if (process.platform === 'darwin') execFileSync('codesign', ['--sign', '-', '--f
 
 rmSync(work, { recursive: true, force: true });
 
-const digest = createHash('sha256').update(readFileSync(executable)).digest('hex');
-writeFileSync(join(output, `${name}.sha256`), `${digest}  ${name}\n`);
-console.log(`${relative(root, executable)}  ${digest}`);
+const notices = noticesName(name);
+writeFileSync(
+  join(output, notices),
+  executableNotices({ root, name, version, metafile: bundle.metafile }),
+);
+
+const sha256 = (file) =>
+  createHash('sha256')
+    .update(readFileSync(join(output, file)))
+    .digest('hex');
+const lines = [name, notices].map((file) => `${sha256(file)}  ${file}`);
+writeFileSync(join(output, `${name}.sha256`), `${lines.join('\n')}\n`);
+for (const line of lines) console.log(line);
