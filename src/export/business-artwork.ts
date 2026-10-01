@@ -3,9 +3,9 @@ import {
   readRenderAsset,
   renderPlatform,
   type RasterImage,
-} from './platform.js';
-import { hueOrigins, type PhysicalBusinessStyle } from './business-designs.js';
-import { hsv } from './color-math.js';
+} from "./platform.js";
+import { hueOrigins, type PhysicalBusinessStyle } from "./business-designs.js";
+import { hsv } from "./color-math.js";
 
 // Cache decoded/resampled bundled images only, never a caller's recolored references.
 const sources = new Map<PhysicalBusinessStyle, Promise<RasterImage>>();
@@ -53,7 +53,7 @@ export async function businessArtwork(
   style: PhysicalBusinessStyle,
   hex: string,
 ): Promise<Uint8Array> {
-  if (!/^#[0-9a-f]{6}$/iu.test(hex)) throw new Error('Invalid RGB reference.');
+  if (!/^#[0-9a-f]{6}$/iu.test(hex)) throw new Error("Invalid RGB reference.");
   const base = await source(style);
   const target = hsv(
     parseInt(hex.slice(1, 3), 16),
@@ -70,10 +70,10 @@ export async function businessArtwork(
       target[1] < 0.08
         ? 0
         : s *
-          (style !== 'it' && style !== 'architect'
+          (style !== "it" && style !== "architect"
             ? Math.max(0.65, target[1])
             : Math.max(0.35, Math.min(0.68, target[1] * 0.75)));
-    const value = v * (target[1] < 0.08 ? 0.6 : style !== 'it' && style !== 'architect' ? 1 : 0.86);
+    const value = v * (target[1] < 0.08 ? 0.6 : style !== "it" && style !== "architect" ? 1 : 0.86);
     const sector = hue * 6;
     const c = value * sat;
     const x = c * (1 - Math.abs((sector % 2) - 1));

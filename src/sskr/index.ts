@@ -1,4 +1,4 @@
-export { splitSskrMnemonic, combineSskrShares, validateThreshold } from './shares.js';
+export { splitSskrMnemonic, combineSskrShares, validateThreshold } from "./shares.js";
 export {
   normalizeShare,
   shareToColors,
@@ -6,5 +6,5 @@ export {
   shareInfo,
   urToTransport,
   validateShareSet,
-} from './transport.js';
-export type { ShareInfo } from './transport.js';
+} from "./transport.js";
+export type { ShareInfo } from "./transport.js";

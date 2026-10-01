@@ -1,4 +1,4 @@
-import { pageDimensions, type CardPageSize, type CardOrientation } from './card-settings.js';
+import { pageDimensions, type CardPageSize, type CardOrientation } from "./card-settings.js";
 
 // The material layout was drawn for a card of 85.6 x 54 mm and is scaled to the page.
 const DRAWN_FOR = { width: 85.6, height: 54 } as const;
@@ -13,10 +13,10 @@ const GRID = {
 
 export function materialPageLayout(size: CardPageSize, orientation?: CardOrientation) {
   // Rotate the physical sheet, never stretch the photographed finishes.
-  if (orientation !== undefined && orientation !== 'portrait' && orientation !== 'landscape')
-    throw new Error('Orientation must be portrait or landscape.');
+  if (orientation !== undefined && orientation !== "portrait" && orientation !== "landscape")
+    throw new Error("Orientation must be portrait or landscape.");
   // Material sheets lie on their long side unless portrait is asked for.
-  const [width, height] = pageDimensions(size, orientation ?? 'landscape');
+  const [width, height] = pageDimensions(size, orientation ?? "landscape");
   const portrait = height > width;
   const scale = portrait
     ? Math.min(width / DRAWN_FOR.height, height / DRAWN_FOR.width)

@@ -9,8 +9,8 @@ import {
   closePath,
   clip,
   endPath,
-} from 'pdf-lib';
-import { MM, type CardBox } from './business-layout.js';
+} from "pdf-lib";
+import { MM, type CardBox } from "./business-layout.js";
 const ink = rgb(0.12, 0.13, 0.14);
 const CORNER_RADIUS_HEIGHT_RATIO = 0.055;
 // A cubic Bezier approximation of one quarter of a circle: 4 * (sqrt(2) - 1) / 3.

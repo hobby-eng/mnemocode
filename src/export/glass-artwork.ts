@@ -3,8 +3,8 @@ import {
   readRenderAsset,
   renderPlatform,
   type RasterImage,
-} from './platform.js';
-import { hsv } from './color-math.js';
+} from "./platform.js";
+import { hsv } from "./color-math.js";
 
 // Caches hold only bundled public artwork. Per-export reference colors are never cached here.
 let source: Promise<RasterImage> | undefined;
@@ -53,7 +53,7 @@ export async function glassArtwork(
     }
     return bytes;
   }
-  source ??= readRenderAsset('images/business-glass-4in1.png').then((bytes) =>
+  source ??= readRenderAsset("images/business-glass-4in1.png").then((bytes) =>
     renderPlatform().decodePng(bytes),
   );
   const base = await source;

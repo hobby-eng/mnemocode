@@ -1,4 +1,4 @@
-import type { DateShiftDate, DatePattern, Bip39WordCount } from './types.js';
+import type { DateShiftDate, DatePattern, Bip39WordCount } from "./types.js";
 
 export function maximumDates(wordCount: Bip39WordCount): number {
   return wordCount / 3;
@@ -15,17 +15,17 @@ export function daysInMonth(year: number, month: number): number {
 
 function assertCalendarDate(date: DateShiftDate): void {
   if (!Number.isInteger(date.year) || date.year < 1 || date.year > 9999) {
-    throw new Error('A date year must be an integer from 0001 through 9999.');
+    throw new Error("A date year must be an integer from 0001 through 9999.");
   }
   if (!Number.isInteger(date.month) || date.month < 1 || date.month > 12) {
-    throw new Error('A date month must be an integer from 1 through 12.');
+    throw new Error("A date month must be an integer from 1 through 12.");
   }
   if (
     !Number.isInteger(date.day) ||
     date.day < 1 ||
     date.day > daysInMonth(date.year, date.month)
   ) {
-    throw new Error('The day is outside the selected calendar month.');
+    throw new Error("The day is outside the selected calendar month.");
   }
 }
 
@@ -35,7 +35,7 @@ export function parseDate(value: string): DateShiftDate {
   // A year always has four digits, so 23-09-26 is an error and never the year 23.
   const yearMonthDay = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(text);
   if (dayMonthYear === null && yearMonthDay === null) {
-    throw new Error('Invalid date. Use DD-MM-YYYY with a four-digit year, for example 23-09-2026.');
+    throw new Error("Invalid date. Use DD-MM-YYYY with a four-digit year, for example 23-09-2026.");
   }
   const match = dayMonthYear ?? yearMonthDay!;
   const date =
@@ -48,7 +48,7 @@ export function parseDate(value: string): DateShiftDate {
 
 export function formatDate(date: DateShiftDate): string {
   assertCalendarDate(date);
-  return `${String(date.day).padStart(2, '0')}-${String(date.month).padStart(2, '0')}-${String(date.year).padStart(4, '0')}`;
+  return `${String(date.day).padStart(2, "0")}-${String(date.month).padStart(2, "0")}-${String(date.year).padStart(4, "0")}`;
 }
 
 export function sortDates(dates: readonly DateShiftDate[]): DateShiftDate[] {
@@ -58,7 +58,7 @@ export function sortDates(dates: readonly DateShiftDate[]): DateShiftDate[] {
 }
 
 export function deriveShifts(dates: readonly DateShiftDate[], wordCount: Bip39WordCount): number[] {
-  if (dates.length === 0) throw new Error('Enter at least one date.');
+  if (dates.length === 0) throw new Error("Enter at least one date.");
   if (dates.length > maximumDates(wordCount)) {
     throw new Error(`${wordCount}-word phrases support at most ${maximumDates(wordCount)} dates.`);
   }
@@ -76,10 +76,10 @@ export function parseDatePattern(value: string): DatePattern {
   const yearMonthDay = /^([0-9?]{4})-([0-9?]{2})-([0-9?]{2})$/u.exec(text);
   if (dayMonthYear === null && yearMonthDay === null) {
     throw new Error(
-      'Invalid date pattern. Use DD-MM-YYYY and replace each forgotten digit with ?.',
+      "Invalid date pattern. Use DD-MM-YYYY and replace each forgotten digit with ?.",
     );
   }
-  if (!text.includes('?')) throw new Error('A recovery pattern must contain at least one ? digit.');
+  if (!text.includes("?")) throw new Error("A recovery pattern must contain at least one ? digit.");
   const match = dayMonthYear ?? yearMonthDay!;
   const masks =
     dayMonthYear === null
@@ -99,18 +99,18 @@ export function parseDatePattern(value: string): DatePattern {
     months: matchingDateParts(masks.month, 1, 12),
     days: matchingDateParts(masks.day, 1, 31),
   };
-  if (pattern.years.length === 0) throw new Error('The date pattern cannot match a valid year.');
-  if (pattern.months.length === 0) throw new Error('The date pattern cannot match a valid month.');
-  if (pattern.days.length === 0) throw new Error('The date pattern cannot match a valid day.');
+  if (pattern.years.length === 0) throw new Error("The date pattern cannot match a valid year.");
+  if (pattern.months.length === 0) throw new Error("The date pattern cannot match a valid month.");
+  if (pattern.days.length === 0) throw new Error("The date pattern cannot match a valid day.");
   if (datePatternCandidateCount(pattern) === 0)
-    throw new Error('The date pattern cannot match a real calendar date.');
+    throw new Error("The date pattern cannot match a real calendar date.");
   return pattern;
 }
 
 function matchingDateParts(mask: string, minimum: number, maximum: number): number[] {
-  const expression = new RegExp(`^${mask.replaceAll('?', '[0-9]')}$`, 'u');
+  const expression = new RegExp(`^${mask.replaceAll("?", "[0-9]")}$`, "u");
   return Array.from({ length: maximum - minimum + 1 }, (_, index) => index + minimum).filter(
-    (part) => expression.test(String(part).padStart(mask.length, '0')),
+    (part) => expression.test(String(part).padStart(mask.length, "0")),
   );
 }
 

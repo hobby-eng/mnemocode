@@ -6,8 +6,8 @@ import {
   representMnemonic,
   type EncodedResult,
   type DateShiftDate,
-} from '../core.js';
-import { type ParsedArguments, value, values } from './arguments.js';
+} from "../core.js";
+import { type ParsedArguments, value, values } from "./arguments.js";
 import {
   dates,
   encodeFormat,
@@ -16,15 +16,15 @@ import {
   transformMode,
   type EncodedFormat,
   type TransformMode,
-} from './input.js';
-import { validateCardOptions, completeEventLabels } from './card-options.js';
-import { validateImageOptions } from './image-options.js';
-import { preflightFileDestination } from './output-paths.js';
-import { requireNewCardDirectory } from '../export/individual-cards.js';
-import { runSskrSplit } from './sskr-command.js';
-import { printEncodeResult } from './encode-report.js';
-import { saveEncodeResult } from './encode-export.js';
-import { optionLabel } from './option-copy.js';
+} from "./input.js";
+import { validateCardOptions, completeEventLabels } from "./card-options.js";
+import { validateImageOptions } from "./image-options.js";
+import { preflightFileDestination } from "./output-paths.js";
+import { requireNewCardDirectory } from "../export/individual-cards.js";
+import { runSskrSplit } from "./sskr-command.js";
+import { printEncodeResult } from "./encode-report.js";
+import { saveEncodeResult } from "./encode-export.js";
+import { optionLabel } from "./option-copy.js";
 
 export interface EncodeOutcome {
   readonly mode: TransformMode;
@@ -42,28 +42,28 @@ export interface EncodeOutcome {
 async function validateEncodeOptions(
   args: ParsedArguments,
 ): Promise<{ mode: TransformMode; format: EncodedFormat }> {
-  for (const key of ['threshold', 'shares', 'share-format', 'card-layout']) {
+  for (const key of ["threshold", "shares", "share-format", "card-layout"]) {
     if (args[key] !== undefined)
       throw new Error(`The ${optionLabel(key)} setting is available only in SSKR mode.`);
   }
   const mode = transformMode(args);
-  const format = encodeFormat(value(args, 'format'));
-  if (mode === 'seedshift-legacy-valid')
+  const format = encodeFormat(value(args, "format"));
+  if (mode === "seedshift-legacy-valid")
     throw new Error(
-      'To create a legacy checksum-valid record, select legacy Seedshift and enable the checksum-word replacement.',
+      "To create a legacy checksum-valid record, select legacy Seedshift and enable the checksum-word replacement.",
     );
-  if (args['legacy-valid-last-word'] === true && mode !== 'seedshift-legacy')
+  if (args["legacy-valid-last-word"] === true && mode !== "seedshift-legacy")
     throw new Error(
-      'The legacy checksum-word replacement is available only in legacy Seedshift mode.',
+      "The legacy checksum-word replacement is available only in legacy Seedshift mode.",
     );
-  if (args.cards === true && format !== 'colors' && format !== 'colors-unicode')
-    throw new Error('Terminal color cards are available only for RGB color formats 4 and 5.');
+  if (args.cards === true && format !== "colors" && format !== "colors-unicode")
+    throw new Error("Terminal color cards are available only for RGB color formats 4 and 5.");
   validateCardOptions(args, format, mode);
   // Validate all destinations before prompting or reading a mnemonic.
   await validateImageOptions(args);
-  const directory = value(args, 'cards-dir');
+  const directory = value(args, "cards-dir");
   if (directory !== undefined) await requireNewCardDirectory(directory);
-  for (const key of ['output', 'pdf', 'qr']) {
+  for (const key of ["output", "pdf", "qr"]) {
     const path = value(args, key);
     if (path !== undefined) await preflightFileDestination(path, true);
   }
@@ -75,8 +75,8 @@ function transformMnemonic(
   enteredDates: readonly DateShiftDate[],
   mode: TransformMode,
 ): EncodedResult {
-  if (mode === 'direct') return representMnemonic(mnemonic);
-  if (mode === 'seedshift-legacy') return encodeMnemonicLegacy(mnemonic, enteredDates);
+  if (mode === "direct") return representMnemonic(mnemonic);
+  if (mode === "seedshift-legacy") return encodeMnemonicLegacy(mnemonic, enteredDates);
   return encodeMnemonic(mnemonic, enteredDates);
 }
 
@@ -87,20 +87,20 @@ function createOutcome(
 ): EncodeOutcome {
   const prompted = promptedEncodeInputs(args, mode);
   const enteredDates = prompted?.dates ?? dates(args);
-  if (mode === 'direct' && enteredDates.length > 0)
-    throw new Error('Dates cannot be used in direct mode.');
-  if (mode !== 'direct' && enteredDates.length === 0)
+  if (mode === "direct" && enteredDates.length > 0)
+    throw new Error("Dates cannot be used in direct mode.");
+  if (mode !== "direct" && enteredDates.length === 0)
     throw new Error(`${mode} requires at least one date.`);
-  const mnemonic = prompted?.mnemonic ?? textInput(args, 'mnemonic');
+  const mnemonic = prompted?.mnemonic ?? textInput(args, "mnemonic");
   const baseResult = transformMnemonic(mnemonic, enteredDates, mode);
   const legacyAlternative =
-    mode === 'seedshift-legacy' ? legacyChecksumValidResult(baseResult) : undefined;
+    mode === "seedshift-legacy" ? legacyChecksumValidResult(baseResult) : undefined;
   const legacyChanged =
     legacyAlternative !== undefined &&
     legacyAlternative.shiftedIndexes.at(-1) !== baseResult.shiftedIndexes.at(-1);
-  const useLegacyValid = args['legacy-valid-last-word'] === true;
+  const useLegacyValid = args["legacy-valid-last-word"] === true;
   const result = useLegacyValid && legacyChanged ? legacyAlternative! : baseResult;
-  const recordMode = useLegacyValid && legacyChanged ? 'seedshift-legacy-valid' : mode;
+  const recordMode = useLegacyValid && legacyChanged ? "seedshift-legacy-valid" : mode;
   return {
     mode,
     recordMode,
@@ -119,10 +119,10 @@ export async function runEncode(args: ParsedArguments): Promise<void> {
   if (args.sskr === true) return runSskrSplit(args, true);
   const { mode, format } = await validateEncodeOptions(args);
   const outcome = createOutcome(args, mode, format);
-  const hasCardExport = value(args, 'pdf') !== undefined || value(args, 'images-dir') !== undefined;
+  const hasCardExport = value(args, "pdf") !== undefined || value(args, "images-dir") !== undefined;
   const eventLabels =
-    hasCardExport && format === 'unicode'
-      ? await completeEventLabels(outcome.enteredDates, values(args, 'event'))
+    hasCardExport && format === "unicode"
+      ? await completeEventLabels(outcome.enteredDates, values(args, "event"))
       : [];
   printEncodeResult(outcome);
   await saveEncodeResult(args, outcome, eventLabels);

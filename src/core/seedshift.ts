@@ -1,4 +1,4 @@
-import { entropyToMnemonic, mnemonicToEntropy, validateMnemonic } from '@scure/bip39';
+import { entropyToMnemonic, mnemonicToEntropy, validateMnemonic } from "@scure/bip39";
 import {
   BIP39_INDEX_BITS,
   BIP39_DICTIONARY_SIZE,
@@ -8,11 +8,11 @@ import {
   assertWordCount,
   validatedEnglishWords,
   unicodeHex,
-} from './words.js';
-import { modulo, bytesToBits, bitsToBytes } from './bits.js';
-import { sortDates, deriveShifts } from './dates.js';
-import { resultFromIndexes, parseInput } from './representations.js';
-import type { EncodedResult, DecodedResult, DateShiftDate, OutputFormat } from './types.js';
+} from "./words.js";
+import { modulo, bytesToBits, bitsToBytes } from "./bits.js";
+import { sortDates, deriveShifts } from "./dates.js";
+import { resultFromIndexes, parseInput } from "./representations.js";
+import type { EncodedResult, DecodedResult, DateShiftDate, OutputFormat } from "./types.js";
 
 /** BIP39 words for owned entropy bits; the temporary byte buffer is cleared afterwards. */
 function mnemonicFromEntropyBits(bits: string): string {
@@ -59,7 +59,7 @@ export function encodeMnemonic(mnemonic: string, dates: readonly DateShiftDate[]
   assertWordCount(words.length);
   const sortedDates = sortDates(dates);
   const shifts = deriveShifts(sortedDates, words.length);
-  const entropyBits = entropyBitsOf(words.join(' '));
+  const entropyBits = entropyBitsOf(words.join(" "));
   const checksumBits = words.length / 3;
   const tailWidth = BIP39_INDEX_BITS - checksumBits;
   const shiftedChunks = Array.from({ length: words.length - 1 }, (_, index) =>
@@ -74,9 +74,9 @@ export function encodeMnemonic(mnemonic: string, dates: readonly DateShiftDate[]
   const tail = Number.parseInt(entropyBits.slice(-tailWidth), 2);
   const shiftedTail = modulo(tail + shifts.at(-1)!, 2 ** tailWidth);
   const shiftedEntropyBits =
-    shiftedChunks.map((chunk) => chunk.toString(2).padStart(BIP39_INDEX_BITS, '0')).join('') +
-    shiftedTail.toString(2).padStart(tailWidth, '0');
-  const shiftedWords = mnemonicFromEntropyBits(shiftedEntropyBits).split(' ');
+    shiftedChunks.map((chunk) => chunk.toString(2).padStart(BIP39_INDEX_BITS, "0")).join("") +
+    shiftedTail.toString(2).padStart(tailWidth, "0");
+  const shiftedWords = mnemonicFromEntropyBits(shiftedEntropyBits).split(" ");
   return resultFromIndexes(
     words,
     shiftedWords.map((word) => ENGLISH_INDEX.get(word)!),
@@ -104,10 +104,10 @@ export function legacyChecksumValidResult(result: EncodedResult): EncodedResult 
   const checksumBits = indexes.length / 3;
   const entropyLength = indexes.length * BIP39_INDEX_BITS - checksumBits;
   const bitStream = indexes
-    .map((index) => index.toString(2).padStart(BIP39_INDEX_BITS, '0'))
-    .join('');
+    .map((index) => index.toString(2).padStart(BIP39_INDEX_BITS, "0"))
+    .join("");
   const mnemonic = mnemonicFromEntropyBits(bitStream.slice(0, entropyLength));
-  const shiftedEnglish = mnemonic.split(' ');
+  const shiftedEnglish = mnemonic.split(" ");
   const shiftedIndexes = shiftedEnglish.map((word) => ENGLISH_INDEX.get(word)!);
   return {
     ...result,
@@ -135,7 +135,7 @@ function assertIndexRange(indexes: readonly number[]): void {
   if (
     indexes.some((index) => !Number.isInteger(index) || index < 0 || index >= BIP39_DICTIONARY_SIZE)
   ) {
-    throw new Error('Every BIP39 index must be an integer from 0 through 2047.');
+    throw new Error("Every BIP39 index must be an integer from 0 through 2047.");
   }
 }
 
@@ -148,10 +148,10 @@ export function decodeIndexes(
   assertIndexRange(indexes);
   const sortedDates = sortDates(dates);
   const shifts = deriveShifts(sortedDates, indexes.length);
-  const containerMnemonic = indexes.map((index) => englishWordlist[index]!).join(' ');
+  const containerMnemonic = indexes.map((index) => englishWordlist[index]!).join(" ");
   if (!validateMnemonic(containerMnemonic, englishWordlist)) {
     throw new Error(
-      'The checksum-valid Seedshift record has an invalid BIP39 checksum. Check the recorded data or select the original Seedshift compatibility mode.',
+      "The checksum-valid Seedshift record has an invalid BIP39 checksum. Check the recorded data or select the original Seedshift compatibility mode.",
     );
   }
   const entropyBits = entropyBitsOf(containerMnemonic);
@@ -169,10 +169,10 @@ export function decodeIndexes(
   const shiftedTail = Number.parseInt(entropyBits.slice(-tailWidth), 2);
   const recoveredTail = modulo(shiftedTail - shifts.at(-1)!, 2 ** tailWidth);
   const recoveredEntropyBits =
-    recoveredChunks.map((chunk) => chunk.toString(2).padStart(BIP39_INDEX_BITS, '0')).join('') +
-    recoveredTail.toString(2).padStart(tailWidth, '0');
+    recoveredChunks.map((chunk) => chunk.toString(2).padStart(BIP39_INDEX_BITS, "0")).join("") +
+    recoveredTail.toString(2).padStart(tailWidth, "0");
   const recoveredMnemonic = mnemonicFromEntropyBits(recoveredEntropyBits);
-  const recoveredIndexes = recoveredMnemonic.split(' ').map((word) => ENGLISH_INDEX.get(word)!);
+  const recoveredIndexes = recoveredMnemonic.split(" ").map((word) => ENGLISH_INDEX.get(word)!);
   return {
     recoveredMnemonic,
     recoveredIndexes,
@@ -194,7 +194,7 @@ export function decodeIndexesLegacy(
   const recoveredIndexes = indexes.map((index, position) =>
     modulo(index - shifts[position]!, BIP39_DICTIONARY_SIZE),
   );
-  const recoveredMnemonic = recoveredIndexes.map((index) => englishWordlist[index]!).join(' ');
+  const recoveredMnemonic = recoveredIndexes.map((index) => englishWordlist[index]!).join(" ");
   return {
     recoveredMnemonic,
     recoveredIndexes,
@@ -216,9 +216,9 @@ export function decodeIndexesLegacyValid(
   assertWordCount(indexes.length);
   // Checked before the word lookup, which would otherwise report a bad index as a bad checksum.
   assertIndexRange(indexes);
-  const containerMnemonic = indexes.map((index) => englishWordlist[index]!).join(' ');
+  const containerMnemonic = indexes.map((index) => englishWordlist[index]!).join(" ");
   if (!validateMnemonic(containerMnemonic, englishWordlist)) {
-    throw new Error('The legacy valid-last-word container has an invalid BIP39 checksum.');
+    throw new Error("The legacy valid-last-word container has an invalid BIP39 checksum.");
   }
   const sortedDates = sortDates(dates);
   const shifts = deriveShifts(sortedDates, indexes.length);
@@ -230,7 +230,7 @@ export function decodeIndexesLegacyValid(
   const candidates: DecodedResult[] = [];
   for (let lastIndex = 0; lastIndex < BIP39_DICTIONARY_SIZE; lastIndex += 1) {
     const recoveredIndexes = [...recoveredPrefix, lastIndex];
-    const recoveredMnemonic = recoveredIndexes.map((index) => englishWordlist[index]!).join(' ');
+    const recoveredMnemonic = recoveredIndexes.map((index) => englishWordlist[index]!).join(" ");
     if (validateMnemonic(recoveredMnemonic, englishWordlist)) {
       candidates.push({
         recoveredMnemonic,
@@ -246,7 +246,7 @@ export function decodeIndexesLegacyValid(
 
 export function decodeInput(
   value: string,
-  format: Exclude<OutputFormat, 'json'>,
+  format: Exclude<OutputFormat, "json">,
   dates: readonly DateShiftDate[],
 ): DecodedResult {
   return decodeIndexes(parseInput(value, format), dates);
@@ -254,7 +254,7 @@ export function decodeInput(
 
 export function decodeInputLegacy(
   value: string,
-  format: Exclude<OutputFormat, 'json'>,
+  format: Exclude<OutputFormat, "json">,
   dates: readonly DateShiftDate[],
 ): DecodedResult {
   return decodeIndexesLegacy(parseInput(value, format), dates);
@@ -263,11 +263,11 @@ export function decodeInputLegacy(
 /** Recovers a mnemonic from a direct representation that was created without date shifting. */
 export function decodeInputDirect(
   value: string,
-  format: Exclude<OutputFormat, 'json'>,
+  format: Exclude<OutputFormat, "json">,
 ): DecodedResult {
   const indexes = parseInput(value, format);
   assertWordCount(indexes.length);
-  const recoveredMnemonic = indexes.map((index) => englishWordlist[index]!).join(' ');
+  const recoveredMnemonic = indexes.map((index) => englishWordlist[index]!).join(" ");
   return {
     recoveredMnemonic,
     recoveredIndexes: indexes,

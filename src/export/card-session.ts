@@ -1,11 +1,11 @@
-import { resolveCardPresentation, type CardCopyOverrides } from './card-copy.js';
-import { createCardIdentity, sectorForTemplate, type CompanySector } from './card-identities.js';
+import { resolveCardPresentation, type CardCopyOverrides } from "./card-copy.js";
+import { createCardIdentity, sectorForTemplate, type CompanySector } from "./card-identities.js";
 import {
   validateProfile,
   type CardPresentation,
   type CardProfile,
   type CardSettings,
-} from './card-settings.js';
+} from "./card-settings.js";
 
 /**
  * Remembers the random choices of one working session.
@@ -21,7 +21,7 @@ export interface CardSession {
     template: string,
     supplied?: CardProfile,
     copy?: CardCopyOverrides,
-  ) => Required<Pick<CardSettings, 'profile' | 'presentation'>>;
+  ) => Required<Pick<CardSettings, "profile" | "presentation">>;
 }
 
 interface Employment {
@@ -33,12 +33,12 @@ export function createCardSession(): CardSession {
   let name: string | undefined;
   let presentation: CardPresentation | undefined;
   // The employer suits the design, so it is remembered for each sector separately.
-  const employments = new Map<CompanySector | 'any', Employment>();
+  const employments = new Map<CompanySector | "any", Employment>();
 
   return {
     settingsFor(template, supplied = {}, copy = {}) {
       const sector = sectorForTemplate(template);
-      const key = sector ?? 'any';
+      const key = sector ?? "any";
       let employment = employments.get(key);
       if (employment === undefined) {
         const chosen = createCardIdentity({}, sector);
@@ -49,7 +49,7 @@ export function createCardSession(): CardSession {
       presentation ??= resolveCardPresentation().presentation;
       const own = validateProfile(supplied);
       // The name was chosen together with the first employment.
-      if (name === undefined) throw new Error('The card session has no name.');
+      if (name === undefined) throw new Error("The card session has no name.");
       return {
         // Email and website follow the company that is finally printed.
         profile: createCardIdentity({ name, ...employment, ...own }, sector),

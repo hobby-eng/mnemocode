@@ -1,21 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
-import { PDFDocument } from 'pdf-lib';
-import jsQR from 'jsqr';
-import { drawCollectionQr, qrSizeMm } from '../src/export/card-qr.js';
-import { MM } from '../src/export/business-layout.js';
+import { describe, expect, it, vi } from "vitest";
+import { PDFDocument } from "pdf-lib";
+import jsQR from "jsqr";
+import { drawCollectionQr, qrSizeMm } from "../src/export/card-qr.js";
+import { MM } from "../src/export/business-layout.js";
 
-describe('Printable card QR', () => {
+describe("Printable card QR", () => {
   it.each([
-    ['#01AB63 #225531 #3E8775 #613911 #7C5809 #98BDC1 #B8E412 #E3AFE8', 28],
-    ['MNC1:direct:english:' + 'abandon '.repeat(11) + 'about', 28],
-    ['\ue001\ue002'.repeat(16), 28],
-    ['#01AB63', 15],
+    ["#01AB63 #225531 #3E8775 #613911 #7C5809 #98BDC1 #B8E412 #E3AFE8", 28],
+    ["MNC1:direct:english:" + "abandon ".repeat(11) + "about", 28],
+    ["\ue001\ue002".repeat(16), 28],
+    ["#01AB63", 15],
   ] as const)(
-    'decodes exact data from the rectangles actually drawn at 200 dpi %#',
+    "decodes exact data from the rectangles actually drawn at 200 dpi %#",
     async (payload, minimum) => {
       const document = await PDFDocument.create();
       const page = document.addPage([85.6 * MM, 54 * MM]);
-      const rectangles = vi.spyOn(page, 'drawRectangle');
+      const rectangles = vi.spyOn(page, "drawRectangle");
       drawCollectionQr(page, payload, 5, 5, qrSizeMm(payload, minimum));
 
       // Small independent raster of the actual PDF drawing calls. The real method
@@ -26,7 +26,7 @@ describe('Printable card QR', () => {
       const pixels = new Uint8ClampedArray(width * height * 4).fill(255);
       for (const [rectangle] of rectangles.mock.calls) {
         const { x = 0, y = 0, width: w = 0, height: h = 0, color } = rectangle!;
-        if (!color || !('red' in color)) throw new Error('Unexpected QR fill color.');
+        if (!color || !("red" in color)) throw new Error("Unexpected QR fill color.");
         const left = Math.round(x * pixelsPerPoint);
         const right = Math.round((x + w) * pixelsPerPoint);
         const top = Math.round((page.getHeight() - y - h) * pixelsPerPoint);
@@ -40,18 +40,18 @@ describe('Printable card QR', () => {
           }
         }
       }
-      expect(jsQR(pixels, width, height, { inversionAttempts: 'dontInvert' })?.data).toBe(payload);
+      expect(jsQR(pixels, width, height, { inversionAttempts: "dontInvert" })?.data).toBe(payload);
     },
   );
 
-  it('rejects undersized or out-of-page codes before drawing anything', async () => {
+  it("rejects undersized or out-of-page codes before drawing anything", async () => {
     const document = await PDFDocument.create();
     const page = document.addPage([90 * MM, 50 * MM]);
-    const rectangles = vi.spyOn(page, 'drawRectangle');
-    const payload = 'public transport data '.repeat(10);
-    expect(() => drawCollectionQr(page, payload, 1, 1, 5)).toThrow('too small');
-    expect(() => drawCollectionQr(page, payload, -1, 1, qrSizeMm(payload))).toThrow('does not fit');
-    expect(() => drawCollectionQr(page, payload, 80, 1, qrSizeMm(payload))).toThrow('does not fit');
+    const rectangles = vi.spyOn(page, "drawRectangle");
+    const payload = "public transport data ".repeat(10);
+    expect(() => drawCollectionQr(page, payload, 1, 1, 5)).toThrow("too small");
+    expect(() => drawCollectionQr(page, payload, -1, 1, qrSizeMm(payload))).toThrow("does not fit");
+    expect(() => drawCollectionQr(page, payload, 80, 1, qrSizeMm(payload))).toThrow("does not fit");
     expect(rectangles).not.toHaveBeenCalled();
   });
 });

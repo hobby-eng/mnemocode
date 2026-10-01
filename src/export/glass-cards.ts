@@ -3,12 +3,12 @@ import {
   GLASS_CARD as CARD,
   GLASS_SHEET as SHEET,
   type GlassPageLayout,
-} from './glass-layout.js';
-import { MM, type CardBox } from './business-layout.js';
-import { clipCard } from './business-render-primitives.js';
-import { resolveIdentityFor } from './card-identities.js';
-import { readRenderAsset } from './platform.js';
-import fontkit from '@pdf-lib/fontkit';
+} from "./glass-layout.js";
+import { MM, type CardBox } from "./business-layout.js";
+import { clipCard } from "./business-render-primitives.js";
+import { resolveIdentityFor } from "./card-identities.js";
+import { readRenderAsset } from "./platform.js";
+import fontkit from "@pdf-lib/fontkit";
 import {
   PDFDocument,
   popGraphicsState,
@@ -16,22 +16,22 @@ import {
   type PDFFont,
   type PDFImage,
   type PDFPage,
-} from 'pdf-lib';
-import { colorsToIndexes, unicodeToColors } from '../core.js';
-import { colorsToShare } from '../sskr/transport.js';
-import { resolvePresentationFor } from './card-copy.js';
-import { clearDocumentMetadata } from './document-metadata.js';
-import type { CardProfile, CardPresentation } from './card-settings.js';
-import { glassArtwork } from './glass-artwork.js';
+} from "pdf-lib";
+import { colorsToIndexes, unicodeToColors } from "../core.js";
+import { colorsToShare } from "../sskr/transport.js";
+import { resolvePresentationFor } from "./card-copy.js";
+import { clearDocumentMetadata } from "./document-metadata.js";
+import type { CardProfile, CardPresentation } from "./card-settings.js";
+import { glassArtwork } from "./glass-artwork.js";
 import {
   collectionSheetLayout,
   drawStudyCaption,
   drawStudyFrame,
   drawStudyShadow,
   studyCaptionWidth,
-} from './collection-sheet.js';
-import type { CardContent } from './templates.js';
-import type { SskrCardContent } from './sskr-content.js';
+} from "./collection-sheet.js";
+import type { CardContent } from "./templates.js";
+import type { SskrCardContent } from "./sskr-content.js";
 
 // Physical millimetres in the compact master; text remains vector and is never stretched.
 const COMPACT_REFERENCES = {
@@ -49,7 +49,7 @@ const ink = rgb(0.1, 0.12, 0.13);
 export const GLASS_REFERENCES_PER_CARD = 4;
 export const glassCardCount = (referenceCount: number, referencesPerCard: 4 | 6 | 8 = 4): number =>
   Math.ceil(referenceCount / referencesPerCard);
-type GlassContent = Exclude<CardContent, { readonly kind: 'unicode' }> | SskrCardContent;
+type GlassContent = Exclude<CardContent, { readonly kind: "unicode" }> | SskrCardContent;
 interface RenderContext {
   doc: PDFDocument;
   font: PDFFont;
@@ -64,19 +64,19 @@ interface RenderContext {
 }
 
 function validateContent(content: CardContent | SskrCardContent): asserts content is GlassContent {
-  if (content.kind !== 'colors' && content.kind !== 'sskr')
-    throw new Error('Glass cards require color references.');
-  if (content.kind === 'sskr') {
-    colorsToShare(content.colors.join(' '));
-    if (content.payload !== content.colors.join(' '))
-      throw new Error('Share QR does not match the printed references.');
+  if (content.kind !== "colors" && content.kind !== "sskr")
+    throw new Error("Glass cards require color references.");
+  if (content.kind === "sskr") {
+    colorsToShare(content.colors.join(" "));
+    if (content.payload !== content.colors.join(" "))
+      throw new Error("Share QR does not match the printed references.");
   } else {
     colorsToIndexes(content.colors);
     if (
-      content.payload !== content.colors.join(' ') &&
-      unicodeToColors(content.payload).join(' ') !== content.colors.join(' ')
+      content.payload !== content.colors.join(" ") &&
+      unicodeToColors(content.payload).join(" ") !== content.colors.join(" ")
     )
-      throw new Error('Collection QR does not match the printed references.');
+      throw new Error("Collection QR does not match the printed references.");
   }
 }
 
@@ -100,7 +100,7 @@ function fit(
     preferred,
     (width * MM) / Math.max(0.001, font.widthOfTextAtSize(value, 1)),
   );
-  if (size < minimum) throw new Error('Card contact details are too long; shorten the value.');
+  if (size < minimum) throw new Error("Card contact details are too long; shorten the value.");
   return size;
 }
 
@@ -138,7 +138,7 @@ function drawSheetIdentity(context: RenderContext, page: PDFPage, layout: GlassP
 }
 
 // Glass cards are light, so their sheet is light as well.
-const SHEET_THEME = 'mist';
+const SHEET_THEME = "mist";
 
 // Share of the width of a photograph that lies outside the rim of the plate, on each side.
 // Measured in the three photographs: 2 to 4 of about 1000 pixels.
@@ -207,14 +207,14 @@ async function drawCard(
       borderColor: rgb(0.85, 0.85, 0.85),
     });
     label(
-      `${String(index * GLASS_REFERENCES_PER_CARD + offset + 1).padStart(2, '0')}  ${ref.slice(1)}`,
+      `${String(index * GLASS_REFERENCES_PER_CARD + offset + 1).padStart(2, "0")}  ${ref.slice(1)}`,
       dx + 4,
       dy,
       6.8,
     );
   }
   label(
-    `${content.kind === 'sskr' ? content.collectionReference : 'Collection reference'}  /  ${String(index + 1).padStart(2, '0')}-${String(count).padStart(2, '0')}`,
+    `${content.kind === "sskr" ? content.collectionReference : "Collection reference"}  /  ${String(index + 1).padStart(2, "0")}-${String(count).padStart(2, "0")}`,
     4,
     46.5,
     4.6,
@@ -258,7 +258,7 @@ function drawCompactLabels(
       borderWidth: 0.25,
     });
     label(
-      `${String(index * referencesPerCard + offset + 1).padStart(2, '0')} ${ref.slice(1)}`,
+      `${String(index * referencesPerCard + offset + 1).padStart(2, "0")} ${ref.slice(1)}`,
       dx + COMPACT_REFERENCES.textOffset,
       dy,
       COMPACT_REFERENCES.fontSize,
@@ -273,23 +273,23 @@ export async function renderGlassCards(
   referencesPerCard: 4 | 6 | 8 = 4,
 ): Promise<Uint8Array> {
   validateContent(content);
-  const wholeShareQr = content.kind === 'sskr' && content.qrCard === true;
-  if (![4, 6, 8].includes(referencesPerCard)) throw new Error('Glass capacity must be 4, 6 or 8.');
+  const wholeShareQr = content.kind === "sskr" && content.qrCard === true;
+  if (![4, 6, 8].includes(referencesPerCard)) throw new Error("Glass capacity must be 4, 6 or 8.");
   const count = glassCardCount(content.colors.length, referencesPerCard);
   // A separate card always has the business size; only a sheet shows the photographs of the
   // 6 and 8 reference cards in their own proportions of 85.6 x 54.
   const businessShape =
-    referencesPerCard === 4 || content.pageSize === 'business' || individualIndex !== undefined;
+    referencesPerCard === 4 || content.pageSize === "business" || individualIndex !== undefined;
   const cardWidth = businessShape ? 90 : 85.6;
   const cardHeight = businessShape ? 50 : 54;
   if (
     individualIndex !== undefined &&
     (!Number.isInteger(individualIndex) || individualIndex < 0 || individualIndex >= count)
   )
-    throw new Error('Invalid glass card index.');
+    throw new Error("Invalid glass card index.");
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  const font = await doc.embedFont(await readRenderAsset('fonts/DejaVuSans-UI.ttf'), {
+  const font = await doc.embedFont(await readRenderAsset("fonts/DejaVuSans-UI.ttf"), {
     subset: true,
   });
   const context: RenderContext = {
@@ -343,9 +343,9 @@ async function drawGlassStudy(context: RenderContext): Promise<void> {
           .slice(offset, offset + 2)
           .map(
             (ref, i) =>
-              `${String(index * referencesPerCard + offset + i + 1).padStart(2, '0')} ${ref.slice(1).toUpperCase()}`,
+              `${String(index * referencesPerCard + offset + i + 1).padStart(2, "0")} ${ref.slice(1).toUpperCase()}`,
           )
-          .join('   '),
+          .join("   "),
       );
     return lines;
   });
@@ -364,7 +364,7 @@ async function drawGlassStudy(context: RenderContext): Promise<void> {
     layout,
     presentation,
     content.title ?? presentation.studioName,
-    content.kind === 'sskr' ? content.collectionReference : '01',
+    content.kind === "sskr" ? content.collectionReference : "01",
     profile.name,
     payload,
     SHEET_THEME,

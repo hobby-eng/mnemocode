@@ -30,22 +30,22 @@ export interface RenderPlatform {
 
 /** Every bundled file a renderer can request, relative to the `assets` directory. */
 export const renderAssets = [
-  'fonts/DejaVuSans-UI.ttf',
-  'images/business-architect-v1.png',
-  'images/business-contact-v1.png',
-  'images/business-curves-v1.png',
-  'images/business-diagonal-v1.png',
-  'images/business-estate-v1.png',
-  'images/business-facets-v1.png',
-  'images/business-it-v1.png',
-  'images/business-glass-4in1.png',
-  'images/business-glass-6in1.jpg',
-  'images/business-glass-8in1.jpg',
-  'images/material-enclosure.jpg',
-  'images/material-kitchen.jpg',
-  'images/material-switch.jpg',
-  'images/material-tile.jpg',
-  'images/material-vehicle.jpg',
+  "fonts/DejaVuSans-UI.ttf",
+  "images/business-architect-v1.png",
+  "images/business-contact-v1.png",
+  "images/business-curves-v1.png",
+  "images/business-diagonal-v1.png",
+  "images/business-estate-v1.png",
+  "images/business-facets-v1.png",
+  "images/business-it-v1.png",
+  "images/business-glass-4in1.png",
+  "images/business-glass-6in1.jpg",
+  "images/business-glass-8in1.jpg",
+  "images/material-enclosure.jpg",
+  "images/material-kitchen.jpg",
+  "images/material-switch.jpg",
+  "images/material-tile.jpg",
+  "images/material-vehicle.jpg",
 ] as const;
 export type RenderAsset = (typeof renderAssets)[number];
 
@@ -62,7 +62,7 @@ export function configureRenderPlatform(platform: RenderPlatform): void {
 export function renderPlatform(): RenderPlatform {
   if (configured === undefined)
     throw new Error(
-      'Card rendering has no platform. Node.js programs import the mnemocode package or export/platform-node.js; other hosts call configureRenderPlatform first.',
+      "Card rendering has no platform. Node.js programs import the mnemocode package or export/platform-node.js; other hosts call configureRenderPlatform first.",
     );
   return configured;
 }
@@ -74,6 +74,6 @@ export function readRenderAsset(path: string): Promise<Uint8Array> {
 
 export function createRasterImage(width: number, height: number): RasterImage {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1)
-    throw new Error('Image dimensions must be positive integers.');
+    throw new Error("Image dimensions must be positive integers.");
   return { width, height, data: new Uint8Array(width * height * 4) };
 }

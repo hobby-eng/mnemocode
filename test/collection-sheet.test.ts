@@ -1,30 +1,30 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readFile } from 'node:fs/promises';
-import { PDFDocument, PDFPage } from 'pdf-lib';
-import { collectionSheetLayout } from '../src/export/collection-sheet.js';
-import { cardTemplates } from '../src/export/templates.js';
-import { indexesToColors } from '../src/core.js';
-import { resolveCardPresentation } from '../src/export/card-copy.js';
-import { renderSskrPdf } from '../src/export/sskr-cards.js';
-import { shareToColors } from '../src/sskr/transport.js';
-import * as qr from '../src/export/card-qr.js';
-import { MM } from '../src/export/business-layout.js';
-import { pageOperators } from './helpers/pdf-content.js';
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFile } from "node:fs/promises";
+import { PDFDocument, PDFPage } from "pdf-lib";
+import { collectionSheetLayout } from "../src/export/collection-sheet.js";
+import { cardTemplates } from "../src/export/templates.js";
+import { indexesToColors } from "../src/core.js";
+import { resolveCardPresentation } from "../src/export/card-copy.js";
+import { renderSskrPdf } from "../src/export/sskr-cards.js";
+import { shareToColors } from "../src/sskr/transport.js";
+import * as qr from "../src/export/card-qr.js";
+import { MM } from "../src/export/business-layout.js";
+import { pageOperators } from "./helpers/pdf-content.js";
 
 const colors = indexesToColors(Array.from({ length: 24 }, (_, index) => index * 73 + 1));
-const payload = colors.join(' ');
+const payload = colors.join(" ");
 const presentation = resolveCardPresentation(
   {},
-  { studioName: 'REVIEW STUDIO' },
+  { studioName: "REVIEW STUDIO" },
   () => 0,
 ).presentation;
 afterEach(() => vi.restoreAllMocks());
 
-describe('single-page design studies', () => {
-  it.each(['business', 'a6', 'a4'] as const)(
-    'reserves non-overlapping artwork, captions and a corner QR for every %s orientation and count',
+describe("single-page design studies", () => {
+  it.each(["business", "a6", "a4"] as const)(
+    "reserves non-overlapping artwork, captions and a corner QR for every %s orientation and count",
     (pageSize) => {
-      for (const orientation of ['portrait', 'landscape'] as const)
+      for (const orientation of ["portrait", "landscape"] as const)
         for (let count = 1; count <= 16; count++)
           for (const includeQr of [false, true]) {
             const layout = collectionSheetLayout(
@@ -63,19 +63,19 @@ describe('single-page design studies', () => {
   );
 
   it.each(cardTemplates.map((template) => [template.id, template] as const))(
-    '%s renders one business-size proposal with one complete QR and all exact references',
+    "%s renders one business-size proposal with one complete QR and all exact references",
     async (_id, template) => {
-      const qrSpy = vi.spyOn(qr, 'drawCollectionQr');
-      const textSpy = vi.spyOn(PDFPage.prototype, 'drawText');
+      const qrSpy = vi.spyOn(qr, "drawCollectionQr");
+      const textSpy = vi.spyOn(PDFPage.prototype, "drawText");
       const pdf = await PDFDocument.load(
         await template.render({
-          kind: 'colors',
+          kind: "colors",
           colors,
           payload,
           presentation,
           cardQr: true,
-          pageSize: 'business',
-          orientation: 'landscape',
+          pageSize: "business",
+          orientation: "landscape",
         }),
       );
       expect(pdf.getPageCount()).toBe(1);
@@ -84,30 +84,30 @@ describe('single-page design studies', () => {
       expect(qrSpy).toHaveBeenCalledTimes(1);
       expect(qrSpy.mock.calls[0]![1]).toBe(payload);
       const labels = textSpy.mock.calls.map(([label]) => label);
-      expect(labels).toContain('REVIEW STUDIO');
-      expect(labels).toContain('DESIGN STUDY / FOR SELECTION');
-      expect(labels.some((label) => label.startsWith('Series '))).toBe(true);
+      expect(labels).toContain("REVIEW STUDIO");
+      expect(labels).toContain("DESIGN STUDY / FOR SELECTION");
+      expect(labels.some((label) => label.startsWith("Series "))).toBe(true);
       for (const color of colors)
         expect(labels.some((label) => label.includes(color.slice(1)))).toBe(true);
-      expect(pdf.getTitle() ?? '').toBe('');
+      expect(pdf.getTitle() ?? "").toBe("");
     },
     30_000,
   );
 
-  it('keeps the same studio on three SSKR study pages, with one own-member QR per page', async () => {
+  it("keeps the same studio on three SSKR study pages, with one own-member QR per page", async () => {
     const vector = JSON.parse(
-      await readFile(new URL('../vectors/sskr-v1.json', import.meta.url), 'utf8'),
+      await readFile(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
     );
     const shares = vector.deterministic[0].shares as string[];
-    const qrSpy = vi.spyOn(qr, 'drawCollectionQr');
-    const textSpy = vi.spyOn(PDFPage.prototype, 'drawText');
+    const qrSpy = vi.spyOn(qr, "drawCollectionQr");
+    const textSpy = vi.spyOn(PDFPage.prototype, "drawText");
     const pdf = await PDFDocument.load(
       await renderSskrPdf(shares, {
-        style: 'it',
-        layout: 'collection',
+        style: "it",
+        layout: "collection",
         // A collection sheet needs a sheet size; a card size would give separate cards.
-        pageSize: 'a6',
-        orientation: 'landscape',
+        pageSize: "a6",
+        orientation: "landscape",
         cardQr: true,
         presentation,
       }),
@@ -115,23 +115,23 @@ describe('single-page design studies', () => {
     expect(shares).toHaveLength(3);
     expect(pdf.getPageCount()).toBe(3);
     expect(qrSpy.mock.calls.map((call) => call[1])).toEqual(
-      shares.map((share) => shareToColors(share).join(' ')),
+      shares.map((share) => shareToColors(share).join(" ")),
     );
     const labels = textSpy.mock.calls.map(([label]) => label);
-    expect(labels.filter((label) => label === 'REVIEW STUDIO')).toHaveLength(3);
+    expect(labels.filter((label) => label === "REVIEW STUDIO")).toHaveLength(3);
     // The footer line carries the slogan, the series of the share and the footer text.
-    expect(new Set(labels.filter((label) => label.includes('Series '))).size).toBe(3);
+    expect(new Set(labels.filter((label) => label.includes("Series "))).size).toBe(3);
   }, 30_000);
 
-  it.each(['business-it', 'material-kitchen', 'business-glass-8in1'])(
-    '%s keeps artwork and QR together at every supported size and orientation',
+  it.each(["business-it", "material-kitchen", "business-glass-8in1"])(
+    "%s keeps artwork and QR together at every supported size and orientation",
     async (id) => {
       const template = cardTemplates.find((item) => item.id === id)!;
-      for (const pageSize of ['business', 'a6', 'a4'] as const)
-        for (const orientation of ['landscape', 'portrait'] as const) {
+      for (const pageSize of ["business", "a6", "a4"] as const)
+        for (const orientation of ["landscape", "portrait"] as const) {
           const document = await PDFDocument.load(
             await template.render({
-              kind: 'colors',
+              kind: "colors",
               colors,
               payload,
               presentation,
@@ -146,24 +146,24 @@ describe('single-page design studies', () => {
     60_000,
   );
 
-  it('puts the light glass cards on a light sheet and every other card on the dark sheet', async () => {
+  it("puts the light glass cards on a light sheet and every other card on the dark sheet", async () => {
     // The first thing drawn on a sheet is its background, a rectangle over the whole page.
     const background = async (id: string) => {
       const template = cardTemplates.find((item) => item.id === id)!;
       const document = await PDFDocument.load(
-        await template.render({ kind: 'colors', colors, payload, presentation, pageSize: 'a6' }),
+        await template.render({ kind: "colors", colors, payload, presentation, pageSize: "a6" }),
       );
       return /^([\d.]+ [\d.]+ [\d.]+) rg$/mu.exec(pageOperators(document, 0))?.[1];
     };
-    for (const id of ['business-glass-4in1', 'business-glass-6in1', 'business-glass-8in1'])
-      expect(await background(id), id).toBe('0.78 0.81 0.85');
-    for (const id of ['business-it', 'business-architect', 'material-tile'])
-      expect(await background(id), id).toBe('0.043 0.047 0.059');
+    for (const id of ["business-glass-4in1", "business-glass-6in1", "business-glass-8in1"])
+      expect(await background(id), id).toBe("0.78 0.81 0.85");
+    for (const id of ["business-it", "business-architect", "material-tile"])
+      expect(await background(id), id).toBe("0.043 0.047 0.059");
   }, 60_000);
 
-  it('fails instead of creating a QR-only back when physical constraints cannot be met', () => {
+  it("fails instead of creating a QR-only back when physical constraints cannot be met", () => {
     expect(() =>
-      collectionSheetLayout({ pageSize: 'business' }, 16, 1.8, 1, 'x'.repeat(2000)),
-    ).toThrow('choose a larger page size');
+      collectionSheetLayout({ pageSize: "business" }, 16, 1.8, 1, "x".repeat(2000)),
+    ).toThrow("choose a larger page size");
   });
 });

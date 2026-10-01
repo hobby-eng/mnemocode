@@ -4,7 +4,7 @@ export const BIP39_WORD_COUNTS = [12, 15, 18, 21, 24] as const;
 
 export type Bip39WordCount = (typeof BIP39_WORD_COUNTS)[number];
 
-export type OutputFormat = 'english' | 'indexes' | 'unicode' | 'colors' | 'colors-unicode' | 'json';
+export type OutputFormat = "english" | "indexes" | "unicode" | "colors" | "colors-unicode" | "json";
 
 export interface DateShiftDate {
   readonly year: number;

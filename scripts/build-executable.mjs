@@ -9,8 +9,8 @@
 // single executable is built from the running Node.js binary, so each system builds its own:
 // CI builds Linux, Windows and macOS (.github/workflows/executable.yml).
 
-import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
@@ -19,18 +19,18 @@ import {
   rmSync,
   statSync,
   writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
-import { executableName, noticesName } from './executable-files.mjs';
-import { executableNotices } from './executable-notices.mjs';
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
+import { executableName, noticesName } from "./executable-files.mjs";
+import { executableNotices } from "./executable-notices.mjs";
 
-const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const output = resolve(process.argv[2] ?? join(root, 'release'));
-const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
-const nodeVersion = readFileSync(join(root, '.node-version'), 'utf8').trim();
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const output = resolve(process.argv[2] ?? join(root, "release"));
+const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
+const nodeVersion = readFileSync(join(root, ".node-version"), "utf8").trim();
 
 const name = executableName(version);
 
@@ -41,10 +41,10 @@ if (process.version !== `v${nodeVersion}`)
 /** Every file the program reads at run time, by its path from the package root; see bundled-files.ts. */
 function bundledFiles() {
   const files = [
-    'vendor/sskr/integrity.json',
-    'vendor/sskr/generated/recovery_sskr_wasm.js',
-    'vendor/sskr/generated/recovery_sskr_wasm_bg.wasm',
-    'vectors/mnemocode-v1.json',
+    "vendor/sskr/integrity.json",
+    "vendor/sskr/generated/recovery_sskr_wasm.js",
+    "vendor/sskr/generated/recovery_sskr_wasm_bg.wasm",
+    "vectors/mnemocode-v1.json",
   ];
   const walk = (folder) => {
     for (const entry of readdirSync(join(root, folder)).sort()) {
@@ -53,42 +53,42 @@ function bundledFiles() {
       else files.push(path);
     }
   };
-  walk('assets');
+  walk("assets");
   return files;
 }
 
 // The bundle and the configuration are intermediate files, kept out of the output folder.
 mkdirSync(output, { recursive: true });
-const work = mkdtempSync(join(tmpdir(), 'mnemocode-executable-build-'));
+const work = mkdtempSync(join(tmpdir(), "mnemocode-executable-build-"));
 
 // One CommonJS file: a Node.js single executable starts from a single script. The SSKR bridge is
 // bundled too; its WASM bytes and the other files come from the embedded assets.
 const bundle = await build({
   absWorkingDir: root,
-  entryPoints: [join(root, 'src', 'mnemocode.ts')],
-  outfile: join(work, 'mnemocode.cjs'),
+  entryPoints: [join(root, "src", "mnemocode.ts")],
+  outfile: join(work, "mnemocode.cjs"),
   bundle: true,
-  platform: 'node',
-  format: 'cjs',
-  target: `node${nodeVersion.split('.')[0]}`,
-  legalComments: 'inline',
+  platform: "node",
+  format: "cjs",
+  target: `node${nodeVersion.split(".")[0]}`,
+  legalComments: "inline",
   // Only bundled-files.ts reads it, on the path that the executable never takes.
-  define: { 'import.meta.url': 'undefined' },
-  logLevel: 'warning',
+  define: { "import.meta.url": "undefined" },
+  logLevel: "warning",
   // The list of bundled files names the npm packages whose licenses travel with the executable.
   metafile: true,
 });
 
 const assets = Object.fromEntries(bundledFiles().map((path) => [path, join(root, path)]));
 const executable = join(output, name);
-const config = join(work, 'sea-config.json');
+const config = join(work, "sea-config.json");
 writeFileSync(
   config,
   `${JSON.stringify(
     {
       // Relative: Node.js records this name in the executable, and a temporary folder would
       // make every build different.
-      main: 'mnemocode.cjs',
+      main: "mnemocode.cjs",
       output: executable,
       disableExperimentalSEAWarning: true,
       // Neither is reproducible across machines, and start-up is fast enough without them.
@@ -101,9 +101,9 @@ writeFileSync(
   )}\n`,
 );
 rmSync(executable, { force: true });
-execFileSync(process.execPath, ['--build-sea', config], { cwd: work, stdio: 'inherit' });
+execFileSync(process.execPath, ["--build-sea", config], { cwd: work, stdio: "inherit" });
 // macOS runs only signed programs; the injected executable needs a new ad-hoc signature.
-if (process.platform === 'darwin') execFileSync('codesign', ['--sign', '-', '--force', executable]);
+if (process.platform === "darwin") execFileSync("codesign", ["--sign", "-", "--force", executable]);
 
 rmSync(work, { recursive: true, force: true });
 
@@ -114,9 +114,9 @@ writeFileSync(
 );
 
 const sha256 = (file) =>
-  createHash('sha256')
+  createHash("sha256")
     .update(readFileSync(join(output, file)))
-    .digest('hex');
+    .digest("hex");
 const lines = [name, notices].map((file) => `${sha256(file)}  ${file}`);
-writeFileSync(join(output, `${name}.sha256`), `${lines.join('\n')}\n`);
+writeFileSync(join(output, `${name}.sha256`), `${lines.join("\n")}\n`);
 for (const line of lines) console.log(line);

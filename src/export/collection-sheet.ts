@@ -1,15 +1,15 @@
-import { rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import { MM, type CardBox } from './business-layout.js';
-import { fit, text } from './business-render-primitives.js';
-import { drawCollectionQr, qrSizeForModuleMm } from './card-qr.js';
+import { rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { MM, type CardBox } from "./business-layout.js";
+import { fit, text } from "./business-render-primitives.js";
+import { drawCollectionQr, qrSizeForModuleMm } from "./card-qr.js";
 import {
   pageDimensions,
   parsePageSize,
   type CardSettings,
   type CardPresentation,
-} from './card-settings.js';
-import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from './world-map.js';
-import { WORLD_MAP_LAND } from './world-map-data.js';
+} from "./card-settings.js";
+import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from "./world-map.js";
+import { WORLD_MAP_LAND } from "./world-map-data.js";
 
 export interface StudyBox extends CardBox {
   readonly captionTop: number;
@@ -30,7 +30,7 @@ export interface StudyLayout {
   readonly qr?: { readonly x: number; readonly y: number; readonly size: number };
 }
 
-export type StudyTheme = 'cool' | 'warm' | 'noir' | 'mist';
+export type StudyTheme = "cool" | "warm" | "noir" | "mist";
 
 const COLLECTION_QR_MODULE_MM = 0.3;
 
@@ -44,18 +44,18 @@ export function collectionSheetLayout(
   minimumCaptionWidth = 0,
 ): StudyLayout {
   if (!Number.isInteger(count) || count < 1 || count > 16 || aspect <= 0 || captionLines < 1)
-    throw new Error('Invalid design study layout.');
+    throw new Error("Invalid design study layout.");
   const size = parsePageSize(settings.pageSize);
   if (
     settings.orientation !== undefined &&
-    !['portrait', 'landscape'].includes(settings.orientation)
+    !["portrait", "landscape"].includes(settings.orientation)
   )
-    throw new Error('Orientation must be portrait or landscape.');
+    throw new Error("Orientation must be portrait or landscape.");
   const [width, height] = pageDimensions(size, settings.orientation);
   // Ordinary cards of the business size are separate cards and never come here. The compact
   // sheet exists for the QR card of one Shamir share, which is offered in every size.
-  const compact = size === 'business';
-  const large = size === 'a4';
+  const compact = size === "business";
+  const large = size === "a4";
   const margin = compact ? 3 : large ? 10 : 5;
   const header = compact ? 11 : large ? 33 : 23;
   const footer = compact ? 4.5 : large ? 13 : 9;
@@ -76,7 +76,7 @@ export function collectionSheetLayout(
   let contentTop = header;
   if (qr) {
     if (qr.x < margin || qr.y + qr.size + lineHeight >= height - footer)
-      throw new Error('The QR cannot fit on the design study; choose a larger page size.');
+      throw new Error("The QR cannot fit on the design study; choose a larger page size.");
     if (compact && width >= height) {
       // A card-sized page is too low to place the cards below the QR code; they sit beside it.
       availableWidth -= qrSize + gap * 2;
@@ -102,7 +102,7 @@ export function collectionSheetLayout(
     if (imageHeight > 2 && (!best || area > best.area))
       best = { columns, rows, cellWidth, imageHeight, area };
   }
-  if (!best) throw new Error('The design study cannot fit legibly; choose a larger page size.');
+  if (!best) throw new Error("The design study cannot fit legibly; choose a larger page size.");
   const { columns, rows, cellWidth, imageHeight } = best;
   const cellHeight = imageHeight + captionHeight;
   const top = contentTop + (availableHeight - rows * cellHeight - (rows - 1) * gap) / 2;
@@ -258,7 +258,7 @@ export function drawStudyFrame(
   series: string,
   preparedFor: string,
   payload?: string,
-  theme: StudyTheme = 'cool',
+  theme: StudyTheme = "cool",
 ): void {
   const { width, height, margin, compact, fontSize } = layout;
   const palette = PALETTES[theme];
@@ -297,15 +297,15 @@ export function drawStudyFrame(
     : large
       ? { title: 9, kind: 18.5, subtitle: 23.5, rule: 28 }
       : { title: 5.5, kind: 12, subtitle: 15.4, rule: 19.4 };
-  centred('The studio name or title', title, rows.title, compact ? 8 : large ? 19 : 13, frameInk);
+  centred("The studio name or title", title, rows.title, compact ? 8 : large ? 19 : 13, frameInk);
   centred(
-    'Study heading',
-    'DESIGN STUDY / FOR SELECTION',
+    "Study heading",
+    "DESIGN STUDY / FOR SELECTION",
     rows.kind,
     compact ? fontSize : fontSize * 0.95,
   );
   centred(
-    'The line with the subtitle and the name',
+    "The line with the subtitle and the name",
     compact ? presentation.subtitle : `${presentation.subtitle}  Prepared for ${preparedFor}`,
     rows.subtitle,
     compact ? 4.3 : fontSize * 0.95,
@@ -321,9 +321,9 @@ export function drawStudyFrame(
     });
   }
   // The slogan shares the footer line, where nothing crosses it.
-  const footer = [compact ? '' : presentation.slogan, `Series ${series} / 01`, presentation.footer]
-    .filter((part) => part !== '')
-    .join('   |   ');
+  const footer = [compact ? "" : presentation.slogan, `Series ${series} / 01`, presentation.footer]
+    .filter((part) => part !== "")
+    .join("   |   ");
   const footerSize = fit(
     font,
     footer,
@@ -331,7 +331,7 @@ export function drawStudyFrame(
     compact ? fontSize : fontSize * 0.9,
     compact ? 4 : 4.5,
     (width - 2 * margin) * MM,
-    'Study footer',
+    "Study footer",
   );
   text(
     page,
@@ -343,7 +343,7 @@ export function drawStudyFrame(
     frameMuted,
   );
   if (payload !== undefined) {
-    if (!layout.qr) throw new Error('Missing design study QR area.');
+    if (!layout.qr) throw new Error("Missing design study QR area.");
     const { x, y, size } = layout.qr;
     page.drawRectangle({
       x: (x - 0.6) * MM,
@@ -357,8 +357,8 @@ export function drawStudyFrame(
       borderOpacity: 0.62,
     });
     drawCollectionQr(page, payload, x, y, size, COLLECTION_QR_MODULE_MM);
-    const caption = 'COLLECTION QR';
-    const fs = fit(font, caption, fontSize, 4, size * MM, 'QR caption');
+    const caption = "COLLECTION QR";
+    const fs = fit(font, caption, fontSize, 4, size * MM, "QR caption");
     text(
       page,
       font,
@@ -371,7 +371,7 @@ export function drawStudyFrame(
   }
 }
 
-export function drawStudyShadow(page: PDFPage, box: CardBox, theme: StudyTheme = 'cool'): void {
+export function drawStudyShadow(page: PDFPage, box: CardBox, theme: StudyTheme = "cool"): void {
   const palette = PALETTES[theme];
   page.drawRectangle({
     x: (box.x + 0.45) * MM,
@@ -397,11 +397,11 @@ export function drawStudyCaption(
   layout: StudyLayout,
   box: StudyBox,
   lines: readonly string[],
-  theme: StudyTheme = 'cool',
+  theme: StudyTheme = "cool",
 ): void {
   const palette = PALETTES[theme];
   for (const [i, value] of lines.entries()) {
-    const fs = fit(font, value, layout.fontSize, 4, box.captionWidth * MM, 'Study reference');
+    const fs = fit(font, value, layout.fontSize, 4, box.captionWidth * MM, "Study reference");
     text(
       page,
       font,

@@ -1,6 +1,6 @@
 /** Print layout is independent of the visual template and the encoded format. */
-export type CardPageSize = 'a6' | 'a4' | 'business';
-export type CardOrientation = 'portrait' | 'landscape';
+export type CardPageSize = "a6" | "a4" | "business";
+export type CardOrientation = "portrait" | "landscape";
 export interface CardProfile {
   readonly name?: string;
   readonly role?: string;
@@ -25,21 +25,21 @@ export interface CardSettings {
   readonly cardQr?: boolean;
 }
 export const profileFields = [
-  'name',
-  'role',
-  'company',
-  'email',
-  'phone',
-  'website',
-  'location',
+  "name",
+  "role",
+  "company",
+  "email",
+  "phone",
+  "website",
+  "location",
 ] as const;
 export type BusinessStyle =
-  'architect' | 'it' | 'estate' | 'diagonal' | 'contact' | 'curves' | 'facets' | 'mixed';
+  "architect" | "it" | "estate" | "diagonal" | "contact" | "curves" | "facets" | "mixed";
 
 export function parsePageSize(value: string | undefined): CardPageSize {
-  if (value === undefined) return 'a6';
-  if (!['a6', 'a4', 'business'].includes(value))
-    throw new Error('Page size must be a6, a4 or business.');
+  if (value === undefined) return "a6";
+  if (!["a6", "a4", "business"].includes(value))
+    throw new Error("Page size must be a6, a4 or business.");
   return value as CardPageSize;
 }
 
@@ -57,8 +57,8 @@ export function pageDimensions(
 ): [number, number] {
   const [width, height] = PAGE_DIMENSIONS[size];
   const turn =
-    (orientation === 'portrait' && width > height) ||
-    (orientation === 'landscape' && width < height);
+    (orientation === "portrait" && width > height) ||
+    (orientation === "landscape" && width < height);
   return turn ? [height, width] : [width, height];
 }
 
@@ -66,13 +66,13 @@ export function pageDimensions(
  * The business size is the size of a real card, so every card becomes its own numbered
  * page. A6 and A4 are sheets that hold the whole collection on one page.
  */
-export function isCardPageSize(size: CardPageSize | undefined): size is 'business' {
-  return size === 'business';
+export function isCardPageSize(size: CardPageSize | undefined): size is "business" {
+  return size === "business";
 }
 
 export function parseOrientation(value: string | undefined): CardOrientation | undefined {
-  if (value === undefined || value === 'portrait' || value === 'landscape') return value;
-  throw new Error('Orientation must be portrait or landscape.');
+  if (value === undefined || value === "portrait" || value === "landscape") return value;
+  throw new Error("Orientation must be portrait or landscape.");
 }
 
 export function validateProfile(profile: CardProfile = {}): CardProfile {
@@ -80,21 +80,21 @@ export function validateProfile(profile: CardProfile = {}): CardProfile {
   for (const field of profileFields) {
     const text = profile[field];
     if (text === undefined) continue;
-    if (typeof text !== 'string' || !text.trim() || /[\p{Cc}\p{Cf}]/u.test(text)) {
+    if (typeof text !== "string" || !text.trim() || /[\p{Cc}\p{Cf}]/u.test(text)) {
       throw new Error(
         `Card ${field} must be non-empty text on one line, without control characters.`,
       );
     }
     if ([...text].length > 100)
       throw new Error(`Card ${field} is too long (maximum 100 characters).`);
-    const normalized = text.trim().normalize('NFC');
+    const normalized = text.trim().normalize("NFC");
     if (
-      field === 'name' &&
+      field === "name" &&
       (!/\p{Script=Latin}/u.test(normalized) ||
         !/^[\p{Script=Latin}\p{M} .’'‐-]+$/u.test(normalized))
     ) {
       throw new Error(
-        'Card name must use Latin letters only (spaces, apostrophes and hyphens are allowed).',
+        "Card name must use Latin letters only (spaces, apostrophes and hyphens are allowed).",
       );
     }
     result[field] = normalized;
@@ -104,31 +104,31 @@ export function validateProfile(profile: CardProfile = {}): CardProfile {
 
 function defaultEmployer(
   style: BusinessStyle,
-): Pick<Required<CardProfile>, 'role' | 'company' | 'email' | 'website' | 'location'> {
-  if (style === 'architect') {
+): Pick<Required<CardProfile>, "role" | "company" | "email" | "website" | "location"> {
+  if (style === "architect") {
     return {
-      role: 'ARCHITECT',
-      company: 'VECTOR STUDIO',
-      email: 'alex@vector.example',
-      website: 'vector.example',
-      location: 'Remote / Worldwide',
+      role: "ARCHITECT",
+      company: "VECTOR STUDIO",
+      email: "alex@vector.example",
+      website: "vector.example",
+      location: "Remote / Worldwide",
     };
   }
-  if (style === 'it') {
+  if (style === "it") {
     return {
-      role: 'IT SOLUTIONS DIRECTOR',
-      company: 'VECTOR SYSTEMS',
-      email: 'alex@vector.example',
-      website: 'vector.example',
-      location: 'Remote / Worldwide',
+      role: "IT SOLUTIONS DIRECTOR",
+      company: "VECTOR SYSTEMS",
+      email: "alex@vector.example",
+      website: "vector.example",
+      location: "Remote / Worldwide",
     };
   }
   return {
-    role: 'Property Consultant',
-    company: 'NORTHLINE',
-    email: 'alex@northline.example',
-    website: 'northline.example',
-    location: 'London / International',
+    role: "Property Consultant",
+    company: "NORTHLINE",
+    email: "alex@northline.example",
+    website: "northline.example",
+    location: "London / International",
   };
 }
 
@@ -137,8 +137,8 @@ export function resolveProfile(
   supplied?: CardProfile,
 ): Required<CardProfile> {
   return {
-    name: 'Alex Morgan',
-    phone: '+44 20 7946 0281',
+    name: "Alex Morgan",
+    phone: "+44 20 7946 0281",
     ...defaultEmployer(style),
     ...validateProfile(supplied),
   };

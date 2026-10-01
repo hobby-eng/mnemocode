@@ -1,14 +1,14 @@
-import { HDKey, type Versions } from '@scure/bip32';
-import { mnemonicToSeedSync } from '@scure/bip39';
-import { Address, NETWORK, TEST_NETWORK, WIF, p2pkh, p2sh, p2tr, p2wpkh } from '@scure/btc-signer';
+import { HDKey, type Versions } from "@scure/bip32";
+import { mnemonicToSeedSync } from "@scure/bip39";
+import { Address, NETWORK, TEST_NETWORK, WIF, p2pkh, p2sh, p2tr, p2wpkh } from "@scure/btc-signer";
 
-export type BitcoinNetworkName = 'mainnet' | 'testnet';
-export type BitcoinProfile = 'legacy' | 'nested-segwit' | 'native-segwit' | 'taproot';
+export type BitcoinNetworkName = "mainnet" | "testnet";
+export type BitcoinProfile = "legacy" | "nested-segwit" | "native-segwit" | "taproot";
 export const bitcoinProfiles: readonly BitcoinProfile[] = [
-  'legacy',
-  'nested-segwit',
-  'native-segwit',
-  'taproot',
+  "legacy",
+  "nested-segwit",
+  "native-segwit",
+  "taproot",
 ];
 
 export interface DerivationLocation {
@@ -20,39 +20,39 @@ export interface DerivationLocation {
 
 export type BitcoinEvidence =
   | {
-      readonly kind: 'address';
+      readonly kind: "address";
       readonly value: string;
       readonly profiles: readonly BitcoinProfile[];
       readonly location: DerivationLocation;
     }
   | {
-      readonly kind: 'compressed-public-key';
+      readonly kind: "compressed-public-key";
       readonly value: string;
       readonly profiles: readonly BitcoinProfile[];
       readonly location: DerivationLocation;
     }
   | {
-      readonly kind: 'wif';
+      readonly kind: "wif";
       readonly value: string;
       readonly profiles: readonly BitcoinProfile[];
       readonly location: DerivationLocation;
     }
-  | { readonly kind: 'master-xpub'; readonly value: string; readonly network: BitcoinNetworkName }
+  | { readonly kind: "master-xpub"; readonly value: string; readonly network: BitcoinNetworkName }
   | {
-      readonly kind: 'account-xpub';
+      readonly kind: "account-xpub";
       readonly value: string;
       readonly profiles: readonly BitcoinProfile[];
       readonly location: DerivationLocation;
     }
   | {
-      readonly kind: 'master-fingerprint';
+      readonly kind: "master-fingerprint";
       readonly value: string;
       readonly network: BitcoinNetworkName;
     };
 
 export interface EvidenceMatch {
   readonly matched: boolean;
-  readonly kind: BitcoinEvidence['kind'];
+  readonly kind: BitcoinEvidence["kind"];
   readonly derived?: string;
   readonly path?: string;
   readonly warning?: string;
@@ -64,16 +64,16 @@ const testnetVersions: Versions = { private: 0x04358394, public: 0x043587cf };
 const extendedKeyVersions: Readonly<
   Record<string, { readonly versions: Versions; readonly network: BitcoinNetworkName }>
 > = {
-  xpub: { versions: mainnetVersions, network: 'mainnet' },
-  ypub: { versions: { private: 0x049d7878, public: 0x049d7cb2 }, network: 'mainnet' },
-  zpub: { versions: { private: 0x04b2430c, public: 0x04b24746 }, network: 'mainnet' },
-  Ypub: { versions: { private: 0x0295b005, public: 0x0295b43f }, network: 'mainnet' },
-  Zpub: { versions: { private: 0x02aa7a99, public: 0x02aa7ed3 }, network: 'mainnet' },
-  tpub: { versions: testnetVersions, network: 'testnet' },
-  upub: { versions: { private: 0x044a4e28, public: 0x044a5262 }, network: 'testnet' },
-  vpub: { versions: { private: 0x045f18bc, public: 0x045f1cf6 }, network: 'testnet' },
-  Upub: { versions: { private: 0x024285b5, public: 0x024289ef }, network: 'testnet' },
-  Vpub: { versions: { private: 0x02575048, public: 0x02575483 }, network: 'testnet' },
+  xpub: { versions: mainnetVersions, network: "mainnet" },
+  ypub: { versions: { private: 0x049d7878, public: 0x049d7cb2 }, network: "mainnet" },
+  zpub: { versions: { private: 0x04b2430c, public: 0x04b24746 }, network: "mainnet" },
+  Ypub: { versions: { private: 0x0295b005, public: 0x0295b43f }, network: "mainnet" },
+  Zpub: { versions: { private: 0x02aa7a99, public: 0x02aa7ed3 }, network: "mainnet" },
+  tpub: { versions: testnetVersions, network: "testnet" },
+  upub: { versions: { private: 0x044a4e28, public: 0x044a5262 }, network: "testnet" },
+  vpub: { versions: { private: 0x045f18bc, public: 0x045f1cf6 }, network: "testnet" },
+  Upub: { versions: { private: 0x024285b5, public: 0x024289ef }, network: "testnet" },
+  Vpub: { versions: { private: 0x02575048, public: 0x02575483 }, network: "testnet" },
 };
 
 function equalBytes(left: Uint8Array | null, right: Uint8Array | null): boolean {
@@ -84,32 +84,32 @@ function equalBytes(left: Uint8Array | null, right: Uint8Array | null): boolean 
 }
 
 function hex(bytes: Uint8Array): string {
-  return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
 function parseHex(value: string): Uint8Array {
   const normalized = value.trim().toLowerCase();
   if (!/^[0-9a-f]{66}$/.test(normalized))
     throw new Error(
-      'A compressed public key must be exactly 33 bytes encoded as 66 hexadecimal characters.',
+      "A compressed public key must be exactly 33 bytes encoded as 66 hexadecimal characters.",
     );
   const bytes = new Uint8Array(33);
   for (let index = 0; index < bytes.length; index += 1)
     bytes[index] = Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16);
   if (bytes[0] !== 0x02 && bytes[0] !== 0x03)
-    throw new Error('A compressed public key must start with 02 or 03.');
+    throw new Error("A compressed public key must start with 02 or 03.");
   return bytes;
 }
 
 function assertNetwork(network: BitcoinNetworkName): void {
-  if (network !== 'mainnet' && network !== 'testnet') {
-    throw new Error('Bitcoin network must be mainnet or testnet.');
+  if (network !== "mainnet" && network !== "testnet") {
+    throw new Error("Bitcoin network must be mainnet or testnet.");
   }
 }
 
 function assertLocation(location: DerivationLocation): void {
   assertNetwork(location.network);
-  for (const name of ['account', 'branch', 'index'] as const) {
+  for (const name of ["account", "branch", "index"] as const) {
     const value = location[name];
     if (!Number.isSafeInteger(value) || value < 0 || value >= 0x80000000) {
       throw new Error(`${name} must be an integer from 0 through 2147483647.`);
@@ -118,13 +118,13 @@ function assertLocation(location: DerivationLocation): void {
 }
 
 function coinType(network: BitcoinNetworkName): number {
-  return network === 'mainnet' ? 0 : 1;
+  return network === "mainnet" ? 0 : 1;
 }
 
 const derivationPurposes: Readonly<Record<BitcoinProfile, number>> = {
   legacy: 44,
-  'nested-segwit': 49,
-  'native-segwit': 84,
+  "nested-segwit": 49,
+  "native-segwit": 84,
   taproot: 86,
 };
 
@@ -145,10 +145,10 @@ function paymentAddress(
   publicKey: Uint8Array,
   network: BitcoinNetworkName,
 ): string {
-  const parameters = network === 'mainnet' ? NETWORK : TEST_NETWORK;
-  if (profile === 'legacy') return p2pkh(publicKey, parameters).address;
-  if (profile === 'nested-segwit') return p2sh(p2wpkh(publicKey, parameters), parameters).address;
-  if (profile === 'native-segwit') return p2wpkh(publicKey, parameters).address;
+  const parameters = network === "mainnet" ? NETWORK : TEST_NETWORK;
+  if (profile === "legacy") return p2pkh(publicKey, parameters).address;
+  if (profile === "nested-segwit") return p2sh(p2wpkh(publicKey, parameters), parameters).address;
+  if (profile === "native-segwit") return p2wpkh(publicKey, parameters).address;
   return p2tr(publicKey.slice(1), undefined, parameters).address;
 }
 
@@ -160,7 +160,7 @@ function extendedMetadata(value: string): {
   const metadata = extendedKeyVersions[prefix];
   if (metadata === undefined)
     throw new Error(
-      'Unsupported extended-key prefix. Supported public forms include xpub, ypub, zpub, Ypub, Zpub, tpub, upub, vpub, Upub, and Vpub.',
+      "Unsupported extended-key prefix. Supported public forms include xpub, ypub, zpub, Ypub, Zpub, tpub, upub, vpub, Upub, and Vpub.",
     );
   return metadata;
 }
@@ -169,7 +169,7 @@ function parseExtendedPublicKey(value: string, versions: Versions): HDKey {
   try {
     return HDKey.fromExtendedKey(value.trim(), versions);
   } catch {
-    throw new Error('The extended public key is not valid.');
+    throw new Error("The extended public key is not valid.");
   }
 }
 
@@ -187,7 +187,7 @@ function rootForMnemonic(mnemonic: string, passphrase: string, network: BitcoinN
   assertNetwork(network);
   const seed = mnemonicToSeedSync(mnemonic, passphrase);
   try {
-    return HDKey.fromMasterSeed(seed, network === 'mainnet' ? mainnetVersions : testnetVersions);
+    return HDKey.fromMasterSeed(seed, network === "mainnet" ? mainnetVersions : testnetVersions);
   } finally {
     // This function owns the temporary byte buffer; caller-owned mnemonic strings remain unchanged.
     seed.fill(0);
@@ -195,10 +195,10 @@ function rootForMnemonic(mnemonic: string, passphrase: string, network: BitcoinN
 }
 
 /** Returns the standard four-byte BIP32 master fingerprint as lowercase hexadecimal. */
-export function masterFingerprint(mnemonic: string, passphrase = ''): string {
-  const root = rootForMnemonic(mnemonic, passphrase, 'mainnet');
+export function masterFingerprint(mnemonic: string, passphrase = ""): string {
+  const root = rootForMnemonic(mnemonic, passphrase, "mainnet");
   try {
-    return root.fingerprint.toString(16).padStart(8, '0');
+    return root.fingerprint.toString(16).padStart(8, "0");
   } finally {
     root.wipePrivateData();
   }
@@ -206,23 +206,23 @@ export function masterFingerprint(mnemonic: string, passphrase = ''): string {
 
 function candidates(profiles: readonly BitcoinProfile[]): readonly BitcoinProfile[] {
   if (profiles.length === 0) {
-    throw new Error('At least one Bitcoin address profile must be selected.');
+    throw new Error("At least one Bitcoin address profile must be selected.");
   }
   if (profiles.some((profile) => !bitcoinProfiles.includes(profile))) {
-    throw new Error('Unknown Bitcoin address profile.');
+    throw new Error("Unknown Bitcoin address profile.");
   }
   return profiles;
 }
 
-type LocatedEvidence = Exclude<BitcoinEvidence, { kind: 'master-xpub' | 'master-fingerprint' }>;
+type LocatedEvidence = Exclude<BitcoinEvidence, { kind: "master-xpub" | "master-fingerprint" }>;
 
 function matchingWif(
   node: HDKey,
-  evidence: Extract<BitcoinEvidence, { kind: 'wif' }>,
+  evidence: Extract<BitcoinEvidence, { kind: "wif" }>,
 ): string | undefined {
   const derivedKey = node.privateKey;
-  if (derivedKey === null) throw new Error('Unable to derive the private key for WIF comparison.');
-  const network = evidence.location.network === 'mainnet' ? NETWORK : TEST_NETWORK;
+  if (derivedKey === null) throw new Error("Unable to derive the private key for WIF comparison.");
+  const network = evidence.location.network === "mainnet" ? NETWORK : TEST_NETWORK;
   const coder = WIF(network);
   let expected: Uint8Array;
   try {
@@ -239,11 +239,11 @@ function matchingWif(
 
 function matchingAccountKey(
   node: HDKey,
-  evidence: Extract<BitcoinEvidence, { kind: 'account-xpub' }>,
+  evidence: Extract<BitcoinEvidence, { kind: "account-xpub" }>,
 ): string | undefined {
   const metadata = extendedMetadata(evidence.value);
   if (metadata.network !== evidence.location.network) {
-    throw new Error('The extended-key prefix does not match the selected Bitcoin network.');
+    throw new Error("The extended-key prefix does not match the selected Bitcoin network.");
   }
   const expected = parseExtendedPublicKey(evidence.value, metadata.versions);
   try {
@@ -258,11 +258,11 @@ function matchDerivedNode(
   evidence: LocatedEvidence,
   profile: BitcoinProfile,
 ): string | undefined {
-  if (node.publicKey === null) throw new Error('Unable to derive the public key.');
+  if (node.publicKey === null) throw new Error("Unable to derive the public key.");
   switch (evidence.kind) {
-    case 'address': {
+    case "address": {
       const derived = paymentAddress(profile, node.publicKey, evidence.location.network);
-      const network = evidence.location.network === 'mainnet' ? NETWORK : TEST_NETWORK;
+      const network = evidence.location.network === "mainnet" ? NETWORK : TEST_NETWORK;
       const address = Address(network);
       let expected: string;
       try {
@@ -272,45 +272,45 @@ function matchDerivedNode(
       }
       return derived === expected ? derived : undefined;
     }
-    case 'compressed-public-key': {
+    case "compressed-public-key": {
       const matches = equalBytes(node.publicKey, parseHex(evidence.value));
       return matches ? hex(node.publicKey) : undefined;
     }
-    case 'wif':
+    case "wif":
       return matchingWif(node, evidence);
-    case 'account-xpub':
+    case "account-xpub":
       return matchingAccountKey(node, evidence);
     default:
       // Unreachable for typed callers; matchBitcoinEvidence rejects other kinds first.
-      throw new Error('Unsupported Bitcoin evidence kind.');
+      throw new Error("Unsupported Bitcoin evidence kind.");
   }
 }
 
 /** Every kind of evidence this module can compare. */
-const EVIDENCE_KINDS: ReadonlySet<string> = new Set<BitcoinEvidence['kind']>([
-  'address',
-  'compressed-public-key',
-  'wif',
-  'master-xpub',
-  'account-xpub',
-  'master-fingerprint',
+const EVIDENCE_KINDS: ReadonlySet<string> = new Set<BitcoinEvidence["kind"]>([
+  "address",
+  "compressed-public-key",
+  "wif",
+  "master-xpub",
+  "account-xpub",
+  "master-fingerprint",
 ]);
 
 /** Compares a recovered mnemonic locally. It does not contact a node or a block explorer. */
 export function matchBitcoinEvidence(
   mnemonic: string,
   evidence: BitcoinEvidence,
-  passphrase = '',
+  passphrase = "",
 ): EvidenceMatch {
   // A JavaScript caller or parsed configuration can pass any kind; an unknown one is an error, not
   // a comparison that failed, which would read as evidence against the wallet.
   if (!EVIDENCE_KINDS.has((evidence as { readonly kind?: unknown }).kind as string)) {
-    throw new Error('Unsupported Bitcoin evidence kind.');
+    throw new Error("Unsupported Bitcoin evidence kind.");
   }
-  if (evidence.kind === 'master-xpub') {
+  if (evidence.kind === "master-xpub") {
     const metadata = extendedMetadata(evidence.value);
     if (metadata.network !== evidence.network)
-      throw new Error('The extended-key prefix does not match the selected Bitcoin network.');
+      throw new Error("The extended-key prefix does not match the selected Bitcoin network.");
     const expected = parseExtendedPublicKey(evidence.value, metadata.versions);
     const root = rootForMnemonic(mnemonic, passphrase, evidence.network);
     try {
@@ -318,7 +318,7 @@ export function matchBitcoinEvidence(
         matched: sameExtendedKey(root, expected),
         kind: evidence.kind,
         derived: root.publicExtendedKey,
-        path: 'm',
+        path: "m",
       };
     } finally {
       root.wipePrivateData();
@@ -326,18 +326,18 @@ export function matchBitcoinEvidence(
     }
   }
 
-  if (evidence.kind === 'master-fingerprint') {
+  if (evidence.kind === "master-fingerprint") {
     if (!/^[0-9a-fA-F]{8}$/.test(evidence.value))
-      throw new Error('A master fingerprint must be eight hexadecimal characters.');
+      throw new Error("A master fingerprint must be eight hexadecimal characters.");
     const root = rootForMnemonic(mnemonic, passphrase, evidence.network);
     try {
-      const derived = root.fingerprint.toString(16).padStart(8, '0');
+      const derived = root.fingerprint.toString(16).padStart(8, "0");
       return {
         matched: derived === evidence.value.toLowerCase(),
         kind: evidence.kind,
         derived,
-        path: 'm',
-        warning: 'A master fingerprint is only 32 bits and is a filter, not proof of recovery.',
+        path: "m",
+        warning: "A master fingerprint is only 32 bits and is a filter, not proof of recovery.",
       };
     } finally {
       root.wipePrivateData();
@@ -350,7 +350,7 @@ export function matchBitcoinEvidence(
   try {
     for (const profile of profiles) {
       const derivationPath =
-        evidence.kind === 'account-xpub'
+        evidence.kind === "account-xpub"
           ? accountPath(profile, evidence.location)
           : path(profile, evidence.location);
       const node = root.derive(derivationPath);

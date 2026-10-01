@@ -1,7 +1,7 @@
-import { MM } from './business-layout.js';
-import { materialPageLayout, materialGridLayout } from './material-layout.js';
-import { readRenderAsset } from './platform.js';
-import fontkit from '@pdf-lib/fontkit';
+import { MM } from "./business-layout.js";
+import { materialPageLayout, materialGridLayout } from "./material-layout.js";
+import { readRenderAsset } from "./platform.js";
+import fontkit from "@pdf-lib/fontkit";
 import {
   PDFDocument,
   rgb,
@@ -12,28 +12,28 @@ import {
   endPath,
   type PDFPage,
   type PDFImage,
-} from 'pdf-lib';
-import { colorsToIndexes, unicodeToColors } from '../core.js';
-import { colorsToShare } from '../sskr/transport.js';
-import type { CardContent } from './templates.js';
-import type { SskrCardContent } from './sskr-content.js';
-import { resolveIdentityFor } from './card-identities.js';
-import { resolvePresentationFor } from './card-copy.js';
-import { clearDocumentMetadata } from './document-metadata.js';
+} from "pdf-lib";
+import { colorsToIndexes, unicodeToColors } from "../core.js";
+import { colorsToShare } from "../sskr/transport.js";
+import type { CardContent } from "./templates.js";
+import type { SskrCardContent } from "./sskr-content.js";
+import { resolveIdentityFor } from "./card-identities.js";
+import { resolvePresentationFor } from "./card-copy.js";
+import { clearDocumentMetadata } from "./document-metadata.js";
 import {
   collectionSheetLayout,
   drawStudyCaption,
   drawStudyFrame,
   drawStudyShadow,
   studyCaptionWidth,
-} from './collection-sheet.js';
+} from "./collection-sheet.js";
 import {
   chooseMaterialFinish,
   materialArtwork,
   type MaterialFinish,
   type MaterialStyle,
-} from './material-artwork.js';
-export type MaterialPageSize = 'business' | 'a6' | 'a4';
+} from "./material-artwork.js";
+export type MaterialPageSize = "business" | "a6" | "a4";
 export interface MaterialCardOptions {
   readonly pageSize?: MaterialPageSize;
   readonly individualIndex?: number;
@@ -99,32 +99,32 @@ async function createRenderContext(
   content: CardContent | SskrCardContent,
   options: MaterialCardOptions,
 ) {
-  if (content.kind !== 'colors' && content.kind !== 'sskr')
-    throw new Error('Material cards require color references.');
-  const share = content.kind === 'sskr';
+  if (content.kind !== "colors" && content.kind !== "sskr")
+    throw new Error("Material cards require color references.");
+  const share = content.kind === "sskr";
   if (share) {
-    colorsToShare(content.colors.join(' '));
-    if (content.payload !== content.colors.join(' '))
-      throw new Error('Share QR does not match its references.');
+    colorsToShare(content.colors.join(" "));
+    if (content.payload !== content.colors.join(" "))
+      throw new Error("Share QR does not match its references.");
   } else {
     colorsToIndexes(content.colors);
     if (
-      content.payload !== content.colors.join(' ') &&
-      unicodeToColors(content.payload).join(' ') !== content.colors.join(' ')
+      content.payload !== content.colors.join(" ") &&
+      unicodeToColors(content.payload).join(" ") !== content.colors.join(" ")
     )
-      throw new Error('Collection QR does not match its references.');
+      throw new Error("Collection QR does not match its references.");
   }
   if (content.colors.length < 1 || content.colors.length > 16)
-    throw new Error('Material cards support at most 16 references.');
-  const size = options.pageSize ?? content.pageSize ?? 'business';
-  if (!['business', 'a6', 'a4'].includes(size))
-    throw new Error('Material page size must be business, a6 or a4.');
+    throw new Error("Material cards support at most 16 references.");
+  const size = options.pageSize ?? content.pageSize ?? "business";
+  if (!["business", "a6", "a4"].includes(size))
+    throw new Error("Material page size must be business, a6 or a4.");
   const individual = options.individualIndex;
   if (
     individual !== undefined &&
     (!Number.isInteger(individual) || individual < 0 || individual >= content.colors.length)
   )
-    throw new Error('Invalid material card index.');
+    throw new Error("Invalid material card index.");
   const { width, height, portrait, scale } = materialPageLayout(size, content.orientation);
   const artwork = materialArtwork[style];
   const presentation = resolvePresentationFor(content);
@@ -132,7 +132,7 @@ async function createRenderContext(
   const profile = resolveIdentityFor(content);
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  const font = await doc.embedFont(await readRenderAsset('fonts/DejaVuSans-UI.ttf'), {
+  const font = await doc.embedFont(await readRenderAsset("fonts/DejaVuSans-UI.ttf"), {
     subset: true,
   });
   const image = await doc.embedJpg(await readRenderAsset(`images/material-${style}.jpg`));
@@ -150,13 +150,13 @@ async function createRenderContext(
   ) => {
     const supported = font.getCharacterSet();
     if ([...value].some((c) => !supported.includes(c.codePointAt(0)!)))
-      throw new Error('Card text contains a character not supported by the font.');
+      throw new Error("Card text contains a character not supported by the font.");
     const fs = Math.min(
       desired * scale,
       (maxWidth * MM) / Math.max(font.widthOfTextAtSize(value, 1), 0.01),
     );
     if (fs < TYPE_LAYOUT.minimumFont * scale)
-      throw new Error('Card text is too long to fit legibly; shorten the company or name.');
+      throw new Error("Card text is too long to fit legibly; shorten the company or name.");
     page.drawText(value, {
       x: center * MM - font.widthOfTextAtSize(value, fs) / 2,
       // Preserve the one-font-size line box used by the other card renderers.
@@ -258,7 +258,7 @@ function drawMaterialFront(context: MaterialRenderContext): void {
     // Both captions share the physical center of the image, including incomplete rows.
     drawText(
       page,
-      `${String(entries[i]!.index + 1).padStart(2, '0')}  ${code.slice(1)}`,
+      `${String(entries[i]!.index + 1).padStart(2, "0")}  ${code.slice(1)}`,
       top + imageHeight + TYPE_LAYOUT.referenceOffset * scale,
       5.5,
       cellWidth,
@@ -288,10 +288,10 @@ function drawMaterialFront(context: MaterialRenderContext): void {
 function drawMaterialStudy(context: MaterialRenderContext): void {
   const { doc, font, content, size, style, image, presentation, profile, includeQr } = context;
   const payload = includeQr ? content.payload : undefined;
-  const compact = size === 'business';
+  const compact = size === "business";
   // Compact studies prioritize exact recovery references over decorative finish names.
   const captions = content.colors.map((code, index) => [
-    `${String(index + 1).padStart(2, '0')}  ${code.slice(1).toUpperCase()}`,
+    `${String(index + 1).padStart(2, "0")}  ${code.slice(1).toUpperCase()}`,
     ...(compact ? [] : [chooseMaterialFinish(style, code).name]),
   ]);
   const layout = collectionSheetLayout(
@@ -309,10 +309,10 @@ function drawMaterialStudy(context: MaterialRenderContext): void {
     layout,
     presentation,
     content.title ?? presentation.studioName,
-    content.kind === 'sskr' ? content.collectionReference : '01',
+    content.kind === "sskr" ? content.collectionReference : "01",
     profile.name,
     payload,
-    'warm',
+    "warm",
   );
   for (const box of layout.cards) {
     const code = content.colors[box.index]!.toUpperCase();

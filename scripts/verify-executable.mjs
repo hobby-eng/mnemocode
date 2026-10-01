@@ -5,7 +5,7 @@
 //
 //   node scripts/verify-executable.mjs [executable or its folder]   (default release)
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdtempSync,
@@ -14,14 +14,14 @@ import {
   rmSync,
   statSync,
   writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { executableName, noticesName } from './executable-files.mjs';
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { executableName, noticesName } from "./executable-files.mjs";
 
-const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 
 /**
  * The executable itself, or in a folder the executable of this computer, by the name that
@@ -34,20 +34,20 @@ function findExecutable(path) {
   return join(path, name);
 }
 
-const executable = findExecutable(resolve(process.argv[2] ?? join(root, 'release')));
+const executable = findExecutable(resolve(process.argv[2] ?? join(root, "release")));
 
 /** The public BIP39 test phrase, and its seedshift encoding with the date 23-09-2026. */
 const TEST_PHRASE =
-  'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
-const SHIFTED = 'wool abuse actual wool abuse actual wool abuse actual wool abuse congress';
+  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+const SHIFTED = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
 
-const folder = mkdtempSync(join(tmpdir(), 'mnemocode-executable-'));
+const folder = mkdtempSync(join(tmpdir(), "mnemocode-executable-"));
 const run = (...arguments_) =>
   execFileSync(executable, arguments_, {
     cwd: folder,
-    encoding: 'utf8',
-    env: { ...process.env, NO_COLOR: '1' },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    encoding: "utf8",
+    env: { ...process.env, NO_COLOR: "1" },
+    stdio: ["ignore", "pipe", "pipe"],
   });
 const check = (condition, what) => {
   if (!condition) throw new Error(`The executable failed: ${what}.`);
@@ -55,49 +55,49 @@ const check = (condition, what) => {
 };
 
 try {
-  check(run('--version') === `mnemocode ${version}\n`, `prints version ${version}`);
-  check(run('self-test').includes('PASS'), 'passes the full self-test');
+  check(run("--version") === `mnemocode ${version}\n`, `prints version ${version}`);
+  check(run("self-test").includes("PASS"), "passes the full self-test");
   const shifted = run(
-    'encode',
-    '--mnemonic',
+    "encode",
+    "--mnemonic",
     TEST_PHRASE,
-    '--dates',
-    '23-09-2026',
-    '--format',
-    '1',
+    "--dates",
+    "23-09-2026",
+    "--format",
+    "1",
   );
-  check(shifted.includes(SHIFTED), 'masks the test phrase with a date');
+  check(shifted.includes(SHIFTED), "masks the test phrase with a date");
   run(
-    'encode',
-    '--sskr',
-    '--mnemonic',
+    "encode",
+    "--sskr",
+    "--mnemonic",
     TEST_PHRASE,
-    '--threshold',
-    '2',
-    '--shares',
-    '3',
-    '--output',
-    'shares.txt',
+    "--threshold",
+    "2",
+    "--shares",
+    "3",
+    "--output",
+    "shares.txt",
   );
-  const shares = readFileSync(join(folder, 'shares.txt'), 'utf8').trim().split('\n');
-  writeFileSync(join(folder, 'two.txt'), `${shares[0]}\n${shares[2]}\n`);
+  const shares = readFileSync(join(folder, "shares.txt"), "utf8").trim().split("\n");
+  writeFileSync(join(folder, "two.txt"), `${shares[0]}\n${shares[2]}\n`);
   check(
-    run('sskr-combine', '--share-file', 'two.txt').includes(TEST_PHRASE),
-    'restores the phrase from 2 of 3 Shamir shares',
+    run("sskr-combine", "--share-file", "two.txt").includes(TEST_PHRASE),
+    "restores the phrase from 2 of 3 Shamir shares",
   );
-  run('preview', '--template', 'business-it', '--pdf', 'preview.pdf');
+  run("preview", "--template", "business-it", "--pdf", "preview.pdf");
   check(
-    readFileSync(join(folder, 'preview.pdf')).subarray(0, 5).toString() === '%PDF-',
-    'draws a card PDF with its embedded artwork',
+    readFileSync(join(folder, "preview.pdf")).subarray(0, 5).toString() === "%PDF-",
+    "draws a card PDF with its embedded artwork",
   );
-  check(run('encode', '--help').includes('Usage: mnemocode encode'), 'prints the help');
+  check(run("encode", "--help").includes("Usage: mnemocode encode"), "prints the help");
   const notices = join(dirname(executable), noticesName(basename(executable)));
-  const text = existsSync(notices) ? readFileSync(notices, 'utf8') : '';
+  const text = existsSync(notices) ? readFileSync(notices, "utf8") : "";
   check(
-    ['MnemoCode', `Node.js ${process.version}`, 'npm package', 'SSKR engine'].every((part) =>
+    ["MnemoCode", `Node.js ${process.version}`, "npm package", "SSKR engine"].every((part) =>
       text.includes(part),
     ),
-    'has its license notices next to it',
+    "has its license notices next to it",
   );
 } finally {
   rmSync(folder, { recursive: true, force: true });
