@@ -47,7 +47,13 @@ jobs:
       - name: The tag names the version in package.json
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
-        run: test "$GITHUB_REF_NAME" = "v$(node -p "require('./package.json').version")"
+        run: |
+          test "$GITHUB_REF_NAME" = "v$(node -p "require('./package.json').version")"
+          # The release text comes from curated notes; a tag without them stops here.
+          test -s "docs/releases/$GITHUB_REF_NAME.md" || {
+            echo "Missing release notes: docs/releases/$GITHUB_REF_NAME.md" >&2
+            exit 1
+          }
       - run: node scripts/build-executable.mjs
       - name: Run the executable on its own system
         run: node scripts/verify-executable.mjs
@@ -66,6 +72,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Only for the release notes in docs/releases; nothing is built here.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: executable-*
@@ -80,5 +90,6 @@ jobs:
           rm *.sha256
           sha256sum --check SHA256SUMS
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-            --title "MnemoCode ${GITHUB_REF_NAME#v}" --notes-from-tag \
+            --title "MnemoCode ${GITHUB_REF_NAME#v}" \
+            --notes-file "$GITHUB_WORKSPACE/docs/releases/$GITHUB_REF_NAME.md" \
             mnemocode-* SHA256SUMS
