@@ -183,6 +183,13 @@ export function dates(arguments_: ParsedArguments): DateShiftDate[] {
 }
 
 export function askSecret(prompt: string): string {
+  // systemd-ask-password draws the hidden prompt and exists only on Linux. Elsewhere, say so
+  // before touching the terminal, instead of blaming a missing terminal or program.
+  if (process.platform !== 'linux') {
+    throw new Error(
+      'Hidden input (--ask-secrets) works on Linux only, where systemd-ask-password asks for the secret. On this system, read the secret from a protected local file (--mnemonic-file, --input-file or --share-file), or give the path - to read it from standard input.',
+    );
+  }
   // A pipe or /dev/null makes systemd-ask-password fall back to a UI agent.
   // Use the controlling terminal even when CLI stdout/stderr are redirected.
   let terminal: number;
