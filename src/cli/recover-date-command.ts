@@ -22,6 +22,7 @@ import {
   recordedInputFormat,
   transformMode,
 } from './input.js';
+import { optionLabel } from './option-copy.js';
 
 const DEFAULT_MAX_CANDIDATES = 1_000_000;
 const HARD_MAX_CANDIDATES = 10_000_000;
@@ -132,11 +133,11 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
     }
     if (checked % progressEvery === 0 || checked === candidateCount) {
       terminalNotice(
-        `Checked ${checked}/${candidateCount} date combinations; found ${foundCount} matches.`,
+        `Checked ${checked}/${candidateCount} date combinations; found ${foundCount} ${foundCount === 1 ? 'match' : 'matches'}.`,
       );
     }
   }
-  terminalResultHeader('DATE RECOVERY', [
+  terminalResultHeader('Date recovery', [
     ['Mode', recoveryMode],
     ['Matches', String(foundCount)],
   ]);
@@ -155,7 +156,10 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
     terminalNotice(
       'A checksum-valid candidate is not proof that its date is correct. Confirm it against independent wallet evidence.',
     );
-  else terminalNotice(`Each displayed candidate matched the requested ${evidence.kind} locally.`);
+  else
+    terminalNotice(
+      `Each displayed candidate matched the requested ${optionLabel(evidence.kind)} locally.`,
+    );
 }
 
 function recoverCandidates(

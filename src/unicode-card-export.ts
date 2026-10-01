@@ -27,7 +27,7 @@ export async function exportUnicodeCard(options: UnicodeCardExportOptions): Prom
     .map((date, index) => {
       parseDate(formatDate(date));
       const label = labels[index]?.trim();
-      if (!label) throw new Error('Card entry labels must not be empty.');
+      if (!label) throw new Error('Card event labels must not be empty.');
       return { date, label };
     })
     .sort(

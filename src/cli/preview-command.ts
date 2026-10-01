@@ -41,7 +41,7 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
     ) {
       throw new Error('Template listing cannot be combined with preview output settings.');
     }
-    terminalResultHeader('CARD TEMPLATES', [['Installed', String(cardTemplates.length)]]);
+    terminalResultHeader('Card templates', [['Installed', String(cardTemplates.length)]]);
     if (!cardTemplates.length)
       console.log(
         'No approved card templates are installed yet. Each design will be added after individual approval.',

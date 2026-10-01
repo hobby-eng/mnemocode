@@ -4,6 +4,7 @@ import { type ParsedArguments, value } from './arguments.js';
 import { bip39Passphrase, bitcoinEvidence } from './bitcoin-options.js';
 import { askSecret, textInput } from './input.js';
 import { terminalNotice, terminalResultHeader } from './terminal.js';
+import { optionLabel } from './option-copy.js';
 
 export function runRecoverWord(arguments_: ParsedArguments): void {
   const recoverLegacyReplacement = arguments_['legacy-valid-last-word'] === true;
@@ -30,7 +31,7 @@ export function runRecoverWord(arguments_: ParsedArguments): void {
     ? recoverLegacyValidLastWords(mnemonic)
     : recoverMissingWord(mnemonic);
   if (candidates.length === 0) {
-    terminalResultHeader('MISSING WORD RECOVERY', [['Checksum-valid candidates', '0']]);
+    terminalResultHeader('Missing word recovery', [['Checksum-valid candidates', '0']]);
     terminalNotice(
       'No checksum-valid BIP39 phrase matches the supplied known words. Check the other words, their order, and the placeholder position.',
       'warning',
@@ -60,7 +61,7 @@ export function runRecoverWord(arguments_: ParsedArguments): void {
     ]);
   }
   if (evidence !== undefined) headerRows.push(['Evidence matches', String(matched)]);
-  terminalResultHeader('MISSING WORD RECOVERY', headerRows);
+  terminalResultHeader('Missing word recovery', headerRows);
   console.log(
     [
       'candidate',
@@ -103,7 +104,7 @@ export function runRecoverWord(arguments_: ParsedArguments): void {
     );
   } else {
     terminalNotice(
-      `Matched ${matched} of ${candidates.length} candidates against the requested ${evidence.kind} locally.`,
+      `Matched ${matched} of ${candidates.length} candidates against the requested ${optionLabel(evidence.kind)} locally.`,
       matched === 0 ? 'warning' : 'success',
     );
     const warning = results.find(({ match }) => match?.warning !== undefined)?.match?.warning;
