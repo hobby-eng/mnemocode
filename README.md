@@ -28,7 +28,7 @@ chmod +x mnemocode-0.1.0-linux-x64
 ./mnemocode-0.1.0-linux-x64 self-test
 ```
 
-The file holds Node.js, the program, the card artwork and fonts, and the SSKR engine. Making images from cards still needs Poppler's `pdftocairo`, and `--ask-secrets` needs `systemd-ask-password`, as below. To build the file for your own computer from a checkout, run `corepack pnpm build:executable`; it writes the file to `dist/executable/` and runs it once from an empty folder.
+The file holds Node.js, the program, the card artwork and fonts, and the SSKR engine. Making images from cards still needs Poppler's `pdftocairo`, and `--ask-secrets` needs `systemd-ask-password`, as below. To build the file for your own computer from a checkout, run `corepack pnpm build:executable`; it writes the file to `release/`, which `pnpm build` leaves alone, and runs it once from an empty folder.
 
 ### From source
 
