@@ -2,7 +2,7 @@
 // command-line program and every file it reads built in: card artwork and fonts, the SSKR engine
 // and the public vectors. Nothing needs to be installed to run it.
 //
-//   node scripts/build-executable.mjs [output folder]   (default dist/executable)
+//   node scripts/build-executable.mjs [output folder]   (default release)
 //
 // Writes mnemocode-<version>-<system>-<processor>[.exe] and its line of SHA256SUMS. A Node.js
 // single executable is built from the running Node.js binary, so each system builds its own:
@@ -10,13 +10,22 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const output = resolve(process.argv[2] ?? join(root, 'dist', 'executable'));
+const output = resolve(process.argv[2] ?? join(root, 'release'));
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 const nodeVersion = readFileSync(join(root, '.node-version'), 'utf8').trim();
 
@@ -49,9 +58,9 @@ function bundledFiles() {
   return files;
 }
 
-const work = join(output, 'build');
-rmSync(work, { recursive: true, force: true });
-mkdirSync(work, { recursive: true });
+// The bundle and the configuration are intermediate files, kept out of the output folder.
+mkdirSync(output, { recursive: true });
+const work = mkdtempSync(join(tmpdir(), 'mnemocode-executable-build-'));
 
 // One CommonJS file: a Node.js single executable starts from a single script. The SSKR bridge is
 // bundled too; its WASM bytes and the other files come from the embedded assets.
@@ -75,7 +84,9 @@ writeFileSync(
   config,
   `${JSON.stringify(
     {
-      main: join(work, 'mnemocode.cjs'),
+      // Relative: Node.js records this name in the executable, and a temporary folder would
+      // make every build different.
+      main: 'mnemocode.cjs',
       output: executable,
       disableExperimentalSEAWarning: true,
       // Neither is reproducible across machines, and start-up is fast enough without them.
@@ -88,9 +99,11 @@ writeFileSync(
   )}\n`,
 );
 rmSync(executable, { force: true });
-execFileSync(process.execPath, ['--build-sea', config], { stdio: 'inherit' });
+execFileSync(process.execPath, ['--build-sea', config], { cwd: work, stdio: 'inherit' });
 // macOS runs only signed programs; the injected executable needs a new ad-hoc signature.
 if (process.platform === 'darwin') execFileSync('codesign', ['--sign', '-', '--force', executable]);
+
+rmSync(work, { recursive: true, force: true });
 
 const digest = createHash('sha256').update(readFileSync(executable)).digest('hex');
 writeFileSync(join(output, `${name}.sha256`), `${digest}  ${name}\n`);

@@ -1,6 +1,8 @@
 node_modules/
 .pnpm-store/
 dist/
+# Single executables from scripts/build-executable.mjs; published only as release files.
+release/
 coverage/
 .DS_Store
 output/
