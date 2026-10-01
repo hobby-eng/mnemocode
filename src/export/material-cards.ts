@@ -4,12 +4,20 @@ import { readRenderAsset } from "./platform.js";
 import fontkit from "@pdf-lib/fontkit";
 import {
   PDFDocument,
+  PDFName,
   rgb,
   pushGraphicsState,
   popGraphicsState,
   rectangle,
   clip,
+  clipEvenOdd,
+  closePath,
   endPath,
+  fill,
+  lineTo,
+  moveTo,
+  setFillingRgbColor,
+  setGraphicsState,
   type PDFPage,
   type PDFImage,
 } from "pdf-lib";
@@ -28,9 +36,12 @@ import {
   studyCaptionWidth,
 } from "./collection-sheet.js";
 import {
-  chooseMaterialFinish,
+  chooseMaterialSamples,
   materialArtwork,
+  TINT_OPACITY,
+  type MaterialArtwork,
   type MaterialFinish,
+  type MaterialSample,
   type MaterialStyle,
 } from "./material-artwork.js";
 export type MaterialPageSize = "business" | "a6" | "a4";
@@ -50,21 +61,64 @@ const TYPE_LAYOUT = {
   minimumFont: 3.8,
 } as const;
 
+// The tint layer keeps the photograph's light, texture and highlights ("Color" blend) and takes
+// the hue and saturation of the catalogue colour of the sample. It covers only the object in the
+// photograph, inside the material's outline; the backdrop, shadows and screws keep their colour.
+const TINT_STATE = PDFName.of("MnemoTint");
+const tintedPages = new WeakSet<PDFPage>();
+
+/** Registers the "Color" blend state of the tint on `page`, once, and names it. */
+function useTintState(page: PDFPage): PDFName {
+  if (!tintedPages.has(page)) {
+    const state = page.doc.context.obj({ Type: "ExtGState", BM: "Color", ca: TINT_OPACITY });
+    page.node.setExtGState(TINT_STATE, page.doc.context.register(state));
+    tintedPages.add(page);
+  }
+  return TINT_STATE;
+}
+
+/** A rectangle in millimetres from the top left corner of the page. */
+interface Area {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** The aspect of a finish's crop, width over height. */
+function cropAspect(image: PDFImage, finish: MaterialFinish): number {
+  const [, , cw, ch] = finish.crop;
+  return (image.width * cw) / (image.height * ch);
+}
+
+/** Where a sample's photograph lies in a box: as large as fits, centred, in millimetres. */
+function sampleArea(image: PDFImage, finish: MaterialFinish, box: Area): Area {
+  const aspect = cropAspect(image, finish);
+  const width = Math.min(box.width, box.height * aspect);
+  const height = width / aspect;
+  return {
+    x: box.x + (box.width - width) / 2,
+    y: box.y + (box.height - height) / 2,
+    width,
+    height,
+  };
+}
+
 function drawSample(
   page: PDFPage,
   image: PDFImage,
-  finish: MaterialFinish,
+  artwork: MaterialArtwork,
+  sample: MaterialSample,
   x: number,
   top: number,
   width: number,
   height: number,
 ) {
-  const [cx, cy, cw, ch] = finish.crop;
-  const cropRatio = (image.width * cw) / (image.height * ch);
-  const dw = Math.min(width, height * cropRatio);
-  const dh = dw / cropRatio;
-  const left = (x + (width - dw) / 2) * MM;
-  const bottom = page.getHeight() - (top + (height + dh) / 2) * MM;
+  const [cx, cy, cw, ch] = sample.finish.crop;
+  const area = sampleArea(image, sample.finish, { x, y: top, width, height });
+  const [dw, dh] = [area.width, area.height];
+  const left = area.x * MM;
+  const bottom = page.getHeight() - (area.y + dh) * MM;
   page.pushOperators(
     pushGraphicsState(),
     rectangle(left, bottom, dw * MM, dh * MM),
@@ -77,6 +131,31 @@ function drawSample(
     width: (dw / cw) * MM,
     height: (dh / ch) * MM,
   });
+  if (sample.tint !== undefined) {
+    const [scale, dx, dy] = sample.finish.outlineFit ?? [1, 0, 0];
+    // Outline points are fractions of the crop with y downwards; the page's y runs upwards.
+    const at = (ring: readonly number[], i: number) =>
+      [
+        left + (ring[i]! * scale + dx) * dw * MM,
+        bottom + (1 - ring[i + 1]! * scale - dy) * dh * MM,
+      ] as const;
+    const outline = artwork.catalogue.outline.flatMap((ring) => [
+      moveTo(...at(ring, 0)),
+      ...Array.from({ length: ring.length / 2 - 1 }, (_, i) => lineTo(...at(ring, 2 * i + 2))),
+      closePath(),
+    ]);
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(sample.tint!.slice(i, i + 2), 16) / 255);
+    page.pushOperators(
+      ...outline,
+      // Even-odd, so that a hole in the outline, such as a screw, stays untinted.
+      clipEvenOdd(),
+      endPath(),
+      setGraphicsState(useTintState(page)),
+      setFillingRgbColor(r!, g!, b!),
+      rectangle(left, bottom, dw * MM, dh * MM),
+      fill(),
+    );
+  }
   page.pushOperators(popGraphicsState());
 }
 
@@ -136,6 +215,9 @@ async function createRenderContext(
     subset: true,
   });
   const image = await doc.embedJpg(await readRenderAsset(`images/material-${style}.jpg`));
+  // Chosen for all references of the card together, so that no two of them look alike and an
+  // individual fragment shows the same sample as the whole card.
+  const samples = chooseMaterialSamples(style, content.colors);
   const ink = artwork.dark ? rgb(0.94, 0.92, 0.87) : rgb(0.15, 0.16, 0.16);
   const muted = artwork.dark ? rgb(0.73, 0.72, 0.67) : rgb(0.38, 0.38, 0.35);
   clearDocumentMetadata(doc);
@@ -183,7 +265,6 @@ async function createRenderContext(
     size,
     content,
     individual,
-    style,
     width,
     height,
     scale,
@@ -192,6 +273,7 @@ async function createRenderContext(
     presentation,
     profile,
     image,
+    samples,
     includeQr,
     drawText,
     makePage,
@@ -202,7 +284,6 @@ function drawMaterialFront(context: MaterialRenderContext): void {
   const {
     content,
     individual,
-    style,
     width,
     height,
     scale,
@@ -211,6 +292,7 @@ function drawMaterialFront(context: MaterialRenderContext): void {
     presentation,
     profile,
     image,
+    samples,
     drawText,
     makePage,
   } = context;
@@ -247,14 +329,14 @@ function drawMaterialFront(context: MaterialRenderContext): void {
   );
   for (let i = 0; i < entries.length; i++) {
     const code = entries[i]!.code.toUpperCase();
-    const finish = chooseMaterialFinish(style, code);
+    const sample = samples[entries[i]!.index]!;
     const countThisRow = Math.min(columns, entries.length - Math.floor(i / columns) * columns);
     const centeredStart = (width - (countThisRow * cellWidth + (countThisRow - 1) * gap)) / 2;
     const x = centeredStart + (i % columns) * (cellWidth + gap);
     const top = areaTop + Math.floor(i / columns) * cellHeight;
     const labelsHeight = TYPE_LAYOUT.labelsHeight * scale;
     const imageHeight = cellHeight - labelsHeight;
-    drawSample(page, image, finish, x, top, cellWidth, imageHeight);
+    drawSample(page, image, artwork, sample, x, top, cellWidth, imageHeight);
     // Both captions share the physical center of the image, including incomplete rows.
     drawText(
       page,
@@ -266,7 +348,7 @@ function drawMaterialFront(context: MaterialRenderContext): void {
     );
     drawText(
       page,
-      finish.name,
+      sample.label,
       top + imageHeight + TYPE_LAYOUT.finishOffset * scale,
       4.8,
       cellWidth,
@@ -286,18 +368,20 @@ function drawMaterialFront(context: MaterialRenderContext): void {
 }
 
 function drawMaterialStudy(context: MaterialRenderContext): void {
-  const { doc, font, content, size, style, image, presentation, profile, includeQr } = context;
+  const { doc, font, content, size, artwork, image, samples, presentation, profile, includeQr } =
+    context;
   const payload = includeQr ? content.payload : undefined;
   const compact = size === "business";
   // Compact studies prioritize exact recovery references over decorative finish names.
   const captions = content.colors.map((code, index) => [
     `${String(index + 1).padStart(2, "0")}  ${code.slice(1).toUpperCase()}`,
-    ...(compact ? [] : [chooseMaterialFinish(style, code).name]),
+    ...(compact ? [] : [samples[index]!.label]),
   ]);
   const layout = collectionSheetLayout(
     { ...content, pageSize: size },
     content.colors.length,
-    1.45,
+    // The finishes of one material are cropped alike, so every box takes the shape of a sample.
+    cropAspect(image, artwork.finishes[0]!),
     compact ? 1 : 2,
     payload,
     studyCaptionWidth(font, captions.flat()),
@@ -312,13 +396,12 @@ function drawMaterialStudy(context: MaterialRenderContext): void {
     content.kind === "sskr" ? content.collectionReference : "01",
     profile.name,
     payload,
-    "warm",
+    artwork.studyTheme,
   );
   for (const box of layout.cards) {
-    const code = content.colors[box.index]!.toUpperCase();
-    const finish = chooseMaterialFinish(style, code);
-    drawStudyShadow(page, box);
-    drawSample(page, image, finish, box.x, box.y, box.width, box.height);
-    drawStudyCaption(page, font, layout, box, captions[box.index]!);
+    const sample = samples[box.index]!;
+    drawStudyShadow(page, { ...box, ...sampleArea(image, sample.finish, box) }, artwork.studyTheme);
+    drawSample(page, image, artwork, sample, box.x, box.y, box.width, box.height);
+    drawStudyCaption(page, font, layout, box, captions[box.index]!, artwork.studyTheme);
   }
 }

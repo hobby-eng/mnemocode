@@ -10,6 +10,7 @@ import {
 } from "./card-settings.js";
 import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from "./world-map.js";
 import { WORLD_MAP_LAND } from "./world-map-data.js";
+import { drawMaterialBackdrop, type MaterialBackdrop } from "./study-backdrops.js";
 
 export interface StudyBox extends CardBox {
   readonly captionTop: number;
@@ -30,7 +31,7 @@ export interface StudyLayout {
   readonly qr?: { readonly x: number; readonly y: number; readonly size: number };
 }
 
-export type StudyTheme = "cool" | "warm" | "noir" | "mist";
+export type StudyTheme = "cool" | "warm" | "noir" | "mist" | MaterialBackdrop;
 
 const COLLECTION_QR_MODULE_MM = 0.3;
 
@@ -145,8 +146,8 @@ type Color = ReturnType<typeof rgb>;
 /** Colours of one sheet. */
 interface SheetPalette {
   readonly background: Color;
-  readonly land: Color;
-  readonly coast: Color;
+  /** The grey world map behind the cards, or the backdrop of a material. */
+  readonly backdrop: { readonly land: Color; readonly coast: Color } | MaterialBackdrop;
   /** The plate behind the QR code and its border. */
   readonly plate: Color;
   readonly plateBorder: Color;
@@ -170,8 +171,7 @@ const GRID = {
 /** The dark page with the grey map, shared by the dark themes; only their ink differs. */
 const DARK_PAGE = {
   background: rgb(0.043, 0.047, 0.059),
-  land: rgb(0.155, 0.165, 0.19),
-  coast: rgb(0.22, 0.235, 0.265),
+  backdrop: { land: rgb(0.155, 0.165, 0.19), coast: rgb(0.22, 0.235, 0.265) },
   plate: rgb(0.075, 0.082, 0.1),
   plateBorder: rgb(0.3, 0.33, 0.38),
 } as const;
@@ -199,8 +199,7 @@ const PALETTES: Readonly<Record<StudyTheme, SheetPalette>> = {
   // A light page for the light glass cards, which a dark page made look cut out.
   mist: {
     background: rgb(0.78, 0.81, 0.85),
-    land: rgb(0.7, 0.74, 0.78),
-    coast: rgb(0.63, 0.67, 0.71),
+    backdrop: { land: rgb(0.7, 0.74, 0.78), coast: rgb(0.63, 0.67, 0.71) },
     plate: rgb(0.91, 0.93, 0.95),
     plateBorder: rgb(0.48, 0.52, 0.57),
     ink: rgb(0.13, 0.15, 0.18),
@@ -210,6 +209,55 @@ const PALETTES: Readonly<Record<StudyTheme, SheetPalette>> = {
     cardEdge: rgb(0.57, 0.61, 0.65),
     shadowOpacity: 0.22,
   },
+  // The light material pages carry dark ink; their own backdrop covers the background.
+  studio: {
+    background: rgb(0.86, 0.87, 0.88),
+    backdrop: "studio",
+    plate: rgb(0.96, 0.965, 0.97),
+    plateBorder: rgb(0.5, 0.53, 0.57),
+    ink: rgb(0.11, 0.12, 0.14),
+    muted: rgb(0.33, 0.36, 0.4),
+    caption: rgb(0.11, 0.12, 0.14),
+    captionMuted: rgb(0.33, 0.36, 0.4),
+    cardEdge: rgb(0.6, 0.63, 0.67),
+    shadowOpacity: 0.24,
+  },
+  concrete: {
+    background: rgb(0.8, 0.79, 0.765),
+    backdrop: "concrete",
+    plate: rgb(0.95, 0.945, 0.93),
+    plateBorder: rgb(0.5, 0.49, 0.47),
+    ink: rgb(0.13, 0.13, 0.13),
+    muted: rgb(0.33, 0.32, 0.3),
+    caption: rgb(0.13, 0.13, 0.13),
+    captionMuted: rgb(0.31, 0.3, 0.28),
+    cardEdge: rgb(0.58, 0.57, 0.55),
+    shadowOpacity: 0.26,
+  },
+  tiled: {
+    background: rgb(0.93, 0.92, 0.9),
+    backdrop: "tiled",
+    plate: rgb(0.97, 0.965, 0.955),
+    plateBorder: rgb(0.52, 0.5, 0.47),
+    ink: rgb(0.14, 0.15, 0.16),
+    muted: rgb(0.35, 0.35, 0.34),
+    caption: rgb(0.14, 0.15, 0.16),
+    captionMuted: rgb(0.33, 0.33, 0.32),
+    cardEdge: rgb(0.55, 0.53, 0.5),
+    shadowOpacity: 0.28,
+  },
+  parquet: {
+    background: rgb(0.86, 0.8, 0.71),
+    backdrop: "parquet",
+    plate: rgb(0.97, 0.95, 0.91),
+    plateBorder: rgb(0.52, 0.45, 0.36),
+    ink: rgb(0.17, 0.13, 0.1),
+    muted: rgb(0.36, 0.29, 0.22),
+    caption: rgb(0.17, 0.13, 0.1),
+    captionMuted: rgb(0.34, 0.27, 0.2),
+    cardEdge: rgb(0.6, 0.53, 0.43),
+    shadowOpacity: 0.26,
+  },
 };
 const GRATICULE_STEP_DEGREES = 30;
 const GRATICULE = graticule(GRATICULE_STEP_DEGREES);
@@ -217,7 +265,7 @@ const GRATICULE = graticule(GRATICULE_STEP_DEGREES);
 /** Draws the grey world map, as wide as the page allows and centred a little below the middle. */
 function drawWorldMap(
   page: PDFPage,
-  palette: SheetPalette,
+  colours: { readonly land: Color; readonly coast: Color },
   width: number,
   height: number,
   margin: number,
@@ -242,8 +290,8 @@ function drawWorldMap(
       x,
       y,
       scale,
-      color: palette.land,
-      borderColor: palette.coast,
+      color: colours.land,
+      borderColor: colours.coast,
       borderWidth: 0.3,
     });
 }
@@ -271,7 +319,9 @@ export function drawStudyFrame(
     height: page.getHeight(),
     color: palette.background,
   });
-  drawWorldMap(page, palette, width, height, margin);
+  if (typeof palette.backdrop === "string")
+    drawMaterialBackdrop(page, palette.backdrop, width, height);
+  else drawWorldMap(page, palette.backdrop, width, height, margin);
 
   // A QR code occupies the top right corner. On a sheet the heading stays centred on the page
   // and clear of the code on both sides; a card-sized page only has room beside the code.
