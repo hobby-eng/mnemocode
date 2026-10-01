@@ -649,7 +649,7 @@
       "title": "The card check scripts write PDFs into a folder that Git does not ignore",
       "category": "BLD",
       "severity": "low",
-      "status": "open",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "scripts/check-card-output.mjs:17, scripts/business-goldens.mjs:8 (default goldens/…), .gitignore"
@@ -879,10 +879,10 @@
     },
     {
       "id": "AUD-005-BLD004",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Original reproduction"
+      "status": "verified",
+      "fixCommit": "BLD004 commit",
+      "verificationCommit": "BLD004 commit",
+      "evidence": ".gitignore ignores goldens/, the default output folder of scripts/check-card-output.mjs and scripts/business-goldens.mjs; git check-ignore matches goldens/current and goldens/after. CI already writes to the ignored output/."
     },
     {
       "id": "AUD-005-BLD005",
