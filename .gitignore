@@ -9,6 +9,8 @@ output/
 tmp/
 export-*/
 exports/
+# Cards written by scripts/check-card-output.mjs and scripts/business-goldens.mjs.
+goldens/
 
 # Audit evidence stays local; only the harness scripts are published (docs/audits/README.md).
 docs/audits/*-evidence/
