@@ -11,11 +11,7 @@ import { dirname, join } from "node:path";
 const LICENSE_FILE = /^(licen[cs]e|copying|notice)(\.(md|txt))?$/iu;
 
 const PROJECT_FILES = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"];
-const SSKR_FILES = [
-  "vendor/sskr/LICENSE",
-  "vendor/sskr/NOTICE.md",
-  "vendor/sskr/UPSTREAM_NOTICES.md",
-];
+const SSKR_FILES = ["sskr-wasm/LICENSE", "sskr-wasm/NOTICE.md", "sskr-wasm/UPSTREAM_NOTICES.md"];
 const ASSET_FILES = [
   "assets/fonts/DejaVuSans-NOTICE",
   "assets/fonts/DroidSansFallback-NOTICE",
@@ -93,7 +89,7 @@ export function executableNotices({ root, name, version, metafile }) {
     heading("MnemoCode") + PROJECT_FILES.map(read).join("\n"),
     heading(`Node.js ${process.version}`) + nodeLicense(),
     ...packages.map((item) => item.text),
-    heading("SSKR engine (vendor/sskr)") + SSKR_FILES.map(read).join("\n"),
+    heading("SSKR engine (sskr-wasm)") + SSKR_FILES.map(read).join("\n"),
     heading("Fonts and map data") + ASSET_FILES.map(read).join("\n"),
   ].join("\n");
 }

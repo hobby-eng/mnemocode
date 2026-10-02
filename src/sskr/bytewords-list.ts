@@ -1,5 +1,5 @@
 // Blockchain Commons Bytewords (BCR-2020-012); extracted from pinned bc-ur WASM.
-// Copyright Blockchain Commons; BSD-2-Clause-Patent. See vendor/sskr/NOTICE.md.
+// Copyright Blockchain Commons; BSD-2-Clause-Patent. See sskr-wasm/NOTICE.md.
 export const bytewords = [
   "able",
   "acid",

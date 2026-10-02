@@ -33,7 +33,7 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 | `cli/sskr-command.ts`  | Share input and export options                                                   |
 | `export/sskr-cards.ts` | Prints existing shares with the card renderers                                   |
 
-`vendor/sskr` contains the Rust source of the share library, its Cargo lockfile, the generated JavaScript and WASM, and their notices. `vendor/sskr/integrity.json` pins the hashes of these files, so the formatter must not rewrite them. [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) names the library versions and licenses.
+`sskr-wasm` contains the Rust source of the share library, its Cargo lockfile, the generated JavaScript and WASM, and their notices. `pnpm build:sskr` builds the WASM from that source offline in the pinned container `Dockerfile.sskr`; `pnpm verify:sskr` builds it again and compares the result byte for byte. `sskr-wasm/integrity.json` pins the hashes of these files, so the formatter must not rewrite them. [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) names the library versions and licenses.
 
 ## CLI
 
@@ -65,7 +65,7 @@ The renderers contain no Node.js code. They get bundled files, random choices, P
 
 ## Maintenance checks
 
-Format the project's TypeScript and JavaScript with the checked-in Prettier configuration, then run `corepack pnpm check` and `corepack pnpm build`. Vendored and generated files are excluded from formatting.
+Format the project's TypeScript and JavaScript with the checked-in Prettier configuration, then run `corepack pnpm check` and `corepack pnpm build`. Generated files and the SSKR bridge are excluded from formatting.
 
 For layout refactoring, `scripts/business-goldens.mjs` creates fixed public fixtures and `scripts/compare-business-goldens.py` compares their pages at 144 dpi. The comparison covers those fixtures, not every combination of design and input. Keep refactoring separate from intended design changes.
 
