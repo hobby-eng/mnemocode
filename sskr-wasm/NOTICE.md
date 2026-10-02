@@ -1,9 +1,11 @@
 # SSKR bridge
 
-MnemoCode includes the SSKR Rust source in `rust/src/lib.rs` and its generated
-JavaScript/WASM adapter. Source revision: `2d2b7cc` of multi-chain-wallet-tools (Rust 1.99.0, wasm-bindgen 0.2.129); bridge package:
-`recovery-sskr-wasm` 0.1.5. The retained bridge copyright and MIT terms are in
-[LICENSE](LICENSE). File hashes are in `integrity.json`.
+MnemoCode's SSKR engine is the Rust source in `rust/src/lib.rs`. `Dockerfile.sskr`
+(`pnpm build:sskr`) builds it into the JavaScript/WASM adapter in `generated/`.
+The bridge was written for multi-chain-wallet-tools and taken from its revision
+`2d2b7cc`; it is kept and built here now. Bridge package: `recovery-sskr-wasm`
+0.1.5. The retained bridge copyright and MIT terms are in [LICENSE](LICENSE).
+File hashes are in `integrity.json`.
 
 Core libraries: Blockchain Commons `sskr` 0.12.0, `bc-shamir` 0.13.0,
 `bc-rand` 0.5.0, `bc-ur` 0.19.2, `bc-tags` 0.12.0 and `dcbor` 0.25.2

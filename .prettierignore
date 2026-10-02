@@ -1,7 +1,7 @@
 dist/
 node_modules/
 assets/
-vendor/
+sskr-wasm/
 vectors/
 # pnpm writes its lockfile in its own style.
 pnpm-lock.yaml

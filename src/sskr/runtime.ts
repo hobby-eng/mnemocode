@@ -1,13 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import { readBundledFile } from "../bundled-files.js";
-import type * as Engine from "../../vendor/sskr/generated/recovery_sskr_wasm.js";
+import type * as Engine from "../../sskr-wasm/generated/recovery_sskr_wasm.js";
 
 let pending: Promise<typeof Engine> | undefined;
 
 /** Node-only loader. The public share transport and export modules do not load WASM. */
 export function sskrEngine(): Promise<typeof Engine> {
   return (pending ??= (async () => {
-    const base = "vendor/sskr/";
+    const base = "sskr-wasm/";
     const manifest = JSON.parse(
       new TextDecoder().decode(await readBundledFile(`${base}integrity.json`)),
     ) as Record<string, string>;
@@ -25,7 +25,7 @@ export function sskrEngine(): Promise<typeof Engine> {
         throw new Error("SSKR dependency integrity check failed. No secret was processed.");
       }
     }
-    const engine = await import("../../vendor/sskr/generated/recovery_sskr_wasm.js");
+    const engine = await import("../../sskr-wasm/generated/recovery_sskr_wasm.js");
     // Initialise from the exact WASM bytes verified above, not a second filesystem read.
     engine.initSync({ module: binary });
     return engine;

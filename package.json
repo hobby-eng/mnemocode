@@ -31,7 +31,7 @@
     "LICENSE",
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
-    "vendor/sskr",
+    "sskr-wasm",
     "docs/SSKR.md",
     "docs/card-designs.md",
     "docs/card-identities.md",
@@ -51,6 +51,8 @@
     "test:coverage": "vitest run --coverage --testTimeout=180000",
     "verify": "pnpm format:check && pnpm check && pnpm build && pnpm test",
     "build:executable": "node scripts/build-executable.mjs && node scripts/verify-executable.mjs",
+    "build:sskr": "node scripts/build-sskr-wasm.mjs",
+    "verify:sskr": "node scripts/build-sskr-wasm.mjs --check",
     "dev": "tsx src/mnemocode.ts"
   },
   "dependencies": {
