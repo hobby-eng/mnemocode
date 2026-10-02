@@ -1,6 +1,6 @@
 # Builds the SSKR engine, sskr-wasm/rust, into WebAssembly with pinned tools and no network.
 # scripts/build-sskr-wasm.mjs runs it with sskr-wasm/rust as the build context and turns the
-# output into sskr-wasm/generated.
+# output into sskr-wasm/generated. The image is x86-64 (linux/amd64) on every host.
 #
 # The toolchain stage is a word-for-word copy of the one in Dockerfile.reproducible of
 # multi-chain-wallet-tools (revision 2d2b7cc): the same base image, clang, Rust and wasm-bindgen

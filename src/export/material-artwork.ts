@@ -528,7 +528,9 @@ export function materialSamples(style: MaterialStyle): MaterialSample[] {
  * The sample of every reference of a card. Every distinct reference gets its own sample: the pairs
  * of reference and sample are taken nearest first, each sample at most once, so that two codes
  * never look alike while each keeps the direction of its colour as far as the catalogue allows.
- * The same reference always gets the same sample.
+ * The same references get the same samples in any order and letter case, and a repeated reference
+ * keeps its sample. Its neighbours take part in the choice, so in another collection a reference
+ * may get another sample; an individual fragment therefore takes its sample from the whole card.
  */
 export function chooseMaterialSamples(
   style: MaterialStyle,
