@@ -6,12 +6,12 @@ MnemoCode is a standalone offline program. Do not mention or depend on the other
 
 ## Commands
 
-- Install: `pnpm install --frozen-lockfile` (pnpm 10.19.0 via Corepack; Node 26.10.0 from `.node-version`).
+- Install: `pnpm install --frozen-lockfile` (pnpm 12.8.1 via Corepack; Node 26.10.0 from `.node-version`).
 - Targeted: `pnpm check` (toolchain pins + `tsc --noEmit`); `pnpm exec vitest run <file>`; `pnpm build` then `node dist/mnemocode.js self-test`.
 - Release-level (explicit request only): `pnpm verify` (format check, type check, build, full tests); `pnpm audit --audit-level high`; `npm pack --dry-run --json --ignore-scripts`.
 - Release notes: `docs/releases/v<version>.md`, written before tagging from the version's section of `CHANGELOG.md`; `.github/workflows/executable.yml` publishes that file and refuses a tag without it.
 - Formatting: `pnpm format:check`; `docs/audits/` is excluded from the formatter and must stay excluded.
-- Vendored SSKR WASM in `vendor/sskr/` is regenerated only in the pinned reproducible container recorded in `docs/audits/` (Rust 1.98.1, clang 18, wasm-bindgen 0.2.128) and compared byte for byte against `vendor/sskr/integrity.json`; never replace it with a host build.
+- Vendored SSKR WASM in `vendor/sskr/` is regenerated only in the canonical reproducible container of multi-chain-wallet-tools (`Dockerfile.reproducible` at the revision named in `vendor/sskr/NOTICE.md`: Rust 1.99.0, clang 18, wasm-bindgen 0.2.129) and compared byte for byte against `vendor/sskr/integrity.json`; never replace it with a host build.
 
 ## Generated exports
 

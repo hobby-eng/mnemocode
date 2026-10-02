@@ -3,6 +3,8 @@ node_modules/
 assets/
 vendor/
 vectors/
+# pnpm writes its lockfile in its own style.
+pnpm-lock.yaml
 goldens/
 docs/audits/
 src/export/world-map-data.ts

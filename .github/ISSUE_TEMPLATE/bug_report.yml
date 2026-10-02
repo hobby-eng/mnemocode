@@ -34,7 +34,7 @@ body:
     attributes:
       label: Environment
       description: Operating system, Node.js version, pnpm version, and relevant local tools such as Poppler.
-      placeholder: Ubuntu 26.04; Node.js 26.10.0; pnpm 10.19.0
+      placeholder: Ubuntu 26.04; Node.js 26.10.0; pnpm 12.8.1
     validations:
       required: true
   - type: textarea

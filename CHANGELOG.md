@@ -47,8 +47,9 @@
 ### Toolchain and dependencies
 
 - The development runtime is Node.js 26.10.0.
-- Updated the npm dependencies, including Vitest 5.0.3 with its V8 coverage provider, TypeScript 7.0.2, Prettier 3.9.9, tsx 4.23.15 and `@types/node` 26.6.3.
-- Pinned pnpm 10.19.0. A toolchain check makes CI read the Node.js version from `.node-version` and the pnpm version from `package.json`.
+- Updated the npm dependencies, including Vitest 5.0.3 with its V8 coverage provider, TypeScript 7.0.2, Prettier 3.9.9, tsx 4.23.15 and `@types/node` 26.6.4.
+- The SSKR engine is built with Rust 1.99.0, wasm-bindgen 0.2.129 and current crates, in the reproducible container of multi-chain-wallet-tools.
+- Pinned pnpm 12.8.1, which also records its own release in the lockfile. A toolchain check makes CI read the Node.js version from `.node-version` and the pnpm version from `package.json`.
 - The npm package includes the guides for shares, cards and the source layout.
 
 ### Audit remediation
