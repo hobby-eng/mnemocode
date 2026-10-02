@@ -1,0 +1,696 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-007",
+  "auditNumber": 7,
+  "date": "2026-10-02",
+  "title": "MnemoCode release review after taking ownership of the SSKR build",
+  "reviewer": {
+    "name": "Codex",
+    "model": null,
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+    "commitComplete": true,
+    "workingTree": "Clean before audit; final edits limited to audit records, harnesses and index. Product hashes unchanged.",
+    "sourceFingerprint": "git-tree:e2ac6ce4d08937d397f79923e87430f4d78e887b"
+  },
+  "scope": "Full-scope read-only CLI/library and release audit, emphasizing independent SSKR source/build ownership, WASM provenance, dependencies, card changes and standalone packaging. Browser/chain surfaces absent.",
+  "releaseAssessment": "INCOMPLETE",
+  "checks": [
+    {
+      "name": "canonical-sskr",
+      "command": "'env' 'PATH=/home/sergio/Documents/bip_tools/mnemocode/docs/audits/AUD-007-harnesses/docker-shim:/home/sergio/.codex/tmp/arg0/codex-arg0nAjxIY:/home/sergio/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/sergio/Documents/bip_tools/workingspace/cargo/bin:/home/sergio/.local/bin:/home/sergio/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/sergio/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/sergio/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources' 'pnpm' 'verify:sskr'",
+      "outcome": "passed",
+      "summary": "Fresh built stage, no network, Rust 1.99.0; four exact generated-file matches.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:09:10.539Z",
+      "completedAt": "2026-10-02T15:09:36.990Z",
+      "record": "canonical-sskr.command.json",
+      "localLog": "canonical-sskr.log",
+      "logSha256": "c3065a92842f6f4c471dcf0bd163f4eefb6f04ee7095a0af1cf75c4c5947ea8a"
+    },
+    {
+      "name": "card-output",
+      "command": "'node' 'scripts/check-card-output.mjs' 'docs/audits/AUD-007-evidence/card-output'",
+      "outcome": "passed",
+      "summary": "25 named PDF cases and SSKR command pass actual raster/QR acceptance; default A6 assertions also pass.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:17:26.726Z",
+      "completedAt": "2026-10-02T15:19:26.278Z",
+      "record": "card-output.command.json",
+      "localLog": "card-output.log",
+      "logSha256": "2efa5af05fa019ab16c40897d684d5e786a20b23fe3727a99b6be7f507233de2"
+    },
+    {
+      "name": "docker-access",
+      "command": "'docker' 'version'",
+      "outcome": "passed",
+      "summary": "Docker server available outside filesystem/network sandbox.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:08:32.790Z",
+      "completedAt": "2026-10-02T15:08:32.849Z",
+      "record": "docker-access.command.json",
+      "localLog": "docker-access.log",
+      "logSha256": "7d8ab97237da592e9f2f90c585322407dbd972c8f61e5d6517ab395a45bf2fcf"
+    },
+    {
+      "name": "docker-environment",
+      "command": "'docker' 'version'",
+      "outcome": "blocked",
+      "summary": "Sandbox denied Docker socket access; permitted retry follows.",
+      "exitCode": 1,
+      "startedAt": "2026-10-02T15:08:16.990Z",
+      "completedAt": "2026-10-02T15:08:17.022Z",
+      "record": "docker-environment.command.json",
+      "localLog": "docker-environment.log",
+      "logSha256": "3c17d1992107caa631beee342a627662591c868e5f091be622ceb3159a3344bb"
+    },
+    {
+      "name": "environment",
+      "command": "'bash' '-c' 'node --version; pnpm --version; python3 --version; uname -srmo; pdftocairo -v; git rev-parse HEAD; git rev-parse \"HEAD^{tree}\"; git rev-list --count origin/main..HEAD'",
+      "outcome": "passed",
+      "summary": "Linux x86-64, Node 26.10.0, pnpm 12.8.1, Python 3.14.4, Poppler 26.01.0; 22 commits ahead.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:15:30.613Z",
+      "completedAt": "2026-10-02T15:15:30.813Z",
+      "record": "environment.command.json",
+      "localLog": "environment.log",
+      "logSha256": "5b63551d23a68bc2cc04796b4321c66d4f41df0b8bc82617315fbc4cea2a0e0c"
+    },
+    {
+      "name": "executable-acceptance",
+      "command": "'node' 'scripts/verify-executable.mjs' 'docs/audits/AUD-007-evidence/executable-linux'",
+      "outcome": "passed",
+      "summary": "From empty cwd: version, full self-test, date encoding, 2-of-3 split/recovery, PDF, help and notices.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:12:56.763Z",
+      "completedAt": "2026-10-02T15:13:17.973Z",
+      "record": "executable-acceptance.command.json",
+      "localLog": "executable-acceptance.log",
+      "logSha256": "a333ad46de7d081d8de90b4279078470acfa97e885adb3fc9f654502b4192f7e"
+    },
+    {
+      "name": "executable-build",
+      "command": "'node' 'scripts/build-executable.mjs' 'docs/audits/AUD-007-evidence/executable-linux'",
+      "outcome": "passed",
+      "summary": "Fresh Linux x64 SEA executable, bundled assets and notices built into ignored evidence.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:11:15.138Z",
+      "completedAt": "2026-10-02T15:11:55.221Z",
+      "record": "executable-build.command.json",
+      "localLog": "executable-build.log",
+      "logSha256": "2659dc6a418bf5b0d1e19a516677e5816ad5a39ad66d6a053cc5dd2678105535"
+    },
+    {
+      "name": "executable-licenses",
+      "command": "'node' 'docs/audits/AUD-005-harnesses/bundled-licenses.mjs' 'docs/audits/AUD-007-evidence/executable-linux'",
+      "outcome": "passed",
+      "summary": "17 bundled npm packages checked; no notice gaps.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:13:18.041Z",
+      "completedAt": "2026-10-02T15:13:18.468Z",
+      "record": "executable-licenses.command.json",
+      "localLog": "executable-licenses.log",
+      "logSha256": "c68438bd844a2d87449034e722f051be056a7aae479dbacab2816535187db03d"
+    },
+    {
+      "name": "frozen-lockfile",
+      "command": "'pnpm' 'install' '--frozen-lockfile' '--offline' '--ignore-scripts'",
+      "outcome": "passed",
+      "summary": "Offline frozen installation with scripts disabled: lockfile current, no resolution change.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:18:08.282Z",
+      "completedAt": "2026-10-02T15:18:08.546Z",
+      "record": "frozen-lockfile.command.json",
+      "localLog": "frozen-lockfile.log",
+      "logSha256": "55490785c07ffdaef8aa0b310309a2a26c0ab78449cf0fa0679c62dd531aef2b"
+    },
+    {
+      "name": "github-runs",
+      "command": "'gh' 'run' 'list' '--repo' 'hobby-eng/mnemocode' '--limit' '8' '--json' 'databaseId,headSha,status,conclusion,workflowName,url'",
+      "outcome": "passed",
+      "summary": "Read-only listing; latest CI and Executable success is 8c427af, no current candidate run.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:09:54.182Z",
+      "completedAt": "2026-10-02T15:09:56.415Z",
+      "record": "github-runs.command.json",
+      "localLog": "github-runs.log",
+      "logSha256": "ab079050011eef7d7c29b0127acf81d7335d47f68f43894ad278a91cc616c164"
+    },
+    {
+      "name": "local-invariants-host",
+      "command": "'node' 'docs/audits/AUD-007-harnesses/local-invariants.mjs'",
+      "outcome": "passed",
+      "summary": "7 pins, no network loader, 30 reconstructed quorums, 20 rejection checks; sample-stability counterexample.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:18:08.004Z",
+      "completedAt": "2026-10-02T15:18:08.219Z",
+      "record": "local-invariants-host.command.json",
+      "localLog": "local-invariants-host.log",
+      "logSha256": "08b1c2612de91bfc47b01dd21145edc1bde29aa50d0423811a2f06b4dc249d33"
+    },
+    {
+      "name": "local-invariants",
+      "command": "'node' 'docs/audits/AUD-007-harnesses/local-invariants.mjs'",
+      "outcome": "passed",
+      "summary": "Sandbox exit 0 lacked stdout; repeated on host for readable evidence.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:17:23.241Z",
+      "completedAt": "2026-10-02T15:17:23.479Z",
+      "record": "local-invariants.command.json",
+      "localLog": "local-invariants.log",
+      "logSha256": "2981a7edca567d27fbee5049d8be306e8f03b1488eac22300ee7fb0acad30894"
+    },
+    {
+      "name": "npm-audit-network",
+      "command": "'pnpm' 'audit' '--audit-level' 'high'",
+      "outcome": "passed",
+      "summary": "No known npm vulnerabilities found.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:09:52.940Z",
+      "completedAt": "2026-10-02T15:09:54.069Z",
+      "record": "npm-audit-network.command.json",
+      "localLog": "npm-audit-network.log",
+      "logSha256": "5cd80755da69714fc9bf4b77533fd21273cd5a70b25cca352ff8687d8d4b7544"
+    },
+    {
+      "name": "npm-audit",
+      "command": "'pnpm' 'audit' '--audit-level' 'high'",
+      "outcome": "blocked",
+      "summary": "ERR_PNPM_AUDIT_BAD_RESPONSE: DNS temporary failure in sandbox.",
+      "exitCode": 1,
+      "startedAt": "2026-10-02T15:08:03.626Z",
+      "completedAt": "2026-10-02T15:09:13.934Z",
+      "record": "npm-audit.command.json",
+      "localLog": "npm-audit.log",
+      "logSha256": "98aa0f030fc72bebeea77210e07997fe277f76585cf73b407e65245fed4cba11"
+    },
+    {
+      "name": "package-dry-run-host",
+      "command": "'npm' 'pack' '--dry-run' '--json' '--ignore-scripts'",
+      "outcome": "passed",
+      "summary": "207 package entries; new sskr-wasm tree included, no audit evidence or release files.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:13:55.444Z",
+      "completedAt": "2026-10-02T15:13:56.580Z",
+      "record": "package-dry-run-host.command.json",
+      "localLog": "package-dry-run-host.log",
+      "logSha256": "4ed010ac725598a3de108ea6914c82825d038f6ba24a98542ff07dfe855da149"
+    },
+    {
+      "name": "package-dry-run",
+      "command": "'npm' 'pack' '--dry-run' '--json' '--ignore-scripts'",
+      "outcome": "failed",
+      "summary": "Sandbox exit 226 with no diagnostic; host retry retained separately.",
+      "exitCode": 226,
+      "startedAt": "2026-10-02T15:10:06.257Z",
+      "completedAt": "2026-10-02T15:10:07.186Z",
+      "record": "package-dry-run.command.json",
+      "localLog": "package-dry-run.log",
+      "logSha256": "53c3b461ea46ab58e344310330b0d1b5b1029ff8c2bc2dbf1246f90074788795"
+    },
+    {
+      "name": "prior-defect-probes",
+      "command": "'node' 'docs/audits/AUD-005-harnesses/defect-probes.mjs' '--fixed'",
+      "outcome": "passed",
+      "summary": "8 AUD-005 probes report no reproduction of fixed defects.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:13:18.540Z",
+      "completedAt": "2026-10-02T15:13:28.641Z",
+      "record": "prior-defect-probes.command.json",
+      "localLog": "prior-defect-probes.log",
+      "logSha256": "bf8ef7820b61a06b80440800c78e5807069f48a7b8d0b4bfc72ad5eb2eda154e"
+    },
+    {
+      "name": "rustsec",
+      "command": "'env' 'CARGO_HOME=/home/sergio/Documents/bip_tools/workingspace/cargo' 'RUSTUP_HOME=/home/sergio/Documents/bip_tools/workingspace/rustup' '/home/sergio/Documents/bip_tools/workingspace/cargo/bin/cargo' 'audit' '--file' 'sskr-wasm/rust/Cargo.lock'",
+      "outcome": "passed",
+      "summary": "137 Rust dependencies scanned; one allowed unmaintained warning RUSTSEC-2024-0436 (paste).",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:11:10.721Z",
+      "completedAt": "2026-10-02T15:11:15.050Z",
+      "record": "rustsec.command.json",
+      "localLog": "rustsec.log",
+      "logSha256": "c5cc2e88269831dddb5d5d99f47c327e93169d754b0fbd8352a01e045c806b16"
+    },
+    {
+      "name": "seedshift-oracle",
+      "command": "'python3' 'docs/audits/AUD-005-harnesses/seedshift-oracle.py'",
+      "outcome": "passed",
+      "summary": "7 public vectors, 400 deterministic cases, 6,000 comparisons, zero mismatches.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:10:07.250Z",
+      "completedAt": "2026-10-02T15:10:10.656Z",
+      "record": "seedshift-oracle.command.json",
+      "localLog": "seedshift-oracle.log",
+      "logSha256": "29dd9a4c0b4fb50a676f45ca7bb19116680a13b911849c083574f663c9ae2339"
+    },
+    {
+      "name": "timeout-regressions-serial",
+      "command": "'pnpm' 'exec' 'vitest' 'run' 'test/card-page-sizes.test.ts' 'test/collection-sheet.test.ts' '--maxWorkers=1'",
+      "outcome": "passed",
+      "summary": "Both affected files pass, 38/38 tests, one worker, unchanged 30/60-second limits; 172.78 s total.",
+      "exitCode": 0,
+      "startedAt": "2026-10-02T15:14:33.084Z",
+      "completedAt": "2026-10-02T15:17:26.642Z",
+      "record": "timeout-regressions-serial.command.json",
+      "localLog": "timeout-regressions-serial.log",
+      "logSha256": "41dd11bdd7c985589d0fdfd0db58df84efe50a464f7ceef5bd66b6c351b1e235"
+    },
+    {
+      "name": "verify-host",
+      "command": "'pnpm' 'verify'",
+      "outcome": "failed",
+      "summary": "Format/type/build passed; 31 test files, 464 passed and 2 timed out out of 466 tests.",
+      "exitCode": 1,
+      "startedAt": "2026-10-02T15:10:38.006Z",
+      "completedAt": "2026-10-02T15:13:55.376Z",
+      "record": "verify-host.command.json",
+      "localLog": "verify-host.log",
+      "logSha256": "ba7b4505f62e6fc6fdc6ef566077ec372b6d8c3e7a4286150416129f2a05d2a4"
+    },
+    {
+      "name": "verify",
+      "command": "'pnpm' 'verify'",
+      "outcome": "failed",
+      "summary": "Sandbox run exited 1 without usable test stdout; not treated as a product diagnosis.",
+      "exitCode": 1,
+      "startedAt": "2026-10-02T15:07:53.123Z",
+      "completedAt": "2026-10-02T15:09:51.260Z",
+      "record": "verify.command.json",
+      "localLog": "verify.log",
+      "logSha256": "9b49b629c51d7732727176ccff7e3dd110674ddfaee06453e72e811dd8ac54d0"
+    }
+  ],
+  "coverageLedger": [
+    {
+      "checkId": "CHECK-SEC-001",
+      "category": "SEC",
+      "logicalGroup": "Threat model and secret ownership",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Source trace of mnemonic/date/share inputs, CLI outputs, file publication and temporary data; current tests and previous defect probes. JavaScript strings, terminal and OS memory remain outside erasure guarantees."
+    },
+    {
+      "checkId": "CHECK-SEC-002",
+      "category": "SEC",
+      "logicalGroup": "Secret Vault, CSP, sandbox, and transport",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "not-applicable",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "No browser vault, server or CSP surface. SECURITY.md explicitly says the CLI/library is not an OS sandbox."
+    },
+    {
+      "checkId": "CHECK-SEC-003",
+      "category": "SEC",
+      "logicalGroup": "Network egress and secret guards",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Reviewed runtime imports and generated glue: no runtime fetch/network loader or neighboring-checkout import. Registry, RustSec and GitHub requests are audit/build traffic only."
+    },
+    {
+      "checkId": "CHECK-SEC-004",
+      "category": "SEC",
+      "logicalGroup": "Randomness, encryption, and authentication",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "SSKR randomBytes(32) to ChaCha20Rng path, threshold validation and source round-trip; public vectors, independent Seedshift oracle, 30 additional recovered quorums and 20 rejection checks. Date masking is not encryption."
+    },
+    {
+      "checkId": "CHECK-SEC-005",
+      "category": "SEC",
+      "logicalGroup": "Secret lifecycle and exceptional paths",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Reviewed TypeScript finally blocks, Rust Zeroize/Zeroizing paths, private staging cleanup and failure tests. No exhaustive memory-forensics or every-instruction fault campaign."
+    },
+    {
+      "checkId": "CHECK-SEC-006",
+      "category": "SEC",
+      "logicalGroup": "Browser injection, persistence, and sensitive APIs",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Reviewed CLI errors, PDF metadata, user text/rendering and private file boundaries; no DOM or browser persistence. Current error-redaction and publication tests pass."
+    },
+    {
+      "checkId": "CHECK-SEC-007",
+      "category": "SEC",
+      "logicalGroup": "Read-only guarantees and availability bounds",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Bounded descriptor/file reads, PNG header/dimension limits, share count and date-search bounds reviewed; current negative/regression tests pass."
+    },
+    {
+      "checkId": "CHECK-FUN-001",
+      "category": "FUN",
+      "logicalGroup": "BIP39, entropy, and seed interpretation",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "All five representations and BIP39 lengths; 7 published vectors and 400 independent deterministic cases produce 6,000 matching library comparisons."
+    },
+    {
+      "checkId": "CHECK-FUN-002",
+      "category": "FUN",
+      "logicalGroup": "HD derivation and every coin/profile",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Offline BIP32 fingerprint and Bitcoin address/key evidence paths, network/path validation and cleanup reviewed; current core/evidence regressions pass. No balances or wallet discovery are implemented."
+    },
+    {
+      "checkId": "CHECK-FUN-003",
+      "category": "FUN",
+      "logicalGroup": "BIP85, BIP38, messages, and Silent Payments",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "not-applicable",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "No BIP85, BIP38, message signing or Silent Payments surface."
+    },
+    {
+      "checkId": "CHECK-FUN-004",
+      "category": "FUN",
+      "logicalGroup": "Scripts, descriptors, Miniscript, and multisig",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "not-applicable",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "No descriptor, Miniscript or multisig construction surface."
+    },
+    {
+      "checkId": "CHECK-FUN-005",
+      "category": "FUN",
+      "logicalGroup": "Transactions, PSBT version context, and commitments",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "not-applicable",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "No transaction, PSBT, signing or broadcasting surface."
+    },
+    {
+      "checkId": "CHECK-FUN-006",
+      "category": "FUN",
+      "logicalGroup": "Recovery and backup formats",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "MNC1 modes, legacy compatibility, UR/Bytewords/RGB, official SSKR fixtures, quorums and corruption guards; full-suite results plus successful unchanged sequential rerun of two timed-out card files."
+    },
+    {
+      "checkId": "CHECK-FUN-007",
+      "category": "FUN",
+      "logicalGroup": "Discovery, providers, proofs, and accounting",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "not-applicable",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "No chain providers, account discovery or monetary accounting."
+    },
+    {
+      "checkId": "CHECK-API-001",
+      "category": "API",
+      "logicalGroup": "Actual dependency call contracts",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Traced actual scure, PDF/QR, WASM and Node calls; invalid discriminants, argument ranges and import/encode contracts covered by current tests and AUD-005 probes."
+    },
+    {
+      "checkId": "CHECK-API-002",
+      "category": "API",
+      "logicalGroup": "Async state, cancellation, and revisions",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Concurrent first-use SSKR split calls exercised through public API; failed lazy initialization resets pending; private publication/cleanup tests reviewed. No GUI revision coordinator exists."
+    },
+    {
+      "checkId": "CHECK-API-003",
+      "category": "API",
+      "logicalGroup": "Public export schema and monetary fidelity",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "MNC1 versus SSKR share-file distinction, exact QR payloads, per-share exports and no individual-fragment QR checked. No monetary export schema."
+    },
+    {
+      "checkId": "CHECK-API-004",
+      "category": "API",
+      "logicalGroup": "Encoding and import/export interoperability",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Independent Seedshift oracle, literal SSKR known answers, every pair at each supported entropy size, tagged and legacy transports and actual PDF-to-image-to-QR checks."
+    },
+    {
+      "checkId": "CHECK-BLD-001",
+      "category": "BLD",
+      "logicalGroup": "Manifest, flags, and feature composition",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Toolchain/version pins, frozen lockfile, typecheck, formatting, Linux executable and 207-entry package dry-run passed. No neighboring repository is needed at runtime or by the SSKR build context."
+    },
+    {
+      "checkId": "CHECK-BLD-002",
+      "category": "BLD",
+      "logicalGroup": "Matrix depth and runtime sampling",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "failed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Default full run: 464/466 tests, two timeouts under concurrent host workload. Both affected files then passed 38/38 with --maxWorkers=1 and unchanged assertions/timeouts. Windows/macOS at this commit are unverified."
+    },
+    {
+      "checkId": "CHECK-BLD-003",
+      "category": "BLD",
+      "logicalGroup": "Lockfiles, source provenance, and licenses",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Frozen installation, npm advisory scan, RustSec, 7 local integrity pins and bundled-license inventory checked. RustSec reports the existing paste 1.0.15 unmaintained warning, not a newly demonstrated exploit."
+    },
+    {
+      "checkId": "CHECK-BLD-004",
+      "category": "BLD",
+      "logicalGroup": "Canonical WASM and Docker bytes",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Fresh offline Rust compilation and wasm-bindgen via production --check wrapper: all four files byte-identical. Toolchain/dependency stages reused; built stage forced uncached, explicit linux/amd64. No committed artifact rewritten."
+    },
+    {
+      "checkId": "CHECK-BLD-005",
+      "category": "BLD",
+      "logicalGroup": "Artifacts, CI, and release workflows",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "blocked",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Linux executable acceptance and checksum/notices pass; release needs verify, sskr and all three build jobs. GitHub latest runs are for 8c427af, not this 22-commit-ahead candidate. Current cross-platform/release execution remains pending."
+    },
+    {
+      "checkId": "CHECK-UI-001",
+      "category": "UI-",
+      "logicalGroup": "Real files and representative viewports",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Actual rendered public-fixture PDFs and QR scans checked; material-full.png visually inspected for readable references, layout and QR separation. No browser viewport interface or physical print/scan assessment."
+    },
+    {
+      "checkId": "CHECK-UI-002",
+      "category": "UI-",
+      "logicalGroup": "Navigation, inputs, and state preservation",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "CLI options, stdin/files, hidden-input policy, help and output behavior checked by tests and prior probes; no GUI navigation surface. No manual terminal secret entry."
+    },
+    {
+      "checkId": "CHECK-UI-003",
+      "category": "UI-",
+      "logicalGroup": "Secret visibility, help, QR, and accessibility",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Terminal help tests, fragment secrecy rules and collection/SSKR QR acceptance pass. Accessibility hardware and physical camera/print fidelity not tested."
+    },
+    {
+      "checkId": "CHECK-ARC-001",
+      "category": "ARC",
+      "logicalGroup": "Ownership, imports, and composition seams",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Reviewed CLI/core/render platform/SSKR seams, relocated WASM imports, embedded asset graph and independent Docker context. Historical provenance mentions are not runtime imports."
+    },
+    {
+      "checkId": "CHECK-ARC-002",
+      "category": "ARC",
+      "logicalGroup": "Dead code, duplication, and false positives",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Semantic diff and code searches reviewed; no additional confirmed dead-code or duplicated-protocol defect. New sheet-wide sample selection keeps printed payload separate from decorative artwork."
+    },
+    {
+      "checkId": "CHECK-ARC-003",
+      "category": "ARC",
+      "logicalGroup": "Comments, tests, and production-path fidelity",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "failed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "AUD-007-ARC001: source and test comments overstate cross-collection sample stability. Counterexample retained; collection/fragment recovery itself passes."
+    },
+    {
+      "checkId": "CHECK-DOC-001",
+      "category": "DOC",
+      "logicalGroup": "User-facing capability and safety descriptions",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "README, SECURITY, SSKR guide and architecture compared with implementation; no encryption claim for Seedshift, source/backend caveats and revised share-file wording retained."
+    },
+    {
+      "checkId": "CHECK-DOC-002",
+      "category": "DOC",
+      "logicalGroup": "Commands, metadata, links, and legal materials",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "Release notes, CLI/help, toolchain/version metadata, licenses, package contents and new SSKR commands reviewed. Build host portability is qualified in observations."
+    },
+    {
+      "checkId": "CHECK-DOC-003",
+      "category": "DOC",
+      "logicalGroup": "Audit records and evidence consistency",
+      "scope": "MnemoCode CLI/library and release candidate",
+      "method": "Read-only source review and recorded commands",
+      "outcome": "passed",
+      "snapshot": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "AUD-001 through AUD-006 index and relevant prior dispositions reconciled; current pair, 32-check ledger, command hashes and unchanged product snapshot validated by finalizer."
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUD-007-ARC001",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "Material-sample comments promise stability across different collections",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/export/material-artwork.ts:527",
+        "test/material-cards.test.ts:111"
+      ],
+      "evidence": "local-invariants-host.log (local): #000000 alone -> Satin black; in [#000000,#000001,#000002,#FFFFFF,#FFFFFE] -> Matte racing green.",
+      "reproduction": "After pnpm build, run node docs/audits/AUD-007-harnesses/local-invariants.mjs. Compare chooseMaterialSamples(\"vehicle\", [\"#000000\"]) with the same reference in the five-color list.",
+      "expected": "Comments describe deterministic assignment for a given collection and explain that adding other references can change its decorative sample.",
+      "observed": "Source says \"The same reference always gets the same sample\"; test says \"whatever comes with it\". Greedy one-to-one assignment depends on the full collection. The test checks reversal/case and duplicates, not changed neighboring references.",
+      "impact": "Misleading maintenance/test contract only. Exact printed hex references and QR payloads are unaffected, and the renderer supplies the whole collection when rendering a fragment. No recovery or confidentiality failure demonstrated.",
+      "recommendedFix": "Qualify both comments with the collection context; if cross-collection stability is intended, design that separately rather than changing the recovery representation.",
+      "requiredVerification": "Keep the counterexample and confirm full-sheet versus individual-fragment consistency for the same collection and exact payload preservation."
+    }
+  ],
+  "observations": [],
+  "informationalNotes": [
+    "The SSKR relocation has no confirmed functional or security defect. The Rust bridge is byte-unchanged by the relocation; its current toolchain/dependencies and generated WASM were independently rebuilt.",
+    "Dockerfile.sskr downloads x86-64 Node and rustup, but the production wrapper does not pass --platform linux/amd64. This audit used an explicit platform. Native ARM-host builds were not attempted; pin the canonical platform or document the x86-64 requirement before promising portable source builds.",
+    "The new build wrapper has useful marker/loader guards but no dedicated tests for missing markers, Docker failure, a one-byte rebuilt mismatch or preservation of tracked files in --check. Add audit-only/fake-Docker regression coverage if extending this script; the current real compare passed.",
+    "The existing AUD-005-BLD007 timing concern recurred on two card tests (one has its own 30 s timeout). Prefer bounded test concurrency over weakening assertions; current sequential rerun passed without raising limits.",
+    "ci.yml lacks its own concurrency group; executable.yml cancels in-progress runs including tag runs. Consider matching the workspace policy to cancel superseded verification while excluding publication from cancellation. No interrupted release was reproduced.",
+    "Removal of the network loader and hashes are integrity consistency checks, not signatures or protection against a host that can replace the application and manifest together."
+  ],
+  "remediation": [
+    {
+      "id": "AUD-007-ARC001",
+      "status": "verified",
+      "fixCommit": "715de78fa7f73823f5680e80b254ee02f955e72e",
+      "verificationCommit": "715de78fa7f73823f5680e80b254ee02f955e72e",
+      "evidence": "src/export/material-artwork.ts and test/material-cards.test.ts now say that the same references get the same samples in any order and letter case, that neighbours take part in the choice, and that an individual fragment takes its sample from the whole card (material-cards.ts chooses once over content.colors and indexes it by entry). local-invariants.mjs still prints the counterexample and recovers 30 quorums with 20 rejections; test/material-cards.test.ts passes 20/20, including the individual-fragment test; no code, payload or vector changed."
+    },
+    {
+      "id": "AUD-005-BLD001",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Current workflow/source reviewed and Linux executable passes; current Windows/macOS GitHub execution still pending."
+    },
+    {
+      "id": "AUD-005-BLD002",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Current Linux notice scan passes with 17 npm packages. Platform-wide GitHub evidence still pending."
+    },
+    {
+      "id": "AUD-006-DOC001",
+      "status": "verified",
+      "fixCommit": "81168dc",
+      "verificationCommit": "6576088ec341d96b3f98cc0ec9e36042f0c7aab6",
+      "evidence": "README distinguishes ordinary MNC1 output and SSKR share-file output; actual standalone SSKR split/recovery passes."
+    }
+  ],
+  "limitations": [
+    "Overall release acceptance is INCOMPLETE: current Windows/macOS executable and CI runs and tag-time reusable CI/SSKR gate were not executed. No push, tag, release or publication was performed.",
+    "The unmodified default pnpm verify command did not finish green: 464/466 passed, two timeouts; the affected two files passed 38/38 sequentially. These are overlapping runs, not 502 distinct tests. Concurrent unrelated MHFE work was observed; causality is not proved by a passing rerun.",
+    "Fresh compilation was uncached only for the offline built stage. Pinned toolchain/dependency Docker layers were reused; the base image, compiler installation and registries were not rebuilt from scratch.",
+    "No native ARM build host, Windows or macOS execution, physical print/camera scan, assistive technology, manual secret TTY session, comprehensive memory forensics, malicious OS defense or independent cryptographic certification.",
+    "Full scope means every checklist area has a disposition, not exhaustive input/state coverage. Prior audit claims are context; only commands listed here were executed on this snapshot."
+  ],
+  "procedureHashes": {
+    "docs/FULL_AUDIT_GUIDE.md": "30fa6a1675892e2a3059bdbd6e97737f2959a74aca98a0a90e4f655ae12854a6",
+    "docs/audits/AUDIT_STANDARD.md": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f",
+    "docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+    "docs/audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7"
+  },
+  "artifacts": {
+    "executable-linux/mnemocode-0.1.0-linux-x64": {
+      "size": 157707389,
+      "sha256": "31c7ba115ed7db33661e4167f3eaa665546cd35d9b6090d8ced372e7ba118659"
+    },
+    "executable-linux/mnemocode-0.1.0-linux-x64-licenses.txt": {
+      "size": 222928,
+      "sha256": "8bad72c0aac1b2f863e8762dccaae79897be320e608109a74c52ca1149b49526"
+    },
+    "executable-linux/mnemocode-0.1.0-linux-x64.sha256": {
+      "size": 197,
+      "sha256": "45d394d9991d773fb8197a9474c468252265d22f8267a0ca1c57c6c566cf9a8b"
+    }
+  }
+}
