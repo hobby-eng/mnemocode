@@ -25,8 +25,8 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `bc-shamir` | 0.13.0 | BSD-2-Clause-Patent |
 | `bc-tags` | 0.12.0 | BSD-2-Clause-Patent |
 | `bc-ur` | 0.19.2 | BSD-2-Clause-Patent |
-| `bitcoin-consensus-encoding` | 1.2.0 | CC0-1.0 |
-| `bitcoin-internals` | 0.6.0 | CC0-1.0 |
+| `bitcoin-consensus-encoding` | 1.3.0 | CC0-1.0 |
+| `bitcoin-internals` | 0.7.0 | CC0-1.0 |
 | `bitcoin-io` | 0.1.101 | CC0-1.0 |
 | `bitcoin-private` | 0.1.0 | CC0-1.0 |
 | `bitcoin_hashes` | 0.12.0 | CC0-1.0 |
@@ -34,8 +34,8 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `blake2` | 0.10.6 | MIT OR Apache-2.0 |
 | `block-buffer` | 0.10.4 | MIT OR Apache-2.0 |
 | `bumpalo` | 3.20.3 | MIT OR Apache-2.0 |
-| `cc` | 1.4.6 | MIT OR Apache-2.0 |
-| `cfg-if` | 1.0.4 | MIT OR Apache-2.0 |
+| `cc` | 1.5.1 | MIT OR Apache-2.0 |
+| `cfg-if` | 1.0.5 | MIT OR Apache-2.0 |
 | `chacha20` | 0.9.1 | MIT OR Apache-2.0 |
 | `chacha20poly1305` | 0.10.1 | MIT OR Apache-2.0 |
 | `chrono` | 0.4.45 | MIT OR Apache-2.0 |
@@ -56,7 +56,7 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `ed25519` | 2.2.3 | Apache-2.0 OR MIT |
 | `ed25519-dalek` | 2.2.0 | BSD-3-Clause |
 | `fiat-crypto` | 0.2.9 | MIT OR Apache-2.0 OR BSD-1-Clause |
-| `find-msvc-tools` | 0.1.12 | MIT OR Apache-2.0 |
+| `find-msvc-tools` | 0.1.14 | MIT OR Apache-2.0 |
 | `futures-core` | 0.3.34 | MIT OR Apache-2.0 |
 | `futures-task` | 0.3.34 | MIT OR Apache-2.0 |
 | `futures-util` | 0.3.34 | MIT OR Apache-2.0 |
@@ -73,7 +73,7 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `iana-time-zone-haiku` | 0.1.2 | MIT OR Apache-2.0 |
 | `inout` | 0.1.4 | MIT OR Apache-2.0 |
 | `js-sys` | 0.3.106 | MIT OR Apache-2.0 |
-| `lazy_static` | 1.5.0 | MIT OR Apache-2.0 |
+| `lazy_static` | 1.5.1 | MIT OR Apache-2.0 |
 | `libc` | 0.2.189 | MIT OR Apache-2.0 |
 | `log` | 0.4.34 | MIT OR Apache-2.0 |
 | `minicbor` | 0.19.1 | BlueOak-1.0.0 |
@@ -116,19 +116,19 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `sha2` | 0.10.9 | MIT OR Apache-2.0 |
 | `shlex` | 2.0.1 | MIT OR Apache-2.0 |
 | `signature` | 2.2.0 | Apache-2.0 OR MIT |
-| `siphasher` | 1.0.3 | MIT/Apache-2.0 |
+| `siphasher` | 1.0.4 | MIT OR Apache-2.0 |
 | `slab` | 0.4.12 | MIT |
 | `spki` | 0.7.3 | Apache-2.0 OR MIT |
 | `sskr` | 0.12.0 | BSD-2-Clause-Patent |
 | `subtle` | 2.6.1 | BSD-3-Clause |
 | `syn` | 1.0.109 | MIT OR Apache-2.0 |
 | `syn` | 2.0.119 | MIT OR Apache-2.0 |
-| `syn` | 3.0.5 | MIT OR Apache-2.0 |
-| `thiserror` | 2.0.20 | MIT OR Apache-2.0 |
-| `thiserror-impl` | 2.0.20 | MIT OR Apache-2.0 |
+| `syn` | 3.0.6 | MIT OR Apache-2.0 |
+| `thiserror` | 2.0.21 | MIT OR Apache-2.0 |
+| `thiserror-impl` | 2.0.21 | MIT OR Apache-2.0 |
 | `tinyvec` | 1.13.3 | Zlib OR Apache-2.0 OR MIT |
 | `typenum` | 1.20.1 | MIT OR Apache-2.0 |
-| `unicode-ident` | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 |
+| `unicode-ident` | 1.0.26 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | `unicode-normalization` | 0.1.25 | MIT OR Apache-2.0 |
 | `universal-hash` | 0.5.1 | MIT OR Apache-2.0 |
 | `ur` | 0.4.1 | MIT |
@@ -147,8 +147,8 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `windows-strings` | 0.5.1 | MIT OR Apache-2.0 |
 | `wit-bindgen` | 0.57.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | `x25519-dalek` | 2.0.1 | BSD-3-Clause |
-| `zerocopy` | 0.8.57 | BSD-2-Clause OR Apache-2.0 OR MIT |
-| `zerocopy-derive` | 0.8.57 | BSD-2-Clause OR Apache-2.0 OR MIT |
+| `zerocopy` | 0.8.59 | BSD-2-Clause OR Apache-2.0 OR MIT |
+| `zerocopy-derive` | 0.8.59 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | `zeroize` | 1.9.0 | Apache-2.0 OR MIT |
 | `zeroize_derive` | 1.5.0 | MIT OR Apache-2.0 |
 
