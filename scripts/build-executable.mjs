@@ -41,9 +41,9 @@ if (process.version !== `v${nodeVersion}`)
 /** Every file the program reads at run time, by its path from the package root; see bundled-files.ts. */
 function bundledFiles() {
   const files = [
-    "vendor/sskr/integrity.json",
-    "vendor/sskr/generated/recovery_sskr_wasm.js",
-    "vendor/sskr/generated/recovery_sskr_wasm_bg.wasm",
+    "sskr-wasm/integrity.json",
+    "sskr-wasm/generated/recovery_sskr_wasm.js",
+    "sskr-wasm/generated/recovery_sskr_wasm_bg.wasm",
     "vectors/mnemocode-v1.json",
   ];
   const walk = (folder) => {

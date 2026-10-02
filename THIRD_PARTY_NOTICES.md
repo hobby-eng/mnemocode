@@ -60,4 +60,4 @@ Visual designs are installed individually after approval.
 
 ## Standalone SSKR
 
-The vendored SSKR Rust/WASM bridge uses Blockchain Commons `sskr 0.12.0` / `bc-shamir 0.13.0` and the Bytewords transport. See [vendor notices](vendor/sskr/NOTICE.md), [SSKR dependency notices and licenses](vendor/sskr/UPSTREAM_NOTICES.md), and the retained Cargo.lock for exact dependencies.
+The SSKR Rust/WASM bridge in `sskr-wasm/` uses Blockchain Commons `sskr 0.12.0` / `bc-shamir 0.13.0` and the Bytewords transport. See [bridge notices](sskr-wasm/NOTICE.md), [SSKR dependency notices and licenses](sskr-wasm/UPSTREAM_NOTICES.md), and the retained Cargo.lock for exact dependencies.

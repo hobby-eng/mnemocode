@@ -7,17 +7,17 @@ import { join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 
 const execute = promisify(execFile);
-const vendor = resolve("vendor/sskr");
+const bridge = resolve("sskr-wasm");
 
 async function manifest(): Promise<Record<string, string>> {
-  return JSON.parse(await readFile(join(vendor, "integrity.json"), "utf8"));
+  return JSON.parse(await readFile(join(bridge, "integrity.json"), "utf8"));
 }
 
 async function filesBelow(folder: string): Promise<string[]> {
   const entries = await readdir(folder, { withFileTypes: true, recursive: true });
   return entries
     .filter((entry) => entry.isFile())
-    .map((entry) => relative(vendor, join(entry.parentPath, entry.name)).replaceAll("\\", "/"));
+    .map((entry) => relative(bridge, join(entry.parentPath, entry.name)).replaceAll("\\", "/"));
 }
 
 /** A disposable installation whose SSKR files can be damaged without touching the checkout. */
@@ -29,11 +29,11 @@ async function withDamagedInstallation(
   try {
     await cp(resolve("dist"), join(directory, "dist"), { recursive: true });
     await cp(resolve("vectors"), join(directory, "vectors"), { recursive: true });
-    await cp(vendor, join(directory, "vendor/sskr"), { recursive: true });
+    await cp(bridge, join(directory, "sskr-wasm"), { recursive: true });
     await writeFile(join(directory, "package.json"), '{"type":"module"}');
     for (const name of ["node_modules", "assets"])
       await symlink(resolve(name), join(directory, name), "junction");
-    const path = join(directory, "vendor/sskr", damaged);
+    const path = join(directory, "sskr-wasm", damaged);
     const bytes = await readFile(path);
     bytes[bytes.length - 1]! ^= 0x01;
     await writeFile(path, bytes);
@@ -44,16 +44,16 @@ async function withDamagedInstallation(
 }
 
 describe("SSKR integrity (AUD-005-BLD005)", () => {
-  it("pins every vendored source, build and generated file with its current hash", async () => {
+  it("pins every bridge source, build and generated file with its current hash", async () => {
     const pins = await manifest();
     for (const [path, digest] of Object.entries(pins)) {
-      const bytes = await readFile(join(vendor, path));
+      const bytes = await readFile(join(bridge, path));
       expect(createHash("sha256").update(bytes).digest("hex"), path).toBe(digest);
     }
     // A refreshed or added file must be pinned too; a Cargo build folder is not part of the bridge.
     const pinnable = [
-      ...(await filesBelow(join(vendor, "generated"))),
-      ...(await filesBelow(join(vendor, "rust"))),
+      ...(await filesBelow(join(bridge, "generated"))),
+      ...(await filesBelow(join(bridge, "rust"))),
     ].filter((path) => !path.startsWith("rust/target/"));
     expect(Object.keys(pins).sort()).toEqual(pinnable.sort());
   });

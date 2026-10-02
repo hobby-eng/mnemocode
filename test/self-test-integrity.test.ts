@@ -15,7 +15,7 @@ async function withInstallation(check: (directory: string) => Promise<void>): Pr
     await cp(resolve("dist"), join(directory, "dist"), { recursive: true });
     await cp(resolve("vectors"), join(directory, "vectors"), { recursive: true });
     await writeFile(join(directory, "package.json"), '{"type":"module"}');
-    for (const name of ["node_modules", "assets", "vendor"]) {
+    for (const name of ["node_modules", "assets", "sskr-wasm"]) {
       await symlink(resolve(name), join(directory, name), "junction");
     }
     await check(directory);
