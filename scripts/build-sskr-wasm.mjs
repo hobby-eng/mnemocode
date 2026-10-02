@@ -78,6 +78,10 @@ async function build(output) {
     "docker",
     [
       "build",
+      // The toolchain stage downloads the x86-64 builds of Node.js and rustup, so the image is
+      // x86-64 on every host; another platform would fail or give other bytes.
+      "--platform",
+      "linux/amd64",
       "--file",
       join(root, "Dockerfile.sskr"),
       "--target",

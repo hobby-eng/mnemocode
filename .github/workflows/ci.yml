@@ -1,13 +1,21 @@
 name: CI
 
 on:
+  # A tag gets this check through the executable workflow, not a second time here.
   push:
+    branches: ["**"]
   pull_request:
   # The executable workflow runs this whole check before it publishes a release.
   workflow_call:
 
 permissions:
   contents: read
+
+# A newer push makes a running check pointless. When the executable workflow calls this one,
+# github.workflow is the caller's name, so the two never share a group; a tag run is not cut off.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   verify:

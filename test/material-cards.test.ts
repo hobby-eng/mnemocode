@@ -108,7 +108,9 @@ describe("material selection cards", () => {
         for (const [j, other] of codes.entries())
           expect(samples[i] === samples[j]).toBe(code === other);
     }
-    // The same reference keeps its sample, in any case and order, and whatever comes with it.
+    // Within one collection a reference keeps its sample in any case and order, and when it is
+    // repeated. Other references may change it (AUD-007-ARC001), so this is not checked across
+    // collections.
     const reversed = chooseMaterialSamples(style, [...colors].reverse());
     expect(
       chooseMaterialSamples(
