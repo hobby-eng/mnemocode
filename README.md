@@ -28,7 +28,7 @@ chmod +x mnemocode-0.1.0-linux-x64
 ./mnemocode-0.1.0-linux-x64 self-test
 ```
 
-The file holds Node.js, the program, the card artwork and fonts, and the SSKR engine. Making images from cards still needs Poppler's `pdftocairo`. `--ask-secrets` works only on Linux, where it uses `systemd-ask-password`; on Windows and macOS, read secrets from a file or standard input, as below. To build the file for your own computer from a checkout, run `corepack pnpm build:executable`; it writes the file and its license notices to `release/`, which `pnpm build` leaves alone, and runs it once from an empty folder.
+The file holds Node.js, the program, the card artwork and fonts, and the SSKR engine. Making images from cards still needs Poppler's `pdftocairo`. Started without a command, for example by a double-click, it opens the [menu](#menu). To build the file for your own computer from a checkout, run `corepack pnpm build:executable`; it writes the file and its license notices to `release/`, which `pnpm build` leaves alone, and runs it once from an empty folder.
 
 ### From source
 
@@ -49,6 +49,28 @@ corepack pnpm dev -- encode --mnemonic "abandon abandon abandon abandon abandon 
 Once the package is installed, the same commands are available as `mnemocode`. The examples below use both spellings.
 
 `mnemocode --help` lists the commands. `mnemocode <command> --help`, for example `mnemocode encode --help`, explains every option of that command with examples; `-h` gives a short summary.
+
+## Menu
+
+Run `mnemocode` without a command in a terminal, or double-click the executable file, and it shows a menu:
+
+```text
+What do you want to do?
+› 1  Encode a seed phrase as numbers, codes or colors
+  2  Decode numbers, codes or colors back into a seed phrase
+  3  Split a seed phrase into Shamir shares, as text or colors
+  4  Restore a seed phrase from Shamir shares
+  5  Find a forgotten word of a seed phrase or a date digit
+  6  Print sample cards with a test seed phrase
+  7  Look up a seed word, its number or its Unicode code
+  8  Check that this copy of MnemoCode works
+  9  Show every command and option
+  0  Quit
+```
+
+Choose with the arrow keys and Enter, or press the number. Each entry asks its questions one at a time and shows examples where they help: Encode, for instance, shows what the test phrase looks like as word numbers, Unicode codes and colors, then asks about dates, Shamir shares and where the result should go. Before it runs, the menu shows in grey the command that does the same, such as `mnemocode encode --ask-secrets --format 5 --mode direct`, so that you can type it next time. `q` goes back to the menu, and in the menu it quits.
+
+The seed phrase, the dates and the shares never become part of the command. They are typed on a private screen of their own, where you see what you type, and the result appears there too. When you press Enter, that screen is cleared and the terminal returns to where it was, so that nothing stays in the scrollback.
 
 ## Transformation modes
 
@@ -119,7 +141,7 @@ node dist/mnemocode.js encode \
   --format 3
 ```
 
-Real secrets typed this way can stay in the shell history and are visible in the list of running programs. On Linux, `--ask-secrets` asks for them with hidden prompts instead:
+Real secrets typed this way can stay in the shell history and are visible in the list of running programs. `--ask-secrets` asks for them on a private screen instead:
 
 ```bash
 node dist/mnemocode.js encode --mode seedshift --ask-secrets --format 3
@@ -128,16 +150,16 @@ node dist/mnemocode.js encode --mode seedshift --ask-secrets --format 3
 | Command        | First prompt                                    | Second prompt                                    |
 | -------------- | ----------------------------------------------- | ------------------------------------------------ |
 | `encode`       | Phrase                                          | Dates                                            |
-| `decode`       | Encoded record                                  | Dates                                            |
-| `recover-date` | Encoded record                                  | Dates, with `?` in place of each forgotten digit |
+| `decode`       | Encoded seed phrase or record                   | Dates                                            |
+| `recover-date` | Encoded seed phrase or record                   | Dates, with `?` in place of each forgotten digit |
 | `recover-word` | Phrase, with `?` in place of the forgotten word | None                                             |
 | `sskr-combine` | Complete shares, separated by semicolons        | Dates, only with `--mode seedshift`              |
 
 Type the dates as one line, for example `23-09-2026 08-08-1988 07-11-1951`. In `direct` mode there is no date prompt.
 
-Hidden input needs a terminal. The prompts appear in that terminal even when the output is sent to a file. Without a terminal the command stops at once.
+`--ask-secrets` works the same on Linux, macOS and Windows. MnemoCode switches the terminal to its alternate screen, a private screen, and reads the keys itself: you see what you type or paste, Backspace deletes a character, Ctrl+U the whole line, and Ctrl+C cancels. The result appears on the same screen. When you press Enter after it, the screen is cleared and the terminal returns to where it was, so that neither the secrets nor the result stay in the scrollback. Standard input must be the terminal; without one the command stops at once. Output sent to a file goes there as before.
 
-`--mnemonic-file PATH` and `--input-file PATH` read the secret from a local file instead; the path `-` reads standard input. On Windows and macOS, which have no `systemd-ask-password`, these are the ways to enter a real secret.
+`--mnemonic-file PATH` and `--input-file PATH` read the secret from a local file instead; the path `-` reads standard input. With `--ask-secrets`, `decode` and `recover-date` can take the record from `--input-file` or `--qr-file` and then ask only for the dates.
 
 Text input, from a prompt, a pipe or a file, may be up to 1 MiB. A QR image may be up to 16 MiB and 4096 pixels on a side. MnemoCode stops reading at the limit and refuses larger input.
 
@@ -180,7 +202,7 @@ node dist/mnemocode.js recover-date --mode seedshift \
   --input "wool abuse actual wool abuse actual wool abuse actual wool abuse congress" \
   --format 1 --dates "??-09-2026" --master-fingerprint 73c5da0a
 
-# The same with hidden input.
+# The same, with the phrase typed on the private screen.
 node dist/mnemocode.js recover-date --mode seedshift --ask-secrets \
   --format 1 --master-fingerprint 73c5da0a
 
@@ -276,7 +298,7 @@ node dist/mnemocode.js preview --template business-it --words 24 \
   --card-name "John Smith" --card-role "Systems Engineer" \
   --card-email "john@example.com" --page-size a6 --pdf my-preview.pdf
 
-# Real export. Hidden prompts ask for the phrase and the dates.
+# Real export. The phrase and the dates are asked on the private screen.
 node dist/mnemocode.js encode --mode seedshift --ask-secrets --format 5 \
   --template business-it --page-size a4 \
   --card-name "John Smith" --card-email "john@example.com" --pdf cards.pdf
@@ -500,11 +522,11 @@ Dependency versions are exact in `package.json`, and `pnpm-lock.yaml` records th
 
 ## Continuous integration
 
-GitHub Actions installs from the frozen lockfile, checks TypeScript and the formatting, builds the CLI and the library, runs the whole test suite, prints cards and Shamir share exports to PDF and reads their QR codes back from the rendered pages, and checks the dependencies for known high-severity vulnerabilities. The tests also run on Windows and macOS; the card tests that need Poppler run on Linux only.
+GitHub Actions installs from the frozen lockfile, checks TypeScript and the formatting, builds the CLI and the library, runs the whole test suite, prints cards and Shamir share exports to PDF and reads their QR codes back from the rendered pages, and checks the dependencies for known high-severity vulnerabilities. The tests also run on Windows and macOS; the card tests that need Poppler run on Linux only. On all three systems `scripts/verify-terminal-input.py` drives the menu and the prompts for secrets in a real pseudo-terminal, and the release workflow does the same with each executable file.
 
 A second workflow builds the single executable on Linux, Windows and macOS and runs each one on its own system. A version tag publishes the executables, their license notices and `SHA256SUMS` only after the complete CI has passed and when the tag names the version in `package.json`.
 
-The tests encode and decode every phrase length in every mode and format. They also cover records with and without a header, hidden input, the self-tests, date recovery, QR input and the recovery checks.
+The tests encode and decode every phrase length in every mode and format. They also cover records with and without a header, secret input, the self-tests, date recovery, QR input and the recovery checks.
 
 ## Source layout and review
 

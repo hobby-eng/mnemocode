@@ -43,14 +43,20 @@ describe("help", () => {
     }
   });
 
+  it("prints the help without a command when there is no terminal for the menu", async () => {
+    const { stdout } = await run([]);
+    expect(stdout).toContain("Usage: mnemocode <COMMAND> [OPTIONS]");
+    expect(stdout).toContain("shows a menu");
+  });
+
   it("gives a summary with -h and the full explanation with --help", async () => {
     const short = await run(["encode", "-h"]);
     const long = await run(["encode", "--help"]);
     const named = await run(["help", "encode"]);
     expect(named.stdout).toBe(long.stdout);
     expect(short.stdout).toContain("--legacy-valid-last-word");
-    expect(short.stdout).not.toContain("systemd-ask-password");
-    expect(long.stdout).toContain("systemd-ask-password");
+    expect(short.stdout).not.toContain("macOS and Windows alike");
+    expect(long.stdout).toContain("macOS and Windows alike");
     expect(long.stdout).toContain("TEST_PHRASE='abandon abandon");
     expect(long.stdout).toContain("mnemocode encode --sskr --ask-secrets --threshold 2 --shares 3");
   });

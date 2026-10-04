@@ -80,12 +80,12 @@ function transformMnemonic(
   return encodeMnemonic(mnemonic, enteredDates);
 }
 
-function createOutcome(
+async function createOutcome(
   args: ParsedArguments,
   mode: TransformMode,
   format: EncodedFormat,
-): EncodeOutcome {
-  const prompted = promptedEncodeInputs(args, mode);
+): Promise<EncodeOutcome> {
+  const prompted = await promptedEncodeInputs(args, mode);
   const enteredDates = prompted?.dates ?? dates(args);
   if (mode === "direct" && enteredDates.length > 0)
     throw new Error("Dates cannot be used in direct mode.");
@@ -118,7 +118,7 @@ function createOutcome(
 export async function runEncode(args: ParsedArguments): Promise<void> {
   if (args.sskr === true) return runSskrSplit(args, true);
   const { mode, format } = await validateEncodeOptions(args);
-  const outcome = createOutcome(args, mode, format);
+  const outcome = await createOutcome(args, mode, format);
   const hasCardExport = value(args, "pdf") !== undefined || value(args, "images-dir") !== undefined;
   const eventLabels =
     hasCardExport && format === "unicode"

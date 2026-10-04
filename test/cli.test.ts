@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -406,53 +406,4 @@ describe("CLI records", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
-});
-
-describe("hidden CLI input", () => {
-  // systemd-ask-password and the util-linux `script` that drives it exist only on Linux.
-  it.skipIf(process.platform !== "linux")(
-    "uses systemd-ask-password for encode and recover-date",
-    async () => {
-      const directory = await mkdtemp(join(tmpdir(), "mnemocode-secret-"));
-      const helper = join(directory, "systemd-ask-password");
-      const recordPath = join(directory, "record.txt");
-      const script = `#!/bin/sh\ntest -t 0 || exit 3\nprintf '%s\\n' "$3" >&2\ncase "$3" in\n  "BIP39 mnemonic:") printf '%s\\n' '${mnemonic}' ;;\n  "Date list (DD-MM-YYYY, separated by spaces):") printf '%s\\n' '10-07-1963' ;;\n  "Encoded record:") cat '${recordPath}' ;;\n  "Date list with ? for each forgotten digit (one to three incomplete dates):") printf '%s\\n' '??-07-1963' ;;\n  *) exit 2 ;;\nesac\n`;
-      try {
-        await writeFile(helper, script, "utf8");
-        await chmod(helper, 0o700);
-        const environment = { ...process.env, PATH: `${directory}:${process.env.PATH ?? ""}` };
-        const runInTerminal = (args: string[]) => {
-          const quote = (text: string) => "'" + text.replaceAll("'", "'\\''") + "'";
-          return execFileAsync(
-            "script",
-            ["-qefc", [process.execPath, cli, ...args].map(quote).join(" "), "/dev/null"],
-            { env: environment },
-          );
-        };
-        const encoded = await runInTerminal([
-          "encode",
-          "--mode",
-          "seedshift-legacy",
-          "--ask-secrets",
-          "--format",
-          "3",
-          "--output",
-          recordPath,
-        ]);
-        expect(encoded.stdout).toContain("BIP39 mnemonic:");
-        expect(encoded.stdout).toContain("Date list (DD-MM-YYYY, separated by spaces):");
-        const recovered = await runInTerminal([
-          "recover-date",
-          "--ask-secrets",
-          "--max-results",
-          "100",
-          "--progress-every",
-          "1000",
-        ]);
-        expect(recovered.stdout).toContain(`10-07-1963\t${mnemonic}`);
-      } finally {
-        await rm(directory, { recursive: true, force: true });
-      }
-    },
-  );
 });

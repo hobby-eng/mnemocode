@@ -12,6 +12,7 @@ import { parseRecord } from "../record.js";
 import { type ParsedArguments, value, values } from "./arguments.js";
 import {
   askSecret,
+  DATES_PROMPT,
   dates,
   encodedInput,
   recordedInputFormat,
@@ -25,26 +26,23 @@ export async function runDecode(arguments_: ParsedArguments): Promise<void> {
   let rawEncoded: string;
   let promptedDates: readonly DateShiftDate[] | undefined;
   if (arguments_["ask-secrets"] === true) {
-    if (
-      value(arguments_, "input") !== undefined ||
-      value(arguments_, "input-file") !== undefined ||
-      value(arguments_, "qr-file") !== undefined ||
-      values(arguments_, "date").length > 0
-    ) {
+    if (value(arguments_, "input") !== undefined || values(arguments_, "date").length > 0) {
       throw new Error(
-        "Hidden input cannot be combined with direct encoded text, an encoded input file, a QR input file, or command-line dates.",
+        "--ask-secrets cannot be combined with direct encoded text or command-line dates.",
       );
     }
-    rawEncoded = askSecret("Encoded record:");
+    // A record file or a QR image gives the encoded seed phrase; only the dates are then asked.
+    const fromFile =
+      value(arguments_, "input-file") !== undefined || value(arguments_, "qr-file") !== undefined;
+    rawEncoded = fromFile
+      ? await encodedInput(arguments_)
+      : await askSecret("Encoded seed phrase or record:");
     const embedded = parseRecord(rawEncoded);
     const promptedMode = transformMode(arguments_, embedded?.mode);
     promptedDates =
       promptedMode === "direct"
         ? []
-        : askSecret("Date list (DD-MM-YYYY, separated by spaces):")
-            .split(/\s+/u)
-            .filter(Boolean)
-            .map(parseDate);
+        : (await askSecret(DATES_PROMPT)).split(/\s+/u).filter(Boolean).map(parseDate);
   } else {
     rawEncoded = await encodedInput(arguments_);
   }

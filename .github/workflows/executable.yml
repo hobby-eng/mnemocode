@@ -77,6 +77,19 @@ jobs:
       - run: node scripts/build-executable.mjs
       - name: Run the executable on its own system
         run: node scripts/verify-executable.mjs
+      # A double-click starts the executable without arguments: its menu and hidden prompts.
+      - name: Drive the menu of the executable in a pseudo-terminal
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          python=python3
+          if [ "$RUNNER_OS" = Windows ]; then
+            python=python
+            # Only the exact files listed with their SHA-256 in the requirements file are accepted.
+            python -m pip install --require-hashes -r scripts/verify-terminal-input-requirements.txt
+          fi
+          executable=$(ls release/mnemocode-* | grep -v -e '-licenses\.txt$' -e '\.sha256$')
+          "$python" scripts/verify-terminal-input.py "$executable"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: executable-${{ matrix.os }}

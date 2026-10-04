@@ -32,7 +32,7 @@ When the library is built into another application, that application is responsi
 
 ## Secret lifecycle and local boundaries
 
-- On Linux, use [`--ask-secrets`](README.md#secret-input-styles) for a real phrase, encoded record and dates. Hidden input does not show what you type. It cannot protect against a compromised terminal, operating system or program. It needs `systemd-ask-password` and is not available on Windows or macOS; there, read secrets from a protected local file or from standard input instead of typing them into the command.
+- Use [`--ask-secrets`](README.md#secret-input-styles) or the [menu](README.md#menu) for a real phrase, encoded record and dates, on Linux, macOS and Windows. The secrets are typed on a private screen that shows them and the result, and is cleared when you press Enter, so that nothing stays in the scrollback. Anyone who can see your screen meanwhile can read them. It cannot protect against a compromised terminal, operating system or program, or against a terminal program that logs what it shows.
 - MnemoCode does not collect, send or log your phrase. It clears its temporary copies of the phrase data, but text in JavaScript memory cannot be erased.
 - MnemoCode cannot control swap, crash dumps, terminal scrollback, screenshots, clipboard history, accessibility tools, browser extensions and malware.
 - Text records, QR codes, PDFs, images, Shamir shares, dates and printed cards can help someone recover the phrase. Treat each of them as a secret, even when it is not the whole phrase.

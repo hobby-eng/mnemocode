@@ -34,6 +34,9 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends poppler-utils
       - run: pnpm build
       - run: pnpm test
+      - name: Drive the menu and the hidden prompts in a Unix pseudo-terminal
+        timeout-minutes: 10
+        run: python3 scripts/verify-terminal-input.py
       # A real PDF-to-image-to-QR round trip of the card and SSKR exports, with public data only.
       - run: node scripts/check-card-output.mjs output/card-output-check
       - run: pnpm audit --audit-level high
@@ -57,3 +60,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
+      - name: Drive the menu and the hidden prompts in a Unix pseudo-terminal
+        if: runner.os == 'macOS'
+        timeout-minutes: 10
+        run: python3 scripts/verify-terminal-input.py
+      - name: Drive the menu and the hidden prompts in a Windows pseudo-console
+        if: runner.os == 'Windows'
+        timeout-minutes: 10
+        run: |
+          # Only the exact files listed with their SHA-256 in the requirements file are accepted.
+          python -m pip install --require-hashes -r scripts/verify-terminal-input-requirements.txt
+          python scripts/verify-terminal-input.py

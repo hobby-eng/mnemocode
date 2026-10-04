@@ -29,7 +29,7 @@ export interface CommandHelp {
   /** What follows "mnemocode <command> " in the usage line. */
   usage: string;
   groups: readonly HelpGroup[];
-  /** What the hidden prompts of --ask-secrets ask for, in `--help`. */
+  /** What the prompts of --ask-secrets ask for, in `--help`. */
   asks?: readonly HelpRow[];
   examples: readonly HelpRow[];
   /** Closing paragraphs of `--help`. */
@@ -62,9 +62,10 @@ const TEST_FINGERPRINT = "73c5da0a";
 
 const askSecrets: HelpOption = {
   flag: "--ask-secrets",
-  summary: "Ask for the secrets at hidden prompts instead of the command line",
+  summary: "Ask for the secrets on a private screen instead of the command line",
   details: [
-    "Uses systemd-ask-password on the controlling terminal, so it works on Linux. The prompts appear in the terminal even when the output goes to a file. Without a terminal the command stops at once.",
+    "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that nothing stays in the scrollback. This works on Linux, macOS and Windows alike.",
+    "Standard input must be the terminal; without one the command stops at once. Output sent to a file goes there as before.",
     "Use it for every real secret: text typed in a command can stay in the shell history and is visible in the list of running programs.",
   ],
 };
@@ -370,7 +371,7 @@ const shareInputs: readonly HelpOption[] = [
   },
   {
     ...askSecrets,
-    summary: "Type the shares at a hidden prompt, separated by semicolons",
+    summary: "Type the shares on the private screen, separated by semicolons",
   },
 ];
 
@@ -486,8 +487,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       },
     ],
     asks: [
-      ["Phrase", "hidden; English BIP39 words"],
-      ["Dates", "hidden, one line, such as 23-09-2026 08-08-1988; none in direct mode"],
+      ["Phrase", "English BIP39 words"],
+      ["Dates", "one line, such as 23-09-2026 08-08-1988; none in direct mode"],
     ],
     examples: [
       ["mnemocode encode --ask-secrets --format 3", "A real phrase, dates asked for, as Unicode"],
@@ -543,11 +544,11 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       },
     ],
     asks: [
-      ["Encoded record", "hidden"],
-      ["Dates", "hidden, one line; none in direct mode"],
+      ["Encoded record", "unless --input-file or --qr-file gives it"],
+      ["Dates", "one line; none in direct mode"],
     ],
     examples: [
-      ["mnemocode decode --ask-secrets", "Record and dates at hidden prompts"],
+      ["mnemocode decode --ask-secrets", "Record and dates on the private screen"],
       [
         "mnemocode decode --input-file shifted.txt --dates 23-09-2026",
         "A record file names its mode and format; only the dates are needed",
@@ -623,13 +624,13 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       },
     ],
     asks: [
-      ["Encoded record", "hidden"],
-      ["Dates", "hidden, one line, with ? in place of each forgotten digit"],
+      ["Encoded record", "unless --input-file or --qr-file gives it"],
+      ["Dates", "one line, with ? in place of each forgotten digit"],
     ],
     examples: [
       [
         `mnemocode recover-date --mode seedshift --ask-secrets --format 1 --master-fingerprint ${TEST_FINGERPRINT}`,
-        "Record and date patterns at hidden prompts",
+        "Record and date patterns on the private screen",
       ],
       [
         `mnemocode recover-date --mode seedshift --input "${SHIFTED_TEST_PHRASE}" --format 1 --dates "??-09-2026" --master-fingerprint ${TEST_FINGERPRINT}`,
@@ -667,9 +668,9 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       },
       evidenceGroup,
     ],
-    asks: [["Phrase", "hidden, with ? in place of the forgotten word"]],
+    asks: [["Phrase", "with ? in place of the forgotten word"]],
     examples: [
-      ["mnemocode recover-word --ask-secrets", "The phrase with ? at a hidden prompt"],
+      ["mnemocode recover-word --ask-secrets", "The phrase with ? on the private screen"],
       [
         `mnemocode recover-word --mnemonic "${TEST_PHRASE.replace(/about$/u, "?")}"`,
         "Every word that passes the checksum",
@@ -710,11 +711,11 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       },
     ],
     asks: [
-      ["Shares", "hidden, complete shares separated by semicolons"],
-      ["Dates", "hidden, only with --mode seedshift"],
+      ["Shares", "complete shares separated by semicolons"],
+      ["Dates", "only with --mode seedshift"],
     ],
     examples: [
-      ["mnemocode sskr-combine --ask-secrets", "Shares at a hidden prompt"],
+      ["mnemocode sskr-combine --ask-secrets", "Shares on the private screen"],
       [
         'mnemocode sskr-combine --share "ur:sskr/FIRST_COMPLETE_SHARE" --share "ur:sskr/SECOND_COMPLETE_SHARE"',
         "Two shares typed as text",
@@ -782,7 +783,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       },
       identityGroup,
     ],
-    asks: [["Shares", "hidden, complete shares separated by semicolons"]],
+    asks: [["Shares", "complete shares separated by semicolons"]],
     examples: [
       [
         "mnemocode sskr-export --share-file ./shares.txt --cards-dir ./share-cards --card-layout collection --template business-it",
@@ -1051,7 +1052,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       ["mnemocode preview --list", "The installed designs"],
       [
         "mnemocode encode --ask-secrets --format 5 --template business-it --pdf cards.pdf",
-        "A real export; hidden prompts ask for the phrase and the dates",
+        "A real export; the phrase and the dates are asked on the private screen",
       ],
       ["mnemocode encode --help", "Every card option explained"],
     ],

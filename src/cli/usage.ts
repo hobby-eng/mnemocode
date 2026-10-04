@@ -224,7 +224,7 @@ export function printUsage(): void {
     ),
     examples(mainExamples),
     notes([
-      "Use --ask-secrets for a real phrase: text typed in a command can stay in the shell history. Work on a trusted computer without a network connection. -h gives a short summary of a command, --help the full explanation.",
+      "Started without a command in a terminal, mnemocode shows a menu that asks step by step and shows the command it runs. Use --ask-secrets for a real phrase: text typed in a command can stay in the shell history. Work on a trusted computer without a network connection. -h gives a short summary of a command, --help the full explanation.",
     ]),
     // The safety line wraps like every other text of the help, so that it stays whole.
     wrapText(

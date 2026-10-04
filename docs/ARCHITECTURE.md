@@ -37,7 +37,16 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 
 ## CLI
 
-`mnemocode.ts` dispatches commands and rejects unsupported flags. `cli/input.ts` owns interactive and file input. `arguments.ts` and the option modules validate values.
+`mnemocode.ts` starts the menu (`cli/menu.ts`) when there is no command and a terminal, and otherwise `cli/command-line.ts`, which dispatches commands and rejects unsupported flags. The menu only builds a command line from its questions and runs it through the same dispatcher. `cli/input.ts` owns interactive and file input. `arguments.ts` and the option modules validate values.
+
+| Module                   | Responsibility                                                                |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `cli/terminal-input.ts`  | Raw terminal keys and typed answers, the same on Linux, macOS and Windows     |
+| `cli/terminal-choice.ts` | Lists chosen with the arrow keys, typed answers and the pause for Enter       |
+| `cli/private-screen.ts`  | The alternate screen for typed secrets and their results, cleared after Enter |
+| `cli/menu.ts`            | The entries, their questions and the command line each answer builds          |
+
+`scripts/verify-terminal-input.py` drives the menu and the prompts for secrets in a real pseudo-terminal: a Unix one on Linux and macOS, a Windows pseudo-console through pywinpty.
 
 `output-paths.ts` checks destinations before any secret is requested. This check is not a lock: the writers still enforce exclusive creation or private atomic replacement.
 
