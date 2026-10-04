@@ -104,6 +104,11 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      # For the build provenance (actions/attest): the workflow's OIDC identity gets a short-lived
+      # Sigstore signing certificate, and GitHub stores the attestation. artifact-metadata is not
+      # needed: a storage record exists only for images pushed to a registry (push-to-registry).
+      id-token: write
+      attestations: write
     steps:
       # Only for the release notes in docs/releases; nothing is built here.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -114,14 +119,22 @@ jobs:
           pattern: executable-*
           path: release
           merge-multiple: true
+      - name: Write SHA256SUMS
+        working-directory: release
+        run: |
+          cat *.sha256 | sort -k 2 > SHA256SUMS
+          rm *.sha256
+          sha256sum --check SHA256SUMS
+      # GitHub signs that each file in SHA256SUMS was built by this workflow from this repository,
+      # before the release exists; gh attestation verify checks a download (README).
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: release/SHA256SUMS
       - name: Publish the executables with SHA256SUMS
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd release
-          cat *.sha256 | sort -k 2 > SHA256SUMS
-          rm *.sha256
-          sha256sum --check SHA256SUMS
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "MnemoCode ${GITHUB_REF_NAME#v}" \
             --notes-file "$GITHUB_WORKSPACE/docs/releases/$GITHUB_REF_NAME.md" \

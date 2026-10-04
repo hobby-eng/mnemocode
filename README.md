@@ -1,5 +1,10 @@
 # MnemoCode
 
+[![CI](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml)
+[![Executable](https://github.com/hobby-eng/mnemocode/actions/workflows/executable.yml/badge.svg?branch=main)](https://github.com/hobby-eng/mnemocode/actions/workflows/executable.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Build provenance: GitHub attestations](https://img.shields.io/badge/build%20provenance-GitHub%20attestations-2ea44f)](https://github.com/hobby-eng/mnemocode/attestations)
+
 This README describes version 0.1.0.
 
 MnemoCode helps you keep a wallet seed phrase (a BIP39 mnemonic) on paper in a form that a stranger will not recognize and cannot use directly. It works completely offline, as the `mnemocode` command or as a TypeScript library.
@@ -26,6 +31,12 @@ Each release has one file for Linux, Windows and macOS that runs without Node.js
 sha256sum --check --ignore-missing SHA256SUMS
 chmod +x mnemocode-0.1.0-linux-x64
 ./mnemocode-0.1.0-linux-x64 self-test
+```
+
+GitHub also signs where each file of a release was built. On the computer you downloaded it with, the [GitHub CLI](https://cli.github.com/) checks that the file was built from this repository by its release workflow, and was not replaced afterwards:
+
+```bash
+gh attestation verify mnemocode-0.1.0-linux-x64 --repo hobby-eng/mnemocode
 ```
 
 The file holds Node.js, the program, the card artwork and fonts, and the SSKR engine. Making images from cards still needs Poppler's `pdftocairo`. Started without a command, for example by a double-click, it opens the [menu](#menu). To build the file for your own computer from a checkout, run `corepack pnpm build:executable`; it writes the file and its license notices to `release/`, which `pnpm build` leaves alone, and runs it once from an empty folder.
