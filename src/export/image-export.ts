@@ -11,6 +11,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { accessSync, constants } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { PDFDocument } from "pdf-lib";
@@ -59,6 +60,21 @@ export async function requireNewImageDirectory(path: string): Promise<string> {
   throw new Error("The image folder already exists. Choose a new folder for the exported images.");
 }
 
+/**
+ * Where the PDF for pdftocairo and its images wait: in memory on Linux (/dev/shm, a tmpfs), so
+ * that these copies of a secret never reach a disk; the system's temporary folder elsewhere.
+ */
+function rasterFolder(): string {
+  const memory = "/dev/shm";
+  if (process.platform !== "linux") return tmpdir();
+  try {
+    accessSync(memory, constants.W_OK);
+    return memory;
+  } catch {
+    return tmpdir();
+  }
+}
+
 /** Emits the unchanged PDF renderer's pages. Multipage documents get numbered image files. */
 export async function writeRenderedDocument(
   bytes: Uint8Array,
@@ -71,7 +87,7 @@ export async function writeRenderedDocument(
   }
   if (format !== "png" && format !== "jpg") throw new Error("Image format must be png or jpg.");
   await assertImageRenderer();
-  const temporary = await mkdtemp(join(tmpdir(), "mnemocode-raster-"));
+  const temporary = await mkdtemp(join(rasterFolder(), "mnemocode-raster-"));
   try {
     const input = join(temporary, "document.pdf");
     await writeFile(input, bytes, { flag: "wx", mode: 0o600 });

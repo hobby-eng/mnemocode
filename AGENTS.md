@@ -11,6 +11,7 @@ MnemoCode is a standalone offline program. Do not mention or depend on the other
 - Release-level (explicit request only): `pnpm verify` (format check, type check, build, full tests); `pnpm audit --audit-level high`; `npm pack --dry-run --json --ignore-scripts`.
 - Release notes: `docs/releases/v<version>.md`, written before tagging from the version's section of `CHANGELOG.md`; `.github/workflows/executable.yml` publishes that file and refuses a tag without it.
 - Formatting: `pnpm format:check`; `docs/audits/` is excluded from the formatter and must stay excluded.
+- Protection: every run is under the Node.js permission model (`src/cli/protection.ts`, flags in `src/cli/protection-flags.json`, also embedded in the executable). A command that newly writes files or starts a program must say so in `neededPermissions`, or it fails with `ERR_ACCESS_DENIED`.
 - SSKR engine: the Rust source is `sskr-wasm/rust/`. `pnpm build:sskr` builds it offline in `Dockerfile.sskr` (Rust 1.99.0, clang 18, wasm-bindgen 0.2.129) and rewrites `sskr-wasm/generated/` and `sskr-wasm/integrity.json`; `pnpm verify:sskr` rebuilds it and compares byte for byte, a long check for a release. Never replace the generated files with a host build. The toolchain stage of `Dockerfile.sskr` is a copy of the one in multi-chain-wallet-tools' `Dockerfile.reproducible`; change both together.
 
 ## Generated exports

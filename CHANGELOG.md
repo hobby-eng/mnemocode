@@ -29,6 +29,9 @@
 - `--ask-secrets` works on Linux, macOS and Windows: MnemoCode reads the answer itself instead of through `systemd-ask-password`, which exists only on Linux. Backspace and Ctrl+U edit it, and an answer pasted ahead of the next question is kept for it.
 - A command that asks for a secret runs on a private screen of its own in the terminal: what you type is shown there, and so is the result. When you press Enter, the screen is cleared, so that nothing stays in the scrollback; output sent to a file or a pipe goes there as before.
 - With `--ask-secrets`, `decode` and `recover-date` take the record from `--input-file` or `--qr-file` and ask only for the dates.
+- Every run is protected as far as Node.js allows: core dumps are off on Linux and macOS, there is no network, and a command that does not need them cannot write files or start other programs (the Node.js permission model). The single executable has this built in, and each entry of the menu runs in a process of its own.
+- Before a secret, MnemoCode warns when swap is not encrypted (Linux) and when a file would be saved into a folder that a cloud service synchronises.
+- On Linux the temporary files of PNG and JPEG export stay in memory (`/dev/shm`).
 - The folder that holds the separate cards of one Shamir share can be read only by your user account, like the other export folders.
 
 ### Card exports

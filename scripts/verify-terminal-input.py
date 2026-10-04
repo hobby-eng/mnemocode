@@ -17,7 +17,8 @@ It checks that
 - an answer longer than 4095 bytes arrives whole, where a terminal's line mode on Linux would cut
   it;
 - two answers pasted at once answer two questions (Encode with dates);
-- Ctrl+C at a prompt for a secret leaves the private screen and ends the tool with exit code 130;
+- Ctrl+C at a prompt for a secret leaves the private screen; in the menu it cancels that command
+  and the menu comes back, a typed command ends with exit code 130;
 - Escape or q in the menu ends it with exit code 0, and Ctrl+C there with 130.
 """
 
@@ -233,9 +234,23 @@ def check_answers_pasted_together():
 
 
 def check_ctrl_c():
+    # In the menu, Ctrl+C at a prompt cancels that command alone: the menu comes back.
     session = Session()
     try:
         prompt_end = at_hidden_record_prompt(session)
+        session.type("abc" + CTRL_C)
+        session.wait_for(MENU_SHOWN)
+        if not WINDOWS:
+            assert LEAVE_ALTERNATE_SCREEN in session.output[prompt_end:], "the screen was not left"
+        session.type(ESCAPE)
+        code = session.wait_for_exit()
+        assert code == 0, f"Escape after a cancelled command gave exit code {code}"
+    finally:
+        session.close()
+    # A typed command ends at Ctrl+C with exit code 130.
+    session = Session(("decode", "--ask-secrets", "--mode", "direct"))
+    try:
+        prompt_end = session.wait_for(HIDDEN_RECORD)
         session.type("abc" + CTRL_C)
         code = session.wait_for_exit()
         assert code == CANCELLED, f"Ctrl+C gave exit code {code}"
@@ -243,7 +258,7 @@ def check_ctrl_c():
             assert LEAVE_ALTERNATE_SCREEN in session.output[prompt_end:], "the screen was not left"
     finally:
         session.close()
-    print(f"Ctrl+C at a prompt for a secret: private screen left, exit code {CANCELLED}")
+    print(f"Ctrl+C at a prompt: back to the menu there, exit code {CANCELLED} for a typed command")
 
 
 def check_menu_ctrl_c():
