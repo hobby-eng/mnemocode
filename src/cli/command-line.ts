@@ -5,7 +5,12 @@ import { runRecoverDate } from "./recover-date-command.js";
 import { runRecoverWord } from "./recover-word-command.js";
 import { assertCoreSelfTest, runSelfTest } from "./self-test.js";
 import { runTable } from "./table-command.js";
-import { withPrivateScreen } from "./private-screen.js";
+import { onPrivateScreen, withPrivateScreen } from "./private-screen.js";
+import { assertProtected, dropUnneeded, protectionSummary } from "./protection.js";
+import { unencryptedSwap } from "./swap-check.js";
+import { cloudServiceOf } from "./cloud-folders.js";
+import { STYLE, terminalNotice, terminalPaint } from "./terminal.js";
+import { value, type ParsedArguments } from "./arguments.js";
 import { runPreview } from "./preview-command.js";
 import { helpNames, printCommandHelp, printNamedHelp, printUsage } from "./usage.js";
 import { commandOptions, isCommandName } from "./command-options.js";
@@ -55,22 +60,24 @@ export async function runCommandLine(argv: readonly string[]): Promise<void> {
   }
   const arguments_ = parseArguments(rest);
   assertFlag(arguments_, "card-qr");
+  // Before anything is read: what this command does not need is given up for good.
+  dropUnneeded(command, arguments_);
   switch (command) {
     case "sskr-split":
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       assertFlag(arguments_, "ask-secrets");
       assertCoreSelfTest();
-      return withPrivateScreen(() => runSskrSplit(arguments_));
+      return withSecrets(arguments_, () => runSskrSplit(arguments_));
     case "sskr-combine":
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       assertFlag(arguments_, "ask-secrets");
       assertCoreSelfTest();
-      return withPrivateScreen(() => runSskrCombine(arguments_));
+      return withSecrets(arguments_, () => runSskrCombine(arguments_));
     case "sskr-export":
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       assertFlag(arguments_, "ask-secrets");
       assertCoreSelfTest();
-      return withPrivateScreen(() => runSskrExport(arguments_));
+      return withSecrets(arguments_, () => runSskrExport(arguments_));
     case "encode":
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       assertFlag(arguments_, "sskr");
@@ -78,23 +85,23 @@ export async function runCommandLine(argv: readonly string[]): Promise<void> {
       assertFlag(arguments_, "ask-secrets");
       assertFlag(arguments_, "legacy-valid-last-word");
       assertCoreSelfTest();
-      return withPrivateScreen(() => runEncode(arguments_));
+      return withSecrets(arguments_, () => runEncode(arguments_));
     case "decode":
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       assertFlag(arguments_, "ask-secrets");
       assertCoreSelfTest();
-      return withPrivateScreen(() => runDecode(arguments_));
+      return withSecrets(arguments_, () => runDecode(arguments_));
     case "recover-date":
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       assertFlag(arguments_, "ask-secrets");
       assertCoreSelfTest();
-      return withPrivateScreen(() => runRecoverDate(arguments_));
+      return withSecrets(arguments_, () => runRecoverDate(arguments_));
     case "recover-word":
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       assertFlag(arguments_, "ask-secrets");
       assertFlag(arguments_, "legacy-valid-last-word");
       assertCoreSelfTest();
-      return withPrivateScreen(() => runRecoverWord(arguments_));
+      return withSecrets(arguments_, () => runRecoverWord(arguments_));
     case "preview":
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       assertFlag(arguments_, "list");
@@ -110,4 +117,37 @@ export async function runCommandLine(argv: readonly string[]): Promise<void> {
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       return runSelfTest();
   }
+}
+
+/** Options that name a file or a folder to save. */
+const SAVED_OPTIONS = ["output", "qr", "pdf", "cards-dir", "images-dir"] as const;
+
+/**
+ * Runs a command that takes or shows a secret: only under the full protection, on the private
+ * screen, which first shows that protection and every warning about where the secret could leak.
+ */
+async function withSecrets(args: ParsedArguments, run: () => Promise<void>): Promise<void> {
+  assertProtected();
+  return withPrivateScreen(async () => {
+    if (onPrivateScreen())
+      console.error(
+        `  ${terminalPaint("stderr", STYLE.muted, "Protection".padEnd(11))} ${protectionSummary()}\n`,
+      );
+    const swap = unencryptedSwap();
+    if (swap.length > 0)
+      terminalNotice(
+        `Swap is not encrypted, or MnemoCode cannot tell (${swap.join(", ")}): the memory of this program, the seed phrase included, may be written to the disk and stay there. Use encrypted swap or none, best a live USB system.`,
+        "warning",
+      );
+    for (const key of SAVED_OPTIONS) {
+      const path = value(args, key);
+      const service = path === undefined ? undefined : cloudServiceOf(path);
+      if (service !== undefined)
+        terminalNotice(
+          `${path} is in a folder that ${service} synchronises: the file is copied to its servers and kept there. Save it to a local folder instead.`,
+          "warning",
+        );
+    }
+    return run();
+  });
 }

@@ -24,6 +24,7 @@ import { decodeQrPngFile } from "./qr-input.js";
 import { exportQrPayload } from "./qr-export.js";
 import { PDFDocument } from "pdf-lib";
 import { cardTemplates } from "../export/templates.js";
+import { assertProtected, protectionSummary } from "./protection.js";
 import { indexesToColors } from "../core.js";
 import { assertSskrSelfTest } from "../sskr/self-test.js";
 import { MNEMOCODE_VERSION } from "../version.js";
@@ -363,6 +364,7 @@ export async function runSelfTest(): Promise<void> {
     rows.push([name, `${detail} (${(performance.now() - stepStarted).toFixed(1)} ms)`]);
   };
 
+  await step("Process protection", assertProtected, protectionSummary());
   await step("Core integrity", runCoreChecks, "word list and fixed forward/reverse vectors");
   await step(
     "SSKR integrity",

@@ -91,6 +91,9 @@ writeFileSync(
       main: "mnemocode.cjs",
       output: executable,
       disableExperimentalSEAWarning: true,
+      // The protection that every run has (src/cli/protection.ts): the permission model and
+      // the options that go with it, the same as for node dist/mnemocode.js.
+      execArgv: JSON.parse(readFileSync(join(root, "src", "cli", "protection-flags.json"), "utf8")),
       // Neither is reproducible across machines, and start-up is fast enough without them.
       useSnapshot: false,
       useCodeCache: false,

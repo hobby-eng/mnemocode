@@ -492,6 +492,8 @@ The public test data is in [`vectors/mnemocode-v1.json`](vectors/mnemocode-v1.js
 
 [SECURITY.md](SECURITY.md) describes how to report a vulnerability, how to work offline, how secrets are handled and which risks remain. Read it before you work with a real phrase.
 
+Every run is protected as far as Node.js allows: no core dumps on Linux and macOS, no network, and no file writes or other programs for a command that does not need them. Before a secret is asked, the private screen shows this protection, and a warning if swap is not encrypted or a file would be saved into a cloud folder.
+
 - Dates are written `DD-MM-YYYY`; `YYYY-MM-DD` is also accepted. The order in which you type them does not matter.
 - A year always has four digits, from `0001` through `9999`. `23-09-26` is an error; the year 26 is written `0026`. Two years that are 2048 apart shift the words by the same amount.
 - You can use one date for every three words: 4, 5, 6, 7 or 8 dates for 12, 15, 18, 21 or 24 words.

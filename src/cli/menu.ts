@@ -7,8 +7,9 @@
 
 import { formatEncoded, representMnemonic, type OutputFormat } from "../core.js";
 import { cardTemplates } from "../export/templates.js";
-import { PRIVATE_SCREEN_COMMANDS, runCommandLine } from "./command-line.js";
-import { privateScreenAvailable } from "./private-screen.js";
+import { PRIVATE_SCREEN_COMMANDS } from "./command-line.js";
+import { CANCELLED_EXIT_CODE, privateScreenAvailable } from "./private-screen.js";
+import { dropForMenu, runInOwnProcess } from "./protection.js";
 import {
   askLine,
   choose,
@@ -17,8 +18,8 @@ import {
   type Choice,
   type Explanation,
 } from "./terminal-choice.js";
-import { InputCancelled, terminalAvailable } from "./terminal-input.js";
-import { STYLE, terminalFailure, terminalPaint, wrapText } from "./terminal.js";
+import { terminalAvailable } from "./terminal-input.js";
+import { STYLE, terminalPaint, wrapText } from "./terminal.js";
 import { printUsage } from "./usage.js";
 
 /** The menu reads keys from a terminal and draws on one; anything else gets the help instead. */
@@ -518,6 +519,9 @@ const paint = (code: string, text: string): string => terminalPaint("stderr", co
 const COMMAND_INDENT = "  ";
 
 export async function runMenu(): Promise<void> {
+  // Each command runs in a process of its own, which gives up what it does not need; the menu
+  // itself saves nothing.
+  dropForMenu();
   console.error(
     `\n${paint(STYLE.heading, "MnemoCode")} ${paint(STYLE.muted, "·")} ${paint(STYLE.strong, "Offline seed phrase encoding")}\n`,
   );
@@ -540,7 +544,6 @@ export async function runMenu(): Promise<void> {
     const action = await entry.action();
     if (action === "quit") return;
     if (action === undefined) continue;
-    let screenCleared = false;
     if (action === "help") {
       printUsage();
     } else {
@@ -548,20 +551,14 @@ export async function runMenu(): Promise<void> {
       console.error(`\n${paint(STYLE.muted, "The same as:")}`);
       for (const line of wrapText(typedCommand(action.run), LINE_WIDTH - COMMAND_INDENT.length))
         console.error(`${COMMAND_INDENT}${paint(STYLE.accent, line)}`);
-      try {
-        await runCommandLine(action.run);
-        screenCleared = PRIVATE_SCREEN_COMMANDS.has(action.run[0]!) && privateScreenAvailable();
-      } catch (error) {
-        // Ctrl+C at a prompt for a secret stops the tool, as it does for a typed command.
-        if (error instanceof InputCancelled) throw error;
-        console.error("");
-        terminalFailure(error instanceof Error ? error.message : String(error));
+      // The command reports its own result, error or cancellation (Ctrl+C), then the menu goes on.
+      const code = await runInOwnProcess(action.run);
+      if (code === CANCELLED_EXIT_CODE) continue;
+      // After the private screen the person has already read the result and pressed Enter.
+      if (code === 0 && PRIVATE_SCREEN_COMMANDS.has(action.run[0]!) && privateScreenAvailable()) {
+        console.error(paint(STYLE.muted, "The screen with the result was cleared."));
+        continue;
       }
-    }
-    // After the private screen the person has already read the result and pressed Enter.
-    if (screenCleared) {
-      console.error(paint(STYLE.muted, "The screen with the result was cleared."));
-      continue;
     }
     console.error("");
     if (!(await waitForEnter("Press Enter to return to the menu (Esc quits)."))) return;

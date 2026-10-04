@@ -39,12 +39,15 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 
 `mnemocode.ts` starts the menu (`cli/menu.ts`) when there is no command and a terminal, and otherwise `cli/command-line.ts`, which dispatches commands and rejects unsupported flags. The menu only builds a command line from its questions and runs it through the same dispatcher. `cli/input.ts` owns interactive and file input. `arguments.ts` and the option modules validate values.
 
-| Module                   | Responsibility                                                                |
-| ------------------------ | ----------------------------------------------------------------------------- |
-| `cli/terminal-input.ts`  | Raw terminal keys and typed answers, the same on Linux, macOS and Windows     |
-| `cli/terminal-choice.ts` | Lists chosen with the arrow keys, typed answers and the pause for Enter       |
-| `cli/private-screen.ts`  | The alternate screen for typed secrets and their results, cleared after Enter |
-| `cli/menu.ts`            | The entries, their questions and the command line each answer builds          |
+| Module                   | Responsibility                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `cli/terminal-input.ts`  | Raw terminal keys and typed answers, the same on Linux, macOS and Windows       |
+| `cli/terminal-choice.ts` | Lists chosen with the arrow keys, typed answers and the pause for Enter         |
+| `cli/private-screen.ts`  | The alternate screen for typed secrets and their results, cleared after Enter   |
+| `cli/protection.ts`      | No core dumps, the permission model, and what a command gives up before it runs |
+| `cli/swap-check.ts`      | Whether swap is encrypted (Linux)                                               |
+| `cli/cloud-folders.ts`   | Whether an output path lies in a cloud-synchronised folder                      |
+| `cli/menu.ts`            | The entries, their questions and the command line each answer builds            |
 
 `scripts/verify-terminal-input.py` drives the menu and the prompts for secrets in a real pseudo-terminal: a Unix one on Linux and macOS, a Windows pseudo-console through pywinpty.
 
