@@ -45,6 +45,9 @@ LONG_PADDING = " " * 5000
 # Exit code when the person cancels with Ctrl+C (src/cli/private-screen.ts).
 CANCELLED = 130
 
+# Bytes written to the pseudo-terminal at a time (Session.type).
+TYPING_PIECE = 256
+
 UP, DOWN, ENTER, CTRL_UP, ESCAPE = "\x1b[A", "\x1b[B", "\r", "\x1b[1;5A", "\x1b"
 BACKSPACE, CTRL_U, CTRL_C = "\x7f", "\x15", "\x03"
 ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN = "\x1b[?1049h", "\x1b[?1049l"
@@ -116,8 +119,14 @@ class Session:
     def type(self, text):
         if WINDOWS:
             self.process.write(text)
-        else:
-            os.write(self.fd, text.encode())
+            return
+        # Typed in small pieces, reading the output between them: the tool shows what is typed
+        # on its private screen, and a macOS pseudo-terminal buffers so little that a long answer
+        # written at once would block both sides, each waiting for the other to read.
+        data = text.encode()
+        for start in range(0, len(data), TYPING_PIECE):
+            os.write(self.fd, data[start : start + TYPING_PIECE])
+            self.read_some()
 
     def alive(self):
         if WINDOWS:
@@ -274,6 +283,8 @@ def check_menu_ctrl_c():
 
 
 def main():
+    # Each result is written at once, so that a CI log shows how far the checks came.
+    sys.stdout.reconfigure(line_buffering=True)
     check_decode_menu()
     check_menu_ctrl_c()
     check_long_line()
