@@ -6,7 +6,7 @@ import { askSecret, textInput } from "./input.js";
 import { terminalNotice, terminalResultHeader } from "./terminal.js";
 import { optionLabel } from "./option-copy.js";
 
-export function runRecoverWord(arguments_: ParsedArguments): void {
+export async function runRecoverWord(arguments_: ParsedArguments): Promise<void> {
   const recoverLegacyReplacement = arguments_["legacy-valid-last-word"] === true;
   let mnemonic: string;
   if (arguments_["ask-secrets"] === true) {
@@ -15,13 +15,13 @@ export function runRecoverWord(arguments_: ParsedArguments): void {
       value(arguments_, "mnemonic-file") !== undefined
     ) {
       throw new Error(
-        "Hidden input cannot be combined with direct mnemonic text or a mnemonic file.",
+        "--ask-secrets cannot be combined with direct mnemonic text or a mnemonic file.",
       );
     }
-    mnemonic = askSecret(
+    mnemonic = await askSecret(
       recoverLegacyReplacement
         ? "Exact legacy Seedshift phrase with its old final word:"
-        : "BIP39 mnemonic with ? for the forgotten word:",
+        : "Seed phrase with ? for the forgotten word:",
     );
   } else {
     mnemonic = textInput(arguments_, "mnemonic");

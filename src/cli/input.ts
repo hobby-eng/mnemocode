@@ -1,7 +1,7 @@
 import { terminalNotice } from "./terminal.js";
-import { closeSync, openSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { createInterface } from "node:readline/promises";
+import { choose, writePrompt } from "./terminal-choice.js";
+import { readLine, terminalAvailable, withRawTerminal } from "./terminal-input.js";
+import { onPrivateScreen } from "./private-screen.js";
 import { detectInputFormats, parseDate, type DateShiftDate, type OutputFormat } from "../core.js";
 import { readBoundedDescriptor, readBoundedFile } from "./bounded-read.js";
 import { decodeQrPngFile } from "./qr-input.js";
@@ -37,7 +37,7 @@ export function textInput(arguments_: ParsedArguments, key: "input" | "mnemonic"
   if (direct !== undefined && path !== undefined)
     throw new Error(`Provide ${subject} either as direct text or in a file, but not both.`);
   if (direct === undefined && path === undefined)
-    throw new Error(`Provide ${subject} as direct text, in a file, or through hidden input.`);
+    throw new Error(`Provide ${subject} as direct text, in a file, or through --ask-secrets.`);
   return (
     direct ??
     (path === "-"
@@ -77,7 +77,7 @@ export function inputFormat(value_: string): EncodedFormat {
 }
 
 async function chooseInputFormat(candidates: readonly EncodedFormat[]): Promise<EncodedFormat> {
-  if (process.stdin.isTTY !== true || process.stderr.isTTY !== true) {
+  if (!terminalAvailable()) {
     if (candidates.length === 0) {
       throw new Error(
         "The input representation could not be detected. Choose the recorded format explicitly and check the source data.",
@@ -87,31 +87,24 @@ async function chooseInputFormat(candidates: readonly EncodedFormat[]): Promise<
       `The input matches several formats (${candidates.join(", ")}). Choose the recorded format explicitly.`,
     );
   }
-  const numbers: Readonly<Record<EncodedFormat, string>> = {
-    english: "1",
-    indexes: "2",
-    unicode: "3",
-    colors: "5",
-    "colors-unicode": "4",
+  const numbers: Readonly<Record<EncodedFormat, number>> = {
+    english: 1,
+    indexes: 2,
+    unicode: 3,
+    "colors-unicode": 4,
+    colors: 5,
   };
   const choices =
     candidates.length === 0 ? (Object.keys(numbers) as EncodedFormat[]) : [...candidates];
-  console.error(
+  const selected = await choose(
     candidates.length === 0
-      ? "The input representation could not be identified. Choose the recorded format:"
-      : "The input matches more than one representation:",
+      ? "The format could not be recognised. Which format was recorded?"
+      : "The input fits more than one format. Which format was recorded?",
+    choices.map((format) => ({ label: format, digit: numbers[format], value: format })),
+    { label: "Format", quit: "cancels" },
   );
-  for (const candidate of choices) console.error(`  ${numbers[candidate]}  ${candidate}`);
-  const terminal = createInterface({ input: process.stdin, output: process.stderr });
-  try {
-    const answer = await terminal.question("Choose the recorded input format: ");
-    const selected = inputFormat(answer.trim());
-    if (candidates.length > 0 && !candidates.includes(selected))
-      throw new Error(`The selected format ${selected} does not match the input.`);
-    return selected;
-  } finally {
-    terminal.close();
-  }
+  if (selected === undefined) throw new Error("No input format was chosen.");
+  return selected;
 }
 
 export async function recordedInputFormat(
@@ -182,46 +175,39 @@ export function dates(arguments_: ParsedArguments): DateShiftDate[] {
   return values(arguments_, "date").map(parseDate);
 }
 
-export function askSecret(prompt: string): string {
-  // systemd-ask-password draws the hidden prompt and exists only on Linux. Elsewhere, say so
-  // before touching the terminal, instead of blaming a missing terminal or program.
-  if (process.platform !== "linux") {
+/**
+ * Asks for a secret at a prompt on the terminal (terminal-input.ts), the same on Linux, macOS and
+ * Windows. On the private screen, which is cleared afterwards, the answer is shown as it is typed,
+ * so that it can be checked; anywhere else nothing typed or pasted is shown.
+ */
+export async function askSecret(prompt: string): Promise<string> {
+  if (!terminalAvailable()) {
     throw new Error(
-      "Hidden input (--ask-secrets) works on Linux only, where systemd-ask-password asks for the secret. On this system, read the secret from a protected local file (--mnemonic-file, --input-file or --share-file), or give the path - to read it from standard input.",
+      "--ask-secrets needs a terminal on standard input and standard error. Run the command in a terminal, or read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-).",
     );
   }
-  // A pipe or /dev/null makes systemd-ask-password fall back to a UI agent.
-  // Use the controlling terminal even when CLI stdout/stderr are redirected.
-  let terminal: number;
-  try {
-    terminal = openSync("/dev/tty", "r+");
-  } catch {
-    throw new Error(
-      "Hidden input requires an interactive terminal. Run the command in a terminal, or read the secret from a file or standard input.",
-    );
-  }
-  try {
-    const result = spawnSync("systemd-ask-password", ["--echo=no", "--", prompt], {
-      encoding: "utf8",
-      stdio: [terminal, "pipe", terminal],
-    });
-    if (result.error !== undefined)
-      throw new Error(
-        "The secure hidden-input prompt could not be started. Ensure that systemd-ask-password is installed and available.",
-      );
-    if (result.status !== 0) throw new Error("Secret input was cancelled or failed.");
-    const secret = result.stdout.trim();
-    if (secret.length === 0) throw new Error("Secret input must not be empty.");
-    return secret;
-  } finally {
-    closeSync(terminal);
-  }
+  const secret = await withRawTerminal(async (next) => {
+    writePrompt(`${prompt} `);
+    try {
+      return await readLine(next, onPrivateScreen());
+    } finally {
+      // The terminal did not show the Enter key either.
+      process.stderr.write("\n");
+    }
+  });
+  if (secret === undefined) throw new Error("Secret input was cancelled or failed.");
+  const trimmed = secret.trim();
+  if (trimmed.length === 0) throw new Error("Secret input must not be empty.");
+  return trimmed;
 }
 
-export function promptedEncodeInputs(
+/** The question for dates; the answer is split at spaces. */
+export const DATES_PROMPT = "Dates (DD-MM-YYYY, separated by spaces):";
+
+export async function promptedEncodeInputs(
   arguments_: ParsedArguments,
   mode: TransformMode,
-): { readonly mnemonic: string; readonly dates: DateShiftDate[] } | undefined {
+): Promise<{ readonly mnemonic: string; readonly dates: DateShiftDate[] } | undefined> {
   if (arguments_["ask-secrets"] !== true) return undefined;
   if (
     value(arguments_, "mnemonic") !== undefined ||
@@ -229,32 +215,33 @@ export function promptedEncodeInputs(
     values(arguments_, "date").length > 0
   ) {
     throw new Error(
-      "Hidden input cannot be combined with a mnemonic supplied on the command line, a mnemonic file, or command-line dates.",
+      "--ask-secrets cannot be combined with a mnemonic supplied on the command line, a mnemonic file, or command-line dates.",
     );
   }
-  const mnemonic = askSecret("BIP39 mnemonic:");
+  const mnemonic = await askSecret("Seed phrase (English BIP39 words):");
   if (mode === "direct") return { mnemonic, dates: [] };
-  const dateLine = askSecret("Date list (DD-MM-YYYY, separated by spaces):");
+  const dateLine = await askSecret(DATES_PROMPT);
   return { mnemonic, dates: dateLine.split(/\s+/u).filter(Boolean).map(parseDate) };
 }
 
-export function promptedRecoveryInputs(
+/**
+ * The answers of recover-date asked by --ask-secrets: the encoded record, unless a record file or a QR image gives
+ * it, and the dates with ? for each forgotten digit.
+ */
+export async function promptedRecoveryInputs(
   arguments_: ParsedArguments,
-): { readonly encoded: string; readonly dateValues: string[] } | undefined {
+): Promise<{ readonly encoded?: string; readonly dateValues: string[] } | undefined> {
   if (arguments_["ask-secrets"] !== true) return undefined;
-  if (
-    value(arguments_, "input") !== undefined ||
-    value(arguments_, "input-file") !== undefined ||
-    value(arguments_, "qr-file") !== undefined ||
-    values(arguments_, "date").length > 0
-  ) {
+  if (value(arguments_, "input") !== undefined || values(arguments_, "date").length > 0) {
     throw new Error(
-      "Hidden input cannot be combined with direct encoded text, an encoded input file, a QR input file, or command-line dates.",
+      "--ask-secrets cannot be combined with direct encoded text or command-line dates.",
     );
   }
-  const encoded = askSecret("Encoded record:");
-  const dateLine = askSecret(
-    "Date list with ? for each forgotten digit (one to three incomplete dates):",
+  const fromFile =
+    value(arguments_, "input-file") !== undefined || value(arguments_, "qr-file") !== undefined;
+  const encoded = fromFile ? undefined : await askSecret("Encoded seed phrase or record:");
+  const dateLine = await askSecret(
+    "Dates with ? for each forgotten digit (one to three incomplete dates):",
   );
   return { encoded, dateValues: dateLine.split(/\s+/u).filter(Boolean) };
 }

@@ -13,6 +13,7 @@ import { preflightFileDestination } from "./output-paths.js";
 import { integerOption, value, values, type ParsedArguments } from "./arguments.js";
 import {
   askSecret,
+  DATES_PROMPT,
   encodeFormat,
   encodedOutputLabel,
   dates,
@@ -198,7 +199,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
     throw new Error(
       "SSKR share creation supports direct mode and checksum-valid Seedshift, but not legacy modes.",
     );
-  const prompted = promptedEncodeInputs(args, mode);
+  const prompted = await promptedEncodeInputs(args, mode);
   const dateValues = prompted?.dates ?? dates(args);
   if (mode === "direct" && dateValues.length) throw new Error("Direct mode does not accept dates.");
   if (mode === "seedshift" && !dateValues.length)
@@ -250,8 +251,8 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
 export async function readShares(args: ParsedArguments): Promise<string[]> {
   if (args["ask-secrets"] === true) {
     if (["share", "share-file", "share-qr"].some((key) => args[key] !== undefined))
-      throw new Error("Hidden input cannot be combined with another share-input source.");
-    return askSecret("SSKR shares (separate complete shares with a semicolon):")
+      throw new Error("--ask-secrets cannot be combined with another share-input source.");
+    return (await askSecret("Shamir shares (separate complete shares with a semicolon):"))
       .split(";")
       .map(normalizeShare);
   }
@@ -274,7 +275,7 @@ export async function readShares(args: ParsedArguments): Promise<string[]> {
   for (const path of values(args, "share-qr")) shares.push(await decodeQrPngFile(path));
   if (!shares.length)
     throw new Error(
-      "Provide at least one complete share as text, in a text file, in a QR image, or through hidden input. Additional share sources may be repeated.",
+      "Provide at least one complete share as text, in a text file, in a QR image, or through --ask-secrets. Additional share sources may be repeated.",
     );
   return shares.map(normalizeShare);
 }
@@ -291,9 +292,7 @@ export async function runSskrCombine(args: ParsedArguments): Promise<void> {
   const shares = await readShares(args);
   if (mode === "seedshift" && !dateValues.length && args["ask-secrets"] === true)
     dateValues.push(
-      ...askSecret("Seedshift dates (DD-MM-YYYY, separated by spaces):")
-        .split(/\s+/u)
-        .flatMap((date) => dates({ date })),
+      ...(await askSecret(DATES_PROMPT)).split(/\s+/u).flatMap((date) => dates({ date })),
     );
   if (mode === "seedshift" && !dateValues.length)
     throw new Error("Seedshift recovery requires its original dates.");

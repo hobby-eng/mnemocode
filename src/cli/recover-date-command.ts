@@ -44,7 +44,7 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
     min: 1,
     max: HARD_MAX_CANDIDATES,
   });
-  const prompted = promptedRecoveryInputs(arguments_);
+  const prompted = await promptedRecoveryInputs(arguments_);
   const rawEncoded = prompted?.encoded ?? (await encodedInput(arguments_));
   const record = parseRecord(rawEncoded);
   if (record?.mode === "direct")

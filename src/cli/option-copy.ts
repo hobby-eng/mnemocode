@@ -1,6 +1,6 @@
 const labels: Readonly<Record<string, string>> = {
   all: "all templates selection",
-  "ask-secrets": "hidden-input mode",
+  "ask-secrets": "secret prompt mode",
   "bip39-passphrase-file": "BIP39 passphrase file",
   "bitcoin-address": "Bitcoin address",
   "bitcoin-profile": "Bitcoin address profile",
