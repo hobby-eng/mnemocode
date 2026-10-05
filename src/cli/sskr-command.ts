@@ -41,6 +41,7 @@ import {
 import { requireNewCardDirectory } from "../export/individual-cards.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import { optionLabel } from "./option-copy.js";
+import { offerShareCheck } from "./backup-check.js";
 
 export const sskrExportOptions = [
   "cards-dir",
@@ -269,6 +270,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
       `Encoded BIP32 master fingerprint (empty BIP39 passphrase): ${masterFingerprint(result.shiftedEnglish.join(" "))}`,
     );
   }
+  await offerShareCheck(result.sourceMnemonic, mode, threshold, () => printShares(shares, format));
 }
 
 export async function readShares(args: ParsedArguments): Promise<string[]> {

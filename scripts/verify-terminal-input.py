@@ -16,7 +16,8 @@ It checks that
 - Backspace and Ctrl+U edit the answer;
 - an answer longer than 4095 bytes arrives whole, where a terminal's line mode on Linux would cut
   it;
-- two answers pasted at once answer two questions (Encode with dates);
+- two answers pasted at once answer two questions (Encode with dates), and the backup typed
+  again with its date passes the check that Encode offers;
 - Ctrl+C at a prompt for a secret leaves the private screen; in the menu it cancels that command
   and the menu comes back, a typed command ends with exit code 130;
 - Escape or q in the menu ends it with exit code 0, and Ctrl+C there with 130.
@@ -40,6 +41,9 @@ TEST_PHRASE = " ".join(["abandon"] * 11 + ["about"])
 # The test phrase as word numbers (format 2), and the same with a wrong last number.
 WORD_NUMBERS = " ".join(["1"] * 11 + ["4"])
 WRONG_LAST = " ".join(["1"] * 11 + ["5"])
+# The public date of the README examples, and the test phrase masked with it as word numbers.
+MASK_DATE = "23-09-2026"
+MASKED_WORD_NUMBERS = "2027 10 24 2027 10 24 2027 10 24 2027 10 377"
 # Longer than the 4095 bytes after which the line mode of a Linux terminal cuts a line.
 LONG_PADDING = " " * 5000
 # Exit code when the person cancels with Ctrl+C (src/cli/private-screen.ts).
@@ -229,8 +233,16 @@ def check_answers_pasted_together():
         session.type("1")
         session.wait_for("Seed phrase")
         # The phrase and the date in one paste: the second line answers the second question.
-        session.type(TEST_PHRASE + ENTER + "23-09-2026" + ENTER)
+        session.type(TEST_PHRASE + ENTER + MASK_DATE + ENTER)
         session.wait_for("Dates")
+        # The check of the backup: typed again from paper, with the date, it restores the phrase.
+        session.wait_for("Check the backup now?")
+        session.type("1")
+        session.wait_for("Your backup, as written down:")
+        session.type(MASKED_WORD_NUMBERS + ENTER)
+        session.wait_for("Dates")
+        session.type(MASK_DATE + ENTER)
+        session.wait_for("The backup restores this seed phrase.")
         session.wait_for(CLEAR_PROMPT)
         assert "Error" not in session.output and "mnemocode:" not in session.output, session.output
         session.type(ENTER)
@@ -239,7 +251,7 @@ def check_answers_pasted_together():
         session.wait_for_exit()
     finally:
         session.close()
-    print("encode in the menu: a phrase and dates pasted together answer both questions")
+    print("encode in the menu: phrase and dates pasted together, then the backup checked")
 
 
 def check_ctrl_c():

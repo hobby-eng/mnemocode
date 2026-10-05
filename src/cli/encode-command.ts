@@ -23,6 +23,7 @@ import { preflightFileDestination } from "./output-paths.js";
 import { requireNewCardDirectory } from "../export/individual-cards.js";
 import { runSskrSplit } from "./sskr-command.js";
 import { printEncodeResult } from "./encode-report.js";
+import { offerEncodedCheck } from "./backup-check.js";
 import { saveEncodeResult } from "./encode-export.js";
 import { optionLabel } from "./option-copy.js";
 
@@ -126,4 +127,7 @@ export async function runEncode(args: ParsedArguments): Promise<void> {
       : [];
   printEncodeResult(outcome);
   await saveEncodeResult(args, outcome, eventLabels);
+  await offerEncodedCheck(outcome.result.sourceMnemonic, format, outcome.recordMode, () =>
+    printEncodeResult(outcome),
+  );
 }
