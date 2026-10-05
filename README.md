@@ -69,17 +69,16 @@ Run `mnemocode` without a command in a terminal, or double-click the executable 
 What do you want to do?
 › 1  Encode a seed phrase as numbers, codes or colors
   2  Decode numbers, codes or colors back into a seed phrase
-  3  Split a seed phrase into Shamir shares, as text or colors
-  4  Restore a seed phrase from Shamir shares
-  5  Find a forgotten word of a seed phrase or a date digit
-  6  Print sample cards with a test seed phrase
-  7  Look up a seed word, its number or its Unicode code
-  8  Check that this copy of MnemoCode works
-  9  Show every command and option
+  3  Restore a seed phrase from Shamir shares
+  4  Find a forgotten word of a seed phrase or a date digit
+  5  Print sample cards with a test seed phrase
+  6  Look up a seed word, its number or its Unicode code
+  7  Check that this copy of MnemoCode works
+  8  Show every command and option
   0  Quit
 ```
 
-Choose with the arrow keys and Enter, or press the number. Each entry asks its questions one at a time and shows examples where they help: Encode, for instance, shows what the test phrase looks like as word numbers, Unicode codes and colors, then asks about dates, Shamir shares and where the result should go. Before it runs, the menu shows in grey the command that does the same, such as `mnemocode encode --ask-secrets --format 5 --mode direct`, so that you can type it next time. Escape goes back to the menu, and in the menu it quits; `q` works too.
+Choose with the arrow keys and Enter, or press the number. Each entry asks its questions one at a time and shows examples where they help. Encode first shows what a test phrase looks like as word numbers, Unicode codes and colors, then asks about Seedshift, then whether to split the phrase into Shamir shares (the usual sets such as 2 of 3 or 3 of 5, or any other up to 16 shares), and last where the result should go. The form chosen decides how shares look: with colors they are color codes, which printable cards can disguise; with numbers, codes or words they are plain text shares, in Bytewords words or a short `ur:sskr/...` code, as other SSKR tools write them. The whole phrase in the chosen form is shown with the shares too, with a warning, for whoever keeps it and holds the shares in reserve. Before it runs, the menu shows the command that does the same, such as `mnemocode encode --ask-secrets --format 5 --mode direct`, so that you can type it next time. Escape goes back to the menu, and in the menu it quits; `q` works too.
 
 The seed phrase, the dates and the shares never become part of the command. They are typed on a private screen of their own, where you see what you type, and the result appears there too. When you press Enter, that screen is cleared and the terminal returns to where it was, so that nothing stays in the scrollback.
 

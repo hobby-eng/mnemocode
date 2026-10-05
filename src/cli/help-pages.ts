@@ -476,10 +476,10 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           shares,
           {
             flag: "--share-format",
-            value: "ur|colors",
+            value: "ur|words|colors",
             summary: "How the shares are shown; default ur",
             details: [
-              "ur is the standard short form, ur:sskr/... colors writes a share as color codes whose order matters; they are a different format from --format 5.",
+              "ur is the standard short form, ur:sskr/... words writes the same share in standard Bytewords, one English word per byte, as other SSKR tools do. colors writes a share as color codes whose order matters; they are a different format from --format 5. A saved text file holds the shares in the same form.",
             ],
           },
           cardLayout,
@@ -749,7 +749,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         options: [
           {
             flag: "--format",
-            value: "ur|colors",
+            value: "ur|words|colors",
             summary: "How the shares are shown; default ur",
           },
           {
@@ -817,7 +817,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           dates,
           threshold,
           shares,
-          { flag: "--format", value: "ur|colors", summary: "The share format; default ur" },
+          { flag: "--format", value: "ur|words|colors", summary: "The share format; default ur" },
           {
             flag: "--output",
             value: "NEW_FILE",

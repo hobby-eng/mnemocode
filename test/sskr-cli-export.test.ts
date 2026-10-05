@@ -41,8 +41,9 @@ describe("integrated SSKR CLI", () => {
       expect(split.stdout + split.stderr).not.toContain("\x1b");
       const records = readFileSync(path, "utf8").trim().split("\n");
       expect(records).toHaveLength(3);
-      // An SSKR file holds the shares themselves, one per line, with no MNC1 record header.
-      for (const record of records) expect(record).toMatch(/^ur:sskr\//u);
+      // An SSKR file holds the shares themselves, one per line in the share format chosen, here
+      // color codes, with no MNC1 record header; sskr-combine reads them back.
+      for (const record of records) expect(record).toMatch(/^#[0-9A-F]{6}( #[0-9A-F]{6})+$/u);
       const restored = cli([
         "sskr-combine",
         "--share",
@@ -101,5 +102,36 @@ describe("integrated SSKR CLI", () => {
     const result = cli(["encode", "--mnemonic", mnemonic, "--format", "5", "--cards"]);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout + result.stderr).not.toContain("\x1b");
+  });
+
+  it("writes and saves shares in Bytewords, and restores the phrase from them", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mnc-words-"));
+    try {
+      const path = join(dir, "shares.txt");
+      const split = cli([
+        "sskr-split",
+        "--mnemonic",
+        mnemonic,
+        "--threshold",
+        "2",
+        "--shares",
+        "3",
+        "--format",
+        "words",
+        "--output",
+        path,
+      ]);
+      expect(split.status, split.stderr).toBe(0);
+      const records = readFileSync(path, "utf8").trim().split("\n");
+      expect(records).toHaveLength(3);
+      // Standard Bytewords of an SSKR share start with its CBOR tag: tuna next keep.
+      for (const record of records) expect(record).toMatch(/^tuna next keep( [a-z]{4})+$/u);
+      expect(split.stdout).toContain(records[0]!);
+      const restored = cli(["sskr-combine", "--share", records[1]!, "--share", records[2]!]);
+      expect(restored.status, restored.stderr).toBe(0);
+      expect(restored.stdout).toContain(mnemonic);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

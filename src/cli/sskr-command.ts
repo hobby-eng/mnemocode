@@ -26,7 +26,12 @@ import { businessOptions, businessOptionNames } from "./business-options.js";
 import { decodeInput, encodeMnemonic, formatEncoded, representMnemonic } from "../core.js";
 import { masterFingerprint } from "../bitcoin-evidence.js";
 import { combineSskrShares, splitSskrMnemonic, validateThreshold } from "../sskr/shares.js";
-import { normalizeShare, shareToColors, validateShareSet } from "../sskr/transport.js";
+import {
+  normalizeShare,
+  shareToColors,
+  urToBytewords,
+  validateShareSet,
+} from "../sskr/transport.js";
 import {
   exportSskrCards,
   exportSskrPdf,
@@ -93,32 +98,47 @@ function exportOptions(args: ParsedArguments): SskrExportOptions | undefined {
   };
 }
 
-function shareFormat(args: ParsedArguments): "ur" | "colors" {
+/** How shares are written: the short UR form, standard Bytewords, or ordered color codes. */
+export type ShareFormat = "ur" | "words" | "colors";
+
+const SHARE_FORMAT_NAMES: Readonly<Record<ShareFormat, string>> = {
+  ur: "Compact UR",
+  words: "Bytewords",
+  colors: "RGB hexadecimal codes (ordered)",
+};
+
+function shareFormat(args: ParsedArguments): ShareFormat {
   const format = value(args, "format") ?? "ur";
-  if (format !== "ur" && format !== "colors")
+  if (format !== "ur" && format !== "words" && format !== "colors")
     throw new Error(
-      "The SSKR share format must be ur or colors. These are share formats, not BIP39 representations.",
+      "The SSKR share format must be ur, words or colors. These are share formats, not BIP39 representations.",
     );
   return format;
 }
 
-function printShares(shares: readonly string[], format: "ur" | "colors"): void {
+/** One share as text in `format`; every form is read back by sskr-combine. */
+function writtenShare(share: string, format: ShareFormat): string {
+  if (format === "words") return urToBytewords(share);
+  if (format === "colors") return shareToColors(share).join(" ");
+  return share;
+}
+
+function printShares(shares: readonly string[], format: ShareFormat): void {
   for (const [index, share] of shares.entries()) {
     if (
       !terminalResultHeader(`SSKR share ${index + 1} of ${shares.length}`, [
-        ["Format", format === "ur" ? "Compact UR" : "RGB hexadecimal codes (ordered)"],
+        ["Format", SHARE_FORMAT_NAMES[format]],
       ])
     )
-      console.error(
-        `SSKR share ${index + 1} — ${format === "ur" ? "Compact UR" : "RGB hexadecimal codes (ordered)"}:`,
-      );
-    console.log(format === "ur" ? share : shareToColors(share).join(" "));
+      console.error(`SSKR share ${index + 1} — ${SHARE_FORMAT_NAMES[format]}:`);
+    console.log(writtenShare(share, format));
   }
 }
 
 async function saveShares(
   shares: readonly string[],
   args: ParsedArguments,
+  format: ShareFormat,
   options?: SskrExportOptions,
 ): Promise<void> {
   if (options?.directory) {
@@ -151,7 +171,9 @@ async function saveShares(
   }
   const output = value(args, "output");
   if (output) {
-    await publishNewPrivateFile(output, new TextEncoder().encode(shares.join("\n") + "\n"));
+    // In the share format chosen, as the terminal shows it.
+    const lines = shares.map((share) => writtenShare(share, format));
+    await publishNewPrivateFile(output, new TextEncoder().encode(lines.join("\n") + "\n"));
     terminalNotice(
       `Saved SSKR records: ${output} (one complete share per line; this file contains all supplied shares).`,
       "success",
@@ -206,7 +228,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
   const result =
     mode === "direct" ? representMnemonic(mnemonic) : encodeMnemonic(mnemonic, dateValues);
   const shares = await splitSskrMnemonic(result.shiftedEnglish.join(" "), threshold, count);
-  await saveShares(shares, args, options);
+  await saveShares(shares, args, format, options);
   if (
     !terminalResultHeader("SSKR export", [
       ["Threshold", `${threshold} of ${count}`],
@@ -227,6 +249,11 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
     )
       console.log(`${encodedOutputLabel(representation, mode)}:`);
     console.log(formatEncoded(result, representation));
+    // Shown for a person who keeps the whole phrase too, with the shares as a reserve.
+    terminalNotice(
+      "This is the whole seed phrase: it restores the wallet without any share.",
+      "warning",
+    );
   }
   printShares(shares, format);
   if (terminalColor("stderr")) {
@@ -319,6 +346,6 @@ export async function runSskrExport(args: ParsedArguments): Promise<void> {
   const options = exportOptions(args);
   await destinations(args, options);
   const shares = validateShareSet(await readShares(args), false);
-  await saveShares(shares, args, options);
+  await saveShares(shares, args, format, options);
   printShares(shares, format);
 }

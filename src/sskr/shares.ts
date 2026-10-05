@@ -5,15 +5,18 @@ import { secureSeed, sskrEngine } from "./runtime.js";
 import { normalizeShare, validateShareSet } from "./transport.js";
 import { assertSskrSelfTest } from "./self-test.js";
 
+/** SSKR allows at most 16 members in a group. */
+export const MAX_SHARES = 16;
+
 export function validateThreshold(threshold: number, count: number): void {
   if (
     !Number.isSafeInteger(threshold) ||
     !Number.isSafeInteger(count) ||
     threshold < 2 ||
     count < threshold ||
-    count > 16
+    count > MAX_SHARES
   )
-    throw new Error("SSKR requires 2 <= threshold <= shares <= 16.");
+    throw new Error(`SSKR requires 2 <= threshold <= shares <= ${MAX_SHARES}.`);
 }
 
 export async function splitSskrMnemonic(
