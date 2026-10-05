@@ -48,6 +48,7 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 | `cli/swap-check.ts`      | Whether swap is encrypted (Linux)                                               |
 | `cli/cloud-folders.ts`   | Whether an output path lies in a cloud-synchronised folder                      |
 | `cli/menu.ts`            | The entries, their questions and the command line each answer builds            |
+| `cli/backup-check.ts`    | The optional check of a backup typed again after Encode                         |
 
 `scripts/verify-terminal-input.py` drives the menu and the prompts for secrets in a real pseudo-terminal: a Unix one on Linux and macOS, a Windows pseudo-console through pywinpty.
 
