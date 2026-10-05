@@ -1,5 +1,11 @@
 import { masterFingerprint } from "../bitcoin-evidence.js";
-import { terminalColor, terminalHint, terminalResultHeader, terminalStatus } from "./terminal.js";
+import {
+  terminalColor,
+  terminalHint,
+  terminalMore,
+  terminalResultHeader,
+  terminalStatus,
+} from "./terminal.js";
 import { encodedOutputLabel } from "./input.js";
 import type { EncodeOutcome } from "./encode-command.js";
 
@@ -68,15 +74,15 @@ export function printEncodeResult(outcome: EncodeOutcome): void {
         `Optional checksum-valid legacy phrase: ${legacyAlternative!.shiftedEnglish.join(" ")}`,
       );
       console.error(
-        "Using that replacement discards the original shifted final word. Run the command again with the legacy checksum-word replacement enabled to record this choice for recovery. Decoding that record lists possible original phrases.",
+        "That word replaces the shifted last word; --legacy-valid-last-word records it.",
       );
+      terminalMore("transformation-modes");
     } else {
       console.error(
         `Replaced legacy final word ${baseResult.shiftedEnglish.at(-1)} with checksum-valid word ${result.shiftedEnglish.at(-1)}.`,
       );
-      console.error(
-        "The original shifted final word is not stored. Recovery must enumerate candidates and use a fingerprint or other wallet evidence to select the original.",
-      );
+      console.error("The shifted last word is not stored; decoding lists the candidates.");
+      terminalMore("transformation-modes");
     }
   }
 }

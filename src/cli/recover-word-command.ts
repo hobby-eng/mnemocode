@@ -3,7 +3,7 @@ import { matchBitcoinEvidence } from "../bitcoin-evidence.js";
 import { type ParsedArguments, value } from "./arguments.js";
 import { bip39Passphrase, bitcoinEvidence } from "./bitcoin-options.js";
 import { askSecret, textInput } from "./input.js";
-import { terminalNotice, terminalResultHeader } from "./terminal.js";
+import { terminalMore, terminalNotice, terminalResultHeader } from "./terminal.js";
 import { optionLabel } from "./option-copy.js";
 
 export async function runRecoverWord(arguments_: ParsedArguments): Promise<void> {
@@ -33,7 +33,7 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<void>
   if (candidates.length === 0) {
     terminalResultHeader("Missing word recovery", [["Checksum-valid candidates", "0"]]);
     terminalNotice(
-      "No checksum-valid BIP39 phrase matches the supplied known words. Check the other words, their order, and the placeholder position.",
+      "No valid phrase fits these words: check them, their order and the ? position.",
       "warning",
     );
     return;
@@ -94,14 +94,12 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<void>
 
   terminalNotice(
     recoverLegacyReplacement
-      ? `Displayed every checksum-valid final-word replacement for the exact legacy phrase. The row marked preserved retains the entropy-bearing bits of the supplied old final word.`
-      : `Displayed every checksum-valid replacement after checking all 2048 English BIP39 words. The checksum column contains the mnemonic's BIP39 checksum bits.`,
+      ? "All checksum-valid last words; the row marked preserved keeps the old word's data."
+      : "All 2048 words checked; the checksum column shows each phrase's checksum bits.",
   );
   if (evidence === undefined) {
-    terminalNotice(
-      "A valid BIP39 checksum does not identify the intended wallet. Confirm the result against independent wallet evidence.",
-      "warning",
-    );
+    terminalNotice("A valid checksum does not prove the wallet: compare an address.", "warning");
+    terminalMore("exact-local-recovery-checks");
   } else {
     terminalNotice(
       `Matched ${matched} of ${candidates.length} candidates against the requested ${optionLabel(evidence.kind)} locally.`,
@@ -112,7 +110,7 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<void>
   }
   if (recoverLegacyReplacement && evidence !== undefined) {
     terminalNotice(
-      "Evidence was compared with the checksum-valid replacement containers, not with original phrases recovered after reversing legacy Seedshift.",
+      "Evidence was compared with the replacements, not with the original legacy phrases.",
       "warning",
     );
   }

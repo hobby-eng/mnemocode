@@ -28,7 +28,7 @@ describe("recover-word CLI", () => {
     expect(lines).toContain(
       "1\tabout\t4\t0011\tabandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
     );
-    expect(result.stderr).toContain("Displayed every checksum-valid replacement");
+    expect(result.stderr).toContain("All 2048 words checked");
   });
 
   it("marks evidence matches without removing non-matching candidates", async () => {
@@ -58,7 +58,7 @@ describe("recover-word CLI", () => {
     expect(lines).toHaveLength(129);
     expect(lines[0]).toBe("candidate\tword\tword-index\tchecksum-bits\tlegacy-tail\tmnemonic");
     expect(lines.filter((line) => line.includes("\tpreserved\t"))).toHaveLength(1);
-    expect(result.stderr).toContain("checksum-valid final-word replacement");
+    expect(result.stderr).toContain("All checksum-valid last words");
   });
 
   it("rejects input without exactly one placeholder", async () => {

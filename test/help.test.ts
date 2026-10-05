@@ -82,3 +82,30 @@ describe("help", () => {
     });
   });
 });
+
+describe("links to the README", () => {
+  it("point only to headings that the README has", async () => {
+    const { readFile, readdir } = await import("node:fs/promises");
+    // GitHub's anchor of a heading: lower case, spaces as hyphens, other punctuation dropped.
+    const anchors = new Set(
+      (await readFile("README.md", "utf8"))
+        .split("\n")
+        .filter((line) => /^#{1,6} /u.test(line))
+        .map((line) =>
+          line
+            .replace(/^#+ /u, "")
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N} -]/gu, "")
+            .replaceAll(" ", "-"),
+        ),
+    );
+    const used = new Set<string>();
+    for (const file of await readdir("src/cli")) {
+      const source = await readFile(`src/cli/${file}`, "utf8");
+      for (const match of source.matchAll(/(?:readmeLink|terminalMore)\("([^"]+)"\)/gu))
+        used.add(match[1]!);
+    }
+    expect(used.size).toBeGreaterThan(0);
+    for (const anchor of used) expect(anchors, anchor).toContain(anchor);
+  });
+});

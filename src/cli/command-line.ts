@@ -9,7 +9,7 @@ import { onPrivateScreen, withPrivateScreen } from "./private-screen.js";
 import { assertProtected, dropUnneeded, protectionSummary } from "./protection.js";
 import { unencryptedSwap } from "./swap-check.js";
 import { cloudServiceOf } from "./cloud-folders.js";
-import { STYLE, terminalNotice, terminalPaint } from "./terminal.js";
+import { STYLE, terminalMore, terminalNotice, terminalPaint } from "./terminal.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { runPreview } from "./preview-command.js";
 import { helpNames, printCommandHelp, printNamedHelp, printUsage } from "./usage.js";
@@ -134,19 +134,20 @@ async function withSecrets(args: ParsedArguments, run: () => Promise<void>): Pro
         `  ${terminalPaint("stderr", STYLE.muted, "Protection".padEnd(11))} ${protectionSummary()}\n`,
       );
     const swap = unencryptedSwap();
-    if (swap.length > 0)
+    if (swap.length > 0) {
       terminalNotice(
-        `Swap is not encrypted, or MnemoCode cannot tell (${swap.join(", ")}): the memory of this program, the seed phrase included, may be written to the disk and stay there. Use encrypted swap or none, best a live USB system.`,
+        `Swap may write this memory to the disk unencrypted: ${swap.join(", ")}`,
         "warning",
       );
+      terminalMore("unencrypted-swap");
+    }
     for (const key of SAVED_OPTIONS) {
       const path = value(args, key);
       const service = path === undefined ? undefined : cloudServiceOf(path);
-      if (service !== undefined)
-        terminalNotice(
-          `${path} is in a folder that ${service} synchronises: the file is copied to its servers and kept there. Save it to a local folder instead.`,
-          "warning",
-        );
+      if (service !== undefined) {
+        terminalNotice(`${service} keeps a copy of ${path}`, "warning");
+        terminalMore("cloud-folders");
+      }
     }
     return run();
   });

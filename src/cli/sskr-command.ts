@@ -128,9 +128,7 @@ async function saveShares(
       "success",
     );
     if (options.layout === "individual")
-      terminalNotice(
-        "Each collection folder is ONE SSKR share. Keep every numbered card in that folder together.",
-      );
+      terminalNotice("Each folder is one share; keep all its cards together.");
     else
       terminalNotice(
         options.imageFormat
@@ -218,9 +216,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
   )
     terminalNotice(`SSKR: ${threshold} of ${count} shares required. Mode: ${mode}.`);
   if (mode === "seedshift")
-    terminalNotice(
-      "Record the Seedshift mode and retain its dates separately; they are not stored in the shares.",
-    );
+    terminalNotice("The shares do not store the dates or the mode; keep them yourself.");
   if (representation !== undefined) {
     if (
       !terminalResultHeader("Encoded result", [

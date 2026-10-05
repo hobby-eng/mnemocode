@@ -19,7 +19,7 @@ import {
   type Explanation,
 } from "./terminal-choice.js";
 import { terminalAvailable } from "./terminal-input.js";
-import { STYLE, terminalPaint, wrapText } from "./terminal.js";
+import { readmeLink, STYLE, terminalMore, terminalPaint, wrapText } from "./terminal.js";
 import { printUsage } from "./usage.js";
 
 /** The menu reads keys from a terminal and draws on one; anything else gets the help instead. */
@@ -92,40 +92,22 @@ function formChoices(): Choice<EncodedForm>[] {
   ];
 }
 
-/** What Seedshift is, shown with the first question about it. */
+/** What Seedshift is, shown with the first question about it; the README explains it. */
 const SEEDSHIFT_EXPLANATION: Explanation = {
-  lines: [
-    "Seedshift masks the seed phrase with dates that you remember.",
-    "Only the same dates turn it back into your seed phrase.",
-    "Without it, anyone who has MnemoCode can read the seed phrase.",
-  ],
-  more: ["mnemocode help modes", "https://github.com/hobby-eng/mnemocode#transformation-modes"],
+  lines: ["Masks the seed phrase with dates you remember; only they turn it back."],
+  more: [readmeLink("transformation-modes")],
 };
 
-/** Why the two Seedshift transformations differ, shown with the question that chooses one. */
+/** How the two Seedshift transformations differ, shown with the question that chooses one. */
 const VARIANT_EXPLANATION: Explanation = {
-  lines: [
-    "MnemoCode Seedshift calculates the checksum again, so the result is a",
-    "valid BIP39 seed phrase too: a wallet accepts it, nothing marks it as",
-    "masked, and the right dates always give back the original.",
-    "",
-    "The original Seedshift program shifts the checksum bits as well, so its",
-    "result usually fails the checksum. Choose it to match a backup made with",
-    "that program.",
-  ],
-  more: [
-    "https://github.com/hobby-eng/mnemocode#how-checksum-valid-seedshift-works",
-    "https://github.com/mifunetoshiro/Seedshift (the original program)",
-  ],
+  lines: ["MnemoCode's result keeps a valid checksum; the original's usually fails it."],
+  more: [readmeLink("how-checksum-valid-seedshift-works")],
 };
 
 /** What Shamir shares are, shown with the question how many to make. */
 const SHARES_EXPLANATION: Explanation = {
-  lines: [
-    "Shamir shares split the seed phrase so that the number of shares you",
-    "choose restores it, and fewer reveal nothing about it. Keep the shares",
-    "in different places.",
-  ],
+  lines: ["Any chosen number of shares restores it; fewer reveal nothing."],
+  more: [readmeLink("splitting-a-mnemonic-into-shares")],
 };
 
 type Mode = "direct" | "seedshift" | "seedshift-legacy";
@@ -525,10 +507,8 @@ export async function runMenu(): Promise<void> {
   console.error(
     `\n${paint(STYLE.heading, "MnemoCode")} ${paint(STYLE.muted, "·")} ${paint(STYLE.strong, "Offline seed phrase encoding")}\n`,
   );
-  for (const line of wrapText(
-    "Encodes a BIP39 seed phrase as numbers, codes or colors, masks it with dates you remember, splits it into Shamir shares and prints it as cards. Every form decodes back to the exact seed phrase.",
-  ))
-    console.error(line);
+  console.error("Encodes a BIP39 seed phrase as numbers, codes or colors, all offline.");
+  terminalMore("menu");
   console.error(paint(STYLE.muted, "Work on a trusted computer without a network connection."));
   // The record of answers starts after a blank line; each question adds its own above it.
   console.error("");
