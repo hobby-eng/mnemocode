@@ -118,6 +118,12 @@ const SHARES_EXPLANATION: Explanation = {
   more: [readmeLink("splitting-a-mnemonic-into-shares")],
 };
 
+/** What the sheet for heirs is, shown with the question whether to make it. */
+const HEIRS_EXPLANATION: Explanation = {
+  lines: ["A printed page on how to restore the backup; it holds no secret."],
+  more: [readmeLink("instructions-for-heirs")],
+};
+
 type Mode = "direct" | "seedshift" | "seedshift-legacy";
 
 /** The two Seedshift transformations (README, Transformation modes). */
@@ -224,11 +230,30 @@ async function encodeAction(): Promise<Action> {
   if (set === undefined) return undefined;
   const output = set === null ? await askResultDestination(form) : await askShares(set, form);
   if (output === undefined) return undefined;
+  const heirs = await askHeirSheet();
+  if (heirs === undefined) return undefined;
   // With shares --format stays: the whole seed phrase in the chosen form is shown with them, for a
   // person who keeps it too and holds the shares in reserve; the command warns that it alone
   // restores the wallet.
   const command = set === null ? run : ["encode", "--sskr", ...run.slice(1)];
-  return { run: [...command, ...output] };
+  return { run: [...command, ...output, ...heirs] };
+}
+
+/** The optional sheet that tells heirs how to restore the backup (README, Instructions for heirs). */
+async function askHeirSheet(): Promise<string[] | undefined> {
+  const size = await choose(
+    "Instructions for your heirs?",
+    [
+      { label: "No", value: "" },
+      { label: "Yes, A5", note: "notebook size, 148 x 210 mm, larger print", value: "a5" },
+      { label: "Yes, A6", note: "postcard size, 105 x 148 mm, small print", value: "a6" },
+    ],
+    { label: "Heirs", explanation: HEIRS_EXPLANATION },
+  );
+  if (size === undefined) return undefined;
+  if (size === "") return [];
+  const path = await askLine("PDF file name", "File", "mnemocode-heirs.pdf");
+  return path === undefined ? undefined : ["--heir-sheet", path, "--heir-sheet-size", size];
 }
 
 /** Where an encoded seed phrase is read from: typed on the private screen, or a file encode saved. */

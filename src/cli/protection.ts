@@ -148,7 +148,7 @@ export function assertProtected(): void {
 }
 
 /** Options that save a file or a folder, and those that draw images with pdftocairo. */
-const WRITING_OPTIONS = ["output", "qr", "pdf", "cards-dir", "images-dir"] as const;
+const WRITING_OPTIONS = ["output", "qr", "pdf", "heir-sheet", "cards-dir", "images-dir"] as const;
 const DRAWING_OPTIONS = ["images-dir", "image-format"] as const;
 
 /** What a command line needs beyond reading: writing files, and running pdftocairo. */

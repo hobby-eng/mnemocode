@@ -41,6 +41,7 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => {
 import { assertAllowedArguments, parseArguments } from "../src/cli/arguments.js";
 import { commandOptions, isCommandName } from "../src/cli/command-options.js";
 import { LINE_WIDTH } from "../src/cli/terminal-choice.js";
+import { HEIR_MENU } from "../src/cli/heir-sheet.js";
 import { MENU_ENTRIES, typedCommand } from "../src/cli/menu.js";
 
 /** Questions whose answers all lead to command lines of the same shape; only the first is taken. */
@@ -156,9 +157,10 @@ describe("start menu", () => {
       "Which form should the seed phrase take?",
       "Which Seedshift?",
       "Where should the result go?",
+      "Instructions for your heirs?",
     ]);
-    // Word numbers, no Seedshift, and a threshold typed under Other.
-    script.answers = [0, 1, 7, 0, 0];
+    // Word numbers, no Seedshift, a threshold typed under Other, and a sheet for heirs.
+    script.answers = [0, 1, 7, 0, 0, 1];
     script.asked = [];
     expect(await encode.action()).toEqual({
       run: [
@@ -175,8 +177,34 @@ describe("start menu", () => {
         "7",
         "--share-format",
         "words",
+        "--heir-sheet",
+        "mnemocode-heirs.pdf",
+        "--heir-sheet-size",
+        "a5",
       ],
     });
+  });
+
+  it("has the entries, questions and answers that the sheet for heirs names", async () => {
+    const asked = async (digit: number) => {
+      const entry = MENU_ENTRIES.find((item) => item.digit === digit)!;
+      script.answers = [];
+      script.asked = [];
+      await entry.action();
+      return { entry: `${entry.digit} ${entry.label}`, asked: script.asked };
+    };
+    for (const [digit, steps] of [
+      [2, HEIR_MENU.decode],
+      [3, HEIR_MENU.restore],
+    ] as const) {
+      const { entry, asked: questions } = await asked(digit);
+      expect(entry).toBe(steps.entry);
+      const question = questions.find((item) => item.question === steps.question);
+      expect(question, steps.question).toBeDefined();
+      for (const answer of Object.values(steps.answers)) expect(question!.labels).toContain(answer);
+    }
+    expect((await asked(2)).asked[0]!.labels[0]).toBe(HEIR_MENU.decode.source);
+    expect((await asked(4)).entry).toBe(HEIR_MENU.recover.entry);
   });
 
   it("offers printable cards only where they print colors", async () => {

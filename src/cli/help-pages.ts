@@ -437,6 +437,22 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
               "The QR code holds only the encoded data in the selected format: no header, mode, dates or fingerprints. decode --qr-file reads it back.",
             ],
           },
+          {
+            flag: "--heir-sheet",
+            value: "PATH",
+            summary: "Also save one sheet that tells heirs how to restore the backup",
+            details: [
+              "A PDF of one sheet to print on both sides. The front says what the backup looks like, how many shares restore it and how many dates it needs, and leaves the rest of its room for a hint written by hand; the back gives the steps in the menu and the basics for someone new to wallets. It holds no secret: no codes, no dates, no fingerprint and no places. Not with --legacy-valid-last-word. See Instructions for heirs in the README.",
+            ],
+          },
+          {
+            flag: "--heir-sheet-size",
+            value: "a5|a6",
+            summary: "The size of that sheet; default a5",
+            details: [
+              "a5 is the size of a notebook, 148 x 210 mm, with larger print; a6 is the size of a postcard and of the cards, 105 x 148 mm, with small print.",
+            ],
+          },
         ],
       },
       {
@@ -523,6 +539,10 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       [
         "mnemocode encode --sskr --ask-secrets --threshold 2 --shares 3 --cards-dir ./share-cards --card-layout qr",
         "Each share as its own QR document",
+      ],
+      [
+        "mnemocode encode --sskr --ask-secrets --threshold 3 --shares 5 --share-format words --heir-sheet heirs.pdf --heir-sheet-size a6",
+        "5 shares in words, any 3 restore it, and an A6 sheet for heirs",
       ],
     ],
     notes: [

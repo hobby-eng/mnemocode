@@ -25,6 +25,7 @@ import { runSskrSplit } from "./sskr-command.js";
 import { printEncodeResult } from "./encode-report.js";
 import { offerEncodedCheck } from "./backup-check.js";
 import { saveEncodeResult } from "./encode-export.js";
+import { saveHeirSheet, validateHeirSheetOptions } from "./heir-sheet.js";
 import { optionLabel } from "./option-copy.js";
 
 export interface EncodeOutcome {
@@ -57,6 +58,11 @@ async function validateEncodeOptions(
     throw new Error(
       "The legacy checksum-word replacement is available only in legacy Seedshift mode.",
     );
+  // The sheet leads through the menu, whose Decode does not offer a replaced last word.
+  if (args["legacy-valid-last-word"] === true && args["heir-sheet"] !== undefined)
+    throw new Error(
+      "Instructions for heirs are not available with the legacy checksum-word replacement.",
+    );
   if (args.cards === true && format !== "colors" && format !== "colors-unicode")
     throw new Error("Terminal color cards are available only for RGB color formats 4 and 5.");
   validateCardOptions(args, format, mode);
@@ -64,7 +70,8 @@ async function validateEncodeOptions(
   await validateImageOptions(args);
   const directory = value(args, "cards-dir");
   if (directory !== undefined) await requireNewCardDirectory(directory);
-  for (const key of ["output", "pdf", "qr"]) {
+  validateHeirSheetOptions(args);
+  for (const key of ["output", "pdf", "qr", "heir-sheet"]) {
     const path = value(args, key);
     if (path !== undefined) await preflightFileDestination(path, true);
   }
@@ -127,6 +134,17 @@ export async function runEncode(args: ParsedArguments): Promise<void> {
       : [];
   printEncodeResult(outcome);
   await saveEncodeResult(args, outcome, eventLabels);
+  // A record with a replaced last word never gets a sheet (validateEncodeOptions).
+  if (outcome.recordMode !== "seedshift-legacy-valid")
+    await saveHeirSheet(
+      args,
+      {
+        backup: { kind: "encoded", format },
+        mode: outcome.recordMode,
+        dates: outcome.enteredDates.length,
+      },
+      true,
+    );
   await offerEncodedCheck(outcome.result.sourceMnemonic, format, outcome.recordMode, () =>
     printEncodeResult(outcome),
   );

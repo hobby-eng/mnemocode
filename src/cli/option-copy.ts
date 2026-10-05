@@ -14,6 +14,8 @@ const labels: Readonly<Record<string, string>> = {
   event: "event label list",
   events: "event label list",
   format: "representation format",
+  "heir-sheet": "instructions for heirs file",
+  "heir-sheet-size": "size of the instructions for heirs",
   "image-format": "image format",
   "images-dir": "image output folder",
   index: "word index",

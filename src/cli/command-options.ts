@@ -34,6 +34,8 @@ export const commandOptions = {
     "cards",
     "qr",
     "pdf",
+    "heir-sheet",
+    "heir-sheet-size",
     "cards-dir",
     "sskr",
     "threshold",

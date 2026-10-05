@@ -7,6 +7,8 @@
 
 This README describes version 0.1.0.
 
+**Have you inherited a backup made with MnemoCode?** Start with [A guide for heirs](docs/HEIRS.md).
+
 MnemoCode helps you keep a wallet seed phrase (a BIP39 mnemonic) on paper in a form that a stranger will not recognize and cannot use directly. It works completely offline, as the `mnemocode` command or as a TypeScript library.
 
 - **Obfuscate the phrase.** The words are written as numbers, Unicode codes or colors, so the note does not look like a seed phrase. MnemoCode converts it back to the exact original words.
@@ -78,7 +80,7 @@ What do you want to do?
   0  Quit
 ```
 
-Choose with the arrow keys and Enter, or press the number. Each entry asks its questions one at a time and shows examples where they help. Encode first shows what a test phrase looks like as word numbers, Unicode codes and colors, then asks about Seedshift, then whether to split the phrase into Shamir shares (the usual sets such as 2 of 3 or 3 of 5, or any other up to 16 shares), and last where the result should go. The form chosen decides how shares look: with colors they are color codes, which printable cards can disguise; with numbers, codes or words they are plain text shares, in Bytewords words or a short `ur:sskr/...` code, as other SSKR tools write them. The whole phrase in the chosen form is shown with the shares too, with a warning, for whoever keeps it and holds the shares in reserve. After the result, Encode offers to check the backup: you type it again from what you wrote down, with the dates, and MnemoCode says whether it restores the same seed phrase, without showing it. Before it runs, the menu shows the command that does the same, such as `mnemocode encode --ask-secrets --format 5 --mode direct`, so that you can type it next time. Escape goes back to the menu, and in the menu it quits; `q` works too.
+Choose with the arrow keys and Enter, or press the number. Each entry asks its questions one at a time and shows examples where they help. Encode first shows what a test phrase looks like as word numbers, Unicode codes and colors, then asks about Seedshift, then whether to split the phrase into Shamir shares (the usual sets such as 2 of 3 or 3 of 5, or any other up to 16 shares), where the result should go, and last whether to print [instructions for heirs](#instructions-for-heirs). The form chosen decides how shares look: with colors they are color codes, which printable cards can disguise; with numbers, codes or words they are plain text shares, in Bytewords words or a short `ur:sskr/...` code, as other SSKR tools write them. The whole phrase in the chosen form is shown with the shares too, with a warning, for whoever keeps it and holds the shares in reserve. After the result, Encode offers to check the backup: you type it again from what you wrote down, with the dates, and MnemoCode says whether it restores the same seed phrase, without showing it. Before it runs, the menu shows the command that does the same, such as `mnemocode encode --ask-secrets --format 5 --mode direct`, so that you can type it next time. Escape goes back to the menu, and in the menu it quits; `q` works too.
 
 The seed phrase, the dates and the shares never become part of the command. They are typed on a private screen of their own, where you see what you type, and the result appears there too. When you press Enter, that screen is cleared and the terminal returns to where it was, so that nothing stays in the scrollback.
 
@@ -292,7 +294,7 @@ MnemoCode includes sixteen templates. `mnemocode preview --list` prints their na
 | `--cards`                      | Color cards in the terminal                            |
 | `--qr PATH`                    | A separate QR code as a PNG image                      |
 
-A file is written into a folder that already exists. `--output`, `--pdf` and `--qr` replace a file that already has that name; files with Shamir shares never replace one. `--cards-dir` and `--images-dir` create their own new folder.
+A file is written into a folder that already exists. `--output`, `--pdf`, `--qr` and `--heir-sheet` replace a file that already has that name; with Shamir shares, no file ever replaces one. `--cards-dir` and `--images-dir` create their own new folder.
 
 The person and the company on the cards are invented; see [Card identity defaults](docs/card-identities.md). To print your own details, use `--card-name`, `--card-role`, `--card-company`, `--card-email`, `--card-phone`, `--card-website` and `--card-location`. Names must use Latin letters; spaces, apostrophes and hyphens are allowed. Other characters and text that does not fit are reported as errors.
 
@@ -397,6 +399,20 @@ A collection sheet names a design studio. It is separate from the employer print
 `encode --sskr --threshold 2 --shares 3` splits the phrase into Shamir shares as the last step of encoding. `sskr-combine` restores the phrase from the shares, and `sskr-export` prints existing shares as cards.
 
 [Shamir secret sharing (SSKR)](docs/SSKR.md) describes the commands, the share formats and recovery.
+
+## Instructions for heirs
+
+Encode can also save one sheet that tells someone else how to restore the backup: answer "Yes, A5" or "Yes, A6" to "Instructions for your heirs?" in the menu, or add `--heir-sheet heirs.pdf`, with `--heir-sheet-size a6` for the smaller size. It is optional.
+
+It is meant for a backup that must be restored after you, by someone who may never have heard of MnemoCode. Without it, an heir who finds cards with colors or a list of numbers may not know what they are, or that a program turns them back into a seed phrase. Keep it apart from the backup: with a will, with a lawyer or a notary, or with the heir in a sealed envelope.
+
+The PDF is one sheet to print on both sides, in A5, the size of a notebook, or A6, the size of a postcard and of the cards, with smaller print. The front says what the backup looks like, how many shares restore it (any 3 of the 5, for example) and how many secret dates it needs, and gives the rest of its room to a hint that you write by hand. The back gives the steps in the menu, what to do when one fails, and the basics for someone who has never used a wallet: what a seed phrase is, how the dates mask it, how to open the wallet, and the scams to avoid.
+
+Write the hint so that only your heirs understand it, such as a reminder of the dates, never the dates themselves. Where it stands on the sheet protects nothing: whoever holds the sheet reads both sides.
+
+It holds nothing that helps a stranger who finds it: no codes, no shares, no dates, no fingerprint, and not where the cards or shares are kept. A fingerprint would let the finder test guessed dates one after another, and a list of places would undo the point of splitting the backup. Whoever has only the sheet cannot restore the wallet.
+
+The sheet prints one address, that of this repository, whose README starts with a link to [A guide for heirs](docs/HEIRS.md), which says the same at more length. Nothing else is linked: the sheet may be kept for decades, and a page elsewhere can change, vanish, or pass to someone who abuses its address.
 
 ## Versioned records and legacy compatibility
 

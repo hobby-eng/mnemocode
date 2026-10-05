@@ -114,7 +114,7 @@ export function terminalNotice(
 
 /** The README on GitHub. A message at run time stays short and links to the section that explains
  * it, as in `mhfe`: the program shows no explanatory paragraphs while it works. */
-const README_URL = "https://github.com/hobby-eng/mnemocode";
+export const README_URL = "https://github.com/hobby-eng/mnemocode";
 
 /** The address of a README section, by its heading's anchor. */
 export function readmeLink(anchor: string): string {
