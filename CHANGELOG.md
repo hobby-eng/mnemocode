@@ -21,6 +21,7 @@
 - `recover-date` accepts `?` for each forgotten digit and up to three incomplete dates. Identical patterns are not tried twice, and a limit stops a search that is too large before it starts.
 - Added `recover-word`. It lists every word that can replace one forgotten word and marks the candidates that match a known detail of the wallet. With `--legacy-valid-last-word` it lists the valid last words of a legacy phrase.
 - After Encode shows its result on the private screen, it offers to check the backup: you type it again from what you wrote down, with the dates, and MnemoCode says whether it restores the same seed phrase.
+- `encode --heir-sheet` saves one sheet for heirs, to print on both sides in A5 or A6 (`--heir-sheet-size`): what the backup is, room for a hint written by hand, the steps in the menu, and the basics for someone new to wallets. It holds no secret: no codes, no dates, no fingerprint and no places. [A guide for heirs](docs/HEIRS.md) explains the same in more detail.
 - A date needs a four-digit year. `23-09-26` was read as the year 23 and is now an error.
 - A record header whose version is written with leading zeros, such as `MNC01:`, is refused instead of being read as `MNC1:`.
 

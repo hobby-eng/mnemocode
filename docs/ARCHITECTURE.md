@@ -49,6 +49,7 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 | `cli/cloud-folders.ts`   | Whether an output path lies in a cloud-synchronised folder                      |
 | `cli/menu.ts`            | The entries, their questions and the command line each answer builds            |
 | `cli/backup-check.ts`    | The optional check of a backup typed again after Encode                         |
+| `cli/heir-sheet.ts`      | The words of the optional sheet for heirs (`--heir-sheet`)                      |
 
 `scripts/verify-terminal-input.py` drives the menu and the prompts for secrets in a real pseudo-terminal: a Unix one on Linux and macOS, a Windows pseudo-console through pywinpty.
 
@@ -68,7 +69,7 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 
 The renderers contain no Node.js code. They get bundled files, random choices, PNG coding and QR matrices from the interface in `export/platform.ts`; `export/platform-node.ts` supplies them for Node.js. `src/cards.ts` is the entry point for another host, such as a browser page, which calls `configureRenderPlatform` and then uses `renderCards` or `renderIndividualCards` from `export/render.ts`.
 
-`pdf.ts`, `individual-cards.ts` and `sskr-cards.ts` organize documents and destinations. `image-export.ts` converts those same PDFs to images with local Poppler. `private-file.ts` replaces file exports through a private staging directory on the same filesystem. Artwork derived from a user's references is cached only for the current document; shared caches contain fixed bundled artwork.
+`heir-sheet.ts` lays out both sides of the sheet for heirs, in A5 or A6. `pdf.ts`, `individual-cards.ts` and `sskr-cards.ts` organize documents and destinations. `image-export.ts` converts those same PDFs to images with local Poppler. `private-file.ts` replaces file exports through a private staging directory on the same filesystem. Artwork derived from a user's references is cached only for the current document; shared caches contain fixed bundled artwork.
 
 ## Single executable
 

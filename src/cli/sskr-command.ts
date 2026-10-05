@@ -42,6 +42,7 @@ import { requireNewCardDirectory } from "../export/individual-cards.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import { optionLabel } from "./option-copy.js";
 import { offerShareCheck } from "./backup-check.js";
+import { saveHeirSheet, validateHeirSheetOptions } from "./heir-sheet.js";
 
 export const sskrExportOptions = [
   "cards-dir",
@@ -184,8 +185,9 @@ async function saveShares(
 
 async function destinations(args: ParsedArguments, options?: SskrExportOptions): Promise<void> {
   await validateImageOptions(args);
+  validateHeirSheetOptions(args);
   if (options?.directory) await requireNewCardDirectory(options.directory);
-  const paths = [value(args, "output"), value(args, "pdf")].filter(
+  const paths = [value(args, "output"), value(args, "pdf"), value(args, "heir-sheet")].filter(
     (p): p is string => p !== undefined,
   );
   for (const path of paths) await preflightFileDestination(path, false);
@@ -230,6 +232,11 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
     mode === "direct" ? representMnemonic(mnemonic) : encodeMnemonic(mnemonic, dateValues);
   const shares = await splitSskrMnemonic(result.shiftedEnglish.join(" "), threshold, count);
   await saveShares(shares, args, format, options);
+  await saveHeirSheet(
+    args,
+    { backup: { kind: "shares", format, threshold, count }, mode, dates: dateValues.length },
+    false,
+  );
   if (
     !terminalResultHeader("SSKR export", [
       ["Threshold", `${threshold} of ${count}`],

@@ -116,6 +116,10 @@ describe("process protection", () => {
       writes: true,
       runsPrograms: false,
     });
+    expect(needs("encode", ["--ask-secrets", "--heir-sheet", "heirs.pdf"])).toEqual({
+      writes: true,
+      runsPrograms: false,
+    });
     expect(needs("encode", ["--ask-secrets", "--images-dir", "cards"])).toEqual({
       writes: true,
       runsPrograms: true,

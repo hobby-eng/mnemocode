@@ -231,6 +231,8 @@ def check_answers_pasted_together():
         session.type("1")
         session.wait_for("Where should the result go?")
         session.type("1")
+        session.wait_for("Instructions for your heirs?")
+        session.type("1")
         session.wait_for("Seed phrase")
         # The phrase and the date in one paste: the second line answers the second question.
         session.type(TEST_PHRASE + ENTER + MASK_DATE + ENTER)
