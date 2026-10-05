@@ -112,6 +112,21 @@ export function terminalNotice(
   });
 }
 
+/** The README on GitHub. A message at run time stays short and links to the section that explains
+ * it, as in `mhfe`: the program shows no explanatory paragraphs while it works. */
+const README_URL = "https://github.com/hobby-eng/mnemocode";
+
+/** The address of a README section, by its heading's anchor. */
+export function readmeLink(anchor: string): string {
+  return `${README_URL}#${anchor}`;
+}
+
+/** A grey "More:" line that points to the README section explaining the message above it. */
+export function terminalMore(anchor: string): void {
+  // Not wrapped: a link must stay whole to be clicked or copied.
+  console.error(terminalPaint("stderr", STYLE.muted, `More: ${readmeLink(anchor)}`));
+}
+
 /** An error message after a red "✗ Error:", as `mhfe` writes it. */
 export function terminalFailure(message: string): void {
   if (!terminalColor("stderr")) {

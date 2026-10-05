@@ -79,7 +79,7 @@ What do you want to do?
   0  Quit
 ```
 
-Choose with the arrow keys and Enter, or press the number. Each entry asks its questions one at a time and shows examples where they help: Encode, for instance, shows what the test phrase looks like as word numbers, Unicode codes and colors, then asks about dates, Shamir shares and where the result should go. Before it runs, the menu shows in grey the command that does the same, such as `mnemocode encode --ask-secrets --format 5 --mode direct`, so that you can type it next time. `q` goes back to the menu, and in the menu it quits.
+Choose with the arrow keys and Enter, or press the number. Each entry asks its questions one at a time and shows examples where they help: Encode, for instance, shows what the test phrase looks like as word numbers, Unicode codes and colors, then asks about dates, Shamir shares and where the result should go. Before it runs, the menu shows in grey the command that does the same, such as `mnemocode encode --ask-secrets --format 5 --mode direct`, so that you can type it next time. Escape goes back to the menu, and in the menu it quits; `q` works too.
 
 The seed phrase, the dates and the shares never become part of the command. They are typed on a private screen of their own, where you see what you type, and the result appears there too. When you press Enter, that screen is cleared and the terminal returns to where it was, so that nothing stays in the scrollback.
 
@@ -503,12 +503,22 @@ The public test data is in [`vectors/mnemocode-v1.json`](vectors/mnemocode-v1.js
 
 [SECURITY.md](SECURITY.md) describes how to report a vulnerability, how to work offline, how secrets are handled and which risks remain. Read it before you work with a real phrase.
 
-Every run is protected as far as Node.js allows: no core dumps on Linux and macOS, no network, and no file writes or other programs for a command that does not need them. Before a secret is asked, the private screen shows this protection, and a warning if swap is not encrypted or a file would be saved into a cloud folder.
-
 - Dates are written `DD-MM-YYYY`; `YYYY-MM-DD` is also accepted. The order in which you type them does not matter.
 - A year always has four digits, from `0001` through `9999`. `23-09-26` is an error; the year 26 is written `0026`. Two years that are 2048 apart shift the words by the same amount.
 - You can use one date for every three words: 4, 5, 6, 7 or 8 dates for 12, 15, 18, 21 or 24 words.
 - The original Seedshift program does not support 21-word phrases; MnemoCode does.
+
+### Protection while it runs
+
+Every run is protected as far as Node.js allows: no core dumps on Linux and macOS, no network, and no file writes or other programs for a command that does not need them. Before a secret is asked, the private screen shows this protection, and a warning if swap is not encrypted or a file would be saved into a cloud folder.
+
+### Unencrypted swap
+
+When memory runs short, the system can write part of the memory of MnemoCode, the seed phrase included, to the swap area on the disk, where it can stay for years. On Linux MnemoCode warns before a secret when swap is not encrypted, or when it cannot tell. Use encrypted swap or none at all; a live USB system is best. Swap on dm-crypt, also below LVM, and zram, which stays in memory, count as safe.
+
+### Cloud folders
+
+A file saved into a folder that Dropbox, OneDrive, Google Drive, iCloud Drive, Yandex Disk, Nextcloud, MEGA or pCloud synchronises is copied to that service's servers and kept there. MnemoCode warns when an output path lies in such a folder, which it recognises by the usual folder names. Save records, cards and shares to a local folder or a removable drive instead.
 
 ## Library use
 

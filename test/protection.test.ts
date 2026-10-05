@@ -123,19 +123,30 @@ describe("process protection", () => {
     expect(needs("self-test", [])).toEqual({ writes: true, runsPrograms: false });
   });
 
-  it("runs every start under the permission model, without network, with core dumps off", async () => {
-    // A plain node start runs the program again with PROTECTION_FLAGS; the self-test reports it.
-    const { stdout, stderr } = await execute(process.execPath, ["dist/mnemocode.js", "self-test"], {
-      env: { ...process.env, NO_COLOR: "1" },
-    });
-    const report = `${stdout}${stderr}`;
-    expect(report).toContain("Process protection");
-    expect(report).toContain("no network");
-    if (process.platform === "linux" || process.platform === "darwin")
-      expect(report).toContain("no core dumps");
-    expect(PROTECTION_FLAGS).toContain("--permission");
-    expect(PROTECTION_FLAGS.some((flag) => flag.startsWith("--allow-net"))).toBe(false);
-  });
+  // The full self-test draws cards; with every other test running beside it, it can take longer
+  // than the common time limit (vitest.config.ts).
+  const SELF_TEST_TIMEOUT_MS = 180_000;
+  it(
+    "runs every start under the permission model, without network, with core dumps off",
+    async () => {
+      // A plain node start runs the program again with PROTECTION_FLAGS; the self-test reports it.
+      const { stdout, stderr } = await execute(
+        process.execPath,
+        ["dist/mnemocode.js", "self-test"],
+        {
+          env: { ...process.env, NO_COLOR: "1" },
+        },
+      );
+      const report = `${stdout}${stderr}`;
+      expect(report).toContain("Process protection");
+      expect(report).toContain("no network");
+      if (process.platform === "linux" || process.platform === "darwin")
+        expect(report).toContain("no core dumps");
+      expect(PROTECTION_FLAGS).toContain("--permission");
+      expect(PROTECTION_FLAGS.some((flag) => flag.startsWith("--allow-net"))).toBe(false);
+    },
+    SELF_TEST_TIMEOUT_MS,
+  );
 
   it("gives up file writes when a command saves nothing", async () => {
     const script = `

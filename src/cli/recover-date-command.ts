@@ -1,4 +1,4 @@
-import { terminalNotice, terminalResultHeader } from "./terminal.js";
+import { terminalMore, terminalNotice, terminalResultHeader } from "./terminal.js";
 import {
   datePatternCombinationCount,
   datePatternCombinations,
@@ -152,11 +152,10 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
   }
   if (foundCount > maxResults)
     terminalNotice(`Displayed ${maxResults} of ${foundCount} checksum-valid candidates.`);
-  if (evidence === undefined)
-    terminalNotice(
-      "A checksum-valid candidate is not proof that its date is correct. Confirm it against independent wallet evidence.",
-    );
-  else
+  if (evidence === undefined) {
+    terminalNotice("A valid checksum does not prove the date: compare an address.");
+    terminalMore("exact-local-recovery-checks");
+  } else
     terminalNotice(
       `Each displayed candidate matched the requested ${optionLabel(evidence.kind)} locally.`,
     );
