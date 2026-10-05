@@ -134,6 +134,22 @@ export function transportToUr(bytes: Uint8Array): string {
   return `ur:sskr/${minimalText}`;
 }
 
+/** The CBOR tag of an SSKR share registered by Blockchain Commons (bc-tags), written in Bytewords. */
+const SSKR_CBOR_TAG = 40309;
+
+/**
+ * A share in standard Bytewords: one English word per byte, the CBOR tag included and a new CRC32
+ * over the tagged bytes, as other SSKR tools write it. bytewordsToUr reads it back.
+ */
+export function urToBytewords(ur: string): string {
+  const transport = urToTransport(ur);
+  const cbor = transport.subarray(0, -CHECKSUM_BYTES);
+  const tagged = new Uint8Array(CBOR_TAG_BYTES + cbor.length);
+  tagged.set([CBOR_UINT16_TAG, SSKR_CBOR_TAG >> 8, SSKR_CBOR_TAG & 0xff]);
+  tagged.set(cbor, CBOR_TAG_BYTES);
+  return Array.from(addTransportChecksum(tagged), (byte) => bytewords[byte]!).join(" ");
+}
+
 export function bytewordsToUr(value: string): string {
   const words = value
     .trim()

@@ -19,12 +19,12 @@ node dist/mnemocode.js encode --sskr --ask-secrets \
 
 The shares are always shown in the terminal. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**, and an existing file is never replaced.
 
-| Option                      | Selects                                             |
-| --------------------------- | --------------------------------------------------- |
-| `--format 1\|2\|3\|4\|5`    | How the phrase is shown, as in an ordinary `encode` |
-| `--share-format ur\|colors` | How the shares are shown; the default is `ur`       |
+| Option                             | Selects                                                 |
+| ---------------------------------- | ------------------------------------------------------- |
+| `--format 1\|2\|3\|4\|5`           | How the phrase is shown, as in an ordinary `encode`     |
+| `--share-format ur\|words\|colors` | How the shares are shown and saved; the default is `ur` |
 
-`sskr-split` is an older name for `encode --sskr`. In `sskr-split` and `sskr-export`, `--format ur|colors` selects the share format.
+`sskr-split` is an older name for `encode --sskr`. In `sskr-split` and `sskr-export`, `--format ur|words|colors` selects the share format. A text file saved with `--output` holds the shares in that format, one per line.
 
 ### Date masking before splitting
 
@@ -39,11 +39,11 @@ With `--mode seedshift`, the phrase is first masked with the dates and then spli
 
 ## Share formats
 
-| Format    | Text                                               |
-| --------- | -------------------------------------------------- |
-| `ur`      | The standard short form, `ur:sskr/...`             |
-| `colors`  | Color codes in a fixed order                       |
-| Bytewords | The standard long form in words; for recovery only |
+| Format   | Text                                       |
+| -------- | ------------------------------------------ |
+| `ur`     | The standard short form, `ur:sskr/...`     |
+| `colors` | Color codes in a fixed order               |
+| `words`  | Bytewords, the standard long form in words |
 
 Color codes may be separated by spaces or joined, with or without `#`. **Their order matters.** The colors of `--format 5` are a different format and are not share colors.
 

@@ -27,7 +27,14 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => {
       return choices[place]!.value;
     },
     askLine: async (question: string, _label: string, fallback?: string) =>
-      fallback ?? { Word: "abandon", "Word number": "1", "Unicode code": "5BF6" }[question],
+      fallback ??
+      {
+        Word: "abandon",
+        "Word number": "1",
+        "Unicode code": "5BF6",
+        "How many shares in all? (2 to 16)": "7",
+        "How many of them restore the seed phrase?": "4",
+      }[question],
   };
 });
 
@@ -37,10 +44,7 @@ import { LINE_WIDTH } from "../src/cli/terminal-choice.js";
 import { MENU_ENTRIES, typedCommand } from "../src/cli/menu.js";
 
 /** Questions whose answers all lead to command lines of the same shape; only the first is taken. */
-const SAME_SHAPE = new Set([
-  "Which card design?",
-  "How many shares, and how many of them restore the seed phrase?",
-]);
+const SAME_SHAPE = new Set(["Which card design?"]);
 
 /** Every command line that the questions of `entry` can build, one per path through them. */
 async function everyPath(entry: (typeof MENU_ENTRIES)[number]): Promise<string[][]> {
@@ -63,8 +67,9 @@ async function everyPath(entry: (typeof MENU_ENTRIES)[number]): Promise<string[]
 }
 
 describe("start menu", () => {
-  it("offers the agreed entries, numbered 1 to 9 and 0 for Quit", () => {
-    expect(MENU_ENTRIES.map((entry) => entry.digit)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
+  it("offers the agreed entries, numbered 1 to 8 and 0 for Quit; shares are part of Encode", () => {
+    expect(MENU_ENTRIES.map((entry) => entry.digit)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 0]);
+    expect(MENU_ENTRIES.some((entry) => entry.label.startsWith("Split"))).toBe(false);
     expect(MENU_ENTRIES[0]!.label).toBe("Encode a seed phrase as numbers, codes or colors");
     expect(MENU_ENTRIES[1]!.label).toBe("Decode numbers, codes or colors back into a seed phrase");
   });
@@ -111,9 +116,9 @@ describe("start menu", () => {
         "mnemocode-cards.pdf",
       ],
     });
-    // Word numbers with MnemoCode Seedshift, split 2 of 3 into shares written as color codes, on
-    // the screen.
-    script.answers = [0, 0, 0, 1, 1, 0];
+    // Word numbers with MnemoCode Seedshift, split 2 of 3 into plain shares in Bytewords, on the
+    // screen; the whole seed phrase is shown too, so --format stays.
+    script.answers = [0, 0, 0, 1, 0, 0];
     script.asked = [];
     expect(await encode.action()).toEqual({
       run: [
@@ -129,9 +134,18 @@ describe("start menu", () => {
         "--shares",
         "3",
         "--share-format",
-        "colors",
+        "words",
       ],
     });
+    // Colors give color shares without a question about their look.
+    script.answers = [2, 1, 1, 0];
+    script.asked = [];
+    expect(await encode.action()).toMatchObject({
+      run: expect.arrayContaining(["--share-format", "colors"]),
+    });
+    expect(script.asked.map((asked) => asked.question)).not.toContain(
+      "How should each share be written?",
+    );
     // English words are always masked; the original Seedshift asks nothing about shares.
     script.answers = [4, 1, 0];
     script.asked = [];
@@ -143,6 +157,26 @@ describe("start menu", () => {
       "Which Seedshift?",
       "Where should the result go?",
     ]);
+    // Word numbers, no Seedshift, and a threshold typed under Other.
+    script.answers = [0, 1, 7, 0, 0];
+    script.asked = [];
+    expect(await encode.action()).toEqual({
+      run: [
+        "encode",
+        "--sskr",
+        "--ask-secrets",
+        "--format",
+        "2",
+        "--mode",
+        "direct",
+        "--threshold",
+        "4",
+        "--shares",
+        "7",
+        "--share-format",
+        "words",
+      ],
+    });
   });
 
   it("offers printable cards only where they print colors", async () => {
@@ -156,13 +190,14 @@ describe("start menu", () => {
     expect(await destinations([0, 1, 0])).not.toContain("Also as printable cards");
     // Colors: cards too.
     expect(await destinations([2, 1, 0])).toContain("Also as printable cards");
-    // Shares written as text: QR codes, no cards; as color codes: cards, no QR codes.
-    expect(await destinations([2, 1, 1, 0])).toEqual([
+    // Shares of word numbers are plain text: QR codes, no cards. Shares of colors are color codes:
+    // disguised cards, no QR codes.
+    expect(await destinations([0, 1, 1, 0])).toEqual([
       "Only on this screen",
       "Also in a text file",
       "Also as QR codes",
     ]);
-    expect(await destinations([0, 1, 1, 1])).toEqual([
+    expect(await destinations([2, 1, 1])).toEqual([
       "Only on this screen",
       "Also in a text file",
       "Also as printable cards",
