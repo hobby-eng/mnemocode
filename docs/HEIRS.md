@@ -50,7 +50,7 @@ Start MnemoCode by a double-click. It shows a menu: choose with the arrow keys a
 
 If MnemoCode shows an error instead, a code or a word was probably mistyped. Check each one against the paper.
 
-If you know a secret date but one of its digits is unclear, the menu entry "Find a forgotten word of a seed phrase or a date digit" can try every possibility.
+If you know a secret date but one of its digits is unclear, the menu entry "Find a forgotten word, a date digit or a share code" can try every possibility.
 
 ## Opening the wallet
 

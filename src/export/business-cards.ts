@@ -17,7 +17,7 @@ import { resolvePresentationFor } from "./card-copy.js";
 import { colorsToIndexes, unicodeToColors } from "../core.js";
 import type { CardContent } from "./templates.js";
 import type { SskrCardContent } from "./sskr-content.js";
-import { colorsToShare } from "../sskr/transport.js";
+import { assertShareQr } from "../sskr/transport.js";
 import { businessArtwork } from "./business-artwork.js";
 import { MM, type CardBox } from "./business-layout.js";
 import {
@@ -46,9 +46,7 @@ function validateContent(
     throw new Error("Business cards require a color representation.");
   const share = content.kind === "sskr";
   if (share) {
-    colorsToShare(content.colors.join(" "));
-    if (content.payload !== content.colors.join(" "))
-      throw new Error("Share QR does not match the printed references.");
+    assertShareQr(content.colors, content.payload);
   } else {
     colorsToIndexes(content.colors);
     if (

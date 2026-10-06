@@ -99,9 +99,9 @@ export function colorsToIndexes(colors: readonly string[]): number[] {
 
 // The BMP Private Use Area has 0x1900 scalars. Quotient/remainder in that radix
 // fits every 24-bit RGB value into two scalars without using surrogate code units.
-const COLOR_UNICODE_BASE = 0xe000;
+export const COLOR_UNICODE_BASE = 0xe000;
 
-const COLOR_UNICODE_WIDTH = 0x1900;
+export const COLOR_UNICODE_WIDTH = 0x1900;
 const COLOR_UNICODE_CODE_POINT_DIGITS = 4;
 
 /** Portable text form: two four-digit Private Use code points per CSS RGB color. */
@@ -123,26 +123,28 @@ export function colorsToUnicode(colors: readonly string[]): string {
     .join("");
 }
 
-export function unicodeToColors(value: string): string[] {
+/** The code points of color Unicode text: four hexadecimal digits each, or the symbols themselves. */
+function colorUnicodePoints(value: string): number[] {
   const compact = value.replace(/[\s,;]+/gu, "");
-  const points =
-    /^[0-9A-F]+$/iu.test(compact) && compact.length % COLOR_UNICODE_CODE_POINT_DIGITS === 0
-      ? Array.from({ length: compact.length / COLOR_UNICODE_CODE_POINT_DIGITS }, (_, index) =>
-          Number.parseInt(
-            compact.slice(
-              index * COLOR_UNICODE_CODE_POINT_DIGITS,
-              index * COLOR_UNICODE_CODE_POINT_DIGITS + COLOR_UNICODE_CODE_POINT_DIGITS,
-            ),
-            16,
+  return /^[0-9A-F]+$/iu.test(compact) && compact.length % COLOR_UNICODE_CODE_POINT_DIGITS === 0
+    ? Array.from({ length: compact.length / COLOR_UNICODE_CODE_POINT_DIGITS }, (_, index) =>
+        Number.parseInt(
+          compact.slice(
+            index * COLOR_UNICODE_CODE_POINT_DIGITS,
+            index * COLOR_UNICODE_CODE_POINT_DIGITS + COLOR_UNICODE_CODE_POINT_DIGITS,
           ),
-        )
-      : Array.from(value)
-          .filter((point) => !/\s/u.test(point))
-          .map((point) => point.codePointAt(0)!);
-  if (![16, 20, 24, 28, 32].includes(points.length))
-    throw new Error(
-      "Color Unicode must contain two code points per CSS color: 16, 20, 24, 28, or 32 code points.",
-    );
+          16,
+        ),
+      )
+    : Array.from(value)
+        .filter((point) => !/\s/u.test(point))
+        .map((point) => point.codePointAt(0)!);
+}
+
+/** Two code points per color back to #RRGGBB codes, for any number of colors. */
+function colorsFromUnicodePoints(points: readonly number[]): string[] {
+  if (points.length === 0 || points.length % 2 !== 0)
+    throw new Error("Color Unicode must contain two code points per CSS color.");
   if (
     points.some(
       (point) => point < COLOR_UNICODE_BASE || point >= COLOR_UNICODE_BASE + COLOR_UNICODE_WIDTH,
@@ -159,4 +161,19 @@ export function unicodeToColors(value: string): string[] {
       throw new Error("Color Unicode contains a value outside the #RRGGBB range.");
     return `#${color.toString(16).toUpperCase().padStart(RGB_HEX_DIGITS, "0")}`;
   });
+}
+
+/** Color Unicode of a seed phrase: 8 to 16 colors, two code points each. */
+export function unicodeToColors(value: string): string[] {
+  const points = colorUnicodePoints(value);
+  if (![16, 20, 24, 28, 32].includes(points.length))
+    throw new Error(
+      "Color Unicode must contain two code points per CSS color: 16, 20, 24, 28, or 32 code points.",
+    );
+  return colorsFromUnicodePoints(points);
+}
+
+/** Color Unicode of any length, such as a share written as colors (src/sskr/transport.ts). */
+export function unicodeToColorCodes(value: string): string[] {
+  return colorsFromUnicodePoints(colorUnicodePoints(value));
 }

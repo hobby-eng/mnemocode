@@ -21,19 +21,42 @@ import {
   readBoundedTextFile,
   textInput,
   transformMode,
+  type EncodedFormat,
 } from "./input.js";
 import { businessOptions, businessOptionNames } from "./business-options.js";
 import { decodeInput, encodeMnemonic, formatEncoded, representMnemonic } from "../core.js";
 import { masterFingerprint } from "../bitcoin-evidence.js";
-import { combineSskrShares, splitSskrMnemonic, validateThreshold } from "../sskr/shares.js";
 import {
-  normalizeShare,
+  planShareRepair,
+  restoreShareSet,
+  splitSskrMnemonic,
+  validateThreshold,
+} from "../sskr/shares.js";
+import {
+  readRepairableShare,
+  ShareVariantsError,
+  type ReadRepairableShare,
+} from "../sskr/repair.js";
+import {
+  assertShareCount,
+  readShare,
   shareInfo,
-  shareToColors,
-  urToBytewords,
   urToTransport,
   validateShareSet,
+  writeShare,
+  type ShareFormat,
 } from "../sskr/transport.js";
+import type { JointPlan, RepairedSet } from "../sskr/joint-repair.js";
+import type { DateShiftDate } from "../core.js";
+import { bip39Passphrase, bitcoinEvidence } from "./bitcoin-options.js";
+import {
+  assessShareRepair,
+  backupFingerprint,
+  matchingSets,
+  reportRepairs,
+  searchLimit,
+  searchShareRepair,
+} from "./share-repair.js";
 import {
   exportSskrCards,
   exportSskrPdf,
@@ -61,7 +84,10 @@ function singleOptions(args: ParsedArguments, repeatable: readonly string[] = []
   }
 }
 
-function exportOptions(args: ParsedArguments): SskrExportOptions | undefined {
+function exportOptions(
+  args: ParsedArguments,
+  shareFormat: ShareFormat,
+): SskrExportOptions | undefined {
   const directory = value(args, "cards-dir");
   const pdf = value(args, "pdf");
   const images = value(args, "images-dir");
@@ -99,52 +125,70 @@ function exportOptions(args: ParsedArguments): SskrExportOptions | undefined {
     layout: resolveSskrLayout(requested, settings.pageSize),
     directory: directory ?? "",
     imageFormat: args["image-format"] === undefined ? undefined : imageFormat(args),
+    shareFormat,
   };
 }
 
-/** How shares are written: the short UR form, standard Bytewords, or ordered color codes. */
-export type ShareFormat = "ur" | "words" | "colors";
-
+/** The share forms as the terminal names them (ShareFormat, src/sskr/transport.ts). */
 const SHARE_FORMAT_NAMES: Readonly<Record<ShareFormat, string>> = {
   ur: "Compact UR",
   words: "Bytewords",
+  indexes: "BIP39 word numbers (1-2048)",
+  unicode: "Unicode codes",
   colors: "RGB hexadecimal codes (ordered)",
+  "colors-unicode": "Colors as Unicode codes",
+};
+
+/**
+ * The form of an encoded seed phrase that matches a share's form, in which the restored backup is
+ * shown; shares in Bytewords or as a UR give it back as words.
+ */
+const RESTORED_FORM: Readonly<Record<ShareFormat, EncodedFormat>> = {
+  ur: "english",
+  words: "english",
+  indexes: "indexes",
+  unicode: "unicode",
+  colors: "colors",
+  "colors-unicode": "colors-unicode",
 };
 
 function shareFormat(args: ParsedArguments): ShareFormat {
   const format = value(args, "format") ?? "ur";
-  if (format !== "ur" && format !== "words" && format !== "colors")
+  if (!Object.hasOwn(SHARE_FORMAT_NAMES, format))
     throw new Error(
-      "The SSKR share format must be ur, words or colors. These are share formats, not BIP39 representations.",
+      "The SSKR share format must be ur, words, indexes, unicode, colors or colors-unicode. These are share formats, not BIP39 representations.",
     );
-  return format;
+  return format as ShareFormat;
 }
 
-/** One share as text in `format`; every form is read back by sskr-combine. */
-function writtenShare(share: string, format: ShareFormat): string {
-  if (format === "words") return urToBytewords(share);
-  if (format === "colors") return shareToColors(share).join(" ");
-  return share;
+/** A share, the form it is shown in, and its place among the shares made or typed. */
+interface ShownShare {
+  readonly ur: string;
+  readonly format: ShareFormat;
+  readonly number: number;
 }
 
-function printShares(shares: readonly string[], format: ShareFormat): void {
-  for (const [index, share] of shares.entries()) {
-    if (
-      !terminalResultHeader(`SSKR share ${index + 1} of ${shares.length}`, [
-        ["Format", SHARE_FORMAT_NAMES[format]],
-      ])
-    )
-      console.error(`SSKR share ${index + 1} — ${SHARE_FORMAT_NAMES[format]}:`);
-    console.log(writtenShare(share, format));
+/** Shares in the same form, in their order, as a split makes them. */
+function inForm(shares: readonly string[], format: ShareFormat): ShownShare[] {
+  return shares.map((ur, index) => ({ ur, format, number: index + 1 }));
+}
+
+/** Prints shares as "SSKR share N of M", by their places among the `total` made or typed. */
+function printShares(shares: readonly ShownShare[], total: number = shares.length): void {
+  for (const share of shares) {
+    const form = SHARE_FORMAT_NAMES[share.format];
+    if (!terminalResultHeader(`SSKR share ${share.number} of ${total}`, [["Format", form]]))
+      console.error(`SSKR share ${share.number} — ${form}:`);
+    console.log(writeShare(share.ur, share.format));
   }
 }
 
 async function saveShares(
-  shares: readonly string[],
+  shown: readonly ShownShare[],
   args: ParsedArguments,
-  format: ShareFormat,
   options?: SskrExportOptions,
 ): Promise<void> {
+  const shares = shown.map((share) => share.ur);
   if (options?.directory) {
     const count = await exportSskrCards(shares, options);
     terminalNotice(
@@ -175,8 +219,8 @@ async function saveShares(
   }
   const output = value(args, "output");
   if (output) {
-    // In the share format chosen, as the terminal shows it.
-    const lines = shares.map((share) => writtenShare(share, format));
+    // Each share in its form, as the terminal shows it.
+    const lines = shown.map((share) => writeShare(share.ur, share.format));
     await publishNewPrivateFile(output, new TextEncoder().encode(lines.join("\n") + "\n"));
     terminalNotice(
       `Saved SSKR records: ${output} (one complete share per line; this file contains all supplied shares).`,
@@ -213,11 +257,16 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
           `The ${optionLabel(key)} setting is not available in SSKR mode. Export shares to a PDF file or an individual-card output folder instead.`,
         );
   }
-  const representation = integrated ? encodeFormat(value(args, "format")) : undefined;
+  // With --format the whole seed phrase is shown beside the shares, in that form; without it, only
+  // the shares, which is what splitting is for.
+  const representation =
+    integrated && value(args, "format") !== undefined
+      ? encodeFormat(value(args, "format"))
+      : undefined;
   const format = integrated
     ? shareFormat({ format: value(args, "share-format") ?? "ur" })
     : shareFormat(args);
-  const options = exportOptions(args);
+  const options = exportOptions(args, format);
   await destinations(args, options);
   const mode = transformMode(args);
   if (mode !== "direct" && mode !== "seedshift")
@@ -233,7 +282,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
   const result =
     mode === "direct" ? representMnemonic(mnemonic) : encodeMnemonic(mnemonic, dateValues);
   const shares = await splitSskrMnemonic(result.shiftedEnglish.join(" "), threshold, count);
-  await saveShares(shares, args, format, options);
+  await saveShares(inForm(shares, format), args, options);
   await saveHeirSheet(args, {
     backup: { kind: "shares", format, threshold, count },
     mode,
@@ -262,11 +311,13 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
     console.log(formatEncoded(result, representation));
     // Shown for a person who keeps the whole phrase too, with the shares as a reserve.
     terminalNotice(
-      "This is the whole seed phrase: it restores the wallet without any share.",
+      mode === "seedshift"
+        ? "This is the complete backup: no share is needed, but the original dates are still required."
+        : "This is the whole seed phrase: it restores the wallet without any share.",
       "warning",
     );
   }
-  printShares(shares, format);
+  printShares(inForm(shares, format));
   if (terminalColor("stderr")) {
     console.error("");
     terminalStatus("Original fingerprint", masterFingerprint(result.sourceMnemonic));
@@ -280,22 +331,25 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
       `Encoded BIP32 master fingerprint (empty BIP39 passphrase): ${masterFingerprint(result.shiftedEnglish.join(" "))}`,
     );
   }
-  await offerShareCheck(result.sourceMnemonic, mode, threshold, () => printShares(shares, format));
+  await offerShareCheck(result.sourceMnemonic, mode, threshold, () =>
+    printShares(inForm(shares, format)),
+  );
 }
 
-export async function readShares(args: ParsedArguments): Promise<string[]> {
+/** The shares as typed or saved, each in the form it was written in. */
+async function readShareTexts(args: ParsedArguments): Promise<string[]> {
   if (args["ask-secrets"] === true) {
     if (["share", "share-file", "share-qr"].some((key) => args[key] !== undefined))
       throw new Error("--ask-secrets cannot be combined with another share-input source.");
-    return (await askSecret("Shamir shares (separate complete shares with a semicolon):"))
-      .split(";")
-      .map(normalizeShare);
+    return (
+      await askSecret("Shamir shares (separate shares with ;, ? for each unreadable code):")
+    ).split(";");
   }
   const shares = [...values(args, "share")];
   if (values(args, "share-file").filter((path) => path === "-").length > 1)
     throw new Error("Standard input can only be read once.");
   for (const path of values(args, "share-file")) {
-    // Text files contain one complete UR or RGB share per non-empty line.
+    // Every non-empty line holds one complete share, optionally with one explicit missing code.
     const text =
       path === "-"
         ? textInput({ "input-file": "-" }, "input")
@@ -312,43 +366,128 @@ export async function readShares(args: ParsedArguments): Promise<string[]> {
     throw new Error(
       "Provide at least one complete share as text, in a text file, in a QR image, or through --ask-secrets. Additional share sources may be repeated.",
     );
-  return shares.map(normalizeShare);
+  return shares;
+}
+
+/**
+ * The phrase sets that the typed shares give: the one of complete shares, or, where elements are
+ * marked with ?, every one that a repair finds, after its assessment (share-repair.ts). `beforeSearch`
+ * runs between the assessment and the search, with the secret's length when it is known.
+ */
+async function restoredSets(
+  texts: readonly string[],
+  limit: number | undefined,
+  beforeSearch: (secretBytes: number | undefined) => Promise<void>,
+  plan?: JointPlan,
+): Promise<RepairedSet[]> {
+  if (!texts.some((text) => text.includes("?"))) {
+    // Every share is read before the dates are asked, so that a mistyped one stops at once.
+    const read = texts.map(readShare);
+    await beforeSearch(shareInfo(urToTransport(read[0]!.ur)).secretLength);
+    return [await restoreShareSet(texts)];
+  }
+  const repair = assessShareRepair(plan ?? (await planShareRepair(texts)));
+  await beforeSearch(repair.plan.assessment.secretBytes);
+  return searchShareRepair(repair, limit);
 }
 
 /** BIP39 writes every 4 bytes of entropy as 3 words: a 16-byte secret is a 12-word phrase. */
-function shareWordCount(share: string): number {
-  return (shareInfo(urToTransport(share)).secretLength * 3) / 4;
+function wordCountOf(secretBytes: number | undefined): number | undefined {
+  return secretBytes === undefined ? undefined : (secretBytes * 3) / 4;
+}
+
+/** The dates given, or asked on the private screen for a Seedshift phrase of `secretBytes`. */
+async function seedshiftDates(
+  args: ParsedArguments,
+  dateValues: DateShiftDate[],
+  secretBytes: number | undefined,
+): Promise<void> {
+  if (!dateValues.length && args["ask-secrets"] === true)
+    dateValues.push(
+      ...(await askSecret(datesPrompt(wordCountOf(secretBytes))))
+        .split(/\s+/u)
+        .flatMap((date) => dates({ date })),
+    );
+  if (!dateValues.length) throw new Error("Seedshift recovery requires its original dates.");
+}
+
+/** Direct mode or checksum-valid Seedshift, the two modes in which shares are made. */
+function shareMode(args: ParsedArguments): "direct" | "seedshift" {
+  const mode = transformMode(args);
+  if (mode !== "direct" && mode !== "seedshift")
+    throw new Error("SSKR share recovery supports direct mode or checksum-valid Seedshift.");
+  return mode;
 }
 
 export async function runSskrCombine(args: ParsedArguments): Promise<void> {
   singleOptions(args, ["share", "share-file", "share-qr", "date"]);
-  const mode = transformMode(args);
-  if (mode !== "direct" && mode !== "seedshift")
-    throw new Error("SSKR share recovery supports direct mode or checksum-valid Seedshift.");
+  const mode = shareMode(args);
   const dateValues = dates(args);
   if (mode === "direct" && dateValues.length) throw new Error("Direct mode does not accept dates.");
   if (mode === "seedshift" && !dateValues.length && args["ask-secrets"] !== true)
     throw new Error("Seedshift recovery requires its original dates.");
-  const shares = await readShares(args);
-  if (mode === "seedshift" && !dateValues.length && args["ask-secrets"] === true)
-    dateValues.push(
-      ...(await askSecret(datesPrompt(shareWordCount(shares[0]!))))
-        .split(/\s+/u)
-        .flatMap((date) => dates({ date })),
+  const evidence = bitcoinEvidence(args);
+  const passphrase = bip39Passphrase(args);
+  const limit = searchLimit(args);
+  const texts = await readShareTexts(args);
+  assertShareCount(texts.length);
+  const sets = await restoredSets(texts, limit, async (secretBytes) => {
+    if (mode === "seedshift") await seedshiftDates(args, dateValues, secretBytes);
+  });
+  const walletOf = (set: RepairedSet) =>
+    mode === "direct"
+      ? set.mnemonic
+      : decodeInput(set.mnemonic, "english", dateValues).recoveredMnemonic;
+  const matching = matchingSets(sets, evidence, walletOf, passphrase);
+  if (matching.length > 1)
+    terminalNotice(
+      `${matching.length} phrases fit these shares. Each is listed with its fingerprint: the wallet tells which is yours.`,
+      "warning",
     );
-  if (mode === "seedshift" && !dateValues.length)
-    throw new Error("Seedshift recovery requires its original dates.");
-  const recovered = await combineSskrShares(shares);
-  const mnemonic =
-    mode === "direct" ? recovered : decodeInput(recovered, "english", dateValues).recoveredMnemonic;
+  matching.forEach((set, index) =>
+    showRestored(set, walletOf(set), mode, {
+      index,
+      of: matching.length,
+      ...(evidence === undefined ? {} : { evidence: optionLabel(evidence.kind) }),
+    }),
+  );
+}
+
+/** Prints one restored phrase: what a repair filled in, the backup in its form, and the phrase. */
+function showRestored(
+  set: RepairedSet,
+  mnemonic: string,
+  mode: "direct" | "seedshift",
+  place: { readonly index: number; readonly of: number; readonly evidence?: string },
+): void {
+  const numbered = place.of > 1 ? ` ${place.index + 1} of ${place.of}` : "";
+  reportRepairs(set);
+  // The backup that was split comes back in the form its shares were written in; the dates then
+  // turn it into the seed phrase below. It is left out where it would be the same words again.
+  const backupForm = RESTORED_FORM[set.shares[0]!.format];
+  const backup = formatEncoded(representMnemonic(set.mnemonic), backupForm);
+  if (backup !== mnemonic) {
+    const label = encodedOutputLabel(backupForm, mode);
+    if (
+      !terminalResultHeader(`Restored backup${numbered}`, [
+        ["Form", backupForm],
+        ["Content", label],
+      ])
+    )
+      console.log(`${label}${numbered}:`);
+    console.log(backup);
+  }
   if (
-    !terminalResultHeader("Recovered result", [
+    !terminalResultHeader(`Recovered result${numbered}`, [
       ["Mode", mode],
       ["Source", "SSKR shares"],
       ["Content", "English BIP39 mnemonic"],
+      ...(place.evidence === undefined
+        ? []
+        : ([["Wallet", `matches the ${place.evidence}`]] as [string, string][])),
     ])
   )
-    console.log("Recovered English BIP39 mnemonic:");
+    console.log(`Recovered English BIP39 mnemonic${numbered}:`);
   console.log(mnemonic);
   if (terminalColor("stderr")) {
     terminalStatus("Recovered fingerprint", masterFingerprint(mnemonic));
@@ -359,12 +498,146 @@ export async function runSskrCombine(args: ParsedArguments): Promise<void> {
     );
 }
 
+/**
+ * Shows a set of shares, repaired or not, each in its own form or the one of --format, and saves
+ * it where the options say. A share with elements that nothing settles, such as one that could not
+ * be read at all, is left out: written down, it would be a guess passed off as the share. Copies
+ * of one share are shown as typed and saved once.
+ */
+async function exportSet(
+  set: Pick<RepairedSet, "shares" | "unsettled">,
+  args: ParsedArguments,
+  given: ShareFormat | undefined,
+  checked: SskrExportOptions | undefined,
+): Promise<void> {
+  reportRepairs(set);
+  const unsettled = new Set(set.unsettled.map((element) => element.share));
+  for (const share of unsettled)
+    terminalNotice(
+      `Share ${share} cannot be settled and is left out: read more of it, or use another copy.`,
+      "warning",
+    );
+  const shown = set.shares.flatMap((share, index) =>
+    unsettled.has(index + 1)
+      ? []
+      : [{ ur: share.ur, format: given ?? share.format, number: index + 1 }],
+  );
+  if (shown.length === 0) throw new Error("No share could be settled.");
+  const saved = shown.filter(
+    (share, index) => shown.findIndex((other) => other.ur === share.ur) === index,
+  );
+  validateShareSet(
+    saved.map((share) => share.ur),
+    false,
+  );
+  if (checked !== undefined && new Set(saved.map((share) => share.format)).size > 1)
+    throw new Error(
+      "The shares are written in different forms: choose one with --format for cards.",
+    );
+  const options = checked === undefined ? undefined : { ...checked, shareFormat: saved[0]!.format };
+  await saveShares(saved, args, options);
+  if (saved.length < shown.length) terminalNotice("Copies of one share are saved once.");
+  printShares(shown, set.shares.length);
+}
+
+/**
+ * Each typed share repaired from its own checks alone, as for fewer shares than the threshold;
+ * undefined after showing every variant of a share that fits more than one way, of which none is
+ * saved.
+ */
+function repairEach(
+  texts: readonly string[],
+  given: ShareFormat | undefined,
+): ReadRepairableShare[] | undefined {
+  const shares: ReadRepairableShare[] = [];
+  for (const [index, text] of texts.entries()) {
+    try {
+      shares.push(readRepairableShare(text));
+    } catch (error) {
+      if (!(error instanceof ShareVariantsError)) throw error;
+      terminalNotice(
+        `Share ${index + 1} fits ${error.variants.length} ways, so nothing is saved: use another copy of it, or more shares.`,
+        "warning",
+      );
+      for (const [place, variant] of error.variants.entries()) {
+        const title = `Share ${index + 1}, variant ${place + 1} of ${error.variants.length}`;
+        const form = SHARE_FORMAT_NAMES[given ?? variant.format];
+        if (!terminalResultHeader(title, [["Format", form]])) console.error(`${title} — ${form}:`);
+        console.log(writeShare(variant.ur, given ?? variant.format));
+      }
+      return undefined;
+    }
+  }
+  return shares;
+}
+
 export async function runSskrExport(args: ParsedArguments): Promise<void> {
-  singleOptions(args, ["share", "share-file", "share-qr"]);
-  const format = shareFormat(args);
-  const options = exportOptions(args);
-  await destinations(args, options);
-  const shares = validateShareSet(await readShares(args), false);
-  await saveShares(shares, args, format, options);
-  printShares(shares, format);
+  singleOptions(args, ["share", "share-file", "share-qr", "date"]);
+  // Without --format each share keeps the form it is written in, so that a share repaired from
+  // its marked elements comes back as it was written, whole.
+  const given = value(args, "format") === undefined ? undefined : shareFormat(args);
+  const checked = exportOptions(args, given ?? "colors");
+  await destinations(args, checked);
+  const limit = searchLimit(args);
+  // A wallet tells sets of repaired shares apart; for a Seedshift phrase it needs the dates.
+  const mode = shareMode(args);
+  const dateValues = dates(args);
+  if (mode === "direct" && dateValues.length) throw new Error("Direct mode does not accept dates.");
+  const evidence = bitcoinEvidence(args);
+  const passphrase = bip39Passphrase(args);
+  if (mode === "seedshift" && evidence === undefined)
+    throw new Error("Seedshift mode here serves only the wallet check: give the wallet too.");
+  const texts = await readShareTexts(args);
+  assertShareCount(texts.length);
+  const marked = texts.some((text) => text.includes("?"));
+  if (!marked && evidence === undefined) {
+    const shares = texts.map((text) => ({ ...readShare(text), repaired: false, filled: [] }));
+    await exportSet({ shares, unsettled: [] }, args, given, checked);
+    return;
+  }
+  const plan = marked ? await planShareRepair(texts) : undefined;
+  if (plan?.assessment.verdict === "not-enough") {
+    if (evidence !== undefined)
+      throw new Error("The wallet can be checked only with as many shares as the threshold.");
+    // Fewer shares than the threshold restore no phrase; each is then repaired on its own.
+    const shares = repairEach(texts, given);
+    if (shares !== undefined) await exportSet({ shares, unsettled: [] }, args, given, checked);
+    return;
+  }
+  const sets = await restoredSets(
+    texts,
+    limit,
+    async (secretBytes) => {
+      if (mode === "seedshift") await seedshiftDates(args, dateValues, secretBytes);
+    },
+    plan,
+  );
+  const walletOf = (set: RepairedSet) =>
+    mode === "direct"
+      ? set.mnemonic
+      : decodeInput(set.mnemonic, "english", dateValues).recoveredMnemonic;
+  const matching = matchingSets(sets, evidence, walletOf, passphrase);
+  if (matching.length === 1) {
+    await exportSet(matching[0]!, args, given, checked);
+    return;
+  }
+  // Every set is shown, with the fingerprint of the phrase it holds; none is chosen or saved.
+  terminalNotice(
+    `${matching.length} sets of shares fit. The fingerprint of each tells the right one; give it, or an address, to save that set.`,
+    "warning",
+  );
+  for (const [index, set] of matching.entries()) {
+    const title = `Variant ${index + 1} of ${matching.length}`;
+    if (!terminalResultHeader(title, [["Fingerprint", backupFingerprint(set)]]))
+      console.log(`${title}, fingerprint ${backupFingerprint(set)}:`);
+    reportRepairs(set);
+    printShares(
+      set.shares.map((share, place) => ({
+        ur: share.ur,
+        format: given ?? share.format,
+        number: place + 1,
+      })),
+    );
+  }
+  terminalHint("Each fingerprint is that of the phrase the shares hold, with an empty passphrase.");
 }

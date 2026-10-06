@@ -351,17 +351,33 @@ const evidenceGroup: HelpGroup = {
   ],
 };
 
+const maxTries: HelpOption = {
+  flag: "--max-tries",
+  value: "N",
+  summary: "Combinations a share repair may try without asking",
+  details: [
+    "Without it, a search that takes up to a minute on this computer starts at once. The number a repair needs, and its time, are shown before it starts; on the private screen a longer search is asked for instead.",
+  ],
+};
+
+const shareWalletCheck: HelpGroup = {
+  ...evidenceGroup,
+  heading: "Wallet check (one of the first six keeps only the matching phrases):",
+};
+
 const shareInputs: readonly HelpOption[] = [
   {
     flag: "--share",
     value: "TEXT",
-    summary: "One complete share as text; repeat for each share",
-    details: ["ur:sskr/..., Bytewords or MnemoCode share colors; the form is found automatically."],
+    summary: "One share as text, ? for each unreadable element; repeat for each share",
+    details: [
+      "ur:sskr/..., Bytewords, word numbers, Unicode codes, colors or colors as Unicode codes; the form is found automatically.",
+    ],
   },
   {
     flag: "--share-file",
     value: "PATH",
-    summary: "A file with one complete share per line; may be repeated",
+    summary: "A file with one share per line; may be repeated",
   },
   {
     flag: "--share-qr",
@@ -403,7 +419,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             value: "FORMAT",
             summary: "The form of the result, 1 to 5 or its name; default 1 (english)",
             details: [
-              "1 english words, 2 indexes, 3 unicode codes, 4 colors-unicode, 5 colors. Cards need 4 or 5. See mnemocode help formats.",
+              "1 english words, 2 indexes, 3 unicode codes, 4 colors-unicode, 5 colors. Cards need 4 or 5. See mnemocode help formats. With --sskr the whole phrase is shown beside the shares only when --format is given.",
             ],
           },
           {
@@ -492,10 +508,11 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           shares,
           {
             flag: "--share-format",
-            value: "ur|words|colors",
-            summary: "How the shares are shown; default ur",
+            value: "FORMAT",
+            summary:
+              "How the shares are shown: ur, words, indexes, unicode, colors, colors-unicode",
             details: [
-              "ur is the standard short form, ur:sskr/... words writes the same share in standard Bytewords, one English word per byte, as other SSKR tools do. colors writes a share as color codes whose order matters; they are a different format from --format 5. A saved text file holds the shares in the same form.",
+              "ur (the default) is the standard short form, ur:sskr/...; words writes the same share in standard Bytewords, one English word per byte. Other SSKR programs read both. indexes, unicode, colors and colors-unicode write a share with the signs of --format 2, 3, 5 and 4, so that it looks like that form; sskr-combine then shows the restored backup in that form again. Only MnemoCode reads these. A saved text file holds the shares in the same form.",
             ],
           },
           cardLayout,
@@ -709,7 +726,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   "sskr-combine": {
     summary: "Restore a phrase from Shamir shares",
     about: [
-      "Needs at least the threshold number of complete shares, in any of the share forms, which may be mixed. A damaged share, the same share twice, shares of different sets and too few shares are refused. The share library checks the restored secret against a hash stored in the shares.",
+      "Needs at least the threshold number of shares, in any of the share forms, which may be mixed. Type each element that cannot be read as ?: the shares are then repaired together, and every phrase that passes the hash stored in the shares is listed with its fingerprint. Shares of different sets, the same share twice and too few shares are refused.",
     ],
     usage:
       "[OPTIONS] (--ask-secrets | --share <TEXT> ... | --share-file <PATH> | --share-qr <PNG>)",
@@ -727,11 +744,13 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             ],
           },
           dates,
+          maxTries,
         ],
       },
+      shareWalletCheck,
     ],
     asks: [
-      ["Shares", "complete shares separated by semicolons"],
+      ["Shares", "shares separated by semicolons, ? for each unreadable element"],
       ["Dates", "only with --mode seedshift"],
     ],
     examples: [
@@ -752,6 +771,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     ],
     notes: [
       "Individual cards of one share must all be present, in numbered order, to rebuild that share.",
+      "Replace each unreadable element with ? at its place, on any of the shares, up to 64 on one share. The shares are solved together: their checksums, the data they share and every share beyond the threshold settle most marks without trying anything, and the hash stored with the secret decides the rest. How many combinations are left, how long they take and what would help is shown first. More than one answer is listed, never chosen.",
+      "A share file has one full share per line; join paper line breaks before saving it.",
     ],
   },
 
@@ -759,18 +780,22 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     summary: "Print existing Shamir shares as cards",
     about: [
       "Prints shares made earlier as cards, PDFs, images or a share file. It changes only the presentation and never makes new shares.",
+      "Shares with elements typed as ? come back whole, repaired together as by sskr-combine, without the phrase being shown. When more than one set of shares fits, each is shown with the fingerprint of the phrase it holds, and none is saved; a wallet check keeps the right one.",
     ],
     usage:
       "[OPTIONS] (--ask-secrets | --share <TEXT> ... | --share-file <PATH> | --share-qr <PNG>)",
     groups: [
-      { heading: "The shares:", options: shareInputs },
+      { heading: "The shares:", options: [...shareInputs, maxTries] },
       {
         heading: "Output:",
         options: [
           {
             flag: "--format",
-            value: "ur|words|colors",
-            summary: "How the shares are shown; default ur",
+            value: "FORMAT",
+            summary: "How the shares are shown (see encode --share-format)",
+            details: [
+              "Without it, in the form they are written in: a share repaired from elements marked with ? comes back whole, in its own form.",
+            ],
           },
           {
             flag: "--output",
@@ -797,13 +822,33 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           {
             ...cardQr,
             summary: "Add a QR code of its own share to each collection sheet",
-            details: ["Each QR code holds only its own share, as color codes."],
+            details: [
+              "Each QR code holds only its own share: word numbers, Unicode codes or colors, according to the chosen form.",
+            ],
           },
         ],
       },
       identityGroup,
+      {
+        ...shareWalletCheck,
+        options: [
+          ...shareWalletCheck.options,
+          {
+            flag: "--mode",
+            value: "seedshift",
+            summary: "The phrase was masked before splitting: check the wallet after the dates",
+            details: [
+              "Without it the wallet check compares the phrase that the shares hold, which is the wallet of a standard split.",
+            ],
+          },
+          dates,
+        ],
+      },
     ],
-    asks: [["Shares", "complete shares separated by semicolons"]],
+    asks: [
+      ["Shares", "shares separated by semicolons, ? for each unreadable element"],
+      ["Dates", "only with --mode seedshift"],
+    ],
     examples: [
       [
         "mnemocode sskr-export --share-file ./shares.txt --cards-dir ./share-cards --card-layout collection --template business-it",
@@ -837,7 +882,11 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           dates,
           threshold,
           shares,
-          { flag: "--format", value: "ur|words|colors", summary: "The share format; default ur" },
+          {
+            flag: "--format",
+            value: "FORMAT",
+            summary: "The share format; default ur (see encode --share-format)",
+          },
           {
             flag: "--output",
             value: "NEW_FILE",

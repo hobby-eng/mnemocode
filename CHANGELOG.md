@@ -6,7 +6,7 @@
 
 - Each release has one executable file for Linux, Windows and macOS, with Node.js, the card artwork and the SSKR engine built in; `pnpm build:executable` builds it for the current computer.
 - Started without a command in a terminal, for example by a double-click on the executable file, MnemoCode shows a menu. It asks step by step, with examples, and shows in grey the command that does the same before it runs it.
-- Encode in the menu offers the usual sets of Shamir shares, such as 2 of 3 or 3 of 5, and any other up to 16 shares.
+- Encode in the menu offers the usual sets of Shamir shares, such as 2 of 3 or 3 of 5, and any other up to 16 shares, and writes them in the form chosen: restoring them gives that form back. Entry 3 splits the seed phrase itself into standard SSKR shares in Bytewords or as a `ur:sskr` code.
 - `mnemocode <command> --help` explains every option of a command with examples; `-h` gives a short summary.
 - Each executable comes with a file of license notices for Node.js and every library it contains, and a release is published only after the complete CI has passed.
 - GitHub signs the build provenance of every release file: `gh attestation verify` shows that a download was built from this repository by its release workflow.
@@ -18,6 +18,7 @@
 
 ### Recovery
 
+- Shares with unreadable elements can still be used: mark each with `?` at its place, on any of the shares, such as two words on each of three shares. MnemoCode repairs all of them together: the checksums, the data the shares have in common and every share beyond the threshold settle most marks without trying anything, and the SSKR secret digest decides the rest. Before any search it shows how many combinations are open, how long they take, and which element or how many more shares would settle them; a search longer than a minute is asked for first, or needs `--max-tries`. Every phrase that passes is listed with its fingerprint, never chosen, and a wallet check keeps the matching one. `sskr-combine` names every filled-in element, by share and place, so that the written copy can be corrected. Entry 5 of the menu and `sskr-export` give the repaired shares back whole, in their own form, without showing the phrase.
 - `recover-date` accepts `?` for each forgotten digit and up to three incomplete dates. Identical patterns are not tried twice, and a limit stops a search that is too large before it starts.
 - Added `recover-word`. It lists every word that can replace one forgotten word and marks the candidates that match a known detail of the wallet. With `--legacy-valid-last-word` it lists the valid last words of a legacy phrase.
 - After Encode shows its result on the private screen, it offers to check the backup: you type it again from what you wrote down, with the dates, and MnemoCode says whether it restores the same seed phrase.
@@ -35,7 +36,7 @@
 - `--ask-secrets` works on Linux, macOS and Windows: MnemoCode reads the answer itself instead of through `systemd-ask-password`, which exists only on Linux. Backspace and Ctrl+U edit it, and an answer pasted ahead of the next question is kept for it.
 - A command that asks for a secret runs on a private screen of its own in the terminal: what you type is shown there, and so is the result. When you press Enter, the screen is cleared, so that nothing stays in the scrollback; output sent to a file or a pipe goes there as before.
 - With `--ask-secrets`, `decode` and `recover-date` take the record from `--input-file` or `--qr-file` and ask only for the dates.
-- Shares can also be written in Bytewords, the standard long form in words (`--share-format words`), as other SSKR tools write them; a share file saved with `--output` holds the shares in the format shown.
+- Shares can also be written in Bytewords, the standard long form in words (`--share-format words`), as other SSKR tools write them, and, for MnemoCode only, as word numbers, Unicode codes or colors as Unicode codes (`indexes`, `unicode`, `colors-unicode`). A share file saved with `--output` holds the shares in the format shown, and `sskr-combine` shows the restored backup in the form of the shares. `encode --sskr` shows the whole phrase beside the shares only with `--format`.
 - Every run is protected as far as Node.js allows: core dumps are off on Linux and macOS, there is no network, and a command that does not need them cannot write files or start other programs (the Node.js permission model). The single executable has this built in, and each entry of the menu runs in a process of its own.
 - Before a secret, MnemoCode warns when swap is not encrypted (Linux) and when a file would be saved into a folder that a cloud service synchronises.
 - On Linux the temporary files of PNG and JPEG export stay in memory (`/dev/shm`).

@@ -22,7 +22,7 @@ import {
   type PDFImage,
 } from "pdf-lib";
 import { colorsToIndexes, unicodeToColors } from "../core.js";
-import { colorsToShare } from "../sskr/transport.js";
+import { assertShareQr } from "../sskr/transport.js";
 import type { CardContent } from "./templates.js";
 import type { SskrCardContent } from "./sskr-content.js";
 import { resolveIdentityFor } from "./card-identities.js";
@@ -182,9 +182,7 @@ async function createRenderContext(
     throw new Error("Material cards require color references.");
   const share = content.kind === "sskr";
   if (share) {
-    colorsToShare(content.colors.join(" "));
-    if (content.payload !== content.colors.join(" "))
-      throw new Error("Share QR does not match its references.");
+    assertShareQr(content.colors, content.payload);
   } else {
     colorsToIndexes(content.colors);
     if (

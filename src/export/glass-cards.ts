@@ -18,7 +18,7 @@ import {
   type PDFPage,
 } from "pdf-lib";
 import { colorsToIndexes, unicodeToColors } from "../core.js";
-import { colorsToShare } from "../sskr/transport.js";
+import { assertShareQr } from "../sskr/transport.js";
 import { resolvePresentationFor } from "./card-copy.js";
 import { clearDocumentMetadata } from "./document-metadata.js";
 import type { CardProfile, CardPresentation } from "./card-settings.js";
@@ -67,9 +67,7 @@ function validateContent(content: CardContent | SskrCardContent): asserts conten
   if (content.kind !== "colors" && content.kind !== "sskr")
     throw new Error("Glass cards require color references.");
   if (content.kind === "sskr") {
-    colorsToShare(content.colors.join(" "));
-    if (content.payload !== content.colors.join(" "))
-      throw new Error("Share QR does not match the printed references.");
+    assertShareQr(content.colors, content.payload);
   } else {
     colorsToIndexes(content.colors);
     if (

@@ -68,9 +68,9 @@ async function everyPath(entry: (typeof MENU_ENTRIES)[number]): Promise<string[]
 }
 
 describe("start menu", () => {
-  it("offers the agreed entries, numbered 1 to 8 and 0 for Quit; shares are part of Encode", () => {
-    expect(MENU_ENTRIES.map((entry) => entry.digit)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 0]);
-    expect(MENU_ENTRIES.some((entry) => entry.label.startsWith("Split"))).toBe(false);
+  it("offers the agreed entries, numbered 1 to 9 and 0 for Quit", () => {
+    expect(MENU_ENTRIES.map((entry) => entry.digit)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
+    expect(MENU_ENTRIES[2]!.label).toBe("Split a seed phrase into standard Shamir shares");
     expect(MENU_ENTRIES[0]!.label).toBe("Encode a seed phrase as numbers, codes or colors");
     expect(MENU_ENTRIES[1]!.label).toBe("Decode numbers, codes or colors back into a seed phrase");
   });
@@ -117,17 +117,15 @@ describe("start menu", () => {
         "mnemocode-cards.pdf",
       ],
     });
-    // Word numbers with MnemoCode Seedshift, split 2 of 3 into plain shares in Bytewords, on the
-    // screen; the whole seed phrase is shown too, so --format stays.
-    script.answers = [0, 0, 0, 1, 0, 0];
+    // Word numbers, always masked, with MnemoCode Seedshift, split 2 of 3 into shares in word
+    // numbers too, on the screen, with the whole seed phrase beside them (--format).
+    script.answers = [0, 0, 1, 0, 1];
     script.asked = [];
     expect(await encode.action()).toEqual({
       run: [
         "encode",
         "--sskr",
         "--ask-secrets",
-        "--format",
-        "2",
         "--mode",
         "seedshift",
         "--threshold",
@@ -135,7 +133,9 @@ describe("start menu", () => {
         "--shares",
         "3",
         "--share-format",
-        "words",
+        "indexes",
+        "--format",
+        "2",
       ],
     });
     // Colors give color shares without a question about their look.
@@ -159,16 +159,15 @@ describe("start menu", () => {
       "Where should the result go?",
       "Instructions for your heirs?",
     ]);
-    // Word numbers, no Seedshift, a threshold typed under Other, and a sheet for heirs.
-    script.answers = [0, 1, 7, 0, 0, 1];
+    // Unicode codes, no Seedshift, a threshold typed under Other, no whole copy, and a sheet for
+    // heirs.
+    script.answers = [1, 1, 7, 0, 0, 1];
     script.asked = [];
     expect(await encode.action()).toEqual({
       run: [
         "encode",
         "--sskr",
         "--ask-secrets",
-        "--format",
-        "2",
         "--mode",
         "direct",
         "--threshold",
@@ -176,13 +175,31 @@ describe("start menu", () => {
         "--shares",
         "7",
         "--share-format",
-        "words",
+        "unicode",
         "--heir-sheet",
         "mnemocode-heirs.pdf",
         "--heir-sheet-size",
         "a5",
       ],
     });
+  });
+
+  it("always masks word numbers and words, and calls an unmasked copy weak", async () => {
+    for (const form of [0, 4]) {
+      script.answers = [form];
+      script.asked = [];
+      await MENU_ENTRIES[0]!.action();
+      const questions = script.asked.map((asked) => asked.question);
+      expect(questions).not.toContain("Use Seedshift?");
+      expect(questions).toContain("Which Seedshift?");
+    }
+    // Unicode codes may stay unmasked, but the answer says how weak that is.
+    script.answers = [1];
+    script.asked = [];
+    script.lists = [];
+    await MENU_ENTRIES[0]!.action();
+    expect(script.asked[1]!.question).toBe("Use Seedshift?");
+    expect(script.lists[1]!.join(" ")).toContain("weak: only disguised");
   });
 
   it("has the entries, questions and answers that the sheet for heirs names", async () => {
@@ -195,7 +212,7 @@ describe("start menu", () => {
     };
     for (const [digit, steps] of [
       [2, HEIR_MENU.decode],
-      [3, HEIR_MENU.restore],
+      [4, HEIR_MENU.restore],
     ] as const) {
       const { entry, asked: questions } = await asked(digit);
       expect(entry).toBe(steps.entry);
@@ -204,7 +221,31 @@ describe("start menu", () => {
       for (const answer of Object.values(steps.answers)) expect(question!.labels).toContain(answer);
     }
     expect((await asked(2)).asked[0]!.labels[0]).toBe(HEIR_MENU.decode.source);
-    expect((await asked(4)).entry).toBe(HEIR_MENU.recover.entry);
+    expect((await asked(HEIR_MENU.recover.digit)).entry).toBe(HEIR_MENU.recover.entry);
+  });
+
+  it("splits into standard shares in words or a short code from entry 3", async () => {
+    const split = MENU_ENTRIES[2]!;
+    // MnemoCode Seedshift, 2 of 3, in Bytewords, on the screen; no "Which Seedshift?" question.
+    script.answers = [0, 0, 0, 0, 0];
+    script.asked = [];
+    expect(await split.action()).toEqual({
+      run: [
+        "encode",
+        "--sskr",
+        "--ask-secrets",
+        "--mode",
+        "seedshift",
+        "--threshold",
+        "2",
+        "--shares",
+        "3",
+        "--share-format",
+        "words",
+      ],
+    });
+    expect(script.asked.map((asked) => asked.question)).not.toContain("Which Seedshift?");
+    expect(script.asked[2]!.labels).toEqual(["Words", "Short code"]);
   });
 
   it("offers printable cards only where they print colors", async () => {
@@ -214,13 +255,13 @@ describe("start menu", () => {
       await MENU_ENTRIES[0]!.action();
       return script.asked.find((asked) => asked.question.startsWith("Where should"))!.labels;
     };
-    // Word numbers, no Seedshift, no shares: a record or a QR code, no cards.
-    expect(await destinations([0, 1, 0])).not.toContain("Also as printable cards");
+    // Word numbers, MnemoCode Seedshift, no shares: a record or a QR code, no cards.
+    expect(await destinations([0, 0, 0])).not.toContain("Also as printable cards");
     // Colors: cards too.
     expect(await destinations([2, 1, 0])).toContain("Also as printable cards");
     // Shares of word numbers are plain text: QR codes, no cards. Shares of colors are color codes:
     // disguised cards, no QR codes.
-    expect(await destinations([0, 1, 1, 0])).toEqual([
+    expect(await destinations([0, 0, 1, 0])).toEqual([
       "Only on this screen",
       "Also in a text file",
       "Also as QR codes",
