@@ -55,7 +55,8 @@ describe("integrated SSKR CLI", () => {
       ]);
       expect(restored.status, restored.stderr).toBe(0);
       expect(restored.stdout).toContain(mnemonic);
-      const refused = cli([
+      // A taken name is numbered as a file manager numbers a copy; the old file stays as it was.
+      const again = cli([
         "encode",
         "--sskr",
         "--mnemonic",
@@ -67,9 +68,11 @@ describe("integrated SSKR CLI", () => {
         "--output",
         path,
       ]);
-      expect(refused.status).toBe(1);
-      expect(refused.stderr).toContain("already exists");
+      expect(again.status, again.stderr).toBe(0);
+      const numbered = join(dir, "shares (1).txt");
+      expect(again.stderr).toContain(`${path} already exists: saved as ${numbered} instead.`);
       expect(readFileSync(path, "utf8").trim().split("\n")).toEqual(records);
+      expect(readFileSync(numbered, "utf8").trim().split("\n")).toHaveLength(3);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

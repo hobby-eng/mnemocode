@@ -10,7 +10,7 @@
 import { MNEMOCODE_VERSION } from "../version.js";
 // The renderer takes its font through the platform interface; Node.js supplies it here.
 import "../export/platform-node.js";
-import { publishNewPrivateFile, replacePrivateFile } from "../export/private-file.js";
+import { publishNewPrivateFile } from "../export/private-file.js";
 import {
   A5,
   A6,
@@ -103,7 +103,7 @@ function steps({ backup, mode, dates }: HeirSheetFacts): string[] {
   const restore = "Open the wallet with this seed phrase in a wallet program (see below).";
   if (backup.kind === "encoded" && backup.format === "english" && mode === "direct")
     return [restore];
-  // As the prompts ask for them (DATES_PROMPT, and the share prompt of sskr-command.ts).
+  // As the prompts ask for them (datesPrompt, and the share prompt of sskr-command.ts).
   const withDates =
     mode === "direct"
       ? ""
@@ -213,18 +213,11 @@ export function validateHeirSheetOptions(args: ParsedArguments): void {
   sheetFormat(args);
 }
 
-/**
- * Saves the sheet when --heir-sheet names a file. `replace` follows the command: encode replaces
- * an existing file as it does its record, while shares are never written over an existing file.
- */
-export async function saveHeirSheet(
-  args: ParsedArguments,
-  facts: HeirSheetFacts,
-  replace: boolean,
-): Promise<void> {
+/** Saves the sheet when --heir-sheet names a file, never over an existing one. */
+export async function saveHeirSheet(args: ParsedArguments, facts: HeirSheetFacts): Promise<void> {
   const path = value(args, "heir-sheet");
   if (path === undefined) return;
   const bytes = await renderHeirSheet(heirSheetText(facts), sheetFormat(args));
-  await (replace ? replacePrivateFile : publishNewPrivateFile)(path, bytes);
+  await publishNewPrivateFile(path, bytes);
   terminalNotice(`Saved instructions for heirs: ${path}`, "success");
 }

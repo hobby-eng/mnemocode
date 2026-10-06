@@ -61,34 +61,38 @@ describe("hidden line", () => {
 
   it("keeps every byte as typed and shows nothing", async () => {
     const shown = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    expect(await readLine(typed("test only\ttab\r"), false)).toBe("test only\ttab");
+    expect(await readLine(typed("test only\ttab\r"), { echo: false })).toBe("test only\ttab");
     expect(shown).not.toHaveBeenCalled();
   });
 
   it("edits with Backspace, Delete and Ctrl+U, also over a character of several bytes", async () => {
-    expect(await readLine(typed("abc\x7fd\r"), false)).toBe("abd");
-    expect(await readLine(typed("ab€\x08c\r"), false)).toBe("abc");
-    expect(await readLine(typed("wrong\x15right\n"), false)).toBe("right");
+    expect(await readLine(typed("abc\x7fd\r"), { echo: false })).toBe("abd");
+    expect(await readLine(typed("ab€\x08c\r"), { echo: false })).toBe("abc");
+    expect(await readLine(typed("wrong\x15right\n"), { echo: false })).toBe("right");
   });
 
   it("ends with Ctrl+D or the end of the input only when nothing was typed", async () => {
-    expect(await readLine(typed("\x04"), false)).toBeUndefined();
-    expect(await readLine(typed(""), false)).toBeUndefined();
-    expect(await readLine(typed("partial"), false)).toBe("partial");
-    expect(await readLine(typed("a\x04b\r"), false)).toBe("a\x04b");
+    expect(await readLine(typed("\x04"), { echo: false })).toBeUndefined();
+    expect(await readLine(typed(""), { echo: false })).toBeUndefined();
+    expect(await readLine(typed("partial"), { echo: false })).toBe("partial");
+    expect(await readLine(typed("a\x04b\r"), { echo: false })).toBe("a\x04b");
   });
 
   it("is cancelled by Ctrl+C", async () => {
-    await expect(readLine(typed("secret\x03"), false)).rejects.toBeInstanceOf(InputCancelled);
+    await expect(readLine(typed("secret\x03"), { echo: false })).rejects.toBeInstanceOf(
+      InputCancelled,
+    );
   });
 
   it("refuses an answer longer than its limit and text that is not UTF-8", async () => {
-    await expect(readLine(typed("12345\r"), false, 4)).rejects.toThrow("longer than 4 bytes");
+    await expect(readLine(typed("12345\r"), { echo: false, limit: 4 })).rejects.toThrow(
+      "longer than 4 bytes",
+    );
     const invalid: NextByte = (() => {
       const bytes = [0xff, 0x0d];
       return async () => bytes.shift();
     })();
-    await expect(readLine(invalid, false)).rejects.toThrow("not valid UTF-8");
+    await expect(readLine(invalid, { echo: false })).rejects.toThrow("not valid UTF-8");
   });
 
   it("shows a visible answer as it is typed, without control keys and escape sequences", async () => {
@@ -97,11 +101,62 @@ describe("hidden line", () => {
       shown.push(Buffer.from(chunk as Uint8Array).toString("utf8"));
       return true;
     });
-    expect(await readLine(typed("ab\x1b[Ac\x01x\x7f\r"), true)).toBe("abc");
-    expect(shown.join("")).toBe("abcx\b \b");
+    // Up is no editing key; Ctrl+A goes to the start, where x goes in and Backspace takes it out.
+    expect(await readLine(typed("ab\x1b[Ac\x01x\x7f\r"), { echo: true })).toBe("abc");
+    expect(shown.join("")).not.toContain("\x1b[A");
     // A pasted Tab between words counts and shows as a space.
     shown.length = 0;
-    expect(await readLine(typed("abandon\tabout\r"), true)).toBe("abandon about");
+    expect(await readLine(typed("abandon\tabout\r"), { echo: true })).toBe("abandon about");
     expect(shown.join("")).toBe("abandon about");
+  });
+
+  it("edits a visible answer at the cursor, as a shell does", async () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const LEFT = "\x1b[D";
+    const RIGHT = "\x1b[C";
+    // Left twice, then a character goes in before the last two.
+    expect(await readLine(typed(`abcd${LEFT}${LEFT}X\r`), { echo: true })).toBe("abXcd");
+    // Backspace deletes before the cursor, Delete under it.
+    expect(await readLine(typed(`abcd${LEFT}${LEFT}\x7f\x1b[3~\r`), { echo: true })).toBe("ad");
+    // Home and End, also as Ctrl+A and Ctrl+E, and the O forms of application mode.
+    expect(await readLine(typed(`bc\x1b[Ha\x1b[Fd\r`), { echo: true })).toBe("abcd");
+    expect(await readLine(typed(`bc\x1bOHa\x05d\r`), { echo: true })).toBe("abcd");
+    // Ctrl+Left and Ctrl+Right move by words; Ctrl+W deletes the word before the cursor.
+    expect(
+      await readLine(typed(`one two three\x1b[1;5D\x1b[1;5DX\x1b[1;5C${RIGHT}Y\r`), { echo: true }),
+    ).toBe("one Xtwo Ythree");
+    expect(await readLine(typed(`one two three\x17\x17four\r`), { echo: true })).toBe("one four");
+    // Ctrl+U deletes what is before the cursor, Ctrl+K what follows it.
+    expect(
+      await readLine(typed(`wrong right${LEFT}${LEFT}${LEFT}${LEFT}${LEFT}\x15\r`), { echo: true }),
+    ).toBe("right");
+    expect(await readLine(typed(`keep cut${LEFT}${LEFT}${LEFT}\x0b\r`), { echo: true })).toBe(
+      "keep ",
+    );
+    // A character of several bytes moves and deletes as one.
+    expect(await readLine(typed(`a€b${LEFT}${LEFT}\x7f\r`), { echo: true })).toBe("€b");
+  });
+
+  it("ignores Escape alone in a secret prompt and goes back with it in the menu", async () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const lone = (text: string) => {
+      const next = typed(text);
+      // Escape alone: nothing follows it at once.
+      let first = true;
+      return {
+        next,
+        moreWithin: async () => {
+          const answer = !first;
+          first = false;
+          return answer;
+        },
+      };
+    };
+    const secret = lone("\x1babc\r");
+    expect(await readLine(secret.next, { echo: true, moreWithin: secret.moreWithin })).toBe("abc");
+    const menu = lone("\x1babc\r");
+    expect(
+      await readLine(menu.next, { echo: true, moreWithin: menu.moreWithin, escapeGoesBack: true }),
+    ).toBeUndefined();
   });
 });

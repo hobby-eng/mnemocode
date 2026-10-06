@@ -2,7 +2,7 @@
 // pause for Enter, drawn on standard error in the style of `mhfe`'s menu (src/bin/mhfe/menu.rs).
 // They need a terminal on standard input and standard error (terminalAvailable).
 
-import { readKey, readLine, withRawTerminal } from "./terminal-input.js";
+import { displayWidth, readKey, readLine, withRawTerminal } from "./terminal-input.js";
 import { STYLE, terminalPaint } from "./terminal.js";
 
 /** The widest line drawn: a list redraws itself by moving the cursor up line by line, which a line
@@ -191,7 +191,12 @@ export async function askLine(
   return withRawTerminal(async (next, moreWithin) => {
     process.stderr.write("\n");
     writePrompt(shown);
-    const typed = await readLine(next, true, undefined, moreWithin);
+    const typed = await readLine(next, {
+      echo: true,
+      moreWithin,
+      escapeGoesBack: true,
+      promptWidth: displayWidth(shown),
+    });
     process.stderr.write("\n");
     redrawFrom(QUESTION_LINES);
     if (typed === undefined) return undefined;

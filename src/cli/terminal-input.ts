@@ -3,9 +3,13 @@
 // and this module edits the line itself, as `mhfe` does (src/bin/mhfe/hidden_input.rs). Every
 // byte is kept as data except these keys, which keep their usual meaning:
 //
-// - Backspace deletes the last character and Ctrl+U the whole line;
+// - Backspace deletes the character before the cursor and Ctrl+U all of them;
 // - Enter ends the line, and Ctrl+D on an empty line ends the input;
 // - Ctrl+C cancels: raw mode delivers it as a byte instead of a signal.
+//
+// A visible answer is also edited as in a shell: the arrow keys, Home and End (Ctrl+A, Ctrl+E) and
+// Ctrl with an arrow move the cursor, Delete deletes the character under it, Ctrl+K what follows it
+// and Ctrl+W the word before it, and what is typed goes in at the cursor.
 //
 // A terminal's line mode would otherwise act on further keys and, on Linux, cut a line after 4095
 // bytes. scripts/verify-terminal-input.py drives this in a Unix pseudo-terminal.
@@ -17,13 +21,19 @@ export const MAX_ANSWER_BYTES = 1024 * 1024;
 
 /** Raw terminal bytes that this module acts on. */
 const KEY = {
+  CTRL_A: 0x01,
   CTRL_C: 0x03,
   CTRL_D: 0x04,
+  CTRL_E: 0x05,
   BACKSPACE: 0x08,
+  TAB: 0x09,
   LINE_FEED: 0x0a,
+  CTRL_K: 0x0b,
   CARRIAGE_RETURN: 0x0d,
   CTRL_U: 0x15,
+  CTRL_W: 0x17,
   ESCAPE: 0x1b,
+  SPACE: 0x20,
   DELETE: 0x7f,
 } as const;
 
@@ -164,20 +174,95 @@ function arrow(finalByte: number | undefined): Key {
   return { kind: "other" };
 }
 
+/** How readLine reads an answer. */
+export interface LineOptions {
+  /** Shows the answer as it is typed and lets the keys at the top edit it; otherwise nothing shows. */
+  readonly echo: boolean;
+  readonly limit?: number;
+  /** Tells Escape alone from the start of a key's escape sequence. */
+  readonly moreWithin?: MoreWithin;
+  /** Escape alone goes back, as in the menu; otherwise it does nothing. */
+  readonly escapeGoesBack?: boolean;
+  /** The width of the prompt before the answer, which starts at the left edge (displayWidth). */
+  readonly promptWidth?: number;
+}
+
+/** The keys of a visible answer that move the cursor or delete, read from their escape sequence. */
+type EditKey = "left" | "right" | "word-left" | "word-right" | "home" | "end" | "delete" | "other";
+
+/** The xterm modifier numbers of Alt and Ctrl, as in ESC [ 1 ; 5 D for Ctrl+Left. */
+const WORD_MODIFIERS = new Set(["3", "5"]);
+
+/** Reads the rest of an escape sequence after ESC and tells which editing key sent it. */
+async function readEditKey(next: NextByte): Promise<EditKey> {
+  const introducer = await next();
+  if (introducer === 0x4f) {
+    const final = await next();
+    if (final === 0x43) return "right";
+    if (final === 0x44) return "left";
+    if (final === 0x48) return "home";
+    if (final === 0x46) return "end";
+    return "other";
+  }
+  if (introducer !== 0x5b) return "other";
+  // ECMA-48: parameter and intermediate bytes, then one final byte from @ to ~.
+  let parameters = "";
+  for (;;) {
+    const part = await next();
+    if (part === undefined) return "other";
+    if (part < 0x40 || part > 0x7e) {
+      parameters += String.fromCharCode(part);
+      continue;
+    }
+    const modifier = parameters.split(";")[1];
+    const word = modifier !== undefined && WORD_MODIFIERS.has(modifier);
+    if (part === 0x43) return word ? "word-right" : "right";
+    if (part === 0x44) return word ? "word-left" : "left";
+    if (part === 0x48) return "home";
+    if (part === 0x46) return "end";
+    if (part === 0x7e) {
+      const code = parameters.split(";")[0];
+      if (code === "1" || code === "7") return "home";
+      if (code === "4" || code === "8") return "end";
+      if (code === "3") return "delete";
+    }
+    return "other";
+  }
+}
+
 /**
- * Edits one line from raw bytes as described at the top. Returns undefined when the input ends
- * before anything was typed, or, for a visible answer, at Escape. With `echo`, each character is written to standard error as it is
- * typed, for answers such as a file name; without it nothing is shown.
+ * Reads one line from raw bytes as described at the top. Returns undefined when the input ends
+ * before anything was typed, or at Escape where it goes back.
  */
-export async function readLine(
-  next: NextByte,
-  echo: boolean,
-  limit: number = MAX_ANSWER_BYTES,
-  moreWithin?: MoreWithin,
-): Promise<string | undefined> {
+export async function readLine(next: NextByte, options: LineOptions): Promise<string | undefined> {
+  const { echo, limit = MAX_ANSWER_BYTES, moreWithin } = options;
   // Reserved at its largest size and never grown, so that no unwiped copy of a secret is left.
   const line = Buffer.alloc(limit);
   let length = 0;
+  // Where the next character goes; always at the start of a character.
+  let cursor = 0;
+  const shown = echo ? new ShownLine(line, options.promptWidth ?? 0) : undefined;
+  const insert = (byte: number): void => {
+    if (length === limit)
+      throw new Error(`An answer is longer than ${limit} bytes; no valid answer is that long.`);
+    line.copyWithin(cursor + 1, cursor, length);
+    line[cursor++] = byte;
+    length += 1;
+    // A character of several bytes is shown once it is complete.
+    if (shown !== undefined && isCharacterEnd(line, cursor))
+      shown.update(length, cursor, cursor === length);
+  };
+  const remove = (from: number, to: number): void => {
+    line.copyWithin(from, to, length);
+    length -= to - from;
+    line.fill(0, length, length + (to - from));
+    cursor = from;
+    shown?.update(length, cursor);
+  };
+  const moveTo = (position: number): void => {
+    cursor = position;
+    shown?.update(length, cursor);
+  };
   try {
     for (;;) {
       const byte = await next();
@@ -188,33 +273,42 @@ export async function readLine(
       if (byte === KEY.CARRIAGE_RETURN || byte === KEY.LINE_FEED) break;
       if (byte === KEY.CTRL_C) throw new InputCancelled();
       if (byte === KEY.BACKSPACE || byte === KEY.DELETE) {
-        const kept = withoutLastCharacter(line, length);
-        if (echo && kept < length) process.stderr.write("\b \b");
-        length = kept;
+        if (cursor > 0) remove(previousCharacter(line, cursor), cursor);
       } else if (byte === KEY.CTRL_U) {
-        if (echo) process.stderr.write("\b \b".repeat(characterCount(line, length)));
-        length = 0;
+        if (cursor > 0) remove(0, cursor);
       } else if (byte === KEY.CTRL_D && length === 0) {
         return undefined;
-      } else if (echo && byte === KEY.ESCAPE) {
-        // Escape alone goes back; an arrow or another special key is no part of a visible answer
-        // such as a file name.
-        if (moreWithin !== undefined && !(await moreWithin(ESCAPE_DELAY_MS))) return undefined;
-        await skipEscapeSequence(next);
-      } else if (echo && byte === 0x09) {
+      } else if (!echo) {
+        insert(byte);
+      } else if (byte === KEY.ESCAPE) {
+        if (moreWithin !== undefined && !(await moreWithin(ESCAPE_DELAY_MS))) {
+          if (options.escapeGoesBack === true) return undefined;
+          continue;
+        }
+        const key = await readEditKey(next);
+        if (key === "left" && cursor > 0) moveTo(previousCharacter(line, cursor));
+        else if (key === "right" && cursor < length) moveTo(nextCharacter(line, cursor, length));
+        else if (key === "word-left") moveTo(previousWord(line, cursor));
+        else if (key === "word-right") moveTo(nextWord(line, cursor, length));
+        else if (key === "home") moveTo(0);
+        else if (key === "end") moveTo(length);
+        else if (key === "delete" && cursor < length)
+          remove(cursor, nextCharacter(line, cursor, length));
+      } else if (byte === KEY.CTRL_A) {
+        moveTo(0);
+      } else if (byte === KEY.CTRL_E) {
+        moveTo(length);
+      } else if (byte === KEY.CTRL_K) {
+        if (cursor < length) remove(cursor, length);
+      } else if (byte === KEY.CTRL_W) {
+        if (cursor > 0) remove(previousWord(line, cursor), cursor);
+      } else if (byte === KEY.TAB) {
         // A pasted Tab between words separates them as a space does, and is shown as one.
-        if (length === limit)
-          throw new Error(`An answer is longer than ${limit} bytes; no valid answer is that long.`);
-        line[length++] = 0x20;
-        process.stderr.write(" ");
-      } else if (echo && byte < 0x20) {
-        // Neither is a control character, which would move the cursor if it were shown.
-      } else {
-        if (length === limit)
-          throw new Error(`An answer is longer than ${limit} bytes; no valid answer is that long.`);
-        line[length++] = byte;
-        if (echo && isCharacterEnd(line, length)) echoLastCharacter(line, length);
+        insert(KEY.SPACE);
+      } else if (byte >= KEY.SPACE) {
+        insert(byte);
       }
+      // Any other control character is left out: shown, it would move the cursor.
     }
     return new TextDecoder("utf-8", { fatal: true }).decode(line.subarray(0, length));
   } catch (error) {
@@ -225,21 +319,135 @@ export async function readLine(
   }
 }
 
+/**
+ * The visible answer on the terminal, which wraps a long answer onto further rows. Every change
+ * but typing at the end redraws the answer from its first row, with relative moves only, so that
+ * it stays right when the screen scrolls. `cursorRow` is the row of the cursor below that first
+ * row; the answer starts on it after the prompt.
+ */
+class ShownLine {
+  private readonly columns: number;
+  private readonly start: number;
+  private cursorRow = 0;
+
+  constructor(
+    private readonly line: Buffer,
+    promptWidth: number,
+  ) {
+    this.columns = Math.max(1, process.stderr.columns || DEFAULT_COLUMNS);
+    this.start = promptWidth % this.columns;
+    // A prompt that ends at the right edge leaves the cursor waiting there; this settles it.
+    if (promptWidth > 0 && this.start === 0) process.stderr.write("\r\n");
+  }
+
+  /** Shows the answer of `length` bytes with the cursor at `cursor`; `typedAtEnd` only adds. */
+  update(length: number, cursor: number, typedAtEnd = false): void {
+    if (typedAtEnd) {
+      const end = this.start + displayWidthOf(this.line, 0, length);
+      process.stderr.write(this.line.subarray(previousCharacter(this.line, cursor), cursor));
+      this.cursorRow = this.settle(end);
+      return;
+    }
+    const out = process.stderr;
+    out.write(
+      `${this.cursorRow > 0 ? `\x1b[${this.cursorRow}A` : ""}\r${this.right(this.start)}\x1b[J`,
+    );
+    out.write(this.line.subarray(0, length));
+    const endRow = this.settle(this.start + displayWidthOf(this.line, 0, length));
+    const target = this.start + displayWidthOf(this.line, 0, cursor);
+    const row = Math.floor(target / this.columns);
+    out.write(
+      `${endRow > row ? `\x1b[${endRow - row}A` : ""}\r${this.right(target % this.columns)}`,
+    );
+    this.cursorRow = row;
+  }
+
+  /**
+   * The row the cursor is on after writing up to `offset`. At the right edge a terminal waits
+   * before it wraps; a new line moves the cursor to where the next character would go.
+   */
+  private settle(offset: number): number {
+    if (offset > 0 && offset % this.columns === 0) process.stderr.write("\r\n");
+    return Math.floor(offset / this.columns);
+  }
+
+  private right(columns: number): string {
+    return columns > 0 ? `\x1b[${columns}C` : "";
+  }
+}
+
+/** Terminal width when the terminal does not say. */
+const DEFAULT_COLUMNS = 80;
+
 const CONTINUATION_MASK = 0b1100_0000;
 const CONTINUATION = 0b1000_0000;
 
-/** The length without the last UTF-8 character: its continuation bytes, then its first byte. */
-function withoutLastCharacter(line: Buffer, length: number): number {
-  let kept = length;
-  while (kept > 0 && (line[kept - 1]! & CONTINUATION_MASK) === CONTINUATION) kept -= 1;
-  return Math.max(0, kept - 1);
+/** Where the UTF-8 character before `position` starts: its continuation bytes, then its first. */
+function previousCharacter(line: Buffer, position: number): number {
+  let start = position;
+  while (start > 0 && (line[start - 1]! & CONTINUATION_MASK) === CONTINUATION) start -= 1;
+  return Math.max(0, start - 1);
 }
 
-function characterCount(line: Buffer, length: number): number {
-  let count = 0;
-  for (let index = 0; index < length; index += 1)
-    if ((line[index]! & CONTINUATION_MASK) !== CONTINUATION) count += 1;
-  return count;
+/** Where the UTF-8 character at `position` ends. */
+function nextCharacter(line: Buffer, position: number, length: number): number {
+  let end = position + 1;
+  while (end < length && (line[end]! & CONTINUATION_MASK) === CONTINUATION) end += 1;
+  return Math.min(end, length);
+}
+
+/** The start of the word before `position`: back over spaces, then over the word. */
+function previousWord(line: Buffer, position: number): number {
+  let start = position;
+  while (start > 0 && line[start - 1] === KEY.SPACE) start -= 1;
+  while (start > 0 && line[start - 1] !== KEY.SPACE) start -= 1;
+  return start;
+}
+
+/** The end of the word after `position`: on over spaces, then over the word. */
+function nextWord(line: Buffer, position: number, length: number): number {
+  let end = position;
+  while (end < length && line[end] === KEY.SPACE) end += 1;
+  while (end < length && line[end] !== KEY.SPACE) end += 1;
+  return end;
+}
+
+/**
+ * Columns that East Asian wide characters take, such as the Chinese words of BIP39 (Unicode
+ * Standard Annex 11: the main wide ranges).
+ */
+const WIDE_RANGES: readonly (readonly [number, number])[] = [
+  [0x1100, 0x115f],
+  [0x2e80, 0xa4cf],
+  [0xac00, 0xd7a3],
+  [0xf900, 0xfaff],
+  [0xfe30, 0xfe4f],
+  [0xff00, 0xff60],
+  [0xffe0, 0xffe6],
+  [0x20000, 0x3fffd],
+];
+
+function codePointWidth(point: number): number {
+  return WIDE_RANGES.some(([first, last]) => point >= first && point <= last) ? 2 : 1;
+}
+
+/** The columns that the UTF-8 text between `from` and `to` takes on a terminal. */
+function displayWidthOf(line: Buffer, from: number, to: number): number {
+  let width = 0;
+  for (let index = from; index < to;) {
+    const first = line[index]!;
+    const size = first < 0x80 ? 1 : first >= 0xf0 ? 4 : first >= 0xe0 ? 3 : 2;
+    let point = size === 1 ? first : first & (0xff >> (size + 1));
+    for (let part = 1; part < size; part += 1) point = (point << 6) | (line[index + part]! & 0x3f);
+    width += codePointWidth(point);
+    index += size;
+  }
+  return width;
+}
+
+/** The columns that a prompt takes on a terminal. */
+export function displayWidth(text: string): number {
+  return displayWidthOf(Buffer.from(text, "utf8"), 0, Buffer.byteLength(text, "utf8"));
 }
 
 /** Whether the bytes up to `length` end with a complete UTF-8 character. */
@@ -249,24 +457,4 @@ function isCharacterEnd(line: Buffer, length: number): boolean {
   const first = line[start]!;
   const expected = first < 0x80 ? 1 : first >= 0xf0 ? 4 : first >= 0xe0 ? 3 : 2;
   return length - start === expected;
-}
-
-function echoLastCharacter(line: Buffer, length: number): void {
-  let start = length - 1;
-  while (start > 0 && (line[start]! & CONTINUATION_MASK) === CONTINUATION) start -= 1;
-  process.stderr.write(line.subarray(start, length));
-}
-
-/** Reads the rest of an escape sequence after ESC, as readKey does, and drops it. */
-async function skipEscapeSequence(next: NextByte): Promise<void> {
-  const introducer = await next();
-  if (introducer === 0x4f) {
-    await next();
-    return;
-  }
-  if (introducer !== 0x5b) return;
-  for (;;) {
-    const part = await next();
-    if (part === undefined || (part >= 0x40 && part <= 0x7e)) return;
-  }
 }

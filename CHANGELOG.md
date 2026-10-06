@@ -28,8 +28,10 @@
 ### Secret handling
 
 - MnemoCode clears its temporary copies of the phrase data after use.
+- Nothing is saved over an existing file or folder. When the name given is taken, MnemoCode saves under the first free numbered name, such as `cards (1).pdf`, and says so after saving; the name is settled before the seed phrase is asked, so a taken name no longer stops a command. A result named like an input of the same command is still refused.
 - A file with Shamir shares now appears under its name only when it is complete, as the other exports already did. MnemoCode writes it to a private temporary file first and then gives it its final name in one step, without ever replacing an existing file. On memory cards and USB sticks formatted with FAT or exFAT, which cannot give a file a second name, an empty file holds the name until the complete one replaces it, and is removed again if that fails.
 - Text, standard input and QR image files are read up to their size limit and no further, also when they come from a pipe or keep growing, instead of trusting the size the system reports.
+- A typed answer can be edited as in a shell: the arrow keys, Home and End, Ctrl with an arrow, Delete, Ctrl+K and Ctrl+W, also when a long answer wraps onto further rows. Escape alone no longer swallows the next key at a prompt for a secret.
 - `--ask-secrets` works on Linux, macOS and Windows: MnemoCode reads the answer itself instead of through `systemd-ask-password`, which exists only on Linux. Backspace and Ctrl+U edit it, and an answer pasted ahead of the next question is kept for it.
 - A command that asks for a secret runs on a private screen of its own in the terminal: what you type is shown there, and so is the result. When you press Enter, the screen is cleared, so that nothing stays in the scrollback; output sent to a file or a pipe goes there as before.
 - With `--ask-secrets`, `decode` and `recover-date` take the record from `--input-file` or `--qr-file` and ask only for the dates.

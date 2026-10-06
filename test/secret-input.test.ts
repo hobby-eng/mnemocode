@@ -36,7 +36,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { parseArguments } from "../src/cli/arguments.js";
 import { runDecode } from "../src/cli/decode-command.js";
-import { askSecret } from "../src/cli/input.js";
+import { askSecret, datesPrompt, encodedWordCount } from "../src/cli/input.js";
 import { InputCancelled } from "../src/cli/terminal-input.js";
 
 const TEST_PHRASE =
@@ -67,7 +67,9 @@ describe("secret input", () => {
     terminal.privateScreen = true;
     terminal.answers = "test onlz\x7fy\r";
     expect(await askSecret("Seed phrase:")).toBe("test only");
-    expect(written.join("")).toBe("Seed phrase: test onlz\b \by\n");
+    // Backspace redraws the answer after the prompt (13 columns): back to its start, cleared, written
+    // again; then y is added.
+    expect(written.join("")).toBe("Seed phrase: test onlz\r\x1b[13C\x1b[Jtest onl\r\x1b[21Cy\n");
   });
 
   it("works the same on every system: no system program is asked", async () => {
@@ -117,10 +119,21 @@ describe("secret input", () => {
       terminal.answers = "23-09-2026\r";
       await runDecode(parseArguments(["--ask-secrets", "--input-file", record]));
       expect(printed).toHaveBeenCalledWith(TEST_PHRASE);
-      expect(written.join("")).toContain("Dates");
+      // The record's 12 words take up to 4 dates, and the question says so.
+      expect(written.join("")).toContain("Dates (up to 4, DD-MM-YYYY, separated by spaces):");
       expect(written.join("")).not.toContain("Encoded seed phrase");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it("names the most dates a seed phrase takes: one for every three words", () => {
+    expect(datesPrompt(12)).toBe("Dates (up to 4, DD-MM-YYYY, separated by spaces):");
+    expect(datesPrompt(24)).toBe("Dates (up to 8, DD-MM-YYYY, separated by spaces):");
+    // A count that is not a BIP39 length, or none yet, leaves the number out.
+    expect(datesPrompt(13)).toBe("Dates (DD-MM-YYYY, separated by spaces):");
+    expect(datesPrompt(undefined)).toBe("Dates (DD-MM-YYYY, separated by spaces):");
+    expect(encodedWordCount("1 2 3 4 5 6 7 8 9 10 11 12 13 14 15")).toBe(15);
+    expect(encodedWordCount("not an encoded seed phrase")).toBeUndefined();
   });
 });

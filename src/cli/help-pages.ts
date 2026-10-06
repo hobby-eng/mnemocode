@@ -422,7 +422,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             value: "PATH",
             summary: "Also save a versioned MNC1 record file",
             details: [
-              "The record starts with MNC1:<mode>:<format>:, so decode needs only the file and the dates. Dates are never stored. An existing file is replaced.",
+              "The record starts with MNC1:<mode>:<format>:, so decode needs only the file and the dates. Dates are never stored. A taken name is numbered, as record (1).txt, never replaced.",
             ],
           },
           {
@@ -776,12 +776,12 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             flag: "--output",
             value: "NEW_FILE",
             summary: "Save the shares, one complete share per line",
-            details: ["The file holds all shares. An existing file is never replaced."],
+            details: ["The file holds all shares. A taken name is numbered, never replaced."],
           },
           {
             ...pdf,
             summary: "Save all shares in one multi-page PDF",
-            details: ["An existing file is never replaced."],
+            details: ["A taken name is numbered, as shares (1).pdf, never replaced."],
           },
           {
             ...cardsDir,

@@ -116,9 +116,14 @@ describe("instructions for heirs", () => {
       const a6 = cli([...split.slice(0, -1), small, "--heir-sheet-size", "a6"]);
       expect(a6.status, a6.stderr).toBe(0);
       expect(await pageSize(small)).toEqual([105, 148]);
+      // A taken name does not stop the command: the sheet is saved as "heirs (1).pdf".
+      const before = readFileSync(path);
       const again = cli(split);
-      expect(again.status).not.toBe(0);
-      expect(again.stderr).toContain("already exists");
+      expect(again.status, again.stderr).toBe(0);
+      const numbered = join(directory, "heirs (1).pdf");
+      expect(again.stderr).toContain(`${path} already exists: saved as ${numbered} instead.`);
+      expect(readFileSync(path)).toEqual(before);
+      expect(await pageSize(numbered)).toEqual([148, 210]);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

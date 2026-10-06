@@ -1,8 +1,87 @@
 import { constants } from "node:fs";
 import { access, lstat, realpath, stat } from "node:fs/promises";
-import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { value, values, type ParsedArguments } from "./arguments.js";
 import { optionLabel } from "./option-copy.js";
+import { terminalNotice } from "./terminal.js";
+import { FILE_OUTPUTS, FOLDER_OUTPUTS, SAVED_OPTIONS } from "./output-options.js";
+
+/** Options that name a file the command reads. */
+const INPUT_OPTIONS = [
+  "mnemonic-file",
+  "input-file",
+  "share-file",
+  "share-qr",
+  "bip39-passphrase-file",
+  "wif-file",
+  "qr-file",
+] as const;
+/** More numbered copies of one name than this are surely a mistake. */
+const MAX_COPY_NUMBER = 999;
+
+/** Results saved under another name: the name used, and the name given. */
+const renamedOutputs = new Map<string, string>();
+
+/** What is at `path`: nothing, a folder, or something else. */
+async function entryAt(path: string): Promise<"none" | "folder" | "other"> {
+  try {
+    return (await lstat(path)).isDirectory() ? "folder" : "other";
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "none";
+    throw error;
+  }
+}
+
+/** "name (1).pdf", or "name (1)" for a folder, as file managers name a copy. */
+function numberedName(path: string, number: number, folder: boolean): string {
+  const trimmed = path.replace(/[\\/]+$/u, "");
+  const extension = folder ? "" : extname(trimmed);
+  return `${trimmed.slice(0, trimmed.length - extension.length)} (${number})${extension}`;
+}
+
+/**
+ * Nothing is ever saved over a file or a folder: when the name given for a result is taken, the
+ * result gets the first free numbered name, and reportRenamedOutputs says so after saving. This
+ * runs before any secret is asked, so that a taken name never stops a command halfway. A folder
+ * given for a file, and an input of the command itself, are left alone for the checks that refuse
+ * them (preflightFileDestination, validateOutputPaths): a result named like its own input is a
+ * mistake, not a copy.
+ */
+export async function settleOutputPaths(args: ParsedArguments): Promise<void> {
+  const inputs = new Set<string>();
+  for (const key of INPUT_OPTIONS)
+    for (const source of values(args, key))
+      if (source !== "-") inputs.add(await realpath(resolve(source)).catch(() => resolve(source)));
+  for (const [keys, folder] of [
+    [FILE_OUTPUTS, false],
+    [FOLDER_OUTPUTS, true],
+  ] as const) {
+    for (const key of keys) {
+      const path = value(args, key);
+      if (path === undefined || !path.trim() || path === "-") continue;
+      const taken = await entryAt(path);
+      if (taken === "none" || (taken === "folder" && !folder)) continue;
+      // A dangling or looping link is a taken name like any other.
+      if (inputs.has(await realpath(resolve(path)).catch(() => resolve(path)))) continue;
+      let number = 1;
+      while ((await entryAt(numberedName(path, number, folder))) !== "none") {
+        number += 1;
+        if (number > MAX_COPY_NUMBER)
+          throw new Error(`${path} has too many numbered copies already. Choose another name.`);
+      }
+      const free = numberedName(path, number, folder);
+      renamedOutputs.set(free, path);
+      args[key] = free;
+    }
+  }
+}
+
+/** After saving: one warning for each result saved under a numbered name. */
+export function reportRenamedOutputs(): void {
+  for (const [used, given] of renamedOutputs)
+    terminalNotice(`${given} already exists: saved as ${used} instead.`, "warning");
+  renamedOutputs.clear();
+}
 
 function contains(parent: string, child: string): boolean {
   const relation = relative(resolve(parent), resolve(child));
@@ -40,7 +119,7 @@ async function effectiveSourcePath(path: string, key: string): Promise<string> {
 
 /** Files and folders must not shadow one another or overwrite an input. */
 export async function validateOutputPaths(args: ParsedArguments): Promise<void> {
-  const outputs = ["images-dir", "cards-dir", "pdf", "output", "qr"].flatMap((key) => {
+  const outputs = SAVED_OPTIONS.flatMap((key) => {
     const path = value(args, key);
     return path === undefined ? [] : [{ key, path }];
   });
@@ -54,7 +133,7 @@ export async function validateOutputPaths(args: ParsedArguments): Promise<void> 
           `The ${optionLabel(left.key)} and ${optionLabel(right.key)} must use separate, non-overlapping paths.`,
         );
     }
-    for (const key of ["mnemonic-file", "input-file", "share-file", "share-qr"]) {
+    for (const key of INPUT_OPTIONS) {
       for (const source of values(args, key)) {
         if (source === "-") continue;
         const effectiveSource = await effectiveSourcePath(source, key);

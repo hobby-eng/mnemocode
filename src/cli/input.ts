@@ -1,11 +1,20 @@
 import { terminalNotice } from "./terminal.js";
 import { choose, writePrompt } from "./terminal-choice.js";
-import { readLine, terminalAvailable, withRawTerminal } from "./terminal-input.js";
+import { displayWidth, readLine, terminalAvailable, withRawTerminal } from "./terminal-input.js";
 import { onPrivateScreen } from "./private-screen.js";
-import { detectInputFormats, parseDate, type DateShiftDate, type OutputFormat } from "../core.js";
+import {
+  detectInputFormats,
+  maximumDates,
+  parseDate,
+  parseInput,
+  type Bip39WordCount,
+  type DateShiftDate,
+  type OutputFormat,
+} from "../core.js";
+import { WORD_COUNT_SET } from "../core/words.js";
 import { readBoundedDescriptor, readBoundedFile } from "./bounded-read.js";
 import { decodeQrPngFile } from "./qr-input.js";
-import { type MnemoCodeRecord, type RecordMode } from "../record.js";
+import { parseRecord, type MnemoCodeRecord, type RecordMode } from "../record.js";
 import { type ParsedArguments, value, values } from "./arguments.js";
 
 export type EncodedFormat = Exclude<OutputFormat, "json">;
@@ -186,10 +195,15 @@ export async function askSecret(prompt: string): Promise<string> {
       "--ask-secrets needs a terminal on standard input and standard error. Run the command in a terminal, or read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-).",
     );
   }
-  const secret = await withRawTerminal(async (next) => {
+  const secret = await withRawTerminal(async (next, moreWithin) => {
     writePrompt(`${prompt} `);
     try {
-      return await readLine(next, onPrivateScreen());
+      // Escape alone does nothing here: a slip of the finger must not lose what was typed.
+      return await readLine(next, {
+        echo: onPrivateScreen(),
+        moreWithin,
+        promptWidth: displayWidth(`${prompt} `),
+      });
     } finally {
       // The terminal did not show the Enter key either.
       process.stderr.write("\n");
@@ -201,8 +215,41 @@ export async function askSecret(prompt: string): Promise<string> {
   return trimmed;
 }
 
-/** The question for dates; the answer is split at spaces. */
-export const DATES_PROMPT = "Dates (DD-MM-YYYY, separated by spaces):";
+/**
+ * "up to N, " for a seed phrase of `wordCount` words, which takes one date for every three words
+ * (maximumDates); nothing when the count is not known yet.
+ */
+function mostDates(wordCount: number | undefined): string {
+  return wordCount !== undefined && WORD_COUNT_SET.has(wordCount)
+    ? `up to ${maximumDates(wordCount as Bip39WordCount)}, `
+    : "";
+}
+
+/** The question for dates, which says how many the seed phrase takes; the answer is split at spaces. */
+export function datesPrompt(wordCount: number | undefined): string {
+  return `Dates (${mostDates(wordCount)}DD-MM-YYYY, separated by spaces):`;
+}
+
+/** The number of words in typed text, such as a seed phrase. */
+export function wordCountOf(text: string): number {
+  return text.split(/\s+/u).filter(Boolean).length;
+}
+
+/**
+ * How many words an encoded seed phrase stands for, when that can be told before its form is
+ * settled: from the form given, or when every form that fits it gives the same count.
+ */
+export function encodedWordCount(encoded: string, format?: EncodedFormat): number | undefined {
+  const counts = new Set<number>();
+  for (const candidate of format === undefined ? detectInputFormats(encoded) : [format]) {
+    try {
+      counts.add(parseInput(encoded, candidate).length);
+    } catch {
+      // A form that does not fit says nothing about the count.
+    }
+  }
+  return counts.size === 1 ? [...counts][0] : undefined;
+}
 
 export async function promptedEncodeInputs(
   arguments_: ParsedArguments,
@@ -220,17 +267,17 @@ export async function promptedEncodeInputs(
   }
   const mnemonic = await askSecret("Seed phrase (English BIP39 words):");
   if (mode === "direct") return { mnemonic, dates: [] };
-  const dateLine = await askSecret(DATES_PROMPT);
+  const dateLine = await askSecret(datesPrompt(wordCountOf(mnemonic)));
   return { mnemonic, dates: dateLine.split(/\s+/u).filter(Boolean).map(parseDate) };
 }
 
 /**
- * The answers of recover-date asked by --ask-secrets: the encoded record, unless a record file or a QR image gives
- * it, and the dates with ? for each forgotten digit.
+ * The answers of recover-date asked by --ask-secrets: the encoded record, which a record file or a
+ * QR image may give instead, and the dates with ? for each forgotten digit.
  */
 export async function promptedRecoveryInputs(
   arguments_: ParsedArguments,
-): Promise<{ readonly encoded?: string; readonly dateValues: string[] } | undefined> {
+): Promise<{ readonly encoded: string; readonly dateValues: string[] } | undefined> {
   if (arguments_["ask-secrets"] !== true) return undefined;
   if (value(arguments_, "input") !== undefined || values(arguments_, "date").length > 0) {
     throw new Error(
@@ -239,9 +286,14 @@ export async function promptedRecoveryInputs(
   }
   const fromFile =
     value(arguments_, "input-file") !== undefined || value(arguments_, "qr-file") !== undefined;
-  const encoded = fromFile ? undefined : await askSecret("Encoded seed phrase or record:");
+  // Read first, so that the question for dates can say how many the seed phrase takes.
+  const encoded = fromFile
+    ? await encodedInput(arguments_)
+    : await askSecret("Encoded seed phrase or record:");
+  const record = parseRecord(encoded);
+  const wordCount = encodedWordCount(record?.payload ?? encoded, record?.format);
   const dateLine = await askSecret(
-    "Dates with ? for each forgotten digit (one to three incomplete dates):",
+    `Dates with ? for each forgotten digit (${mostDates(wordCount)}one to three of them incomplete):`,
   );
   return { encoded, dateValues: dateLine.split(/\s+/u).filter(Boolean) };
 }

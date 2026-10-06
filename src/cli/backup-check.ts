@@ -14,7 +14,13 @@ import {
 import { parseRecord } from "../record.js";
 import { combineSskrShares } from "../sskr/shares.js";
 import { normalizeShare } from "../sskr/transport.js";
-import { askSecret, DATES_PROMPT, type EncodedFormat, type TransformMode } from "./input.js";
+import {
+  askSecret,
+  datesPrompt,
+  wordCountOf,
+  type EncodedFormat,
+  type TransformMode,
+} from "./input.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { choose } from "./terminal-choice.js";
 import { terminalNotice } from "./terminal.js";
@@ -146,7 +152,7 @@ export async function offerEncodedCheck(
     "the codes",
     async () => {
       const typed = await askSecret("Your backup, as written down:");
-      const dateLine = mode === "direct" ? "" : await askSecret(DATES_PROMPT);
+      const dateLine = mode === "direct" ? "" : await askSecret(datesPrompt(wordCountOf(original)));
       return checkEncodedBackup(original, typed, format, mode, dateLine);
     },
     show,
@@ -166,7 +172,7 @@ export async function offerShareCheck(
       const typed = await askSecret(
         `${threshold} shares as written down (separated by semicolons):`,
       );
-      const dateLine = mode === "direct" ? "" : await askSecret(DATES_PROMPT);
+      const dateLine = mode === "direct" ? "" : await askSecret(datesPrompt(wordCountOf(original)));
       return checkShareBackup(original, typed, mode, dateLine);
     },
     show,

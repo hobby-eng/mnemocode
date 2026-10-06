@@ -1,4 +1,4 @@
-import { replacePrivateFile } from "../export/private-file.js";
+import { publishNewPrivateFile } from "../export/private-file.js";
 import QRCode from "qrcode";
 
 export async function exportQrPayload(payload: string, path: string): Promise<void> {
@@ -9,5 +9,5 @@ export async function exportQrPayload(payload: string, path: string): Promise<vo
     type: "png",
     width: 720,
   });
-  await replacePrivateFile(path, png);
+  await publishNewPrivateFile(path, png);
 }

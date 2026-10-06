@@ -19,6 +19,7 @@ import { once } from "node:events";
 import { constants } from "node:os";
 import { isSea } from "node:sea";
 import { type ParsedArguments } from "./arguments.js";
+import { SAVED_OPTIONS } from "./output-options.js";
 import protectionFlags from "./protection-flags.json" with { type: "json" };
 
 /**
@@ -147,8 +148,7 @@ export function assertProtected(): void {
     );
 }
 
-/** Options that save a file or a folder, and those that draw images with pdftocairo. */
-const WRITING_OPTIONS = ["output", "qr", "pdf", "heir-sheet", "cards-dir", "images-dir"] as const;
+/** Options that draw images with pdftocairo. */
 const DRAWING_OPTIONS = ["images-dir", "image-format"] as const;
 
 /** What a command line needs beyond reading: writing files, and running pdftocairo. */
@@ -158,7 +158,7 @@ export function neededPermissions(
 ): { readonly writes: boolean; readonly runsPrograms: boolean } {
   return {
     // The self-test writes its cards to a temporary folder.
-    writes: command === "self-test" || WRITING_OPTIONS.some((key) => args[key] !== undefined),
+    writes: command === "self-test" || SAVED_OPTIONS.some((key) => args[key] !== undefined),
     runsPrograms: DRAWING_OPTIONS.some((key) => args[key] !== undefined),
   };
 }

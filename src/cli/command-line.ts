@@ -16,6 +16,8 @@ import { helpNames, printCommandHelp, printNamedHelp, printUsage } from "./usage
 import { commandOptions, isCommandName } from "./command-options.js";
 import { MNEMOCODE_VERSION } from "../version.js";
 import { runSskrSplit, runSskrCombine, runSskrExport } from "./sskr-command.js";
+import { reportRenamedOutputs, settleOutputPaths } from "./output-paths.js";
+import { SAVED_OPTIONS } from "./output-options.js";
 
 /** The commands that take a secret or show one; at a terminal they run on the private screen. */
 export const PRIVATE_SCREEN_COMMANDS: ReadonlySet<string> = new Set([
@@ -107,7 +109,9 @@ export async function runCommandLine(argv: readonly string[]): Promise<void> {
       assertFlag(arguments_, "list");
       assertFlag(arguments_, "all");
       assertCoreSelfTest();
-      return runPreview(arguments_);
+      await settleOutputPaths(arguments_);
+      await runPreview(arguments_);
+      return reportRenamedOutputs();
     case "table":
       assertAllowedArguments(arguments_, command, commandOptions[command]);
       assertFlag(arguments_, "all");
@@ -118,9 +122,6 @@ export async function runCommandLine(argv: readonly string[]): Promise<void> {
       return runSelfTest();
   }
 }
-
-/** Options that name a file or a folder to save. */
-const SAVED_OPTIONS = ["output", "qr", "pdf", "cards-dir", "images-dir"] as const;
 
 /**
  * Runs a command that takes or shows a secret: only under the full protection, on the private
@@ -141,6 +142,8 @@ async function withSecrets(args: ParsedArguments, run: () => Promise<void>): Pro
       );
       terminalMore("unencrypted-swap");
     }
+    // Before the warnings about where files go, which then name the files as they will be saved.
+    await settleOutputPaths(args);
     for (const key of SAVED_OPTIONS) {
       const path = value(args, key);
       const service = path === undefined ? undefined : cloudServiceOf(path);
@@ -149,6 +152,8 @@ async function withSecrets(args: ParsedArguments, run: () => Promise<void>): Pro
         terminalMore("cloud-folders");
       }
     }
-    return run();
+    await run();
+    // A command reports its own; this catches any left, still on the private screen.
+    reportRenamedOutputs();
   });
 }

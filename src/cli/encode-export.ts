@@ -1,7 +1,7 @@
 import { imageFormat } from "./image-options.js";
 import { exportPageImages } from "../export/image-export.js";
 import { renderCards } from "../export/pdf.js";
-import { replacePrivateFile } from "../export/private-file.js";
+import { publishNewPrivateFile } from "../export/private-file.js";
 import { exportIndividualCards } from "../export/individual-cards.js";
 import { selectTemplate } from "../export/templates.js";
 import { businessOptions } from "./business-options.js";
@@ -28,7 +28,7 @@ export async function saveEncodeResult(
   const record = serializeRecord(recordMode, format, encoded);
   const outputPath = value(arguments_, "output");
   if (outputPath !== undefined) {
-    await replacePrivateFile(outputPath, Buffer.from(`${record}\n`, "utf8"));
+    await publishNewPrivateFile(outputPath, Buffer.from(`${record}\n`, "utf8"));
     terminalNotice(`Saved MnemoCode record: ${outputPath}`, "success");
   }
   if (arguments_.cards === true) {
