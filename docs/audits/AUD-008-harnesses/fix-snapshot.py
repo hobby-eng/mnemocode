@@ -30,8 +30,11 @@ def main():
     if target.exists():
         old = json.loads(target.read_text())
         changed = sorted(name for name in set(files) | set(old["files"]) if files.get(name) != old["files"].get(name))
-        result = {"unchanged": not changed and head == old["commit"], "changedFiles": changed, "sourceFingerprint": fingerprint, "commit": head}
-        (EVIDENCE / "fix-snapshot-verification.json").write_text(json.dumps(result, indent=2) + "\n")
+        # A signed remediation commit advances HEAD without changing the reviewed product bytes.
+        related = subprocess.run(["git", "merge-base", "--is-ancestor", old["commit"], head], cwd=ROOT).returncode == 0
+        result = {"unchanged": not changed and related, "changedFiles": changed, "sourceFingerprint": fingerprint, "commit": head, "reviewedBaseCommit": old["commit"], "reviewedBaseIsAncestor": related}
+        verification_name = "fix-snapshot-verification.json" if head == old["commit"] else "commit-binding-snapshot-verification.json"
+        (EVIDENCE / verification_name).write_text(json.dumps(result, indent=2) + "\n")
         print(json.dumps(result))
         return 0 if result["unchanged"] else 1
     EVIDENCE.mkdir(parents=True, exist_ok=True)
