@@ -277,6 +277,7 @@ export async function promptedEncodeInputs(
  */
 export async function promptedRecoveryInputs(
   arguments_: ParsedArguments,
+  checkRecord: (record: MnemoCodeRecord | undefined) => void = () => {},
 ): Promise<{ readonly encoded: string; readonly dateValues: string[] } | undefined> {
   if (arguments_["ask-secrets"] !== true) return undefined;
   if (value(arguments_, "input") !== undefined || values(arguments_, "date").length > 0) {
@@ -291,6 +292,8 @@ export async function promptedRecoveryInputs(
     ? await encodedInput(arguments_)
     : await askSecret("Encoded seed phrase or record:");
   const record = parseRecord(encoded);
+  // What the record says, such as its mode, is checked before the dates are typed.
+  checkRecord(record);
   const wordCount = encodedWordCount(record?.payload ?? encoded, record?.format);
   const dateLine = await askSecret(
     `Dates with ? for each forgotten digit (${mostDates(wordCount)}one to three of them incomplete):`,

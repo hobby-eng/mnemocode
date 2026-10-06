@@ -360,6 +360,42 @@ const maxTries: HelpOption = {
   ],
 };
 
+const candidateListGroup: HelpGroup = {
+  heading: "Candidate list for the Discovery Scanner (docs/CANDIDATES.md):",
+  options: [
+    {
+      flag: "--candidates-file",
+      value: "NEW_FILE",
+      summary: "Save the candidates as a list: record N is candidate N",
+      details: [
+        "The Discovery Scanner of the multi-chain wallet tools imports it and checks every candidate online. With a wallet check, only the matching candidates are saved. A taken name is numbered, never replaced.",
+      ],
+    },
+    {
+      flag: "--candidates-key",
+      value: "AGE1_KEY",
+      summary: "Encrypt the list to the one-time key the Scanner shows, age1…",
+    },
+    {
+      flag: "--candidates-key-file",
+      value: "PATH",
+      summary: "The same key, read from a text file",
+    },
+    {
+      flag: "--candidates-passphrase-file",
+      value: "PATH",
+      summary: "Encrypt the list with a passphrase of 12 characters or more, read from a file",
+      details: [
+        "With --ask-secrets and neither key nor passphrase file, the passphrase is asked on the private screen.",
+      ],
+    },
+    {
+      flag: "--plaintext-candidates",
+      summary: "Save the list without encryption; it then holds the seed phrases in the open",
+    },
+  ],
+};
+
 const shareWalletCheck: HelpGroup = {
   ...evidenceGroup,
   heading: "Wallet check (one of the first six keeps only the matching phrases):",
@@ -659,6 +695,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           },
         ],
       },
+      candidateListGroup,
     ],
     asks: [
       ["Encoded record", "unless --input-file or --qr-file gives it"],
@@ -682,9 +719,9 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   },
 
   "recover-word": {
-    summary: "Find one forgotten word of a phrase",
+    summary: "Find forgotten words of a phrase",
     about: [
-      "Put exactly one ? in place of the forgotten word. MnemoCode tries all 2,048 words and prints every word that passes the checksum test: about 128 for a 12-word phrase, about 8 for 24 words. Each row shows the word, its number in the BIP39 list, the checksum bits and the whole phrase. A recovery check marks the matching rows; the other candidates are still shown.",
+      "Put ? in place of each forgotten word, ab* for a word that starts with ab, or rich|rice for one of a few words. MnemoCode tries every combination, up to 16,777,216, and lists those that pass the checksum test: for one forgotten word about 128 in a 12-word phrase, about 8 in 24 words. With one forgotten word each row shows the word, its number in the BIP39 list, the checksum bits and the whole phrase. A recovery check marks the matching rows; the other candidates are still shown. More than 2,048 candidates are not shown: save them with --candidates-file, or check them against the wallet.",
     ],
     usage: "[OPTIONS] (--ask-secrets | --mnemonic-file <PATH> | --mnemonic <TEXT>)",
     groups: [
@@ -693,7 +730,14 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         options: [
           askSecrets,
           mnemonicFile,
-          { ...mnemonicText, summary: "The phrase with ? in place of the forgotten word" },
+          { ...mnemonicText, summary: "The phrase with ? in place of each forgotten word" },
+          {
+            flag: "--missing-word",
+            summary: "One word is missing, and where is not known",
+            details: [
+              "Give the 11, 14, 17, 20 or 23 words you have, in their order; every place and every word is tried.",
+            ],
+          },
           {
             ...legacyValidLastWord,
             summary: "List the valid last words of a whole seedshift-legacy phrase",
@@ -704,8 +748,9 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         ],
       },
       evidenceGroup,
+      candidateListGroup,
     ],
-    asks: [["Phrase", "with ? in place of the forgotten word"]],
+    asks: [["Phrase", "with ? in place of each forgotten word"]],
     examples: [
       ["mnemocode recover-word --ask-secrets", "The phrase with ? on the private screen"],
       [
@@ -715,6 +760,11 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       [
         `mnemocode recover-word --ask-secrets --master-fingerprint ${TEST_FINGERPRINT}`,
         "Mark the candidate with this fingerprint",
+      ],
+      ["mnemocode recover-word --ask-secrets --missing-word", "A word missing at an unknown place"],
+      [
+        "mnemocode recover-word --ask-secrets --candidates-file ./candidates.age --candidates-key age1…",
+        "Every candidate, encrypted for the Discovery Scanner",
       ],
       [
         "mnemocode recover-word --legacy-valid-last-word --ask-secrets",
@@ -748,6 +798,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         ],
       },
       shareWalletCheck,
+      candidateListGroup,
     ],
     asks: [
       ["Shares", "shares separated by semicolons, ? for each unreadable element"],

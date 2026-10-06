@@ -56,10 +56,12 @@
     "dev": "tsx src/mnemocode.ts"
   },
   "dependencies": {
+    "@noble/hashes": "2.4.0",
     "@pdf-lib/fontkit": "1.1.1",
     "@scure/bip32": "2.4.0",
     "@scure/bip39": "2.4.0",
     "@scure/btc-signer": "2.4.1",
+    "age-encryption": "0.3.1",
     "bwip-js": "4.11.4",
     "jsqr": "1.4.0",
     "pdf-lib": "1.17.1",

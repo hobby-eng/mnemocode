@@ -12,6 +12,8 @@ const INPUT_OPTIONS = [
   "input-file",
   "share-file",
   "share-qr",
+  "candidates-key-file",
+  "candidates-passphrase-file",
   "bip39-passphrase-file",
   "wif-file",
   "qr-file",
@@ -74,6 +76,11 @@ export async function settleOutputPaths(args: ParsedArguments): Promise<void> {
       args[key] = free;
     }
   }
+}
+
+/** For a result that was not saved after all: its numbered name is not reported. */
+export function discardRenamedOutput(path: string): void {
+  renamedOutputs.delete(path);
 }
 
 /** After saving: one warning for each result saved under a numbered name. */

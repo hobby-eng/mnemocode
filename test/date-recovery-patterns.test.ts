@@ -6,7 +6,11 @@ import {
   datePatternCandidateCount,
   datePatternCombinationCount,
   datePatternCombinations,
+  dateRecoveryCandidates,
+  encodeMnemonic,
   expandDatePattern,
+  formatDate,
+  parseDate,
   parseDatePattern,
 } from "../src/core.js";
 
@@ -41,6 +45,23 @@ describe("date recovery patterns", () => {
     const pattern = parseDatePattern("?3-09-2026");
     expect(datePatternCombinationCount([pattern, pattern])).toBe(6);
     expect([...datePatternCombinations([pattern, pattern])]).toHaveLength(6);
+  });
+
+  it("finds the forgotten digits in the core, once per combination, without the command line", () => {
+    const known = parseDate("10-07-1963");
+    const forgotten = parseDate("23-09-2026");
+    const encoded = encodeMnemonic(publicMnemonic, [known, forgotten]);
+    const patterns = [parseDatePattern("2?-09-2026")];
+    const steps = [
+      ...dateRecoveryCandidates(encoded.shiftedIndexes, [known], patterns, "seedshift"),
+    ];
+    // One step per day that the pattern allows, so that a caller can show progress.
+    expect(steps).toHaveLength(datePatternCombinationCount(patterns, 100));
+    const found = steps.flat();
+    // Checksum-valid Seedshift gives a valid phrase for every date; the wallet tells them apart.
+    expect(found).toHaveLength(steps.length);
+    const right = found.filter((candidate) => candidate.mnemonic === publicMnemonic);
+    expect(right.map((candidate) => candidate.dates.map(formatDate))).toEqual([["23-09-2026"]]);
   });
 
   it("recovers several incomplete dates with per-digit wildcards", async () => {

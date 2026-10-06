@@ -440,9 +440,13 @@ The library decodes text. Reading a QR image is a function of the command-line p
 
 ## Forgotten-word recovery
 
-`recover-word` accepts an English BIP39 phrase with exactly one word replaced by `?`. It tries all 2,048 words and prints every word that passes the checksum test: about 128 words for a 12-word phrase and about 8 for a 24-word phrase. Each row shows the number of the candidate, the word, its number in the BIP39 list, the checksum bits and the whole phrase.
+`recover-word` accepts an English BIP39 phrase with each forgotten word replaced by `?`. Where you remember a little more, write `ab*` for a word that begins with "ab", or `rich|rice` for one of a few words. MnemoCode tries every combination, up to 16,777,216 of them, and lists those that pass the checksum test: for one forgotten word, about 128 in a 12-word phrase and about 8 in 24 words; for two, about 262,144. With one forgotten word, each row shows the number of the candidate, the word, its number in the BIP39 list, the checksum bits and the whole phrase.
 
-Passing the checksum test does not prove that a candidate is your wallet. Add one of the [recovery checks](#exact-local-recovery-checks) to mark the matching rows. The other candidates are still shown.
+If a word is missing and you do not know where, give the words you have with `--missing-word`: every place and every word is tried, about 1,500 candidates for 12 words.
+
+Passing the checksum test does not prove that a candidate is your wallet. Add one of the [recovery checks](#exact-local-recovery-checks) to mark the matching rows; then MnemoCode checks every candidate itself, without the network, which for 262,144 candidates takes a few minutes. The other candidates are still shown when there are at most 2,048 of them.
+
+Without a fingerprint or an address, only a search for funds can tell the candidates apart. `--candidates-file candidates.age` saves them as a list for the Discovery Scanner of the [multi-chain wallet tools](https://github.com/hobby-eng/multi-chain-wallet-tools), which checks each one online; candidate 5 on the screen is record 5 of the list. The list holds real seed phrases, so it is encrypted: to the one-time key that the Scanner shows (`--candidates-key age1…`), or with a passphrase. `sskr-combine` and `recover-date` save their candidates the same way. [Candidate lists](docs/CANDIDATES.md) describes the format.
 
 For an old `seedshift-legacy` phrase whose last word fails the checksum test, `recover-word --legacy-valid-last-word` accepts the whole phrase without `?` and lists every valid last word. One row is marked `preserved`: it keeps the data bits of the old last word, and it is the word that legacy encoding suggests. These phrases are replacements for the stored phrase. The original wallet phrase is recovered from them with the dates.
 
