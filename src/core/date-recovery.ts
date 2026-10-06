@@ -16,15 +16,26 @@ export interface DateCandidate {
   readonly mnemonic: string;
 }
 
+const SEEDSHIFT_MODES: ReadonlySet<string> = new Set<SeedshiftMode>([
+  "seedshift",
+  "seedshift-legacy",
+  "seedshift-legacy-valid",
+]);
+
 /** The phrases that `dates` give in `mode`; the legacy-valid variant can give several. */
 function decodeWith(
   indexes: readonly number[],
   dates: readonly DateShiftDate[],
   mode: SeedshiftMode,
 ): DecodedResult[] {
-  if (mode === "seedshift-legacy-valid") return decodeIndexesLegacyValid(indexes, dates);
-  if (mode === "seedshift-legacy") return [decodeIndexesLegacy(indexes, dates)];
-  return [decodeIndexes(indexes, dates)];
+  switch (mode) {
+    case "seedshift":
+      return [decodeIndexes(indexes, dates)];
+    case "seedshift-legacy":
+      return [decodeIndexesLegacy(indexes, dates)];
+    case "seedshift-legacy-valid":
+      return decodeIndexesLegacyValid(indexes, dates);
+  }
 }
 
 /**
@@ -38,6 +49,8 @@ export function* dateRecoveryCandidates(
   patterns: readonly DatePattern[],
   mode: SeedshiftMode,
 ): Generator<readonly DateCandidate[]> {
+  // A JavaScript host may pass any value; another mode would silently decode another way.
+  if (!SEEDSHIFT_MODES.has(mode as string)) throw new Error("Unsupported Seedshift mode.");
   // Two combinations may name the same dates in another order; each result is kept once.
   const seen = new Set<string>();
   for (const guessed of datePatternCombinations(patterns)) {

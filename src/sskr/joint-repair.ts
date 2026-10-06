@@ -115,6 +115,11 @@ export interface RepairedSet {
   readonly shares: readonly ReadRepairableShare[];
   /** Elements that the phrase does not depend on and nothing settles: their values are a guess. */
   readonly unsettled: readonly MarkedElement[];
+  /**
+   * Shares, counted from 1, that took no part and were not checked: members of a group with fewer
+   * than its threshold, in a set of several groups.
+   */
+  readonly unchecked?: readonly number[];
 }
 
 export interface SearchOptions {
@@ -539,6 +544,7 @@ export async function planJointRepair(
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<JointPlan> {
   const { signal } = options;
+  signal?.throwIfAborted();
   const texts = records.map((record) => record.trim());
   const marksOf = (text: string) => (text.match(/\?/gu) ?? []).length;
   for (const [index, text] of texts.entries())
@@ -672,6 +678,7 @@ async function searchBranches(
   branches: readonly Branch[],
   options: SearchOptions = {},
 ): Promise<RepairedSet[]> {
+  options.signal?.throwIfAborted();
   const total = branches.reduce((sum, branch) => sum + 2 ** branch.visible.length, 0);
   const platform = sharePlatform();
   const found = new Map<string, RepairedSet>();

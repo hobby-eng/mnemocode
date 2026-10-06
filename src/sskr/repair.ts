@@ -249,18 +249,20 @@ function mixedStructures(
 }
 
 /**
- * Structures of a standard share, in Bytewords (tagged) or as a UR (untagged): the checksum against
- * the bytes before it, and the rows of the layout that this length takes.
+ * Structures of a standard share, in Bytewords or as a UR: the checksum against the bytes before
+ * it, and the rows of the layout that this length takes. Either form may carry the SSKR tag, 40309
+ * or the earlier 309, or none, since transport.ts reads all of them (AUD-008-API006).
  */
-function standardStructures(units: number, tagged: boolean): ShareStructure[] {
-  const tags = tagged ? SSKR_TAGS : [[]];
-  const content = units - CHECKSUM_BYTES - (tagged ? SSKR_TAG_BYTES.length : 0);
-  const layouts: CborLayout[] = tags.flatMap((tagBytes) => [
-    { payloadLength: content - 2, header: 2, tagBytes },
-    ...(content - 1 < CBOR_SHORT_LENGTH_LIMIT
-      ? [{ payloadLength: content - 1, header: 1, tagBytes }]
-      : []),
-  ]);
+function standardStructures(units: number): ShareStructure[] {
+  const layouts: CborLayout[] = [[], ...SSKR_TAGS].flatMap((tagBytes) => {
+    const content = units - CHECKSUM_BYTES - tagBytes.length;
+    return [
+      { payloadLength: content - 2, header: 2, tagBytes },
+      ...(content - 1 < CBOR_SHORT_LENGTH_LIMIT
+        ? [{ payloadLength: content - 1, header: 1, tagBytes }]
+        : []),
+    ];
+  });
   return layouts
     .filter((layout) => SHARE_LENGTHS.has(layout.payloadLength))
     .map((layout) => ({
@@ -317,7 +319,7 @@ function unitModels(text: string): UnitModel[] {
     addModel(models, units, (unit) => MINIMAL_BYTEWORD_VALUES.get(unit), {
       format: "ur",
       unitBits: BYTE_BITS,
-      structures: units === undefined ? [] : standardStructures(units.length, false),
+      structures: units === undefined ? [] : standardStructures(units.length),
       unitText: (value) => MINIMAL_BYTEWORDS[value]!,
       separator: "",
     });
@@ -349,7 +351,7 @@ function unitModels(text: string): UnitModel[] {
     addModel(models, words, (unit) => BYTEWORD_VALUES.get(unit), {
       format: "words",
       unitBits: BYTE_BITS,
-      structures: standardStructures(words.length, true),
+      structures: standardStructures(words.length),
       unitText: (value) => bytewords[value]!,
       separator: " ",
     });

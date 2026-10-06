@@ -12,7 +12,8 @@ import {
   type DateShiftDate,
 } from "../core.js";
 import { parseRecord } from "../record.js";
-import { combineSskrShares } from "../sskr/shares.js";
+import { combineSskrShareSet } from "../sskr/shares.js";
+import type { RepairedSet } from "../sskr/joint-repair.js";
 import {
   askSecret,
   datesPrompt,
@@ -28,7 +29,7 @@ import { terminalNotice } from "./terminal.js";
 const CLEAR_SCREEN = "\x1b[2J\x1b[H";
 
 /** What a backup typed again turned out to be. */
-export type CheckResult = "restores" | "differs" | "unreadable";
+export type CheckResult = "restores" | "differs" | "unreadable" | "unchecked";
 
 function datesOf(line: string): DateShiftDate[] {
   return line.split(/\s+/u).filter(Boolean).map(parseDate);
@@ -70,18 +71,19 @@ export async function checkShareBackup(
   mode: "direct" | "seedshift",
   dateLine: string,
 ): Promise<CheckResult> {
-  let masked: string;
+  let set: RepairedSet;
   try {
-    masked = await combineSskrShares(typed.split(";"));
+    set = await combineSskrShareSet(typed.split(";"));
   } catch {
     return "unreadable";
   }
   try {
     const restored =
       mode === "direct"
-        ? masked
-        : decodeInput(masked, "english", datesOf(dateLine)).recoveredMnemonic;
-    return restored === original ? "restores" : "differs";
+        ? set.mnemonic
+        : decodeInput(set.mnemonic, "english", datesOf(dateLine)).recoveredMnemonic;
+    if (restored !== original) return "differs";
+    return set.unchecked?.length || set.unsettled.length ? "unchecked" : "restores";
   } catch {
     return "unreadable";
   }
@@ -115,9 +117,11 @@ async function offerCheck(
       return;
     }
     terminalNotice(
-      result === "unreadable"
-        ? "The backup cannot be read: check every code or word."
-        : "The backup gives another seed phrase: check the codes and the dates.",
+      result === "unchecked"
+        ? "The phrase matches, but some shares or repaired elements were not checked. Supply complete groups and check the marks."
+        : result === "unreadable"
+          ? "The backup cannot be read: check every code or word."
+          : "The backup gives another seed phrase: check the codes and the dates.",
       "warning",
     );
     console.error("");

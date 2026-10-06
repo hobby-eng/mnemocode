@@ -10,7 +10,7 @@ import { readBoundedTextFile } from "../src/cli/input.js";
 import { validateOutputPaths } from "../src/cli/output-paths.js";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
-import { readShares, runSskrSplit } from "../src/cli/sskr-command.js";
+import { readShareTexts, runSskrSplit } from "../src/cli/sskr-command.js";
 import { runTable } from "../src/cli/table-command.js";
 
 const publicMnemonic = "abandon ".repeat(11) + "about";
@@ -91,7 +91,7 @@ describe("AUD-002-SEC001 bounded secret-bearing files", () => {
       expect(() => bip39Passphrase({ "bip39-passphrase-file": path })).toThrow(
         "1 MiB safety limit",
       );
-      await expect(readShares({ "share-file": path })).rejects.toThrow("1 MiB safety limit");
+      await expect(readShareTexts({ "share-file": path })).rejects.toThrow("1 MiB safety limit");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

@@ -19,7 +19,12 @@ Security fixes are made in the current source and the current release. Installed
 
 MnemoCode is an offline Node.js command-line program and TypeScript library. Its own code uses no network: it has no online service, telemetry, analytics, update check or remote file. The recovery checks are calculated on your computer; MnemoCode never asks a wallet, a node or a block explorer.
 
-MnemoCode is **not a sandbox**. It runs with the file, process and network rights of the Node.js process that starts it. "Offline" describes what the program does. It does not mean that the operating system stops a compromised program from opening a connection.
+MnemoCode is **not a sandbox**, and what limits it depends on how it runs:
+
+- **The `mnemocode` command and the single executable** run under the Node.js permission model, described [below](#secret-lifecycle-and-local-boundaries): no network, no worker threads and no native addons. A Node.js process that already runs under the permission model and was given such a right on purpose, such as `--allow-net`, keeps it; MnemoCode does not take back rights that its caller granted.
+- **The library**, built into another program, runs with the file, process and network rights of that program, and adds no limit of its own.
+
+Neither is a limit of the operating system. "Offline" describes what the program does; it does not mean that the system stops a compromised program from opening a connection.
 
 For a real phrase:
 
@@ -34,7 +39,7 @@ When the library is built into another application, that application is responsi
 
 - Use [`--ask-secrets`](README.md#secret-input-styles) or the [menu](README.md#menu) for a real phrase, encoded record and dates, on Linux, macOS and Windows. The secrets are typed on a private screen that shows them and the result, and is cleared when you press Enter, so that nothing stays in the scrollback. Anyone who can see your screen meanwhile can read them. It cannot protect against a compromised terminal, operating system or program, or against a terminal program that logs what it shows.
 - MnemoCode does not collect, send or log your phrase. It clears its temporary copies of the phrase data, but text in JavaScript memory cannot be erased.
-- Every run is protected as far as Node.js allows. On Linux and macOS MnemoCode switches off core dumps, so that a crash cannot write its memory, the phrase included, to the disk; on Linux this also keeps other programs of the same user from reading that memory. Without it, MnemoCode asks for no secret. It always runs under the Node.js permission model: no network, no worker threads and no native addons; a command that saves nothing cannot write files, and one that draws no images cannot start other programs. Each entry of the menu runs in a process of its own. Node.js enforces these limits, not the kernel, and describes them as a safety belt for trusted code rather than a boundary against malicious code.
+- Every run is protected as far as Node.js allows. On Linux and macOS MnemoCode switches off core dumps, so that a crash cannot write its memory, the phrase included, to the disk; on Linux this also keeps other programs of the same user from reading that memory. Without it, MnemoCode asks for no secret. Started as a command, it runs under the Node.js permission model: no network, no worker threads and no native addons, unless a caller already under that model granted one on purpose; a command that saves nothing cannot write files, and one that draws no images cannot start other programs. Each entry of the menu runs in a process of its own. Node.js enforces these limits, not the kernel, and describes them as a safety belt for trusted code rather than a boundary against malicious code.
 - On Linux MnemoCode warns before a secret when swap is not encrypted, or when it cannot tell: the system may write the memory of MnemoCode to the disk, where it can stay for years. Use encrypted swap or none, best a live USB system. Swap counts as safe on dm-crypt, also below LVM, and on zram.
 - MnemoCode warns when a file is saved into a folder that Dropbox, OneDrive, Google Drive, iCloud Drive, Yandex Disk, Nextcloud, MEGA or pCloud synchronises: the service keeps a copy. It recognises these folders by their usual names.
 - MnemoCode cannot keep the system from hibernating to the disk, and it cannot control screenshots, clipboard history, accessibility tools, browser extensions and malware.

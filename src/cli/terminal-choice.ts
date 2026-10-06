@@ -31,6 +31,24 @@ function redrawFrom(lines: number): void {
   if (lines > 0) process.stderr.write(`\x1b[${lines}A\r\x1b[J`);
 }
 
+/** Colour codes (SGR sequences), which take no room on the screen. */
+const STYLE_CODES = /\x1b\[[0-9;]*m/gu;
+
+/**
+ * The terminal rows that `lines` take. A terminal narrower than LINE_WIDTH wraps a long line onto
+ * further rows, and a redraw that moved up by lines would leave the extra rows behind
+ * (AUD-008-UI001). The width is read at each redraw, so that a resized terminal is counted anew.
+ */
+export function rowsOf(lines: readonly string[]): number {
+  const columns = process.stderr.columns;
+  const width = columns !== undefined && columns > 0 ? columns : Number.POSITIVE_INFINITY;
+  return lines.reduce(
+    (rows, line) =>
+      rows + Math.max(1, Math.ceil(displayWidth(line.replace(STYLE_CODES, "")) / width)),
+    0,
+  );
+}
+
 /** `text` cut to `room` characters with "…" at the end, so that it cannot wrap the line. */
 export function shortened(text: string, room: number): string {
   const characters = [...text];
@@ -112,8 +130,10 @@ function answerLine(label: string, answer: string): string {
   return `${TEXT_INDENT}${paint(STYLE.muted, label.padEnd(ANSWER_LABEL_WIDTH))} ${paint(STYLE.accent, answer)}\n`;
 }
 
-/** The blank line and the question that start every question; they are erased with its list. */
-const QUESTION_LINES = 2;
+/** The rows of the blank line and the question that start every question, erased with its list. */
+function questionRows(question: string): number {
+  return 1 + rowsOf([question]);
+}
 
 /**
  * Asks `question` and lets the person choose an entry with the arrow keys and Enter, or at once with
@@ -137,13 +157,13 @@ export async function choose<T>(
   const explanation = explanationLines(options.explanation);
   return withRawTerminal(async (next, moreWithin) => {
     process.stderr.write(`\n${paint(STYLE.strong, question)}\n`);
-    const draw = (): number => {
+    const draw = (): string[] => {
       const lines = [...explanation, ...listLines(choices, selected), "", hint];
       process.stderr.write(`${lines.join("\n")}\n`);
-      return lines.length;
+      return lines;
     };
     const answer = (index: number): T => {
-      redrawFrom(drawn + QUESTION_LINES);
+      redrawFrom(rowsOf(drawn) + questionRows(question));
       process.stderr.write(answerLine(options.label, choices[index]!.label));
       return choices[index]!.value;
     };
@@ -151,7 +171,7 @@ export async function choose<T>(
     for (;;) {
       const key = await readKey(next, moreWithin);
       if (key.kind === "back") {
-        redrawFrom(drawn + QUESTION_LINES);
+        redrawFrom(rowsOf(drawn) + questionRows(question));
         return undefined;
       }
       if (key.kind === "enter") return answer(selected);
@@ -162,7 +182,8 @@ export async function choose<T>(
         if (index >= 0) return answer(index);
         continue;
       } else continue;
-      redrawFrom(drawn);
+      // Recount the previous logical lines at the current width after terminal reflow.
+      redrawFrom(rowsOf(drawn));
       drawn = draw();
     }
   });
@@ -198,7 +219,8 @@ export async function askLine(
       promptWidth: displayWidth(shown),
     });
     process.stderr.write("\n");
-    redrawFrom(QUESTION_LINES);
+    // The answer may have wrapped the line of the question.
+    redrawFrom(1 + rowsOf([`${shown}${typed ?? ""}`]));
     if (typed === undefined) return undefined;
     const trimmed = typed.trim();
     const answer = trimmed === "" ? fallback : trimmed;

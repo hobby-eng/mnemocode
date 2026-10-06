@@ -11,23 +11,9 @@ import { MAX_SHARES, validateThreshold } from "../sskr/shares.js";
 import { PRIVATE_SCREEN_COMMANDS } from "./command-line.js";
 import { CANCELLED_EXIT_CODE, privateScreenAvailable } from "./private-screen.js";
 import { dropForMenu, runInOwnProcess } from "./protection.js";
-import {
-  askLine,
-  choose,
-  LINE_WIDTH,
-  waitForEnter,
-  type Choice,
-  type Explanation,
-} from "./terminal-choice.js";
+import { askLine, choose, waitForEnter, type Choice, type Explanation } from "./terminal-choice.js";
 import { terminalAvailable } from "./terminal-input.js";
-import {
-  readmeLink,
-  STYLE,
-  terminalMore,
-  terminalNotice,
-  terminalPaint,
-  wrapText,
-} from "./terminal.js";
+import { readmeLink, STYLE, terminalMore, terminalNotice, terminalPaint } from "./terminal.js";
 import { printUsage } from "./usage.js";
 
 /** The menu reads keys from a terminal and draws on one; anything else gets the help instead. */
@@ -792,10 +778,24 @@ export const MENU_ENTRIES: readonly Entry[] = [
   { label: "Quit", digit: 0, action: async () => "quit" },
 ];
 
-/** The command line as it would be typed; an argument with a space or a quote is quoted. */
-export function typedCommand(run: readonly string[]): string {
+/** Arguments that no shell changes, which are shown without quotes. */
+const PLAIN_ARGUMENT = /^[\w./:@%+=,-]+$/u;
+
+/**
+ * The command line as it would be typed, in the shell of the system: an argument with anything
+ * a shell reads, such as a space, $, ` or \, is put in single quotes, where no shell expands
+ * anything (AUD-008-UI002). A quote inside is written as POSIX shells and PowerShell each want it.
+ */
+export function typedCommand(
+  run: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const quote =
+    platform === "win32"
+      ? (argument: string) => `'${argument.replaceAll("'", "''")}'`
+      : (argument: string) => `'${argument.replaceAll("'", "'\\''")}'`;
   const quoted = run.map((argument) =>
-    /^[\w./:@%+=,-]+$/u.test(argument) ? argument : `"${argument.replaceAll('"', '\\"')}"`,
+    PLAIN_ARGUMENT.test(argument) ? argument : quote(argument),
   );
   return ["mnemocode", ...quoted].join(" ");
 }
@@ -804,6 +804,11 @@ const paint = (code: string, text: string): string => terminalPaint("stderr", co
 
 /** Indent of the typed command under "The same as:". */
 const COMMAND_INDENT = "  ";
+
+/** Prose wrapping changes quoted arguments; let the terminal soft-wrap the literal command. */
+export function commandDisplay(run: readonly string[]): string {
+  return `${COMMAND_INDENT}${typedCommand(run)}`;
+}
 
 export async function runMenu(): Promise<void> {
   // Each command runs in a process of its own, which gives up what it does not need; the menu
@@ -834,8 +839,7 @@ export async function runMenu(): Promise<void> {
     } else {
       // Shown before the command asks anything: the same answers typed after mnemocode.
       console.error(`\n${paint(STYLE.muted, "The same as:")}`);
-      for (const line of wrapText(typedCommand(action.run), LINE_WIDTH - COMMAND_INDENT.length))
-        console.error(`${COMMAND_INDENT}${paint(STYLE.accent, line)}`);
+      console.error(paint(STYLE.accent, commandDisplay(action.run)));
       // The command reports its own result, error or cancellation (Ctrl+C), then the menu goes on.
       const code = await runInOwnProcess(action.run);
       if (code === CANCELLED_EXIT_CODE) continue;

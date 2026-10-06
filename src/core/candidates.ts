@@ -80,8 +80,40 @@ export function parseMissingWord(text: string): WordSearch {
   return { kind: "missing-word", written: indexes };
 }
 
+/** Whether a word index is one of the BIP39 list. */
+function isWordIndex(value: unknown): boolean {
+  return (
+    Number.isInteger(value) && (value as number) >= 0 && (value as number) < BIP39_DICTIONARY_SIZE
+  );
+}
+
+/**
+ * Refuses a search that the parsers above could not have made: another host may build its own,
+ * and an empty place, for one, would never end (AUD-008-API003).
+ */
+function assertSearch(search: WordSearch): void {
+  if (search.kind === "missing-word") {
+    if (!Array.isArray(search.written) || !PHRASE_LENGTHS.has(search.written.length + 1))
+      throw new Error("A missing-word search needs one word fewer than a valid phrase length.");
+    if (!search.written.every(isWordIndex)) throw new Error("A written word is not a BIP39 index.");
+    return;
+  }
+  if (search.kind !== "unknown-words") throw new Error("Unknown kind of word search.");
+  if (!Array.isArray(search.places) || !PHRASE_LENGTHS.has(search.places.length))
+    throw new Error("A word search needs 12, 15, 18, 21 or 24 places.");
+  for (const place of search.places)
+    // Ascending and distinct, so that the order of docs/CANDIDATES.md holds.
+    if (
+      !Array.isArray(place) ||
+      place.length === 0 ||
+      !place.every((index, at) => isWordIndex(index) && (at === 0 || index > place[at - 1]!))
+    )
+      throw new Error("Every place needs one or more BIP39 indexes in ascending order.");
+}
+
 /** The combinations a search checks: the work it takes, which MAX_SEARCH_COMBINATIONS bounds. */
 export function searchCombinations(search: WordSearch): number {
+  assertSearch(search);
   if (search.kind === "missing-word") return (search.written.length + 1) * BIP39_DICTIONARY_SIZE;
   return search.places.reduce((product, place) => product * place.length, 1);
 }

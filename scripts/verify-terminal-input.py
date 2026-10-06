@@ -14,6 +14,7 @@ It checks that
   alternate screen, the private screen: what is typed there is shown, and the screen is left and
   cleared after Enter;
 - Backspace and Ctrl+U edit the answer, and Home, End and Delete edit it at the cursor;
+- Ctrl+C stops a long date search and leaves the private screen;
 - an answer longer than 4095 bytes arrives whole, where a terminal's line mode on Linux would cut
   it;
 - two answers pasted at once answer two questions (Encode with dates), and the backup typed
@@ -300,6 +301,25 @@ def check_ctrl_c():
     print(f"Ctrl+C at a prompt: back to the menu there, exit code {CANCELLED} for a typed command")
 
 
+def check_date_search_ctrl_c():
+    # A date search of hours must stop at Ctrl+C and leave the private screen (AUD-008-API001).
+    session = Session((
+        "recover-date", "--mode", "seedshift", "--format", "english", "--input", TEST_PHRASE,
+        "--date", "01-01-????", "--master-fingerprint", "deadbeef",
+        "--max-candidates", "10000", "--progress-every", "1",
+    ))
+    try:
+        session.wait_for("Checked 1/9999 date combinations")
+        session.type(CTRL_C)
+        code = session.wait_for_exit(limit=5)
+        assert code == CANCELLED, f"Ctrl+C during the date search gave exit code {code}"
+        if not WINDOWS:
+            assert LEAVE_ALTERNATE_SCREEN in session.output, "the private screen was not left"
+    finally:
+        session.close()
+    print(f"Ctrl+C during a date search: the private screen left, exit code {CANCELLED}")
+
+
 def check_menu_ctrl_c():
     session = Session()
     try:
@@ -321,6 +341,7 @@ def main():
     check_cursor_editing()
     check_answers_pasted_together()
     check_ctrl_c()
+    check_date_search_ctrl_c()
     print("terminal input checks passed")
 
 
