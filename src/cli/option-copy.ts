@@ -26,6 +26,7 @@ const labels: Readonly<Record<string, string>> = {
   "master-fingerprint": "master fingerprint",
   "max-results": "result limit",
   "max-candidates": "candidate search limit",
+  "max-tries": "share repair search limit",
   mnemonic: "mnemonic text",
   "mnemonic-file": "mnemonic file",
   mode: "transformation mode",

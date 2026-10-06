@@ -21,7 +21,7 @@ import {
 } from "../export/heir-sheet.js";
 import { type ParsedArguments, value } from "./arguments.js";
 import type { EncodedFormat } from "./input.js";
-import type { ShareFormat } from "./sskr-command.js";
+import type { ShareFormat } from "../sskr/transport.js";
 import { README_URL, terminalNotice } from "./terminal.js";
 
 /** What was made: the seed phrase in one encoded form, or Shamir shares of it. */
@@ -57,11 +57,11 @@ export const HEIR_MENU = {
     },
   },
   restore: {
-    entry: "3 Restore a seed phrase from Shamir shares",
+    entry: "4 Restore a seed phrase from Shamir shares",
     question: "Was Seedshift used before it was split?",
     answers: { direct: "No", seedshift: "Yes" },
   },
-  recover: { digit: 4, entry: "4 Find a forgotten word of a seed phrase or a date digit" },
+  recover: { digit: 5, entry: "5 Find a forgotten word, a date digit or a share code" },
 } as const;
 
 /** How each encoded form looks, so that an heir recognises the backup. */
@@ -77,7 +77,10 @@ const ENCODED_LOOKS: Readonly<Record<EncodedFormat, string>> = {
 const SHARE_LOOKS: Readonly<Record<ShareFormat, string>> = {
   words: "words such as tuna next keep gyro",
   ur: "codes that start with ur:sskr/",
+  indexes: "numbers from 1 to 2048",
+  unicode: "codes of four digits and letters A to F",
   colors: "color codes such as #1EAB91, on paper or on printed cards",
+  "colors-unicode": "codes of digits and letters A to F that stand for colors",
 };
 
 function needs({ backup, mode, dates }: HeirSheetFacts): string[] {
@@ -131,11 +134,17 @@ function steps({ backup, mode, dates }: HeirSheetFacts): string[] {
   ];
 }
 
-function trouble({ mode }: HeirSheetFacts): string {
-  const mistyped =
-    "An error usually means a mistyped code or word: check each one against the paper.";
-  if (mode === "direct") return mistyped;
-  return `${mistyped} If a digit of a date is unclear, menu entry ${HEIR_MENU.recover.digit} tries every possibility.`;
+function trouble({ backup, mode }: HeirSheetFacts): string {
+  const advice = [
+    "An error usually means a mistyped code or word: check each one against the paper.",
+  ];
+  // Unreadable elements of a share are filled in from its checksum (src/sskr/repair.ts).
+  if (backup.kind === "shares") advice.push("Type ? for each code you cannot read.");
+  if (mode !== "direct")
+    advice.push(
+      `If a digit of a date is unclear, menu entry ${HEIR_MENU.recover.digit} tries every possibility.`,
+    );
+  return advice.join(" ");
 }
 
 function hintNote({ mode }: HeirSheetFacts): string {

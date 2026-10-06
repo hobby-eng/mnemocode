@@ -71,16 +71,17 @@ Run `mnemocode` without a command in a terminal, or double-click the executable 
 What do you want to do?
 › 1  Encode a seed phrase as numbers, codes or colors
   2  Decode numbers, codes or colors back into a seed phrase
-  3  Restore a seed phrase from Shamir shares
-  4  Find a forgotten word of a seed phrase or a date digit
-  5  Print sample cards with a test seed phrase
-  6  Look up a seed word, its number or its Unicode code
-  7  Check that this copy of MnemoCode works
-  8  Show every command and option
+  3  Split a seed phrase into standard Shamir shares
+  4  Restore a seed phrase from Shamir shares
+  5  Find a forgotten word, a date digit or a share code
+  6  Print sample cards with a test seed phrase
+  7  Look up a seed word, its number or its Unicode code
+  8  Check that this copy of MnemoCode works
+  9  Show every command and option
   0  Quit
 ```
 
-Choose with the arrow keys and Enter, or press the number. Each entry asks its questions one at a time and shows examples where they help. Encode first shows what a test phrase looks like as word numbers, Unicode codes and colors, then asks about Seedshift, then whether to split the phrase into Shamir shares (the usual sets such as 2 of 3 or 3 of 5, or any other up to 16 shares), where the result should go, and last whether to print [instructions for heirs](#instructions-for-heirs). The form chosen decides how shares look: with colors they are color codes, which printable cards can disguise; with numbers, codes or words they are plain text shares, in Bytewords words or a short `ur:sskr/...` code, as other SSKR tools write them. The whole phrase in the chosen form is shown with the shares too, with a warning, for whoever keeps it and holds the shares in reserve. After the result, Encode offers to check the backup: you type it again from what you wrote down, with the dates, and MnemoCode says whether it restores the same seed phrase, without showing it. Before it runs, the menu shows the command that does the same, such as `mnemocode encode --ask-secrets --format 5 --mode direct`, so that you can type it next time. Escape goes back to the menu, and in the menu it quits; `q` works too.
+Choose with the arrow keys and Enter, or press the number. Each entry asks its questions one at a time and shows examples where they help. Encode first shows what a test phrase looks like as word numbers, Unicode codes and colors, then asks about Seedshift, then whether to split the phrase into Shamir shares (the usual sets such as 2 of 3 or 3 of 5, or any other up to 16 shares), where the result should go, and last whether to print [instructions for heirs](#instructions-for-heirs). The menu always masks word numbers and English words with Seedshift: unmasked, anyone with the BIP39 word list reads them. Unicode codes and colors may stay unmasked, but then they only disguise the phrase. The shares are written in the form chosen, and restoring them gives that form back; [Splitting a mnemonic into shares](#splitting-a-mnemonic-into-shares) explains the two ways to split. On request, the whole phrase in that form is shown beside the shares, with a warning, for whoever keeps it and holds the shares in reserve. After the result, Encode offers to check the backup: you type it again from what you wrote down, with the dates, and MnemoCode says whether it restores the same seed phrase, without showing it. Before it runs, the menu shows the command that does the same, such as `mnemocode encode --ask-secrets --format 5 --mode direct`, so that you can type it next time. Escape goes back to the menu, and in the menu it quits; `q` works too.
 
 The seed phrase, the dates and the shares never become part of the command. They are typed on a private screen of their own, where you see what you type, and the result appears there too. When you press Enter, that screen is cleared and the terminal returns to where it was, so that nothing stays in the scrollback.
 
@@ -398,7 +399,20 @@ A collection sheet names a design studio. It is separate from the employer print
 
 `encode --sskr --threshold 2 --shares 3` splits the phrase into Shamir shares as the last step of encoding. `sskr-combine` restores the phrase from the shares, and `sskr-export` prints existing shares as cards.
 
+There are two ways to split, and each gives back what it was given:
+
+- **In the form you chose.** Encode in the menu, after word numbers, Unicode codes or colors and the dates, writes the shares in that same form (`--share-format indexes`, `unicode`, `colors` or `colors-unicode`). Restoring them gives back exactly that backup: the Unicode codes, the word numbers or the color codes, masked with the dates as before; with the dates, MnemoCode also shows the seed phrase. These shares are MnemoCode's own, like its color shares: other SSKR programs do not read them.
+- **Classic SSKR of the seed phrase itself.** Entry 3 of the menu, "Split a seed phrase into standard Shamir shares", splits the bytes of the seed phrase as the SSKR standard does and writes the shares in Bytewords or as a short `ur:sskr/...` code (`--share-format words` or `ur`). Restoring them gives the seed phrase in words, and other SSKR programs read them too. English words chosen in Encode give these standard shares as well.
+
 [Shamir secret sharing (SSKR)](docs/SSKR.md) describes the commands, the share formats and recovery.
+
+### Damaged shares
+
+When a share cannot be read in full, type each element you cannot read as `?` at its place: a word number, a Unicode code, a color, a Byteword or a pair of letters of a `ur:sskr` code. Several shares may each miss something, such as two words on each of three shares, and a share may also be given twice when two damaged copies of it are kept.
+
+MnemoCode then repairs all the shares together. Every share has a checksum, all of them carry the same set number, and every share beyond the threshold repeats what the others already say: a third share of a 2-of-3 set holds the whole secret over again. Together this settles most of the marks without trying anything. What is still open is decided by a check of the secret that the shares keep, and before it tries anything MnemoCode shows how many combinations are left, how long they take, and which element, read again, or whether one more share would settle them. A search that takes up to a minute on your computer starts at once; a longer one is asked for first, and is limited to about a trillion combinations.
+
+If more than one seed phrase passes, each is listed with its fingerprint, and none is chosen: compare them with your wallet, or give its fingerprint or a Bitcoin address, which keeps only the matching phrase. Entry 5 of the menu, or `sskr-export`, gives the repaired shares back whole, in their own form, without showing the seed phrase, so that you can write them down again. [Repairing shares](docs/SSKR.md#damaged-shares) gives the numbers.
 
 ## Instructions for heirs
 
@@ -420,7 +434,7 @@ A file written by `encode --output PATH` starts with a header: `MNC1:<mode>:<for
 
 Terminal output, typed text and QR codes have no header. Give the original `--mode` when you decode them.
 
-`encode --sskr --output` writes no `MNC1` record: the file holds the SSKR shares themselves, one `ur:sskr/…` share per line. See [Shamir secret sharing (SSKR)](docs/SSKR.md).
+`encode --sskr --output` writes no `MNC1` record: the file holds one complete SSKR share per line, in the selected share format (`ur:sskr/…` by default). See [Shamir secret sharing (SSKR)](docs/SSKR.md).
 
 The library decodes text. Reading a QR image is a function of the command-line program.
 

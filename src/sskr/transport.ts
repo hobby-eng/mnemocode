@@ -1,36 +1,32 @@
 import { bytewords } from "./bytewords-list.js";
+import { crc32, shareMask } from "./checksum.js";
+import { colorsToUnicode, unicodeToColorCodes } from "../core/colors.js";
+import { traditionalChineseWordlist, UNICODE_INDEX, unicodeHex } from "../core/words.js";
 
-const CHECKSUM_BYTES = 4;
+export const CHECKSUM_BYTES = 4;
 const MAX_TRANSPORT_BYTES = 128;
-const CRC32_INITIAL = 0xffffffff;
-const CRC32_REFLECTED_POLYNOMIAL = 0xedb88320;
 const CBOR_UINT16_TAG = 0xd9;
-const CBOR_TAG_BYTES = 3;
+export const CBOR_TAG_BYTES = 3;
 const SSKR_CBOR_TAGS = new Set([40309, 309]);
 const SHARE_METADATA_BYTES = 5;
-const SHARE_LENGTHS = new Set([21, 25, 29, 33, 37]);
+/** Metadata and secret of a share, for secrets of 16 to 32 bytes: 12- to 24-word phrases. */
+export const SHARE_LENGTHS: ReadonlySet<number> = new Set([21, 25, 29, 33, 37]);
 const LOW_NIBBLE_MASK = 0x0f;
-const COLOR_VERSION = 0xa1;
-const COLOR_HEADER_BYTES = 2;
-const RGB_BYTES = 3;
+export const COLOR_VERSION = 0xa1;
+/** Shares written as BIP39 word numbers or Unicode codes: MnemoCode's own form, like colors. */
+export const WORD_VERSION = 0xa2;
+/** The version byte and the length of the CBOR, before the CBOR of a share in colors or words. */
+export const SHARE_HEADER_BYTES = 2;
+/** One BIP39 word stands for 11 bits: 2048 words. */
+export const WORD_BITS = 11;
+export const WORD_COUNT = 2 ** WORD_BITS;
+export const RGB_BYTES = 3;
 const MAX_COLOR_TEXT_LENGTH = 1024;
 const MAX_SHARE_COUNT = 256;
 
 const minimalBytewords = bytewords.map((word) => word[0]! + word[3]!);
 const minimalBytewordValues = new Map(minimalBytewords.map((word, index) => [word, index]));
 const fullBytewordValues = new Map<string, number>(bytewords.map((word, index) => [word, index]));
-
-function crc32(bytes: Uint8Array): number {
-  let crc = CRC32_INITIAL;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit++) {
-      const polynomial = crc & 1 ? CRC32_REFLECTED_POLYNOMIAL : 0;
-      crc = (crc >>> 1) ^ polynomial;
-    }
-  }
-  return (crc ^ CRC32_INITIAL) >>> 0;
-}
 
 function validateTransportChecksum(bytes: Uint8Array): void {
   if (bytes.length < CHECKSUM_BYTES + 1 || bytes.length > MAX_TRANSPORT_BYTES) {
@@ -164,25 +160,49 @@ export function bytewordsToUr(value: string): string {
   return transportToUr(bytes);
 }
 
-function paddedColorLength(payloadLength: number): number {
-  return Math.ceil((payloadLength + COLOR_HEADER_BYTES) / RGB_BYTES) * RGB_BYTES;
+/**
+ * The checksum, then the version, CBOR length and CBOR, mixed to remove the constant prefix.
+ * First codes can still coincide; anyone can undo this mixing and recognize the format.
+ */
+function mixShare(transport: Uint8Array, version: number): number[] {
+  const checksum = transport.subarray(-CHECKSUM_BYTES);
+  const cbor = transport.subarray(0, -CHECKSUM_BYTES);
+  const body = [version, cbor.length, ...cbor];
+  return [...checksum, ...body.map((byte, index) => byte ^ shareMask(checksum, index))];
 }
 
-function colorHex(bytes: Uint8Array): string {
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+/**
+ * Undoes mixShare on `bytes`, which may go on with zero filling: the transport bytes and how many
+ * of `bytes` the share takes, or undefined when the version or the length does not fit.
+ */
+function unmixShare(
+  bytes: readonly number[],
+  version: number,
+): { readonly transport: Uint8Array; readonly length: number } | undefined {
+  const checksum = Uint8Array.from(bytes.slice(0, CHECKSUM_BYTES));
+  const body = bytes.slice(CHECKSUM_BYTES).map((byte, index) => byte ^ shareMask(checksum, index));
+  const cborLength = body[1] ?? 0;
+  const bodyEnd = SHARE_HEADER_BYTES + cborLength;
+  if (checksum.length < CHECKSUM_BYTES || body[0] !== version || cborLength < 1) return undefined;
+  if (body.length < bodyEnd) return undefined;
+  return {
+    transport: Uint8Array.from([...body.slice(SHARE_HEADER_BYTES, bodyEnd), ...checksum]),
+    length: CHECKSUM_BYTES + bodyEnd,
+  };
+}
+
+function colorHex(bytes: readonly number[]): string {
+  const hex = bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("");
   return `#${hex.toUpperCase()}`;
 }
 
-/** Version 1: A1, byte length, original UR bytewords bytes including CRC, zero padding. */
+/** The mixed share (mixShare, version A1), zero bytes to a whole color, three bytes per #RRGGBB. */
 export function shareToColors(ur: string): string[] {
-  const payload = urToTransport(ur);
-  const bytes = new Uint8Array(paddedColorLength(payload.length));
-  bytes[0] = COLOR_VERSION;
-  bytes[1] = payload.length;
-  bytes.set(payload, COLOR_HEADER_BYTES);
+  const bytes = mixShare(urToTransport(ur), COLOR_VERSION);
+  while (bytes.length % RGB_BYTES !== 0) bytes.push(0);
   const colors: string[] = [];
   for (let offset = 0; offset < bytes.length; offset += RGB_BYTES) {
-    colors.push(colorHex(bytes.subarray(offset, offset + RGB_BYTES)));
+    colors.push(colorHex(bytes.slice(offset, offset + RGB_BYTES)));
   }
   return colors;
 }
@@ -199,26 +219,172 @@ function parseColorBytes(value: string): Uint8Array {
 }
 
 export function colorsToShare(value: string): string {
-  const bytes = parseColorBytes(value);
-  const payloadLength = bytes[1]!;
-  const payloadEnd = COLOR_HEADER_BYTES + payloadLength;
-  const paddingIsZero = bytes.subarray(payloadEnd).every((byte) => byte === 0);
+  const bytes = Array.from(parseColorBytes(value));
+  const share = unmixShare(bytes, COLOR_VERSION);
   if (
-    bytes[0] !== COLOR_VERSION ||
-    payloadLength < CHECKSUM_BYTES + 1 ||
-    bytes.length !== paddedColorLength(payloadLength) ||
-    !paddingIsZero
+    share === undefined ||
+    bytes.length !== Math.ceil(share.length / RGB_BYTES) * RGB_BYTES ||
+    bytes.slice(share.length).some((byte) => byte !== 0)
   ) {
     throw new Error("Unsupported or truncated SSKR color record.");
   }
-  return transportToUr(bytes.subarray(COLOR_HEADER_BYTES, payloadEnd));
+  return transportToUr(share.transport);
+}
+
+/** How a share is written: the forms of an encoded seed phrase, and the short UR code. */
+export type ShareFormat = "ur" | "words" | "indexes" | "unicode" | "colors" | "colors-unicode";
+
+/** BIP39 word indexes from bytes, 11 bits each, the last one filled with zero bits. */
+function bytesToWordIndexes(bytes: readonly number[]): number[] {
+  const indexes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const byte of bytes) {
+    buffer = (buffer << 8) | byte;
+    bits += 8;
+    while (bits >= WORD_BITS) {
+      bits -= WORD_BITS;
+      indexes.push((buffer >>> bits) & (WORD_COUNT - 1));
+    }
+    buffer &= (1 << bits) - 1;
+  }
+  if (bits > 0) indexes.push((buffer << (WORD_BITS - bits)) & (WORD_COUNT - 1));
+  return indexes;
+}
+
+/** Bytes from BIP39 word indexes, and the bits left over, which must be the zero filling. */
+function wordIndexesToBytes(indexes: readonly number[]): { bytes: number[]; leftover: number } {
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const index of indexes) {
+    buffer = (buffer << WORD_BITS) | index;
+    bits += WORD_BITS;
+    while (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >>> bits) & 0xff);
+    }
+    buffer &= (1 << bits) - 1;
+  }
+  return { bytes, leftover: buffer };
+}
+
+/**
+ * The share as BIP39 word indexes: the mixed share (mixShare, version A2), 11 bits per word, the
+ * last word filled with zero bits. Word numbers and Unicode codes write these indexes as the
+ * encoded seed phrase writes its own, so that a share looks like the form chosen for it.
+ */
+function shareToWordIndexes(ur: string): number[] {
+  return bytesToWordIndexes(mixShare(urToTransport(ur), WORD_VERSION));
+}
+
+function wordIndexesToShare(indexes: readonly number[]): string {
+  const { bytes, leftover } = wordIndexesToBytes(indexes);
+  const share = unmixShare(bytes, WORD_VERSION);
+  // The words hold exactly the share, and the filling is zero.
+  if (
+    share === undefined ||
+    indexes.length !== Math.ceil((share.length * 8) / WORD_BITS) ||
+    leftover !== 0 ||
+    bytes.slice(share.length).some((byte) => byte !== 0)
+  )
+    throw new Error("Unsupported or truncated SSKR share in word numbers or Unicode codes.");
+  return transportToUr(share.transport);
+}
+
+function indexesToShare(value: string): string {
+  const numbers = value.trim().split(/[\s,]+/u);
+  if (numbers.length > MAX_COLOR_TEXT_LENGTH || numbers.some((item) => !/^\d{1,4}$/u.test(item)))
+    throw new Error("Word numbers of a share are whole numbers from 1 through 2048.");
+  const indexes = numbers.map((item) => Number(item) - 1);
+  if (indexes.some((index) => index < 0 || index >= WORD_COUNT))
+    throw new Error("Word numbers of a share are whole numbers from 1 through 2048.");
+  return wordIndexesToShare(indexes);
+}
+
+function unicodeToShare(value: string): string {
+  const compact = value.replace(/\s+/gu, "").toUpperCase();
+  if (compact.length > MAX_COLOR_TEXT_LENGTH || !/^(?:[0-9A-F]{4})+$/u.test(compact))
+    throw new Error("Unicode codes of a share have four hexadecimal digits each.");
+  const indexes = compact.match(/.{4}/gu)!.map((code) => {
+    const index = UNICODE_INDEX.get(code);
+    if (index === undefined) throw new Error("A Unicode code of the share is not a BIP39 word.");
+    return index;
+  });
+  return wordIndexesToShare(indexes);
+}
+
+/** One share as text in `format`; readShare reads every one of them back. */
+export function writeShare(share: string, format: ShareFormat): string {
+  switch (format) {
+    case "ur":
+      return share;
+    case "words":
+      return urToBytewords(share);
+    case "indexes":
+      return shareToWordIndexes(share)
+        .map((index) => String(index + 1))
+        .join(" ");
+    case "unicode":
+      return shareToWordIndexes(share)
+        .map((index) => unicodeHex(traditionalChineseWordlist[index]!))
+        .join(" ");
+    case "colors":
+      return shareToColors(share).join(" ");
+    case "colors-unicode":
+      return colorsToUnicode(shareToColors(share));
+  }
+}
+
+/**
+ * The readers of each form, with what its text looks like. Text may look like more than one form,
+ * such as hexadecimal digits; each form carries a version byte, a length and a checksum, so only
+ * the right reader accepts it.
+ */
+const SHARE_READERS: readonly {
+  readonly format: ShareFormat;
+  readonly looks: RegExp;
+  readonly read: (text: string) => string;
+}[] = [
+  { format: "ur", looks: /^ur:/iu, read: (text) => transportToUr(urToTransport(text)) },
+  { format: "indexes", looks: /^\d+(?:[\s,]+\d+)*$/u, read: indexesToShare },
+  { format: "colors", looks: /^[#0-9a-f\s]+$/iu, read: colorsToShare },
+  { format: "unicode", looks: /^[0-9a-f\s]+$/iu, read: unicodeToShare },
+  {
+    format: "colors-unicode",
+    looks: /^[0-9a-f\s,;\uE000-\uF8FF]+$/iu,
+    read: (text) => colorsToShare(unicodeToColorCodes(text).join(" ")),
+  },
+  // Anything else is read as Bytewords, the standard form in words.
+  { format: "words", looks: /[\s\S]/u, read: bytewordsToUr },
+];
+
+/** A share in any form MnemoCode writes, as its UR, and the form it was written in. */
+export function readShare(value: string): { readonly ur: string; readonly format: ShareFormat } {
+  const text = value.trim();
+  let firstError: unknown;
+  for (const reader of SHARE_READERS) {
+    if (!reader.looks.test(text)) continue;
+    try {
+      return { ur: reader.read(text), format: reader.format };
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  throw firstError instanceof Error ? firstError : new Error("This is not an SSKR share.");
 }
 
 export function normalizeShare(value: string): string {
-  const text = value.trim();
-  if (/^ur:/iu.test(text)) return transportToUr(urToTransport(text));
-  if (/^[#0-9a-f\s]+$/iu.test(text)) return colorsToShare(text);
-  return bytewordsToUr(text);
+  return readShare(value).ur;
+}
+
+/**
+ * Checks that the QR code of a share card holds the share its color references print, in
+ * whatever form the QR code writes it.
+ */
+export function assertShareQr(colors: readonly string[], payload: string): void {
+  if (readShare(payload).ur !== colorsToShare(colors.join(" ")))
+    throw new Error("Share QR does not match the printed references.");
 }
 
 function assertSameSet(info: ShareInfo, expected: ShareInfo): void {
@@ -232,11 +398,16 @@ function assertSameSet(info: ShareInfo, expected: ShareInfo): void {
   }
 }
 
-/** Reject mixed sets and duplicate members before asking the cryptographic engine. */
-export function validateShareSet(records: readonly string[], requireQuorum = true): string[] {
-  if (!records.length || records.length > MAX_SHARE_COUNT) {
+/** Bound the input before parsing or searching for any missing elements. */
+export function assertShareCount(count: number): void {
+  if (!Number.isSafeInteger(count) || count < 1 || count > MAX_SHARE_COUNT) {
     throw new Error("Provide between 1 and 256 SSKR shares.");
   }
+}
+
+/** Reject mixed sets and duplicate members before asking the cryptographic engine. */
+export function validateShareSet(records: readonly string[], requireQuorum = true): string[] {
+  assertShareCount(records.length);
   const shares = records.map(normalizeShare);
   const infos = shares.map((share) => shareInfo(urToTransport(share)));
   const first = infos[0]!;

@@ -13,7 +13,6 @@ import {
 } from "../core.js";
 import { parseRecord } from "../record.js";
 import { combineSskrShares } from "../sskr/shares.js";
-import { normalizeShare } from "../sskr/transport.js";
 import {
   askSecret,
   datesPrompt,
@@ -73,7 +72,7 @@ export async function checkShareBackup(
 ): Promise<CheckResult> {
   let masked: string;
   try {
-    masked = await combineSskrShares(typed.split(";").map(normalizeShare));
+    masked = await combineSskrShares(typed.split(";"));
   } catch {
     return "unreadable";
   }
@@ -170,7 +169,7 @@ export async function offerShareCheck(
     `${threshold} shares`,
     async () => {
       const typed = await askSecret(
-        `${threshold} shares as written down (separated by semicolons):`,
+        `${threshold} shares as written down (separate with ;, ? for each unreadable code):`,
       );
       const dateLine = mode === "direct" ? "" : await askSecret(datesPrompt(wordCountOf(original)));
       return checkShareBackup(original, typed, mode, dateLine);

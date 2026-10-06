@@ -3,7 +3,7 @@
 # output into sskr-wasm/generated. The image is x86-64 (linux/amd64) on every host.
 #
 # The toolchain stage is a word-for-word copy of the one in Dockerfile.reproducible of
-# multi-chain-wallet-tools (revision 2d2b7cc): the same base image, clang, Rust and wasm-bindgen
+# multi-chain-wallet-tools (revision 8964b65): the same base image, clang, Rust and wasm-bindgen
 # give the same bytes there and here, and Docker can reuse the layers it already built. Change it
 # only together with that file.
 FROM buildpack-deps:noble@sha256:cf0b8fb7b19c45ef68523a0c8a32a742b5f2c0839b1e8ca0061f73d6b1a19062 AS toolchain

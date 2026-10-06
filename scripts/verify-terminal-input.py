@@ -240,8 +240,7 @@ def check_answers_pasted_together():
         session.type(ENCODE_ENTRY)
         session.wait_for("Which form should the seed phrase take?")
         session.type("1")
-        session.wait_for("Use Seedshift?")
-        session.type("1")
+        # Word numbers are always masked: the menu asks only which Seedshift.
         session.wait_for("Which Seedshift?")
         session.type("1")
         session.wait_for("Split it into Shamir shares?")

@@ -11,7 +11,14 @@ import { publishNewPrivateFile } from "./private-file.js";
 import { businessStyles } from "./business-designs.js";
 import { PDFDocument } from "pdf-lib";
 import { dirname, join } from "node:path";
-import { shareInfo, shareToColors, urToTransport, validateShareSet } from "../sskr/transport.js";
+import {
+  shareInfo,
+  shareToColors,
+  urToTransport,
+  validateShareSet,
+  writeShare,
+  type ShareFormat,
+} from "../sskr/transport.js";
 import { renderBusinessCards } from "./business-cards.js";
 import { requireNewCardDirectory } from "./individual-cards.js";
 import type { BusinessStyle, CardSettings } from "./card-settings.js";
@@ -21,9 +28,18 @@ export interface SskrExportOptions extends CardSettings {
   readonly style: BusinessStyle | MaterialStyle | "glass-4in1" | "glass-6in1" | "glass-8in1";
   /** Omitted: decided by the page size. */
   readonly layout?: SskrCardLayout;
+  /**
+   * The form of the shares. A QR code holds the color codes that the card prints, unless the
+   * shares are written as word numbers or Unicode codes: then it holds them in that form, so that
+   * a share read from it comes back as it was written.
+   */
+  readonly shareFormat?: ShareFormat;
   readonly directory: string;
   readonly imageFormat?: ImageFormat;
 }
+
+/** Share forms that a QR code of a share card holds as they are; any other gives the colors. */
+const QR_FORMS: ReadonlySet<ShareFormat> = new Set(["indexes", "unicode", "colors-unicode"]);
 
 function glassReferencesPerCard(style: SskrExportOptions["style"]): 4 | 6 | 8 | undefined {
   if (style === "glass-4in1") return 4;
@@ -90,11 +106,14 @@ function prepareMembers(
     const id =
       `${info.identifier.toString(16).padStart(4, "0")}-${info.groupIndex + 1}-${info.memberIndex + 1}`.toUpperCase();
     const colors = shareToColors(share);
+    const qrFormat = QR_FORMS.has(options.shareFormat ?? "colors")
+      ? options.shareFormat!
+      : "colors";
     const content: SskrCardContent = {
       ...options,
       kind: "sskr",
       colors,
-      payload: colors.join(" "),
+      payload: writeShare(share, qrFormat),
       collectionReference: id,
       qrCard: options.layout === "qr",
       cardQr: options.layout === "qr" || options.cardQr === true,

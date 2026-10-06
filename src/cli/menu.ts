@@ -70,7 +70,7 @@ function formChoices(): Choice<EncodedForm>[] {
   return [
     {
       label: "Word numbers",
-      note: "its place in the BIP39 word list, 1 to 2048",
+      note: "its place in the BIP39 word list, masked with your dates",
       example: example("indexes"),
       value: "indexes",
     },
@@ -114,8 +114,19 @@ const VARIANT_EXPLANATION: Explanation = {
 
 /** What Shamir shares are, shown with the question how many to make. */
 const SHARES_EXPLANATION: Explanation = {
-  lines: ["Any chosen number of shares restores it; fewer reveal nothing."],
+  lines: ["Shares in this form; restoring gives it back. Fewer reveal nothing."],
   more: [readmeLink("splitting-a-mnemonic-into-shares")],
+};
+
+/** What standard shares are, shown with the question how many to make in entry 3. */
+const STANDARD_SHARES_EXPLANATION: Explanation = {
+  lines: ["Standard SSKR shares of the seed phrase itself, which other SSKR tools read."],
+  more: [readmeLink("splitting-a-mnemonic-into-shares")],
+};
+
+/** What a whole copy beside the shares means, shown with the question whether to show one. */
+const COPY_EXPLANATION: Explanation = {
+  lines: ["It alone restores the wallet: keep it apart from the shares, or choose No."],
 };
 
 /** What the sheet for heirs is, shown with the question whether to make it. */
@@ -141,28 +152,50 @@ const SEEDSHIFT_VARIANTS: readonly Choice<Mode>[] = [
 ];
 
 /**
- * Whether Seedshift is used and which; undefined means back. English words are always masked
- * (`required`): unmasked they would be the seed phrase itself.
+ * Forms that only write the words differently: English words are the seed phrase itself, and
+ * anyone with the BIP39 list reads word numbers. Unmasked they would protect nothing while seeming
+ * to, so the menu always masks them.
+ */
+const ALWAYS_MASKED: ReadonlySet<EncodedForm> = new Set(["english", "indexes"]);
+
+/** Why there is no question whether to mask, shown with the question which Seedshift. */
+const ALWAYS_MASKED_EXPLANATION: Explanation = {
+  lines: [
+    "Always masked: unmasked, this form shows the seed phrase itself.",
+    ...VARIANT_EXPLANATION.lines,
+  ],
+  more: VARIANT_EXPLANATION.more,
+};
+
+/**
+ * Whether Seedshift is used and which; undefined means back. A form in ALWAYS_MASKED is always
+ * masked (`required`). Standard shares take only MnemoCode Seedshift (`shares`), so there is
+ * nothing to choose between, and without it the shares themselves still protect the phrase.
  */
 async function askSeedshift(
   question: string,
-  options: { readonly required?: boolean } = {},
+  options: { readonly required?: boolean; readonly shares?: boolean } = {},
 ): Promise<Mode | undefined> {
   if (options.required !== true) {
+    const unmasked =
+      options.shares === true
+        ? "the shares alone restore it"
+        : "weak: only disguised, anyone with MnemoCode reads it";
     const used = await choose(
       question,
       [
         { label: "Yes", note: "the same dates are needed to get it back", value: true },
-        { label: "No", note: "anyone with MnemoCode can get it back", value: false },
+        { label: "No", note: unmasked, value: false },
       ],
       { label: "Seedshift", explanation: SEEDSHIFT_EXPLANATION },
     );
     if (used === undefined) return undefined;
     if (!used) return "direct";
   }
+  if (options.shares === true) return "seedshift";
   return choose("Which Seedshift?", SEEDSHIFT_VARIANTS, {
     label: "Variant",
-    explanation: VARIANT_EXPLANATION,
+    explanation: options.required === true ? ALWAYS_MASKED_EXPLANATION : VARIANT_EXPLANATION,
   });
 }
 
@@ -214,29 +247,74 @@ async function askResultDestination(form: EncodedForm): Promise<string[] | undef
   return [destination === "record" ? "--output" : "--qr", path];
 }
 
-/** Entry 1: the seed phrase in another form, masked with Seedshift and split into shares if wanted. */
+/**
+ * Entry 1: the seed phrase in another form, masked with Seedshift and split into Shamir shares if
+ * wanted. The shares are written in the same form, so that whatever is chosen looks alike.
+ */
 async function encodeAction(): Promise<Action> {
   const form = await choose("Which form should the seed phrase take?", formChoices(), {
     label: "Form",
   });
   if (form === undefined) return undefined;
-  const mode = await askSeedshift("Use Seedshift?", {
-    required: form === "english",
-  });
+  const mode = await askSeedshift("Use Seedshift?", { required: ALWAYS_MASKED.has(form) });
   if (mode === undefined) return undefined;
-  const run = ["encode", "--ask-secrets", "--format", FORMAT_NUMBER[form], "--mode", mode];
   // The original Seedshift cannot be split into shares (mnemocode encode --help).
-  const set = mode === "seedshift-legacy" ? null : await askShareSet();
+  const set =
+    mode === "seedshift-legacy"
+      ? null
+      : await askShareSet("Split it into Shamir shares?", SHARES_EXPLANATION, true);
   if (set === undefined) return undefined;
-  const output = set === null ? await askResultDestination(form) : await askShares(set, form);
-  if (output === undefined) return undefined;
+  const run =
+    set === null ? await askCopyDestination(form, mode) : await askSharesRun(set, form, mode);
+  if (run === undefined) return undefined;
   const heirs = await askHeirSheet();
-  if (heirs === undefined) return undefined;
-  // With shares --format stays: the whole seed phrase in the chosen form is shown with them, for a
-  // person who keeps it too and holds the shares in reserve; the command warns that it alone
-  // restores the wallet.
-  const command = set === null ? run : ["encode", "--sskr", ...run.slice(1)];
-  return { run: [...command, ...output, ...heirs] };
+  return heirs === undefined ? undefined : { run: [...run, ...heirs] };
+}
+
+/** One copy in the chosen form, and where it goes. */
+async function askCopyDestination(form: EncodedForm, mode: Mode): Promise<string[] | undefined> {
+  const destination = await askResultDestination(form);
+  if (destination === undefined) return undefined;
+  return [
+    "encode",
+    "--ask-secrets",
+    "--format",
+    FORMAT_NUMBER[form],
+    "--mode",
+    mode,
+    ...destination,
+  ];
+}
+
+/**
+ * Shares in the chosen form, where they go, and whether the whole seed phrase is shown beside
+ * them (--format), for a person who keeps it and holds the shares in reserve.
+ */
+async function askSharesRun(
+  set: ShareSet,
+  form: EncodedForm,
+  mode: Mode,
+): Promise<string[] | undefined> {
+  const shares = await askShares(set, SHARE_FORMAT[form]);
+  if (shares === undefined) return undefined;
+  const copy = await choose(
+    "Also show the whole seed phrase?",
+    [
+      { label: "No", note: "only the shares", value: false },
+      { label: "Yes", note: "in the same form, beside the shares", value: true },
+    ],
+    { label: "Copy", explanation: COPY_EXPLANATION },
+  );
+  if (copy === undefined) return undefined;
+  return [
+    "encode",
+    "--sskr",
+    "--ask-secrets",
+    "--mode",
+    mode,
+    ...shares,
+    ...(copy ? ["--format", FORMAT_NUMBER[form]] : []),
+  ];
 }
 
 /** The optional sheet that tells heirs how to restore the backup (README, Instructions for heirs). */
@@ -321,14 +399,18 @@ const SHARE_SETS: readonly (readonly [number, number])[] = [
 type ShareSet = readonly [threshold: number, count: number];
 
 /**
- * Whether to split the seed phrase into Shamir shares and how many of them restore it: null for No,
- * undefined for back.
+ * How many Shamir shares, and how many of them restore the seed phrase: null for No, which Encode
+ * offers first (`withNo`), undefined for back.
  */
-async function askShareSet(): Promise<ShareSet | null | undefined> {
+async function askShareSet(
+  question: string,
+  explanation: Explanation,
+  withNo: boolean,
+): Promise<ShareSet | null | undefined> {
   const set = await choose<ShareSet | "other" | null>(
-    "Split it into Shamir shares?",
+    question,
     [
-      { label: "No", note: "one result, not split", value: null },
+      ...(withNo ? [{ label: "No", note: "one encoded copy, not split", value: null }] : []),
       ...SHARE_SETS.map(([threshold, count]) => ({
         label: `${threshold} of ${count}`,
         note: `${count} shares, any ${threshold} restore it`,
@@ -336,7 +418,7 @@ async function askShareSet(): Promise<ShareSet | null | undefined> {
       })),
       { label: "Other", note: `type the numbers, up to ${MAX_SHARES} shares`, value: "other" },
     ],
-    { label: "Shares", explanation: SHARES_EXPLANATION },
+    { label: "Shares", explanation },
   );
   return set === "other" ? askOtherShareSet() : set;
 }
@@ -373,31 +455,31 @@ async function askOtherShareSet(): Promise<ShareSet | undefined> {
 }
 
 /**
- * How the shares are written and where they go; the form chosen for the seed phrase decides their
- * look. With colors they are color codes, which printable cards can disguise; with numbers, codes
- * or words they are plain text shares, as other SSKR tools write them, in words or a short code.
+ * The share form of each form of the seed phrase: English words give standard Bytewords, which
+ * other SSKR tools read too; the other forms give MnemoCode's own shares that look alike.
+ */
+const SHARE_FORMAT: Readonly<Record<EncodedForm, string>> = {
+  english: "words",
+  indexes: "indexes",
+  unicode: "unicode",
+  colors: "colors",
+  "colors-unicode": "colors-unicode",
+};
+
+/**
+ * Where the shares go, written in `shareFormat` (--share-format). Shares in colors can be printed
+ * as cards that disguise them; the others as QR codes.
  */
 async function askShares(
   [threshold, count]: ShareSet,
-  form: EncodedForm,
+  shareFormat: string,
 ): Promise<string[] | undefined> {
-  const colors = form === "colors" || form === "colors-unicode";
-  const shareFormat = colors
-    ? "colors"
-    : await choose(
-        "How should each share be written?",
-        [
-          { label: "Words", note: "Bytewords, such as tuna next keep gyro ...", value: "words" },
-          { label: "Short code", note: "ur:sskr/..., the standard short form", value: "ur" },
-        ] as const,
-        { label: "Shares as" },
-      );
-  if (shareFormat === undefined) return undefined;
   const options = ["--threshold", String(threshold), "--shares", String(count)];
   options.push("--share-format", shareFormat);
-  const printed: Choice<"qr" | "cards"> = colors
-    ? { label: "Also as printable cards", note: "disguised, one sheet per share", value: "cards" }
-    : { label: "Also as QR codes", note: "a PDF with one QR code per share", value: "qr" };
+  const printed: Choice<"qr" | "cards"> =
+    shareFormat === "colors" || shareFormat === "colors-unicode"
+      ? { label: "Also as printable cards", note: "disguised, one sheet per share", value: "cards" }
+      : { label: "Also as QR codes", note: "a PDF with one QR code per share", value: "qr" };
   const destination = await choose(
     "Where should the shares go?",
     [
@@ -423,7 +505,36 @@ async function askShares(
     : [...options, "--card-layout", "qr", "--pdf", path];
 }
 
-/** Entry 3: the seed phrase rebuilt from typed Shamir shares. */
+/**
+ * Entry 3: standard Shamir shares of the seed phrase itself, in Bytewords or as a short code, as
+ * other SSKR tools write and read them; restoring them gives the seed phrase in words.
+ */
+async function splitAction(): Promise<Action> {
+  const mode = await askSeedshift("Use Seedshift before splitting?", { shares: true });
+  if (mode === undefined) return undefined;
+  const set = await askShareSet(
+    "How many shares, and how many of them restore the seed phrase?",
+    STANDARD_SHARES_EXPLANATION,
+    false,
+  );
+  if (set === undefined || set === null) return undefined;
+  const shareFormat = await choose(
+    "How should each share be written?",
+    [
+      { label: "Words", note: "Bytewords, such as tuna next keep gyro ...", value: "words" },
+      { label: "Short code", note: "ur:sskr/..., the standard short form", value: "ur" },
+    ] as const,
+    { label: "Shares as" },
+  );
+  if (shareFormat === undefined) return undefined;
+  const shares = await askShares(set, shareFormat);
+  if (shares === undefined) return undefined;
+  const heirs = await askHeirSheet();
+  if (heirs === undefined) return undefined;
+  return { run: ["encode", "--sskr", "--ask-secrets", "--mode", mode, ...shares, ...heirs] };
+}
+
+/** Entry 4: the seed phrase rebuilt from typed Shamir shares. */
 async function restoreAction(): Promise<Action> {
   const mode = await choose(
     "Was Seedshift used before it was split?",
@@ -439,7 +550,7 @@ async function restoreAction(): Promise<Action> {
   };
 }
 
-/** Entry 4: a forgotten word, or a forgotten digit of a date. */
+/** Entry 5: a forgotten word, a forgotten digit of a date, or an unreadable code of a share. */
 async function recoverAction(): Promise<Action> {
   const forgotten = await choose(
     "What is forgotten?",
@@ -450,11 +561,18 @@ async function recoverAction(): Promise<Action> {
         note: "for a seed phrase masked with Seedshift",
         value: "date",
       },
+      {
+        label: "A code of a Shamir share",
+        note: "type the share with ? for each unreadable code",
+        value: "share",
+      },
     ] as const,
     { label: "Forgotten" },
   );
   if (forgotten === undefined) return undefined;
   if (forgotten === "word") return { run: ["recover-word", "--ask-secrets"] };
+  // The shares come back whole, in their own form, without the seed phrase being shown.
+  if (forgotten === "share") return { run: ["sskr-export", "--ask-secrets"] };
   const source = await askSource();
   if (source === undefined) return undefined;
   // A record file names its mode; otherwise the person says which Seedshift was used.
@@ -468,7 +586,7 @@ async function recoverAction(): Promise<Action> {
   return { run: ["recover-date", "--ask-secrets", ...source.options, "--mode", mode] };
 }
 
-/** Entry 5: card designs drawn with the public test phrase. */
+/** Entry 6: card designs drawn with the public test phrase. */
 async function previewAction(): Promise<Action> {
   const design = await askDesign(true);
   if (design === undefined) return undefined;
@@ -479,7 +597,7 @@ async function previewAction(): Promise<Action> {
   };
 }
 
-/** Entry 6: one row of the word table, or all of it. */
+/** Entry 7: one row of the word table, or all of it. */
 async function tableAction(): Promise<Action> {
   const lookup = await choose(
     "What do you want to look up?",
@@ -512,20 +630,21 @@ export const MENU_ENTRIES: readonly Entry[] = [
     digit: 2,
     action: decodeAction,
   },
-  { label: "Restore a seed phrase from Shamir shares", digit: 3, action: restoreAction },
+  { label: "Split a seed phrase into standard Shamir shares", digit: 3, action: splitAction },
+  { label: "Restore a seed phrase from Shamir shares", digit: 4, action: restoreAction },
   {
-    label: "Find a forgotten word of a seed phrase or a date digit",
-    digit: 4,
+    label: "Find a forgotten word, a date digit or a share code",
+    digit: 5,
     action: recoverAction,
   },
-  { label: "Print sample cards with a test seed phrase", digit: 5, action: previewAction },
-  { label: "Look up a seed word, its number or its Unicode code", digit: 6, action: tableAction },
+  { label: "Print sample cards with a test seed phrase", digit: 6, action: previewAction },
+  { label: "Look up a seed word, its number or its Unicode code", digit: 7, action: tableAction },
   {
     label: "Check that this copy of MnemoCode works",
-    digit: 7,
+    digit: 8,
     action: async () => ({ run: ["self-test"] }),
   },
-  { label: "Show every command and option", digit: 8, action: async () => "help" },
+  { label: "Show every command and option", digit: 9, action: async () => "help" },
   { label: "Quit", digit: 0, action: async () => "quit" },
 ];
 
