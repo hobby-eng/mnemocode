@@ -185,3 +185,13 @@ python3 docs/audits/AUD-008-harnesses/fix-validate.py
 New evidence uses `fix-*` filenames. Do not overwrite original or `recheck-*` records.
 The package build is fresh; no standalone executable/Docker build, Windows/macOS execution,
 crash consistency, concurrent publication, universal terminal policy or release approval is claimed.
+
+## Commit binding after remediation
+
+The authorized four-fix source is committed in signed commit
+`9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b`. `fix-snapshot.py` preserves the original
+pre-commit record but accepts a descendant HEAD when every product byte still matches.
+`fix-validate.py` checks the recorded signed commit, ancestry, committed product tree and
+source hashes; later audit-only commits do not invalidate it. Changed source still fails.
+The original execution-time hashes of these helpers remain in the report; the commit-binding
+update records their current hashes separately. Recording this binding is not a new audit run.

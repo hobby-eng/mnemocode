@@ -2744,8 +2744,8 @@
     {
       "id": "AUD-008-FUN001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
       "verifiedAt": "2026-10-06T02:42:14.255877Z",
       "sourceFingerprint": "20ab1841be1812ab1e150f657e097e50da3156e8dd95bb6e32340f4af209790d",
       "scope": "Authorized targeted remediation; original and first verification evidence preserved; not release approval.",
@@ -2780,8 +2780,8 @@
     {
       "id": "AUD-008-UI001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
       "verifiedAt": "2026-10-06T02:42:14.255877Z",
       "sourceFingerprint": "20ab1841be1812ab1e150f657e097e50da3156e8dd95bb6e32340f4af209790d",
       "scope": "Authorized targeted remediation; original and first verification evidence preserved; not release approval.",
@@ -2808,8 +2808,8 @@
     {
       "id": "AUD-008-UI002",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
       "verifiedAt": "2026-10-06T02:42:14.255877Z",
       "sourceFingerprint": "20ab1841be1812ab1e150f657e097e50da3156e8dd95bb6e32340f4af209790d",
       "scope": "Authorized targeted remediation; original and first verification evidence preserved; not release approval.",
@@ -2824,8 +2824,8 @@
     {
       "id": "AUD-008-BLD001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
       "verifiedAt": "2026-10-06T02:42:14.255877Z",
       "sourceFingerprint": "20ab1841be1812ab1e150f657e097e50da3156e8dd95bb6e32340f4af209790d",
       "scope": "Authorized targeted remediation; original and first verification evidence preserved; not release approval.",
@@ -4698,7 +4698,23 @@
       "No real executable/Docker release rebuild, Windows/macOS acceptance, physical terminal-emulator capture or release approval.",
       "PTY resize captures are real; visible-screen replay assumes logical rows reflow. Terminal-specific resize and clipboard policies are not universally verified.",
       "Builder fault injection executes exact source with an in-memory filesystem; rollback failure preserves backups but does not guarantee automatic recovery after crash or power loss.",
-      "No commit, push, tag or release."
-    ]
+      "No commit, push, tag or release.",
+      "During the owner's remediation, before the first remediation verification, reruns of the narrow-terminal probe wrote into AUD-008-evidence/ and replaced four original local captures: interface-menu-120.raw.txt, interface-menu-40.raw.txt, interface-menu-40.screen.txt and interface-narrow-terminal-results.json. The replacements were moved aside under remediation-* names, so the original names are now absent, and sha256sum -c SHA256SUMS in the evidence folder reports exactly these four as missing. Their SHA-256 values stay recorded in this report; the original log interface-narrow-terminal.log (ded91f28…) and interface-menu-120.screen.txt (9fa83991…) still match. The UI001 failure is therefore documented by the retained log, the recorded hashes and the observation above, not by byte-for-byte captures. All later harnesses write only remediation-*, recheck-* or fix-* names."
+    ],
+    "commitBinding": {
+      "commit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "sourceFingerprint": "20ab1841be1812ab1e150f657e097e50da3156e8dd95bb6e32340f4af209790d",
+      "recordedAt": "2026-10-06T02:56:20.892822Z",
+      "meaning": "All reviewed product bytes are in the signed remediation commit. Original audit and pre-commit snapshots remain unchanged; later commits may change audit records only.",
+      "harnessHashes": {
+        "docs/audits/AUD-008-harnesses/fix-snapshot.py": "eeae6204b233909ec62e56bc4e52485a95edd8410d5d959424a1cd868594afad",
+        "docs/audits/AUD-008-harnesses/fix-validate.py": "c0397d27098c1b97f7d42ca5956c4122f6a8c959b543a9da4f58f6f3a9826da1",
+        "docs/audits/AUD-008-harnesses/README.md": "c89a7a7ad37da32e527a06b5a59570f08957cf08287e84c2aafa146ff61f5019"
+      },
+      "limits": [
+        "A signature header is present; this validator does not establish a signer trust policy.",
+        "All original run results and counts are retained. Recording the commit and updating the validator is not a new product audit."
+      ]
+    }
   }
 }

@@ -43,9 +43,22 @@ def main():
     assert report["remediationVerification"] == prior["remediationVerification"]
     assert report["historicalEvidence"]["remediationBeforeAuthorizedFixes"] == prior["remediation"]
     assert phase["snapshot"] == load(EVIDENCE / "fix-snapshot.json")
-    verified = load(EVIDENCE / "fix-snapshot-verification.json")
+    binding = phase.get("commitBinding")
+    verification_name = "fix-snapshot-verification.json" if binding is None else "commit-binding-snapshot-verification.json"
+    verified = load(EVIDENCE / verification_name)
     assert verified["unchanged"] and not verified["changedFiles"]
-    assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip() == phase["snapshot"]["commit"]
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip()
+    if binding is None:
+        assert head == phase["snapshot"]["commit"]
+    else:
+        committed = binding["commit"]
+        assert binding["sourceFingerprint"] == phase["snapshot"]["sourceFingerprint"]
+        assert subprocess.run(["git", "merge-base", "--is-ancestor", phase["snapshot"]["commit"], committed], cwd=ROOT).returncode == 0
+        assert subprocess.run(["git", "merge-base", "--is-ancestor", committed, head], cwd=ROOT).returncode == 0
+        headers = subprocess.check_output(["git", "cat-file", "-p", committed], cwd=ROOT).split(b"\n\n", 1)[0]
+        assert b"\ngpgsig " in b"\n" + headers, "Remediation commit has no signature header"
+        # Comparing the committed product tree keeps unrelated HEAD movement from passing as a fix.
+        assert subprocess.run(["git", "diff", "--quiet", committed, "--", ".", ":(exclude)docs/audits/**"], cwd=ROOT).returncode == 0
     for name, sha in phase["snapshot"]["files"].items():
         assert digest(ROOT / name) == sha, name
     for name, sha in load(EVIDENCE / "fix-dist-manifest.json").items():
@@ -53,7 +66,14 @@ def main():
     for name, sha in phase["procedureHashes"].items():
         assert digest(Path(name)) == sha, name
     for name, sha in phase["harnessHashes"].items():
-        assert digest(ROOT / name) == sha, name
+        replacement = binding["harnessHashes"].get(name) if binding is not None else None
+        if replacement is None:
+            assert digest(ROOT / name) == sha, name
+        else:
+            # Keep execution-time hashes: the commit-binding update is a later harness revision.
+            before = subprocess.check_output(["git", "show", binding["commit"] + ":" + name], cwd=ROOT)
+            assert hashlib.sha256(before).hexdigest() == sha, name
+            assert digest(ROOT / name) == replacement, name
     for name, sha in phase["reviewRecordHashes"].items():
         assert digest(EVIDENCE / name) == sha, name
     for current, before in zip(report["findings"], original["findings"], strict=True):
@@ -64,8 +84,9 @@ def main():
     assert len(dispositions) == len(report["findings"]) == 11
     for finding in report["findings"]:
         assert finding["status"] == dispositions[finding["id"]]["status"] == "verified"
-        assert dispositions[finding["id"]]["fixCommit"] is None
-        assert dispositions[finding["id"]]["verificationCommit"] is None
+        expected_commit = binding["commit"] if binding is not None and finding["id"] in phase["newlyVerified"] else None
+        assert dispositions[finding["id"]]["fixCommit"] == expected_commit
+        assert dispositions[finding["id"]]["verificationCommit"] == expected_commit
     assert phase["statusCounts"] == {"verified": 11, "open": 0}
     for item in prior["remediation"]:
         if item["status"] == "verified":
@@ -82,7 +103,8 @@ def main():
     assert subprocess.run(["git", "check-ignore", "-q", str(EVIDENCE / "fix-snapshot.json")], cwd=ROOT).returncode == 0
     assert not subprocess.check_output(["git", "diff", "--cached", "--name-only"], cwd=ROOT).strip()
     result = {"schema": "passed", "originalAndPriorEvidencePreserved": True, "productFilesBound": len(phase["snapshot"]["files"]), "statuses": phase["statusCounts"], "distinctSelectedTests": phase["distinctSelectedTests"], "buildFaultCases": phase["buildFaultCases"], "resizedPtyCases": phase["resizedPtyCases"], "evidenceIgnored": True, "stagedChanges": False}
-    (EVIDENCE / "fix-report-validation.json").write_text(json.dumps(result, indent=2) + "\n")
+    validation_name = "fix-report-validation.json" if binding is None else "commit-binding-report-validation.json"
+    (EVIDENCE / validation_name).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result))
 
 
