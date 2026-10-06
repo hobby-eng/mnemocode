@@ -1,4 +1,5 @@
 import { pbkdf2Sync } from "node:crypto";
+import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { HDKey, type Versions } from "@scure/bip32";
 import { Address, NETWORK, TEST_NETWORK, WIF, p2pkh, p2sh, p2tr, p2wpkh } from "@scure/btc-signer";
 
@@ -98,7 +99,35 @@ function parseHex(value: string): Uint8Array {
     bytes[index] = Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16);
   if (bytes[0] !== 0x02 && bytes[0] !== 0x03)
     throw new Error("A compressed public key must start with 02 or 03.");
+  // Without this, a key that no wallet can have would only fail to match (AUD-008-API002).
+  if (!secp256k1.utils.isValidPublicKey(bytes, true))
+    throw new Error("The compressed public key is not a point of the secp256k1 curve.");
   return bytes;
+}
+
+/** A WIF's private key, refused unless it is a valid secp256k1 secret: 1 to the group order − 1. */
+function wifKey(evidence: Extract<BitcoinEvidence, { kind: "wif" }>): Uint8Array {
+  const network = evidence.location.network === "mainnet" ? NETWORK : TEST_NETWORK;
+  let key: Uint8Array;
+  try {
+    key = WIF(network).decode(evidence.value.trim());
+  } catch {
+    throw new Error(`The WIF is not valid for Bitcoin ${evidence.location.network}.`);
+  }
+  if (!secp256k1.utils.isValidSecretKey(key)) {
+    key.fill(0);
+    throw new Error("The WIF holds no valid secp256k1 private key.");
+  }
+  return key;
+}
+
+/**
+ * Refuses evidence that no wallet can match before any wallet is derived: a malformed key would
+ * otherwise read as evidence against every candidate.
+ */
+function assertEvidenceValue(evidence: LocatedEvidence): void {
+  if (evidence.kind === "compressed-public-key") parseHex(evidence.value);
+  if (evidence.kind === "wif") wifKey(evidence).fill(0);
 }
 
 function assertNetwork(network: BitcoinNetworkName): void {
@@ -188,8 +217,13 @@ const SEED_ROUNDS = 2048;
 const SEED_BYTES = 64;
 const BIP39_WORD_COUNTS: ReadonlySet<number> = new Set([12, 15, 18, 21, 24]);
 
-/** The NFKD form that BIP39 hashes; refused, as by @scure/bip39, when it is not well formed. */
+/**
+ * The NFKD form that BIP39 hashes; refused, as by @scure/bip39, when it is not text or not well
+ * formed: a JavaScript caller could pass null or a number, which would otherwise become the salt of
+ * another wallet as "null" or "123" (AUD-008-API005).
+ */
 function nfkd(text: string): string {
+  if (typeof text !== "string") throw new TypeError("expected a string");
   // With the u flag, a surrogate on its own is a code point of its own; a pair is not.
   if (/\p{Cs}/u.test(text)) throw new TypeError("expected well-formed Unicode string");
   return text.normalize("NFKD");
@@ -203,6 +237,8 @@ function nfkd(text: string): string {
 function bip39Seed(mnemonic: string, passphrase: string): Uint8Array {
   const phrase = nfkd(mnemonic);
   if (!BIP39_WORD_COUNTS.has(phrase.split(" ").length)) throw new Error("Invalid mnemonic");
+  // Checked before the template below would turn it into text.
+  if (typeof passphrase !== "string") throw new TypeError("expected a string passphrase");
   const seed = pbkdf2Sync(phrase, nfkd(`mnemonic${passphrase}`), SEED_ROUNDS, SEED_BYTES, "sha512");
   return new Uint8Array(seed.buffer, seed.byteOffset, seed.byteLength);
 }
@@ -246,14 +282,8 @@ function matchingWif(
 ): string | undefined {
   const derivedKey = node.privateKey;
   if (derivedKey === null) throw new Error("Unable to derive the private key for WIF comparison.");
-  const network = evidence.location.network === "mainnet" ? NETWORK : TEST_NETWORK;
-  const coder = WIF(network);
-  let expected: Uint8Array;
-  try {
-    expected = coder.decode(evidence.value.trim());
-  } catch {
-    throw new Error(`The WIF is not valid for Bitcoin ${evidence.location.network}.`);
-  }
+  const coder = WIF(evidence.location.network === "mainnet" ? NETWORK : TEST_NETWORK);
+  const expected = wifKey(evidence);
   try {
     return equalBytes(derivedKey, expected) ? coder.encode(derivedKey) : undefined;
   } finally {
@@ -370,6 +400,7 @@ export function matchBitcoinEvidence(
 
   assertLocation(evidence.location);
   const profiles = candidates(evidence.profiles);
+  assertEvidenceValue(evidence);
   const root = rootForMnemonic(mnemonic, passphrase, evidence.location.network);
   try {
     for (const profile of profiles) {

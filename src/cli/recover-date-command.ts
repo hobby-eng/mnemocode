@@ -26,6 +26,11 @@ import { MAX_CANDIDATE_RECORDS } from "../core/candidate-list.js";
 const DEFAULT_MAX_CANDIDATES = 1_000_000;
 const HARD_MAX_CANDIDATES = 10_000_000;
 const MAX_INCOMPLETE_DATES = 3;
+/**
+ * Milliseconds of search between two turns of the event loop: without them, Ctrl+C could not leave
+ * the private screen until a search of hours ended (AUD-008-API001).
+ */
+const TURN_MILLISECONDS = 50;
 
 /**
  * Checksum-valid Seedshift gives a valid phrase for every date, so only the wallet can tell the
@@ -114,6 +119,7 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
   const kept: string[] = [];
   let checked = 0;
   let foundCount = 0;
+  let lastTurn = Date.now();
   for (const candidates of dateRecoveryCandidates(
     encryptedIndexes,
     knownDates,
@@ -121,6 +127,10 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
     recoveryMode,
   )) {
     checked += 1;
+    if (Date.now() - lastTurn >= TURN_MILLISECONDS) {
+      await new Promise((resolve) => setImmediate(resolve));
+      lastTurn = Date.now();
+    }
     for (const candidate of candidates) {
       const match =
         evidence === undefined

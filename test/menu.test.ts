@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 
 // The questions are answered by a script instead of a terminal: `answers` holds the place of the
@@ -47,7 +48,7 @@ import { assertAllowedArguments, parseArguments } from "../src/cli/arguments.js"
 import { commandOptions, isCommandName } from "../src/cli/command-options.js";
 import { LINE_WIDTH } from "../src/cli/terminal-choice.js";
 import { HEIR_MENU } from "../src/cli/heir-sheet.js";
-import { MENU_ENTRIES, typedCommand } from "../src/cli/menu.js";
+import { commandDisplay, MENU_ENTRIES, typedCommand } from "../src/cli/menu.js";
 
 /** Questions whose answers all lead to command lines of the same shape; only the first is taken. */
 const SAME_SHAPE = new Set(["Which card design?"]);
@@ -279,9 +280,36 @@ describe("start menu", () => {
   });
 
   it("shows the typed command with quotes only where a shell needs them", () => {
-    expect(typedCommand(["decode", "--ask-secrets", "--input-file", "my record.txt"])).toBe(
-      'mnemocode decode --ask-secrets --input-file "my record.txt"',
-    );
+    expect(
+      typedCommand(["decode", "--ask-secrets", "--input-file", "my record.txt"], "linux"),
+    ).toBe("mnemocode decode --ask-secrets --input-file 'my record.txt'");
     expect(typedCommand(["table", "--word", "abandon"])).toBe("mnemocode table --word abandon");
+    expect(typedCommand(["preview", "--pdf", "it's.pdf"], "win32")).toBe(
+      "mnemocode preview --pdf 'it''s.pdf'",
+    );
   });
+
+  // Windows has no POSIX shell to paste into; its quoting is checked above.
+  it.skipIf(process.platform === "win32")(
+    "keeps every file name byte for byte when the command is pasted into a shell",
+    () => {
+      const names = [
+        "output/a$(printf b).pdf",
+        "a `date` b.pdf",
+        "back\\slash \\n.pdf",
+        "say \"hi\" and 'bye'.pdf",
+        "carte d'identité ✓ 日本.pdf",
+        "$HOME/*.pdf",
+        "output/a  b.pdf",
+        `output/${"a".repeat(45)} ${"b".repeat(45)}.pdf`,
+      ];
+      for (const name of names) {
+        // The shown command is run in a real POSIX shell, with mnemocode as a function that prints
+        // its arguments one per NUL.
+        const script = `mnemocode() { printf '%s\\0' "$@"; }; ${commandDisplay(["preview", "--pdf", name])}`;
+        const printed = spawnSync("sh", ["-c", script], { encoding: "utf8" }).stdout.split("\0");
+        expect(printed.slice(0, 3)).toEqual(["preview", "--pdf", name]);
+      }
+    },
+  );
 });

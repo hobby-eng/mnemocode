@@ -95,7 +95,7 @@ The reference printed on a share sheet shows the numbers of the set, the group a
 
 ```bash
 node dist/mnemocode.js sskr-combine --ask-secrets
-# Enter complete shares separated by semicolons in the hidden prompt.
+# Type the shares, separated by semicolons, on the private screen.
 
 node dist/mnemocode.js sskr-combine \
   --share "ur:sskr/FIRST_COMPLETE_SHARE" \
@@ -110,6 +110,10 @@ node dist/mnemocode.js sskr-combine --share-qr ./first.png --share-qr ./second.p
 The restored backup is shown in the form of the first share: word numbers, Unicode codes or colors for shares written that way, words for shares in Bytewords or `ur`. With `--mode seedshift` and the dates, the seed phrase follows.
 
 MnemoCode refuses a damaged share, the same share given twice, shares from different sets and too few shares. The share library also checks the restored secret against a hash stored in the shares. The 16-bit number of a set only tells sets apart. It does not prove that a share is genuine.
+
+Every supplied member of a complete group is checked for consistency, including members and groups beyond the recovery threshold. Members of an incomplete group cannot be checked against its polynomial: the CLI names them as not checked. The written-backup check warns instead of reporting that the whole backup was checked.
+
+For library callers, `combineSskrShares` returns a phrase only when no supplied shares or repaired elements remain unchecked. `combineSskrShareSet` returns the phrase together with `unchecked` (share numbers counted from 1) and `unsettled` repair elements; callers using this partial-recovery API must report those limits. Both functions, and `restoreShareSet` for complete input, are exported from `mnemocode/sskr`.
 
 ### Damaged shares
 

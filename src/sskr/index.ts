@@ -1,4 +1,11 @@
-export { splitSskrMnemonic, combineSskrShares, validateThreshold } from "./shares.js";
+export {
+  splitSskrMnemonic,
+  combineSskrShares,
+  combineSskrShareSet,
+  restoreShareSet,
+  validateThreshold,
+} from "./shares.js";
+export type { RepairedSet } from "./joint-repair.js";
 export {
   normalizeShare,
   shareToColors,

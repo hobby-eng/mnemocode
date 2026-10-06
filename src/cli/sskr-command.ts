@@ -340,7 +340,7 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
 }
 
 /** The shares as typed or saved, each in the form it was written in. */
-async function readShareTexts(args: ParsedArguments): Promise<string[]> {
+export async function readShareTexts(args: ParsedArguments): Promise<string[]> {
   if (args["ask-secrets"] === true) {
     if (["share", "share-file", "share-qr"].some((key) => args[key] !== undefined))
       throw new Error("--ask-secrets cannot be combined with another share-input source.");
@@ -387,7 +387,13 @@ async function restoredSets(
     // Every share is read before the dates are asked, so that a mistyped one stops at once.
     const read = texts.map(readShare);
     await beforeSearch(shareInfo(urToTransport(read[0]!.ur)).secretLength);
-    return [await restoreShareSet(texts)];
+    const set = await restoreShareSet(texts);
+    if (set.unchecked !== undefined)
+      terminalNotice(
+        `Share ${set.unchecked.join(", ")}: too few shares of its group to take part; not checked.`,
+        "warning",
+      );
+    return [set];
   }
   const repair = assessShareRepair(plan ?? (await planShareRepair(texts)));
   await beforeSearch(repair.plan.assessment.secretBytes);
