@@ -34,6 +34,11 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => {
         "Unicode code": "5BF6",
         "How many shares in all? (2 to 16)": "7",
         "How many of them restore the seed phrase?": "4",
+        // The public test phrase's fingerprint and its first native SegWit address.
+        Fingerprint: "73c5da0a",
+        // A public test key: the recipient of a key that is thrown away.
+        "Scanner key": "age12d86zp9uj65df2snvl656uewdl82zrdfya8a2zgxu5rauaw7fsaqrr6w3x",
+        "Bitcoin address": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
       }[question],
   };
 });

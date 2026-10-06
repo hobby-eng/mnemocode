@@ -555,7 +555,7 @@ async function recoverAction(): Promise<Action> {
   const forgotten = await choose(
     "What is forgotten?",
     [
-      { label: "A word of the seed phrase", note: "type the phrase with ? for it", value: "word" },
+      { label: "A word of the seed phrase", note: "or several, or a missing one", value: "word" },
       {
         label: "A digit of a date",
         note: "for a seed phrase masked with Seedshift",
@@ -570,20 +570,164 @@ async function recoverAction(): Promise<Action> {
     { label: "Forgotten" },
   );
   if (forgotten === undefined) return undefined;
-  if (forgotten === "word") return { run: ["recover-word", "--ask-secrets"] };
+  if (forgotten === "word") return wordRecoveryAction();
   // The shares come back whole, in their own form, without the seed phrase being shown.
-  if (forgotten === "share") return { run: ["sskr-export", "--ask-secrets"] };
+  if (forgotten === "share") return shareRepairAction();
   const source = await askSource();
   if (source === undefined) return undefined;
   // A record file names its mode; otherwise the person says which Seedshift was used.
-  if (source.options[0] === "--input-file")
-    return { run: ["recover-date", "--ask-secrets", ...source.options] };
-  const mode = await choose("Which Seedshift was used?", SEEDSHIFT_VARIANTS, {
-    label: "Seedshift",
-    explanation: VARIANT_EXPLANATION,
+  const mode =
+    source.options[0] === "--input-file"
+      ? undefined
+      : await choose("Which Seedshift was used?", SEEDSHIFT_VARIANTS, {
+          label: "Seedshift",
+          explanation: VARIANT_EXPLANATION,
+        });
+  if (mode === undefined && source.options[0] !== "--input-file") return undefined;
+  // Every date gives MnemoCode Seedshift a valid phrase, so only the wallet can tell the right one;
+  // the original Seedshift's checksum sorts out most dates by itself. A record file names its own
+  // mode, and recover-date asks for the wallet after reading it only when that mode needs one.
+  const wallet = await askWallet(mode !== undefined && mode !== "seedshift-legacy");
+  if (wallet === undefined) return undefined;
+  return {
+    run: [
+      "recover-date",
+      "--ask-secrets",
+      ...source.options,
+      ...(mode === undefined ? [] : ["--mode", mode]),
+      ...wallet,
+    ],
+  };
+}
+
+/** Why the wallet is asked for, shown with the question. */
+const WALLET_EXPLANATION: Explanation = {
+  lines: ["Each guessed date gives a valid phrase; the wallet tells which is yours."],
+  more: [readmeLink("date-recovery-helper")],
+};
+
+/** Why the wallet is asked for before shares are repaired. */
+const SHARE_WALLET_EXPLANATION: Explanation = {
+  lines: ["Shares with many ? may fit in several ways; the wallet tells the right one."],
+  more: [readmeLink("damaged-shares")],
+};
+
+/**
+ * Entry 5, forgotten words: at their places with ?, or one missing word whose place is not known;
+ * on request every candidate also goes to a list for the Discovery Scanner.
+ */
+async function wordRecoveryAction(): Promise<Action> {
+  const where = await choose(
+    "Do you know where the forgotten words were?",
+    [
+      { label: "Yes", note: "type ? at each place, or ab* if it began with ab", value: "places" },
+      { label: "No", note: "one word is missing; type the words you have", value: "missing" },
+    ] as const,
+    { label: "Places" },
+  );
+  if (where === undefined) return undefined;
+  const search = [
+    "recover-word",
+    "--ask-secrets",
+    ...(where === "missing" ? ["--missing-word"] : []),
+  ];
+  const save = await choose(
+    "Save the candidates for the Discovery Scanner?",
+    [
+      { label: "No", value: false },
+      { label: "Yes", note: "an encrypted list that the Scanner checks online", value: true },
+    ],
+    { label: "List", explanation: CANDIDATES_EXPLANATION },
+  );
+  if (save === undefined) return undefined;
+  if (!save) return { run: search };
+  const path = await askLine("File name", "File", "candidates.age");
+  if (path === undefined) return undefined;
+  const protection = await choose(
+    "How should the list be encrypted?",
+    [
+      { label: "The Scanner's key", note: "paste the age1 key the Scanner shows", value: "key" },
+      {
+        label: "A passphrase",
+        note: "asked next; for a list made in advance",
+        value: "passphrase",
+      },
+    ] as const,
+    { label: "Protect" },
+  );
+  if (protection === undefined) return undefined;
+  const key = protection === "key" ? await askLine("Scanner key", "Key") : undefined;
+  if (protection === "key" && (key === undefined || key === "")) return undefined;
+  return {
+    run: [
+      ...search,
+      "--candidates-file",
+      path,
+      ...(key === undefined ? [] : ["--candidates-key", key]),
+    ],
+  };
+}
+
+/** Why candidates are saved, shown with the question. */
+const CANDIDATES_EXPLANATION: Explanation = {
+  lines: ["Without the wallet's fingerprint, only a search for funds tells them apart."],
+  more: [readmeLink("forgotten-word-recovery")],
+};
+
+/**
+ * Entry 5, a code of a share: the wallet, if it can be told, picks among sets of shares that fit.
+ * For a phrase masked before splitting, the wallet is checked after the dates.
+ */
+async function shareRepairAction(): Promise<Action> {
+  const wallet = await askWallet(false, SHARE_WALLET_EXPLANATION);
+  if (wallet === undefined) return undefined;
+  if (wallet.length === 0) return { run: ["sskr-export", "--ask-secrets"] };
+  const mode = await askSeedshift("Was the phrase masked with Seedshift before splitting?", {
+    shares: true,
   });
   if (mode === undefined) return undefined;
-  return { run: ["recover-date", "--ask-secrets", ...source.options, "--mode", mode] };
+  return {
+    run: [
+      "sskr-export",
+      "--ask-secrets",
+      ...(mode === "direct" ? [] : ["--mode", mode]),
+      ...wallet,
+    ],
+  };
+}
+
+/**
+ * What tells the right phrase among the candidates: the BIP32 master fingerprint, the same for
+ * every coin of the wallet and shown by Encode, or a Bitcoin receiving address. Without it
+ * (`required` false) every candidate is listed.
+ */
+async function askWallet(
+  required: boolean,
+  explanation: Explanation = WALLET_EXPLANATION,
+): Promise<string[] | undefined> {
+  const kind = await choose(
+    "How can MnemoCode recognise the wallet?",
+    [
+      {
+        label: "Fingerprint",
+        note: "eight characters, such as 73c5da0a, that Encode shows",
+        value: "fingerprint",
+      },
+      { label: "Bitcoin address", note: "1..., 3..., bc1q... or bc1p...", value: "address" },
+      ...(required
+        ? []
+        : [{ label: "It cannot", note: "list every candidate instead", value: "none" }]),
+    ] as const,
+    { label: "Wallet", explanation },
+  );
+  if (kind === undefined) return undefined;
+  if (kind === "none") return [];
+  const answer =
+    kind === "fingerprint"
+      ? await askLine("Fingerprint", "Fingerprint")
+      : await askLine("Bitcoin address", "Address");
+  if (answer === undefined || answer === "") return undefined;
+  return [kind === "fingerprint" ? "--master-fingerprint" : "--bitcoin-address", answer];
 }
 
 /** Entry 6: card designs drawn with the public test phrase. */

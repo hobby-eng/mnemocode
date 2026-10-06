@@ -67,6 +67,9 @@ import { requireNewCardDirectory } from "../export/individual-cards.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import { optionLabel } from "./option-copy.js";
 import { offerShareCheck } from "./backup-check.js";
+import { mnemonicToEntropy } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
+import { candidatesTarget, prepareCandidates, saveCandidates } from "./candidates-file.js";
 import { saveHeirSheet, validateHeirSheetOptions } from "./heir-sheet.js";
 
 export const sskrExportOptions = [
@@ -429,8 +432,10 @@ export async function runSskrCombine(args: ParsedArguments): Promise<void> {
   const evidence = bitcoinEvidence(args);
   const passphrase = bip39Passphrase(args);
   const limit = searchLimit(args);
+  const candidates = await candidatesTarget(args);
   const texts = await readShareTexts(args);
   assertShareCount(texts.length);
+  await prepareCandidates(candidates, passphrase);
   const sets = await restoredSets(texts, limit, async (secretBytes) => {
     if (mode === "seedshift") await seedshiftDates(args, dateValues, secretBytes);
   });
@@ -451,6 +456,12 @@ export async function runSskrCombine(args: ParsedArguments): Promise<void> {
       ...(evidence === undefined ? {} : { evidence: optionLabel(evidence.kind) }),
     }),
   );
+  if (candidates !== undefined)
+    await saveCandidates(
+      candidates,
+      matching.map((set) => mnemonicToEntropy(walletOf(set), wordlist)),
+      passphrase,
+    );
 }
 
 /** Prints one restored phrase: what a repair filled in, the backup in its form, and the phrase. */

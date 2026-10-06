@@ -1,20 +1,15 @@
 import { terminalMore, terminalNotice, terminalResultHeader } from "./terminal.js";
 import {
   datePatternCombinationCount,
-  datePatternCombinations,
-  decodeIndexes,
-  decodeIndexesLegacy,
-  decodeIndexesLegacyValid,
+  dateRecoveryCandidates,
   formatDate,
   parseDate,
   parseDatePattern,
   parseInput,
-  sortDates,
-  type DateShiftDate,
 } from "../core.js";
 import { matchBitcoinEvidence } from "../bitcoin-evidence.js";
 import { parseRecord } from "../record.js";
-import { integerOption, type ParsedArguments, values } from "./arguments.js";
+import { integerOption, type ParsedArguments, value, values } from "./arguments.js";
 import { bip39Passphrase, bitcoinEvidence } from "./bitcoin-options.js";
 import {
   encodedInput,
@@ -23,10 +18,25 @@ import {
   transformMode,
 } from "./input.js";
 import { optionLabel } from "./option-copy.js";
+import { candidatesTarget, prepareCandidates, saveCandidates } from "./candidates-file.js";
+import { mnemonicToEntropy } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
+import { MAX_CANDIDATE_RECORDS } from "../core/candidate-list.js";
 
 const DEFAULT_MAX_CANDIDATES = 1_000_000;
 const HARD_MAX_CANDIDATES = 10_000_000;
 const MAX_INCOMPLETE_DATES = 3;
+
+/**
+ * Checksum-valid Seedshift gives a valid phrase for every date, so only the wallet can tell the
+ * right dates: without a fingerprint, an address, a public key or a WIF there is nothing to search.
+ */
+function assertWalletEvidence(mode: string, evidence: unknown): void {
+  if ((mode === "seedshift" || mode === "seedshift-legacy-valid") && evidence === undefined)
+    throw new Error(
+      "This recovery mode can produce checksum-valid candidates for every date. Provide a master fingerprint, address, public key, extended public key, or WIF to identify the intended wallet.",
+    );
+}
 
 export async function runRecoverDate(arguments_: ParsedArguments): Promise<void> {
   const maxResults = integerOption(arguments_, "max-results", {
@@ -44,8 +54,15 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
     min: 1,
     max: HARD_MAX_CANDIDATES,
   });
-  const prompted = await promptedRecoveryInputs(arguments_);
-  const rawEncoded = prompted?.encoded ?? (await encodedInput(arguments_));
+  const target = await candidatesTarget(arguments_);
+  // Checked before any secret is asked when --mode names the mode; a record file names its own.
+  const givenMode = value(arguments_, "mode");
+  if (givenMode !== undefined)
+    assertWalletEvidence(transformMode(arguments_), bitcoinEvidence(arguments_));
+  const prompted = await promptedRecoveryInputs(arguments_, (record) =>
+    assertWalletEvidence(transformMode(arguments_, record?.mode), bitcoinEvidence(arguments_)),
+  );
+  const rawEncoded = prompted !== undefined ? prompted.encoded : await encodedInput(arguments_);
   const record = parseRecord(rawEncoded);
   if (record?.mode === "direct")
     throw new Error("Date recovery is available only for records created with Seedshift.");
@@ -82,15 +99,9 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
   }
   const knownDates = dateValues.filter((item) => !item.includes("?")).map(parseDate);
   const evidence = bitcoinEvidence(arguments_);
-  if (
-    (recoveryMode === "seedshift" || recoveryMode === "seedshift-legacy-valid") &&
-    evidence === undefined
-  ) {
-    throw new Error(
-      "This recovery mode can produce checksum-valid candidates for every date. Provide a master fingerprint, address, public key, extended public key, or WIF to identify the intended wallet.",
-    );
-  }
+  assertWalletEvidence(recoveryMode, evidence);
   const passphrase = bip39Passphrase(arguments_);
+  await prepareCandidates(target, passphrase);
 
   terminalNotice(
     `Recovery search contains ${candidateCount.toLocaleString("en-US")} date combinations.`,
@@ -99,37 +110,32 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
     terminalNotice("This is a large local search and may take hours. Progress will be reported.");
   const found: { readonly dates: string; readonly mnemonic: string; readonly evidence?: string }[] =
     [];
-  const foundKeys = new Set<string>();
+  // Every match, for a candidate list; the screen shows the first maxResults of them.
+  const kept: string[] = [];
   let checked = 0;
   let foundCount = 0;
-  for (const candidateDates of datePatternCombinations(patterns)) {
+  for (const candidates of dateRecoveryCandidates(
+    encryptedIndexes,
+    knownDates,
+    patterns,
+    recoveryMode,
+  )) {
     checked += 1;
-    const results = recoverCandidates(
-      encryptedIndexes,
-      [...knownDates, ...candidateDates],
-      recoveryMode,
-    );
-    for (const [resultIndex, result] of results.entries()) {
-      if (result.checksumValid) {
-        const match =
-          evidence === undefined
-            ? undefined
-            : matchBitcoinEvidence(result.recoveredMnemonic, evidence, passphrase);
-        if (match === undefined || match.matched) {
-          const recoveredDates = sortDates(candidateDates).map(formatDate).join(" ");
-          const key = `${recoveredDates}\0${resultIndex}`;
-          if (!foundKeys.has(key)) {
-            foundKeys.add(key);
-            foundCount += 1;
-            if (found.length < maxResults)
-              found.push({
-                dates: recoveredDates,
-                mnemonic: result.recoveredMnemonic,
-                evidence: match?.path,
-              });
-          }
-        }
-      }
+    for (const candidate of candidates) {
+      const match =
+        evidence === undefined
+          ? undefined
+          : matchBitcoinEvidence(candidate.mnemonic, evidence, passphrase);
+      if (match !== undefined && !match.matched) continue;
+      foundCount += 1;
+      if (target !== undefined && kept.length <= MAX_CANDIDATE_RECORDS)
+        kept.push(candidate.mnemonic);
+      if (found.length < maxResults)
+        found.push({
+          dates: candidate.dates.map(formatDate).join(" "),
+          mnemonic: candidate.mnemonic,
+          evidence: match?.path,
+        });
     }
     if (checked % progressEvery === 0 || checked === candidateCount) {
       terminalNotice(
@@ -152,6 +158,17 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
   }
   if (foundCount > maxResults)
     terminalNotice(`Displayed ${maxResults} of ${foundCount} checksum-valid candidates.`);
+  if (target !== undefined) {
+    if (foundCount > MAX_CANDIDATE_RECORDS)
+      throw new Error(
+        `${foundCount.toLocaleString("en-US")} candidates are more than one list holds (${MAX_CANDIDATE_RECORDS.toLocaleString("en-US")}): narrow the dates, or give the wallet's fingerprint.`,
+      );
+    await saveCandidates(
+      target,
+      kept.map((phrase) => mnemonicToEntropy(phrase, wordlist)),
+      passphrase,
+    );
+  }
   if (evidence === undefined) {
     terminalNotice("A valid checksum does not prove the date: compare an address.");
     terminalMore("exact-local-recovery-checks");
@@ -159,14 +176,4 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
     terminalNotice(
       `Each displayed candidate matched the requested ${optionLabel(evidence.kind)} locally.`,
     );
-}
-
-function recoverCandidates(
-  indexes: readonly number[],
-  dates: readonly DateShiftDate[],
-  mode: string,
-) {
-  if (mode === "seedshift-legacy-valid") return decodeIndexesLegacyValid(indexes, dates);
-  if (mode === "seedshift-legacy") return [decodeIndexesLegacy(indexes, dates)];
-  return [decodeIndexes(indexes, dates)];
 }

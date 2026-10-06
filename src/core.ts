@@ -41,6 +41,11 @@ export {
 } from "./core/colors.js";
 export { parseInput, detectInputFormats, formatEncoded } from "./core/representations.js";
 export {
+  dateRecoveryCandidates,
+  type DateCandidate,
+  type SeedshiftMode,
+} from "./core/date-recovery.js";
+export {
   encodeMnemonic,
   encodeMnemonicLegacy,
   legacyChecksumValidResult,

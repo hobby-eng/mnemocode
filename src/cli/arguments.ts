@@ -12,6 +12,8 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
     "cards",
     "legacy-valid-last-word",
     "list",
+    "missing-word",
+    "plaintext-candidates",
   ]);
   for (let index = 0; index < items.length; index += 1) {
     const item = items[index]!;

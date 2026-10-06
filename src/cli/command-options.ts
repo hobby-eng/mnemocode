@@ -21,6 +21,15 @@ const bitcoinEvidenceOptions = [
   "bip39-passphrase-file",
 ] as const;
 
+/** A candidate list for the Discovery Scanner, and its protection (candidates-file.ts). */
+const candidateListOptions = [
+  "candidates-file",
+  "candidates-key",
+  "candidates-key-file",
+  "candidates-passphrase-file",
+  "plaintext-candidates",
+] as const;
+
 export const commandOptions = {
   encode: [
     "mode",
@@ -61,12 +70,15 @@ export const commandOptions = {
     "max-results",
     "max-candidates",
     "progress-every",
+    ...candidateListOptions,
   ],
   "recover-word": [
     "mnemonic",
     "mnemonic-file",
     "ask-secrets",
     "legacy-valid-last-word",
+    "missing-word",
+    ...candidateListOptions,
     ...bitcoinEvidenceOptions,
   ],
   "sskr-combine": [
@@ -74,6 +86,7 @@ export const commandOptions = {
     "date",
     ...sskrInputOptions,
     "max-tries",
+    ...candidateListOptions,
     ...bitcoinEvidenceOptions,
   ],
   "sskr-export": [

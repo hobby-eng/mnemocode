@@ -27,6 +27,19 @@ MnemoCode depends on [`@scure/bip39`](https://github.com/paulmillr/scure-bip39),
 MIT licensed. Their pinned versions are recorded in `package.json` and the
 lockfile after installation.
 
+## age encryption and @noble libraries
+
+Candidate lists are encrypted with [`age-encryption`](https://github.com/FiloSottile/typage)
+by Filippo Valsorda, which is licensed under the BSD 3-Clause License; its built files
+carry no license header, so this notice names it. It uses
+[`@noble/ciphers`](https://github.com/paulmillr/noble-ciphers),
+[`@noble/curves`](https://github.com/paulmillr/noble-curves),
+[`@noble/hashes`](https://github.com/paulmillr/noble-hashes),
+[`@noble/post-quantum`](https://github.com/paulmillr/noble-post-quantum) and
+[`@scure/base`](https://github.com/paulmillr/scure-base) by Paul Miller, which are MIT
+licensed. MnemoCode also uses `@noble/hashes` directly for the checksum test of the word
+search. Their pinned versions are recorded in `package.json` and the lockfile.
+
 ## QR generation and reading
 
 QR PNG generation uses [`qrcode`](https://github.com/soldair/node-qrcode),

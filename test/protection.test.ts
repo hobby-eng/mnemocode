@@ -120,6 +120,10 @@ describe("process protection", () => {
       writes: true,
       runsPrograms: false,
     });
+    expect(needs("recover-word", ["--ask-secrets", "--candidates-file", "c.txt"])).toEqual({
+      writes: true,
+      runsPrograms: false,
+    });
     expect(needs("encode", ["--ask-secrets", "--images-dir", "cards"])).toEqual({
       writes: true,
       runsPrograms: true,

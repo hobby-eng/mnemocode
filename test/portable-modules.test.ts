@@ -8,6 +8,10 @@ import { describe, expect, it } from "vitest";
 const ENTRY_MODULES = [
   "src/core.ts",
   "src/record.ts",
+  "src/core/date-recovery.ts",
+  "src/core/candidates.ts",
+  "src/core/candidate-list.ts",
+  "src/core/candidate-encryption.ts",
   "src/sskr/transport.ts",
   "src/sskr/repair.ts",
   "src/sskr/joint-repair.ts",
@@ -17,6 +21,10 @@ const ALLOWED_PACKAGES = new Set([
   "@scure/bip39",
   "@scure/bip39/wordlists/english.js",
   "@scure/bip39/wordlists/traditional-chinese.js",
+  // The checksum test of the candidate search, many times faster than validating whole phrases.
+  "@noble/hashes/sha2.js",
+  // Only the encryption of candidate lists.
+  "age-encryption",
 ]);
 /** Globals that exist in Node.js but not in a browser page. */
 const NODE_ONLY_GLOBALS = /\b(?:process|Buffer|setImmediate|require|__dirname|__filename)\b/u;
