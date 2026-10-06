@@ -294,7 +294,7 @@ MnemoCode includes sixteen templates. `mnemocode preview --list` prints their na
 | `--cards`                      | Color cards in the terminal                            |
 | `--qr PATH`                    | A separate QR code as a PNG image                      |
 
-A file is written into a folder that already exists. `--output`, `--pdf`, `--qr` and `--heir-sheet` replace a file that already has that name; with Shamir shares, no file ever replaces one. `--cards-dir` and `--images-dir` create their own new folder.
+A file is written into a folder that already exists. Nothing is saved over an existing file or folder: when the name is taken, MnemoCode saves under the first free numbered name, such as `cards (1).pdf`, as a file manager names a copy, and says so after saving. The name is settled before the seed phrase is asked, so a taken name never stops a command halfway. `--cards-dir` and `--images-dir` create their own new folder, numbered the same way when the name is taken.
 
 The person and the company on the cards are invented; see [Card identity defaults](docs/card-identities.md). To print your own details, use `--card-name`, `--card-role`, `--card-company`, `--card-email`, `--card-phone`, `--card-website` and `--card-location`. Names must use Latin letters; spaces, apostrophes and hyphens are allowed. Other characters and text that does not fit are reported as errors.
 

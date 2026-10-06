@@ -19,7 +19,7 @@ import {
 } from "./input.js";
 import { validateCardOptions, completeEventLabels } from "./card-options.js";
 import { validateImageOptions } from "./image-options.js";
-import { preflightFileDestination } from "./output-paths.js";
+import { preflightFileDestination, reportRenamedOutputs } from "./output-paths.js";
 import { requireNewCardDirectory } from "../export/individual-cards.js";
 import { runSskrSplit } from "./sskr-command.js";
 import { printEncodeResult } from "./encode-report.js";
@@ -136,15 +136,12 @@ export async function runEncode(args: ParsedArguments): Promise<void> {
   await saveEncodeResult(args, outcome, eventLabels);
   // A record with a replaced last word never gets a sheet (validateEncodeOptions).
   if (outcome.recordMode !== "seedshift-legacy-valid")
-    await saveHeirSheet(
-      args,
-      {
-        backup: { kind: "encoded", format },
-        mode: outcome.recordMode,
-        dates: outcome.enteredDates.length,
-      },
-      true,
-    );
+    await saveHeirSheet(args, {
+      backup: { kind: "encoded", format },
+      mode: outcome.recordMode,
+      dates: outcome.enteredDates.length,
+    });
+  reportRenamedOutputs();
   await offerEncodedCheck(outcome.result.sourceMnemonic, format, outcome.recordMode, () =>
     printEncodeResult(outcome),
   );

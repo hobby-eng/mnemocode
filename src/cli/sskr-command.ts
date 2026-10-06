@@ -9,11 +9,11 @@ import {
   terminalStatus,
 } from "./terminal.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
-import { preflightFileDestination } from "./output-paths.js";
+import { preflightFileDestination, reportRenamedOutputs } from "./output-paths.js";
 import { integerOption, value, values, type ParsedArguments } from "./arguments.js";
 import {
   askSecret,
-  DATES_PROMPT,
+  datesPrompt,
   encodeFormat,
   encodedOutputLabel,
   dates,
@@ -28,8 +28,10 @@ import { masterFingerprint } from "../bitcoin-evidence.js";
 import { combineSskrShares, splitSskrMnemonic, validateThreshold } from "../sskr/shares.js";
 import {
   normalizeShare,
+  shareInfo,
   shareToColors,
   urToBytewords,
+  urToTransport,
   validateShareSet,
 } from "../sskr/transport.js";
 import {
@@ -232,11 +234,12 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
     mode === "direct" ? representMnemonic(mnemonic) : encodeMnemonic(mnemonic, dateValues);
   const shares = await splitSskrMnemonic(result.shiftedEnglish.join(" "), threshold, count);
   await saveShares(shares, args, format, options);
-  await saveHeirSheet(
-    args,
-    { backup: { kind: "shares", format, threshold, count }, mode, dates: dateValues.length },
-    false,
-  );
+  await saveHeirSheet(args, {
+    backup: { kind: "shares", format, threshold, count },
+    mode,
+    dates: dateValues.length,
+  });
+  reportRenamedOutputs();
   if (
     !terminalResultHeader("SSKR export", [
       ["Threshold", `${threshold} of ${count}`],
@@ -312,6 +315,11 @@ export async function readShares(args: ParsedArguments): Promise<string[]> {
   return shares.map(normalizeShare);
 }
 
+/** BIP39 writes every 4 bytes of entropy as 3 words: a 16-byte secret is a 12-word phrase. */
+function shareWordCount(share: string): number {
+  return (shareInfo(urToTransport(share)).secretLength * 3) / 4;
+}
+
 export async function runSskrCombine(args: ParsedArguments): Promise<void> {
   singleOptions(args, ["share", "share-file", "share-qr", "date"]);
   const mode = transformMode(args);
@@ -324,7 +332,9 @@ export async function runSskrCombine(args: ParsedArguments): Promise<void> {
   const shares = await readShares(args);
   if (mode === "seedshift" && !dateValues.length && args["ask-secrets"] === true)
     dateValues.push(
-      ...(await askSecret(DATES_PROMPT)).split(/\s+/u).flatMap((date) => dates({ date })),
+      ...(await askSecret(datesPrompt(shareWordCount(shares[0]!))))
+        .split(/\s+/u)
+        .flatMap((date) => dates({ date })),
     );
   if (mode === "seedshift" && !dateValues.length)
     throw new Error("Seedshift recovery requires its original dates.");

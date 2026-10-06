@@ -13,7 +13,7 @@ It checks that
 - Decode, with the word numbers typed at its prompt, recovers the test phrase on the terminal's
   alternate screen, the private screen: what is typed there is shown, and the screen is left and
   cleared after Enter;
-- Backspace and Ctrl+U edit the answer;
+- Backspace and Ctrl+U edit the answer, and Home, End and Delete edit it at the cursor;
 - an answer longer than 4095 bytes arrives whole, where a terminal's line mode on Linux would cut
   it;
 - two answers pasted at once answer two questions (Encode with dates), and the backup typed
@@ -53,6 +53,7 @@ CANCELLED = 130
 TYPING_PIECE = 256
 
 UP, DOWN, ENTER, CTRL_UP, ESCAPE = "\x1b[A", "\x1b[B", "\r", "\x1b[1;5A", "\x1b"
+HOME, END, DELETE = "\x1b[H", "\x1b[F", "\x1b[3~"
 BACKSPACE, CTRL_U, CTRL_C = "\x7f", "\x15", "\x03"
 ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN = "\x1b[?1049h", "\x1b[?1049l"
 
@@ -200,6 +201,22 @@ def check_decode_menu():
     print("decode in the menu: answer shown and edited on the private screen, Esc exits with 0")
 
 
+def check_cursor_editing():
+    session = Session(("decode", "--ask-secrets", "--mode", "direct"))
+    try:
+        session.wait_for(HIDDEN_RECORD)
+        # A wrong first number, put right at the start of the line: Home, Delete, the right one.
+        session.type("9" + WORD_NUMBERS[1:] + HOME + DELETE + "1" + END + ENTER)
+        session.wait_for(TEST_PHRASE)
+        session.wait_for(CLEAR_PROMPT)
+        session.type(ENTER)
+        code = session.wait_for_exit()
+        assert code == 0, f"the edited answer gave exit code {code}"
+    finally:
+        session.close()
+    print("an answer edited at the cursor with Home, Delete and End")
+
+
 def check_long_line():
     session = Session()
     try:
@@ -302,6 +319,7 @@ def main():
     check_decode_menu()
     check_menu_ctrl_c()
     check_long_line()
+    check_cursor_editing()
     check_answers_pasted_together()
     check_ctrl_c()
     print("terminal input checks passed")

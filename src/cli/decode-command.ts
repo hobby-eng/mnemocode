@@ -12,7 +12,8 @@ import { parseRecord } from "../record.js";
 import { type ParsedArguments, value, values } from "./arguments.js";
 import {
   askSecret,
-  DATES_PROMPT,
+  datesPrompt,
+  encodedWordCount,
   dates,
   encodedInput,
   recordedInputFormat,
@@ -42,7 +43,14 @@ export async function runDecode(arguments_: ParsedArguments): Promise<void> {
     promptedDates =
       promptedMode === "direct"
         ? []
-        : (await askSecret(DATES_PROMPT)).split(/\s+/u).filter(Boolean).map(parseDate);
+        : (
+            await askSecret(
+              datesPrompt(encodedWordCount(embedded?.payload ?? rawEncoded, embedded?.format)),
+            )
+          )
+            .split(/\s+/u)
+            .filter(Boolean)
+            .map(parseDate);
   } else {
     rawEncoded = await encodedInput(arguments_);
   }

@@ -17,7 +17,7 @@ node dist/mnemocode.js encode --sskr --ask-secrets \
 
 `--threshold` is N and `--shares` is M. Both need `--sskr`. The phrase is entered as in every `encode` command; see [Secret input styles](../README.md#secret-input-styles).
 
-The shares are always shown in the terminal. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**, and an existing file is never replaced.
+The shares are always shown in the terminal. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares (1).txt`, and MnemoCode says so.
 
 | Option                             | Selects                                                 |
 | ---------------------------------- | ------------------------------------------------------- |
@@ -77,7 +77,7 @@ The page size decides what is printed, as for ordinary cards. `--card-layout` is
 
 A QR code holds the color codes of its own share. No QR code holds several shares.
 
-Each file or folder in `--cards-dir` holds one share: keep them in different places. A file written with `--pdf` and a folder written with `--images-dir` hold **all** shares. Existing files and folders are never replaced.
+Each file or folder in `--cards-dir` holds one share: keep them in different places. A file written with `--pdf` and a folder written with `--images-dir` hold **all** shares. Existing files and folders are never replaced; a taken name is numbered as `name (1)`.
 
 The reference printed on a share sheet shows the numbers of the set, the group and the share.
 
