@@ -1,5 +1,5 @@
+import { pbkdf2Sync } from "node:crypto";
 import { HDKey, type Versions } from "@scure/bip32";
-import { mnemonicToSeedSync } from "@scure/bip39";
 import { Address, NETWORK, TEST_NETWORK, WIF, p2pkh, p2sh, p2tr, p2wpkh } from "@scure/btc-signer";
 
 export type BitcoinNetworkName = "mainnet" | "testnet";
@@ -183,9 +183,33 @@ function sameExtendedKey(left: HDKey, right: HDKey): boolean {
   );
 }
 
+/** BIP39 "From mnemonic to seed": PBKDF2-HMAC-SHA512, 2048 rounds, 64 bytes. */
+const SEED_ROUNDS = 2048;
+const SEED_BYTES = 64;
+const BIP39_WORD_COUNTS: ReadonlySet<number> = new Set([12, 15, 18, 21, 24]);
+
+/** The NFKD form that BIP39 hashes; refused, as by @scure/bip39, when it is not well formed. */
+function nfkd(text: string): string {
+  // With the u flag, a surrogate on its own is a code point of its own; a pair is not.
+  if (/\p{Cs}/u.test(text)) throw new TypeError("expected well-formed Unicode string");
+  return text.normalize("NFKD");
+}
+
+/**
+ * The BIP39 seed, as @scure/bip39 mnemonicToSeedSync gives it, from Node's OpenSSL instead of
+ * pure JavaScript: SHA-512 works on 64-bit words, which JavaScript has to build from pairs of
+ * 32-bit numbers, so the native code is about seven times faster. The result is the same.
+ */
+function bip39Seed(mnemonic: string, passphrase: string): Uint8Array {
+  const phrase = nfkd(mnemonic);
+  if (!BIP39_WORD_COUNTS.has(phrase.split(" ").length)) throw new Error("Invalid mnemonic");
+  const seed = pbkdf2Sync(phrase, nfkd(`mnemonic${passphrase}`), SEED_ROUNDS, SEED_BYTES, "sha512");
+  return new Uint8Array(seed.buffer, seed.byteOffset, seed.byteLength);
+}
+
 function rootForMnemonic(mnemonic: string, passphrase: string, network: BitcoinNetworkName): HDKey {
   assertNetwork(network);
-  const seed = mnemonicToSeedSync(mnemonic, passphrase);
+  const seed = bip39Seed(mnemonic, passphrase);
   try {
     return HDKey.fromMasterSeed(seed, network === "mainnet" ? mainnetVersions : testnetVersions);
   } finally {
