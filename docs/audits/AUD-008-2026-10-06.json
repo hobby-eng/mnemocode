@@ -2648,8 +2648,9 @@
     {
       "id": "AUD-008-API001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "commitBindingNote": "Added on 2026-10-06 after verification. The commit does not hold the whole first-phase tree: 226 of the 234 first-phase product files are byte-identical in signed commit 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b, and the other eight are files the four-fix phase changed. None of the eight is a file this finding names, and every first-phase change outside them is byte-identical in the commit; fixVerification.recordUpdates[0] lists both. Verification time, fingerprint, scope, result and evidence keep their first-phase values.",
       "verifiedAt": "2026-10-06T02:29:25.796240Z",
       "sourceFingerprint": "1b05926f5234b36d7b767a7b1698bfa992ee902234f4abe08af06dd74eddfe3d",
       "scope": "Owner uncommitted remediation, not a new full audit or release approval.",
@@ -2672,8 +2673,9 @@
     {
       "id": "AUD-008-API002",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "commitBindingNote": "Added on 2026-10-06 after verification. The commit does not hold the whole first-phase tree: 226 of the 234 first-phase product files are byte-identical in signed commit 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b, and the other eight are files the four-fix phase changed. None of the eight is a file this finding names, and every first-phase change outside them is byte-identical in the commit; fixVerification.recordUpdates[0] lists both. Verification time, fingerprint, scope, result and evidence keep their first-phase values.",
       "verifiedAt": "2026-10-06T02:29:25.796275Z",
       "sourceFingerprint": "1b05926f5234b36d7b767a7b1698bfa992ee902234f4abe08af06dd74eddfe3d",
       "scope": "Owner uncommitted remediation, not a new full audit or release approval.",
@@ -2692,8 +2694,9 @@
     {
       "id": "AUD-008-API003",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "commitBindingNote": "Added on 2026-10-06 after verification. The commit does not hold the whole first-phase tree: 226 of the 234 first-phase product files are byte-identical in signed commit 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b, and the other eight are files the four-fix phase changed. None of the eight is a file this finding names, and every first-phase change outside them is byte-identical in the commit; fixVerification.recordUpdates[0] lists both. Verification time, fingerprint, scope, result and evidence keep their first-phase values.",
       "verifiedAt": "2026-10-06T02:29:25.796285Z",
       "sourceFingerprint": "1b05926f5234b36d7b767a7b1698bfa992ee902234f4abe08af06dd74eddfe3d",
       "scope": "Owner uncommitted remediation, not a new full audit or release approval.",
@@ -2708,8 +2711,9 @@
     {
       "id": "AUD-008-API004",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "commitBindingNote": "Added on 2026-10-06 after verification. The commit does not hold the whole first-phase tree: 226 of the 234 first-phase product files are byte-identical in signed commit 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b, and the other eight are files the four-fix phase changed. None of the eight is a file this finding names, and every first-phase change outside them is byte-identical in the commit; fixVerification.recordUpdates[0] lists both. Verification time, fingerprint, scope, result and evidence keep their first-phase values.",
       "verifiedAt": "2026-10-06T02:29:25.796288Z",
       "sourceFingerprint": "1b05926f5234b36d7b767a7b1698bfa992ee902234f4abe08af06dd74eddfe3d",
       "scope": "Owner uncommitted remediation, not a new full audit or release approval.",
@@ -2724,8 +2728,9 @@
     {
       "id": "AUD-008-API005",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "commitBindingNote": "Added on 2026-10-06 after verification. The commit does not hold the whole first-phase tree: 226 of the 234 first-phase product files are byte-identical in signed commit 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b, and the other eight are files the four-fix phase changed. None of the eight is a file this finding names, and every first-phase change outside them is byte-identical in the commit; fixVerification.recordUpdates[0] lists both. Verification time, fingerprint, scope, result and evidence keep their first-phase values.",
       "verifiedAt": "2026-10-06T02:29:25.796291Z",
       "sourceFingerprint": "1b05926f5234b36d7b767a7b1698bfa992ee902234f4abe08af06dd74eddfe3d",
       "scope": "Owner uncommitted remediation, not a new full audit or release approval.",
@@ -2760,8 +2765,9 @@
     {
       "id": "AUD-008-API006",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "commitBindingNote": "Added on 2026-10-06 after verification. The commit does not hold the whole first-phase tree: 226 of the 234 first-phase product files are byte-identical in signed commit 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b, and the other eight are files the four-fix phase changed. None of the eight is a file this finding names, and every first-phase change outside them is byte-identical in the commit; fixVerification.recordUpdates[0] lists both. Verification time, fingerprint, scope, result and evidence keep their first-phase values.",
       "verifiedAt": "2026-10-06T02:29:25.796298Z",
       "sourceFingerprint": "1b05926f5234b36d7b767a7b1698bfa992ee902234f4abe08af06dd74eddfe3d",
       "scope": "Owner uncommitted remediation, not a new full audit or release approval.",
@@ -2840,8 +2846,9 @@
     {
       "id": "AUD-008-DOC001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "verificationCommit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+      "commitBindingNote": "Added on 2026-10-06 after verification. The commit does not hold the whole first-phase tree: 226 of the 234 first-phase product files are byte-identical in signed commit 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b, and the other eight are files the four-fix phase changed. None of the eight is a file this finding names, and every first-phase change outside them is byte-identical in the commit; fixVerification.recordUpdates[0] lists both. Verification time, fingerprint, scope, result and evidence keep their first-phase values.",
       "verifiedAt": "2026-10-06T02:29:25.796307Z",
       "sourceFingerprint": "1b05926f5234b36d7b767a7b1698bfa992ee902234f4abe08af06dd74eddfe3d",
       "scope": "Owner uncommitted remediation, not a new full audit or release approval.",
@@ -4715,6 +4722,119 @@
         "A signature header is present; this validator does not establish a signer trust policy.",
         "All original run results and counts are retained. Recording the commit and updating the validator is not a new product audit."
       ]
-    }
+    },
+    "recordUpdates": [
+      {
+        "recordedAt": "2026-10-06T08:53:49.874343Z",
+        "meaning": "The seven first-phase dispositions (API001-API006, DOC001) now name the signed remediation commit as fix and verification commit, like the four final-phase dispositions. Their commit fields were null because they were verified on an uncommitted tree; the binding was added after 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b and the record commit db83c4bd89a5942f1b0f3bb709ee372dbdf4bf41 were pushed.",
+        "commit": "9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b",
+        "previousRecordCommit": "db83c4bd89a5942f1b0f3bb709ee372dbdf4bf41",
+        "findings": [
+          "AUD-008-API001",
+          "AUD-008-API002",
+          "AUD-008-API003",
+          "AUD-008-API004",
+          "AUD-008-API005",
+          "AUD-008-API006",
+          "AUD-008-DOC001"
+        ],
+        "firstPhaseSourceFingerprint": "1b05926f5234b36d7b767a7b1698bfa992ee902234f4abe08af06dd74eddfe3d",
+        "firstPhaseProductFiles": 234,
+        "identicalInCommit": 226,
+        "changedByFourFixPhase": [
+          "docs/SSKR.md",
+          "scripts/build-executable.mjs",
+          "src/cli/backup-check.ts",
+          "src/cli/menu.ts",
+          "src/cli/terminal-choice.ts",
+          "src/sskr/index.ts",
+          "src/sskr/shares.ts",
+          "test/menu.test.ts"
+        ],
+        "addedByFourFixPhase": [
+          "test/aud-008-final-fixes.test.ts",
+          "test/terminal-choice-resize.test.ts"
+        ],
+        "firstPhaseChangesChangedAgain": [
+          "docs/SSKR.md",
+          "scripts/build-executable.mjs",
+          "src/cli/menu.ts",
+          "src/cli/terminal-choice.ts",
+          "src/sskr/shares.ts",
+          "test/menu.test.ts"
+        ],
+        "firstPhaseChangesIdenticalInCommit": [
+          "SECURITY.md",
+          "package.json",
+          "pnpm-lock.yaml",
+          "scripts/verify-terminal-input.py",
+          "src/bitcoin-evidence.ts",
+          "src/cli/recover-date-command.ts",
+          "src/cli/sskr-command.ts",
+          "src/core/candidates.ts",
+          "src/core/date-recovery.ts",
+          "src/sskr/joint-repair.ts",
+          "src/sskr/repair.ts",
+          "test/aud-002-remediation.test.ts",
+          "test/aud-008-remediation.test.ts"
+        ],
+        "harnessHashes": {
+          "docs/audits/AUD-008-harnesses/README.md": "cb98463c3ec0abf5144637011e85becf35e56a2dfc248228042bebf30fb01ed4",
+          "docs/audits/AUD-008-harnesses/fix-validate.py": "462faa89a7cd4027feeea00257d248b35747c82e12ee35eee08a641509e25e06"
+        },
+        "validation": {
+          "kind": "The published fix-validate.py with its --from-commit option, run through record-command.py.",
+          "harness": {
+            "path": "docs/audits/AUD-008-harnesses/fix-validate.py",
+            "sha256": "462faa89a7cd4027feeea00257d248b35747c82e12ee35eee08a641509e25e06"
+          },
+          "relaxedChecks": [
+            "The product files are read from the signed commit 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b with git, which must hold exactly the 236 snapshot files with source fingerprint 20ab1841..., instead of comparing the working tree with the commit and with the snapshot. Product changes after the commit are not checked.",
+            "dist/ files that differ from fix-dist-manifest.json, and procedure files whose hash differs, are listed under environmentDrift instead of failing.",
+            "The result is written to record-update-from-commit-validation.json instead of record-update-report-validation.json."
+          ],
+          "run": {
+            "argv": [
+              "python3",
+              "-B",
+              "docs/audits/AUD-008-harnesses/fix-validate.py",
+              "--from-commit"
+            ],
+            "command": "python3 -B docs/audits/AUD-008-harnesses/fix-validate.py --from-commit",
+            "cwd": "/home/user/Documents/bip_tools/mnemocode",
+            "startedAt": "2026-10-06T12:44:58.316364Z",
+            "timeoutSeconds": 300,
+            "environment": {
+              "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+              "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
+              "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
+            },
+            "exitCode": 0,
+            "finishedAt": "2026-10-06T12:44:59.384646Z",
+            "logSha256": "e76148487cde132ad10e94e325c95bf35168c6d83345a59d73ebdc620273e671",
+            "logBytes": 1574,
+            "localLog": "docs/audits/AUD-008-evidence/record-update-from-commit.log",
+            "ledger": "docs/audits/AUD-008-evidence/record-update-from-commit.command.json"
+          },
+          "result": {
+            "path": "docs/audits/AUD-008-evidence/record-update-from-commit-validation.json",
+            "sha256": "aef55df5ab71d0215679edd8dd5bf2e11216ea67f39833f5ad7bf9461d37fa56"
+          },
+          "environmentDrift": {
+            "procedures": {
+              "/home/user/Documents/bip_tools/AGENTS.md": "3e2e522b7b357614436751a01f26ac0fd0e7b0fc6d0acf9d3e2deb7d3443d985",
+              "/home/user/Documents/bip_tools/mnemocode/AGENTS.md": "061c559f6dda6c82965217d05ac65c49d3d56b17d49182311eef169fe5d6fae1"
+            },
+            "distFiles": 34
+          },
+          "note": "The run checked this record before run, result and environmentDrift were filled in; the validator reads only harness from this block."
+        },
+        "limits": [
+          "The commit holds every file the seven findings name and the first-phase changes in firstPhaseChangesIdenticalInCommit, not the whole first-phase tree: the files in firstPhaseChangesChangedAgain were changed again by the four-fix phase, so the first-phase runs covered versions of them that the commit no longer holds. No product test was run for this update. The four-fix phase's 242/242 run included test/aud-008-remediation.test.ts, which exercised API002-API006 again on product bytes identical to 9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b. API001 rests on its byte-identical files and the final terminal-input regression, DOC001 on the byte-identical SECURITY.md; the date-search interrupt probe was not rerun on the commit.",
+          "The published fix-validate.py cannot pass on this machine on 2026-10-06, not even on a clean checkout: the workspace AGENTS.md changed after the four-fix phase (11a945c9... recorded), so its procedure-hash check fails, and the working tree also holds uncommitted later work outside docs/audits/, which stops its committed-tree comparison and its product-file hashes, with dist/ rebuilt from that work. This update was validated with fix-validate.py --from-commit, described in validation, which reads the product files from the signed commit and lists procedure and dist/ mismatches instead of failing, and changes no other check. Its command record, log and result are in the ignored evidence folder.",
+          "Recording commit fields is not a new audit run or release approval."
+        ]
+      }
+    ]
   }
 }

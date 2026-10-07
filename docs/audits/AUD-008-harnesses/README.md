@@ -127,6 +127,18 @@ it never replaces the original clean audit snapshot. A later call compares the c
 files with that follow-up snapshot. `recheck-narrow-terminal.py` repeats the retained static-width
 PTY harness with new evidence filenames, without replacing the original capture.
 
+`remediation-narrow-terminal.py` is the owner's remediation version of
+`interface-narrow-terminal.py`. It starts the real protected menu in a Linux pseudo-terminal of
+40 rows at 120, 80, 60, 40 and 30 columns (`NO_COLOR=1`, `TERM=xterm`), presses Down twice,
+replays the output with the same small VT model and requires exactly one visible selection at
+every width. It prints the marker counts per width and the full results, writes
+`remediation-menu-<columns>.raw.txt`, `remediation-menu-<columns>.screen.txt` and
+`remediation-narrow-terminal-results.json`, and exits 0; a stale selection stops it with an
+`AssertionError`, exit 1. It needs a fresh `dist/` build and Node at
+`/home/user/.local/bin/node`. Running it again replaces the `remediation-*` files named under
+"Evidence retention" in the report, so change its output names first, as
+`recheck-narrow-terminal.py` does.
+
 `recheck-validate.py` validates the dated addendum, both preserved and new execution log hashes,
 current source/dist/procedure bindings, seven verified/four open dispositions and the ignored
 local-evidence boundary. Run it after the source-snapshot comparison:
@@ -136,11 +148,15 @@ python3 docs/audits/AUD-008-harnesses/recheck-snapshot.py
 python3 docs/audits/AUD-008-harnesses/recheck-validate.py
 ```
 
-Both binding checks expect exit 0 on this recorded follow-up state. Original
+Both binding checks exited 0 on that recorded follow-up state; on any later commit they stop at
+the HEAD comparison, exit 1 (see "Snapshot and record validators" below). Original
 `capture-snapshot.py` and `validate-report.py` intentionally remain bound to the original clean
-baseline; they do not certify a subsequently changed product tree. The residual-contract helpers
-for SSKR, displayed commands, publication failures and modeled resize currently exit 1 with the
-remaining acceptance failures. That is retained defect evidence, not a failed source-binding gate.
+baseline; they do not certify a subsequently changed product tree. On the first-phase source the
+residual-contract helpers for SSKR, displayed commands, publication failures and modeled resize
+exited 1 with the remaining acceptance failures. That is retained defect evidence, not a failed
+source-binding gate. On the fixed source `recheck-ui-build-resize-counts.mjs` exits 0
+(`fix-resize-model` in the report); the other three were not rerun there, because the four-fix
+phase checks those findings with its own tests and `fix-build-failure.mjs`.
 
 ## Authorized four-fix phase
 
@@ -195,3 +211,96 @@ pre-commit record but accepts a descendant HEAD when every product byte still ma
 source hashes; later audit-only commits do not invalidate it. Changed source still fails.
 The original execution-time hashes of these helpers remain in the report; the commit-binding
 update records their current hashes separately. Recording this binding is not a new audit run.
+
+Later on 2026-10-06, after `9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b` and the record commit `db83c4bd89a5942f1b0f3bb709ee372dbdf4bf41` were pushed, the seven
+first-phase dispositions (API001–API006 and DOC001) were bound to the same commit, recorded in
+JSON `fixVerification.recordUpdates`. `fix-validate.py` now expects that commit for all eleven
+dispositions. It recomputes from git that 226 of the 234 first-phase product files are
+byte-identical in `9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b` and that the other eight are the files the four-fix phase changed,
+which of the first phase's own changes are identical there and which were changed again, and
+that no file the seven findings name differs. It checks that `db83c4bd89a5942f1b0f3bb709ee372dbdf4bf41` changes only
+`docs/audits/` and compares the five-column remediation table with the JSON. It takes the
+current hashes of this README and of itself from the record update, after checking that the
+hashes they supersede match the files in `db83c4bd89a5942f1b0f3bb709ee372dbdf4bf41`, and requires the record update to name that
+validator version as the one it was validated with.
+
+## Snapshot and record validators
+
+The snapshot and validator scripts check the maintainer's checkout; they are not product tests.
+They need:
+
+- `git` and the repository history with the recorded commits; nothing is copied or checked out.
+- For `validate-report.py`, `recheck-validate.py` and `fix-validate.py`: Python 3 with the
+  `jsonschema` package (Draft 2020-12; 4.19.2 was used) and the sibling checkout
+  `../multi-chain-wallet-tools`, whose `docs/audit-report.schema.json` is the schema. The
+  procedure files listed in the report are hashed at their absolute paths.
+- The maintainer's ignored `docs/audits/AUD-008-evidence/`: snapshots, dist manifests, the
+  retained earlier reports, review records and every command log named in the JSON. It is not
+  published, so a reader without it can rerun the probes above but not these validators.
+
+Each script prints one JSON line when it gets to the end; the snapshot scripts report a mismatch
+in that line and exit 1. A failed validator check prints no JSON and ends with a Python
+traceback, exit 1. Usually it is an `AssertionError`, which names the file or finding only for
+per-file and per-finding checks (`validate-report.py` gives most checks a short message); many
+checks fail with a bare `AssertionError`. A missing `jsonschema` package, schema or evidence
+file ends with `ModuleNotFoundError` or `FileNotFoundError`, a schema violation with
+`jsonschema.exceptions.ValidationError`, also exit 1.
+
+- `capture-snapshot.py` and `validate-report.py` belong to the original clean audit at
+  `2d80c86c050c7e3b7de395b9f96548867c9cd44c`. On that state they printed an unchanged snapshot and the coverage, finding and hash
+  counts, exit 0; `validate-report.py` also rewrote the evidence `SHA256SUMS`. On any later commit
+  the snapshot script writes `snapshot-verification.json` with `"unchanged": false`, exit 1, and
+  `validate-report.py` stops at its HEAD comparison, exit 1.
+- `recheck-snapshot.py` and `recheck-validate.py` belong to the first remediation verification
+  (HEAD `2d80c86c050c7e3b7de395b9f96548867c9cd44c` with the owner's uncommitted fixes, fingerprint `1b05926f…`). They printed
+  `"unchanged": true` and seven verified/four open, exit 0, on that state and exit 1 on any later
+  commit. The snapshot script rewrites `recheck-snapshot-verification.json` whenever it runs.
+- `fix-snapshot.py` compares the product files with `fix-snapshot.json` (fingerprint
+  `20ab1841…`) and accepts a HEAD that descends from `2d80c86c050c7e3b7de395b9f96548867c9cd44c`. With identical product bytes it
+  prints `"unchanged": true`, exit 0; changed, added or removed product files are listed in
+  `changedFiles`, exit 1. Away from `2d80c86c050c7e3b7de395b9f96548867c9cd44c` it writes
+  `commit-binding-snapshot-verification.json`, replacing the earlier result, and
+  `fix-validate.py` then requires `"unchanged": true` in it.
+- `fix-validate.py` checks the schema, both earlier phases, the signed commit `9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b`
+  (signature header, ancestry, working-tree product files equal to the commit), the record
+  update, all source, dist, procedure, harness, review and log hashes, the eleven dispositions
+  and the Markdown tables. On success it prints
+  `{"schema": "passed", ..., "statuses": {"verified": 11, "open": 0}, ...}`, exit 0, and writes
+  `record-update-report-validation.json`; the earlier record states wrote
+  `fix-report-validation.json` and `commit-binding-report-validation.json`.
+
+`fix-validate.py` can pass only on a clean tree whose product files and `dist/` equal the
+four-fix phase, and on 2026-10-06 no checkout on this machine passes it. Uncommitted or later
+changes to any tracked file outside `docs/audits/`, the repository `AGENTS.md` included, stop it
+at the committed-tree comparison, exit 1. The workspace `AGENTS.md` has also changed since that
+phase (`11a945c9…` recorded), so its procedure-hash check fails even on a clean tree, exit 1.
+Both are binding gates working as intended, not errors in the record.
+
+`fix-validate.py --from-commit` checks the record against the signed commit instead, so that it
+can be rerun on a checkout that holds later work. The 2026-10-06 record update was validated
+this way:
+
+```bash
+python3 docs/audits/AUD-008-harnesses/record-command.py --label <new-label> --timeout 300 -- \
+  python3 -B docs/audits/AUD-008-harnesses/fix-validate.py --from-commit
+```
+
+It differs from the default run in three ways and no others:
+
+- It reads the product files from `9b91a27f5ccccd67aa3ad7c722fc8105a6e3807b` with git and requires that commit to hold exactly
+  the 236 snapshot files, with fingerprint `20ab1841…`, instead of comparing the working tree
+  with the commit and with the snapshot. HEAD must still descend from the commit; product changes
+  after the commit, in HEAD or in the working tree, are not checked.
+- It lists the `dist/` files that differ from `fix-dist-manifest.json`, and the procedure files
+  whose hash differs with their current hash, under `environmentDrift` instead of failing.
+- It writes `record-update-from-commit-validation.json`, whose result also names
+  `productFilesReadFrom` and `environmentDrift`, instead of `record-update-report-validation.json`.
+
+Every other check is the default one, the record update, harness hashes, Markdown tables and
+ignored-evidence boundary included, and it needs the same `jsonschema`, sibling schema and
+ignored evidence. On success it prints the result line, exit 0; a failed check ends as above,
+exit 1. JSON `fixVerification.recordUpdates[0].validation` holds the recorded run; its command
+record, log and result are in the ignored evidence folder. A rerun under a new label keeps that
+command record and log, whose log holds the result line, but rewrites the result file.
+
+Never run the snapshot scripts merely to look: each rewrites its local verification record.

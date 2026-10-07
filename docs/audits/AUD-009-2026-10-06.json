@@ -1,0 +1,545 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-009",
+  "auditNumber": 9,
+  "date": "2026-10-06",
+  "title": "Full-scope read-only audit of the modular MnemoCode refactor",
+  "reviewer": {
+    "name": "Codex coordinator and three scoped reviewers; package reviewer also independently challenged findings",
+    "model": null,
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "db83c4bd89a5942f1b0f3bb709ee372dbdf4bf41",
+    "commitComplete": false,
+    "workingTree": "Pre-existing dirty refactor including source/tests/docs/manifests; no production edits by audit. Audited bytes, not HEAD alone, identified by281-path manifest excluding docs/audits.",
+    "sourceFingerprint": "5fa2ac526582177f5c3f6086b494c6e138abb2c338010ed9bb00d316b43ab4e6"
+  },
+  "scope": "Ordinary full-scope review of security, core/Seedshift/recovery, Bitcoin evidence, SSKR, candidate encryption, modular API, CLI/private input/cards, build artifacts, local CI configuration and documentation. Heavy checks sequential; two test workers. Only public/synthetic fixtures. Not release acceptance.",
+  "checks": [
+    {
+      "id": "CHECK-SEC-001",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "reviewed",
+      "evidence": "Threat model, ownership and host boundaries traced; mutable checked-date state is FUN001."
+    },
+    {
+      "id": "CHECK-SEC-002",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "sampled-pass",
+      "evidence": "Node permission flags, guarded CLI spawning and offline sandbox inspected; real PTY and executable run. No separate browser Secret Vault/CSP in this package."
+    },
+    {
+      "id": "CHECK-SEC-003",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "reviewed",
+      "evidence": "Offline host/core and no provider flow reviewed; permission/network tests in suite. No live egress monitoring."
+    },
+    {
+      "id": "CHECK-SEC-004",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "sampled-pass",
+      "evidence": "RNG injection, candidate age/scrypt authentication and SSKR randomness traced; suite covers boundaries. No new cryptographic proof or exhaustive age interop run."
+    },
+    {
+      "id": "CHECK-SEC-005",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "sampled-pass",
+      "evidence": "Private-screen cleanup and exception paths inspected; captured Bitcoin seed zeroed; PTY cancellation passed. JS immutable-string wiping cannot be guaranteed."
+    },
+    {
+      "id": "CHECK-SEC-006",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "partial",
+      "evidence": "Host-neutral import tests and sensitive APIs reviewed; actual browser embedding/storage/CSP not executed."
+    },
+    {
+      "id": "CHECK-SEC-007",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "failed",
+      "evidence": "Post-construction pattern mutation starts work above checked hard limit; FUN001. File/input bounds and permission paths also reviewed."
+    },
+    {
+      "id": "CHECK-FUN-001",
+      "owner": "core reviewer",
+      "outcome": "passed",
+      "evidence": "All2048 BIP39 mappings, five lengths and representation oracle; published fingerprint and suite."
+    },
+    {
+      "id": "CHECK-FUN-002",
+      "owner": "core reviewer",
+      "outcome": "sampled-pass",
+      "evidence": "Published BIP84 first address and fingerprint; sync/async host seed equality. Project implements Bitcoin evidence, not a general multicoin derivation engine."
+    },
+    {
+      "id": "CHECK-FUN-003",
+      "owner": "core reviewer",
+      "outcome": "not-applicable",
+      "evidence": "No BIP85/BIP38/message signing/Silent Payments feature."
+    },
+    {
+      "id": "CHECK-FUN-004",
+      "owner": "core reviewer",
+      "outcome": "not-applicable",
+      "evidence": "No descriptor/Miniscript/multisig tool."
+    },
+    {
+      "id": "CHECK-FUN-005",
+      "owner": "core reviewer",
+      "outcome": "not-applicable",
+      "evidence": "No transaction or PSBT parser."
+    },
+    {
+      "id": "CHECK-FUN-006",
+      "owner": "core reviewer",
+      "outcome": "failed",
+      "evidence": "Recovery, SSKR and repair sampled; mutation falsely approves SSKR backup (FUN001); constructor regressions API001/API002."
+    },
+    {
+      "id": "CHECK-FUN-007",
+      "owner": "core reviewer",
+      "outcome": "not-applicable",
+      "evidence": "No connected discovery/provider accounting feature."
+    },
+    {
+      "id": "CHECK-API-001",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "sampled-pass",
+      "evidence": "Pinned scure/noble, PDF/QR and SSKR calls traced; suite and real artifacts. No exhaustive third-party implementation proof."
+    },
+    {
+      "id": "CHECK-API-002",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "reviewed",
+      "evidence": "Search cancellation and async seed cleanup traced; PTY cancellation passed; availability mutation remains FUN001."
+    },
+    {
+      "id": "CHECK-API-003",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "failed",
+      "evidence": "26 declared module exports resolve; typed constructor invariants fail API001/API002."
+    },
+    {
+      "id": "CHECK-API-004",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "passed",
+      "evidence": "45 oracle transforms/450 representation checks; candidate record CRC/round-trip; SSKR split/restore and executable import/export."
+    },
+    {
+      "id": "CHECK-BLD-001",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "passed",
+      "evidence": "Toolchain/version pins, type configurations, permission composition and26 subpath exports checked."
+    },
+    {
+      "id": "CHECK-BLD-002",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "partial",
+      "evidence": "Linux Node26 full suite1103/67, PTY and standalone executable exercised. Current Windows/macOS/browser execution not run."
+    },
+    {
+      "id": "CHECK-BLD-003",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "reviewed",
+      "evidence": "Lockfile, manifests, notices and signing scripts inspected; all7 SSKR integrity pins validated. No fresh registry advisory query."
+    },
+    {
+      "id": "CHECK-BLD-004",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "partial",
+      "evidence": "Existing WASM bytes match integrity manifest; canonical Docker rebuild not run in this ordinary audit."
+    },
+    {
+      "id": "CHECK-BLD-005",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "partial",
+      "evidence": "Fresh253 compiler files exactly match dist; existing executable tested and hashed; workflows read. No executable rebuild, signature/attestation verification or remote CI."
+    },
+    {
+      "id": "CHECK-UI-001",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "sampled-pass",
+      "evidence": "25 rendered cases, five additional A6 checks and three SSKR member pages; exact QR/no-QR assertions at200 dpi. One business-it study visually inspected; not all layouts or physical printouts."
+    },
+    {
+      "id": "CHECK-UI-002",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "passed",
+      "evidence": "Real PTY menu/back/escape/retry/edit/multiline input and cancellation passed."
+    },
+    {
+      "id": "CHECK-UI-003",
+      "owner": "coordinator with scoped reviewers",
+      "outcome": "partial",
+      "evidence": "PTY hidden input/screen restoration and actual raster QR checks passed; physical scanning and assistive accessibility tools not run."
+    },
+    {
+      "id": "CHECK-ARC-001",
+      "owner": "package reviewer/coordinator",
+      "outcome": "failed",
+      "evidence": "Class/subpath ownership improved and ShareSet copies/freezes graph; shallow checked dates remain FUN001."
+    },
+    {
+      "id": "CHECK-ARC-002",
+      "owner": "package reviewer/coordinator",
+      "outcome": "reviewed",
+      "evidence": "CLI-to-library migration, module composition and compatibility wrappers reviewed; no additional confirmed duplicate-logic defect."
+    },
+    {
+      "id": "CHECK-ARC-003",
+      "owner": "package reviewer/coordinator",
+      "outcome": "sampled-pass",
+      "evidence": "Full suite, fresh compiler output and targeted probes tied to source bytes; distinct harness mistakes excluded from product findings."
+    },
+    {
+      "id": "CHECK-DOC-001",
+      "owner": "package reviewer/coordinator",
+      "outcome": "reviewed",
+      "evidence": "README/architecture/SSKR/candidate safety and host limitations compared with code; renderer-global limitation disclosed."
+    },
+    {
+      "id": "CHECK-DOC-002",
+      "owner": "package reviewer/coordinator",
+      "outcome": "reviewed",
+      "evidence": "Commands, package version, notices and release documentation reviewed. Release provenance hardening is optional, not a demonstrated exploit."
+    },
+    {
+      "id": "CHECK-DOC-003",
+      "owner": "package reviewer/coordinator",
+      "outcome": "passed",
+      "evidence": "Paired records and32-item ledger schema validated; command hashes and unchanged281-path source/artifact snapshots validated; local evidence ignored."
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUD-009-FUN001",
+      "category": "FUN",
+      "kind": "finding",
+      "title": "Caller-owned dates can alter checked state and falsely approve an SSKR backup",
+      "severity": "medium",
+      "status": "fixed",
+      "releaseBlocking": true,
+      "affectedFiles": [
+        "src/core/date-search.ts:111",
+        "src/core/date-search.ts:185",
+        "src/core/backup-check.ts:268",
+        "src/core/backup-check.ts:526",
+        "src/core/backup-check.ts:621"
+      ],
+      "evidence": "core-invariants.log: date ownership, pattern expansion and first-progress sentinel; sskr-boundaries.log: actual production WASM and mismatching recovered mnemonic.",
+      "reproduction": "Mask public abandon ... about at 23-09-2026, split 2-of-3, construct ShareBackupCheck with a retained date object and confirm restores. Change that object to day 24; checking the same shares with 24-09-2026 still reports restores although actual recovery produces a different phrase. Separately retain a DatesAnswer pattern and expand its arrays after construction: existing DateSearch grows from 365 to the 10,000,001 hard-limit sentinel and starts work. The harness stops at first progress, not a giant search.",
+      "expected": "Objects own an immutable validated snapshot; backup approval corresponds to actual reconstruction and searches cannot exceed validated limits through caller mutation.",
+      "observed": "Outer arrays are copied or frozen but nested dates/pattern arrays alias caller data. ShareBackupCheck caches held material before mutation and later compares changed dates without final recovered-phrase comparison.",
+      "impact": "Supported library callers can receive false backup assurance or start work beyond the checked limit. No current CLI false-pass, remote exploit, secret theft or giant search was demonstrated. EncodedBackupCheck baseline dates mutate too, but its full check has a recovered-result comparison; do not extrapolate the SSKR false-pass to it.",
+      "recommendedFix": "Deep-copy and freeze date/pattern graphs at ownership boundaries, return independent immutable values, and retain the validated snapshot throughout search and backup checking.",
+      "requiredVerification": "Retained input and getter mutation cannot change state; original-date SSKR backup restores and wrong-date backup fails; compare actual recovery; attempted post-construction limit expansion cannot start work.",
+      "releaseBlockingReason": "False approval of a backup contradicts a core recovery guarantee; resolve before publishing the new library API."
+    },
+    {
+      "id": "AUD-009-API001",
+      "category": "API",
+      "kind": "finding",
+      "title": "DatesAnswer.of accepts invalid calendars and empty search patterns",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/core/date-search.ts:162"
+      ],
+      "evidence": "core-invariants.log: missing expected exceptions for calendar and empty pattern.",
+      "reproduction": "DatesAnswer.of accepts {year:2026,month:2,day:31}; it also accepts a pattern with years:[], months:[1], days:[1]. Equivalent parsed input rejects these cases.",
+      "expected": "The typed public constructor preserves the documented searchable invariant and validation equivalent to parsing.",
+      "observed": "Only outer nonemptiness and work limits are checked; invalid complete dates and zero-candidate patterns become constructed objects.",
+      "impact": "Bounded exported-library contract failure. Invalid calendars generally fail later in normalization; empty patterns yield no work/no matches. CLI string parsing is not shown affected; no wrong wallet result is demonstrated.",
+      "recommendedFix": "Validate calendar dates and nonempty valid candidate sets before constructing DatesAnswer; share validation with parsing.",
+      "requiredVerification": "Negative constructor tests for invalid calendars and empty patterns, plus valid leap-day and ordinary pattern acceptance."
+    },
+    {
+      "id": "AUD-009-API002",
+      "category": "API",
+      "kind": "finding",
+      "title": "EncodedBackup.of accepts sparse index arrays",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/core/encoded-backup.ts:121"
+      ],
+      "evidence": "core-invariants.log: missing expected exception for new Array<number>(12).",
+      "reproduction": "EncodedBackup.of(new Array<number>(12), 'indexes', 'direct') succeeds; unchecked seedshift-legacy has the same validation shape.",
+      "expected": "Every index is a present integer within the BIP39 index range before the object is constructed.",
+      "observed": "Array.some skips holes; constructor spread materializes undefined elements. Decoding later rejects the invalid indexes.",
+      "impact": "Malformed native/browser host input produces an invalid public object. CLI read creates dense arrays; no accepted incorrect mnemonic or secrecy compromise is demonstrated.",
+      "recommendedFix": "Validate every indexed position including holes, using the explicit density checks already present in candidate handling.",
+      "requiredVerification": "Reject sparse/partially sparse arrays, undefined and out-of-range entries; retain dense valid round-trips in all supported modes."
+    }
+  ],
+  "observations": [],
+  "remediation": [
+    {
+      "id": "AUD-009-FUN001",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Owned frozen copies of dates and patterns (core/dates.ts ownedDate/ownedPattern) in DatesAnswer, DateSearch, EncodedBackupCheck and ShareBackupCheck; ShareBackupCheck.compareDates confirms the actual recovery; limits checked in the DatesAnswer constructor; patterns sharing a key with other dates and duplicate pattern values refused; ShareBackupCheck refuses modes shares are not made in. test/aud-009-remediation.test.ts; sskr-boundaries.mjs 4/4 including the retained-date SSKR reproduction; core-invariants.ts 10/12, the two pattern-mutation checks now throw TypeError because the arrays are frozen (intended). Source fingerprint 837d75eec85234a0072f48c0e37840adce151b485df15f6bb1921336fd700dbe; not committed yet."
+    },
+    {
+      "id": "AUD-009-API001",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "DatesAnswer.of checks each date and pattern as parse does and names its place (Date N: ...); impossible calendar dates, empty or impossible patterns refused; leap day and ordinary patterns accepted. test/aud-009-remediation.test.ts; core-invariants.ts checks passed. Source fingerprint 837d75eec85234a0072f48c0e37840adce151b485df15f6bb1921336fd700dbe; not committed yet."
+    },
+    {
+      "id": "AUD-009-API002",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "EncodedBackup checks every position in its constructor (copy first, then check), so holes, undefined and out-of-range indexes are refused through of and the raw constructor alike; the same hole check in seedshift.ts, colors.ts, candidate-list.ts and DateSearch. test/aud-009-remediation.test.ts; core-invariants.ts check passed. Source fingerprint 837d75eec85234a0072f48c0e37840adce151b485df15f6bb1921336fd700dbe; not committed yet."
+    }
+  ],
+  "limitations": [
+    "No production remediation, commit, push or release.",
+    "No live Deriver/browser integration, Windows/macOS execution, physical print recovery or assistive accessibility verification.",
+    "No canonical Docker WASM or standalone executable reproducibility rebuild, remote CI, signed release verification or fresh dependency advisory query.",
+    "Owner-reported1183 recorded-run replay not independently repeated.",
+    "Passing tests and sampled crypto outputs are not proof of cryptographic security or absence of defects.",
+    "Initial pnpm check failed in restricted sandbox with spawnSync git EPERM; escalated unchanged rerun passed. Initial unwrapped failure has no exact timestamped command record. Narrow earlier core harness revisions are not additive tests; initial SSKR harness used invalid fixture index10, corrected to5.",
+    "Original snapshot harness omitted actual WASM due obsolete basename; artifact-consistency independently validates actual file."
+  ],
+  "procedureHashes": {
+    "multi-chain-wallet-tools/docs/FULL_AUDIT_GUIDE.md": "30fa6a1675892e2a3059bdbd6e97737f2959a74aca98a0a90e4f655ae12854a6",
+    "multi-chain-wallet-tools/docs/audits/AUDIT_STANDARD.md": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f",
+    "multi-chain-wallet-tools/docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+    "multi-chain-wallet-tools/docs/audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7"
+  },
+  "sourceHashes": {
+    "src/core/date-search.ts": "058946d124c1d5b38e355d4750677231f40ee2bf530c46a0fb8f910368b7b889",
+    "src/core/encoded-backup.ts": "0dae67b07e6ed3b105c8a9ba402e96562b4b262830bc2a1a0f1a707ec8a4dc04",
+    "src/core/backup-check.ts": "47a35e40581b68b317de145739e4b1d2792607d3c26ca81dfff2dd727657d895"
+  },
+  "recommendations": [
+    "Retain real deep ownership rather than adding classes around shared mutable graphs.",
+    "Renderer global platform is a documented remaining composition limitation, not a newly hidden defect.",
+    "Optionally bind release attestation verification to expected workflow and tag commit rather than repository-only acceptance; live attestation was not verified."
+  ],
+  "artifacts": {
+    "release/mnemocode-0.1.0-linux-x64": "4de961892dc3e4c07f6deecf464317ae174fe838be912e9062282ea458bbe96f",
+    "dist/mnemocode.js": "e77c11a4e12f926f1c6bf16507267f4923d944ac81c78cc7bef72d45b99297b7",
+    "sskr-wasm/generated/recovery_sskr_wasm_bg.wasm": "02af1d40c8b6e8c52ba905e6d014a71b60223cafaab14e3bb9e3d6c0908da53a"
+  },
+  "conformance": [
+    "ShareSet independently copies and freezes its nested graph; probe passed.",
+    "JointRepair uses the injected SharePlatform even if global configured services throw; probe passed.",
+    "All 253 newly emitted compiler files match existing dist byte-for-byte; seven SSKR integrity entries and 26 subpath exports validate.",
+    "The modular split and host-neutral public classes improve reuse; class presence alone is not correctness or runtime-speed evidence. No speed benchmark against the previous release was performed."
+  ],
+  "harnessHashes": {
+    "core-invariants.ts": "dab850fd4fea9372ed498938e84b7f8f51b64e29c2d894702147dac89e92232c",
+    "sskr-boundaries.mjs": "ff81d3230a5d2c2857abc61ee177abce8aad0d887d273a2e5709c055ca4b810b"
+  },
+  "commandEvidence": [
+    {
+      "label": "artifact-consistency",
+      "command": [
+        "/home/user/.local/bin/node",
+        "docs/audits/AUD-009-harnesses/artifact-consistency.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:38:09.459Z",
+      "endedAt": "2026-10-06T19:38:09.772Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "0a465cc0dcdd8a15c361b5fd1effcc2511d4aef2e788f3e28126200d1b4b4198"
+    },
+    {
+      "label": "check",
+      "command": [
+        "/home/user/.local/bin/pnpm",
+        "check"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:35:50.180Z",
+      "endedAt": "2026-10-06T19:35:50.802Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "2bca4004313105656fc2857b114b2f0b306c59aa13e7630f986d113426903305"
+    },
+    {
+      "label": "compile",
+      "command": [
+        "/home/user/.local/bin/pnpm",
+        "exec",
+        "tsc",
+        "-p",
+        "tsconfig.json",
+        "--outDir",
+        "docs/audits/AUD-009-evidence/compiled"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:37:48.381Z",
+      "endedAt": "2026-10-06T19:37:48.917Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "core-invariants",
+      "command": [
+        "/home/user/.local/bin/node",
+        "--import",
+        "tsx",
+        "docs/audits/AUD-009-harnesses/core-invariants.ts"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:37:17.967Z",
+      "endedAt": "2026-10-06T19:37:27.023Z",
+      "exitCode": 1,
+      "signal": null,
+      "failure": null,
+      "logSha256": "580032ae60482ee0a3582b687d2cf65c689ef2638dede8ecdd5e228319b3771a"
+    },
+    {
+      "label": "environment",
+      "command": [
+        "/home/user/.local/bin/node",
+        "-e",
+        "console.log(JSON.stringify({node:process.version,platform:process.platform,arch:process.arch,versions:process.versions},null,2))"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:42:53.101Z",
+      "endedAt": "2026-10-06T19:42:53.131Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "a34221d1e074ba9c5b08c09ba5faad145a9e1d2f95ed0ff3af646ce4fce62b3f"
+    },
+    {
+      "label": "executable",
+      "command": [
+        "/home/user/.local/bin/node",
+        "scripts/verify-executable.mjs",
+        "release/mnemocode-0.1.0-linux-x64"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:41:56.727Z",
+      "endedAt": "2026-10-06T19:42:05.594Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "73cae2d29fc39e4eb4d0170c317f88ba89ce8d9a1821003aae2a67640bf93b6d"
+    },
+    {
+      "label": "format",
+      "command": [
+        "/home/user/.local/bin/pnpm",
+        "format:check"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:36:03.939Z",
+      "endedAt": "2026-10-06T19:36:06.934Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2"
+    },
+    {
+      "label": "independent-oracle",
+      "command": [
+        "/home/user/.local/bin/node",
+        "docs/audits/AUD-008-harnesses/core-oracles.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:40:52.733Z",
+      "endedAt": "2026-10-06T19:40:54.402Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "42c5ec4434e5ca055382743659105b421eaae8b3944782574fc3fd4e69480317"
+    },
+    {
+      "label": "sskr-boundaries",
+      "command": [
+        "/home/user/.local/bin/node",
+        "--import",
+        "tsx",
+        "docs/audits/AUD-009-harnesses/sskr-boundaries.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:37:37.904Z",
+      "endedAt": "2026-10-06T19:37:38.106Z",
+      "exitCode": 1,
+      "signal": null,
+      "failure": null,
+      "logSha256": "14849c91859352d8133f246a185fdd673cca7f801633885c3249f09cd13a52bb"
+    },
+    {
+      "label": "suite",
+      "command": [
+        "/home/user/.local/bin/pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--maxWorkers=2"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:36:21.004Z",
+      "endedAt": "2026-10-06T19:40:13.253Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "5e65ae9bc277ba1c7369860caf5fb15bc937be3150dbf33e72a93b5b32038c62"
+    },
+    {
+      "label": "terminal",
+      "command": [
+        "python3",
+        "scripts/verify-terminal-input.py"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:41:02.381Z",
+      "endedAt": "2026-10-06T19:41:31.227Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "640fad9cd9244db2821b088fcbfd5d96c0561a57aaf5fd23e7e22c7ae734c1f9"
+    },
+    {
+      "label": "cards",
+      "command": [
+        "/home/user/.local/bin/node",
+        "scripts/check-card-output.mjs",
+        "output/audit-009-card-output"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-06T19:42:49.463Z",
+      "endedAt": "2026-10-06T19:43:58.010Z",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "logSha256": "99120fcbde639a8dfaec2651167e977ff3dd4b1696daaef58cbab86d53456963"
+    }
+  ],
+  "results": {
+    "suite": "1103 tests in67files passed;231.88seconds",
+    "coreProbe": "12 assertions:6pass,6fail;3root causes;exit1",
+    "sskrProbe": "4assertions:2pass,2fail;exit1",
+    "oracle": {
+      "transforms": 45,
+      "representationChecks": 450,
+      "wordMappings": 2048,
+      "finalCandidates": 248,
+      "missingPlaceCandidates": 1509,
+      "invalidIndexChecks": 15
+    },
+    "artifacts": "253 compiler files exact;7integrity files;26exports",
+    "cards": "25case PDFs,5additional A6 layout checks,3member pages; raster QR checks passed",
+    "executable": "7 checks passed",
+    "terminal": "11 scenario groups passed",
+    "sourceUnchanged": true
+  },
+  "assessment": "Three confirmed open findings: one medium and two low; no high/critical issue demonstrated. FUN001 blocks acceptance of the new recovery API until fixed and verified. Architecture moves in the right direction; no measured speed advantage over the previous release is established. Browser integration and release reproducibility remain unexecuted, so this is not release approval."
+}
