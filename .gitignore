@@ -3,6 +3,8 @@ node_modules/
 dist/
 # Single executables from scripts/build-executable.mjs; published only as release files.
 release/
+# A draft release downloaded to be OpenPGP-signed (scripts/sign-release.mjs).
+release-signing-*/
 coverage/
 .DS_Store
 output/
