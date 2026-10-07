@@ -152,7 +152,8 @@ export const BITCOIN_LIKE_ADDRESS_SELF_TEST = coinFamilySelfTest({
       address: "ltc1qnnphcvq5zgyf4f0uepust6d7gyt2zl69vftnz2",
     },
   ],
-  startup: [20],
+  // One vector of each coin, and Taproot, whose tweak no other vector takes.
+  startup: [20, 16, 18, 5],
   elsewhere: 7,
   scanned: 3,
   refused: [

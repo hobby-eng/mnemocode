@@ -22,8 +22,8 @@ const ABANDON = "abandon ".repeat(11) + "about";
 /** The BIP39 test vector of entropy ff…ff: another wallet. */
 const ZOO = "zoo ".repeat(11) + "wrong";
 
-const nodePbkdf2: Pbkdf2HmacSha512 = (password, salt, rounds, bytes) =>
-  Uint8Array.from(pbkdf2Sync(password, salt, rounds, bytes, "sha512"));
+const nodePbkdf2 = ((password, salt, rounds, bytes) =>
+  Uint8Array.from(pbkdf2Sync(password, salt, rounds, bytes, "sha512"))) satisfies Pbkdf2HmacSha512;
 const check = new WalletEvidenceCheck(nodePbkdf2);
 
 /**
@@ -122,7 +122,11 @@ function locationOf(path: string): AddressLocation {
   return { account: account!, branch: branch!, index: index! };
 }
 
-function coinAddress(coin: string, value: string, location: AddressLocation): WalletEvidence {
+function coinAddress(
+  coin: string,
+  value: string,
+  location: AddressLocation,
+): Extract<WalletEvidence, { kind: "coin-address" }> {
   return { kind: "coin-address", coin: coin as CoinId, value, location };
 }
 
@@ -344,7 +348,7 @@ describe("addresses out of reach", () => {
       [
         "bitcoin-cash",
         "bitcoincash:pqkh9ahfj069qv8l6eysyufazpe4fdjq3u4hna323j",
-        "only single-key addresses (bitcoincash:q…) can be checked",
+        "only single-key addresses (bitcoincash:q… or 1…) can be checked",
       ],
       // Zcash's P2SH "t3…".
       ["zcash", "t3Vz22vK5z2LcKEdg16Yv4FFneEL1zg9ojd", "it is not an address of Zcash (t1…)"],
@@ -588,5 +592,70 @@ describe("the coins", () => {
     expect(described("dash", "dash1krma5z3ttj75la4m93xcndna9ullamq9y5e9n5rs")).toBe(
       "Platform payment (DIP17)",
     );
+  });
+});
+
+describe("an address of another coin (AUD-010-API003)", () => {
+  /** One valid address of each coin, from the coins' own self-test vectors. */
+  const SAMPLES: Readonly<Record<CoinId, readonly string[]>> = {
+    bitcoin: [
+      "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA",
+      "37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf",
+      "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+    ],
+    "bitcoin-cash": ["bitcoincash:qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6"],
+    cosmos: ["cosmos19rl4cm2hmr8afy4kldpxz3fka4jguq0auqdal4"],
+    dash: ["XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf5", "dash1kzjl7qzxy9lar37j8r37z3kvt07epqe20ckxfezw"],
+    dogecoin: ["DBus3bamQjgJULBJtYXpEzDWQRwF5iwxgC"],
+    ethereum: [
+      "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+      // Mixed case whose small letters all fit CashAddr's alphabet.
+      "0x7f0d20e7C84e6f66D83de2c004434D9A522A62FD",
+    ],
+    "ethereum-classic": ["0xFA22515E43658ce56A7682B801e9B5456f511420"],
+    injective: ["inj1npvwllfr9dqr8erajqqr6s0vxnk2ak55re90dz"],
+    litecoin: ["LUWPbpM43E2p7ZSh8cyTBEkvpHmr3cB8Ez", "ltc1qnnphcvq5zgyf4f0uepust6d7gyt2zl69vftnz2"],
+    tron: ["TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH"],
+    // The second fits the alphabet of CashAddr in small letters, so Bitcoin Cash met its case rule.
+    xrp: ["rHsMGQEkVNJmpGWs8XUBoTBiAAbwxZN5v3", "rwRxAXgcHjLz6exJdcQ9ugkk8xhNNvNFHP"],
+    zcash: ["t1XVXWCvpMgBvUaed4XDqWtgQgJSu1Ghz7F"],
+  };
+  /**
+   * Addresses that two coins share by design: Bitcoin's legacy 1… is Bitcoin Cash's too, a 3… is
+   * Litecoin's old form, the 0x of Ethereum and Ethereum Classic is the same account, and a 3…
+   * on Bitcoin Cash is a script, refused as one.
+   */
+  const SHARED = (address: string, coin: CoinId): boolean =>
+    (address.startsWith("1") && coin === "bitcoin-cash") ||
+    (address.startsWith("3") && (coin === "litecoin" || coin === "bitcoin-cash")) ||
+    (address.startsWith("0x") && (coin === "ethereum" || coin === "ethereum-classic"));
+
+  it("is refused by every other coin as not its own, never as damaged", () => {
+    for (const [owner, addresses] of Object.entries(SAMPLES) as [CoinId, readonly string[]][])
+      for (const address of addresses) {
+        expect(coinById(owner).parse(address).text.toLowerCase()).toBe(address.toLowerCase());
+        for (const coin of COINS) {
+          if (coin.id === owner || SHARED(address, coin.id)) continue;
+          expect(() => coin.parse(address), `${address} as ${coin.id}`).toThrow(
+            `it is not an address of ${coin.name}`,
+          );
+        }
+      }
+  });
+
+  it("is still refused as damaged where its checksum fails", () => {
+    expect(() => coinById("dash").parse("XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf6")).toThrow(
+      "its checksum or format is wrong",
+    );
+    expect(() => coinById("xrp").parse("bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv")).toThrow(
+      "its checksum or format is wrong",
+    );
+    expect(() => coinById("bitcoin-cash").parse("37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf")).toThrow(
+      "only single-key addresses",
+    );
+    // Bitcoin Cash's own address with one capital is still refused for its case.
+    expect(() =>
+      coinById("bitcoin-cash").parse("bitcoincash:Qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6"),
+    ).toThrow("it mixes capital and small letters, which CashAddr does not allow");
   });
 });

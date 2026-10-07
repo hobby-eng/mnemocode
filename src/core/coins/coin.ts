@@ -5,12 +5,15 @@
 //
 // Every coin uses secp256k1 keys on BIP44-style paths m/purpose'/coin'/account'/branch/index, or,
 // for Dash Platform, on DIP17 paths m/9'/coin'/17'/account'/key_class'/index; they differ only in
-// how a public key becomes an address.
+// how a public key becomes an address. A key's HASH160 on BIP44's paths is the rule; a family that
+// writes other kinds gives their commitments and purposes (CoinRules), so that a host of one coin
+// carries no other coin's.
 //
-// Host-neutral: it imports only address-types.ts and core/white-space.ts
+// Host-neutral: it imports only address-types.ts, other-forms.ts and core/white-space.ts
 // (test/portable-modules.test.ts).
 
-import { ADDRESS_PURPOSES, commitmentOf, type AddressType } from "./address-types.js";
+import { hash160, type AddressType } from "./address-types.js";
+import { writtenAsAnAddress } from "./other-forms.js";
 import { trimWhiteSpace } from "../white-space.js";
 
 /** The identifier of each coin, as a host names it, such as "bitcoin-cash". */
@@ -49,10 +52,21 @@ export interface CoinDescription {
   readonly coinTypes: readonly number[];
 }
 
+/** How an address commits to a compressed secp256k1 public key, where not by its HASH160. */
+export type KeyCommitment = (publicKey: Uint8Array) => Uint8Array;
+
+/** What a family adds for its address types that are not BIP44's legacy kind. */
+export interface CoinRules {
+  /** The types that commit otherwise than to the key's HASH160, and how. */
+  readonly commitments?: Readonly<Partial<Record<AddressType, KeyCommitment>>>;
+  /** The types whose paths begin otherwise than with BIP44's 44, and with what. */
+  readonly purposes?: Readonly<Partial<Record<AddressType, number>>>;
+}
+
 /** SLIP-44: every test network uses coin type 1. */
 const TESTNET_COIN_TYPE = 1;
-/** DIP17: the DIP9 feature number of Dash Platform payment keys. */
-const DIP17_FEATURE = 17;
+/** BIP44: the first step of the paths of legacy single-key addresses. */
+const BIP44_PURPOSE = 44;
 /** BIP32: indexes from 2^31 up are hardened, and a path step names one below that. */
 const HARDENED_OFFSET = 0x80000000;
 
@@ -64,6 +78,8 @@ export function invalidAddress(reason: string): Error {
 /** The reasons that several families give. */
 export const DAMAGED = "its checksum or format is wrong";
 export const WRONG_LENGTH = "it has the wrong length";
+/** The refusal of a damaged address, which Coin.parse tells from an address of another coin. */
+const DAMAGED_MESSAGE = invalidAddress(DAMAGED).message;
 
 /**
  * A coin whose single-key receiving addresses can be compared with a phrase's keys. A class
@@ -75,12 +91,30 @@ export abstract class Coin implements CoinDescription {
   readonly name: string;
   readonly addressForms: string;
   readonly coinTypes: readonly number[];
+  readonly #commitments: Readonly<Partial<Record<AddressType, KeyCommitment>>>;
+  readonly #purposes: Readonly<Partial<Record<AddressType, number>>>;
 
-  constructor(description: CoinDescription) {
+  constructor(description: CoinDescription & CoinRules) {
     this.id = description.id;
     this.name = description.name;
     this.addressForms = description.addressForms;
     this.coinTypes = Object.freeze([...description.coinTypes]);
+    this.#commitments = Object.freeze({ ...description.commitments });
+    this.#purposes = Object.freeze({ ...description.purposes });
+  }
+
+  /** What an address of `type` commits to for `publicKey`: its HASH160 unless the family says. */
+  commitmentOf(type: AddressType, publicKey: Uint8Array): Uint8Array {
+    return (this.#commitments[type] ?? hash160)(publicKey);
+  }
+
+  /**
+   * The path of the branch that holds an address of `type` at `location`, with `coinType`: BIP44's
+   * shape, its first step the purpose of the type (BIP44's 44 unless the family says).
+   */
+  branchPathOf(type: AddressType, coinType: number, location: AddressLocation): string {
+    const purpose = this.#purposes[type] ?? BIP44_PURPOSE;
+    return `m/${purpose}'/${coinType}'/${location.account}'/${location.branch}`;
   }
 
   /**
@@ -89,7 +123,29 @@ export abstract class Coin implements CoinDescription {
    * A host checks an answer with it at once: no secret is needed.
    */
   parse(text: string): CoinAddress {
-    return this.read(trimWhiteSpace(text));
+    const trimmed = trimWhiteSpace(text);
+    try {
+      return this.read(trimmed);
+    } catch (error) {
+      // What this coin cannot read but is valid in another coin's form is that coin's address;
+      // with this coin's own prefix it is this coin's, damaged.
+      if (
+        error instanceof Error &&
+        error.message === DAMAGED_MESSAGE &&
+        !startsWithAny(trimmed, this.ownPrefixes) &&
+        writtenAsAnAddress(trimmed)
+      )
+        throw this.notOurs();
+      throw error;
+    }
+  }
+
+  /**
+   * How the coin's addresses in a form with a prefix begin, such as "bc1" or "bitcoincash:": an
+   * address so written that cannot be read is this coin's, damaged, not another coin's.
+   */
+  protected get ownPrefixes(): readonly string[] {
+    return [];
   }
 
   /** What a person calls an address of `type`, where the coin has several kinds; none here. */
@@ -169,19 +225,13 @@ export class CoinAddress {
    */
   branchPathsAt(location: AddressLocation): string[] {
     assertAddressLocation(location);
-    const { account, branch } = location;
-    const purpose = ADDRESS_PURPOSES[this.type];
     const coinTypes = this.testnet ? [TESTNET_COIN_TYPE] : this.coin.coinTypes;
-    return coinTypes.map((coinType) =>
-      this.type === "dash-platform"
-        ? `m/${purpose}'/${coinType}'/${DIP17_FEATURE}'/${account}'/${branch}'`
-        : `m/${purpose}'/${coinType}'/${account}'/${branch}`,
-    );
+    return coinTypes.map((coinType) => this.coin.branchPathOf(this.type, coinType, location));
   }
 
   /** Whether `publicKey`, a compressed secp256k1 key, is the key of this address. */
   isAddressOf(publicKey: Uint8Array): boolean {
-    const derived = commitmentOf(this.type, publicKey);
+    const derived = this.coin.commitmentOf(this.type, publicKey);
     return (
       derived.length === this.#commitment.length &&
       derived.every((byte, position) => byte === this.#commitment[position])

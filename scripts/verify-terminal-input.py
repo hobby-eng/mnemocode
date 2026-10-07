@@ -622,10 +622,9 @@ def check_restore_share_asked_again():
     print("restore in the menu: Ctrl+D and an unreadable share asked again, a ? date found")
 
 
-def at_card_saving(session):
-    """Chooses Encode in the menu shown, in colors, neither masked nor split, as cards of the first
-    design, up to the question how the cards are saved. Returns the name of that design, which
-    the list shows after it, on POSIX."""
+def at_card_files(session):
+    """Chooses Encode in the menu shown, in colors, neither masked nor split, as printable cards,
+    up to the first question of how they are saved: the kind of file, then their layout."""
     session.type(ENCODE_ENTRY)
     session.wait_for("Which form should the seed phrase take?")
     session.type("3")
@@ -636,10 +635,15 @@ def at_card_saving(session):
     session.wait_for("Where should the result go?")
     # Also as printable cards, which only a form in colors offers.
     session.type("4")
+    session.wait_for("Which kind of file?")
+
+
+def first_design(session):
+    """Chooses the first card design, asked once the files are named, and returns its name, which
+    the list shows after it, on POSIX."""
     session.wait_for("Which card design?")
     design = line_starting(session, "› 1  ").split()[-1]
     session.type("1")
-    session.wait_for("How should the cards be saved?")
     return design
 
 
@@ -665,11 +669,14 @@ def check_card_questions():
         session = Session(folder=folder)
         try:
             session.wait_for(MENU_SHOWN)
-            design = at_card_saving(session)
-            # One PDF of A6 sheets, under the name offered.
+            at_card_files(session)
+            # One PDF of A6 sheets, under the name offered, then the design.
+            session.type("1")
+            session.wait_for("How should the cards be laid out?")
             session.type("1")
             session.wait_for("PDF file name (Enter: mnemocode-cards.pdf):")
             session.type(ENTER)
+            design = first_design(session)
             session.wait_for("Add a QR code with all the codes of the sheet?")
             session.type("1")
             session.wait_for("Type your own details for the cards?")
@@ -693,13 +700,14 @@ def check_card_questions():
                 assert command == sheets, f"the menu ran {command!r}"
 
             # Separate business cards, PDF files in a new folder: no QR code is asked for.
-            at_card_saving(session)
+            at_card_files(session)
             asked = session.seen
-            session.type("3")
-            session.wait_for("Which kind of file for each card?")
             session.type("1")
+            session.wait_for("How should the cards be laid out?")
+            session.type("3")
             session.wait_for("Name of the new folder (Enter: mnemocode-cards):")
             session.type(ENTER)
+            assert first_design(session) == design or WINDOWS, "another first design"
             session.wait_for("Type your own details for the cards?")
             assert "Add a QR code" not in session.output[asked:], "separate cards got a QR code"
             session.type("1")

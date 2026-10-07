@@ -3,7 +3,7 @@ import { runCommandLine } from "./cli/command-line.js";
 import { menuAvailable, runMenu } from "./cli/menu.js";
 import { hardenProcess, relaunchProtected, underProtection } from "./cli/protection.js";
 import { CANCELLED_EXIT_CODE } from "./cli/private-screen.js";
-import { InputCancelled } from "./cli/terminal-input.js";
+import { dumbTerminal, InputCancelled, terminalsAttached } from "./cli/terminal-input.js";
 import { terminalFailure, terminalHint } from "./cli/terminal.js";
 
 async function main(): Promise<void> {
@@ -17,6 +17,9 @@ async function main(): Promise<void> {
   // Started without arguments at a terminal, as by a double-click, MnemoCode shows its menu; a
   // script or a pipe gets the help, as before.
   if (argv.length === 0 && menuAvailable()) return runMenu();
+  // A terminal that says TERM=dumb cannot draw the menu: the help comes, with the reason.
+  if (argv.length === 0 && terminalsAttached() && dumbTerminal())
+    terminalHint("The menu needs a terminal that can clear its screen; this one says TERM=dumb.");
   return runCommandLine(argv);
 }
 

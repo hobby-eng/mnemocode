@@ -56,6 +56,8 @@ import {
   InputCancelled,
   readLine,
   terminalAvailable,
+  terminalsAttached,
+  dumbTerminal,
   UnusableAnswer,
   withRawTerminal,
   type NextByte,
@@ -99,10 +101,15 @@ type Reading =
 
 /** Refuses a question without a terminal, before the terminal is touched. */
 function assertTerminal(): void {
-  if (!terminalAvailable())
+  if (terminalAvailable()) return;
+  // A terminal of the type "dumb", as in some editors, cannot draw the private screen.
+  if (terminalsAttached() && dumbTerminal())
     throw new Error(
-      "--ask-secrets needs a terminal on standard input and standard error. Run the command in a terminal, or read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-).",
+      "--ask-secrets needs a terminal that can clear its screen; this one says TERM=dumb. Run the command in another terminal, set TERM (such as TERM=xterm-256color), or read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-).",
     );
+  throw new Error(
+    "--ask-secrets needs a terminal on standard input and standard error. Run the command in a terminal, or read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-).",
+  );
 }
 
 /**

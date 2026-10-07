@@ -21,4 +21,4 @@ Never commit generated cards, PDFs, PNG/JPEG images, QR images, share files or e
 
 ## Documents
 
-`README.md`, `docs/ARCHITECTURE.md`, `docs/SSKR.md`, `docs/card-designs.md`, `docs/card-identities.md`, `CHANGELOG.md`, audit records in `docs/audits/` (AUD-001, AUD-002 and their evidence).
+`README.md`, `CHANGELOG.md`, and in `docs/`: `ARCHITECTURE.md`, `SSKR.md`, `HEIRS.md`, `CANDIDATES.md`, `SEEDSHIFT_CONSTRUCTION.md`, `RELEASING.md`, `ROADMAP.md`, `card-designs.md`, `card-identities.md`, and the audit records in `docs/audits/` with their harnesses (their evidence stays local, ignored by Git).

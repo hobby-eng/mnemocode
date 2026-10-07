@@ -5,8 +5,9 @@
 // MnemoCodeSelfTest.core), so that a build without them carries none of it.
 //
 // From the host it needs, for the PDF only, the render platform (export/platform.ts,
-// configureRenderPlatform), set before the full check runs: the details of the cards are given
-// here, so that nothing is chosen at random. It writes no file and holds no secret.
+// configureRenderPlatform), set before the full check runs: the details of the cards and the
+// source of their decorative colors are given here, so that nothing is chosen at random. It writes
+// no file and holds no secret.
 //
 // Host-neutral: it imports only other export and sskr modules, core/self-test-check.ts and pdf-lib.
 
@@ -26,6 +27,11 @@ const SHARES = [
  * (BCR-2020-011): identifier 4BBF, group 1, members 1 and 2.
  */
 const REFERENCES = "4BBF-1-1 4BBF-1-2";
+/**
+ * The source of the decorative colors of cards that print codes: fixed, so that the quick check
+ * needs no render platform and draws nothing at random; colors that repeat take the next free one.
+ */
+const FIXED_DECORATION = (): number => 0;
 /**
  * The details of the cards, given, so that nothing is chosen at random; the glass design, the
  * quickest to draw (cards-self-test.ts draws every design).
@@ -79,12 +85,18 @@ function checkShareCardsStartup(): void {
     "Share card QR code in colors",
   );
   expectSame(
-    qrCodesOf(new ShareCardSet(SHARES, { ...OPTIONS, shareFormat: "unicode" })).split("; ")[0],
+    qrCodesOf(
+      new ShareCardSet(SHARES, { ...OPTIONS, shareFormat: "unicode" }, FIXED_DECORATION),
+    ).split("; ")[0],
     `4BBF-1-1: ${sskrVector.firstShareUnicode}`,
     "Share card QR code in Unicode codes",
   );
   // In word numbers the cards print the numbers, three to a card, and the QR code holds them all.
-  const numbers = new ShareCardSet(SHARES, { ...OPTIONS, shareFormat: "indexes" });
+  const numbers = new ShareCardSet(
+    SHARES,
+    { ...OPTIONS, shareFormat: "indexes" },
+    FIXED_DECORATION,
+  );
   expectSame(
     numbers.printedCodes(0)[0],
     sskrVector.firstShareNumbers.split(" ").slice(0, 3).join(" "),
@@ -125,7 +137,11 @@ async function checkShareCards(): Promise<void> {
     "A QR code of another share",
   );
   // Cards that print word numbers: the QR code must hold the share those spell.
-  const numbers = new ShareCardSet(SHARES, { ...OPTIONS, shareFormat: "indexes" });
+  const numbers = new ShareCardSet(
+    SHARES,
+    { ...OPTIONS, shareFormat: "indexes" },
+    FIXED_DECORATION,
+  );
   expectRefused(
     () => assertShareQr([], cards.qrCodes[1]!.payload, numbers.printedCodes(0)),
     /does not match/u,

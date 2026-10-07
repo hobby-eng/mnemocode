@@ -30,7 +30,6 @@ import {
   BIP39_DICTIONARY_SIZE,
   traditionalChineseWordlist,
   unicodeHex,
-  UNICODE_INDEX,
   WORD_COUNT_SET,
 } from "./words.js";
 

@@ -11,7 +11,7 @@ import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import "../dist/export/platform-node.js";
 import { cardTemplates, selectTemplate } from "../dist/export/templates.js";
-import { shareToColors } from "../dist/sskr/transport.js";
+import { urToBytewords } from "../dist/sskr/transport.js";
 import { renderBusinessCards } from "../dist/export/business-cards.js";
 import { renderGlassCards } from "../dist/export/glass-cards.js";
 const destination = resolve(process.argv[2] ?? "goldens/current");
@@ -186,7 +186,8 @@ for (let i = 0; i < shares.length; i++) {
   const png = PNG.sync.read(await readFile(prefix + ".png"));
   assert.equal(
     jsQR(new Uint8ClampedArray(png.data), png.width, png.height)?.data,
-    shareToColors(shares[i]).join(" "),
+    // A share given as ur:sskr is printed, and so held in the QR code, as its Bytewords.
+    urToBytewords(shares[i]),
     "SSKR study must contain only its own member",
   );
 }

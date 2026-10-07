@@ -1,6 +1,6 @@
 import { resolveIdentityFor, sectorForTemplate } from "./card-identities.js";
 import { fit, text, clipCard } from "./business-render-primitives.js";
-import { businessFields, physicalStyle } from "./business-designs.js";
+import { businessFields, physicalStyle, type PhysicalBusinessStyle } from "./business-designs.js";
 import { readRenderAsset } from "./platform.js";
 import fontkit from "@pdf-lib/fontkit";
 import {
@@ -25,6 +25,7 @@ import {
   drawStudyCaption,
   drawStudyFrame,
   drawStudyShadow,
+  studyCaptionWidth,
 } from "./collection-sheet.js";
 import {
   pageDimensions,
@@ -34,6 +35,13 @@ import {
   type CardPresentation,
 } from "./card-settings.js";
 import { printedCode } from "./card-codes.js";
+
+/** Where the reference line of a separate card starts, in millimetres from the left edge. */
+const REFERENCE_MARGIN = 7.2;
+/** How long the reference line may be, in millimetres. */
+const REFERENCE_WIDTH = 76;
+/** Where the IT design ends its reference line, clear of its artwork, in millimetres. */
+const IT_REFERENCE_END = 55.5;
 
 const ink = rgb(0.12, 0.13, 0.14);
 const white = rgb(1, 1, 1);
@@ -186,26 +194,41 @@ async function renderSingle(context: RenderContext, individualIndex: number): Pr
     : `${position}  ${printedCode(content, individualIndex)}`;
   const referenceText = `${presentation.referenceLabel} ${reference}`.trim();
   const design = physicalStyle(style, individualIndex + styleOffset);
-  const referenceSize = fit(
-    font,
-    referenceText,
-    design === "contact" ? 4.6 : 6.3,
-    4.2,
-    76 * MM,
-    "Reference",
-  );
-  const referenceX =
-    design === "it" ? 55.5 - font.widthOfTextAtSize(referenceText, referenceSize) / MM : 7.2;
+  const placement = referencePlacement(font, referenceText, design);
   text(
     page,
     font,
     referenceText,
-    referenceX,
+    placement.x,
     46,
-    referenceSize,
+    placement.size,
     ["contact", "facets"].includes(design) ? ink : rgb(0.84, 0.86, 0.88),
   );
   resizeSinglePage(page, content);
+}
+
+/**
+ * Where the reference line of a separate card of `design` starts, in millimetres, and its size in
+ * points. The IT design ends the line at 55.5 mm, clear of its artwork, so a long label shrinks to
+ * the room between the margin and that end instead of running off the card.
+ */
+export function referencePlacement(
+  font: PDFFont,
+  line: string,
+  design: PhysicalBusinessStyle,
+): { readonly x: number; readonly size: number } {
+  const end = design === "it" ? IT_REFERENCE_END : REFERENCE_MARGIN + REFERENCE_WIDTH;
+  const size = fit(
+    font,
+    line,
+    design === "contact" ? 4.6 : 6.3,
+    4.2,
+    (end - REFERENCE_MARGIN) * MM,
+    "Reference",
+  );
+  const x =
+    design === "it" ? IT_REFERENCE_END - font.widthOfTextAtSize(line, size) / MM : REFERENCE_MARGIN;
+  return { x, size };
 }
 
 async function renderCollection(context: RenderContext): Promise<void> {
@@ -213,12 +236,18 @@ async function renderCollection(context: RenderContext): Promise<void> {
   const share = content.kind === "sskr";
   const studyTheme = style === "it" ? "noir" : "cool";
   const payload = content.cardQr || (share && content.qrCard) ? content.payload : undefined;
+  const captions = content.colors.map(
+    (_, index) => `${String(index + 1).padStart(2, "0")}  ${printedCode(content, index)}`,
+  );
+  // The captions decide how narrow a column may be: the three words of a share's code are wider
+  // than a color code, and on a card-sized page they take fewer cards to a row.
   const layout = collectionSheetLayout(
     content,
     content.colors.length,
     CARD.width / CARD.height,
     1,
     payload,
+    studyCaptionWidth(font, captions),
   );
   const page = doc.addPage([layout.width * MM, layout.height * MM]);
   drawStudyFrame(
@@ -234,14 +263,7 @@ async function renderCollection(context: RenderContext): Promise<void> {
   );
   for (const box of layout.cards) {
     await drawCard(context, page, box, studyTheme);
-    drawStudyCaption(
-      page,
-      font,
-      layout,
-      box,
-      [`${String(box.index + 1).padStart(2, "0")}  ${printedCode(content, box.index)}`],
-      studyTheme,
-    );
+    drawStudyCaption(page, font, layout, box, [captions[box.index]!], studyTheme);
   }
 }
 

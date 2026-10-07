@@ -75,9 +75,10 @@ function ownedPart(values: readonly number[], minimum: number, maximum: number, 
     !copy.every((value) => Number.isInteger(value) && value >= minimum && value <= maximum)
   )
     throw new Error(`The date pattern cannot match a valid ${name}.`);
-  // Each value once: datePatternCombinationCount counts distinct dates, and a value given twice
-  // would make the search try more combinations than it counted.
-  return Object.freeze([...new Set(copy)]);
+  // Each value once, in ascending order, as parseDatePattern gives them: datePatternCombinationCount
+  // counts distinct dates, a value given twice would be tried twice, and the search keeps the
+  // earliest dates of each shift, which it meets first only in this order.
+  return Object.freeze([...new Set(copy)].sort((left, right) => left - right));
 }
 
 /**
@@ -85,6 +86,9 @@ function ownedPart(values: readonly number[], minimum: number, maximum: number, 
  * has values a date can have, and at least one real calendar date fits (AUD-009-FUN001, API001).
  */
 export function ownedPattern(pattern: DatePattern): DatePattern {
+  // A hole of a sparse list reaches here as undefined, as for ownedDate.
+  if (typeof pattern !== "object" || pattern === null)
+    throw new Error("A date pattern must have its years, months and days.");
   const owned: DatePattern = Object.freeze({
     key: String(pattern.key),
     years: ownedPart(pattern.years, 1, 9999, "year"),
@@ -271,7 +275,8 @@ export function* datePatternCombinations(
   }
 }
 
-function compareDates(left: DateShiftDate, right: DateShiftDate): number {
+/** Earlier dates first: the order of sortDates and of datePatternCandidates. */
+export function compareDates(left: DateShiftDate, right: DateShiftDate): number {
   return left.year - right.year || left.month - right.month || left.day - right.day;
 }
 

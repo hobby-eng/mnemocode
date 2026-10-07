@@ -3,13 +3,17 @@
 // (EIP-55), and Tron, which writes it in Base58Check. Injective, a Cosmos SDK chain with the same
 // keys, writes it as Cosmos accounts are written (cosmos.ts).
 //
-// Host-neutral: it imports only base58.ts, coin.ts, @scure/base and @noble/hashes
-// (test/portable-modules.test.ts).
+// Host-neutral: it imports only base58.ts, coin.ts, keccak-account.ts, @scure/base and
+// @noble/hashes (test/portable-modules.test.ts).
 
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hex, utf8 } from "@scure/base";
 import { Base58Coin } from "./base58.js";
-import { Coin, invalidAddress, type CoinAddress } from "./coin.js";
+import { Coin, invalidAddress, type CoinAddress, type CoinRules } from "./coin.js";
+import { keccakAccount } from "./keccak-account.js";
+
+/** An account is the last 20 bytes of the Keccak-256 of the key. */
+export const KECCAK_RULES: CoinRules = { commitments: { keccak: keccakAccount } };
 
 /** "0x" and 40 hexadecimal digits, the 20 bytes of the account. */
 const HEX_ACCOUNT = /^[0-9a-f]{40}$/iu;
@@ -49,6 +53,7 @@ export const ETHEREUM = new HexCoin({
   name: "Ethereum and EVM networks",
   addressForms: "0x…",
   coinTypes: [60],
+  ...KECCAK_RULES,
 });
 
 export const ETHEREUM_CLASSIC = new HexCoin({
@@ -57,6 +62,7 @@ export const ETHEREUM_CLASSIC = new HexCoin({
   addressForms: "0x…",
   // Its own coin type, and Ethereum's, from which it forked.
   coinTypes: [61, 60],
+  ...KECCAK_RULES,
 });
 
 export const TRON = new Base58Coin({
@@ -66,4 +72,5 @@ export const TRON = new Base58Coin({
   coinTypes: [195],
   // Tron's address prefix 0x41 before the Keccak account.
   versions: [{ prefix: [0x41], type: "keccak", testnet: false }],
+  ...KECCAK_RULES,
 });

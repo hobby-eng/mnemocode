@@ -17,6 +17,15 @@ const vectors = JSON.parse(
   readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
 );
 const bytes = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
+/** A deterministic regression fixture of vectors/sskr-v1.json. */
+interface DeterministicVector {
+  readonly name: string;
+  readonly entropy: string;
+  readonly testOnlySeed: string;
+  readonly groupThreshold: number;
+  readonly shares: readonly string[];
+  readonly colors: readonly (readonly string[])[];
+}
 const original = entropyToMnemonic(bytes(vectors.official.entropy), wordlist);
 // Independent CRC writer for malformed semantic fixtures; avoids rejecting just the CRC.
 function recheck(body: Uint8Array): Uint8Array {
@@ -56,27 +65,30 @@ describe("Published SSKR v1 vectors", () => {
       ).rejects.toThrow();
     },
   );
-  it.each(vectors.deterministic)("locks exact creation and every pair: $name", async (v: any) => {
-    const engine = await sskrEngine();
-    const actual = engine
-      .create_sskr_shares(
-        bytes(v.entropy),
-        v.groupThreshold,
-        Uint8Array.of(2, 3),
-        bytes(v.testOnlySeed),
-      )
-      .trim()
-      .split("\n");
-    expect(actual).toEqual(v.shares);
-    expect(actual.map(shareToColors)).toEqual(v.colors);
-    const expected = entropyToMnemonic(bytes(v.entropy), wordlist);
-    for (const [a, b] of [
-      [0, 1],
-      [0, 2],
-      [1, 2],
-    ])
-      expect(await combineSskrShares([actual[a]!, actual[b]!])).toBe(expected);
-  });
+  it.each(vectors.deterministic as DeterministicVector[])(
+    "locks exact creation and every pair: $name",
+    async (v) => {
+      const engine = await sskrEngine();
+      const actual = engine
+        .create_sskr_shares(
+          bytes(v.entropy),
+          v.groupThreshold,
+          Uint8Array.of(2, 3),
+          bytes(v.testOnlySeed),
+        )
+        .trim()
+        .split("\n");
+      expect(actual).toEqual(v.shares);
+      expect(actual.map(shareToColors)).toEqual(v.colors);
+      const expected = entropyToMnemonic(bytes(v.entropy), wordlist);
+      for (const [a, b] of [
+        [0, 1],
+        [0, 2],
+        [1, 2],
+      ])
+        expect(await combineSskrShares([actual[a]!, actual[b]!])).toBe(expected);
+    },
+  );
   it("rejects bad CBOR metadata even with an intact CRC", () => {
     const body = urToTransport(vectors.official.shares[0]).slice(0, -4);
     for (const [offset, value] of [

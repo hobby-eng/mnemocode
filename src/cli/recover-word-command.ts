@@ -44,7 +44,7 @@ import {
   wrapText,
 } from "./terminal.js";
 import type { Choice } from "./terminal-choice.js";
-import { evidenceLabel, optionLabel } from "./option-copy.js";
+import { evidenceLabel } from "./option-copy.js";
 import {
   assertListable,
   candidatesTarget,

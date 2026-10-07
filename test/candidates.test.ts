@@ -330,6 +330,30 @@ describe("Candidate file encryption", () => {
     );
   });
 
+  it("refuses a damaged file with age's own reason, also where Response hides it (AUD-010-API001)", async () => {
+    const session = await createSessionIdentity();
+    const file = await encryptCandidates(plain, session.recipient);
+    file[file.length - 1]! ^= 1;
+    // A browser's Response replaces an error inside its stream with its own, as Chromium does.
+    class BrowserResponse extends Response {
+      override async arrayBuffer(): Promise<ArrayBuffer> {
+        try {
+          return await super.arrayBuffer();
+        } catch {
+          throw new TypeError("Failed to fetch");
+        }
+      }
+    }
+    vi.stubGlobal("Response", BrowserResponse);
+    await expect(decryptCandidates(file, { identity: session.identity })).rejects.toThrow(
+      /invalid tag/u,
+    );
+    // age itself, given bytes, loses the reason there.
+    const decrypter = new Decrypter();
+    decrypter.addIdentity(session.identity);
+    await expect(decrypter.decrypt(file)).rejects.toThrow("Failed to fetch");
+  });
+
   it("makes one-time X25519 keys, and takes a recipient in any case", async () => {
     const session = await createSessionIdentity();
     expect(session.recipient).toMatch(/^age1[02-9ac-hj-np-z]{58}$/u);

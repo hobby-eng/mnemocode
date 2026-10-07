@@ -74,7 +74,8 @@ const ENCODED_LOOKS: Readonly<Record<RecordFormat, string>> = {
 /** How each share format looks. */
 const SHARE_LOOKS: Readonly<Record<ShareFormat, string>> = {
   words: "words such as tuna next keep gyro",
-  ur: "codes that start with ur:sskr/",
+  // Printed cards show such a share as its words; the text of it starts with ur:sskr/.
+  ur: "codes that start with ur:sskr/, or words such as tuna next keep gyro on printed cards",
   indexes: "numbers from 1 to 2048",
   unicode: "codes of four digits and letters A to F",
   colors: "color codes such as #1EAB91, on paper or on printed cards",
@@ -84,8 +85,23 @@ const SHARE_LOOKS: Readonly<Record<ShareFormat, string>> = {
 /** The last step, whatever the program. */
 const OPEN_WALLET = "Open the wallet with this seed phrase in a wallet program (see below).";
 
-/** Web addresses, to find any that a route would print besides its own. */
-const WEB_ADDRESS = /https?:\/\/[^\s,"]+/gu;
+/**
+ * Web addresses, to find any that a route would print besides its own: with http:// or https://,
+ * with www., or a host name with a domain ending, such as example.org/heirs, with or without a
+ * path. An address of another form, such as a project name, is told only by being the route's.
+ */
+const WEB_ADDRESS =
+  /\b(?:https?:\/\/|www\.)[^\s,"]+|\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}\b(?:\/[^\s,"]*)?/u;
+
+/**
+ * `address` where it stands whole: followed by the end, white space, a comma, a quote, or a
+ * punctuation mark that ends a sentence; undefined for a route without an address.
+ */
+function wholeAddress(address: string): RegExp | undefined {
+  if (address === "") return undefined;
+  const escaped = address.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`${escaped}(?=$|[\\s,"]|[.;:!?)](?:\\s|$))`, "gu");
+}
 
 function needs({ backup, mode, dates }: HeirSheetFacts): string[] {
   const lines =
@@ -205,8 +221,13 @@ export class HeirInstructions {
       basics: basics(facts),
     };
     // The seed phrase itself in English words needs no program, and so no address.
-    const printed = linesOf(text).join("\n").match(WEB_ADDRESS) ?? [];
-    if (printed.length > 1 || printed.some((address) => address !== this.#route.address))
+    // The route's own address, counted where it stands whole, then any other left beside it: a
+    // longer address that starts with it, such as its releases page, is another address.
+    const sheet = linesOf(text).join("\n");
+    const own = wholeAddress(this.#route.address);
+    const printed = own === undefined ? 0 : [...sheet.matchAll(own)].length;
+    const rest = own === undefined ? sheet : sheet.replace(own, " ");
+    if (printed > 1 || WEB_ADDRESS.test(rest))
       throw new Error("The sheet for heirs may print the route's address once and no other.");
     return text;
   }

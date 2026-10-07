@@ -51,6 +51,9 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
     else if (Array.isArray(existing)) existing.push(next);
     else parsed[key] = [String(existing), next];
   }
+  // An on-or-off option takes no value, for every command: "--missing-word yes" would otherwise
+  // be read as off, and the search asked for silently left out.
+  for (const key of booleanOptions) assertFlag(parsed, key);
   return parsed;
 }
 
@@ -70,6 +73,8 @@ export interface IntegerOptionBounds {
   defaultValue?: number;
   min: number;
   max: number;
+  /** What the value is, where the option means another thing for this command (option-copy.ts). */
+  label?: string;
 }
 
 /** Parse a canonical base-10 integer without accepting JavaScript numeric syntax. */
@@ -79,20 +84,17 @@ export function integerOption(
   bounds: IntegerOptionBounds,
 ): number {
   const raw = value(arguments_, key);
+  const named = bounds.label === undefined ? optionValue(key) : `The ${bounds.label} value`;
   if (raw === undefined) {
     if (bounds.defaultValue !== undefined) return bounds.defaultValue;
-    throw new Error(`${optionValue(key)} is required.`);
+    throw new Error(`${named} is required.`);
   }
   if (!/^(?:0|[1-9][0-9]*)$/u.test(raw)) {
-    throw new Error(
-      `${optionValue(key)} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`,
-    );
+    throw new Error(`${named} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`);
   }
   const parsed = Number(raw);
   if (!Number.isSafeInteger(parsed) || parsed < bounds.min || parsed > bounds.max) {
-    throw new Error(
-      `${optionValue(key)} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`,
-    );
+    throw new Error(`${named} must be a base-10 integer from ${bounds.min} through ${bounds.max}.`);
   }
   return parsed;
 }

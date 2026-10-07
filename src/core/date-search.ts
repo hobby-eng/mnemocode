@@ -14,6 +14,7 @@
 //
 // Host-neutral: test/portable-modules.test.ts checks that it reaches only host-neutral modules.
 
+import { entropyToMnemonic } from "@scure/bip39";
 import {
   datePatternCombinationCount,
   formatDate,
@@ -31,7 +32,14 @@ import { placesInWords } from "./places.js";
 import { keptCount, nextTask, QUESTION_SECONDS, TURN_MILLISECONDS } from "./search-turns.js";
 import type { Bip39WordCount, DatePattern, DateShiftDate } from "./types.js";
 import type { WalletCheck } from "./wallet-check.js";
-import { assertWordCount, BIP39_DICTIONARY_SIZE, WORD_COUNT_SET } from "./words.js";
+import {
+  assertWordCount,
+  BIP39_DICTIONARY_SIZE,
+  BIP39_INDEX_BITS,
+  ENGLISH_INDEX,
+  englishWordlist,
+  WORD_COUNT_SET,
+} from "./words.js";
 
 export type { WalletCheck, WalletMatch } from "./wallet-check.js";
 
@@ -55,11 +63,20 @@ const PROBE_PHRASE = `${"abandon ".repeat(11)}about`;
 const PROBE_CHECKS = 3;
 /** Combinations decoded for an estimate: some hundredths of a second, enough to be steady. */
 const PROBE_COMBINATIONS = 256;
+/** BIP39 adds one checksum bit for every three words. */
+const WORDS_PER_CHECKSUM_BIT = 3;
+const BITS_PER_BYTE = 8;
+
 /**
- * The BIP39 indexes of a public phrase of 24 words, all-zero entropy, which the decoding is timed
- * with: as long as a phrase gets, so that every count of dates fits it, and public test data.
+ * The BIP39 indexes of the public phrase of `wordCount` words with all-zero entropy, which the
+ * decoding is timed with. Its length counts: with a valid last word, the Original Seedshift
+ * decodes 2^(11 - checksum bits) phrases for each combination, 128 for 12 words and 8 for 24.
  */
-const PROBE_INDEXES: readonly number[] = [...Array<number>(23).fill(0), 102];
+function probeIndexes(wordCount: Bip39WordCount): number[] {
+  const entropyBits = wordCount * BIP39_INDEX_BITS - wordCount / WORDS_PER_CHECKSUM_BIT;
+  const mnemonic = entropyToMnemonic(new Uint8Array(entropyBits / BITS_PER_BYTE), englishWordlist);
+  return mnemonic.split(" ").map((word) => ENGLISH_INDEX.get(word)!);
+}
 const MILLISECONDS_PER_SECOND = 1000;
 
 /**
@@ -456,14 +473,19 @@ export class DateSearch {
 
   /**
    * Seconds that decoding one combination of `dates` takes in this host in `mode`, from the first
-   * combinations of a search of a public phrase: for a search without a wallet check it is all
-   * the work, and beside one it is still a part (estimatedSeconds).
+   * combinations of a search of the public phrase of `wordCount` words: for a search without a
+   * wallet check it is all the work, and beside one it is still a part (estimatedSeconds).
    */
-  static secondsPerCombination(mode: SeedshiftMode, dates: DatesAnswer): number {
+  static secondsPerCombination(
+    mode: SeedshiftMode,
+    dates: DatesAnswer,
+    wordCount: Bip39WordCount,
+  ): number {
+    assertWordCount(wordCount);
     const start = performance.now();
     let decoded = 0;
     for (const candidates of dateRecoveryCandidates(
-      PROBE_INDEXES,
+      probeIndexes(wordCount),
       dates.known,
       dates.patterns,
       mode,
@@ -484,7 +506,11 @@ export class DateSearch {
     return {
       perCheck:
         this.#walletCheck === undefined ? 0 : await DateSearch.secondsPerCheck(this.#walletCheck),
-      perCombination: DateSearch.secondsPerCombination(this.#mode, this.#dates),
+      perCombination: DateSearch.secondsPerCombination(
+        this.#mode,
+        this.#dates,
+        this.#indexes.length as Bip39WordCount,
+      ),
     };
   }
 

@@ -29,7 +29,8 @@ export const COSMOS_ADDRESS_SELF_TEST = coinFamilySelfTest({
       address: "inj1npvwllfr9dqr8erajqqr6s0vxnk2ak55re90dz",
     },
   ],
-  startup: [0],
+  // One vector of each coin.
+  startup: [0, 2],
   elsewhere: 1,
   refused: [
     {

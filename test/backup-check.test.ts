@@ -411,7 +411,7 @@ describe("the share check on the private screen", () => {
       `${shares[0]};${shares[0]};${shares[2]}\r`,
     ];
     terminal.choices = [true];
-    await offerShareCheck(PHRASE, "direct", 2, () => undefined);
+    await offerShareCheck(PHRASE, "direct", 2, () => undefined, undefined);
     expect(notices.filter((line) => line !== "")).toEqual([
       "Share 2 is a copy of share 1: it is used once.",
       "Once the copies are left out, one share is left; type 2 different shares.",

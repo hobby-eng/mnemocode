@@ -23,16 +23,6 @@ export interface BusinessField {
 export function physicalStyle(style: BusinessStyle, index: number): PhysicalBusinessStyle {
   return style === "mixed" ? businessStyles[index % businessStyles.length]! : style;
 }
-export const businessTitles: Readonly<Record<BusinessStyle, string>> = {
-  architect: "ARCHITECTURE / CARD COLLECTION",
-  it: "IT BUSINESS CARD COLLECTION",
-  estate: "PRIVATE REAL ESTATE / COLLECTION",
-  diagonal: "CITY / CARD COLLECTION",
-  contact: "CONTACT / CARD COLLECTION",
-  curves: "SIGNATURE / CARD COLLECTION",
-  facets: "GEOMETRY / CARD COLLECTION",
-  mixed: "BUSINESS CARD COLLECTION",
-};
 export const hueOrigins: Readonly<Record<PhysicalBusinessStyle, number>> = {
   architect: 0.56,
   it: 0.56,

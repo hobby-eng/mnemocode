@@ -189,7 +189,7 @@ describe("DateSearch", () => {
 
   it("measures its pace in the host: the decoding, and the wallet check if there is one", async () => {
     const answer = dates("2?-09-2026");
-    expect(DateSearch.secondsPerCombination("seedshift", answer)).toBeGreaterThan(0);
+    expect(DateSearch.secondsPerCombination("seedshift", answer, 12)).toBeGreaterThan(0);
     const listing = new DateSearch({ indexes: MASKED, dates: answer, mode: "seedshift" });
     expect((await listing.pace()).perCheck).toBe(0);
     const checked = new DateSearch({
@@ -206,7 +206,16 @@ describe("DateSearch", () => {
       "01-01-2020 02-01-2020 03-01-2020 04-01-2020 05-01-2020 06-01-2020 07-01-2020 0?-01-2021",
       { wordCount: 24, patterns: true },
     );
-    expect(DateSearch.secondsPerCombination("seedshift", eight)).toBeGreaterThan(0);
+    expect(DateSearch.secondsPerCombination("seedshift", eight, 24)).toBeGreaterThan(0);
+  });
+
+  it("times the decoding with a phrase of the search's own length (AUD-010-UI005)", () => {
+    // With a valid last word the Original Seedshift decodes 128 phrases a combination for 12
+    // words and 8 for 24: a 24-word probe made 12-word searches look about 14 times shorter.
+    const answer = dates("0?-09-2026");
+    const twelve = DateSearch.secondsPerCombination("seedshift-legacy-valid", answer, 12);
+    const twentyFour = DateSearch.secondsPerCombination("seedshift-legacy-valid", answer, 24);
+    expect(twelve / twentyFour).toBeGreaterThan(3);
   });
 
   it("is asked for first when it takes longer than twelve hours, or tries more than a limit", () => {

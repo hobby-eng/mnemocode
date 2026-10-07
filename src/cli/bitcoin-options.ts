@@ -32,12 +32,13 @@ function bitcoinNetwork(arguments_: ParsedArguments): BitcoinNetworkName {
 
 /** The account, branch and index of an address or a key, by --account, --branch and --index. */
 function placeOf(arguments_: ParsedArguments): Omit<DerivationLocation, "network"> {
-  const bip32Index = (name: string) =>
-    integerOption(arguments_, name, { defaultValue: 0, min: 0, max: 0x7fffffff });
+  // Named for the wallet: the table command takes --index for a word.
+  const bip32Index = (name: string, label: string) =>
+    integerOption(arguments_, name, { defaultValue: 0, min: 0, max: 0x7fffffff, label });
   return {
-    account: bip32Index("account"),
-    branch: bip32Index("branch"),
-    index: bip32Index("index"),
+    account: bip32Index("account", "--account address account"),
+    branch: bip32Index("branch", "--branch address branch"),
+    index: bip32Index("index", "--index first address index"),
   };
 }
 

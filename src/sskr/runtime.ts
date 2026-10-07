@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { readBundledFile } from "../bundled-files.js";
 import type * as Engine from "../../sskr-wasm/generated/recovery_sskr_wasm.js";
 
@@ -33,8 +33,4 @@ export function sskrEngine(): Promise<typeof Engine> {
     pending = undefined;
     throw error;
   }));
-}
-
-export function secureSeed(): Uint8Array {
-  return randomBytes(32);
 }

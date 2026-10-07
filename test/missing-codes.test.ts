@@ -43,8 +43,14 @@ describe("codes marked with ? (core/missing-codes.ts)", () => {
       expect(MissingCodes.formats(text), format).toContain(format);
       const codes = MissingCodes.read(text, format, "seedshift");
       expect(codes.checksummed).toBe(true);
+      // The fingerprint of each candidate takes milliseconds: it tells one form, and the phrase
+      // itself the others, so that the test stays quick on a busy machine.
+      const encodedPhrase = ENCODED.shiftedEnglish.join(" ");
       const result = await codes.run({
-        check: (indexes) => fingerprints.fingerprint(phraseOf(indexes)) === encodedFingerprint,
+        check: (indexes) =>
+          format === "indexes"
+            ? fingerprints.fingerprint(phraseOf(indexes)) === encodedFingerprint
+            : phraseOf(indexes) === encodedPhrase,
       });
       expect(result.passed, format).toBe(1);
       expect(result.found[0]!.indexes, format).toEqual(ENCODED.shiftedIndexes);

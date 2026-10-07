@@ -103,7 +103,10 @@ export function collectionSheetLayout(
     if (imageHeight > 2 && (!best || area > best.area))
       best = { columns, rows, cellWidth, imageHeight, area };
   }
-  if (!best) throw new Error("The design study cannot fit legibly; choose a larger page size.");
+  if (!best)
+    throw new Error(
+      "The cards and their codes cannot fit legibly on this page; choose a larger page size, such as A6.",
+    );
   const { columns, rows, cellWidth, imageHeight } = best;
   const cellHeight = imageHeight + captionHeight;
   const top = contentTop + (availableHeight - rows * cellHeight - (rows - 1) * gap) / 2;

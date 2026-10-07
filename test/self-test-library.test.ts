@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { pbkdf2Sync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -109,6 +110,28 @@ describe("The self-test as a library (core/self-test.ts)", () => {
   it("has a quick core check that needs nothing from the host", () => {
     expect(() => MnemoCodeSelfTest.core()).not.toThrow();
     expect(() => MnemoCodeSelfTest.core(FEATURES)).not.toThrow();
+  });
+
+  it("runs the quick checks of every feature without the render platform (AUD-010-API002)", () => {
+    // The tests install the Node.js render platform for every file (vitest.config.ts), so the
+    // quick checks run in a process of their own, which imports none.
+    const script = `
+      const { MnemoCodeSelfTest } = await import("./src/core/self-test.ts");
+      const features = [
+        (await import("./src/core/wallet-evidence-self-test.ts")).WALLET_EVIDENCE_SELF_TEST,
+        (await import("./src/core/coins-self-test.ts")).COIN_ADDRESS_SELF_TEST,
+        (await import("./src/export/heir-sheet-self-test.ts")).HEIR_SHEET_SELF_TEST,
+        (await import("./src/export/sskr-render-self-test.ts")).SHARE_CARDS_SELF_TEST,
+      ];
+      MnemoCodeSelfTest.core(features);
+      console.log("quick checks passed");
+    `;
+    const output = execFileSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", script],
+      { cwd: process.cwd(), encoding: "utf8" },
+    );
+    expect(output.trim()).toBe("quick checks passed");
   });
 
   it("runs the quick checks of the features given to core, and stops at one that fails", () => {

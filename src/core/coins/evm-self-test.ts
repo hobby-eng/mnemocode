@@ -48,7 +48,8 @@ export const EVM_ADDRESS_SELF_TEST = coinFamilySelfTest({
       address: "TTD7MudE8L26nvnrEf2LHzXm6stKRpFZH1",
     },
   ],
-  startup: [0],
+  // One vector of each coin.
+  startup: [0, 2, 4],
   elsewhere: 1,
   refused: [
     // The EIP-55 vector with one letter's case changed.

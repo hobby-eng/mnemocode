@@ -547,6 +547,10 @@ async function recoverySettings(
 ): Promise<Omit<Recovery, "shares" | "target">> {
   const mode = shareMode(args);
   const given = dates(args);
+  // Dates are secret: with --ask-secrets they are asked on the private screen, as every command
+  // that takes them does, and never also taken from the command line.
+  if (args["ask-secrets"] === true && given.length)
+    throw new Error("--ask-secrets cannot be combined with command-line dates.");
   if (mode === "direct" && given.length) throw new Error("Direct mode does not accept dates.");
   if (mode === "seedshift" && !given.length && args["ask-secrets"] !== true)
     throw new Error("Seedshift recovery requires its original dates.");

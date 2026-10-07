@@ -340,6 +340,11 @@ export class EncodedBackupCheck implements BackupCheck {
   }
 
   async check(written: WrittenBackup): Promise<BackupResult> {
+    return this.checkNow(written);
+  }
+
+  /** check, which needs nothing that answers later for codes: for a host's quick self-test too. */
+  checkNow(written: WrittenBackup): BackupResult {
     let codes: WrittenCodes;
     try {
       codes = this.readCodes(written.backup);

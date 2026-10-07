@@ -25,7 +25,7 @@ MnemoCode depends on [`@scure/bip39`](https://github.com/paulmillr/scure-bip39),
 [`@scure/bip32`](https://github.com/paulmillr/scure-bip32),
 [`@scure/btc-signer`](https://github.com/paulmillr/scure-btc-signer), and
 [`@scure/base`](https://github.com/paulmillr/scure-base), which reads and writes the
-addresses of the other coins, which are MIT licensed. Their pinned versions are recorded in `package.json` and the
+addresses of the other coins. They are MIT licensed. Their pinned versions are recorded in `package.json` and the
 lockfile after installation.
 
 ## age encryption and @noble libraries
@@ -67,11 +67,10 @@ notice is included as `assets/fonts/DejaVuSans-NOTICE`.
 
 The world map on collection sheets is drawn from the Natural Earth land polygons at 1:110 million scale, stored as `assets/maps/ne_110m_land.geojson`. Natural Earth map data is in the public domain; see `assets/maps/NOTICE`.
 
-## PDF and barcode export dependencies
+## PDF export dependencies
 
-The export infrastructure retains MIT-licensed `pdf-lib` (1.17.1),
-`@pdf-lib/fontkit` (1.1.1), and `bwip-js` (4.11.4).
-Visual designs are installed individually after approval.
+Cards and sheets are drawn with the MIT-licensed `pdf-lib` (1.17.1) and
+`@pdf-lib/fontkit` (1.1.1), which embeds the bundled font.
 
 ## Standalone SSKR
 

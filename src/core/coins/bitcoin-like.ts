@@ -2,16 +2,11 @@
 // Litecoin also SegWit in Bech32 or Bech32m (BIP173, BIP350). Bitcoin, Litecoin, Dogecoin and the
 // transparent addresses of Zcash.
 //
-// Host-neutral: it imports only base58.ts, coin.ts, address-types.ts and @scure/base
+// Host-neutral: it imports only base58.ts, coin.ts, address-types.ts, taproot.ts and @scure/base
 // (test/portable-modules.test.ts).
 
 import { bech32, bech32m } from "@scure/base";
-import {
-  ADDRESS_PURPOSES,
-  ADDRESS_TYPE_NAMES,
-  COMMITMENT_BYTES,
-  type AddressType,
-} from "./address-types.js";
+import { HASH160_BYTES, type AddressType } from "./address-types.js";
 import { Base58Coin, type Base58CoinDescription } from "./base58.js";
 import {
   asciiLowercase,
@@ -19,7 +14,9 @@ import {
   invalidAddress,
   startsWithAny,
   type CoinAddress,
+  type CoinRules,
 } from "./coin.js";
+import { nestedSegwitHash, taprootOutputKey, X_ONLY_KEY_BYTES } from "./taproot.js";
 
 /** The human-readable parts of a coin's SegWit addresses, and whether it has Taproot. */
 interface SegwitPrefixes {
@@ -37,19 +34,41 @@ const MIN_PROGRAM_BYTES = 2;
 const MAX_PROGRAM_BYTES = 40;
 const V0_PROGRAM_BYTES: ReadonlySet<number> = new Set([20, 32]);
 
+/**
+ * The SegWit kinds of single-key address: what they commit to, the first step of their paths
+ * (the BIP of the same number), and what a person calls them.
+ */
+const SEGWIT_RULES: CoinRules = {
+  commitments: { "p2sh-p2wpkh": nestedSegwitHash, p2tr: taprootOutputKey },
+  purposes: { "p2sh-p2wpkh": 49, p2wpkh: 84, p2tr: 86 },
+};
+const LEGACY_PURPOSE = 44;
+const TYPE_NAMES: Readonly<Partial<Record<AddressType, string>>> = {
+  p2pkh: "legacy",
+  "p2sh-p2wpkh": "nested SegWit",
+  p2wpkh: "native SegWit",
+  p2tr: "Taproot",
+};
+
 /** A Bitcoin-like coin with SegWit addresses besides its Base58Check ones. */
 class SegwitCoin extends Base58Coin {
   readonly #segwit: SegwitPrefixes;
 
   constructor(description: Base58CoinDescription & { readonly segwit: SegwitPrefixes }) {
-    super(description);
+    super({ ...description, ...SEGWIT_RULES });
     this.#segwit = description.segwit;
+  }
+
+  protected override get ownPrefixes(): readonly string[] {
+    const { mainnet, testnet } = this.#segwit;
+    return [mainnet, ...(testnet === undefined ? [] : [testnet])].map((prefix) => `${prefix}1`);
   }
 
   /** Such as "testnet, nested SegWit (BIP49)". */
   override describe(type: AddressType, testnet: boolean): string {
     const network = testnet ? "testnet, " : "";
-    return `${network}${ADDRESS_TYPE_NAMES[type]} (BIP${ADDRESS_PURPOSES[type]})`;
+    const purpose = SEGWIT_RULES.purposes?.[type] ?? LEGACY_PURPOSE;
+    return `${network}${TYPE_NAMES[type]} (BIP${purpose})`;
   }
 
   protected override read(text: string): CoinAddress {
@@ -74,8 +93,8 @@ class SegwitCoin extends Base58Coin {
     else throw this.notOurs();
     // The single-key programs: version 0 with the key's HASH160, version 1 with a Taproot key.
     let type: AddressType;
-    if (version === 0 && program.length === COMMITMENT_BYTES.p2wpkh) type = "p2wpkh";
-    else if (version === 1 && program.length === COMMITMENT_BYTES.p2tr && this.#segwit.taproot)
+    if (version === 0 && program.length === HASH160_BYTES) type = "p2wpkh";
+    else if (version === 1 && program.length === X_ONLY_KEY_BYTES && this.#segwit.taproot)
       type = "p2tr";
     else
       throw invalidAddress(

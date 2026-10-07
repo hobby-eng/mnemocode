@@ -1,8 +1,9 @@
 // The self-test of the check of a backup written down (core/backup-check.ts): the published
 // Seedshift vector typed again, found right, and with a wrong date or a wrong word found wrong at
 // its place; and, with the host's SSKR library, shares of a published set found right, also with a
-// color unread, and shares of another set or with a wrong color found wrong. It answers later, so
-// core/self-test.ts runs it only in the full self-test.
+// color unread, and shares of another set or with a wrong color found wrong. The codes need
+// nothing that answers later, so core/self-test.ts runs their check before every command too; the
+// shares, which the SSKR library restores, in the full self-test.
 //
 // From the host it needs, for the shares only, its SharePlatform (sskr/share-platform.ts). It
 // holds public test data, no secret.
@@ -41,8 +42,11 @@ function verdictOf(result: BackupResult): string {
     : `${result.verdict} ${finding.part} ${finding.places.join(",")}`.trim();
 }
 
-/** The published Seedshift vector typed again: right, with a wrong date, and with a wrong word. */
-async function checkEncodedBackup(): Promise<void> {
+/**
+ * The published Seedshift vector typed again: right, with a wrong date, and with a wrong word. The
+ * quick known answer that runs before every command.
+ */
+export function checkBackupCheckStartup(): void {
   const check = new EncodedBackupCheck({
     mnemonic: PUBLIC_MNEMONIC,
     format: "english",
@@ -50,11 +54,11 @@ async function checkEncodedBackup(): Promise<void> {
     codes: MASKED_NUMBERS.map((number) => number - 1),
     dates: [parseDate(MASKED_DATE)],
   });
-  const right = await check.check({ backup: MASKED_ENGLISH, dates: MASKED_DATE });
+  const right = check.checkNow({ backup: MASKED_ENGLISH, dates: MASKED_DATE });
   expectSame(verdictOf(right), "restores", "Backup check of the Seedshift vector");
-  const wrongDate = await check.check({ backup: MASKED_ENGLISH, dates: "24-09-2026" });
+  const wrongDate = check.checkNow({ backup: MASKED_ENGLISH, dates: "24-09-2026" });
   expectSame(verdictOf(wrongDate), "differs dates 1", "Backup check with a wrong date");
-  const wrongWord = await check.check({
+  const wrongWord = check.checkNow({
     backup: MASKED_ENGLISH.replace("actual", "wool"),
     dates: MASKED_DATE,
   });
@@ -89,6 +93,6 @@ async function checkShareBackup(platform: SharePlatform): Promise<void> {
 
 /** Every check: the encoded backup, and with the host's SSKR library the shares. */
 export async function checkBackupCheck(platform?: SharePlatform): Promise<void> {
-  await checkEncodedBackup();
+  checkBackupCheckStartup();
   if (platform !== undefined) await checkShareBackup(platform);
 }

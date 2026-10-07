@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
 import { integerOption } from "../src/cli/arguments.js";
-import { bip39Passphrase, bitcoinEvidence } from "../src/cli/bitcoin-options.js";
+import { bip39Passphrase, walletEvidence } from "../src/cli/bitcoin-options.js";
 import { readBoundedTextFile } from "../src/cli/input.js";
 import { validateOutputPaths } from "../src/cli/output-paths.js";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
@@ -71,7 +71,7 @@ describe("AUD-002-API001 canonical integer options", () => {
   it("applies the shared parser to every affected command family", async () => {
     expect(() => runTable({ index: "0x10" })).toThrow("base-10 integer");
     expect(() =>
-      bitcoinEvidence({
+      walletEvidence({
         "bitcoin-address": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
         account: "1e3",
       }),
@@ -87,7 +87,7 @@ describe("AUD-002-SEC001 bounded secret-bearing files", () => {
     const path = join(directory, "oversized.txt");
     try {
       await writeFile(path, Buffer.alloc(1024 * 1024 + 1, 0x61));
-      expect(() => bitcoinEvidence({ "wif-file": path })).toThrow("1 MiB safety limit");
+      expect(() => walletEvidence({ "wif-file": path })).toThrow("1 MiB safety limit");
       expect(() => bip39Passphrase({ "bip39-passphrase-file": path })).toThrow(
         "1 MiB safety limit",
       );

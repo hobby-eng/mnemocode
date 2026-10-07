@@ -6,7 +6,7 @@
 // (test/portable-modules.test.ts).
 
 import { bech32m } from "@scure/base";
-import { ADDRESS_TYPE_NAMES, COMMITMENT_BYTES, type AddressType } from "./address-types.js";
+import { HASH160_BYTES, type AddressType } from "./address-types.js";
 import { Base58Coin } from "./base58.js";
 import { decodeBech32 } from "./bech32.js";
 import {
@@ -15,6 +15,7 @@ import {
   invalidAddress,
   startsWithAny,
   WRONG_LENGTH,
+  type AddressLocation,
   type CoinAddress,
 } from "./coin.js";
 
@@ -31,18 +32,30 @@ const PLATFORM_ORCHARD = 0x10;
  */
 const PAYMENT_GROUPS = 34;
 const PADDING_MASK = 0b11;
+/** DIP9's feature paths begin with 9, and DIP17 is the feature of Platform payment keys. */
+const DIP9_PURPOSE = 9;
+const DIP17_FEATURE = 17;
 
 class DashCoin extends Base58Coin {
   /** "Core (BIP44)", or "Platform payment (DIP17)", with "testnet, " before it on testnet. */
   override describe(type: AddressType, testnet: boolean): string {
     if (type !== "dash-platform") return "Core (BIP44)";
-    return `${testnet ? "testnet, " : ""}${ADDRESS_TYPE_NAMES[type]} (DIP17)`;
+    return `${testnet ? "testnet, " : ""}Platform payment (DIP17)`;
+  }
+
+  /** DIP17: m/9'/coin'/17'/account'/key_class' for Platform payment keys, the key class hardened. */
+  override branchPathOf(type: AddressType, coinType: number, location: AddressLocation): string {
+    if (type !== "dash-platform") return super.branchPathOf(type, coinType, location);
+    const { account, branch } = location;
+    return `m/${DIP9_PURPOSE}'/${coinType}'/${DIP17_FEATURE}'/${account}'/${branch}'`;
+  }
+
+  protected override get ownPrefixes(): readonly string[] {
+    return [`${PLATFORM_MAINNET}1`, `${PLATFORM_TESTNET}1`];
   }
 
   protected override read(text: string): CoinAddress {
-    return startsWithAny(text, [`${PLATFORM_MAINNET}1`, `${PLATFORM_TESTNET}1`])
-      ? this.#readPlatform(text)
-      : this.readBase58(text);
+    return startsWithAny(text, this.ownPrefixes) ? this.#readPlatform(text) : this.readBase58(text);
   }
 
   #readPlatform(text: string): CoinAddress {
@@ -54,7 +67,7 @@ class DashCoin extends Base58Coin {
     else throw this.notOurs();
     const [type, ...hash] = bytesOf(decoded.words);
     if (type === PLATFORM_P2PKH) {
-      if (hash.length !== COMMITMENT_BYTES["dash-platform"]) throw invalidAddress(WRONG_LENGTH);
+      if (hash.length !== HASH160_BYTES) throw invalidAddress(WRONG_LENGTH);
       const last = decoded.words[decoded.words.length - 1]!;
       if (decoded.words.length !== PAYMENT_GROUPS || (last & PADDING_MASK) !== 0)
         throw invalidAddress(DAMAGED);

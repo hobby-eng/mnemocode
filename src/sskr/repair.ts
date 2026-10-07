@@ -60,7 +60,6 @@ const MAX_REPAIR_UNITS = 128;
  * to 2^8 of them, since the SSKR library then keeps only the one whose secret digest fits.
  */
 export const LISTED_FREE_BITS = 4;
-export const RESOLVED_FREE_BITS = 16;
 const BYTE_BITS = 8;
 const COLOR_BITS = RGB_BYTES * BYTE_BITS;
 const CRC_BITS = CHECKSUM_BYTES * BYTE_BITS;

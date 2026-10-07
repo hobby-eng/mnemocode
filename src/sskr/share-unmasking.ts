@@ -61,6 +61,8 @@ const REDACTED = "[ShareUnmasking: redacted]";
  * before the shares say how many words their phrase has.
  */
 const ANY_WORD_COUNT = 12;
+/** The longest phrase, which the decoding of the dates is timed with (secondsPerCombination). */
+const LONGEST_PHRASE = 24;
 
 /**
  * How the sets of one restore are turned into seed phrases. A class, so that a host builds it once
@@ -103,7 +105,8 @@ export class ShareUnmasking {
     const mode = this.#mode;
     if (!this.searches || mode === "direct") return undefined;
     const dates = this.#dates!;
-    const decoding = DateSearch.secondsPerCombination(mode, dates);
+    // The shares do not say yet how long their phrase is; every count of dates fits 24 words.
+    const decoding = DateSearch.secondsPerCombination(mode, dates, LONGEST_PHRASE);
     if (this.#walletCheck === undefined)
       return { combinations: dates.combinations, secondsEach: decoding };
     const checks = Masking.of(mode).checksPerCombination(ANY_WORD_COUNT);

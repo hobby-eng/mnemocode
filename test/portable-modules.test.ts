@@ -71,8 +71,9 @@ const PARTS: Readonly<Record<string, Part>> = {
   // Deriver's Dash edition, without the evidence of Bitcoin or the list of every coin.
   "src/core/coin-address-evidence.ts": {
     uses: ["src/core/master-fingerprint.ts"],
-    // The types of core/coins/coin.ts, whose module computes addresses with the hashes and curve.
-    packages: ["@scure/bip32", ...COIN_PACKAGES],
+    // The types of core/coins/coin.ts, whose module computes addresses with the hashes and curve
+    // and tells other coins' forms of address with @scure/base.
+    packages: ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
   },
   "src/core/wallet-evidence.ts": {
     uses: [
@@ -96,6 +97,15 @@ const PARTS: Readonly<Record<string, Part>> = {
   // Codes marked with ?, and the search for them.
   "src/core/missing-codes.ts": {
     uses: ["src/core/candidates.ts", "src/core/encoded-backup.ts", "src/core/masking.ts"],
+  },
+  "src/core/missing-codes-search.ts": {
+    uses: [
+      "src/core/date-search.ts",
+      "src/core/encoded-backup.ts",
+      "src/core/masking.ts",
+      "src/core/missing-codes.ts",
+      "src/sskr/repair-report.ts",
+    ],
   },
   "src/core/backup-reading.ts": {
     uses: [
@@ -262,8 +272,12 @@ const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   "src/export/study-backdrops.ts": ["pdf-lib"],
   "src/export/card-codes.ts": [],
   // The coin families of core/coins.ts, each of which a host can take without the others.
-  "src/core/coins/address-types.ts": COIN_PACKAGES,
-  "src/core/coins/coin.ts": COIN_PACKAGES,
+  "src/core/coins/address-types.ts": ["@noble/hashes/sha2.js", "@noble/hashes/legacy.js"],
+  "src/core/coins/taproot.ts": COIN_PACKAGES,
+  "src/core/coins/keccak-account.ts": COIN_PACKAGES,
+  "src/core/coins/coin.ts": ["@scure/base", ...COIN_PACKAGES],
+  "src/core/coins/base58-check.ts": ["@scure/base", "@noble/hashes/sha2.js"],
+  "src/core/coins/other-forms.ts": ["@scure/base", "@noble/hashes/sha2.js"],
   "src/core/coins/base58.ts": ["@scure/base", ...COIN_PACKAGES],
   "src/core/coins/bech32.ts": ["@scure/base"],
   "src/core/coins/bitcoin-like.ts": ["@scure/base", ...COIN_PACKAGES],
@@ -273,7 +287,7 @@ const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   "src/core/coins/cosmos.ts": ["@scure/base", ...COIN_PACKAGES],
   "src/core/coins/xrp.ts": ["@scure/base", ...COIN_PACKAGES],
   // The self-test of each coin family, which a host of that family alone takes.
-  "src/core/coins/coin-self-test.ts": ["@scure/bip32", ...COIN_PACKAGES],
+  "src/core/coins/coin-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
   "src/core/coins/bitcoin-like-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
   "src/core/coins/bitcoin-cash-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
   "src/core/coins/cosmos-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
@@ -312,8 +326,9 @@ const NODE_GLOBAL_MARK = "NODE_ONLY_GLOBAL_";
 const NODE_GLOBAL_MARKED = new RegExp(`${NODE_GLOBAL_MARK}(\\w+)`, "gu");
 /** Node.js's own types, which only @types/node declares. */
 const NODE_TYPES = /\bNodeJS\./u;
+/** Imports and re-exports with `from`, dynamic imports, and imports for their effect alone. */
 const IMPORT =
-  /(?:^|\s)(?:import|export)\s[^;]*?\sfrom\s+"([^"]+)"|import\s*\(\s*"([^"]+)"\s*\)/gsu;
+  /(?:^|\s)(?:import|export)\s[^;]*?\sfrom\s+"([^"]+)"|import\s*\(\s*"([^"]+)"\s*\)|(?:^|\s)import\s+"([^"]+)"/gsu;
 
 /** The source without its comments, so that a comment may name what the code must not use. */
 function code(text: string): string {

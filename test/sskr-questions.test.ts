@@ -488,9 +488,9 @@ describe("shares on the private screen", () => {
       expect(out).toContain(TEST_PHRASE);
     });
 
-    it("shows the encoded fingerprint with the dates given, only on the private screen", async () => {
-      terminal.answers = [`${shares[0]};${shares[2]}\r`];
-      await combine({ mode: "seedshift", date: TEST_DATE });
+    it("shows the encoded fingerprint with the dates typed, only on the private screen", async () => {
+      terminal.answers = [`${shares[0]};${shares[2]}\r`, `${TEST_DATE}\r`];
+      await combine({ mode: "seedshift" });
       expect(notices).toContain(encodedLine());
       expect(out).toContain(TEST_PHRASE);
       // From the command line, as decode, and without Seedshift, none is shown.
@@ -506,8 +506,8 @@ describe("shares on the private screen", () => {
     it("shows each part of the result apart on a colour terminal, each phrase with its fingerprint", async () => {
       vi.stubEnv("NO_COLOR", "");
       vi.stubEnv("CLICOLOR_FORCE", "1");
-      terminal.answers = [`${shares[0]};${shares[1]}\r`];
-      await combine({ mode: "seedshift", date: TEST_DATE });
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
+      await combine({ mode: "seedshift" });
       const shown = out.map(withoutColour);
       const parts = [
         "\nMnemoCode · Restored from shares",
@@ -530,8 +530,8 @@ describe("shares on the private screen", () => {
     it("shows the encoded fingerprint as a status line in colour", async () => {
       vi.stubEnv("NO_COLOR", "");
       vi.stubEnv("CLICOLOR_FORCE", "1");
-      terminal.answers = [`${shares[0]};${shares[1]}\r`];
-      await combine({ mode: "seedshift", date: TEST_DATE });
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
+      await combine({ mode: "seedshift" });
       const plain = notices.map((line) => line.replace(/\x1b\[[0-9;]*m/gu, ""));
       expect(plain).toContain(
         `✓ Encoded fingerprint (of the masked phrase) ${masterFingerprint(masked)}`,
@@ -625,11 +625,11 @@ describe("shares on the private screen", () => {
     });
 
     it("says why the dates are asked again when they are more than the phrase takes", async () => {
-      const given = ["24-09-2026", "25-09-2026", "26-09-2026", "27-09-2026", "28-09-2026"];
-      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
-      await combine({ mode: "seedshift", date: given });
-      expect(notices).toContain("12-word phrases support at most 4 dates.");
-      expect(promptsShown()).toEqual([SHARES_PROMPT, DATES_PROMPT]);
+      const typed = "24-09-2026 25-09-2026 26-09-2026 27-09-2026 28-09-2026";
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${typed}\r`, `${TEST_DATE}\r`];
+      await combine({ mode: "seedshift" });
+      expect(notices.some((line) => /at most 4 dates/u.test(line))).toBe(true);
+      expect(promptsShown()).toEqual([SHARES_PROMPT, DATES_PROMPT, DATES_PROMPT]);
       expect(out).toContain(TEST_PHRASE);
     });
 
@@ -654,9 +654,9 @@ describe("shares on the private screen", () => {
 
     it("leaves Seedshift when the wallet shows that the phrase was not masked", async () => {
       const plain = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
-      terminal.answers = [`${plain[0]};${plain[2]}\r`];
+      terminal.answers = [`${plain[0]};${plain[2]}\r`, `${TEST_DATE}\r`];
       terminal.choices = ["mode"];
-      await combine({ mode: "seedshift", date: TEST_DATE, "master-fingerprint": FINGERPRINT });
+      await combine({ mode: "seedshift", "master-fingerprint": FINGERPRINT });
       expect(terminal.labels[0]).toEqual([
         "Change the dates",
         "Change the wallet",
@@ -664,8 +664,15 @@ describe("shares on the private screen", () => {
         "It was not masked with Seedshift",
         "Stop",
       ]);
-      expect(promptsShown()).toEqual([SHARES_PROMPT]);
+      expect(promptsShown()).toEqual([SHARES_PROMPT, DATES_PROMPT]);
       expect(out).toContain(TEST_PHRASE);
+    });
+
+    it("refuses dates from the command line beside --ask-secrets (AUD-010-SEC001)", async () => {
+      await expect(combine({ mode: "seedshift", date: TEST_DATE })).rejects.toThrow(
+        "--ask-secrets cannot be combined with command-line dates.",
+      );
+      expect(promptsShown()).toEqual([]);
     });
   });
 

@@ -270,11 +270,6 @@ function answerLine(label: string, answer: string): string {
   return `  ${label.padEnd(11)} ${answer}\n`;
 }
 
-/** A warning above a question, as askLine and choose show it without colours. */
-function warningLine(warning: string): string {
-  return `! ${warning}\n`;
-}
-
 /** A folder for the files that the menu's questions name, made for these tests. */
 let folder = "";
 beforeAll(async () => {

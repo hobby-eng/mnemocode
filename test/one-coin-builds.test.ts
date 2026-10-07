@@ -18,6 +18,13 @@ const OTHER_COINS = [
   /BIP84/u,
   /BIP86/u,
   /EIP-55/u,
+  // Bitcoin's and Ethereum's kinds of address, and their code (AUD-010-BLD007).
+  /Taproot/u,
+  /SegWit/u,
+  /BIP341/u,
+  /TapTweak/u,
+  /Keccak/iu,
+  /p2tr|p2wpkh|p2sh-p2wpkh/u,
 ];
 /**
  * The key with which BIP32 makes a master key from a seed, "Bitcoin seed", which every wallet of

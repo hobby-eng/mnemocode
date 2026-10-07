@@ -125,23 +125,27 @@ describe("Ctrl+C during a long search", () => {
     expectTerminalGivenBack();
   });
 
-  it("suspends the whole job at Ctrl+Z, out of raw mode, and reads on once it continues", () => {
-    // What kill is asked, with the raw modes until then; the job is not really stopped.
-    const kills: [number, unknown, boolean[]][] = [];
-    vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
-      kills.push([pid, signal, [...terminal.rawModes]]);
-      return true;
-    });
-    const watch = watchForCtrlC();
-    keys.type(CTRL_Z);
-    expect(kills).toEqual([[0, "SIGTSTP", [true, false]]]);
-    expect(terminal.rawModes).toEqual([true, false, true]);
-    expect(watch.signal.aborted).toBe(false);
-    keys.type(CTRL_C);
-    expect(() => watch.signal.throwIfAborted()).toThrow(InputCancelled);
-    watch.stop();
-    expectTerminalGivenBack();
-  });
+  // Windows has no job control: Ctrl+Z is dropped there, as a test of this file shows, never sent.
+  it.skipIf(process.platform === "win32")(
+    "suspends the whole job at Ctrl+Z, out of raw mode, and reads on once it continues",
+    () => {
+      // What kill is asked, with the raw modes until then; the job is not really stopped.
+      const kills: [number, unknown, boolean[]][] = [];
+      vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+        kills.push([pid, signal, [...terminal.rawModes]]);
+        return true;
+      });
+      const watch = watchForCtrlC();
+      keys.type(CTRL_Z);
+      expect(kills).toEqual([[0, "SIGTSTP", [true, false]]]);
+      expect(terminal.rawModes).toEqual([true, false, true]);
+      expect(watch.signal.aborted).toBe(false);
+      keys.type(CTRL_C);
+      expect(() => watch.signal.throwIfAborted()).toThrow(InputCancelled);
+      watch.stop();
+      expectTerminalGivenBack();
+    },
+  );
 
   it("drops Ctrl+Z on Windows, which has no job control", () => {
     const kill = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -155,17 +159,21 @@ describe("Ctrl+C during a long search", () => {
     expectTerminalGivenBack();
   });
 
-  it("stops the search with the error when raw mode cannot be taken again after Ctrl+Z", () => {
-    vi.spyOn(process, "kill").mockImplementation(() => {
-      terminal.refusesRawMode = true;
-      return true;
-    });
-    const watch = watchForCtrlC();
-    keys.type(CTRL_Z);
-    expect(() => watch.signal.throwIfAborted()).toThrow("setRawMode EIO");
-    watch.stop();
-    expectTerminalGivenBack();
-  });
+  // Windows has no job control: Ctrl+Z is dropped there, as a test of this file shows, never sent.
+  it.skipIf(process.platform === "win32")(
+    "stops the search with the error when raw mode cannot be taken again after Ctrl+Z",
+    () => {
+      vi.spyOn(process, "kill").mockImplementation(() => {
+        terminal.refusesRawMode = true;
+        return true;
+      });
+      const watch = watchForCtrlC();
+      keys.type(CTRL_Z);
+      expect(() => watch.signal.throwIfAborted()).toThrow("setRawMode EIO");
+      watch.stop();
+      expectTerminalGivenBack();
+    },
+  );
 
   it("stops watching when the search watched ends or fails", async () => {
     await expect(withCtrlCWatch(async (signal) => signal.aborted)).resolves.toBe(false);

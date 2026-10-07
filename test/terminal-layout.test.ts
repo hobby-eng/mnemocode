@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ProgressLine, terminalPhrase } from "../src/cli/terminal.js";
+import { printableText, ProgressLine, terminalPhrase } from "../src/cli/terminal.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 
@@ -40,7 +40,8 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
     for (const [name, descriptor] of saved) {
-      if (descriptor === undefined) delete (process.stderr as { [key: string]: unknown })[name];
+      if (descriptor === undefined)
+        delete (process.stderr as unknown as { [key: string]: unknown })[name];
       else Object.defineProperty(process.stderr, name, descriptor);
     }
     saved.clear();
@@ -90,5 +91,16 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
       "On one line, for copying:",
       TEST_PHRASE,
     ]);
+  });
+});
+
+describe("text from outside the program (AUD-010-SEC002)", () => {
+  it("is shown without control characters, which could move the cursor or erase a line", () => {
+    // What a crafted QR code image held: cursor up, erase the line, red, a reset and a bell.
+    const crafted = "\u001b[1A\u001b[2K\u001b[31mRED\u001b[0m hello\u0007";
+    expect(printableText(crafted)).toBe("\ufffd[1A\ufffd[2K\ufffd[31mRED\ufffd[0m hello\ufffd");
+    // C1 controls and DEL too; ordinary text, Bytewords and Unicode stay as they are.
+    expect(printableText("a\u009bb\u007fc")).toBe("a\ufffdb\ufffdc");
+    expect(printableText("ur:sskr/tuna next keep 7AE5 漢")).toBe("ur:sskr/tuna next keep 7AE5 漢");
   });
 });

@@ -23,7 +23,7 @@ import {
   representMnemonic,
 } from "./seedshift.js";
 import type { DateShiftDate, DecodedResult, EncodedResult } from "./types.js";
-import { assertWordCount, BIP39_INDEX_BITS } from "./words.js";
+import { assertWordCount, BIP39_DICTIONARY_SIZE, BIP39_INDEX_BITS } from "./words.js";
 
 /** How a seed phrase was written: not masked, or one of the Seedshift variants (record.ts). */
 export type MaskingMode = "direct" | "seedshift" | "seedshift-legacy" | "seedshift-legacy-valid";
@@ -52,6 +52,8 @@ interface Variant {
   readonly undo: (indexes: readonly number[], dates: readonly DateShiftDate[]) => DecodedResult[];
   /** The checksum-valid phrases, so wallet checks, that one date combination gives on average. */
   readonly checks: (checksumBits: number) => number;
+  /** What the shift of the last word is taken modulo, for a phrase with `checksumBits`. */
+  readonly lastShift: (checksumBits: number) => number;
 }
 
 const VARIANTS: Readonly<Record<MaskingMode, Variant>> = Object.freeze({
@@ -65,6 +67,7 @@ const VARIANTS: Readonly<Record<MaskingMode, Variant>> = Object.freeze({
     undo: (indexes) => [decodeIndexesDirect(indexes)],
     // Without dates there is nothing to search.
     checks: () => 0,
+    lastShift: () => BIP39_DICTIONARY_SIZE,
   },
   // Writes the checksum again after the shift, so that every date gives a valid phrase.
   seedshift: {
@@ -76,6 +79,8 @@ const VARIANTS: Readonly<Record<MaskingMode, Variant>> = Object.freeze({
     encode: encodeMnemonic,
     undo: (indexes, dates) => [decodeIndexes(indexes, dates)],
     checks: () => 1,
+    // The last word holds 11 - checksum bits of entropy, and the shift is added to them alone.
+    lastShift: (checksumBits) => 2 ** (BIP39_INDEX_BITS - checksumBits),
   },
   "seedshift-legacy": {
     name: "the Original Seedshift",
@@ -89,6 +94,7 @@ const VARIANTS: Readonly<Record<MaskingMode, Variant>> = Object.freeze({
     undo: (indexes, dates) => [decodeIndexesLegacy(indexes, dates)],
     // A wrong date gives a valid phrase only by chance, once in 2^bits.
     checks: (checksumBits) => 2 ** -checksumBits,
+    lastShift: () => BIP39_DICTIONARY_SIZE,
   },
   // The last word replaced by one whose checksum fits: every phrase that it may have hidden is
   // tried, 2^(11 - bits) of them, and only a search finds the seed phrase again, so that no check
@@ -102,6 +108,8 @@ const VARIANTS: Readonly<Record<MaskingMode, Variant>> = Object.freeze({
     encode: (mnemonic, dates) => legacyChecksumValidResult(encodeMnemonicLegacy(mnemonic, dates)),
     undo: decodeIndexesLegacyValid,
     checks: (checksumBits) => 2 ** (BIP39_INDEX_BITS - checksumBits),
+    // Every last word with a valid checksum is tried, whatever the shift of the last word was.
+    lastShift: () => 1,
   },
 });
 
@@ -230,6 +238,24 @@ export class Masking {
   checksPerCombination(wordCount: number): number {
     assertWordCount(wordCount);
     return this.#variant.checks(wordCount / WORDS_PER_CHECKSUM_BIT);
+  }
+
+  /**
+   * The shifts of one date combination as this mode applies them: each word number moves modulo
+   * the 2,048 words, and the last word modulo what this mode adds its shift to (lastShift), so
+   * that two combinations with the same effective shifts give the same phrases.
+   */
+  effectiveShifts(shifts: readonly number[]): number[] {
+    const last = this.lastShiftModulus(shifts.length);
+    return shifts.map((shift, index) =>
+      index === shifts.length - 1 ? shift % last : shift % BIP39_DICTIONARY_SIZE,
+    );
+  }
+
+  /** What the shift of the last word of a `wordCount`-word phrase is taken modulo in this mode. */
+  lastShiftModulus(wordCount: number): number {
+    assertWordCount(wordCount);
+    return this.#variant.lastShift(wordCount / WORDS_PER_CHECKSUM_BIT);
   }
 
   toString(): string {

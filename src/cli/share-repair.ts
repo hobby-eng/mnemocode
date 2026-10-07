@@ -33,6 +33,7 @@ import { decodeQrPngFile } from "./qr-input.js";
 import { choose, type Choice } from "./terminal-choice.js";
 import { dropTypedAhead, InputCancelled, withCtrlCWatch } from "./terminal-input.js";
 import {
+  printableText,
   ProgressLine,
   STYLE,
   TEXT_WIDTH,
@@ -209,7 +210,8 @@ export class TypedShares {
   #showRead(): void {
     if (!this.#fromQr) return;
     const share = this.list.at(-1)!;
-    terminalStatus(`Share ${share.place}, from its QR code:`, share.text);
+    // An image may hold any text: it is shown without its control characters.
+    terminalStatus(`Share ${share.place}, from its QR code:`, printableText(share.text));
   }
 
   /**

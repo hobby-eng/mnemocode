@@ -74,6 +74,20 @@ export function terminalResultHeader(title: string, rows: readonly [string, stri
   return true;
 }
 
+/**
+ * Control characters: C0, DEL and C1, which move the cursor, erase or ring rather than show, and
+ * the marks and controls of text direction, which reorder what is shown.
+ */
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu;
+
+/**
+ * Text that came from outside the program, such as a QR code image, as it may be shown: each
+ * control character becomes U+FFFD, so that the text cannot move the cursor or erase a line.
+ */
+export function printableText(text: string): string {
+  return text.replace(CONTROL_CHARACTERS, "\ufffd");
+}
+
 /** A checked fact after a green ✓ (or a yellow ! when `good` is false): its label and its value in bold. */
 export function terminalStatus(label: string, value: string, good: boolean = true): void {
   const mark = good

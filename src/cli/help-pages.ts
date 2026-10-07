@@ -68,7 +68,7 @@ const askSecrets: HelpOption = {
   details: [
     "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that nothing stays in the scrollback. This works on Linux, macOS and Windows alike.",
     "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While an answer is typed, Escape does nothing, so that a slip loses nothing; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
-    "Standard input must be the terminal; without one the command stops at once. Output sent to a file goes there as before.",
+    "Standard input must be the terminal; without one, or in a terminal that says TERM=dumb, the command stops at once. Output sent to a file goes there as before.",
     "Use it for every real secret: text typed in a command can stay in the shell history and is visible in the list of running programs.",
   ],
 };
@@ -183,7 +183,7 @@ const cardsDir: HelpOption = {
   value: "NEW_FOLDER",
   summary: "Save one file per card in a new folder",
   details: [
-    "Files are named 01-ABCDEF.pdf, 02-123456.pdf and so on; each holds only its own reference or group. Use it with --page-size business or without a page size. The folder must not exist yet: it is created only when every card is ready.",
+    "Files are named after their number and the codes they print, such as 01-ABCDEF.pdf or 01-tuna-next-keep.pdf; each holds only its own reference or group. Use it with --page-size business or without a page size. The folder must not exist yet: it is created only when every card is ready.",
   ],
 };
 
@@ -294,7 +294,7 @@ const cardLayout: HelpOption = {
   value: "qr|collection|individual",
   summary: "How each share is printed; follows the page size if omitted",
   details: [
-    "qr: one document with a QR code per share, in any page size. collection: one sheet per share (a6 or a4); --card-qr adds a QR code. individual: numbered business cards without a QR code; every card of a share is needed to rebuild that share.",
+    "qr: one document with a QR code per share, in any page size; the Bytewords of a 24-word share usually need A6 or A4, except in the glass designs. collection: one sheet per share (a6 or a4); --card-qr adds a QR code. individual: numbered business cards without a QR code; every card of a share is needed to rebuild that share.",
     "The cards print each share in the form it is written in: its colors, or its word numbers, Unicode codes or Bytewords, three to a card, beside colors drawn at random that only decorate them. A share written as ur:sskr prints its Bytewords.",
   ],
 };
@@ -681,7 +681,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             value: "codes|share",
             summary: "What a text that may be a Shamir share is read as",
             details: [
-              "share restores the seed phrase from shares, the text kept as the first share; codes reads it as the encoded seed phrase. Without it, MnemoCode asks when the text is or may be a share.",
+              "share restores the seed phrase from shares, the text kept as the first share; codes reads it as the encoded seed phrase. Without it, a text that is surely a share goes to the restore at once, and MnemoCode asks only when the text may be either.",
             ],
           },
           {
@@ -1203,7 +1203,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     summary: "Run the full self-test",
     about: [
       "Checks every phrase length, format and mode, the sorting of dates, the public test vectors, the 24 English BIP39 seed vectors, the date and word searches with a wallet, encrypted candidate lists, the check of a written backup, marked Shamir shares repaired together and with dates, every coin address vector, the sheet for heirs, share cards, QR images beside a sheet and card export with every kind of artwork and font. The check of each feature is also given a case it must refuse. Run it before using a newly built or copied installation.",
-      "A smaller core self-test runs before every command that processes data, in about a third of a second: it checks both BIP39 word lists and fixed test phrases in every mode, and compares each feature with known answers: the BIP39 seed and fingerprint, dates with ? and |, codes and shares marked with ?, the word search, the candidate list, wallet evidence and the addresses of the twelve coins, the sheet for heirs and share cards. A failure stops the command before any input is read.",
+      "A smaller core self-test runs before every command that processes data, in less than half a second: it checks both BIP39 word lists and fixed test phrases in every mode, and compares each feature with known answers: the BIP39 seed and fingerprint, dates with ? and |, codes and shares marked with ?, the word search, the candidate list, the check of a written backup, wallet evidence and the addresses of the twelve coins, the sheet for heirs and share cards. A failure stops the command before any input is read.",
     ],
     usage: "",
     groups: [],

@@ -85,6 +85,10 @@
       "types": "./dist/core/missing-codes.d.ts",
       "import": "./dist/core/missing-codes.js"
     },
+    "./core/missing-codes-search": {
+      "types": "./dist/core/missing-codes-search.d.ts",
+      "import": "./dist/core/missing-codes-search.js"
+    },
     "./core/date-search": {
       "types": "./dist/core/date-search.d.ts",
       "import": "./dist/core/date-search.js"
@@ -213,6 +217,10 @@
     "docs/card-identities.md",
     "docs/ARCHITECTURE.md",
     "docs/SEEDSHIFT_CONSTRUCTION.md",
+    "docs/HEIRS.md",
+    "docs/CANDIDATES.md",
+    "docs/RELEASING.md",
+    "docs/ROADMAP.md",
     "docs/audits/README.md",
     "CHANGELOG.md"
   ],
@@ -221,7 +229,7 @@
     "build": "pnpm clean && tsc -p tsconfig.json",
     "check:toolchain": "node scripts/verify-toolchain.mjs",
     "check:markdown": "node scripts/verify-markdown.mjs",
-    "check": "pnpm check:toolchain && pnpm check:markdown && tsc --noEmit && tsc --noEmit -p tsconfig.cards.json && tsc -p tsconfig.strict-consumers.json",
+    "check": "pnpm check:toolchain && pnpm check:markdown && tsc --noEmit && tsc -p tsconfig.tests.json && tsc --noEmit -p tsconfig.cards.json && tsc -p tsconfig.strict-consumers.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
@@ -241,7 +249,6 @@
     "@scure/bip39": "2.4.0",
     "@scure/btc-signer": "2.4.1",
     "age-encryption": "0.3.1",
-    "bwip-js": "4.11.4",
     "jsqr": "1.4.0",
     "pdf-lib": "1.17.1",
     "pngjs": "7.0.0",

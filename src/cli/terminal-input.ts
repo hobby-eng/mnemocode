@@ -82,9 +82,19 @@ export type Key =
  * questions drawn on one on standard error. A script or a pipe gets neither.
  */
 export function terminalAvailable(): boolean {
+  return terminalsAttached() && !dumbTerminal();
+}
+
+/** Whether standard input and standard error are terminals, whatever their type. */
+export function terminalsAttached(): boolean {
   // isatty, not process.stdin.isTTY: reading that property opens standard input as a stream,
   // which switches a pipe to non-blocking reads, and a later synchronous read then fails (EAGAIN).
-  return isatty(0) && isatty(2) && process.env.TERM !== "dumb";
+  return isatty(0) && isatty(2);
+}
+
+/** Whether the terminal says it cannot move the cursor or clear the screen: TERM=dumb. */
+export function dumbTerminal(): boolean {
+  return process.env.TERM === "dumb";
 }
 
 /**

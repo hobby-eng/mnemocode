@@ -57,6 +57,15 @@ describe("instructions for heirs", () => {
     });
     expect(text.needs[0]).toContain("Any 3 of the 5 Shamir shares");
     expect(text.needs[0]).toContain("tuna next keep gyro");
+    // Shares written as ur:sskr are printed on cards as their words, and named both ways
+    // (AUD-010-DOC004).
+    const ur = heirSheetText({
+      backup: { kind: "shares", format: "ur", threshold: 3, count: 5 },
+      mode: "direct",
+      dates: 0,
+    });
+    expect(ur.needs[0]).toContain("codes that start with ur:sskr/");
+    expect(ur.needs[0]).toContain("words such as tuna next keep gyro on printed cards");
     expect(text.needs[1]).toContain("The owner's 2 secret dates (see the back)");
     expect(text.steps).toContain(
       'Type any 3 shares, separated by ";", then the secret dates as day-month-year (23-09-2026). MnemoCode shows the seed phrase.',
@@ -85,7 +94,7 @@ describe("instructions for heirs", () => {
       address,
       start: [`Open ${address} on a computer you trust, then go offline.`],
       decode: (mode) => [`Open the Decode tab in ${mode} mode and type the backup.`],
-      restore: (mode, threshold, dates) => [
+      restore: (_mode, threshold, dates) => [
         `Open the Shares tab and type ${threshold} shares${dates === undefined ? "" : `, then ${dates}`}.`,
       ],
       dateDigitHelp: undefined,
@@ -117,6 +126,40 @@ describe("instructions for heirs", () => {
       start: [...route.start, "Read more at https://elsewhere.example/guide."],
     });
     expect(() => elsewhere.text(facts)).toThrow("may print the route's address once and no other");
+    // Addresses written without http(s):// are seen too (AUD-010-API005), and a route's address of
+    // any form may be printed only once.
+    for (const other of ["www.elsewhere.example", "elsewhere.example/guide", "elsewhere.example"]) {
+      const without = new HeirInstructions({ ...route, start: [...route.start, `See ${other}.`] });
+      expect(() => without.text(facts), other).toThrow("route's address once and no other");
+    }
+    const named = new HeirInstructions({
+      ...route,
+      address: "hobby-eng/multi-chain-wallet-tools",
+      start: ["Find hobby-eng/multi-chain-wallet-tools on GitHub, then go offline."],
+    });
+    expect(named.text(facts).steps[0]).toContain("hobby-eng/multi-chain-wallet-tools");
+    const twice = new HeirInstructions({
+      ...route,
+      address: "hobby-eng/multi-chain-wallet-tools",
+      start: ["Find hobby-eng/multi-chain-wallet-tools.", "Or hobby-eng/multi-chain-wallet-tools."],
+    });
+    expect(() => twice.text(facts)).toThrow("route's address once and no other");
+    // A longer address that starts with the route's is another address, not the route's.
+    const repository = "https://github.com/hobby-eng/mnemocode";
+    for (const longer of ["/releases/tag/v0.1.0", "-mirror", ".git", "?ref=x"]) {
+      const beside = new HeirInstructions({
+        ...route,
+        address: repository,
+        start: [`Open ${repository}.`, `Or ${repository}${longer} instead.`],
+      });
+      expect(() => beside.text(facts), longer).toThrow("route's address once and no other");
+    }
+    const atEnd = new HeirInstructions({
+      ...route,
+      address: repository,
+      start: [`Open ${repository}, then go offline.`],
+    });
+    expect(atEnd.text(facts).steps[0]).toBe(`Open ${repository}, then go offline.`);
     // Nor do facts that would print a wrong sheet.
     expect(() => instructions.text({ ...facts, dates: 0 })).toThrow("at least one");
     expect(() =>

@@ -2,8 +2,8 @@
 // account in Bech32 (BIP173). Cosmos hashes the key with HASH160; Injective takes the Keccak account
 // of Ethereum, whose coin type its wallets use.
 //
-// Host-neutral: it imports only coin.ts, address-types.ts, bech32.ts and @scure/base
-// (test/portable-modules.test.ts).
+// Host-neutral: it imports only coin.ts, address-types.ts, bech32.ts, keccak-account.ts and
+// @scure/base (test/portable-modules.test.ts).
 
 import { bech32 } from "@scure/base";
 import type { AddressType } from "./address-types.js";
@@ -16,7 +16,9 @@ import {
   WRONG_LENGTH,
   type CoinAddress,
   type CoinDescription,
+  type CoinRules,
 } from "./coin.js";
+import { keccakAccount } from "./keccak-account.js";
 
 /** A 160-bit account is exactly 32 five-bit groups, with no padding. */
 const ACCOUNT_GROUPS = 32;
@@ -27,11 +29,16 @@ class Bech32AccountCoin extends Coin {
   readonly #type: AddressType;
 
   constructor(
-    description: CoinDescription & { readonly prefix: string; readonly type: AddressType },
+    description: CoinDescription &
+      CoinRules & { readonly prefix: string; readonly type: AddressType },
   ) {
     super(description);
     this.#prefix = description.prefix;
     this.#type = description.type;
+  }
+
+  protected override get ownPrefixes(): readonly string[] {
+    return [`${this.#prefix}1`];
   }
 
   protected read(text: string): CoinAddress {
@@ -61,4 +68,6 @@ export const INJECTIVE = new Bech32AccountCoin({
   coinTypes: [60],
   prefix: "inj",
   type: "keccak",
+  // Ethereum's account, written as Cosmos accounts are.
+  commitments: { keccak: keccakAccount },
 });

@@ -385,8 +385,14 @@ describe("recover-date on the private screen", () => {
     // As decode reads them: the codes do not say how they were made, and taken as not masked a
     // masked phrase would be shown as the seed phrase.
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-questions-"));
-    const decoding = (args: Record<string, string>) =>
-      askEncodedBackup({ args: { "ask-secrets": true, ...args }, seedshiftOnly: false });
+    const decoding = async (args: Record<string, string>) => {
+      const read = await askEncodedBackup({
+        args: { "ask-secrets": true, ...args },
+        seedshiftOnly: false,
+      });
+      if (read.kind !== "codes") throw new Error(`Read ${read.kind}, not the codes.`);
+      return read;
+    };
     try {
       const plain = join(directory, "codes.txt");
       await writeFile(plain, `${MASKED}\n`);

@@ -149,7 +149,44 @@ export async function decryptCandidates(
   const decrypter = new Decrypter();
   if ("identity" in key) decrypter.addIdentity(key.identity);
   else decrypter.addPassphrase(key.passphrase);
-  return decrypter.decrypt(file);
+  // Given bytes, age reads its output through a fetch Response, and a browser replaces any error
+  // inside it with its own ("Failed to fetch", "The operation was aborted"): given a stream, it
+  // returns the stream unread, and its own error, such as "invalid tag", reaches every host.
+  return readWhole(await decrypter.decrypt(streamOf(file)));
+}
+
+/** `bytes` as a stream of one chunk. */
+function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
+/** Every chunk of `stream` joined, read to its end; the chunks are wiped once copied. */
+async function readWhole(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  const reader = stream.getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    const whole = new Uint8Array(chunks.reduce((length, chunk) => length + chunk.length, 0));
+    let offset = 0;
+    for (const chunk of chunks) {
+      whole.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return whole;
+  } finally {
+    // The list is a secret: no copy stays behind, also when the file is refused part way.
+    for (const chunk of chunks) chunk.fill(0);
+    reader.releaseLock();
+  }
 }
 
 /**

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeMnemonic, encodeMnemonicLegacy, parseDate } from "../src/core.js";
 import { HARD_MAX_COMBINATIONS, reportDateMatches, searchDates } from "../src/cli/date-search.js";
+import { NoProtection } from "../src/core/candidate-encryption.js";
 import { DatesAnswer, DateSearch } from "../src/core/date-search.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 
@@ -90,15 +91,15 @@ describe("the date search", () => {
       limits: { maxResults: 100 },
       report: { progressEvery: 1000 },
     };
-    const all = await searchDates(search);
+    const all = (await searchDates(search))!;
     // MnemoCode Seedshift gives a valid phrase for every date.
     expect(all).toMatchObject({ combinations: 10, checksumValid: 10, matchCount: 10 });
     expect(all.kept).toEqual([]);
-    const matched = await searchDates({
+    const matched = (await searchDates({
       ...search,
       evidence: { kind: "master-fingerprint", value: FINGERPRINT, network: "mainnet" },
-      target: { path: "unused.age", protection: { kind: "plaintext" } },
-    });
+      target: { path: "unused.age", protection: new NoProtection() },
+    }))!;
     expect(matched).toMatchObject({ checksumValid: 10, matchCount: 1, kept: [TEST_PHRASE] });
     expect(matched.shown).toEqual([{ dates: "23-09-2026", mnemonic: TEST_PHRASE, evidence: "m" }]);
     // The size of each search first, then its progress.

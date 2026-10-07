@@ -66,7 +66,7 @@ Installed as a package, or as the single executable, the program is called `mnem
 
 ## Menu
 
-Run `mnemocode` without a command in a terminal, or double-click the executable file, and it shows a menu:
+Run `mnemocode` without a command in a terminal, or double-click the executable file, and it shows a menu (a terminal that says `TERM=dumb` cannot draw it and gets the help instead):
 
 ```text
 What do you want to do?
@@ -175,7 +175,7 @@ mnemocode encode --mode seedshift --ask-secrets --format 3
 
 Type the dates as one line, for example `23-09-2026 08-08-1988 07-11-1951`. In `direct` mode there is no date prompt. When the dates hold `?` and every date gives a valid phrase, as in MnemoCode Seedshift, one more question asks how to recognise the wallet, unless an option gave it: by its fingerprint or one of its first receiving addresses, of Bitcoin or another coin. With the original Seedshift the checksum sorts out most dates by itself: Decode, and the menu before it searches a forgotten digit, still offer the wallet question, and you may answer "It cannot" to see every date that passes the checksum. [Date recovery helper](#date-recovery-helper) describes the search.
 
-`--ask-secrets` works the same on Linux, macOS and Windows. MnemoCode switches the terminal to its alternate screen, a private screen, and reads the keys itself: you see what you type or paste, Backspace deletes a character, Ctrl+U the whole line, and Ctrl+C cancels. The result appears on the same screen. When you press Enter after it, the screen is cleared and the terminal returns to where it was, so that neither the secrets nor the result stay in the scrollback. Standard input must be the terminal; without one the command stops at once. Output sent to a file goes there as before.
+`--ask-secrets` works the same on Linux, macOS and Windows. MnemoCode switches the terminal to its alternate screen, a private screen, and reads the keys itself: you see what you type or paste, Backspace deletes a character, Ctrl+U the whole line, and Ctrl+C cancels. The result appears on the same screen. When you press Enter after it, the screen is cleared and the terminal returns to where it was, so that neither the secrets nor the result stay in the scrollback. Standard input must be the terminal; without one the command stops at once, and so it does in a terminal that says `TERM=dumb`, as some editors' consoles do, which cannot clear its screen. Output sent to a file goes there as before.
 
 Each answer on the private screen is checked at once, as in the [menu](#menu): a wrong one is explained in one line and asked again, and the answers before it are kept. While you type an answer, Escape does nothing, so that a slip of the finger loses nothing. In a list of choices, Escape does what the key hint below it says; when MnemoCode asks what to do next, that is the last choice, such as Stop. Keys typed before a question appears do not answer it. A paste of several lines is one answer: words, codes or dates may come one per line, and shares pasted one per line count as separated by semicolons.
 
@@ -374,7 +374,7 @@ mnemocode preview --template business-it --words 24 \
   --cards-dir ./sample-it-cards
 ```
 
-Files are named `01-ABCDEF.pdf`, `02-123456.pdf`, and so on. Each file holds only its own reference, or its own group on [cards with several codes](#cards-with-several-codes).
+Files are named after their number and the codes they print, such as `01-ABCDEF.pdf`, `02-123456.pdf` or, for a share in Bytewords, `01-tuna-next-keep.pdf`. Each file holds only its own reference, or its own group on [cards with several codes](#cards-with-several-codes).
 
 This is **not Shamir secret sharing**. Every card is needed to recover the phrase, and each card reveals a part of the encoded phrase.
 
@@ -575,7 +575,7 @@ A WIF can spend the funds. Never put it in a shell command or an issue report.
 
 ## Self-tests and public vectors
 
-Before a command processes data, MnemoCode tests itself, in about a third of a second. It checks the length and the SHA-256 hash of both BIP39 word lists, encodes and decodes fixed test phrases in every mode, and compares each feature with known answers from published test vectors or from an independent implementation that first reproduces one: the BIP39 seed and master fingerprint, dates with `?` and `|`, codes and Shamir shares marked with `?`, the word search, the candidate list, wallet evidence and the addresses of the twelve coins, the sheet for heirs and share cards. If a check fails, the command stops:
+Before a command processes data, MnemoCode tests itself, in less than half a second. It checks the length and the SHA-256 hash of both BIP39 word lists, encodes and decodes fixed test phrases in every mode, and compares each feature with known answers from published test vectors or from an independent implementation that first reproduces one: the BIP39 seed and master fingerprint, dates with `?` and `|`, codes and Shamir shares marked with `?`, the word search, the candidate list, the check of a written backup, wallet evidence and the addresses of the twelve coins, the sheet for heirs and share cards. If a check fails, the command stops:
 
 ```text
 CRITICAL: MnemoCode core self-test failed.

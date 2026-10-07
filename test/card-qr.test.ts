@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { PDFDocument } from "pdf-lib";
-import jsQR from "jsqr";
+import jsQRModule from "jsqr";
 import { drawCollectionQr, qrSizeMm } from "../src/export/card-qr.js";
 import { MM } from "../src/export/business-layout.js";
+
+// jsQR's CommonJS wrapper is typed as a module under NodeNext; src/cli/qr-input.ts reads it so too.
+const jsQR = jsQRModule as unknown as (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options?: { inversionAttempts?: "dontInvert" },
+) => { data: string } | null;
 
 describe("Printable card QR", () => {
   it.each([

@@ -52,7 +52,7 @@ const labels: Readonly<Record<string, string>> = {
   "progress-every": "progress interval",
   qr: "QR output file",
   "qr-file": "QR input file",
-  "scan-gap": "number of addresses scanned",
+  "scan-gap": "--scan-gap address count",
   share: "share text",
   "share-file": "share file",
   "share-format": "share format",

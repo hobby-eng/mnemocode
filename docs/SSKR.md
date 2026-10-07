@@ -87,9 +87,11 @@ The page size decides what is printed, as for ordinary cards. `--card-layout` is
 | ---------------------- | --------------- | ------------------------------------------------ | ------------------------------------------- |
 | `a6` (default) or `a4` | `collection`    | One collection sheet; `--card-qr` adds a QR code | All codes on the sheet, or its QR code      |
 | `business`             | `individual`    | Numbered cards without a QR code                 | Every card of that share, in numbered order |
-| any                    | `qr`            | One document with a QR code                      | The QR code                                 |
+| any (see below)        | `qr`            | One document with a QR code                      | The QR code                                 |
 
-A QR code holds one share. For `indexes`, `unicode` and `colors-unicode`, it holds that representation; for the other formats, it holds the share's color codes. No QR code holds several shares.
+A QR code holds one share, in the form its cards print: word numbers, Unicode codes or Bytewords (also for a share written as `ur:sskr`) as they are, `colors-unicode` as such, and `colors` as color codes. No QR code holds several shares.
+
+On the business size, the Bytewords of a 24-word share usually do not fit legibly beside the QR code, except in the glass designs: choose `a6` or `a4` for them. Word numbers and Unicode codes fit.
 
 Each file or folder in `--cards-dir` holds one share: keep them in different places. A file written with `--pdf` and a folder written with `--images-dir` hold **all** shares. Existing files and folders are never replaced; a taken name is numbered as `name-1`.
 

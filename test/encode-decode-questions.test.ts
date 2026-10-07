@@ -891,7 +891,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         `${DATE}\r`,
       ];
       terminal.choices = [true, "again", "again"];
-      await offerEncodedCheck(original, () => undefined);
+      await offerEncodedCheck(original, () => undefined, undefined);
       expect(notices).toEqual([
         "",
         "Type the codes you wrote down, or press Ctrl+C to stop.",
@@ -911,14 +911,15 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("names the dates in the offer only where the backup has them, and Escape skips it", async () => {
-      await offerEncodedCheck(original, () => undefined);
+      await offerEncodedCheck(original, () => undefined, undefined);
       const direct = representMnemonic(TEST_PHRASE).shiftedIndexes;
       await offerEncodedCheck(
         { mnemonic: TEST_PHRASE, format: "indexes", mode: "direct", codes: direct, dates: [] },
         () => undefined,
+        undefined,
       );
-      await offerShareCheck(TEST_PHRASE, "direct", 2, () => undefined);
-      await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined);
+      await offerShareCheck(TEST_PHRASE, "direct", 2, () => undefined, undefined);
+      await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined);
       expect(terminal.notes.map((notes) => notes[0])).toEqual([
         "type the codes from what you wrote down, and the dates",
         "type the codes from what you wrote down",
@@ -970,6 +971,7 @@ describe("encode, decode and the backup check on the private screen", () => {
           dates: [],
         },
         show,
+        undefined,
       );
       expect(show).toHaveBeenCalledTimes(1);
       expect(terminal.questions).toEqual([
@@ -1028,7 +1030,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
       terminal.answers = [`${shares[0]};${shares[1]}\r`, "24-09-2026\r", `${DATE}\r`];
       terminal.choices = [true, "again"];
-      await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined);
+      await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined);
       expect(notices.filter((line) => line !== "")).toEqual([
         "The shares with these dates give another seed phrase: check the dates and the shares.",
         "The backup restores this seed phrase.",
@@ -1049,7 +1051,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("stops at Ctrl+C inside the check", async () => {
       terminal.answers = ["12\x03"];
       terminal.choices = [true];
-      await expect(offerEncodedCheck(original, () => undefined)).rejects.toBeInstanceOf(
+      await expect(offerEncodedCheck(original, () => undefined, undefined)).rejects.toBeInstanceOf(
         InputCancelled,
       );
     });

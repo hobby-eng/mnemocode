@@ -58,7 +58,7 @@ import {
   type TransformMode,
 } from "./input.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
-import { evidenceLabel, optionLabel } from "./option-copy.js";
+import { evidenceLabel } from "./option-copy.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import {

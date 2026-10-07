@@ -31,6 +31,26 @@ const FORGOTTEN_LAST_DIGIT = "23-09-202?";
 /** A phrase of twelve words takes four dates, one for every three words. */
 const TWELVE_WORDS = { wordCount: 12, patterns: true } as const;
 
+/** The public phrase of 24 words, all-zero entropy. */
+const PUBLIC_24_WORDS = `${"abandon ".repeat(23)}art`;
+/**
+ * Eight dates, the most that 24 words take, with the day of the latest forgotten: that day moves
+ * only the last word, and MnemoCode Seedshift adds it to the last 3 bits of entropy alone, so
+ * days 01 and 09 give the same phrase. The independent oracle of the AUD-010 audit
+ * (docs/audits/AUD-010-harnesses/core-date-dedupe.ts) gives 8 phrases for its 9 combinations.
+ */
+const LATEST_DAY_FORGOTTEN =
+  "01-01-2001 01-01-2002 01-01-2003 01-01-2004 01-01-2005 01-01-2006 01-01-2007 0?-12-2030";
+/**
+ * The public 24-word phrase masked with MnemoCode Seedshift and those dates, the latest
+ * 09-12-2030, as word numbers counted from 1; the search below must give the phrase back.
+ */
+const LATEST_DAY_MASKED = [
+  2002, 2, 2, 2003, 2, 2, 2004, 2, 2, 2005, 2, 2, 2006, 2, 2, 2007, 2, 2, 2008, 2, 2, 2031, 13, 304,
+] as const;
+/** The masked phrase's date, and the same date 2,048 years later: the same shift. */
+const YEAR_AND_2048_LATER = "23-09-2026|4074";
+
 /**
  * Typed dates and the combinations they stand for, counted independently with Python's datetime:
  * a ? for each forgotten digit, a lone ? for a whole part, values joined by |, a complete date
@@ -109,6 +129,47 @@ export function checkDateSearchStartup(): void {
   }
   expectSame(combinations, 10, "Date search combinations");
   expectSame(found.join(" "), MASKED_DATE, "Date search of the Seedshift vector");
+  checkShiftsTriedOnce();
+}
+
+/**
+ * Each effective shift is tried once (dateRecoveryCandidates): a year 2,048 years later, and a
+ * latest day that moves the last word only in part, give no phrase a second time.
+ */
+function checkShiftsTriedOnce(): void {
+  const searched = (indexes: readonly number[], typed: string, wordCount: 12 | 24) => {
+    const dates = DatesAnswer.parse(typed, { wordCount, patterns: true });
+    let combinations = 0;
+    const phrases: string[] = [];
+    const found: string[] = [];
+    for (const candidates of dateRecoveryCandidates(
+      indexes,
+      dates.known,
+      dates.patterns,
+      "seedshift",
+    )) {
+      combinations += 1;
+      for (const candidate of candidates) {
+        phrases.push(candidate.mnemonic);
+        if (candidate.mnemonic === (wordCount === 12 ? PUBLIC_MNEMONIC : PUBLIC_24_WORDS))
+          found.push(candidate.dates.map(formatDate).join(" "));
+      }
+    }
+    return { combinations, phrases: phrases.length, found: found.join(" ") };
+  };
+  const years = searched(MASKED_INDEXES, YEAR_AND_2048_LATER, 12);
+  expectSame(years.combinations, 2, "Date search combinations of a year and 2,048 years later");
+  expectSame(years.phrases, 1, "Date search phrases of a year and 2,048 years later");
+  expectSame(years.found, MASKED_DATE, "Date search of a year and 2,048 years later");
+  const latest = searched(
+    LATEST_DAY_MASKED.map((number) => number - 1),
+    LATEST_DAY_FORGOTTEN,
+    24,
+  );
+  expectSame(latest.combinations, 9, "Date search combinations of the latest day");
+  expectSame(latest.phrases, 8, "Date search phrases of the latest day");
+  // 01-12-2030 is tried before 09-12-2030 and gives the same phrase.
+  expectSame(latest.found, "01-12-2030", "Date search of the latest day");
 }
 
 /**

@@ -29,7 +29,7 @@ import type { SharePlatform } from "../sskr/share-platform.js";
 import { checkSskrKnownAnswers } from "../sskr/known-answers.js";
 import { checkShareRepair, checkShareRepairStartup } from "../sskr/repair-self-test.js";
 import { checkShareUnmasking } from "../sskr/share-unmasking-self-test.js";
-import { checkBackupCheck } from "./backup-check-self-test.js";
+import { checkBackupCheck, checkBackupCheckStartup } from "./backup-check-self-test.js";
 import { checkBackupReading, checkBackupReadingStartup } from "./backup-reading-self-test.js";
 import { checkCandidateEncryption } from "./candidate-encryption-self-test.js";
 import { checkCandidateListStartup } from "./candidate-list-self-test.js";
@@ -369,6 +369,7 @@ const FEATURE_STARTUP: readonly (() => void)[] = [
   checkBackupReadingStartup,
   checkWordSearchStartup,
   checkCandidateListStartup,
+  checkBackupCheckStartup,
   checkShareRepairStartup,
 ];
 

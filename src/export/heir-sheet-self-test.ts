@@ -21,8 +21,11 @@ import {
 } from "./heir-sheet-text.js";
 import { A5, A6, renderHeirSheet, type HeirSheetFormat, type HeirSheetText } from "./heir-sheet.js";
 
-/** An address reserved for examples (RFC 2606), the one the test route prints. */
-const ROUTE_ADDRESS = "https://example.org/heirs";
+/**
+ * An address reserved for examples (RFC 2606), the one the test route prints, without http(s)://
+ * so that a host whose pages allow only their own links can carry this check.
+ */
+const ROUTE_ADDRESS = "example.org/heirs";
 /** A route through no real program: what the sheet adds around its steps is what is checked. */
 const TEST_ROUTE: HeirRoute = Object.freeze({
   subtitle: "Made by the self-test.",
@@ -118,7 +121,7 @@ function checkHeirTextStartup(): void {
   );
   const twoAddresses = new HeirInstructions({
     ...TEST_ROUTE,
-    start: [...TEST_ROUTE.start, "Or open https://example.com/elsewhere."],
+    start: [...TEST_ROUTE.start, "Or open example.com/elsewhere."],
   });
   expectRefused(
     () => twoAddresses.text(SHARES),

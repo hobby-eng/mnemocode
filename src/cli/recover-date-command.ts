@@ -11,7 +11,6 @@ import { parseInput, type SeedshiftMode } from "../core.js";
 import { MAX_CANDIDATE_RECORDS, TooManyForList } from "../core/candidate-list.js";
 import {
   DatesAnswer,
-  HARD_MAX_COMBINATIONS,
   MAX_SHOWN_MATCHES,
   NARROW_DATE_SEARCH,
   walletNeeded,

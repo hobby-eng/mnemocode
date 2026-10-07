@@ -25,8 +25,8 @@ import { masterFingerprint, matchBitcoinEvidence } from "../src/bitcoin-evidence
 const publicMnemonic = "abandon ".repeat(11) + "about";
 
 /** The pure JavaScript PBKDF2 that @scure/bip39 uses, as a page passes it. */
-const noblePbkdf2: Pbkdf2HmacSha512 = (password, salt, rounds, bytes) =>
-  pbkdf2(sha512, password, salt, { c: rounds, dkLen: bytes });
+const noblePbkdf2 = ((password, salt, rounds, bytes) =>
+  pbkdf2(sha512, password, salt, { c: rounds, dkLen: bytes })) satisfies Pbkdf2HmacSha512;
 const browserCheck = new WalletEvidenceCheck(noblePbkdf2);
 
 /** The BIP84 vectors of the public phrase (BIP-0084, "Test vectors"). */

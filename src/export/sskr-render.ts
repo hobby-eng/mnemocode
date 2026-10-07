@@ -37,9 +37,9 @@ export interface SskrRenderOptions extends CardSettings {
   /** Omitted: decided by the page size. */
   readonly layout?: SskrCardLayout;
   /**
-   * The form of the shares. A QR code holds the color codes that the card prints, unless the
-   * shares are written as word numbers or Unicode codes: then it holds them in that form, so that
-   * a share read from it comes back as it was written.
+   * The form of the shares. A QR code holds what the cards print, so that a share read from it
+   * comes back as it was written: word numbers, Unicode codes or Bytewords (also for ur) as they
+   * are, the Unicode codes of colors as such, and the color codes otherwise.
    */
   readonly shareFormat?: ShareFormat;
 }
@@ -113,13 +113,27 @@ export class ShareCardSet {
   readonly #referencesPerCard: number;
   readonly #members: readonly Member[];
 
-  /** Checks the layout, the style and the shares, and settles the details of the cards. */
-  constructor(records: readonly string[], requested: SskrRenderOptions) {
+  /**
+   * Checks the layout, the style and the shares, and settles the details of the cards. The
+   * decorative colors of the forms that print codes come from `randomInt`, the render platform's
+   * random integers below a limit unless a host, such as its self-test, gives its own.
+   */
+  constructor(
+    records: readonly string[],
+    requested: SskrRenderOptions,
+    randomInt: (limit: number) => number = (limit) => renderPlatform().randomInt(limit),
+  ) {
     if (requested.layout !== undefined && !LAYOUTS.has(requested.layout))
       throw new Error("Card layout must be qr, collection, or individual.");
+    const layout = resolveSskrLayout(requested.layout, requested.pageSize);
     const options: ResolvedOptions = {
       ...requested,
-      layout: resolveSskrLayout(requested.layout, requested.pageSize),
+      layout,
+      // Sheets are A6 when no size is given, in every design, as ordinary cards are (render.ts);
+      // separate cards have the business size.
+      ...(requested.pageSize === undefined && layout !== "individual"
+        ? { pageSize: "a6" as const }
+        : {}),
     };
     if (
       options.style !== "mixed" &&
@@ -142,7 +156,8 @@ export class ShareCardSet {
       const labelForm = LABELLED_FORMS[options.shareFormat ?? "colors"];
       const labels =
         labelForm === undefined ? undefined : cardGroups(writeShare(record, labelForm).split(" "));
-      const colors = labels === undefined ? shareToColors(record) : decorativeColors(labels.length);
+      const colors =
+        labels === undefined ? shareToColors(record) : decorativeColors(labels.length, randomInt);
       // The QR code holds what the cards print, so that a share read from it comes back as written.
       const payload =
         labels !== undefined
@@ -234,7 +249,9 @@ export class ShareCardSet {
    */
   #documentName(member: Member, index: number): string {
     if (member.share.folder === undefined) return `collection-${member.share.reference}`;
-    return `${String(index + 1).padStart(2, "0")}-${printedCode(member.content, index * this.#referencesPerCard)}`;
+    // The codes joined by hyphens, so that the name needs no quotes in a shell.
+    const codes = printedCode(member.content, index * this.#referencesPerCard).replaceAll(" ", "-");
+    return `${String(index + 1).padStart(2, "0")}-${codes}`;
   }
 
   /** The document `index` of `member`: a fragment, a collection sheet or a QR card. */
@@ -290,10 +307,13 @@ function cardGroups(codes: readonly string[]): string[] {
  * `count` colors drawn at random, none twice: decoration, which carries nothing of the share, so
  * that no code is tied to a color and the same code on two cards may have two colors.
  */
-function decorativeColors(count: number): string[] {
+function decorativeColors(count: number, randomInt: (limit: number) => number): string[] {
   const chosen = new Set<number>();
   for (let card = 0; card < count; card++) {
-    let color = renderPlatform().randomInt(COLOR_CODES);
+    let color = randomInt(COLOR_CODES);
+    // A host's source may give anything: only a color code ends the loop below with a valid code.
+    if (!Number.isInteger(color) || color < 0 || color >= COLOR_CODES)
+      throw new Error("The random source of the card colors gave a number out of range.");
     // A color drawn twice takes the next free one, so that even a poor random source ends.
     while (chosen.has(color)) color = (color + 1) % COLOR_CODES;
     chosen.add(color);
