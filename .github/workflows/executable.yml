@@ -3,8 +3,9 @@ name: Executable
 # Builds MnemoCode as one executable file on Linux, Windows and macOS: a Node.js single executable
 # is made from the Node.js binary of the system that builds it, so each system builds its own
 # (scripts/build-executable.mjs). Each one is run on its own system from an empty folder
-# (scripts/verify-executable.mjs). A tag v<version> publishes the three files, the license notices
-# written next to each of them and SHA256SUMS as a GitHub release.
+# (scripts/verify-executable.mjs). A tag v<version> puts the three files, the license notices
+# written next to each of them and SHA256SUMS in a draft GitHub release, which the owner signs and
+# publishes (docs/RELEASING.md).
 
 on:
   push:
@@ -18,7 +19,7 @@ permissions:
 
 concurrency:
   group: executable-${{ github.ref }}
-  # A newer push makes a running build pointless; a tag run publishes the release and is never
+  # A newer push makes a running build pointless; a tag run creates the release draft and is never
   # cut off halfway.
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
@@ -110,6 +111,17 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      # GitHub does not tie a draft to its tag, so running this job again would add a second draft
+      # with other builds beside the first. A broken draft is deleted on GitHub before a re-run.
+      - name: Refuse a tag that has a release or draft already
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tags=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq '.[].tag_name')
+          if printf '%s\n' "$tags" | grep -Fqx -- "$GITHUB_REF_NAME"; then
+            echo "::error::$GITHUB_REF_NAME has a release or draft already; delete it first."
+            exit 1
+          fi
       # Only for the release notes in docs/releases; nothing is built here.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -130,12 +142,15 @@ jobs:
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: release/SHA256SUMS
-      - name: Publish the executables with SHA256SUMS
+      # Only a draft: the OpenPGP key stays on the owner's computer. scripts/sign-release.mjs checks
+      # the draft, signs SHA256SUMS and uploads the signature; then the owner publishes the draft,
+      # on GitHub or with the script's --publish (docs/RELEASING.md).
+      - name: Create the release draft for OpenPGP signing
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd release
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
             --title "MnemoCode ${GITHUB_REF_NAME#v}" \
             --notes-file "$GITHUB_WORKSPACE/docs/releases/$GITHUB_REF_NAME.md" \
             mnemocode-* SHA256SUMS
