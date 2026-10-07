@@ -30,7 +30,7 @@ Use a computer that you trust, for example your own. Do not do this on a compute
 
 Download MnemoCode from its release page, `https://github.com/hobby-eng/mnemocode/releases`, and from nowhere else. Choose the file for your computer: the one ending in `win-x64.exe` for Windows, `macos-arm64` for a Mac with an Apple processor, `linux-x64` for Linux.
 
-The release page also has a file called `SHA256SUMS`. It lets you check that the file you downloaded is exactly the one that was published. The [README](../README.md#one-executable-file) shows how. If this is too technical, ask someone you trust to check it with you; they do not need to see the backup for this.
+The release page also has a file called `SHA256SUMS`, signed by the maintainer of MnemoCode. It lets you check that the file you downloaded is exactly the one that was published. The [README](../README.md#one-executable-file) shows how to check the file and the signature. If this is too technical, ask someone you trust to check it with you; they do not need to see the backup for this.
 
 Then disconnect the computer from the internet: unplug the cable and turn off Wi-Fi.
 
@@ -48,9 +48,9 @@ Start MnemoCode by a double-click. It shows a menu: choose with the arrow keys a
 - When MnemoCode asks for "Dates", type the secret dates as day-month-year, such as `23-09-2026`, separated by spaces.
 - What you type is shown so that you can check it. When you press Enter at the end, the screen is cleared again.
 
-If MnemoCode shows an error instead, a code or a word was probably mistyped. Check each one against the paper.
+If something you typed cannot be right, MnemoCode says so in one line, names where, such as "Date 2" or "Share 3", and asks for it again; what you typed before is kept. A code or a word was probably mistyped: check each one against the paper.
 
-If you know a secret date but one of its digits is unclear, the menu entry "Find a forgotten word, a date digit or a share code" can try every possibility.
+If you know a secret date but one of its digits is unclear, type `?` in place of that digit, such as `?3-09-2026`. MnemoCode then tries every possibility, both when it restores the backup and in the menu entry "Find a forgotten word, a date digit or a share code". To tell the right date, it usually asks for the wallet's fingerprint, eight characters such as `73c5da0a`, or one of its first receiving addresses.
 
 ## Opening the wallet
 

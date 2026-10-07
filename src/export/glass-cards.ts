@@ -17,7 +17,7 @@ import {
   type PDFImage,
   type PDFPage,
 } from "pdf-lib";
-import { colorsToIndexes, unicodeToColors } from "../core.js";
+import { colorsToIndexes, unicodeToColors } from "../core/colors.js";
 import { assertShareQr } from "../sskr/transport.js";
 import { resolvePresentationFor } from "./card-copy.js";
 import { clearDocumentMetadata } from "./document-metadata.js";
@@ -32,6 +32,7 @@ import {
 } from "./collection-sheet.js";
 import type { CardContent } from "./templates.js";
 import type { SskrCardContent } from "./sskr-content.js";
+import { printedCode } from "./card-codes.js";
 
 // Physical millimetres in the compact master; text remains vector and is never stretched.
 const COMPACT_REFERENCES = {
@@ -67,7 +68,7 @@ function validateContent(content: CardContent | SskrCardContent): asserts conten
   if (content.kind !== "colors" && content.kind !== "sskr")
     throw new Error("Glass cards require color references.");
   if (content.kind === "sskr") {
-    assertShareQr(content.colors, content.payload);
+    assertShareQr(content.colors, content.payload, content.labels);
   } else {
     colorsToIndexes(content.colors);
     if (
@@ -205,7 +206,7 @@ async function drawCard(
       borderColor: rgb(0.85, 0.85, 0.85),
     });
     label(
-      `${String(index * GLASS_REFERENCES_PER_CARD + offset + 1).padStart(2, "0")}  ${ref.slice(1)}`,
+      `${String(index * GLASS_REFERENCES_PER_CARD + offset + 1).padStart(2, "0")}  ${printedCode(content, index * GLASS_REFERENCES_PER_CARD + offset)}`,
       dx + 4,
       dy,
       6.8,
@@ -256,7 +257,7 @@ function drawCompactLabels(
       borderWidth: 0.25,
     });
     label(
-      `${String(index * referencesPerCard + offset + 1).padStart(2, "0")} ${ref.slice(1)}`,
+      `${String(index * referencesPerCard + offset + 1).padStart(2, "0")} ${printedCode(context.content, index * referencesPerCard + offset)}`,
       dx + COMPACT_REFERENCES.textOffset,
       dy,
       COMPACT_REFERENCES.fontSize,
@@ -340,8 +341,8 @@ async function drawGlassStudy(context: RenderContext): Promise<void> {
         refs
           .slice(offset, offset + 2)
           .map(
-            (ref, i) =>
-              `${String(index * referencesPerCard + offset + i + 1).padStart(2, "0")} ${ref.slice(1).toUpperCase()}`,
+            (_, i) =>
+              `${String(index * referencesPerCard + offset + i + 1).padStart(2, "0")} ${printedCode(content, index * referencesPerCard + offset + i)}`,
           )
           .join("   "),
       );

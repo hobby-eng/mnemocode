@@ -1,5 +1,6 @@
 import { businessOptionNames, businessOptions } from "./business-options.js";
-import { createInterface } from "node:readline/promises";
+import { askSecretUntil } from "./ask.js";
+import { terminalAvailable } from "./terminal-input.js";
 import { formatDate, type DateShiftDate } from "../core.js";
 import { selectTemplate } from "../export/templates.js";
 import type { EncodedFormat } from "./input.js";
@@ -49,6 +50,13 @@ export function validateCardOptions(
   selectTemplate(value(args, "template"), format === "unicode" ? "unicode" : "colors");
 }
 
+/**
+ * One event label for each date of a dated card: those given with --event, then the others asked
+ * on the private screen, where an empty label is asked again. A label stands next to its date on
+ * the card, so it is asked like the date, as a secret. With --ask-secrets the dates question
+ * already wants a date for each label given (promptedEncodeInputs), so the first check below
+ * refuses only dates given with --dates.
+ */
 export async function completeEventLabels(
   dates: readonly DateShiftDate[],
   supplied: readonly string[],
@@ -58,17 +66,14 @@ export async function completeEventLabels(
   const labels = supplied.map((label) => label.trim());
   if (labels.some((label) => !label)) throw new Error("Card event labels must not be empty.");
   if (labels.length === dates.length) return labels;
-  if (!process.stdin.isTTY || !process.stderr.isTTY)
+  // terminalAvailable, as every question asks it: also TERM=dumb asks nothing.
+  if (!terminalAvailable())
     throw new Error("To export a dated card, provide one event label for every date.");
-  const terminal = createInterface({ input: process.stdin, output: process.stderr });
-  try {
-    for (let i = labels.length; i < dates.length; i += 1) {
-      const label = (await terminal.question(`Event label for ${formatDate(dates[i]!)}: `)).trim();
-      if (!label) throw new Error("Card event labels must not be empty.");
-      labels.push(label);
-    }
-  } finally {
-    terminal.close();
-  }
+  for (const date of dates.slice(labels.length))
+    labels.push(
+      await askSecretUntil(`Event label for ${formatDate(date)}:`, (label) => label, {
+        what: "a label for this date",
+      }),
+    );
   return labels;
 }

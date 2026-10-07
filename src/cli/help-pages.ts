@@ -2,6 +2,8 @@
 // usage.ts lays it out. Every option a command accepts (command-options.ts) appears in its page,
 // and a test checks that.
 
+import { HARD_MAX_COMBINATIONS } from "../core/date-search.js";
+import { MAX_ADDRESS_COUNT } from "../core/wallet-evidence.js";
 import type { CommandName } from "./command-options.js";
 
 export interface HelpOption {
@@ -65,6 +67,7 @@ const askSecrets: HelpOption = {
   summary: "Ask for the secrets on a private screen instead of the command line",
   details: [
     "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that nothing stays in the scrollback. This works on Linux, macOS and Windows alike.",
+    "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While an answer is typed, Escape does nothing, so that a slip loses nothing; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
     "Standard input must be the terminal; without one the command stops at once. Output sent to a file goes there as before.",
     "Use it for every real secret: text typed in a command can stay in the shell history and is visible in the list of running programs.",
   ],
@@ -117,7 +120,7 @@ const encodedQr: HelpOption = {
   value: "PNG",
   summary: "Read the encoded record from a QR code in a PNG image",
   details: [
-    "The image is read on this computer. It may be up to 16 MiB and 4096 pixels on a side. A QR code holds no header, so give --mode for a masked record.",
+    "The image is read on this computer. It may be up to 16 MiB and 4096 pixels on a side. A QR code holds no header, so give --mode for a masked record; without it, --ask-secrets asks how it was masked.",
   ],
 };
 
@@ -126,7 +129,7 @@ const decodeMode: HelpOption = {
   value: "MODE",
   summary: "direct, seedshift, seedshift-legacy or seedshift-legacy-valid",
   details: [
-    "Needed for typed text, terminal output and QR codes, which carry no header. A file saved with --output names its mode; a --mode that contradicts it stops the command. See mnemocode help modes.",
+    "Needed for typed text, terminal output and QR codes, which carry no header; without it, --ask-secrets asks how they were masked. A file saved with --output names its mode; a --mode that contradicts it stops the command, and with --ask-secrets MnemoCode offers to read the record as it says or to give it again. See mnemocode help modes.",
   ],
 };
 
@@ -136,6 +139,24 @@ const decodeFormat: HelpOption = {
   summary: "The record format, 1 to 5 or its name; usually found automatically",
   details: [
     "MnemoCode picks the format itself when exactly one fits the whole record. Otherwise it asks in the terminal, and a script must pass --format. See mnemocode help formats.",
+  ],
+};
+
+const maxCandidates: HelpOption = {
+  flag: "--max-candidates",
+  value: "N",
+  summary: "Most combinations a search of dates tries without asking",
+  details: [
+    `Without it, a search that takes up to 12 hours on this computer starts at once; a longer one is asked for on the private screen and needs this option elsewhere. The number of attempts, and the time with a wallet check, are shown before the search starts. Up to ${HARD_MAX_COMBINATIONS.toLocaleString("en-US")}; every supported date is 3,652,059 attempts.`,
+  ],
+};
+
+const backupCheck: HelpOption = {
+  flag: "--backup-check",
+  value: "yes|no",
+  summary: "Answer whether to check the written-down backup on the private screen",
+  details: [
+    "After the result, --ask-secrets offers to type the backup again from what you wrote down, with the dates, and says whether it restores the same phrase. yes starts that check at once; no leaves it out. Without the option it is asked.",
   ],
 };
 
@@ -204,6 +225,7 @@ const cardQr: HelpOption = {
   summary: "Add one QR code with the whole encoded phrase to a collection sheet",
   details: [
     "Off by default. The QR code holds only the encoded data in the selected format: no header, mode, dates, names or fingerprints. Separate cards never carry a QR code.",
+    "encode and the commands of shares also save the QR code as a PNG image where the sheets go: beside the PDF (cards.pdf gives cards-qr.png), or in their folder; one image per share for Shamir shares. Decode reads it back with --qr-file, Restore with --share-qr. With encode alone, --qr names the image instead. preview only draws it.",
   ],
 };
 
@@ -263,7 +285,7 @@ const identityOptions: readonly HelpOption[] = [
 ];
 
 const identityGroup: HelpGroup = {
-  heading: "Details printed on the cards (decoration, not needed for recovery):",
+  heading: "Details on the cards (a decoy, random unless given; not needed for recovery):",
   options: identityOptions,
 };
 
@@ -273,6 +295,7 @@ const cardLayout: HelpOption = {
   summary: "How each share is printed; follows the page size if omitted",
   details: [
     "qr: one document with a QR code per share, in any page size. collection: one sheet per share (a6 or a4); --card-qr adds a QR code. individual: numbered business cards without a QR code; every card of a share is needed to rebuild that share.",
+    "The cards print each share in the form it is written in: its colors, or its word numbers, Unicode codes or Bytewords, three to a card, beside colors drawn at random that only decorate them. A share written as ur:sskr prints its Bytewords.",
   ],
 };
 
@@ -289,18 +312,34 @@ const shares: HelpOption = {
 };
 
 const evidenceGroup: HelpGroup = {
-  heading: "Recovery checks (one of the first six marks the matching candidates):",
+  heading: "Recovery checks (one of them finds the wallet among the candidates):",
   options: [
     {
       flag: "--master-fingerprint",
       value: "HEX",
       summary: "The BIP32 master fingerprint, eight hexadecimal digits",
-      details: ["It has only 32 bits, so it is a filter and not a proof."],
+      details: [
+        "The fingerprint of the wallet itself: with Seedshift, of the phrase before the shift, which encode shows as the original fingerprint, not the encoded one.",
+        "It has only 32 bits, so it is a filter and not a proof.",
+      ],
     },
     {
       flag: "--bitcoin-address",
       value: "ADDRESS",
-      summary: "A Bitcoin address of the wallet at the selected place",
+      summary: "A Bitcoin address of the wallet, one of the --scan-gap from the selected place",
+    },
+    {
+      flag: "--coin-address",
+      value: "ADDRESS",
+      summary: "An address of another coin, one of the --scan-gap from the place, with --coin",
+      details: [
+        "Single-key receiving addresses of the coins of mhfe, on their standard paths: Bitcoin Cash, Cosmos, Dash (also Platform), Dogecoin, Ethereum and EVM networks, Ethereum Classic, Injective, Litecoin, Tron, XRP and Zcash (transparent). The address tells its type and network.",
+      ],
+    },
+    {
+      flag: "--coin",
+      value: "ID",
+      summary: "The coin of --coin-address, such as ethereum, litecoin or bitcoin-cash",
     },
     {
       flag: "--master-xpub",
@@ -319,7 +358,7 @@ const evidenceGroup: HelpGroup = {
     {
       flag: "--compressed-public-key",
       value: "HEX",
-      summary: "A 33-byte compressed public key at the selected place",
+      summary: "A 33-byte compressed public key, one of the --scan-gap from the selected place",
     },
     {
       flag: "--wif-file",
@@ -347,7 +386,15 @@ const evidenceGroup: HelpGroup = {
     },
     { flag: "--account", value: "N", summary: "Account number; default 0" },
     { flag: "--branch", value: "N", summary: "0 for receiving, 1 for change; default 0" },
-    { flag: "--index", value: "N", summary: "Address number; default 0" },
+    { flag: "--index", value: "N", summary: "The first address number compared; default 0" },
+    {
+      flag: "--scan-gap",
+      value: "N",
+      summary: "Scan N addresses from --index on; default 20",
+      details: [
+        `For an address, a compressed public key or a WIF whose place is not known exactly: the first 20 are the addresses a wallet hands out before it waits for one of them to be used. Up to ${MAX_ADDRESS_COUNT}; each one adds a derivation to every phrase a search tries. With --ask-secrets and no wallet option, it also sets how many addresses an address typed on the screen is compared with, and that number is then not asked.`,
+      ],
+    },
   ],
 };
 
@@ -356,7 +403,7 @@ const maxTries: HelpOption = {
   value: "N",
   summary: "Combinations a share repair may try without asking",
   details: [
-    "Without it, a search that takes up to a minute on this computer starts at once. The number a repair needs, and its time, are shown before it starts; on the private screen a longer search is asked for instead.",
+    "Without it, a search that takes up to 12 hours on this computer starts at once. The number a repair needs, and its time, are shown before it starts; on the private screen a longer search is asked for instead.",
   ],
 };
 
@@ -368,7 +415,7 @@ const candidateListGroup: HelpGroup = {
       value: "NEW_FILE",
       summary: "Save the candidates as a list: record N is candidate N",
       details: [
-        "The Discovery Scanner of the multi-chain wallet tools imports it and checks every candidate online. With a wallet check, only the matching candidates are saved. A taken name is numbered, never replaced.",
+        "The Discovery Scanner of the multi-chain wallet tools imports it and checks every candidate online. With a wallet check, recover-word saves every candidate and marks the matches on the screen; recover-date and sskr-combine save only the matching ones. A taken name is numbered, never replaced.",
       ],
     },
     {
@@ -398,7 +445,7 @@ const candidateListGroup: HelpGroup = {
 
 const shareWalletCheck: HelpGroup = {
   ...evidenceGroup,
-  heading: "Wallet check (one of the first six keeps only the matching phrases):",
+  heading: "Wallet check (one of them keeps only the matching phrases):",
 };
 
 const shareInputs: readonly HelpOption[] = [
@@ -426,6 +473,24 @@ const shareInputs: readonly HelpOption[] = [
     summary: "Type the shares on the private screen, separated by semicolons",
   },
 ];
+
+const heirSheet: HelpOption = {
+  flag: "--heir-sheet",
+  value: "PATH",
+  summary: "Also save one sheet that tells heirs how to restore the backup",
+  details: [
+    "A PDF of one sheet to print on both sides. The front says what the backup looks like, how many shares restore it and how many dates it needs, and leaves the rest of its room for a hint written by hand; the back gives the steps in the menu and the basics for someone new to wallets. It holds no secret: no codes, no dates, no fingerprint and no places. Not with --legacy-valid-last-word. See Instructions for heirs in the README.",
+  ],
+};
+
+const heirSheetSize: HelpOption = {
+  flag: "--heir-sheet-size",
+  value: "a5|a6",
+  summary: "The size of that sheet; default a5",
+  details: [
+    "a5 is the size of a notebook, 148 x 210 mm, with larger print; a6 is the size of a postcard and of the cards, 105 x 148 mm, with small print.",
+  ],
+};
 
 export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   encode: {
@@ -474,7 +539,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             value: "PATH",
             summary: "Also save a versioned MNC1 record file",
             details: [
-              "The record starts with MNC1:<mode>:<format>:, so decode needs only the file and the dates. Dates are never stored. A taken name is numbered, as record (1).txt, never replaced.",
+              "The record starts with MNC1:<mode>:<format>:, so decode needs only the file and the dates. Dates are never stored. A taken name is numbered, as record-1.txt, never replaced.",
             ],
           },
           {
@@ -489,22 +554,9 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
               "The QR code holds only the encoded data in the selected format: no header, mode, dates or fingerprints. decode --qr-file reads it back.",
             ],
           },
-          {
-            flag: "--heir-sheet",
-            value: "PATH",
-            summary: "Also save one sheet that tells heirs how to restore the backup",
-            details: [
-              "A PDF of one sheet to print on both sides. The front says what the backup looks like, how many shares restore it and how many dates it needs, and leaves the rest of its room for a hint written by hand; the back gives the steps in the menu and the basics for someone new to wallets. It holds no secret: no codes, no dates, no fingerprint and no places. Not with --legacy-valid-last-word. See Instructions for heirs in the README.",
-            ],
-          },
-          {
-            flag: "--heir-sheet-size",
-            value: "a5|a6",
-            summary: "The size of that sheet; default a5",
-            details: [
-              "a5 is the size of a notebook, 148 x 210 mm, with larger print; a6 is the size of a postcard and of the cards, 105 x 148 mm, with small print.",
-            ],
-          },
+          heirSheet,
+          heirSheetSize,
+          backupCheck,
         ],
       },
       {
@@ -558,6 +610,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     asks: [
       ["Phrase", "English BIP39 words"],
       ["Dates", "one line, such as 23-09-2026 08-08-1988; none in direct mode"],
+      ["Event labels", "one per date, for dated Unicode cards, unless --events"],
+      ["Backup check", "whether to type the backup again from paper, unless --backup-check"],
     ],
     examples: [
       ["mnemocode encode --ask-secrets --format 3", "A real phrase, dates asked for, as Unicode"],
@@ -599,7 +653,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       ],
     ],
     notes: [
-      "Fingerprints are calculated for an empty BIP39 passphrase. They are public identifiers, not secrets. A legacy result may not be a valid phrase, so only the original fingerprint is shown.",
+      "Fingerprints are calculated for an empty BIP39 passphrase. They do not reveal the phrase. A legacy result is a valid phrase only by chance; when it is not, only the original fingerprint is shown.",
+      "Note the encoded fingerprint too: decode, recover-date and sskr-combine show it again on the private screen once the codes or shares are read, before the dates, so that a code written or typed wrongly shows before the dates are typed.",
       "Individual cards are not Shamir sharing: every card is needed, and each reveals a part of the encoded phrase.",
     ],
   },
@@ -608,6 +663,9 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     summary: "Turn an encoded record back into the phrase",
     about: [
       "Reads a record in any of the five formats, from text, a file or a QR code, and prints the phrase with its fingerprint. A masked record needs the same dates. A seedshift-legacy-valid record gives every possible last word, each with its fingerprint: 128 candidates for 12 words, 8 for 24.",
+      "With --ask-secrets the record is checked before the dates are asked for. Codes without an MNC1 header do not say how they were made: without --mode, MnemoCode asks whether Seedshift was used, and which. Where the codes of a masked record form a valid BIP39 phrase, their encoded fingerprint is shown before the dates, to compare with the one encode showed.",
+      "A date may then hold ? for each forgotten digit, as in recover-date: the dates are searched, and the matches listed as recover-date lists them. Before the search the wallet's fingerprint or one of its first receiving addresses, of Bitcoin or another coin, is asked for. It is needed where every date gives a valid phrase, as in seedshift mode; with seedshift-legacy, whose checksum sorts out most dates, it may be left out.",
+      "On the private screen the codes may hold ? where one cannot be read: a word number, a word, a Unicode code or a whole color, narrowed by a few letters (ab*), words joined by |, or a ? for one digit. The right codes are told by the encoded fingerprint that encode showed, by the wallet with the dates, which may hold ? too, or by a list where they are few. A Shamir share typed in place of the codes, or read from a QR code, leads to the restore from shares, the share kept as the first; after a share from a QR code the next can be read from another.",
     ],
     usage: "[OPTIONS] (--ask-secrets | --input-file <PATH> | --qr-file <PNG> | --input <TEXT>)",
     groups: [
@@ -615,13 +673,72 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         heading: "Options:",
         options: [askSecrets, encodedFile, encodedQr, encodedText, dates, decodeMode, decodeFormat],
       },
+      {
+        heading: "Answers for the private screen (--ask-secrets), where dates or codes hold ?:",
+        options: [
+          {
+            flag: "--input-kind",
+            value: "codes|share",
+            summary: "What a text that may be a Shamir share is read as",
+            details: [
+              "share restores the seed phrase from shares, the text kept as the first share; codes reads it as the encoded seed phrase. Without it, MnemoCode asks when the text is or may be a share.",
+            ],
+          },
+          {
+            flag: "--encoded-fingerprint",
+            value: "HEX",
+            summary: "Tell codes marked with ? by the encoded fingerprint that encode showed",
+            details: [
+              "No dates are needed for it. Only for codes that keep a BIP39 checksum: those of MnemoCode Seedshift, and those without Seedshift, whose encoded fingerprint is the wallet's own; not those of the Original Seedshift.",
+            ],
+          },
+          {
+            flag: "--list-candidates",
+            summary: "List the candidates instead of telling them by the wallet",
+            details: [
+              "For codes marked with ? where they are few, and for dates with ? in seedshift-legacy mode, whose checksum sorts out most dates.",
+            ],
+          },
+          {
+            ...maxCandidates,
+            summary:
+              "Most combinations a search of codes marked with ? or of dates tries without asking",
+            details: [
+              "Codes are counted with every date combination they are tried with. Without it, a search that takes up to 12 hours on this computer starts at once, and a longer one is asked for. The number of combinations and their time are shown before the search starts.",
+            ],
+          },
+          { flag: "--max-results", value: "N", summary: "Most date matches shown; default 100" },
+          {
+            ...maxTries,
+            summary: "Combinations a share repair may try without asking, after a share typed here",
+          },
+        ],
+      },
+      {
+        ...evidenceGroup,
+        heading:
+          "Wallet check, for dates or codes with ?, and for the shares when a share is typed here:",
+      },
     ],
     asks: [
-      ["Encoded record", "unless --input-file or --qr-file gives it"],
-      ["Dates", "one line; none in direct mode"],
+      ["Encoded record", "unless --input-file or --qr-file gives it; ? for a code not read"],
+      ["Share or codes", "for a text that may be a Shamir share, unless --input-kind"],
+      ["Format", "when the codes fit several forms, unless --format"],
+      ["Seedshift", "whether and which, for codes without a header, unless --mode"],
+      ["Dates", "one line, ? for what is forgotten; none in direct mode"],
+      ["Codes with ?", "how to tell them, unless an option answers it"],
+      [
+        "Wallet",
+        "for dates or codes with ?, unless an option gives it; then how many addresses, unless --scan-gap",
+      ],
+      ["Search", "one longer than 12 hours, unless --max-candidates or --max-tries allows it"],
     ],
     examples: [
       ["mnemocode decode --ask-secrets", "Record and dates on the private screen"],
+      [
+        "mnemocode decode --ask-secrets --input-file shifted.txt",
+        "Only the dates on the private screen, ? for a forgotten digit",
+      ],
       [
         "mnemocode decode --input-file shifted.txt --dates 23-09-2026",
         "A record file names its mode and format; only the dates are needed",
@@ -648,9 +765,10 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     summary: "Find a forgotten digit of a date",
     about: [
       "Tries every date that fits one to three incomplete dates, where each forgotten digit is written as ?, and lists the candidates that pass a recovery check. Every check is local and offline.",
-      "In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of 4 to 8 bits.",
+      "In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of 4 to 8 bits.",
+      "With --ask-secrets the encoded fingerprint of the codes is shown once they are read, before the dates, as decode shows it, so that a code typed wrongly shows before a long search.",
     ],
-    usage: "[OPTIONS] --dates <PATTERN ...> <RECOVERY CHECK>",
+    usage: "[OPTIONS] (--ask-secrets | --dates <PATTERN ...>) [<RECOVERY CHECK>]",
     groups: [
       {
         heading: "The record and the dates:",
@@ -662,9 +780,9 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           {
             ...dates,
             value: "PATTERN ...",
-            summary: "The dates, with ? for each forgotten digit, such as ??-09-2026",
+            summary: "The dates, with ? for what is forgotten, such as ?-09-2026",
             details: [
-              "?3-09-2026 tries days ending in 3, 0?-09-2026 days 1 to 9, ??-??-2026 every date in 2026, ????-??-?? every supported date. One to three dates may be incomplete; two identical patterns are tried once.",
+              "?3-09-2026 tries days ending in 3, 0?-09-2026 days 1 to 9, 05|15-09-2026 day 5 or 15, 15-?-2025 the 15th of every month, ?-?-2026 every date in 2026, a lone ? every supported date. One to three dates may be incomplete; two identical patterns are tried once.",
             ],
           },
           { ...decodeMode, summary: "seedshift, seedshift-legacy or seedshift-legacy-valid" },
@@ -675,14 +793,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       {
         heading: "Search limits:",
         options: [
-          {
-            flag: "--max-candidates",
-            value: "N",
-            summary: "Most dates tried; default 1000000, at most 10000000",
-            details: [
-              "The number of attempts is shown before the search starts. Every supported date is 3,652,059 attempts and needs --max-candidates 3652059. Large searches can take hours.",
-            ],
-          },
+          maxCandidates,
           {
             flag: "--max-results",
             value: "N",
@@ -699,7 +810,13 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     ],
     asks: [
       ["Encoded record", "unless --input-file or --qr-file gives it"],
+      ["Seedshift", "which, for codes without a header, unless --mode"],
       ["Dates", "one line, with ? in place of each forgotten digit"],
+      [
+        "Wallet",
+        "when the mode needs it and no option gives it; then how many addresses, unless --scan-gap",
+      ],
+      ["List passphrase", "for a candidate list, unless --candidates-passphrase-file"],
     ],
     examples: [
       [
@@ -715,7 +832,9 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         "The same with the first native SegWit receiving address, m/84'/0'/0'/0/0",
       ],
     ],
-    notes: ['Quote the patterns, as in "??-09-2026", so that the shell does not expand the ?.'],
+    notes: [
+      'Quote the patterns, as in "??-09-2026" or "05|15-09-2026", so that the shell neither expands ? nor reads | as a pipe.',
+    ],
   },
 
   "recover-word": {
@@ -750,7 +869,14 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       evidenceGroup,
       candidateListGroup,
     ],
-    asks: [["Phrase", "with ? in place of each forgotten word"]],
+    asks: [
+      ["Phrase", "with ? in place of each forgotten word"],
+      [
+        "Wallet",
+        "to check the candidates, after the search, unless an option gives it; then how many addresses, unless --scan-gap",
+      ],
+      ["List passphrase", "for a candidate list, unless --candidates-passphrase-file"],
+    ],
     examples: [
       ["mnemocode recover-word --ask-secrets", "The phrase with ? on the private screen"],
       [
@@ -776,7 +902,9 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   "sskr-combine": {
     summary: "Restore a phrase from Shamir shares",
     about: [
-      "Needs at least the threshold number of shares, in any of the share forms, which may be mixed. Type each element that cannot be read as ?: the shares are then repaired together, and every phrase that passes the hash stored in the shares is listed with its fingerprint. Shares of different sets, the same share twice and too few shares are refused.",
+      "Needs at least the threshold number of shares, in any of the share forms, which may be mixed. Type each element that cannot be read as ?: the shares are then repaired together, and every phrase that passes the hash stored in the shares is listed with its fingerprint. Shares of different sets, two different shares with the same member number and too few shares are refused; a share given twice is used once.",
+      "With --ask-secrets each share is read as soon as the answer is given: a share that cannot be read is named and typed again alone, and a result that cannot be used offers what to change. Where nothing tells which of two shares is wrong, such as two that are the same member of the set but differ, both are named and you choose which to change or leave out.",
+      "On the private screen with --mode seedshift, complete shares show the encoded fingerprint of the masked phrase they hold before the dates are asked for, to compare with the one the split showed. A date may then hold ? for each forgotten digit, also together with ? in the shares: the dates are searched as recover-date searches them, after the wallet's fingerprint or one of its first receiving addresses, of Bitcoin or another coin, is asked for, and the work, share combinations times date combinations, is shown first.",
     ],
     usage:
       "[OPTIONS] (--ask-secrets | --share <TEXT> ... | --share-file <PATH> | --share-qr <PNG>)",
@@ -795,6 +923,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           },
           dates,
           maxTries,
+          maxCandidates,
         ],
       },
       shareWalletCheck,
@@ -802,10 +931,19 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     ],
     asks: [
       ["Shares", "shares separated by semicolons, ? for each unreadable element"],
-      ["Dates", "only with --mode seedshift"],
+      ["Dates", "only with --mode seedshift; ? for each forgotten digit"],
+      [
+        "Wallet",
+        "for dates with ?, unless an option gives it; then how many addresses, unless --scan-gap",
+      ],
+      ["List passphrase", "for a candidate list, unless --candidates-passphrase-file"],
     ],
     examples: [
       ["mnemocode sskr-combine --ask-secrets", "Shares on the private screen"],
+      [
+        "mnemocode sskr-combine --ask-secrets --mode seedshift",
+        "Shares and dates on the private screen, ? for a forgotten digit",
+      ],
       [
         'mnemocode sskr-combine --share "ur:sskr/FIRST_COMPLETE_SHARE" --share "ur:sskr/SECOND_COMPLETE_SHARE"',
         "Two shares typed as text",
@@ -822,7 +960,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     ],
     notes: [
       "Individual cards of one share must all be present, in numbered order, to rebuild that share.",
-      "Replace each unreadable element with ? at its place, on any of the shares, up to 64 on one share. The shares are solved together: their checksums, the data they share and every share beyond the threshold settle most marks without trying anything, and the hash stored with the secret decides the rest. How many combinations are left, how long they take and what would help is shown first. More than one answer is listed, never chosen.",
+      "Replace each unreadable element with ? at its place, on any of the shares, up to 64 on one share. In a color or the Unicode code of a word written apart, a ? may also stand for one digit, such as #B5?0?? or 4E?0, and the digits read are used; other forms take a ? only for a whole element. The shares are solved together: their checksums, the data they share and every share beyond the threshold settle most marks without trying anything, and the hash stored with the secret decides the rest. How many combinations are left, how long they take and what would help is shown first. More than one answer is listed, never chosen.",
       "A share file has one full share per line; join paper line breaks before saving it.",
     ],
   },
@@ -836,7 +974,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     usage:
       "[OPTIONS] (--ask-secrets | --share <TEXT> ... | --share-file <PATH> | --share-qr <PNG>)",
     groups: [
-      { heading: "The shares:", options: [...shareInputs, maxTries] },
+      { heading: "The shares:", options: [...shareInputs, maxTries, maxCandidates] },
       {
         heading: "Output:",
         options: [
@@ -857,7 +995,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           {
             ...pdf,
             summary: "Save all shares in one multi-page PDF",
-            details: ["A taken name is numbered, as shares (1).pdf, never replaced."],
+            details: ["A taken name is numbered, as shares-1.pdf, never replaced."],
           },
           {
             ...cardsDir,
@@ -898,7 +1036,11 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     ],
     asks: [
       ["Shares", "shares separated by semicolons, ? for each unreadable element"],
-      ["Dates", "only with --mode seedshift"],
+      ["Dates", "only with --mode seedshift; ? for each forgotten digit"],
+      [
+        "Wallet",
+        "when several sets of shares fit, unless an option gives it; then how many addresses, unless --scan-gap",
+      ],
     ],
     examples: [
       [
@@ -952,9 +1094,17 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           pageSize,
           orientation,
           cardQr,
+          heirSheet,
+          heirSheetSize,
+          backupCheck,
         ],
       },
       identityGroup,
+    ],
+    asks: [
+      ["Phrase", "English BIP39 words"],
+      ["Dates", "only with --mode seedshift"],
+      ["Backup check", "whether to type the shares again from paper, unless --backup-check"],
     ],
     examples: [
       [
@@ -1052,8 +1202,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   "self-test": {
     summary: "Run the full self-test",
     about: [
-      "Checks every phrase length, format and mode, the sorting of dates, the public test vectors, writing and reading QR codes, Shamir shares and card export with every kind of artwork and font. Run it before using a newly built or copied installation.",
-      "A smaller core self-test runs before every command that processes data: it checks the BIP39 word list and fixed test phrases in every mode, and a failure stops the command before any input is read.",
+      "Checks every phrase length, format and mode, the sorting of dates, the public test vectors, the 24 English BIP39 seed vectors, the date and word searches with a wallet, encrypted candidate lists, the check of a written backup, marked Shamir shares repaired together and with dates, every coin address vector, the sheet for heirs, share cards, QR images beside a sheet and card export with every kind of artwork and font. The check of each feature is also given a case it must refuse. Run it before using a newly built or copied installation.",
+      "A smaller core self-test runs before every command that processes data, in about a third of a second: it checks both BIP39 word lists and fixed test phrases in every mode, and compares each feature with known answers: the BIP39 seed and fingerprint, dates with ? and |, codes and shares marked with ?, the word search, the candidate list, wallet evidence and the addresses of the twelve coins, the sheet for heirs and share cards. A failure stops the command before any input is read.",
     ],
     usage: "",
     groups: [],
@@ -1150,7 +1300,14 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "What a card holds:",
         paragraphs: [
-          "In formats 4 and 5 the phrase is a short list of color codes. A template places them into a familiar document, such as a print studio proposal with sample business cards. Each card shows one color and its code, such as Ref. 01AB63. The printed codes are the whole value: decode turns them back into the phrase. Names, companies and photographs are decoration.",
+          "In formats 4 and 5 the phrase is a short list of color codes. A template places them into a familiar document, such as a print studio proposal with sample business cards. Each card shows one color and its code, such as Ref. 01AB63. The printed codes are the whole value: decode turns them back into the phrase.",
+          "The names, companies and contact details are a decoy that makes the cards look ordinary, invented at random unless given with --card-name and the other details. Like the photographs, they are not needed for recovery.",
+        ],
+      },
+      {
+        heading: "In the menu:",
+        paragraphs: [
+          'After "Also as printable cards", the menu asks how to save the cards: one PDF of A6 or A4 sheets, separate business cards in a new folder as PDF, PNG or JPEG, or images of the sheets as PNG or JPEG. Images need pdftocairo. For sheets it then asks whether to add a QR code with all the codes of the sheet. Last, for every way of saving, it asks whether to type your own details; Enter on a detail keeps it random.',
         ],
       },
       {

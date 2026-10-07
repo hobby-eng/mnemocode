@@ -1,9 +1,14 @@
+import { coinById, type WalletEvidence } from "../bitcoin-evidence.js";
+
 const labels: Readonly<Record<string, string>> = {
   all: "all templates selection",
   "ask-secrets": "secret prompt mode",
+  "backup-check": "written-backup check",
   "bip39-passphrase-file": "BIP39 passphrase file",
   "bitcoin-address": "Bitcoin address",
   "bitcoin-profile": "Bitcoin address profile",
+  coin: "coin",
+  "coin-address": "coin address",
   "card-layout": "card layout",
   "card-qr": "card QR code",
   "candidates-file": "candidates file",
@@ -15,6 +20,7 @@ const labels: Readonly<Record<string, string>> = {
   cards: "terminal color card display",
   "cards-dir": "folder for individual card files",
   "compressed-public-key": "compressed public key",
+  "encoded-fingerprint": "encoded fingerprint",
   date: "date list",
   dates: "date list",
   event: "event label list",
@@ -26,9 +32,11 @@ const labels: Readonly<Record<string, string>> = {
   "images-dir": "image output folder",
   index: "word index",
   input: "encoded text",
+  "input-kind": "kind of the typed text",
   "input-file": "encoded input file",
   "legacy-valid-last-word": "legacy checksum word replacement",
   list: "template listing",
+  "list-candidates": "listing of every candidate",
   "master-fingerprint": "master fingerprint",
   "max-results": "result limit",
   "max-candidates": "candidate search limit",
@@ -44,6 +52,7 @@ const labels: Readonly<Record<string, string>> = {
   "progress-every": "progress interval",
   qr: "QR output file",
   "qr-file": "QR input file",
+  "scan-gap": "number of addresses scanned",
   share: "share text",
   "share-file": "share file",
   "share-format": "share format",
@@ -71,4 +80,15 @@ export function optionSubject(key: string): string {
 
 export function optionValue(key: string): string {
   return `The ${optionLabel(key)} value`;
+}
+
+/**
+ * What a wallet check compares, in the words of a result line: "master fingerprint", or for an
+ * address of another coin, "address of Litecoin", whose name may be several words, such as
+ * "Ethereum and EVM networks".
+ */
+export function evidenceLabel(evidence: WalletEvidence): string {
+  return evidence.kind === "coin-address"
+    ? `address of ${coinById(evidence.coin).name}`
+    : optionLabel(evidence.kind);
 }

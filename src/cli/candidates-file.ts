@@ -2,58 +2,45 @@
 // N on the screen. The Discovery Scanner of the multi-chain wallet tools imports it and checks every
 // candidate online. The list holds real seed phrases, and when the recovery is right, the wallet's
 // own, so it is encrypted: to the Scanner's one-time key, or under a passphrase. Without either
-// only on explicit request.
+// only on explicit request. The list, its limit, its protection and the passphrase rule are the
+// core's (core/candidate-list.ts, core/candidate-encryption.ts); this module reads the options and
+// files, asks on the private screen, writes the file and says what happened.
 
 import {
-  encryptCandidates,
-  encryptCandidatesWithPassphrase,
-  parseRecipient,
+  MIN_LIST_PASSPHRASE_LENGTH,
+  NoProtection,
+  parseListPassphrase,
+  PassphraseProtection,
+  ScannerKeyProtection,
+  type ListProtection,
 } from "../core/candidate-encryption.js";
 import {
   assertListPassphrase,
   encodeCandidateList,
   MAX_CANDIDATE_RECORDS,
+  TooManyForList,
 } from "../core/candidate-list.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { value, type ParsedArguments } from "./arguments.js";
-import { askSecret, readBoundedTextFile } from "./input.js";
+import { askSecretUntil } from "./ask.js";
+import { readBoundedTextFile } from "./input.js";
 import { discardRenamedOutput, preflightFileDestination } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
+import { saveWithRetry } from "./save-retry.js";
 import { terminalNotice } from "./terminal.js";
-
-/** Shorter passphrases are refused: the passphrase is all that protects the seed phrases. */
-const MIN_PASSPHRASE_LENGTH = 12;
-/** Tries at the private screen's passphrase question before giving up. */
-const PASSPHRASE_TRIES = 3;
-const BYTE_ORDER_MARK = "﻿";
-
-/** How the list is protected: the Scanner's key, a passphrase, or nothing on explicit request. */
-type Protection =
-  | { readonly kind: "key"; readonly recipient: string }
-  | { readonly kind: "passphrase"; passphrase?: string }
-  | { readonly kind: "plaintext" };
 
 /** Where the candidates go and how they are protected, known before any secret is asked. */
 export interface CandidatesTarget {
   readonly path: string;
-  readonly protection: Protection;
+  /** None yet when the passphrase is to be asked on the private screen (prepareCandidates). */
+  protection: ListProtection | undefined;
 }
 
 /**
- * The passphrase of a list as docs/CANDIDATES.md defines it: the text as entered, without white
- * space at its ends; from a file also without a byte order mark. A short one is refused.
+ * The protection chosen with the options; none when, on the private screen, a passphrase is asked
+ * later.
  */
-function listPassphrase(text: string): string {
-  const passphrase = text.replace(new RegExp(`^${BYTE_ORDER_MARK}`, "u"), "").trim();
-  if ([...passphrase].length < MIN_PASSPHRASE_LENGTH)
-    throw new Error(
-      `Use at least ${MIN_PASSPHRASE_LENGTH} characters for the passphrase: it is all that protects these seed phrases.`,
-    );
-  return passphrase;
-}
-
-/** The protection chosen with the options; on the private screen a passphrase may be asked later. */
-function protectionOf(args: ParsedArguments): Protection {
+function protectionOf(args: ParsedArguments): ListProtection | undefined {
   const key = value(args, "candidates-key");
   const keyFile = value(args, "candidates-key-file");
   const passphraseFile = value(args, "candidates-passphrase-file");
@@ -63,19 +50,13 @@ function protectionOf(args: ParsedArguments): Protection {
     throw new Error(
       "Choose one protection for the candidates: the Scanner's key, a passphrase, or none.",
     );
-  if (key !== undefined) return { kind: "key", recipient: parseRecipient(key) };
+  if (key !== undefined) return new ScannerKeyProtection(key);
   if (keyFile !== undefined)
-    return {
-      kind: "key",
-      recipient: parseRecipient(readBoundedTextFile(keyFile, "The Scanner's key file")),
-    };
+    return new ScannerKeyProtection(readBoundedTextFile(keyFile, "The Scanner's key file"));
   if (passphraseFile !== undefined)
-    return {
-      kind: "passphrase",
-      passphrase: listPassphrase(readBoundedTextFile(passphraseFile, "The passphrase file")),
-    };
-  if (plaintext) return { kind: "plaintext" };
-  if (args["ask-secrets"] === true) return { kind: "passphrase" };
+    return new PassphraseProtection(readBoundedTextFile(passphraseFile, "The passphrase file"));
+  if (plaintext) return new NoProtection();
+  if (args["ask-secrets"] === true) return undefined;
   throw new Error(
     "Protect the candidates with --candidates-key (the Scanner's age1 key), --candidates-key-file or --candidates-passphrase-file; --plaintext-candidates writes them without encryption.",
   );
@@ -101,9 +82,21 @@ export async function candidatesTarget(
 }
 
 /**
+ * Refuses, before any question, a BIP39 passphrase (--bip39-passphrase-file) that a list could not
+ * hold, when a list is to be saved: otherwise this would show only after the secrets were typed.
+ */
+export function assertListable(
+  target: CandidatesTarget | undefined,
+  bip39Passphrase: string,
+): void {
+  if (target !== undefined) assertListPassphrase(bip39Passphrase);
+}
+
+/**
  * Settles what a list needs before a search can take long: the passphrase, asked twice on the
- * private screen when no file gave it, and the BIP39 passphrase that the list would hold. A typing
- * error is asked again, so that it does not lose a finished search.
+ * private screen when no file gave it, and the BIP39 passphrase that the list would hold. A short
+ * passphrase, or two that differ, is asked again without a limit, so that it does not lose a
+ * finished search; only Ctrl+C leaves.
  */
 export async function prepareCandidates(
   target: CandidatesTarget | undefined,
@@ -111,22 +104,40 @@ export async function prepareCandidates(
 ): Promise<void> {
   if (target === undefined) return;
   assertListPassphrase(bip39Passphrase);
-  const { protection } = target;
-  if (protection.kind !== "passphrase" || protection.passphrase !== undefined) return;
+  if (target.protection !== undefined) return;
   if (!onPrivateScreen())
     throw new Error("Give the passphrase for the candidates with --candidates-passphrase-file.");
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      const first = listPassphrase(await askSecret("Passphrase for the candidates list:"));
-      if ((await askSecret("The same passphrase again:")).trim() !== first)
-        throw new Error("The two passphrases differ.");
-      protection.passphrase = first;
+  for (;;) {
+    const first = await askSecretUntil("Passphrase for the candidates list:", parseListPassphrase, {
+      what: `a passphrase of at least ${MIN_LIST_PASSPHRASE_LENGTH} characters`,
+    });
+    const again = await askSecretUntil("The same passphrase again:", (answer) => answer, {
+      what: "the same passphrase again",
+    });
+    if (again === first) {
+      target.protection = new PassphraseProtection(first);
       return;
-    } catch (error) {
-      if (attempt === PASSPHRASE_TRIES) throw error;
-      terminalNotice(`${(error as Error).message} Try again.`, "warning");
     }
+    // Either of the two may be the mistyped one, so both are asked again.
+    terminalNotice("The two passphrases differ: type both again.", "warning");
   }
+}
+
+/** How any search is narrowed when its candidates are more than a list holds. */
+const NARROW_ANY_SEARCH = "narrow the search, or give the wallet's fingerprint";
+
+/** How another name for the list is checked before it is used. */
+function checkedName(path: string): Promise<void> {
+  return preflightFileDestination(path, false);
+}
+
+/**
+ * For a list that is not saved after all, such as one of more candidates than a list holds: says
+ * so, and the numbered name it was given is not reported.
+ */
+export function discardCandidates(target: CandidatesTarget): void {
+  discardRenamedOutput(target.path);
+  terminalNotice("No list was saved; no file was written.", "warning");
 }
 
 /**
@@ -143,39 +154,37 @@ export async function saveCandidates(
     terminalNotice("No candidate to save; no file was written.", "warning");
     return;
   }
-  if (entropies.length > MAX_CANDIDATE_RECORDS)
-    throw new Error(
-      `${entropies.length.toLocaleString("en-US")} candidates are more than one list holds (${MAX_CANDIDATE_RECORDS.toLocaleString("en-US")}): give more of the words, or the wallet's fingerprint.`,
-    );
+  // The searches refuse a list before this; here only a fault of MnemoCode would be refused.
+  if (entropies.length > MAX_CANDIDATE_RECORDS) throw new TooManyForList(NARROW_ANY_SEARCH);
   await prepareCandidates(target, passphrase);
+  // prepareCandidates has settled the protection, or refused.
+  const protection = target.protection!;
   const records = entropies.map((entropy) => ({ entropy }));
   const plain = encodeCandidateList({ ...(passphrase === "" ? {} : { passphrase }), records });
-  const { protection } = target;
+  let saved: string | undefined;
   try {
-    const bytes =
-      protection.kind === "key"
-        ? await encryptCandidates(plain, protection.recipient)
-        : protection.kind === "passphrase"
-          ? await encryptCandidatesWithPassphrase(plain, protection.passphrase!)
-          : plain;
-    await publishNewPrivateFile(target.path, bytes);
+    const bytes = await protection.protect(plain);
+    // A save that fails on the private screen is offered again, under another name, or skipped,
+    // and the candidates stay on the screen (save-retry.ts).
+    saved = await saveWithRetry({
+      what: "The candidate list",
+      kind: "file",
+      path: target.path,
+      write: (path) => publishNewPrivateFile(path, bytes),
+      checkName: checkedName,
+    });
   } finally {
     plain.fill(0);
   }
-  const how =
-    protection.kind === "key"
-      ? "encrypted to the Scanner's key"
-      : protection.kind === "passphrase"
-        ? "encrypted with the passphrase"
-        : "NOT encrypted";
+  if (saved === undefined) return;
   terminalNotice(
-    `Saved ${entropies.length.toLocaleString("en-US")} candidate ${entropies.length === 1 ? "phrase" : "phrases"}, ${how}: ${target.path} (record N is candidate N).`,
+    `Saved ${entropies.length.toLocaleString("en-US")} candidate ${entropies.length === 1 ? "phrase" : "phrases"}, ${protection.description}: ${saved} (record N is candidate N).`,
     "success",
   );
   terminalNotice(
-    protection.kind === "plaintext"
-      ? "This file holds real seed phrases in the open: keep it offline, and delete it once the wallet is found."
-      : "Delete the file once the wallet is found.",
+    protection.encrypted
+      ? "Delete the file once the wallet is found."
+      : "This file holds real seed phrases in the open: keep it offline, and delete it once the wallet is found.",
     "warning",
   );
 }

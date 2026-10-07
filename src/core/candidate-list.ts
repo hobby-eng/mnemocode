@@ -1,6 +1,11 @@
 // The candidate list (docs/CANDIDATES.md, "The list"): BIP39 entropies with optional passphrases,
-// in the order of the search, padded with Padmé so that its size tells little. Encryption with
-// age is a separate layer (candidate-encryption.ts). Host-neutral, like the rest of the core.
+// in the order of the search, padded with Padmé so that its size tells little, and the limit of
+// records one list holds (TooManyForList). Any search can fill one: it knows nothing of words,
+// dates or shares.
+//
+// It needs nothing from the host. It does not encrypt, which is a separate layer
+// (candidate-encryption.ts), and reads or writes no file. Host-neutral: its only import is the
+// CRC-32 of sskr/checksum.ts.
 
 import { crc32 } from "../sskr/checksum.js";
 
@@ -16,6 +21,7 @@ const RECORD_PASSPHRASE_FLAG = 0b10;
  */
 export const MAX_CANDIDATE_RECORDS = 2 ** 19;
 export const MAX_PASSPHRASE_BYTES = 256;
+
 /** BIP39 entropy: 16 to 32 bytes for 12 to 24 words. */
 const ENTROPY_LENGTHS = new Set([16, 20, 24, 28, 32]);
 /** Magic, version, flags, entropy length and the 4-byte count. */
@@ -23,6 +29,20 @@ const HEADER_BYTES = 11;
 const LENGTH_BYTES = 2;
 const COUNT_BYTES = 4;
 const CRC_BYTES = 4;
+
+/**
+ * Thrown when a search finds, or surely will find, more candidates than one list holds, so that a
+ * host can tell this refusal from the others and offer what still works: narrowing the search, or
+ * a wallet check without a list. `advice` says how the search that found them is narrowed, such as
+ * "give more of the words, or a few letters of them".
+ */
+export class TooManyForList extends Error {
+  constructor(advice: string) {
+    super(
+      `More than ${MAX_CANDIDATE_RECORDS.toLocaleString("en-US")} candidates, more than one list holds: ${advice}.`,
+    );
+  }
+}
 
 export interface CandidateRecord {
   readonly entropy: Uint8Array;
@@ -74,19 +94,23 @@ function passphraseBytes(passphrase: string | undefined, what: string): Uint8Arr
 
 /** Writes a list; every record must have the same entropy length. */
 export function encodeCandidateList(list: CandidateList): Uint8Array {
-  const count = list.records.length;
+  // Array.from turns holes into undefined, which is refused below: some(), map() and forEach()
+  // would skip them, and the header would count records that the list does not hold.
+  const records = Array.from(list.records);
+  const count = records.length;
   if (count < 1 || count > MAX_CANDIDATE_RECORDS)
     throw new Error(
       `A candidate list holds 1 to ${MAX_CANDIDATE_RECORDS.toLocaleString("en-US")} records.`,
     );
-  const entropyLength = list.records[0]!.entropy.length;
+  const entropyLength = records[0]?.entropy?.length;
   if (
+    entropyLength === undefined ||
     !ENTROPY_LENGTHS.has(entropyLength) ||
-    list.records.some((r) => r.entropy.length !== entropyLength)
+    records.some((r) => r?.entropy?.length !== entropyLength)
   )
     throw new Error("Every candidate must be BIP39 entropy of one length, 16 to 32 bytes.");
   const global = passphraseBytes(list.passphrase, "passphrase for all candidates");
-  const own = list.records.map((record, index) =>
+  const own = records.map((record, index) =>
     passphraseBytes(record.passphrase, `passphrase of candidate ${index + 1}`),
   );
   const perRecord = own.some((bytes) => bytes !== undefined);
@@ -104,7 +128,7 @@ export function encodeCandidateList(list: CandidateList): Uint8Array {
     parts.push(length, bytes);
   };
   if (global) field(global);
-  list.records.forEach((record, index) => {
+  records.forEach((record, index) => {
     parts.push(record.entropy);
     if (perRecord) field(own[index] ?? new Uint8Array());
   });

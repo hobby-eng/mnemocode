@@ -1,7 +1,8 @@
+import { validateMnemonic } from "@scure/bip39";
 import { terminalNotice } from "./terminal.js";
-import { choose, writePrompt } from "./terminal-choice.js";
-import { displayWidth, readLine, terminalAvailable, withRawTerminal } from "./terminal-input.js";
-import { onPrivateScreen } from "./private-screen.js";
+import { askSecretUntil } from "./ask.js";
+import { choose } from "./terminal-choice.js";
+import { InputCancelled, terminalAvailable } from "./terminal-input.js";
 import {
   detectInputFormats,
   maximumDates,
@@ -11,10 +12,12 @@ import {
   type DateShiftDate,
   type OutputFormat,
 } from "../core.js";
-import { WORD_COUNT_SET } from "../core/words.js";
+import { DatesAnswer } from "../core/date-search.js";
+import { Masking } from "../core/masking.js";
+import { canonicalEnglishWords, englishWordlist, WORD_COUNT_SET } from "../core/words.js";
 import { readBoundedDescriptor, readBoundedFile } from "./bounded-read.js";
 import { decodeQrPngFile } from "./qr-input.js";
-import { parseRecord, type MnemoCodeRecord, type RecordMode } from "../record.js";
+import { type MnemoCodeRecord, type RecordMode } from "../record.js";
 import { type ParsedArguments, value, values } from "./arguments.js";
 
 export type EncodedFormat = Exclude<OutputFormat, "json">;
@@ -58,13 +61,19 @@ export function textInput(arguments_: ParsedArguments, key: "input" | "mnemonic"
   );
 }
 
-export async function encodedInput(arguments_: ParsedArguments): Promise<string> {
-  const qrPath = value(arguments_, "qr-file");
-  if (qrPath === undefined) return textInput(arguments_, "input");
-  if (value(arguments_, "input") !== undefined || value(arguments_, "input-file") !== undefined) {
+/** Refuses a QR image together with encoded text or a text file: only one source is read. */
+export function assertOneEncodedSource(arguments_: ParsedArguments): void {
+  if (
+    value(arguments_, "qr-file") !== undefined &&
+    (value(arguments_, "input") !== undefined || value(arguments_, "input-file") !== undefined)
+  )
     throw new Error("Choose one encoded input source: a QR image, direct text, or a text file.");
-  }
-  return decodeQrPngFile(qrPath);
+}
+
+export async function encodedInput(arguments_: ParsedArguments): Promise<string> {
+  assertOneEncodedSource(arguments_);
+  const qrPath = value(arguments_, "qr-file");
+  return qrPath === undefined ? textInput(arguments_, "input") : decodeQrPngFile(qrPath);
 }
 
 export function inputFormat(value_: string): EncodedFormat {
@@ -112,7 +121,8 @@ async function chooseInputFormat(candidates: readonly EncodedFormat[]): Promise<
     choices.map((format) => ({ label: format, digit: numbers[format], value: format })),
     { label: "Format", quit: "cancels" },
   );
-  if (selected === undefined) throw new Error("No input format was chosen.");
+  // Escape is the person leaving, as the hint says, not an error of MnemoCode.
+  if (selected === undefined) throw new InputCancelled();
   return selected;
 }
 
@@ -146,10 +156,7 @@ export function transformMode(
   embedded?: TransformMode,
 ): TransformMode {
   const explicit = value(arguments_, "mode");
-  if (
-    explicit !== undefined &&
-    !["direct", "seedshift", "seedshift-legacy", "seedshift-legacy-valid"].includes(explicit)
-  ) {
+  if (explicit !== undefined && !Masking.isMode(explicit)) {
     throw new Error(
       "The transformation mode must be direct, seedshift, seedshift-legacy, or seedshift-legacy-valid.",
     );
@@ -165,20 +172,17 @@ export function transformMode(
 }
 
 export function encodedOutputLabel(format: EncodedFormat, mode: TransformMode): string {
-  const shifted = mode === "direct" ? "" : "Shifted ";
-  switch (format) {
-    case "english":
-      return `${shifted}English BIP39 words`;
-    case "indexes":
-      return `${shifted}BIP39 word indexes (1-2048)`;
-    case "unicode":
-      return "Unicode code points";
-    case "colors":
-      return `${shifted}BIP39Colors RGB hexadecimal codes`;
-    case "colors-unicode":
-      return `${shifted}MnemoCode color Unicode code points`;
-  }
+  return `${FORM_LABELS[format]} of ${Masking.of(mode).holds}`;
 }
+
+/** The forms of encoded output, as a result names them. */
+const FORM_LABELS: Readonly<Record<EncodedFormat, string>> = {
+  english: "English BIP39 words",
+  indexes: "BIP39 word indexes (1-2048)",
+  unicode: "Unicode code points",
+  colors: "BIP39Colors RGB hexadecimal codes",
+  "colors-unicode": "MnemoCode color Unicode code points",
+};
 
 export function dates(arguments_: ParsedArguments): DateShiftDate[] {
   return values(arguments_, "date").map(parseDate);
@@ -187,32 +191,11 @@ export function dates(arguments_: ParsedArguments): DateShiftDate[] {
 /**
  * Asks for a secret at a prompt on the terminal (terminal-input.ts), the same on Linux, macOS and
  * Windows. On the private screen, which is cleared afterwards, the answer is shown as it is typed,
- * so that it can be checked; anywhere else nothing typed or pasted is shown.
+ * so that it can be checked; anywhere else nothing typed or pasted is shown. An empty answer is
+ * asked again, as every answer of askSecretUntil (ask.ts) is; the answer is trimmed.
  */
 export async function askSecret(prompt: string): Promise<string> {
-  if (!terminalAvailable()) {
-    throw new Error(
-      "--ask-secrets needs a terminal on standard input and standard error. Run the command in a terminal, or read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-).",
-    );
-  }
-  const secret = await withRawTerminal(async (next, moreWithin) => {
-    writePrompt(`${prompt} `);
-    try {
-      // Escape alone does nothing here: a slip of the finger must not lose what was typed.
-      return await readLine(next, {
-        echo: onPrivateScreen(),
-        moreWithin,
-        promptWidth: displayWidth(`${prompt} `),
-      });
-    } finally {
-      // The terminal did not show the Enter key either.
-      process.stderr.write("\n");
-    }
-  });
-  if (secret === undefined) throw new Error("Secret input was cancelled or failed.");
-  const trimmed = secret.trim();
-  if (trimmed.length === 0) throw new Error("Secret input must not be empty.");
-  return trimmed;
+  return askSecretUntil(prompt, (answer) => answer);
 }
 
 /**
@@ -251,6 +234,32 @@ export function encodedWordCount(encoded: string, format?: EncodedFormat): numbe
   return counts.size === 1 ? [...counts][0] : undefined;
 }
 
+/**
+ * A typed seed phrase as Encode takes it: 12 to 24 English BIP39 words with a valid checksum,
+ * written as the core writes them. A wrong count, a word at a place or the checksum is named, and
+ * no word is repeated.
+ */
+function typedSeedPhrase(answer: string): string {
+  const words = canonicalEnglishWords(answer);
+  if (!validateMnemonic(words.join(" "), englishWordlist))
+    throw new Error("These words fail the BIP39 checksum: check each word and their order.");
+  return words.join(" ");
+}
+
+/**
+ * The dates of one answer for Encode, which never searches them: every date in full, each wrong
+ * one named by its place and never repeated, and at most one for every three words, by the rules
+ * and words of the core's dates (DatesAnswer.parse without ?).
+ */
+function typedDates(line: string, wordCount: number | undefined): DateShiftDate[] {
+  return DatesAnswer.parse(line, { wordCount, patterns: false }).known;
+}
+
+/**
+ * The seed phrase and the dates of Encode with --ask-secrets, each asked again until it can be
+ * used (askSecretUntil): the phrase first, checked at once, then the dates alone, which a second
+ * try asks without the phrase. Event labels given with --event need a date each.
+ */
 export async function promptedEncodeInputs(
   arguments_: ParsedArguments,
   mode: TransformMode,
@@ -265,38 +274,21 @@ export async function promptedEncodeInputs(
       "--ask-secrets cannot be combined with a mnemonic supplied on the command line, a mnemonic file, or command-line dates.",
     );
   }
-  const mnemonic = await askSecret("Seed phrase (English BIP39 words):");
+  const mnemonic = await askSecretUntil("Seed phrase (English BIP39 words):", typedSeedPhrase, {
+    what: "the words of the seed phrase",
+  });
   if (mode === "direct") return { mnemonic, dates: [] };
-  const dateLine = await askSecret(datesPrompt(wordCountOf(mnemonic)));
-  return { mnemonic, dates: dateLine.split(/\s+/u).filter(Boolean).map(parseDate) };
-}
-
-/**
- * The answers of recover-date asked by --ask-secrets: the encoded record, which a record file or a
- * QR image may give instead, and the dates with ? for each forgotten digit.
- */
-export async function promptedRecoveryInputs(
-  arguments_: ParsedArguments,
-  checkRecord: (record: MnemoCodeRecord | undefined) => void = () => {},
-): Promise<{ readonly encoded: string; readonly dateValues: string[] } | undefined> {
-  if (arguments_["ask-secrets"] !== true) return undefined;
-  if (value(arguments_, "input") !== undefined || values(arguments_, "date").length > 0) {
-    throw new Error(
-      "--ask-secrets cannot be combined with direct encoded text or command-line dates.",
-    );
-  }
-  const fromFile =
-    value(arguments_, "input-file") !== undefined || value(arguments_, "qr-file") !== undefined;
-  // Read first, so that the question for dates can say how many the seed phrase takes.
-  const encoded = fromFile
-    ? await encodedInput(arguments_)
-    : await askSecret("Encoded seed phrase or record:");
-  const record = parseRecord(encoded);
-  // What the record says, such as its mode, is checked before the dates are typed.
-  checkRecord(record);
-  const wordCount = encodedWordCount(record?.payload ?? encoded, record?.format);
-  const dateLine = await askSecret(
-    `Dates with ? for each forgotten digit (${mostDates(wordCount)}one to three of them incomplete):`,
+  const wordCount = wordCountOf(mnemonic);
+  const labels = values(arguments_, "event").length;
+  const dates = await askSecretUntil(
+    datesPrompt(wordCount),
+    (line) => {
+      const typed = typedDates(line, wordCount);
+      if (typed.length < labels)
+        throw new Error(`There are ${labels} event labels (--event): type a date for each.`);
+      return typed;
+    },
+    { what: "the dates" },
   );
-  return { encoded, dateValues: dateLine.split(/\s+/u).filter(Boolean) };
+  return { mnemonic, dates };
 }

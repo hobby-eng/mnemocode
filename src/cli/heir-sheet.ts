@@ -1,13 +1,8 @@
-// The words of the optional sheet for heirs (encode --heir-sheet, README "Instructions for heirs").
-// It says what the backup is and how to restore it with the menu, and leaves room for a hint
-// written by hand. It never names anything that would help whoever finds it: no codes, no dates,
-// no fingerprint (it would let a finder test guessed dates) and no places where shares are kept
-// (listing them all on one sheet would undo the point of splitting the backup). It prints one
-// address, the repository's, whose README leads to the guide for heirs (docs/HEIRS.md). Nothing
-// else is linked: the sheet may be kept for decades, and a page elsewhere can change, vanish, or
-// pass to someone who abuses its address.
+// The sheet for heirs on the command line (encode --heir-sheet): its route through the start menu,
+// its size, and saving it. The words are the library's (export/heir-sheet-text.ts), the layout too
+// (export/heir-sheet.ts); the route names the menu's entries, questions and answers, and the one
+// address it prints is the repository's, whose README leads to the guide for heirs.
 
-import { MNEMOCODE_VERSION } from "../version.js";
 // The renderer takes its font through the platform interface; Node.js supplies it here.
 import "../export/platform-node.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
@@ -16,38 +11,30 @@ import {
   A6,
   renderHeirSheet,
   type HeirSheetFormat,
-  type HeirSheetSection,
   type HeirSheetText,
 } from "../export/heir-sheet.js";
+import {
+  HeirInstructions,
+  type HeirMode,
+  type HeirRoute,
+  type HeirSheetFacts,
+  type HeirShareMode,
+} from "../export/heir-sheet-text.js";
 import { type ParsedArguments, value } from "./arguments.js";
-import type { EncodedFormat } from "./input.js";
-import type { ShareFormat } from "../sskr/transport.js";
+import { MENU_ENTRY_NAMES, shownEntry } from "./menu-entries.js";
+import { MNEMOCODE_VERSION } from "../version.js";
 import { README_URL, terminalNotice } from "./terminal.js";
 
-/** What was made: the seed phrase in one encoded form, or Shamir shares of it. */
-export type HeirBackup =
-  | { readonly kind: "encoded"; readonly format: EncodedFormat }
-  | {
-      readonly kind: "shares";
-      readonly format: ShareFormat;
-      readonly threshold: number;
-      readonly count: number;
-    };
-
-export interface HeirSheetFacts {
-  readonly backup: HeirBackup;
-  readonly mode: "direct" | "seedshift" | "seedshift-legacy";
-  /** How many dates mask the seed phrase; none in direct mode. */
-  readonly dates: number;
-}
+export type { HeirBackup, HeirSheetFacts } from "../export/heir-sheet-text.js";
 
 /**
- * The menu entries, questions and answers that the steps name. A test checks them against the
- * menu (src/cli/menu.ts), so that the sheet leads through the menu as it is.
+ * The menu entries, questions and answers that the steps name, the entries as menu-entries.ts
+ * names them. A test checks them against the menu (src/cli/menu.ts), so that the sheet leads
+ * through the menu as it is.
  */
 export const HEIR_MENU = {
   decode: {
-    entry: "2 Decode numbers, codes or colors back into a seed phrase",
+    entry: shownEntry(MENU_ENTRY_NAMES.decode),
     source: "Type or paste it",
     question: "Was Seedshift used when it was encoded?",
     answers: {
@@ -57,150 +44,55 @@ export const HEIR_MENU = {
     },
   },
   restore: {
-    entry: "4 Restore a seed phrase from Shamir shares",
+    entry: shownEntry(MENU_ENTRY_NAMES.restore),
     question: "Was Seedshift used before it was split?",
     answers: { direct: "No", seedshift: "Yes" },
   },
-  recover: { digit: 5, entry: "5 Find a forgotten word, a date digit or a share code" },
+  recover: {
+    digit: MENU_ENTRY_NAMES.recover.digit,
+    entry: shownEntry(MENU_ENTRY_NAMES.recover),
+  },
 } as const;
 
-/** How each encoded form looks, so that an heir recognises the backup. */
-const ENCODED_LOOKS: Readonly<Record<EncodedFormat, string>> = {
-  english: "English words that look like a seed phrase but are masked",
-  indexes: "numbers from 1 to 2048, one per word",
-  unicode: "codes of four digits and letters A to F, one per word",
-  colors: "color codes such as #1EAB91, on paper or on printed cards",
-  "colors-unicode": "codes of digits and letters A to F that stand for colors",
-};
-
-/** How each share format looks. */
-const SHARE_LOOKS: Readonly<Record<ShareFormat, string>> = {
-  words: "words such as tuna next keep gyro",
-  ur: "codes that start with ur:sskr/",
-  indexes: "numbers from 1 to 2048",
-  unicode: "codes of four digits and letters A to F",
-  colors: "color codes such as #1EAB91, on paper or on printed cards",
-  "colors-unicode": "codes of digits and letters A to F that stand for colors",
-};
-
-function needs({ backup, mode, dates }: HeirSheetFacts): string[] {
-  const lines =
-    backup.kind === "shares"
-      ? [
-          `Any ${backup.threshold} of the ${backup.count} Shamir shares, written as ${SHARE_LOOKS[backup.format]}.`,
-        ]
-      : mode === "direct" && backup.format === "english"
-        ? ["The seed phrase itself: English words, not masked."]
-        : [`The backup: ${ENCODED_LOOKS[backup.format]}.`];
-  lines.push(
-    mode === "direct"
-      ? "No secret dates are needed."
-      : dates === 1
-        ? "The owner's secret date (see the back). It is written nowhere; the hint may lead to it."
-        : `The owner's ${dates} secret dates (see the back). They are written nowhere; the hint may lead to them.`,
-  );
-  return lines;
+/** ", then `dates`" after what is typed, or nothing when no dates are asked. */
+function thenDates(dates: string | undefined): string {
+  return dates === undefined ? "" : `, then ${dates}`;
 }
 
-function steps({ backup, mode, dates }: HeirSheetFacts): string[] {
-  const restore = "Open the wallet with this seed phrase in a wallet program (see below).";
-  if (backup.kind === "encoded" && backup.format === "english" && mode === "direct")
-    return [restore];
-  // As the prompts ask for them (datesPrompt, and the share prompt of sskr-command.ts).
-  const withDates =
-    mode === "direct"
-      ? ""
-      : `, then the secret ${dates === 1 ? "date" : "dates"} as day-month-year (23-09-2026)`;
-  const start = [
+/**
+ * The way through MnemoCode's start menu, as a double-click opens it. What is typed follows the
+ * prompts: the backup or the shares separated by ";" (the share prompt of sskr-command.ts), then
+ * the dates (datesPrompt).
+ */
+const MENU_ROUTE: HeirRoute = {
+  subtitle: `Made with MnemoCode ${MNEMOCODE_VERSION}, free and offline.`,
+  address: README_URL,
+  start: [
     `On a computer you trust, open ${README_URL}, download MnemoCode under "Releases" and check it as the guide for heirs there says.`,
     "Go offline, then start MnemoCode by a double-click: it shows a menu.",
-  ];
-  if (backup.kind === "shares") {
-    if (mode === "seedshift-legacy") throw new Error("Shares cannot use the original Seedshift.");
+  ],
+  decode(mode: HeirMode, dates: string | undefined): string[] {
+    const { entry, source, question, answers } = HEIR_MENU.decode;
+    return [
+      `Choose "${entry}", then "${source}". To "${question}" answer "${answers[mode]}".`,
+      `Type the backup${thenDates(dates)}. MnemoCode shows the seed phrase.`,
+    ];
+  },
+  restore(mode: HeirShareMode, threshold: number, dates: string | undefined): string[] {
     const { entry, question, answers } = HEIR_MENU.restore;
     return [
-      ...start,
       `Choose "${entry}". To "${question}" answer "${answers[mode]}".`,
-      `Type any ${backup.threshold} shares, separated by ";"${withDates}. MnemoCode shows the seed phrase.`,
-      restore,
+      `Type any ${threshold} shares, separated by ";"${thenDates(dates)}. MnemoCode shows the seed phrase.`,
     ];
-  }
-  const { entry, source, question, answers } = HEIR_MENU.decode;
-  return [
-    ...start,
-    `Choose "${entry}", then "${source}". To "${question}" answer "${answers[mode]}".`,
-    `Type the backup${withDates}. MnemoCode shows the seed phrase.`,
-    restore,
-  ];
-}
+  },
+  dateDigitHelp: `If a digit of a date is unclear, menu entry ${HEIR_MENU.recover.digit} tries every possibility.`,
+};
 
-function trouble({ backup, mode }: HeirSheetFacts): string {
-  const advice = [
-    "An error usually means a mistyped code or word: check each one against the paper.",
-  ];
-  // Unreadable elements of a share are filled in from its checksum (src/sskr/repair.ts).
-  if (backup.kind === "shares") advice.push("Type ? for each code you cannot read.");
-  if (mode !== "direct")
-    advice.push(
-      `If a digit of a date is unclear, menu entry ${HEIR_MENU.recover.digit} tries every possibility.`,
-    );
-  return advice.join(" ");
-}
+const MENU_INSTRUCTIONS = new HeirInstructions(MENU_ROUTE);
 
-function hintNote({ mode }: HeirSheetFacts): string {
-  const note = "By hand: what only your heirs will understand";
-  return mode === "direct" ? `${note}.` : `${note}, never the dates themselves.`;
-}
-
-/** The back: what someone who has never used a wallet needs to know first. */
-function basics({ mode }: HeirSheetFacts): HeirSheetSection[] {
-  const sections: HeirSheetSection[] = [
-    {
-      heading: "Seed phrase",
-      paragraphs: [
-        "Cryptocurrency is recorded on a public ledger, not at a bank. Whoever knows the seed phrase of a wallet, 12 to 24 English words from the BIP39 list, can spend what it holds; any BIP39 wallet program opens it.",
-      ],
-    },
-  ];
-  if (mode !== "direct")
-    sections.push({
-      heading: "Secret dates",
-      paragraphs: [
-        // The example is the one of the README (How checksum-valid Seedshift works).
-        'The owner masked the words with dates of their choosing, such as birthdays: the year, month and day of each date move the words along the BIP39 list of 2048 words, like a simple cipher (with 23-09-2026, "abandon" becomes "wool"). Only the same dates move them back; a wrong date gives no error, just another seed phrase with an empty wallet. The dates have nothing to do with today\'s date.',
-      ],
-    });
-  sections.push(
-    {
-      heading: "Opening the wallet",
-      paragraphs: [
-        'Install a well-known wallet program from its own website, choose "Restore" (not "Create") and type the seed phrase. Wallet empty? Check the dates, try the program the owner used, or look for a BIP39 passphrase, an extra word that MnemoCode does not keep. Then move everything to a new wallet of your own.',
-      ],
-    },
-    {
-      heading: "Scams",
-      paragraphs: [
-        "Nobody honest asks for a seed phrase; whoever has it can take everything for good. For help, ask someone you trust to sit beside you, and keep the words in your own hands.",
-      ],
-    },
-  );
-  return sections;
-}
-
+/** The words of the sheet for `facts`, with the steps through the start menu. */
 export function heirSheetText(facts: HeirSheetFacts): HeirSheetText {
-  return {
-    title: "How to restore this wallet backup",
-    subtitle: `Made with MnemoCode ${MNEMOCODE_VERSION}, free and offline.`,
-    newcomer: 'The steps are on the back. New to wallets? Read "The basics" there first.',
-    needs: needs(facts),
-    hintNote: hintNote(facts),
-    steps: steps(facts),
-    trouble: trouble(facts),
-    warning: `Never type the backup${facts.mode === "direct" ? "" : ", the dates"} or the seed phrase into a website or send them to anyone.`,
-    footer: "This sheet holds no secret. Keep it apart from the backup.",
-    basicsTitle: "The basics",
-    basics: basics(facts),
-  };
+  return MENU_INSTRUCTIONS.text(facts);
 }
 
 /** The sizes that --heir-sheet-size takes; A5 unless it says otherwise. */

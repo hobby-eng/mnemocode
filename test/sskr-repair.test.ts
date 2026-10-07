@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { readRepairableShare } from "../src/sskr/repair.js";
+import { markCount, markProblem, placesWithin, readRepairableShare } from "../src/sskr/repair.js";
 import {
   readShare,
   writeShare,
@@ -223,4 +223,154 @@ describe("Several unreadable SSKR elements", () => {
       expect(await combineSskrShares(restore), format).toBe(expected);
     }
   }, 120_000);
+});
+
+describe("Unreadable digits inside a color or a Unicode code", () => {
+  const vector = vectors.deterministic[0]!;
+  const share = vector.shares[0]!;
+
+  /** The share in `format` with the elements at `places` marked whole. */
+  function wholeMarks(format: ShareFormat, places: readonly number[]): string {
+    const parts = units(share, format);
+    for (const place of places) parts[place] = "?";
+    return join(parts, format);
+  }
+
+  /** The share in `format` with the digits at `digits` (from 0, after any #) of each element unreadable. */
+  function markDigits(format: ShareFormat, marks: Record<number, readonly number[]>): string {
+    const parts = units(share, format);
+    for (const [place, digits] of Object.entries(marks)) {
+      const part = parts[Number(place)]!;
+      const prefix = part.startsWith("#") ? "#" : "";
+      const symbols = [...part.slice(prefix.length)];
+      for (const digit of digits) symbols[digit] = "?";
+      parts[Number(place)] = prefix + symbols.join("");
+    }
+    return join(parts, format);
+  }
+
+  it("uses the digits read of colors: three colors missing two digits each are settled", () => {
+    const colors = units(share, "colors");
+    // Places 4 to 6 hold only the secret, which nothing but the checksum settles.
+    const typed = markDigits("colors", { 4: [4, 5], 5: [0, 3], 6: [1, 2] });
+    const read = readRepairableShare(typed);
+    expect(read.ur).toBe(share);
+    expect(read.filled).toEqual(
+      [4, 5, 6].map((place) => ({ position: place + 1, value: colors[place] })),
+    );
+    // The same colors marked whole leave too many open bits for one share alone.
+    expect(() => readRepairableShare(wholeMarks("colors", [4, 5, 6]))).toThrow(
+      /Too many|shares fit/u,
+    );
+    // A lone ?, ?????? and #? are each the whole color.
+    for (const whole of ["?", "??????", "#?"])
+      expect(
+        readRepairableShare(
+          join(
+            colors.map((color, place) => (place === 5 ? whole : color)),
+            "colors",
+          ),
+        ).ur,
+      ).toBe(share);
+  });
+
+  it("refuses a color or a code whose digits read are wrong, or that has too few symbols", () => {
+    const colors = units(share, "colors");
+    const wrong = [...colors];
+    const digit = wrong[5]![1] === "0" ? "1" : "0";
+    // The first digit read wrong, the last one unread: six symbols still.
+    wrong[5] = `#${digit}${wrong[5]!.slice(2, 6)}?`;
+    expect(() => readRepairableShare(join(wrong, "colors"))).toThrow(/No valid share/u);
+    const short = [...colors];
+    short[9] = `${short[9]!.slice(0, 5)}?`;
+    expect(() => readRepairableShare(join(short, "colors"))).toThrow(
+      "Color 10 has 5 of 6 symbols: write a ? for each digit that cannot be read, or a lone ? for the whole color.",
+    );
+    const codes = units(share, "unicode");
+    codes[3] = `${codes[3]!.slice(0, 2)}?`;
+    expect(() => readRepairableShare(join(codes, "unicode"))).toThrow(
+      "Code 4 has 3 of 4 symbols: write a ? for each digit that cannot be read, or a lone ? for the whole code.",
+    );
+  });
+
+  it("tries the words whose Unicode code fits the digits read", () => {
+    const codes = units(share, "unicode");
+    const typed = markDigits("unicode", { 4: [3], 7: [2], 9: [1], 12: [3], 15: [2] });
+    const read = readRepairableShare(typed);
+    expect(read.ur).toBe(share);
+    expect(read.filled.map((element) => element.value)).toEqual(
+      [4, 7, 9, 12, 15].map((place) => codes[place]),
+    );
+    // Five whole codes are more than six marks' worth of checks alone can settle without variants.
+    expect(() => readRepairableShare(wholeMarks("unicode", [4, 7, 9, 12, 15]))).toThrow();
+  });
+
+  it("reads a lone ? joined to a code as a whole element, as before digit marks", () => {
+    const colors = units(share, "colors");
+    // Spaces everywhere but at the mark, which is joined to the color after it or before it.
+    for (const joined of [
+      [...colors.slice(0, 4), `#?${colors[5]}`, ...colors.slice(6)],
+      [...colors.slice(0, 3), `${colors[3]}#?`, ...colors.slice(5)],
+    ])
+      expect(readRepairableShare(joined.join(" ")).ur).toBe(share);
+    const codes = units(share, "unicode");
+    const glued = [...codes.slice(0, 4), `?${codes[5]}`, ...codes.slice(6)];
+    expect(readRepairableShare(glued.join(" ")).ur).toBe(share);
+    // A code all of whose digits are ? is the whole code.
+    expect(
+      readRepairableShare(
+        join(
+          codes.map((code, i) => (i === 5 ? "????" : code)),
+          "unicode",
+        ),
+      ).ur,
+    ).toBe(share);
+  });
+
+  it("names a misplaced ? by the form the other codes are in", () => {
+    const colors = units(share, "colors");
+    const joined = colors.map((color, i) => (i === 2 ? color.slice(0, 4) + "?" : color)).join("");
+    expect(markProblem(joined)).toBe(
+      "color 3 has 4 of 6 symbols: write a ? for each digit that cannot be read, or a lone ? for the whole color.",
+    );
+    const colorCodes = units(share, "colors-unicode");
+    colorCodes[4] = `${colorCodes[4]!.slice(0, 3)}?`;
+    expect(markProblem(colorCodes.join(" "))).toBe(
+      "code 5 has a ? among its digits: Color Unicode codes take only a lone ? for a whole code.",
+    );
+    const numbers = units(share, "indexes");
+    numbers[2] = `${numbers[2]!.slice(0, -1)}?`;
+    expect(markProblem(numbers.join(" "))).toBe(
+      "word number 3 has a ? among its digits: word numbers take only a lone ? for a whole word number.",
+    );
+    // Words of another kind, and texts in no form, are left to the reading.
+    expect(markProblem("able ac?d zoom")).toBeUndefined();
+    expect(markProblem("? ? ?")).toBeUndefined();
+  });
+
+  it("chooses the units to try as whole numbers within the limit, however large their counts", () => {
+    const units = [{ count: 2 }, { count: 2 ** 60 }, { count: 3 }, { count: 2 ** 1000 }];
+    expect(placesWithin(units, 6)).toEqual([{ count: 2 }, { count: 3 }]);
+    expect(placesWithin(units, 1)).toEqual([]);
+    expect(placesWithin([{ count: Number.MAX_SAFE_INTEGER }], 64)).toEqual([]);
+  });
+
+  it("counts a code with ? among its digits as one marked element", () => {
+    expect(markCount("#B5?0?? ? #123456")).toBe(2);
+    // A run of ? alone counts each ?: each may stand for a whole element.
+    expect(markCount("4E?0 4E00 ????")).toBe(5);
+    expect(markCount("ur:sskr/ab??cd")).toBe(2);
+    expect(markCount("able ? ? zoom")).toBe(2);
+    const colors = units(share, "colors");
+    const partly = (count: number) =>
+      join(
+        colors.map((color, place) =>
+          place < count ? `${color.slice(0, 3)}??${color.slice(5)}` : color,
+        ),
+        "colors",
+      );
+    expect(markCount(partly(6))).toBe(6);
+    expect(() => readRepairableShare(partly(6))).not.toThrow(/at most 6/u);
+    expect(() => readRepairableShare(partly(7))).toThrow(/at most 6/u);
+  });
 });

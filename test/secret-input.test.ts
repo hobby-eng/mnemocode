@@ -86,12 +86,18 @@ describe("secret input", () => {
     expect(terminal.switched).toBe(0);
   });
 
-  it.each([
-    ["an empty answer", "   \r", "must not be empty"],
-    ["the end of the input", "", "cancelled or failed"],
-  ])("refuses %s", async (_, answers, message) => {
-    terminal.answers = answers;
-    await expect(askSecret("Seed phrase:")).rejects.toThrow(message);
+  it("asks again after an empty answer, with one line that repeats nothing typed", async () => {
+    const notices = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    terminal.answers = "   \rtest only\r";
+    expect(await askSecret("Seed phrase:")).toBe("test only");
+    expect(notices).toHaveBeenCalledWith("Type an answer, or press Ctrl+C to stop.");
+    expect(written.join("").match(/Seed phrase: /gu)).toHaveLength(2);
+  });
+
+  it("cancels at the end of the input instead of asking again", async () => {
+    terminal.answers = "";
+    await expect(askSecret("Seed phrase:")).rejects.toBeInstanceOf(InputCancelled);
+    expect(written.join("").match(/Seed phrase: /gu)).toHaveLength(1);
   });
 
   it("stops at Ctrl+C", async () => {
@@ -119,8 +125,11 @@ describe("secret input", () => {
       terminal.answers = "23-09-2026\r";
       await runDecode(parseArguments(["--ask-secrets", "--input-file", record]));
       expect(printed).toHaveBeenCalledWith(TEST_PHRASE);
-      // The record's 12 words take up to 4 dates, and the question says so.
-      expect(written.join("")).toContain("Dates (up to 4, DD-MM-YYYY, separated by spaces):");
+      // The record's 12 words take up to 4 dates, and the question says so; decode searches a
+      // date with ? for a forgotten digit.
+      expect(written.join("")).toContain(
+        "Dates (up to 4, DD-MM-YYYY, ? for what is forgotten, separated by spaces):",
+      );
       expect(written.join("")).not.toContain("Encoded seed phrase");
     } finally {
       await rm(directory, { recursive: true, force: true });

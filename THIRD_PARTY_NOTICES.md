@@ -22,9 +22,10 @@ provided by the `@scure/bip39` dependency in this project.
 ## @scure libraries
 
 MnemoCode depends on [`@scure/bip39`](https://github.com/paulmillr/scure-bip39),
-[`@scure/bip32`](https://github.com/paulmillr/scure-bip32), and
-[`@scure/btc-signer`](https://github.com/paulmillr/scure-btc-signer), which are
-MIT licensed. Their pinned versions are recorded in `package.json` and the
+[`@scure/bip32`](https://github.com/paulmillr/scure-bip32),
+[`@scure/btc-signer`](https://github.com/paulmillr/scure-btc-signer), and
+[`@scure/base`](https://github.com/paulmillr/scure-base), which reads and writes the
+addresses of the other coins, which are MIT licensed. Their pinned versions are recorded in `package.json` and the
 lockfile after installation.
 
 ## age encryption and @noble libraries
@@ -38,7 +39,8 @@ carry no license header, so this notice names it. It uses
 [`@noble/post-quantum`](https://github.com/paulmillr/noble-post-quantum) and
 [`@scure/base`](https://github.com/paulmillr/scure-base) by Paul Miller, which are MIT
 licensed. MnemoCode also uses `@noble/hashes` directly for the checksum test of the word
-search. Their pinned versions are recorded in `package.json` and the lockfile.
+search and, with `@noble/curves`, for the addresses of the other coins: SHA-256,
+RIPEMD-160 and Keccak-256 of their keys, and secp256k1 and Taproot output keys. Their pinned versions are recorded in `package.json` and the lockfile.
 
 ## QR generation and reading
 

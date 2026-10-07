@@ -228,3 +228,108 @@ describe("Joint repair of the shares of one set", () => {
     await expect(search).rejects.toThrow("stopped");
   });
 });
+
+describe("Joint repair with digits read in part", () => {
+  const vector = vectors.deterministic[0]!;
+
+  /** `share` in `format` with ? at the digits `digits` of each element at `places`. */
+  function markDigits(
+    share: string,
+    format: ShareFormat,
+    places: readonly number[],
+    digits: readonly number[],
+  ): string {
+    const parts = units(share, format);
+    for (const place of places) {
+      const part = parts[place]!;
+      const prefix = part.startsWith("#") ? "#" : "";
+      const symbols = [...part.slice(prefix.length)];
+      for (const digit of digits) symbols[digit] = "?";
+      parts[place] = prefix + symbols.join("");
+    }
+    return join(parts, format);
+  }
+
+  it("settles colors missing digits on both shares, where whole colors need a long search", async () => {
+    const typed = [
+      markDigits(vector.shares[0]!, "colors", [4, 5, 6], [4, 5]),
+      markDigits(vector.shares[1]!, "colors", [6, 7], [3, 4, 5]),
+    ];
+    const plan = await planJointRepair(typed);
+    expect(plan.assessment.openBits).toBe(0);
+    const found = await plan.search();
+    expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
+    expect(found[0]!.shares.map((share) => share.ur)).toEqual(vector.shares.slice(0, 2));
+    const whole = await planJointRepair([
+      mark(vector.shares[0]!, "colors", [4, 5, 6]),
+      mark(vector.shares[1]!, "colors", [6, 7]),
+    ]);
+    expect(whole.assessment.openBits).toBeGreaterThan(32);
+  }, 60_000);
+
+  it("settles Unicode codes missing a digit each by the words that fit them", async () => {
+    const typed = [
+      markDigits(vector.shares[0]!, "unicode", [4, 7, 9, 12, 15], [3]),
+      markDigits(vector.shares[1]!, "unicode", [5, 8, 10, 13], [2]),
+    ];
+    const plan = await planJointRepair(typed);
+    expect(plan.assessment.verdict).toBe("determined");
+    const found = await plan.search();
+    expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
+    expect(found[0]!.shares[0]!.filled.map((element) => element.position)).toEqual([
+      5, 8, 10, 13, 16,
+    ]);
+  }, 60_000);
+
+  it("tries words only within a bound, so that even many partly read codes are assessed in seconds", async () => {
+    // Three missing digits of six codes on each share: about 200 words fit each code.
+    const typed = vector.shares
+      .slice(0, 2)
+      .map((share) => markDigits(share, "unicode", [3, 5, 7, 9, 11, 13], [1, 2, 3]));
+    const plan = await planJointRepair(typed);
+    expect(plan.assessment.verdict).not.toBe("no-fit");
+    // The first sixteen codes of all three shares of a 24-word set, each missing its last digit,
+    // took minutes when every word was tried (AUD review of the digit marks).
+    const long = vectors.deterministic[4]!;
+    const started = Date.now();
+    const many = await planJointRepair(
+      long.shares.map((share) =>
+        markDigits(
+          share,
+          "unicode",
+          Array.from({ length: 16 }, (_, i) => i + 1),
+          [3],
+        ),
+      ),
+    );
+    expect(Date.now() - started).toBeLessThan(15_000);
+    expect(many.assessment.verdict).not.toBe("no-fit");
+  }, 120_000);
+
+  it("says that shares are too few, not that they do not fit, with partly read codes", async () => {
+    const shares = await splitSskrMnemonic(mnemonicOf(vector), 3, 6);
+    const typed = shares
+      .slice(0, 2)
+      .map((share) => markDigits(share, "unicode", [12, 14, 16, 18], [3]));
+    const plan = await planJointRepair(typed);
+    expect(plan.assessment.verdict).toBe("not-enough");
+    expect(plan.assessment.reason).toBe(
+      "Too few shares: the threshold of this set needs more of them.",
+    );
+  }, 60_000);
+
+  it("hears a stop between the shares and between the choices of member numbers", async () => {
+    const stop = new AbortController();
+    const typed = vector.shares.map((share) =>
+      markDigits(
+        share,
+        "unicode",
+        Array.from({ length: 12 }, (_, i) => i + 1),
+        [3],
+      ),
+    );
+    const planned = planJointRepair(typed, { signal: stop.signal });
+    stop.abort(new Error("stopped"));
+    await expect(planned).rejects.toThrow("stopped");
+  }, 60_000);
+});

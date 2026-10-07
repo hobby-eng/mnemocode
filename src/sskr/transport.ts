@@ -1,3 +1,14 @@
+// The forms of an SSKR share and their transport: the UR with its CBOR and CRC-32, standard
+// Bytewords, and MnemoCode's own forms that look like an encoded seed phrase (BIP39 word numbers,
+// Unicode codes, RGB colors and colors as Unicode codes), each read back by its own checks; a
+// share's metadata (its set, group and member); and the checks of a set before the SSKR library
+// sees it. Share, at the end, is the entry: one share as read, written in any form; the functions
+// before it stay for the hosts that already call them.
+//
+// Needs from the host: nothing.
+// Does not: split, restore or repair shares (split.ts, share-set.ts, repair.ts, joint-repair.ts).
+// Its messages never repeat a share.
+
 import { bytewords } from "./bytewords-list.js";
 import { crc32, shareMask } from "./checksum.js";
 import { colorsToUnicode, unicodeToColorCodes } from "../core/colors.js";
@@ -382,8 +393,19 @@ export function normalizeShare(value: string): string {
  * Checks that the QR code of a share card holds the share its color references print, in
  * whatever form the QR code writes it.
  */
-export function assertShareQr(colors: readonly string[], payload: string): void {
-  if (readShare(payload).ur !== colorsToShare(colors.join(" ")))
+/**
+ * Refuses a share QR code that holds another share than the cards beside it print: the share of
+ * the colors, or, where the cards print `labels`, the share's codes in another form, the share
+ * that those spell.
+ */
+export function assertShareQr(
+  colors: readonly string[],
+  payload: string,
+  labels?: readonly string[],
+): void {
+  const printed =
+    labels === undefined ? colorsToShare(colors.join(" ")) : readShare(labels.join(" ")).ur;
+  if (readShare(payload).ur !== printed)
     throw new Error("Share QR does not match the printed references.");
 }
 
@@ -432,4 +454,86 @@ export function validateShareSet(records: readonly string[], requireQuorum = tru
     throw new Error("Not enough SSKR shares to meet the recorded threshold.");
   }
   return shares;
+}
+
+/** What toString, toJSON and Node.js's inspect show of a share: never the share. */
+const REDACTED_SHARE = "[Share: redacted]";
+
+/**
+ * One SSKR share, as read from any of its forms: its UR, the form it was written in, and its
+ * metadata. A class, so that a share exists only once it reads, its own checks holding; it writes
+ * itself in any form; it never changes; and, being part of a secret, it never shows through
+ * toString, toJSON or Node.js's inspect.
+ */
+export class Share {
+  readonly #ur: string;
+  readonly #format: ShareFormat;
+
+  private constructor(ur: string, format: ShareFormat) {
+    this.#ur = ur;
+    this.#format = format;
+  }
+
+  /** The forms that a share is written in. */
+  static readonly FORMATS: readonly ShareFormat[] = Object.freeze([
+    "ur",
+    "words",
+    "indexes",
+    "unicode",
+    "colors",
+    "colors-unicode",
+  ]);
+
+  /** Reads a share in any of its forms; throws why it cannot be read, without repeating it. */
+  static read(text: string): Share {
+    const { ur, format } = readShare(text);
+    return new Share(ur, format);
+  }
+
+  /** Whether `text` reads as a whole share: its own checksum makes other text pass one in 2^32. */
+  static reads(text: string): boolean {
+    try {
+      readShare(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** The share as its UR, ur:sskr/…, the form that the SSKR library takes. */
+  get ur(): string {
+    return this.#ur;
+  }
+
+  /** The form the share was written in. */
+  get format(): ShareFormat {
+    return this.#format;
+  }
+
+  /** What the share's metadata says: its set, its group and its member. */
+  get info(): ShareInfo {
+    return shareInfo(urToTransport(this.#ur));
+  }
+
+  /** The share written in `format`, by default the one it was read in. */
+  write(format: ShareFormat = this.#format): string {
+    return writeShare(this.#ur, format);
+  }
+
+  /** Whether `other` is the same share, however either of them was written. */
+  sameAs(other: Share): boolean {
+    return other.#ur === this.#ur;
+  }
+
+  toString(): string {
+    return REDACTED_SHARE;
+  }
+
+  toJSON(): string {
+    return REDACTED_SHARE;
+  }
+
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return REDACTED_SHARE;
+  }
 }

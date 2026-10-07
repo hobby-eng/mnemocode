@@ -13,6 +13,7 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
     "legacy-valid-last-word",
     "list",
     "missing-word",
+    "list-candidates",
     "plaintext-candidates",
   ]);
   for (let index = 0; index < items.length; index += 1) {

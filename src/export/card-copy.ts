@@ -1,3 +1,14 @@
+// The texts of a card design besides the person's details: the invented studio name, slogan,
+// subtitle and footer of the frame of a design study, and the label before a card's code. Which of
+// them a design prints (designTexts), the pools they are drawn from, the checks of a text that the
+// person gives instead, and the drawing of the rest once per export (resolveCardPresentation), so
+// that every page and output format of one export shows the same.
+//
+// Needs from the host: a uniform random choice, passed as `choose`, or by default the randomInt of
+// the render platform that the host configured (export/platform.ts, configureRenderPlatform).
+// Does not: draw cards, choose the person's details (card-identities.ts), or hold any secret: the
+// texts are independent of every seed phrase and share.
+
 import { renderPlatform } from "./platform.js";
 import {
   validateProfile,
@@ -103,6 +114,22 @@ export interface CardCopyOverrides {
   readonly footer?: string;
   readonly referenceLabel?: string;
 }
+
+/**
+ * The texts that `design` (a template id) prints besides the person's details, in the order in
+ * which a host asks for them: every sheet has the frame of a design study with the studio name,
+ * slogan, subtitle and footer (drawStudyFrame, collection-sheet.ts); a separate business card
+ * prints the label before its code (business-cards.ts), a separate material card the studio name
+ * and subtitle (material-cards.ts), and a separate glass card none of them. `sheets`: the cards
+ * are printed on sheets, not as separate cards.
+ */
+export function designTexts(design: string, sheets: boolean): readonly (keyof CardCopyOverrides)[] {
+  if (sheets) return ["studioName", "slogan", "subtitle", "footer"];
+  if (design.startsWith("material-")) return ["studioName", "subtitle"];
+  if (design.startsWith("business-glass-")) return [];
+  return ["referenceLabel"];
+}
+
 export interface ResolvedCardPresentation {
   readonly profile: CardProfile;
   readonly presentation: CardPresentation;
@@ -116,7 +143,9 @@ export function resolvePresentationFor(settings: CardSettings): CardPresentation
   if (settings.presentation) return settings.presentation;
   let presentation = presentationCache.get(settings);
   if (!presentation) {
-    presentation = resolveCardPresentation().presentation;
+    // Frozen: every caller with these settings gets this one object, and none may change it for
+    // the pages that follow.
+    presentation = Object.freeze(resolveCardPresentation().presentation);
     presentationCache.set(settings, presentation);
   }
   return presentation;

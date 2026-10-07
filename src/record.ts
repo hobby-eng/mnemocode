@@ -1,4 +1,4 @@
-import type { OutputFormat } from "./core.js";
+import type { OutputFormat } from "./core/types.js";
 
 export const MNEMOCODE_RECORD_VERSION = 1 as const;
 export type RecordMode = "direct" | "seedshift" | "seedshift-legacy" | "seedshift-legacy-valid";

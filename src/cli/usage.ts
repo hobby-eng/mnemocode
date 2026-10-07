@@ -197,7 +197,7 @@ export function printUsage(): void {
       "mnemocode decode --input-file shifted.txt --dates 23-09-2026",
       "Turn a record back into the phrase",
     ],
-    ["mnemocode recover-word --ask-secrets", "Find one forgotten word"],
+    ["mnemocode recover-word --ask-secrets", "Find forgotten words"],
     [
       "mnemocode encode --sskr --ask-secrets --threshold 2 --shares 3",
       "Split a phrase into 3 shares, any 2 restore it",
@@ -224,7 +224,7 @@ export function printUsage(): void {
     ),
     examples(mainExamples),
     notes([
-      "Started without a command in a terminal, mnemocode shows a menu that asks step by step and shows the command it runs. Use --ask-secrets for a real phrase: text typed in a command can stay in the shell history. Work on a trusted computer without a network connection. -h gives a short summary of a command, --help the full explanation.",
+      "Started without a command in a terminal, mnemocode shows a menu that asks step by step, asks again after an answer that cannot be used, and shows the command it runs. Use --ask-secrets for a real phrase: text typed in a command can stay in the shell history. Work on a trusted computer without a network connection. -h gives a short summary of a command, --help the full explanation.",
     ]),
     // The safety line wraps like every other text of the help, so that it stays whole.
     wrapText(

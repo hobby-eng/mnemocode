@@ -4,17 +4,13 @@ import { exportPageImages } from "../export/image-export.js";
 import { terminalNotice, terminalResultHeader } from "./terminal.js";
 import { exportIndividualCards, requireNewCardDirectory } from "../export/individual-cards.js";
 import { validateCardOptions } from "./card-options.js";
-import { entropyToMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { businessOptions, businessOptionNames } from "./business-options.js";
-import { encodeMnemonic, formatEncoded, indexesToColors, parseDate } from "../core.js";
 import { exportCards, renderCards } from "../export/pdf.js";
-import { cardTemplates, selectTemplate, type CardContent } from "../export/templates.js";
+import { cardTemplates, selectTemplate } from "../export/templates.js";
+import { CardPreview } from "../export/card-preview.js";
 import { value, type ParsedArguments } from "./arguments.js";
 
-const MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-const DATES = ["31-10-2008", "03-01-2009", "12-01-2009", "22-05-2010"].map(parseDate);
+/** What dated Unicode sample cards print beside their four dates: the events of those dates. */
 const LABELS = [
   "Bitcoin whitepaper",
   "Genesis block",
@@ -78,31 +74,15 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
   const words = value(args, "words") ?? "12";
   if (!["12", "15", "18", "21", "24"].includes(words))
     throw new Error("The preview mnemonic must contain 12, 15, 18, 21, or 24 words.");
-  const mnemonic =
-    words === "12"
-      ? MNEMONIC
-      : entropyToMnemonic(new Uint8Array((Number(words) / 3) * 4), wordlist);
-  const result = encodeMnemonic(mnemonic, DATES);
-  const colors = indexesToColors(result.shiftedIndexes);
-  const jobs = selected.map((template) => {
-    const content: CardContent =
-      template.kind === "colors"
-        ? {
-            ...settings,
-            kind: "colors",
-            colors,
-            payload: colors.join(" "),
-            title: value(args, "title"),
-          }
-        : {
-            kind: "unicode",
-            dates: result.dates,
-            eventLabels: LABELS,
-            payload: formatEncoded(result, "unicode"),
-            title: value(args, "title"),
-          };
-    return { template, content };
+  // The sample cards themselves come from the library (export/card-preview.ts), which a page
+  // uses too; this command only reads the options and saves the files.
+  const preview = new CardPreview({
+    words: Number(words),
+    labels: LABELS,
+    settings,
+    title: value(args, "title"),
   });
+  const jobs = selected.map((template) => ({ template, content: preview.content(template) }));
   if (directory !== undefined) {
     const job = jobs[0]!;
     const count = await exportIndividualCards(

@@ -34,11 +34,29 @@ async function entryAt(path: string): Promise<"none" | "folder" | "other"> {
   }
 }
 
-/** "name (1).pdf", or "name (1)" for a folder, as file managers name a copy. */
+/**
+ * "name-1.pdf", or "name-1" for a folder: without the space and the brackets of a file manager's
+ * "name (1).pdf", which a shell reads as two words and a syntax error, so that a numbered name, and
+ * the QR code images named after it, can be typed in a command without quotes.
+ */
 function numberedName(path: string, number: number, folder: boolean): string {
   const trimmed = path.replace(/[\\/]+$/u, "");
   const extension = folder ? "" : extname(trimmed);
-  return `${trimmed.slice(0, trimmed.length - extension.length)} (${number})${extension}`;
+  return `${trimmed.slice(0, trimmed.length - extension.length)}-${number}${extension}`;
+}
+
+/**
+ * `path` when nothing is there, or its first free numbered name, "name-1.png": for a file that
+ * the command names itself, such as the QR code image beside a PDF, which is never saved over
+ * another.
+ */
+export async function firstFreeName(path: string): Promise<string> {
+  if ((await entryAt(path)) === "none") return path;
+  for (let number = 1; number <= MAX_COPY_NUMBER; number += 1) {
+    const free = numberedName(path, number, false);
+    if ((await entryAt(free)) === "none") return free;
+  }
+  throw new Error(`${path} has too many numbered copies already. Choose another name.`);
 }
 
 /**

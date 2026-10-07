@@ -39,6 +39,21 @@ describe("CLI records", () => {
     expect(result.stdout).toContain("QR adapter");
     expect(result.stdout).toContain("PASS");
     expect(result.stdout).toContain("Card export assets");
+    // The checks of the library's features and of those the command line builds in.
+    for (const row of [
+      "BIP39 seed",
+      "Dates",
+      "Backup reading",
+      "Word search",
+      "Share repair",
+      "Share unmasking",
+      "Wallet evidence",
+      "Coin addresses",
+      "Heir sheet",
+      "Share cards",
+      "QR beside sheets",
+    ])
+      expect(result.stdout).toContain(row);
   });
 
   it("writes a self-describing record and decodes it without mode or format flags", async () => {
@@ -78,7 +93,7 @@ describe("CLI records", () => {
         "--output",
         path,
       ]);
-      expect(encoded.stdout).toContain("English BIP39 words:");
+      expect(encoded.stdout).toContain("English BIP39 words of");
       expect(encoded.stdout).toContain(mnemonic);
       expect(await readFile(path, "utf8")).toMatch(/^MNC1:direct:english:/u);
       await expect(

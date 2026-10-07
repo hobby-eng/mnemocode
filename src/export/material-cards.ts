@@ -21,7 +21,7 @@ import {
   type PDFPage,
   type PDFImage,
 } from "pdf-lib";
-import { colorsToIndexes, unicodeToColors } from "../core.js";
+import { colorsToIndexes, unicodeToColors } from "../core/colors.js";
 import { assertShareQr } from "../sskr/transport.js";
 import type { CardContent } from "./templates.js";
 import type { SskrCardContent } from "./sskr-content.js";
@@ -44,6 +44,7 @@ import {
   type MaterialSample,
   type MaterialStyle,
 } from "./material-artwork.js";
+import { printedCode } from "./card-codes.js";
 export type MaterialPageSize = "business" | "a6" | "a4";
 export interface MaterialCardOptions {
   readonly pageSize?: MaterialPageSize;
@@ -182,7 +183,7 @@ async function createRenderContext(
     throw new Error("Material cards require color references.");
   const share = content.kind === "sskr";
   if (share) {
-    assertShareQr(content.colors, content.payload);
+    assertShareQr(content.colors, content.payload, content.labels);
   } else {
     colorsToIndexes(content.colors);
     if (
@@ -326,7 +327,6 @@ function drawMaterialFront(context: MaterialRenderContext): void {
     individual,
   );
   for (let i = 0; i < entries.length; i++) {
-    const code = entries[i]!.code.toUpperCase();
     const sample = samples[entries[i]!.index]!;
     const countThisRow = Math.min(columns, entries.length - Math.floor(i / columns) * columns);
     const centeredStart = (width - (countThisRow * cellWidth + (countThisRow - 1) * gap)) / 2;
@@ -338,7 +338,7 @@ function drawMaterialFront(context: MaterialRenderContext): void {
     // Both captions share the physical center of the image, including incomplete rows.
     drawText(
       page,
-      `${String(entries[i]!.index + 1).padStart(2, "0")}  ${code.slice(1)}`,
+      `${String(entries[i]!.index + 1).padStart(2, "0")}  ${printedCode(content, entries[i]!.index)}`,
       top + imageHeight + TYPE_LAYOUT.referenceOffset * scale,
       5.5,
       cellWidth,
@@ -371,8 +371,8 @@ function drawMaterialStudy(context: MaterialRenderContext): void {
   const payload = includeQr ? content.payload : undefined;
   const compact = size === "business";
   // Compact studies prioritize exact recovery references over decorative finish names.
-  const captions = content.colors.map((code, index) => [
-    `${String(index + 1).padStart(2, "0")}  ${code.slice(1).toUpperCase()}`,
+  const captions = content.colors.map((_, index) => [
+    `${String(index + 1).padStart(2, "0")}  ${printedCode(content, index)}`,
     ...(compact ? [] : [samples[index]!.label]),
   ]);
   const layout = collectionSheetLayout(

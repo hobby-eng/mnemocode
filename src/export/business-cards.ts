@@ -14,7 +14,7 @@ import {
 export { drawCollectionQr } from "./card-qr.js";
 import { clearDocumentMetadata } from "./document-metadata.js";
 import { resolvePresentationFor } from "./card-copy.js";
-import { colorsToIndexes, unicodeToColors } from "../core.js";
+import { colorsToIndexes, unicodeToColors } from "../core/colors.js";
 import type { CardContent } from "./templates.js";
 import type { SskrCardContent } from "./sskr-content.js";
 import { assertShareQr } from "../sskr/transport.js";
@@ -33,6 +33,7 @@ import {
   type CardProfile,
   type CardPresentation,
 } from "./card-settings.js";
+import { printedCode } from "./card-codes.js";
 
 const ink = rgb(0.12, 0.13, 0.14);
 const white = rgb(1, 1, 1);
@@ -46,7 +47,7 @@ function validateContent(
     throw new Error("Business cards require a color representation.");
   const share = content.kind === "sskr";
   if (share) {
-    assertShareQr(content.colors, content.payload);
+    assertShareQr(content.colors, content.payload, content.labels);
   } else {
     colorsToIndexes(content.colors);
     if (
@@ -181,8 +182,8 @@ async function renderSingle(context: RenderContext, individualIndex: number): Pr
   // Every separate card shows its number and the size of the set, so a missing card is noticed.
   const position = `${String(individualIndex + 1).padStart(2, "0")} / ${String(content.colors.length).padStart(2, "0")}`;
   const reference = share
-    ? `${String(individualIndex + 1).padStart(2, "0")} / ${content.colors.length}  ${code.slice(1)}  |  ${content.collectionReference}`
-    : `${position}  ${code.slice(1)}`;
+    ? `${String(individualIndex + 1).padStart(2, "0")} / ${content.colors.length}  ${printedCode(content, individualIndex)}  |  ${content.collectionReference}`
+    : `${position}  ${printedCode(content, individualIndex)}`;
   const referenceText = `${presentation.referenceLabel} ${reference}`.trim();
   const design = physicalStyle(style, individualIndex + styleOffset);
   const referenceSize = fit(
@@ -238,9 +239,7 @@ async function renderCollection(context: RenderContext): Promise<void> {
       font,
       layout,
       box,
-      [
-        `${String(box.index + 1).padStart(2, "0")}  ${content.colors[box.index]!.slice(1).toUpperCase()}`,
-      ],
+      [`${String(box.index + 1).padStart(2, "0")}  ${printedCode(content, box.index)}`],
       studyTheme,
     );
   }

@@ -218,7 +218,9 @@ export function resolveIdentityFor(
 ): Required<CardProfile> {
   let profile = identities.get(settings);
   if (!profile) {
-    profile = createCardIdentity(settings.profile, sector);
+    // Frozen: every caller with these settings gets this one object, and none may change it for
+    // the pages, formats and shares that follow.
+    profile = Object.freeze(createCardIdentity(settings.profile, sector));
     identities.set(settings, profile);
   }
   return profile;
