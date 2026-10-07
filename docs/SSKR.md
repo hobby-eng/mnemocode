@@ -11,13 +11,13 @@ A BIP39 passphrase is not part of the phrase and is **not stored** in the shares
 ## Creating shares
 
 ```bash
-node dist/mnemocode.js encode --sskr --ask-secrets \
+mnemocode encode --sskr --ask-secrets \
   --threshold 2 --shares 3 --output ./shares.txt
 ```
 
 `--threshold` is N and `--shares` is M. Both need `--sskr`. The phrase is entered as in every `encode` command; see [Secret input styles](../README.md#secret-input-styles).
 
-The shares are always shown in the terminal. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares (1).txt`, and MnemoCode says so.
+The shares are always shown in the terminal. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares-1.txt`, and MnemoCode says so. When a file cannot be saved on the private screen, for example because the disk is full, the shares are still shown, and MnemoCode offers to try again, to use another name, or to skip that file.
 
 | Option                   | Selects                                                                                  |
 | ------------------------ | ---------------------------------------------------------------------------------------- |
@@ -29,13 +29,17 @@ The shares are always shown in the terminal. `--output NEW_FILE` also saves them
 ### Date masking before splitting
 
 ```bash
-node dist/mnemocode.js encode --sskr --mode seedshift --ask-secrets \
+mnemocode encode --sskr --mode seedshift --ask-secrets \
   --format 3 --threshold 2 --shares 3 \
   --template business-it --card-layout qr \
   --cards-dir ./property-shares --pdf ./property-shares.pdf
 ```
 
 With `--mode seedshift`, the phrase is first masked with the dates and then split. Give the same `--mode seedshift` and dates to `sskr-combine` to get the original phrase. The mode and the dates are not stored in the shares and are not printed on share cards: keep them yourself. The legacy Seedshift modes cannot be used with shares.
+
+The split shows the fingerprint of the original phrase and that of the masked phrase, the encoded fingerprint. They do not reveal the phrase. On the private screen (`sskr-combine --ask-secrets --mode seedshift`, or Restore in the menu), complete shares show the encoded fingerprint again before the dates are asked for: if it is not the one you noted, a share is wrong, and you find out before typing the dates.
+
+When a digit of a date is forgotten, type `?` in its place on the private screen (`sskr-combine --ask-secrets`, or Restore in the menu), also when share codes hold `?`. MnemoCode then restores the masked phrase from the shares, asks for the wallet's fingerprint or one of its first receiving addresses, and searches the dates as `recover-date` does, for each phrase that the shares can give. Before the search it shows the whole work, share combinations times date combinations, and about how long it takes. `sskr-export --ask-secrets --mode seedshift`, which gives the shares back whole and takes the wallet from its options, searches such dates too. Dates given with `--dates` must be complete.
 
 ## Share formats
 
@@ -51,6 +55,8 @@ With `--mode seedshift`, the phrase is first masked with the dates and then spli
 The last four write a share with the same signs as the form of an encoded phrase, so that shares look like the form chosen in Encode, and `sskr-combine` shows the restored backup in that form again. They are only other ways to write the same share, not encryption, and other SSKR programs do not read them.
 
 Color codes may be separated by spaces or joined, with or without `#`. **Their order matters.** A share in colors has its own colors: they are not the colors of the phrase itself.
+
+Share cards print each share in its form. A share in colors prints its colors. A share in word numbers, Unicode codes or Bytewords prints those, three to a card, in order; the colors of those cards are drawn at random, none twice, and only decorate them, so that the same code may stand on a card of any color. A share written as `ur:sskr` prints its Bytewords. A QR code on the sheet holds what the cards print.
 
 The forms in colors, word numbers and Unicode codes are only other ways to write a share, not encryption. For developers of compatible programs, a share is written in colors in five steps:
 
@@ -69,7 +75,7 @@ Word numbers and Unicode codes are made the same way with the version byte `A2`,
 Shares can be printed as cards with every template. `sskr-export` prints existing shares and never makes new ones:
 
 ```bash
-node dist/mnemocode.js sskr-export --share-file ./shares.txt \
+mnemocode sskr-export --share-file ./shares.txt \
   --cards-dir ./share-cards --card-layout collection --template business-it
 ```
 
@@ -85,7 +91,7 @@ The page size decides what is printed, as for ordinary cards. `--card-layout` is
 
 A QR code holds one share. For `indexes`, `unicode` and `colors-unicode`, it holds that representation; for the other formats, it holds the share's color codes. No QR code holds several shares.
 
-Each file or folder in `--cards-dir` holds one share: keep them in different places. A file written with `--pdf` and a folder written with `--images-dir` hold **all** shares. Existing files and folders are never replaced; a taken name is numbered as `name (1)`.
+Each file or folder in `--cards-dir` holds one share: keep them in different places. A file written with `--pdf` and a folder written with `--images-dir` hold **all** shares. Existing files and folders are never replaced; a taken name is numbered as `name-1`.
 
 The reference printed on a share sheet shows the numbers of the set, the group and the share.
 
@@ -94,30 +100,34 @@ The reference printed on a share sheet shows the numbers of the set, the group a
 `sskr-combine` needs complete shares, not single cards of a share:
 
 ```bash
-node dist/mnemocode.js sskr-combine --ask-secrets
+mnemocode sskr-combine --ask-secrets
 # Type the shares, separated by semicolons, on the private screen.
 
-node dist/mnemocode.js sskr-combine \
+mnemocode sskr-combine \
   --share "ur:sskr/FIRST_COMPLETE_SHARE" \
   --share "ur:sskr/SECOND_COMPLETE_SHARE"
 
-node dist/mnemocode.js sskr-combine --share-file ./selected-shares.txt
-node dist/mnemocode.js sskr-combine --share-qr ./first.png --share-qr ./second.png
+mnemocode sskr-combine --share-file ./selected-shares.txt
+mnemocode sskr-combine --share-qr ./first.png --share-qr ./second.png
 ```
 
 `--share`, `--share-file` and `--share-qr` may be repeated and used together. A text file holds one complete share per line. `--share-qr` reads a PNG image; it cannot read a PDF. The format of each share is found automatically, so formats can be mixed. Shares that another program made in several groups are accepted.
 
 The restored backup is shown in the form of the first share: word numbers, Unicode codes or colors for shares written that way, words for shares in Bytewords or `ur`. With `--mode seedshift` and the dates, the seed phrase follows.
 
-MnemoCode refuses a damaged share, the same share given twice, shares from different sets and too few shares. The share library also checks the restored secret against a hash stored in the shares. The 16-bit number of a set only tells sets apart. It does not prove that a share is genuine.
+MnemoCode refuses a damaged share, two different shares with the same member number, shares from different sets and too few shares. A share given twice is used once, with a note, so its copy does not count towards the threshold. From the command line such a problem ends the command. On the private screen it is named by the place of the share among those typed, and the other answers are kept: a share that cannot be read is typed again alone, a share beyond the threshold that disagrees with the others can be left out or typed again, and more shares can be added to too few. When nothing tells which share is wrong, such as two different shares with the same member number, or as many shares of one set as of another, they are named together, and you choose which to change or leave out. When the shares restore nothing, or no phrase matches the wallet, MnemoCode asks what to change: a share, the dates, the wallet, whether the phrase was masked with Seedshift, or Stop.
+
+The share library also checks the restored secret against a hash stored in the shares. The 16-bit number of a set only tells sets apart. It does not prove that a share is genuine.
 
 Every supplied member of a complete group is checked for consistency, including members and groups beyond the recovery threshold. Members of an incomplete group cannot be checked against its polynomial: the CLI names them as not checked. The written-backup check warns instead of reporting that the whole backup was checked.
 
-For library callers, `combineSskrShares` returns a phrase only when no supplied shares or repaired elements remain unchecked. `combineSskrShareSet` returns the phrase together with `unchecked` (share numbers counted from 1) and `unsettled` repair elements; callers using this partial-recovery API must report those limits. Both functions, and `restoreShareSet` for complete input, are exported from `mnemocode/sskr`.
+For library callers, `combineSskrShares` returns a phrase only when no supplied shares or repaired elements remain unchecked. `combineSskrShareSet` returns the phrase together with `unchecked` (share numbers counted from 1) and `unsettled` repair elements; callers using this partial-recovery API must report those limits. Both functions, and `restoreShareSet` for complete input, are exported from `mnemocode/sskr`. For complete shares they refuse a member given more than once, even as an exact copy; `sskr-combine` leaves such copies out before it calls them.
 
 ### Damaged shares
 
-Replace each unreadable element of a share with `?`, keeping its place: a word number, a four-digit Unicode code, a color code, a color Unicode code or pair, a Bytewords word, or a two-letter pair inside `ur:sskr/...`. `sskr-combine`, `sskr-export` and the backup check fill them in. Spaces are needed around a missing word or number; fixed-width codes and UR pairs may stay joined. Do not remove the element, and do not mark each of its digits. Any of the shares may have marks, up to 64 on one share, and a share may be given twice when two damaged copies of it are kept.
+Replace each unreadable element of a share with `?`, keeping its place: a word number, a four-digit Unicode code, a color code, a color Unicode code or pair, a Bytewords word, or a two-letter pair inside `ur:sskr/...`. `sskr-combine`, `sskr-export` and the backup check fill them in. Spaces are needed around a missing word or number; fixed-width codes and UR pairs may stay joined. Do not remove the element. Any of the shares may have marks, up to 64 on one share, and a share may be given twice when two damaged copies of it are kept.
+
+In colors and in the four-digit Unicode codes of words, written apart by spaces, commas or `#`, a `?` inside a code stands for one digit, and the digits that can be read are used: `#B5?0??` misses three digits of a color, `4E?0` one digit of a word's code. A lone `?` stands for the whole color or code, and so does a code all of whose digits are `?`, such as `??????` or `????`; a `?` joined to a whole code, as in `?4E00` or `#?#1F9121`, is still one whole element. A code with a `?` keeps all its symbols, six for a color and four for a Unicode code, or the share is refused with the code's place. The digits of a color are bits of the share, so the digits read become equations of their own: two unreadable digits leave 8 bits open instead of 24. The digits of a Unicode code are not bits of its word number: such a code is unknown as a whole, and only a word whose code fits the digits read can fill it. One unreadable digit leaves about 2.5 of the 2,048 words on average, two digits about 19, three about 200. Where that shortens the search, the codes with the fewest fitting words are also tried word by word, those in the first codes of a share first, since they tell the member numbers: up to 64 combinations of words over all the shares, and a bounded amount of work, so that the assessment takes seconds at most. Color Unicode codes, word numbers, Bytewords and `ur` take a `?` only for a whole element, and a share that marks one of their digits is refused with the code's place.
 
 All the shares are repaired together, as one system of linear equations over GF(2) in the bits of the marked elements (`src/sskr/joint-repair.ts`):
 
@@ -125,7 +135,7 @@ All the shares are repaired together, as one system of linear equations over GF(
 - all shares of a set carry the same identifier and thresholds, and each has its member number;
 - every share beyond the threshold lies on the polynomial of the others: each of its bytes is a fixed GF(256) combination of theirs, and multiplying by a fixed constant is linear over GF(2).
 
-Elimination solves this without trying any value. What it leaves open is decided by the 32-bit digest that the SSKR library keeps with the secret: each combination is checked with HMAC-SHA256 in Gray code order, about 2.5 to 4.5 µs a try depending on the computer, and every one that passes is read as ordinary shares and restored by the SSKR library itself, which checks everything once more. Before the search, MnemoCode shows how many combinations are open, how long they take, which marked elements would close the most if read again, and how many more shares would likely settle the rest. A search expected to take up to a minute starts at once, about 2^24 combinations; a longer one needs `--max-tries` or a yes on the private screen, up to 2^40 combinations in all, about a month. Only sets of one group are repaired, which is all that MnemoCode writes.
+Elimination solves this without trying any value. What it leaves open is decided by the 32-bit digest that the SSKR library keeps with the secret: each combination is checked with HMAC-SHA256 in Gray code order, about 2.5 to 4.5 µs a try depending on the computer, and every one that passes is read as ordinary shares and restored by the SSKR library itself, which checks everything once more. Before the search, MnemoCode shows how many combinations are open, how long they take, which marked elements would close the most if read again, and how many more shares would likely settle the rest. A search expected to take up to 12 hours starts at once, about 2^34 combinations, with its progress shown and Ctrl+C to stop it; a longer one needs `--max-tries` or a yes on the private screen, up to 2^40 combinations in all, about a month. Only sets of one group are repaired, which is all that MnemoCode writes.
 
 These are the marks that each share of a 2-of-3 set may have, at random places in the secret part of each share, in at least 18 of 20 tries; marks in the identifier and the thresholds cost less, since the other shares carry the same. The search columns assume about 2.5 µs a try:
 

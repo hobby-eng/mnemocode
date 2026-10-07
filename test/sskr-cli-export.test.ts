@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { encodeMnemonic, formatEncoded, parseDate } from "../src/core.js";
@@ -48,7 +48,7 @@ describe("integrated SSKR CLI", () => {
       expect(result.status, result.stderr).toBe(0);
       expect(result.stderr).toMatch(/Share 1: element \d+ is \S+\./u);
       expect(result.stderr).not.toContain(damaged);
-      expect(result.stdout).toContain("Recovered English BIP39 mnemonic:");
+      expect(result.stdout).toContain("Original seed phrase, the wallet's:");
     }
   });
 
@@ -86,7 +86,7 @@ describe("integrated SSKR CLI", () => {
         path,
       ]);
       expect(split.status, split.stderr).toBe(0);
-      expect(split.stdout).toContain("Unicode code points:");
+      expect(split.stdout).toContain("Unicode code points of");
       expect(split.stdout).toContain("#");
       expect(split.stdout + split.stderr).not.toContain("\x1b");
       expect(split.stderr).toContain("the original dates are still required");
@@ -106,7 +106,7 @@ describe("integrated SSKR CLI", () => {
       ]);
       expect(restored.status, restored.stderr).toBe(0);
       expect(restored.stdout).toContain(mnemonic);
-      // A taken name is numbered as a file manager numbers a copy; the old file stays as it was.
+      // A taken name is numbered, shares-1.txt, without spaces; the old file stays as it was.
       const again = cli([
         "encode",
         "--sskr",
@@ -120,7 +120,7 @@ describe("integrated SSKR CLI", () => {
         path,
       ]);
       expect(again.status, again.stderr).toBe(0);
-      const numbered = join(dir, "shares (1).txt");
+      const numbered = join(dir, "shares-1.txt");
       expect(again.stderr).toContain(`${path} already exists: saved as ${numbered} instead.`);
       expect(readFileSync(path, "utf8").trim().split("\n")).toEqual(records);
       expect(readFileSync(numbered, "utf8").trim().split("\n")).toHaveLength(3);
@@ -128,6 +128,71 @@ describe("integrated SSKR CLI", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+  it("saves the QR code of the sheets as images beside the PDF, which restore and decode read", () => {
+    const directory = mkdtempSync(join(tmpdir(), "mnemocode-sheet-qr-"));
+    try {
+      const pdf = join(directory, "cards.pdf");
+      const single = cli([
+        "encode",
+        "--mnemonic",
+        mnemonic,
+        "--format",
+        "colors",
+        "--pdf",
+        pdf,
+        "--card-qr",
+      ]);
+      expect(single.status, single.stderr).toBe(0);
+      expect(single.stderr).toContain(
+        `Saved the QR code of the sheet as an image: ${join(directory, "cards-qr.png")}`,
+      );
+      const decoded = cli([
+        "decode",
+        "--mode",
+        "direct",
+        "--qr-file",
+        join(directory, "cards-qr.png"),
+      ]);
+      expect(decoded.stdout.trim()).toBe(mnemonic);
+      // The shares: one image for each, named after its reference.
+      const shares = join(directory, "shares.pdf");
+      const split = cli([
+        "encode",
+        "--sskr",
+        "--mnemonic",
+        mnemonic,
+        "--threshold",
+        "2",
+        "--shares",
+        "3",
+        "--share-format",
+        "colors",
+        "--pdf",
+        shares,
+        "--card-qr",
+      ]);
+      expect(split.status, split.stderr).toBe(0);
+      expect(split.stderr).toContain(
+        "Saved the QR code of each share's sheets as an image beside them: 3 PNG files.",
+      );
+      const images = readdirSync(directory)
+        .filter((name) => /^shares-.+-qr\.png$/u.test(name))
+        .sort();
+      expect(images).toHaveLength(3);
+      const restored = cli([
+        "sskr-combine",
+        "--share-qr",
+        join(directory, images[0]!),
+        "--share-qr",
+        join(directory, images[2]!),
+      ]);
+      // The backup in the form of the shares comes first, then the seed phrase.
+      expect(restored.stdout.trim().split("\n").at(-1)).toBe(mnemonic);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }, 120_000);
+
   it("rejects unsupported and orphan options before secret input", () => {
     for (const extras of [
       ["--threshold", "2"],
@@ -212,7 +277,7 @@ describe("integrated SSKR CLI", () => {
       ]);
       expect(split.status, split.stderr).toBe(0);
       // Without --format only the shares are shown, not the whole seed phrase.
-      expect(split.stdout).not.toContain("Unicode code points:");
+      expect(split.stdout).not.toContain("Unicode code points of");
       const records = readFileSync(path, "utf8").trim().split("\n");
       for (const record of records) expect(record).toMatch(/^[0-9A-F]{4}( [0-9A-F]{4})+$/u);
       const masked = formatEncoded(encodeMnemonic(mnemonic, [parseDate(date)]), "unicode");
@@ -284,6 +349,6 @@ describe("integrated SSKR CLI", () => {
     expect(refused.stderr).toContain("Allow it with --max-tries 65536.");
     const allowed = cli(["sskr-combine", ...typed]);
     expect(allowed.status, allowed.stderr).toBe(0);
-    expect(allowed.stdout).toContain("Recovered English BIP39 mnemonic:");
+    expect(allowed.stdout).toContain("Original seed phrase, the wallet's:");
   });
 });

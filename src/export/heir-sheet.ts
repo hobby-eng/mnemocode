@@ -1,7 +1,12 @@
 // The sheet that tells heirs how to restore a backup (mnemocode encode --heir-sheet): one sheet,
 // printed on both sides. The front says what the owner leaves and gives the rest of its room, in
 // one block, to a hint written by hand; the back gives the steps and the basics for someone new to
-// wallets. It holds no secret; src/cli/heir-sheet.ts writes its words, this file only lays them out.
+// wallets. It holds no secret; export/heir-sheet-text.ts writes its words, this file only lays
+// them out, in A5 or A6, as PDF bytes (renderHeirSheet).
+//
+// Needs from the host: the bundled font, read through the render platform that the host configured
+// (export/platform.ts, configureRenderPlatform; export/platform-node.ts in Node.js).
+// Does not: write the words, save the PDF, or turn it into an image.
 
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";

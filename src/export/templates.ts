@@ -1,6 +1,6 @@
 import { renderMaterialCard } from "./material-cards.js";
 import { renderGlassCards } from "./glass-cards.js";
-import type { DateShiftDate } from "../core.js";
+import type { DateShiftDate } from "../core/types.js";
 import type { CardSettings } from "./card-settings.js";
 import { renderBusinessCards } from "./business-cards.js";
 

@@ -1,4 +1,5 @@
 import { masterFingerprint } from "../bitcoin-evidence.js";
+import { EncodedBackup } from "../core/encoded-backup.js";
 import {
   terminalColor,
   terminalHint,
@@ -8,6 +9,7 @@ import {
 } from "./terminal.js";
 import { encodedOutputLabel } from "./input.js";
 import type { EncodeOutcome } from "./encode-command.js";
+import { Masking, PHRASE_WORDS } from "../core/masking.js";
 
 /** Reporting is separate from transformation and file side effects. */
 export function printEncodeResult(outcome: EncodeOutcome): void {
@@ -33,30 +35,38 @@ export function printEncodeResult(outcome: EncodeOutcome): void {
     console.log(`${displayedLabel}:`);
   }
   console.log(encoded);
+  // By the rule that decode and sskr-combine show it by (EncodedBackup.fingerprint): only codes
+  // that are a valid BIP39 phrase have one, which the Original Seedshift's are only by chance.
+  const encodedFingerprint = EncodedBackup.of(
+    result.shiftedIndexes,
+    format,
+    recordMode,
+  ).fingerprint(masterFingerprint);
   if (terminalColor("stderr")) {
     console.error("");
     terminalStatus("Original fingerprint", masterFingerprint(result.sourceMnemonic));
-    if (mode === "seedshift-legacy" && !useLegacyValid) {
+    if (encodedFingerprint === undefined) {
       terminalStatus(
-        "Encoded fingerprint",
+        Masking.of(recordMode).encodedFingerprintLabel,
         "unavailable: legacy output may have an invalid checksum",
         false,
       );
     } else {
-      terminalStatus("Encoded fingerprint", masterFingerprint(result.shiftedEnglish.join(" ")));
+      terminalStatus(Masking.of(recordMode).encodedFingerprintLabel, encodedFingerprint);
     }
     terminalHint("BIP32 fingerprints above use an empty BIP39 passphrase.");
+    if (mode !== "direct") terminalHint(PHRASE_WORDS.fingerprintRoles);
   } else {
     console.error(
       `Original BIP32 master fingerprint (empty BIP39 passphrase): ${masterFingerprint(result.sourceMnemonic)}`,
     );
-    if (mode === "seedshift-legacy" && !useLegacyValid) {
+    if (encodedFingerprint === undefined) {
       console.error(
         "Encoded BIP32 master fingerprint: unavailable because legacy Seedshift output may have an invalid BIP39 checksum.",
       );
     } else {
       console.error(
-        `Encoded BIP32 master fingerprint (empty BIP39 passphrase): ${masterFingerprint(result.shiftedEnglish.join(" "))}`,
+        `Encoded BIP32 master fingerprint${Masking.of(recordMode).masked ? " of the masked phrase" : ""} (empty BIP39 passphrase): ${encodedFingerprint}`,
       );
     }
   }

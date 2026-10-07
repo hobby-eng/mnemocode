@@ -6,6 +6,7 @@ import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { heirSheetText, type HeirSheetFacts } from "../src/cli/heir-sheet.js";
 import { A5, A6, renderHeirSheet } from "../src/export/heir-sheet.js";
+import { HeirInstructions, type HeirRoute } from "../src/export/heir-sheet-text.js";
 
 // The public BIP39 test phrase and public dates of the examples.
 const PHRASE = `${"abandon ".repeat(11)}about`;
@@ -76,6 +77,60 @@ describe("instructions for heirs", () => {
     expect(direct.basics.map((section) => section.heading)).not.toContain("Secret dates");
   });
 
+  it("leads through the route of any program, which prints its own address once", () => {
+    // A stand-in for another program, such as a page with tabs.
+    const address = "https://example.com/wallet-tool";
+    const route: HeirRoute = {
+      subtitle: "Made with the Wallet Tool, free and offline.",
+      address,
+      start: [`Open ${address} on a computer you trust, then go offline.`],
+      decode: (mode) => [`Open the Decode tab in ${mode} mode and type the backup.`],
+      restore: (mode, threshold, dates) => [
+        `Open the Shares tab and type ${threshold} shares${dates === undefined ? "" : `, then ${dates}`}.`,
+      ],
+      dateDigitHelp: undefined,
+    };
+    const instructions = new HeirInstructions(route);
+    const facts: HeirSheetFacts = {
+      backup: { kind: "shares", format: "words", threshold: 2, count: 3 },
+      mode: "seedshift",
+      dates: 1,
+    };
+    const text = instructions.text(facts);
+    // The route names its own program under the title, and MnemoCode's names MnemoCode.
+    expect(text.subtitle).toBe("Made with the Wallet Tool, free and offline.");
+    expect(heirSheetText(facts).subtitle).toMatch(/^Made with MnemoCode \d+\.\d+\.\d+, /u);
+    expect(text.steps).toEqual([
+      `Open ${address} on a computer you trust, then go offline.`,
+      "Open the Shares tab and type 2 shares, then the secret date as day-month-year (23-09-2026).",
+      "Open the wallet with this seed phrase in a wallet program (see below).",
+    ]);
+    // What every program shares stays the same: what is needed, the warning and the basics.
+    expect(text.needs).toEqual(heirSheetText(facts).needs);
+    expect(text.basics).toEqual(heirSheetText(facts).basics);
+    // Without a search for a date digit, the advice offers none.
+    expect(text.trouble).not.toContain("digit");
+    expect(heirSheetText(facts).trouble).toContain("menu entry 5 tries every possibility");
+    // A route that prints another address as well makes no sheet.
+    const elsewhere = new HeirInstructions({
+      ...route,
+      start: [...route.start, "Read more at https://elsewhere.example/guide."],
+    });
+    expect(() => elsewhere.text(facts)).toThrow("may print the route's address once and no other");
+    // Nor do facts that would print a wrong sheet.
+    expect(() => instructions.text({ ...facts, dates: 0 })).toThrow("at least one");
+    expect(() =>
+      instructions.text({
+        backup: { kind: "encoded", format: "unicode" },
+        mode: "direct",
+        dates: 1,
+      }),
+    ).toThrow("no dates in direct mode");
+    expect(() => instructions.text({ ...facts, mode: "seedshift-legacy" })).toThrow(
+      "Shares cannot use the original Seedshift.",
+    );
+  });
+
   it("fits every kind of backup on one sheet, both sides, in A5 and in A6", async () => {
     // Rendering refuses a front without room for the hint and a back the basics overflow.
     for (const format of [A5, A6])
@@ -116,11 +171,16 @@ describe("instructions for heirs", () => {
       const a6 = cli([...split.slice(0, -1), small, "--heir-sheet-size", "a6"]);
       expect(a6.status, a6.stderr).toBe(0);
       expect(await pageSize(small)).toEqual([105, 148]);
-      // A taken name does not stop the command: the sheet is saved as "heirs (1).pdf".
+      // sskr-split, the older name of encode --sskr, saves it as well.
+      const older = join(directory, "heirs-split.pdf");
+      const splitSheet = cli(["sskr-split", "--mode", "seedshift", ...split.slice(2, -1), older]);
+      expect(splitSheet.status, splitSheet.stderr).toBe(0);
+      expect(await pageSize(older)).toEqual([148, 210]);
+      // A taken name does not stop the command: the sheet is saved as "heirs-1.pdf".
       const before = readFileSync(path);
       const again = cli(split);
       expect(again.status, again.stderr).toBe(0);
-      const numbered = join(directory, "heirs (1).pdf");
+      const numbered = join(directory, "heirs-1.pdf");
       expect(again.stderr).toContain(`${path} already exists: saved as ${numbered} instead.`);
       expect(readFileSync(path)).toEqual(before);
       expect(await pageSize(numbered)).toEqual([148, 210]);

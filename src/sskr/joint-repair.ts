@@ -8,28 +8,44 @@
 // checked with HMAC-SHA256 here, and each one that passes is restored by the SSKR library itself.
 // Every phrase that passes is reported; none is chosen.
 //
-// Only sets of one group are repaired, which is all that MnemoCode writes. The module runs in any
-// host: HMAC-SHA256 and the SSKR library come from share-platform.ts, and long work gives the host
-// a turn now and then, so that it can show progress or stop it.
+// Only sets of one group are repaired, which is all that MnemoCode writes. JointRepair, at the
+// end, is the entry: built with the host's SharePlatform (share-platform.ts), whose HMAC-SHA256
+// checks each candidate and whose SSKR library restores it, it assesses the shares and searches
+// them. Long work gives the host a turn now and then, so that it can show progress or stop it.
+// The functions before it stay for the hosts that already call them; without a platform of their
+// own they use the one configured with configureSharePlatform, as the Node.js entry configures it.
+//
+// Needs from the host: its SharePlatform, and an AbortSignal and a progress callback for a search.
+// Does not: ask whether to search, say what a repair filled in (repair-report.ts), or name shares
+// by where they were typed (share-input.ts).
 
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
+import { TURN_MILLISECONDS } from "../core/search-turns.js";
 import { bytesToBits, solve, topBit } from "./gf2.js";
 import { DIGEST_X, gfMultiply, lagrangeCoefficients, SECRET_X } from "./gf256.js";
 import {
+  candidateCounts,
+  choicesAt,
+  reachesMetadata,
+  markCount,
   markedReadings,
+  markProblem,
   MAX_REPAIR_TEXT_LENGTH,
+  placesWithin,
   METADATA_BYTES,
   readingSpace,
   type FilledElement,
   type ReadingSpace,
   type ReadRepairableShare,
 } from "./repair.js";
-import { sharePlatform } from "./share-platform.js";
+import { sharePlatform, type SharePlatform } from "./share-platform.js";
 import { readShare, validateShareSet, type ShareFormat } from "./transport.js";
 
 /** Marked elements on one share. The other shares settle most of them; see the assessment. */
 export const MAX_JOINT_MARKED_ELEMENTS = 64;
+/** The most ? on one share: a ? for each of the six digits of every color it may mark. */
+const MAX_JOINT_MARK_SYMBOLS = MAX_JOINT_MARKED_ELEMENTS * 6;
 /**
  * Combinations that a search may try, 2^40 in all: they take weeks, and leave about 2^8 phrases
  * that pass by chance.
@@ -285,9 +301,12 @@ function digestFits(secretAndDigestBytes: Uint8Array, secretBytes: number, hmac:
   return true;
 }
 
-/** Digest checks per second in this host, from a short run on zero bytes. */
-export function measureTriesPerSecond(): number {
-  const { hmacSha256 } = sharePlatform();
+/**
+ * Digest checks per second in this host, from a short run on zero bytes, with `platform`'s
+ * HMAC-SHA256; without it, with the configured platform (JointRepair.triesPerSecond).
+ */
+export function measureTriesPerSecond(platform: SharePlatform = sharePlatform()): number {
+  const { hmacSha256 } = platform;
   const secretBytes = 32;
   const sample = new Uint8Array(2 * secretBytes);
   const tries = 10_000;
@@ -359,10 +378,23 @@ interface JointSolution {
 }
 
 /**
+ * The work that solveJoint may still do for the choices of thresholds and member numbers, each
+ * choice an elimination of its own: payloads of one share evaluated, about a microsecond each. A
+ * bound on the work of trying words (refined) that does not depend on the computer.
+ */
+interface WorkBudget {
+  left: number;
+}
+
+/**
  * Solves one reading of every share: first the rows that every reading shares, then, for each
  * threshold and each set of member numbers that those leave possible, the polynomial.
  */
-async function solveJoint(joint: Joint, signal: AbortSignal | undefined): Promise<JointSolution> {
+async function solveJoint(
+  joint: Joint,
+  signal: AbortSignal | undefined,
+  budget?: WorkBudget,
+): Promise<JointSolution> {
   const solution: JointSolution = {
     branches: [],
     conflict: false,
@@ -377,11 +409,23 @@ async function solveJoint(joint: Joint, signal: AbortSignal | undefined): Promis
   const labels = linearize((z) => labelsOf(payloadsAt(joint, z)), common.particular, common.free);
   const labelBasis = basisOf(labels.columns);
   if (labelBasis.length > MAX_LABEL_BITS) return { ...solution, tooMany: true };
+  if (budget !== undefined) {
+    // Each choice evaluates the payloads of every share once for each free bit and once more.
+    const work = 2 ** labelBasis.length * (common.free.length + 1) * joint.spaces.length;
+    if (work > budget.left) return { ...solution, tooMany: true };
+    budget.left -= work;
+  }
   const shares = joint.spaces.length;
   const labelWidth = BigInt(NIBBLE_BITS * (shares + 1));
   let { enoughMembers, duplicates } = solution;
+  let turned = Date.now();
   for (let choice = 0; choice < 2 ** labelBasis.length; choice += 1) {
-    await nextTurn(signal);
+    // A turn now and then, not for each choice: a turn costs about a millisecond.
+    signal?.throwIfAborted();
+    if (Date.now() - turned >= TURN_MILLISECONDS) {
+      await nextTurn(signal);
+      turned = Date.now();
+    }
     const label = labels.value ^ combine(labelBasis, BigInt(choice));
     const threshold = Number(label & BigInt(NIBBLE)) + 1;
     const members = Array.from({ length: shares }, (_, share) =>
@@ -445,10 +489,15 @@ function holesOf(space: ReadingSpace): number[] {
 function openBitsIfRead(branch: Branch, share: number, hole: number): number {
   const width = BigInt(branch.joint.spaces[share]!.reading.unitBits);
   const mask = ((1n << width) - 1n) << (BigInt(hole) * width);
-  const directions = [
-    ...branch.visible.map((direction, i) => [direction, bytesToBits(branch.visibleDeltas[i]!)]),
-    ...branch.hidden.map((direction) => [direction, 0n]),
-  ] as const;
+  // Each direction with the change it makes in (S, D): a pair, typed as one so that a host that
+  // compiles with noUncheckedIndexedAccess reads both of its parts as present.
+  const directions: (readonly [bigint, bigint])[] = [
+    ...branch.visible.map((direction, i): readonly [bigint, bigint] => [
+      direction,
+      bytesToBits(branch.visibleDeltas[i]!),
+    ]),
+    ...branch.hidden.map((direction): readonly [bigint, bigint] => [direction, 0n]),
+  ];
   // The combinations of directions that leave this element as it is, with their images in (S, D).
   const pivots = new Map<number, { part: bigint; image: bigint }>();
   const kept: bigint[] = [];
@@ -535,51 +584,55 @@ function agreed<T>(branches: readonly Branch[], field: (branch: Branch) => T): T
 }
 
 /**
- * Assesses the shares as typed, with ? for each unreadable element, and returns a plan whose search
- * finds every phrase they can restore. Nothing is tried before `search` is called. `signal` stops
- * the assessment, which can take a while for many marks.
+ * The refusal of a share, counted from 0, that no reading fits. Its marks are named only when it
+ * has any: a share without them is typed wrong, or is no share. A code marked with the wrong
+ * number of symbols is named (markProblem).
  */
-export async function planJointRepair(
-  records: readonly string[],
-  options: { readonly signal?: AbortSignal } = {},
-): Promise<JointPlan> {
-  const { signal } = options;
-  signal?.throwIfAborted();
-  const texts = records.map((record) => record.trim());
-  const marksOf = (text: string) => (text.match(/\?/gu) ?? []).length;
-  for (const [index, text] of texts.entries())
-    if (text.length > MAX_REPAIR_TEXT_LENGTH || marksOf(text) > MAX_JOINT_MARKED_ELEMENTS)
-      throw new Error(
-        `Share ${index + 1}: mark at most ${MAX_JOINT_MARKED_ELEMENTS} unreadable elements with ?.`,
-      );
-  const spacesOf = texts.map((text) =>
-    markedReadings(text)
-      .map(readingSpace)
-      .filter((space): space is ReadingSpace => space !== undefined),
-  );
-  const shares: ShareAssessment[] = spacesOf.map((spaces, index) => ({
-    marks: marksOf(texts[index]!),
-    forms: [...new Set(spaces.map((space) => space.reading.format))],
-    openAlone: spaces.length === 0 ? 0 : Math.min(...spaces.map((space) => space.basis.length)),
-  }));
-  const unfit = spacesOf.findIndex((spaces) => spaces.length === 0);
-  if (unfit >= 0)
-    return refusal(
-      shares,
-      "no-fit",
-      `Share ${unfit + 1} is no share: check its marks and its other elements.`,
-    );
-  if (spacesOf.some(severalGroups))
-    return refusal(
-      shares,
-      "no-fit",
-      "These shares belong to a set of several groups; only sets of one group are repaired.",
-    );
+function unreadableShare(share: number, marks: number, text: string): string {
+  const problem = markProblem(text);
+  if (problem !== undefined) return `Share ${share + 1}: ${problem}`;
+  return marks === 0
+    ? `Share ${share + 1} cannot be read as a share: check each of its elements.`
+    : `Share ${share + 1} cannot be read as a share: check the elements marked with ?, and the others.`;
+}
+
+/** What solving every combination of the shares' readings gives (solveReadings). */
+interface Solved {
+  readonly branches: Branch[];
+  /** The rows that every reading shares had no solution in some combination. */
+  readonly conflict: boolean;
+  /** Some possibility had as many distinct members as its threshold. */
+  readonly enoughMembers: boolean;
+  /** Some possibility gave two shares the same member number. */
+  readonly duplicates: boolean;
+  /** Some length of the secret is one that every share can be read in. */
+  readonly sameLength: boolean;
+  /** Why the shares cannot be assessed at all, when they cannot. */
+  readonly refused?: { readonly verdict: JointAssessment["verdict"]; readonly reason: string };
+}
+
+/**
+ * Solves every combination of one reading of each share (solveJoint), for each length of the
+ * secret that every share can be read in, and gathers the branches.
+ */
+async function solveReadings(
+  spacesOf: readonly (readonly ReadingSpace[])[],
+  signal: AbortSignal | undefined,
+  budget?: WorkBudget,
+): Promise<Solved> {
   const branches: Branch[] = [];
   let conflict = false;
   let enoughMembers = false;
   let duplicates = false;
   let sameLength = false;
+  const solved = (refused?: Solved["refused"]): Solved => ({
+    branches,
+    conflict,
+    enoughMembers,
+    duplicates,
+    sameLength,
+    ...(refused === undefined ? {} : { refused }),
+  });
   const lengths = new Set(spacesOf[0]!.map((space) => space.reading.structure.payloadLength));
   for (const payloadLength of lengths) {
     const secretBytes = payloadLength - METADATA_BYTES;
@@ -591,7 +644,10 @@ export async function planJointRepair(
     sameLength = true;
     const readings = picks(choices, MAX_BRANCHES);
     if (readings === undefined)
-      return refusal(shares, "too-uncertain", "Too many forms fit these shares; mark fewer.");
+      return solved({
+        verdict: "too-uncertain",
+        reason: "Too many forms fit these shares; mark fewer.",
+      });
     // Readings with the fewest forms first: a share all marked is then taken in the form of the
     // others, which is how its repair is shown.
     const formsIn = (spaces: readonly ReadingSpace[]) =>
@@ -602,27 +658,162 @@ export async function planJointRepair(
         spaces.slice(0, share).reduce((sum, space) => sum + space.basis.length, 0),
       );
       const dimensions = offsets.at(-1)! + spaces.at(-1)!.basis.length;
-      const solved = await solveJoint({ spaces, offsets, dimensions, secretBytes }, signal);
-      if (solved.tooMany)
-        return refusal(
-          shares,
-          "too-uncertain",
-          "The member numbers of these shares cannot be told; read more of their first elements.",
-        );
-      conflict ||= solved.conflict;
-      enoughMembers ||= solved.enoughMembers;
-      duplicates ||= solved.duplicates;
-      branches.push(...solved.branches);
+      const joint = await solveJoint({ spaces, offsets, dimensions, secretBytes }, signal, budget);
+      if (joint.tooMany)
+        return solved({
+          verdict: "too-uncertain",
+          reason:
+            "The member numbers of these shares cannot be told; read more of their first elements.",
+        });
+      conflict ||= joint.conflict;
+      enoughMembers ||= joint.enoughMembers;
+      duplicates ||= joint.duplicates;
+      branches.push(...joint.branches);
       if (branches.length > MAX_BRANCHES)
-        return refusal(shares, "too-uncertain", "Too many ways fit these shares; mark fewer.");
+        return solved({
+          verdict: "too-uncertain",
+          reason: "Too many ways fit these shares; mark fewer.",
+        });
     }
   }
-  if (!sameLength)
+  return solved();
+}
+
+/** The combinations that a search of `branches` tries. */
+function combinationsOf(branches: readonly Branch[]): number {
+  return branches.reduce((sum, branch) => sum + 2 ** branch.visible.length, 0);
+}
+
+/**
+ * Combinations of words that the partly read Unicode codes of all the shares are tried in, word
+ * by word (refined), and the work that all of them may do together for the choices of thresholds
+ * and member numbers (WorkBudget): a few seconds at most, so that the assessment never runs for
+ * minutes. Beyond them
+ * the codes stay unknown as a whole, and the assessment says what would help.
+ */
+const CODE_TRIALS = 64;
+const TRIAL_WORK = 2 ** 19;
+
+/**
+ * The branches of the shares with their partly read Unicode codes tried word by word: the codes
+ * with the fewest fitting words, across the shares, as many as keep the combinations within
+ * CODE_TRIALS (repair.ts, placesWithin and choicesAt), each combination solved as the shares
+ * are. Every word that fits a code is tried, so nothing that the digits allow is lost. Undefined
+ * when no code is read in part, or when that does not shorten the search of `branches`: the codes
+ * then stay unknown as a whole, their digits still checked (MarkedReading.fits).
+ */
+async function refined(
+  spacesOf: readonly (readonly ReadingSpace[])[],
+  before: number,
+  signal: AbortSignal | undefined,
+): Promise<Branch[] | undefined> {
+  if (before <= 1) return undefined;
+  const units = spacesOf.flatMap((spaces, share) => {
+    const reading = spaces.find((space) => space.reading.candidates !== undefined)?.reading;
+    return reading === undefined
+      ? []
+      : candidateCounts(reading).map((unit) => ({
+          ...unit,
+          share,
+          metadata: reachesMetadata(reading, unit.place),
+        }));
+  });
+  // The codes that reach the metadata first, which tell the member numbers; then those with the
+  // fewest words, which gain the most bits for their choices.
+  units.sort((a, b) => Number(b.metadata) - Number(a.metadata) || a.count - b.count);
+  const chosen = placesWithin(units, CODE_TRIALS);
+  if (chosen.length === 0) return undefined;
+  const expanded: ReadingSpace[][] = [];
+  for (const [share, spaces] of spacesOf.entries()) {
+    await nextTurn(signal);
+    const places = chosen.filter((unit) => unit.share === share).map((unit) => unit.place);
+    expanded.push(
+      spaces.flatMap((space) =>
+        choicesAt(space.reading, places)
+          .map(readingSpace)
+          .filter((tried): tried is ReadingSpace => tried !== undefined),
+      ),
+    );
+  }
+  if (expanded.some((spaces) => spaces.length === 0)) return undefined;
+  const solved = await solveReadings(expanded, signal, { left: TRIAL_WORK });
+  if (solved.refused !== undefined || solved.branches.length === 0) return undefined;
+  return combinationsOf(solved.branches) < before ? solved.branches : undefined;
+}
+
+/** How planJointRepair assesses the shares. */
+export interface PlanOptions {
+  /** Stops the assessment, which can take a while for many marks. */
+  readonly signal?: AbortSignal | undefined;
+  /**
+   * The host's services, with which the search checks and restores each candidate; the platform
+   * configured with configureSharePlatform when none is given (JointRepair passes its own).
+   */
+  readonly platform?: SharePlatform | undefined;
+}
+
+/**
+ * Assesses the shares as typed, with ? for each unreadable element, and returns a plan whose search
+ * finds every phrase they can restore. Nothing is tried before `search` is called. `signal` stops
+ * the assessment, which can take a while for many marks.
+ */
+export async function planJointRepair(
+  records: readonly string[],
+  options: PlanOptions = {},
+): Promise<JointPlan> {
+  const { signal } = options;
+  signal?.throwIfAborted();
+  const { platform } = options;
+  const texts = records.map((record) => record.trim());
+  for (const [index, text] of texts.entries())
+    if (
+      text.length > MAX_REPAIR_TEXT_LENGTH ||
+      (text.match(/\?/gu) ?? []).length > MAX_JOINT_MARK_SYMBOLS ||
+      markCount(text) > MAX_JOINT_MARKED_ELEMENTS
+    )
+      throw new Error(
+        `Share ${index + 1}: mark at most ${MAX_JOINT_MARKED_ELEMENTS} unreadable elements with ?.`,
+      );
+  const spacesOf: ReadingSpace[][] = [];
+  for (const text of texts) {
+    // A turn between the shares: reading one is quick, but many add up.
+    await nextTurn(signal);
+    spacesOf.push(
+      markedReadings(text)
+        .map(readingSpace)
+        .filter((space): space is ReadingSpace => space !== undefined),
+    );
+  }
+  const shares: ShareAssessment[] = spacesOf.map((spaces, index) => ({
+    marks: markCount(texts[index]!),
+    forms: [...new Set(spaces.map((space) => space.reading.format))],
+    openAlone: spaces.length === 0 ? 0 : Math.min(...spaces.map((space) => space.basis.length)),
+  }));
+  const unfit = spacesOf.findIndex((spaces) => spaces.length === 0);
+  if (unfit >= 0)
+    return refusal(shares, "no-fit", unreadableShare(unfit, shares[unfit]!.marks, texts[unfit]!));
+  if (spacesOf.some(severalGroups))
+    return refusal(
+      shares,
+      "no-fit",
+      "These shares belong to a set of several groups; only sets of one group are repaired.",
+    );
+  const solved = await solveReadings(spacesOf, signal);
+  if (solved.refused !== undefined) {
+    // The digits read of partly read codes may tell what the codes unknown as a whole cannot.
+    const tried =
+      solved.refused.verdict === "too-uncertain"
+        ? await refined(spacesOf, Number.POSITIVE_INFINITY, signal)
+        : undefined;
+    if (tried === undefined) return refusal(shares, solved.refused.verdict, solved.refused.reason);
+    return planOf(shares, tried, platform, signal);
+  }
+  if (!solved.sameLength)
     return refusal(shares, "no-fit", "These shares are of different lengths: not of one set.");
-  if (branches.length === 0) {
+  if (solved.branches.length === 0) {
     // The common rows fail for shares of another set, or for a misread identifier or threshold:
     // more shares would not help.
-    if (enoughMembers || conflict)
+    if (solved.enoughMembers || solved.conflict)
       return refusal(
         shares,
         "no-fit",
@@ -631,13 +822,27 @@ export async function planJointRepair(
     return refusal(
       shares,
       "not-enough",
-      duplicates
+      solved.duplicates
         ? "The same share is given more than once: the threshold of this set needs more shares."
         : "Too few shares: the threshold of this set needs more of them.",
     );
   }
+  // Partly read Unicode codes are tried word by word where that shortens the search; the verdicts
+  // above come from the codes unknown as a whole, which a wrong word cannot mislead.
+  const branches =
+    (await refined(spacesOf, combinationsOf(solved.branches), signal)) ?? solved.branches;
+  return planOf(shares, branches, platform, signal);
+}
+
+/** The assessment of `branches` and the search of them, with the host's platform. */
+async function planOf(
+  shares: readonly ShareAssessment[],
+  branches: readonly Branch[],
+  platform: SharePlatform | undefined,
+  signal: AbortSignal | undefined,
+): Promise<JointPlan> {
   const openBits = Math.max(...branches.map((branch) => branch.visible.length));
-  const combinations = branches.reduce((sum, branch) => sum + 2 ** branch.visible.length, 0);
+  const combinations = combinationsOf(branches);
   const threshold = agreed(branches, (branch) => branch.threshold);
   const secretBytes = agreed(branches, (branch) => branch.joint.secretBytes);
   const tooOpen = combinations > 2 ** MAX_SEARCH_BITS;
@@ -659,7 +864,11 @@ export async function planJointRepair(
       : {}),
   };
   if (tooOpen) return { assessment, search: async () => [] };
-  return { assessment, search: (options) => searchBranches(branches, options) };
+  // The configured platform is read only by a search, which the assessment alone does not need.
+  return {
+    assessment,
+    search: (options) => searchBranches(branches, platform ?? sharePlatform(), options),
+  };
 }
 
 /** The place of the lowest set bit of a positive integer below 2^53. */
@@ -676,11 +885,11 @@ function lowestBit(value: number): number {
  */
 async function searchBranches(
   branches: readonly Branch[],
+  platform: SharePlatform,
   options: SearchOptions = {},
 ): Promise<RepairedSet[]> {
   options.signal?.throwIfAborted();
   const total = branches.reduce((sum, branch) => sum + 2 ** branch.visible.length, 0);
-  const platform = sharePlatform();
   const found = new Map<string, RepairedSet>();
   let done = 0;
   for (const branch of branches) {
@@ -695,7 +904,8 @@ async function searchBranches(
         }
         if (digestFits(current, secretBytes, platform.hmacSha256)) {
           const gray = BigInt(step) ^ (BigInt(step) >> 1n);
-          const repaired = await confirm(branch, branch.particular ^ combine(branch.visible, gray));
+          const z = branch.particular ^ combine(branch.visible, gray);
+          const repaired = await confirm(branch, z, platform);
           if (repaired !== undefined) {
             const known = found.get(repaired.mnemonic);
             found.set(repaired.mnemonic, known === undefined ? repaired : merged(known, repaired));
@@ -789,6 +999,7 @@ function readCandidate(branch: Branch, z: bigint): ReadRepairableShare[] | undef
 async function restore(
   branch: Branch,
   shares: readonly ReadRepairableShare[],
+  platform: SharePlatform,
 ): Promise<string | undefined> {
   const { base, members, threshold } = branch;
   const firstOf = new Map<number, number>();
@@ -804,7 +1015,7 @@ async function restore(
     let entropy: Uint8Array | undefined;
     try {
       const records = validateShareSet(window.map((share) => shares[share]!.ur));
-      entropy = await sharePlatform().combineShares(records);
+      entropy = await platform.combineShares(records);
       const mnemonic = entropyToMnemonic(entropy, wordlist);
       if (restored !== undefined && restored !== mnemonic) return undefined;
       restored = mnemonic;
@@ -822,15 +1033,53 @@ async function restore(
  * elements do not change the phrase; the first of their values with which every share reads are
  * taken, and they are reported as unsettled.
  */
-async function confirm(branch: Branch, z: bigint): Promise<RepairedSet | undefined> {
+async function confirm(
+  branch: Branch,
+  z: bigint,
+  platform: SharePlatform,
+): Promise<RepairedSet | undefined> {
   const hiddenBits = Math.min(branch.hidden.length, MAX_HIDDEN_TRIES_BITS);
   for (let choice = 0; choice < 2 ** hiddenBits; choice += 1) {
     const shares = readCandidate(branch, z ^ combine(branch.hidden, BigInt(choice)));
     if (shares === undefined) continue;
-    const mnemonic = await restore(branch, shares);
+    const mnemonic = await restore(branch, shares, platform);
     return mnemonic === undefined
       ? undefined
       : { mnemonic, shares, unsettled: unsettledElements(branch) };
   }
   return undefined;
+}
+
+/**
+ * The repair of marked shares with the host's services. A class, so that a page binds its
+ * SharePlatform once and every assessment, search and measure of its pace uses it, and never a
+ * platform configured elsewhere.
+ */
+export class JointRepair {
+  readonly #platform: SharePlatform;
+
+  constructor(platform: SharePlatform) {
+    if (typeof platform?.hmacSha256 !== "function" || typeof platform.combineShares !== "function")
+      throw new TypeError("A share repair needs the host's SharePlatform.");
+    this.#platform = platform;
+  }
+
+  /** Marked elements on one share that a repair takes (MAX_JOINT_MARKED_ELEMENTS). */
+  static readonly MAX_MARKED_ELEMENTS = MAX_JOINT_MARKED_ELEMENTS;
+
+  /**
+   * Assesses `records`, the shares as typed with ? for each unreadable element, and returns the
+   * plan whose search finds every phrase they can restore (planJointRepair).
+   */
+  plan(
+    records: readonly string[],
+    options: { readonly signal?: AbortSignal } = {},
+  ): Promise<JointPlan> {
+    return planJointRepair(records, { ...options, platform: this.#platform });
+  }
+
+  /** Digest checks per second in this host, for the time of a search (RepairReport). */
+  triesPerSecond(): number {
+    return measureTriesPerSecond(this.#platform);
+  }
 }

@@ -6,14 +6,14 @@ Candidate N on MnemoCode's screen is record N of the file, counting from 1.
 
 ## Where the candidates come from
 
-| Search                                  | Command                       | Order of the candidates      |
-| --------------------------------------- | ----------------------------- | ---------------------------- |
-| Unknown words at known places           | `recover-word`                | [below](#unknown-words)      |
-| One word missing at an unknown place    | `recover-word --missing-word` | [below](#a-missing-word)     |
-| Forgotten digits of the Seedshift dates | `recover-date`                | as `recover-date` lists them |
-| Damaged Shamir shares                   | `sskr-combine`                | as `sskr-combine` lists them |
+| Search                                                                           | Command                       | Order of the candidates      |
+| -------------------------------------------------------------------------------- | ----------------------------- | ---------------------------- |
+| Unknown words at known places                                                    | `recover-word`                | [below](#unknown-words)      |
+| One word missing at an unknown place                                             | `recover-word --missing-word` | [below](#a-missing-word)     |
+| Forgotten digits of the Seedshift dates                                          | `recover-date`                | as `recover-date` lists them |
+| Damaged Shamir shares, forgotten date digits of a phrase masked before splitting | `sskr-combine`                | as `sskr-combine` lists them |
 
-The searches are in MnemoCode's host-neutral core (`src/core/candidates.ts`, `src/core/date-recovery.ts`, `src/sskr/joint-repair.ts`), which the Deriver compiles unchanged, so the same input gives the same list in both.
+The searches are host-neutral parts of MnemoCode, which the Deriver compiles unchanged, so the same input gives the same list in both: `WordCandidateSearch` in `src/core/candidates.ts` for words, `DateSearch` in `src/core/date-search.ts` for dates, and `src/sskr/joint-repair.ts` for shares.
 
 A candidate is kept only when its BIP39 checksum is valid. A wallet check (a fingerprint, an address, a public key) works differently by search: `recover-word` lists and saves every candidate and marks those that match, while `recover-date` and `sskr-combine` list and save only the candidates that match. Either way the list holds exactly the candidates the screen numbers, in that order.
 
@@ -82,7 +82,9 @@ A list leaves MnemoCode encrypted with [age](https://age-encryption.org/v1), in 
 
 X25519 is not post-quantum: a file kept today could be opened by a large quantum computer in the future. The owner chose it over the hybrid ML-KEM-768 key, whose recipient is 1,959 characters long. A passphrase file is symmetric and not exposed in this way, as long as the passphrase is strong.
 
-Both sides use one module, `src/core/candidate-encryption.ts`, which imports only the npm package `age-encryption` 0.3.1: `createSessionIdentity`, `encryptCandidates`, `encryptCandidatesWithPassphrase` and `decryptCandidates`. A list without encryption is written only on explicit request (`--plaintext-candidates`), with a warning; whether to read one is up to the reader.
+With `--ask-secrets` and neither a key nor a passphrase file, MnemoCode asks for the passphrase twice on the private screen before the search, and asks for both again until they agree and are long enough; only Ctrl+C leaves. When the list cannot be saved, for example because the disk is full, it offers to try again, to use another file name, or to skip the list; the candidates stay on the screen.
+
+Both sides use one module, `src/core/candidate-encryption.ts`, which imports only the npm package `age-encryption` 0.3.1: `createSessionIdentity`, `encryptCandidates`, `encryptCandidatesWithPassphrase` and `decryptCandidates`. A writer chooses the protection once, as one of the three classes behind `ListProtection` (`ScannerKeyProtection`, `PassphraseProtection`, `NoProtection`), and `parseListPassphrase` holds the rule for the passphrase above, so that every host accepts the same ones. A list without encryption is written only on explicit request (`--plaintext-candidates`), with a warning; whether to read one is up to the reader.
 
 ## Limits
 

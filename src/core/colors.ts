@@ -8,7 +8,10 @@ const RGB_HEX_DIGITS = 6;
 const RGB_MAX_VALUE = 0xffffff;
 
 /** CSS RGB packing of BIP39 indexes. The 12- and 24-word cases are BIP39Colors-compatible. */
-export function indexesToColors(indexes: readonly number[]): string[] {
+export function indexesToColors(given: readonly number[]): string[] {
+  // Array.from turns holes into undefined, which is refused; some() would skip them, and map and
+  // join would then leave them out of the colors without a word.
+  const indexes = Array.from(given);
   assertWordCount(indexes.length);
   if (
     indexes.some((index) => !Number.isInteger(index) || index < 0 || index >= BIP39_DICTIONARY_SIZE)
@@ -54,7 +57,9 @@ export function parseColors(value: string): string[] {
   return colors;
 }
 
-export function colorsToIndexes(colors: readonly string[]): number[] {
+export function colorsToIndexes(given: readonly string[]): number[] {
+  // Array.from, so that a hole is a color that is refused rather than one that map skips.
+  const colors = Array.from(given);
   if (!RGB_REFERENCE_COUNTS.includes(colors.length))
     throw new Error("Enter 8, 10, 12, 14, or 16 colors for a standard BIP39 word count.");
   const encoded = colors
@@ -97,6 +102,51 @@ export function colorsToIndexes(colors: readonly string[]): number[] {
   return positions.map((position) => position - 1);
 }
 
+/**
+ * The 1-based word positions that colors give, four decimal digits each, where some colors cannot
+ * be read (undefined): "?" for every digit of such a color. The colors may come in any order, as
+ * colorsToIndexes takes them: the order tags of those that can be read place them, and one that
+ * cannot be read takes a tag that is left. MnemoCode counts the tags from 0; another offset is
+ * taken only where the tags read leave no doubt about it.
+ */
+export function wordPositionPatterns(colors: readonly (string | undefined)[]): string[] {
+  const given = Array.from(colors);
+  if (!RGB_REFERENCE_COUNTS.includes(given.length))
+    throw new Error("Enter 8, 10, 12, 14, or 16 colors for a standard BIP39 word count.");
+  const step = given.length === 8 ? 2 : 1;
+  const payloads = new Map<number, string>();
+  for (const color of given) {
+    if (color === undefined) continue;
+    if (!/^#[0-9A-F]{6}$/u.test(color))
+      throw new Error("Each color must use uppercase #RRGGBB form.");
+    const digits = Number.parseInt(color.slice(1), 16)
+      .toString(10)
+      .padStart(ORDER_TAG_DIGITS + RGB_PAYLOAD_DIGITS, "0");
+    const tag = Number(digits.slice(0, ORDER_TAG_DIGITS));
+    if (payloads.has(tag))
+      throw new Error("These colors do not form a valid BIP39Colors-compatible set.");
+    payloads.set(tag, digits.slice(-RGB_PAYLOAD_DIGITS));
+  }
+  const tags = [...payloads.keys()];
+  const fits = (offset: number) =>
+    tags.every((tag) => (tag - offset) % step === 0 && (tag - offset) / step < given.length);
+  const lowest = Math.min(...tags, Number.POSITIVE_INFINITY);
+  const offsets = Array.from(
+    { length: Number.isFinite(lowest) ? lowest + 1 : 1 },
+    (_, o) => o,
+  ).filter((offset) => offset <= lowest && fits(offset));
+  // The tags of MnemoCode start at 0; another start is taken only when it is the one that fits.
+  const offset = offsets.includes(0) ? 0 : offsets.length === 1 ? offsets[0] : undefined;
+  if (offset === undefined)
+    throw new Error("The colors that can be read do not tell where the others belong.");
+  const digits = given
+    .map((_, slot) => payloads.get(offset + slot * step) ?? "?".repeat(RGB_PAYLOAD_DIGITS))
+    .join("");
+  return Array.from({ length: digits.length / WORD_POSITION_DIGITS }, (_, index) =>
+    digits.slice(index * WORD_POSITION_DIGITS, (index + 1) * WORD_POSITION_DIGITS),
+  );
+}
+
 // The BMP Private Use Area has 0x1900 scalars. Quotient/remainder in that radix
 // fits every 24-bit RGB value into two scalars without using surrogate code units.
 export const COLOR_UNICODE_BASE = 0xe000;
@@ -106,7 +156,8 @@ const COLOR_UNICODE_CODE_POINT_DIGITS = 4;
 
 /** Portable text form: two four-digit Private Use code points per CSS RGB color. */
 export function colorsToUnicode(colors: readonly string[]): string {
-  return colors
+  // Array.from, so that a hole is a color that is refused rather than one left out of the text.
+  return Array.from(colors)
     .map((color) => {
       if (!/^#[0-9A-F]{6}$/u.test(color))
         throw new Error("Each color must use uppercase #RRGGBB form.");

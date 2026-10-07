@@ -15,6 +15,9 @@ const ENTER_ALTERNATE_SCREEN = "\x1b[?1049h\x1b[2J\x1b[H";
  * clear comes first, so that the words also vanish where there is no alternate screen. */
 const LEAVE_ALTERNATE_SCREEN = "\x1b[2J\x1b[H\x1b[?1049l";
 
+/** Clears the screen and moves to its top left (VT100 "erase in display" and "home"). */
+const CLEAR_SCREEN = "\x1b[2J\x1b[H";
+
 /** The exit code of a tool stopped by Ctrl+C: 128 plus SIGINT (2). */
 export const CANCELLED_EXIT_CODE = 130;
 
@@ -35,9 +38,22 @@ export function onPrivateScreen(): boolean {
 }
 
 /**
+ * Clears the private screen before a result, so that it stands alone, without the questions and
+ * the search above it, as each step of `mhfe` gets a screen of its own. Whether it was cleared:
+ * outside the private screen nothing is.
+ */
+export function clearPrivateScreen(): boolean {
+  if (!active) return false;
+  process.stderr.write(CLEAR_SCREEN);
+  return true;
+}
+
+/**
  * Runs `body` on the alternate screen when privateScreenAvailable(), waits for Enter after it
  * succeeds and then leaves the screen. When `body` fails, the screen is left at once, so that the
- * error is shown on the main screen. Ctrl+C while `body` computes also leaves it first.
+ * error is shown on the main screen. Ctrl+C also leaves it first: at a question and during a long
+ * search it is read as a key (watchForCtrlC), and `body` fails with InputCancelled; SIGINT, from
+ * Ctrl+C while `body` computes something else or sent by other means, is handled here.
  */
 export async function withPrivateScreen<T>(body: () => Promise<T>): Promise<T> {
   if (!privateScreenAvailable()) return body();

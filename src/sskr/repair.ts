@@ -7,6 +7,12 @@
 // be 2^72 tries. Each solution is then read as an ordinary share, which checks everything again.
 // More solutions than one are listed as variants, never chosen silently; unmarked errors are never
 // repaired.
+//
+// An element may also be read in part, a ? standing for each digit that cannot be read: a color
+// such as #B5?0??, whose digits are bits, adds the bits read as equations of their own. A Unicode
+// code such as 4E?0, whose digits are not bits of its word number, is unknown as a whole, and the
+// words whose code fits are its candidates: a solution must be one of them (fits), and where that
+// shortens the search they are tried one by one, each as the code's bits (withValues).
 
 import { bytewords } from "./bytewords-list.js";
 import { crc32, shareMask } from "./checksum.js";
@@ -33,6 +39,20 @@ import {
 
 /** More marked elements than this leave too few checksum bits to find them. */
 export const MAX_MARKED_ELEMENTS = 6;
+/** Hexadecimal digits of a color, #RRGGBB, and of a Unicode code of a word. */
+const COLOR_DIGITS = 6;
+const CODE_DIGITS = 4;
+const NIBBLE_BITS = 4;
+/**
+ * The most ? a text may hold: a ? for each digit of every color that a share may mark
+ * (MAX_MARKED_ELEMENTS colors), so that marking digits one by one costs no element.
+ */
+const MAX_MARK_SYMBOLS = MAX_MARKED_ELEMENTS * COLOR_DIGITS;
+/**
+ * Readings that one share alone is tried in, one for each choice of words for its partly read
+ * Unicode codes (choicesWithin), when the checksum alone leaves too many solutions.
+ */
+export const MAX_CODE_CHOICES = 256;
 export const MAX_REPAIR_TEXT_LENGTH = 2048;
 const MAX_REPAIR_UNITS = 128;
 /**
@@ -108,6 +128,20 @@ interface UnitModel {
   readonly text: (values: readonly number[]) => string;
   /** Rejects values that the written text rules out, such as a color code given half. */
   readonly fits?: (values: readonly number[]) => boolean;
+  /** For each marked unit read in part, the bits that were read (ReadBits). */
+  readonly readBits?: readonly (ReadBits | undefined)[];
+  /** For each partly read unit whose digits are no bits of it, the values that fit them. */
+  readonly candidates?: readonly (readonly number[] | undefined)[];
+}
+
+/**
+ * The bits of a marked unit that were read, `mask` set where `value` holds them: the digits of a
+ * color that could be read, or every bit of the one word that a reading takes for a partly read
+ * Unicode code.
+ */
+export interface ReadBits {
+  readonly value: number;
+  readonly mask: number;
 }
 
 /** Fields as one number of bits, the first field lowest: [value, width] pairs. */
@@ -288,6 +322,39 @@ function unitsOf(text: string, unit: RegExp): string[] | undefined {
   return units;
 }
 
+/**
+ * Hexadecimal codes of `digits` digits written apart, such as colors or Unicode codes: each a lone
+ * ? where none of its digits can be read, or `digits` symbols in which each ? is one digit that
+ * cannot be read. Undefined when the text is not written so; a ? then stands for a whole unit.
+ */
+function separatedCodes(text: string, digits: number): string[] | undefined {
+  const tokens = text
+    .toUpperCase()
+    .split(/[\s,;#]+/u)
+    .filter(Boolean);
+  const code = new RegExp(`^(?:\\?|[0-9A-F?]{${digits}})$`, "u");
+  if (tokens.length === 0 || tokens.length > MAX_REPAIR_UNITS) return undefined;
+  if (!tokens.every((token) => code.test(token))) return undefined;
+  // Every digit marked is the same as the code marked as a whole.
+  return tokens.map((token) => (/^\?+$/u.test(token) ? "?" : token));
+}
+
+/** Whether `code` has digits that can be read and digits that cannot. */
+function readInPart(code: string): boolean {
+  return code !== "?" && code.includes("?");
+}
+
+/** The digits of `code` that can be read, as ReadBits; each digit is four bits, the first highest. */
+function digitBits(code: string): ReadBits {
+  let value = 0;
+  let mask = 0;
+  for (const digit of code) {
+    value = value * 2 ** NIBBLE_BITS + (digit === "?" ? 0 : parseInt(digit, 16));
+    mask = mask * 2 ** NIBBLE_BITS + (digit === "?" ? 0 : 2 ** NIBBLE_BITS - 1);
+  }
+  return { value, mask };
+}
+
 const MINIMAL_BYTEWORDS = bytewords.map((word) => word[0]! + word[3]!);
 const MINIMAL_BYTEWORD_VALUES = new Map(MINIMAL_BYTEWORDS.map((pair, value) => [pair, value]));
 const BYTEWORD_VALUES = new Map<string, number>(bytewords.map((word, value) => [word, value]));
@@ -356,24 +423,69 @@ function unitModels(text: string): UnitModel[] {
       separator: " ",
     });
   const compact = text.replace(/[\s,;]+/gu, "").toUpperCase();
-  const codes = unitsOf(compact, /[0-9A-F]{4}/);
-  addModel(models, codes, (unit) => UNICODE_INDEX.get(unit), {
-    format: "unicode",
-    unitBits: WORD_BITS,
-    structures: codes === undefined ? [] : wordStructures(codes.length),
-    unitText: (value) => UNICODE_CODES[value]!,
-    separator: " ",
-  });
-  const colors = unitsOf(compact.replace(/#/gu, ""), /[0-9A-F]{6}/);
-  addModel(models, colors, (unit) => parseInt(unit, 16), {
-    format: "colors",
-    unitBits: COLOR_BITS,
-    structures: colors === undefined ? [] : colorStructures(colors.length),
-    unitText: hexColor,
-    separator: " ",
-  });
+  addUnicodeModel(models, text, compact);
+  addColorModel(models, text, compact);
   addColorUnicodeModels(models, text, compact);
   return models;
+}
+
+/**
+ * Unicode codes of words, read apart or run together. A code read in part, such as 4E?0, is
+ * unknown as a whole; the words whose code fits it are its candidates, and a solution must take
+ * one of them. A code that no word fits leaves no reading in this form.
+ */
+function addUnicodeModel(models: UnitModel[], text: string, compact: string): void {
+  const codes = separatedCodes(text, CODE_DIGITS) ?? unitsOf(compact, /[0-9A-F]{4}/);
+  if (codes === undefined) return;
+  const values = codes.map((code) => (code.includes("?") ? undefined : UNICODE_INDEX.get(code)));
+  if (values.some((value, index) => value === undefined && !codes[index]!.includes("?"))) return;
+  const candidates = codes.map((code) => (readInPart(code) ? fittingWords(code) : undefined));
+  if (candidates.some((words) => words?.length === 0)) return;
+  const fitting = candidates.map((words) => (words === undefined ? undefined : new Set(words)));
+  models.push({
+    format: "unicode",
+    unitBits: WORD_BITS,
+    values,
+    structures: wordStructures(codes.length),
+    unitText: (value) => UNICODE_CODES[value]!,
+    text: (filled) => filled.map((value) => UNICODE_CODES[value]!).join(" "),
+    ...(candidates.some((words) => words !== undefined)
+      ? {
+          candidates,
+          fits: (filled: readonly number[]) =>
+            fitting.every((words, place) => words?.has(filled[place]!) ?? true),
+        }
+      : {}),
+  });
+}
+
+/** The words of the list whose Unicode code fits `code`, any digit standing where it has a ?. */
+function fittingWords(code: string): number[] {
+  const pattern = new RegExp(`^${code.replace(/\?/gu, "[0-9A-F]")}$`, "u");
+  return UNICODE_CODES.flatMap((written, index) => (pattern.test(written) ? [index] : []));
+}
+
+/**
+ * Colors written apart, each a lone ? when it cannot be read at all, or with a ? for each digit
+ * that cannot be read, whose digits read are then known bits; or colors run together, a ? standing
+ * for a whole color.
+ */
+function addColorModel(models: UnitModel[], text: string, compact: string): void {
+  const colors =
+    separatedCodes(text, COLOR_DIGITS) ?? unitsOf(compact.replace(/#/gu, ""), /[0-9A-F]{6}/);
+  if (colors === undefined) return;
+  const partly = colors.some(readInPart);
+  models.push({
+    format: "colors",
+    unitBits: COLOR_BITS,
+    values: colors.map((color) => (color.includes("?") ? undefined : parseInt(color, 16))),
+    structures: colorStructures(colors.length),
+    unitText: hexColor,
+    text: (filled) => filled.map(hexColor).join(" "),
+    ...(partly
+      ? { readBits: colors.map((color) => (readInPart(color) ? digitBits(color) : undefined)) }
+      : {}),
+  });
 }
 
 function wordStructures(units: number): ShareStructure[] {
@@ -456,6 +568,13 @@ export interface MarkedReading {
   readonly unitText: (value: number) => string;
   readonly text: (values: readonly number[]) => string;
   readonly fits?: (values: readonly number[]) => boolean;
+  /** For each marked unit read in part, the bits that were read; they are equations too. */
+  readonly readBits?: readonly (ReadBits | undefined)[];
+  /**
+   * For each partly read unit whose digits are no bits of it, such as a Unicode code, the values
+   * that fit the digits read: a solution takes one of them (fits), and withValues tries them.
+   */
+  readonly candidates?: readonly (readonly number[] | undefined)[];
 }
 
 /** Every reading of `text`: each form it can be in, with each structure its length allows. */
@@ -469,8 +588,172 @@ export function markedReadings(text: string): MarkedReading[] {
       unitText: model.unitText,
       text: model.text,
       ...(model.fits === undefined ? {} : { fits: model.fits }),
+      ...(model.readBits === undefined ? {} : { readBits: model.readBits }),
+      ...(model.candidates === undefined ? {} : { candidates: model.candidates }),
     })),
   );
+}
+
+/**
+ * `reading` with the units at the places of `chosen` taken as the values given, each one of its
+ * candidates: all their bits become equations, and they are still reported as filled in.
+ */
+export function withValues(
+  reading: MarkedReading,
+  chosen: ReadonlyMap<number, number>,
+): MarkedReading {
+  const mask = 2 ** reading.unitBits - 1;
+  const readBits = reading.values.map((_, place) => {
+    const value = chosen.get(place);
+    return value === undefined ? reading.readBits?.[place] : { value, mask };
+  });
+  return { ...reading, readBits };
+}
+
+/**
+ * The candidate units to try value by value, in the order given, as many as keep the product of
+ * their counts within `limit`; the others stay unknown as a whole.
+ */
+export function placesWithin<Unit extends { readonly count: number }>(
+  units: readonly Unit[],
+  limit: number,
+): Unit[] {
+  const chosen: Unit[] = [];
+  let product = 1;
+  for (const unit of units) {
+    // Compared before multiplying, so that the product stays a whole number within the limit.
+    if (unit.count > Math.floor(limit / product)) continue;
+    product *= unit.count;
+    chosen.push(unit);
+  }
+  return chosen;
+}
+
+/**
+ * Whether the bits of the marked unit at `place` reach the SSKR metadata of the share, its first
+ * METADATA_BYTES payload bytes: the identifier and the thresholds, which all shares of a set
+ * carry, and the member number. Units that reach it tell the shares apart, and settle the most.
+ */
+export function reachesMetadata(reading: MarkedReading, place: number): boolean {
+  const values = reading.values.map((value) => value ?? 0);
+  const before = reading.structure.evaluate(values).payload;
+  for (let bit = 0; bit < reading.unitBits; bit += 1) {
+    const flipped = [...values];
+    flipped[place] = values[place]! ^ (1 << bit);
+    const after = reading.structure.evaluate(flipped).payload;
+    for (let byte = 0; byte < METADATA_BYTES; byte += 1)
+      if (after[byte] !== before[byte]) return true;
+  }
+  return false;
+}
+
+/**
+ * Every reading of `reading` with the candidate units at `places` taken value by value
+ * (withValues): one for each combination of their values.
+ */
+export function choicesAt(reading: MarkedReading, places: readonly number[]): MarkedReading[] {
+  // Another reading of the share, such as another form, may have no candidates at these places.
+  const tried = places.filter((place) => reading.candidates?.[place] !== undefined);
+  if (tried.length === 0) return [reading];
+  let all: Map<number, number>[] = [new Map()];
+  for (const place of tried)
+    all = all.flatMap((chosen) =>
+      reading.candidates![place]!.map((value) => new Map(chosen).set(place, value)),
+    );
+  return all.map((chosen) => withValues(reading, chosen));
+}
+
+/** The candidate units of `reading`: each with its place and its number of values. */
+export function candidateCounts(
+  reading: MarkedReading,
+): { readonly place: number; readonly count: number }[] {
+  return (reading.candidates ?? []).flatMap((values, place) =>
+    values === undefined ? [] : [{ place, count: values.length }],
+  );
+}
+
+/**
+ * The marked elements of `text`, as written: each ?, except that a code of four or six symbols
+ * with ? among its digits, such as #B5?0?? or 4E?0, is one element however many digits it
+ * misses. A run of ? alone counts each ?, as each may stand for a whole element.
+ */
+export function markCount(text: string): number {
+  return text
+    .split(/[\s,;#]+/u)
+    .filter(Boolean)
+    .reduce((marks, token) => {
+      const symbols = (token.match(/\?/gu) ?? []).length;
+      const code = token.length === CODE_DIGITS || token.length === COLOR_DIGITS;
+      const partly = code && symbols > 0 && symbols < token.length && /^[0-9A-F?]+$/iu.test(token);
+      return marks + (partly ? 1 : symbols);
+    }, 0);
+}
+
+/** Code points of the Color Unicode codes (core/colors.ts), which take a ? only for a whole code. */
+const COLOR_UNICODE_CODE = (token: string): boolean => {
+  if (!/^[0-9A-F]{4}$/u.test(token)) return false;
+  const point = parseInt(token, 16);
+  return point >= COLOR_UNICODE_BASE && point < COLOR_UNICODE_BASE + COLOR_UNICODE_WIDTH;
+};
+
+/**
+ * The forms written as codes apart, as markProblem tells them by the codes that can be read:
+ * colors and the Unicode codes of words take a ? for a digit; Color Unicode codes and word numbers
+ * only for a whole code.
+ */
+const CODE_FORMS: readonly {
+  readonly name: string;
+  readonly plural: string;
+  /** The symbols of a code, where a ? may stand for one of them. */
+  readonly digits?: number;
+  readonly reads: (token: string) => boolean;
+}[] = [
+  {
+    name: "color",
+    plural: "colors",
+    digits: COLOR_DIGITS,
+    reads: (token) => /^[0-9A-F]{6}$/u.test(token),
+  },
+  {
+    name: "code",
+    plural: "Unicode codes",
+    digits: CODE_DIGITS,
+    reads: (token) => UNICODE_INDEX.has(token),
+  },
+  { name: "code", plural: "Color Unicode codes", reads: COLOR_UNICODE_CODE },
+  {
+    name: "word number",
+    plural: "word numbers",
+    reads: (token) => /^\d{1,4}$/u.test(token) && Number(token) >= 1 && Number(token) <= WORD_COUNT,
+  },
+];
+
+/**
+ * Why a code with a ? among its symbols cannot be read, in words that follow "Share 2: ", when the
+ * text is codes written apart of one form (CODE_FORMS): in a color or a Unicode code it must keep
+ * all its symbols, a ? for each digit that cannot be read; the other forms take only a lone ? for
+ * a whole code. A ? joined to a whole code, as in ?4E00, is read as before and not named. It names
+ * the code by its place only: the text may be shown where the screen is not private.
+ */
+export function markProblem(text: string): string | undefined {
+  const tokens = text
+    .toUpperCase()
+    .split(/[\s,;#]+/u)
+    .filter(Boolean);
+  const read = tokens.filter((token) => !token.includes("?"));
+  if (read.length === 0) return undefined;
+  const form = CODE_FORMS.find((candidate) => read.every(candidate.reads));
+  if (form === undefined) return undefined;
+  for (const [index, token] of tokens.entries()) {
+    if (!token.includes("?") || /^\?+$/u.test(token)) continue;
+    const name = `${form.name} ${index + 1}`;
+    if (form.digits === undefined)
+      return `${name} has a ? among its digits: ${form.plural} take only a lone ? for a whole ${form.name}.`;
+    // Longer than a code: a whole mark joined to a code, which the joined reading takes.
+    if (token.length < form.digits)
+      return `${name} has ${token.length} of ${form.digits} symbols: write a ? for each digit that cannot be read, or a lone ? for the whole ${form.name}.`;
+  }
+  return undefined;
 }
 
 /**
@@ -500,10 +783,25 @@ export function readingSpace(reading: MarkedReading): ReadingSpace | undefined {
     });
     return values;
   };
-  const at = (bits: bigint) => reading.structure.evaluate(valuesAt(bits));
+  const unknownBits = holes.length * reading.unitBits;
+  const at = (bits: bigint) => {
+    const values = valuesAt(bits);
+    const evaluated = reading.structure.evaluate(values);
+    const { readBits } = reading;
+    if (readBits === undefined) return evaluated;
+    // The bits read of a partly read unit are equations too: each keeps the value it was read as.
+    const read = bitFields(
+      holes.map((hole) => {
+        const bitsRead = readBits[hole];
+        const change =
+          bitsRead === undefined ? 0 : (values[hole]! ^ bitsRead.value) & bitsRead.mask;
+        return [change, reading.unitBits] as const;
+      }),
+    );
+    return { ...evaluated, residual: (evaluated.residual << BigInt(unknownBits)) | read };
+  };
   const baseline = at(0n);
   // The residual is affine in the missing bits: one column per bit, from flipping it alone.
-  const unknownBits = holes.length * reading.unitBits;
   const columns = Array.from(
     { length: unknownBits },
     (_, bit) => at(1n << BigInt(bit)).residual ^ baseline.residual,
@@ -549,6 +847,24 @@ function solutions(
 }
 
 /**
+ * `reading` as one share alone is solved: as it is, or, when the checksum leaves more than
+ * 2^freeBits solutions and it has candidate units, once for each choice of their values within
+ * MAX_CODE_CHOICES (placesWithin, choicesAt).
+ */
+function triedReadings(reading: MarkedReading, freeBits: number): MarkedReading[] {
+  const counts = candidateCounts(reading);
+  if (counts.length === 0) return [reading];
+  const space = readingSpace(reading);
+  if (space === undefined || space.basis.length <= freeBits) return [reading];
+  // The units with the fewest values first: each gains the most bits for its choices.
+  const fewestFirst = [...counts].sort((a, b) => a.count - b.count);
+  return choicesAt(
+    reading,
+    placesWithin(fewestFirst, MAX_CODE_CHOICES).map((unit) => unit.place),
+  );
+}
+
+/**
  * Every share that `value` can be, in any form, with up to MAX_MARKED_ELEMENTS elements marked with
  * ? where they are unreadable; at most 2^freeBits of them. Every candidate passes the ordinary
  * reader, so its checksum and its SSKR metadata are checked as for any share.
@@ -559,14 +875,21 @@ export function repairCandidates(
 ): ReadRepairableShare[] {
   if (!value.includes("?")) return [{ ...readShare(value), repaired: false, filled: [] }];
   const text = value.trim();
-  const marks = text.match(/\?/gu)!.length;
-  if (text.length > MAX_REPAIR_TEXT_LENGTH || marks > MAX_MARKED_ELEMENTS)
+  const symbols = text.match(/\?/gu)!.length;
+  if (
+    text.length > MAX_REPAIR_TEXT_LENGTH ||
+    symbols > MAX_MARK_SYMBOLS ||
+    markCount(text) > MAX_MARKED_ELEMENTS
+  )
     throw new Error(
       `Mark at most ${MAX_MARKED_ELEMENTS} unreadable elements with ?, each at its place.`,
     );
+  const problem = markProblem(text);
+  if (problem !== undefined)
+    throw new Error(`${problem.charAt(0).toUpperCase()}${problem.slice(1)}`);
   const found = new Map<string, ReadRepairableShare>();
   let tooMany = false;
-  for (const model of markedReadings(text)) {
+  for (const model of markedReadings(text).flatMap((reading) => triedReadings(reading, freeBits))) {
     const solved = solutions(model, freeBits);
     tooMany ||= solved.tooMany;
     for (const values of solved.found) {

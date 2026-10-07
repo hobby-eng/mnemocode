@@ -25,7 +25,16 @@ export function resolveSskrLayout(
 
 export interface SskrCardContent extends CardSettings {
   readonly kind: "sskr";
+  /**
+   * The colors of the cards: the share itself in the color forms; otherwise drawn at random, none
+   * twice, to decorate the cards that print `labels`.
+   */
   readonly colors: readonly string[];
+  /**
+   * The share's codes in the form it is written in, a few to each card, for a share written as
+   * word numbers, Unicode codes or words: the cards print them in place of the colors' hex codes.
+   */
+  readonly labels?: readonly string[];
   readonly payload: string;
   readonly collectionReference: string;
   readonly qrCard?: boolean;

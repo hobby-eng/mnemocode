@@ -3,9 +3,10 @@
 // of them is the right one, so the caller checks each against a fingerprint or an address; the
 // command line and other hosts share this search and differ only in that check and in reporting.
 
-import { datePatternCombinations, formatDate, sortDates } from "./dates.js";
-import { decodeIndexes, decodeIndexesLegacy, decodeIndexesLegacyValid } from "./seedshift.js";
-import type { DatePattern, DateShiftDate, DecodedResult } from "./types.js";
+import { datePatternCombinations, deriveShifts, sortDates } from "./dates.js";
+import { Masking } from "./masking.js";
+import type { Bip39WordCount, DatePattern, DateShiftDate } from "./types.js";
+import { BIP39_DICTIONARY_SIZE } from "./words.js";
 
 /** The Seedshift variants whose dates can be searched. */
 export type SeedshiftMode = "seedshift" | "seedshift-legacy" | "seedshift-legacy-valid";
@@ -16,32 +17,15 @@ export interface DateCandidate {
   readonly mnemonic: string;
 }
 
-const SEEDSHIFT_MODES: ReadonlySet<string> = new Set<SeedshiftMode>([
-  "seedshift",
-  "seedshift-legacy",
-  "seedshift-legacy-valid",
-]);
-
-/** The phrases that `dates` give in `mode`; the legacy-valid variant can give several. */
-function decodeWith(
-  indexes: readonly number[],
-  dates: readonly DateShiftDate[],
-  mode: SeedshiftMode,
-): DecodedResult[] {
-  switch (mode) {
-    case "seedshift":
-      return [decodeIndexes(indexes, dates)];
-    case "seedshift-legacy":
-      return [decodeIndexesLegacy(indexes, dates)];
-    case "seedshift-legacy-valid":
-      return decodeIndexesLegacyValid(indexes, dates);
-  }
-}
-
 /**
  * Tries every combination of the forgotten dates (datePatternCombinations) together with the
  * known ones. It yields once per combination, with the checksum-valid phrases that are new, so
  * that the caller can count combinations for progress and check each phrase as it comes.
+ *
+ * A combination that shifts every word as an earlier one did gives the same phrases, and none:
+ * the same dates in another order, or a year 2,048 years later, since Seedshift adds the year to
+ * a word number modulo the 2,048 words. So a forgotten year is not found four or five times over,
+ * each shift is tried once, with the earliest dates that give it.
  */
 export function* dateRecoveryCandidates(
   indexes: readonly number[],
@@ -50,18 +34,23 @@ export function* dateRecoveryCandidates(
   mode: SeedshiftMode,
 ): Generator<readonly DateCandidate[]> {
   // A JavaScript host may pass any value; another mode would silently decode another way.
-  if (!SEEDSHIFT_MODES.has(mode as string)) throw new Error("Unsupported Seedshift mode.");
-  // Two combinations may name the same dates in another order; each result is kept once.
+  if (!Masking.isMode(mode) || !Masking.of(mode).masked)
+    throw new Error("Unsupported Seedshift mode.");
+  const masking = Masking.of(mode);
   const seen = new Set<string>();
   for (const guessed of datePatternCombinations(patterns)) {
+    const shifts = deriveShifts([...knownDates, ...guessed], indexes.length as Bip39WordCount)
+      .map((shift) => shift % BIP39_DICTIONARY_SIZE)
+      .join(",");
+    if (seen.has(shifts)) {
+      yield [];
+      continue;
+    }
+    seen.add(shifts);
     const sorted = sortDates(guessed);
-    const key = sorted.map(formatDate).join(" ");
-    const fresh: DateCandidate[] = [];
-    decodeWith(indexes, [...knownDates, ...guessed], mode).forEach((result, index) => {
-      if (!result.checksumValid || seen.has(`${key}\0${index}`)) return;
-      seen.add(`${key}\0${index}`);
-      fresh.push({ dates: sorted, mnemonic: result.recoveredMnemonic });
-    });
-    yield fresh;
+    yield masking
+      .undo(indexes, [...knownDates, ...guessed])
+      .filter((result) => result.checksumValid)
+      .map((result) => ({ dates: sorted, mnemonic: result.recoveredMnemonic }));
   }
 }

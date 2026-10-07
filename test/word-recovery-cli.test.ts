@@ -67,7 +67,7 @@ describe("recover-word CLI", () => {
       // A taken name is numbered, never replaced.
       const again = await save(path, "--candidates-key", session.recipient);
       expect(again.stderr).toContain("saved as");
-      expect(statSync(join(dir, "candidates (1).age")).size).toBe(statSync(path).size);
+      expect(statSync(join(dir, "candidates-1.age")).size).toBe(statSync(path).size);
       // The file holds seed phrases, so a synchronised folder is warned about as for any output.
       mkdirSync(join(dir, "Dropbox"));
       const synced = await save(

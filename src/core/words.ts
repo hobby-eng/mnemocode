@@ -1,4 +1,4 @@
-import { validateMnemonic } from "@scure/bip39";
+import { entropyToMnemonic, validateMnemonic } from "@scure/bip39";
 import { wordlist as englishWordlist } from "@scure/bip39/wordlists/english.js";
 import { wordlist as traditionalChineseWordlist } from "@scure/bip39/wordlists/traditional-chinese.js";
 import {
@@ -88,6 +88,7 @@ export function recoverMissingWord(value: string): MissingWordCandidate[] {
 }
 
 function recoverWordAt(words: readonly string[], missingIndex: number): MissingWordCandidate[] {
+  if (missingIndex === words.length - 1) return finalWordCandidates(words);
   const checksumLength = words.length / 3;
   const candidates: MissingWordCandidate[] = [];
   for (const [index, word] of englishWordlist.entries()) {
@@ -108,6 +109,56 @@ function recoverWordAt(words: readonly string[], missingIndex: number): MissingW
     });
   }
   return candidates;
+}
+
+/** Bits in a byte, for the entropy that the last word completes. */
+const BYTE_BITS = 8;
+
+/**
+ * The valid last words of `words`, whose last word is missing, as recoverWordAt finds them and in
+ * the same order, but without validating 2,048 phrases: the last word holds 11 − checksum bits of
+ * entropy, and BIP39 gives each of their values one checksum (entropyToMnemonic). This keeps the
+ * startup self-test, which recovers last words, quick.
+ */
+function finalWordCandidates(words: readonly string[]): MissingWordCandidate[] {
+  const checksumLength = words.length / 3;
+  const prefix = words.slice(0, -1).map((word) => ENGLISH_INDEX.get(word)!);
+  return validLastWordIndexes(prefix).map((index) => {
+    const word = englishWordlist[index]!;
+    return {
+      position: words.length,
+      word,
+      wordIndex: index + 1,
+      mnemonic: [...words.slice(0, -1), word].join(" "),
+      checksumBits: index.toString(2).padStart(BIP39_INDEX_BITS, "0").slice(-checksumLength),
+    };
+  });
+}
+
+/**
+ * The word numbers, counted from 0 and in their order, that end a phrase of `prefix` (every word
+ * but the last, as BIP39 indexes) with a valid checksum: one for each value of the entropy bits
+ * that the last word holds, 2^(11 − checksum bits) of them, found from the entropy rather than by
+ * validating 2,048 phrases.
+ */
+export function validLastWordIndexes(prefix: readonly number[]): number[] {
+  const checksumLength = (prefix.length + 1) / 3;
+  const tailBits = BIP39_INDEX_BITS - checksumLength;
+  const knownBits = prefix
+    .map((index) => index.toString(2).padStart(BIP39_INDEX_BITS, "0"))
+    .join("");
+  const indexes: number[] = [];
+  for (let tail = 0; tail < 2 ** tailBits; tail += 1) {
+    const bits = knownBits + tail.toString(2).padStart(tailBits, "0");
+    const entropy = Uint8Array.from({ length: bits.length / BYTE_BITS }, (_, byte) =>
+      Number.parseInt(bits.slice(byte * BYTE_BITS, (byte + 1) * BYTE_BITS), 2),
+    );
+    const mnemonic = entropyToMnemonic(entropy, englishWordlist);
+    // One of the candidates is the wallet's.
+    entropy.fill(0);
+    indexes.push(ENGLISH_INDEX.get(mnemonic.slice(mnemonic.lastIndexOf(" ") + 1))!);
+  }
+  return indexes;
 }
 
 /**

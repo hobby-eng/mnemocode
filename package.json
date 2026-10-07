@@ -20,6 +20,182 @@
     "./sskr": {
       "types": "./dist/sskr/index.d.ts",
       "import": "./dist/sskr/index.js"
+    },
+    "./core/self-test": {
+      "types": "./dist/core/self-test.d.ts",
+      "import": "./dist/core/self-test.js"
+    },
+    "./sskr/known-answers": {
+      "types": "./dist/sskr/known-answers.d.ts",
+      "import": "./dist/sskr/known-answers.js"
+    },
+    "./export/card-preview": {
+      "types": "./dist/export/card-preview.d.ts",
+      "import": "./dist/export/card-preview.js"
+    },
+    "./export/cards-self-test": {
+      "types": "./dist/export/cards-self-test.d.ts",
+      "import": "./dist/export/cards-self-test.js"
+    },
+    "./core/master-fingerprint": {
+      "types": "./dist/core/master-fingerprint.d.ts",
+      "import": "./dist/core/master-fingerprint.js"
+    },
+    "./core/master-fingerprint-self-test": {
+      "types": "./dist/core/master-fingerprint-self-test.d.ts",
+      "import": "./dist/core/master-fingerprint-self-test.js"
+    },
+    "./core/coins": {
+      "types": "./dist/core/coins.d.ts",
+      "import": "./dist/core/coins.js"
+    },
+    "./core/coins-self-test": {
+      "types": "./dist/core/coins-self-test.d.ts",
+      "import": "./dist/core/coins-self-test.js"
+    },
+    "./core/coin-address-evidence": {
+      "types": "./dist/core/coin-address-evidence.d.ts",
+      "import": "./dist/core/coin-address-evidence.js"
+    },
+    "./core/wallet-evidence": {
+      "types": "./dist/core/wallet-evidence.d.ts",
+      "import": "./dist/core/wallet-evidence.js"
+    },
+    "./core/wallet-evidence-self-test": {
+      "types": "./dist/core/wallet-evidence-self-test.d.ts",
+      "import": "./dist/core/wallet-evidence-self-test.js"
+    },
+    "./core/masking": {
+      "types": "./dist/core/masking.d.ts",
+      "import": "./dist/core/masking.js"
+    },
+    "./core/encoded-backup": {
+      "types": "./dist/core/encoded-backup.d.ts",
+      "import": "./dist/core/encoded-backup.js"
+    },
+    "./core/backup-reading": {
+      "types": "./dist/core/backup-reading.d.ts",
+      "import": "./dist/core/backup-reading.js"
+    },
+    "./core/backup-reading-self-test": {
+      "types": "./dist/core/backup-reading-self-test.d.ts",
+      "import": "./dist/core/backup-reading-self-test.js"
+    },
+    "./core/missing-codes": {
+      "types": "./dist/core/missing-codes.d.ts",
+      "import": "./dist/core/missing-codes.js"
+    },
+    "./core/date-search": {
+      "types": "./dist/core/date-search.d.ts",
+      "import": "./dist/core/date-search.js"
+    },
+    "./core/date-search-self-test": {
+      "types": "./dist/core/date-search-self-test.d.ts",
+      "import": "./dist/core/date-search-self-test.js"
+    },
+    "./core/candidates": {
+      "types": "./dist/core/candidates.d.ts",
+      "import": "./dist/core/candidates.js"
+    },
+    "./core/candidates-self-test": {
+      "types": "./dist/core/candidates-self-test.d.ts",
+      "import": "./dist/core/candidates-self-test.js"
+    },
+    "./core/candidate-list": {
+      "types": "./dist/core/candidate-list.d.ts",
+      "import": "./dist/core/candidate-list.js"
+    },
+    "./core/candidate-list-self-test": {
+      "types": "./dist/core/candidate-list-self-test.d.ts",
+      "import": "./dist/core/candidate-list-self-test.js"
+    },
+    "./core/candidate-encryption": {
+      "types": "./dist/core/candidate-encryption.d.ts",
+      "import": "./dist/core/candidate-encryption.js"
+    },
+    "./core/candidate-encryption-self-test": {
+      "types": "./dist/core/candidate-encryption-self-test.d.ts",
+      "import": "./dist/core/candidate-encryption-self-test.js"
+    },
+    "./core/backup-options": {
+      "types": "./dist/core/backup-options.d.ts",
+      "import": "./dist/core/backup-options.js"
+    },
+    "./core/backup-check": {
+      "types": "./dist/core/backup-check.d.ts",
+      "import": "./dist/core/backup-check.js"
+    },
+    "./core/backup-check-self-test": {
+      "types": "./dist/core/backup-check-self-test.d.ts",
+      "import": "./dist/core/backup-check-self-test.js"
+    },
+    "./sskr/share-platform": {
+      "types": "./dist/sskr/share-platform.d.ts",
+      "import": "./dist/sskr/share-platform.js"
+    },
+    "./sskr/transport": {
+      "types": "./dist/sskr/transport.d.ts",
+      "import": "./dist/sskr/transport.js"
+    },
+    "./sskr/joint-repair": {
+      "types": "./dist/sskr/joint-repair.d.ts",
+      "import": "./dist/sskr/joint-repair.js"
+    },
+    "./sskr/repair-report": {
+      "types": "./dist/sskr/repair-report.d.ts",
+      "import": "./dist/sskr/repair-report.js"
+    },
+    "./sskr/split": {
+      "types": "./dist/sskr/split.d.ts",
+      "import": "./dist/sskr/split.js"
+    },
+    "./sskr/share-set": {
+      "types": "./dist/sskr/share-set.d.ts",
+      "import": "./dist/sskr/share-set.js"
+    },
+    "./sskr/repair-self-test": {
+      "types": "./dist/sskr/repair-self-test.d.ts",
+      "import": "./dist/sskr/repair-self-test.js"
+    },
+    "./sskr/share-input": {
+      "types": "./dist/sskr/share-input.d.ts",
+      "import": "./dist/sskr/share-input.js"
+    },
+    "./sskr/share-unmasking": {
+      "types": "./dist/sskr/share-unmasking.d.ts",
+      "import": "./dist/sskr/share-unmasking.js"
+    },
+    "./sskr/share-unmasking-self-test": {
+      "types": "./dist/sskr/share-unmasking-self-test.d.ts",
+      "import": "./dist/sskr/share-unmasking-self-test.js"
+    },
+    "./export/platform": {
+      "types": "./dist/export/platform.d.ts",
+      "import": "./dist/export/platform.js"
+    },
+    "./export/card-copy": {
+      "types": "./dist/export/card-copy.d.ts",
+      "import": "./dist/export/card-copy.js"
+    },
+    "./export/sskr-render": {
+      "types": "./dist/export/sskr-render.d.ts",
+      "import": "./dist/export/sskr-render.js"
+    },
+    "./export/sskr-render-self-test": {
+      "types": "./dist/export/sskr-render-self-test.d.ts",
+      "import": "./dist/export/sskr-render-self-test.js"
+    },
+    "./export/heir-sheet": {
+      "types": "./dist/export/heir-sheet.d.ts",
+      "import": "./dist/export/heir-sheet.js"
+    },
+    "./export/heir-sheet-text": {
+      "types": "./dist/export/heir-sheet-text.d.ts",
+      "import": "./dist/export/heir-sheet-text.js"
+    },
+    "./export/heir-sheet-self-test": {
+      "types": "./dist/export/heir-sheet-self-test.d.ts",
+      "import": "./dist/export/heir-sheet-self-test.js"
     }
   },
   "files": [
@@ -45,7 +221,7 @@
     "build": "pnpm clean && tsc -p tsconfig.json",
     "check:toolchain": "node scripts/verify-toolchain.mjs",
     "check:markdown": "node scripts/verify-markdown.mjs",
-    "check": "pnpm check:toolchain && pnpm check:markdown && tsc --noEmit && tsc --noEmit -p tsconfig.cards.json",
+    "check": "pnpm check:toolchain && pnpm check:markdown && tsc --noEmit && tsc --noEmit -p tsconfig.cards.json && tsc -p tsconfig.strict-consumers.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
@@ -60,6 +236,7 @@
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
     "@pdf-lib/fontkit": "1.1.1",
+    "@scure/base": "2.4.0",
     "@scure/bip32": "2.4.0",
     "@scure/bip39": "2.4.0",
     "@scure/btc-signer": "2.4.1",

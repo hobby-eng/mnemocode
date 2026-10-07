@@ -4,6 +4,11 @@ export function maximumDates(wordCount: Bip39WordCount): number {
   return wordCount / 3;
 }
 
+/** The refusal of more dates than a phrase of `wordCount` words takes (maximumDates). */
+export function tooManyDatesMessage(wordCount: Bip39WordCount): string {
+  return `${wordCount}-word phrases support at most ${maximumDates(wordCount)} dates.`;
+}
+
 export function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
@@ -46,6 +51,51 @@ export function parseDate(value: string): DateShiftDate {
   return date;
 }
 
+/**
+ * A copy of `date` that nothing can change, checked as parseDate checks a typed date: an object
+ * that keeps a date must not share it with its caller, who could change it after it was checked
+ * (AUD-009-FUN001), and a day the calendar does not have is refused (AUD-009-API001).
+ */
+export function ownedDate(date: DateShiftDate): DateShiftDate {
+  // A hole of a sparse list reaches here as undefined.
+  if (typeof date !== "object" || date === null)
+    throw new Error("A date must have a year, a month and a day.");
+  // Copied first and the copy checked: a getter could give one value to a check and another later.
+  const copy = { year: date.year, month: date.month, day: date.day };
+  assertCalendarDate(copy);
+  return Object.freeze(copy);
+}
+
+/** The values of one part of a pattern, copied and frozen; refused when none can be a date. */
+function ownedPart(values: readonly number[], minimum: number, maximum: number, name: string) {
+  // Array.from turns holes into undefined, which the check below refuses; some() would skip them.
+  const copy = Array.from(values ?? []);
+  if (
+    copy.length === 0 ||
+    !copy.every((value) => Number.isInteger(value) && value >= minimum && value <= maximum)
+  )
+    throw new Error(`The date pattern cannot match a valid ${name}.`);
+  // Each value once: datePatternCombinationCount counts distinct dates, and a value given twice
+  // would make the search try more combinations than it counted.
+  return Object.freeze([...new Set(copy)]);
+}
+
+/**
+ * A copy of `pattern` that nothing can change, held to the rules of parseDatePattern: every part
+ * has values a date can have, and at least one real calendar date fits (AUD-009-FUN001, API001).
+ */
+export function ownedPattern(pattern: DatePattern): DatePattern {
+  const owned: DatePattern = Object.freeze({
+    key: String(pattern.key),
+    years: ownedPart(pattern.years, 1, 9999, "year"),
+    months: ownedPart(pattern.months, 1, 12, "month"),
+    days: ownedPart(pattern.days, 1, 31, "day"),
+  });
+  if (datePatternCandidateCount(owned) === 0)
+    throw new Error("The date pattern cannot match a real calendar date.");
+  return owned;
+}
+
 export function formatDate(date: DateShiftDate): string {
   assertCalendarDate(date);
   return `${String(date.day).padStart(2, "0")}-${String(date.month).padStart(2, "0")}-${String(date.year).padStart(4, "0")}`;
@@ -59,9 +109,7 @@ export function sortDates(dates: readonly DateShiftDate[]): DateShiftDate[] {
 
 export function deriveShifts(dates: readonly DateShiftDate[], wordCount: Bip39WordCount): number[] {
   if (dates.length === 0) throw new Error("Enter at least one date.");
-  if (dates.length > maximumDates(wordCount)) {
-    throw new Error(`${wordCount}-word phrases support at most ${maximumDates(wordCount)} dates.`);
-  }
+  if (dates.length > maximumDates(wordCount)) throw new Error(tooManyDatesMessage(wordCount));
   const sorted = sortDates(dates);
   sorted.forEach(assertCalendarDate);
   // Sorting makes the input date order irrelevant; years, months and days
@@ -70,34 +118,66 @@ export function deriveShifts(dates: readonly DateShiftDate[], wordCount: Bip39Wo
   return Array.from({ length: wordCount }, (_, index) => sequence[index % sequence.length]!);
 }
 
-export function parseDatePattern(value: string): DatePattern {
+/**
+ * A date of which nothing is remembered, typed in its place as a lone ?, as a code that cannot be
+ * read is: every date that is supported.
+ */
+export const WHOLE_DATE = "?";
+/** What a date of which nothing is remembered stands for. */
+const WHOLE_DATE_PATTERN = "??-??-????";
+
+/**
+ * Whether a typed date is one to search: a ? for a forgotten digit, a few values of a part joined
+ * by |, such as 05|15, or a lone ? for a date not remembered at all.
+ */
+export function isDatePattern(value: string): boolean {
   const text = value.trim();
-  const dayMonthYear = /^([0-9?]{2})-([0-9?]{2})-([0-9?]{4})$/u.exec(text);
-  const yearMonthDay = /^([0-9?]{4})-([0-9?]{2})-([0-9?]{2})$/u.exec(text);
-  if (dayMonthYear === null && yearMonthDay === null) {
+  return text === WHOLE_DATE || /[?|]/u.test(text);
+}
+
+/**
+ * The masks of one part of a date: its values joined by |, each with ? for a forgotten digit; a
+ * lone ? is the whole part, such as the month of 15-?-2025.
+ */
+function partMasks(part: string, width: number): string[] | undefined {
+  const masks = part.split("|").map((mask) => (mask === "?" ? "?".repeat(width) : mask));
+  return masks.every((mask) => new RegExp(`^[0-9?]{${width}}$`, "u").test(mask))
+    ? masks
+    : undefined;
+}
+
+export function parseDatePattern(value: string): DatePattern {
+  const typed = value.trim();
+  const text = typed === WHOLE_DATE ? WHOLE_DATE_PATTERN : typed;
+  const parts = text.split("-");
+  // DD-MM-YYYY or YYYY-MM-DD, each part with its values joined by |.
+  const dayMonthYear =
+    parts.length === 3
+      ? [partMasks(parts[0]!, 2), partMasks(parts[1]!, 2), partMasks(parts[2]!, 4)]
+      : [];
+  const yearMonthDay =
+    parts.length === 3
+      ? [partMasks(parts[0]!, 4), partMasks(parts[1]!, 2), partMasks(parts[2]!, 2)]
+      : [];
+  const read =
+    dayMonthYear.every(Boolean) && dayMonthYear.length === 3
+      ? { day: dayMonthYear[0]!, month: dayMonthYear[1]!, year: dayMonthYear[2]! }
+      : yearMonthDay.every(Boolean) && yearMonthDay.length === 3
+        ? { year: yearMonthDay[0]!, month: yearMonthDay[1]!, day: yearMonthDay[2]! }
+        : undefined;
+  if (read === undefined)
     throw new Error(
-      "Invalid date pattern. Use DD-MM-YYYY and replace each forgotten digit with ?.",
+      "Invalid date pattern. Use DD-MM-YYYY with ? for each forgotten digit, a few values joined by | such as 05|15, or a lone ? for a whole date.",
     );
-  }
-  if (!text.includes("?")) throw new Error("A recovery pattern must contain at least one ? digit.");
-  const match = dayMonthYear ?? yearMonthDay!;
-  const masks =
-    dayMonthYear === null
-      ? {
-          year: match[1]!,
-          month: match[2]!,
-          day: match[3]!,
-        }
-      : {
-          year: match[3]!,
-          month: match[2]!,
-          day: match[1]!,
-        };
+  if (!isDatePattern(typed))
+    throw new Error("A recovery pattern must contain a ? digit, or values joined by |.");
+  // The same values in another order are the same pattern: one key, so that it is searched once.
+  const keyOf = (masks: readonly string[]) => [...new Set(masks)].sort().join("|");
   const pattern: DatePattern = {
-    key: `${masks.year}-${masks.month}-${masks.day}`,
-    years: matchingDateParts(masks.year, 1, 9999),
-    months: matchingDateParts(masks.month, 1, 12),
-    days: matchingDateParts(masks.day, 1, 31),
+    key: `${keyOf(read.year)}-${keyOf(read.month)}-${keyOf(read.day)}`,
+    years: matchingDateParts(read.year, 1, 9999),
+    months: matchingDateParts(read.month, 1, 12),
+    days: matchingDateParts(read.day, 1, 31),
   };
   if (pattern.years.length === 0) throw new Error("The date pattern cannot match a valid year.");
   if (pattern.months.length === 0) throw new Error("The date pattern cannot match a valid month.");
@@ -107,10 +187,17 @@ export function parseDatePattern(value: string): DatePattern {
   return pattern;
 }
 
-function matchingDateParts(mask: string, minimum: number, maximum: number): number[] {
-  const expression = new RegExp(`^${mask.replaceAll("?", "[0-9]")}$`, "u");
+/** The values from `minimum` to `maximum` that one of `masks` allows, each once, in order. */
+function matchingDateParts(masks: readonly string[], minimum: number, maximum: number): number[] {
+  const expressions = masks.map((mask) => ({
+    width: mask.length,
+    expression: new RegExp(`^${mask.replaceAll("?", "[0-9]")}$`, "u"),
+  }));
   return Array.from({ length: maximum - minimum + 1 }, (_, index) => index + minimum).filter(
-    (part) => expression.test(String(part).padStart(mask.length, "0")),
+    (part) =>
+      expressions.some(({ width, expression }) =>
+        expression.test(String(part).padStart(width, "0")),
+      ),
   );
 }
 

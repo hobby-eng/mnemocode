@@ -119,7 +119,8 @@ export function businessFields(
     ];
   if (style === "curves")
     return [
-      field("Company", p.company, 0.06, 0.29, 0.31, 9),
+      // Above the logo, on the plain background: lower down, the curve runs under the line.
+      field("Company", p.company, 0.06, 0.095, 0.31, 9),
       field("Name", p.name, 0.45, 0.163, 0.46, 10, true),
       field("Role", p.role, 0.45, 0.246, 0.46, 6.5, true),
       field("Phone", p.phone, 0.44, 0.49, 0.47, 7),

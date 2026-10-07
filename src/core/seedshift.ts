@@ -8,6 +8,7 @@ import {
   assertWordCount,
   validatedEnglishWords,
   unicodeHex,
+  validLastWordIndexes,
 } from "./words.js";
 import { modulo, bytesToBits, bitsToBytes } from "./bits.js";
 import { sortDates, deriveShifts } from "./dates.js";
@@ -101,6 +102,8 @@ export function encodeMnemonicLegacy(
 export function legacyChecksumValidResult(result: EncodedResult): EncodedResult {
   const indexes = result.shiftedIndexes;
   assertWordCount(indexes.length);
+  // An index above 2047 would write more than 11 bits and shift every later bit of the entropy.
+  assertIndexRange(indexes);
   const checksumBits = indexes.length / 3;
   const entropyLength = indexes.length * BIP39_INDEX_BITS - checksumBits;
   const bitStream = indexes
@@ -133,7 +136,10 @@ export function representMnemonic(mnemonic: string): EncodedResult {
 /** Every decoder accepts the same indexes: whole numbers from 0 through 2047. */
 function assertIndexRange(indexes: readonly number[]): void {
   if (
-    indexes.some((index) => !Number.isInteger(index) || index < 0 || index >= BIP39_DICTIONARY_SIZE)
+    // Array.from turns holes into undefined, which is refused; some() alone skips them.
+    Array.from(indexes).some(
+      (index) => !Number.isInteger(index) || index < 0 || index >= BIP39_DICTIONARY_SIZE,
+    )
   ) {
     throw new Error("Every BIP39 index must be an integer from 0 through 2047.");
   }
@@ -226,22 +232,18 @@ export function decodeIndexesLegacyValid(
     .slice(0, -1)
     .map((index, position) => modulo(index - shifts[position]!, BIP39_DICTIONARY_SIZE));
   // Historical records may replace the entire last word. Do not narrow this
-  // search to our own checksum-only replacement without an explicit format version.
-  const candidates: DecodedResult[] = [];
-  for (let lastIndex = 0; lastIndex < BIP39_DICTIONARY_SIZE; lastIndex += 1) {
+  // search to our own checksum-only replacement without an explicit format version: every last
+  // word with a valid checksum is a candidate, in the order of the word list.
+  return validLastWordIndexes(recoveredPrefix).map((lastIndex) => {
     const recoveredIndexes = [...recoveredPrefix, lastIndex];
-    const recoveredMnemonic = recoveredIndexes.map((index) => englishWordlist[index]!).join(" ");
-    if (validateMnemonic(recoveredMnemonic, englishWordlist)) {
-      candidates.push({
-        recoveredMnemonic,
-        recoveredIndexes,
-        dates: sortedDates,
-        shifts,
-        checksumValid: true,
-      });
-    }
-  }
-  return candidates;
+    return {
+      recoveredMnemonic: recoveredIndexes.map((index) => englishWordlist[index]!).join(" "),
+      recoveredIndexes,
+      dates: sortedDates,
+      shifts,
+      checksumValid: true,
+    };
+  });
 }
 
 export function decodeInput(
@@ -260,19 +262,24 @@ export function decodeInputLegacy(
   return decodeIndexesLegacy(parseInput(value, format), dates);
 }
 
+/** The mnemonic of indexes that were written without date shifting: the words themselves. */
+export function decodeIndexesDirect(indexes: readonly number[]): DecodedResult {
+  assertWordCount(indexes.length);
+  assertIndexRange(indexes);
+  const recoveredMnemonic = indexes.map((index) => englishWordlist[index]!).join(" ");
+  return {
+    recoveredMnemonic,
+    recoveredIndexes: [...indexes],
+    dates: [],
+    shifts: indexes.map(() => 0),
+    checksumValid: validateMnemonic(recoveredMnemonic, englishWordlist),
+  };
+}
+
 /** Recovers a mnemonic from a direct representation that was created without date shifting. */
 export function decodeInputDirect(
   value: string,
   format: Exclude<OutputFormat, "json">,
 ): DecodedResult {
-  const indexes = parseInput(value, format);
-  assertWordCount(indexes.length);
-  const recoveredMnemonic = indexes.map((index) => englishWordlist[index]!).join(" ");
-  return {
-    recoveredMnemonic,
-    recoveredIndexes: indexes,
-    dates: [],
-    shifts: indexes.map(() => 0),
-    checksumValid: validateMnemonic(recoveredMnemonic, englishWordlist),
-  };
+  return decodeIndexesDirect(parseInput(value, format));
 }

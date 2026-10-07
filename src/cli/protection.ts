@@ -7,12 +7,15 @@
 //   reading /proc/PID/mem. macOS: setrlimit. Node.js 26 calls them through its node:ffi module.
 //   Windows writes no crash dump unless an administrator set one up; MnemoCode changes nothing
 //   there.
-// - The Node.js permission model. MnemoCode always runs with PROTECTION_FLAGS: no network, no
-//   worker threads, native addons or WASI. Before a command runs, it gives up writing files when
+// - The Node.js permission model. A start outside it runs again with PROTECTION_FLAGS, which the
+//   executable has built in: no network, no worker threads, native addons or WASI. A process
+//   that already runs under the model is not started again, so a right that its caller granted
+//   on purpose, such as --allow-net, stays. Before a command runs, it gives up writing files when
 //   it saves nothing, and running other programs when it draws no images (dropUnneeded). Node.js
 //   enforces this, not the kernel, and documents it as a safety belt for trusted code rather than
 //   a boundary against malicious code; mhfe's kernel isolation (seccomp, Landlock) cannot be
 //   applied here, because Node.js has started its own threads before any script runs.
+// - The library uses none of this: it has the rights of the program that imports it.
 
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -23,8 +26,11 @@ import { SAVED_OPTIONS } from "./output-options.js";
 import protectionFlags from "./protection-flags.json" with { type: "json" };
 
 /**
- * The Node.js options MnemoCode always runs with, kept in protection-flags.json so that
- * scripts/build-executable.mjs embeds the same ones in the executable:
+ * The Node.js options that a start outside the permission model runs again with
+ * (relaunchProtected), kept in protection-flags.json so that scripts/build-executable.mjs embeds
+ * the same ones in the executable. A process that its caller started under the model is not run
+ * with them: a right that the caller granted, such as --allow-net, stays, unless a command gives it
+ * up as below. The options:
  * - --permission, with every file readable: the program's own files and the inputs named;
  * - file writes, other programs and FFI, granted at start and given up as soon as a command does
  *   not need them (hardenProcess, dropUnneeded); no network, worker threads, addons or WASI;
@@ -33,7 +39,11 @@ import protectionFlags from "./protection-flags.json" with { type: "json" };
  */
 export const PROTECTION_FLAGS: readonly string[] = protectionFlags;
 
-/** Whether this process runs under the permission model, that is with PROTECTION_FLAGS. */
+/**
+ * Whether this process runs under the permission model: with PROTECTION_FLAGS, or with the options
+ * of a caller that started it under the model, such as `node --permission --allow-fs-read=*
+ * --allow-net dist/mnemocode.js`. Such a process is not started again with PROTECTION_FLAGS.
+ */
 export function underProtection(): boolean {
   return process.permission !== undefined;
 }

@@ -15,7 +15,7 @@ export const STYLE = {
 } as const;
 
 /** Longest line of running text, so that messages read well in an 80-column terminal. */
-const TEXT_WIDTH = 78;
+export const TEXT_WIDTH = 78;
 const RESET = "\x1b[0m";
 
 /**
@@ -110,6 +110,96 @@ export function terminalNotice(
     const text = kind === "warning" ? terminalPaint("stderr", code, line) : line;
     console.error(`${index === 0 ? terminalPaint("stderr", code, mark) : " "} ${text}`);
   });
+}
+
+/** Words per row when a phrase is shown for writing down, as `mhfe` shows one. */
+const WORDS_PER_ROW = 4;
+/** The longest word of the English BIP39 list has eight letters. */
+const LONGEST_WORD = 8;
+/** Spaces between two words of a row. */
+const WORD_GAP = 3;
+
+/** `text` with its first letter in capitals, for a label made of words that run in a sentence. */
+export function capitalized(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
+/**
+ * The label of one part of a result, after a blank line: bold for the part that matters most, grey
+ * for the others. Only where terminalResultHeader printed the heading of that result.
+ */
+export function terminalPart(label: string, strong: boolean = false): void {
+  console.log(`\n${terminalPaint("stdout", strong ? STYLE.strong : STYLE.muted, label)}`);
+}
+
+/**
+ * A seed phrase for a person to write down, as `mhfe` shows one: numbered, four words to a row,
+ * the numbers grey and the words bold; then on one plain line, for copying. Returns false without
+ * printing when stdout has no colour; the caller then prints its plain form.
+ */
+export function terminalPhrase(phrase: string): boolean {
+  if (!terminalColor("stdout")) return false;
+  const words = phrase.split(" ");
+  for (let start = 0; start < words.length; start += WORDS_PER_ROW) {
+    const row = words.slice(start, start + WORDS_PER_ROW);
+    const cells = row.map((word, column) => {
+      const number = terminalPaint(
+        "stdout",
+        STYLE.muted,
+        `${String(start + column + 1).padStart(3)}.`,
+      );
+      // The last word of a row needs no padding to line up the next one.
+      const padded = column === row.length - 1 ? word : word.padEnd(LONGEST_WORD);
+      return `${number} ${terminalPaint("stdout", STYLE.strong, padded)}`;
+    });
+    console.log(`  ${cells.join(" ".repeat(WORD_GAP))}`);
+  }
+  console.log(terminalPaint("stdout", STYLE.muted, "On one line, for copying:"));
+  console.log(phrase);
+  return true;
+}
+
+/**
+ * A fingerprint under the phrase it belongs to, as `mhfe` shows one: the label grey, the value bold
+ * and a grey note in brackets. Only where terminalResultHeader printed the heading of the result.
+ */
+export function terminalFingerprint(label: string, value: string, note: string): void {
+  const paint = (code: string, text: string): string => terminalPaint("stdout", code, text);
+  console.log(
+    `${paint(STYLE.muted, label)}  ${paint(STYLE.strong, value)}  ${paint(STYLE.muted, `(${note})`)}`,
+  );
+}
+
+/** What the fingerprints of the command line are made with, as their note says. */
+export const FINGERPRINT_NOTE = "empty BIP39 passphrase";
+
+/** Returns to the start of the line and erases it (VT100 "erase in line"). */
+const REWRITE_LINE = "\r\x1b[2K";
+
+/**
+ * The progress of a long search. On a terminal each update replaces the one before, so that the
+ * screen keeps one line however long the search runs; in a file or a pipe, or on a "dumb" terminal
+ * without control sequences, each is a line of its own. end() closes the line after the search.
+ */
+export class ProgressLine {
+  #open = false;
+
+  show(message: string): void {
+    if (process.stderr.isTTY !== true || process.env.TERM === "dumb") {
+      terminalHint(message);
+      return;
+    }
+    // A line longer than the window would wrap, and only its last row would be rewritten.
+    const columns = process.stderr.columns;
+    const text = columns > 1 && message.length >= columns ? message.slice(0, columns - 1) : message;
+    process.stderr.write(`${REWRITE_LINE}${terminalPaint("stderr", STYLE.muted, text)}`);
+    this.#open = true;
+  }
+
+  end(): void {
+    if (this.#open) process.stderr.write("\n");
+    this.#open = false;
+  }
 }
 
 /** The README on GitHub. A message at run time stays short and links to the section that explains
