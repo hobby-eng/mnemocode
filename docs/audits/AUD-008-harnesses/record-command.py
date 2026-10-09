@@ -40,7 +40,7 @@ def main():
         "cwd": str(Path(args.cwd).resolve()),
         "startedAt": now(),
         "timeoutSeconds": args.timeout,
-        "environment": {key: os.environ[key] for key in ("PATH", "CARGO_HOME", "RUSTUP_HOME", "TZ") if key in os.environ},
+        "environment": {key: os.environ[key] for key in ("CARGO_HOME", "RUSTUP_HOME") if key in os.environ},
         "exitCode": None,
     }
     ledger.write_text(json.dumps(record, indent=2) + "\n")

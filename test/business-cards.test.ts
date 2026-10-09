@@ -22,7 +22,7 @@ describe("business card collections", () => {
     const profile = resolveProfile("architect", { name: " Alex Morgan ", email: "me@example.com" });
     expect(profile.name).toBe("Alex Morgan");
     expect(resolveProfile("it", { name: "Jean-Luc D’Angelo" }).name).toBe("Jean-Luc D’Angelo");
-    expect(() => validateProfile({ name: "Сергей Иванов" })).toThrow("Latin letters only");
+    expect(() => validateProfile({ name: "Νίκος Παππάς" })).toThrow("Latin letters only");
     expect(profile.role).toBe("ARCHITECT");
     expect(profile.email).toBe("me@example.com");
     expect(profile.website).toBe("vector.example");

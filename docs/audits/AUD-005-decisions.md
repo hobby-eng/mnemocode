@@ -105,3 +105,5 @@ and what is left for the maintainer. It belongs to [AUD-005](AUD-005-2026-10-01.
   need to resync them.
 - **The SSKR bridge refresh.** It must keep `vendor/sskr/integrity.json` complete and current;
   `test/sskr-integrity.test.ts` now enforces that.
+
+Privacy-only metadata redaction (2026-10-09, owner-authorized): a local clock time is omitted. The decisions and their outcomes are unchanged.

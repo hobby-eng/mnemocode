@@ -810,5 +810,14 @@
     "Initial sandbox run: 403 passed, 28 failed, 3 skipped; subprocess EPERM invalidated those CLI failures as product evidence. Unrestricted rerun: 434 passed with zero skips. Initial npm/Docker/network permission failures were kept separately.",
     "First audit render harness failed because pdf-lib load default rewrote metadata. Corrected to updateMetadata:false; the unmodified production output then passed. This was an auditor-harness error, not a product finding.",
     "No independent cryptographic certification, no release approval, no production fix, no commit/push/tag/release."
-  ]
+  ],
+  "privacyRedaction": {
+    "kind": "privacy-only-metadata-redaction",
+    "homePath": "/home/user",
+    "locationAnnotations": "omitted",
+    "timestampsUTC": true,
+    "reviewedSourceHashesUnchanged": true,
+    "findingsAndOutcomesUnchanged": true,
+    "newAudit": false
+  }
 }

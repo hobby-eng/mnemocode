@@ -1,8 +1,8 @@
-import { readFile, readdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import ts from 'typescript';
+import { readFile, readdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import ts from "typescript";
 import * as prettier from "prettier";
-import { createHash } from 'node:crypto';
+import { createHash } from "node:crypto";
 const root = process.cwd();
 async function files(dir) {
   const list = [];
@@ -13,21 +13,21 @@ async function files(dir) {
   }
   return list;
 }
-const source = (await files('src')).filter((p) => p.endsWith('.ts'));
-const owned = [...source, ...(await files('test')), ...(await files('scripts'))].filter((p) =>
+const source = (await files("src")).filter((p) => p.endsWith(".ts"));
+const owned = [...source, ...(await files("test")), ...(await files("scripts"))].filter((p) =>
   /\.(ts|mjs)$/.test(p),
 );
 const docFiles = [
-  'README.md',
-  'THIRD_PARTY_NOTICES.md',
-  'package.json',
-  'tsconfig.json',
-  ...(await files('docs')),
+  "README.md",
+  "THIRD_PARTY_NOTICES.md",
+  "package.json",
+  "tsconfig.json",
+  ...(await files("docs")),
 ].filter((p) => /\.(md|json)$/.test(p));
 const formatting = [];
 for (const p of [...owned, ...docFiles]) {
   const config = await prettier.resolveConfig(p);
-  if (!(await prettier.check(await readFile(p, 'utf8'), { ...config, filepath: p })))
+  if (!(await prettier.check(await readFile(p, "utf8"), { ...config, filepath: p })))
     formatting.push(p);
 }
 const functionLengths = [];
@@ -35,7 +35,7 @@ let assertions = 0;
 let nestedTernaries = 0;
 const graph = {};
 for (const p of source) {
-  const text = await readFile(p, 'utf8');
+  const text = await readFile(p, "utf8");
   const ast = ts.createSourceFile(p, text, ts.ScriptTarget.Latest, true);
   function visit(n) {
     if (ts.isNonNullExpression(n)) assertions++;
@@ -53,7 +53,7 @@ for (const p of source) {
       if (end - start + 1 >= 70)
         functionLengths.push({
           file: p,
-          name: n.name?.getText(ast) ?? '<anonymous>',
+          name: n.name?.getText(ast) ?? "<anonymous>",
           start,
           lines: end - start + 1,
         });
@@ -62,12 +62,12 @@ for (const p of source) {
   }
   visit(ast);
 }
-for (const p of (await files('dist')).filter((p) => p.endsWith('.js'))) {
-  const ast = ts.createSourceFile(p, await readFile(p, 'utf8'), ts.ScriptTarget.Latest, true);
+for (const p of (await files("dist")).filter((p) => p.endsWith(".js"))) {
+  const ast = ts.createSourceFile(p, await readFile(p, "utf8"), ts.ScriptTarget.Latest, true);
   graph[p] = ast.statements
     .filter((n) => (ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier)
     .map((n) => n.moduleSpecifier.text)
-    .filter((n) => n.startsWith('.'))
+    .filter((n) => n.startsWith("."))
     .map((n) => path.normalize(path.join(path.dirname(p), n)));
 }
 const cycles = [];
@@ -86,23 +86,23 @@ function traverse(p) {
   active.pop();
 }
 Object.keys(graph).forEach(traverse);
-const manifest = JSON.parse(await readFile('vendor/sskr/integrity.json', 'utf8'));
+const manifest = JSON.parse(await readFile("vendor/sskr/integrity.json", "utf8"));
 const integrity = [];
 for (const [p, hash] of Object.entries(manifest))
   integrity.push({
     path: p,
     match:
-      createHash('sha256')
-        .update(await readFile('vendor/sskr/' + p))
-        .digest('hex') === hash,
+      createHash("sha256")
+        .update(await readFile("vendor/sskr/" + p))
+        .digest("hex") === hash,
   });
-const vectors = JSON.parse(await readFile('vectors/mnemocode-v1.json', 'utf8'));
-const sskr = JSON.parse(await readFile('vectors/sskr-v1.json', 'utf8'));
+const vectors = JSON.parse(await readFile("vectors/mnemocode-v1.json", "utf8"));
+const sskr = JSON.parse(await readFile("vectors/sskr-v1.json", "utf8"));
 const installed = {};
-const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+const pkg = JSON.parse(await readFile("package.json", "utf8"));
 for (const [name, version] of Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })) {
   const current = JSON.parse(
-    await readFile('node_modules/' + name + '/package.json', 'utf8'),
+    await readFile("node_modules/" + name + "/package.json", "utf8"),
   ).version;
   installed[name] = { pinned: version, installed: current, match: current === version };
 }
@@ -118,7 +118,7 @@ const data = {
   installed,
   vectors: vectors.vectors.map((v) => ({
     name: v.name,
-    words: v.sourceMnemonic.split(' ').length,
+    words: v.sourceMnemonic.split(" ").length,
     mode: v.mode,
     sourceFingerprint: v.sourceFingerprint !== undefined,
     encodedFingerprint: v.encodedFingerprint !== undefined,
@@ -126,7 +126,7 @@ const data = {
   sskr: { officialShares: sskr.official.shares.length, deterministic: sskr.deterministic.length },
 };
 await writeFile(
-  '/tmp/mnemocode-aud-001/evidence/static-review.json',
+  "/tmp/mnemocode-aud-001/evidence/static-review.json",
   JSON.stringify(data, null, 2),
 );
 console.log(JSON.stringify(data, null, 2));

@@ -1162,5 +1162,14 @@
     "No real hidden-prompt session, physical print or scan, assistive technology, or RustSec scan.",
     "The oracle's color and color-Unicode packing re-implements documented rules; only the BIP39 list and the Seedshift construction are fully independent of the code.",
     "No release approval and no independent cryptographic certification."
-  ]
+  ],
+  "privacyRedaction": {
+    "kind": "privacy-only-metadata-redaction",
+    "homePath": "/home/user",
+    "locationAnnotations": "omitted",
+    "timestampsUTC": true,
+    "reviewedSourceHashesUnchanged": true,
+    "findingsAndOutcomesUnchanged": true,
+    "newAudit": false
+  }
 }

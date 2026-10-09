@@ -7,23 +7,24 @@ commit belongs to the history before the rewrite of 2026-09-28 (see
 produced the command logs and probe results the report cites. Those logs are kept locally by the
 maintainer and are not published; the report states the commands, counts and outcomes.
 
-The scripts are kept byte for byte as they ran, so they still contain the paths of the audit
-machine, such as `/tmp/mnemocode-aud-001`. Adjust the paths before running them, use a disposable
-workspace, and use only the public test inputs they already contain. Never point them at real
-wallet data.
+The scripts retain their recorded probes and public test inputs. Privacy-only path portability
+edits resolve the current project checkout and its installed Prettier dynamically; original local
+execution records remain unchanged, and no audit checks were rerun. Historical scratch paths such
+as `/tmp/mnemocode-aud-001` still describe the original layout. Adjust the scratch paths before
+running the probes, and never point them at real wallet data.
 
-| Script                   | What it does                                                                                                                                       |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `run.py`                 | Runs one command in the workspace with a 300-second limit and writes `<name>.log` and `<name>.command.json` (command, UTC times, exit code, SHA-256) |
-| `run-long.py`            | The same with a 1200-second limit, for the render matrix                                                                                           |
-| `run-actual.py`          | The same, run in the project checkout during the test-only remediation phase                                                                       |
-| `run-tests-update.py`    | The same, run in the copy with the updated tests                                                                                                   |
-| `audit-static.mjs`       | Static review: parses the TypeScript sources, checks formatting with Prettier and hashes the files                                                 |
-| `audit-probes.mjs`       | Boundary probes of the core encoding, records, SSKR policies, transports and card templates                                                        |
-| `audit-extra.mjs`        | Bitcoin address matching (upper and mixed case), the empty catalogue case and package contents                                                     |
-| `audit-output-alias.mjs` | Reproduces AUD-001-SEC002: overwriting the input through a parent-directory alias of `--output`                                                    |
-| `audit-render-matrix.mjs` | Renders every card template at every page size and orientation, 16 × 4 × 2 PDFs                                                                   |
-| `audit-final-checks.mjs` | Decodes the QR codes of exported PNG and JPEG files and checks file and directory permissions                                                      |
+| Script                    | What it does                                                                                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run.py`                  | Runs one command in the workspace with a 300-second limit and writes `<name>.log` and `<name>.command.json` (command, UTC times, exit code, SHA-256) |
+| `run-long.py`             | The same with a 1200-second limit, for the render matrix                                                                                             |
+| `run-actual.py`           | The same, run in the project checkout during the test-only remediation phase                                                                         |
+| `run-tests-update.py`     | The same, run in the copy with the updated tests                                                                                                     |
+| `audit-static.mjs`        | Static review: parses the TypeScript sources, checks formatting with Prettier and hashes the files                                                   |
+| `audit-probes.mjs`        | Boundary probes of the core encoding, records, SSKR policies, transports and card templates                                                          |
+| `audit-extra.mjs`         | Bitcoin address matching (upper and mixed case), the empty catalogue case and package contents                                                       |
+| `audit-output-alias.mjs`  | Reproduces AUD-001-SEC002: overwriting the input through a parent-directory alias of `--output`                                                      |
+| `audit-render-matrix.mjs` | Renders every card template at every page size and orientation, 16 × 4 × 2 PDFs                                                                      |
+| `audit-final-checks.mjs`  | Decodes the QR codes of exported PNG and JPEG files and checks file and directory permissions                                                        |
 
 ## How to run them
 
@@ -44,5 +45,4 @@ wallet data.
 
 4. Compare each `<name>.log` with the row of the same name in the report's Checks table. The
    runners print the command record and the end of the log; `exitCode` 124 means the time limit
-   was reached. `audit-static.mjs` imports Prettier from the audit machine's npm cache; point
-   that import at an installed Prettier first.
+   was reached. `audit-static.mjs` imports the reviewed checkout's installed `prettier` package.

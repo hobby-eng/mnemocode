@@ -541,5 +541,14 @@
     "terminal": "11 scenario groups passed",
     "sourceUnchanged": true
   },
-  "assessment": "Three confirmed open findings: one medium and two low; no high/critical issue demonstrated. FUN001 blocks acceptance of the new recovery API until fixed and verified. Architecture moves in the right direction; no measured speed advantage over the previous release is established. Browser integration and release reproducibility remain unexecuted, so this is not release approval."
+  "assessment": "Three confirmed open findings: one medium and two low; no high/critical issue demonstrated. FUN001 blocks acceptance of the new recovery API until fixed and verified. Architecture moves in the right direction; no measured speed advantage over the previous release is established. Browser integration and release reproducibility remain unexecuted, so this is not release approval.",
+  "privacyRedaction": {
+    "kind": "privacy-only-metadata-redaction",
+    "homePath": "/home/user",
+    "locationAnnotations": "omitted",
+    "timestampsUTC": true,
+    "reviewedSourceHashesUnchanged": true,
+    "findingsAndOutcomesUnchanged": true,
+    "newAudit": false
+  }
 }

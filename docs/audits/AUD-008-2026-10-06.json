@@ -302,7 +302,7 @@
     "/home/user/Documents/bip_tools/multi-chain-wallet-tools/docs/audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7",
     "/home/user/Documents/bip_tools/AGENTS.md": "11a945c9b25efcb2c81140b99d98bc2a0463d53494363f183605da03eea69a2c",
     "/home/user/Documents/bip_tools/mnemocode/AGENTS.md": "77101fdcfc66344a47a1503f716a4105fe7fff7fba7f0dec5d9c5d339e591320",
-    "/home/user/.codex/skills/wallet-full-audit/SKILL.md": "82e15c8a818023e2a7a3ab88416f6e3a219d6a78c6b2c24aa53a6e17ab1ae2d0"
+    ".github/skills/wallet-full-audit/SKILL.md": "82e15c8a818023e2a7a3ab88416f6e3a219d6a78c6b2c24aa53a6e17ab1ae2d0"
   },
   "scope": "CLI/library, all five BIP39 widths and representations, Seedshift/date/word recovery, local Bitcoin evidence, SSKR transports/thresholds/joint repair/WASM integration, candidate-list age export, private input/files, selected real PDF/QR outputs, architecture/docs/dependencies and static CI/release gates. Ordinary audit, not release approval.",
   "artifacts": {
@@ -860,7 +860,7 @@
       "startedAt": "2026-10-06T00:57:03.655677Z",
       "timeoutSeconds": 240,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -882,7 +882,7 @@
       "startedAt": "2026-10-06T00:53:42.916859Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -907,7 +907,7 @@
       "startedAt": "2026-10-06T00:55:22.237325Z",
       "timeoutSeconds": 15,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -929,7 +929,7 @@
       "startedAt": "2026-10-06T00:55:57.489666Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -951,7 +951,7 @@
       "startedAt": "2026-10-06T00:57:09.132413Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -973,7 +973,7 @@
       "startedAt": "2026-10-06T00:56:55.508206Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -996,7 +996,7 @@
       "startedAt": "2026-10-06T00:56:24.978945Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1019,7 +1019,7 @@
       "startedAt": "2026-10-06T00:56:54.156138Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1042,7 +1042,7 @@
       "startedAt": "2026-10-06T00:57:12.970196Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1065,7 +1065,7 @@
       "startedAt": "2026-10-06T00:55:58.252561Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1088,7 +1088,7 @@
       "startedAt": "2026-10-06T00:56:23.073074Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1110,7 +1110,7 @@
       "startedAt": "2026-10-06T00:55:57.218602Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1133,7 +1133,7 @@
       "startedAt": "2026-10-06T00:57:39.734735Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1180,7 +1180,7 @@
       "startedAt": "2026-10-06T00:54:13.299937Z",
       "timeoutSeconds": 480,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1204,7 +1204,7 @@
       "startedAt": "2026-10-06T01:00:48.556414Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1228,7 +1228,7 @@
       "startedAt": "2026-10-06T01:00:41.354168Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1252,7 +1252,7 @@
       "startedAt": "2026-10-06T01:01:55.526174Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1274,7 +1274,7 @@
       "startedAt": "2026-10-06T01:01:55.318055Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1296,7 +1296,7 @@
       "startedAt": "2026-10-06T01:01:46.823393Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1318,7 +1318,7 @@
       "startedAt": "2026-10-06T01:01:40.609845Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1342,7 +1342,7 @@
       "startedAt": "2026-10-06T00:53:07.505474Z",
       "timeoutSeconds": 30,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1364,7 +1364,7 @@
       "startedAt": "2026-10-06T00:53:37.521947Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1388,7 +1388,7 @@
       "startedAt": "2026-10-06T00:56:39.739450Z",
       "timeoutSeconds": 30,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1412,7 +1412,7 @@
       "startedAt": "2026-10-06T00:56:22.953731Z",
       "timeoutSeconds": 30,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1435,7 +1435,7 @@
       "startedAt": "2026-10-06T01:00:42.305719Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1457,7 +1457,7 @@
       "startedAt": "2026-10-06T00:59:15.575788Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1480,7 +1480,7 @@
       "startedAt": "2026-10-06T01:00:02.917749Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1503,7 +1503,7 @@
       "startedAt": "2026-10-06T01:03:46.002048Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1525,7 +1525,7 @@
       "startedAt": "2026-10-06T01:03:08.891461Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1547,7 +1547,7 @@
       "startedAt": "2026-10-06T01:03:49.679888Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1574,7 +1574,7 @@
       "startedAt": "2026-10-06T01:02:22.135393Z",
       "timeoutSeconds": 120,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1601,7 +1601,7 @@
       "startedAt": "2026-10-06T00:56:23.189170Z",
       "timeoutSeconds": 30,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1628,7 +1628,7 @@
       "startedAt": "2026-10-06T00:56:10.709640Z",
       "timeoutSeconds": 30,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1651,7 +1651,7 @@
       "startedAt": "2026-10-06T00:55:43.657845Z",
       "timeoutSeconds": 30,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1673,7 +1673,7 @@
       "startedAt": "2026-10-06T00:57:24.365049Z",
       "timeoutSeconds": 10,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1695,7 +1695,7 @@
       "startedAt": "2026-10-06T00:55:41.888347Z",
       "timeoutSeconds": 10,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1717,7 +1717,7 @@
       "startedAt": "2026-10-06T00:59:43.232763Z",
       "timeoutSeconds": 30,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1739,7 +1739,7 @@
       "startedAt": "2026-10-06T00:58:58.376395Z",
       "timeoutSeconds": 30,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1768,7 +1768,7 @@
       "startedAt": "2026-10-06T00:55:29.671631Z",
       "timeoutSeconds": 10,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1790,7 +1790,7 @@
       "startedAt": "2026-10-06T00:58:58.874898Z",
       "timeoutSeconds": 15,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1817,7 +1817,7 @@
       "startedAt": "2026-10-06T00:55:23.150819Z",
       "timeoutSeconds": 10,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1839,7 +1839,7 @@
       "startedAt": "2026-10-06T00:57:26.343145Z",
       "timeoutSeconds": 45,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1861,7 +1861,7 @@
       "startedAt": "2026-10-06T00:55:13.417262Z",
       "timeoutSeconds": 45,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1884,7 +1884,7 @@
       "startedAt": "2026-10-06T00:56:19.222857Z",
       "timeoutSeconds": 45,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1906,7 +1906,7 @@
       "startedAt": "2026-10-06T00:55:02.219740Z",
       "timeoutSeconds": 45,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1929,7 +1929,7 @@
       "startedAt": "2026-10-06T00:56:56.528160Z",
       "timeoutSeconds": 40,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1951,7 +1951,7 @@
       "startedAt": "2026-10-06T01:04:03.117599Z",
       "timeoutSeconds": 60,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1973,7 +1973,7 @@
       "startedAt": "2026-10-06T01:03:51.314360Z",
       "timeoutSeconds": 60,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -1996,7 +1996,7 @@
       "startedAt": "2026-10-06T00:55:28.246275Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -2018,7 +2018,7 @@
       "startedAt": "2026-10-06T00:54:22.763508Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -2041,7 +2041,7 @@
       "startedAt": "2026-10-06T00:56:56.728928Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -2063,7 +2063,7 @@
       "startedAt": "2026-10-06T01:03:02.939021Z",
       "timeoutSeconds": 120,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -2085,7 +2085,7 @@
       "startedAt": "2026-10-06T00:53:37.532274Z",
       "timeoutSeconds": 90,
       "environment": {
-        "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+        "PATH": "<elided>",
         "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
         "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
       },
@@ -2990,7 +2990,7 @@
     "docs/audits/AUD-008-harnesses/interface-narrow-terminal.py": "7aacd97dc445976ba6ee7b1075d4606d98f0396aadda29e0d87bd4974c115ec5",
     "docs/audits/AUD-008-harnesses/interface-record-review.py": "11e76ac9fbb312300a9f1b393ee5727ce3e9d07565f3a64b3625268ad876442d",
     "docs/audits/AUD-008-harnesses/interface-validate-review.py": "67da86c14f6d8af068a5186b27717840af99135f70fb6554a371a1113a0dc352",
-    "docs/audits/AUD-008-harnesses/record-command.py": "1171943d98a081d099c14d1a336915d83a830be49175d1e6dd8df523401d8bfd",
+    "docs/audits/AUD-008-harnesses/record-command.py": "ba857a62509b88a9077f603d971d0239149b5965acd98393ef0b4f6867e55fab",
     "docs/audits/AUD-008-harnesses/record-skeptic.py": "8a510342742301e69b9ac0f7dd29722066c4d4e2699adbed2b7a0e3074718ffb",
     "docs/audits/AUD-008-harnesses/runner-probe.test.ts": "a53d9b5cf2bb5cd32779cd3d8d69fdc78cf5806cd3a03bf7cddb9bb785bc96cc",
     "docs/audits/AUD-008-harnesses/security-README.md": "4f60dfc4120f923e61fc2660eaae52094dd6d83d34a9152ed30e08b9b862f198",
@@ -3624,7 +3624,7 @@
       "/home/user/Documents/bip_tools/multi-chain-wallet-tools/docs/audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7",
       "/home/user/Documents/bip_tools/AGENTS.md": "11a945c9b25efcb2c81140b99d98bc2a0463d53494363f183605da03eea69a2c",
       "/home/user/Documents/bip_tools/mnemocode/AGENTS.md": "77101fdcfc66344a47a1503f716a4105fe7fff7fba7f0dec5d9c5d339e591320",
-      "/home/user/.codex/skills/wallet-full-audit/SKILL.md": "82e15c8a818023e2a7a3ab88416f6e3a219d6a78c6b2c24aa53a6e17ab1ae2d0"
+      ".github/skills/wallet-full-audit/SKILL.md": "82e15c8a818023e2a7a3ab88416f6e3a219d6a78c6b2c24aa53a6e17ab1ae2d0"
     },
     "commands": [
       {
@@ -3637,7 +3637,7 @@
         "startedAt": "2026-10-06T02:25:31.307223Z",
         "timeoutSeconds": 60,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3659,7 +3659,7 @@
         "startedAt": "2026-10-06T02:25:53.439302Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3681,7 +3681,7 @@
         "startedAt": "2026-10-06T02:25:38.961182Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3702,7 +3702,7 @@
         "startedAt": "2026-10-06T02:25:15.479393Z",
         "timeoutSeconds": 120,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3723,7 +3723,7 @@
         "startedAt": "2026-10-06T02:25:32.023384Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3750,7 +3750,7 @@
         "startedAt": "2026-10-06T02:25:52.239849Z",
         "timeoutSeconds": 90,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3771,7 +3771,7 @@
         "startedAt": "2026-10-06T02:26:03.644417Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3792,7 +3792,7 @@
         "startedAt": "2026-10-06T02:25:53.619884Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3813,7 +3813,7 @@
         "startedAt": "2026-10-06T02:26:33.388308Z",
         "timeoutSeconds": 60,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3847,7 +3847,7 @@
         "startedAt": "2026-10-06T02:25:22.798785Z",
         "timeoutSeconds": 180,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3868,7 +3868,7 @@
         "startedAt": "2026-10-06T02:28:07.980096Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3889,7 +3889,7 @@
         "startedAt": "2026-10-06T02:28:02.744547Z",
         "timeoutSeconds": 120,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3910,7 +3910,7 @@
         "startedAt": "2026-10-06T02:26:59.709718Z",
         "timeoutSeconds": 120,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3931,7 +3931,7 @@
         "startedAt": "2026-10-06T02:26:03.865400Z",
         "timeoutSeconds": 120,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3958,7 +3958,7 @@
         "startedAt": "2026-10-06T02:29:24.105005Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -3980,7 +3980,7 @@
         "startedAt": "2026-10-06T02:29:24.411638Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4006,7 +4006,7 @@
         "startedAt": "2026-10-06T02:26:10.287623Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4028,7 +4028,7 @@
         "startedAt": "2026-10-06T02:26:10.614953Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4049,7 +4049,7 @@
         "startedAt": "2026-10-06T02:25:37.786410Z",
         "timeoutSeconds": 90,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4070,7 +4070,7 @@
         "startedAt": "2026-10-06T02:25:10.092565Z",
         "timeoutSeconds": 120,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4366,7 +4366,7 @@
       "/home/user/Documents/bip_tools/multi-chain-wallet-tools/docs/audit-report.schema.json": "d47df01252ad6fb11d8cad00b7d9e6dde62b3ee3331c3bfbef9a7b99adda30f7",
       "/home/user/Documents/bip_tools/AGENTS.md": "11a945c9b25efcb2c81140b99d98bc2a0463d53494363f183605da03eea69a2c",
       "/home/user/Documents/bip_tools/mnemocode/AGENTS.md": "77101fdcfc66344a47a1503f716a4105fe7fff7fba7f0dec5d9c5d339e591320",
-      "/home/user/.codex/skills/wallet-full-audit/SKILL.md": "82e15c8a818023e2a7a3ab88416f6e3a219d6a78c6b2c24aa53a6e17ab1ae2d0"
+      ".github/skills/wallet-full-audit/SKILL.md": "82e15c8a818023e2a7a3ab88416f6e3a219d6a78c6b2c24aa53a6e17ab1ae2d0"
     },
     "commands": [
       {
@@ -4380,7 +4380,7 @@
         "startedAt": "2026-10-06T02:38:46.773868Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4402,7 +4402,7 @@
         "startedAt": "2026-10-06T02:37:09.278581Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4423,7 +4423,7 @@
         "startedAt": "2026-10-06T02:35:43.770171Z",
         "timeoutSeconds": 120,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4445,7 +4445,7 @@
         "startedAt": "2026-10-06T02:42:36.086359Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4479,7 +4479,7 @@
         "startedAt": "2026-10-06T02:38:48.142146Z",
         "timeoutSeconds": 180,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4513,7 +4513,7 @@
         "startedAt": "2026-10-06T02:35:44.226976Z",
         "timeoutSeconds": 180,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4536,7 +4536,7 @@
         "startedAt": "2026-10-06T02:42:50.971045Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4557,7 +4557,7 @@
         "startedAt": "2026-10-06T02:35:45.395609Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4578,7 +4578,7 @@
         "startedAt": "2026-10-06T02:38:46.979624Z",
         "timeoutSeconds": 90,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4599,7 +4599,7 @@
         "startedAt": "2026-10-06T02:41:20.483757Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4620,7 +4620,7 @@
         "startedAt": "2026-10-06T02:42:36.204269Z",
         "timeoutSeconds": 30,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4641,7 +4641,7 @@
         "startedAt": "2026-10-06T02:39:06.401227Z",
         "timeoutSeconds": 90,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4662,7 +4662,7 @@
         "startedAt": "2026-10-06T02:35:16.547786Z",
         "timeoutSeconds": 120,
         "environment": {
-          "PATH": "/home/user/.codex/tmp/arg0/codex-arg0PtJIhL:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources",
+          "PATH": "<elided>",
           "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
           "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
         },
@@ -4805,7 +4805,7 @@
             "startedAt": "2026-10-06T12:44:58.316364Z",
             "timeoutSeconds": 300,
             "environment": {
-              "PATH": "/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback",
+              "PATH": "<elided>",
               "CARGO_HOME": "/home/user/Documents/bip_tools/workingspace/cargo",
               "RUSTUP_HOME": "/home/user/Documents/bip_tools/workingspace/rustup"
             },
@@ -4836,5 +4836,92 @@
         ]
       }
     ]
+  },
+  "privacyRedaction": {
+    "kind": "privacy-only-metadata-redaction",
+    "homePath": "/home/user",
+    "locationAnnotations": "omitted",
+    "timestampsUTC": true,
+    "reviewedSourceHashesUnchanged": true,
+    "findingsAndOutcomesUnchanged": true,
+    "newAudit": false,
+    "documentBindings": [
+      {
+        "keyPath": [
+          "harnessHashes",
+          "docs/audits/AUD-008-harnesses/interface-README.md"
+        ],
+        "document": "docs/audits/AUD-008-harnesses/interface-README.md",
+        "originalSha256": "ec88390fc4d2a3460e542aad75390be2fbfaa682f6cb3fb2c9690afa7fc66768",
+        "redactedSha256": "2ad1a1d58293e8758a94b31c7298d02dda7bf09f3481ca62b3199f5e770245cb",
+        "change": "privacy-only harness documentation; no executable or audit rerun"
+      },
+      {
+        "keyPath": [
+          "remediationVerification",
+          "harnessHashes",
+          "docs/audits/AUD-008-harnesses/recheck-sskr-README.md"
+        ],
+        "document": "docs/audits/AUD-008-harnesses/recheck-sskr-README.md",
+        "originalSha256": "048c8e7656140840283ceebf30879f6835ee9443333b54419fa4fa80c5817d7f",
+        "redactedSha256": "c01eb176a43928e96b6cbc2313435c4980003128e9b7c52b5418d5238b61b066",
+        "change": "privacy-only harness documentation; no executable or audit rerun"
+      },
+      {
+        "keyPath": [
+          "fixVerification",
+          "recordUpdates",
+          0,
+          "harnessHashes",
+          "docs/audits/AUD-008-harnesses/README.md"
+        ],
+        "document": "docs/audits/AUD-008-harnesses/README.md",
+        "originalSha256": "cb98463c3ec0abf5144637011e85becf35e56a2dfc248228042bebf30fb01ed4",
+        "redactedSha256": "222f97baa2cfc990add16b56e07057d014df953d714ce0f5eebd6344889c9264",
+        "change": "privacy-only harness documentation; no executable or audit rerun"
+      },
+      {
+        "keyPath": [
+          "harnessHashes",
+          "docs/audits/AUD-008-harnesses/interface-narrow-terminal.py"
+        ],
+        "document": "docs/audits/AUD-008-harnesses/interface-narrow-terminal.py",
+        "originalSha256": "7aacd97dc445976ba6ee7b1075d4606d98f0396aadda29e0d87bd4974c115ec5",
+        "redactedSha256": "d3ad154a9e12e0f1d60f3f130463cd199f3ecce3ff0fe97742d7eb14d1c11c58",
+        "change": "privacy-only runtime path portability; the original execution digest is retained; no audit checks were rerun"
+      },
+      {
+        "keyPath": [
+          "harnessHashes",
+          "docs/audits/AUD-008-harnesses/sskr-record-review.mjs"
+        ],
+        "document": "docs/audits/AUD-008-harnesses/sskr-record-review.mjs",
+        "originalSha256": "b1f41f82fc7e1c06f16ca35626c850ca48eed24cd4b4a4fd0d1396a41c6efee5",
+        "redactedSha256": "85e4428344b2bd510360fc978290694ea5d63fd2f3d23a5f89fa4cf032d7b7d0",
+        "change": "privacy-only runtime path portability; the original execution digest is retained; no audit checks were rerun"
+      },
+      {
+        "keyPath": [
+          "fixVerification",
+          "harnessHashes",
+          "docs/audits/AUD-008-harnesses/fix-resized-terminal.py"
+        ],
+        "document": "docs/audits/AUD-008-harnesses/fix-resized-terminal.py",
+        "originalSha256": "f85d301e94276cd69181d40a1eae7bb87c5c60c4957d062225999fd9c1a14837",
+        "redactedSha256": "8f8b10cb1255b3538c2e9b2c466d72ff22c8c714fa7e316cfcf0b83756429c7c",
+        "change": "privacy-only runtime path portability; the original execution digest is retained; no audit checks were rerun"
+      },
+      {
+        "keyPath": [
+          "harnessHashes",
+          "docs/audits/AUD-008-harnesses/record-command.py"
+        ],
+        "document": "docs/audits/AUD-008-harnesses/record-command.py",
+        "originalSha256": "1171943d98a081d099c14d1a336915d83a830be49175d1e6dd8df523401d8bfd",
+        "redactedSha256": "ba857a62509b88a9077f603d971d0239149b5965acd98393ef0b4f6867e55fab",
+        "change": "privacy-only: the recorder no longer copies PATH or TZ into a record; no audit checks were rerun"
+      }
+    ],
+    "toolPaths": "elided"
   }
 }

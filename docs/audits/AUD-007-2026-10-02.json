@@ -20,7 +20,7 @@
   "checks": [
     {
       "name": "canonical-sskr",
-      "command": "'env' 'PATH=/home/user/Documents/bip_tools/mnemocode/docs/audits/AUD-007-harnesses/docker-shim:/home/user/.codex/tmp/arg0/codex-arg0nAjxIY:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/user/Documents/bip_tools/workingspace/cargo/bin:/home/user/.local/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/home/user/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/lib/chatgpt/resources' 'pnpm' 'verify:sskr'",
+      "command": "'env' 'PATH=<elided>' 'pnpm' 'verify:sskr'",
       "outcome": "passed",
       "summary": "Fresh built stage, no network, Rust 1.99.0; four exact generated-file matches.",
       "exitCode": 0,
@@ -692,5 +692,15 @@
       "size": 197,
       "sha256": "45d394d9991d773fb8197a9474c468252265d22f8267a0ca1c57c6c566cf9a8b"
     }
+  },
+  "privacyRedaction": {
+    "kind": "privacy-only-metadata-redaction",
+    "homePath": "/home/user",
+    "locationAnnotations": "omitted",
+    "timestampsUTC": true,
+    "reviewedSourceHashesUnchanged": true,
+    "findingsAndOutcomesUnchanged": true,
+    "newAudit": false,
+    "toolPaths": "elided"
   }
 }

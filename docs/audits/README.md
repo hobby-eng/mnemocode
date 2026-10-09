@@ -44,3 +44,7 @@ AUD-003 names its commits as they were on `main` on 2026-09-29. It also identifi
 ```bash
 git ls-tree -r COMMIT | grep -v '\.md$' | sha256sum
 ```
+
+## Privacy metadata
+
+Privacy-only metadata redaction: home paths use /home/user, location-specific annotations are omitted, and timestamps use UTC. Recorded findings, outcomes and reviewed-source hashes are unchanged; this is not a new audit.

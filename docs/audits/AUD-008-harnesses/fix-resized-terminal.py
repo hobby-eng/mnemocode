@@ -19,7 +19,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[3]
 EVIDENCE = ROOT / "docs/audits/AUD-008-evidence"
-NODE = (str(__import__("pathlib").Path.home()) + "/.local/bin/node")
+NODE = str(Path.home() / ".local/bin/node")
 source = Path(__file__).with_name("remediation-narrow-terminal.py").read_text()
 scope = {"re": __import__("re")}
 # Reuse the original decoder definition without rerunning or overwriting its old captures.

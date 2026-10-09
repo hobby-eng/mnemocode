@@ -14,7 +14,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[3]
 EVIDENCE = ROOT / "docs/audits/AUD-008-evidence"
-NODE = (str(__import__("pathlib").Path.home()) + "/.local/bin/node")
+NODE = str(Path.home() / ".local/bin/node")
 
 
 class Screen:

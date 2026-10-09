@@ -845,5 +845,14 @@
       "114bc5c8d4764ae49cd3b58ce25f1e92bd9b5865"
     ],
     "note": "Remediation after the report-only review; the reviewed snapshot b0cf0d7 and the finding text are unchanged. AUD-005-BLD001 and AUD-005-BLD002 stay fixed until GitHub runs their commits."
+  },
+  "privacyRedaction": {
+    "kind": "privacy-only-metadata-redaction",
+    "homePath": "/home/user",
+    "locationAnnotations": "omitted",
+    "timestampsUTC": true,
+    "reviewedSourceHashesUnchanged": true,
+    "findingsAndOutcomesUnchanged": true,
+    "newAudit": false
   }
 }

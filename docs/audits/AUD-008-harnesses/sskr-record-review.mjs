@@ -1,6 +1,7 @@
 /** Bind the AUD-008 SSKR review to exact production, fixture, harness and command bytes. */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const sha256 = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
 const paths = [
@@ -38,8 +39,12 @@ const paths = [
   "docs/audits/AUD-008-evidence/sskr-coverage.log",
   "docs/audits/AUD-008-evidence/sskr-coverage.command.json",
 ];
-const upstream =
-  (decodeURIComponent(new URL("../../../../", import.meta.url).pathname).replace(/\/$/, "") + "/workingspace/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/");
+const upstream = fileURLToPath(
+  new URL(
+    "../../../../workingspace/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/",
+    import.meta.url,
+  ),
+);
 const upstreamPaths = [
   "sskr-0.12.0/src/encoding.rs",
   "sskr-0.12.0/src/secret.rs",

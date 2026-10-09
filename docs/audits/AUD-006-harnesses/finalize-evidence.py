@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 
 import jsonschema
 
@@ -41,6 +42,10 @@ CHECK_COUNTS = {
     "DOC": 3,
 }
 PROCEDURE_ROOT = ROOT.parent / "multi-chain-wallet-tools"
+# The owner's later edits of the procedure files are recorded where those files live, each with
+# its reverse edit; this helper recovers the bytes this audit pinned (2026-10-09).
+sys.path.insert(0, str(PROCEDURE_ROOT / "docs/audits"))
+from procedure_changes import matches_audited  # noqa: E402
 
 
 def sha256(data: bytes) -> str:
@@ -121,8 +126,7 @@ if len(coverage_ids) != 32 or set(coverage_ids) != expected_checks:
     raise ValueError(f"coverage ledger mismatch: expected 32 checks, found {len(coverage_ids)}")
 
 for relative, expected in PROCEDURES.items():
-    actual = sha256((PROCEDURE_ROOT / relative).read_bytes())
-    if actual != expected:
+    if not matches_audited(PROCEDURE_ROOT / relative, expected):
         raise ValueError(f"procedure hash mismatch: {relative}")
 
 for document in (REPORT_MD, AUDITS / "README.md", Path(__file__).with_name("README.md")):
