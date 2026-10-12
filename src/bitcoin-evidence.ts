@@ -15,9 +15,13 @@ export {
   DEFAULT_ADDRESS_COUNT,
   MAX_ADDRESS_COUNT,
   defaultAddressCount,
-  assertBitcoinEvidence,
-  assertWalletEvidence,
   bitcoinProfiles,
+  checkedBitcoinProfiles,
+  isBitcoinNetwork,
+  isBitcoinProfile,
+  isPlacedKind,
+  isScannedEvidence,
+  isScannedKind,
   parseBitcoinAddress,
   parseMasterFingerprint,
   type AddressLocation,
@@ -29,6 +33,7 @@ export {
   type EvidenceMatch,
   type WalletEvidence,
 } from "./core/wallet-evidence.js";
+import { COINS } from "./core/coins.js";
 export {
   COINS,
   coinById,
@@ -53,8 +58,21 @@ export function nodePbkdf2HmacSha512(
   return new Uint8Array(key.buffer, key.byteOffset, key.byteLength);
 }
 
-/** One check serves every caller: it holds nothing but the PBKDF2 function. */
-const walletEvidence = new WalletEvidenceCheck(nodePbkdf2HmacSha512);
+/** One check serves every caller: it holds the PBKDF2 function and every coin, nothing else. */
+const walletEvidence = new WalletEvidenceCheck(nodePbkdf2HmacSha512, COINS);
+
+/**
+ * Refuses evidence that no wallet can match before any secret is asked, an address of any coin of
+ * core/coins.ts included: core's assertWalletEvidence with every coin bound. Needs no seed phrase.
+ */
+export function assertWalletEvidence(evidence: WalletEvidence): void {
+  walletEvidence.assert(evidence);
+}
+
+/** The same check under its name from when the evidence was Bitcoin's only. */
+export function assertBitcoinEvidence(evidence: WalletEvidence): void {
+  assertWalletEvidence(evidence);
+}
 
 /** Compares a recovered mnemonic locally. It does not contact a node or a block explorer. */
 export function matchWalletEvidence(

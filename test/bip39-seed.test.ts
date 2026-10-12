@@ -6,6 +6,7 @@ import { entropyToMnemonic, mnemonicToSeedSync } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { WalletEvidenceCheck } from "../src/core/wallet-evidence.js";
+import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
 
 /** The fingerprint from @scure/bip39's own seed, which bitcoin-evidence.ts computes natively. */
 function scureFingerprint(mnemonic: string, passphrase: string): string {
@@ -14,8 +15,9 @@ function scureFingerprint(mnemonic: string, passphrase: string): string {
 }
 
 /** The wallet check as a page builds it, with the pure JavaScript PBKDF2 of @noble/hashes. */
-const pageCheck = new WalletEvidenceCheck((password, salt, rounds, bytes) =>
-  pbkdf2(sha512, password, salt, { c: rounds, dkLen: bytes }),
+const pageCheck = new WalletEvidenceCheck(
+  (password, salt, rounds, bytes) => pbkdf2(sha512, password, salt, { c: rounds, dkLen: bytes }),
+  [BITCOIN],
 );
 
 describe("BIP39 seed from Node's PBKDF2", () => {

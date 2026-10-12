@@ -19,17 +19,23 @@
 // part by part, as the command line does, calls the steps (read, then compare) and asks again only
 // for the part that a finding names.
 
-import { parseRecord, type RecordFormat, type RecordMode } from "../record.js";
+import { parseRecord } from "../record.js";
 import type { SharePlatform } from "../sskr/share-platform.js";
-import { ShareInput, type TypedShare } from "../sskr/share-input.js";
-import { ShareSet } from "../sskr/share-set.js";
+import { ShareInput, type TypedShare, SHARE_SEPARATOR } from "../sskr/share-input.js";
+import { ShareSet, type PlacedShare } from "../sskr/share-set.js";
 import { readShare } from "../sskr/transport.js";
+import { MIN_RECORDED_THRESHOLD } from "../sskr/share-layout.js";
 import { DatesAnswer } from "./date-search.js";
-import { formatDate, ownedDate } from "./dates.js";
+import { formatDate, ownedDates } from "./dates.js";
 import { EncodedBackup } from "./encoded-backup.js";
-import { Masking } from "./masking.js";
-import { placesInWords } from "./places.js";
-import type { DateShiftDate } from "./types.js";
+import { Masking, type MaskedMode, type SplitMode } from "./masking.js";
+import { placesInWords, placesNamed } from "./places.js";
+import { type DateShiftDate, type MaskingMode, type EncodedFormat } from "./types.js";
+import { Redacted } from "./redacted.js";
+import { modeConflictOf } from "./backup-reading.js";
+import { englishTokens } from "./english-words.js";
+import { isMarked } from "../sskr/repair.js";
+import { refusalMessage } from "./refusal.js";
 
 /** The part of a backup that a finding is about. */
 export type BackupPart = "codes" | "shares" | "dates";
@@ -89,9 +95,6 @@ export interface BackupCheck {
 /** The line of a check that found nothing. */
 export const RESTORES_MESSAGE = "The backup restores this seed phrase.";
 
-/** What toString, toJSON and Node.js's inspect show of a value that holds part of a backup. */
-const REDACTED = "[backup check: redacted]";
-
 /** The verdict of each kind of finding: a part that can be read but does not fit differs. */
 const VERDICTS: Readonly<Record<FindingKind, BackupVerdict>> = {
   unreadable: "unreadable",
@@ -129,17 +132,6 @@ function resultOf(found: BackupFinding | undefined, notes: readonly string[] = [
   );
 }
 
-/** The message of a refusal; anything thrown that is not an Error passes through. */
-function messageOf(error: unknown): string {
-  if (!(error instanceof Error)) throw error;
-  return error.message;
-}
-
-/** The number of words in a seed phrase as the core writes it. */
-function wordCountOf(mnemonic: string): number {
-  return mnemonic.split(/\s+/u).filter(Boolean).length;
-}
-
 /** The complete dates of one answer: no ?, at most as many as the phrase takes. */
 function readDates(line: string, wordCount: number): readonly DateShiftDate[] {
   return DatesAnswer.parse(line, { wordCount, patterns: false }).known;
@@ -170,11 +162,68 @@ function compareDateLists(
   return finding(
     "dates",
     "places",
-    places.length === 1
-      ? `Date ${places[0]} is not one of the dates of this backup.`
-      : `Dates ${placesInWords(places)} are not dates of this backup.`,
+    `${placesNamed("Date", places)} ${places.length === 1 ? "is not one of the dates" : "are not dates"} of this backup.`,
     places,
   );
+}
+
+// The order of a check.
+
+/**
+ * The comparisons of one kind of backup over what was written down (`Written`): the codes as read,
+ * or the shares as restored. Each check gives its own (`steps`); nextFinding runs them in the
+ * order of every check, and a host that asks part by part drives the same order through it.
+ */
+export interface PartChecks<Written> {
+  readonly dated: boolean;
+  readonly wordCount: number;
+  readDates(line: string): readonly DateShiftDate[];
+  compare(written: Written): BackupFinding | undefined;
+  compareDates(written: Written, dates: readonly DateShiftDate[]): BackupFinding | undefined;
+  compareRestored(written: Written, dates: readonly DateShiftDate[]): BackupFinding | undefined;
+}
+
+/**
+ * The first finding of a check: what was written down, then the dates where the backup is dated,
+ * then what the two restore. "dates" when the dates are needed and not given yet.
+ */
+export function nextFinding<Written>(
+  checks: PartChecks<Written>,
+  written: Written,
+): BackupFinding | undefined | "dates";
+export function nextFinding<Written>(
+  checks: PartChecks<Written>,
+  written: Written,
+  dates: readonly DateShiftDate[],
+): BackupFinding | undefined;
+export function nextFinding<Written>(
+  checks: PartChecks<Written>,
+  written: Written,
+  dates?: readonly DateShiftDate[],
+): BackupFinding | undefined | "dates" {
+  const found = checks.compare(written);
+  if (found !== undefined) return found;
+  if (!checks.dated) return checks.compareRestored(written, []);
+  if (dates === undefined) return "dates";
+  return checks.compareDates(written, dates) ?? checks.compareRestored(written, dates);
+}
+
+/** The result of a whole check once what was written down is read: nextFinding with its dates. */
+function checkWritten<Written>(
+  checks: PartChecks<Written>,
+  written: Written,
+  dateLine: string | undefined,
+  notes: readonly string[] = [],
+): BackupResult {
+  const found = nextFinding(checks, written);
+  if (found !== "dates") return resultOf(found, notes);
+  let dates: readonly DateShiftDate[];
+  try {
+    dates = checks.readDates(dateLine ?? "");
+  } catch (error) {
+    return resultOf(finding("dates", "unreadable", refusalMessage(error)), notes);
+  }
+  return resultOf(nextFinding(checks, written, dates), notes);
 }
 
 // The encoded seed phrase.
@@ -183,8 +232,8 @@ function compareDateLists(
 export interface EncodedOriginal {
   /** The seed phrase, as the core writes it. */
   readonly mnemonic: string;
-  readonly format: RecordFormat;
-  readonly mode: RecordMode;
+  readonly format: EncodedFormat;
+  readonly mode: MaskingMode;
   /** The codes of the result as BIP39 indexes, 0 to 2047. */
   readonly codes: readonly number[];
   readonly dates: readonly DateShiftDate[];
@@ -196,11 +245,12 @@ export interface EncodedOriginal {
  * place rather than refused). Built only by `read`, so that every value holds as many codes as a
  * seed phrase has words.
  */
-export class WrittenCodes {
-  readonly #mode: RecordMode;
+export class WrittenCodes extends Redacted {
+  readonly #mode: MaskingMode;
   readonly #codes: EncodedBackup;
 
-  private constructor(mode: RecordMode, codes: EncodedBackup) {
+  private constructor(mode: MaskingMode, codes: EncodedBackup) {
+    super("WrittenCodes");
     this.#mode = mode;
     this.#codes = codes;
   }
@@ -209,13 +259,13 @@ export class WrittenCodes {
    * Reads the codes of a backup as written down, in `format` with `mode`, unless a record names
    * its own form and mode. Throws why they cannot be read, naming places and counts only.
    */
-  static read(typed: string, format: RecordFormat, mode: RecordMode): WrittenCodes {
+  static read(typed: string, format: EncodedFormat, mode: MaskingMode): WrittenCodes {
     const record = parseRecord(typed);
     const codes = EncodedBackup.read(record?.payload ?? typed, record?.format ?? format, "direct");
     return new WrittenCodes(record?.mode ?? mode, codes);
   }
 
-  get mode(): RecordMode {
+  get mode(): MaskingMode {
     return this.#mode;
   }
 
@@ -229,21 +279,9 @@ export class WrittenCodes {
    * Seedshift with a valid last word, which only a search undoes.
    */
   restores(mnemonic: string, dates: readonly DateShiftDate[]): boolean {
-    const masking = Masking.of(this.#mode);
-    if (masking.givesSeveral) throw new Error(UNCHECKABLE);
-    return masking.undo(this.#codes.indexes, dates)[0]!.recoveredMnemonic === mnemonic;
-  }
-
-  toString(): string {
-    return REDACTED;
-  }
-
-  toJSON(): string {
-    return REDACTED;
-  }
-
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED;
+    // The mode is taken only here: read as direct, a mistyped code is named by its place instead
+    // of being refused for its checksum.
+    return this.#codes.withMode(this.#mode).decode(dates).recoveredMnemonic === mnemonic;
   }
 }
 
@@ -259,7 +297,7 @@ export class EncodedBackupCheck implements BackupCheck {
    * Whether a backup made in `mode` can be checked: not the Original Seedshift with a valid last
    * word, whose last word was replaced, so that only a search finds the seed phrase again.
    */
-  static supports(mode: RecordMode): boolean {
+  static supports(mode: MaskingMode): boolean {
     return Masking.of(mode).capabilities.backupCheck;
   }
 
@@ -269,8 +307,7 @@ export class EncodedBackupCheck implements BackupCheck {
       ...original,
       codes: Object.freeze([...original.codes]),
       // Copied date by date: the caller keeps the originals and could change them (AUD-009-FUN001).
-      // Array.from reads a hole of a sparse list as a date, which is refused; map would keep it.
-      dates: Object.freeze(Array.from(original.dates, (date) => ownedDate(date))),
+      dates: ownedDates(original.dates),
     });
   }
 
@@ -295,12 +332,8 @@ export class EncodedBackupCheck implements BackupCheck {
   /** How codes that can be read differ from those of the result: their mode, count or places. */
   compareCodes(codes: WrittenCodes): BackupFinding | undefined {
     const original = this.#original;
-    if (codes.mode !== original.mode)
-      return finding(
-        "codes",
-        "mode",
-        `This record names ${Masking.of(codes.mode).name}; the backup was made with ${Masking.of(original.mode).name}.`,
-      );
+    const conflict = modeConflictOf(codes.mode, original.mode);
+    if (conflict !== undefined) return finding("codes", "mode", conflict);
     if (codes.indexes.length !== original.codes.length)
       return finding(
         "codes",
@@ -349,18 +382,21 @@ export class EncodedBackupCheck implements BackupCheck {
     try {
       codes = this.readCodes(written.backup);
     } catch (error) {
-      return resultOf(finding("codes", "unreadable", messageOf(error)));
+      return resultOf(finding("codes", "unreadable", refusalMessage(error)));
     }
-    const codesFinding = this.compareCodes(codes);
-    if (codesFinding !== undefined || !this.dated)
-      return resultOf(codesFinding ?? this.compareRestored(codes, []));
-    let dates: readonly DateShiftDate[];
-    try {
-      dates = this.readDates(written.dates ?? "");
-    } catch (error) {
-      return resultOf(finding("dates", "unreadable", messageOf(error)));
-    }
-    return resultOf(this.compareDates(dates) ?? this.compareRestored(codes, dates));
+    return checkWritten(this.steps, codes, written.dates);
+  }
+
+  /** The comparisons of this check, in the shape that nextFinding runs. */
+  get steps(): PartChecks<WrittenCodes> {
+    return {
+      dated: this.dated,
+      wordCount: this.wordCount,
+      readDates: (line) => this.readDates(line),
+      compare: (codes) => this.compareCodes(codes),
+      compareDates: (_codes, dates) => this.compareDates(dates),
+      compareRestored: (codes, dates) => this.compareRestored(codes, dates),
+    };
   }
 }
 
@@ -370,7 +406,7 @@ export class EncodedBackupCheck implements BackupCheck {
 export interface ShareOriginal {
   /** The seed phrase, as the core writes it. */
   readonly mnemonic: string;
-  readonly mode: "direct" | "seedshift";
+  readonly mode: SplitMode;
   /** The shares that restore it: as many are asked for. */
   readonly threshold: number;
   /** The dates of the result, when known: a date that is not one of them is named by its place. */
@@ -382,17 +418,30 @@ function sharesTyped(count: number): string {
   return count === 1 ? "This is one share" : `These are ${count} shares`;
 }
 
+/** Why `count` shares typed are too few for a set of `threshold`, and how to type them. */
+function tooFewShares(count: number, threshold: number): string {
+  return `${sharesTyped(count)}; type ${threshold}, separated by ${SHARE_SEPARATOR}.`;
+}
+
+/** The shares of `typed` without ?, each read, with its place. */
+function completeOf(typed: readonly TypedShare[]): PlacedShare[] {
+  return typed
+    .filter((share) => !isMarked(share.text))
+    .map((share) => ({ place: share.place, ur: readShare(share.text).ur }));
+}
+
 /**
  * The shares typed again, each once: an exact copy of a share typed before it is left out, with a
  * note, by the rule sskr-combine uses (ShareInput.copiesOf). A share with ? is kept as it is: only
  * its repair tells what it holds. A class built only by `of`, so that the shares kept, their
  * places among those typed and the notes always agree.
  */
-export class KeptShares {
+export class KeptShares extends Redacted {
   readonly #kept: readonly TypedShare[];
   readonly #notes: readonly string[];
 
   private constructor(kept: readonly TypedShare[], notes: readonly string[]) {
+    super("KeptShares");
     this.#kept = Object.freeze(kept);
     this.#notes = Object.freeze(notes);
   }
@@ -403,9 +452,7 @@ export class KeptShares {
    */
   static of(texts: readonly string[]): KeptShares {
     const typed: TypedShare[] = texts.map((text, index) => ({ place: index + 1, text }));
-    const complete = typed
-      .filter((share) => !share.text.includes("?"))
-      .map((share) => ({ place: share.place, ur: readShare(share.text).ur }));
+    const complete = completeOf(typed);
     const copies = ShareInput.copiesOf(complete);
     const copied = new Set(copies.map((copy) => copy.place));
     return new KeptShares(
@@ -429,21 +476,13 @@ export class KeptShares {
     return this.#notes;
   }
 
-  /** Whether each share kept is at its place among those typed: no copy before it was left out. */
-  get namedAsTyped(): boolean {
-    return this.#kept.every((share, index) => share.place === index + 1);
-  }
-
-  toString(): string {
-    return REDACTED;
-  }
-
-  toJSON(): string {
-    return REDACTED;
-  }
-
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED;
+  /**
+   * Why the complete shares kept do not belong together, or are too few where no share with ?
+   * may still complete them (ShareInput.completeSetProblem); undefined when nothing is wrong yet.
+   */
+  get setProblem(): string | undefined {
+    const complete = completeOf(this.#kept);
+    return ShareInput.completeSetProblem(complete, complete.length < this.#kept.length);
   }
 }
 
@@ -453,11 +492,12 @@ export class KeptShares {
  * never handed out, and toString, toJSON and inspect show none of it. ShareBackupCheck.restore
  * builds it.
  */
-export class RestoredShares {
+export class RestoredShares extends Redacted {
   readonly #set: ShareSet;
   readonly #unchecked: readonly number[];
 
   private constructor(set: ShareSet, unchecked: readonly number[]) {
+    super("RestoredShares");
     this.#set = set;
     this.#unchecked = Object.freeze(unchecked);
   }
@@ -479,9 +519,9 @@ export class RestoredShares {
     return this.#set.mnemonic === phrase;
   }
 
-  /** Whether the phrase that the shares hold, with Seedshift undone with `dates`, is `mnemonic`. */
-  unmasksTo(mnemonic: string, dates: readonly DateShiftDate[]): boolean {
-    const masked = EncodedBackup.read(this.#set.mnemonic, "english", "seedshift");
+  /** Whether the phrase that the shares hold, with `mode` undone with `dates`, is `mnemonic`. */
+  unmasksTo(mnemonic: string, mode: MaskedMode, dates: readonly DateShiftDate[]): boolean {
+    const masked = EncodedBackup.read(this.#set.mnemonic, "english", mode);
     return masked.decode(dates).recoveredMnemonic === mnemonic;
   }
 
@@ -489,22 +529,7 @@ export class RestoredShares {
   get unchecked(): readonly number[] {
     return this.#unchecked;
   }
-
-  toString(): string {
-    return REDACTED;
-  }
-
-  toJSON(): string {
-    return REDACTED;
-  }
-
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED;
-  }
 }
-
-/** The least threshold of a share check: the restore asks for the quorum the shares record. */
-const MIN_THRESHOLD = 1;
 
 /**
  * The check of Shamir shares: the shares, then the dates. A class, so that a host builds it once
@@ -528,19 +553,17 @@ export class ShareBackupCheck implements BackupCheck {
     platform: SharePlatform,
     texts: { readonly decodeEntry: string },
   ) {
-    // A JavaScript host may pass any mode, and shares are made in these two only (Masking's
+    // A JavaScript host may pass any mode, and shares are made only in some (Masking's
     // capabilities). Another mode would ask no dates and, without the dates of the result, compare
     // nothing, so that any shares that restore would pass.
-    if (original.mode !== "direct" && original.mode !== "seedshift")
-      throw new Error("Shares are made without Seedshift or with MnemoCode Seedshift.");
-    if (!Number.isSafeInteger(original.threshold) || original.threshold < MIN_THRESHOLD)
-      throw new Error("A share check needs a whole threshold of at least 1.");
+    Masking.assertSplitMode(original.mode);
+    if (!Number.isSafeInteger(original.threshold) || original.threshold < MIN_RECORDED_THRESHOLD)
+      throw new Error(
+        `A share check needs a whole threshold of at least ${MIN_RECORDED_THRESHOLD}.`,
+      );
     this.#original = Object.freeze({
       ...original,
-      dates:
-        original.dates === undefined
-          ? undefined
-          : Object.freeze(Array.from(original.dates, (date) => ownedDate(date))),
+      dates: original.dates === undefined ? undefined : ownedDates(original.dates),
     });
     this.#platform = platform;
     this.#input = new ShareInput({ decodeEntry: texts.decodeEntry });
@@ -548,11 +571,11 @@ export class ShareBackupCheck implements BackupCheck {
   }
 
   get dated(): boolean {
-    return this.#original.mode === "seedshift";
+    return Masking.of(this.#original.mode).masked;
   }
 
   get wordCount(): number {
-    return wordCountOf(this.#original.mnemonic);
+    return englishTokens(this.#original.mnemonic).length;
   }
 
   /** The shares asked for. */
@@ -568,7 +591,7 @@ export class ShareBackupCheck implements BackupCheck {
   sharesOf(answer: string): string[] {
     const shares = this.#input.sharesOfAnswer(answer);
     if (shares.length < this.threshold)
-      throw new Error(`${sharesTyped(shares.length)}; type ${this.threshold}, separated by ;.`);
+      throw new Error(tooFewShares(shares.length, this.threshold));
     return shares;
   }
 
@@ -588,28 +611,24 @@ export class ShareBackupCheck implements BackupCheck {
 
   /**
    * Restores the shares kept (ShareSet.combine); throws why they cannot be, after which they are
-   * all typed again. The set names a share by its place among those it was given, which is its
-   * place among those typed only while no copy came before it; otherwise the refusal names none.
+   * all typed again. The set names each share by its place among those typed.
    */
   async restore(kept: KeptShares): Promise<RestoredShares> {
     const count = kept.texts.length;
     if (count < this.threshold)
       throw new Error(
         kept.notes.length === 0
-          ? `${sharesTyped(count)}; type ${this.threshold}, separated by ;.`
+          ? tooFewShares(count, this.threshold)
           : `Once the copies are left out, ${count === 1 ? "one share is" : `${count} shares are`} left; type ${this.threshold} different shares.`,
       );
+    // Shares of another set, or a repeated member, are named as sskr-combine names them.
+    const problem = kept.setProblem;
+    if (problem !== undefined) throw new Error(problem);
     let set: ShareSet;
     try {
-      set = await ShareSet.combine(kept.texts, this.#platform);
+      set = await ShareSet.combine(kept.texts, this.#platform, kept.places);
     } catch (error) {
-      const message = messageOf(error);
-      throw new Error(
-        kept.namedAsTyped
-          ? `The shares cannot be restored: ${message}`
-          : "The shares cannot be restored: one of them is wrong, or of another set.",
-        { cause: error },
-      );
+      throw new Error(refusalMessage(error), { cause: error });
     }
     return RestoredShares.of(set, kept);
   }
@@ -639,7 +658,9 @@ export class ShareBackupCheck implements BackupCheck {
     }
     // The dates are accepted only when the shares with them really give the seed phrase back,
     // also when they equal the dates of the result (AUD-009-FUN001).
-    if (restored.unmasksTo(original.mnemonic, dates)) return undefined;
+    const mode = original.mode;
+    if (Masking.isMaskedMode(mode) && restored.unmasksTo(original.mnemonic, mode, dates))
+      return undefined;
     return finding(
       "dates",
       "other-phrase",
@@ -663,7 +684,7 @@ export class ShareBackupCheck implements BackupCheck {
     try {
       texts = this.sharesOf(written.backup);
     } catch (error) {
-      return resultOf(finding("shares", "unreadable", messageOf(error)));
+      return resultOf(finding("shares", "unreadable", refusalMessage(error)));
     }
     for (const [index, text] of texts.entries()) {
       const problem = this.shareProblem(index + 1, text);
@@ -675,21 +696,21 @@ export class ShareBackupCheck implements BackupCheck {
     try {
       restored = await this.restore(kept);
     } catch (error) {
-      return resultOf(finding("shares", "unreadable", messageOf(error)), kept.notes);
+      return resultOf(finding("shares", "unreadable", refusalMessage(error)), kept.notes);
     }
-    const sharesFinding = this.compareShares(restored);
-    if (sharesFinding !== undefined || !this.dated)
-      return resultOf(sharesFinding ?? this.compareChecked(restored), kept.notes);
-    let dates: readonly DateShiftDate[];
-    try {
-      dates = this.readDates(written.dates ?? "");
-    } catch (error) {
-      return resultOf(finding("dates", "unreadable", messageOf(error)), kept.notes);
-    }
-    return resultOf(
-      this.compareDates(restored, dates) ?? this.compareChecked(restored),
-      kept.notes,
-    );
+    return checkWritten(this.steps, restored, written.dates, kept.notes);
+  }
+
+  /** The comparisons of this check, in the shape that nextFinding runs. */
+  get steps(): PartChecks<RestoredShares> {
+    return {
+      dated: this.dated,
+      wordCount: this.wordCount,
+      readDates: (line) => this.readDates(line),
+      compare: (restored) => this.compareShares(restored),
+      compareDates: (restored, dates) => this.compareDates(restored, dates),
+      compareRestored: (restored) => this.compareChecked(restored),
+    };
   }
 }
 
@@ -701,5 +722,5 @@ function heldPhrase(original: ShareOriginal): string | undefined {
   const masking = Masking.of(original.mode);
   if (!masking.masked) return original.mnemonic;
   if (original.dates === undefined) return undefined;
-  return masking.encode(original.mnemonic, original.dates).shiftedEnglish.join(" ");
+  return masking.held(original.mnemonic, original.dates);
 }

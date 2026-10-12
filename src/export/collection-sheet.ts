@@ -1,12 +1,16 @@
-import { rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { MM, type CardBox } from "./business-layout.js";
-import { fit, text } from "./business-render-primitives.js";
+import { rgb, type PDFDocument, type PDFFont, type PDFPage } from "pdf-lib";
+import { MM, centredRunStart, runCellSize, type CardBox, type MmRect } from "./business-layout.js";
+import { centredText, pdfPoint, pdfRect } from "./business-render-primitives.js";
+import { assertCardIndex } from "./card-codes.js";
 import { drawCollectionQr, qrSizeForModuleMm } from "./card-qr.js";
+import type { QrModules, QrSource } from "./platform.js";
 import {
   pageDimensions,
   parsePageSize,
   type CardSettings,
   type CardPresentation,
+  type CardPageSize,
+  isCardPageSize,
 } from "./card-settings.js";
 import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from "./world-map.js";
 import { WORLD_MAP_LAND } from "./world-map-data.js";
@@ -18,14 +22,50 @@ export interface StudyBox extends CardBox {
   readonly captionX: number;
 }
 
+/**
+ * The measures of a sheet of one page size, in millimetres and points (STUDY_METRICS): its room,
+ * its text and its heading. The frame and the layout read every per-size value from it.
+ */
+export interface StudySheetMetrics {
+  /** The margin on each side, and the heights of the heading and of the footer, in millimetres. */
+  readonly margin: number;
+  readonly headingHeight: number;
+  readonly footer: number;
+  /** The size of the captions in points, and the height of one caption line in millimetres. */
+  readonly fontSize: number;
+  readonly lineHeight: number;
+  /** The room between two cards, and between the cards and the QR code, in millimetres. */
+  readonly gap: number;
+  /** The room that a caption adds below its lines, and its distance below the card. */
+  readonly captionPad: number;
+  readonly captionOffset: number;
+  /** The tops of the heading's lines and of the rule under it, from the top edge. */
+  readonly rows: {
+    readonly title: number;
+    readonly kind: number;
+    readonly subtitle: number;
+    /** Absent where the heading has no rule under it: a card-sized page has no room for one. */
+    readonly rule?: number;
+  };
+  /** The size of the title, in points. */
+  readonly titleSize: number;
+  /** The heading's two smaller lines and the footer, at these shares of the caption size. */
+  readonly headingScale: number;
+  readonly footerScale: number;
+  /** The top of the footer line, from the bottom edge. */
+  readonly footerBaseline: number;
+  /** The least size of the heading and the footer, in points. */
+  readonly frameMinimumFont: number;
+}
+
 export interface StudyLayout {
   readonly width: number;
   readonly height: number;
-  readonly margin: number;
+  /** The measures of the sheet's page size. */
+  readonly metrics: StudySheetMetrics;
+  /** Where the cards may start: below the heading, or below the QR code and its caption. */
   readonly header: number;
-  readonly footer: number;
-  readonly fontSize: number;
-  readonly lineHeight: number;
+  /** A card-sized page: the heading sits beside the QR code, and there is no rule or slogan. */
   readonly compact: boolean;
   readonly cards: readonly StudyBox[];
   readonly qr?: { readonly x: number; readonly y: number; readonly size: number };
@@ -35,37 +75,111 @@ export type StudyTheme = "cool" | "warm" | "noir" | "mist" | MaterialBackdrop;
 
 const COLLECTION_QR_MODULE_MM = 0.3;
 
-/** A collection is a single design proposal, never a stack of duplex print cards. */
+/**
+ * The smallest size, in points, that a sheet prints: the captions, the QR caption and the frame of
+ * a card-sized page. studyCaptionWidth measures captions at it, so that a column the layout accepts
+ * never refuses its caption.
+ */
+const MINIMUM_FONT = 4;
+/**
+ * Millimetres added to a caption's measured width, so that turning the column's millimetres back
+ * into points for fit() never leaves the caption a rounding error below MINIMUM_FONT.
+ */
+const CAPTION_WIDTH_SLACK_MM = 0.1;
+/** The smallest size of the frame of an A6 or A4 sheet, in points. */
+const SHEET_FRAME_MINIMUM_FONT = 4.5;
+/** How far the plate behind the QR code reaches beyond it on each side, in millimetres. */
+const QR_PLATE_MARGIN = 0.6;
+
+/**
+ * The measures of a sheet of each page size. A card-sized page is laid out tighter than a sheet,
+ * an A4 sheet larger; the approved sheets were drawn with these numbers. Keyed by every size, so
+ * that a new size cannot be printed before its row is written.
+ */
+const STUDY_METRICS: Readonly<Record<CardPageSize, StudySheetMetrics>> = Object.freeze({
+  business: {
+    margin: 3,
+    headingHeight: 11,
+    footer: 4.5,
+    fontSize: 4.3,
+    lineHeight: 2.1,
+    gap: 1.5,
+    captionPad: 0.6,
+    captionOffset: 0.5,
+    rows: { title: 1.8, kind: 5.4, subtitle: 7.5 },
+    titleSize: 8,
+    // A card-sized page already prints its frame at the caption size, the smallest legible one.
+    headingScale: 1,
+    footerScale: 1,
+    footerBaseline: 3,
+    frameMinimumFont: MINIMUM_FONT,
+  },
+  a6: {
+    margin: 5,
+    headingHeight: 23,
+    footer: 9,
+    fontSize: 6,
+    lineHeight: 3,
+    gap: 3,
+    captionPad: 1.2,
+    captionOffset: 1,
+    rows: { title: 5.5, kind: 12, subtitle: 15.4, rule: 19.4 },
+    titleSize: 13,
+    headingScale: 0.95,
+    footerScale: 0.9,
+    footerBaseline: 5.2,
+    frameMinimumFont: SHEET_FRAME_MINIMUM_FONT,
+  },
+  a4: {
+    margin: 10,
+    headingHeight: 33,
+    footer: 13,
+    fontSize: 8,
+    lineHeight: 4,
+    gap: 6,
+    captionPad: 1.2,
+    captionOffset: 1,
+    rows: { title: 9, kind: 18.5, subtitle: 23.5, rule: 28 },
+    titleSize: 19,
+    headingScale: 0.95,
+    footerScale: 0.9,
+    footerBaseline: 7.5,
+    frameMinimumFont: SHEET_FRAME_MINIMUM_FONT,
+  },
+});
+
+/**
+ * The most cards that one sheet lays out: the 16 colours of a 24-word phrase, one box per card.
+ * The codes of a share are grouped on its cards so that they fit too (sskr-render.ts).
+ */
+export const MAX_SHEET_CARDS = 16;
+
+/**
+ * A collection is a single design proposal, never a stack of duplex print cards. `code` is the QR
+ * code that the sheet prints, if any, whose size the layout makes room for.
+ */
 export function collectionSheetLayout(
   settings: CardSettings,
   count: number,
   aspect: number,
   captionLines: number,
-  payload?: string,
+  code?: QrModules,
   minimumCaptionWidth = 0,
 ): StudyLayout {
-  if (!Number.isInteger(count) || count < 1 || count > 16 || aspect <= 0 || captionLines < 1)
+  if (Number.isInteger(count) && count > MAX_SHEET_CARDS)
+    throw new Error(`A sheet holds at most ${MAX_SHEET_CARDS} cards.`);
+  if (!Number.isInteger(count) || count < 1 || aspect <= 0 || captionLines < 1)
     throw new Error("Invalid design study layout.");
   const size = parsePageSize(settings.pageSize);
-  if (
-    settings.orientation !== undefined &&
-    !["portrait", "landscape"].includes(settings.orientation)
-  )
-    throw new Error("Orientation must be portrait or landscape.");
   const [width, height] = pageDimensions(size, settings.orientation);
   // Ordinary cards of the business size are separate cards and never come here. The compact
   // sheet exists for the QR card of one Shamir share, which is offered in every size.
-  const compact = size === "business";
-  const large = size === "a4";
-  const margin = compact ? 3 : large ? 10 : 5;
-  const header = compact ? 11 : large ? 33 : 23;
-  const footer = compact ? 4.5 : large ? 13 : 9;
-  const fontSize = compact ? 4.3 : large ? 8 : 6;
-  const lineHeight = compact ? 2.1 : large ? 4 : 3;
-  const gap = compact ? 1.5 : large ? 6 : 3;
-  const qrSize = payload === undefined ? 0 : qrSizeForModuleMm(payload, 0, COLLECTION_QR_MODULE_MM);
+  const compact = isCardPageSize(size);
+  const metrics = STUDY_METRICS[size];
+  const { margin, headingHeight, footer, lineHeight, gap } = metrics;
+  const qrSize = code === undefined ? 0 : qrSizeForModuleMm(code, 0, COLLECTION_QR_MODULE_MM);
   const qr =
-    payload === undefined
+    code === undefined
       ? undefined
       : {
           x: width - margin - qrSize,
@@ -73,8 +187,8 @@ export function collectionSheetLayout(
           size: qrSize,
         };
   let availableWidth = width - margin * 2;
-  let availableHeight = height - header - footer;
-  let contentTop = header;
+  let availableHeight = height - headingHeight - footer;
+  let contentTop = headingHeight;
   if (qr) {
     if (qr.x < margin || qr.y + qr.size + lineHeight >= height - footer)
       throw new Error("The QR cannot fit on the design study; choose a larger page size.");
@@ -83,21 +197,21 @@ export function collectionSheetLayout(
       availableWidth -= qrSize + gap * 2;
     } else {
       // The cards start below the QR code, so they stay centred under the heading.
-      contentTop = Math.max(header, qr.y + qrSize + lineHeight + gap);
+      contentTop = Math.max(headingHeight, qr.y + qrSize + lineHeight + gap);
       availableHeight = height - contentTop - footer;
     }
   }
-  const captionHeight = captionLines * lineHeight + (compact ? 0.6 : 1.2);
+  const captionHeight = captionLines * lineHeight + metrics.captionPad;
   let best:
     | { columns: number; rows: number; cellWidth: number; imageHeight: number; area: number }
     | undefined;
   for (let columns = 1; columns <= Math.min(count, 6); columns++) {
     const rows = Math.ceil(count / columns);
-    const cellWidth = (availableWidth - (columns - 1) * gap) / columns;
+    const cellWidth = runCellSize(availableWidth, columns, gap);
     if (cellWidth < minimumCaptionWidth) continue;
     const imageHeight = Math.min(
       cellWidth / aspect,
-      (availableHeight - (rows - 1) * gap) / rows - captionHeight,
+      runCellSize(availableHeight, rows, gap) - captionHeight,
     );
     const area = imageHeight * imageHeight * aspect;
     if (imageHeight > 2 && (!best || area > best.area))
@@ -109,13 +223,13 @@ export function collectionSheetLayout(
     );
   const { columns, rows, cellWidth, imageHeight } = best;
   const cellHeight = imageHeight + captionHeight;
-  const top = contentTop + (availableHeight - rows * cellHeight - (rows - 1) * gap) / 2;
+  const top = contentTop + centredRunStart(availableHeight, rows, cellHeight, gap);
   const cards = Array.from({ length: count }, (_, index): StudyBox => {
     const row = Math.floor(index / columns);
     const rowCount = Math.min(columns, count - row * columns);
     const captionX =
       margin +
-      (availableWidth - rowCount * cellWidth - (rowCount - 1) * gap) / 2 +
+      centredRunStart(availableWidth, rowCount, cellWidth, gap) +
       (index % columns) * (cellWidth + gap);
     const y = top + row * (cellHeight + gap);
     const cardWidth = imageHeight * aspect;
@@ -127,17 +241,14 @@ export function collectionSheetLayout(
       height: imageHeight,
       captionX,
       captionWidth: cellWidth,
-      captionTop: y + imageHeight + (compact ? 0.5 : 1),
+      captionTop: y + imageHeight + metrics.captionOffset,
     };
   });
   return {
     width,
     height,
-    margin,
+    metrics,
     header: contentTop,
-    footer,
-    fontSize,
-    lineHeight,
     compact,
     cards,
     ...(qr === undefined ? {} : { qr }),
@@ -300,7 +411,7 @@ function drawWorldMap(
 }
 
 /** A restrained proposal frame surrounds the existing artwork without altering it. */
-export function drawStudyFrame(
+function drawStudyFrame(
   page: PDFPage,
   font: PDFFont,
   layout: StudyLayout,
@@ -308,10 +419,11 @@ export function drawStudyFrame(
   title: string,
   series: string,
   preparedFor: string,
-  payload?: string,
+  code?: QrModules,
   theme: StudyTheme = "cool",
 ): void {
-  const { width, height, margin, compact, fontSize } = layout;
+  const { width, height, compact, metrics } = layout;
+  const { margin, fontSize, rows } = metrics;
   const palette = PALETTES[theme];
   const frameInk = palette.ink;
   const frameMuted = palette.muted;
@@ -330,7 +442,7 @@ export function drawStudyFrame(
   // and clear of the code on both sides; a card-sized page only has room beside the code.
   const reserved = layout.qr === undefined ? 0 : layout.qr.size + margin;
   const headingWidth = width - 2 * margin - (compact ? reserved : 2 * reserved);
-  const headingCentre = compact ? margin + headingWidth / 2 : width / 2;
+  const headingLeft = compact ? margin : (width - headingWidth) / 2;
   // The label names the text in the error message when it does not fit.
   const centred = (
     label: string,
@@ -338,36 +450,36 @@ export function drawStudyFrame(
     top: number,
     preferred: number,
     color = frameMuted,
-  ) => {
-    const size = fit(font, value, preferred, compact ? 4 : 4.5, headingWidth * MM, label);
-    const left = headingCentre - font.widthOfTextAtSize(value, size) / MM / 2;
-    text(page, font, value, left, top, size, color);
-  };
-  // Heading positions are in millimetres from the top edge; an A4 sheet is laid out larger.
-  const large = width > 200 || height > 200;
-  const rows = compact
-    ? { title: 1.8, kind: 5.4, subtitle: 7.5, rule: 0 }
-    : large
-      ? { title: 9, kind: 18.5, subtitle: 23.5, rule: 28 }
-      : { title: 5.5, kind: 12, subtitle: 15.4, rule: 19.4 };
-  centred("The studio name or title", title, rows.title, compact ? 8 : large ? 19 : 13, frameInk);
+  ) =>
+    centredText(
+      page,
+      font,
+      value,
+      { left: headingLeft, top, width: headingWidth },
+      preferred,
+      metrics.frameMinimumFont,
+      label,
+      color,
+    );
+  // Heading positions are in millimetres from the top edge.
+  centred("The studio name or title", title, rows.title, metrics.titleSize, frameInk);
   centred(
     "Study heading",
     "DESIGN STUDY / FOR SELECTION",
     rows.kind,
-    compact ? fontSize : fontSize * 0.95,
+    fontSize * metrics.headingScale,
   );
   centred(
     "The line with the subtitle and the name",
-    compact ? presentation.subtitle : `${presentation.subtitle}  Prepared for ${preparedFor}`,
+    compact ? presentation.subtitle : `${presentation.subtitle}  ${preparedForLine(preparedFor)}`,
     rows.subtitle,
-    compact ? 4.3 : fontSize * 0.95,
+    fontSize * metrics.headingScale,
   );
-  if (!compact) {
+  if (rows.rule !== undefined) {
     const ruleWidth = Math.min(40, headingWidth * 0.4);
     page.drawLine({
-      start: { x: ((width - ruleWidth) / 2) * MM, y: (height - rows.rule) * MM },
-      end: { x: ((width + ruleWidth) / 2) * MM, y: (height - rows.rule) * MM },
+      start: pdfPoint(page, (width - ruleWidth) / 2, rows.rule),
+      end: pdfPoint(page, (width + ruleWidth) / 2, rows.rule),
       color: frameMuted,
       thickness: 0.4,
       opacity: 0.55,
@@ -377,68 +489,62 @@ export function drawStudyFrame(
   const footer = [compact ? "" : presentation.slogan, `Series ${series} / 01`, presentation.footer]
     .filter((part) => part !== "")
     .join("   |   ");
-  const footerSize = fit(
-    font,
-    footer,
-    // A card-sized page already uses the smallest legible size.
-    compact ? fontSize : fontSize * 0.9,
-    compact ? 4 : 4.5,
-    (width - 2 * margin) * MM,
-    "Study footer",
-  );
-  text(
+  centredText(
     page,
     font,
     footer,
-    (width - font.widthOfTextAtSize(footer, footerSize) / MM) / 2,
-    height - (compact ? 3 : large ? 7.5 : 5.2),
-    footerSize,
+    { left: margin, top: height - metrics.footerBaseline, width: width - 2 * margin },
+    fontSize * metrics.footerScale,
+    metrics.frameMinimumFont,
+    "Study footer",
     frameMuted,
   );
-  if (payload !== undefined) {
+  if (code !== undefined) {
     if (!layout.qr) throw new Error("Missing design study QR area.");
     const { x, y, size } = layout.qr;
     page.drawRectangle({
-      x: (x - 0.6) * MM,
-      y: (height - y - size - 0.6) * MM,
-      width: (size + 1.2) * MM,
-      height: (size + 1.2) * MM,
+      ...pdfRect(page, {
+        x: x - QR_PLATE_MARGIN,
+        y: y - QR_PLATE_MARGIN,
+        width: size + 2 * QR_PLATE_MARGIN,
+        height: size + 2 * QR_PLATE_MARGIN,
+      }),
       color: palette.plate,
       borderColor: palette.plateBorder,
       borderWidth: 0.4,
       opacity: 0.94,
       borderOpacity: 0.62,
     });
-    drawCollectionQr(page, payload, x, y, size, COLLECTION_QR_MODULE_MM);
-    const caption = "COLLECTION QR";
-    const fs = fit(font, caption, fontSize, 4, size * MM, "QR caption");
-    text(
+    drawCollectionQr(page, code, x, y, size, COLLECTION_QR_MODULE_MM);
+    centredText(
       page,
       font,
-      caption,
-      x + (size - font.widthOfTextAtSize(caption, fs) / MM) / 2,
-      y + size + 0.3,
-      fs,
+      "COLLECTION QR",
+      { left: x, top: y + size + 0.3, width: size },
+      fontSize,
+      MINIMUM_FONT,
+      "QR caption",
       frameMuted,
     );
   }
 }
 
-export function drawStudyShadow(page: PDFPage, box: CardBox, theme: StudyTheme = "cool"): void {
+/** The shadow and the thin edge round a card's picture in `box` on a sheet. */
+function drawStudyShadow(page: PDFPage, box: MmRect, theme: StudyTheme): void {
   const palette = PALETTES[theme];
+  // The shadow falls to the lower right; the edge shows round the card.
   page.drawRectangle({
-    x: (box.x + 0.45) * MM,
-    y: page.getHeight() - (box.y + box.height + 0.7) * MM,
-    width: box.width * MM,
-    height: box.height * MM,
+    ...pdfRect(page, { ...box, x: box.x + 0.45, y: box.y + 0.7 }),
     color: rgb(0, 0, 0),
     opacity: palette.shadowOpacity,
   });
   page.drawRectangle({
-    x: (box.x - 0.3) * MM,
-    y: page.getHeight() - (box.y + box.height + 0.3) * MM,
-    width: (box.width + 0.6) * MM,
-    height: (box.height + 0.6) * MM,
+    ...pdfRect(page, {
+      x: box.x - 0.3,
+      y: box.y - 0.3,
+      width: box.width + 0.6,
+      height: box.height + 0.6,
+    }),
     color: palette.cardEdge,
     opacity: 0.88,
   });
@@ -453,20 +559,184 @@ export function drawStudyCaption(
   theme: StudyTheme = "cool",
 ): void {
   const palette = PALETTES[theme];
-  for (const [i, value] of lines.entries()) {
-    const fs = fit(font, value, layout.fontSize, 4, box.captionWidth * MM, "Study reference");
-    text(
+  for (const [i, value] of lines.entries())
+    centredText(
       page,
       font,
       value,
-      box.captionX + (box.captionWidth - font.widthOfTextAtSize(value, fs) / MM) / 2,
-      box.captionTop + i * layout.lineHeight,
-      fs,
+      {
+        left: box.captionX,
+        top: box.captionTop + i * layout.metrics.lineHeight,
+        width: box.captionWidth,
+      },
+      layout.metrics.fontSize,
+      MINIMUM_FONT,
+      "Study reference",
       i === 0 ? palette.caption : palette.captionMuted,
     );
-  }
 }
 
 export function studyCaptionWidth(font: PDFFont, lines: readonly string[]): number {
-  return Math.max(...lines.map((line) => font.widthOfTextAtSize(line, 4) / MM)) + 0.1;
+  const widest = Math.max(...lines.map((line) => font.widthOfTextAtSize(line, MINIMUM_FONT)));
+  return widest / MM + CAPTION_WIDTH_SLACK_MM;
+}
+
+/** What a collection sheet of color cards is made from: a seed phrase's colors, or a share's. */
+export interface CollectionContent {
+  readonly kind: "colors" | "sskr";
+  readonly payload: string;
+  readonly title?: string | undefined;
+  readonly cardQr?: boolean | undefined;
+  /** A share's: the reference of its set, which the sheet names as its series. */
+  readonly collectionReference?: string;
+  /** A share's: a QR code of the whole share on its sheet. */
+  readonly qrCard?: boolean | undefined;
+}
+
+/**
+ * The series of the cards and sheets of a seed phrase's colors, which has no set to name: every
+ * family prints it alike (owner, 2026-10-09: the glass card too, in place of a placeholder text).
+ */
+const PHRASE_SERIES = "01";
+
+/** The series that a card or sheet of `content` names: a share's set, or a seed phrase's one. */
+export function collectionSeries(
+  content: Pick<CollectionContent, "kind" | "collectionReference">,
+): string {
+  return content.kind === "sskr" ? content.collectionReference! : PHRASE_SERIES;
+}
+
+/** The line that names the person a set of cards is prepared for. */
+export function preparedForLine(name: string): string {
+  return `Prepared for ${name}`;
+}
+
+/**
+ * The title and the series that the frame of a collection sheet names: the content's title or
+ * the studio's name, and a share's set or the one series of a seed phrase. Every family's sheet
+ * is framed with them, through addCollectionPage.
+ */
+function collectionFrame(
+  content: CollectionContent,
+  presentation: Pick<CardPresentation, "studioName">,
+): { readonly title: string; readonly series: string } {
+  return {
+    title: content.title ?? presentation.studioName,
+    series: collectionSeries(content),
+  };
+}
+
+/** Whether the sheet holds a share's whole-share QR code, which only `qrCard: true` asks for. */
+function wholeShareQr(content: CollectionContent): boolean {
+  return content.kind === "sskr" && content.qrCard === true;
+}
+
+/**
+ * The text of the collection's QR code where the cards ask for one: with `cardQr: true`, or a
+ * share's whole-share QR code; undefined otherwise. Only true asks: any other value leaves it out.
+ */
+export function collectionPayload(content: CollectionContent): string | undefined {
+  return content.cardQr === true || wholeShareQr(content) ? content.payload : undefined;
+}
+
+/**
+ * The separate card that a renderer is asked for: `index`, or undefined, a sheet, where the content
+ * asks for a share's whole-share QR code, which only a sheet prints. Every family of cards decides
+ * with it whether it draws a separate card or a sheet. An index that is not one of the `count`
+ * cards is refused first, also where the sheet is drawn, so that every family answers it alike.
+ */
+export function separateCardIndex(
+  content: CollectionContent,
+  index: number | undefined,
+  count: number,
+): number | undefined {
+  if (index !== undefined) assertCardIndex(index, count);
+  return wholeShareQr(content) ? undefined : index;
+}
+
+/** What drawCollectionStudy draws a family's collection sheet from. */
+export interface CollectionStudy {
+  readonly doc: PDFDocument;
+  readonly font: PDFFont;
+  /** The host's QR matrices (CardDrawing), for the code of the sheet where it prints one. */
+  readonly qr: QrSource;
+  /** The page size and the orientation of the sheet. */
+  readonly settings: CardSettings;
+  readonly content: CollectionContent;
+  readonly presentation: CardPresentation;
+  /** The name of the person the sheet is prepared for. */
+  readonly preparedFor: string;
+  readonly theme: StudyTheme;
+  /** The shape of a card's box, width over height. */
+  readonly aspect: number;
+  /** The lines under each card, in the order of the cards. */
+  readonly captions: readonly (readonly string[])[];
+  /**
+   * The lines that each caption is given room for: the longest caption's unless a design keeps
+   * the room of a full card for every card, as the glass cards do.
+   */
+  readonly captionLines?: number;
+  /** Draws card `box.index` in its box, after its shadow and before its caption. */
+  readonly paint: (page: PDFPage, box: StudyBox) => void | Promise<void>;
+  /** Where the picture of a card lies in its box, which the shadow follows; the box by default. */
+  readonly pictureArea?: (box: StudyBox) => MmRect;
+}
+
+/**
+ * Draws the collection sheet of `study` on a new page: the frame (addCollectionPage), then for each
+ * card its shadow, the family's painting and its caption. Every family of cards draws its sheet
+ * with it; it returns the layout it drew.
+ */
+export async function drawCollectionStudy(study: CollectionStudy): Promise<StudyLayout> {
+  const { doc, font, content, captions, theme } = study;
+  const payload = collectionPayload(content);
+  // One matrix for the room that the layout keeps and for the code drawn in it.
+  const code = payload === undefined ? undefined : study.qr.qrModules(payload);
+  const layout = collectionSheetLayout(
+    study.settings,
+    captions.length,
+    study.aspect,
+    study.captionLines ?? Math.max(...captions.map((lines) => lines.length)),
+    code,
+    // The captions decide how narrow a column may be: the three words of a share's code are
+    // wider than a color code, and on a card-sized page they take fewer cards to a row.
+    studyCaptionWidth(font, captions.flat()),
+  );
+  const page = addCollectionPage(
+    doc,
+    font,
+    layout,
+    content,
+    study.presentation,
+    study.preparedFor,
+    code,
+    theme,
+  );
+  for (const box of layout.cards) {
+    drawStudyShadow(page, study.pictureArea?.(box) ?? box, theme);
+    await study.paint(page, box);
+    drawStudyCaption(page, font, layout, box, captions[box.index]!, theme);
+  }
+  return layout;
+}
+
+/**
+ * A new page of `doc` for the collection sheet of `content`, laid out by `layout`, with its frame
+ * drawn: the title and series of collectionFrame, the person it is prepared for, and the QR code
+ * `code` where there is one.
+ */
+function addCollectionPage(
+  doc: PDFDocument,
+  font: PDFFont,
+  layout: StudyLayout,
+  content: CollectionContent,
+  presentation: CardPresentation,
+  preparedFor: string,
+  code: QrModules | undefined,
+  theme: StudyTheme,
+): PDFPage {
+  const page = doc.addPage([layout.width * MM, layout.height * MM]);
+  const { title, series } = collectionFrame(content, presentation);
+  drawStudyFrame(page, font, layout, presentation, title, series, preparedFor, code, theme);
+  return page;
 }

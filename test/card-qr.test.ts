@@ -3,6 +3,7 @@ import { PDFDocument } from "pdf-lib";
 import jsQRModule from "jsqr";
 import { drawCollectionQr, qrSizeMm } from "../src/export/card-qr.js";
 import { MM } from "../src/export/business-layout.js";
+import { nodeRenderPlatform } from "../src/export/platform-node.js";
 
 // jsQR's CommonJS wrapper is typed as a module under NodeNext; src/cli/qr-input.ts reads it so too.
 const jsQR = jsQRModule as unknown as (
@@ -24,7 +25,9 @@ describe("Printable card QR", () => {
       const document = await PDFDocument.create();
       const page = document.addPage([85.6 * MM, 54 * MM]);
       const rectangles = vi.spyOn(page, "drawRectangle");
-      drawCollectionQr(page, payload, 5, 5, qrSizeMm(payload, minimum));
+      // The matrix the Node.js platform makes, which every host's qrModules gives too.
+      const code = nodeRenderPlatform.qrModules(payload);
+      drawCollectionQr(page, code, 5, 5, qrSizeMm(code, minimum));
 
       // Small independent raster of the actual PDF drawing calls. The real method
       // still runs. Full PDF rasterization is covered by check-card-output.mjs.
@@ -56,10 +59,10 @@ describe("Printable card QR", () => {
     const document = await PDFDocument.create();
     const page = document.addPage([90 * MM, 50 * MM]);
     const rectangles = vi.spyOn(page, "drawRectangle");
-    const payload = "public transport data ".repeat(10);
-    expect(() => drawCollectionQr(page, payload, 1, 1, 5)).toThrow("too small");
-    expect(() => drawCollectionQr(page, payload, -1, 1, qrSizeMm(payload))).toThrow("does not fit");
-    expect(() => drawCollectionQr(page, payload, 80, 1, qrSizeMm(payload))).toThrow("does not fit");
+    const code = nodeRenderPlatform.qrModules("public transport data ".repeat(10));
+    expect(() => drawCollectionQr(page, code, 1, 1, 5)).toThrow("too small");
+    expect(() => drawCollectionQr(page, code, -1, 1, qrSizeMm(code))).toThrow("does not fit");
+    expect(() => drawCollectionQr(page, code, 80, 1, qrSizeMm(code))).toThrow("does not fit");
     expect(rectangles).not.toHaveBeenCalled();
   });
 });

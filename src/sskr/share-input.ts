@@ -11,38 +11,49 @@
 // Does not: ask anything, show anything, or search shares with unreadable elements (joint-repair.ts
 // assesses and searches them; this module only names the trouble that an assessment finds).
 
-import { validateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english.js";
+import { phraseChecksumValid, phraseOfIndexes } from "../core/english-words.js";
 import { placesInWords } from "../core/places.js";
 import { detectInputFormats, parseInput } from "../core/representations.js";
 import {
-  MAX_JOINT_MARKED_ELEMENTS,
   type JointAssessment,
   type RepairedSet,
+  jointMarkLimitProblem,
+  type RepairedShares,
 } from "./joint-repair.js";
 import {
-  markCount,
   markProblem,
-  MAX_REPAIR_TEXT_LENGTH,
   readRepairableShare,
   ShareVariantsError,
   type ReadRepairableShare,
+  unrepairedShare,
+  isMarked,
 } from "./repair.js";
 import type { SharePlatform } from "./share-platform.js";
-import { copiesAmong, ShareSet } from "./share-set.js";
+import { copiesAmong, ShareExport, ShareSet } from "./share-set.js";
 import {
   assertShareCount,
   readShare,
+  shareCountProblem,
+  type ShareFormat,
   Share,
-  shareInfo,
-  urToTransport,
   type ShareInfo,
 } from "./transport.js";
+import {
+  SET_CONFLICT_TEXTS,
+  SetTopology,
+  withoutCopies,
+  type PlacedShare,
+} from "./set-topology.js";
+import { misfitMessage } from "./complete-shares.js";
+import { refusalMessage } from "../core/refusal.js";
+import { afterPlace } from "../core/prose.js";
 
 /** Lines that one share may take in a paste, as a narrow column of a PDF wraps it. */
 const MAX_WRAPPED_LINES = 8;
-/** What separates the shares of one answer: a semicolon, or a line break. */
-const SHARE_SEPARATORS = /;|\r?\n/u;
+/** What a person types between the shares of one answer; prompts and messages name it. */
+export const SHARE_SEPARATOR = ";";
+/** What separates the shares of one answer: SHARE_SEPARATOR (no regular-expression character), or a line break. */
+const SHARE_SEPARATORS = new RegExp(`${SHARE_SEPARATOR}|\\r?\\n`, "u");
 
 /** A share as typed, and its place among the shares typed, by which every message names it. */
 export interface TypedShare {
@@ -71,10 +82,26 @@ export interface ShareCopy {
   readonly message: string;
 }
 
+/** The shares' first problem, as every outcome of shares tells it. */
+export interface SharesTrouble {
+  readonly kind: "trouble";
+  readonly trouble: ShareTrouble;
+}
+
 /** What complete shares give: the phrase, with the secret's length, or their first problem. */
 export type CompleteOutcome =
-  | { readonly kind: "complete"; readonly set: RepairedSet; readonly secretBytes: number }
-  | { readonly kind: "trouble"; readonly trouble: ShareTrouble };
+  | {
+      readonly kind: "complete";
+      readonly set: RepairedSet;
+      readonly secretBytes: number;
+      /**
+       * The places of the set's shares among those typed, copies left out: those of the shares as
+       * they were when the restore began, so that a host that changes the input while it awaits
+       * the restore still gets the places of the set restored (AUD-014-API004).
+       */
+      readonly places: readonly number[];
+    }
+  | SharesTrouble;
 
 /**
  * Each share repaired alone (ShareInput.repairEach): every one of them, or the first that cannot
@@ -95,11 +122,26 @@ export type EachRepair =
       readonly message: string;
     };
 
-/** A complete share as read, with its place and its metadata. */
-interface ReadShare {
-  readonly place: number;
-  readonly ur: string;
+/** Complete shares as one set to write again (ShareInput.rewritten), or their first problem. */
+export type RewrittenShares =
+  SharesTrouble | { readonly kind: "set"; readonly set: RepairedShares };
+
+/** What an export of a set settles: the shares written, or why none or not these. */
+export type CheckedExport =
+  | { readonly kind: "written"; readonly written: ShareExport }
+  /** Every share has an element that nothing settles: each is left out. */
+  | { readonly kind: "none"; readonly written: ShareExport }
+  /** Shares repaired each on its own may be of several sets, or the same member twice. */
+  | (SharesTrouble & { readonly written: ShareExport });
+
+/** A complete share as read, with its place and its metadata (Share.info). */
+interface ReadShare extends PlacedShare {
   readonly info: ShareInfo;
+}
+
+/** `share`, given at a place, with its metadata, as the checks of a set take it. */
+function withInfo(share: PlacedShare): ReadShare {
+  return { ...share, info: Share.read(share.ur).info };
 }
 
 /**
@@ -112,8 +154,7 @@ interface ReadShare {
 function phraseKind(text: string): "words" | "encoded" | undefined {
   for (const format of detectInputFormats(text)) {
     if (format === "english") return "words";
-    const words = parseInput(text, format).map((index) => wordlist[index]!);
-    if (validateMnemonic(words.join(" "), wordlist)) return "encoded";
+    if (phraseChecksumValid(phraseOfIndexes(parseInput(text, format)))) return "encoded";
   }
   return undefined;
 }
@@ -133,7 +174,7 @@ function wrappedShare(
   const lines: string[] = [];
   for (let end = start; end < parts.length && lines.length < MAX_WRAPPED_LINES; end += 1) {
     const part = parts[end]!;
-    if (part.includes("?") || Share.reads(part)) return undefined;
+    if (shareOrMarked(part)) return undefined;
     lines.push(part);
     if (lines.length < 2) continue;
     for (const separator of [" ", ""]) {
@@ -142,6 +183,11 @@ function wrappedShare(
     }
   }
   return undefined;
+}
+
+/** Whether `text` is a share as it stands: one that reads, or one with elements marked with ?. */
+function shareOrMarked(text: string): boolean {
+  return isMarked(text) || Share.reads(text);
 }
 
 /** The parts of an answer with each share that a paste wrapped over lines joined again. */
@@ -154,13 +200,6 @@ function joinWrapped(parts: readonly string[]): string[] {
   }
   return shares;
 }
-
-/** Shares of one set agree on all of these. */
-const setOf = (info: ShareInfo): string =>
-  [info.identifier, info.groupThreshold, info.groupCount, info.secretLength].join(":");
-
-/** One member of a set, which no two different shares may be. */
-const memberOf = (info: ShareInfo): string => `${info.groupIndex}:${info.memberIndex}`;
 
 /**
  * Shares of which nothing tells the wrong one, named together: the person chooses which to change
@@ -182,52 +221,40 @@ function undecided(places: readonly number[], what: string): ShareTrouble {
  * group different thresholds. Copies are left out before.
  */
 function setTrouble(shares: readonly ReadShare[]): ShareTrouble | undefined {
-  // The places of the shares of each set, in the order typed.
+  // The shares of each set, by index, in the order typed.
   const sets = new Map<string, number[]>();
-  for (const share of shares) {
-    const set = setOf(share.info);
-    sets.set(set, [...(sets.get(set) ?? []), share.place]);
-  }
-  const largest = Math.max(...[...sets.values()].map((places) => places.length));
-  const main = [...sets].filter(([, places]) => places.length === largest);
+  shares.forEach((share, index) => {
+    const set = SetTopology.setOf(share.info);
+    sets.set(set, [...(sets.get(set) ?? []), index]);
+  });
+  const largest = Math.max(...[...sets.values()].map((indexes) => indexes.length));
+  const main = [...sets.values()].filter((indexes) => indexes.length === largest);
+  const placeOf = (index: number) => shares[index]!.place;
   if (main.length > 1)
     return undecided(
-      main.map(([, places]) => places[0]!),
-      "are of different sets",
+      main.map((indexes) => placeOf(indexes[0]!)),
+      SET_CONFLICT_TEXTS.set.between,
     );
-  const [mainSet, mainPlaces] = main[0]!;
-  const members = new Map<string, number>();
-  const thresholds = new Map<number, ReadShare>();
-  for (const share of shares) {
-    if (setOf(share.info) !== mainSet)
-      return {
-        kind: "odd",
-        place: share.place,
-        message: `Share ${share.place} is of another set than share ${mainPlaces[0]!}.`,
-      };
-    const same = members.get(memberOf(share.info));
-    if (same !== undefined)
-      return undecided([same, share.place], "are the same member of the set but differ");
-    members.set(memberOf(share.info), share.place);
-    const group = thresholds.get(share.info.groupIndex);
-    if (group !== undefined && group.info.memberThreshold !== share.info.memberThreshold)
-      return undecided([group.place, share.place], "give their group different thresholds");
-    thresholds.set(share.info.groupIndex, share);
-  }
-  return undefined;
+  const reference = main[0]![0]!;
+  const conflict = SetTopology.firstConflict(
+    shares.map((share) => share.info),
+    reference,
+  );
+  if (conflict === undefined) return undefined;
+  const [earlier, later] = [placeOf(conflict.with), placeOf(conflict.at)];
+  if (conflict.kind === "set")
+    return {
+      kind: "odd",
+      place: later,
+      message: `Share ${later} is of another set than share ${earlier}.`,
+    };
+  return undecided([earlier, later], SET_CONFLICT_TEXTS[conflict.kind].between);
 }
 
 /** Why complete shares of one set are too few to restore it, or undefined when they are enough. */
 function fewTrouble(shares: readonly ReadShare[]): ShareTrouble | undefined {
   const { groupThreshold, groupCount } = shares[0]!.info;
-  const groups = new Map<number, { readonly threshold: number; members: number }>();
-  for (const { info } of shares) {
-    const group = groups.get(info.groupIndex) ?? { threshold: info.memberThreshold, members: 0 };
-    group.members += 1;
-    groups.set(info.groupIndex, group);
-  }
-  const complete = [...groups.values()].filter((group) => group.members >= group.threshold);
-  if (complete.length >= groupThreshold) return undefined;
+  if (new SetTopology(shares.map((share) => share.info)).enough) return undefined;
   if (groupCount === 1) {
     const needed = shares[0]!.info.memberThreshold;
     const typed = shares.length === 1 ? "One share is" : `These ${shares.length} shares are`;
@@ -237,17 +264,6 @@ function fewTrouble(shares: readonly ReadShare[]): ShareTrouble | undefined {
     kind: "few",
     message: `These shares are not enough: this set needs ${groupThreshold} of its ${groupCount} groups, each with as many shares as its threshold.`,
   };
-}
-
-/** Whether the places are 1, 2, 3, …: the share set then names each share by its place. */
-function namedAsTyped(places: readonly number[]): boolean {
-  return places.every((place, index) => place === index + 1);
-}
-
-/** The message of a refusal; a throw that is no Error passes through. */
-function refusal(error: unknown): string {
-  if (!(error instanceof Error)) throw error;
-  return error.message;
 }
 
 /**
@@ -277,24 +293,27 @@ export class ShareInput {
    * Its first letter is made small, unless it begins an abbreviation such as SSKR.
    */
   static aboutShare(place: number, joint: string, message: string): string {
-    const text = /^[A-Z]{2}/u.test(message)
-      ? message
-      : `${message.charAt(0).toLowerCase()}${message.slice(1)}`;
-    return `Share ${place}${joint}${text}`;
+    return afterPlace("Share", place, message, joint);
   }
 
   /**
    * The first share of `shares` that does not belong with the others, for shares that need no
    * quorum, such as those written again by an export. A copy of a share is no problem.
    */
-  static looseSetTrouble(
-    shares: readonly { readonly place: number; readonly ur: string }[],
-  ): ShareTrouble | undefined {
-    const copied = new Set(copiesAmong(shares).map((copy) => copy.place));
-    const distinct = shares.filter((share) => !copied.has(share.place));
-    return setTrouble(
-      distinct.map((share) => ({ ...share, info: shareInfo(urToTransport(share.ur)) })),
-    );
+  static looseSetTrouble(shares: readonly PlacedShare[]): ShareTrouble | undefined {
+    return setTrouble(withoutCopies(shares).map(withInfo));
+  }
+
+  /**
+   * Why complete shares cannot be restored together, as sskr-combine says it before it tries:
+   * shares that do not belong together (setTrouble) and, unless `more` are still to come, too
+   * few for the quorum they record (fewTrouble). Copies are left out first. The restore here and
+   * the backup check both ask it.
+   */
+  static completeSetProblem(shares: readonly PlacedShare[], more = false): string | undefined {
+    const read = withoutCopies(shares).map(withInfo);
+    if (read.length === 0) return undefined;
+    return (setTrouble(read) ?? (more ? undefined : fewTrouble(read)))?.message;
   }
 
   /**
@@ -302,7 +321,7 @@ export class ShareInput {
    * the first and a note: a copy adds nothing to a restore, so it is left out and used once. The
    * restore here and the backup check (core/backup-check.ts) both apply this rule.
    */
-  static copiesOf(shares: readonly { readonly place: number; readonly ur: string }[]): ShareCopy[] {
+  static copiesOf(shares: readonly PlacedShare[]): ShareCopy[] {
     return copiesAmong(shares).map((copy) => ({
       ...copy,
       message: `Share ${copy.place} is a copy of share ${copy.of}: it is used once.`,
@@ -326,7 +345,7 @@ export class ShareInput {
 
   /** Whether an element of a share is marked with ? as unreadable. */
   get marked(): boolean {
-    return this.#shares.some((share) => share.text.includes("?"));
+    return this.#shares.some((share) => isMarked(share.text));
   }
 
   /** Whether a share was typed at `place`, and is not left out. */
@@ -335,33 +354,44 @@ export class ShareInput {
   }
 
   /**
-   * The shares of one answer, split at ; and at line breaks, as a page's field holds one share per
-   * line, with each share that a paste wrapped over lines joined again (wrappedShare), checked to
-   * fit in a set: alone, or `adding` them to those typed. An empty part, from a ; at the end or two
-   * in a row, is no share and is passed over. A seed phrase typed or pasted here, also one word per
-   * line, is refused as one.
+   * The shares in a text, typed, pasted or read from a file: split at ; and at line breaks, as a
+   * page's field holds one share per line, with each share that a paste or a narrow column wrapped
+   * over lines joined again (wrappedShare); none for a text without one. An empty part, from a ; at
+   * the end or two in a row, is no share and is passed over. A seed phrase, also one word per line,
+   * is refused as one: `subject` names the text in that message, "This is" or "The file holds".
    */
-  sharesOfAnswer(answer: string, adding = false): string[] {
-    const parts = answer
+  sharesOfText(text: string, subject = "This is"): string[] {
+    const parts = text
       .split(SHARE_SEPARATORS)
-      .map((text) => text.trim())
+      .map((part) => part.trim())
       .filter(Boolean);
-    if (parts.length === 0) throw new Error("Type at least one share.");
+    if (parts.length === 0) return [];
     // Bounds the work below: wrapped or not, the parts make no more shares than a set may have.
     assertShareCount(Math.ceil(parts.length / MAX_WRAPPED_LINES));
     const shares = joinWrapped(parts);
     // Looked for only when nothing reads as a share: a share in word numbers, wrapped or not, may
     // have as many numbers as a phrase has words.
-    if (!shares.some((share) => share.includes("?") || Share.reads(share))) {
+    if (!shares.some(shareOrMarked)) {
       const kind = phraseKind(parts.join(" "));
-      if (kind !== undefined) throw new Error(this.#notShareMessage(kind, "This is"));
+      if (kind !== undefined) throw new Error(this.#notShareMessage(kind, subject));
     }
+    return shares;
+  }
+
+  /**
+   * The shares of one answer (sharesOfText), at least one, checked to fit in a set: alone, or
+   * `adding` them to those typed.
+   */
+  sharesOfAnswer(answer: string, adding = false): string[] {
+    const shares = this.sharesOfText(answer);
+    if (shares.length === 0) throw new Error("Type at least one share.");
     assertShareCount((adding ? this.#shares.length : 0) + shares.length);
     return shares;
   }
 
-  /** Adds shares after those typed, each at the next place. */
+  /** Adds shares after those typed, each at the next place; adding none changes nothing. */
   add(texts: readonly string[]): void {
+    if (texts.length === 0) return;
     assertShareCount(this.#shares.length + texts.length);
     for (const text of texts)
       this.#shares = [...this.#shares, Object.freeze({ place: this.#nextPlace++, text })];
@@ -394,17 +424,17 @@ export class ShareInput {
    * repair takes (planJointRepair), which tells later whether the rest of it fits.
    */
   readProblem(place: number, text: string): string | undefined {
-    if (text.includes("?")) {
-      if (text.length > MAX_REPAIR_TEXT_LENGTH || markCount(text) > MAX_JOINT_MARKED_ELEMENTS)
-        return `Share ${place}: mark at most ${MAX_JOINT_MARKED_ELEMENTS} unreadable elements with ?.`;
+    if (isMarked(text)) {
+      const limit = jointMarkLimitProblem(place, text);
+      if (limit !== undefined) return limit;
       const problem = markProblem(text);
-      return problem === undefined ? undefined : `Share ${place}: ${problem}`;
+      return problem === undefined ? undefined : afterPlace("Share", place, problem);
     }
     try {
       readShare(text);
       return undefined;
     } catch (error) {
-      const message = refusal(error);
+      const message = refusalMessage(error);
       const kind = phraseKind(text);
       return kind === undefined
         ? ShareInput.aboutShare(place, " cannot be read: ", message)
@@ -415,10 +445,20 @@ export class ShareInput {
   /** The first share typed that cannot be read (readProblem), or undefined. */
   firstUnreadable(): ShareTrouble | undefined {
     for (const { place, text } of this.#shares) {
-      const message = this.readProblem(place, text);
-      if (message !== undefined) return { kind: "unreadable", place, message };
+      const trouble = this.#unreadable(place, text);
+      if (trouble !== undefined) return trouble;
     }
     return undefined;
+  }
+
+  /**
+   * The trouble of the share typed at `place` when it cannot be read (readProblem), named by its
+   * place; undefined when it can. Every reader of the typed shares refuses one so
+   * (AUD-012-ARC010).
+   */
+  #unreadable(place: number, text: string): ShareTrouble | undefined {
+    const message = this.readProblem(place, text);
+    return message === undefined ? undefined : { kind: "unreadable", place, message };
   }
 
   /**
@@ -446,19 +486,45 @@ export class ShareInput {
     const distinct = read.filter((share) => this.has(share.place));
     const trouble = setTrouble(distinct) ?? fewTrouble(distinct);
     if (trouble !== undefined) return { outcome: { kind: "trouble", trouble }, copies };
-    return { outcome: await this.#restoreChecked(distinct, platform), copies };
+    // Taken before the restore is awaited: the host may change the input meanwhile.
+    return { outcome: await this.#restoreChecked(distinct, this.texts(), platform), copies };
   }
 
   /**
-   * Each share repaired from its own checks alone (readRepairableShare), as an export does with
-   * fewer shares than the threshold, which restore no phrase: the shares, or the first problem.
+   * The complete shares as one set to write again: no phrase is restored and no quorum is needed.
+   * A share that cannot be read, or shares that are not of one set, are refused.
    */
+  rewritten(): RewrittenShares {
+    const trouble = this.looseTrouble();
+    if (trouble !== undefined) return { kind: "trouble", trouble };
+    const shares = this.texts().map(unrepairedShare);
+    return { kind: "set", set: { shares, unsettled: [] } };
+  }
+
+  /**
+   * The shares of `set` to write again, named by `places`, in `form` or their own: a share that
+   * nothing settles is left out, and shares repaired each on its own must still be of one set
+   * (looseSetTrouble).
+   */
+  static checkedExport(
+    set: RepairedShares,
+    places: readonly number[],
+    form: ShareFormat | undefined,
+  ): CheckedExport {
+    const written = ShareExport.of(set, places, form);
+    if (written.shown.length === 0) return { kind: "none", written };
+    const trouble = ShareInput.looseSetTrouble(written.members);
+    if (trouble !== undefined) return { kind: "trouble", written, trouble };
+    return { kind: "written", written };
+  }
+
   repairEach(): EachRepair {
     const shares: ReadRepairableShare[] = [];
     for (const { place, text } of this.#shares) {
       try {
         shares.push(readRepairableShare(text));
       } catch (error) {
+        // Narrowed here, not by refusalMessage: the result keeps the Error as its cause.
         if (!(error instanceof Error)) throw error;
         if (!(error instanceof ShareVariantsError))
           return {
@@ -478,23 +544,24 @@ export class ShareInput {
     return { kind: "repaired", shares };
   }
 
-  /** The problem that an assessment of marked shares names, or undefined when they can be searched. */
-  assessmentTrouble(assessment: JointAssessment): ShareTrouble | undefined {
+  /**
+   * The problem that an assessment of marked shares names, or undefined when they can be searched.
+   * The assessment is of these shares, planned with their places (ShareRestore.read), so that its
+   * reason names each share as it was typed. `places` are those it was planned with, which a host
+   * that changed the input while the assessment ran no longer has (AUD-014-API004).
+   */
+  assessmentTrouble(
+    assessment: JointAssessment,
+    places: readonly number[] = this.places(),
+  ): ShareTrouble | undefined {
     if (assessment.reason === undefined) return undefined;
-    // A share that no reading fits is named, by its place, rather than by the reason's index.
-    const unfit = assessment.shares.findIndex((share) => share.forms.length === 0);
-    if (unfit >= 0) {
-      const place = this.#shares[unfit]!.place;
-      const check =
-        assessment.shares[unfit]!.marks === 0
-          ? "each of its elements"
-          : "the elements marked with ?, and the others";
+    // A share that no reading fits is typed again or left out, by its place.
+    if (assessment.unfit !== undefined)
       return {
         kind: "unreadable",
-        place,
-        message: `Share ${place} cannot be read as a share: check ${check}.`,
+        place: places[assessment.unfit - 1]!,
+        message: assessment.reason,
       };
-    }
     return {
       kind: assessment.verdict === "not-enough" ? "few" : "refused",
       message: assessment.reason,
@@ -503,7 +570,7 @@ export class ShareInput {
 
   /**
    * The one line for a seed phrase typed where a share was asked for: what it is and which entry
-   * reads it, without repeating it. `subject` is "This is" or "Share N is".
+   * reads it, without repeating it. `subject` is "This is", "The file holds" or "Share N is".
    */
   #notShareMessage(kind: "words" | "encoded", subject: string): string {
     return kind === "words"
@@ -511,16 +578,20 @@ export class ShareInput {
       : `${subject} an encoded seed phrase, not a Shamir share: ${this.#decodeEntry} reads it.`;
   }
 
-  /** Reads every complete share; the first that cannot be read is the trouble. */
+  /**
+   * Reads every complete share; no share at all, or the first that cannot be read, is the trouble.
+   * An input that is empty, as it starts and once every share is left out, is "few": more shares
+   * are needed (AUD-014-API009).
+   */
   #readAll(): ReadShare[] | ShareTrouble {
-    const read: ReadShare[] = [];
-    for (const { place, text } of this.#shares) {
-      const message = this.readProblem(place, text);
-      if (message !== undefined) return { kind: "unreadable", place, message };
-      const { ur } = readShare(text);
-      read.push({ place, ur, info: shareInfo(urToTransport(ur)) });
-    }
-    return read;
+    const count = shareCountProblem(this.#shares.length);
+    if (count !== undefined) return { kind: "few", message: count };
+    const trouble = this.firstUnreadable();
+    if (trouble !== undefined) return trouble;
+    return this.#shares.map(({ place, text }) => {
+      const share = Share.read(text);
+      return { place, ur: share.ur, info: share.info };
+    });
   }
 
   /** Leaves out each share typed again as an earlier one (copiesOf). */
@@ -530,17 +601,21 @@ export class ShareInput {
     return copies;
   }
 
-  /** The phrase of `read`, checked as a set before; or the share named as the one that is wrong. */
+  /**
+   * The phrase of `read`, typed as `texts`, checked as a set before; or the share named as the one
+   * that is wrong. Bound to `read` and `texts` alone, never to the input as it is after an await.
+   */
   async #restoreChecked(
     read: readonly ReadShare[],
+    texts: readonly string[],
     platform: SharePlatform,
   ): Promise<CompleteOutcome> {
-    const texts = this.texts();
+    const places = read.map((share) => share.place);
     try {
-      const set = (await ShareSet.restore(texts, platform)).toRepairedSet();
-      return { kind: "complete", set, secretBytes: read[0]!.info.secretLength };
+      const set = (await ShareSet.restore(texts, platform, places)).toRepairedSet();
+      return { kind: "complete", set, secretBytes: read[0]!.info.secretLength, places };
     } catch (error) {
-      const message = refusal(error);
+      const message = refusalMessage(error);
       const fits: number[] = [];
       for (const [index, share] of read.entries()) {
         try {
@@ -550,29 +625,16 @@ export class ShareInput {
           );
           fits.push(share.place);
         } catch (other) {
-          refusal(other);
+          refusalMessage(other);
         }
       }
       if (fits.length === 1)
         return {
           kind: "trouble",
-          trouble: {
-            kind: "odd",
-            place: fits[0]!,
-            message: `Share ${fits[0]} does not fit with the others: with it they give another phrase or none.`,
-          },
+          trouble: { kind: "odd", place: fits[0]!, message: misfitMessage(fits[0]!) },
         };
-      // The share set names shares by their index, which is their place only while none was left
-      // out.
-      return {
-        kind: "trouble",
-        trouble: {
-          kind: "refused",
-          message: namedAsTyped(this.places())
-            ? message
-            : "These shares do not restore one phrase: one of them is wrong, or of another set.",
-        },
-      };
+      // The share set names each share by the place it was typed at.
+      return { kind: "trouble", trouble: { kind: "refused", message } };
     }
   }
 }

@@ -1,7 +1,8 @@
 // The share parts with a platform of the host's own, as a browser page passes it, in a module graph
-// that never loads the Node.js platform (share-platform-node.ts), which would configure the global
-// one: every repair, search and measure must use the platform it was given (JointRepair), and the
-// restore of a masked phrase from shares runs with the host's wallet check (ShareUnmasking).
+// that never loads the Node.js platform (share-platform-node.ts): every repair, search and measure
+// must use the platform it was given (JointRepair, planJointRepair), none keeps one of its own (scan
+// finding S108), and the restore of a masked phrase from shares runs with the host's wallet check
+// (ShareUnmasking).
 // Published SSKR vectors and the public test phrase only.
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -11,9 +12,14 @@ import { describe, expect, it, vi } from "vitest";
 import { encodeMnemonic, parseDate } from "../src/core.js";
 import { ShareBackupCheck } from "../src/core/backup-check.js";
 import { DatesAnswer } from "../src/core/date-search.js";
-import { JointRepair, measureTriesPerSecond } from "../src/sskr/joint-repair.js";
+import {
+  JointRepair,
+  measureTriesPerSecond,
+  planJointRepair,
+  type PlanOptions,
+} from "../src/sskr/joint-repair.js";
 import { sskrEngine } from "../src/sskr/runtime.js";
-import { sharePlatform, type SharePlatform } from "../src/sskr/share-platform.js";
+import type { SharePlatform } from "../src/sskr/share-platform.js";
 import { ShareSet } from "../src/sskr/share-set.js";
 import { ShareUnmasking } from "../src/sskr/share-unmasking.js";
 import { writeShare } from "../src/sskr/transport.js";
@@ -54,8 +60,20 @@ function marked(place: number): string {
 }
 
 describe("the share parts with the host's platform", () => {
-  it("never configure a platform themselves", () => {
-    expect(() => sharePlatform()).toThrow("Share repair has no platform.");
+  it("keep no platform of their own, and refuse a plan without the host's", async () => {
+    // Only the interface and two constants: no platform to configure, none to read.
+    expect(Object.keys(await import("../src/sskr/share-platform.js")).sort()).toEqual([
+      "ONE_GROUP",
+      "SEED_BYTES",
+    ]);
+    // A host in JavaScript may leave it out; the plan refuses before any share is read.
+    await expect(planJointRepair([FIRST, marked(5)], {} as PlanOptions)).rejects.toThrow(
+      "A share repair needs the host's SharePlatform.",
+    );
+    const platform = hostPlatform();
+    const plan = await planJointRepair([FIRST, marked(5)], { platform });
+    expect((await plan.search()).map((one) => one.mnemonic)).toEqual([PHRASE]);
+    expect(platform.calls.hmac).toBeGreaterThan(0);
   });
 
   it("repair marked shares with the platform given, for a set and for a backup check", async () => {
@@ -141,7 +159,7 @@ describe("ShareUnmasking", () => {
       listed: [TEST_PHRASE],
     });
     expect(progress).toHaveBeenLastCalledWith(
-      expect.objectContaining({ checked: 10, combinations: 10, matchCount: 1 }),
+      expect.objectContaining({ checked: 10, total: 10, matched: 1 }),
     );
     // The time of each phrase's search: 10 combinations, one wallet check each.
     const work = await searched.dateWork();

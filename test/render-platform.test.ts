@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  CardRenderer,
   cardTemplates,
-  configureRenderPlatform,
   renderAssets,
   renderCards,
   renderIndividualCards,
@@ -69,9 +69,35 @@ describe("platform-neutral card rendering", () => {
     for (const path of renderAssets) expect(existsSync(join(assets, path)), path).toBe(true);
     const requested = new Set<string>();
     for (const file of importGraph("cards.ts").keys()) {
+      // platform.ts only passes on the paths its callers ask for (BundledAssetCache.get), which
+      // are read from the callers below.
+      if (file === "export/platform.ts") continue;
       const text = readFileSync(join(source, file), "utf8");
-      for (const match of text.matchAll(/readRenderAsset\(\s*[`'"]([^`'"]+)[`'"]/gu))
+      // readRenderAsset(source, path): the path is its second argument.
+      for (const match of text.matchAll(/readRenderAsset\(\s*[\w$]+,\s*[`'"]([^`'"]+)[`'"]/gu))
         requested.add(match[1]!);
+      // A request through a bundled-asset cache of the same file, such as this.#artwork.get(path),
+      // a constant or a private field of the class that owns the cache.
+      for (const cache of text.matchAll(
+        /(?:const |this\.)(#?[A-Za-z_$][\w$]*) = new BundledAssetCache\b/gu,
+      ))
+        for (const match of text.matchAll(
+          new RegExp(`(?<![\\w$#])${cache[1]!}\\.get\\(\\s*[\`'"]([^\`'"]+)[\`'"]`, "gu"),
+        ))
+          requested.add(match[1]!);
+      // A request through a constant of the same file, such as readRenderAsset(assets, UI_FONT),
+      // names the path that the constant holds; one that cannot be followed fails the test.
+      for (const match of text.matchAll(
+        /readRenderAsset\(\s*[\w$]+,\s*([A-Za-z_$][\w$]*)\s*\)/gu,
+      )) {
+        const constant = new RegExp(`const ${match[1]!}\\s*=\\s*[\`'"]([^\`'"]+)[\`'"]`, "u").exec(
+          text,
+        );
+        expect(constant, `${file} requests ${match[1]!}, which is no path written there`).not.toBe(
+          null,
+        );
+        requested.add(constant![1]!);
+      }
     }
     const patterns = [...requested].map(
       (path) =>
@@ -109,18 +135,20 @@ describe("platform-neutral card rendering", () => {
         return nodeRenderPlatform.qrModules(payload);
       },
     };
-    configureRenderPlatform(host);
-    try {
+    // The host's own renderer: every service comes from its platform, none from elsewhere.
+    const renderer = new CardRenderer(host);
+    {
       const template = selectTemplate("business-it", "colors");
-      const bytes = await renderCards([{ template, content: { ...content } }]);
+      const bytes = await renderCards(renderer, [{ template, content: { ...content } }]);
       expect(new TextDecoder().decode(bytes.subarray(0, 5))).toBe("%PDF-");
       expect(calls.assets).toContain("fonts/DejaVuSans-UI.ttf");
       expect(calls.assets).toContain("images/business-it-v1.png");
       expect(calls.random).toBeGreaterThan(0);
+      expect(calls.decode).toBeGreaterThan(0);
       expect(calls.encode).toBeGreaterThan(0);
       expect(calls.qr).toBeGreaterThan(0);
       // Separate cards have the business size, not the sheet size used above.
-      const cards = await renderIndividualCards(template, {
+      const cards = await renderIndividualCards(renderer, template, {
         ...content,
         pageSize: "business",
         cardQr: false,
@@ -130,8 +158,6 @@ describe("platform-neutral card rendering", () => {
           (color, index) => `${String(index + 1).padStart(2, "0")}-${color.slice(1).toUpperCase()}`,
         ),
       );
-    } finally {
-      configureRenderPlatform(nodeRenderPlatform);
     }
   });
 

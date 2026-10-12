@@ -2,7 +2,7 @@
 // what they refuse.
 
 import { describe, expect, it } from "vitest";
-import { addressCount, walletEvidence } from "../src/cli/bitcoin-options.js";
+import { scanGapOf, walletEvidence } from "../src/cli/bitcoin-options.js";
 import { parseArguments } from "../src/cli/arguments.js";
 import { runSskrCombine, runSskrExport } from "../src/cli/sskr-command.js";
 import { runTable } from "../src/cli/table-command.js";
@@ -13,11 +13,11 @@ describe("AUD-010-SEC001: dates are never taken from the command line with --ask
   it("is refused by sskr-combine and sskr-export before any question", async () => {
     const args = { "ask-secrets": true, mode: "seedshift", date: "23-09-2026" } as const;
     await expect(runSskrCombine({ ...args })).rejects.toThrow(
-      "--ask-secrets cannot be combined with command-line dates.",
+      "--ask-secrets cannot be combined with --dates.",
     );
     await expect(
       runSskrExport({ ...args, "master-fingerprint": "73c5da0a", "cards-dir": "unused" }),
-    ).rejects.toThrow("--ask-secrets cannot be combined with command-line dates.");
+    ).rejects.toThrow("--ask-secrets cannot be combined with --dates.");
   });
 });
 
@@ -43,7 +43,7 @@ describe("AUD-010-UI002: the numbers of a wallet's place are named as such", () 
       "The --account address account value",
     );
     expect(() => runTable({ index: "x" })).toThrow("word index");
-    expect(() => addressCount({ "scan-gap": "0" })).toThrow(
+    expect(() => scanGapOf({ "scan-gap": "0" })).toThrow(
       "The --scan-gap address count value must be a base-10 integer from 1 through 1000.",
     );
   });

@@ -1,7 +1,14 @@
 import type { StudyTheme } from "./collection-sheet.js";
+import { channelsHex, rgbChannels } from "./color-math.js";
+import { isRgbReference, rgbReferenceDigits } from "../core/colors.js";
+import type { MaterialStyle } from "./card-settings.js";
+import { capitalized } from "../core/prose.js";
 
-/** Approved photographic finishes. RGB entries describe the artwork, never the encoded reference. */
-export type MaterialStyle = "vehicle" | "enclosure" | "tile" | "switch" | "kitchen";
+// The styles are named with the other card settings, which the template catalog reads without
+// this artwork.
+export type { MaterialStyle };
+
+/** RGB entries describe the artwork, never the encoded reference. */
 export interface MaterialFinish {
   readonly name: string;
   readonly color: string;
@@ -46,27 +53,42 @@ export interface MaterialArtwork {
   readonly finishes: readonly MaterialFinish[];
   readonly catalogue: MaterialCatalogue;
 }
-interface FinishDetails {
-  readonly surface?: string;
-  readonly outlineFit?: readonly [number, number, number];
-  readonly onlyTinted?: boolean;
-}
-const finish = (
+/** The optional details of a finish row: those of MaterialFinish beyond its name, colour and crop. */
+type FinishDetails = Pick<MaterialFinish, "surface" | "outlineFit" | "onlyTinted">;
+/** A finish photographed for its material: its name, colour, crop in pixels and details. */
+type FinishRow = (
   name: string,
   color: string,
   x: number,
   y: number,
   cropWidth: number,
   cropHeight: number,
+  details?: FinishDetails,
+) => MaterialFinish;
+/**
+ * The finishes of one photograph of `sourceWidth` x `sourceHeight` pixels, which `rows` writes
+ * one `finish` row each, its crop in pixels of the photograph. The size is stated once per
+ * material; scripts/trace-material-outlines.py reads it and the rows from here.
+ */
+function photographed(
   sourceWidth: number,
   sourceHeight: number,
-  details: FinishDetails = {},
-): MaterialFinish => ({
-  name,
-  color,
-  crop: [x / sourceWidth, y / sourceHeight, cropWidth / sourceWidth, cropHeight / sourceHeight],
-  ...details,
-});
+  rows: (finish: FinishRow) => MaterialFinish[],
+): MaterialFinish[] {
+  return rows((name, color, x, y, cropWidth, cropHeight, details = {}) => ({
+    name,
+    color,
+    crop: [x / sourceWidth, y / sourceHeight, cropWidth / sourceWidth, cropHeight / sourceHeight],
+    ...details,
+  }));
+}
+/**
+ * The details of a finish that takes the catalogue colours: the word of its surface, and the
+ * scale and shift that lay the material's outline on its photograph (outlineFit).
+ */
+function surfaced(surface: string, scale: number, x: number, y: number): FinishDetails {
+  return { surface, outlineFit: [scale, x, y] };
+}
 const colours = (entries: Record<string, string>): CatalogueColour[] =>
   Object.entries(entries).map(([name, color]) => ({ name, color }));
 export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
@@ -75,22 +97,40 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
     studyTheme: "parquet",
     dark: false,
     background: [0.928, 0.915, 0.886],
-    finishes: [
-      finish("Ivory limestone", "E3DCCF", 52, 187, 346, 250, 1580, 996),
-      finish("Smoked walnut", "795A42", 430, 187, 346, 250, 1580, 996),
-      finish("Cashmere matte", "AAA092", 810, 187, 346, 250, 1580, 996, matte(0.99, -0.001, 0.013)),
-      finish("Graphite matte", "383C3D", 1190, 187, 346, 250, 1580, 996, matte(1, 0, 0)),
-      finish("Champagne satin", "A89273", 52, 507, 346, 250, 1580, 996, {
-        surface: "satin",
-        outlineFit: [0.995, -0.009, 0.007],
-      }),
-      finish("Olive lacquer", "747968", 430, 507, 346, 250, 1580, 996, {
-        surface: "lacquer",
-        outlineFit: [1.005, -0.005, 0.006],
-      }),
-      finish("Warm travertine", "D2C0A2", 810, 507, 346, 250, 1580, 996),
-      finish("Smoked glass", "87928F", 1190, 507, 346, 250, 1580, 996),
-    ],
+    finishes: photographed(1580, 996, (finish) => [
+      finish("Ivory limestone", "E3DCCF", 52, 187, 346, 250),
+      finish("Smoked walnut", "795A42", 430, 187, 346, 250),
+      finish(
+        "Cashmere matte",
+        "AAA092",
+        810,
+        187,
+        346,
+        250,
+        surfaced("matte", 0.99, -0.001, 0.013),
+      ),
+      finish("Graphite matte", "383C3D", 1190, 187, 346, 250, surfaced("matte", 1, 0, 0)),
+      finish(
+        "Champagne satin",
+        "A89273",
+        52,
+        507,
+        346,
+        250,
+        surfaced("satin", 0.995, -0.009, 0.007),
+      ),
+      finish(
+        "Olive lacquer",
+        "747968",
+        430,
+        507,
+        346,
+        250,
+        surfaced("lacquer", 1.005, -0.005, 0.006),
+      ),
+      finish("Warm travertine", "D2C0A2", 810, 507, 346, 250),
+      finish("Smoked glass", "87928F", 1190, 507, 346, 250),
+    ]),
     // Lacquer colours of kitchen fronts, quiet enough for a kitchen; walnut, stone and glass are
     // shown only as photographed.
     catalogue: {
@@ -139,40 +179,24 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
     studyTheme: "studio",
     dark: false,
     background: [0.916, 0.904, 0.875],
-    finishes: [
-      finish("Matte charcoal", "35383B", 84, 251, 335, 232, 1536, 1024, {
-        surface: "matte",
-        outlineFit: [1.005, 0.001, 0.006],
-      }),
-      finish("Satin black", "181B20", 433, 251, 335, 232, 1536, 1024, {
-        surface: "satin",
-        outlineFit: [1, 0, 0],
-      }),
-      finish("Cement gray", "8A9094", 784, 251, 335, 232, 1536, 1024, {
-        surface: "matte",
-        outlineFit: [1.005, -0.017, -0.002],
-      }),
-      finish("Ivory white", "E8E4DC", 1124, 251, 335, 232, 1536, 1024, {
-        surface: "satin",
-        outlineFit: [0.98, 0.01, 0.009],
-      }),
-      finish("Desert sand", "BAA17C", 82, 544, 335, 233, 1536, 1024, {
-        surface: "matte",
-        outlineFit: [1.015, 0.002, 0.028],
-      }),
-      finish("Army olive", "59624B", 431, 544, 335, 233, 1536, 1024, {
-        surface: "matte",
-        outlineFit: [1.015, 0.002, 0.019],
-      }),
-      finish("Midnight blue", "263E59", 779, 544, 335, 233, 1536, 1024, {
-        surface: "satin",
-        outlineFit: [1.015, -0.007, 0.019],
-      }),
-      finish("Warm taupe", "8D8073", 1121, 544, 335, 233, 1536, 1024, {
-        surface: "matte",
-        outlineFit: [1.015, 0.005, 0.019],
-      }),
-    ],
+    finishes: photographed(1536, 1024, (finish) => [
+      finish("Matte charcoal", "35383B", 84, 251, 335, 232, surfaced("matte", 1.005, 0.001, 0.006)),
+      finish("Satin black", "181B20", 433, 251, 335, 232, surfaced("satin", 1, 0, 0)),
+      finish("Cement gray", "8A9094", 784, 251, 335, 232, surfaced("matte", 1.005, -0.017, -0.002)),
+      finish("Ivory white", "E8E4DC", 1124, 251, 335, 232, surfaced("satin", 0.98, 0.01, 0.009)),
+      finish("Desert sand", "BAA17C", 82, 544, 335, 233, surfaced("matte", 1.015, 0.002, 0.028)),
+      finish("Army olive", "59624B", 431, 544, 335, 233, surfaced("matte", 1.015, 0.002, 0.019)),
+      finish(
+        "Midnight blue",
+        "263E59",
+        779,
+        544,
+        335,
+        233,
+        surfaced("satin", 1.015, -0.007, 0.019),
+      ),
+      finish("Warm taupe", "8D8073", 1121, 544, 335, 233, surfaced("matte", 1.015, 0.005, 0.019)),
+    ]),
     // Wrap film colours; cars carry them far more vividly than tiles or switches.
     catalogue: {
       colours: colours({
@@ -227,16 +251,16 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
     studyTheme: "warm",
     dark: true,
     background: [0.1, 0.105, 0.11],
-    finishes: [
-      finish("Deep blue", "304C68", 50, 148, 356, 294, 1578, 997, anodised(1.005, -0.005, -0.009)),
-      finish("Petrol teal", "35666B", 424, 148, 356, 294, 1578, 997, anodised(1, 0, 0)),
-      finish("Smoked violet", "514757", 798, 148, 356, 294, 1578, 997, anodised(1, 0, 0)),
-      finish("Sage anodised", "76816D", 1173, 148, 356, 294, 1578, 997, anodised(1.01, 0.001, 0)),
-      finish("Bronze gold", "827445", 50, 509, 356, 294, 1578, 997, anodised(1, -0.003, 0.01)),
-      finish("Burgundy", "783E49", 424, 509, 356, 294, 1578, 997, anodised(1, 0, 0.007)),
-      finish("Champagne", "B1A69A", 798, 509, 356, 294, 1578, 997, anodised(1.005, 0.003, 0.012)),
-      finish("Graphite", "555B60", 1173, 509, 356, 294, 1578, 997, anodised(1, -0.003, 0.01)),
-    ],
+    finishes: photographed(1578, 997, (finish) => [
+      finish("Deep blue", "304C68", 50, 148, 356, 294, surfaced("anodised", 1.005, -0.005, -0.009)),
+      finish("Petrol teal", "35666B", 424, 148, 356, 294, surfaced("anodised", 1, 0, 0)),
+      finish("Smoked violet", "514757", 798, 148, 356, 294, surfaced("anodised", 1, 0, 0)),
+      finish("Sage anodised", "76816D", 1173, 148, 356, 294, surfaced("anodised", 1.01, 0.001, 0)),
+      finish("Bronze gold", "827445", 50, 509, 356, 294, surfaced("anodised", 1, -0.003, 0.01)),
+      finish("Burgundy", "783E49", 424, 509, 356, 294, surfaced("anodised", 1, 0, 0.007)),
+      finish("Champagne", "B1A69A", 798, 509, 356, 294, surfaced("anodised", 1.005, 0.003, 0.012)),
+      finish("Graphite", "555B60", 1173, 509, 356, 294, surfaced("anodised", 1, -0.003, 0.01)),
+    ]),
     // Anodised aluminium colours of instrument cases.
     catalogue: {
       colours: colours({
@@ -293,20 +317,20 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
     studyTheme: "tiled",
     dark: true,
     background: [0.235, 0.228, 0.209],
-    finishes: [
-      finish("Travertine", "BDA78B", 77, 125, 336, 319, 1578, 996),
-      finish("Ivory limestone", "D4C6AD", 446, 125, 336, 319, 1578, 996),
-      finish("White marble", "DAD8D0", 808, 125, 336, 319, 1578, 996),
-      finish("Black marble", "383A39", 1175, 125, 336, 319, 1578, 996),
-      finish("Olive glaze", "81856A", 77, 497, 336, 319, 1578, 996, { surface: "glaze" }),
-      finish("Petrol glaze", "335D64", 446, 497, 336, 319, 1578, 996, { surface: "glaze" }),
-      finish("Terracotta", "A66E52", 808, 497, 336, 319, 1578, 996, { surface: "clay" }),
+    finishes: photographed(1578, 996, (finish) => [
+      finish("Travertine", "BDA78B", 77, 125, 336, 319),
+      finish("Ivory limestone", "D4C6AD", 446, 125, 336, 319),
+      finish("White marble", "DAD8D0", 808, 125, 336, 319),
+      finish("Black marble", "383A39", 1175, 125, 336, 319),
+      finish("Olive glaze", "81856A", 77, 497, 336, 319, { surface: "glaze" }),
+      finish("Petrol glaze", "335D64", 446, 497, 336, 319, { surface: "glaze" }),
+      finish("Terracotta", "A66E52", 808, 497, 336, 319, { surface: "clay" }),
       // As photographed it is too close to Travertine; it carries the light catalogue colours.
-      finish("Fluted sand", "B4AA98", 1175, 497, 336, 319, 1578, 996, {
+      finish("Fluted sand", "B4AA98", 1175, 497, 336, 319, {
         surface: "fluted tile",
         onlyTinted: true,
       }),
-    ],
+    ]),
     // Colours that glazed and clay tiles are really made in, after tile catalogues: far quieter
     // than most codes, so that the sheet stays one a bathroom planner could hand out.
     catalogue: {
@@ -343,7 +367,7 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
     studyTheme: "concrete",
     dark: false,
     background: [0.934, 0.927, 0.899],
-    finishes: [
+    finishes: photographed(1579, 996, (finish) => [
       finish(
         "Brushed brass",
         "B8A078",
@@ -351,9 +375,7 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
         141,
         320,
         303,
-        1579,
-        996,
-        brushed(1.005, -0.006, -0.002),
+        surfaced("brushed", 1.005, -0.006, -0.002),
       ),
       finish(
         "Brushed silver",
@@ -362,17 +384,15 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
         141,
         320,
         303,
-        1579,
-        996,
-        brushed(0.985, 0.013, 0.014),
+        surfaced("brushed", 0.985, 0.013, 0.014),
       ),
-      finish("Graphite", "414548", 827, 141, 320, 303, 1579, 996, matte(1.01, -0.005, -0.012)),
-      finish("Porcelain", "E5E3DC", 1199, 141, 320, 303, 1579, 996, matte(1, -0.003, -0.01)),
-      finish("Aged bronze", "6B5940", 82, 506, 320, 303, 1579, 996, brushed(1, 0, 0.003)),
-      finish("Ocean blue", "315969", 454, 506, 320, 303, 1579, 996, matte(1, 0, 0)),
-      finish("Sage green", "798267", 827, 506, 320, 303, 1579, 996, matte(1.01, -0.005, -0.005)),
-      finish("Copper", "B68161", 1199, 506, 320, 303, 1579, 996, brushed(1.01, -0.014, -0.005)),
-    ],
+      finish("Graphite", "414548", 827, 141, 320, 303, surfaced("matte", 1.01, -0.005, -0.012)),
+      finish("Porcelain", "E5E3DC", 1199, 141, 320, 303, surfaced("matte", 1, -0.003, -0.01)),
+      finish("Aged bronze", "6B5940", 82, 506, 320, 303, surfaced("brushed", 1, 0, 0.003)),
+      finish("Ocean blue", "315969", 454, 506, 320, 303, surfaced("matte", 1, 0, 0)),
+      finish("Sage green", "798267", 827, 506, 320, 303, surfaced("matte", 1.01, -0.005, -0.005)),
+      finish("Copper", "B68161", 1199, 506, 320, 303, surfaced("brushed", 1.01, -0.014, -0.005)),
+    ]),
     // Colours of designer switch ranges, in brushed metal or matte lacquer.
     catalogue: {
       colours: colours({
@@ -417,24 +437,13 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
     },
   },
 };
-function anodised(scale: number, x: number, y: number): FinishDetails {
-  return { surface: "anodised", outlineFit: [scale, x, y] };
-}
-function brushed(scale: number, x: number, y: number): FinishDetails {
-  return { surface: "brushed", outlineFit: [scale, x, y] };
-}
-function matte(scale: number, x: number, y: number): FinishDetails {
-  return { surface: "matte", outlineFit: [scale, x, y] };
-}
 
 // sRGB transfer curve and D65 XYZ-to-Lab conversion. Distances choose decoration only;
 // the original hexadecimal reference remains untouched and fully recoverable.
 function lab(hex: string): [number, number, number] {
-  const channels = hex
-    .replace(/^#/u, "")
-    .match(/../gu)!
-    .map((v) => parseInt(v, 16) / 255)
-    .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  const channels = rgbChannels(hex).map((v) =>
+    v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4,
+  );
   const [r, g, b] = channels as [number, number, number];
   const f = (v: number) => (v > 216 / 24389 ? Math.cbrt(v) : ((24389 / 27) * v + 16) / 116);
   const x = f((0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047);
@@ -462,12 +471,6 @@ const CHROMA_CAP = 45;
 // steps of lightness, and the direction of the colour matters most.
 const MATCH_LIGHTNESS_WEIGHT = 0.5;
 
-const hexDigits = (reference: string) => reference.replace(/^#/u, "").toUpperCase();
-const rgb = (hex: string) =>
-  hexDigits(hex)
-    .match(/../gu)!
-    .map((v) => parseInt(v, 16) / 255);
-
 /**
  * How a photograph of colour `base` looks under a tint, as the PDF "Color" blend mode paints it
  * (ISO 32000-1, 11.3.5.3): the tint's hue and saturation at the photograph's luminosity, mixed
@@ -475,9 +478,9 @@ const rgb = (hex: string) =>
  */
 export function tintedLook(base: string, tint: string): string {
   const luminosity = ([r, g, b]: number[]) => 0.3 * r! + 0.59 * g! + 0.11 * b!;
-  const backdrop = rgb(base);
+  const backdrop: number[] = rgbChannels(base);
   const light = luminosity(backdrop);
-  const shifted = rgb(tint).map((v, _, all) => v + light - luminosity(all));
+  const shifted = rgbChannels(tint).map((v, _, all) => v + light - luminosity(all));
   // ClipColor: pulls the channels toward the luminosity until they fit between 0 and 1.
   const low = Math.min(...shifted);
   const high = Math.max(...shifted);
@@ -486,15 +489,7 @@ export function tintedLook(base: string, tint: string): string {
     if (high > 1) v = light + ((v - light) * (1 - light)) / (high - light);
     return v;
   });
-  return backdrop
-    .map((v, i) => (1 - TINT_OPACITY) * v + TINT_OPACITY * clipped[i]!)
-    .map((v) =>
-      Math.round(Math.min(1, Math.max(0, v)) * 255)
-        .toString(16)
-        .padStart(2, "0"),
-    )
-    .join("")
-    .toUpperCase();
+  return channelsHex(backdrop.map((v, i) => (1 - TINT_OPACITY) * v + TINT_OPACITY * clipped[i]!));
 }
 
 /**
@@ -517,7 +512,7 @@ export function materialSamples(style: MaterialStyle): MaterialSample[] {
     );
     const surface = finish.surface!;
     const label = catalogue.surfaceFirst
-      ? `${surface[0]!.toUpperCase()}${surface.slice(1)} ${name.toLowerCase()}`
+      ? `${capitalized(surface)} ${name.toLowerCase()}`
       : `${name} ${surface}`;
     return { finish, tint: color, label, look: tintedLook(finish.color, color) };
   });
@@ -536,12 +531,11 @@ export function chooseMaterialSamples(
   style: MaterialStyle,
   references: readonly string[],
 ): MaterialSample[] {
-  for (const reference of references)
-    if (!/^#?[0-9a-f]{6}$/iu.test(reference))
-      throw new Error("Material reference must contain exactly six hexadecimal digits.");
+  if (!references.every(isRgbReference))
+    throw new Error("Material reference must contain exactly six hexadecimal digits.");
   const { chromaScale } = materialArtwork[style].catalogue;
   const samples = materialSamples(style);
-  const codes = [...new Set(references.map(hexDigits))];
+  const codes = [...new Set(references.map(rgbReferenceDigits))];
   if (codes.length > samples.length)
     throw new Error(`The ${style} material offers only ${samples.length} distinct samples.`);
   const point = ([l, a, b]: readonly number[]) => [l! * MATCH_LIGHTNESS_WEIGHT, a!, b!];
@@ -561,7 +555,7 @@ export function chooseMaterialSamples(
     chosen[c] = samples[s]!;
     taken.add(s);
   }
-  return references.map((reference) => chosen[codes.indexOf(hexDigits(reference))]!);
+  return references.map((reference) => chosen[codes.indexOf(rgbReferenceDigits(reference))]!);
 }
 
 const labDistance = (a: readonly number[], b: readonly number[]) =>

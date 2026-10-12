@@ -125,7 +125,7 @@ describe("DateSearch", () => {
     const answer = dates("2?-09-2026");
     expect(
       () => new DateSearch({ indexes: MASKED.slice(1), dates: answer, mode: "seedshift" }),
-    ).toThrow("Expected 12, 15, 18, 21, or 24 word indexes.");
+    ).toThrow("Expected 12, 15, 18, 21 or 24 word indexes.");
     expect(
       () =>
         new DateSearch({
@@ -228,21 +228,21 @@ describe("DateSearch", () => {
     });
     const at = (perCheck: number, perCombination = 0) => ({ perCheck, perCombination });
     // Ten wallet checks: twelve hours at 4,320 seconds a check, not more.
-    expect(search.needsQuestion(at(QUESTION_SECONDS / 10))).toBe(false);
-    expect(search.needsQuestion(at(QUESTION_SECONDS / 10 + 1))).toBe(true);
+    expect(search.plan(at(QUESTION_SECONDS / 10)).ask).toBe(false);
+    expect(search.plan(at(QUESTION_SECONDS / 10 + 1)).ask).toBe(true);
     // The decoding counts too.
-    expect(search.needsQuestion(at(QUESTION_SECONDS / 10, 1))).toBe(true);
+    expect(search.plan(at(QUESTION_SECONDS / 10, 1)).ask).toBe(true);
     // A limit given by the person counts combinations instead.
-    expect(search.needsQuestion(at(QUESTION_SECONDS), 10)).toBe(false);
-    expect(search.needsQuestion(at(0), 9)).toBe(true);
+    expect(search.plan(at(QUESTION_SECONDS), 10).ask).toBe(false);
+    expect(search.plan(at(0), 9).ask).toBe(true);
     // Without a wallet check only a decoding as slow as twelve hours asks.
     const listing = new DateSearch({
       indexes: MASKED,
       dates: dates("2?-09-2026"),
       mode: "seedshift",
     });
-    expect(listing.needsQuestion(at(QUESTION_SECONDS))).toBe(false);
-    expect(listing.needsQuestion(at(0, QUESTION_SECONDS / 10 + 1))).toBe(true);
+    expect(listing.plan(at(QUESTION_SECONDS)).ask).toBe(false);
+    expect(listing.plan(at(0, QUESTION_SECONDS / 10 + 1)).ask).toBe(true);
   });
 
   it("finds the dates with the wallet, and calls back with its progress and each match", async () => {
@@ -264,17 +264,19 @@ describe("DateSearch", () => {
       combinations: 10,
       checksumValid: 10,
       matchCount: 1,
-      shown: [{ dates: "23-09-2026", mnemonic: TEST_PHRASE, evidence: "m" }],
+      shown: [
+        {
+          dates: "23-09-2026",
+          allDates: [{ year: 2026, month: 9, day: 23 }],
+          mnemonic: TEST_PHRASE,
+          evidence: "m",
+        },
+      ],
       kept: [TEST_PHRASE],
     });
     expect(matches).toEqual(result.shown);
     expect(progress.map((step) => step.checked)).toEqual([4, 8, 10]);
-    expect(progress.at(-1)).toEqual({
-      checked: 10,
-      combinations: 10,
-      checksumValid: 10,
-      matchCount: 1,
-    });
+    expect(progress.at(-1)).toEqual({ checked: 10, total: 10, found: 10, matched: 1 });
   });
 
   it("takes a wallet check that answers later, as a page's WebCrypto does", async () => {
@@ -285,7 +287,14 @@ describe("DateSearch", () => {
       mode: "seedshift",
       walletCheck: later,
     }).run();
-    expect(result.shown).toEqual([{ dates: "23-09-2026", mnemonic: TEST_PHRASE, evidence: "m" }]);
+    expect(result.shown).toEqual([
+      {
+        dates: "23-09-2026",
+        allDates: [{ year: 2026, month: 9, day: 23 }],
+        mnemonic: TEST_PHRASE,
+        evidence: "m",
+      },
+    ]);
   });
 
   it("without a wallet keeps every checksum-valid phrase, shown up to its limit", async () => {
@@ -301,7 +310,11 @@ describe("DateSearch", () => {
     expect(result).toMatchObject({ combinations: 30, checksumValid: 30, matchCount: 30, kept: [] });
     expect(result.shown).toHaveLength(2);
     expect(matches).toHaveLength(30);
-    expect(result.shown[0]).toEqual({ dates: "01-09-2026", mnemonic: expect.any(String) });
+    expect(result.shown[0]).toStrictEqual({
+      dates: "01-09-2026",
+      allDates: [{ year: 2026, month: 9, day: 1 }],
+      mnemonic: expect.any(String),
+    });
     // The Original Seedshift with a valid last word tries every last word whose checksum fits: 128
     // for 12 words. One combination only, as each of them takes a while to decode.
     const valid = await new DateSearch({
@@ -327,7 +340,7 @@ describe("DateSearch", () => {
 
     // Every combination takes longer than a turn's time here, so the search turns before each.
     let now = 0;
-    vi.spyOn(Date, "now").mockImplementation(() => (now += 1000));
+    vi.spyOn(performance, "now").mockImplementation(() => (now += 1000));
     const controller = new AbortController();
     let turns = 0;
     const checked: number[] = [];

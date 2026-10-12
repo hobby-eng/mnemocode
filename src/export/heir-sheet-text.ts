@@ -12,19 +12,27 @@
 // (src/cli/heir-sheet.ts), a page through its tabs.
 // Does not: lay out the sheet (export/heir-sheet.ts renders these words in A5 or A6) or save it.
 
-import type { RecordFormat } from "../record.js";
-import type { ShareFormat } from "../sskr/transport.js";
+import { WORD_NUMBERS } from "../core/bip39-sizes.js";
+import { EncodedForm } from "../core/encoded-form.js";
+import { Masking, type HeirSheetMode, type SplitMode } from "../core/masking.js";
+import {
+  isRecordedQuorum,
+  MAX_GROUP_MEMBERS,
+  MIN_RECORDED_THRESHOLD,
+} from "../sskr/share-layout.js";
+import { parseShareFormat, type ShareFormat } from "../sskr/transport.js";
 import type { HeirSheetSection, HeirSheetText } from "./heir-sheet.js";
+import type { EncodedFormat } from "../core/types.js";
 
-/** How the seed phrase was masked; a sheet is never made with a replaced last word. */
-export type HeirMode = "direct" | "seedshift" | "seedshift-legacy";
+/** How the seed phrase was masked: a mode for which a sheet can be made (Masking). */
+export type HeirMode = HeirSheetMode;
 
-/** How shares may have been masked before the split: the Original Seedshift cannot be split. */
-export type HeirShareMode = Exclude<HeirMode, "seedshift-legacy">;
+/** How shares may have been masked before the split: a heir-sheet mode in which shares are made. */
+export type HeirShareMode = Extract<HeirSheetMode, SplitMode>;
 
 /** What was made: the seed phrase in one encoded form, or Shamir shares of it. */
 export type HeirBackup =
-  | { readonly kind: "encoded"; readonly format: RecordFormat }
+  | { readonly kind: "encoded"; readonly format: EncodedFormat }
   | {
       readonly kind: "shares";
       readonly format: ShareFormat;
@@ -62,13 +70,17 @@ export interface HeirRoute {
   readonly dateDigitHelp: string | undefined;
 }
 
+/** How the color forms look, the same for codes and for shares. */
+const COLORS_LOOK = "color codes such as #1EAB91, on paper or on printed cards";
+const COLOR_CODES_LOOK = "codes of digits and letters A to F that stand for colors";
+
 /** How each encoded form looks, so that an heir recognises the backup. */
-const ENCODED_LOOKS: Readonly<Record<RecordFormat, string>> = {
+const ENCODED_LOOKS: Readonly<Record<EncodedFormat, string>> = {
   english: "English words that look like a seed phrase but are masked",
-  indexes: "numbers from 1 to 2048, one per word",
+  indexes: `numbers from ${WORD_NUMBERS}, one per word`,
   unicode: "codes of four digits and letters A to F, one per word",
-  colors: "color codes such as #1EAB91, on paper or on printed cards",
-  "colors-unicode": "codes of digits and letters A to F that stand for colors",
+  colors: COLORS_LOOK,
+  "colors-unicode": COLOR_CODES_LOOK,
 };
 
 /** How each share format looks. */
@@ -76,10 +88,10 @@ const SHARE_LOOKS: Readonly<Record<ShareFormat, string>> = {
   words: "words such as tuna next keep gyro",
   // Printed cards show such a share as its words; the text of it starts with ur:sskr/.
   ur: "codes that start with ur:sskr/, or words such as tuna next keep gyro on printed cards",
-  indexes: "numbers from 1 to 2048",
+  indexes: `numbers from ${WORD_NUMBERS}`,
   unicode: "codes of four digits and letters A to F",
-  colors: "color codes such as #1EAB91, on paper or on printed cards",
-  "colors-unicode": "codes of digits and letters A to F that stand for colors",
+  colors: COLORS_LOOK,
+  "colors-unicode": COLOR_CODES_LOOK,
 };
 
 /** The last step, whatever the program. */
@@ -109,11 +121,11 @@ function needs({ backup, mode, dates }: HeirSheetFacts): string[] {
       ? [
           `Any ${backup.threshold} of the ${backup.count} Shamir shares, written as ${SHARE_LOOKS[backup.format]}.`,
         ]
-      : mode === "direct" && backup.format === "english"
+      : !Masking.of(mode).masked && backup.format === "english"
         ? ["The seed phrase itself: English words, not masked."]
         : [`The backup: ${ENCODED_LOOKS[backup.format]}.`];
   lines.push(
-    mode === "direct"
+    !Masking.of(mode).masked
       ? "No secret dates are needed."
       : dates === 1
         ? "The owner's secret date (see the back). It is written nowhere; the hint may lead to it."
@@ -123,7 +135,7 @@ function needs({ backup, mode, dates }: HeirSheetFacts): string[] {
 }
 
 function hintNote({ mode, dates }: HeirSheetFacts): string {
-  if (mode === "direct")
+  if (!Masking.of(mode).masked)
     return "Write by hand what only your heirs will understand, such as a clue to a BIP39 passphrase if you used one.";
   const what = dates === 1 ? "the date" : "the dates";
   const example = dates === 1 ? '"the day we met"' : '"the day we met and our son\'s birthday"';
@@ -141,7 +153,7 @@ function basics({ mode }: HeirSheetFacts): HeirSheetSection[] {
       ],
     },
   ];
-  if (mode !== "direct")
+  if (Masking.of(mode).masked)
     sections.push({
       heading: "Secret dates",
       paragraphs: [
@@ -166,13 +178,44 @@ function basics({ mode }: HeirSheetFacts): HeirSheetSection[] {
   return sections;
 }
 
-/** Refuses facts that would print a wrong sheet: a count of dates that does not fit the mode. */
+/** Refuses shares of which `threshold` of `count` could not restore anything (isRecordedQuorum). */
+function assertQuorum(threshold: number, count: number): void {
+  if (!isRecordedQuorum(threshold, count))
+    throw new Error(
+      `A sheet for heirs needs a threshold from ${MIN_RECORDED_THRESHOLD} to the number of shares, and at most ${MAX_GROUP_MEMBERS} shares.`,
+    );
+}
+
+/**
+ * Refuses a backup that the sheet cannot name truthfully: another kind, a form that the encoded
+ * forms (EncodedForm.of) or the share forms (parseShareFormat) refuse, or an impossible quorum. A
+ * host may pass anything at run time (AUD-014-API012).
+ */
+function assertBackup(backup: HeirBackup): void {
+  switch (backup?.kind) {
+    case "encoded":
+      EncodedForm.of(backup.format);
+      return;
+    case "shares":
+      parseShareFormat(backup.format);
+      assertQuorum(backup.threshold, backup.count);
+      return;
+    default:
+      throw new Error("A sheet for heirs is made for an encoded backup or for Shamir shares.");
+  }
+}
+
+/**
+ * Refuses facts that would print a wrong sheet: a mode without one, a backup it cannot name
+ * (assertBackup), or a count of dates that does not fit the mode.
+ */
 function assertFacts({ backup, mode, dates }: HeirSheetFacts): void {
-  if (backup.kind === "shares" && mode === "seedshift-legacy")
-    throw new Error("Shares cannot use the original Seedshift.");
-  const fits = mode === "direct" ? dates === 0 : Number.isSafeInteger(dates) && dates >= 1;
-  if (!fits)
-    throw new Error("A sheet for heirs needs no dates in direct mode and at least one otherwise.");
+  Masking.assertHeirSheetMode(mode);
+  assertBackup(backup);
+  if (backup.kind === "shares") Masking.assertSplitMode(mode);
+  if (!Number.isSafeInteger(dates) || dates < 0)
+    throw new Error("A sheet for heirs needs a whole number of dates.");
+  Masking.of(mode).assertDateCount(dates);
 }
 
 /** Every line of `text`, in the order it is printed. */
@@ -180,17 +223,26 @@ function linesOf(text: HeirSheetText): string[] {
   return [
     text.title,
     text.subtitle,
+    text.footer,
     text.newcomer,
+    text.needsHeading,
     ...text.needs,
+    text.hintHeading,
     text.hintNote,
+    text.stepsTitle,
     ...text.steps,
+    text.troubleHeading,
     text.trouble,
     text.warning,
-    text.footer,
     text.basicsTitle,
     ...text.basics.flatMap((section) => [section.heading, ...section.paragraphs]),
   ];
 }
+
+/** The title of the back of the sheet, which the front points to. */
+const STEPS_TITLE = "Steps";
+/** The title of the part for newcomers, which the front points to. */
+const BASICS_TITLE = "The basics";
 
 /**
  * The words of the sheet for heirs, for the program that `route` leads through. A class, so that a
@@ -210,14 +262,18 @@ export class HeirInstructions {
     const text: HeirSheetText = {
       title: "How to restore this wallet backup",
       subtitle: this.#route.subtitle,
-      newcomer: 'The steps are on the back. New to wallets? Read "The basics" there first.',
+      newcomer: `The ${STEPS_TITLE.toLowerCase()} are on the back. New to wallets? Read "${BASICS_TITLE}" there first.`,
+      needsHeading: "What you need",
       needs: needs(facts),
+      hintHeading: "Hint from the owner",
       hintNote: hintNote(facts),
+      stepsTitle: STEPS_TITLE,
       steps: this.#steps(facts),
+      troubleHeading: "If something goes wrong",
       trouble: this.#trouble(facts),
-      warning: `Never type the backup${facts.mode === "direct" ? "" : ", the dates"} or the seed phrase into a website or send them to anyone.`,
+      warning: `Never type the backup${!Masking.of(facts.mode).masked ? "" : ", the dates"} or the seed phrase into a website or send them to anyone.`,
       footer: "This sheet holds no secret. Keep it apart from the backup.",
-      basicsTitle: "The basics",
+      basicsTitle: BASICS_TITLE,
       basics: basics(facts),
     };
     // The seed phrase itself in English words needs no program, and so no address.
@@ -234,13 +290,12 @@ export class HeirInstructions {
 
   #steps({ backup, mode, dates }: HeirSheetFacts): string[] {
     // The seed phrase itself needs no program at all.
-    if (backup.kind === "encoded" && backup.format === "english" && mode === "direct")
+    if (backup.kind === "encoded" && backup.format === "english" && !Masking.of(mode).masked)
       return [OPEN_WALLET];
     // As the programs ask for them: day-month-year, as datesPrompt and the share prompt do.
-    const typedDates =
-      mode === "direct"
-        ? undefined
-        : `the secret ${dates === 1 ? "date" : "dates"} as day-month-year (23-09-2026)`;
+    const typedDates = !Masking.of(mode).masked
+      ? undefined
+      : `the secret ${dates === 1 ? "date" : "dates"} as day-month-year (23-09-2026)`;
     const route = this.#route;
     // assertFacts refused shares of the Original Seedshift.
     const open =
@@ -257,7 +312,7 @@ export class HeirInstructions {
     // Unreadable elements of a share are filled in from its checksum (src/sskr/repair.ts).
     if (backup.kind === "shares") advice.push("Type ? for each code you cannot read.");
     const help = this.#route.dateDigitHelp;
-    if (mode !== "direct" && help !== undefined) advice.push(help);
+    if (Masking.of(mode).masked && help !== undefined) advice.push(help);
     return advice.join(" ");
   }
 }

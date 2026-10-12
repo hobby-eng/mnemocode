@@ -4,12 +4,13 @@ import { isCardPageSize, renderCards, selectTemplate, type CardContent } from ".
 import { indexesToColors } from "../src/core.js";
 import { MM } from "../src/export/business-layout.js";
 import { pageOperators } from "./helpers/pdf-content.js";
+import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 
 const colors = indexesToColors(Array.from({ length: 12 }, (_, index) => index * 7));
 const content: CardContent = { kind: "colors", colors, payload: colors.join(" ") };
 
 async function pages(template: string, settings: Partial<CardContent>) {
-  const bytes = await renderCards([
+  const bytes = await renderCards(nodeCardRenderer, [
     {
       template: selectTemplate(template, "colors"),
       content: { ...content, ...settings } as CardContent,
@@ -56,10 +57,12 @@ describe("page size decides between a sheet and separate cards", () => {
     const { renderIndividualCards } = await import("../src/cards.js");
     const template = selectTemplate("business-it", "colors");
     for (const pageSize of ["a6", "a4"] as const)
-      await expect(renderIndividualCards(template, { ...content, pageSize })).rejects.toThrow(
-        "Separate cards have the business size.",
-      );
-    expect(await renderIndividualCards(template, { ...content })).toHaveLength(colors.length);
+      await expect(
+        renderIndividualCards(nodeCardRenderer, template, { ...content, pageSize }),
+      ).rejects.toThrow("Separate cards have the business size.");
+    expect(await renderIndividualCards(nodeCardRenderer, template, { ...content })).toHaveLength(
+      colors.length,
+    );
   });
 
   it("knows the size of every page in both orientations", async () => {
@@ -76,7 +79,7 @@ describe("page size decides between a sheet and separate cards", () => {
     async (id) => {
       const template = selectTemplate(id, "colors");
       const document = await PDFDocument.load(
-        await template.renderIndividual!({ ...content, pageSize: "business" }, 0),
+        await template.renderIndividual!(nodeCardRenderer, { ...content, pageSize: "business" }, 0),
       );
       const operators = pageOperators(document, 0);
       // Four curves form the corners of the clipping path; the artwork is drawn inside it.
@@ -115,10 +118,12 @@ describe("page size decides the layout of Shamir share cards", () => {
     const { renderSskrPdf } = await import("../src/export/sskr-cards.js");
     // Public BIP39 test vector; never a real wallet.
     const shares = await splitSskrMnemonic(`${"abandon ".repeat(11)}about`, 2, 3);
-    const sheets = await PDFDocument.load(await renderSskrPdf(shares, { style: "it" }));
+    const sheets = await PDFDocument.load(
+      await renderSskrPdf(nodeCardRenderer, shares, { style: "it" }),
+    );
     expect(sheets.getPageCount()).toBe(shares.length);
     const cards = await PDFDocument.load(
-      await renderSskrPdf(shares, { style: "it", pageSize: "business" }),
+      await renderSskrPdf(nodeCardRenderer, shares, { style: "it", pageSize: "business" }),
     );
     const references = shares.reduce((sum, share) => sum + shareToColors(share).length, 0);
     expect(cards.getPageCount()).toBe(references);
@@ -133,7 +138,11 @@ describe("page size decides the layout of Shamir share cards", () => {
     // Public BIP39 test vector; never a real wallet.
     const shares = await splitSskrMnemonic(`${"abandon ".repeat(11)}about`, 2, 3);
     const document = await PDFDocument.load(
-      await renderSskrPdf(shares, { style: "it", pageSize: "business", layout: "qr" }),
+      await renderSskrPdf(nodeCardRenderer, shares, {
+        style: "it",
+        pageSize: "business",
+        layout: "qr",
+      }),
     );
     // One page for every share, each with its QR code: this is the only use of the compact sheet.
     expect(document.getPageCount()).toBe(shares.length);
@@ -142,9 +151,18 @@ describe("page size decides the layout of Shamir share cards", () => {
       expect([Math.round(width / MM), Math.round(height / MM)]).toEqual([90, 50]);
       expect(pageOperators(document, document.getPages().indexOf(page))).toContain(" Do");
     }
-    expect(collectionSheetLayout({ pageSize: "business" }, 1, 1.8, 1, "payload").compact).toBe(
-      true,
-    );
-    expect(collectionSheetLayout({ pageSize: "a6" }, 1, 1.8, 1, "payload").compact).toBe(false);
+    expect(
+      collectionSheetLayout(
+        { pageSize: "business" },
+        1,
+        1.8,
+        1,
+        nodeRenderPlatform.qrModules("payload"),
+      ).compact,
+    ).toBe(true);
+    expect(
+      collectionSheetLayout({ pageSize: "a6" }, 1, 1.8, 1, nodeRenderPlatform.qrModules("payload"))
+        .compact,
+    ).toBe(false);
   });
 });

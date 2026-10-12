@@ -16,6 +16,8 @@ import {
   type EncodedFormat,
 } from "../src/core/encoded-backup.js";
 import { WalletEvidenceCheck } from "../src/core/wallet-evidence.js";
+import { Masking } from "../src/core/masking.js";
+import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
 
 // The host-neutral encoded backup on its own, as another host such as the Deriver uses it: the
 // codes of an encoded seed phrase checked before its dates, the encoded fingerprint with the
@@ -37,8 +39,9 @@ const FORMATS: readonly EncodedFormat[] = [
 ];
 
 /** The pure JavaScript PBKDF2 that @scure/bip39 uses, as a page passes it. */
-const pageCheck = new WalletEvidenceCheck((password, salt, rounds, bytes) =>
-  pbkdf2(sha512, password, salt, { c: rounds, dkLen: bytes }),
+const pageCheck = new WalletEvidenceCheck(
+  (password, salt, rounds, bytes) => pbkdf2(sha512, password, salt, { c: rounds, dkLen: bytes }),
+  [BITCOIN],
 );
 
 describe("EncodedBackup", () => {
@@ -97,10 +100,10 @@ describe("EncodedBackup", () => {
     expect(original.mode).toBe("seedshift-legacy");
     // withMode gives another backup; the first keeps its mode.
     expect(codes.mode).toBe("direct");
-    expect(EncodedBackup.keepsChecksum("seedshift")).toBe(true);
-    expect(EncodedBackup.keepsChecksum("seedshift-legacy-valid")).toBe(true);
-    expect(EncodedBackup.keepsChecksum("seedshift-legacy")).toBe(false);
-    expect(EncodedBackup.keepsChecksum("direct")).toBe(false);
+    expect(Masking.of("seedshift").keepsChecksum).toBe(true);
+    expect(Masking.of("seedshift-legacy-valid").keepsChecksum).toBe(true);
+    expect(Masking.of("seedshift-legacy").keepsChecksum).toBe(false);
+    expect(Masking.of("direct").keepsChecksum).toBe(false);
   });
 
   it("gives the encoded fingerprint with the host's function when the codes are a valid phrase", () => {
@@ -163,8 +166,38 @@ describe("EncodedBackup", () => {
       "Indexes use Seedshift-compatible numbering from 1 through 2048.",
     );
     expect(EncodedBackup.whyUnreadable("abandon abandon")).toBe(
-      "Enter 12, 15, 18, 21, or 24 English BIP39 words.",
+      "Enter 12, 15, 18, 21 or 24 English BIP39 words.",
     );
+  });
+
+  it("guesses the form of unreadable codes by the separators that their readers take", () => {
+    // Final review CC-02: word numbers or Unicode codes apart by ; or , are not taken for words.
+    // A # is taken for colors first, the most telling sign (EncodedForm.likely).
+    const numbers = Array.from({ length: 13 }, (_, index) => index + 1);
+    for (const separator of [";", ","])
+      expect(EncodedBackup.whyUnreadable(numbers.join(separator)), separator).toBe(
+        "These are 13 word numbers; an encoded seed phrase has 12, 15, 18, 21 or 24.",
+      );
+    const codes = formatEncoded(MASKED, "unicode").match(/.{4}/gu)!;
+    expect(EncodedBackup.whyUnreadable(codes.slice(1).join(";"))).toMatch(/^These are 11 codes;/u);
+  });
+
+  it("refuses a # out of place among colors, as it did before the shared tokenizer", () => {
+    // Final review CC-08: each # starts the six digits of one color, or no color has one.
+    const colors = formatEncoded(MASKED, "colors").split(" ");
+    const digits = colors.map((color) => color.slice(1)).join("");
+    for (const written of [colors.join(" "), colors.join(""), colors.join(", "), digits])
+      expect(EncodedBackup.read(written, "colors", "seedshift").indexes).toEqual(
+        MASKED.shiftedIndexes,
+      );
+    for (const written of [
+      `#${digits.slice(0, 8)} #${digits.slice(8)}`,
+      `${digits.slice(0, 6)}#${digits.slice(6)}`,
+      `${colors[0]} ${digits.slice(6)}`,
+    ])
+      expect(() => EncodedBackup.read(written, "colors", "seedshift"), written).toThrow(
+        "Colors must use #RRGGBB codes, separated or concatenated.",
+      );
   });
 
   it("never changes, and keeps its codes out of text, JSON and a printed object", () => {

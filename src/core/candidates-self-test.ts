@@ -9,8 +9,10 @@
 //
 // Host-neutral: it imports only other core modules.
 
+import { wipeAll } from "./bits.js";
 import { WordCandidateSearch, type WordSearch } from "./candidates.js";
 import { expectRefused, expectSame, hexOfBytes } from "./self-test-check.js";
+import { fingerprintWalletCheck, type PhraseFingerprint } from "./wallet-check.js";
 
 /** The master fingerprint of the public phrase (vectors/mnemocode-v1.json, direct-12). */
 const PUBLIC_FINGERPRINT = "73c5da0a";
@@ -133,16 +135,12 @@ export function checkWordSearchStartup(): void {
  * search run with the wallet check of the host's master fingerprint, which matches only the public
  * phrase and keeps the entropy of every candidate for a list.
  */
-export async function checkWordSearch(
-  fingerprint: (mnemonic: string) => string | PromiseLike<string>,
-): Promise<void> {
+export async function checkWordSearch(fingerprint: PhraseFingerprint): Promise<void> {
   checkWordSearchStartup();
   checkSearch(MISSING_AMONG_REPEATED);
   checkSearch(MISSING_OF_24);
   const result = await WordCandidateSearch.parse(PREFIX_AND_CHOICE.text, "unknown-words").run({
-    walletCheck: async (mnemonic) => ({
-      matched: (await fingerprint(mnemonic)) === PUBLIC_FINGERPRINT,
-    }),
+    walletCheck: fingerprintWalletCheck(fingerprint, PUBLIC_FINGERPRINT),
     keep: PREFIX_AND_CHOICE.count,
   });
   try {
@@ -155,6 +153,6 @@ export async function checkWordSearch(
       "Word search entropies for a list",
     );
   } finally {
-    for (const entropy of result.entropies) entropy.fill(0);
+    wipeAll(result.entropies);
   }
 }

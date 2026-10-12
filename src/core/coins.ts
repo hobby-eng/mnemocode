@@ -16,41 +16,47 @@
 
 import { BITCOIN_CASH } from "./coins/bitcoin-cash.js";
 import { BITCOIN, DOGECOIN, LITECOIN, ZCASH } from "./coins/bitcoin-like.js";
-import { asciiLowercase, trimWhiteSpace, type Coin } from "./coins/coin.js";
+import { CoinList, type Coin, type CoinId } from "./coins/coin.js";
 import { COSMOS, INJECTIVE } from "./coins/cosmos.js";
 import { DASH } from "./coins/dash.js";
-import { ETHEREUM, ETHEREUM_CLASSIC, TRON } from "./coins/evm.js";
+import { ETHEREUM } from "./coins/ethereum.js";
+import { ETHEREUM_CLASSIC, TRON } from "./coins/evm.js";
 import { XRP } from "./coins/xrp.js";
 
 export type { AddressType } from "./coins/address-types.js";
 export { assertAddressLocation } from "./coins/coin.js";
 export type { AddressLocation, Coin, CoinAddress, CoinDescription, CoinId } from "./coins/coin.js";
 
+/**
+ * Every coin by its identifier: a record, so that the compiler wants each identifier once. A test
+ * checks that each key is its coin's identifier.
+ */
+export const COIN_OF_ID: Readonly<Record<CoinId, Coin>> = Object.freeze({
+  bitcoin: BITCOIN,
+  "bitcoin-cash": BITCOIN_CASH,
+  cosmos: COSMOS,
+  dash: DASH,
+  dogecoin: DOGECOIN,
+  ethereum: ETHEREUM,
+  "ethereum-classic": ETHEREUM_CLASSIC,
+  injective: INJECTIVE,
+  litecoin: LITECOIN,
+  tron: TRON,
+  xrp: XRP,
+  zcash: ZCASH,
+});
+
 /** Every coin, in the alphabetical order of their names, the order a host offers them in. */
-export const COINS: readonly Coin[] = Object.freeze([
-  BITCOIN,
-  BITCOIN_CASH,
-  COSMOS,
-  DASH,
-  DOGECOIN,
-  ETHEREUM,
-  ETHEREUM_CLASSIC,
-  INJECTIVE,
-  LITECOIN,
-  TRON,
-  XRP,
-  ZCASH,
-]);
+export const COINS: readonly Coin[] = Object.freeze(
+  Object.values(COIN_OF_ID).sort((left, right) => left.name.localeCompare(right.name, "en")),
+);
+
+/** Every coin, each once, which the command line's wallet checks offer. */
+const COIN_LIST = new CoinList(COINS);
 
 /** The coin of an identifier such as "bitcoin-cash", in either case; refused when unknown. */
 export function coinById(id: string): Coin {
-  const wanted = asciiLowercase(trimWhiteSpace(String(id)));
-  const coin = COINS.find((candidate) => candidate.id === wanted);
-  if (coin === undefined)
-    throw new Error(
-      `Unknown coin "${id}"; the coins are ${COINS.map((known) => known.id).join(", ")}.`,
-    );
-  return coin;
+  return COIN_LIST.byId(id);
 }
 
 /**

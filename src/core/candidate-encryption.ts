@@ -2,9 +2,9 @@
 // MnemoCode, the Wallet Deriver and the Discovery Scanner compile it unchanged. A list goes either
 // to the Scanner's one-time X25519 key (age1…) or, as a separate file, under a passphrase through
 // scrypt; never both and never to more than one key, since a file is only as strong as its weakest
-// stanza and age-encryption itself would accept a mix. ListProtection, at the end, is the entry: the
-// three ways to protect a list behind one interface, chosen once. It also holds the rule for the
-// passphrase of a list (parseListPassphrase), so that every host accepts the same ones.
+// stanza and age-encryption itself would accept a mix. ListProtection, at the end, is the entry:
+// the three ways to protect a list behind one interface, chosen once. It also holds the rule for
+// the passphrase of a list (parseListPassphrase), so that every host accepts the same ones.
 //
 // From the host it needs crypto.getRandomValues and, for X25519 only, WebCrypto (crypto.subtle),
 // which a browser offers only on a secure page; without it the X25519 operations refuse at once
@@ -12,7 +12,12 @@
 // @noble. It reads and writes no file and asks nothing; its only import is age-encryption, nothing
 // of Node.js.
 
+import { wipeAll } from "./bits.js";
 import { Decrypter, Encrypter, generateX25519Identity, identityToRecipient } from "age-encryption";
+import { Redacted } from "./redacted.js";
+import { withoutByteOrderMark } from "./white-space.js";
+import { describeError } from "./refusal.js";
+import { listInWords } from "./places.js";
 
 /** The stanza types that the two kinds of file have, each the only one in its header. */
 const X25519_STANZA = "X25519";
@@ -29,9 +34,6 @@ const STANZA_LINE_START = "-> ";
 const MAX_HEADER_BYTES = 64 * 1024;
 /** Shorter list passphrases are refused: the passphrase is all that protects the seed phrases. */
 export const MIN_LIST_PASSPHRASE_LENGTH = 12;
-/** U+FEFF, which an editor may put at the start of a passphrase file. */
-const BYTE_ORDER_MARK = "\uFEFF";
-const REDACTED_PASSPHRASE = "[PassphraseProtection: redacted]";
 const NO_WEBCRYPTO =
   "An age key (X25519) needs WebCrypto (crypto.subtle), which is missing here: a browser offers it only on a secure page, opened as a file, from localhost or over https.";
 
@@ -92,7 +94,7 @@ export async function encryptCandidates(plain: Uint8Array, recipient: string): P
  * space at its ends; from a file also without a byte order mark. A short one is refused.
  */
 export function parseListPassphrase(text: string): string {
-  const passphrase = (text.startsWith(BYTE_ORDER_MARK) ? text.slice(1) : text).trim();
+  const passphrase = withoutByteOrderMark(text).trim();
   // Characters as a person counts them: code points, not UTF-16 units.
   if ([...passphrase].length < MIN_LIST_PASSPHRASE_LENGTH)
     throw new Error(
@@ -116,13 +118,35 @@ export async function encryptCandidatesWithPassphrase(
   return encrypter.encrypt(plain);
 }
 
+/**
+ * Why a candidate file was refused, by the step it failed at: its header is not that of a list
+ * (`unsupported`), the key given does not open it (`key`), or its contents were changed or cut
+ * (`damaged`).
+ */
+export type CandidateFileProblem = "unsupported" | "key" | "damaged";
+
+/**
+ * Thrown when a candidate file cannot be opened, with why (`problem`), so that a host can add its
+ * own words where it knows more, such as which page a key belongs to. age's own error, where it
+ * failed, is the `cause`.
+ */
+export class CandidateFileRefused extends Error {
+  readonly problem: CandidateFileProblem;
+
+  constructor(problem: CandidateFileProblem, message: string, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.problem = problem;
+  }
+}
+
 /** The stanzas of a binary age file's header, each as its type followed by its arguments. */
-export function ageStanzas(file: Uint8Array): string[][] {
+function ageStanzas(file: Uint8Array): string[][] {
   const header = new TextDecoder("latin1").decode(file.subarray(0, MAX_HEADER_BYTES));
   const lines = header.split("\n");
-  if (lines[0] !== AGE_FIRST_LINE) throw new Error("This is not a binary age file.");
+  if (lines[0] !== AGE_FIRST_LINE)
+    throw new CandidateFileRefused("unsupported", "This is not a binary age file.");
   const end = lines.findIndex((line) => line.startsWith(MAC_LINE_START));
-  if (end < 0) throw new Error("The age header has no end.");
+  if (end < 0) throw new CandidateFileRefused("unsupported", "The age header has no end.");
   return lines
     .slice(1, end)
     .filter((line) => line.startsWith(STANZA_LINE_START))
@@ -130,29 +154,97 @@ export function ageStanzas(file: Uint8Array): string[][] {
 }
 
 /**
+ * How a host chooses to protect a list: to the Scanner's key, under a passphrase, or not at all.
+ */
+export type ListProtectionChoice =
+  | { readonly kind: "key"; readonly recipient: string }
+  | { readonly kind: "passphrase"; readonly passphrase: string }
+  | { readonly kind: "none" };
+
+/** The kind of key that opens a list file: the Scanner's key, or a passphrase. */
+export type ListFileLock = Exclude<ListProtectionChoice["kind"], "none">;
+
+/** The stanza type of each kind of list file. */
+const LOCK_STANZAS: Readonly<Record<ListFileLock, string>> = Object.freeze({
+  key: X25519_STANZA,
+  passphrase: SCRYPT_STANZA,
+});
+
+/**
+ * The kind of key that opens the list `file`, read from its age header: exactly one stanza, X25519
+ * for the Scanner's key or scrypt at the fixed work factor for a passphrase. Anything else is
+ * refused with why, before any key is asked for.
+ */
+export function listFileLock(file: Uint8Array): ListFileLock {
+  const stanzas = ageStanzas(file);
+  const type = stanzas[0]?.[0];
+  const lock = (Object.keys(LOCK_STANZAS) as ListFileLock[]).find(
+    (kind) => LOCK_STANZAS[kind] === type,
+  );
+  if (lock === undefined)
+    throw new CandidateFileRefused(
+      "unsupported",
+      `The candidate file must have exactly one ${X25519_STANZA} or ${SCRYPT_STANZA} recipient.`,
+    );
+  if (stanzas.length !== 1)
+    throw new CandidateFileRefused(
+      "unsupported",
+      `The candidate file must have exactly one ${type} recipient.`,
+    );
+  // An scrypt stanza is "scrypt <salt> <log2 of the work factor>".
+  if (lock === "passphrase" && stanzas[0]![2] !== String(SCRYPT_LOG_N))
+    throw new CandidateFileRefused(
+      "unsupported",
+      `The candidate file must use the scrypt work factor ${SCRYPT_LOG_N}.`,
+    );
+  return lock;
+}
+
+/**
  * Decrypts a candidate file with the session identity or with a passphrase, after checking that
- * its header has exactly one stanza, of the kind that key opens: X25519 for an identity, scrypt at
- * the fixed work factor for a passphrase. The whole file is authenticated before it is returned.
+ * its header has exactly one stanza, of the kind that key opens (listFileLock). The whole file is
+ * authenticated before it is returned.
  */
 export async function decryptCandidates(
   file: Uint8Array,
   key: { readonly identity: string } | { readonly passphrase: string },
 ): Promise<Uint8Array> {
   if ("identity" in key) requireWebCryptoX25519();
-  const stanzas = ageStanzas(file);
-  const expected = "identity" in key ? X25519_STANZA : SCRYPT_STANZA;
-  if (stanzas.length !== 1 || stanzas[0]![0] !== expected)
-    throw new Error(`The candidate file must have exactly one ${expected} recipient.`);
-  // An scrypt stanza is "scrypt <salt> <log2 of the work factor>".
-  if (expected === SCRYPT_STANZA && stanzas[0]![2] !== String(SCRYPT_LOG_N))
-    throw new Error(`The candidate file must use the scrypt work factor ${SCRYPT_LOG_N}.`);
+  const given: ListFileLock = "identity" in key ? "key" : "passphrase";
+  if (listFileLock(file) !== given)
+    throw new CandidateFileRefused(
+      "unsupported",
+      `The candidate file must have exactly one ${LOCK_STANZAS[given]} recipient.`,
+    );
   const decrypter = new Decrypter();
   if ("identity" in key) decrypter.addIdentity(key.identity);
   else decrypter.addPassphrase(key.passphrase);
   // Given bytes, age reads its output through a fetch Response, and a browser replaces any error
   // inside it with its own ("Failed to fetch", "The operation was aborted"): given a stream, it
   // returns the stream unread, and its own error, such as "invalid tag", reaches every host.
-  return readWhole(await decrypter.decrypt(streamOf(file)));
+  let stream: ReadableStream<Uint8Array>;
+  try {
+    // The header: a key that opens no stanza fails here, and so does a stanza changed on its way,
+    // which age cannot tell apart from a wrong key.
+    stream = await decrypter.decrypt(streamOf(file));
+  } catch (error) {
+    const what = given === "key" ? "This Scanner key" : "This passphrase";
+    throw new CandidateFileRefused(
+      "key",
+      `${what} does not open the candidate file, or its header is damaged (${describeError(error)}).`,
+      error,
+    );
+  }
+  try {
+    return await readWhole(stream);
+  } catch (error) {
+    // The contents: every chunk carries its own tag, so a changed or cut file fails here.
+    throw new CandidateFileRefused(
+      "damaged",
+      `The candidate file is damaged (${describeError(error)}).`,
+      error,
+    );
+  }
 }
 
 /** `bytes` as a stream of one chunk. */
@@ -184,7 +276,7 @@ async function readWhole(stream: ReadableStream<Uint8Array>): Promise<Uint8Array
     return whole;
   } finally {
     // The list is a secret: no copy stays behind, also when the file is refused part way.
-    for (const chunk of chunks) chunk.fill(0);
+    wipeAll(chunks);
     reader.releaseLock();
   }
 }
@@ -237,11 +329,12 @@ export class ScannerKeyProtection implements ListProtection {
  * read by the rule of parseListPassphrase, so that a short one cannot be used, and it is kept only
  * here, never shown through toString, toJSON or Node's inspect.
  */
-export class PassphraseProtection implements ListProtection {
+export class PassphraseProtection extends Redacted implements ListProtection {
   readonly #passphrase: string;
 
   /** Takes the passphrase as typed or read from a file (parseListPassphrase). */
   constructor(text: string) {
+    super("PassphraseProtection");
     this.#passphrase = parseListPassphrase(text);
   }
 
@@ -256,18 +349,6 @@ export class PassphraseProtection implements ListProtection {
 
   protect(list: Uint8Array): Promise<Uint8Array> {
     return encryptCandidatesWithPassphrase(list, this.#passphrase);
-  }
-
-  toString(): string {
-    return REDACTED_PASSPHRASE;
-  }
-
-  toJSON(): string {
-    return REDACTED_PASSPHRASE;
-  }
-
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED_PASSPHRASE;
   }
 }
 
@@ -285,5 +366,65 @@ export class NoProtection implements ListProtection {
   /** The list itself, the same bytes. */
   protect(list: Uint8Array): Promise<Uint8Array> {
     return Promise.resolve(list);
+  }
+}
+
+/** The fields of each kind of ListProtectionChoice besides its kind, each a string. */
+const CHOICE_FIELDS = Object.freeze({
+  key: ["recipient"],
+  passphrase: ["passphrase"],
+  none: [],
+} as const) satisfies Readonly<Record<ListProtectionChoice["kind"], readonly string[]>>;
+
+/** Each kind of choice as a host writes it, such as `{ kind: "key", recipient }`. */
+const CHOICE_SHAPES = Object.entries(CHOICE_FIELDS).map(
+  ([kind, fields]) => `{ kind: "${kind}"${fields.map((field) => `, ${field}`).join("")} }`,
+);
+
+/** Why a choice is refused that is not one of ListProtectionChoice; it repeats nothing given. */
+const NOT_A_PROTECTION_CHOICE =
+  `The protection of a candidate list must be ${listInWords(CHOICE_SHAPES, "or")}, ` +
+  "each field a text and no other field.";
+
+/**
+ * `choice` as ListProtectionChoice, or a TypeError: a JavaScript or parsed host may pass a kind
+ * that is misspelt, missing or inherited, or fields of another kind, and none of these may fall
+ * through to a list in the open (AUD-014-SEC001). Only an own kind of CHOICE_FIELDS is taken, with
+ * exactly its own fields, each a string. The choice is copied once and the copy is checked and
+ * returned: a host's object may answer differently when it is read again (AUD-015).
+ */
+function checkedChoice(given: unknown): ListProtectionChoice {
+  if (typeof given !== "object" || given === null) throw new TypeError(NOT_A_PROTECTION_CHOICE);
+  const choice: object = { ...given };
+  const fields = choice as Readonly<Record<string, unknown>>;
+  const kind = Object.hasOwn(choice, "kind") ? fields["kind"] : undefined;
+  if (typeof kind !== "string" || !Object.hasOwn(CHOICE_FIELDS, kind))
+    throw new TypeError(NOT_A_PROTECTION_CHOICE);
+  const wanted: readonly string[] = CHOICE_FIELDS[kind as ListProtectionChoice["kind"]];
+  // Own enumerable names, as many as the kind has and each one of them: no field is missing, and
+  // none of another kind, such as a passphrase beside "none", comes along unread.
+  const names = Object.keys(choice);
+  if (
+    names.length !== wanted.length + 1 ||
+    !names.every((name) => name === "kind" || wanted.includes(name)) ||
+    !wanted.every((name) => typeof fields[name] === "string")
+  )
+    throw new TypeError(NOT_A_PROTECTION_CHOICE);
+  return choice as ListProtectionChoice;
+}
+
+/**
+ * The protection that a host's `choice` names (ListProtectionChoice); a list in the open only for
+ * an explicit `{ kind: "none" }`, and anything else that is not one of the three is refused.
+ */
+export function protectionFor(choice: ListProtectionChoice): ListProtection {
+  const checked = checkedChoice(choice);
+  switch (checked.kind) {
+    case "key":
+      return new ScannerKeyProtection(checked.recipient);
+    case "passphrase":
+      return new PassphraseProtection(checked.passphrase);
+    case "none":
+      return new NoProtection();
   }
 }

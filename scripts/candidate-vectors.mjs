@@ -15,8 +15,14 @@ import {
   searchCombinations,
   entropyOfWords,
 } from "../dist/core/candidates.js";
-import { encodeCandidateList, padmeLength } from "../dist/core/candidate-list.js";
-import { crc32 } from "../dist/sskr/checksum.js";
+import {
+  encodeCandidateList,
+  padmeLength,
+  MAX_CANDIDATE_RECORDS,
+  MAX_PASSPHRASE_BYTES,
+} from "../dist/core/candidate-list.js";
+import { CRC32_BYTES, crc32 } from "../dist/sskr/checksum.js";
+import { BIP39_ENTROPY_BYTES } from "../dist/core/bip39-sizes.js";
 import {
   createSessionIdentity,
   encryptCandidates,
@@ -28,6 +34,22 @@ const PATH = new URL("../vectors/candidates-v1.json", import.meta.url);
 const hex = (bytes) => Buffer.from(bytes).toString("hex");
 const fromHex = (text) => Uint8Array.from(Buffer.from(text, "hex"));
 const repeat = (word, times) => Array(times).fill(word).join(" ");
+const entropy = (phrase) => entropyOfWords(phrase.split(" ").map((word) => wordlist.indexOf(word)));
+
+/**
+ * The places and sizes of the list's fields that the invalid lists change, in bytes, as
+ * docs/CANDIDATES.md, "The list", gives them.
+ */
+const LIST = Object.freeze({
+  MAGIC_AT: 0,
+  VERSION_AT: 4,
+  FLAGS_AT: 5,
+  ENTROPY_LENGTH_AT: 6,
+  COUNT_AT: 7,
+  HEADER: 11,
+  PASSPHRASE_LENGTH: 2,
+  CRC: CRC32_BYTES,
+});
 
 /** Public BIP39 test phrases (BIP-0039 reference vectors). */
 const LEGAL = "legal winner thank year wave sausage worth useful legal winner thank yellow";
@@ -111,7 +133,7 @@ function searchVector(search) {
   const at = (number) => ({
     number,
     phrase: phrases[number - 1],
-    entropy: hex(entropyOfWords(phrases[number - 1].split(" ").map((w) => wordlist.indexOf(w)))),
+    entropy: hex(entropy(phrases[number - 1])),
   });
   const samples = search.samples ?? [1, 2, phrases.length];
   const vector = {
@@ -128,7 +150,6 @@ function searchVector(search) {
   return vector;
 }
 
-const entropy = (phrase) => entropyOfWords(phrase.split(" ").map((word) => wordlist.indexOf(word)));
 const small = [`${repeat("abandon", 11)} about`, LEGAL, `${repeat("zoo", 11)} wrong`];
 const lists = [
   { name: "three phrases", list: { records: small.map((p) => ({ entropy: entropy(p) })) } },
@@ -182,68 +203,94 @@ const lists = [
  * Lists a reader must refuse, each a valid list with one thing broken and, where a field rule is
  * meant, its CRC-32 and padding written anew, so that only that rule can refuse it.
  */
-const CRC_BYTES = 4;
-/** A list from raw content: CRC-32 and Padmé padding as a writer would add them. */
+/**
+ * A list from raw content: CRC-32 and Padmé padding as a writer would add them. It rebuilds the
+ * sealing of the specification on purpose instead of calling the writer, so that no invalid list
+ * comes from the code under test; test/candidates.test.ts keeps it in step, since a sealing that
+ * drifted would change the reason each of these lists is refused for.
+ */
 function sealed(content) {
-  const length = content.length + CRC_BYTES;
+  const length = content.length + LIST.CRC;
   const bytes = new Uint8Array(padmeLength(length));
   bytes.set(content);
   new DataView(bytes.buffer).setUint32(content.length, crc32(content));
   return bytes;
 }
 const three = fromHex(lists[0].bytes);
-const threeContent = three.subarray(0, 11 + 3 * 16);
+const threeContent = three.subarray(0, LIST.HEADER + small.length * entropy(small[0]).length);
 const withPassphraseField = (flags, fieldBytes) =>
   Uint8Array.from([
-    ...threeContent.subarray(0, 5),
+    ...threeContent.subarray(0, LIST.FLAGS_AT),
     flags,
-    ...threeContent.subarray(6, 11),
+    ...threeContent.subarray(LIST.FLAGS_AT + 1, LIST.HEADER),
     ...fieldBytes,
-    ...threeContent.subarray(11),
+    ...threeContent.subarray(LIST.HEADER),
   ]);
+/** A passphrase field: its length, then its bytes. */
+const passphraseField = (bytes) => {
+  const field = new Uint8Array(LIST.PASSPHRASE_LENGTH + bytes.length);
+  new DataView(field.buffer).setUint16(0, bytes.length);
+  field.set(bytes, LIST.PASSPHRASE_LENGTH);
+  return field;
+};
+/** The header of the three phrases with `count` records written in it. */
+const headerWithCount = (count) => {
+  const header = Uint8Array.from(threeContent.subarray(0, LIST.HEADER));
+  new DataView(header.buffer).setUint32(LIST.COUNT_AT, count);
+  return header;
+};
 const changed = (offset, value) => {
   const content = Uint8Array.from(threeContent);
   content[offset] = value;
   return sealed(content);
 };
 const invalidLists = [
-  { name: "wrong magic", refusal: "not a MnemoCode candidate list", bytes: changed(0, 0x4e) },
-  { name: "version 2", refusal: "version", bytes: changed(4, 2) },
-  { name: "an unknown flag", refusal: "flags", bytes: changed(5, 4) },
-  { name: "entropy length 17", refusal: "entropy length", bytes: changed(6, 17) },
   {
-    name: "no records",
-    refusal: "record count",
-    bytes: sealed(Uint8Array.from([...threeContent.subarray(0, 7), 0, 0, 0, 0])),
+    name: "wrong magic",
+    refusal: "not a MnemoCode candidate list",
+    bytes: changed(LIST.MAGIC_AT, 0x4e),
   },
+  { name: "version 2", refusal: "version", bytes: changed(LIST.VERSION_AT, 2) },
+  { name: "an unknown flag", refusal: "flags", bytes: changed(LIST.FLAGS_AT, 4) },
   {
-    name: `${2 ** 19 + 1} records`,
+    name: "entropy length 17",
+    refusal: "entropy length",
+    bytes: changed(LIST.ENTROPY_LENGTH_AT, 17),
+  },
+  { name: "no records", refusal: "record count", bytes: sealed(headerWithCount(0)) },
+  {
+    name: `${MAX_CANDIDATE_RECORDS + 1} records`,
     refusal: "record count",
     bytes: sealed(
-      Uint8Array.from([...threeContent.subarray(0, 7), 0, 8, 0, 1, ...threeContent.subarray(11)]),
+      Uint8Array.from([
+        ...headerWithCount(MAX_CANDIDATE_RECORDS + 1),
+        ...threeContent.subarray(LIST.HEADER),
+      ]),
     ),
   },
   {
     name: "a passphrase for all of length 0",
     refusal: "wrong length",
-    bytes: sealed(withPassphraseField(1, [0, 0])),
+    bytes: sealed(withPassphraseField(1, passphraseField([]))),
   },
   {
-    name: "a passphrase for all of 257 bytes",
+    name: `a passphrase for all of ${MAX_PASSPHRASE_BYTES + 1} bytes`,
     refusal: "wrong length",
-    bytes: sealed(withPassphraseField(1, [1, 1, ...Array(257).fill(0x61)])),
+    bytes: sealed(
+      withPassphraseField(1, passphraseField(Array(MAX_PASSPHRASE_BYTES + 1).fill(0x61))),
+    ),
   },
   {
     name: "a passphrase that is not UTF-8",
     refusal: "UTF-8",
-    bytes: sealed(withPassphraseField(1, [0, 2, 0xc3, 0x28])),
+    bytes: sealed(withPassphraseField(1, passphraseField([0xc3, 0x28]))),
   },
   {
     name: "a damaged record",
     refusal: "CRC-32",
     bytes: (() => {
       const bytes = Uint8Array.from(three);
-      bytes[11] ^= 1;
+      bytes[LIST.HEADER] ^= 1;
       return bytes;
     })(),
   },
@@ -260,9 +307,15 @@ const invalidLists = [
   { name: "a byte too few", refusal: "", bytes: three.subarray(0, three.length - 1) },
 ].map((vector) => ({ ...vector, bytes: hex(vector.bytes) }));
 
-const padme = [31, 32, 63, 100, 1000, 4097, 65_536, 2 ** 19 * 16 + 15, 2 ** 19 * 32 + 15].map(
-  (length) => ({ length, padded: padmeLength(length) }),
-);
+/** Lengths at and around the steps of Padmé. */
+const PADME_STEPS = [31, 32, 63, 100, 1000, 4097, 65_536];
+/** The length of the longest list of phrases of `entropyBytes`, before its padding. */
+const longestList = (entropyBytes) => MAX_CANDIDATE_RECORDS * entropyBytes + LIST.HEADER + LIST.CRC;
+const padme = [
+  ...PADME_STEPS,
+  longestList(BIP39_ENTROPY_BYTES[0]),
+  longestList(BIP39_ENTROPY_BYTES.at(-1)),
+].map((length) => ({ length, padded: padmeLength(length) }));
 
 async function ageVectors(previous) {
   if (previous !== undefined && !process.argv.includes("--new-age-files")) return previous;

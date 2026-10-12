@@ -13,65 +13,83 @@
 // code such as 4E?0, whose digits are not bits of its word number, is unknown as a whole, and the
 // words whose code fits are its candidates: a solution must be one of them (fits), and where that
 // shortens the search they are tried one by one, each as the code's bits (withValues).
+//
+// MarkedReading and ReadingSpace are the classes of the repair: a way to read a marked text, and
+// the solutions of that reading on its own, which owns the share's secret arrays and wipes them.
+// The units of each form are read and written through share-units.ts and the mixed layout through
+// mixed-layout.ts, as the reader of shares reads them (transport.ts).
 
-import { bytewords } from "./bytewords-list.js";
-import { crc32, shareMask } from "./checksum.js";
-import { solve } from "./gf2.js";
 import {
-  CHECKSUM_BYTES,
-  COLOR_VERSION,
-  readShare,
-  RGB_BYTES,
-  SHARE_HEADER_BYTES,
+  apartHexUnits,
+  codeTokens,
+  hexCodePoint,
+  hexUnits,
+  joinedHexUnits,
+  UNICODE_CODE_DIGITS,
+  wholeMark,
+} from "../core/code-text.js";
+import {
+  byteStringHeads,
+  MEMBER_BYTE,
+  NIBBLE_BITS,
   SHARE_LENGTHS,
-  WORD_BITS,
-  WORD_COUNT,
-  WORD_VERSION,
-  type ShareFormat,
-} from "./transport.js";
-import { traditionalChineseWordlist, UNICODE_INDEX, unicodeHex } from "../core/words.js";
+  SHARE_METADATA_BYTES,
+  SSKR_CBOR_TAGS,
+  tagBytes,
+  payloadLayouts,
+} from "./share-layout.js";
+import { checksumAt, crc32 } from "./checksum.js";
+import { BitFields, combination, linearize, solve, unitVectors } from "./gf2.js";
+import { CHECKSUM_BYTES, MAX_TRANSPORT_BYTES, readShare, type ShareFormat } from "./transport.js";
+import {
+  fillingFields,
+  headerFields,
+  SHARE_HEADER_BYTES,
+  unmixedBody,
+  type MixedForm,
+  type ZeroField,
+} from "./mixed-layout.js";
+import { BYTEWORD_SEPARATORS, SHARE_UNITS, UR_SSKR_START } from "./share-units.js";
+import { unicodeCodesFitting } from "../core/words.js";
 import {
   COLOR_UNICODE_BASE,
-  COLOR_UNICODE_WIDTH,
-  colorsToUnicode,
-  unicodeToColorCodes,
+  COLOR_UNICODE_POINTS_PER_COLOR,
+  isColorUnicodePoint,
+  markedColorSymbols,
+  RGB_HEX_DIGITS,
 } from "../core/colors.js";
+import { BITS_PER_BYTE, xorInto } from "../core/bits.js";
+import { capitalized } from "../core/prose.js";
+import { listPieces } from "../core/pieces.js";
 
 /** More marked elements than this leave too few checksum bits to find them. */
 export const MAX_MARKED_ELEMENTS = 6;
 /** Hexadecimal digits of a color, #RRGGBB, and of a Unicode code of a word. */
-const COLOR_DIGITS = 6;
-const CODE_DIGITS = 4;
-const NIBBLE_BITS = 4;
-/**
- * The most ? a text may hold: a ? for each digit of every color that a share may mark
- * (MAX_MARKED_ELEMENTS colors), so that marking digits one by one costs no element.
- */
-const MAX_MARK_SYMBOLS = MAX_MARKED_ELEMENTS * COLOR_DIGITS;
+const COLOR_DIGITS = RGB_HEX_DIGITS;
+const CODE_DIGITS = UNICODE_CODE_DIGITS;
+/** The bits of one hexadecimal digit. */
+const HEX_DIGIT_BITS = 4;
+/** A whole Unicode code, alone. */
+const WHOLE_CODE = new RegExp(`^[0-9A-F]{${CODE_DIGITS}}$`, "u");
+/** The code points of Color Unicode text, each as its hexadecimal digits. */
+const CODE_POINT_TEXT = new RegExp(`.{${CODE_DIGITS}}`, "gu");
+/** A pair of letters of a UR as written, in lower case. */
+const UR_PAIR = /[a-z]{2}/;
 /**
  * Readings that one share alone is tried in, one for each choice of words for its partly read
- * Unicode codes (choicesWithin), when the checksum alone leaves too many solutions.
+ * Unicode codes (MarkedReading.choicesAt), when the checksum alone leaves too many solutions.
  */
 export const MAX_CODE_CHOICES = 256;
-export const MAX_REPAIR_TEXT_LENGTH = 2048;
-const MAX_REPAIR_UNITS = 128;
+/** The longest text of one share that a repair reads (exceedsMarks). */
+const MAX_REPAIR_TEXT_LENGTH = 2048;
+// Every unit holds at least one byte of the transport, so no repairable share has more units.
+const MAX_REPAIR_UNITS = MAX_TRANSPORT_BYTES;
 /**
  * Up to 2^4 solutions of one share are listed as variants. Restoring with other shares may try up
  * to 2^8 of them, since the SSKR library then keeps only the one whose secret digest fits.
  */
 export const LISTED_FREE_BITS = 4;
-const BYTE_BITS = 8;
-const COLOR_BITS = RGB_BYTES * BYTE_BITS;
-const CRC_BITS = CHECKSUM_BYTES * BYTE_BITS;
-/** A CBOR byte string of fewer than 24 bytes may also carry its length in a byte of its own. */
-const CBOR_SHORT_LENGTH_LIMIT = 24;
-/** The registered SSKR CBOR tag 40309, as the bytes that open a share in Bytewords. */
-const SSKR_TAG_BYTES = [0xd9, 0x9d, 0x75] as const;
-/** The SSKR tag 309 that earlier tools wrote. */
-const SSKR_LEGACY_TAG_BYTES = [0xd9, 0x01, 0x35] as const;
-/** CBOR major type 2, a byte string: its length in the low bits, or in the byte after 0x58. */
-const CBOR_BYTE_STRING = 0x40;
-const CBOR_BYTE_STRING_ONE_BYTE_LENGTH = 0x58;
+const CRC_BITS = CHECKSUM_BYTES * BITS_PER_BYTE;
 
 /** An element filled in by a repair: its place, counted from 1, and what it is. */
 export interface FilledElement {
@@ -85,6 +103,16 @@ export interface ReadRepairableShare {
   readonly repaired: boolean;
   /** The marked elements as the repair filled them in, in order. */
   readonly filled: readonly FilledElement[];
+}
+
+/** A complete share, read in its form, as a repair gives it back with nothing filled in. */
+export function unrepairedShare(text: string): ReadRepairableShare {
+  return { ...readShare(text), repaired: false, filled: [] };
+}
+
+/** Whether `text`, a whole share as written, marks an element that could not be read with ?. */
+export function isMarked(text: string): boolean {
+  return text.includes("?");
 }
 
 /**
@@ -115,22 +143,26 @@ export interface ShareStructure {
 }
 
 /**
- * A share read as units of one form: their values, undefined where marked, and the structures that
- * the unit count allows.
+ * A share read as units of one form: their values, undefined where marked. The form writes the
+ * units (SHARE_UNITS).
  */
-interface UnitModel {
+interface ReadingUnits {
   readonly format: ShareFormat;
-  readonly unitBits: number;
   readonly values: readonly (number | undefined)[];
-  readonly structures: readonly ShareStructure[];
-  readonly unitText: (value: number) => string;
-  readonly text: (values: readonly number[]) => string;
   /** Rejects values that the written text rules out, such as a color code given half. */
   readonly fits?: (values: readonly number[]) => boolean;
-  /** For each marked unit read in part, the bits that were read (ReadBits). */
+  /** For each marked unit read in part, the bits that were read (ReadBits); equations too. */
   readonly readBits?: readonly (ReadBits | undefined)[];
-  /** For each partly read unit whose digits are no bits of it, the values that fit them. */
+  /**
+   * For each partly read unit whose digits are no bits of it, such as a Unicode code, the values
+   * that fit the digits read: a solution takes one of them (fits), and withValues tries them.
+   */
   readonly candidates?: readonly (readonly number[] | undefined)[];
+}
+
+/** The units of a share in one form, with every structure that their count allows. */
+interface UnitModel extends ReadingUnits {
+  readonly structures: readonly ShareStructure[];
 }
 
 /**
@@ -143,23 +175,6 @@ export interface ReadBits {
   readonly mask: number;
 }
 
-/** Fields as one number of bits, the first field lowest: [value, width] pairs. */
-function bitFields(fields: readonly (readonly [number, number])[]): bigint {
-  let result = 0n;
-  let shift = 0n;
-  for (const [value, width] of fields) {
-    result |= (BigInt(value) & ((1n << BigInt(width)) - 1n)) << shift;
-    shift += BigInt(width);
-  }
-  return result;
-}
-
-function uint32At(bytes: readonly number[], at: number): number {
-  return (
-    ((bytes[at]! << 24) | (bytes[at + 1]! << 16) | (bytes[at + 2]! << 8) | bytes[at + 3]!) >>> 0
-  );
-}
-
 /**
  * A CBOR layout of a share: its payload length, its byte-string header in bytes, and the bytes of
  * its tag, if any.
@@ -170,38 +185,31 @@ interface CborLayout {
   readonly tagBytes: readonly number[];
 }
 
-/** The SSKR tags that the reader accepts (transport.ts): 40309, and the earlier 309. */
-const SSKR_TAGS: readonly (readonly number[])[] = [SSKR_TAG_BYTES, SSKR_LEGACY_TAG_BYTES];
+/** The bytes that open a share with each SSKR tag that the reader accepts (share-layout.ts). */
+const SSKR_TAGS: readonly (readonly number[])[] = SSKR_CBOR_TAGS.map(tagBytes);
 
-/** Every CBOR layout: SSKR metadata and secret, a short or long header, each of `tags`. */
+/** Every CBOR layout: SSKR metadata and secret, each head its length allows, each of `tags`. */
 function cborLayouts(tags: readonly (readonly number[])[]): CborLayout[] {
   return [...SHARE_LENGTHS].flatMap((payloadLength) =>
-    (payloadLength < CBOR_SHORT_LENGTH_LIMIT ? [1, 2] : [2]).flatMap((header) =>
-      tags.map((tagBytes) => ({ payloadLength, header, tagBytes })),
+    byteStringHeads(payloadLength).flatMap((head) =>
+      tags.map((tagBytes) => ({ payloadLength, header: head.length, tagBytes })),
     ),
   );
 }
-
-/** SSKR metadata: 2 identifier bytes, 2 bytes of thresholds and the group, then the member. */
-export const METADATA_BYTES = 5;
-/** The high nibble of the member byte is reserved and must be zero (sskr encoding.rs). */
-const RESERVED_SHIFT = 4;
 
 /**
  * Residual rows that every layout adds: the tag, the byte-string header for its payload length,
  * and the reserved nibble.
  */
-function cborRows(cbor: ArrayLike<number>, layout: CborLayout): (readonly [number, number])[] {
+function cborRows(cbor: ArrayLike<number>, layout: CborLayout): ZeroField[] {
   const { payloadLength, header, tagBytes } = layout;
   const tag = tagBytes.length;
-  const headerBytes =
-    header === 1
-      ? [CBOR_BYTE_STRING + payloadLength]
-      : [CBOR_BYTE_STRING_ONE_BYTE_LENGTH, payloadLength];
+  const headerBytes = byteStringHeads(payloadLength).find((head) => head.length === header)!;
   return [
-    ...tagBytes.map((byte, index) => [cbor[index]! ^ byte, BYTE_BITS] as const),
-    ...headerBytes.map((byte, index) => [cbor[tag + index]! ^ byte, BYTE_BITS] as const),
-    [cbor[tag + header + METADATA_BYTES - 1]! >>> RESERVED_SHIFT, BYTE_BITS - RESERVED_SHIFT],
+    ...tagBytes.map((byte, index) => [cbor[index]! ^ byte, BITS_PER_BYTE] as const),
+    ...headerBytes.map((byte, index) => [cbor[tag + index]! ^ byte, BITS_PER_BYTE] as const),
+    // The reserved high nibble of the member's byte (sskr encoding.rs).
+    [cbor[tag + header + MEMBER_BYTE]! >>> NIBBLE_BITS, BITS_PER_BYTE - NIBBLE_BITS],
   ];
 }
 
@@ -212,69 +220,78 @@ function payloadOf(cbor: ArrayLike<number>, layout: CborLayout): Uint8Array {
   );
 }
 
-/** Bytes and the bits left over after the last whole byte, as written by one form. */
-type Packed = { readonly bytes: readonly number[]; readonly leftover: readonly [number, number] };
-
-/** Bytes from 11-bit word indexes (transport.ts, bytesToWordIndexes, in reverse). */
-function wordBytes(values: readonly number[]): Packed {
-  const bytes: number[] = [];
-  let buffer = 0;
-  let bits = 0;
-  for (const value of values) {
-    buffer = (buffer << WORD_BITS) | value;
-    bits += WORD_BITS;
-    while (bits >= BYTE_BITS) {
-      bits -= BYTE_BITS;
-      bytes.push((buffer >>> bits) & 0xff);
-    }
-    buffer &= (1 << bits) - 1;
+/**
+ * The residual and the payload of `cbor` laid out as `layout`, with `recorded` its checksum as
+ * written: the checksum against the CBOR, then `fields` of the form, then the rows of the layout.
+ * Every structure, standard or mixed, evaluates its share through it. It owns `cbor`, a new array
+ * from each caller that holds the whole share, and wipes it: the payload it gives back is a copy,
+ * which the caller wipes.
+ */
+function layoutResidual(
+  cbor: Uint8Array,
+  recorded: number,
+  layout: CborLayout,
+  fields: readonly ZeroField[] = [],
+): { readonly residual: bigint; readonly payload: Uint8Array } {
+  try {
+    return {
+      residual: BitFields.of([
+        [crc32(cbor) ^ recorded, CRC_BITS],
+        ...fields,
+        ...cborRows(cbor, layout),
+      ]),
+      payload: payloadOf(cbor, layout),
+    };
+  } finally {
+    cbor.fill(0);
   }
-  return { bytes, leftover: [buffer, bits] };
 }
 
-function colorBytes(values: readonly number[]): Packed {
-  return {
-    bytes: values.flatMap((color) => [(color >>> 16) & 0xff, (color >>> 8) & 0xff, color & 0xff]),
-    leftover: [0, 0],
-  };
+/** Every CBOR layout of a mixed share: without a tag, or with each SSKR tag. */
+const MIXED_LAYOUTS: readonly CborLayout[] = cborLayouts([[], ...SSKR_TAGS]);
+
+/** The bytes of the CBOR of `layout`: its tag, its byte-string header and its payload. */
+function cborLengthOf(layout: CborLayout): number {
+  return layout.tagBytes.length + layout.header + layout.payloadLength;
+}
+
+/** Where a mixed share of `layout` ends: its checksum, its version and length, and its CBOR. */
+function mixedEnd(layout: CborLayout): number {
+  return CHECKSUM_BYTES + SHARE_HEADER_BYTES + cborLengthOf(layout);
+}
+
+/** The unit counts that a mixed share of `form` can have: those that mixedStructures solves. */
+function mixedUnitCounts(form: MixedForm): ReadonlySet<number> {
+  return new Set(MIXED_LAYOUTS.map((layout) => form.unitCount(mixedEnd(layout))));
 }
 
 /**
- * Structures of a mixed share, in colors or words (transport.ts, mixShare), one per CBOR layout
- * whose length fits: the checksum against the unmixed CBOR, the version, the length, the filling
- * after the share, which must be zero, and the rows of the layout itself.
+ * Structures of a mixed share of `units` units of `form`, in colors or words (mixed-layout.ts),
+ * one per CBOR layout whose length the units hold: the checksum against the unmixed CBOR, the
+ * version and the length (headerFields), the filling after the share, which must be zero
+ * (fillingFields), and the rows of the layout itself.
  */
-function mixedStructures(
-  version: number,
-  fitsLength: (shareBytes: number) => boolean,
-  toBytes: (values: readonly number[]) => Packed,
-): ShareStructure[] {
-  return cborLayouts([[], ...SSKR_TAGS]).flatMap((layout) => {
-    const cborLength = layout.tagBytes.length + layout.header + layout.payloadLength;
-    const end = CHECKSUM_BYTES + SHARE_HEADER_BYTES + cborLength;
-    if (!fitsLength(end)) return [];
+function mixedStructures(form: MixedForm, units: number): ShareStructure[] {
+  return MIXED_LAYOUTS.flatMap((layout) => {
+    const cborLength = cborLengthOf(layout);
+    const end = mixedEnd(layout);
+    if (form.unitCount(end) !== units) return [];
     return [
       {
         payloadLength: layout.payloadLength,
         evaluate: (values) => {
-          const { bytes, leftover } = toBytes(values);
-          const checksum = Uint8Array.from(bytes.slice(0, CHECKSUM_BYTES));
-          const unmix = (index: number) =>
-            bytes[CHECKSUM_BYTES + index]! ^ shareMask(checksum, index);
-          const cbor = Uint8Array.from({ length: cborLength }, (_, index) =>
-            unmix(SHARE_HEADER_BYTES + index),
-          );
-          return {
-            residual: bitFields([
-              [crc32(cbor) ^ uint32At(bytes, 0), CRC_BITS],
-              [unmix(0) ^ version, BYTE_BITS],
-              [unmix(1) ^ cborLength, BYTE_BITS],
-              ...bytes.slice(end).map((byte) => [byte, BYTE_BITS] as const),
-              leftover,
-              ...cborRows(cbor, layout),
-            ]),
-            payload: payloadOf(cbor, layout),
-          };
+          const packed = form.pack(values);
+          const body = unmixedBody(packed.bytes, SHARE_HEADER_BYTES + cborLength);
+          const cbor = Uint8Array.from(body.slice(SHARE_HEADER_BYTES));
+          try {
+            return layoutResidual(cbor, checksumAt(packed.bytes, 0), layout, [
+              ...headerFields(body, form.version, cborLength),
+              ...fillingFields(packed, end),
+            ]);
+          } finally {
+            // The unmixed share, whose CBOR layoutResidual wipes in its own copy.
+            body.fill(0);
+          }
         },
       },
     ];
@@ -287,55 +304,50 @@ function mixedStructures(
  * or the earlier 309, or none, since transport.ts reads all of them (AUD-008-API006).
  */
 function standardStructures(units: number): ShareStructure[] {
-  const layouts: CborLayout[] = [[], ...SSKR_TAGS].flatMap((tagBytes) => {
-    const content = units - CHECKSUM_BYTES - tagBytes.length;
-    return [
-      { payloadLength: content - 2, header: 2, tagBytes },
-      ...(content - 1 < CBOR_SHORT_LENGTH_LIMIT
-        ? [{ payloadLength: content - 1, header: 1, tagBytes }]
-        : []),
-    ];
-  });
-  return layouts
-    .filter((layout) => SHARE_LENGTHS.has(layout.payloadLength))
-    .map((layout) => ({
-      payloadLength: layout.payloadLength,
-      evaluate: (values) => {
-        const cbor = values.slice(0, units - CHECKSUM_BYTES);
-        return {
-          residual: bitFields([
-            [crc32(Uint8Array.from(cbor)) ^ uint32At(values, units - CHECKSUM_BYTES), CRC_BITS],
-            ...cborRows(cbor, layout),
-          ]),
-          payload: payloadOf(cbor, layout),
-        };
-      },
-    }));
+  const layouts: CborLayout[] = [[], ...SSKR_TAGS].flatMap((tagBytes) =>
+    payloadLayouts(units - CHECKSUM_BYTES - tagBytes.length).map(({ payloadLength, head }) => ({
+      payloadLength,
+      header: head,
+      tagBytes,
+    })),
+  );
+  return layouts.map((layout) => ({
+    payloadLength: layout.payloadLength,
+    evaluate: (values) =>
+      layoutResidual(
+        Uint8Array.from(values.slice(0, units - CHECKSUM_BYTES)),
+        checksumAt(values, units - CHECKSUM_BYTES),
+        layout,
+      ),
+  }));
 }
 
-/** Splits text into units of one pattern, with ? for an unreadable unit, or undefined. */
-function unitsOf(text: string, unit: RegExp): string[] | undefined {
-  const units = text.match(new RegExp(`${unit.source}|\\?`, "giu"));
-  if (units === null || units.join("") !== text || units.length > MAX_REPAIR_UNITS)
-    return undefined;
-  return units;
+/** The structures of a share of `units` units in `format`: mixed, or standard. */
+function structuresOf(format: ShareFormat, units: number): ShareStructure[] {
+  const { mixed } = SHARE_UNITS[format];
+  return mixed === undefined ? standardStructures(units) : mixedStructures(mixed, units);
+}
+
+/** `units`, or undefined when there are more of them than any repairable share has. */
+function withinRepair(units: string[] | undefined): string[] | undefined {
+  return units !== undefined && units.length <= MAX_REPAIR_UNITS ? units : undefined;
+}
+
+/** The pairs of letters of a UR as written, with ? for an unreadable pair, or undefined. */
+function urPairs(body: string): string[] | undefined {
+  const units = body.match(new RegExp(`${UR_PAIR.source}|\\?`, "giu"));
+  return withinRepair(units !== null && units.join("") === body ? units : undefined);
 }
 
 /**
- * Hexadecimal codes of `digits` digits written apart, such as colors or Unicode codes: each a lone
- * ? where none of its digits can be read, or `digits` symbols in which each ? is one digit that
- * cannot be read. Undefined when the text is not written so; a ? then stands for a whole unit.
+ * Hexadecimal codes of `digits` digits, such as colors or Unicode codes, as code-text reads them
+ * (hexUnits): written apart, each a lone ? where none of its digits can be read, or `digits`
+ * symbols in which each ? is one digit that cannot be read, a code all of whose digits are ? being
+ * the same as a lone ?; or run together, a ? standing for a whole code. Undefined when the text is
+ * neither.
  */
-function separatedCodes(text: string, digits: number): string[] | undefined {
-  const tokens = text
-    .toUpperCase()
-    .split(/[\s,;#]+/u)
-    .filter(Boolean);
-  const code = new RegExp(`^(?:\\?|[0-9A-F?]{${digits}})$`, "u");
-  if (tokens.length === 0 || tokens.length > MAX_REPAIR_UNITS) return undefined;
-  if (!tokens.every((token) => code.test(token))) return undefined;
-  // Every digit marked is the same as the code marked as a whole.
-  return tokens.map((token) => (/^\?+$/u.test(token) ? "?" : token));
+function markedCodes(text: string, digits: number): string[] | undefined {
+  return withinRepair(hexUnits(text, digits, { foldWholeMarks: true }));
 }
 
 /** Whether `code` has digits that can be read and digits that cannot. */
@@ -348,83 +360,56 @@ function digitBits(code: string): ReadBits {
   let value = 0;
   let mask = 0;
   for (const digit of code) {
-    value = value * 2 ** NIBBLE_BITS + (digit === "?" ? 0 : parseInt(digit, 16));
-    mask = mask * 2 ** NIBBLE_BITS + (digit === "?" ? 0 : 2 ** NIBBLE_BITS - 1);
+    value = value * 2 ** HEX_DIGIT_BITS + (digit === "?" ? 0 : parseInt(digit, 16));
+    mask = mask * 2 ** HEX_DIGIT_BITS + (digit === "?" ? 0 : 2 ** HEX_DIGIT_BITS - 1);
   }
   return { value, mask };
 }
 
-const MINIMAL_BYTEWORDS = bytewords.map((word) => word[0]! + word[3]!);
-const MINIMAL_BYTEWORD_VALUES = new Map(MINIMAL_BYTEWORDS.map((pair, value) => [pair, value]));
-const BYTEWORD_VALUES = new Map<string, number>(bytewords.map((word, value) => [word, value]));
-const UNICODE_CODES = traditionalChineseWordlist.map(unicodeHex);
-const hexColor = (value: number) => `#${value.toString(16).toUpperCase().padStart(6, "0")}`;
+/**
+ * The values of `units` in `format`, undefined at each unit that is `marked`; undefined when a unit
+ * that is not marked has none. Every model of a form reads its units through it.
+ */
+function unitValues(
+  format: ShareFormat,
+  units: readonly string[],
+  marked: (unit: string) => boolean,
+): (number | undefined)[] | undefined {
+  const { valueOf } = SHARE_UNITS[format];
+  const values = units.map((unit) => (marked(unit) ? undefined : valueOf(unit)));
+  return values.some((value, index) => value === undefined && !marked(units[index]!))
+    ? undefined
+    : values;
+}
 
-/** Adds a model when every unit that is not marked has a value. */
+/** A unit marked as a whole, by a lone ?: the only mark of a Byteword, a UR pair or a word number. */
+const loneMark = (unit: string): boolean => unit === "?";
+
+/** Adds the model of `units` in `format` when every unit that is not a lone ? has a value. */
 function addModel(
   models: UnitModel[],
+  format: ShareFormat,
   units: readonly string[] | undefined,
-  valueOf: (unit: string) => number | undefined,
-  model: Omit<UnitModel, "values" | "text"> & { readonly separator: string },
 ): void {
   if (units === undefined) return;
-  const values = units.map((unit) => (unit === "?" ? undefined : valueOf(unit)));
-  if (values.some((value, index) => value === undefined && units[index] !== "?")) return;
-  models.push({
-    ...model,
-    values,
-    text: (filled) => filled.map(model.unitText).join(model.separator),
-  });
+  const values = unitValues(format, units, loneMark);
+  if (values === undefined) return;
+  models.push({ format, values, structures: structuresOf(format, units.length) });
 }
 
 /** Every way that `text` can be read as a share in one form, with marked elements. */
 function unitModels(text: string): UnitModel[] {
   const models: UnitModel[] = [];
-  if (/^ur:sskr\//iu.test(text)) {
-    const units = unitsOf(text.slice("ur:sskr/".length).toLowerCase(), /[a-z]{2}/);
-    addModel(models, units, (unit) => MINIMAL_BYTEWORD_VALUES.get(unit), {
-      format: "ur",
-      unitBits: BYTE_BITS,
-      structures: units === undefined ? [] : standardStructures(units.length),
-      unitText: (value) => MINIMAL_BYTEWORDS[value]!,
-      separator: "",
-    });
-    // A UR keeps "ur:sskr/" in front.
-    const model = models.pop();
-    if (model !== undefined)
-      models.push({ ...model, text: (filled) => `ur:sskr/${filled.map(model.unitText).join("")}` });
+  const prefix = UR_SSKR_START.exec(text)?.[0];
+  if (prefix !== undefined) {
+    addModel(models, "ur", urPairs(text.slice(prefix.length).toLowerCase()));
     return models;
   }
-  const numbers = text.split(/[\s,]+/u).filter(Boolean);
-  if (numbers.every((unit) => unit === "?" || /^\d{1,4}$/u.test(unit)))
-    addModel(
-      models,
-      numbers,
-      (unit) => (Number(unit) >= 1 && Number(unit) <= WORD_COUNT ? Number(unit) - 1 : undefined),
-      {
-        format: "indexes",
-        unitBits: WORD_BITS,
-        structures: wordStructures(numbers.length),
-        unitText: (value) => String(value + 1),
-        separator: " ",
-      },
-    );
-  const words = text
-    .toLowerCase()
-    .split(/[\s-]+/u)
-    .filter(Boolean);
-  if (words.every((unit) => unit === "?" || /^[a-z]{4}$/u.test(unit)))
-    addModel(models, words, (unit) => BYTEWORD_VALUES.get(unit), {
-      format: "words",
-      unitBits: BYTE_BITS,
-      structures: standardStructures(words.length),
-      unitText: (value) => bytewords[value]!,
-      separator: " ",
-    });
-  const compact = text.replace(/[\s,;]+/gu, "").toUpperCase();
-  addUnicodeModel(models, text, compact);
-  addColorModel(models, text, compact);
-  addColorUnicodeModels(models, text, compact);
+  addModel(models, "indexes", codeTokens(text));
+  addModel(models, "words", text.toLowerCase().split(BYTEWORD_SEPARATORS).filter(Boolean));
+  addUnicodeModel(models, text);
+  addColorModel(models, text);
+  addColorUnicodeModels(models, text);
   return models;
 }
 
@@ -433,21 +418,21 @@ function unitModels(text: string): UnitModel[] {
  * unknown as a whole; the words whose code fits it are its candidates, and a solution must take
  * one of them. A code that no word fits leaves no reading in this form.
  */
-function addUnicodeModel(models: UnitModel[], text: string, compact: string): void {
-  const codes = separatedCodes(text, CODE_DIGITS) ?? unitsOf(compact, /[0-9A-F]{4}/);
+function addUnicodeModel(models: UnitModel[], text: string): void {
+  const codes = markedCodes(text, CODE_DIGITS);
   if (codes === undefined) return;
-  const values = codes.map((code) => (code.includes("?") ? undefined : UNICODE_INDEX.get(code)));
-  if (values.some((value, index) => value === undefined && !codes[index]!.includes("?"))) return;
-  const candidates = codes.map((code) => (readInPart(code) ? fittingWords(code) : undefined));
+  // A code with a ? among its digits is unknown as a whole, as a lone ? is.
+  const values = unitValues("unicode", codes, isMarked);
+  if (values === undefined) return;
+  const candidates = codes.map((code) =>
+    readInPart(code) ? unicodeCodesFitting(code) : undefined,
+  );
   if (candidates.some((words) => words?.length === 0)) return;
   const fitting = candidates.map((words) => (words === undefined ? undefined : new Set(words)));
   models.push({
     format: "unicode",
-    unitBits: WORD_BITS,
     values,
-    structures: wordStructures(codes.length),
-    unitText: (value) => UNICODE_CODES[value]!,
-    text: (filled) => filled.map((value) => UNICODE_CODES[value]!).join(" "),
+    structures: structuresOf("unicode", codes.length),
     ...(candidates.some((words) => words !== undefined)
       ? {
           candidates,
@@ -458,97 +443,189 @@ function addUnicodeModel(models: UnitModel[], text: string, compact: string): vo
   });
 }
 
-/** The words of the list whose Unicode code fits `code`, any digit standing where it has a ?. */
-function fittingWords(code: string): number[] {
-  const pattern = new RegExp(`^${code.replace(/\?/gu, "[0-9A-F]")}$`, "u");
-  return UNICODE_CODES.flatMap((written, index) => (pattern.test(written) ? [index] : []));
-}
-
 /**
  * Colors written apart, each a lone ? when it cannot be read at all, or with a ? for each digit
  * that cannot be read, whose digits read are then known bits; or colors run together, a ? standing
  * for a whole color.
  */
-function addColorModel(models: UnitModel[], text: string, compact: string): void {
-  const colors =
-    separatedCodes(text, COLOR_DIGITS) ?? unitsOf(compact.replace(/#/gu, ""), /[0-9A-F]{6}/);
+function addColorModel(models: UnitModel[], text: string): void {
+  const colors = markedCodes(text, COLOR_DIGITS);
   if (colors === undefined) return;
   const partly = colors.some(readInPart);
+  // Every color not marked has six digits (markedCodes), so it has a value.
+  const values = unitValues("colors", colors, isMarked)!;
   models.push({
     format: "colors",
-    unitBits: COLOR_BITS,
-    values: colors.map((color) => (color.includes("?") ? undefined : parseInt(color, 16))),
-    structures: colorStructures(colors.length),
-    unitText: hexColor,
-    text: (filled) => filled.map(hexColor).join(" "),
+    values,
+    structures: structuresOf("colors", colors.length),
     ...(partly
       ? { readBits: colors.map((color) => (readInPart(color) ? digitBits(color) : undefined)) }
       : {}),
   });
 }
 
-function wordStructures(units: number): ShareStructure[] {
-  return mixedStructures(
-    WORD_VERSION,
-    (bytes) => Math.ceil((bytes * BYTE_BITS) / WORD_BITS) === units,
-    wordBytes,
-  );
+/**
+ * Ways to read the marks of one share's Color Unicode codes that a repair tries at most
+ * (colorUnicodePairings). Every way is solved, some milliseconds each: eight colors of a public
+ * share each written as ?? fit about 110 ways, solved together with two other shares in a few
+ * seconds. More ways than this are refused instead of solved for minutes.
+ */
+const MAX_MARK_WIDTH_READINGS = 2 ** 8;
+/**
+ * Steps of the search for those ways, each a code or a run of marks placed: a bound on its work
+ * when many ways are given up before the end, some tens of milliseconds at most.
+ */
+const MAX_MARK_WIDTH_STEPS = 2 ** 16;
+/** The refusal of a share whose marks fit more ways than MAX_MARK_WIDTH_READINGS or the steps. */
+export const AMBIGUOUS_MARK_WIDTHS =
+  "Its ? marks fit too many ways to read the Color Unicode codes, each ? a code or a whole color: read more of the codes.";
+
+/**
+ * Thrown when the marks of Color Unicode codes fit too many ways (AMBIGUOUS_MARK_WIDTHS): none
+ * of them is left out unsaid. A joint repair names the share by its place.
+ */
+export class AmbiguousMarksError extends Error {
+  constructor() {
+    super(AMBIGUOUS_MARK_WIDTHS);
+  }
 }
 
-function colorStructures(units: number): ShareStructure[] {
-  return mixedStructures(
-    COLOR_VERSION,
-    (bytes) => Math.ceil(bytes / RGB_BYTES) === units,
-    colorBytes,
-  );
+/** A Color Unicode code as read, or a run of marks: that many ? together. */
+type CodePiece = string | { readonly marks: number };
+
+/** `scalars`, codes and ? marks, with each run of ? together as one piece. */
+function codePieces(scalars: readonly string[]): CodePiece[] {
+  const pieces: CodePiece[] = [];
+  for (const code of scalars) {
+    const last = pieces.at(-1);
+    if (code !== "?") pieces.push(code);
+    else if (typeof last === "object") pieces[pieces.length - 1] = { marks: last.marks + 1 };
+    else pieces.push({ marks: 1 });
+  }
+  return pieces;
 }
 
 /**
- * Colors written as Unicode codes, two per color: a mark may stand for one of the two codes or for
- * the whole color, and both readings are tried. A color with a mark is unknown as a whole; one with
- * one code given keeps that code (`fits`).
+ * The numbers of codes, fewest first, that `marks` marks together stand for when the first is at
+ * `start`: each mark one code, or a whole color, which begins at the first code of a color. A
+ * number of codes is one reading however the marks make it.
  */
-function addColorUnicodeModels(models: UnitModel[], text: string, compact: string): void {
-  const symbols = Array.from(text.replace(/\s+/gu, ""));
-  const scalars = symbols.every((symbol) => symbol === "?" || /^[-]$/u.test(symbol))
-    ? symbols.map((symbol) =>
-        symbol === "?" ? "?" : symbol.codePointAt(0)!.toString(16).toUpperCase(),
-      )
-    : unitsOf(compact, /[0-9A-F]{4}/);
-  if (scalars === undefined) return;
-  const inRange = (code: string) => {
-    const point = parseInt(code, 16);
-    return point >= COLOR_UNICODE_BASE && point < COLOR_UNICODE_BASE + COLOR_UNICODE_WIDTH;
-  };
-  if (!scalars.every((code) => code === "?" || inRange(code))) return;
-  const colorText = (value: number) => colorsToUnicode([hexColor(value)]);
-  for (const wholeColor of [false, true]) {
-    const expanded = scalars.flatMap((code) => (code === "?" && wholeColor ? ["?", "?"] : [code]));
-    if (expanded.length % 2 !== 0) continue;
-    const pairs = Array.from({ length: expanded.length / 2 }, (_, index) =>
-      expanded.slice(index * 2, index * 2 + 2),
-    );
-    // Paired the wrong way, two codes may not make a color at all: that reading is not the one.
-    let values: (number | undefined)[];
-    try {
-      values = pairs.map((pair) =>
-        pair.includes("?")
-          ? undefined
-          : parseInt(unicodeToColorCodes(pair.join(""))[0]!.slice(1), 16),
-      );
-    } catch {
-      continue;
+function runLengths(marks: number, start: number): number[] {
+  let lengths = new Set([0]);
+  for (let mark = 0; mark < marks; mark += 1) {
+    const next = new Set<number>();
+    for (const length of lengths) {
+      next.add(length + 1);
+      if ((start + length) % COLOR_UNICODE_POINTS_PER_COLOR === 0)
+        next.add(length + COLOR_UNICODE_POINTS_PER_COLOR);
     }
+    lengths = next;
+  }
+  return [...lengths].sort((a, b) => a - b);
+}
+
+/** The lowest Color Unicode code, which a marked code is taken as to ask whether a color fits. */
+const LOWEST_COLOR_CODE = hexCodePoint(COLOR_UNICODE_BASE);
+
+/**
+ * Whether some color fits `pair`, its codes with ? where marked or not yet placed. The first code
+ * holds the high part of the value, so a color fits exactly when one fits with each ? taken as the
+ * lowest code.
+ */
+function someColorFits(pair: readonly string[]): boolean {
+  const lowest = pair.map((code) => (code === "?" ? LOWEST_COLOR_CODE : code));
+  return SHARE_UNITS["colors-unicode"].valueOf(lowest.join("")) !== undefined;
+}
+
+/**
+ * The ways to read `scalars`, Color Unicode codes run together with a ? for each one that cannot
+ * be read, as colors: each mark one code, or a whole color that begins at the first code of a
+ * color (docs/SSKR.md). A run of marks is expanded to each number of codes that it can stand for,
+ * so that two ways to the same codes are one reading. A way is given up as soon as a color that
+ * it makes fits no color, or the codes left cannot end at a number of colors that a share has.
+ * Every way that is left is given, the fewest codes for each run first; AmbiguousMarksError when
+ * there are more than MAX_MARK_WIDTH_READINGS, or the search takes more than its steps.
+ */
+function colorUnicodePairings(scalars: readonly string[]): string[][][] {
+  const pieces = codePieces(scalars);
+  const per = COLOR_UNICODE_POINTS_PER_COLOR;
+  const colorCounts = [...mixedUnitCounts(SHARE_UNITS["colors-unicode"].mixed!)];
+  // The fewest and the most codes that the pieces from each one on stand for: a mark one code,
+  // or at most a whole color.
+  const fewest = new Array<number>(pieces.length + 1).fill(0);
+  const most = new Array<number>(pieces.length + 1).fill(0);
+  for (let piece = pieces.length - 1; piece >= 0; piece -= 1) {
+    const current = pieces[piece]!;
+    const marks = typeof current === "string" ? 0 : current.marks;
+    fewest[piece] = fewest[piece + 1]! + (marks === 0 ? 1 : marks);
+    most[piece] = most[piece + 1]! + (marks === 0 ? 1 : marks * per);
+  }
+  const codes: string[] = [];
+  const readings: string[][][] = [];
+  let steps = 0;
+  /** Whether the colors that the codes from `from` on touch each fit some color. */
+  const colorsFit = (from: number): boolean => {
+    for (let color = Math.floor(from / per); color * per < codes.length; color += 1) {
+      const pair = Array.from({ length: per }, (_, half) => codes[color * per + half] ?? "?");
+      if (!someColorFits(pair)) return false;
+    }
+    return true;
+  };
+  const place = (piece: number): void => {
+    steps += 1;
+    if (steps > MAX_MARK_WIDTH_STEPS) throw new AmbiguousMarksError();
+    const least = codes.length + fewest[piece]!;
+    const greatest = codes.length + most[piece]!;
+    if (!colorCounts.some((count) => least <= count * per && count * per <= greatest)) return;
+    if (piece === pieces.length) {
+      readings.push(listPieces(codes, per));
+      if (readings.length > MAX_MARK_WIDTH_READINGS) throw new AmbiguousMarksError();
+      return;
+    }
+    const current = pieces[piece]!;
+    const placings =
+      typeof current === "string"
+        ? [[current]]
+        : runLengths(current.marks, codes.length).map((length) =>
+            new Array<string>(length).fill("?"),
+          );
+    for (const placed of placings) {
+      const start = codes.length;
+      codes.push(...placed);
+      if (colorsFit(start)) place(piece + 1);
+      codes.length = start;
+    }
+  };
+  place(0);
+  return readings;
+}
+
+/**
+ * Colors written as Unicode codes, two per color: each mark may stand for one of the two codes or
+ * for a whole color, and every way that fits is tried (colorUnicodePairings). A color with a mark
+ * is unknown as a whole; one with one code given keeps that code (`fits`).
+ */
+function addColorUnicodeModels(models: UnitModel[], text: string): void {
+  // Run together only: a ? among the codes' digits marks no digit of a color (CODE_FORMS).
+  const scalars = markedColorSymbols(text) ?? withinRepair(joinedHexUnits(text, CODE_DIGITS));
+  if (scalars === undefined) return;
+  if (!scalars.every((code) => code === "?" || isColorUnicodePoint(parseInt(code, 16)))) return;
+  const { unitText } = SHARE_UNITS["colors-unicode"];
+  for (const pairs of colorUnicodePairings(scalars)) {
+    // Every color whose codes are all read is one (colorUnicodePairings); one with a mark in
+    // either of its codes is unknown as a whole.
+    const values = unitValues(
+      "colors-unicode",
+      pairs.map((pair) => pair.join("")),
+      isMarked,
+    )!;
     models.push({
       format: "colors-unicode",
-      unitBits: COLOR_BITS,
       values,
-      structures: colorStructures(pairs.length),
-      unitText: colorText,
-      text: (filled) => filled.map(colorText).join(""),
+      structures: structuresOf("colors-unicode", pairs.length),
       fits: (filled) =>
         pairs.every((pair, index) => {
-          const written = colorText(filled[index]!).match(/.{4}/gu)!;
+          const written = unitText(filled[index]!).match(CODE_POINT_TEXT)!;
           return pair.every((code, half) => code === "?" || code === written[half]);
         }),
     });
@@ -556,57 +633,22 @@ function addColorUnicodeModels(models: UnitModel[], text: string, compact: strin
 }
 
 /**
- * One way to read a marked text: a form with its unit values, undefined where marked, and one
- * structure. joint-repair.ts solves several cards together from these.
+ * Every way to pick one item of each list, the first list's items varying slowest; undefined once
+ * there are more than `limit`. The choices of candidate words and the readings of several shares
+ * are both expanded through it.
  */
-export interface MarkedReading {
-  readonly format: ShareFormat;
-  readonly unitBits: number;
-  readonly values: readonly (number | undefined)[];
-  readonly structure: ShareStructure;
-  readonly unitText: (value: number) => string;
-  readonly text: (values: readonly number[]) => string;
-  readonly fits?: (values: readonly number[]) => boolean;
-  /** For each marked unit read in part, the bits that were read; they are equations too. */
-  readonly readBits?: readonly (ReadBits | undefined)[];
-  /**
-   * For each partly read unit whose digits are no bits of it, such as a Unicode code, the values
-   * that fit the digits read: a solution takes one of them (fits), and withValues tries them.
-   */
-  readonly candidates?: readonly (readonly number[] | undefined)[];
-}
-
-/** Every reading of `text`: each form it can be in, with each structure its length allows. */
-export function markedReadings(text: string): MarkedReading[] {
-  return unitModels(text).flatMap((model) =>
-    model.structures.map((structure) => ({
-      format: model.format,
-      unitBits: model.unitBits,
-      values: model.values,
-      structure,
-      unitText: model.unitText,
-      text: model.text,
-      ...(model.fits === undefined ? {} : { fits: model.fits }),
-      ...(model.readBits === undefined ? {} : { readBits: model.readBits }),
-      ...(model.candidates === undefined ? {} : { candidates: model.candidates }),
-    })),
-  );
-}
-
-/**
- * `reading` with the units at the places of `chosen` taken as the values given, each one of its
- * candidates: all their bits become equations, and they are still reported as filled in.
- */
-export function withValues(
-  reading: MarkedReading,
-  chosen: ReadonlyMap<number, number>,
-): MarkedReading {
-  const mask = 2 ** reading.unitBits - 1;
-  const readBits = reading.values.map((_, place) => {
-    const value = chosen.get(place);
-    return value === undefined ? reading.readBits?.[place] : { value, mask };
-  });
-  return { ...reading, readBits };
+export function everyPick<T>(
+  lists: readonly (readonly T[])[],
+  limit = Infinity,
+): T[][] | undefined {
+  let all: T[][] = [[]];
+  for (const list of lists) {
+    // Compared before the ways are made, and divided so that no product grows past the limit; an
+    // empty list leaves no way, which is within any limit.
+    if (list.length > 0 && all.length > Math.floor(limit / list.length)) return undefined;
+    all = all.flatMap((prefix) => list.map((item) => [...prefix, item]));
+  }
+  return all;
 }
 
 /**
@@ -629,103 +671,456 @@ export function placesWithin<Unit extends { readonly count: number }>(
 }
 
 /**
- * Whether the bits of the marked unit at `place` reach the SSKR metadata of the share, its first
- * METADATA_BYTES payload bytes: the identifier and the thresholds, which all shares of a set
- * carry, and the member number. Units that reach it tell the shares apart, and settle the most.
+ * One way to read a marked text: a form with its unit values, undefined where marked, and one
+ * structure. A class, so that a reading is made only from text (MarkedReading.of) and every
+ * question about it is answered by it: its marked places and the layout of their bits, the share
+ * that values at them give, and its space of solutions. It never changes: values chosen for its
+ * candidates make another reading (withValues). joint-repair.ts solves several shares together
+ * from these.
  */
-export function reachesMetadata(reading: MarkedReading, place: number): boolean {
-  const values = reading.values.map((value) => value ?? 0);
-  const before = reading.structure.evaluate(values).payload;
-  for (let bit = 0; bit < reading.unitBits; bit += 1) {
-    const flipped = [...values];
-    flipped[place] = values[place]! ^ (1 << bit);
-    const after = reading.structure.evaluate(flipped).payload;
-    for (let byte = 0; byte < METADATA_BYTES; byte += 1)
-      if (after[byte] !== before[byte]) return true;
-  }
-  return false;
-}
+export class MarkedReading {
+  readonly #units: ReadingUnits;
+  readonly #structure: ShareStructure;
+  /** The places of the marked units, in the order of their bits among the unknowns. */
+  readonly #holes: readonly number[];
 
-/**
- * Every reading of `reading` with the candidate units at `places` taken value by value
- * (withValues): one for each combination of their values.
- */
-export function choicesAt(reading: MarkedReading, places: readonly number[]): MarkedReading[] {
-  // Another reading of the share, such as another form, may have no candidates at these places.
-  const tried = places.filter((place) => reading.candidates?.[place] !== undefined);
-  if (tried.length === 0) return [reading];
-  let all: Map<number, number>[] = [new Map()];
-  for (const place of tried)
-    all = all.flatMap((chosen) =>
-      reading.candidates![place]!.map((value) => new Map(chosen).set(place, value)),
+  private constructor(units: ReadingUnits, structure: ShareStructure) {
+    this.#units = units;
+    this.#structure = structure;
+    this.#holes = Object.freeze(
+      units.values.flatMap((value, index) => (value === undefined ? [index] : [])),
     );
-  return all.map((chosen) => withValues(reading, chosen));
-}
+  }
 
-/** The candidate units of `reading`: each with its place and its number of values. */
-export function candidateCounts(
-  reading: MarkedReading,
-): { readonly place: number; readonly count: number }[] {
-  return (reading.candidates ?? []).flatMap((values, place) =>
-    values === undefined ? [] : [{ place, count: values.length }],
-  );
+  /** Every reading of `text`: each form it can be in, with each structure its length allows. */
+  static of(text: string): MarkedReading[] {
+    return unitModels(text).flatMap(({ structures, ...units }) =>
+      structures.map((structure) => new MarkedReading(units, structure)),
+    );
+  }
+
+  /** The form that the text is read in. */
+  get format(): ShareFormat {
+    return this.#units.format;
+  }
+
+  /** The bits of one unit of the form. */
+  get unitBits(): number {
+    return SHARE_UNITS[this.format].unitBits;
+  }
+
+  /** The value of every unit, undefined where it is marked. */
+  get values(): readonly (number | undefined)[] {
+    return this.#units.values;
+  }
+
+  /** The layout of the share's bytes that this reading takes. */
+  get structure(): ShareStructure {
+    return this.#structure;
+  }
+
+  /** For each marked unit read in part, the bits that were read (ReadBits). */
+  get readBits(): readonly (ReadBits | undefined)[] | undefined {
+    return this.#units.readBits;
+  }
+
+  /** For each partly read unit whose digits are no bits of it, the values that fit them. */
+  get candidates(): readonly (readonly number[] | undefined)[] | undefined {
+    return this.#units.candidates;
+  }
+
+  /** The places of the marked units, in the order of their bits among the unknowns. */
+  get holes(): readonly number[] {
+    return this.#holes;
+  }
+
+  /** The unknown bits: those of every marked unit. */
+  get unknownBits(): number {
+    return this.#holes.length * this.unitBits;
+  }
+
+  /**
+   * Where the bits of the marked unit that comes `order`-th start among the unknowns: unit k at
+   * bits k * unitBits on. The one layout of the unknowns, which every reader of them asks through
+   * unitMask and valuesAt.
+   */
+  #shift(order: number): bigint {
+    return BigInt(order * this.unitBits);
+  }
+
+  /** The bits, among the unknowns, of the marked unit that comes `order`-th (holes[order]). */
+  unitMask(order: number): bigint {
+    return ((1n << BigInt(this.unitBits)) - 1n) << this.#shift(order);
+  }
+
+  /** The values of every unit with the unknown bits `bits` at the marked ones. */
+  valuesAt(bits: bigint): number[] {
+    const values = this.zeroFilled();
+    this.#holes.forEach((hole, order) => {
+      values[hole] = Number((bits & this.unitMask(order)) >> this.#shift(order));
+    });
+    return values;
+  }
+
+  /** The values of the units with every marked one taken as zero. */
+  zeroFilled(): number[] {
+    return this.values.map((value) => value ?? 0);
+  }
+
+  /**
+   * This reading with the units at the places of `chosen` taken as the values given, each one of
+   * its candidates: all their bits become equations, and they are still reported as filled in.
+   */
+  withValues(chosen: ReadonlyMap<number, number>): MarkedReading {
+    const mask = 2 ** this.unitBits - 1;
+    const readBits = this.values.map((_, place) => {
+      const value = chosen.get(place);
+      return value === undefined ? this.readBits?.[place] : { value, mask };
+    });
+    return new MarkedReading({ ...this.#units, readBits }, this.#structure);
+  }
+
+  /**
+   * Whether the bits of the marked unit at `place` reach the SSKR metadata of the share, its first
+   * SHARE_METADATA_BYTES payload bytes: the identifier and the thresholds, which all shares of a
+   * set carry, and the member number. Units that reach it tell the shares apart, and settle the
+   * most.
+   */
+  reachesMetadata(place: number): boolean {
+    const values = this.zeroFilled();
+    const before = this.#structure.evaluate(values).payload;
+    try {
+      for (let bit = 0; bit < this.unitBits; bit += 1) {
+        const flipped = [...values];
+        flipped[place] = values[place]! ^ (1 << bit);
+        const after = this.#structure.evaluate(flipped).payload;
+        try {
+          for (let byte = 0; byte < SHARE_METADATA_BYTES; byte += 1)
+            if (after[byte] !== before[byte]) return true;
+        } finally {
+          // A share's part of the secret, needed only for this comparison.
+          after.fill(0);
+        }
+      }
+      return false;
+    } finally {
+      before.fill(0);
+    }
+  }
+
+  /**
+   * Every reading of this one with the candidate units at `places` taken value by value
+   * (withValues): one for each combination of their values.
+   */
+  choicesAt(places: readonly number[]): MarkedReading[] {
+    const { candidates } = this;
+    // Another reading of the share, such as another form, may have no candidates at these places.
+    const tried = places.filter((place) => candidates?.[place] !== undefined);
+    if (tried.length === 0) return [this];
+    return everyPick(tried.map((place) => candidates![place]!))!.map((values) =>
+      this.withValues(new Map(tried.map((place, index) => [place, values[index]!]))),
+    );
+  }
+
+  /** The candidate units of this reading: each with its place and its number of values. */
+  candidateCounts(): { readonly place: number; readonly count: number }[] {
+    return (this.candidates ?? []).flatMap((values, place) =>
+      values === undefined ? [] : [{ place, count: values.length }],
+    );
+  }
+
+  /**
+   * The share that this reading gives with `values` at its marks, read as an ordinary share
+   * (readShare), which checks everything again, with the elements filled in; undefined when the
+   * values do not fit what was read, the text is no share, or it reads as another form. The repair
+   * of one share and of several together both take their solutions through it.
+   */
+  solvedShare(values: readonly number[]): ReadRepairableShare | undefined {
+    const { fits } = this.#units;
+    if (fits !== undefined && !fits(values)) return undefined;
+    const units = SHARE_UNITS[this.format];
+    let read;
+    try {
+      read = readShare(units.text(values));
+    } catch {
+      return undefined;
+    }
+    if (read.format !== this.format) return undefined;
+    const filled = this.#holes.map((index) => ({
+      position: index + 1,
+      value: units.unitText(values[index]!),
+    }));
+    return { ur: read.ur, format: read.format, repaired: filled.length > 0, filled };
+  }
+
+  /** The solutions of this reading on its own (ReadingSpace.solve). */
+  space(): ReadingSpace | undefined {
+    return ReadingSpace.solve(this);
+  }
+
+  /** What `use` makes of the space of this reading, which is wiped after it (ReadingSpace.use). */
+  withSpace<T>(use: (space: ReadingSpace | undefined) => T): T {
+    return ReadingSpace.use(this, use);
+  }
 }
 
 /**
- * The marked elements of `text`, as written: each ?, except that a code of four or six symbols
- * with ? among its digits, such as #B5?0?? or 4E?0, is one element however many digits it
- * misses. A run of ? alone counts each ?, as each may stand for a whole element.
+ * The solutions of one reading on its own, as an affine space over the bits of its marked units
+ * (bit b of the k-th mark is bit k * unitBits + b): one solution, the basis of the rest, and the
+ * payload at that solution with the change each basis vector makes to it. A class because it owns
+ * a share's part of the secret, the payload and its changes, and wipes them (wipe). payloadAt
+ * hands out a payload to read, always as a new array that the caller wipes; secretArrays gives the
+ * space's own arrays only to an owner that wipes them (AssessmentSecrets, AUD-012-SEC004).
+ */
+export class ReadingSpace {
+  readonly #reading: MarkedReading;
+  readonly #rank: number;
+  readonly #particular: bigint;
+  readonly #basis: readonly bigint[];
+  readonly #payload: Uint8Array;
+  readonly #payloadDeltas: readonly Uint8Array[];
+
+  private constructor(
+    reading: MarkedReading,
+    solved: {
+      readonly rank: number;
+      readonly particular: bigint;
+      readonly free: readonly bigint[];
+    },
+    payload: Uint8Array,
+    payloadDeltas: readonly Uint8Array[],
+  ) {
+    this.#reading = reading;
+    this.#rank = solved.rank;
+    this.#particular = solved.particular;
+    this.#basis = Object.freeze([...solved.free]);
+    this.#payload = payload;
+    this.#payloadDeltas = Object.freeze([...payloadDeltas]);
+  }
+
+  /** Solves one reading on its own; undefined when no values fit it. */
+  static solve(reading: MarkedReading): ReadingSpace | undefined {
+    const { holes, unitBits, unknownBits } = reading;
+    const at = (bits: bigint) => {
+      const values = reading.valuesAt(bits);
+      const evaluated = reading.structure.evaluate(values);
+      const { readBits } = reading;
+      if (readBits === undefined) return evaluated;
+      // The bits read of a partly read unit are equations too: each keeps the value it was read as.
+      const read = BitFields.of(
+        holes.map((hole) => {
+          const bitsRead = readBits[hole];
+          const change =
+            bitsRead === undefined ? 0 : (values[hole]! ^ bitsRead.value) & bitsRead.mask;
+          return [change, unitBits] as const;
+        }),
+      );
+      return { ...evaluated, residual: (evaluated.residual << BigInt(unknownBits)) | read };
+    };
+    /** The residual alone at `bits`: the payload, a share's part of the secret, is wiped. */
+    const residualAt = (bits: bigint): bigint => {
+      const { residual, payload } = at(bits);
+      payload.fill(0);
+      return residual;
+    };
+    // The residual is affine in the missing bits: one column per bit, from flipping it alone.
+    const { value: baseline, columns } = linearize(residualAt, 0n, unitVectors(unknownBits));
+    const solved = solve(columns, baseline);
+    if (solved === undefined) return undefined;
+    const payload = at(solved.particular).payload;
+    // Each payload made here becomes the change from `payload` in place: the space owns both.
+    const payloadDeltas = solved.free.map((direction) => {
+      const delta = at(solved.particular ^ direction).payload;
+      xorInto(delta, payload);
+      return delta;
+    });
+    return new ReadingSpace(reading, solved, payload, payloadDeltas);
+  }
+
+  /**
+   * What `use` makes of the space of `reading` (undefined when no values fit it), for a caller
+   * that needs its solutions and not its payload: the space is wiped once `use` returns
+   * (AUD-012-SEC004).
+   */
+  static use<T>(reading: MarkedReading, use: (space: ReadingSpace | undefined) => T): T {
+    const space = ReadingSpace.solve(reading);
+    try {
+      return use(space);
+    } finally {
+      space?.wipe();
+    }
+  }
+
+  /** The reading that was solved. */
+  get reading(): MarkedReading {
+    return this.#reading;
+  }
+
+  /** The unknown bits: those of every marked unit. */
+  get unknownBits(): number {
+    return this.#reading.unknownBits;
+  }
+
+  /** The rank of the equations that the unknown bits meet. */
+  get rank(): number {
+    return this.#rank;
+  }
+
+  /** One solution, as the unknown bits. */
+  get particular(): bigint {
+    return this.#particular;
+  }
+
+  /** The basis of the differences between solutions. */
+  get basis(): readonly bigint[] {
+    return this.#basis;
+  }
+
+  /** The places of the marked units, in the order of their bits among the unknowns. */
+  get holes(): readonly number[] {
+    return this.#reading.holes;
+  }
+
+  /** The bits, among the unknowns, of the marked unit that comes `order`-th (holes[order]). */
+  unitMask(order: number): bigint {
+    return this.#reading.unitMask(order);
+  }
+
+  /** The values of every unit with the unknown bits `bits` at the marked ones. */
+  valuesAt(bits: bigint): number[] {
+    return this.#reading.valuesAt(bits);
+  }
+
+  /** The places of the marked units that `change`, a change of the unknown bits, touches. */
+  holesChangedBy(change: bigint): number[] {
+    return this.holes.filter((_, order) => (change & this.unitMask(order)) !== 0n);
+  }
+
+  /**
+   * The payload at the solution that the bits of `own` pick from the basis, bit j the j-th basis
+   * vector: a new array, which holds a share's part of the secret and which the caller wipes.
+   */
+  payloadAt(own: bigint): Uint8Array {
+    const payload = Uint8Array.from(this.#payload);
+    this.#payloadDeltas.forEach((delta, j) => {
+      if ((own >> BigInt(j)) & 1n) xorInto(payload, delta);
+    });
+    return payload;
+  }
+
+  /** The payload's byte at `index` when no solution changes it; undefined when one does. */
+  fixedPayloadByte(index: number): number | undefined {
+    return this.#payloadDeltas.every((delta) => delta[index] === 0)
+      ? this.#payload[index]
+      : undefined;
+  }
+
+  /**
+   * The space's own arrays that hold a share's part of the secret, the payload and the changes to
+   * it, not copies: only for an owner that keeps them to wipe them, such as AssessmentSecrets
+   * (AUD-012-SEC004).
+   */
+  secretArrays(): Uint8Array[] {
+    return [this.#payload, ...this.#payloadDeltas];
+  }
+
+  /** Wipes the share's part of the secret that the space holds. */
+  wipe(): void {
+    for (const array of this.secretArrays()) array.fill(0);
+  }
+}
+
+/**
+ * The marked elements of `text`, as the repair reads them (docs/SSKR.md, Damaged shares). Among
+ * colors or Unicode codes of words written apart, each code with a ? is one element: a lone ?, a
+ * code read in part such as #B5?0?? or 4E?0, and a code all of whose digits are ?, such as ??????
+ * or ????, which the repair reads as a lone ? (markedCodes). Elsewhere each ? counts, as each may
+ * stand for a whole element of codes run together, except that a code of four or six symbols with
+ * ? among its digits is still one element.
  */
 export function markCount(text: string): number {
-  return text
-    .split(/[\s,;#]+/u)
-    .filter(Boolean)
-    .reduce((marks, token) => {
-      const symbols = (token.match(/\?/gu) ?? []).length;
-      const code = token.length === CODE_DIGITS || token.length === COLOR_DIGITS;
-      const partly = code && symbols > 0 && symbols < token.length && /^[0-9A-F?]+$/iu.test(token);
-      return marks + (partly ? 1 : symbols);
-    }, 0);
+  const apart = digitCodesApart(text);
+  if (apart !== undefined) return apart.filter(isMarked).length;
+  return codeTokens(text).reduce((marks, token) => {
+    const symbols = (token.match(/\?/gu) ?? []).length;
+    const code = DIGIT_MARKED_WIDTHS.includes(token.length);
+    const partly = code && symbols > 0 && symbols < token.length && /^[0-9A-F?]+$/iu.test(token);
+    return marks + (partly ? 1 : symbols);
+  }, 0);
+}
+
+/**
+ * Whether `text` is longer than a repair reads or marks more than `maxElements` elements: the
+ * bound of one share's repair and of a joint repair, each with its own number. The ? are bounded
+ * with the elements: a partly read code holds fewer ? than its digits and counts as one.
+ */
+export function exceedsMarks(text: string, maxElements: number): boolean {
+  const trimmed = text.trim();
+  return trimmed.length > MAX_REPAIR_TEXT_LENGTH || markCount(trimmed) > maxElements;
+}
+
+/** The bound of exceedsMarks as a refusal says it: "mark at most N unreadable elements with ?". */
+export function markLimit(maxElements: number): string {
+  return `mark at most ${maxElements} unreadable elements with ?`;
 }
 
 /** Code points of the Color Unicode codes (core/colors.ts), which take a ? only for a whole code. */
-const COLOR_UNICODE_CODE = (token: string): boolean => {
-  if (!/^[0-9A-F]{4}$/u.test(token)) return false;
-  const point = parseInt(token, 16);
-  return point >= COLOR_UNICODE_BASE && point < COLOR_UNICODE_BASE + COLOR_UNICODE_WIDTH;
-};
+const COLOR_UNICODE_CODE = (token: string): boolean =>
+  WHOLE_CODE.test(token) && isColorUnicodePoint(parseInt(token, 16));
+
+/** A form written as codes apart, with what markProblem and markCount ask of it. */
+interface CodeForm {
+  readonly name: string;
+  readonly plural: string;
+  /** The symbols of a code, where a ? may stand for one of them. */
+  readonly digits?: number;
+  readonly reads: (token: string) => boolean;
+}
 
 /**
  * The forms written as codes apart, as markProblem tells them by the codes that can be read:
  * colors and the Unicode codes of words take a ? for a digit; Color Unicode codes and word numbers
  * only for a whole code.
  */
-const CODE_FORMS: readonly {
-  readonly name: string;
-  readonly plural: string;
-  /** The symbols of a code, where a ? may stand for one of them. */
-  readonly digits?: number;
-  readonly reads: (token: string) => boolean;
-}[] = [
+const CODE_FORMS: readonly CodeForm[] = [
   {
     name: "color",
     plural: "colors",
     digits: COLOR_DIGITS,
-    reads: (token) => /^[0-9A-F]{6}$/u.test(token),
+    reads: (token) => SHARE_UNITS.colors.valueOf(token) !== undefined,
   },
   {
     name: "code",
     plural: "Unicode codes",
     digits: CODE_DIGITS,
-    reads: (token) => UNICODE_INDEX.has(token),
+    reads: (token) => SHARE_UNITS.unicode.valueOf(token) !== undefined,
   },
   { name: "code", plural: "Color Unicode codes", reads: COLOR_UNICODE_CODE },
   {
     name: "word number",
     plural: "word numbers",
-    reads: (token) => /^\d{1,4}$/u.test(token) && Number(token) >= 1 && Number(token) <= WORD_COUNT,
+    reads: (token) => SHARE_UNITS.indexes.valueOf(token) !== undefined,
   },
 ];
+
+/** The widths of the codes in which a ? may stand for one digit (CODE_FORMS): six and four. */
+const DIGIT_MARKED_WIDTHS: readonly number[] = CODE_FORMS.flatMap((form) => form.digits ?? []);
+
+/** The form of codes written apart (CODE_FORMS) that every code of `tokens` read fits, if any. */
+function codeFormOf(tokens: readonly string[]): CodeForm | undefined {
+  const read = tokens.filter((token) => !token.includes("?"));
+  if (read.length === 0) return undefined;
+  return CODE_FORMS.find((candidate) => read.every(candidate.reads));
+}
+
+/**
+ * The codes of `text` when it is codes written apart of a form whose codes take a ? for a digit,
+ * colors or Unicode codes of words, as the repair reads them (apartHexUnits); undefined otherwise.
+ */
+function digitCodesApart(text: string): string[] | undefined {
+  const digits = codeFormOf(codeTokens(text))?.digits;
+  return digits === undefined ? undefined : apartHexUnits(text, digits);
+}
 
 /**
  * Why a code with a ? among its symbols cannot be read, in words that follow "Share 2: ", when the
@@ -735,16 +1130,11 @@ const CODE_FORMS: readonly {
  * the code by its place only: the text may be shown where the screen is not private.
  */
 export function markProblem(text: string): string | undefined {
-  const tokens = text
-    .toUpperCase()
-    .split(/[\s,;#]+/u)
-    .filter(Boolean);
-  const read = tokens.filter((token) => !token.includes("?"));
-  if (read.length === 0) return undefined;
-  const form = CODE_FORMS.find((candidate) => read.every(candidate.reads));
+  const tokens = codeTokens(text);
+  const form = codeFormOf(tokens);
   if (form === undefined) return undefined;
   for (const [index, token] of tokens.entries()) {
-    if (!token.includes("?") || /^\?+$/u.test(token)) continue;
+    if (!token.includes("?") || wholeMark(token)) continue;
     const name = `${form.name} ${index + 1}`;
     if (form.digits === undefined)
       return `${name} has a ? among its digits: ${form.plural} take only a lone ? for a whole ${form.name}.`;
@@ -756,74 +1146,6 @@ export function markProblem(text: string): string | undefined {
 }
 
 /**
- * The solutions of one reading on its own, as an affine space over the bits of its marked units
- * (bit b of the k-th mark is bit k * unitBits + b): one solution, the basis of the rest, and the
- * payload at that solution with the change each basis vector makes to it.
- */
-export interface ReadingSpace {
-  readonly reading: MarkedReading;
-  readonly unknownBits: number;
-  readonly rank: number;
-  readonly particular: bigint;
-  readonly basis: readonly bigint[];
-  readonly payload: Uint8Array;
-  readonly payloadDeltas: readonly Uint8Array[];
-  readonly valuesAt: (bits: bigint) => number[];
-}
-
-/** Solves one reading on its own; undefined when no values fit it. */
-export function readingSpace(reading: MarkedReading): ReadingSpace | undefined {
-  const holes = reading.values.flatMap((value, index) => (value === undefined ? [index] : []));
-  const mask = (1n << BigInt(reading.unitBits)) - 1n;
-  const valuesAt = (bits: bigint): number[] => {
-    const values = reading.values.map((value) => value ?? 0);
-    holes.forEach((hole, order) => {
-      values[hole] = Number((bits >> BigInt(order * reading.unitBits)) & mask);
-    });
-    return values;
-  };
-  const unknownBits = holes.length * reading.unitBits;
-  const at = (bits: bigint) => {
-    const values = valuesAt(bits);
-    const evaluated = reading.structure.evaluate(values);
-    const { readBits } = reading;
-    if (readBits === undefined) return evaluated;
-    // The bits read of a partly read unit are equations too: each keeps the value it was read as.
-    const read = bitFields(
-      holes.map((hole) => {
-        const bitsRead = readBits[hole];
-        const change =
-          bitsRead === undefined ? 0 : (values[hole]! ^ bitsRead.value) & bitsRead.mask;
-        return [change, reading.unitBits] as const;
-      }),
-    );
-    return { ...evaluated, residual: (evaluated.residual << BigInt(unknownBits)) | read };
-  };
-  const baseline = at(0n);
-  // The residual is affine in the missing bits: one column per bit, from flipping it alone.
-  const columns = Array.from(
-    { length: unknownBits },
-    (_, bit) => at(1n << BigInt(bit)).residual ^ baseline.residual,
-  );
-  const solved = solve(columns, baseline.residual);
-  if (solved === undefined) return undefined;
-  const payload = at(solved.particular).payload;
-  const payloadDeltas = solved.free.map((direction) =>
-    at(solved.particular ^ direction).payload.map((byte, index) => byte ^ payload[index]!),
-  );
-  return {
-    reading,
-    unknownBits,
-    rank: solved.rank,
-    particular: solved.particular,
-    basis: solved.free,
-    payload,
-    payloadDeltas,
-    valuesAt,
-  };
-}
-
-/**
  * The unit values of every solution of `reading` on its own; `tooMany` when there are more than
  * 2^freeBits of them, which are then not listed.
  */
@@ -831,18 +1153,15 @@ function solutions(
   reading: MarkedReading,
   freeBits: number,
 ): { readonly found: number[][]; readonly tooMany: boolean } {
-  const space = readingSpace(reading);
-  if (space === undefined) return { found: [], tooMany: false };
-  if (space.basis.length > freeBits) return { found: [], tooMany: true };
-  const found: number[][] = [];
-  for (let choice = 0; choice < 1 << space.basis.length; choice += 1) {
-    let bits = space.particular;
-    space.basis.forEach((direction, index) => {
-      if (choice & (1 << index)) bits ^= direction;
-    });
-    found.push(space.valuesAt(bits));
-  }
-  return { found, tooMany: false };
+  return reading.withSpace((space) => {
+    if (space === undefined) return { found: [], tooMany: false };
+    if (space.basis.length > freeBits) return { found: [], tooMany: true };
+    const found: number[][] = [];
+    for (let choice = 0; choice < 1 << space.basis.length; choice += 1) {
+      found.push(space.valuesAt(space.particular ^ combination(space.basis, BigInt(choice))));
+    }
+    return { found, tooMany: false };
+  });
 }
 
 /**
@@ -851,16 +1170,13 @@ function solutions(
  * MAX_CODE_CHOICES (placesWithin, choicesAt).
  */
 function triedReadings(reading: MarkedReading, freeBits: number): MarkedReading[] {
-  const counts = candidateCounts(reading);
+  const counts = reading.candidateCounts();
   if (counts.length === 0) return [reading];
-  const space = readingSpace(reading);
-  if (space === undefined || space.basis.length <= freeBits) return [reading];
+  const freeBitsOfReading = reading.withSpace((space) => space?.basis.length);
+  if (freeBitsOfReading === undefined || freeBitsOfReading <= freeBits) return [reading];
   // The units with the fewest values first: each gains the most bits for its choices.
   const fewestFirst = [...counts].sort((a, b) => a.count - b.count);
-  return choicesAt(
-    reading,
-    placesWithin(fewestFirst, MAX_CODE_CHOICES).map((unit) => unit.place),
-  );
+  return reading.choicesAt(placesWithin(fewestFirst, MAX_CODE_CHOICES).map((unit) => unit.place));
 }
 
 /**
@@ -872,38 +1188,22 @@ export function repairCandidates(
   value: string,
   freeBits: number = LISTED_FREE_BITS,
 ): ReadRepairableShare[] {
-  if (!value.includes("?")) return [{ ...readShare(value), repaired: false, filled: [] }];
+  if (!isMarked(value)) return [unrepairedShare(value)];
   const text = value.trim();
-  const symbols = text.match(/\?/gu)!.length;
-  if (
-    text.length > MAX_REPAIR_TEXT_LENGTH ||
-    symbols > MAX_MARK_SYMBOLS ||
-    markCount(text) > MAX_MARKED_ELEMENTS
-  )
-    throw new Error(
-      `Mark at most ${MAX_MARKED_ELEMENTS} unreadable elements with ?, each at its place.`,
-    );
+  if (exceedsMarks(text, MAX_MARKED_ELEMENTS))
+    throw new Error(`${capitalized(markLimit(MAX_MARKED_ELEMENTS))}, each at its place.`);
   const problem = markProblem(text);
-  if (problem !== undefined)
-    throw new Error(`${problem.charAt(0).toUpperCase()}${problem.slice(1)}`);
+  if (problem !== undefined) throw new Error(capitalized(problem));
   const found = new Map<string, ReadRepairableShare>();
   let tooMany = false;
-  for (const model of markedReadings(text).flatMap((reading) => triedReadings(reading, freeBits))) {
+  for (const model of MarkedReading.of(text).flatMap((reading) =>
+    triedReadings(reading, freeBits),
+  )) {
     const solved = solutions(model, freeBits);
     tooMany ||= solved.tooMany;
     for (const values of solved.found) {
-      if (model.fits !== undefined && !model.fits(values)) continue;
-      let read;
-      try {
-        read = readShare(model.text(values));
-      } catch {
-        continue;
-      }
-      if (read.format !== model.format) continue;
-      const filled = model.values.flatMap((known, index) =>
-        known === undefined ? [{ position: index + 1, value: model.unitText(values[index]!) }] : [],
-      );
-      found.set(read.ur, { ur: read.ur, format: read.format, repaired: true, filled });
+      const share = model.solvedShare(values);
+      if (share !== undefined) found.set(share.ur, share);
     }
   }
   if (found.size === 0)

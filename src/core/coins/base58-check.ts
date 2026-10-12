@@ -2,10 +2,11 @@
 // or a coin's own. Its own module, so that the coins and the test of other coins' forms
 // (other-forms.ts) share it without the Base58 coin class.
 //
-// Host-neutral: it imports only @scure/base and @noble/hashes (test/portable-modules.test.ts).
+// Host-neutral, with @scure/base and @noble/hashes (test/portable-modules.test.ts).
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import type { BytesCoder } from "@scure/base";
+import { equalBytes } from "../bits.js";
 
 /** Base58Check: four bytes of double SHA-256 close the data. */
 const CHECKSUM_BYTES = 4;
@@ -21,7 +22,5 @@ export function checkedData(text: string, alphabet: BytesCoder): Uint8Array | un
   if (bytes.length < CHECKSUM_BYTES) return undefined;
   const data = bytes.subarray(0, bytes.length - CHECKSUM_BYTES);
   const checksum = sha256(sha256(data)).subarray(0, CHECKSUM_BYTES);
-  return checksum.every((byte, position) => bytes[data.length + position] === byte)
-    ? data
-    : undefined;
+  return equalBytes(bytes.subarray(data.length), checksum) ? data : undefined;
 }

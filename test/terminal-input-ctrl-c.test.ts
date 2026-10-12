@@ -1,4 +1,7 @@
 import { EventEmitter } from "node:events";
+import { ShareInput } from "../src/sskr/share-input.js";
+import { ShareRestore } from "../src/sskr/share-restore.js";
+import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -33,8 +36,6 @@ import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
 import { searchShareRepair } from "../src/cli/share-repair.js";
 import { InputCancelled, watchForCtrlC, withCtrlCWatch } from "../src/cli/terminal-input.js";
-import { planJointRepair } from "../src/sskr/joint-repair.js";
-import "../src/sskr/share-platform-node.js";
 import { writeShare } from "../src/sskr/transport.js";
 
 const TEST_PHRASE =
@@ -232,12 +233,15 @@ describe("Ctrl+C during a long search", () => {
     // Two unreadable colours: 65,536 combinations, several turns of the search.
     const parts = writeShare(second!, "colors").split(" ");
     for (const place of [5, 7]) parts[place] = "?";
-    const plan = await planJointRepair([first!, parts.join(" ")]);
-    expect(plan.assessment.verdict).toBe("search");
-    expect(plan.assessment.combinations).toBe(2 ** 16);
+    const input = new ShareInput({ decodeEntry: "The Decode entry" });
+    input.add([first!, parts.join(" ")]);
+    const read = await new ShareRestore(nodeSharePlatform).read(input);
+    if (read.kind !== "marked") throw new Error("The shares were not read as marked.");
+    expect(read.plan.assessment.verdict).toBe("search");
+    expect(read.plan.assessment.combinations).toBe(2 ** 16);
     // Longer than allowed without a question, on the private screen: Yes is chosen.
     terminal.privateScreen = true;
-    const search = searchShareRepair({ plan, triesPerSecond: 1 }, { shares: 1 });
+    const search = searchShareRepair(read, { shares: 1 });
     // Typed once the question is answered: a Ctrl+C typed before it would cancel at the drop of
     // the keys typed ahead, before the question is asked.
     const typeAfterQuestion = (): void => {
@@ -246,10 +250,10 @@ describe("Ctrl+C during a long search", () => {
     };
     typeAfterQuestion();
     await expect(search).rejects.toBeInstanceOf(InputCancelled);
-    // The keys typed ahead are dropped in raw mode, which is left before the question; the watch
-    // takes raw mode only after it.
-    expect(terminal.modesAtQuestions).toEqual([[true, false]]);
-    expect(terminal.rawModes).toEqual([true, false, true, false]);
+    // The question drops the keys typed ahead itself (choose, replaced here); the watch takes raw
+    // mode only after it.
+    expect(terminal.modesAtQuestions).toEqual([[]]);
+    expect(terminal.rawModes).toEqual([true, false]);
     expectTerminalGivenBack();
   });
 });

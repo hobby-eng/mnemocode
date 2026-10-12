@@ -8,6 +8,7 @@ import {
   parseInput,
   representMnemonic,
   formatEncoded,
+  type EncodedFormat,
   type OutputFormat,
 } from "../src/core.js";
 import { parseRecord, serializeRecord } from "../src/record.js";
@@ -67,9 +68,7 @@ describe("AUD-001 regression contracts", () => {
   });
 
   it("AUD-001-API001: rejects an unknown input format at the JavaScript boundary", () => {
-    expect(() =>
-      parseInput(publicMnemonic, "misspelled" as Exclude<OutputFormat, "json">),
-    ).toThrow();
+    expect(() => parseInput(publicMnemonic, "misspelled" as EncodedFormat)).toThrow();
   });
 
   it("AUD-001-API001: rejects an unknown output format at the JavaScript boundary", () => {
@@ -80,7 +79,7 @@ describe("AUD-001 regression contracts", () => {
 
   it("AUD-001-API001: cannot serialize an unreadable record format", () => {
     expect(() =>
-      serializeRecord("direct", "misspelled" as Exclude<OutputFormat, "json">, publicMnemonic),
+      serializeRecord("direct", "misspelled" as EncodedFormat, publicMnemonic),
     ).toThrow();
   });
 });
@@ -229,7 +228,7 @@ describe("AUD-004 regression contracts", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  }, 60_000);
+  });
 
   it("AUD-004-DOC001: publishes a new private file whole and never replaces an existing one", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-publish-"));
@@ -295,6 +294,5 @@ describe("AUD-005 regression contracts", () => {
         await rm(directory, { recursive: true, force: true });
       }
     },
-    60_000,
   );
 });

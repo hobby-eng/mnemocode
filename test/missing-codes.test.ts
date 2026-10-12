@@ -6,7 +6,6 @@ import { DatesAnswer } from "../src/core/date-search.js";
 import { MasterFingerprintCheck } from "../src/core/master-fingerprint.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { englishWordlist } from "../src/core/words.js";
-import "../src/sskr/share-platform-node.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
 
@@ -56,7 +55,7 @@ describe("codes marked with ? (core/missing-codes.ts)", () => {
       expect(result.found[0]!.indexes, format).toEqual(ENCODED.shiftedIndexes);
       expect(String(codes)).toBe("[MissingCodes: redacted]");
     }
-  }, 60_000);
+  });
 
   it("holds the candidates to the checksum the codes keep, and to none for the Original Seedshift", () => {
     const text = marked("indexes", [5]);
@@ -94,7 +93,9 @@ describe("codes marked with ? (core/missing-codes.ts)", () => {
       MissingCodes.read(formatEncoded(ENCODED, "indexes"), "indexes", "seedshift"),
     ).toThrow("No code is marked");
     const three = marked("indexes", [1, 4, 7]);
-    expect(() => MissingCodes.read(three, "indexes", "seedshift")).toThrow("at most 16,777,216");
+    expect(() => MissingCodes.read(three, "indexes", "seedshift")).toThrow(
+      "more than 16,777,216 combinations",
+    );
     expect(() => MissingCodes.read("1 2 ? 4", "indexes", "seedshift")).toThrow("a seed phrase has");
     expect(() =>
       MissingCodes.read(marked("indexes", [2]).replace("10", "9999"), "indexes", "direct"),

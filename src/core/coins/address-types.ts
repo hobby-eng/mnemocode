@@ -7,6 +7,7 @@
 
 import { ripemd160 } from "@noble/hashes/legacy.js";
 import { sha256 } from "@noble/hashes/sha2.js";
+import { HASH160_BYTES } from "./address-sizes.js";
 
 /**
  * How an address commits to a public key. p2pkh: HASH160 of the key, as legacy addresses ("1…",
@@ -17,8 +18,8 @@ import { sha256 } from "@noble/hashes/sha2.js";
  */
 export type AddressType = "p2pkh" | "p2sh-p2wpkh" | "p2wpkh" | "p2tr" | "keccak" | "dash-platform";
 
-/** RIPEMD-160 gives 160 bits: a HASH160 is 20 bytes. */
-export const HASH160_BYTES = 20;
+// The size of a HASH160 is address-sizes.ts's; here too for the families that take it with it.
+export { HASH160_BYTES };
 
 /** RIPEMD-160 of SHA-256, Bitcoin's hash of keys and scripts. */
 export function hash160(bytes: Uint8Array): Uint8Array {

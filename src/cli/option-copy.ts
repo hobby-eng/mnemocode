@@ -23,8 +23,6 @@ const labels: Readonly<Record<string, string>> = {
   "encoded-fingerprint": "encoded fingerprint",
   date: "date list",
   dates: "date list",
-  event: "event label list",
-  events: "event label list",
   format: "representation format",
   "heir-sheet": "instructions for heirs file",
   "heir-sheet-size": "size of the instructions for heirs",
@@ -69,9 +67,13 @@ const labels: Readonly<Record<string, string>> = {
   words: "mnemonic word count",
 };
 
-/** Human-facing CLI copy must not expose internal parser keys. */
+/**
+ * Human-facing CLI copy must not expose internal parser keys. The key may be any name typed, such
+ * as --constructor, so only the table's own entries are labels, never what an object inherits
+ * (AUD-015-UI001).
+ */
 export function optionLabel(key: string): string {
-  return labels[key] ?? key.replaceAll("-", " ");
+  return Object.hasOwn(labels, key) ? labels[key]! : key.replaceAll("-", " ");
 }
 
 export function optionSubject(key: string): string {

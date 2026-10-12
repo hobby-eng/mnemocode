@@ -2,9 +2,9 @@
 // double-click; the same idea as the menu of `mhfe` (src/bin/mhfe/menu.rs). An entry asks its
 // questions as lists chosen with the arrow keys, builds the command line that does the same, shows
 // it in grey and runs it exactly as if it had been typed after `mnemocode`, so that the person can
-// type it later. A secret is never part of that command line: the command asks for it on its private
-// screen (--ask-secrets, private-screen.ts), and what is typed before that screen shows is not
-// echoed on the main one (withEchoOff).
+// type it later. A secret is never part of that command line: the command asks for it on its
+// private screen (--ask-secrets, private-screen.ts), and what is typed before that screen shows is
+// not echoed on the main one (withEchoOff).
 //
 // The menu checks each of its own answers at once, none of which is a secret: a file name, a
 // fingerprint, an address, a key or a lookup that the command would refuse is explained in one
@@ -12,18 +12,13 @@
 // and the menu writes nothing (dropForMenu); the command checks everything again, since a file
 // may change in between.
 
-import { spawnSync } from "node:child_process";
+import type { SplitMode } from "../core/masking.js";
 import { constants as fileAccess, type Stats } from "node:fs";
 import { access, stat } from "node:fs/promises";
-import { constants as systemConstants } from "node:os";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
-import {
-  DEFAULT_ADDRESS_COUNT,
-  parseBitcoinAddress,
-  parseCoinAddress,
-  parseMasterFingerprint,
-} from "../bitcoin-evidence.js";
-import { allMappingRows, formatEncoded, representMnemonic, type OutputFormat } from "../core.js";
+import { resolve } from "node:path";
+import { pathsOverlap } from "./path-within.js";
+import { formatEncoded, representMnemonic, type EncodedFormat } from "../core.js";
+import { UNICODE_CODE_HINT, wordTableRow } from "../core/words.js";
 import {
   ALWAYS_MASKED_NOTE,
   alwaysMasked,
@@ -31,37 +26,63 @@ import {
   shareFormatOf,
   ShareSetChoice,
   UNMASKED_NOTE,
+  writtenInColors,
 } from "../core/backup-options.js";
 import { parseRecipient } from "../core/candidate-encryption.js";
+import { designTexts, resolveCardPresentation } from "../export/card-copy.js";
 import {
-  designTexts,
-  resolveCardPresentation,
-  type CardCopyOverrides,
-} from "../export/card-copy.js";
-import { profileFields, validateProfile } from "../export/card-settings.js";
-import { assertImageRenderer, type ImageFormat } from "../export/image-export.js";
+  profileFieldLabel,
+  profileFields,
+  validateProfile,
+  pageSizeLabel,
+  SEPARATE_CARD_SIZE,
+  type CopyField,
+  type ProfileField,
+} from "../export/card-settings.js";
+import { assertImageRenderer } from "../export/image-export.js";
+import {
+  DOCUMENT_FORMAT_FACTS,
+  DOCUMENT_FORMATS,
+  type DocumentFormat,
+} from "../export/document-formats.js";
 import { cardTemplates } from "../export/templates.js";
 import type { ShareFormat } from "../sskr/transport.js";
-import { droppedPath, OTHER_COINS, OTHER_COINS_NOTE, parseAddressCount } from "./ask.js";
-import { MENU_ENTRY_NAMES } from "./menu-entries.js";
+import { droppedPath, askWalletEvidence, type WalletValueAsker } from "./ask.js";
+import { limitName, MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
+import { formatNumber } from "./input.js";
+import { MAX_PNG_BYTES } from "./qr-limits.js";
+import { WORD_NUMBERS } from "../core/bip39-sizes.js";
+import {
+  SEEDSHIFT_CHOICES,
+  ENCODED_SEEDSHIFT_QUESTION,
+  SHARE_SEEDSHIFT_CHOICES,
+  SHARE_SEEDSHIFT_QUESTION,
+  WHICH_SEEDSHIFT_QUESTION,
+  type OfferedSeedshift,
+  ENCODED_SEEDSHIFT_CHOICES,
+} from "./seedshift-choices.js";
+import { MENU_ENTRY_NAMES, TYPED_SOURCE } from "./menu-entries.js";
 import { PRIVATE_SCREEN_COMMANDS } from "./command-line.js";
-import { preflightFileDestination } from "./output-paths.js";
+import {
+  isUnusableOutputPath,
+  preflightFileDestination,
+  preflightFolderDestination,
+} from "./output-paths.js";
 import { CANCELLED_EXIT_CODE, privateScreenAvailable } from "./private-screen.js";
-import { assertProtected, dropForMenu, runInOwnProcess } from "./protection.js";
+import { assertProtected, dropForMenu } from "./protection.js";
 import { assertCoreSelfTest } from "./self-test.js";
 import {
   answerMark,
   askLine,
-  choose as chooseNow,
+  choose,
   notesRoom,
   eraseAnswersSince,
   startRecord,
   waitForEnter,
   type Choice,
-  type ChooseOptions,
   type Explanation,
 } from "./terminal-choice.js";
-import { dropTypedAhead, InputCancelled, terminalAvailable } from "./terminal-input.js";
+import { terminalAvailable, refusal } from "./terminal-input.js";
 import {
   readmeLink,
   STYLE,
@@ -71,6 +92,27 @@ import {
   terminalPaint,
 } from "./terminal.js";
 import { printUsage } from "./usage.js";
+import { isColorShareFormat } from "../sskr/transport.js";
+import { REPAIR_ANCHOR } from "../sskr/repair-report.js";
+import { walletNeeded } from "../core/date-search.js";
+import { walletExplanation } from "./date-search.js";
+import { numberedForms } from "./format-numbers.js";
+import { EncodedForm } from "../core/encoded-form.js";
+import { commandDisplay, typedCommand } from "./shell-command.js";
+import { runCommand } from "./menu-runner.js";
+import { COLOR_COUNTS_TEXT } from "../core/colors.js";
+import { walletEvidenceArguments } from "./bitcoin-options.js";
+import { headingLine } from "./terminal-style.js";
+import {
+  HEIR_SHEET_FILE,
+  heirSheetSizeLabel,
+  HEIR_SHEET_SIZES,
+  type HeirSheetSize,
+} from "../export/heir-sheet.js";
+import { COPY_OPTIONS, profileOption } from "./business-options.js";
+import { describeError } from "../core/refusal.js";
+import { SAMPLE_FILE_BASE } from "../export/card-preview.js";
+import { textPieces } from "../core/pieces.js";
 
 /** The menu reads keys from a terminal and draws on one; anything else gets the help instead. */
 export function menuAvailable(): boolean {
@@ -78,32 +120,9 @@ export function menuAvailable(): boolean {
 }
 
 /**
- * Asks as terminal-choice's choose does, once what was typed or pasted before the question showed
- * is dropped and wiped (dropTypedAhead): the rest of a paste would otherwise choose entries, its q
- * would go back, and its bytes would stay in the menu's memory.
+ * What an entry does once its questions are answered; undefined means that the person went back.
  */
-async function choose<T>(
-  question: string,
-  choices: readonly Choice<T>[],
-  options: ChooseOptions,
-): Promise<T | undefined> {
-  await dropTypedAhead();
-  return chooseNow(question, choices, options);
-}
-
-/** What an entry does once its questions are answered; undefined means that the person went back. */
 type Action = { readonly run: readonly string[] } | "help" | "quit" | undefined;
-
-type EncodedForm = Exclude<OutputFormat, "json">;
-
-/** The number that --format takes for each form (mnemocode help formats). */
-const FORMAT_NUMBER: Readonly<Record<EncodedForm, string>> = {
-  english: "1",
-  indexes: "2",
-  unicode: "3",
-  "colors-unicode": "4",
-  colors: "5",
-};
 
 /**
  * The phrase of the examples: a public BIP39 test vector (entropy 0x80 repeated). The usual test
@@ -119,12 +138,11 @@ const EXAMPLE_PHRASE =
 const SOURCE_SAMPLE_ROOM = 25;
 
 /** A form written out for the example phrase, in groups that read well. */
-function example(form: EncodedForm): string {
+function example(form: EncodedFormat): string {
   const written = formatEncoded(representMnemonic(EXAMPLE_PHRASE), form);
-  // Unicode codes have four digits and colours as text eight; both are written joined.
-  if (form === "unicode") return written.match(/.{4}/gu)!.join(" ");
-  if (form === "colors-unicode") return written.match(/.{8}/gu)!.join(" ");
-  return written;
+  // Forms written joined, as Unicode codes are, are spaced apart code by code.
+  const width = EncodedForm.of(form).joinedWidth;
+  return width === undefined ? written : textPieces(written, width).join(" ");
 }
 
 /**
@@ -152,38 +170,41 @@ function withSamples<T>(choices: readonly Choice<T>[]): Choice<T>[] {
 }
 
 /** The forms in the order of the question, the first three being the usual ones. */
-function formChoices(): Choice<EncodedForm>[] {
-  return withSamples([
-    {
-      label: "Word numbers",
-      note: "its place in the BIP39 word list, masked with your dates",
-      example: example("indexes"),
-      value: "indexes",
-    },
-    {
-      label: "Unicode codes",
-      note: "four-digit hexadecimal codes of the Chinese BIP39 words",
-      example: example("unicode"),
-      value: "unicode",
-    },
-    {
-      label: "Colors",
-      note: "color codes, 8 to 16 for the whole seed phrase",
-      example: example("colors"),
-      value: "colors",
-    },
-    {
-      label: "Colors as text",
-      note: "the same colors written as Unicode codes, no font needed",
-      example: example("colors-unicode"),
-      value: "colors-unicode",
-    },
-    {
-      label: "English words",
-      note: "the seed phrase itself, masked with your dates",
-      value: "english",
-    },
-  ]);
+function formChoices(): Choice<EncodedFormat>[] {
+  // Each answered by its --format number, which the command shown then takes.
+  return withSamples(
+    numberedForms([
+      {
+        label: "Word numbers",
+        note: "its place in the BIP39 word list, masked with your dates",
+        example: example("indexes"),
+        value: "indexes",
+      },
+      {
+        label: "Unicode codes",
+        note: "four-digit hexadecimal codes of the Chinese BIP39 words",
+        example: example("unicode"),
+        value: "unicode",
+      },
+      {
+        label: "Colors",
+        note: `color codes, ${COLOR_COUNTS_TEXT} for the whole seed phrase`,
+        example: example("colors"),
+        value: "colors",
+      },
+      {
+        label: "Colors as text",
+        note: "the same colors written as Unicode codes, no font needed",
+        example: example("colors-unicode"),
+        value: "colors-unicode",
+      },
+      {
+        label: "English words",
+        note: "the seed phrase itself, masked with your dates",
+        value: "english",
+      },
+    ]),
+  );
 }
 
 /** What Seedshift is, shown with the first question about it; the README explains it. */
@@ -221,21 +242,8 @@ const HEIRS_EXPLANATION: Explanation = {
   more: [readmeLink("instructions-for-heirs")],
 };
 
-type Mode = "direct" | "seedshift" | "seedshift-legacy";
-
-/** The two Seedshift transformations (README, Transformation modes). */
-const SEEDSHIFT_VARIANTS: readonly Choice<Mode>[] = [
-  {
-    label: "MnemoCode Seedshift",
-    note: "a valid BIP39 seed phrase again; recommended",
-    value: "seedshift",
-  },
-  {
-    label: "Original Seedshift",
-    note: "as the original program; checksum usually fails",
-    value: "seedshift-legacy",
-  },
-];
+/** The modes that the menu offers: no Seedshift, or one of the Seedshifts it offers. */
+type Mode = "direct" | OfferedSeedshift;
 
 /**
  * Why there is no question whether to mask a form that is always masked (alwaysMasked), shown with
@@ -270,43 +278,52 @@ async function askSeedshift(
     if (!used) return "direct";
   }
   if (options.shares === true) return "seedshift";
-  return choose("Which Seedshift?", SEEDSHIFT_VARIANTS, {
+  return choose("Which Seedshift?", SEEDSHIFT_CHOICES, {
     label: "Variant",
     explanation: options.required === true ? ALWAYS_MASKED_EXPLANATION : VARIANT_EXPLANATION,
   });
 }
 
 /**
- * The files that the answers of the entry being asked name for saving, as absolute paths, so that
- * a second file of the same entry cannot take the place of a first (assertUnclaimed). Every entry
+ * The files and folders that the answers of the entry being asked name for saving, as absolute
+ * paths, so that a second output of the same entry cannot take the place of a first. Every entry
  * starts with none (askedAfresh).
  */
-const entryOutputs: string[] = [];
+class ClaimedOutputs {
+  readonly #paths: string[] = [];
+
+  /** Forgets the outputs of an earlier entry. */
+  reset(): void {
+    this.#paths.length = 0;
+  }
+
+  /**
+   * Refuses `path` when it is the place of an earlier output, lies in it or holds it: the command
+   * would refuse the pair (validateOutputPaths), and a name taken by both would be numbered to the
+   * same free name. Checked first, as it says the most; an answer that passes every check is then
+   * claimed.
+   */
+  assertFree(path: string): void {
+    const absolute = resolve(path);
+    if (this.#paths.some((earlier) => pathsOverlap(earlier, absolute)))
+      throw new Error(
+        "Another file of this task has this name or this folder; choose another one.",
+      );
+  }
+
+  claim(path: string): void {
+    this.#paths.push(resolve(path));
+  }
+}
+
+const entryOutputs = new ClaimedOutputs();
 
 /** `action` with no file of an earlier entry claimed. */
 function askedAfresh(action: () => Promise<Action>): () => Promise<Action> {
   return () => {
-    entryOutputs.length = 0;
+    entryOutputs.reset();
     return action();
   };
-}
-
-/** Whether `child` is `parent` or lies inside it, as output-paths.ts compares outputs. */
-function contains(parent: string, child: string): boolean {
-  const relation = relative(parent, child);
-  return relation === "" || (relation.split(/[\\/]/u)[0] !== ".." && !isAbsolute(relation));
-}
-
-/**
- * Refuses `path` for an output of this entry when it is the place of an earlier one, lies in it or
- * holds it: the command would refuse the pair (validateOutputPaths), and a name taken by both
- * would be numbered to the same free name. Checked first, as it says the most; an answer that
- * passes every check is then claimed (entryOutputs).
- */
-function assertUnclaimed(path: string): void {
-  const absolute = resolve(path);
-  if (entryOutputs.some((earlier) => contains(earlier, absolute) || contains(absolute, earlier)))
-    throw new Error("Another file of this task has this name or this folder; choose another one.");
 }
 
 /**
@@ -319,9 +336,13 @@ function assertUnclaimed(path: string): void {
  */
 function typedPath(answer: string): string {
   const path = droppedPath(answer);
-  if (path.trim() === "")
-    throw new Error("That name is blank; type a name, or press Enter alone for the one shown.");
-  if (path === "-") throw new Error("- is no file name here; type the name of a file.");
+  // The command's rule for a name that is no path (isUnusableOutputPath), in the menu's words.
+  if (isUnusableOutputPath(path))
+    throw new Error(
+      path === "-"
+        ? "- is no file name here; type the name of a file."
+        : "That name is blank; type a name, or press Enter alone for the one shown.",
+    );
   if (path.startsWith("-"))
     throw new Error("A name that starts with - would be read as an option; type ./ before it.");
   return path;
@@ -334,71 +355,31 @@ function typedPath(answer: string): string {
  */
 async function outputFile(answer: string): Promise<string> {
   const path = typedPath(answer);
-  assertUnclaimed(path);
-  try {
-    await preflightFileDestination(path, true);
-  } catch (error) {
-    // Its own checks say why in words; an error of the file system, such as ENOTDIR for a name
-    // under a file, would name the path and the system call instead.
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === undefined) throw error;
-    throw new Error(
-      code === "ENOTDIR"
-        ? "The folder containing the output file is not a directory."
-        : "The folder containing the output file must already exist and be writable.",
-    );
-  }
-  entryOutputs.push(resolve(path));
+  entryOutputs.assertFree(path);
+  await preflightFileDestination(path, true);
+  entryOutputs.claim(path);
   return path;
 }
 
-/** Why a new folder cannot be made where it is to go. */
-const FOLDER_UNWRITABLE =
-  "MnemoCode may not make a folder there; choose a folder you can write to.";
-
 /**
- * A new folder to save into, such as one for the cards. The command makes the folders of its path
- * that do not exist yet and numbers a name that is taken, so the nearest folder of the path that
- * exists must be one that may be written to.
+ * A new folder to save into, such as one for the cards, checked as the command checks it
+ * (preflightFolderDestination): the command makes the folders of its path that do not exist yet
+ * and numbers a name that is taken.
  */
 async function newFolder(answer: string): Promise<string> {
   const path = typedPath(answer);
-  assertUnclaimed(path);
-  let ancestor = dirname(resolve(path));
-  for (;;) {
-    let info: Stats;
-    try {
-      info = await stat(ancestor);
-    } catch (error) {
-      const parent = dirname(ancestor);
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT" || parent === ancestor)
-        throw new Error(FOLDER_UNWRITABLE);
-      ancestor = parent;
-      continue;
-    }
-    if (!info.isDirectory())
-      throw new Error("A file stands where a folder of this name should be; choose another name.");
-    try {
-      await access(ancestor, fileAccess.W_OK);
-    } catch {
-      throw new Error(FOLDER_UNWRITABLE);
-    }
-    entryOutputs.push(resolve(path));
-    return path;
-  }
+  entryOutputs.assertFree(path);
+  await preflightFolderDestination(path);
+  entryOutputs.claim(path);
+  return path;
 }
-
-/** The largest record file that the command reads, MAX_TEXT_INPUT_BYTES of input.ts: 1 MiB. */
-const RECORD_FILE_LIMIT = 1024 * 1024;
-/** The largest QR code image that the command reads, MAX_PNG_BYTES of qr-input.ts: 16 MiB. */
-const QR_FILE_LIMIT = 16 * 1024 * 1024;
 
 /**
  * A file to read, checked without reading it: it exists, is a file and may be read, and it is no
- * larger than the command reads (`limit`, named `size` in the message). What is in it only the
- * command can tell, after it has read the file.
+ * larger than the command reads (`limit`). What is in it only the command can tell, after it has
+ * read the file.
  */
-async function inputFile(answer: string, limit: number, size: string): Promise<string> {
+async function inputFile(answer: string, limit: number): Promise<string> {
   const path = typedPath(answer);
   let info: Stats;
   try {
@@ -413,7 +394,8 @@ async function inputFile(answer: string, limit: number, size: string): Promise<s
   } catch {
     throw new Error("MnemoCode may not read that file.");
   }
-  if (info.size > limit) throw new Error(`That file is larger than ${size}; it cannot be the one.`);
+  if (info.size > limit)
+    throw new Error(`That file is larger than ${limitName(limit)}; it cannot be the one.`);
   return path;
 }
 
@@ -438,19 +420,22 @@ async function askDesign(withEveryDesign: boolean): Promise<string | undefined> 
   return choose("Which card design?", designs, { label: "Design" });
 }
 
-/** The kind of file that printable cards are saved in: a PDF, or an image, which needs pdftocairo. */
-type CardFileKind = "pdf" | ImageFormat;
-
 /** How the cards are laid out: on sheets of one size, or as separate business cards. */
 type CardLayout = "a6" | "a4" | "separate";
 
 const CARD_LAYOUTS: readonly Choice<CardLayout>[] = [
-  { label: "A6 sheets", note: "148 x 105 mm, the usual choice", value: "a6" },
-  { label: "A4 sheets", note: "210 x 297 mm", value: "a4" },
-  { label: "Separate business cards", note: "90 x 50 mm, one file each", value: "separate" },
+  { label: "A6 sheets", note: `${pageSizeLabel("a6")}, the usual choice`, value: "a6" },
+  { label: "A4 sheets", note: pageSizeLabel("a4"), value: "a4" },
+  {
+    label: "Separate business cards",
+    note: `${pageSizeLabel(SEPARATE_CARD_SIZE)}, one file each`,
+    value: "separate",
+  },
 ];
 
-/** The options of the chosen way of saving, and whether it gives sheets, which may get a QR code. */
+/**
+ * The options of the chosen way of saving, and whether it gives sheets, which may get a QR code.
+ */
 interface CardFiles {
   readonly options: readonly string[];
   readonly sheets: boolean;
@@ -461,8 +446,9 @@ async function missingImageRenderer(): Promise<string | undefined> {
   try {
     await assertImageRenderer();
     return undefined;
-  } catch {
-    return "Images need Poppler's pdftocairo, which is not installed here; choose a PDF.";
+  } catch (error) {
+    // The renderer's own refusal, as the command says it.
+    return refusal(error);
   }
 }
 
@@ -505,17 +491,25 @@ async function askCardFiles(base: string, shares: boolean): Promise<CardFiles | 
   return { sheets: true, options: ["--images-dir", folder, ...image, ...size] };
 }
 
-/** The kind of file of the cards: a PDF, or an image, which needs pdftocairo. */
-async function askCardFileKind(): Promise<CardFileKind | undefined> {
+/**
+ * The kind of file that printable cards are saved in: a PDF, or an image, which needs pdftocairo.
+ */
+async function askCardFileKind(): Promise<DocumentFormat | undefined> {
   let warning: string | undefined;
   for (;;) {
     const kind = await choose(
       "Which kind of file?",
       [
-        { label: "PDF", note: "prints at its exact size", value: "pdf" },
-        { label: "PNG", note: "images, sharp text and QR codes; needs pdftocairo", value: "png" },
-        { label: "JPEG", note: "smaller images; needs pdftocairo", value: "jpg" },
-      ] as const,
+        ...DOCUMENT_FORMATS.map((format) => {
+          const { name, note } = DOCUMENT_FORMAT_FACTS[format];
+          // Images are drawn from the PDF with pdftocairo, which the menu checks for below.
+          return {
+            label: name,
+            note: format === "pdf" ? note : `${note}; needs pdftocairo`,
+            value: format,
+          };
+        }),
+      ],
       { label: "Files", warning },
     );
     if (kind === undefined || kind === "pdf") return kind;
@@ -544,23 +538,22 @@ function refuseOptionLike(answer: string): void {
     throw new Error("A detail that starts with - would be read as an option; leave out the -.");
 }
 
-/** The question and the label of each detail of the person on the cards (--card-<field>). */
-const PERSON_QUESTIONS: Readonly<
-  Record<(typeof profileFields)[number], { readonly question: string; readonly label: string }>
-> = {
-  name: { question: "Name, in Latin letters", label: "Name" },
-  role: { question: "Role", label: "Role" },
-  company: { question: "Company", label: "Company" },
-  email: { question: "Email", label: "Email" },
-  phone: { question: "Phone", label: "Phone" },
-  website: { question: "Website", label: "Website" },
-  location: { question: "Location", label: "Location" },
+/** The question for each detail of the person on the cards (--card-<field>). */
+const PERSON_QUESTIONS: Readonly<Record<ProfileField, string>> = {
+  name: "Name, in Latin letters",
+  role: "Role",
+  company: "Company",
+  email: "Email",
+  phone: "Phone",
+  website: "Website",
+  location: "Location",
 };
 
 /** The details of the person, which every design may print, checked as the command checks them. */
 const PERSON_DETAILS: readonly CardDetail[] = profileFields.map((field) => ({
-  option: `card-${field}`,
-  ...PERSON_QUESTIONS[field],
+  option: profileOption(field),
+  question: PERSON_QUESTIONS[field],
+  label: profileFieldLabel(field),
   check: (answer) => {
     refuseOptionLike(answer);
     return validateProfile({ [field]: answer })[field]!;
@@ -568,38 +561,28 @@ const PERSON_DETAILS: readonly CardDetail[] = profileFields.map((field) => ({
 }));
 
 /** Text printed around the cards, which "-" leaves off, checked as resolveCardPresentation does. */
-function textDetail(
-  key: keyof CardCopyOverrides,
-  option: string,
-  question: string,
-  label: string,
-): CardDetail {
+function textDetail(key: CopyField, question: string, label: string): CardDetail {
   return {
-    option,
+    option: COPY_OPTIONS[key],
     question,
     label,
     check: (answer) => {
       if (answer === "-") return answer;
       refuseOptionLike(answer);
       // The fixed choice stands for the random pick of the other texts, which are not used here.
-      resolveCardPresentation({}, { [key]: answer }, () => 0);
+      resolveCardPresentation(() => 0, { [key]: answer });
       return answer;
     },
   };
 }
 
 /** The question of each text around the cards, in the order that designTexts names them. */
-const TEXT_DETAILS: Readonly<Record<keyof CardCopyOverrides, CardDetail>> = {
-  studioName: textDetail("studioName", "studio-name", "Studio name", "Studio"),
-  slogan: textDetail("slogan", "card-slogan", "Slogan", "Slogan"),
-  subtitle: textDetail("subtitle", "card-subtitle", "Subtitle", "Subtitle"),
-  footer: textDetail("footer", "card-footer", "Footer", "Footer"),
-  referenceLabel: textDetail(
-    "referenceLabel",
-    "card-reference-label",
-    "Label before each code",
-    "Reference",
-  ),
+const TEXT_DETAILS: Readonly<Record<CopyField, CardDetail>> = {
+  studioName: textDetail("studioName", "Studio name", "Studio"),
+  slogan: textDetail("slogan", "Slogan", "Slogan"),
+  subtitle: textDetail("subtitle", "Subtitle", "Subtitle"),
+  footer: textDetail("footer", "Footer", "Footer"),
+  referenceLabel: textDetail("referenceLabel", "Label before each code", "Reference"),
 };
 
 /**
@@ -666,13 +649,13 @@ async function askCards(base: string, shares: boolean): Promise<string[] | undef
  * Where an encoded result goes besides the screen. Cards print color codes, so they are offered
  * only for a result written in colors.
  */
-async function askResultDestination(form: EncodedForm): Promise<string[] | undefined> {
+async function askResultDestination(form: EncodedFormat): Promise<string[] | undefined> {
   const choices: Choice<"screen" | "record" | "qr" | "cards">[] = [
     { label: "Only on this screen", value: "screen" },
     { label: "Also in a record file", note: "text that Decode reads back", value: "record" },
     { label: "Also as a QR code image", note: "a PNG file that Decode reads back", value: "qr" },
   ];
-  if (form === "colors" || form === "colors-unicode")
+  if (writtenInColors(form))
     choices.push({
       label: "Also as printable cards",
       note: "a PDF or images in a card design",
@@ -684,11 +667,16 @@ async function askResultDestination(form: EncodedForm): Promise<string[] | undef
   if (destination === "cards") return askCards("mnemocode-cards", false);
   const path =
     destination === "record"
-      ? await askOutputFile("Record file name", "mnemocode-record.txt")
-      : await askOutputFile("QR code file name", "mnemocode-qr.png");
+      ? await askOutputFile("Record file name", RECORD_FILE)
+      : await askOutputFile("QR code file name", QR_FILE);
   if (path === undefined) return undefined;
   return [destination === "record" ? "--output" : "--qr", path];
 }
+
+/** The file that Encode saves a record in by default, and that Decode reads by default. */
+const RECORD_FILE = "mnemocode-record.txt";
+/** The QR code image that Encode saves by default, and that Decode reads by default. */
+const QR_FILE = "mnemocode-qr.png";
 
 /**
  * Entry 1: the seed phrase in another form, masked with Seedshift and split into Shamir shares if
@@ -714,14 +702,14 @@ async function encodeAction(): Promise<Action> {
 }
 
 /** One copy in the chosen form, and where it goes. */
-async function askCopyDestination(form: EncodedForm, mode: Mode): Promise<string[] | undefined> {
+async function askCopyDestination(form: EncodedFormat, mode: Mode): Promise<string[] | undefined> {
   const destination = await askResultDestination(form);
   if (destination === undefined) return undefined;
   return [
     "encode",
     "--ask-secrets",
     "--format",
-    FORMAT_NUMBER[form],
+    String(formatNumber(form)),
     "--mode",
     mode,
     ...destination,
@@ -734,7 +722,7 @@ async function askCopyDestination(form: EncodedForm, mode: Mode): Promise<string
  */
 async function askSharesRun(
   set: ShareSetChoice,
-  form: EncodedForm,
+  form: EncodedFormat,
   mode: Mode,
 ): Promise<string[] | undefined> {
   const shares = await askShares(set, shareFormatOf(form));
@@ -755,9 +743,15 @@ async function askSharesRun(
     "--mode",
     mode,
     ...shares,
-    ...(copy ? ["--format", FORMAT_NUMBER[form]] : []),
+    ...(copy ? ["--format", String(formatNumber(form))] : []),
   ];
 }
+
+/** What each size of the sheet for heirs is like, as the menu offers it. */
+const HEIR_SHEET_NOTES: Readonly<Record<HeirSheetSize, string>> = {
+  a5: `notebook size, ${heirSheetSizeLabel("a5")}, larger print`,
+  a6: `postcard size, ${heirSheetSizeLabel("a6")}, small print`,
+};
 
 /**
  * The optional sheet that tells heirs how to restore the backup (README, Instructions for heirs),
@@ -768,25 +762,30 @@ async function askHeirSheet(mode: Mode): Promise<string[] | undefined> {
   const size = await choose(
     "Instructions for your heirs?",
     [
-      { label: "No", value: "" },
-      { label: "Yes, A5", note: "notebook size, 148 x 210 mm, larger print", value: "a5" },
-      { label: "Yes, A6", note: "postcard size, 105 x 148 mm, small print", value: "a6" },
+      { label: "No", value: "" as const },
+      ...HEIR_SHEET_SIZES.map((size) => ({
+        label: `Yes, ${size.toUpperCase()}`,
+        note: HEIR_SHEET_NOTES[size],
+        value: size,
+      })),
     ],
     { label: "Heirs", explanation: HEIRS_EXPLANATION },
   );
   if (size === undefined) return undefined;
   if (size === "") return [];
-  const path = await askOutputFile("PDF file name", "mnemocode-heirs.pdf");
+  const path = await askOutputFile("PDF file name", HEIR_SHEET_FILE);
   return path === undefined ? undefined : ["--heir-sheet", path, "--heir-sheet-size", size];
 }
 
-/** Where an encoded seed phrase is read from: typed on the private screen, or a file encode saved. */
+/**
+ * Where an encoded seed phrase is read from: typed on the private screen, or a file encode saved.
+ */
 async function askSource(): Promise<{ readonly options: string[] } | undefined> {
   const source = await choose(
     "Where is the encoded seed phrase?",
     [
       {
-        label: "Type or paste it",
+        label: TYPED_SOURCE,
         note: "numbers, codes, colors or a record",
         // Half the room for each sample, less the " · " between them.
         example: `${sampleOf(example("indexes"), SOURCE_SAMPLE_ROOM)} · ${sampleOf(example("colors"), SOURCE_SAMPLE_ROOM)}`,
@@ -802,12 +801,12 @@ async function askSource(): Promise<{ readonly options: string[] } | undefined> 
   const path =
     source === "record"
       ? await askLine("Record file name", "File", {
-          fallback: "mnemocode-record.txt",
-          check: (answer) => inputFile(answer, RECORD_FILE_LIMIT, "1 MiB"),
+          fallback: RECORD_FILE,
+          check: (answer) => inputFile(answer, MAX_TEXT_INPUT_BYTES),
         })
       : await askLine("QR code file name", "File", {
-          fallback: "mnemocode-qr.png",
-          check: (answer) => inputFile(answer, QR_FILE_LIMIT, "16 MiB"),
+          fallback: QR_FILE,
+          check: (answer) => inputFile(answer, MAX_PNG_BYTES),
         });
   if (path === undefined) return undefined;
   return { options: [source === "record" ? "--input-file" : "--qr-file", path] };
@@ -822,12 +821,13 @@ async function decodeAction(): Promise<Action> {
   // Every answer gives --mode, No too: decode asks itself for codes that name no mode, and a typed
   // record that names another mode is questioned there, before any date is asked.
   if (source.options[0] !== "--input-file") {
+    // The menu says what follows rather than what each variant does: the variants are told apart
+    // where the codes are read (decode), and the explanation here says what Seedshift is.
     const mode = await choose(
-      "Was Seedshift used when it was encoded?",
-      [
-        { label: "No", note: "the codes stand for the words themselves", value: "direct" },
-        ...SEEDSHIFT_VARIANTS.map((variant) => ({ ...variant, note: "the dates are asked next" })),
-      ],
+      ENCODED_SEEDSHIFT_QUESTION,
+      ENCODED_SEEDSHIFT_CHOICES.map((choice) =>
+        choice.value === "direct" ? choice : { ...choice, note: "the dates are asked next" },
+      ),
       { label: "Seedshift", explanation: SEEDSHIFT_EXPLANATION },
     );
     if (mode === undefined) return undefined;
@@ -860,16 +860,6 @@ async function askShareSet(
     { label: "Shares", explanation },
   );
   return set === "other" ? askOtherShareSet() : set;
-}
-
-/**
- * A typed number from `min` to `max`, written as the command line takes it (no leading zeros);
- * otherwise `refusal` is the warning.
- */
-function numberFrom(answer: string, min: number, max: number, refusal: string): string {
-  const number = /^\d+$/u.test(answer) ? Number(answer) : Number.NaN;
-  if (!(number >= min && number <= max)) throw new Error(refusal);
-  return String(number);
 }
 
 /**
@@ -910,10 +900,9 @@ async function askShares(
   // Cards print each share in its form: its colors, or its codes beside colors that only decorate.
   const printed: Choice<"cards"> = {
     label: "Also as printable cards",
-    note:
-      shareFormat === "colors" || shareFormat === "colors-unicode"
-        ? "disguised, one sheet per share"
-        : "its codes on cards, one sheet per share",
+    note: isColorShareFormat(shareFormat)
+      ? "disguised, one sheet per share"
+      : "its codes on cards, one sheet per share",
     value: "cards",
   };
   const destination = await choose(
@@ -964,16 +953,20 @@ async function splitAction(): Promise<Action> {
   return { run: ["encode", "--sskr", "--ask-secrets", "--mode", mode, ...shares, ...heirs] };
 }
 
+/**
+ * Whether the phrase of shares was masked before it was split, as the sheet for heirs and the
+ * commands of shares ask it; undefined means back. Entries 4 and 5 ask it so.
+ */
+function askSharesMasked(): Promise<SplitMode | undefined> {
+  return choose(SHARE_SEEDSHIFT_QUESTION, SHARE_SEEDSHIFT_CHOICES, {
+    label: "Seedshift",
+    explanation: SEEDSHIFT_EXPLANATION,
+  });
+}
+
 /** Entry 4: the seed phrase rebuilt from typed Shamir shares. */
 async function restoreAction(): Promise<Action> {
-  const mode = await choose(
-    "Was Seedshift used before it was split?",
-    [
-      { label: "No", value: "direct" },
-      { label: "Yes", note: "the dates are asked after the shares", value: "seedshift" },
-    ] as const,
-    { label: "Seedshift" },
-  );
+  const mode = await askSharesMasked();
   if (mode === undefined) return undefined;
   return {
     run: ["sskr-combine", "--ask-secrets", ...(mode === "seedshift" ? ["--mode", mode] : [])],
@@ -1009,7 +1002,7 @@ async function recoverAction(): Promise<Action> {
   const mode =
     source.options[0] === "--input-file"
       ? undefined
-      : await choose("Which Seedshift was used?", SEEDSHIFT_VARIANTS, {
+      : await choose(WHICH_SEEDSHIFT_QUESTION, SEEDSHIFT_CHOICES, {
           label: "Seedshift",
           explanation: VARIANT_EXPLANATION,
         });
@@ -1017,7 +1010,7 @@ async function recoverAction(): Promise<Action> {
   // Every date gives MnemoCode Seedshift a valid phrase, so only the wallet can tell the right one;
   // the original Seedshift's checksum sorts out most dates by itself. A record file names its own
   // mode, and recover-date asks for the wallet after reading it only when that mode needs one.
-  const wallet = await askWallet(mode !== undefined && mode !== "seedshift-legacy");
+  const wallet = await askWallet(mode !== undefined && walletNeeded(mode), walletExplanation(mode));
   if (wallet === undefined) return undefined;
   return {
     run: [
@@ -1030,16 +1023,10 @@ async function recoverAction(): Promise<Action> {
   };
 }
 
-/** Why the wallet is asked for, shown with the question. */
-const WALLET_EXPLANATION: Explanation = {
-  lines: ["Each guessed date gives a valid phrase; the wallet tells which is yours."],
-  more: [readmeLink("date-recovery-helper")],
-};
-
 /** Why the wallet is asked for before shares are repaired. */
 const SHARE_WALLET_EXPLANATION: Explanation = {
   lines: ["Shares with many ? may fit in several ways; the wallet tells the right one."],
-  more: [readmeLink("damaged-shares")],
+  more: [readmeLink(REPAIR_ANCHOR)],
 };
 
 /**
@@ -1113,9 +1100,7 @@ async function shareRepairAction(): Promise<Action> {
   const wallet = await askWallet(false, SHARE_WALLET_EXPLANATION);
   if (wallet === undefined) return undefined;
   if (wallet.length === 0) return { run: ["sskr-export", "--ask-secrets"] };
-  const mode = await askSeedshift("Was the phrase masked with Seedshift before splitting?", {
-    shares: true,
-  });
+  const mode = await askSharesMasked();
   if (mode === undefined) return undefined;
   return {
     run: [
@@ -1136,90 +1121,44 @@ async function shareRepairAction(): Promise<Action> {
  */
 async function askWallet(
   required: boolean,
-  explanation: Explanation = WALLET_EXPLANATION,
+  explanation: Explanation,
 ): Promise<string[] | undefined> {
-  const kind = await choose(
-    "How can MnemoCode recognise the wallet?",
-    [
-      {
-        label: "Fingerprint",
-        // The phrase of the wallet: with Seedshift the one before the shift, which Encode calls Original.
-        note: "Encode's Original, not the Encoded",
-        value: "fingerprint",
-      },
-      {
-        label: "Bitcoin address",
-        note: "one of its first receiving addresses",
-        example: "1..., 3..., bc1q... or bc1p...",
-        value: "address",
-      },
-      { label: "Address of another coin", note: OTHER_COINS_NOTE, value: "coin" },
-      ...(required
-        ? []
-        : [{ label: "It cannot", note: "list every candidate instead", value: "none" }]),
-    ] as const,
-    { label: "Wallet", explanation },
-  );
-  if (kind === undefined) return undefined;
-  if (kind === "none") return [];
-  if (kind === "fingerprint") {
-    const fingerprint = await askLine(
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)",
-      "Fingerprint",
-      { what: "the eight characters of the fingerprint", check: parseMasterFingerprint },
-    );
-    return fingerprint === undefined ? undefined : ["--master-fingerprint", fingerprint];
-  }
-  const address = kind === "coin" ? await askCoinAddress() : await askBitcoinAddress();
-  if (address === undefined) return undefined;
-  const count = await askLine("Compare with how many addresses from the first", "Addresses", {
-    fallback: String(DEFAULT_ADDRESS_COUNT),
-    check: (text) => String(parseAddressCount(text)),
-  });
-  return count === undefined ? undefined : [...address, "--scan-gap", count];
+  const answer = await askWalletEvidence({ optional: !required, explanation }, MENU_ASKER);
+  if (answer.kind === "back") return undefined;
+  if (answer.kind === "none") return [];
+  return walletEvidenceArguments(answer.evidence);
 }
 
-/** A Bitcoin address of the wallet, as the options that give it. */
-async function askBitcoinAddress(): Promise<string[] | undefined> {
-  const address = await askLine("Bitcoin address (one of the first receiving ones)", "Address", {
-    what: "a receiving address of the wallet",
-    check: (text) => parseBitcoinAddress(text, "mainnet"),
-  });
-  return address === undefined ? undefined : ["--bitcoin-address", address];
-}
-
-/** Which coin, then an address of the wallet in it, as the options that give them. */
-async function askCoinAddress(): Promise<string[] | undefined> {
-  const coin = await choose(
-    "Which coin?",
-    OTHER_COINS.map((each) => ({ label: each.name, note: each.addressForms, value: each })),
-    { label: "Coin" },
-  );
-  if (coin === undefined) return undefined;
-  const address = await askLine(
-    `Address (${coin.name}, one of the first receiving ones)`,
-    "Address",
-    {
-      what: `the wallet's address of ${coin.name}`,
-      check: (text) => parseCoinAddress(coin.id, text),
-    },
-  );
-  return address === undefined ? undefined : ["--coin", coin.id, "--coin-address", address];
-}
+/**
+ * The menu's way of asking the values of the wallet question (askWalletEvidence): each on a line
+ * of its own, recorded as typed, and going back leaves the entry.
+ */
+const MENU_ASKER: WalletValueAsker = {
+  async ask(value, parse) {
+    let parsed: ReturnType<typeof parse> | undefined;
+    const answer = await askLine(value.prompt, value.label, {
+      what: value.what,
+      ...(value.fallback === undefined ? {} : { fallback: value.fallback }),
+      check: (text) => {
+        parsed = parse(text);
+        return text;
+      },
+    });
+    return answer === undefined ? undefined : parsed;
+  },
+  backLeaves: true,
+};
 
 /** Entry 6: card designs drawn with the public test phrase. */
 async function previewAction(): Promise<Action> {
   const design = await askDesign(true);
   if (design === undefined) return undefined;
-  const path = await askOutputFile("PDF file name", "mnemocode-preview.pdf");
+  const path = await askOutputFile("PDF file name", `${SAMPLE_FILE_BASE}.pdf`);
   if (path === undefined) return undefined;
   return {
     run: ["preview", ...(design === "" ? ["--all"] : ["--template", design]), "--pdf", path],
   };
 }
-
-/** The words of the BIP39 list (table --index). */
-const WORD_COUNT = 2048;
 
 /** A lookup of the word table: its question, and its answer checked as the table looks it up. */
 interface Lookup {
@@ -1235,31 +1174,21 @@ const LOOKUPS: Readonly<Record<"word" | "index" | "unicode", Lookup>> = {
     question: "Word",
     label: "Word",
     what: "a word of the English BIP39 list",
-    check: (answer) => {
-      // The table compares words as the list writes them, in lower case.
-      const word = answer.toLowerCase();
-      if (!allMappingRows().some((row) => row.english === word))
-        throw new Error("That word is not in the English BIP39 list.");
-      return word;
-    },
+    // Given as the table writes it, in lower case.
+    check: (answer) => wordTableRow("word", answer).english,
   },
   index: {
     question: "Word number",
     label: "Number",
-    what: `a number from 1 to ${WORD_COUNT}`,
-    check: (answer) =>
-      numberFrom(answer, 1, WORD_COUNT, `Type a whole number from 1 to ${WORD_COUNT}.`),
+    what: `a number from ${WORD_NUMBERS}`,
+    // Written as the command line takes it, without leading zeros.
+    check: (answer) => String(wordTableRow("index", answer).index),
   },
   unicode: {
     question: "Unicode code",
     label: "Code",
-    what: "four hexadecimal digits, such as 5BF6",
-    check: (answer) => {
-      const code = answer.toUpperCase();
-      if (!allMappingRows().some((row) => row.unicodeHex === code))
-        throw new Error("No BIP39 word has that code; type four hexadecimal digits, such as 5BF6.");
-      return code;
-    },
+    what: UNICODE_CODE_HINT,
+    check: (answer) => wordTableRow("unicode", answer).unicodeHex,
   },
 };
 
@@ -1269,8 +1198,12 @@ async function tableAction(): Promise<Action> {
     "What do you want to look up?",
     [
       { label: "A word", note: "such as abandon", value: "word" },
-      { label: "A word number", note: `1 to ${WORD_COUNT}`, value: "index" },
-      { label: "A Unicode code", note: "four hexadecimal digits, such as 5BF6", value: "unicode" },
+      {
+        label: "A word number",
+        note: WORD_NUMBERS,
+        value: "index",
+      },
+      { label: "A Unicode code", note: UNICODE_CODE_HINT, value: "unicode" },
       { label: "The whole table", note: "all 2,048 rows", value: "all" },
     ] as const,
     { label: "Look up" },
@@ -1287,7 +1220,9 @@ interface Entry {
   readonly label: string;
   readonly digit: number;
   readonly action: () => Promise<Action>;
-  /** The command asks for a seed phrase or a share, which needs a protected, self-tested process. */
+  /**
+   * The command asks for a seed phrase or a share, which needs a protected, self-tested process.
+   */
   readonly asksSecrets?: boolean;
 }
 
@@ -1304,82 +1239,11 @@ export const MENU_ENTRIES: readonly Entry[] = [
   { ...MENU_ENTRY_NAMES.quit, action: async () => "quit" },
 ];
 
-/**
- * Characters that sh, bash, zsh, cmd.exe and PowerShell all take as they are, so that an argument
- * of only these is shown without quotes. % (cmd.exe variables) and , (PowerShell arrays) are not
- * among them.
- */
-const PLAIN_ARGUMENT = /^[\w./:@+=-]+$/u;
-
-/** A first character that a shell still reads: zsh expands =name to the path of a program, and
- * PowerShell reads @name as splatting. */
-const SPECIAL_FIRST = /^[=@]/u;
-
-/**
- * An argument that PowerShell may read as a number and pass on as it writes that number: 4E00 as
- * 4, 0x10 as 16, 1kb as 1024, 007 as 7, also after a sign or a point. Only a plain decimal
- * without a leading zero is passed on as it was typed.
- */
-const NUMBER_START = /^[+-]?\.?\d/u;
-const PLAIN_DECIMAL = /^(?:0|[1-9]\d*)$/u;
-
-/**
- * What cmd.exe or PowerShell still reads inside double quotes: " and its typographic forms
- * U+201C, U+201D and U+201E, which PowerShell takes as quotes too, $ and ` (PowerShell), % ! and ^
- * (cmd.exe), a line break, and a backslash at the end, which the program's own reading of its
- * command line takes as an escape of the closing quote.
- */
-const SPECIAL_IN_DOUBLE_QUOTES = /["\u201C\u201D\u201E$`%!^\r\n]|\\$/u;
-
-/** The characters that end a PowerShell single-quoted string: ' and its typographic forms U+2018,
- * U+2019, U+201A and U+201B. */
-const POWERSHELL_SINGLE_QUOTES = /['\u2018\u2019\u201A\u201B]/gu;
-
-/** Whether `argument` reads the same in every shell of `platform` without quotes. */
-function isPlain(argument: string, platform: NodeJS.Platform): boolean {
-  if (!PLAIN_ARGUMENT.test(argument) || SPECIAL_FIRST.test(argument)) return false;
-  return platform !== "win32" || !NUMBER_START.test(argument) || PLAIN_DECIMAL.test(argument);
-}
-
-/** An argument in single quotes, where a POSIX shell expands nothing; a ' inside ends them. */
-function posixQuoted(argument: string): string {
-  return `'${argument.replaceAll("'", "'\\''")}'`;
-}
-
-/**
- * An argument quoted for both shells of Windows. cmd.exe knows only double quotes, and they read
- * the same in PowerShell while the argument holds none of SPECIAL_IN_DOUBLE_QUOTES, which leaves
- * paths with spaces and backslashes in them. Anything else gets PowerShell's single quotes, inside
- * which each of its five single quote characters is doubled; cmd.exe has no quotes for it.
- */
-function windowsQuoted(argument: string): string {
-  if (!SPECIAL_IN_DOUBLE_QUOTES.test(argument)) return `"${argument}"`;
-  return `'${argument.replace(POWERSHELL_SINGLE_QUOTES, "$&$&")}'`;
-}
-
-/**
- * The command line as it would be typed in the shell of the system: an argument with anything a
- * shell reads, such as a space, $, ` or \, and on Windows one that PowerShell may read as a
- * number, is quoted so that no shell changes it (AUD-008-UI002).
- */
-export function typedCommand(
-  run: readonly string[],
-  platform: NodeJS.Platform = process.platform,
-): string {
-  const quote = platform === "win32" ? windowsQuoted : posixQuoted;
-  const quoted = run.map((argument) => (isPlain(argument, platform) ? argument : quote(argument)));
-  return ["mnemocode", ...quoted].join(" ");
-}
-
 const paint = (code: string, text: string): string => terminalPaint("stderr", code, text);
 
-/** Indent of the typed command under "The same as:". */
-const COMMAND_INDENT = "  ";
-
-/** Prose wrapping changes quoted arguments; let the terminal soft-wrap the literal command. */
-export function commandDisplay(run: readonly string[]): string {
-  return `${COMMAND_INDENT}${typedCommand(run)}`;
-}
+// The command lines as typed are shown by shell-command.ts; here too for the tests that take them
+// with the menu.
+export { commandDisplay, typedCommand };
 
 /**
  * Why no command may ask for a secret here, or undefined: this process could not switch off core
@@ -1393,7 +1257,7 @@ function secretsRefusal(): string | undefined {
     assertCoreSelfTest();
     return undefined;
   } catch (error) {
-    return error instanceof Error ? error.message : String(error);
+    return describeError(error);
   }
 }
 
@@ -1401,107 +1265,9 @@ function secretsRefusal(): string | undefined {
 const SECRET_ENTRIES_LEFT_OUT =
   "The entries that ask for a seed phrase or a share are not offered.";
 
-/** What a shell reports for a process that a signal stopped: 128 plus the signal's number. */
-const SIGNAL_EXIT_BASE = 128;
-
-/** The name of the signal that ended a process with `code` (SIGNAL_EXIT_BASE plus its number). */
-function signalOf(code: number): string {
-  const number = code - SIGNAL_EXIT_BASE;
-  const name = Object.entries(systemConstants.signals).find(([, value]) => value === number)?.[0];
-  return name ?? `signal ${number}`;
-}
-
-/**
- * Clears the private screen and returns to the main screen, as private-screen.ts leaves it, for a
- * command that was stopped while it may have shown it. The clear comes first, so that the words
- * also vanish where there is no alternate screen.
- */
-const LEAVE_ALTERNATE_SCREEN = "\x1b[2J\x1b[H\x1b[?1049l";
-
-/**
- * Wipes what was typed while a command ran but not read by it, such as the rest of a paste after
- * it had failed, so that it answers no question of the menu. A Ctrl+C among it was meant for the
- * command, which has ended.
- */
-async function dropAfterCommand(): Promise<void> {
-  try {
-    await dropTypedAhead();
-  } catch (error) {
-    if (!(error instanceof InputCancelled)) throw error;
-  }
-}
-
-/** stty, run by its own path, as Linux and macOS have it, rather than looked up. */
-const STTY = "/bin/stty";
-
-/** Runs stty for the terminal on standard input; what it printed, or undefined when it failed. */
-function stty(args: readonly string[]): string | undefined {
-  const result = spawnSync(STTY, args, { stdio: ["inherit", "pipe", "ignore"], encoding: "utf8" });
-  return result.status === 0 ? result.stdout.trim() : undefined;
-}
-
-/**
- * Runs `body`, a command and what the menu reads right after it, with the terminal's echo off, and
- * gives the terminal back exactly as it was (stty -g), also after a command that a signal stopped
- * while it read keys in raw mode. A command takes the terminal at its first question, after its
- * self-test; until then the terminal would show the keys typed for it, the start of a secret too,
- * on the main screen, whose scrollback keeps them. Raw mode would hide them as well, but a command
- * started in it takes it as its normal mode, since Node.js gives back the mode that it found, and
- * Ctrl+C would then not stop the command between its questions. A Windows console shows no key
- * before a program reads it; there, and without stty, nothing is changed.
- */
-async function withEchoOff<T>(body: () => Promise<T>): Promise<T> {
-  const saved = process.platform === "win32" || !terminalAvailable() ? undefined : stty(["-g"]);
-  if (saved === undefined || stty(["-echo"]) === undefined) return body();
-  try {
-    return await body();
-  } finally {
-    stty([saved]);
-  }
-}
-
-/**
- * Runs `run` in a process of its own and returns its exit code, or undefined when the person went
- * back to the menu instead. A command that could not be started, or that a signal stopped, such as
- * the out-of-memory killer, is said so in one line and offered again with the same answers.
- */
-async function runCommand(run: readonly string[]): Promise<number | undefined> {
-  for (;;) {
-    let failure: string;
-    try {
-      const code = await withEchoOff(async () => {
-        // What was typed or pasted with the last answer goes to no process: a command reads only
-        // the keys pressed for its own questions.
-        await dropTypedAhead();
-        const exit = await runInOwnProcess(run);
-        await dropAfterCommand();
-        return exit;
-      });
-      if (code <= SIGNAL_EXIT_BASE || code === CANCELLED_EXIT_CODE) return code;
-      if (PRIVATE_SCREEN_COMMANDS.has(run[0]!) && privateScreenAvailable())
-        process.stderr.write(LEAVE_ALTERNATE_SCREEN);
-      failure = `The command stopped unexpectedly (${signalOf(code)}).`;
-    } catch (error) {
-      const reason = (error as NodeJS.ErrnoException).code ?? (error as Error).message;
-      failure = `The command could not be started (${reason}).`;
-    }
-    const again = await choose(
-      "What now?",
-      [
-        { label: "Start it again", note: "with the same answers", value: true },
-        { label: "Back to the menu", value: false },
-      ],
-      { label: "Next", warning: failure },
-    );
-    if (again !== true) return undefined;
-  }
-}
-
 /** The menu's heading; `refusal` says why no entry that asks for a secret is offered. */
 function writeHeading(refusal: string | undefined): void {
-  console.error(
-    `\n${paint(STYLE.heading, "MnemoCode")} ${paint(STYLE.muted, "·")} ${paint(STYLE.strong, "Offline seed phrase encoding")}\n`,
-  );
+  console.error(`\n${headingLine(process.stderr, "Offline seed phrase encoding")}\n`);
   console.error("Encodes a BIP39 seed phrase as numbers, codes or colors, all offline.");
   terminalMore("menu");
   console.error(paint(STYLE.muted, "Work on a trusted computer without a network connection."));

@@ -36,7 +36,11 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { parseArguments } from "../src/cli/arguments.js";
 import { runDecode } from "../src/cli/decode-command.js";
-import { askSecret, datesPrompt, encodedWordCount } from "../src/cli/input.js";
+import { askSecretUntil } from "../src/cli/ask.js";
+import { datesPrompt } from "../src/cli/input.js";
+
+/** The answer as typed: the secret questions take a reading of it, here none. */
+const typed = (answer: string) => answer;
 import { InputCancelled } from "../src/cli/terminal-input.js";
 
 const TEST_PHRASE =
@@ -59,14 +63,14 @@ describe("secret input", () => {
 
   it("reads the answer at a hidden prompt and shows only the question", async () => {
     terminal.answers = "  test only  \r";
-    expect(await askSecret("Seed phrase (English BIP39 words):")).toBe("test only");
+    expect(await askSecretUntil("Seed phrase (English BIP39 words):", typed)).toBe("test only");
     expect(written.join("")).toBe("Seed phrase (English BIP39 words): \n");
   });
 
   it("shows the answer as it is typed on the private screen, which is cleared afterwards", async () => {
     terminal.privateScreen = true;
     terminal.answers = "test onlz\x7fy\r";
-    expect(await askSecret("Seed phrase:")).toBe("test only");
+    expect(await askSecretUntil("Seed phrase:", typed)).toBe("test only");
     // Backspace redraws the answer after the prompt (13 columns): back to its start, cleared, written
     // again; then y is added.
     expect(written.join("")).toBe("Seed phrase: test onlz\r\x1b[13C\x1b[Jtest onl\r\x1b[21Cy\n");
@@ -76,33 +80,33 @@ describe("secret input", () => {
     for (const platform of ["linux", "darwin", "win32"] as const) {
       vi.spyOn(process, "platform", "get").mockReturnValue(platform);
       terminal.answers = "test only\r";
-      expect(await askSecret("Seed phrase:")).toBe("test only");
+      expect(await askSecretUntil("Seed phrase:", typed)).toBe("test only");
     }
   });
 
   it("refuses without a terminal before it touches one", async () => {
     terminal.available = false;
-    await expect(askSecret("Seed phrase:")).rejects.toThrow("needs a terminal");
+    await expect(askSecretUntil("Seed phrase:", typed)).rejects.toThrow("needs a terminal");
     expect(terminal.switched).toBe(0);
   });
 
   it("asks again after an empty answer, with one line that repeats nothing typed", async () => {
     const notices = vi.spyOn(console, "error").mockImplementation(() => undefined);
     terminal.answers = "   \rtest only\r";
-    expect(await askSecret("Seed phrase:")).toBe("test only");
+    expect(await askSecretUntil("Seed phrase:", typed)).toBe("test only");
     expect(notices).toHaveBeenCalledWith("Type an answer, or press Ctrl+C to stop.");
     expect(written.join("").match(/Seed phrase: /gu)).toHaveLength(2);
   });
 
   it("cancels at the end of the input instead of asking again", async () => {
     terminal.answers = "";
-    await expect(askSecret("Seed phrase:")).rejects.toBeInstanceOf(InputCancelled);
+    await expect(askSecretUntil("Seed phrase:", typed)).rejects.toBeInstanceOf(InputCancelled);
     expect(written.join("").match(/Seed phrase: /gu)).toHaveLength(1);
   });
 
   it("stops at Ctrl+C", async () => {
     terminal.answers = "test\x03";
-    await expect(askSecret("Seed phrase:")).rejects.toBeInstanceOf(InputCancelled);
+    await expect(askSecretUntil("Seed phrase:", typed)).rejects.toBeInstanceOf(InputCancelled);
   });
 
   it("asks only for the dates when a record file gives the encoded seed phrase", async () => {
@@ -142,7 +146,5 @@ describe("secret input", () => {
     // A count that is not a BIP39 length, or none yet, leaves the number out.
     expect(datesPrompt(13)).toBe("Dates (DD-MM-YYYY, separated by spaces):");
     expect(datesPrompt(undefined)).toBe("Dates (DD-MM-YYYY, separated by spaces):");
-    expect(encodedWordCount("1 2 3 4 5 6 7 8 9 10 11 12 13 14 15")).toBe(15);
-    expect(encodedWordCount("not an encoded seed phrase")).toBeUndefined();
   });
 });

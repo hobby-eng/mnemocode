@@ -17,7 +17,13 @@ import {
   PUBLIC_PHRASE_SEEDS,
   VECTOR_PASSPHRASE,
 } from "./master-fingerprint-self-test.js";
-import { expectRefused, expectSame, type SelfTestFeature } from "./self-test-check.js";
+import { BITCOIN } from "./coins/bitcoin-like.js";
+import {
+  expectRefused,
+  expectSame,
+  selfTestFeature,
+  type SelfTestFeature,
+} from "./self-test-check.js";
 import {
   bitcoinProfiles,
   parseBitcoinAddress,
@@ -72,7 +78,7 @@ const SCRIPT_ADDRESS = "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q
 const TESTNET_ADDRESS = "tb1q6rz28mcfaxtmd6v789l9rrlrusdprr9pqcpvkl";
 
 const FIRST = { account: 0, branch: 0, index: 0 } as const;
-const checks = new WalletEvidenceCheck(PUBLIC_PHRASE_SEEDS);
+const checks = new WalletEvidenceCheck(PUBLIC_PHRASE_SEEDS, [BITCOIN]);
 
 /** Evidence of one key at the first receiving place, in `profiles`. */
 function located(
@@ -247,7 +253,7 @@ const REFUSED: readonly (readonly [string, WalletEvidence, RegExp])[] = [
   [
     "A script address",
     located("address", SCRIPT_ADDRESS, ["native-segwit"]),
-    /belongs to a script/u,
+    /not the address of a single key/u,
   ],
   [
     "A testnet address on mainnet",
@@ -277,11 +283,9 @@ function checkWalletEvidence(): void {
 }
 
 /** The checks of Bitcoin wallet evidence, for a host that builds it in. */
-export const WALLET_EVIDENCE_SELF_TEST: SelfTestFeature = Object.freeze({
+export const WALLET_EVIDENCE_SELF_TEST: SelfTestFeature = selfTestFeature({
+  name: "Wallet evidence",
+  detail: "fingerprint, xpubs, four profiles, key, WIF, address scan, refusals",
   startup: checkWalletEvidenceStartup,
-  check: Object.freeze({
-    name: "Wallet evidence",
-    detail: "fingerprint, xpubs, four profiles, key, WIF, address scan, refusals",
-    run: checkWalletEvidence,
-  }),
+  run: checkWalletEvidence,
 });

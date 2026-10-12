@@ -4,6 +4,7 @@
 // data only.
 //
 //   node scripts/verify-executable.mjs [executable or its folder]   (default release)
+//   node scripts/verify-executable.mjs --print-path   (only prints release/<this system's executable>)
 
 import { execFileSync } from "node:child_process";
 import {
@@ -18,7 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { executableName, noticesName } from "./executable-files.mjs";
+import { RELEASE_FOLDER, executableName, noticesName } from "./executable-files.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
@@ -34,7 +35,15 @@ function findExecutable(path) {
   return join(path, name);
 }
 
-const executable = findExecutable(resolve(process.argv[2] ?? join(root, "release")));
+/** Prints the path of the executable that this computer's build makes, for the release workflow. */
+const PRINT_PATH = "--print-path";
+if (process.argv[2] === PRINT_PATH) {
+  // From the checkout and with "/", as the workflow's bash steps take it on every system.
+  console.log(`${RELEASE_FOLDER}/${executableName(version)}`);
+  process.exit(0);
+}
+
+const executable = findExecutable(resolve(process.argv[2] ?? join(root, RELEASE_FOLDER)));
 
 /** The public BIP39 test phrase, and its seedshift encoding with the date 23-09-2026. */
 const TEST_PHRASE =

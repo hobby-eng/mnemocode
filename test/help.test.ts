@@ -4,6 +4,19 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { commandOptions, type CommandName } from "../src/cli/command-options.js";
 import { commandHelp, topicHelp } from "../src/cli/help-pages.js";
+import { QUESTION_HOURS } from "../src/core/search-turns.js";
+import { DEFAULT_ADDRESS_COUNT } from "../src/core/address-scan.js";
+import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
+import { MIN_THRESHOLD, MAX_SHARES } from "../src/sskr/split.js";
+import { MAX_SHOWN_MATCHES } from "../src/core/date-search.js";
+import { MIN_LIST_PASSPHRASE_LENGTH } from "../src/core/candidate-encryption.js";
+import { COINS } from "../src/core/coins.js";
+import { MASKING_MODES } from "../src/core/types.js";
+import {
+  bitcoinProfiles,
+  BITCOIN_NETWORKS,
+  extendedPublicKeyPrefixes,
+} from "../src/core/wallet-evidence.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -107,5 +120,34 @@ describe("links to the README", () => {
     }
     expect(used.size).toBeGreaterThan(0);
     for (const anchor of used) expect(anchors, anchor).toContain(anchor);
+  });
+});
+
+describe("S051: the numbers of the help come from the constants that own them", () => {
+  it("says the limits and defaults as the library holds them", () => {
+    const text = JSON.stringify({ commandHelp, topicHelp });
+    for (const value of [
+      `up to ${QUESTION_HOURS} hours`,
+      `default ${DEFAULT_ADDRESS_COUNT}`,
+      `up to ${MAX_JOINT_MARKED_ELEMENTS} on one share`,
+      `at least ${MIN_THRESHOLD}`,
+      `N to ${MAX_SHARES}`,
+      `default ${MAX_SHOWN_MATCHES}`,
+      `${MIN_LIST_PASSPHRASE_LENGTH} characters or more`,
+    ])
+      expect(text).toContain(value);
+  });
+});
+
+describe("S052: the help names every coin, mode and profile of the library", () => {
+  it("leaves none of them out", () => {
+    const text = JSON.stringify({ commandHelp, topicHelp });
+    for (const name of [
+      ...COINS.map((coin) => coin.name),
+      ...MASKING_MODES,
+      ...bitcoinProfiles,
+      ...BITCOIN_NETWORKS.flatMap(extendedPublicKeyPrefixes),
+    ])
+      expect(text, name).toContain(name);
   });
 });

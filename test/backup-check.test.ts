@@ -182,8 +182,7 @@ describe("checking a written-down encoded seed phrase", () => {
       part: "codes",
       kind: "mode",
       places: [],
-      message:
-        "This record names the Original Seedshift; the backup was made with MnemoCode Seedshift.",
+      message: "The record was made with the Original Seedshift, not with MnemoCode Seedshift.",
     });
   });
 
@@ -366,8 +365,6 @@ describe("checking written-down Shamir shares", () => {
 });
 
 describe("what a backup check hands out", () => {
-  const REDACTED = "[backup check: redacted]";
-
   it("shows no code, share or phrase through toString, toJSON or inspect", async () => {
     const original = encoded([DATE], "indexes");
     const codes = new EncodedBackupCheck(original).readCodes(written(original));
@@ -379,10 +376,15 @@ describe("what a backup check hands out", () => {
       TEXTS,
     ).restore(kept);
     expect(restored.holds(PHRASE)).toBe(true);
-    for (const value of [codes, kept, restored]) {
-      expect(String(value)).toBe(REDACTED);
-      expect(JSON.stringify({ value })).toBe(JSON.stringify({ value: REDACTED }));
-      expect(inspect(value, { showHidden: true, getters: true })).toBe(REDACTED);
+    for (const [value, label] of [
+      [codes, "WrittenCodes"],
+      [kept, "KeptShares"],
+      [restored, "RestoredShares"],
+    ] as const) {
+      const redacted = `[${label}: redacted]`;
+      expect(String(value)).toBe(redacted);
+      expect(JSON.stringify({ value })).toBe(JSON.stringify({ value: redacted }));
+      expect(inspect(value, { showHidden: true, getters: true })).toBe(redacted);
     }
   });
 });

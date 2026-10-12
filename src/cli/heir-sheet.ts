@@ -4,14 +4,13 @@
 // address it prints is the repository's, whose README leads to the guide for heirs.
 
 // The renderer takes its font through the platform interface; Node.js supplies it here.
-import "../export/platform-node.js";
+import { nodeRenderPlatform } from "../export/platform-node.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import {
-  A5,
-  A6,
   renderHeirSheet,
   type HeirSheetFormat,
   type HeirSheetText,
+  parseHeirSheetSize,
 } from "../export/heir-sheet.js";
 import {
   HeirInstructions,
@@ -21,9 +20,17 @@ import {
   type HeirShareMode,
 } from "../export/heir-sheet-text.js";
 import { type ParsedArguments, value } from "./arguments.js";
-import { MENU_ENTRY_NAMES, shownEntry } from "./menu-entries.js";
+import { MENU_ENTRY_NAMES, shownEntry, TYPED_SOURCE } from "./menu-entries.js";
 import { MNEMOCODE_VERSION } from "../version.js";
 import { README_URL, terminalNotice } from "./terminal.js";
+import {
+  answerLabel,
+  ENCODED_SEEDSHIFT_QUESTION,
+  SHARE_SEEDSHIFT_CHOICES,
+  SHARE_SEEDSHIFT_QUESTION,
+  ENCODED_SEEDSHIFT_CHOICES,
+} from "./seedshift-choices.js";
+import { SHARE_SEPARATOR } from "../sskr/share-input.js";
 
 export type { HeirBackup, HeirSheetFacts } from "../export/heir-sheet-text.js";
 
@@ -35,18 +42,21 @@ export type { HeirBackup, HeirSheetFacts } from "../export/heir-sheet-text.js";
 export const HEIR_MENU = {
   decode: {
     entry: shownEntry(MENU_ENTRY_NAMES.decode),
-    source: "Type or paste it",
-    question: "Was Seedshift used when it was encoded?",
+    source: TYPED_SOURCE,
+    question: ENCODED_SEEDSHIFT_QUESTION,
     answers: {
-      direct: "No",
-      seedshift: "MnemoCode Seedshift",
-      "seedshift-legacy": "Original Seedshift",
+      direct: answerLabel(ENCODED_SEEDSHIFT_CHOICES, "direct"),
+      seedshift: answerLabel(ENCODED_SEEDSHIFT_CHOICES, "seedshift"),
+      "seedshift-legacy": answerLabel(ENCODED_SEEDSHIFT_CHOICES, "seedshift-legacy"),
     },
   },
   restore: {
     entry: shownEntry(MENU_ENTRY_NAMES.restore),
-    question: "Was Seedshift used before it was split?",
-    answers: { direct: "No", seedshift: "Yes" },
+    question: SHARE_SEEDSHIFT_QUESTION,
+    answers: {
+      direct: answerLabel(SHARE_SEEDSHIFT_CHOICES, "direct"),
+      seedshift: answerLabel(SHARE_SEEDSHIFT_CHOICES, "seedshift"),
+    },
   },
   recover: {
     digit: MENU_ENTRY_NAMES.recover.digit,
@@ -61,7 +71,7 @@ function thenDates(dates: string | undefined): string {
 
 /**
  * The way through MnemoCode's start menu, as a double-click opens it. What is typed follows the
- * prompts: the backup or the shares separated by ";" (the share prompt of sskr-command.ts), then
+ * prompts: the backup or the shares separated by SHARE_SEPARATOR (the share prompt of share-repair.ts), then
  * the dates (datesPrompt).
  */
 const MENU_ROUTE: HeirRoute = {
@@ -82,7 +92,7 @@ const MENU_ROUTE: HeirRoute = {
     const { entry, question, answers } = HEIR_MENU.restore;
     return [
       `Choose "${entry}". To "${question}" answer "${answers[mode]}".`,
-      `Type any ${threshold} shares, separated by ";"${thenDates(dates)}. MnemoCode shows the seed phrase.`,
+      `Type any ${threshold} shares, separated by "${SHARE_SEPARATOR}"${thenDates(dates)}. MnemoCode shows the seed phrase.`,
     ];
   },
   dateDigitHelp: `If a digit of a date is unclear, menu entry ${HEIR_MENU.recover.digit} tries every possibility.`,
@@ -95,16 +105,9 @@ export function heirSheetText(facts: HeirSheetFacts): HeirSheetText {
   return MENU_INSTRUCTIONS.text(facts);
 }
 
-/** The sizes that --heir-sheet-size takes; A5 unless it says otherwise. */
-const SHEET_SIZES: Readonly<Record<string, HeirSheetFormat>> = { a5: A5, a6: A6 };
-
 /** The size of the sheet; checked before any secret is asked (validateHeirSheetOptions). */
 function sheetFormat(args: ParsedArguments): HeirSheetFormat {
-  const size = value(args, "heir-sheet-size") ?? "a5";
-  const format = Object.hasOwn(SHEET_SIZES, size) ? SHEET_SIZES[size] : undefined;
-  if (format === undefined)
-    throw new Error("The size of the instructions for heirs must be a5 or a6.");
-  return format;
+  return parseHeirSheetSize(value(args, "heir-sheet-size"));
 }
 
 /** Refuses a size without a sheet, or a size that does not exist. */
@@ -118,7 +121,7 @@ export function validateHeirSheetOptions(args: ParsedArguments): void {
 export async function saveHeirSheet(args: ParsedArguments, facts: HeirSheetFacts): Promise<void> {
   const path = value(args, "heir-sheet");
   if (path === undefined) return;
-  const bytes = await renderHeirSheet(heirSheetText(facts), sheetFormat(args));
+  const bytes = await renderHeirSheet(nodeRenderPlatform, heirSheetText(facts), sheetFormat(args));
   await publishNewPrivateFile(path, bytes);
   terminalNotice(`Saved instructions for heirs: ${path}`, "success");
 }

@@ -10,13 +10,10 @@ import {
 } from "../src/export/material-artwork.js";
 import { renderMaterialCard, type MaterialPageSize } from "../src/export/material-cards.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
+import { nodeCardRenderer } from "../src/export/platform-node.js";
 
 const colors = indexesToColors(Array.from({ length: 24 }, (_, i) => i * 73 + 1));
-const presentation = resolveCardPresentation(
-  {},
-  { studioName: "NORTHLINE STUDIO" },
-  () => 0,
-).presentation;
+const presentation = resolveCardPresentation(() => 0, { studioName: "NORTHLINE STUDIO" });
 // The recipient name is otherwise chosen randomly for every export.
 const content = {
   kind: "colors" as const,
@@ -146,7 +143,11 @@ describe("material selection cards", () => {
 
   it("tints the object of a photograph with a Color blend", async () => {
     const blend = async (style: MaterialStyle) =>
-      (await PDFDocument.load(await renderMaterialCard(style, content, { pageSize: "a4" }))).context
+      (
+        await PDFDocument.load(
+          await renderMaterialCard(nodeCardRenderer, style, content, { pageSize: "a4" }),
+        )
+      ).context
         .enumerateIndirectObjects()
         .some(
           ([, object]) =>
@@ -155,7 +156,7 @@ describe("material selection cards", () => {
     for (const style of styles) expect(await blend(style)).toBe(true);
     // The outline is a clipping path: every tinted sample draws one before its tint.
     const pdf = await PDFDocument.load(
-      await renderMaterialCard("enclosure", content, { pageSize: "a4" }),
+      await renderMaterialCard(nodeCardRenderer, "enclosure", content, { pageSize: "a4" }),
     );
     const tints = chooseMaterialSamples("enclosure", colors).filter((s) => s.tint).length;
     expect((operators(pdf)[0].match(/\nW\*\nn\n/gu) ?? []).length).toBe(tints);
@@ -169,7 +170,12 @@ describe("material selection cards", () => {
     };
     for (const orientation of ["landscape", "portrait"] as const) {
       const pdf = await PDFDocument.load(
-        await renderMaterialCard("vehicle", { ...content, orientation }, { pageSize: size }),
+        await renderMaterialCard(
+          nodeCardRenderer,
+          "vehicle",
+          { ...content, orientation },
+          { pageSize: size },
+        ),
       );
       const dimensions =
         orientation === "portrait" ? [...expected[size]].reverse() : expected[size];
@@ -184,12 +190,11 @@ describe("material selection cards", () => {
   it("prints exact ordered references and finish names on the same study page as the QR", async () => {
     const texts = textSpy();
     const pdf = await PDFDocument.load(
-      await renderMaterialCard("vehicle", {
+      await renderMaterialCard(nodeCardRenderer, "vehicle", {
         ...content,
         cardQr: true,
         pageSize: "a6",
-        presentation: resolveCardPresentation({}, { studioName: "AURORA STUDIO" }, () => 0)
-          .presentation,
+        presentation: resolveCardPresentation(() => 0, { studioName: "AURORA STUDIO" }),
         profile: { name: "John Smith" },
       }),
     );
@@ -208,7 +213,10 @@ describe("material selection cards", () => {
   it("uses the resolved studio and exposes only one reference in an individual fragment, without QR", async () => {
     const texts = textSpy();
     const pdf = await PDFDocument.load(
-      await renderMaterialCard("switch", content, { individualIndex: 2, pageSize: "business" }),
+      await renderMaterialCard(nodeCardRenderer, "switch", content, {
+        individualIndex: 2,
+        pageSize: "business",
+      }),
     );
     expect(pdf.getPageCount()).toBe(1);
     expect(texts()).toContain("NORTHLINE STUDIO");
@@ -222,13 +230,14 @@ describe("material selection cards", () => {
   it("keeps individual artwork unchanged when collection QR is requested", async () => {
     const withQr = await PDFDocument.load(
       await renderMaterialCard(
+        nodeCardRenderer,
         "switch",
         { ...content, cardQr: true },
         { individualIndex: 2, pageSize: "business" },
       ),
     );
     const withoutQr = await PDFDocument.load(
-      await renderMaterialCard("switch", content, {
+      await renderMaterialCard(nodeCardRenderer, "switch", content, {
         individualIndex: 2,
         pageSize: "business",
       }),
@@ -239,10 +248,12 @@ describe("material selection cards", () => {
 
   it("rejects mismatched QR data and invalid fragment indices", async () => {
     await expect(
-      renderMaterialCard("tile", { ...content, payload: "MNC1:unrelated" }),
+      renderMaterialCard(nodeCardRenderer, "tile", { ...content, payload: "MNC1:unrelated" }),
     ).rejects.toThrow();
     await expect(
-      renderMaterialCard("enclosure", content, { individualIndex: colors.length }),
-    ).rejects.toThrow("index");
+      renderMaterialCard(nodeCardRenderer, "enclosure", content, {
+        individualIndex: colors.length,
+      }),
+    ).rejects.toThrow(`There is no card ${colors.length + 1}`);
   });
 });

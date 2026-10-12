@@ -14,26 +14,34 @@ import { COIN_ADDRESS_SELF_TEST } from "../core/coins-self-test.js";
 import { MnemoCodeSelfTest, type SelfTestCheck, type SelfTestFeature } from "../core/self-test.js";
 import { expectRefusedLater, expectSame } from "../core/self-test-check.js";
 import { WALLET_EVIDENCE_SELF_TEST } from "../core/wallet-evidence-self-test.js";
-import { CARD_EXPORT_CHECK } from "../export/cards-self-test.js";
-import { HEIR_SHEET_SELF_TEST } from "../export/heir-sheet-self-test.js";
-import { SHARE_CARDS_SELF_TEST } from "../export/sskr-render-self-test.js";
+import { cardExportCheck } from "../export/cards-self-test.js";
+import { heirSheetSelfTest } from "../export/heir-sheet-self-test.js";
+import { nodeCardRenderer } from "../export/platform-node.js";
+import { shareCardsSelfTest } from "../export/sskr-render-self-test.js";
 import { sskrVector } from "../sskr/known-answers.js";
 import { decodeQrPngFile } from "./qr-input.js";
-import { exportQrPayload, saveQrBeside, saveQrInside } from "./qr-export.js";
+import { saveQrBeside, saveQrInside } from "./qr-export.js";
+import { exportQrPayload } from "../export/qr-image.js";
 import { assertProtected, protectionSummary } from "./protection.js";
 import { nodeSharePlatform } from "../sskr/share-platform-node.js";
 import { MNEMOCODE_VERSION } from "../version.js";
 import { readBundledFile } from "../bundled-files.js";
+import { headingLine } from "./terminal-style.js";
+import { PUBLIC_VECTORS_FILE } from "../bundled-file-paths.js";
+import { describeError } from "../core/refusal.js";
 
 const PUBLIC_MNEMONIC =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+/** The column of the names of the checks, as wide as the longest name with room to spare. */
+const CHECK_NAME_WIDTH = 24;
 
 /** The features the command line builds in beside the library, with their checks. */
 const FEATURES: readonly SelfTestFeature[] = [
   WALLET_EVIDENCE_SELF_TEST,
   COIN_ADDRESS_SELF_TEST,
-  HEIR_SHEET_SELF_TEST,
-  SHARE_CARDS_SELF_TEST,
+  heirSheetSelfTest(nodeCardRenderer),
+  shareCardsSelfTest(nodeCardRenderer),
 ];
 
 /**
@@ -44,27 +52,34 @@ export function assertCoreSelfTest(): void {
   try {
     MnemoCodeSelfTest.core(FEATURES);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
+    const detail = describeError(error);
     throw new Error(
       `CRITICAL: MnemoCode core self-test failed.\nNo mnemonic data was processed.\n${detail}`,
     );
   }
 }
 
-async function checkQrRoundTrip(): Promise<void> {
+/** Runs `check` in a new temporary folder, which is removed afterwards whatever happens. */
+async function withTemporaryFolder(check: (directory: string) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "mnemocode-self-test-"));
-  const path = join(directory, "vector.png");
+  try {
+    await check(directory);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+async function checkQrRoundTrip(): Promise<void> {
   const payload = formatEncoded(
     encodeMnemonic(PUBLIC_MNEMONIC, [parseDate("23-09-2026")]),
     "unicode",
   );
-  try {
+  await withTemporaryFolder(async (directory) => {
+    const path = join(directory, "vector.png");
     await exportQrPayload(payload, path);
     if ((await decodeQrPngFile(path)) !== payload)
       throw new Error("QR write/read round trip mismatch.");
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
+  });
 }
 
 const QR_CHECK: SelfTestCheck = {
@@ -79,10 +94,9 @@ const QR_CHECK: SelfTestCheck = {
  * back as the first share of the official SSKR vector; an empty one refused.
  */
 async function checkQrBesideSheets(): Promise<void> {
-  const directory = await mkdtemp(join(tmpdir(), "mnemocode-self-test-"));
-  const sheet = join(directory, "cards.pdf");
   const payload = sskrVector.firstShareColors.join(" ");
-  try {
+  await withTemporaryFolder(async (directory) => {
+    const sheet = join(directory, "cards.pdf");
     const beside = await saveQrBeside(payload, sheet);
     expectSame(beside, join(directory, "cards-qr.png"), "QR image beside a PDF");
     expectSame(
@@ -101,9 +115,7 @@ async function checkQrBesideSheets(): Promise<void> {
       /must not be empty/u,
       "An empty QR image",
     );
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
+  });
 }
 
 /** The check of the QR images beside sheets, exported for its test. */
@@ -120,14 +132,14 @@ export async function runSelfTest(): Promise<void> {
     fingerprint: (mnemonic) => masterFingerprint(mnemonic),
     pbkdf2: nodePbkdf2HmacSha512,
     publicVectors: JSON.parse(
-      new TextDecoder().decode(await readBundledFile("vectors/mnemocode-v1.json")),
+      new TextDecoder().decode(await readBundledFile(PUBLIC_VECTORS_FILE)),
     ) as unknown,
     sharePlatform: nodeSharePlatform,
     shareLibrary: "pinned WASM",
     features: FEATURES,
     // Built here, not at load: the protection is in place only once the command has started.
     before: [{ name: "Process protection", detail: protectionSummary(), run: assertProtected }],
-    after: [QR_CHECK, QR_BESIDE_CHECK, CARD_EXPORT_CHECK],
+    after: [QR_CHECK, QR_BESIDE_CHECK, cardExportCheck(nodeCardRenderer)],
   }).run();
   const rows = report.rows.map(
     (row) => [row.name, `${row.detail} (${row.milliseconds.toFixed(1)} ms)`] as const,
@@ -136,17 +148,17 @@ export async function runSelfTest(): Promise<void> {
   if (terminalColor("stdout")) {
     // The terminal look of the bip_tools tools: a title line, a ✓ per check, grey details.
     const paint = (code: string, text: string): string => terminalPaint("stdout", code, text);
-    console.log(
-      `\n${paint(STYLE.heading, "MnemoCode")} ${paint(STYLE.muted, "·")} ${paint(STYLE.strong, `Self-test ${MNEMOCODE_VERSION}`)}`,
-    );
+    console.log(`\n${headingLine(process.stdout, `Self-test ${MNEMOCODE_VERSION}`)}`);
     for (const [name, detail] of rows)
-      console.log(`${paint(STYLE.good, "✓")} ${name.padEnd(24)} ${paint(STYLE.muted, detail)}`);
+      console.log(
+        `${paint(STYLE.good, "✓")} ${name.padEnd(CHECK_NAME_WIDTH)} ${paint(STYLE.muted, detail)}`,
+      );
     console.log(`${paint(STYLE.good, "✓ Passed:")} ${summary}`);
     return;
   }
   console.log(`MnemoCode ${MNEMOCODE_VERSION} self-test`);
   console.log("────────────────────────────────────────────────────────────────────────");
-  for (const [name, detail] of rows) console.log(`✓ ${name.padEnd(24)} ${detail}`);
+  for (const [name, detail] of rows) console.log(`✓ ${name.padEnd(CHECK_NAME_WIDTH)} ${detail}`);
   console.log("────────────────────────────────────────────────────────────────────────");
   console.log(`PASS  ${summary}`);
 }

@@ -4,8 +4,10 @@
 // the testnet tpub, upub, vpub, Upub, Vpub), or, in one or more of the four single-key Bitcoin
 // profiles, an account extended public key at an account, or an address, a compressed public key
 // or a WIF private key at an account, branch and index; on mainnet or testnet. Or it is a
-// receiving address of one of the coins of core/coins.ts at an account, branch and index, compared
-// on the paths where that coin's wallets put it. An address, a public key or a WIF may also be
+// receiving address of one of the coins that the host offers, which it always names (every coin
+// of core/coins.ts on the command line) at an account, branch and index, compared on the paths where
+// that coin's wallets put it. The host passes its coins, so that a build of a few coins carries no
+// other coin's code. An address, a public key or a WIF may also be
 // compared with several addresses in a row, from its index on, such as the first 20 of a wallet,
 // when the person does not know which one it is. A program that checks wallets takes this module
 // alone: it needs nothing about Seedshift, shares or cards.
@@ -25,39 +27,89 @@
 // The BIP39 seed rule, the master fingerprint and its check live in core/master-fingerprint.ts,
 // which a host that tells wallets by their fingerprint alone takes without this module.
 //
-// Host-neutral: it imports only core/master-fingerprint.ts, core/coins.ts, core/coin-address-
-// evidence.ts, core/address-scan.ts, core/white-space.ts, @scure/bip32, @scure/btc-signer and
-// @noble/curves (test/portable-modules.test.ts).
+// Bitcoin's addresses are read, and their profiles' paths written, by Bitcoin's coin
+// (core/coins/bitcoin-like.ts), as every coin address is; @scure/btc-signer writes only WIF keys.
+//
+// Host-neutral, with @scure/bip32, @scure/btc-signer and @noble/curves
+// (test/portable-modules.test.ts).
 
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { HDKey, type Versions } from "@scure/bip32";
-import { Address, NETWORK, TEST_NETWORK, WIF, p2pkh, p2sh, p2tr, p2wpkh } from "@scure/btc-signer";
+import { NETWORK, TEST_NETWORK, WIF } from "@scure/btc-signer";
 import { addressCount, matchAtPath, scanBranch, type KeyMatch } from "./address-scan.js";
-import { CoinAddressComparison } from "./coin-address-evidence.js";
-import { assertAddressLocation, coinById, type AddressLocation, type CoinId } from "./coins.js";
+import {
+  CoinAddressComparison,
+  type CoinAddressEvidence,
+  type CoinAddressMatch,
+} from "./coin-address-evidence.js";
+import type { AddressType } from "./coins/address-types.js";
+import {
+  assertAddressLocation,
+  Coin,
+  CoinList,
+  type AddressLocation,
+  type CoinAddress,
+  type CoinId,
+  AddressRefusal,
+} from "./coins/coin.js";
+import { BITCOIN } from "./coins/bitcoin-like.js";
 import {
   Bip39Seed,
-  FINGERPRINT_WARNING,
+  fingerprintMatch,
   fingerprintOfKey,
   MasterFingerprintCheck,
   parseMasterFingerprint,
   type Pbkdf2HmacSha512,
 } from "./master-fingerprint.js";
 import { trimWhiteSpace } from "./white-space.js";
+import { MASTER_KEY_PATH } from "./wallet-check.js";
+import { hexOfBytes, bytesOfHex, equalBytes, HEX_DIGITS_PER_BYTE } from "./bits.js";
+import { listInWords } from "./places.js";
 
 // What every caller of this module used here before the split keeps working.
 export { parseMasterFingerprint, type Pbkdf2HmacSha512 };
 // What a caller needs to write coin-address evidence.
 export type { AddressLocation, CoinId };
 
-export type BitcoinNetworkName = "mainnet" | "testnet";
-export type BitcoinProfile = "legacy" | "nested-segwit" | "native-segwit" | "taproot";
-export const bitcoinProfiles: readonly BitcoinProfile[] = [
+/** The networks that evidence is compared on, mainnet first as the default. */
+export const BITCOIN_NETWORKS = Object.freeze(["mainnet", "testnet"] as const);
+export type BitcoinNetworkName = (typeof BITCOIN_NETWORKS)[number];
+/** The networks as a refusal names them: "mainnet or testnet". */
+export const BITCOIN_NETWORKS_TEXT = listInWords(BITCOIN_NETWORKS, "or");
+export const bitcoinProfiles = Object.freeze([
   "legacy",
   "nested-segwit",
   "native-segwit",
   "taproot",
-];
+] as const);
+export type BitcoinProfile = (typeof bitcoinProfiles)[number];
+
+/** Whether `value` names a network that the evidence is compared on. A host words its refusal. */
+export function isBitcoinNetwork(value: unknown): value is BitcoinNetworkName {
+  return (BITCOIN_NETWORKS as readonly unknown[]).includes(value);
+}
+
+/** Whether `value` names one of the four profiles. A host words its refusal. */
+export function isBitcoinProfile(value: unknown): value is BitcoinProfile {
+  return typeof value === "string" && (bitcoinProfiles as readonly string[]).includes(value);
+}
+
+/**
+ * The first receiving address of the first account on mainnet, m/…'/0'/0'/0/0: where a wallet is
+ * looked for when nothing says otherwise.
+ */
+export const FIRST_RECEIVING_LOCATION = Object.freeze({
+  network: BITCOIN_NETWORKS[0],
+  account: 0,
+  branch: 0,
+  index: 0,
+}) satisfies DerivationLocation;
+
+/** Whether `location` is the first receiving address of the first account, on any network. */
+export function isFirstReceiving(location: AddressLocation): boolean {
+  const { account, branch, index } = FIRST_RECEIVING_LOCATION;
+  return location.account === account && location.branch === branch && location.index === index;
+}
 
 export interface DerivationLocation extends AddressLocation {
   readonly network: BitcoinNetworkName;
@@ -66,71 +118,71 @@ export interface DerivationLocation extends AddressLocation {
 // The scan's limits, under the names every caller of this module has used.
 export { DEFAULT_ADDRESS_COUNT, defaultAddressCount, MAX_ADDRESS_COUNT } from "./address-scan.js";
 
+/** A key or an address of kind `K` at a place of a wallet, in its profiles. */
+interface KeyAtPlace<K extends string> {
+  readonly kind: K;
+  readonly value: string;
+  readonly profiles: readonly BitcoinProfile[];
+  readonly location: DerivationLocation;
+}
+
+/** A key or an address of kind `K` looked for among addresses from its place on. */
+interface ScannedKey<K extends string> extends KeyAtPlace<K> {
+  /** How many addresses are compared, from the location's index on: one when left out. */
+  readonly addresses?: number;
+}
+
+/** A key of kind `K` of the whole wallet, on a network. */
+interface NetworkKey<K extends string> {
+  readonly kind: K;
+  readonly value: string;
+  readonly network: BitcoinNetworkName;
+}
+
 /** Evidence of a Bitcoin wallet, in the forms that Bitcoin wallets show. */
 export type BitcoinEvidence =
-  | {
-      readonly kind: "address";
-      readonly value: string;
-      readonly profiles: readonly BitcoinProfile[];
-      readonly location: DerivationLocation;
-      /** How many addresses are compared, from the location's index on: one when left out. */
-      readonly addresses?: number;
-    }
-  | {
-      readonly kind: "compressed-public-key";
-      readonly value: string;
-      readonly profiles: readonly BitcoinProfile[];
-      readonly location: DerivationLocation;
-      /** How many addresses are compared, from the location's index on: one when left out. */
-      readonly addresses?: number;
-    }
-  | {
-      readonly kind: "wif";
-      readonly value: string;
-      readonly profiles: readonly BitcoinProfile[];
-      readonly location: DerivationLocation;
-      /** How many addresses are compared, from the location's index on: one when left out. */
-      readonly addresses?: number;
-    }
-  | { readonly kind: "master-xpub"; readonly value: string; readonly network: BitcoinNetworkName }
-  | {
-      readonly kind: "account-xpub";
-      readonly value: string;
-      readonly profiles: readonly BitcoinProfile[];
-      readonly location: DerivationLocation;
-    }
-  | {
-      readonly kind: "master-fingerprint";
-      readonly value: string;
-      readonly network: BitcoinNetworkName;
-    };
+  | ScannedKey<"address">
+  | ScannedKey<"compressed-public-key">
+  | ScannedKey<"wif">
+  | NetworkKey<"master-xpub">
+  | KeyAtPlace<"account-xpub">
+  | NetworkKey<"master-fingerprint">;
 
 /**
- * Every kind of evidence: Bitcoin's, and a receiving address of any coin of core/coins.ts, Bitcoin
- * included, whose address names its type and network.
+ * Every kind of evidence: Bitcoin's, and a receiving address of a coin that the host offers,
+ * Bitcoin included, whose address names its type and network.
  */
 export type WalletEvidence =
   | BitcoinEvidence
-  | {
-      readonly kind: "coin-address";
-      readonly coin: CoinId;
-      readonly value: string;
-      readonly location: AddressLocation;
-      /** How many addresses are compared, from the location's index on: one when left out. */
-      readonly addresses?: number;
-    };
+  | (Omit<CoinAddressEvidence, "coin"> & { readonly kind: "coin-address"; readonly coin: CoinId });
 
-export interface EvidenceMatch {
-  readonly matched: boolean;
+/** What a comparison with evidence says: a wallet match, with the kind and what was derived. */
+export interface EvidenceMatch extends CoinAddressMatch {
   readonly kind: WalletEvidence["kind"];
-  readonly derived?: string;
-  readonly path?: string;
-  readonly warning?: string;
 }
 
 /** BIP32 and SLIP-132 version bytes of the root keys that the comparison derives. */
 const mainnetVersions: Versions = { private: 0x0488ade4, public: 0x0488b21e };
 const testnetVersions: Versions = { private: 0x04358394, public: 0x043587cf };
+
+/**
+ * The facts of each Bitcoin network that the comparison needs: whether it is a test network, as
+ * a coin's paths say it (Coin.coinTypesOn), the version bytes of its root key, and its WIF.
+ */
+const NETWORK_FACTS = Object.freeze({
+  mainnet: { testnet: false, versions: mainnetVersions, wif: NETWORK },
+  testnet: { testnet: true, versions: testnetVersions, wif: TEST_NETWORK },
+}) satisfies Readonly<
+  Record<
+    BitcoinNetworkName,
+    { readonly testnet: boolean; readonly versions: Versions; readonly wif: typeof NETWORK }
+  >
+>;
+
+/** The network that a coin's test-network flag names. */
+function networkNamed(testnet: boolean): BitcoinNetworkName {
+  return BITCOIN_NETWORKS.find((network) => NETWORK_FACTS[network].testnet === testnet)!;
+}
 
 /** The SLIP-132 forms of an extended public key, by their four-character prefix. */
 const extendedKeyVersions: Readonly<
@@ -148,43 +200,74 @@ const extendedKeyVersions: Readonly<
   Vpub: { versions: { private: 0x02575048, public: 0x02575483 }, network: "testnet" },
 };
 
-/** The BIP44, BIP49, BIP84 and BIP86 purpose of each profile. */
-const derivationPurposes: Readonly<Record<BitcoinProfile, number>> = {
-  legacy: 44,
-  "nested-segwit": 49,
-  "native-segwit": 84,
-  taproot: 86,
+/** The prefixes of the extended public keys accepted on `network`: xpub, ypub, … on mainnet. */
+export function extendedPublicKeyPrefixes(network: BitcoinNetworkName): string[] {
+  return Object.entries(extendedKeyVersions).flatMap(([prefix, metadata]) =>
+    metadata.network === network ? [prefix] : [],
+  );
+}
+
+/**
+ * The kind of address that each profile writes. Bitcoin's coin owns the rest: the purpose of the
+ * paths (BIP44, BIP49, BIP84, BIP86), what each kind commits to, and the reading of addresses.
+ */
+const PROFILE_TYPES: Readonly<Record<BitcoinProfile, AddressType>> = {
+  legacy: "p2pkh",
+  "nested-segwit": "p2sh-p2wpkh",
+  "native-segwit": "p2wpkh",
+  taproot: "p2tr",
 };
 
-/** The address types that one key of a seed phrase gives in the four profiles. */
-const SINGLE_KEY_ADDRESS_TYPES: ReadonlySet<string> = new Set(["pkh", "sh", "wpkh", "tr"]);
+/** The BIP whose paths a profile's addresses follow, as Bitcoin's coin says: 44 for legacy. */
+export function bitcoinProfilePurpose(profile: BitcoinProfile): number {
+  return BITCOIN.purposeOf(PROFILE_TYPES[profile]);
+}
 
 /** A compressed secp256k1 public key: a 02 or 03 byte and the 32 bytes of x. */
-const COMPRESSED_KEY_BYTES = 33;
+export const COMPRESSED_KEY_BYTES = 33;
 
 /**
  * Compares BIP39 phrases with wallet evidence and gives their master fingerprints. A class because
- * the host's PBKDF2 is bound once and every comparison uses it; it holds nothing else, so one
- * instance serves every phrase and every caller. Each operation has two forms: match and
- * fingerprint for a PBKDF2 that answers at once, matchAsync and fingerprintAsync for one that may
- * answer later.
+ * the host's PBKDF2 and the coins it offers are bound once and every comparison uses them; it
+ * holds nothing else, so one instance serves every phrase and every caller. Each operation has two
+ * forms: match and fingerprint for a PBKDF2 that answers at once, matchAsync and fingerprintAsync
+ * for one that may answer later.
  */
 export class WalletEvidenceCheck {
   readonly #seed: Bip39Seed;
   readonly #fingerprints: MasterFingerprintCheck;
+  readonly #coins: CoinList;
 
-  constructor(pbkdf2: Pbkdf2HmacSha512) {
+  /**
+   * `coins` are those whose addresses "coin-address" evidence may name, which the host always
+   * names: every coin of core/coins.ts on the command line, the coins of its build on a page.
+   */
+  constructor(pbkdf2: Pbkdf2HmacSha512, coins: readonly Coin[]) {
+    this.#coins = new CoinList(coins);
     this.#seed = new Bip39Seed(pbkdf2);
     this.#fingerprints = new MasterFingerprintCheck(pbkdf2);
   }
 
   /**
+   * Refuses evidence that no wallet can match, or that names a coin this check does not offer,
+   * before any secret is asked. Needs no seed phrase.
+   */
+  assert(evidence: WalletEvidence): void {
+    evidenceOf(evidence, this.#coins);
+  }
+
+  /**
    * Compares a recovered phrase with `evidence` locally. Evidence that no wallet can match is
-   * refused before the seed is derived, as assertWalletEvidence refuses it.
+   * refused before the seed is derived, as `assert` refuses it.
    */
   match(mnemonic: string, evidence: WalletEvidence, passphrase = ""): EvidenceMatch {
-    const expected = evidenceOf(evidence);
-    return compareWith(expected, this.#seed.now(mnemonic, passphrase));
+    const expected = evidenceOf(evidence, this.#coins);
+    return this.#seed.withRoot(
+      mnemonic,
+      passphrase,
+      (root) => expected.compare(root),
+      versionsOf(expected.network),
+    );
   }
 
   /** The same as match, with a PBKDF2 that may answer later. */
@@ -193,8 +276,13 @@ export class WalletEvidenceCheck {
     evidence: WalletEvidence,
     passphrase = "",
   ): Promise<EvidenceMatch> {
-    const expected = evidenceOf(evidence);
-    return compareWith(expected, await this.#seed.later(mnemonic, passphrase));
+    const expected = evidenceOf(evidence, this.#coins);
+    return this.#seed.withRootLater(
+      mnemonic,
+      passphrase,
+      (root) => expected.compare(root),
+      versionsOf(expected.network),
+    );
   }
 
   /** The standard four-byte BIP32 master fingerprint as lowercase hexadecimal. */
@@ -208,24 +296,21 @@ export class WalletEvidenceCheck {
   }
 }
 
-/** The master key of `seed` on `network`; the seed is wiped, whatever happens. */
-function rootOf(seed: Uint8Array, network: BitcoinNetworkName): HDKey {
-  try {
-    return HDKey.fromMasterSeed(seed, network === "mainnet" ? mainnetVersions : testnetVersions);
-  } finally {
-    // This module owns the temporary seed; the caller's mnemonic strings remain unchanged.
-    seed.fill(0);
-  }
+/** The version bytes of the root key on `network`. */
+function versionsOf(network: BitcoinNetworkName): Versions {
+  return NETWORK_FACTS[network].versions;
 }
 
-/** Compares the wallet of `seed` with the checked evidence; every key derived is wiped. */
-function compareWith(expected: Evidence, seed: Uint8Array): EvidenceMatch {
-  const root = rootOf(seed, expected.network);
-  try {
-    return expected.compare(root);
-  } finally {
-    root.wipePrivateData();
+/** The first key that `find` finds at one of `paths`, tried in their order. */
+function firstFound<T>(
+  paths: readonly string[],
+  find: (path: string) => T | undefined,
+): T | undefined {
+  for (const path of paths) {
+    const found = find(path);
+    if (found !== undefined) return found;
   }
+  return undefined;
 }
 
 /**
@@ -234,36 +319,37 @@ function compareWith(expected: Evidence, seed: Uint8Array): EvidenceMatch {
  * an answer with it at once: no secret is needed.
  */
 export function parseBitcoinAddress(value: string, network: BitcoinNetworkName): string {
-  const text = trimWhiteSpace(value);
-  const decoded = decodedAddress(text, network);
-  if (decoded === undefined) {
-    const other = network === "mainnet" ? "testnet" : "mainnet";
-    throw new Error(
-      decodedAddress(text, other) === undefined
-        ? `The address is not valid for Bitcoin ${network}.`
-        : `The address is not valid for Bitcoin ${network}; it is a ${other} address.`,
-    );
+  return bitcoinAddressOn(value, network).text;
+}
+
+/**
+ * An address as Bitcoin's coin reads it, refused unless it is on `network`: an address that is not
+ * valid, or is of the other network, in the words that the evidence has always used; the address of
+ * a script, which no single key gives, in the coin's own words.
+ */
+function bitcoinAddressOn(value: string, network: BitcoinNetworkName): CoinAddress {
+  let address: CoinAddress;
+  try {
+    address = BITCOIN.parse(value);
+  } catch (error) {
+    // An address of a script is Bitcoin's, only of no single key: said as the coin says it.
+    if (error instanceof AddressRefusal && error.kind === "not-single-key") throw error;
+    throw new Error(`The address is not valid for Bitcoin ${network}.`);
   }
-  if (!SINGLE_KEY_ADDRESS_TYPES.has(decoded.type))
-    throw new Error(
-      "This address belongs to a script, not to one key: no seed phrase gives it on its own.",
-    );
-  const address = Address(networkParameters(network));
-  return address.encode(address.decode(text));
+  const on = networkNamed(address.testnet);
+  if (on !== network)
+    throw new Error(`The address is not valid for Bitcoin ${network}; it is a ${on} address.`);
+  return address;
 }
 
 /**
  * Refuses evidence that no wallet can match, before any secret is asked: everything that a
  * comparison would refuse at its first candidate, which may come only after the secrets were typed
- * and a long search ran. Needs no seed phrase.
+ * and a long search ran. A "coin-address" names one of `coins`, the host's, as
+ * WalletEvidenceCheck's `assert` takes its own. Needs no seed phrase.
  */
-export function assertWalletEvidence(evidence: WalletEvidence): void {
-  evidenceOf(evidence);
-}
-
-/** The same check under its name from when the evidence was Bitcoin's only. */
-export function assertBitcoinEvidence(evidence: WalletEvidence): void {
-  assertWalletEvidence(evidence);
+export function assertWalletEvidence(evidence: WalletEvidence, coins: readonly Coin[]): void {
+  evidenceOf(evidence, new CoinList(coins));
 }
 
 /** One piece of evidence, refused when it is built unless some wallet can match it. */
@@ -274,24 +360,57 @@ interface Evidence {
   compare(root: HDKey): EvidenceMatch;
 }
 
-/** The kinds that name one key among several addresses in a row (`addresses`). */
-const SCANNED_KINDS: ReadonlySet<string> = new Set([
-  "address",
-  "compressed-public-key",
-  "wif",
-  "coin-address",
-]);
+/**
+ * Where the key that each kind of evidence names sits: the master key, an account key, or the key
+ * of one address. Every fact of a kind follows from it, so that a new kind is one more row here.
+ */
+export type EvidenceLevel = "master" | "account" | "address";
+const EVIDENCE_LEVELS = Object.freeze({
+  "master-fingerprint": "master",
+  "master-xpub": "master",
+  "account-xpub": "account",
+  address: "address",
+  "compressed-public-key": "address",
+  wif: "address",
+  "coin-address": "address",
+} satisfies Record<WalletEvidence["kind"], EvidenceLevel>);
 
-/** The checked evidence of `evidence`: the one place that tells the kinds apart. */
-function evidenceOf(evidence: WalletEvidence): Evidence {
+/** The kinds whose key is one address's: compared with several addresses in a row. */
+export type ScannedKind = {
+  [K in keyof typeof EVIDENCE_LEVELS]: (typeof EVIDENCE_LEVELS)[K] extends "address" ? K : never;
+}[keyof typeof EVIDENCE_LEVELS];
+
+/** Whether evidence of `kind` names one key among several addresses in a row (`addresses`). */
+export function isScannedKind(kind: string): kind is ScannedKind {
+  return (EVIDENCE_LEVELS as Record<string, EvidenceLevel | undefined>)[kind] === "address";
+}
+
+/** Whether `evidence` names one key among several addresses in a row, as isScannedKind says. */
+export function isScannedEvidence(
+  evidence: WalletEvidence,
+): evidence is Extract<WalletEvidence, { kind: ScannedKind }> {
+  return isScannedKind(evidence.kind);
+}
+
+/** Whether evidence of `kind` sits at a place of an account; a master key has none. */
+export function isPlacedKind(kind: string): boolean {
+  const level = (EVIDENCE_LEVELS as Record<string, EvidenceLevel | undefined>)[kind];
+  return level !== undefined && level !== "master";
+}
+
+/**
+ * The checked evidence of `evidence`, a coin address naming one of `coins`: the one place that
+ * tells the kinds apart.
+ */
+function evidenceOf(evidence: WalletEvidence, coins: CoinList): Evidence {
   // A JavaScript caller or parsed configuration can pass any kind; an unknown one is an error, not
   // a comparison that failed, which would read as evidence against the wallet.
   if (
-    !SCANNED_KINDS.has(evidence.kind) &&
+    !isScannedKind(evidence.kind) &&
     (evidence as { addresses?: unknown }).addresses !== undefined
   )
     throw new Error(
-      "Only an address, a compressed public key or a WIF is compared with several addresses.",
+      "Only an address, an address of another coin, a compressed public key or a WIF is compared with several addresses.",
     );
   switch (evidence.kind) {
     case "master-fingerprint":
@@ -307,7 +426,7 @@ function evidenceOf(evidence: WalletEvidence): Evidence {
     case "account-xpub":
       return new AccountKeyEvidence(evidence);
     case "coin-address":
-      return new CoinEvidence(evidence);
+      return new CoinEvidence(evidence, coins);
     default:
       throw new Error("Unsupported Bitcoin evidence kind.");
   }
@@ -326,13 +445,7 @@ class MasterFingerprintEvidence implements Evidence {
 
   compare(root: HDKey): EvidenceMatch {
     const derived = fingerprintOfKey(root);
-    return {
-      matched: derived === this.#expected,
-      kind: "master-fingerprint",
-      derived,
-      path: "m",
-      warning: FINGERPRINT_WARNING,
-    };
+    return { ...fingerprintMatch(derived, this.#expected), kind: "master-fingerprint", derived };
   }
 }
 
@@ -352,7 +465,7 @@ class MasterKeyEvidence implements Evidence {
       matched: sameExtendedKey(root, this.#expected),
       kind: "master-xpub",
       derived: root.publicExtendedKey,
-      path: "m",
+      path: MASTER_KEY_PATH,
     };
   }
 }
@@ -362,8 +475,8 @@ type LocatedBitcoinEvidence = Exclude<
   { kind: "master-xpub" | "master-fingerprint" }
 >;
 
-/** Where in a profile the key that a kind names sits. */
-type KeyLevel = "account" | "address";
+/** Where in a profile the key that a located kind names sits. */
+type KeyLevel = Exclude<EvidenceLevel, "master">;
 
 /**
  * Evidence of one key at a place of the wallet: the account key, or the key at an account, branch
@@ -381,11 +494,10 @@ abstract class LocatedEvidence implements Evidence {
   /** Checks the place and the profiles, before the kind checks its value. */
   constructor(evidence: LocatedBitcoinEvidence, level: KeyLevel) {
     assertLocation(evidence.location);
-    this.#profiles = [...checkedProfiles(evidence.profiles)];
+    this.#profiles = checkedBitcoinProfiles(evidence.profiles);
     const { network, account, branch, index } = evidence.location;
     this.#location = { network, account, branch, index };
-    this.#addresses =
-      evidence.kind === "account-xpub" ? 1 : addressCount(evidence.addresses, index);
+    this.#addresses = isScannedEvidence(evidence) ? addressCount(evidence.addresses, index) : 1;
     this.#kind = evidence.kind;
     this.#level = level;
     this.network = network;
@@ -396,12 +508,14 @@ abstract class LocatedEvidence implements Evidence {
       const matchOf: KeyMatch = (node, publicKey) => this.derivedFrom(node, publicKey, profile);
       const found =
         this.#level === "account"
-          ? matchAtPath(root, this.#accountPath(profile), matchOf)
-          : scanBranch(
-              root,
-              `${this.#accountPath(profile)}/${this.#location.branch}`,
-              { first: this.#location.index, count: this.#addresses },
-              matchOf,
+          ? firstFound(this.#accountPaths(profile), (path) => matchAtPath(root, path, matchOf))
+          : firstFound(this.#branchPaths(profile), (path) =>
+              scanBranch(
+                root,
+                path,
+                { first: this.#location.index, count: this.#addresses },
+                matchOf,
+              ),
             );
       if (found !== undefined) return { matched: true, kind: this.#kind, ...found };
     }
@@ -415,25 +529,40 @@ abstract class LocatedEvidence implements Evidence {
     profile: BitcoinProfile,
   ): string | undefined;
 
-  #accountPath(profile: BitcoinProfile): string {
+  /** The account's paths in `profile`, as Bitcoin's coin writes them on the evidence's network. */
+  #accountPaths(profile: BitcoinProfile): string[] {
     const { network, account } = this.#location;
-    const coinType = network === "mainnet" ? 0 : 1;
-    return `m/${derivationPurposes[profile]}'/${coinType}'/${account}'`;
+    return BITCOIN.accountPathsOf(PROFILE_TYPES[profile], NETWORK_FACTS[network].testnet, account);
+  }
+
+  /** The paths of the branch at the evidence's place in `profile`, as Bitcoin's coin writes them. */
+  #branchPaths(profile: BitcoinProfile): string[] {
+    const location = this.#location;
+    return BITCOIN.branchPathsOf(
+      PROFILE_TYPES[profile],
+      NETWORK_FACTS[location.network].testnet,
+      location,
+    );
   }
 }
 
-/** A receiving or change address of one key. */
+/**
+ * A receiving or change address of one key, compared as Bitcoin's coin compares it: in a profile
+ * that writes its kind, with what it commits to.
+ */
 class AddressEvidence extends LocatedEvidence {
-  readonly #expected: string;
+  readonly #expected: CoinAddress;
 
   constructor(evidence: Extract<BitcoinEvidence, { kind: "address" }>) {
     super(evidence, "address");
-    this.#expected = parseBitcoinAddress(evidence.value, evidence.location.network);
+    this.#expected = bitcoinAddressOn(evidence.value, evidence.location.network);
   }
 
   protected derivedFrom(_node: HDKey, publicKey: Uint8Array, profile: BitcoinProfile) {
-    const derived = paymentAddress(profile, publicKey, this.network);
-    return derived === this.#expected ? derived : undefined;
+    const address = this.#expected;
+    return PROFILE_TYPES[profile] === address.type && address.isAddressOf(publicKey)
+      ? address.text
+      : undefined;
   }
 }
 
@@ -447,7 +576,7 @@ class PublicKeyEvidence extends LocatedEvidence {
   }
 
   protected derivedFrom(_node: HDKey, publicKey: Uint8Array) {
-    return equalBytes(publicKey, this.#expected) ? hex(publicKey) : undefined;
+    return equalBytes(publicKey, this.#expected) ? hexOfBytes(publicKey) : undefined;
   }
 }
 
@@ -496,21 +625,21 @@ class AccountKeyEvidence extends LocatedEvidence {
 }
 
 /**
- * A receiving address of a coin of core/coins.ts, by its name, compared as core/coin-address-
+ * A receiving address of one of the host's coins, by its name, compared as core/coin-address-
  * evidence.ts compares an address of a coin given itself.
  */
 class CoinEvidence implements Evidence {
   readonly network: BitcoinNetworkName;
   readonly #comparison: CoinAddressComparison;
 
-  constructor(evidence: Extract<WalletEvidence, { kind: "coin-address" }>) {
+  constructor(evidence: Extract<WalletEvidence, { kind: "coin-address" }>, coins: CoinList) {
     this.#comparison = new CoinAddressComparison({
-      coin: coinById(evidence.coin),
+      coin: coins.byId(evidence.coin),
       value: evidence.value,
       location: evidence.location,
       addresses: evidence.addresses,
     });
-    this.network = this.#comparison.testnet ? "testnet" : "mainnet";
+    this.network = networkNamed(this.#comparison.testnet);
   }
 
   compare(root: HDKey): EvidenceMatch {
@@ -519,9 +648,8 @@ class CoinEvidence implements Evidence {
 }
 
 function assertNetwork(network: BitcoinNetworkName): void {
-  if (network !== "mainnet" && network !== "testnet") {
-    throw new Error("Bitcoin network must be mainnet or testnet.");
-  }
+  if (!isBitcoinNetwork(network))
+    throw new Error(`Bitcoin network must be ${BITCOIN_NETWORKS_TEXT}.`);
 }
 
 function assertLocation(location: DerivationLocation): void {
@@ -529,40 +657,35 @@ function assertLocation(location: DerivationLocation): void {
   assertAddressLocation(location);
 }
 
-function checkedProfiles(profiles: readonly BitcoinProfile[]): readonly BitcoinProfile[] {
-  if (profiles.length === 0) {
-    throw new Error("At least one Bitcoin address profile must be selected.");
-  }
-  if (profiles.some((profile) => !bitcoinProfiles.includes(profile))) {
-    throw new Error("Unknown Bitcoin address profile.");
-  }
-  return profiles;
+/**
+ * `profiles` copied, then checked: at least one, each one of the four (isBitcoinProfile). A hole
+ * of a sparse list is copied as undefined and refused (AUD-012-API007). The evidence checks its
+ * profiles with it, and the command line its list, after reading "auto" or the names given.
+ */
+export function checkedBitcoinProfiles(profiles: readonly unknown[]): readonly BitcoinProfile[] {
+  const owned = Array.from(profiles);
+  if (owned.length === 0) throw new Error("At least one Bitcoin address profile must be selected.");
+  if (!owned.every(isBitcoinProfile)) throw new Error("Unknown Bitcoin address profile.");
+  return Object.freeze(owned);
 }
 
 function networkParameters(network: BitcoinNetworkName): typeof NETWORK {
-  return network === "mainnet" ? NETWORK : TEST_NETWORK;
+  return NETWORK_FACTS[network].wif;
 }
 
-function equalBytes(left: Uint8Array | null, right: Uint8Array | null): boolean {
-  if (left === null || right === null || left.length !== right.length) return false;
-  let different = 0;
-  for (let index = 0; index < left.length; index += 1) different |= left[index]! ^ right[index]!;
-  return different === 0;
-}
-
-function hex(bytes: Uint8Array): string {
-  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+/** equalBytes for the keys of an HDKey, which may be missing; a missing key matches nothing. */
+function equalKeyBytes(left: Uint8Array | null, right: Uint8Array | null): boolean {
+  return left !== null && right !== null && equalBytes(left, right);
 }
 
 function parseCompressedPublicKey(value: string): Uint8Array {
   const normalized = trimWhiteSpace(value).toLowerCase();
-  if (!/^[0-9a-f]{66}$/.test(normalized))
+  const digits = COMPRESSED_KEY_BYTES * HEX_DIGITS_PER_BYTE;
+  if (!new RegExp(`^[0-9a-f]{${digits}}$`, "u").test(normalized))
     throw new Error(
-      "A compressed public key must be exactly 33 bytes encoded as 66 hexadecimal characters.",
+      `A compressed public key must be exactly ${COMPRESSED_KEY_BYTES} bytes encoded as ${digits} hexadecimal characters.`,
     );
-  const bytes = new Uint8Array(COMPRESSED_KEY_BYTES);
-  for (let index = 0; index < bytes.length; index += 1)
-    bytes[index] = Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16);
+  const bytes = bytesOfHex(normalized);
   if (bytes[0] !== 0x02 && bytes[0] !== 0x03)
     throw new Error("A compressed public key must start with 02 or 03.");
   // Without this, a key that no wallet can have would only fail to match (AUD-008-API002).
@@ -586,31 +709,6 @@ function wifKey(value: string, network: BitcoinNetworkName): Uint8Array {
   return key;
 }
 
-/** The address decoded for `network`, or undefined when it is no address there. */
-function decodedAddress(
-  value: string,
-  network: BitcoinNetworkName,
-): { readonly type: string } | undefined {
-  try {
-    return Address(networkParameters(network)).decode(value);
-  } catch {
-    return undefined;
-  }
-}
-
-function paymentAddress(
-  profile: BitcoinProfile,
-  publicKey: Uint8Array,
-  network: BitcoinNetworkName,
-): string {
-  const parameters = networkParameters(network);
-  if (profile === "legacy") return p2pkh(publicKey, parameters).address;
-  if (profile === "nested-segwit") return p2sh(p2wpkh(publicKey, parameters), parameters).address;
-  if (profile === "native-segwit") return p2wpkh(publicKey, parameters).address;
-  // BIP86: the key path of a Taproot output takes the 32-byte x-only key.
-  return p2tr(publicKey.slice(1), undefined, parameters).address;
-}
-
 /**
  * An extended public key, refused unless its prefix is known and names `network`. Only public
  * versions are accepted, so the parsed key never holds a private key.
@@ -620,7 +718,9 @@ function extendedPublicKeyOn(value: string, network: BitcoinNetworkName): HDKey 
   const metadata = extendedKeyVersions[prefix];
   if (metadata === undefined)
     throw new Error(
-      "Unsupported extended-key prefix. Supported public forms include xpub, ypub, zpub, Ypub, Zpub, tpub, upub, vpub, Upub, and Vpub.",
+      `Unsupported extended-key prefix. Supported public forms include ${listInWords(
+        BITCOIN_NETWORKS.flatMap(extendedPublicKeyPrefixes),
+      )}.`,
     );
   if (metadata.network !== network)
     throw new Error("The extended-key prefix does not match the selected Bitcoin network.");
@@ -637,7 +737,7 @@ function sameExtendedKey(left: HDKey, right: HDKey): boolean {
     left.depth === right.depth &&
     left.index === right.index &&
     left.parentFingerprint === right.parentFingerprint &&
-    equalBytes(left.publicKey, right.publicKey) &&
-    equalBytes(left.chainCode, right.chainCode)
+    equalKeyBytes(left.publicKey, right.publicKey) &&
+    equalKeyBytes(left.chainCode, right.chainCode)
   );
 }

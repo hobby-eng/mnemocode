@@ -2,9 +2,100 @@
 // usage.ts lays it out. Every option a command accepts (command-options.ts) appears in its page,
 // and a test checks that.
 
-import { HARD_MAX_COMBINATIONS } from "../core/date-search.js";
-import { MAX_ADDRESS_COUNT } from "../core/wallet-evidence.js";
+import {
+  HARD_MAX_COMBINATIONS,
+  MAX_SHOWN_MATCHES,
+  MAX_INCOMPLETE_DATES,
+} from "../core/date-search.js";
+import {
+  MAX_ADDRESS_COUNT,
+  BITCOIN_NETWORKS,
+  COMPRESSED_KEY_BYTES,
+  extendedPublicKeyPrefixes,
+  bitcoinProfilePurpose,
+  bitcoinProfiles,
+} from "../core/wallet-evidence.js";
+import { limitName, MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
 import type { CommandName } from "./command-options.js";
+import { MAX_PNG_BYTES, MAX_PNG_DIMENSION } from "./qr-limits.js";
+import { ENCODED_FORMATS, type EncodedFormat, MASKING_MODES } from "../core/types.js";
+import {
+  COLOR_FORMAT_NUMBERS,
+  formatLegend,
+  formatNumber,
+  CARD_FORMAT_NUMBERS,
+  FORMAT_NUMBER_RANGE,
+} from "./format-numbers.js";
+import {
+  WORD_NUMBERS,
+  BIP39_WORD_COUNTS,
+  WORD_COUNTS_TEXT,
+  WORD_COUNTS_LESS_ONE_TEXT,
+  BIP39_DICTIONARY_SIZE,
+  checksumBits,
+} from "../core/bip39-sizes.js";
+import { listInWords } from "../core/places.js";
+import { zeroEntropyPhrase } from "../core/english-words.js";
+import {
+  maximumDates,
+  datePatternCandidateCount,
+  parseDatePattern,
+  WHOLE_DATE,
+} from "../core/dates.js";
+import { DEFAULT_SAMPLE_WORDS } from "../export/card-preview.js";
+import { IMAGE_FORMATS, IMAGE_DPI, JPEG_QUALITY } from "../export/document-formats.js";
+import { CARD_PAGE_SIZES, CARD_ORIENTATIONS, pageSizeLabel } from "../export/card-settings.js";
+import { SSKR_CARD_LAYOUTS } from "../export/sskr-content.js";
+import { PROGRESS_EVERY } from "./date-search.js";
+import { counting } from "../core/search-plan.js";
+import { Masking } from "../core/masking.js";
+import { QUESTION_HOURS } from "../core/search-turns.js";
+import { numberWord } from "../core/prose.js";
+import { MIN_THRESHOLD, MAX_SHARES } from "../sskr/split.js";
+import { DEFAULT_ADDRESS_COUNT } from "../core/address-scan.js";
+import { MIN_LIST_PASSPHRASE_LENGTH } from "../core/candidate-encryption.js";
+import { MAX_JOINT_MARKED_ELEMENTS } from "../sskr/joint-repair.js";
+import { COLOR_COUNTS_TEXT } from "../core/colors.js";
+import { COINS } from "../core/coins.js";
+import { SHARE_SEPARATOR } from "../sskr/share-input.js";
+import {
+  heirSheetSizeLabel,
+  HEIR_SHEET_SIZES,
+  DEFAULT_HEIR_SHEET_SIZE,
+} from "../export/heir-sheet.js";
+
+/** The dates of a lone ?, every supported date: the attempts of one such date. */
+const EVERY_DATE_COMBINATIONS = datePatternCandidateCount(parseDatePattern(WHOLE_DATE));
+
+/** The candidates of a seedshift-legacy-valid record of `words` words: its every last word. */
+function legacyValidCandidates(words: number): number {
+  return Masking.of("seedshift-legacy-valid").checksPerCombination(words);
+}
+
+/** The modes that encode writes, and those that mask with dates, from the modes' own rules. */
+const ENCODE_MODES = MASKING_MODES.filter((mode) => Masking.of(mode).encodable);
+const MASKED_MODES = MASKING_MODES.filter((mode) => Masking.of(mode).masked);
+
+/** The width of a column of the table of candidates. */
+const TABLE_COLUMN = 5;
+/** Each form as the line of --format names it, after its number. */
+const FORMAT_LEGEND_NAMES: Readonly<Record<EncodedFormat, string>> = {
+  english: "english words",
+  indexes: "indexes",
+  unicode: "unicode codes",
+  "colors-unicode": "colors-unicode",
+  colors: "colors",
+};
+
+/** What each form is, in the topic of the formats. */
+const FORMAT_DESCRIPTIONS: Readonly<Record<EncodedFormat, string>> = {
+  english: "English BIP39 words",
+  indexes: `The numbers of the words in the BIP39 list, ${WORD_NUMBERS}, as in Seedshift`,
+  unicode:
+    "Four-digit Unicode codes of the words of the Traditional Chinese BIP39 list; only the codes are written, spaced or joined",
+  "colors-unicode": `The color codes of format ${formatNumber("colors")}, each written as two four-digit Private Use codes; all five lengths; plain text that needs no special font`,
+  colors: `Color codes such as #01AB63: ${COLOR_COUNTS_TEXT} codes for ${BIP39_WORD_COUNTS[0]} to ${BIP39_WORD_COUNTS.at(-1)!} words, BIP39Colors-compatible for 12 and 24 words; MnemoCode also supports 15, 18 and 21. Separated or joined, in any order, but every code is needed`,
+};
 
 export interface HelpOption {
   /** The option as typed, such as "--mode". */
@@ -51,8 +142,7 @@ export interface TopicHelp {
 }
 
 /** The public BIP39 test phrase of the examples, set once above them as a shell variable. */
-export const TEST_PHRASE =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+export const TEST_PHRASE = zeroEntropyPhrase(BIP39_WORD_COUNTS[0]);
 export const TEST_PHRASE_VARIABLE = '"$TEST_PHRASE"';
 /** TEST_PHRASE masked with the date 23-09-2026 in seedshift mode. */
 const SHIFTED_TEST_PHRASE =
@@ -86,7 +176,7 @@ const mnemonicFile: HelpOption = {
   flag: "--mnemonic-file",
   value: "PATH",
   summary: "Read the phrase from a file; - reads standard input",
-  details: ["Text input may be up to 1 MiB."],
+  details: [`Text input may be up to ${limitName(MAX_TEXT_INPUT_BYTES)}.`],
 };
 
 const dates: HelpOption = {
@@ -95,7 +185,7 @@ const dates: HelpOption = {
   summary: "One or more dates, DD-MM-YYYY, separated by spaces",
   details: [
     "YYYY-MM-DD is also accepted. The order does not matter: the dates are sorted, oldest first. A year always has four digits, 0001 to 9999, so the year 26 is written 0026.",
-    "Up to one date for every three words: 4, 5, 6, 7 or 8 dates for 12, 15, 18, 21 or 24 words. Dates are never stored; keep them yourself.",
+    `Up to one date for every three words: ${listInWords(BIP39_WORD_COUNTS.map(maximumDates), "or")} dates for ${WORD_COUNTS_TEXT} words. Dates are never stored; keep them yourself.`,
   ],
 };
 
@@ -103,7 +193,9 @@ const encodedText: HelpOption = {
   flag: "--input",
   value: "TEXT",
   summary: "The encoded record as text",
-  details: ["Any of the five formats, with or without an MNC1 header."],
+  details: [
+    `Any of the ${numberWord(ENCODED_FORMATS.length)} formats, with or without an MNC1 header.`,
+  ],
 };
 
 const encodedFile: HelpOption = {
@@ -120,14 +212,14 @@ const encodedQr: HelpOption = {
   value: "PNG",
   summary: "Read the encoded record from a QR code in a PNG image",
   details: [
-    "The image is read on this computer. It may be up to 16 MiB and 4096 pixels on a side. A QR code holds no header, so give --mode for a masked record; without it, --ask-secrets asks how it was masked.",
+    `The image is read on this computer. It may be up to ${limitName(MAX_PNG_BYTES)} and ${MAX_PNG_DIMENSION} pixels on a side. A QR code holds no header, so give --mode for a masked record; without it, --ask-secrets asks how it was masked.`,
   ],
 };
 
 const decodeMode: HelpOption = {
   flag: "--mode",
   value: "MODE",
-  summary: "direct, seedshift, seedshift-legacy or seedshift-legacy-valid",
+  summary: listInWords(MASKING_MODES, "or"),
   details: [
     "Needed for typed text, terminal output and QR codes, which carry no header; without it, --ask-secrets asks how they were masked. A file saved with --output names its mode; a --mode that contradicts it stops the command, and with --ask-secrets MnemoCode offers to read the record as it says or to give it again. See mnemocode help modes.",
   ],
@@ -136,7 +228,7 @@ const decodeMode: HelpOption = {
 const decodeFormat: HelpOption = {
   flag: "--format",
   value: "FORMAT",
-  summary: "The record format, 1 to 5 or its name; usually found automatically",
+  summary: `The record format, ${FORMAT_NUMBER_RANGE} or its name; usually found automatically`,
   details: [
     "MnemoCode picks the format itself when exactly one fits the whole record. Otherwise it asks in the terminal, and a script must pass --format. See mnemocode help formats.",
   ],
@@ -147,7 +239,7 @@ const maxCandidates: HelpOption = {
   value: "N",
   summary: "Most combinations a search of dates tries without asking",
   details: [
-    `Without it, a search that takes up to 12 hours on this computer starts at once; a longer one is asked for on the private screen and needs this option elsewhere. The number of attempts, and the time with a wallet check, are shown before the search starts. Up to ${HARD_MAX_COMBINATIONS.toLocaleString("en-US")}; every supported date is 3,652,059 attempts.`,
+    `Without it, a search that takes up to ${QUESTION_HOURS} hours on this computer starts at once; a longer one is asked for on the private screen and needs this option elsewhere. The number of attempts, and the time with a wallet check, are shown before the search starts. Up to ${counting(HARD_MAX_COMBINATIONS)}; every supported date is ${counting(EVERY_DATE_COMBINATIONS)} attempts.`,
   ],
 };
 
@@ -171,6 +263,11 @@ const template: HelpOption = {
   summary: "The card design, by name or number; mnemocode preview --list lists them",
 };
 
+const title: HelpOption = {
+  flag: "--title",
+  value: "TEXT",
+  summary: "Collection title; default the studio name",
+};
 const pdf: HelpOption = {
   flag: "--pdf",
   value: "PATH",
@@ -192,31 +289,31 @@ const imagesDir: HelpOption = {
   value: "NEW_FOLDER",
   summary: "Save the pages as images in a new folder",
   details: [
-    "Needs the Poppler program pdftocairo; PDF files do not. Pages are drawn at 300 dpi. If pdftocairo is missing, MnemoCode says so before it asks for a secret.",
+    `Needs the Poppler program pdftocairo; PDF files do not. Pages are drawn at ${IMAGE_DPI} dpi. If pdftocairo is missing, MnemoCode says so before it asks for a secret.`,
   ],
 };
 
 const imageFormat: HelpOption = {
   flag: "--image-format",
-  value: "png|jpg",
+  value: IMAGE_FORMATS.join("|"),
   summary: "Image format for --images-dir and --cards-dir; default png",
   details: [
-    "jpeg is accepted for jpg. PNG keeps text and QR codes sharp; JPEG uses quality 90. The rounded corners of a separate card are transparent in PNG and white in JPEG.",
+    `jpeg is accepted for jpg. PNG keeps text and QR codes sharp; JPEG uses quality ${JPEG_QUALITY}. The rounded corners of a separate card are transparent in PNG and white in JPEG.`,
   ],
 };
 
 const pageSize: HelpOption = {
   flag: "--page-size",
-  value: "a6|a4|business",
+  value: CARD_PAGE_SIZES.join("|"),
   summary: "a6 (default) or a4 for one sheet, business for separate cards",
   details: [
-    "a6 is 148 x 105 mm and a4 210 x 297 mm: the whole collection on one sheet, scaled to the page, a design proposal that cannot be cut into cards. business gives real 90 x 50 mm cards, numbered, one per page or file. Print at 100% / actual size.",
+    `a6 is ${pageSizeLabel("a6")} and a4 ${pageSizeLabel("a4")}: the whole collection on one sheet, scaled to the page, a design proposal that cannot be cut into cards. business gives real ${pageSizeLabel("business")} cards, numbered, one per page or file. Print at 100% / actual size.`,
   ],
 };
 
 const orientation: HelpOption = {
   flag: "--orientation",
-  value: "portrait|landscape",
+  value: CARD_ORIENTATIONS.join("|"),
   summary: "Page orientation; works with every page size",
 };
 
@@ -291,7 +388,7 @@ const identityGroup: HelpGroup = {
 
 const cardLayout: HelpOption = {
   flag: "--card-layout",
-  value: "qr|collection|individual",
+  value: SSKR_CARD_LAYOUTS.join("|"),
   summary: "How each share is printed; follows the page size if omitted",
   details: [
     "qr: one document with a QR code per share, in any page size; the Bytewords of a 24-word share usually need A6 or A4, except in the glass designs. collection: one sheet per share (a6 or a4); --card-qr adds a QR code. individual: numbered business cards without a QR code; every card of a share is needed to rebuild that share.",
@@ -302,13 +399,13 @@ const cardLayout: HelpOption = {
 const threshold: HelpOption = {
   flag: "--threshold",
   value: "N",
-  summary: "Shares needed to restore the phrase, at least 2",
+  summary: `Shares needed to restore the phrase, at least ${MIN_THRESHOLD}`,
 };
 
 const shares: HelpOption = {
   flag: "--shares",
   value: "M",
-  summary: "Shares to make, N to 16",
+  summary: `Shares to make, N to ${MAX_SHARES}`,
 };
 
 const evidenceGroup: HelpGroup = {
@@ -346,7 +443,7 @@ const evidenceGroup: HelpGroup = {
       value: "XPUB",
       summary: "The master extended public key",
       details: [
-        "Standard and SLIP-132 forms are accepted: xpub, ypub, zpub, Ypub, Zpub; on testnet tpub, upub, vpub, Upub, Vpub.",
+        `Standard and SLIP-132 forms are accepted: ${extendedPublicKeyPrefixes("mainnet").join(", ")}; on testnet ${extendedPublicKeyPrefixes("testnet").join(", ")}.`,
       ],
     },
     {
@@ -358,7 +455,7 @@ const evidenceGroup: HelpGroup = {
     {
       flag: "--compressed-public-key",
       value: "HEX",
-      summary: "A 33-byte compressed public key, one of the --scan-gap from the selected place",
+      summary: `A ${COMPRESSED_KEY_BYTES}-byte compressed public key, one of the --scan-gap from the selected place`,
     },
     {
       flag: "--wif-file",
@@ -373,7 +470,7 @@ const evidenceGroup: HelpGroup = {
     },
     {
       flag: "--network",
-      value: "mainnet|testnet",
+      value: BITCOIN_NETWORKS.join("|"),
       summary: "Network of the address or key; default mainnet",
     },
     {
@@ -381,7 +478,7 @@ const evidenceGroup: HelpGroup = {
       value: "NAME",
       summary: "auto (default), or a comma-separated list of address types",
       details: [
-        "The types are legacy (BIP44), nested-segwit (BIP49), native-segwit (BIP84) and taproot (BIP86), such as native-segwit,taproot. auto tries all four at the selected place.",
+        `The types are ${listInWords(bitcoinProfiles.map((profile) => `${profile} (BIP${bitcoinProfilePurpose(profile)})`))}, such as native-segwit,taproot. auto tries all ${numberWord(bitcoinProfiles.length)} at the selected place.`,
       ],
     },
     { flag: "--account", value: "N", summary: "Account number; default 0" },
@@ -390,7 +487,7 @@ const evidenceGroup: HelpGroup = {
     {
       flag: "--scan-gap",
       value: "N",
-      summary: "Scan N addresses from --index on; default 20",
+      summary: `Scan N addresses from --index on; default ${DEFAULT_ADDRESS_COUNT}`,
       details: [
         `For an address, a compressed public key or a WIF whose place is not known exactly: the first 20 are the addresses a wallet hands out before it waits for one of them to be used. Up to ${MAX_ADDRESS_COUNT}; each one adds a derivation to every phrase a search tries. With --ask-secrets and no wallet option, it also sets how many addresses an address typed on the screen is compared with, and that number is then not asked.`,
       ],
@@ -403,9 +500,19 @@ const maxTries: HelpOption = {
   value: "N",
   summary: "Combinations a share repair may try without asking",
   details: [
-    "Without it, a search that takes up to 12 hours on this computer starts at once. The number a repair needs, and its time, are shown before it starts; on the private screen a longer search is asked for instead.",
+    `Without it, a search that takes up to ${QUESTION_HOURS} hours on this computer starts at once. The number a repair needs, and its time, are shown before it starts; on the private screen a longer search is asked for instead.`,
   ],
 };
+
+/**
+ * The question for a candidate list's passphrase, as each recovery command's help lists it. The
+ * rule of when it is asked is protectionOf's (candidates-file.ts): only when no option chose the
+ * list's protection, a key, a passphrase file or none.
+ */
+const LIST_PASSPHRASE_ASK: HelpRow = [
+  "List passphrase",
+  "twice, for a candidate list, unless an option chooses how the list is protected",
+];
 
 const candidateListGroup: HelpGroup = {
   heading: "Candidate list for the Discovery Scanner (docs/CANDIDATES.md):",
@@ -431,9 +538,9 @@ const candidateListGroup: HelpGroup = {
     {
       flag: "--candidates-passphrase-file",
       value: "PATH",
-      summary: "Encrypt the list with a passphrase of 12 characters or more, read from a file",
+      summary: `Encrypt the list with a passphrase of ${MIN_LIST_PASSPHRASE_LENGTH} characters or more, read from a file`,
       details: [
-        "With --ask-secrets and neither key nor passphrase file, the passphrase is asked on the private screen.",
+        "With --ask-secrets and no option that chooses how the list is protected, the passphrase is asked twice on the private screen.",
       ],
     },
     {
@@ -460,7 +567,7 @@ const shareInputs: readonly HelpOption[] = [
   {
     flag: "--share-file",
     value: "PATH",
-    summary: "A file with one share per line; may be repeated",
+    summary: `A file of shares, one per line or with ${SHARE_SEPARATOR} between them; may be repeated`,
   },
   {
     flag: "--share-qr",
@@ -470,7 +577,7 @@ const shareInputs: readonly HelpOption[] = [
   },
   {
     ...askSecrets,
-    summary: "Type the shares on the private screen, separated by semicolons",
+    summary: `Type the shares on the private screen, separated by ${SHARE_SEPARATOR}`,
   },
 ];
 
@@ -485,10 +592,10 @@ const heirSheet: HelpOption = {
 
 const heirSheetSize: HelpOption = {
   flag: "--heir-sheet-size",
-  value: "a5|a6",
-  summary: "The size of that sheet; default a5",
+  value: HEIR_SHEET_SIZES.join("|"),
+  summary: `The size of that sheet; default ${DEFAULT_HEIR_SHEET_SIZE}`,
   details: [
-    "a5 is the size of a notebook, 148 x 210 mm, with larger print; a6 is the size of a postcard and of the cards, 105 x 148 mm, with small print.",
+    `a5 is the size of a notebook, ${heirSheetSizeLabel("a5")}, with larger print; a6 is the size of a postcard and of the cards, ${heirSheetSizeLabel("a6")}, with small print.`,
   ],
 };
 
@@ -509,7 +616,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           {
             flag: "--mode",
             value: "MODE",
-            summary: "direct, seedshift or seedshift-legacy; see mnemocode help modes",
+            summary: `${listInWords(ENCODE_MODES, "or")}; see mnemocode help modes`,
             details: [
               "Without --mode, MnemoCode uses seedshift when --dates is given and direct otherwise.",
             ],
@@ -518,9 +625,9 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           {
             flag: "--format",
             value: "FORMAT",
-            summary: "The form of the result, 1 to 5 or its name; default 1 (english)",
+            summary: `The form of the result, ${FORMAT_NUMBER_RANGE} or its name; default ${formatNumber("english")} (english)`,
             details: [
-              "1 english words, 2 indexes, 3 unicode codes, 4 colors-unicode, 5 colors. Cards need 4 or 5. See mnemocode help formats. With --sskr the whole phrase is shown beside the shares only when --format is given.",
+              `${formatLegend(FORMAT_LEGEND_NAMES)}. Cards need ${CARD_FORMAT_NUMBERS}, ${formatNumber("unicode")} only with dates. See mnemocode help formats. With --sskr the whole phrase is shown beside the shares only when --format is given.`,
             ],
           },
           {
@@ -544,7 +651,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           },
           {
             flag: "--cards",
-            summary: "Show the color codes as colored cards in the terminal (formats 4 and 5)",
+            summary: `Show the color codes as colored cards in the terminal (formats ${COLOR_FORMAT_NUMBERS})`,
           },
           {
             flag: "--qr",
@@ -560,7 +667,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         ],
       },
       {
-        heading: "Cards (formats 4 and 5):",
+        heading: `Cards (formats ${COLOR_FORMAT_NUMBERS}):`,
         options: [
           template,
           pdf,
@@ -570,15 +677,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           pageSize,
           orientation,
           cardQr,
-          { flag: "--title", value: "TEXT", summary: "Collection title; default the studio name" },
-          {
-            flag: "--events",
-            value: "LABEL ...",
-            summary: "One label per date, for dated Unicode cards",
-            details: [
-              "For cards that print the dates with format 3. No template of that kind is installed yet.",
-            ],
-          },
+          title,
         ],
       },
       identityGroup,
@@ -600,7 +699,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             summary:
               "How the shares are shown: ur, words, indexes, unicode, colors, colors-unicode",
             details: [
-              "ur (the default) is the standard short form, ur:sskr/...; words writes the same share in standard Bytewords, one English word per byte. Other SSKR programs read both. indexes, unicode, colors and colors-unicode write a share with the signs of --format 2, 3, 5 and 4, so that it looks like that form; sskr-combine then shows the restored backup in that form again. Only MnemoCode reads these. A saved text file holds the shares in the same form.",
+              `ur (the default) is the standard short form, ur:sskr/...; words writes the same share in standard Bytewords, one English word per byte. Other SSKR programs read both. indexes, unicode, colors and colors-unicode write a share with the signs of --format ${formatNumber("indexes")}, ${formatNumber("unicode")}, ${formatNumber("colors")} and ${formatNumber("colors-unicode")}, so that it looks like that form; sskr-combine then shows the restored backup in that form again. Only MnemoCode reads these. A saved text file holds the shares in the same form.`,
             ],
           },
           cardLayout,
@@ -610,7 +709,6 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     asks: [
       ["Phrase", "English BIP39 words"],
       ["Dates", "one line, such as 23-09-2026 08-08-1988; none in direct mode"],
-      ["Event labels", "one per date, for dated Unicode cards, unless --events"],
       ["Backup check", "whether to type the backup again from paper, unless --backup-check"],
     ],
     examples: [
@@ -662,7 +760,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   decode: {
     summary: "Turn an encoded record back into the phrase",
     about: [
-      "Reads a record in any of the five formats, from text, a file or a QR code, and prints the phrase with its fingerprint. A masked record needs the same dates. A seedshift-legacy-valid record gives every possible last word, each with its fingerprint: 128 candidates for 12 words, 8 for 24.",
+      `Reads a record in any of the ${numberWord(ENCODED_FORMATS.length)} formats, from text, a file or a QR code, and prints the phrase with its fingerprint. A masked record needs the same dates. A seedshift-legacy-valid record gives every possible last word, each with its fingerprint: ${legacyValidCandidates(BIP39_WORD_COUNTS[0])} candidates for ${BIP39_WORD_COUNTS[0]} words, ${legacyValidCandidates(BIP39_WORD_COUNTS.at(-1)!)} for ${BIP39_WORD_COUNTS.at(-1)!}.`,
       "With --ask-secrets the record is checked before the dates are asked for. Codes without an MNC1 header do not say how they were made: without --mode, MnemoCode asks whether Seedshift was used, and which. Where the codes of a masked record form a valid BIP39 phrase, their encoded fingerprint is shown before the dates, to compare with the one encode showed.",
       "A date may then hold ? for each forgotten digit, as in recover-date: the dates are searched, and the matches listed as recover-date lists them. Before the search the wallet's fingerprint or one of its first receiving addresses, of Bitcoin or another coin, is asked for. It is needed where every date gives a valid phrase, as in seedshift mode; with seedshift-legacy, whose checksum sorts out most dates, it may be left out.",
       "On the private screen the codes may hold ? where one cannot be read: a word number, a word, a Unicode code or a whole color, narrowed by a few letters (ab*), words joined by |, or a ? for one digit. The right codes are told by the encoded fingerprint that encode showed, by the wallet with the dates, which may hold ? too, or by a list where they are few. A Shamir share typed in place of the codes, or read from a QR code, leads to the restore from shares, the share kept as the first; after a share from a QR code the next can be read from another.",
@@ -704,10 +802,14 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             summary:
               "Most combinations a search of codes marked with ? or of dates tries without asking",
             details: [
-              "Codes are counted with every date combination they are tried with. Without it, a search that takes up to 12 hours on this computer starts at once, and a longer one is asked for. The number of combinations and their time are shown before the search starts.",
+              `Codes are counted with every date combination they are tried with. Without it, a search that takes up to ${QUESTION_HOURS} hours on this computer starts at once, and a longer one is asked for. The number of combinations and their time are shown before the search starts.`,
             ],
           },
-          { flag: "--max-results", value: "N", summary: "Most date matches shown; default 100" },
+          {
+            flag: "--max-results",
+            value: "N",
+            summary: `Most date matches shown; default ${MAX_SHOWN_MATCHES}`,
+          },
           {
             ...maxTries,
             summary: "Combinations a share repair may try without asking, after a share typed here",
@@ -731,7 +833,10 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         "Wallet",
         "for dates or codes with ?, unless an option gives it; then how many addresses, unless --scan-gap",
       ],
-      ["Search", "one longer than 12 hours, unless --max-candidates or --max-tries allows it"],
+      [
+        "Search",
+        `one longer than ${QUESTION_HOURS} hours, unless --max-candidates or --max-tries allows it`,
+      ],
     ],
     examples: [
       ["mnemocode decode --ask-secrets", "Record and dates on the private screen"],
@@ -764,8 +869,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   "recover-date": {
     summary: "Find a forgotten digit of a date",
     about: [
-      "Tries every date that fits one to three incomplete dates, where each forgotten digit is written as ?, and lists the candidates that pass a recovery check. Every check is local and offline.",
-      "In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of 4 to 8 bits.",
+      `Tries every date that fits one to ${numberWord(MAX_INCOMPLETE_DATES)} incomplete dates, where each forgotten digit is written as ?, and lists the candidates that pass a recovery check. Every check is local and offline.`,
+      `In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of ${checksumBits(BIP39_WORD_COUNTS[0])} to ${checksumBits(BIP39_WORD_COUNTS.at(-1)!)} bits.`,
       "With --ask-secrets the encoded fingerprint of the codes is shown once they are read, before the dates, as decode shows it, so that a code typed wrongly shows before a long search.",
     ],
     usage: "[OPTIONS] (--ask-secrets | --dates <PATTERN ...>) [<RECOVERY CHECK>]",
@@ -785,7 +890,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
               "?3-09-2026 tries days ending in 3, 0?-09-2026 days 1 to 9, 05|15-09-2026 day 5 or 15, 15-?-2025 the 15th of every month, ?-?-2026 every date in 2026, a lone ? every supported date. One to three dates may be incomplete; two identical patterns are tried once.",
             ],
           },
-          { ...decodeMode, summary: "seedshift, seedshift-legacy or seedshift-legacy-valid" },
+          { ...decodeMode, summary: listInWords(MASKED_MODES, "or") },
           decodeFormat,
         ],
       },
@@ -797,12 +902,12 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           {
             flag: "--max-results",
             value: "N",
-            summary: "Most candidates shown; default 100",
+            summary: `Most candidates shown; default ${MAX_SHOWN_MATCHES}`,
           },
           {
             flag: "--progress-every",
             value: "N",
-            summary: "Report progress after every N attempts; default 1000",
+            summary: `Report progress after every N attempts; default ${PROGRESS_EVERY}`,
           },
         ],
       },
@@ -816,7 +921,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         "Wallet",
         "when the mode needs it and no option gives it; then how many addresses, unless --scan-gap",
       ],
-      ["List passphrase", "for a candidate list, unless --candidates-passphrase-file"],
+      LIST_PASSPHRASE_ASK,
     ],
     examples: [
       [
@@ -854,7 +959,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             flag: "--missing-word",
             summary: "One word is missing, and where is not known",
             details: [
-              "Give the 11, 14, 17, 20 or 23 words you have, in their order; every place and every word is tried.",
+              `Give the ${WORD_COUNTS_LESS_ONE_TEXT} words you have, in their order; every place and every word is tried.`,
             ],
           },
           {
@@ -875,7 +980,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         "Wallet",
         "to check the candidates, after the search, unless an option gives it; then how many addresses, unless --scan-gap",
       ],
-      ["List passphrase", "for a candidate list, unless --candidates-passphrase-file"],
+      LIST_PASSPHRASE_ASK,
     ],
     examples: [
       ["mnemocode recover-word --ask-secrets", "The phrase with ? on the private screen"],
@@ -930,13 +1035,13 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       candidateListGroup,
     ],
     asks: [
-      ["Shares", "shares separated by semicolons, ? for each unreadable element"],
+      ["Shares", `shares separated by ${SHARE_SEPARATOR}, ? for each unreadable element`],
       ["Dates", "only with --mode seedshift; ? for each forgotten digit"],
       [
         "Wallet",
         "for dates with ?, unless an option gives it; then how many addresses, unless --scan-gap",
       ],
-      ["List passphrase", "for a candidate list, unless --candidates-passphrase-file"],
+      LIST_PASSPHRASE_ASK,
     ],
     examples: [
       ["mnemocode sskr-combine --ask-secrets", "Shares on the private screen"],
@@ -960,8 +1065,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     ],
     notes: [
       "Individual cards of one share must all be present, in numbered order, to rebuild that share.",
-      "Replace each unreadable element with ? at its place, on any of the shares, up to 64 on one share. In a color or the Unicode code of a word written apart, a ? may also stand for one digit, such as #B5?0?? or 4E?0, and the digits read are used; other forms take a ? only for a whole element. The shares are solved together: their checksums, the data they share and every share beyond the threshold settle most marks without trying anything, and the hash stored with the secret decides the rest. How many combinations are left, how long they take and what would help is shown first. More than one answer is listed, never chosen.",
-      "A share file has one full share per line; join paper line breaks before saving it.",
+      `Replace each unreadable element with ? at its place, on any of the shares, up to ${MAX_JOINT_MARKED_ELEMENTS} on one share. In a color or the Unicode code of a word written apart, a ? may also stand for one digit, such as #B5?0?? or 4E?0, and the digits read are used; other forms take a ? only for a whole element. The shares are solved together: their checksums, the data they share and every share beyond the threshold settle most marks without trying anything, and the hash stored with the secret decides the rest. How many combinations are left, how long they take and what would help is shown first. More than one answer is listed, never chosen.`,
+      `A share file holds shares one per line or separated by ${SHARE_SEPARATOR}. A share that a narrow column wrapped over lines is joined again, as when it is pasted.`,
     ],
   },
 
@@ -1035,7 +1140,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       },
     ],
     asks: [
-      ["Shares", "shares separated by semicolons, ? for each unreadable element"],
+      ["Shares", `shares separated by ${SHARE_SEPARATOR}, ? for each unreadable element`],
       ["Dates", "only with --mode seedshift; ? for each forgotten digit"],
       [
         "Wallet",
@@ -1133,8 +1238,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           },
           {
             flag: "--words",
-            value: "12|15|18|21|24",
-            summary: "Length of the test phrase; default 12",
+            value: BIP39_WORD_COUNTS.join("|"),
+            summary: `Length of the test phrase; default ${DEFAULT_SAMPLE_WORDS}`,
           },
           pdf,
           cardsDir,
@@ -1143,7 +1248,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           pageSize,
           orientation,
           cardQr,
-          { flag: "--title", value: "TEXT", summary: "Collection title; default the studio name" },
+          title,
         ],
       },
       identityGroup,
@@ -1161,7 +1266,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       ],
       [
         "mnemocode preview --template business-it --words 24 --page-size business --pdf business-cards.pdf",
-        "Real 90 x 50 mm cards, one per page",
+        `Real ${pageSizeLabel("business")} cards, one per page`,
       ],
       [
         "mnemocode preview --template business-it --words 24 --cards-dir ./sample-cards",
@@ -1177,7 +1282,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   table: {
     summary: "Look up a word, its number or its Unicode code",
     about: [
-      "Prints the row of the BIP39 table that links an English word, its number from 1 to 2048 and the four-digit Unicode code of format 3, or the whole table.",
+      `Prints the row of the BIP39 table that links an English word, its number from ${WORD_NUMBERS} and the four-digit Unicode code of format ${formatNumber("unicode")}, or the whole table.`,
     ],
     usage: "(--word <WORD> | --index <N> | --unicode <HEX> | --all)",
     groups: [
@@ -1185,7 +1290,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         heading: "Options (exactly one):",
         options: [
           { flag: "--word", value: "WORD", summary: "An English BIP39 word" },
-          { flag: "--index", value: "N", summary: "A word number, 1 to 2048" },
+          { flag: "--index", value: "N", summary: `A word number, ${WORD_NUMBERS}` },
           { flag: "--unicode", value: "HEX", summary: "A four-digit Unicode code, such as 5BF6" },
           { flag: "--all", summary: "The whole table: number, word and code, tab-separated" },
         ],
@@ -1195,7 +1300,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       ["mnemocode table --word abandon", "The row of abandon"],
       ["mnemocode table --index 1", "The first word"],
       ["mnemocode table --unicode 5BF6", "The word with this code"],
-      ["mnemocode table --all", "All 2,048 rows"],
+      ["mnemocode table --all", `All ${counting(BIP39_DICTIONARY_SIZE)} rows`],
     ],
   },
 
@@ -1203,7 +1308,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     summary: "Run the full self-test",
     about: [
       "Checks every phrase length, format and mode, the sorting of dates, the public test vectors, the 24 English BIP39 seed vectors, the date and word searches with a wallet, encrypted candidate lists, the check of a written backup, marked Shamir shares repaired together and with dates, every coin address vector, the sheet for heirs, share cards, QR images beside a sheet and card export with every kind of artwork and font. The check of each feature is also given a case it must refuse. Run it before using a newly built or copied installation.",
-      "A smaller core self-test runs before every command that processes data, in less than half a second: it checks both BIP39 word lists and fixed test phrases in every mode, and compares each feature with known answers: the BIP39 seed and fingerprint, dates with ? and |, codes and shares marked with ?, the word search, the candidate list, the check of a written backup, wallet evidence and the addresses of the twelve coins, the sheet for heirs and share cards. A failure stops the command before any input is read.",
+      `A smaller core self-test runs before every command that processes data, in less than half a second: it checks both BIP39 word lists and fixed test phrases in every mode, and compares each feature with known answers: the BIP39 seed and fingerprint, dates with ? and |, codes and shares marked with ?, the word search, the candidate list, the check of a written backup, wallet evidence and the addresses of the ${numberWord(COINS.length)} coins, the sheet for heirs and share cards. A failure stops the command before any input is read.`,
     ],
     usage: "",
     groups: [],
@@ -1243,8 +1348,20 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "Candidates of a legacy-valid record:",
         rows: [
-          ["Words", "12   15   18   21   24"],
-          ["Candidates", "128  64   32   16   8"],
+          [
+            "Words",
+            BIP39_WORD_COUNTS.map((count) => String(count).padEnd(TABLE_COLUMN))
+              .join("")
+              .trimEnd(),
+          ],
+          [
+            "Candidates",
+            BIP39_WORD_COUNTS.map((count) =>
+              String(legacyValidCandidates(count)).padEnd(TABLE_COLUMN),
+            )
+              .join("")
+              .trimEnd(),
+          ],
         ],
       },
     ],
@@ -1257,26 +1374,14 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
   },
 
   formats: {
-    summary: "The five forms a phrase can be written in (--format)",
+    summary: `The ${numberWord(ENCODED_FORMATS.length)} forms a phrase can be written in (--format)`,
     sections: [
       {
         heading: "Formats:",
-        rows: [
-          ["1  english", "English BIP39 words"],
-          ["2  indexes", "The numbers of the words in the BIP39 list, 1 to 2048, as in Seedshift"],
-          [
-            "3  unicode",
-            "Four-digit Unicode codes of the words of the Traditional Chinese BIP39 list; only the codes are written, spaced or joined",
-          ],
-          [
-            "4  colors-unicode",
-            "The color codes of format 5, each written as two four-digit Private Use codes; all five lengths; plain text that needs no special font",
-          ],
-          [
-            "5  colors",
-            "Color codes such as #01AB63: 8 to 16 codes for 12 to 24 words, BIP39Colors-compatible for 12 and 24 words; MnemoCode also supports 15, 18 and 21. Separated or joined, in any order, but every code is needed",
-          ],
-        ],
+        rows: ENCODED_FORMATS.map((format) => [
+          `${formatNumber(format)}  ${format}`,
+          FORMAT_DESCRIPTIONS[format],
+        ]),
       },
       {
         heading: "Notes:",
@@ -1290,7 +1395,10 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
         `mnemocode encode --mode direct --mnemonic ${TEST_PHRASE_VARIABLE} --format 3`,
         "The test phrase as Unicode codes",
       ],
-      ["mnemocode table --word abandon", "One word in formats 1 to 3"],
+      [
+        "mnemocode table --word abandon",
+        `One word in formats ${formatNumber("english")} to ${formatNumber("unicode")}`,
+      ],
     ],
   },
 
@@ -1300,7 +1408,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "What a card holds:",
         paragraphs: [
-          "In formats 4 and 5 the phrase is a short list of color codes. A template places them into a familiar document, such as a print studio proposal with sample business cards. Each card shows one color and its code, such as Ref. 01AB63. The printed codes are the whole value: decode turns them back into the phrase.",
+          `In formats ${COLOR_FORMAT_NUMBERS} the phrase is a short list of color codes. A template places them into a familiar document, such as a print studio proposal with sample business cards. Each card shows one color and its code, such as Ref. 01AB63. The printed codes are the whole value: decode turns them back into the phrase.`,
           "The names, companies and contact details are a decoy that makes the cards look ordinary, invented at random unless given with --card-name and the other details. Like the photographs, they are not needed for recovery.",
         ],
       },
@@ -1313,9 +1421,12 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "Page sizes:",
         rows: [
-          ["a6", "148 x 105 mm: one sheet with the whole collection (the default)"],
-          ["a4", "210 x 297 mm: one sheet"],
-          ["business", "90 x 50 mm: separate numbered cards, one per page or file"],
+          ["a6", `${pageSizeLabel("a6")}: one sheet with the whole collection (the default)`],
+          ["a4", `${pageSizeLabel("a4")}: one sheet`],
+          [
+            "business",
+            `${pageSizeLabel("business")}: separate numbered cards, one per page or file`,
+          ],
         ],
       },
       {

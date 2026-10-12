@@ -4,44 +4,26 @@
 // --ask-secrets, on the private screen, each answer is checked as soon as it is given and asked
 // again, and a search without a usable result offers what to change; the other answers are kept.
 
-import { mnemonicToEntropy } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { assertWalletEvidence, type WalletEvidence } from "../bitcoin-evidence.js";
-import { parseInput, type SeedshiftMode } from "../core.js";
-import { MAX_CANDIDATE_RECORDS, TooManyForList } from "../core/candidate-list.js";
+import { Masking } from "../core/masking.js";
+import { type WalletEvidence } from "../bitcoin-evidence.js";
+import { type SeedshiftMode } from "../core.js";
+import { candidateListHolds, TooManyForList } from "../core/candidate-list.js";
 import {
   DatesAnswer,
-  MAX_SHOWN_MATCHES,
   NARROW_DATE_SEARCH,
   walletNeeded,
   type DateSearchResult,
 } from "../core/date-search.js";
-import type { EncodedBackup, EncodedMode } from "../core/encoded-backup.js";
-import { WORD_COUNT_SET } from "../core/words.js";
-import { parseRecord } from "../record.js";
+import type { EncodedBackup } from "../core/encoded-backup.js";
 import { integerOption, type ParsedArguments, value, values } from "./arguments.js";
-import {
-  askAfterFailure,
-  askWalletEvidence,
-  assertWalletPlaceUsed,
-  walletPlaceOf,
-  type WalletPlace,
-} from "./ask.js";
-import { bip39Passphrase, walletEvidence } from "./bitcoin-options.js";
-import {
-  assertListable,
-  candidatesTarget,
-  discardCandidates,
-  prepareCandidates,
-  saveCandidates,
-  type CandidatesTarget,
-} from "./candidates-file.js";
+import { askWalletEvidence } from "./ask.js";
+import { type WalletPlace, givenWallet } from "./bitcoin-options.js";
+import { CandidatesFile } from "./candidates-file.js";
 import {
   askDates,
   askEncodedCodes,
   dateMatchNotes,
   encodedFingerprintOf,
-  matchesFitScreen,
   maxCandidatesOf,
   PROGRESS_EVERY,
   recoveryDatesPrompt,
@@ -49,18 +31,28 @@ import {
   searchDates,
   showEncodedFingerprint,
   typedAfterFile,
+  walletExplanation,
+  maxResultsOf,
+  askAfterDateSearch,
+  backupChoice,
 } from "./date-search.js";
-import { encodedInput, inputFormat, recordedInputFormat, transformMode } from "./input.js";
-import { readmeLink, terminalNotice } from "./terminal.js";
-import type { Choice, Explanation } from "./terminal-choice.js";
+import {
+  assertAskedEncodedInput,
+  givenInputFormat,
+  backupFromOptions,
+  transformMode,
+} from "./input.js";
+import { terminalNotice } from "./terminal.js";
 import { InputCancelled } from "./terminal-input.js";
+import { counting } from "../core/search-plan.js";
+import type { MaskingMode } from "../core/types.js";
 
 /**
  * Checksum-valid Seedshift gives a valid phrase for every date, so only the wallet can tell the
  * right dates: without a fingerprint, an address, a public key or a WIF there is nothing to search.
  */
-function assertEvidenceGiven(mode: string, evidence: unknown): void {
-  if (walletNeeded(mode as EncodedMode) && evidence === undefined)
+function assertEvidenceGiven(mode: MaskingMode, evidence: unknown): void {
+  if (walletNeeded(mode) && evidence === undefined)
     throw new Error(
       "This recovery mode can produce checksum-valid candidates for every date. Provide a master fingerprint, address, public key, extended public key, or WIF to identify the intended wallet.",
     );
@@ -72,7 +64,7 @@ interface Settings {
   readonly progressEvery: number;
   /** The combinations searched without asking (--max-candidates); without it, twelve hours. */
   readonly maxCandidates: number | undefined;
-  readonly target: CandidatesTarget | undefined;
+  readonly target: CandidatesFile | undefined;
   readonly evidence: WalletEvidence | undefined;
   /** Where a wallet asked on the private screen is looked for: as the one given, if any. */
   readonly place: WalletPlace;
@@ -85,43 +77,37 @@ interface Settings {
  * and where it is looked for, and the BIP39 passphrase file.
  */
 async function settingsOf(args: ParsedArguments): Promise<Settings> {
-  const maxResults = integerOption(args, "max-results", {
-    defaultValue: MAX_SHOWN_MATCHES,
-    min: 1,
-    max: Number.MAX_SAFE_INTEGER,
-  });
+  const maxResults = maxResultsOf(args);
   const progressEvery = integerOption(args, "progress-every", {
     defaultValue: PROGRESS_EVERY,
     min: 1,
     max: Number.MAX_SAFE_INTEGER,
   });
   const maxCandidates = maxCandidatesOf(args);
-  const target = await candidatesTarget(args);
-  // A record may name another mode or format; askEncodedBackup and recordedInputFormat settle that.
-  if (value(args, "mode") !== undefined && transformMode(args) === "direct")
-    throw new Error("Date recovery is available only when a Seedshift mode is selected.");
-  const format = value(args, "format");
-  if (format !== undefined) inputFormat(format);
-  const evidence = walletEvidence(args);
-  if (evidence !== undefined) assertWalletEvidence(evidence);
-  // A wallet asked on the screen is looked for where the evidence given says, or at the default.
-  assertWalletPlaceUsed(args, evidence);
+  const target = await CandidatesFile.of(args);
+  // A record may name another mode or format; askEncodedCodes and backupFromOptions settle that.
+  if (value(args, "mode") !== undefined && !Masking.isMaskedMode(transformMode(args)))
+    throw new Error(SEEDSHIFT_MODE_ONLY);
+  givenInputFormat(args);
+  const { evidence, place, passphrase } = givenWallet(args);
   if (args["ask-secrets"] !== true && value(args, "mode") !== undefined) {
     // From the command line nothing can be asked later; a record names its own mode.
     assertEvidenceGiven(transformMode(args), evidence);
   }
-  const passphrase = bip39Passphrase(args);
-  assertListable(target, passphrase);
+  target?.assertListable(passphrase);
   return {
     maxResults,
     progressEvery,
     maxCandidates,
     target,
     evidence,
-    place: walletPlaceOf(evidence, args),
+    place,
     passphrase,
   };
 }
+
+/** Why recover-date refuses a mode given or chosen: only a masked phrase has dates to search. */
+const SEEDSHIFT_MODE_ONLY = "Date recovery is available only when a Seedshift mode is selected.";
 
 export async function runRecoverDate(arguments_: ParsedArguments): Promise<void> {
   const settings = await settingsOf(arguments_);
@@ -137,19 +123,10 @@ function requireIncompleteDate(dates: DatesAnswer): void {
 
 /** Every input from the options, as before --ask-secrets existed; a problem ends the command. */
 async function recoverFromOptions(args: ParsedArguments, settings: Settings): Promise<void> {
-  const rawEncoded = await encodedInput(args);
-  const record = parseRecord(rawEncoded);
-  if (record?.mode === "direct")
-    throw new Error("Date recovery is available only for records created with Seedshift.");
-  const mode = transformMode(args, record?.mode);
-  if (mode === "direct")
-    throw new Error("Date recovery is available only when a Seedshift mode is selected.");
+  const { backup, mode } = await backupFromOptions(args, true);
+  if (!Masking.isMaskedMode(mode)) throw new Error(SEEDSHIFT_MODE_ONLY);
   assertEvidenceGiven(mode, settings.evidence);
-  const encoded = record?.payload ?? rawEncoded;
-  const format = await recordedInputFormat(args, encoded, record);
-  const indexes = parseInput(encoded, format);
-  if (!WORD_COUNT_SET.has(indexes.length))
-    throw new Error("Expected 12, 15, 18, 21, or 24 word indexes.");
+  const indexes = backup.indexes;
   const dateValues = values(args, "date");
   if (dateValues.length === 0)
     throw new Error("Provide dates, including at least one pattern containing ? digits.");
@@ -160,25 +137,25 @@ async function recoverFromOptions(args: ParsedArguments, settings: Settings): Pr
   requireIncompleteDate(dates);
   const { combinations } = dates;
   if (settings.maxCandidates !== undefined && combinations > settings.maxCandidates) {
-    const formatted = combinations.toLocaleString("en-US");
+    const formatted = counting(combinations);
     throw new Error(
       `The date patterns produce ${formatted} combinations. Increase the candidate search limit to at least ${formatted} to continue.`,
     );
   }
-  await prepareCandidates(settings.target, settings.passphrase);
+  await settings.target?.prepare(settings.passphrase);
   const result = await search(indexes, dates, mode, settings.evidence, settings);
   // Asked on the private screen whether to make a search longer than allowed, the person said no.
   if (result === undefined) {
-    if (settings.target !== undefined) discardCandidates(settings.target);
+    if (settings.target !== undefined) settings.target.discard();
     throw new InputCancelled();
   }
   reportDateMatches(result, { mode, evidence: settings.evidence, maxResults: settings.maxResults });
   if (result.matchCount === 0) {
-    if (settings.target !== undefined) await saveCandidates(settings.target, []);
+    if (settings.target !== undefined) await settings.target.saveEntropies([]);
     return;
   }
   if (settings.target !== undefined) {
-    if (result.matchCount > MAX_CANDIDATE_RECORDS) throw new TooManyForList(NARROW_DATE_SEARCH);
+    if (!candidateListHolds(result.matchCount)) throw new TooManyForList(NARROW_DATE_SEARCH);
     await saveList(settings, result);
   }
   dateMatchNotes(settings.evidence);
@@ -209,18 +186,8 @@ function search(
 
 /** Saves every match as a candidate list. */
 async function saveList(settings: Settings, result: DateSearchResult): Promise<void> {
-  await saveCandidates(
-    settings.target!,
-    result.kept.map((phrase) => mnemonicToEntropy(phrase, wordlist)),
-    settings.passphrase,
-  );
+  await settings.target!.savePhrases(result.kept, settings.passphrase);
 }
-
-/** Why the wallet is asked for on the private screen, shown with the question. */
-const WALLET_EXPLANATION: Explanation = {
-  lines: ["Each guessed date gives a valid phrase; the wallet tells which is yours."],
-  more: [readmeLink("date-recovery-helper")],
-};
 
 /** What is asked next on the private screen. */
 type Step = "backup" | "dates" | "wallet" | "search" | "done";
@@ -234,14 +201,11 @@ type Step = "backup" | "dates" | "wallet" | "search" | "done";
  * kept.
  */
 async function recoverWithQuestions(args: ParsedArguments, settings: Settings): Promise<void> {
-  if (value(args, "input") !== undefined || values(args, "date").length > 0)
-    throw new Error(
-      "--ask-secrets cannot be combined with direct encoded text or command-line dates.",
-    );
+  assertAskedEncodedInput(args);
   let backupArgs = args;
   let backup: EncodedBackup | undefined;
   // The mode that a record header named, for codes typed after it without one.
-  let recordMode: EncodedMode | undefined;
+  let recordMode: MaskingMode | undefined;
   let dates: DatesAnswer | undefined;
   let evidence = settings.evidence;
   // Whether the list was saved, and how many matched the last search, for a list that was not.
@@ -263,15 +227,16 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
       else {
         const answer = await askWalletEvidence({
           optional: false,
-          explanation: WALLET_EXPLANATION,
+          explanation: walletExplanation(backup!.mode),
           place: settings.place,
         });
         if (answer.kind === "wallet") evidence = answer.evidence;
         step = answer.kind === "back" ? "dates" : "search";
       }
     } else {
-      const mode = backup!.mode as SeedshiftMode;
-      await prepareCandidates(settings.target, settings.passphrase);
+      const { mode } = backup!;
+      Masking.assertMaskedMode(mode);
+      await settings.target?.prepare(settings.passphrase);
       const result = await search(backup!.indexes, dates!, mode, evidence, settings);
       // A search longer than allowed that the person did not want: the dates are typed again.
       if (result === undefined) {
@@ -279,7 +244,7 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
         continue;
       }
       reportDateMatches(result, { mode, evidence, maxResults: settings.maxResults });
-      const listable = settings.target === undefined || result.matchCount <= MAX_CANDIDATE_RECORDS;
+      const listable = settings.target === undefined || candidateListHolds(result.matchCount);
       lastMatches = result.matchCount;
       if (result.matchCount > 0 && listable) {
         if (settings.target !== undefined) await saveList(settings, result);
@@ -287,24 +252,18 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
         dateMatchNotes(evidence);
       } else if (!listable)
         terminalNotice(new TooManyForList(NARROW_DATE_SEARCH).message, "warning");
-      for (;;) {
-        const next = await nextStep(result, evidence, settings);
-        if (next !== "wallet" && next !== "change-wallet") {
-          step = next;
-          break;
-        }
-        // "It cannot" only where it changes the search: in place of a wallet that matched none,
-        // where the mode can list the candidates without one. Asked for a wallet that was
-        // missing, it would run the same search again.
-        const answer = await askWalletEvidence({
-          optional: next === "change-wallet" && !walletNeeded(mode),
-          explanation: WALLET_EXPLANATION,
-          place: settings.place,
-        });
-        if (answer.kind === "back") continue;
-        evidence = answer.kind === "wallet" ? answer.evidence : undefined;
+      const next = await askAfterDateSearch(result, {
+        evidence,
+        mode,
+        maxResults: settings.maxResults,
+        again: backupChoice(backupArgs),
+        wallet: { explanation: walletExplanation(mode), place: settings.place },
+        listing: settings.target !== undefined,
+      });
+      if (typeof next === "string") step = next;
+      else {
+        evidence = next.evidence;
         step = "search";
-        break;
       }
       // The same file would give the same phrase: it is typed this time, and its mode asked again
       // unless --mode or a record named it.
@@ -312,8 +271,8 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
     }
   }
   if (settings.target === undefined || listed) return;
-  if (lastMatches === 0) await saveCandidates(settings.target, []);
-  else discardCandidates(settings.target);
+  if (lastMatches === 0) await settings.target.saveEntropies([]);
+  else settings.target.discard();
 }
 
 /** Asks for the dates with ? until they can be used. */
@@ -325,65 +284,4 @@ async function askRecoveryDates(backup: EncodedBackup): Promise<DatesAnswer> {
     prompt: recoveryDatesPrompt(wordCount),
     check: requireIncompleteDate,
   });
-}
-
-/**
- * What comes after a search: a step, or "change-wallet", which asks for another wallet in place
- * of one that matched none, as "wallet" asks for one that was not given.
- */
-type AfterSearch = Exclude<Step, "search"> | "change-wallet";
-
-/**
- * What the person changes after a result that cannot be used: none matched, more than a list
- * holds, or, without a wallet, more than are shown or than fit on the screen. "done" when the
- * result is complete.
- */
-async function nextStep(
-  result: DateSearchResult,
-  evidence: WalletEvidence | undefined,
-  settings: Settings,
-): Promise<AfterSearch> {
-  const done: Choice<AfterSearch> = { label: "Stop", value: "done" };
-  const dates: Choice<AfterSearch> = { label: "Change the dates", value: "dates" };
-  if (result.matchCount === 0) {
-    const wallet: Choice<AfterSearch>[] =
-      evidence === undefined
-        ? []
-        : [
-            {
-              label: "Change the wallet",
-              note: "the fingerprint or the address",
-              value: "change-wallet",
-            },
-          ];
-    const again: Choice<AfterSearch> = {
-      label: "Type the encoded seed phrase again",
-      value: "backup",
-    };
-    return askAfterFailure("What now?", [dates, ...wallet, again, done]);
-  }
-  if (settings.target !== undefined && result.matchCount > MAX_CANDIDATE_RECORDS)
-    return askAfterFailure("What now?", [
-      { label: "Give the wallet", note: "its fingerprint or an address", value: "wallet" },
-      dates,
-      { ...done, note: "no list is saved" },
-    ]);
-  // A list holds every match already; without one, the wallet picks those to show.
-  if (
-    settings.target === undefined &&
-    evidence === undefined &&
-    result.matchCount > settings.maxResults
-  )
-    return askAfterFailure("Not every candidate is shown. What now?", [
-      { label: "Check them against the wallet", note: "only those that match", value: "wallet" },
-      { ...done, label: "Done" },
-    ]);
-  // The private screen keeps no scrollback: matches above its top could not be read.
-  if (settings.target === undefined && evidence === undefined && !matchesFitScreen(result))
-    return askAfterFailure("Not every candidate fits on the screen. What now?", [
-      { label: "Check them against the wallet", note: "only those that match", value: "wallet" },
-      { ...dates, note: "fewer ? give fewer candidates" },
-      { ...done, label: "Done" },
-    ]);
-  return "done";
 }

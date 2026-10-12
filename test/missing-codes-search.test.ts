@@ -86,13 +86,18 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     // A limit below the candidates asks first.
     expect((await way.plan(100)).ask).toBe(true);
     const progress: number[] = [];
-    const found = await way.run({ onProgress: ({ count }) => progress.push(count) });
+    const found = await way.run({ onProgress: ({ checked }) => progress.push(checked) });
     expect(found.kind).toBe("found");
     if (found.kind !== "found") return;
     expect(found.backup.indexes).toEqual(ENCODED.shiftedIndexes);
     expect(found.dates).toBeUndefined();
     const none = await search.byEncodedFingerprint("00000000").run();
     expect(none).toEqual({ kind: "none", message: MISSING_CODES_TEXTS.noneByFingerprint });
+    // A fingerprint as a person types it, in capitals and with spaces, is read as every one is
+    // (scan finding S004); one that is no fingerprint is refused when the way is made.
+    const typed = ` ${(await fingerprint(ENCODED_PHRASE)).toUpperCase()} `;
+    expect((await search.byEncodedFingerprint(typed).run()).kind).toBe("found");
+    expect(() => search.byEncodedFingerprint("not hex")).toThrow("eight hexadecimal characters");
   });
 
   it("finds the codes and the forgotten digit of the date together by the wallet", async () => {

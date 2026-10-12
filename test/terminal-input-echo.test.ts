@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  answerEndRow,
-  readLine,
-  rowsOfText,
-  terminalColumns,
-  type LineOptions,
-} from "../src/cli/terminal-input.js";
+import { readLine, type LineOptions } from "../src/cli/terminal-input.js";
+import { answerEndRow, rowsOfText, terminalColumns } from "../src/cli/terminal-geometry.js";
 
 const LEFT = "\x1b[D";
 const HOME = "\x1b[H";

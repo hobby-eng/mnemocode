@@ -27,11 +27,25 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-import { executableName, noticesName } from "./executable-files.mjs";
+import {
+  RELEASE_FOLDER,
+  checksumLine,
+  checksumsName,
+  executableName,
+  noticesName,
+} from "./executable-files.mjs";
 import { executableNotices } from "./executable-notices.mjs";
+import {
+  ASSETS_FOLDER,
+  PUBLIC_VECTORS_FILE,
+  SSKR_BINARY,
+  SSKR_BRIDGE,
+  SSKR_ENGINE_FOLDER,
+  SSKR_MANIFEST,
+} from "../src/bundled-file-paths.ts";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const output = resolve(process.argv[2] ?? join(root, "release"));
+const output = resolve(process.argv[2] ?? join(root, RELEASE_FOLDER));
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 const nodeVersion = readFileSync(join(root, ".node-version"), "utf8").trim();
 
@@ -41,13 +55,11 @@ const name = executableName(version);
 if (process.version !== `v${nodeVersion}`)
   throw new Error(`Build with Node.js ${nodeVersion} from .node-version, not ${process.version}.`);
 
-/** Every file the program reads at run time, by its path from the package root; see bundled-files.ts. */
+/** Every file the program reads at run time, by its path from the package root (bundled-file-paths.ts). */
 function bundledFiles() {
   const files = [
-    "sskr-wasm/integrity.json",
-    "sskr-wasm/generated/recovery_sskr_wasm.js",
-    "sskr-wasm/generated/recovery_sskr_wasm_bg.wasm",
-    "vectors/mnemocode-v1.json",
+    ...[SSKR_MANIFEST, SSKR_BRIDGE, SSKR_BINARY].map((file) => `${SSKR_ENGINE_FOLDER}${file}`),
+    PUBLIC_VECTORS_FILE,
   ];
   const walk = (folder) => {
     for (const entry of readdirSync(join(root, folder)).sort()) {
@@ -56,7 +68,7 @@ function bundledFiles() {
       else files.push(path);
     }
   };
-  walk("assets");
+  walk(ASSETS_FOLDER.slice(0, -1));
   return files;
 }
 
@@ -131,8 +143,8 @@ try {
     createHash("sha256")
       .update(readFileSync(join(staging, file)))
       .digest("hex");
-  const lines = [name, notices].map((file) => `${sha256(file)}  ${file}`);
-  const checksums = `${name}.sha256`;
+  const lines = [name, notices].map((file) => checksumLine(sha256(file), file));
+  const checksums = checksumsName(name);
   writeFileSync(join(staging, checksums), `${lines.join("\n")}\n`);
   const files = [name, notices, checksums];
   // Preserve the old set before any rename. Backups stay on the same filesystem for rollback.

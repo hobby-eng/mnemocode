@@ -16,12 +16,16 @@
 // for the share it refuses.
 
 import { parseRecord, type MnemoCodeRecord } from "../record.js";
-import { markedReadings, readingSpace } from "../sskr/repair.js";
+import { MarkedReading } from "../sskr/repair.js";
 import { Share } from "../sskr/transport.js";
-import { EncodedBackup, type EncodedFormat, type EncodedMode } from "./encoded-backup.js";
+import { EncodedBackup, FIT_NO_FORM, type EncodedFormat } from "./encoded-backup.js";
 import { Masking } from "./masking.js";
 import { MissingCodes } from "./missing-codes.js";
 import { detectInputFormats } from "./representations.js";
+import { Redacted } from "./redacted.js";
+import { CRC32_BYTES } from "../sskr/checksum.js";
+import { BITS_PER_BYTE } from "./bits.js";
+import type { MaskingMode } from "./types.js";
 
 /** What a host reads a backup for. */
 export interface ReadingRules {
@@ -44,10 +48,7 @@ export type ShareKind = "share" | "either";
  * Unknown bits of a marked share below which its solution settles that the text is a share: its
  * CRC-32 alone is 32 bits, and its version, length and layout add some 20 more.
  */
-const SURE_SHARE_UNKNOWN_BITS = 32;
-
-/** What toString, toJSON and Node.js's inspect show of a reading: never its codes. */
-const REDACTED = "[BackupReading: redacted]";
+const SURE_SHARE_UNKNOWN_BITS = CRC32_BYTES * BITS_PER_BYTE;
 
 /**
  * One backup as given, before its codes are read: the text and its record header. A class, so
@@ -55,11 +56,12 @@ const REDACTED = "[BackupReading: redacted]";
  * later rule works on the same reading; it keeps the text, which may be the seed phrase itself, out
  * of toString, toJSON and Node.js's inspect.
  */
-export class BackupReading {
+export class BackupReading extends Redacted {
   readonly #record: MnemoCodeRecord | undefined;
   readonly #payload: string;
 
   private constructor(record: MnemoCodeRecord | undefined, payload: string) {
+    super("BackupReading");
     this.#record = record;
     this.#payload = payload;
   }
@@ -71,7 +73,7 @@ export class BackupReading {
    */
   static of(text: string, rules: ReadingRules): BackupReading {
     const record = parseRecord(text);
-    if (record?.mode === "direct" && rules.seedshiftOnly)
+    if (record !== undefined && !Masking.isMaskedMode(record.mode) && rules.seedshiftOnly)
       throw new Error("Date recovery is available only for records created with Seedshift.");
     const payload = record?.payload ?? text;
     // A share's own checksum makes a phrase's codes read as one only by a chance of about one in
@@ -97,17 +99,19 @@ export class BackupReading {
     if (parseRecord(text) !== undefined) return undefined;
     if (Share.reads(text)) return "share";
     if (!MissingCodes.marked(text)) return undefined;
-    let spaces: ReturnType<typeof readingSpace>[] = [];
+    // The unknown bits of each reading that has a solution; the spaces themselves are wiped.
+    let unknownBits: number[] = [];
     try {
-      spaces = markedReadings(text.trim()).map(readingSpace);
+      unknownBits = MarkedReading.of(text.trim()).flatMap((reading) =>
+        reading.withSpace((space) => (space === undefined ? [] : [space.unknownBits])),
+      );
     } catch {
       return undefined;
     }
-    const solved = spaces.filter((space) => space !== undefined);
-    if (solved.length === 0) return undefined;
+    if (unknownBits.length === 0) return undefined;
     // A share's checksum and layout are more than 50 bits of rules: marks of up to 32 unknown bits
     // that still meet them leave no doubt, while text of another kind meets them by chance only.
-    if (solved.some((space) => space.unknownBits <= SURE_SHARE_UNKNOWN_BITS)) return "share";
+    if (unknownBits.some((bits) => bits <= SURE_SHARE_UNKNOWN_BITS)) return "share";
     return MissingCodes.formats(text).length > 0 ? "either" : "share";
   }
 
@@ -121,22 +125,18 @@ export class BackupReading {
    * and the host asks the person. Where the record and `given` differ, it is the record's, which
    * the host offers after modeConflict.
    */
-  mode(given?: EncodedMode): EncodedMode | undefined {
+  mode(given?: MaskingMode): MaskingMode | undefined {
     return this.#record?.mode ?? given;
   }
 
   /** The line that says that the record names another mode than `given`, or undefined. */
-  modeConflict(given?: EncodedMode): string | undefined {
-    const record = this.#record;
-    if (record === undefined || given === undefined || given === record.mode) return undefined;
-    return `The record was made with ${Masking.of(record.mode).name}, not with ${Masking.of(given).name}.`;
+  modeConflict(given?: MaskingMode): string | undefined {
+    return modeConflictOf(this.#record?.mode, given);
   }
 
   /** The line that says that the record holds codes of another form than `given`, or undefined. */
   formatConflict(given?: EncodedFormat): string | undefined {
-    const record = this.#record;
-    if (record === undefined || given === undefined || given === record.format) return undefined;
-    return `The record holds ${record.format} codes, not ${given}.`;
+    return formatConflictOf(this.#record?.format, given);
   }
 
   /**
@@ -145,11 +145,34 @@ export class BackupReading {
    * the form that their characters most likely are names it.
    */
   formats(given?: EncodedFormat): EncodedFormat[] {
-    if (this.#record !== undefined) return [this.#record.format];
-    if (given !== undefined) return [given];
-    const fitting = detectInputFormats(this.#payload);
-    if (fitting.length === 0) throw new Error(EncodedBackup.whyUnreadable(this.#payload));
+    return this.#formatsOf(given, detectInputFormats, () =>
+      EncodedBackup.whyUnreadable(this.#payload),
+    );
+  }
+
+  /**
+   * The named form (#namedFormat), or every form that `detect` finds the codes to fit; throws
+   * `none()` when they fit none. Complete and marked codes differ only in these two.
+   */
+  #formatsOf(
+    given: EncodedFormat | undefined,
+    detect: (payload: string) => EncodedFormat[],
+    none: () => string,
+  ): EncodedFormat[] {
+    const named = this.#namedFormat(given);
+    if (named !== undefined) return [named];
+    const fitting = detect(this.#payload);
+    if (fitting.length === 0) throw new Error(none());
     return fitting;
+  }
+
+  /**
+   * The form that is named, before any is detected: the record's, which wins over `given`, the
+   * host's; undefined when neither names one. Complete and marked codes take it alike
+   * (AUD-012-ARC006).
+   */
+  #namedFormat(given: EncodedFormat | undefined): EncodedFormat | undefined {
+    return this.#record?.format ?? given;
   }
 
   /** Whether the codes mark some that cannot be read (MissingCodes.marked), to be searched. */
@@ -162,14 +185,11 @@ export class BackupReading {
    * fit (MissingCodes.formats). Throws when they fit none.
    */
   markedFormats(given?: EncodedFormat): EncodedFormat[] {
-    if (this.#record !== undefined) return [this.#record.format];
-    if (given !== undefined) return [given];
-    const fitting = MissingCodes.formats(this.#payload);
-    if (fitting.length === 0)
-      throw new Error(
-        "These codes fit no form of an encoded seed phrase: mark each code that cannot be read with ?, in its place.",
-      );
-    return fitting;
+    return this.#formatsOf(
+      given,
+      (payload) => MissingCodes.formats(payload),
+      () => `${FIT_NO_FORM}: mark each code that cannot be read with ?, in its place.`,
+    );
   }
 
   /** The marked codes in `format`, taken as not masked until the host gives their mode. */
@@ -185,16 +205,34 @@ export class BackupReading {
   codes(format: EncodedFormat): EncodedBackup {
     return EncodedBackup.read(this.#payload, format, "direct");
   }
+}
 
-  toString(): string {
-    return REDACTED;
-  }
+/**
+ * Whether a host gave a record's metadata, mode or form, as another value than the record names:
+ * never where either is missing. The one rule of both conflicts below.
+ */
+function metadataDiffers<T>(recorded: T | undefined, given: T | undefined): boolean {
+  return recorded !== undefined && given !== undefined && given !== recorded;
+}
 
-  toJSON(): string {
-    return REDACTED;
-  }
+/**
+ * The line that says that a record made with `recorded` was given another mode, `given`, or
+ * undefined when either is missing or they agree. A host answers it in its way: the command line
+ * refuses, a question offers the record's mode.
+ */
+export function modeConflictOf(
+  recorded: MaskingMode | undefined,
+  given: MaskingMode | undefined,
+): string | undefined {
+  if (!metadataDiffers(recorded, given)) return undefined;
+  return `The record was made with ${Masking.of(recorded!).name}, not with ${Masking.of(given!).name}.`;
+}
 
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED;
-  }
+/** The same for the form of the codes: the record's, `recorded`, and `given`. */
+export function formatConflictOf(
+  recorded: EncodedFormat | undefined,
+  given: EncodedFormat | undefined,
+): string | undefined {
+  if (!metadataDiffers(recorded, given)) return undefined;
+  return `The record holds ${recorded} codes, not ${given}.`;
 }

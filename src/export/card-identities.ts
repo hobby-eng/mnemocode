@@ -1,5 +1,5 @@
-import { renderPlatform } from "./platform.js";
-import { validateProfile, type CardProfile, type CardSettings } from "./card-settings.js";
+import { pickWith, type UniformChoice } from "./platform.js";
+import { validateProfile, type BusinessStyle, type CardProfile } from "./card-settings.js";
 
 export type CompanySector = "it" | "architecture" | "property" | "consulting";
 
@@ -127,23 +127,22 @@ export const personNames = [
 ] as const;
 
 const sectors = Object.keys(employers) as CompanySector[];
-type Choice = (upperExclusive: number) => number;
-const identities = new WeakMap<CardSettings, Required<CardProfile>>();
 
-function pick<T>(values: readonly T[], choose: Choice): T {
-  const index = choose(values.length);
-  if (!Number.isInteger(index) || index < 0 || index >= values.length)
-    throw new Error("Invalid random identity selection.");
-  return values[index]!;
-}
+/** The sector of the employer that suits a business style; the other styles take any. */
+const STYLE_SECTORS: Readonly<Partial<Record<BusinessStyle, CompanySector>>> = Object.freeze({
+  architect: "architecture",
+  it: "it",
+  estate: "property",
+});
 
-export function sectorForTemplate(template?: string): CompanySector | undefined {
-  if (template === "it" || template === "business-it" || template === "2") return "it";
-  if (template === "architect" || template === "business-architect" || template === "1")
-    return "architecture";
-  if (template === "estate" || template === "business-estate" || template === "3")
-    return "property";
-  return undefined;
+/**
+ * The sector of the employer that the cards of `style` print (STYLE_SECTORS), or undefined for a
+ * style that suits any: it follows the style of a design, never its place in a list.
+ */
+export function sectorForStyle(style: string | undefined): CompanySector | undefined {
+  return style !== undefined && Object.hasOwn(STYLE_SECTORS, style)
+    ? STYLE_SECTORS[style as BusinessStyle]
+    : undefined;
 }
 
 function knownSector(profile: CardProfile): CompanySector | undefined {
@@ -190,38 +189,35 @@ function contactDomain(company: string): string {
   return `${label || "company"}${INVENTED_DOMAIN_ENDING}`;
 }
 
-/** Selection is independent of secret data; explicit values always win. */
+/**
+ * The phone number of every invented identity: a London number that Ofcom, the UK regulator,
+ * keeps for drama and fiction (020 7946 0000 to 0999), so that it rings no one
+ * (docs/card-identities.md).
+ */
+const INVENTED_PHONE = "+44 20 7946 0281";
+/** Where an invented identity works when none is given. */
+const DEFAULT_LOCATION = "International";
+
+/**
+ * The person on the cards: `supplied`, with the rest chosen with `choose`, the host's uniform
+ * choice. Selection is independent of secret data; explicit values always win.
+ */
 export function createCardIdentity(
+  choose: UniformChoice,
   supplied: CardProfile = {},
   sectorHint?: CompanySector,
-  choose: Choice = (upperExclusive) => renderPlatform().randomInt(upperExclusive),
 ): Required<CardProfile> {
   const profile = validateProfile(supplied);
-  const sector = knownSector(profile) ?? sectorHint ?? pick(sectors, choose);
-  const company = profile.company ?? pick(employers[sector], choose);
+  const sector = knownSector(profile) ?? sectorHint ?? pickWith(sectors, choose);
+  const company = profile.company ?? pickWith(employers[sector], choose);
   const domain = contactDomain(company);
   return {
-    name: profile.name ?? pick(personNames, choose),
+    name: profile.name ?? pickWith(personNames, choose),
     company,
-    role: profile.role ?? pick([...sectorRoles[sector], ...commonRoles], choose),
+    role: profile.role ?? pickWith([...sectorRoles[sector], ...commonRoles], choose),
     email: profile.email ?? `contact@${domain}`,
     website: profile.website ?? domain,
-    phone: profile.phone ?? "+44 20 7946 0281",
-    location: profile.location ?? "International",
+    phone: profile.phone ?? INVENTED_PHONE,
+    location: profile.location ?? DEFAULT_LOCATION,
   };
-}
-
-/** Reuse an identity across all pages, formats and shares in one export. */
-export function resolveIdentityFor(
-  settings: CardSettings,
-  sector?: CompanySector,
-): Required<CardProfile> {
-  let profile = identities.get(settings);
-  if (!profile) {
-    // Frozen: every caller with these settings gets this one object, and none may change it for
-    // the pages, formats and shares that follow.
-    profile = Object.freeze(createCardIdentity(settings.profile, sector));
-    identities.set(settings, profile);
-  }
-  return profile;
 }

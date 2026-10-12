@@ -31,7 +31,7 @@ export function gfMultiply(a: number, b: number): number {
   return a === 0 || b === 0 ? 0 : EXP[LOG[a]! + LOG[b]!]!;
 }
 
-export function gfInverse(a: number): number {
+function gfInverse(a: number): number {
   if (a === 0) throw new Error("Zero has no inverse in GF(256).");
   return EXP[ORDER - LOG[a]!]!;
 }

@@ -5,31 +5,36 @@
 
 import {
   compareDates,
+  DATE_PARTS,
   datePatternCombinations,
   daysInMonth,
   deriveShifts,
-  ownedPattern,
   sortDates,
+  ownedPatterns,
+  ownedDates,
+  sameKeyPredecessors,
+  maximumDates,
 } from "./dates.js";
-import { Masking } from "./masking.js";
+import { Masking, type MaskedMode } from "./masking.js";
 import type { Bip39WordCount, DatePattern, DateShiftDate } from "./types.js";
 import { assertWordCount, BIP39_DICTIONARY_SIZE } from "./words.js";
 
-/** The Seedshift variants whose dates can be searched. */
-export type SeedshiftMode = "seedshift" | "seedshift-legacy" | "seedshift-legacy-valid";
+/** The Seedshift variants whose dates can be searched: those that mask with them (MaskedMode). */
+export type SeedshiftMode = MaskedMode;
 
 /** A phrase that one combination of dates gives, with the guessed dates sorted. */
 export interface DateCandidate {
+  /** The dates that were guessed, sorted: what the search found. */
   readonly dates: readonly DateShiftDate[];
+  /** Every date that decodes the codes to `mnemonic`, the known ones too, sorted. */
+  readonly allDates: readonly DateShiftDate[];
   readonly mnemonic: string;
 }
 
-/** The largest year of a date (core/dates.ts). */
-const LAST_YEAR = 9999;
+/** The largest year of a date. */
+const LAST_YEAR = DATE_PARTS.year.max;
 /** The days of the longest month: a shift modulo more than this tells every day apart. */
-const LONGEST_MONTH = 31;
-/** Shifts, years, months and days are put together in one array for each date. */
-const SHIFTS_PER_DATE = 3;
+const LONGEST_MONTH = DATE_PARTS.day.max;
 
 /**
  * Tries every combination of the forgotten dates (datePatternCombinations) together with the
@@ -49,24 +54,25 @@ export function* dateRecoveryCandidates(
   patterns: readonly DatePattern[],
   mode: SeedshiftMode,
 ): Generator<readonly DateCandidate[]> {
-  // A JavaScript host may pass any value; another mode would silently decode another way.
-  if (!Masking.isMode(mode) || !Masking.of(mode).masked)
-    throw new Error("Unsupported Seedshift mode.");
+  Masking.assertMaskedMode(mode);
   assertWordCount(indexes.length);
   const masking = Masking.of(mode);
-  // A host may build patterns itself: each value once and in order, as parsing gives them.
-  const owned = patterns.map(ownedPattern);
-  const earlier = new EarlierShifts(knownDates, owned, masking, indexes.length);
+  // A host may build patterns and dates itself: each held to the rules of parsed ones, and copied,
+  // so that nothing the host changes later reaches the search.
+  const owned = ownedPatterns(patterns);
+  const known = ownedDates(knownDates);
+  const earlier = new EarlierShifts(known, owned, masking, indexes.length);
   for (const guessed of datePatternCombinations(owned)) {
     if (earlier.gaveShiftsOf(guessed)) {
       yield [];
       continue;
     }
-    const sorted = sortDates(guessed);
+    const sorted = Object.freeze(sortDates(guessed));
+    const allDates = Object.freeze(sortDates([...known, ...guessed]));
     yield masking
-      .undo(indexes, [...knownDates, ...guessed])
+      .undo(indexes, allDates)
       .filter((result) => result.checksumValid)
-      .map((result) => ({ dates: sorted, mnemonic: result.recoveredMnemonic }));
+      .map((result) => ({ dates: sorted, allDates, mnemonic: result.recoveredMnemonic }));
   }
 }
 
@@ -119,11 +125,7 @@ class EarlierShifts {
       days: new Set(pattern.days),
     }));
     // datePatternCombinations takes patterns with one key as a set: never an earlier date later.
-    this.#sameAs = patterns.map((pattern, index) => {
-      const before = patterns.slice(0, index).map((other) => other.key);
-      const at = before.lastIndexOf(pattern.key);
-      return at < 0 ? undefined : at;
-    });
+    this.#sameAs = sameKeyPredecessors(patterns);
     this.#masking = masking;
     this.#wordCount = wordCount;
     this.#lastModulus = masking.lastShiftModulus(wordCount);
@@ -157,7 +159,7 @@ class EarlierShifts {
   ): { readonly year: number; readonly month: number; readonly day: number } | undefined {
     if (this.#lastModulus > LONGEST_MONTH) return undefined;
     // With fewer dates the shifts repeat, and the day of the last date moves other words too.
-    if (all.length * SHIFTS_PER_DATE !== this.#wordCount) return undefined;
+    if (all.length !== maximumDates(this.#wordCount)) return undefined;
     const last = all.at(-1)!;
     return {
       year: last.year % BIP39_DICTIONARY_SIZE,
@@ -182,13 +184,12 @@ class EarlierShifts {
     for (const key of remaining.keys()) {
       const [year, month, day] = key.split("-").map(Number) as [number, number, number];
       for (let other = year; other <= LAST_YEAR; other += BIP39_DICTIONARY_SIZE)
-        if (other >= 1) add(other, month, day, key);
+        add(other, month, day, key);
     }
     if (lastDay !== undefined)
       for (let year = lastDay.year; year <= LAST_YEAR; year += BIP39_DICTIONARY_SIZE)
         for (const day of allowed.days)
-          if (year >= 1 && day % this.#lastModulus === lastDay.day)
-            add(year, lastDay.month, day, undefined);
+          if (day % this.#lastModulus === lastDay.day) add(year, lastDay.month, day, undefined);
     return stands.sort((left, right) => compareDates(left.date, right.date));
   }
 

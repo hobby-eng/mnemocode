@@ -8,50 +8,57 @@
 import { bech32m } from "@scure/base";
 import { HASH160_BYTES, type AddressType } from "./address-types.js";
 import { Base58Coin } from "./base58.js";
-import { decodeBech32 } from "./bech32.js";
+import { BECH32_GROUP_BITS, bech32Groups, decodeBech32, Bech32Prefixes } from "./bech32.js";
+import { BITS_PER_BYTE } from "../bits.js";
 import {
   asciiLowercase,
-  DAMAGED,
   invalidAddress,
   startsWithAny,
   WRONG_LENGTH,
   type AddressLocation,
   type CoinAddress,
+  unreadableAddress,
 } from "./coin.js";
 
 /** DIP18's human-readable parts on the main and the test network. */
-const PLATFORM_MAINNET = "dash";
-const PLATFORM_TESTNET = "tdash";
+const PLATFORM = new Bech32Prefixes("dash", "tdash");
 /** DIP18's type bytes: the payment address of one DIP17 key, and an Orchard shielded address. */
 const PLATFORM_P2PKH = 0xb0;
 const PLATFORM_ORCHARD = 0x10;
+/** The type byte and the hash of a payment address. */
+const PAYMENT_BYTES = 1 + HASH160_BYTES;
 /**
  * The type byte and the hash are 21 bytes, 168 bits: 34 five-bit groups, 170 bits, whose last two
  * are padding and zero (BIP173). Only that encoding is the address; another group at the end, or
  * padding bits set, would read as the same bytes.
  */
-const PAYMENT_GROUPS = 34;
-const PADDING_MASK = 0b11;
+const PAYMENT_GROUPS = bech32Groups(PAYMENT_BYTES);
+const PADDING_MASK = 2 ** (PAYMENT_GROUPS * BECH32_GROUP_BITS - PAYMENT_BYTES * BITS_PER_BYTE) - 1;
 /** DIP9's feature paths begin with 9, and DIP17 is the feature of Platform payment keys. */
 const DIP9_PURPOSE = 9;
 const DIP17_FEATURE = 17;
 
 class DashCoin extends Base58Coin {
-  /** "Core (BIP44)", or "Platform payment (DIP17)", with "testnet, " before it on testnet. */
-  override describe(type: AddressType, testnet: boolean): string {
-    if (type !== "dash-platform") return "Core (BIP44)";
-    return `${testnet ? "testnet, " : ""}Platform payment (DIP17)`;
+  /** "Core (BIP44)", or "Platform payment (DIP17)". */
+  override describe(type: AddressType): string {
+    if (type !== "dash-platform") return `Core (BIP${this.purposeOf(type)})`;
+    return `Platform payment (DIP${DIP17_FEATURE})`;
   }
 
-  /** DIP17: m/9'/coin'/17'/account'/key_class' for Platform payment keys, the key class hardened. */
+  /** DIP17: m/9'/coin'/17'/account' for Platform payment keys, DIP9's purpose and feature. */
+  override accountPathOf(type: AddressType, coinType: number, account: number): string {
+    if (type !== "dash-platform") return super.accountPathOf(type, coinType, account);
+    return `m/${this.purposeOf(type)}'/${coinType}'/${DIP17_FEATURE}'/${account}'`;
+  }
+
+  /** DIP17: the account's path, then the key class hardened, m/9'/coin'/17'/account'/class'. */
   override branchPathOf(type: AddressType, coinType: number, location: AddressLocation): string {
     if (type !== "dash-platform") return super.branchPathOf(type, coinType, location);
-    const { account, branch } = location;
-    return `m/${DIP9_PURPOSE}'/${coinType}'/${DIP17_FEATURE}'/${account}'/${branch}'`;
+    return `${this.accountPathOf(type, coinType, location.account)}/${location.branch}'`;
   }
 
   protected override get ownPrefixes(): readonly string[] {
-    return [`${PLATFORM_MAINNET}1`, `${PLATFORM_TESTNET}1`];
+    return PLATFORM.starts;
   }
 
   protected override read(text: string): CoinAddress {
@@ -60,24 +67,19 @@ class DashCoin extends Base58Coin {
 
   #readPlatform(text: string): CoinAddress {
     const decoded = decodeBech32(text, bech32m);
-    if (!decoded) throw invalidAddress(DAMAGED);
-    let testnet: boolean;
-    if (decoded.prefix === PLATFORM_MAINNET) testnet = false;
-    else if (decoded.prefix === PLATFORM_TESTNET) testnet = true;
-    else throw this.notOurs();
+    if (!decoded) throw unreadableAddress();
+    const testnet = PLATFORM.testnetOf(decoded.prefix);
+    if (testnet === undefined) throw this.notOurs();
     const [type, ...hash] = bytesOf(decoded.words);
     if (type === PLATFORM_P2PKH) {
       if (hash.length !== HASH160_BYTES) throw invalidAddress(WRONG_LENGTH);
       const last = decoded.words[decoded.words.length - 1]!;
       if (decoded.words.length !== PAYMENT_GROUPS || (last & PADDING_MASK) !== 0)
-        throw invalidAddress(DAMAGED);
+        throw unreadableAddress();
       return this.address("dash-platform", Uint8Array.from(hash), asciiLowercase(text), testnet);
     }
-    if (type === PLATFORM_ORCHARD)
-      throw invalidAddress(
-        "it is shielded; use a Dash Core X… or Platform dash1k… address of the same wallet",
-      );
-    throw invalidAddress("it is not the Platform payment address of a single key");
+    if (type === PLATFORM_ORCHARD) throw this.shielded("a Dash Core X… or Platform dash1k…");
+    throw this.singleKeyOnly();
   }
 }
 
@@ -91,10 +93,10 @@ function bytesOf(groups: readonly number[]): number[] {
   let bits = 0;
   for (const group of groups) {
     // At most seven bits wait and five arrive: twelve bits hold them.
-    accumulator = ((accumulator << 5) | group) & 0xfff;
-    bits += 5;
-    if (bits >= 8) {
-      bits -= 8;
+    accumulator = ((accumulator << BECH32_GROUP_BITS) | group) & 0xfff;
+    bits += BECH32_GROUP_BITS;
+    if (bits >= BITS_PER_BYTE) {
+      bits -= BITS_PER_BYTE;
       bytes.push((accumulator >> bits) & 0xff);
     }
   }
@@ -107,4 +109,5 @@ export const DASH = new DashCoin({
   addressForms: "X… or dash1k…",
   coinTypes: [5],
   versions: [{ prefix: [0x4c], type: "p2pkh", testnet: false }],
+  purposes: { "dash-platform": DIP9_PURPOSE },
 });

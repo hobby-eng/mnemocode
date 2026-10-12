@@ -4,11 +4,11 @@ import {
   InputCancelled,
   readKey,
   readLine,
-  rowsOfOutputLine,
   type Key,
   type MoreWithin,
   type NextByte,
 } from "../src/cli/terminal-input.js";
+import { rowsOfOutputLine } from "../src/cli/terminal-geometry.js";
 
 /** The bytes of `text` as a terminal in raw mode delivers them, then the end of the input. */
 function typed(text: string): NextByte {

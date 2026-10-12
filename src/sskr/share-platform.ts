@@ -4,13 +4,17 @@
  * The share modules are platform-neutral (split.ts, share-set.ts, joint-repair.ts). What only the
  * host has comes in through this interface: Node.js supplies it through `share-platform-node.ts`,
  * with node:crypto and the bundled SSKR WASM, and another host, such as a browser page, supplies
- * its own, as it does for the card renderers (export/platform.ts). split.ts, share-set.ts,
- * share-input.ts and JointRepair (joint-repair.ts) take the platform as a parameter. Only the older
- * functions of joint-repair.ts, planJointRepair and measureTriesPerSecond called without one, read
- * the platform configured here, as the Node.js entry configures it (share-platform-node.ts).
+ * its own, as it does for the card renderers (export/platform.ts). Every share module that needs it
+ * takes it as a parameter (split.ts, share-set.ts, share-input.ts, joint-repair.ts); none reads a
+ * platform configured beforehand.
  */
 export interface SharePlatform {
-  /** HMAC-SHA256 of `message` under `key`. Synchronous: the search calls it for every try. */
+  /**
+   * HMAC-SHA256 of `message` under `key`. Synchronous: the search calls it for every try. Returns
+   * a fresh array of the 32 bytes of the MAC, which the caller owns and may wipe once it has
+   * compared it; never storage that the host reuses or a view of `key` or `message`, which stay
+   * the caller's and are not changed.
+   */
   readonly hmacSha256: (key: Uint8Array, message: Uint8Array) => Uint8Array;
   /** The secret that complete shares restore, from the host's SSKR library; throws if none. */
   readonly combineShares: (records: readonly string[]) => Promise<Uint8Array>;
@@ -27,19 +31,16 @@ export interface SharePlatform {
   ) => Promise<string[]>;
 }
 
-/** Random bytes that seed one split: the SSKR WASM takes exactly 32 (sskr-wasm/rust/src/lib.rs). */
+/**
+ * Random bytes that seed one split: the SSKR WASM takes exactly 32, the seed of its ChaCha20
+ * generator (sskr-wasm/rust/src/lib.rs). A deliberate copy across the languages, which the WASM
+ * cannot export before it is loaded; test/sskr-vectors.test.ts keeps it in step by asking the
+ * engine to take this length and refuse one byte less or more.
+ */
 export const SEED_BYTES = 32;
 
-let configured: SharePlatform | undefined;
-
-export function configureSharePlatform(platform: SharePlatform): void {
-  configured = platform;
-}
-
-export function sharePlatform(): SharePlatform {
-  if (configured === undefined)
-    throw new Error(
-      "Share repair has no platform. Node.js programs import mnemocode/sskr or sskr/share-platform-node.js; other hosts pass their SharePlatform to JointRepair.",
-    );
-  return configured;
-}
+/**
+ * The one group that MnemoCode writes, and so the group threshold it takes: createShares makes
+ * shares of one group, which every host's bridge is asked for.
+ */
+export const ONE_GROUP = 1;

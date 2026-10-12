@@ -1,14 +1,11 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.strict-consumers.json",
   "compilerOptions": {
-    "noEmit": true,
     "declaration": false,
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM"],
-    "types": [],
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "types": []
   },
   "include": ["src/cards.ts"]
 }

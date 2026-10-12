@@ -7,6 +7,7 @@ import {
   parseMasterFingerprint,
 } from "../src/core/master-fingerprint.js";
 import { WalletEvidenceCheck } from "../src/core/wallet-evidence.js";
+import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
 
 // Public data only: the all-zero entropy's phrase, whose master fingerprint is 73c5da0a.
 const PHRASE = `${"abandon ".repeat(11)}about`;
@@ -44,7 +45,7 @@ describe("The master fingerprint on its own (core/master-fingerprint.ts)", () =>
   });
 
   it("gives what the wallet evidence check gives, which is built on it", () => {
-    const evidence = new WalletEvidenceCheck(now);
+    const evidence = new WalletEvidenceCheck(now, [BITCOIN]);
     expect(evidence.fingerprint(PHRASE)).toBe(FINGERPRINT);
     expect(
       evidence.match(PHRASE, {

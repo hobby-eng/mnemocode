@@ -10,48 +10,47 @@
 // (sskr/split.ts for a share set, core/backup-check.ts for a check of what was written down), so
 // these rules only keep a person from choosing what would be refused later.
 
-import type { RecordFormat, RecordMode } from "../record.js";
-import { MAX_SHARES, ShareSplit } from "../sskr/split.js";
+import { MAX_SHARES, MIN_THRESHOLD, ShareSplit } from "../sskr/split.js";
 import type { ShareFormat } from "../sskr/transport.js";
 import { Masking, type MaskingCapabilities } from "./masking.js";
-
-/** What a transformation mode allows besides the backup itself (Masking.capabilities). */
-export type ModeCapabilities = MaskingCapabilities;
+import { typedWholeNumber, type WholeRange } from "./typed-number.js";
+import { type CardKind, type MaskingMode, type EncodedFormat } from "./types.js";
+import { shareFormatMirroring } from "../sskr/transport.js";
+import { EncodedForm } from "./encoded-form.js";
 
 /** What a backup made in `mode` allows; refuses a name that is no transformation mode. */
-export function capabilities(mode: RecordMode): ModeCapabilities {
-  if (!Masking.isMode(mode)) throw new Error(`Unknown transformation mode: ${mode}.`);
+export function capabilities(mode: MaskingMode): MaskingCapabilities {
   return Masking.of(mode).capabilities;
 }
 
 /**
- * The share form of each form of the seed phrase: English words give standard Bytewords, which
- * other SSKR tools read too; the other forms give MnemoCode's own shares that look alike.
+ * The form in which the shares of a seed phrase in `form` are written, unless one is chosen: the
+ * one that looks like it (shareFormatMirroring, transport.ts).
  */
-const SHARE_FORMATS: Readonly<Record<RecordFormat, ShareFormat>> = Object.freeze({
-  english: "words",
-  indexes: "indexes",
-  unicode: "unicode",
-  colors: "colors",
-  "colors-unicode": "colors-unicode",
-});
+export function shareFormatOf(form: EncodedFormat): ShareFormat {
+  // A value that names no form is refused by the form's own refusal (EncodedForm.of).
+  return shareFormatMirroring(EncodedForm.of(form).format);
+}
 
-/** The form in which the shares of a seed phrase in `form` are written, unless one is chosen. */
-export function shareFormatOf(form: RecordFormat): ShareFormat {
-  if (!Object.hasOwn(SHARE_FORMATS, form)) throw new Error(`Unknown encoded format: ${form}.`);
-  return SHARE_FORMATS[form];
+// The kinds of cards are named in types.ts, which the card exports read without this module.
+export type { CardKind };
+
+/** How a seed phrase in `form` prints on cards, or undefined when it has none (EncodedForm). */
+export function cardKindOf(form: EncodedFormat): CardKind | undefined {
+  return EncodedForm.of(form).cardKind;
+}
+
+/** Whether `form` is written in colors: its cards show colors, and the terminal colour cards. */
+export function writtenInColors(form: EncodedFormat): boolean {
+  return cardKindOf(form) === "colors";
 }
 
 /**
- * Forms that only write the words differently: English words are the seed phrase itself, and
- * anyone with the BIP39 list reads word numbers. Unmasked they would protect nothing while seeming
- * to, so the menu always masks them, and a page that offers them unmasked warns (UNMASKED_NOTE).
+ * Whether a seed phrase in `form` is always masked with Seedshift: the menu always masks it, and
+ * a page that offers it unmasked warns (UNMASKED_NOTE). The reason is the form's (EncodedForm).
  */
-const ALWAYS_MASKED: ReadonlySet<RecordFormat> = new Set(["english", "indexes"]);
-
-/** Whether a seed phrase in `form` is always masked with Seedshift. */
-export function alwaysMasked(form: RecordFormat): boolean {
-  return ALWAYS_MASKED.has(form);
+export function alwaysMasked(form: EncodedFormat): boolean {
+  return EncodedForm.of(form).alwaysMasked;
 }
 
 /** Why a form that is always masked has no choice of not masking it. */
@@ -61,15 +60,8 @@ export const ALWAYS_MASKED_NOTE =
 /** What a copy of the other forms is worth without Seedshift (the note of the answer No). */
 export const UNMASKED_NOTE = "weak: only disguised, anyone with MnemoCode reads it";
 
-/** The fewest shares, and the fewest that restore the phrase, that SSKR allows (ShareSplit). */
-const MIN_SHARES = 2;
-
-/** A typed whole number from `min` to `max`, without a sign or a point; otherwise `refusal`. */
-function typedNumber(answer: string, min: number, max: number, refusal: string): number {
-  const number = /^\d+$/u.test(answer) ? Number(answer) : Number.NaN;
-  if (!(number >= min && number <= max)) throw new Error(refusal);
-  return number;
-}
+/** The fewest shares, and the fewest that restore the phrase, that a split makes (ShareSplit). */
+const MIN_SHARES = MIN_THRESHOLD;
 
 /**
  * How many Shamir shares to make, and how many of them restore the seed phrase. A value object, so
@@ -82,6 +74,8 @@ export class ShareSetChoice {
   static readonly MIN_SHARES = MIN_SHARES;
   /** The most shares in all (SSKR's limit for one group). */
   static readonly MAX_SHARES = MAX_SHARES;
+  /** The numbers that a share count or a threshold may be, each on its own (of checks both). */
+  static readonly RANGE: WholeRange = Object.freeze({ min: MIN_SHARES, max: MAX_SHARES });
 
   readonly #threshold: number;
   readonly #count: number;
@@ -116,20 +110,18 @@ export class ShareSetChoice {
 
   /** The number of shares in all, as typed; refused unless it is a number SSKR allows. */
   static typedCount(answer: string): number {
-    return typedNumber(
+    return typedWholeNumber(
       answer,
-      MIN_SHARES,
-      MAX_SHARES,
+      ShareSetChoice.RANGE,
       `Choose ${MIN_SHARES} to ${MAX_SHARES} shares.`,
     );
   }
 
   /** How many of `count` shares restore the phrase, as typed; refused unless it fits `count`. */
   static typedThreshold(answer: string, count: number): number {
-    return typedNumber(
+    return typedWholeNumber(
       answer,
-      MIN_SHARES,
-      count,
+      { min: MIN_SHARES, max: count },
       `Type a number from ${MIN_SHARES} to ${count}, the number of shares.`,
     );
   }

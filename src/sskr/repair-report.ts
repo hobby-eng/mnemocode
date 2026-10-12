@@ -10,14 +10,12 @@
 // Does not: search, ask whether to search, or show the lines: a host maps each kind of line to its
 // own style (the command line: a status line, a grey hint, a warning, a README link).
 
-import { QUESTION_SECONDS } from "../core/search-turns.js";
-import type { JointAssessment, RepairedSet } from "./joint-repair.js";
+import { asksFirst } from "../core/search-turns.js";
+import type { JointAssessment } from "./joint-repair.js";
+import { CORRECT_WRITTEN_COPY, counted, counting, duration } from "../core/search-plan.js";
+import type { RepairedShares } from "./joint-repair.js";
+import { placeOf } from "../core/places.js";
 
-/**
- * A search expected to take longer than this, on this computer, is asked for first: the twelve
- * hours of every search of the library (search-turns.ts, QUESTION_SECONDS).
- */
-export const AUTO_SECONDS = QUESTION_SECONDS;
 /** The refusal when the search of marked shares found no phrase. */
 export const NO_PHRASE_FITS =
   "No phrase fits these shares: a ? may stand at a wrong place, or an element without ? be misread.";
@@ -25,15 +23,8 @@ export const NO_PHRASE_FITS =
 const NAMED_HELPS = 3;
 /** Wrong phrases expected by chance from which the assessment mentions them. */
 const NOTABLE_FALSE = 0.01;
-/** The README section on damaged shares. */
-const REPAIR_ANCHOR = "damaged-shares";
-/** Units of a duration in words, the largest first, in seconds. */
-const TIME_UNITS = [
-  ["day", 86_400],
-  ["hour", 3_600],
-  ["minute", 60],
-  ["second", 1],
-] as const;
+/** The README section on damaged shares, which the report and the command line's menu link to. */
+export const REPAIR_ANCHOR = "damaged-shares";
 
 /**
  * One line of a report: a status with its label and value, good or not; a hint that can be passed
@@ -69,7 +60,7 @@ export interface ShareRepairs {
 export const REPAIR_NOTES = Object.freeze({
   heading: "Filled in where ? stood:",
   guesses: "The phrase does not depend on the guesses, and nothing settles them: do not copy them.",
-  correct: "Correct the written copy; then check the wallet that comes back.",
+  correct: CORRECT_WRITTEN_COPY,
 });
 
 /** A date search after the share search, for each phrase it finds: its size and its pace. */
@@ -78,7 +69,20 @@ export interface DateWork {
   readonly secondsEach: number;
 }
 
-const count = (value: number): string => value.toLocaleString("en-US");
+const count = counting;
+
+/**
+ * Seconds that the date search of `phrases` phrases takes, each searched with `work`: the one
+ * reckoning of its time, which the notice, the question and the limits all take.
+ */
+function dateSeconds(work: DateWork, phrases: number): number {
+  return work.combinations * work.secondsEach * phrases;
+}
+
+/** How a date search names its phrases when there are several: " for each of the 3 phrases". */
+function forEachPhrase(phrases: number): string {
+  return phrases > 1 ? ` for each of the ${phrases} phrases` : "";
+}
 
 /**
  * A copy of `assessment` that nothing can change, every array and object of it frozen: a report
@@ -97,10 +101,8 @@ function ownedAssessment(assessment: JointAssessment): JointAssessment {
   });
 }
 
-/** The place of the share counted `share` from 1 in the plan. */
-function placeOf(places: readonly number[] | undefined, share: number): number {
-  return places?.[share - 1] ?? share;
-}
+// The naming of a share by its place belongs to core/places.ts; here too for its old callers.
+export { placeOf };
 
 /**
  * The report of a repair: the assessment of the shares as typed, with the pace of this machine
@@ -120,26 +122,12 @@ export class RepairReport {
     this.#places = places === undefined ? undefined : Object.freeze([...places]);
   }
 
-  /** A length of time in words: "about 3 minutes". */
-  static duration(seconds: number): string {
-    if (seconds < 1) return "under a second";
-    const [name, size] = TIME_UNITS.find(([, size]) => seconds >= size)!;
-    const rounded = Math.round(seconds / size);
-    return `about ${count(rounded)} ${name}${rounded === 1 ? "" : "s"}`;
-  }
-
-  /** `value` and `noun`, in the plural unless the value is 1: "1 share combination". */
-  static counted(value: number, noun: string): string {
-    return `${count(value)} ${noun}${value === 1 ? "" : "s"}`;
-  }
-
   /**
    * The notice before the date search of `phrases` phrases restored from complete shares, each
    * searched with `work`: its size and about how long it takes on this machine.
    */
   static dateSearchNotice(work: DateWork, phrases: number): string {
-    const each = phrases > 1 ? ` for each of the ${phrases} phrases` : "";
-    return `The search tries ${RepairReport.counted(work.combinations, "date combination")}${each}: ${RepairReport.duration(work.combinations * work.secondsEach * phrases)}.`;
+    return `The search tries ${counted(work.combinations, "date combination")}${forEachPhrase(phrases)}: ${duration(dateSeconds(work, phrases))}.`;
   }
 
   /**
@@ -147,10 +135,7 @@ export class RepairReport {
    * can be corrected; shares without a ? are left out. An element that nothing settles is a guess.
    * Each share is named by its place in `places`, by its index in the set.
    */
-  static repairs(
-    set: Pick<RepairedSet, "shares" | "unsettled">,
-    places?: readonly number[],
-  ): ShareRepairs[] {
+  static repairs(set: RepairedShares, places?: readonly number[]): ShareRepairs[] {
     const repairs: ShareRepairs[] = [];
     set.shares.forEach((share, index) => {
       if (!share.repaired) return;
@@ -171,21 +156,29 @@ export class RepairReport {
 
   /**
    * The repairs as lines of text (repairs), one warning for each share, a guess said to be one,
-   * then the notes on guesses and on correcting the written copy.
+   * then the notes on guesses and on correcting the written copy (notes).
    */
-  static repairLines(
-    set: Pick<RepairedSet, "shares" | "unsettled">,
-    places?: readonly number[],
-  ): ReportLine[] {
-    const repairs = RepairReport.repairs(set, places);
-    const lines: ReportLine[] = repairs.map(({ share, elements }) => ({
+  static repairLines(set: RepairedShares, places?: readonly number[]): ReportLine[] {
+    const lines: ReportLine[] = RepairReport.repairs(set, places).map(({ share, elements }) => ({
       kind: "warning",
       text: `Share ${share}: ${elements
         .map((e) => `element ${e.position} is ${e.value}${e.guess ? " (a guess)" : ""}`)
         .join(", ")}.`,
     }));
+    return [...lines, ...RepairReport.notes(set)];
+  }
+
+  /**
+   * The notes after what a repair of `set` filled in: that the guesses are not to be copied, where
+   * an element is unsettled, and, where a share was repaired, that the written copy is to be
+   * corrected. A host that lays the repairs out itself, such as a table, shows these lines after
+   * them.
+   */
+  static notes(set: RepairedShares): ReportLine[] {
+    const lines: ReportLine[] = [];
     if (set.unsettled.length > 0) lines.push({ kind: "warning", text: REPAIR_NOTES.guesses });
-    if (repairs.length > 0) lines.push({ kind: "notice", text: REPAIR_NOTES.correct });
+    if (set.shares.some((share) => share.repaired))
+      lines.push({ kind: "notice", text: REPAIR_NOTES.correct });
     return lines;
   }
 
@@ -211,22 +204,23 @@ export class RepairReport {
     const phrases = 1 + this.#assessment.expectedFalse;
     return (
       this.combinations / this.#triesPerSecond +
-      (dates === undefined ? 0 : dates.combinations * dates.secondsEach * phrases)
+      (dates === undefined ? 0 : dateSeconds(dates, phrases))
     );
   }
 
   /** The time of the search in words, with `dates` as in seconds. */
   duration(dates?: DateWork): string {
-    return RepairReport.duration(this.seconds(dates));
+    return duration(this.seconds(dates));
   }
 
   /**
    * Whether the search is to be asked for first: it takes more checks than `limit`, or the date
    * search of each phrase it finds, `dates`, more date combinations than `dateLimit`; without
-   * either limit, it takes longer than AUTO_SECONDS on this machine, the date search included.
+   * either limit, it takes longer than QUESTION_SECONDS (search-turns.ts) on this machine, the date
+   * search included.
    */
   needsQuestion(limit?: number, dates?: DateWork, dateLimit?: number): boolean {
-    if (limit === undefined && dateLimit === undefined) return this.seconds(dates) > AUTO_SECONDS;
+    if (limit === undefined && dateLimit === undefined) return asksFirst(0, this.seconds(dates));
     const shares = limit !== undefined && this.combinations > limit;
     const dated = dateLimit !== undefined && dates !== undefined && dates.combinations > dateLimit;
     return shares || dated;
@@ -235,29 +229,36 @@ export class RepairReport {
   /**
    * Whether the date search of `phrases` phrases restored from complete shares, each searched with
    * `work`, is to be asked for first: it tries more date combinations in all than `limit`, the
-   * person's own limit, or without one takes longer than AUTO_SECONDS on this machine.
+   * person's own limit, or without one takes longer than QUESTION_SECONDS (search-turns.ts) on this
+   * machine.
    */
   static dateSearchNeedsQuestion(work: DateWork, phrases: number, limit?: number): boolean {
-    if (limit !== undefined) return work.combinations * phrases > limit;
-    return work.combinations * work.secondsEach * phrases > AUTO_SECONDS;
+    return asksFirst(work.combinations * phrases, dateSeconds(work, phrases), limit);
   }
 
   /** The question before such a date search: "Search 3,650 date combinations, about 9 hours?" */
   static dateSearchQuestion(work: DateWork, phrases: number): string {
-    const each = phrases > 1 ? ` for each of the ${phrases} phrases` : "";
-    return `Search ${RepairReport.counted(work.combinations, "date combination")}${each}, ${RepairReport.duration(work.combinations * work.secondsEach * phrases)}?`;
+    return `Search ${counted(work.combinations, "date combination")}${forEachPhrase(phrases)}, ${duration(dateSeconds(work, phrases))}?`;
   }
 
   /** What the search tries, as its question and notice name it, with `dates` as in seconds. */
   searchSize(dates?: DateWork): string {
     return dates === undefined
       ? `${count(this.combinations)} combinations`
-      : `${RepairReport.counted(this.combinations, "share combination")}, then ${RepairReport.counted(dates.combinations, "date combination")} for each phrase found`;
+      : `${counted(this.combinations, "share combination")}, then ${counted(dates.combinations, "date combination")} for each phrase found`;
   }
 
   /** The question before a search that needsQuestion, with `dates` as in seconds. */
   searchQuestion(dates?: DateWork): string {
     return `Search ${this.searchSize(dates)}, ${this.duration(dates)}?`;
+  }
+
+  /**
+   * What the search takes, for a host that cannot ask its question and names the limit that
+   * allows it instead: "The search takes 65,536 checks, about 2 seconds."
+   */
+  searchExtent(dates?: DateWork): string {
+    return `The search takes ${count(this.combinations)} checks, ${this.duration(dates)}.`;
   }
 
   /** The notice before a search that goes ahead without a question, with `dates` as in seconds. */

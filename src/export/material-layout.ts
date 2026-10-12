@@ -1,7 +1,14 @@
-import { pageDimensions, type CardPageSize, type CardOrientation } from "./card-settings.js";
+import {
+  pageDimensions,
+  parseOrientation,
+  type CardOrientation,
+  type CardPageSize,
+  ID1_CARD_MM,
+} from "./card-settings.js";
+import { runCellSize } from "./business-layout.js";
 
 // The material layout was drawn for a card of 85.6 x 54 mm and is scaled to the page.
-const DRAWN_FOR = { width: 85.6, height: 54 } as const;
+const DRAWN_FOR = ID1_CARD_MM;
 const GRID = {
   portraitColumns: 3,
   landscapeColumns: 4,
@@ -13,10 +20,9 @@ const GRID = {
 
 export function materialPageLayout(size: CardPageSize, orientation?: CardOrientation) {
   // Rotate the physical sheet, never stretch the photographed finishes.
-  if (orientation !== undefined && orientation !== "portrait" && orientation !== "landscape")
-    throw new Error("Orientation must be portrait or landscape.");
-  // Material sheets lie on their long side unless portrait is asked for.
-  const [width, height] = pageDimensions(size, orientation ?? "landscape");
+  // Material sheets lie on their long side unless portrait is asked for; an orientation that is
+  // given is checked as every family checks it, so that null is refused, not taken as none.
+  const [width, height] = pageDimensions(size, parseOrientation(orientation) ?? "landscape");
   const portrait = height > width;
   const scale = portrait
     ? Math.min(width / DRAWN_FOR.height, height / DRAWN_FOR.width)
@@ -40,6 +46,6 @@ export function materialGridLayout(
   const areaTop = GRID.top * scale;
   const areaBottom = height - GRID.bottom * scale;
   const cellHeight = (areaBottom - areaTop) / rows;
-  const cellWidth = (width - 2 * margin - (columns - 1) * gap) / columns;
+  const cellWidth = runCellSize(width - 2 * margin, columns, gap);
   return { columns, rows, cellHeight, cellWidth, gap, areaTop };
 }

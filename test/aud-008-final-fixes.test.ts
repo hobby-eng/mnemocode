@@ -4,9 +4,10 @@ import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { combineSskrShares, combineSskrShareSet, restoreShareSet } from "../src/sskr/index.js";
 import { sskrEngine } from "../src/sskr/runtime.js";
-import { crc32 } from "../src/sskr/checksum.js";
-import { transportToUr, urToTransport, writeShare } from "../src/sskr/transport.js";
+import { writeShare } from "../src/sskr/transport.js";
+import { wrongValue } from "./helpers/shares.js";
 import { checkShareBackup } from "../src/cli/backup-check.js";
+import { SEED_BYTES } from "../src/sskr/share-platform.js";
 
 const PHRASE = "abandon ".repeat(11) + "about";
 
@@ -14,7 +15,7 @@ describe("AUD-008-FUN001: incomplete-group disclosure", () => {
   it("exposes unchecked members through the package API and warns when checking the backup", async () => {
     const engine = await sskrEngine();
     const entropy = new Uint8Array(16);
-    const randomness = new Uint8Array(32).fill(7);
+    const randomness = new Uint8Array(SEED_BYTES).fill(7);
     let shares: string[];
     try {
       shares = engine
@@ -26,13 +27,7 @@ describe("AUD-008-FUN001: incomplete-group disclosure", () => {
       randomness.fill(0);
     }
     // Corrupt an incomplete group's value but keep its unkeyed transport checksum valid.
-    const bytes = urToTransport(shares[3]!);
-    bytes[10]! ^= 1;
-    new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(
-      bytes.length - 4,
-      crc32(bytes.slice(0, -4)),
-    );
-    const given = [shares[0]!, shares[1]!, transportToUr(bytes)];
+    const given = [shares[0]!, shares[1]!, wrongValue(shares[3]!)];
     expect(await restoreShareSet(given)).toMatchObject({ mnemonic: PHRASE, unchecked: [3] });
     expect(await combineSskrShareSet(given)).toMatchObject({ mnemonic: PHRASE, unchecked: [3] });
     await expect(combineSskrShares(given)).rejects.toThrow("could not be checked");

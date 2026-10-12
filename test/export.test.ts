@@ -5,17 +5,14 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderCards, exportCards } from "../src/export/pdf.js";
-import {
-  cardTemplates,
-  selectTemplate,
-  type CardContent,
-  type CardTemplate,
-} from "../src/export/templates.js";
+import type { CardContent } from "../src/export/backup-cards.js";
+import { cardTemplates, selectTemplate, type CardTemplate } from "../src/export/templates.js";
 import { parseArguments, values } from "../src/cli/arguments.js";
-import { completeEventLabels } from "../src/cli/card-options.js";
-import { indexesToColors, parseDate } from "../src/core.js";
+import { commandOptions } from "../src/cli/command-options.js";
+import { indexesToColors } from "../src/core.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
-import { resolveProfile } from "../src/export/card-settings.js";
+import { createCardIdentity } from "../src/export/card-identities.js";
+import { nodeCardRenderer } from "../src/export/platform-node.js";
 
 // Blank PDF fixture tests the export transport only. It is never a registered design.
 async function fixture(pageCount = 1) {
@@ -38,8 +35,8 @@ const fragmentColors = indexesToColors(Array.from({ length: 12 }, (_, index) => 
 // Identity and sheet copy are chosen randomly per export; pin them so paired
 // renders can differ only through the setting under test.
 const fixedIdentity = {
-  presentation: resolveCardPresentation({}, {}, () => 0).presentation,
-  profile: resolveProfile("it", { name: "Alex Morgan" }),
+  presentation: resolveCardPresentation(() => 0, {}),
+  profile: createCardIdentity(() => 0, { name: "Alex Morgan" }),
 };
 
 describe("export infrastructure", () => {
@@ -63,6 +60,7 @@ describe("export infrastructure", () => {
     for (const pageSize of [undefined, "business"] as const) {
       const withQr = await PDFDocument.load(
         await template.renderIndividual!(
+          nodeCardRenderer,
           {
             kind: "colors",
             colors: fragmentColors,
@@ -76,6 +74,7 @@ describe("export infrastructure", () => {
       );
       const withoutQr = await PDFDocument.load(
         await template.renderIndividual!(
+          nodeCardRenderer,
           {
             kind: "colors",
             colors: fragmentColors,
@@ -103,7 +102,9 @@ describe("export infrastructure", () => {
     };
     const jobs = [{ template, content }];
     const original = await PDFDocument.load(bytes);
-    const preview = await PDFDocument.load(await renderCards(jobs), { updateMetadata: false });
+    const preview = await PDFDocument.load(await renderCards(nodeCardRenderer, jobs), {
+      updateMetadata: false,
+    });
     const verify = (document: PDFDocument) => {
       expect(document.getPageCount()).toBe(original.getPageCount());
       expect(document.getPage(0).getSize()).toEqual(original.getPage(0).getSize());
@@ -128,7 +129,9 @@ describe("export infrastructure", () => {
       await rm(directory, { recursive: true, force: true });
     }
     expect(template.render).toHaveBeenCalledTimes(2);
+    // Both drawn with the Node.js renderer, which exportCards passes as the preview's caller does.
     expect(template.render).toHaveBeenCalledWith(
+      nodeCardRenderer,
       expect.objectContaining({
         ...content,
         cardQr: false,
@@ -136,6 +139,9 @@ describe("export infrastructure", () => {
         presentation: expect.any(Object),
       }),
     );
+    expect(
+      vi.mocked(template.render).mock.calls.every(([drawing]) => drawing === nodeCardRenderer),
+    ).toBe(true);
   });
 
   it("merges all renderers into a single PDF with unchanged page dimensions", async () => {
@@ -147,7 +153,7 @@ describe("export infrastructure", () => {
       render: () => fixture(),
     };
     const output = await PDFDocument.load(
-      await renderCards([
+      await renderCards(nodeCardRenderer, [
         { template, content },
         { template, content },
       ]),
@@ -165,11 +171,11 @@ describe("export infrastructure", () => {
       description: "",
       render: () => fixture(2),
     };
-    await expect(renderCards([])).rejects.toThrow("No approved");
+    await expect(renderCards(nodeCardRenderer, [])).rejects.toThrow("No approved");
     expect(
       (
         await PDFDocument.load(
-          await renderCards([
+          await renderCards(nodeCardRenderer, [
             { template, content },
             { template, content },
           ]),
@@ -177,27 +183,18 @@ describe("export infrastructure", () => {
       ).getPageCount(),
     ).toBe(4);
     await expect(
-      renderCards([{ template: { ...template, kind: "unicode" }, content }]),
+      // A JavaScript host may pass a design of another kind than its content.
+      renderCards(nodeCardRenderer, [
+        { template: { ...template, kind: "unicode" as never }, content },
+      ]),
     ).rejects.toThrow("does not support");
   });
 
-  it("keeps date and label lists in entered order and validates the number of labels", async () => {
-    const args = parseArguments([
-      "--dates",
-      "23-09-2026",
-      "08-08-1988",
-      "--events",
-      "Project review",
-      "Birthday",
-    ]);
+  it("keeps a date list in entered order", () => {
+    const args = parseArguments(["--dates", "23-09-2026", "08-08-1988"]);
     expect(values(args, "date")).toEqual(["23-09-2026", "08-08-1988"]);
-    expect(values(args, "event")).toEqual(["Project review", "Birthday"]);
-    const dates = values(args, "date").map(parseDate);
-    expect(await completeEventLabels(dates, values(args, "event"))).toEqual([
-      "Project review",
-      "Birthday",
-    ]);
-    await expect(completeEventLabels(dates, ["A", "B", "C"])).rejects.toThrow("exactly one");
-    await expect(completeEventLabels(dates, ["A", " "])).rejects.toThrow("must not be empty");
+    // The labels of dated Unicode cards went with those cards (owner, 2026-10-09): no command
+    // takes them.
+    expect(Object.values(commandOptions).flat()).not.toContain("event");
   });
 });

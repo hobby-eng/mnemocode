@@ -10,7 +10,6 @@ import {
   walletCheckOf,
   type WalletEvidence,
 } from "../bitcoin-evidence.js";
-import type { DateShiftDate } from "../core.js";
 import type { DatesAnswer } from "../core/date-search.js";
 import type { EncodedBackup } from "../core/encoded-backup.js";
 import {
@@ -19,14 +18,18 @@ import {
   type MissingCodesResult,
   type MissingCodesWay,
   type MissingCodesWaySearch,
+  type MissingCodesFound,
 } from "../core/missing-codes-search.js";
 import type { MissingCodes } from "../core/missing-codes.js";
-import { RepairReport } from "../sskr/repair-report.js";
-import { askAfterFailure, askValueUntil, askWalletEvidence, type WalletPlace } from "./ask.js";
+import { askAfterFailure, askValueUntil, askWalletEvidence, WHAT_NOW } from "./ask.js";
 import { askDates } from "./date-search.js";
 import { choose } from "./terminal-choice.js";
-import { dropTypedAhead, withCtrlCWatch } from "./terminal-input.js";
+import { askToSearch } from "./search-consent.js";
+import { withCtrlCWatch, nodeTurn } from "./terminal-input.js";
 import { ProgressLine, terminalHint, terminalNotice, terminalStatus } from "./terminal.js";
+import { counting } from "../core/search-plan.js";
+import { type WalletPlace } from "./bitcoin-options.js";
+import { lowerFirst } from "../core/prose.js";
 
 /** Seconds between two progress updates of a long search. */
 const PROGRESS_SECONDS = 2;
@@ -34,13 +37,7 @@ const PROGRESS_SECONDS = 2;
 /** What the search of marked codes gave the decode that asked for it. */
 export type MissingOutcome =
   /** The one set of codes that fits, to be decoded as complete codes are, with these dates. */
-  | {
-      readonly kind: "found";
-      readonly backup: EncodedBackup;
-      readonly dates?: readonly DateShiftDate[] | undefined;
-      /** The dates as found by a search of their forgotten digits, to be shown with the codes. */
-      readonly foundDates?: string | undefined;
-    }
+  | MissingCodesFound
   /** The phrases were shown already, as a list. */
   | { readonly kind: "shown" }
   /** The codes are to be typed again. */
@@ -68,19 +65,15 @@ function givenWay(
   answers: MissingCodesAnswers,
 ): MissingCodesWay | undefined {
   if (answers.encodedFingerprint !== undefined) {
-    if (search.fits("encoded")) return "encoded";
-    terminalNotice(
-      "--encoded-fingerprint cannot tell these codes: they keep no checksum.",
-      "warning",
-    );
+    const refusal = search.whyNot("encoded");
+    if (refusal === undefined) return "encoded";
+    terminalNotice(`--encoded-fingerprint: ${lowerFirst(refusal)}`, "warning");
   }
   if (answers.evidence !== undefined) return "wallet";
   if (answers.list) {
-    if (search.fits("list")) return "list";
-    terminalNotice(
-      `--list-candidates lists at most ${MissingCodesSearch.MAX_LISTED} candidates; these codes have about ${RepairReport.counted(search.codes.expected, "candidate")}.`,
-      "warning",
-    );
+    const refusal = search.whyNot("list");
+    if (refusal === undefined) return "list";
+    terminalNotice(`--list-candidates: ${lowerFirst(refusal)}`, "warning");
   }
   return undefined;
 }
@@ -101,38 +94,24 @@ export function reportFound(codes: MissingCodes, backup: EncodedBackup, foundDat
  */
 async function started(way: MissingCodesWaySearch, limit: number | undefined): Promise<boolean> {
   const plan = await way.plan(limit);
-  const time = plan.seconds >= 1 ? `, ${RepairReport.duration(plan.seconds)}` : "";
-  if (plan.ask) {
-    await dropTypedAhead();
-    const start = await choose(
-      `Search ${plan.size}${time}?`,
-      [
-        { label: "Yes", note: "Ctrl+C stops it", value: true },
-        { label: "No", note: "choose another way", value: false },
-      ],
-      { label: "Search", quit: "goes back" },
-    );
-    return start === true;
-  }
-  if (plan.tell) terminalNotice(`The search tries ${plan.size}${time}; progress is shown.`);
+  if (plan.ask)
+    return askToSearch(plan.question(), { note: "choose another way", quit: "goes back" });
+  if (plan.tell) terminalNotice(plan.notice());
   return true;
 }
 
 /** Runs `way` while Ctrl+C is read as a key, with its progress on one line. */
 async function ran(way: MissingCodesWaySearch): Promise<MissingCodesResult> {
-  const progress = new ProgressLine();
-  let shown = Date.now();
+  const progress = new ProgressLine(PROGRESS_SECONDS);
   try {
     return await withCtrlCWatch((signal) =>
       way.run({
         signal,
-        onProgress: ({ count, expected, found }) => {
-          if (Date.now() - shown < PROGRESS_SECONDS * 1000) return;
-          shown = Date.now();
-          progress.show(
-            `Checked ${count.toLocaleString("en-US")} of about ${expected.toLocaleString("en-US")}; ${found} found.`,
-          );
-        },
+        turn: nodeTurn,
+        onProgress: ({ checked, total, found }) =>
+          progress.showEvery(
+            () => `Checked ${counting(checked)} of about ${counting(total)}; ${found} found.`,
+          ),
       }),
     );
   } finally {
@@ -167,7 +146,6 @@ export async function searchMissingCodes(
 
 /** Asks how the right codes are told; undefined types the codes again. */
 async function askWay(search: MissingCodesSearch): Promise<MissingCodesWay | undefined> {
-  await dropTypedAhead();
   return choose(
     MISSING_CODES_TEXTS.question,
     search.ways.map(({ way, label, note }) => ({ label, note, value: way })),
@@ -259,7 +237,7 @@ async function outcomeOf(
   if (result.kind !== "several") return { kind: "shown" };
   terminalNotice(result.message, "warning");
   const next = await askAfterFailure(
-    "What now?",
+    WHAT_NOW,
     [
       { label: "Tell them by the wallet", value: "wallet" },
       { label: "Type the codes again", value: "again" },

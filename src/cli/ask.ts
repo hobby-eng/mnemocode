@@ -1,11 +1,11 @@
-// Questions that are asked again until their answer can be used, on the private screen of a
-// command (private-screen.ts). Nowhere may a command end abruptly and lose what the person typed:
-// a wrong or unusable answer is explained in one warning line, which never repeats what was typed
-// (a position such as "date 2" or "place 11" is fine), and the same question is asked again, while
-// the caller keeps every earlier answer. Only the person leaves: Ctrl+C (InputCancelled, exit code
-// 130), or the last choice of askAfterFailure. Inside a secret question Escape does nothing, so
-// that a slip of the finger loses nothing. Every question first drops what was typed before it
-// showed (dropTypedAhead), so that only keys pressed for it answer it.
+// Questions that are asked again until their answer can be used, on the private screen of a command
+// (private-screen.ts). Nowhere may a command end abruptly and lose what the person typed: a wrong
+// or unusable answer is explained in one warning line, which never repeats what was typed (a
+// position such as "date 2" or "place 11" is fine), and the same question is asked again, while the
+// caller keeps every earlier answer. Only the person leaves: Ctrl+C (InputCancelled, exit code
+// CANCELLED_EXIT_CODE), or the last choice of askAfterFailure. Inside a secret question Escape does
+// nothing, so that a slip of the finger loses nothing. Every question first drops what was typed
+// before it showed (dropTypedAhead), so that only keys pressed for it answer it.
 //
 // The API for the commands:
 // - askSecretUntil(prompt, parse, { what, pastedLineBreak }): a secret, asked until `parse`
@@ -32,36 +32,48 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
-  bitcoinProfiles,
+  type AddressLocation,
+  type Coin,
   COINS,
-  DEFAULT_ADDRESS_COUNT,
-  MAX_ADDRESS_COUNT,
+  type DerivationLocation,
+  isScannedEvidence,
   parseBitcoinAddress,
   parseCoinAddress,
   parseMasterFingerprint,
-  type AddressLocation,
-  type BitcoinProfile,
-  type DerivationLocation,
   type WalletEvidence,
 } from "../bitcoin-evidence.js";
-import type { ParsedArguments } from "./arguments.js";
-import { addressCount } from "./bitcoin-options.js";
+import { parseAddressCount, defaultAddressCount } from "../core/address-scan.js";
+import { FIRST_RECEIVING, type WalletPlace } from "./bitcoin-options.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { terminalNotice } from "./terminal.js";
-import { choose, writePrompt, type Choice, type Explanation } from "./terminal-choice.js";
 import {
-  displayWidth,
+  choose,
+  writePrompt,
+  type Choice,
+  type Explanation,
+  enteredAnswer,
+  typeHint,
+} from "./terminal-choice.js";
+import {
   dropRestOfPaste,
   dropTypedAhead,
   InputCancelled,
   readLine,
   terminalAvailable,
-  terminalsAttached,
-  dumbTerminal,
   UnusableAnswer,
   withRawTerminal,
   type NextByte,
+  refusal,
+  type PastedLineBreak,
+  NOT_UTF8,
+  terminalTooDumb,
+  dumbTerminalReason,
+  SECRET_SOURCE_ADVICE,
 } from "./terminal-input.js";
+import { displayWidth } from "./terminal-geometry.js";
+import { trimWhiteSpace } from "../core/white-space.js";
+import { isFirstReceiving } from "../core/wallet-evidence.js";
+import { validCharacters } from "./utf8.js";
 
 /** How a question is asked again. */
 export interface AskOptions {
@@ -81,7 +93,7 @@ export interface SecretAskOptions extends AskOptions {
    * What a line break inside a paste of several lines becomes (readLine): a space by default, so
    * that words, codes or dates pasted one per line are one answer; ";" between shares.
    */
-  readonly pastedLineBreak?: " " | ";";
+  readonly pastedLineBreak?: PastedLineBreak;
 }
 
 /** Checks an answer: returns what it means, or throws an Error whose message is the warning. */
@@ -103,12 +115,12 @@ type Reading =
 function assertTerminal(): void {
   if (terminalAvailable()) return;
   // A terminal of the type "dumb", as in some editors, cannot draw the private screen.
-  if (terminalsAttached() && dumbTerminal())
+  if (terminalTooDumb())
     throw new Error(
-      "--ask-secrets needs a terminal that can clear its screen; this one says TERM=dumb. Run the command in another terminal, set TERM (such as TERM=xterm-256color), or read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-).",
+      `${dumbTerminalReason("--ask-secrets")} Run the command in another terminal, set TERM (such as TERM=xterm-256color), or ${SECRET_SOURCE_ADVICE}.`,
     );
   throw new Error(
-    "--ask-secrets needs a terminal on standard input and standard error. Run the command in a terminal, or read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-).",
+    `--ask-secrets needs a terminal on standard input and standard error. Run the command in a terminal, or ${SECRET_SOURCE_ADVICE}.`,
   );
 }
 
@@ -121,7 +133,7 @@ async function readAnswer(
   how: {
     readonly echo: boolean;
     readonly back: boolean;
-    readonly pastedLineBreak?: " " | ";";
+    readonly pastedLineBreak?: PastedLineBreak;
   },
 ): Promise<Reading> {
   return withRawTerminal(async (next, moreWithin) => {
@@ -129,8 +141,10 @@ async function readAnswer(
     // The end of the input is told from Ctrl+D by the reader: readLine returns nothing for both.
     let ended = false;
     let wentBack = false;
+    // Only valid UTF-8 is shown and read, as in the menu's questions (validCharacters).
+    const valid = validCharacters(next);
     const reader: NextByte = async () => {
-      const byte = await next();
+      const byte = await valid.next();
       if (byte === undefined) ended = true;
       return byte;
     };
@@ -146,7 +160,10 @@ async function readAnswer(
         },
         ...(how.pastedLineBreak === undefined ? {} : { pastedLineBreak: how.pastedLineBreak }),
       });
-      const trimmed = text?.trim() ?? "";
+      // An answer given with Enter that held a byte of no character is refused; Escape still goes
+      // back.
+      if (text !== undefined && valid.leftOut()) return { kind: "unusable", reason: NOT_UTF8 };
+      const trimmed = trimWhiteSpace(text ?? "");
       if (trimmed !== "") return { kind: "answer", text: trimmed };
       if (ended) return { kind: "ended" };
       return { kind: wentBack ? "back" : "empty" };
@@ -162,12 +179,6 @@ async function readAnswer(
   });
 }
 
-/** The warning for an answer that `parse` refused; InputCancelled and other throws pass through. */
-function refusal(error: unknown): string {
-  if (error instanceof InputCancelled || !(error instanceof Error)) throw error;
-  return error.message;
-}
-
 /**
  * Asks for a secret until `parse` accepts the answer, as described at the top, and returns what
  * `parse` made of it. The answer is trimmed. On the private screen it shows as it is typed.
@@ -177,21 +188,63 @@ export async function askSecretUntil<T>(
   parse: AnswerParser<T>,
   options: SecretAskOptions = {},
 ): Promise<T> {
-  assertTerminal();
-  const what = options.what ?? "an answer";
-  for (let warning: string | undefined; ;) {
-    if (warning !== undefined) terminalNotice(warning, "warning");
+  const answer = await askUntil(parse, async () => {
     const reading = await readAnswer(prompt, {
       echo: onPrivateScreen(),
       back: false,
       pastedLineBreak: options.pastedLineBreak ?? " ",
     });
-    if (reading.kind === "ended") throw new InputCancelled();
-    if (reading.kind === "unusable") warning = reading.reason;
-    else if (reading.kind !== "answer") warning = `Type ${what}, or press Ctrl+C to stop.`;
+    return turnOfReading(reading, { ...options, leave: "stop" });
+  });
+  // A secret is never left with Escape: Ctrl+C stops instead.
+  return answer as T;
+}
+
+/** One answer to a question that asks until it can be used: its text, back, or a warning. */
+type Turn = { readonly text: string } | { readonly warning: string } | "back";
+
+/** How a typed question treats an answer not given, and how it is left (enteredAnswer). */
+type TurnRules = Parameters<typeof enteredAnswer>[1];
+
+/** The turn of a typed answer, trimmed, by the rule of every typed question (enteredAnswer). */
+function turnOf(typed: string, rules: TurnRules): Turn {
+  const entered = enteredAnswer(typed, rules);
+  // No question of ask.ts may be left out: its answer is always a text or the hint.
+  return entered.kind === "text"
+    ? { text: entered.text }
+    : { warning: entered.kind === "refused" ? entered.reason : typeHint(rules.what, rules.leave) };
+}
+
+/**
+ * The turn of one reading of a question, for a secret and a visible value alike: the end of the
+ * input stops, an unusable answer is its warning, and Escape goes back only where `rules.leave`
+ * says so. Where it does not, as in a secret, an answer not given is empty.
+ */
+function turnOfReading(reading: Reading, rules: TurnRules): Turn {
+  if (reading.kind === "ended") throw new InputCancelled();
+  if (reading.kind === "unusable") return { warning: reading.reason };
+  if (reading.kind === "back" && rules.leave === "back") return "back";
+  return turnOf(reading.kind === "answer" ? reading.text : "", rules);
+}
+
+/**
+ * Asks, by `turn`, until `parse` accepts an answer, each warning shown before the question comes
+ * again: why the answer was refused, or why it was empty. Undefined when the person went back.
+ * The questions for a secret and for a visible value ask through it.
+ */
+async function askUntil<T>(
+  parse: AnswerParser<T>,
+  turn: () => Promise<Turn>,
+): Promise<T | undefined> {
+  assertTerminal();
+  for (let warning: string | undefined; ;) {
+    if (warning !== undefined) terminalNotice(warning, "warning");
+    const answer = await turn();
+    if (answer === "back") return undefined;
+    if ("warning" in answer) warning = answer.warning;
     else
       try {
-        return await parse(reading.text);
+        return await parse(answer.text);
       } catch (error) {
         warning = refusal(error);
       }
@@ -208,24 +261,10 @@ export async function askValueUntil<T>(
   parse: AnswerParser<T>,
   options: ValueAskOptions = {},
 ): Promise<T | undefined> {
-  assertTerminal();
-  const what = options.what ?? "an answer";
-  for (let warning: string | undefined; ;) {
-    if (warning !== undefined) terminalNotice(warning, "warning");
+  return askUntil(parse, async () => {
     const reading = await readAnswer(prompt, { echo: true, back: true });
-    if (reading.kind === "ended") throw new InputCancelled();
-    if (reading.kind === "back") return undefined;
-    const answer = reading.kind === "empty" ? options.fallback : undefined;
-    if (reading.kind === "unusable") warning = reading.reason;
-    else if (reading.kind === "empty" && answer === undefined)
-      warning = `Type ${what}, or press Esc to go back.`;
-    else
-      try {
-        return await parse(reading.kind === "answer" ? reading.text : answer!);
-      } catch (error) {
-        warning = refusal(error);
-      }
-  }
+    return turnOfReading(reading, { ...options, leave: "back" });
+  });
 }
 
 /**
@@ -243,7 +282,6 @@ export async function askAfterFailure<T>(
   const last = choices.at(-1);
   if (last === undefined) throw new Error("A question after a failure needs a choice.");
   assertTerminal();
-  await dropTypedAhead();
   const chosen = await choose(question, choices, {
     label: options.label ?? "Next",
     quit: options.escape ?? "stops",
@@ -251,82 +289,69 @@ export async function askAfterFailure<T>(
   return chosen === undefined ? last.value : chosen;
 }
 
+/** The question after a failure, where nothing more particular is asked; others end with it. */
+export const WHAT_NOW = "What now?";
+
+/** The value of the Stop that askOrCancel adds, which no other answer of its question may have. */
+const STOPPED = "stop";
+
 /**
- * Where a wallet is looked for: on which network, and for an address at which place of which
- * account, in which of the four profiles, and among how many addresses from there.
+ * Asks what to do after a failure (askAfterFailure), with a Stop of its own as the last choice,
+ * which cancels the command (InputCancelled): so Escape, q and the end of the input stop. With
+ * `back`, for a question reached from another, Escape goes back instead and gives undefined.
  */
-export interface WalletPlace {
-  readonly location: DerivationLocation;
-  readonly profiles: readonly BitcoinProfile[];
-  /** How many addresses in a row an address is compared with; asked after it when left out. */
-  readonly addresses?: number;
+export async function askOrCancel<T>(
+  question: string,
+  choices: readonly Choice<T>[],
+  options?: { readonly label?: string; readonly back?: false },
+): Promise<T>;
+export async function askOrCancel<T>(
+  question: string,
+  choices: readonly Choice<T>[],
+  options: { readonly label?: string; readonly back: boolean },
+): Promise<T | undefined>;
+export async function askOrCancel<T>(
+  question: string,
+  choices: readonly Choice<T>[],
+  options: { readonly label?: string; readonly back?: boolean } = {},
+): Promise<T | undefined> {
+  if (choices.some((choice) => choice.value === STOPPED))
+    throw new Error(`An answer of a question with Stop has the value "${STOPPED}".`);
+  const all: Choice<T | typeof STOPPED>[] = [...choices, { label: "Stop", value: STOPPED }];
+  const chosen =
+    options.back === true
+      ? await chooseOrBack(question, all, options.label)
+      : await askAfterFailure(
+          question,
+          all,
+          options.label === undefined ? {} : { label: options.label },
+        );
+  if (chosen === STOPPED) throw new InputCancelled();
+  return chosen as T | undefined;
 }
 
 /**
- * The first receiving address of the first account on mainnet, m/…'/0'/0'/0/0, in each of the
- * four profiles, as bitcoinEvidence (bitcoin-options.ts) takes --bitcoin-address without
- * --network, --account, --branch, --index and --bitcoin-profile.
+ * The choice of a question reached from another: undefined at Escape, q or the end of the input,
+ * which go back. At the end of the input the question gone back to then picks its Stop, so that
+ * nothing loops.
  */
-const FIRST_RECEIVING: WalletPlace = {
-  location: { network: "mainnet", account: 0, branch: 0, index: 0 },
-  profiles: bitcoinProfiles,
-};
-
-/**
- * Where another wallet is looked for after `given`, the one given with the options: on its
- * network, and for an address or a key at its place, in its profiles and among as many addresses.
- * A wallet asked on the screen is compared with as many addresses as --scan-gap says, without
- * asking; without a wallet given or asked, --scan-gap is refused, since nothing would use it.
- */
-export function walletPlaceOf(
-  given: WalletEvidence | undefined,
-  args: ParsedArguments,
-): WalletPlace {
-  const addresses = addressCount(args);
-  if (addresses !== undefined && given === undefined && args["ask-secrets"] !== true)
-    throw new Error(
-      "--scan-gap applies to an address given with an option, or asked on the screen with --ask-secrets.",
-    );
-  const counted = (place: WalletPlace, count: number | undefined): WalletPlace =>
-    count === undefined ? place : { ...place, addresses: count };
-  if (given === undefined) return counted(FIRST_RECEIVING, addresses);
-  if (given.kind === "master-fingerprint" || given.kind === "master-xpub")
-    return counted(
-      { ...FIRST_RECEIVING, location: { ...FIRST_RECEIVING.location, network: given.network } },
-      addresses,
-    );
-  // A coin's address tells its own network and type: its place is kept, on Bitcoin's mainnet.
-  if (given.kind === "coin-address")
-    return counted(
-      { ...FIRST_RECEIVING, location: { network: "mainnet", ...given.location } },
-      given.addresses,
-    );
-  const place = { location: given.location, profiles: given.profiles };
-  return given.kind === "account-xpub" ? place : counted(place, given.addresses);
+async function chooseOrBack<T>(
+  question: string,
+  choices: readonly Choice<T>[],
+  label = "Next",
+): Promise<T | undefined> {
+  assertTerminal();
+  return choose(question, choices, { label, quit: "goes back" });
 }
 
-/** The options that say where a wallet given with an option is looked for (bitcoin-options.ts). */
-const WALLET_PLACE_OPTIONS = ["network", "account", "branch", "index", "bitcoin-profile"] as const;
+/** The answer that asks for another wallet in place of one given, with `value`. */
+export function changeWalletAnswer<T>(value: T): Choice<T> {
+  return { label: "Change the wallet", note: "the fingerprint or the address", value };
+}
 
-/**
- * Refuses, before the first question, an option that places a wallet when no option gives the
- * wallet: walletEvidence reads them only with one, so a wallet asked on the screen would be looked
- * for elsewhere than the person said, and without one nothing would use them.
- */
-export function assertWalletPlaceUsed(
-  args: ParsedArguments,
-  given: WalletEvidence | undefined,
-): void {
-  if (given !== undefined) return;
-  const placing = WALLET_PLACE_OPTIONS.find((key) => args[key] !== undefined);
-  if (placing === undefined) return;
-  const asked =
-    args["ask-secrets"] === true
-      ? "; the wallet asked on the screen is looked for on mainnet among its first receiving addresses"
-      : "";
-  throw new Error(
-    `--${placing} applies to a wallet given as an option, such as --bitcoin-address${asked}.`,
-  );
+/** The answer that asks for the wallet to check candidates against, `note` saying what follows. */
+export function checkWalletAnswer<T>(value: T, note = "only those that match"): Choice<T> {
+  return { label: "Check them against the wallet", note, value };
 }
 
 /** What askWalletEvidence asks. */
@@ -354,7 +379,7 @@ export type WalletAnswer =
   | { readonly kind: "back" };
 
 /** Where an address is looked for, in the words of the questions. */
-interface AddressRange {
+interface AddressWords {
   /** For the list of ways, such as "one of its first 20 receiving addresses". */
   readonly note: string;
   /** For the address prompt, such as "one of the first 20 receiving ones". */
@@ -364,12 +389,21 @@ interface AddressRange {
 }
 
 /**
+ * The place of an address as the questions name it, from the account on: "m/.../0/3" among the
+ * first receiving addresses, with the account where it is another, "m/.../2'/0/3".
+ */
+function placePath(location: AddressLocation): string {
+  const account = isFirstReceiving(location) ? "" : `${location.account}'/`;
+  return `m/.../${account}${location.branch}/${location.index}`;
+}
+
+/**
  * The words for an address at `location`, or among `addresses` of them from there; without a
  * count, which is asked after the address, among the first receiving ones.
  */
-function addressRange(location: AddressLocation, addresses: number | undefined): AddressRange {
-  const first = location.account === 0 && location.branch === 0 && location.index === 0;
-  const path = `m/.../${first ? "" : `${location.account}'/`}${location.branch}/${location.index}`;
+function addressWords(location: AddressLocation, addresses: number | undefined): AddressWords {
+  const first = isFirstReceiving(location);
+  const path = placePath(location);
   if (addresses === 1)
     return {
       note: first ? `its first receiving address, ${path}` : `its address at ${path}`,
@@ -385,7 +419,7 @@ function addressRange(location: AddressLocation, addresses: number | undefined):
     };
   return {
     note: `one of its ${count}addresses from ${path}`,
-    prompt: `one of the ${count}from ${path}`,
+    prompt: `one of the ${count}addresses from ${path}`,
     what: `an address of the wallet from ${path}`,
   };
 }
@@ -397,28 +431,98 @@ function bitcoinAddressForms(network: DerivationLocation["network"]): string {
     : "m..., n..., 2..., tb1q... or tb1p...";
 }
 
-/**
- * Asks among how many addresses from `location` the address typed is, Enter for the first 20;
- * undefined when the person goes back with Escape.
- */
-async function askAddressCount(location: AddressLocation): Promise<number | undefined> {
-  const first = location.account === 0 && location.branch === 0 && location.index === 0;
-  const from = first
-    ? "the first"
-    : `m/.../${location.account}'/${location.branch}/${location.index}`;
-  return askValueUntil(
-    `Compare with how many addresses from ${from} (Enter: ${DEFAULT_ADDRESS_COUNT}):`,
-    parseAddressCount,
-    { what: "how many addresses", fallback: String(DEFAULT_ADDRESS_COUNT) },
-  );
+/** A way of recognising a wallet, as the wallet question offers it. */
+export type WalletWay = "fingerprint" | "address" | "coin" | "none";
+
+/** What a value is asked with: its prompt, and what to type, said after an empty answer. */
+export interface AskedValue {
+  readonly prompt: string;
+  readonly what: string;
 }
 
-/** An answer to the count of addresses, as typed: a whole number from 1 through the most. */
-export function parseAddressCount(answer: string): number {
-  const count = /^[1-9][0-9]{0,5}$/u.test(answer) ? Number(answer) : Number.NaN;
-  if (!(count <= MAX_ADDRESS_COUNT))
-    throw new Error(`Type a number from 1 through ${MAX_ADDRESS_COUNT}.`);
-  return count;
+/**
+ * The words of the question how a wallet at a place can be recognised, and of the value that each
+ * way asks for. The menu asks it for the options of a command, the questions of a command for the
+ * evidence itself; each presents the same words in its way.
+ */
+class WalletQuestionWords {
+  static readonly QUESTION = "How can MnemoCode recognise the wallet?";
+  static readonly COIN_QUESTION = "Which coin?";
+  static readonly FINGERPRINT: AskedValue = Object.freeze({
+    prompt: "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)",
+    what: "the eight characters of the fingerprint",
+  });
+
+  readonly #location: DerivationLocation;
+  readonly #words: AddressWords;
+
+  /** The words about the wallet at `place`: its first receiving addresses by default. */
+  constructor(place: Pick<WalletPlace, "location" | "addresses"> = FIRST_RECEIVING) {
+    this.#location = place.location;
+    this.#words = addressWords(place.location, place.addresses);
+  }
+
+  /** The ways, and "It cannot" where the wallet is `optional`. */
+  ways(optional = false): Choice<WalletWay>[] {
+    return [
+      {
+        label: "Fingerprint",
+        // The phrase of the wallet: with Seedshift the one before the shift, which Encode calls
+        // Original.
+        note: "Encode's Original, not the Encoded",
+        value: "fingerprint",
+      },
+      {
+        label: "Bitcoin address",
+        note: this.#words.note,
+        example: bitcoinAddressForms(this.#location.network),
+        value: "address",
+      },
+      { label: "Address of another coin", note: OTHER_COINS_NOTE, value: "coin" },
+      ...(optional
+        ? [{ label: "It cannot", note: "list every candidate instead", value: "none" } as const]
+        : []),
+    ];
+  }
+
+  get bitcoinAddress(): AskedValue {
+    return { prompt: `Bitcoin address (${this.#words.prompt})`, what: this.#words.what };
+  }
+
+  /** The coins besides Bitcoin, for "Which coin?". */
+  static coins(): Choice<Coin>[] {
+    return OTHER_COINS.map((coin) => ({ label: coin.name, note: coin.addressForms, value: coin }));
+  }
+
+  coinAddress(coin: Coin): AskedValue {
+    return {
+      prompt: `Address (${coin.name}, ${this.#words.prompt})`,
+      what: `the wallet's address of ${coin.name}`,
+    };
+  }
+
+  /** How many addresses from the place the address typed is compared with. */
+  get addressCount(): AskedValue {
+    const from = isFirstReceiving(this.#location) ? "the first" : placePath(this.#location);
+    return { prompt: `Compare with how many addresses from ${from}`, what: "how many addresses" };
+  }
+}
+
+/**
+ * Asks among how many addresses from `place` the address typed is, Enter for the count that fits
+ * from there (defaultAddressCount); undefined when the person goes back with Escape.
+ */
+async function askAddressCount(
+  place: WalletPlace,
+  asker: WalletValueAsker,
+): Promise<number | undefined> {
+  const asked = new WalletQuestionWords(place).addressCount;
+  const first = place.location.index;
+  // Enter takes the count that fits from this index on, one at the last index (AUD-012-UI001).
+  const fallback = String(defaultAddressCount(first));
+  return asker.ask({ ...asked, label: "Addresses", fallback }, (answer) =>
+    parseAddressCount(answer, first),
+  );
 }
 
 /**
@@ -428,77 +532,90 @@ export function parseAddressCount(answer: string): number {
 async function withAddressCount(
   evidence: WalletEvidence | undefined,
   place: WalletPlace,
+  asker: WalletValueAsker,
 ): Promise<WalletEvidence | undefined> {
-  if (evidence === undefined || (evidence.kind !== "address" && evidence.kind !== "coin-address"))
-    return evidence;
-  const addresses = place.addresses ?? (await askAddressCount(place.location));
+  if (evidence === undefined || !isScannedEvidence(evidence)) return evidence;
+  const addresses = place.addresses ?? (await askAddressCount(place, asker));
   return addresses === undefined ? undefined : { ...evidence, addresses };
 }
+
+/** One typed value of the wallet question, as a front end asks it. */
+export interface WalletValue extends AskedValue {
+  /** Its line in the record of answers, where the front end keeps one. */
+  readonly label: string;
+  /** The answer that Enter alone gives, if any. */
+  readonly fallback?: string;
+}
+
+/**
+ * How a front end asks the typed values of the wallet question: on the private screen, or in the
+ * menu, which records each answer and builds the command line from them.
+ */
+export interface WalletValueAsker {
+  /** Asks `value` until `parse` takes it; undefined when the person goes back. */
+  ask<T>(value: WalletValue, parse: (answer: string) => T): Promise<T | undefined>;
+  /** Whether going back from a value leaves the question, as in the menu, not back to its list. */
+  readonly backLeaves: boolean;
+}
+
+/** The private screen's way: each value asked until it can be used; back goes to the list. */
+const SCREEN_ASKER: WalletValueAsker = {
+  ask: (value, parse) =>
+    askValueUntil(
+      value.fallback === undefined
+        ? `${value.prompt}:`
+        : `${value.prompt} (Enter: ${value.fallback}):`,
+      parse,
+      { what: value.what, ...(value.fallback === undefined ? {} : { fallback: value.fallback }) },
+    ),
+  backLeaves: false,
+};
 
 /**
  * Asks how the wallet can be recognised: by its BIP32 master fingerprint, by the first receiving
  * address of its Bitcoin account (or the address at `place`), or, when `optional`, not at all. A
- * value that no wallet can have is refused at once and asked again; Escape at a value goes back
- * to the list.
+ * value that no wallet can have is refused at once and asked again; going back from a value goes
+ * back to the list, or leaves the question where `asker` says so. The private screen and the menu
+ * both ask it, each with its own asker.
  */
-export async function askWalletEvidence(question: WalletQuestion): Promise<WalletAnswer> {
+export async function askWalletEvidence(
+  question: WalletQuestion,
+  asker: WalletValueAsker = SCREEN_ASKER,
+): Promise<WalletAnswer> {
   const place = question.place ?? FIRST_RECEIVING;
   const { location, profiles } = place;
-  const range = addressRange(location, place.addresses);
+  const words = new WalletQuestionWords(place);
   for (;;) {
-    await dropTypedAhead();
-    const kind = await choose(
-      "How can MnemoCode recognise the wallet?",
-      [
-        {
-          label: "Fingerprint",
-          // The phrase of the wallet: with Seedshift the one before the shift, which Encode calls Original.
-          note: "Encode's Original, not the Encoded",
-          value: "fingerprint",
-        },
-        {
-          label: "Bitcoin address",
-          note: range.note,
-          example: bitcoinAddressForms(location.network),
-          value: "address",
-        },
-        { label: "Address of another coin", note: OTHER_COINS_NOTE, value: "coin" },
-        ...(question.optional
-          ? [{ label: "It cannot", note: "list every candidate instead", value: "none" }]
-          : []),
-      ] as const,
-      {
-        label: "Wallet",
-        ...(question.explanation === undefined ? {} : { explanation: question.explanation }),
-      },
-    );
+    const kind = await choose(WalletQuestionWords.QUESTION, words.ways(question.optional), {
+      label: "Wallet",
+      ...(question.explanation === undefined ? {} : { explanation: question.explanation }),
+    });
     if (kind === undefined) return { kind: "back" };
     if (kind === "none") return { kind: "none" };
     const typed =
       kind === "fingerprint"
-        ? await askValueUntil(
-            "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):",
+        ? await asker.ask(
+            { ...WalletQuestionWords.FINGERPRINT, label: "Fingerprint" },
             (answer): WalletEvidence => ({
               kind: "master-fingerprint",
               value: parseMasterFingerprint(answer),
               network: location.network,
             }),
-            { what: "the eight characters of the fingerprint" },
           )
         : kind === "coin"
-          ? await askCoinAddress(location, range)
-          : await askValueUntil(
-              `Bitcoin address (${range.prompt}):`,
+          ? await askCoinAddress(location, words, asker)
+          : await asker.ask(
+              { ...words.bitcoinAddress, label: "Address" },
               (answer): WalletEvidence => ({
                 kind: "address",
                 value: parseBitcoinAddress(answer, location.network),
                 profiles,
                 location,
               }),
-              { what: range.what },
             );
-    const evidence = await withAddressCount(typed, place);
+    const evidence = await withAddressCount(typed, place, asker);
     if (evidence !== undefined) return { kind: "wallet", evidence };
+    if (asker.backLeaves) return { kind: "back" };
   }
 }
 
@@ -517,26 +634,21 @@ export const OTHER_COINS_NOTE = `${OTHER_COINS.slice(0, NAMED_COINS)
  */
 async function askCoinAddress(
   location: DerivationLocation,
-  range: AddressRange,
+  words: WalletQuestionWords,
+  asker: WalletValueAsker,
 ): Promise<WalletEvidence | undefined> {
-  await dropTypedAhead();
-  const coin = await choose(
-    "Which coin?",
-    OTHER_COINS.map((each) => ({ label: each.name, note: each.addressForms, value: each })),
-    { label: "Coin", quit: "goes back" },
-  );
+  const coin = await choose(WalletQuestionWords.COIN_QUESTION, WalletQuestionWords.coins(), {
+    label: "Coin",
+    quit: "goes back",
+  });
   if (coin === undefined) return undefined;
   const { account, branch, index } = location;
-  return askValueUntil(
-    `Address (${coin.name}, ${range.prompt}):`,
-    (answer): WalletEvidence => ({
-      kind: "coin-address",
-      coin: coin.id,
-      value: parseCoinAddress(coin.id, answer),
-      location: { account, branch, index },
-    }),
-    { what: `the wallet's address of ${coin.name}` },
-  );
+  return asker.ask({ ...words.coinAddress(coin), label: "Address" }, (answer): WalletEvidence => ({
+    kind: "coin-address",
+    coin: coin.id,
+    value: parseCoinAddress(coin.id, answer),
+    location: { account, branch, index },
+  }));
 }
 
 /** Quotes that a terminal puts around a path dragged into it: GNOME's ', Windows Terminal's ". */

@@ -3,57 +3,68 @@
 // headings and options, grey for labels and secondary text, a green ✓, a yellow ! and a red ✗.
 // Output that does not go to a terminal carries no colour codes and keeps its plain form.
 
-/** SGR codes of the shared palette. Bright black is the grey of most schemes; "dim" is too faint in some. */
-export const STYLE = {
-  heading: "1;36",
-  accent: "36",
-  strong: "1",
-  muted: "90",
-  good: "1;32",
-  warning: "1;33",
-  bad: "1;31",
-} as const;
+import {
+  STYLE,
+  SGR_RESET,
+  failureLine,
+  hintLines as styledHintLines,
+  markedLines as styledMarkedLines,
+  NOTICE_TEXT_WIDTH,
+  noticeLines as styledNoticeLines,
+  type NoticeKind,
+  paint,
+  resultLines,
+  statusLine,
+  streamCanRedraw,
+  streamGetsColor,
+  TEXT_WIDTH,
+  wrapText,
+} from "./terminal-style.js";
+import { rgbBytes } from "../export/color-math.js";
+import { MILLISECONDS_PER_SECOND } from "../core/search-turns.js";
+import { capitalized } from "../core/prose.js";
 
-/** Longest line of running text, so that messages read well in an 80-column terminal. */
-export const TEXT_WIDTH = 78;
-const RESET = "\x1b[0m";
+// The palette, under the name every module of the command line takes it by.
+export { STYLE };
+
+// The running text and its width are terminal-style's, which a maintainer script takes too.
+export { TEXT_WIDTH, NOTICE_TEXT_WIDTH, wrapText, type NoticeKind };
 
 /**
- * Whether `channel` gets colour, decided as the Rust tools decide it: NO_COLOR turns it off,
- * CLICOLOR_FORCE turns it on, and otherwise only a terminal that is not "dumb" and has not set
- * CLICOLOR=0 gets it.
+ * Clears the screen and moves to its top left (VT100 "erase in display" and "home"). Written raw,
+ * as every sequence below: NO_COLOR removes colours, not these.
  */
+export const CLEAR_SCREEN = "\x1b[2J\x1b[H";
+/** Clears from the cursor to the end of the screen (VT100 "erase in display"). */
+export const ERASE_BELOW = "\x1b[J";
+
+/** Moves the cursor up `lines` lines (VT100 "cursor up"); nothing for none. */
+export function cursorUp(lines: number): string {
+  return lines > 0 ? `\x1b[${lines}A` : "";
+}
+
+/** Moves the cursor right `columns` columns (VT100 "cursor forward"); nothing for none. */
+export function cursorRight(columns: number): string {
+  return columns > 0 ? `\x1b[${columns}C` : "";
+}
+/**
+ * Switches to the alternate screen, clears it and moves to its top left (xterm control sequences,
+ * also understood by tmux and most terminals).
+ */
+export const ENTER_ALTERNATE_SCREEN = `\x1b[?1049h${CLEAR_SCREEN}`;
+/**
+ * Clears the alternate screen, then returns to the main screen with its earlier content. The
+ * clear comes first, so that the words also vanish where there is no alternate screen.
+ */
+export const LEAVE_ALTERNATE_SCREEN = `${CLEAR_SCREEN}\x1b[?1049l`;
+
+/** Whether `channel` gets colour (streamGetsColor, the rule of every bip_tools tool). */
 export function terminalColor(channel: "stdout" | "stderr"): boolean {
-  const environment = process.env;
-  if (environment.NO_COLOR !== undefined && environment.NO_COLOR !== "") return false;
-  if (
-    environment.CLICOLOR_FORCE !== undefined &&
-    environment.CLICOLOR_FORCE !== "" &&
-    environment.CLICOLOR_FORCE !== "0"
-  )
-    return true;
-  if (process[channel].isTTY !== true) return false;
-  if (environment.TERM === "dumb") return false;
-  return environment.CLICOLOR !== "0";
+  return streamGetsColor(process[channel]);
 }
 
 export function terminalPaint(channel: "stdout" | "stderr", code: string, text: string): string {
-  return terminalColor(channel) ? `\x1b[${code}m${text}${RESET}` : text;
-}
-
-/** Breaks `text` into lines of at most `width` characters at spaces. */
-export function wrapText(text: string, width: number = TEXT_WIDTH): string[] {
-  const lines: string[] = [];
-  let line = "";
-  for (const word of text.split(" ").filter((part) => part !== "")) {
-    if (line !== "" && line.length + 1 + word.length > width) {
-      lines.push(line);
-      line = "";
-    }
-    line = line === "" ? word : `${line} ${word}`;
-  }
-  if (line !== "") lines.push(line);
-  return lines;
+  return paint(process[channel], code, text);
 }
 
 /**
@@ -62,16 +73,17 @@ export function wrapText(text: string, width: number = TEXT_WIDTH): string[] {
  * then prints its plain form.
  */
 export function terminalResultHeader(title: string, rows: readonly [string, string][]): boolean {
-  if (!terminalColor("stdout")) return false;
-  const paint = (code: string, text: string): string => terminalPaint("stdout", code, text);
-  console.log(
-    `\n${paint(STYLE.heading, "MnemoCode")} ${paint(STYLE.muted, "·")} ${paint(STYLE.strong, title)}`,
-  );
-  const labelWidth = Math.max(10, ...rows.map(([label]) => label.length));
-  for (const [label, value] of rows) {
-    console.log(`  ${paint(STYLE.muted, label.padEnd(labelWidth))} ${value}`);
-  }
-  return true;
+  const lines = resultHeaderLines(title, rows);
+  for (const line of lines) console.log(line);
+  return lines.length > 0;
+}
+
+/**
+ * The lines that terminalResultHeader prints, a blank line first, or none when stdout has no
+ * colour: what a check of the room on the screen measures.
+ */
+export function resultHeaderLines(title: string, rows: readonly [string, string][]): string[] {
+  return terminalColor("stdout") ? resultLines(process.stdout, title, rows) : [];
 }
 
 /**
@@ -88,42 +100,37 @@ export function printableText(text: string): string {
   return text.replace(CONTROL_CHARACTERS, "\ufffd");
 }
 
-/** A checked fact after a green ✓ (or a yellow ! when `good` is false): its label and its value in bold. */
+/**
+ * A checked fact after a green ✓ (or a yellow ! when `good` is false): its label and its value in
+ * bold.
+ */
 export function terminalStatus(label: string, value: string, good: boolean = true): void {
-  const mark = good
-    ? terminalPaint("stderr", STYLE.good, "✓")
-    : terminalPaint("stderr", STYLE.warning, "!");
-  console.error(`${mark} ${label} ${terminalPaint("stderr", STYLE.strong, value)}`);
+  console.error(statusLine(process.stderr, label, value, good));
 }
 
 /** Advice that can be read and passed over: grey, wrapped to the text width. */
 export function terminalHint(message: string): void {
-  if (!terminalColor("stderr")) {
-    console.error(message);
-    return;
-  }
-  for (const line of wrapText(message)) console.error(terminalPaint("stderr", STYLE.muted, line));
+  for (const line of hintLines(message)) console.error(line);
+}
+
+/** The lines of terminalHint (hintLines of terminal-style.ts, on standard error). */
+export function hintLines(message: string): string[] {
+  return styledHintLines(process.stderr, message);
 }
 
 /** Human-facing status goes to stderr; redirected output contains no ANSI escapes. */
-export function terminalNotice(
-  message: string,
-  kind: "info" | "success" | "warning" = "info",
-): void {
-  if (!terminalColor("stderr")) {
-    console.error(message);
-    return;
-  }
-  if (kind === "info") {
-    terminalHint(message);
-    return;
-  }
-  const [mark, code] = kind === "success" ? ["✓", STYLE.good] : ["!", STYLE.warning];
-  const lines = wrapText(message, TEXT_WIDTH - 2);
-  lines.forEach((line, index) => {
-    const text = kind === "warning" ? terminalPaint("stderr", code, line) : line;
-    console.error(`${index === 0 ? terminalPaint("stderr", code, mark) : " "} ${text}`);
-  });
+export function terminalNotice(message: string, kind: NoticeKind = "info"): void {
+  for (const line of noticeLines(message, kind)) console.error(line);
+}
+
+/** The lines of terminalNotice (noticeLines of terminal-style.ts, on standard error). */
+export function noticeLines(message: string, kind: NoticeKind = "info"): string[] {
+  return styledNoticeLines(process.stderr, message, kind);
+}
+
+/** A success or a warning after its mark, on standard error (markedLines of terminal-style.ts). */
+export function markedLines(message: string, kind: "success" | "warning"): string[] {
+  return styledMarkedLines(process.stderr, message, kind);
 }
 
 /** Words per row when a phrase is shown for writing down, as `mhfe` shows one. */
@@ -133,10 +140,9 @@ const LONGEST_WORD = 8;
 /** Spaces between two words of a row. */
 const WORD_GAP = 3;
 
-/** `text` with its first letter in capitals, for a label made of words that run in a sentence. */
-export function capitalized(text: string): string {
-  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
-}
+// The rule is the library's (core/prose.ts); here too for the front ends that take it with the
+// rest.
+export { capitalized };
 
 /**
  * The label of one part of a result, after a blank line: bold for the part that matters most, grey
@@ -191,15 +197,45 @@ export const FINGERPRINT_NOTE = "empty BIP39 passphrase";
 const REWRITE_LINE = "\r\x1b[2K";
 
 /**
+ * Seconds between two progress lines of a long search, the share repair's and the word search's
+ * wallet check: a line that changes less often stays readable.
+ */
+export const SEARCH_PROGRESS_SECONDS = 10;
+
+/**
  * The progress of a long search. On a terminal each update replaces the one before, so that the
  * screen keeps one line however long the search runs; in a file or a pipe, or on a "dumb" terminal
  * without control sequences, each is a line of its own. end() closes the line after the search.
  */
 export class ProgressLine {
   #open = false;
+  readonly #intervalMs: number;
+  readonly #now: () => number;
+  #shownAt: number;
+
+  /**
+   * A line that `showEvery` rewrites at most once every `intervalSeconds`, counted from when the
+   * line is made; `now` is the clock, which a test replaces.
+   */
+  constructor(intervalSeconds = 0, now: () => number = Date.now) {
+    this.#intervalMs = intervalSeconds * MILLISECONDS_PER_SECOND;
+    this.#now = now;
+    this.#shownAt = now();
+  }
+
+  /**
+   * Shows the line that `message` makes, unless the last was shown less than the interval ago;
+   * the message is made only when it is shown. A search reports its progress through it.
+   */
+  showEvery(message: () => string): void {
+    const now = this.#now();
+    if (now - this.#shownAt < this.#intervalMs) return;
+    this.#shownAt = now;
+    this.show(message());
+  }
 
   show(message: string): void {
-    if (process.stderr.isTTY !== true || process.env.TERM === "dumb") {
+    if (!streamCanRedraw(process.stderr)) {
       terminalHint(message);
       return;
     }
@@ -227,29 +263,43 @@ export function readmeLink(anchor: string): string {
 
 /** A grey "More:" line that points to the README section explaining the message above it. */
 export function terminalMore(anchor: string): void {
-  // Not wrapped: a link must stay whole to be clicked or copied.
-  console.error(terminalPaint("stderr", STYLE.muted, `More: ${readmeLink(anchor)}`));
+  console.error(moreLine(anchor));
+}
+
+/** The line of terminalMore, grey; not wrapped: a link must stay whole to be clicked or copied. */
+export function moreLine(anchor: string): string {
+  return terminalPaint("stderr", STYLE.muted, `More: ${readmeLink(anchor)}`);
 }
 
 /** An error message after a red "✗ Error:", as `mhfe` writes it. */
 export function terminalFailure(message: string): void {
-  if (!terminalColor("stderr")) {
-    console.error(`mnemocode: ${message}`);
-    return;
-  }
-  console.error(`${terminalPaint("stderr", STYLE.bad, "✗ Error:")} ${message}`);
+  console.error(failureLine(process.stderr, "mnemocode", message));
 }
+
+/** The weights of ITU-R BT.601 in thousandths: 0.299, 0.587 and 0.114. */
+const BT601_PER_MILLE = Object.freeze({ red: 299, green: 587, blue: 114, total: 1000 });
+
+/**
+ * The brightness of a colour by BT.601, on the 0-255 scale of its channels: what picks black or
+ * white text on a colour in the terminal. Summed in whole thousandths, so that no rounding moves
+ * a colour across LIGHT_LUMA. The cards have their own rule for print (business-cards.ts), tuned
+ * for another medium.
+ */
+function lumaOf(red: number, green: number, blue: number): number {
+  const { red: r, green: g, blue: b, total } = BT601_PER_MILLE;
+  return (red * r + green * g + blue * b) / total;
+}
+/** The brightness above which a colour takes black text. */
+const LIGHT_LUMA = 150;
 
 export function colorCards(colors: readonly string[]): string {
   if (!terminalColor("stderr")) return colors.join(" ");
   return colors
     .map((color) => {
-      const red = Number.parseInt(color.slice(1, 3), 16);
-      const green = Number.parseInt(color.slice(3, 5), 16);
-      const blue = Number.parseInt(color.slice(5, 7), 16);
-      const light = (red * 299 + green * 587 + blue * 114) / 1000 > 150;
+      const [red, green, blue] = rgbBytes(color);
+      const light = lumaOf(red, green, blue) > LIGHT_LUMA;
       // The colour itself is the content here, so it is shown in true colour, not the palette.
-      return `\x1b[48;2;${red};${green};${blue}m\x1b[${light ? "30" : "97"}m ${color} ${RESET}`;
+      return `\x1b[48;2;${red};${green};${blue}m\x1b[${light ? "30" : "97"}m ${color} ${SGR_RESET}`;
     })
     .join(" ");
 }

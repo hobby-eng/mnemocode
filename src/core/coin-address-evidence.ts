@@ -15,6 +15,7 @@
 import { HDKey } from "@scure/bip32";
 import { addressCount, scanBranch, type AddressRange, type KeyMatch } from "./address-scan.js";
 import type { AddressLocation, Coin, CoinAddress } from "./coins/coin.js";
+import type { WalletMatch } from "./wallet-check.js";
 import { Bip39Seed, type Pbkdf2HmacSha512 } from "./master-fingerprint.js";
 
 /** An address of `coin` at `location`, or among `addresses` of them from there (one by default). */
@@ -26,10 +27,8 @@ export interface CoinAddressEvidence {
 }
 
 /** Whether the wallet has the address, and where: the address in its standard form and its path. */
-export interface CoinAddressMatch {
-  readonly matched: boolean;
+export interface CoinAddressMatch extends WalletMatch {
   readonly derived?: string;
-  readonly path?: string;
 }
 
 /**
@@ -82,7 +81,8 @@ export class CoinAddressCheck {
   /** Compares a phrase with `evidence`; evidence no wallet can match is refused before the seed. */
   match(mnemonic: string, evidence: CoinAddressEvidence, passphrase = ""): CoinAddressMatch {
     const comparison = new CoinAddressComparison(evidence);
-    return compareWith(comparison, this.#seed.now(mnemonic, passphrase));
+    // A root's version bytes do not enter an address: BIP32's default ones serve every coin.
+    return this.#seed.withRoot(mnemonic, passphrase, (root) => comparison.compare(root));
   }
 
   /** The same as match, with a PBKDF2 that may answer later. */
@@ -92,25 +92,6 @@ export class CoinAddressCheck {
     passphrase = "",
   ): Promise<CoinAddressMatch> {
     const comparison = new CoinAddressComparison(evidence);
-    return compareWith(comparison, await this.#seed.later(mnemonic, passphrase));
-  }
-}
-
-/**
- * `comparison` with the wallet of `seed`. The root's version bytes, all that a network changes in
- * it, do not enter an address, so BIP32's default ones serve every coin. The seed and the root are
- * wiped, whatever happens.
- */
-function compareWith(comparison: CoinAddressComparison, seed: Uint8Array): CoinAddressMatch {
-  let root: HDKey;
-  try {
-    root = HDKey.fromMasterSeed(seed);
-  } finally {
-    seed.fill(0);
-  }
-  try {
-    return comparison.compare(root);
-  } finally {
-    root.wipePrivateData();
+    return this.#seed.withRootLater(mnemonic, passphrase, (root) => comparison.compare(root));
   }
 }

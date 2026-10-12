@@ -1,10 +1,11 @@
-dist/
-node_modules/
+# Prettier also reads .gitignore, so what Git ignores (dist/, node_modules/, goldens/ …) is not
+# repeated here. scripts/verify-markdown.mjs leaves out the same files.
 assets/
+# The SSKR bridge keeps its notices as they came with it.
 sskr-wasm/
 vectors/
 # pnpm writes its lockfile in its own style.
 pnpm-lock.yaml
-goldens/
+# Audit records are frozen.
 docs/audits/
 src/export/world-map-data.ts

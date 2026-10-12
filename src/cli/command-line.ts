@@ -1,4 +1,4 @@
-import { assertAllowedArguments, assertFlag, parseArguments } from "./arguments.js";
+import { assertAllowedArguments, parseArguments } from "./arguments.js";
 import { runDecode } from "./decode-command.js";
 import { runEncode } from "./encode-command.js";
 import { runRecoverDate } from "./recover-date-command.js";
@@ -7,28 +7,45 @@ import { assertCoreSelfTest, runSelfTest } from "./self-test.js";
 import { runTable } from "./table-command.js";
 import { onPrivateScreen, withPrivateScreen } from "./private-screen.js";
 import { assertProtected, dropUnneeded, protectionSummary } from "./protection.js";
-import { unencryptedSwap } from "./swap-check.js";
-import { cloudServiceOf } from "./cloud-folders.js";
-import { STYLE, terminalMore, terminalNotice, terminalPaint } from "./terminal.js";
+import { swapWarning } from "./swap-check.js";
+import { warnOfCloudCopy } from "./cloud-folders.js";
+import { terminalMore, terminalNotice } from "./terminal.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { runPreview } from "./preview-command.js";
 import { helpNames, printCommandHelp, printNamedHelp, printUsage } from "./usage.js";
-import { commandOptions, isCommandName } from "./command-options.js";
+import {
+  COMMAND_FACTS,
+  commandOptions,
+  HELP_FLAGS,
+  isCommandName,
+  isFlagOf,
+  PRIVATE_SCREEN_COMMANDS,
+  VERSION_FLAGS,
+  type CommandName,
+} from "./command-options.js";
 import { MNEMOCODE_VERSION } from "../version.js";
 import { runSskrSplit, runSskrCombine, runSskrExport } from "./sskr-command.js";
 import { reportRenamedOutputs, settleOutputPaths } from "./output-paths.js";
 import { SAVED_OPTIONS } from "./output-options.js";
+import { factLine } from "./terminal-style.js";
+import { ANSWER_LABEL_WIDTH } from "./terminal-choice.js";
 
-/** The commands that take a secret or show one; at a terminal they run on the private screen. */
-export const PRIVATE_SCREEN_COMMANDS: ReadonlySet<string> = new Set([
-  "encode",
-  "decode",
-  "recover-date",
-  "recover-word",
-  "sskr-split",
-  "sskr-combine",
-  "sskr-export",
-]);
+// Here too for the modules that take it with the command line (menu-runner.ts, menu.ts).
+export { PRIVATE_SCREEN_COMMANDS };
+
+/** What runs each command, with its options; a command without one does not compile. */
+const HANDLERS: Readonly<Record<CommandName, (args: ParsedArguments) => void | Promise<void>>> = {
+  encode: runEncode,
+  decode: runDecode,
+  "recover-date": runRecoverDate,
+  "recover-word": runRecoverWord,
+  "sskr-split": (args) => runSskrSplit(args),
+  "sskr-combine": (args) => runSskrCombine(args),
+  "sskr-export": runSskrExport,
+  preview: runPreview,
+  table: runTable,
+  "self-test": () => runSelfTest(),
+};
 
 /**
  * Runs one command line, the arguments after `mnemocode`. A command that shows a seed phrase, an
@@ -36,7 +53,7 @@ export const PRIVATE_SCREEN_COMMANDS: ReadonlySet<string> = new Set([
  */
 export async function runCommandLine(argv: readonly string[]): Promise<void> {
   const [command, ...rest] = argv;
-  if (command === undefined || command === "--help" || command === "-h") {
+  if (command === undefined || isFlagOf(HELP_FLAGS, command)) {
     printUsage();
     return;
   }
@@ -47,7 +64,7 @@ export async function runCommandLine(argv: readonly string[]): Promise<void> {
       throw new Error(`There is no command or topic “${rest[0]}”. Choose one of: ${helpNames()}.`);
     return;
   }
-  if (command === "--version" || command === "-V" || command === "version") {
+  if (isFlagOf(VERSION_FLAGS, command) || command === "version") {
     if (rest.length > 0)
       throw new Error("The version command does not accept additional arguments.");
     console.log(`mnemocode ${MNEMOCODE_VERSION}`);
@@ -56,71 +73,29 @@ export async function runCommandLine(argv: readonly string[]): Promise<void> {
   if (!isCommandName(command))
     throw new Error(`There is no command “${command}”. Run mnemocode --help to see the commands.`);
   // A help request wins over every other option, so that it works on a half-typed command.
-  if (rest.includes("--help") || rest.includes("-h")) {
-    printCommandHelp(command, rest.includes("--help"));
+  if (rest.some((argument) => isFlagOf(HELP_FLAGS, argument))) {
+    printCommandHelp(command, rest.includes(HELP_FLAGS.long));
     return;
   }
+  // parseArguments refuses a value given to an on-or-off option.
   const arguments_ = parseArguments(rest);
-  assertFlag(arguments_, "card-qr");
+  const facts = COMMAND_FACTS[command];
   // Before anything is read: what this command does not need is given up for good.
-  dropUnneeded(command, arguments_);
-  switch (command) {
-    case "sskr-split":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      assertFlag(arguments_, "ask-secrets");
-      assertCoreSelfTest();
-      return withSecrets(arguments_, () => runSskrSplit(arguments_));
-    case "sskr-combine":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      assertFlag(arguments_, "ask-secrets");
-      assertCoreSelfTest();
-      return withSecrets(arguments_, () => runSskrCombine(arguments_));
-    case "sskr-export":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      assertFlag(arguments_, "ask-secrets");
-      assertCoreSelfTest();
-      return withSecrets(arguments_, () => runSskrExport(arguments_));
-    case "encode":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      assertFlag(arguments_, "sskr");
-      assertFlag(arguments_, "cards");
-      assertFlag(arguments_, "ask-secrets");
-      assertFlag(arguments_, "legacy-valid-last-word");
-      assertCoreSelfTest();
-      return withSecrets(arguments_, () => runEncode(arguments_));
-    case "decode":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      assertFlag(arguments_, "ask-secrets");
-      assertCoreSelfTest();
-      return withSecrets(arguments_, () => runDecode(arguments_));
-    case "recover-date":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      assertFlag(arguments_, "ask-secrets");
-      assertCoreSelfTest();
-      return withSecrets(arguments_, () => runRecoverDate(arguments_));
-    case "recover-word":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      assertFlag(arguments_, "ask-secrets");
-      assertFlag(arguments_, "legacy-valid-last-word");
-      assertCoreSelfTest();
-      return withSecrets(arguments_, () => runRecoverWord(arguments_));
-    case "preview":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      assertFlag(arguments_, "list");
-      assertFlag(arguments_, "all");
-      assertCoreSelfTest();
-      await settleOutputPaths(arguments_);
-      await runPreview(arguments_);
-      return reportRenamedOutputs();
-    case "table":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      assertFlag(arguments_, "all");
-      assertCoreSelfTest();
-      return runTable(arguments_);
-    case "self-test":
-      assertAllowedArguments(arguments_, command, commandOptions[command]);
-      return runSelfTest();
-  }
+  dropUnneeded(facts.alwaysWrites, arguments_);
+  assertAllowedArguments(arguments_, command, commandOptions[command]);
+  if (facts.coreSelfTest) assertCoreSelfTest();
+  const run = async (): Promise<void> => HANDLERS[command](arguments_);
+  return facts.secret ? withSecrets(arguments_, run) : withOutputs(arguments_, run);
+}
+
+/**
+ * Runs a command with the outputs that its options name: a taken name numbered first
+ * (settleOutputPaths), and each numbered one reported after it ran.
+ */
+async function withOutputs(args: ParsedArguments, run: () => Promise<void>): Promise<void> {
+  await settleOutputPaths(args);
+  await run();
+  reportRenamedOutputs();
 }
 
 /**
@@ -132,28 +107,19 @@ async function withSecrets(args: ParsedArguments, run: () => Promise<void>): Pro
   return withPrivateScreen(async () => {
     if (onPrivateScreen())
       console.error(
-        `  ${terminalPaint("stderr", STYLE.muted, "Protection".padEnd(11))} ${protectionSummary()}\n`,
+        `${factLine(process.stderr, "Protection", protectionSummary(), ANSWER_LABEL_WIDTH)}\n`,
       );
-    const swap = unencryptedSwap();
-    if (swap.length > 0) {
-      terminalNotice(
-        `Swap may write this memory to the disk unencrypted: ${swap.join(", ")}`,
-        "warning",
-      );
+    const swap = swapWarning();
+    if (swap !== undefined) {
+      terminalNotice(swap, "warning");
       terminalMore("unencrypted-swap");
     }
-    // Before the warnings about where files go, which then name the files as they will be saved.
-    await settleOutputPaths(args);
-    for (const key of SAVED_OPTIONS) {
-      const path = value(args, key);
-      const service = path === undefined ? undefined : cloudServiceOf(path);
-      if (service !== undefined) {
-        terminalNotice(`${service} keeps a copy of ${path}`, "warning");
-        terminalMore("cloud-folders");
-      }
-    }
-    await run();
-    // A command reports its own; this catches any left, still on the private screen.
-    reportRenamedOutputs();
+    // The outputs are settled before the warnings about where files go, which then name the files
+    // as they will be saved; a command reports its own renamed names, and any left are reported
+    // still on the private screen.
+    await withOutputs(args, async () => {
+      for (const key of SAVED_OPTIONS) warnOfCloudCopy(value(args, key));
+      await run();
+    });
   });
 }

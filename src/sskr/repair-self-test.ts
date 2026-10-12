@@ -10,7 +10,7 @@
 // Host-neutral: it imports only other host-neutral sskr modules and core/self-test-check.ts.
 
 import { expectRefused, expectRefusedLater, expectSame } from "../core/self-test-check.js";
-import { JointRepair } from "./joint-repair.js";
+import { JointRepair, searchOnce } from "./joint-repair.js";
 import { sskrSetVector, sskrVector } from "./known-answers.js";
 import { MAX_MARKED_ELEMENTS, readRepairableShare } from "./repair.js";
 import { ShareSet } from "./share-set.js";
@@ -91,7 +91,7 @@ export async function checkShareRepair(platform: SharePlatform): Promise<void> {
     marked(SET_COLORS[1], "#E8135A", "#E81?5A"),
   ];
   const plan = await repair.plan(records);
-  const found = await plan.search();
+  const found = await searchOnce(plan);
   expectSame(found.length, 1, "Shares repaired together: phrases");
   expectSame(found[0]!.mnemonic, SET_PHRASE, "Shares repaired together: phrase");
   expectSame(

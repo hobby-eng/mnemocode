@@ -90,11 +90,13 @@ import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
 import { runSskrCombine, runSskrExport, runSskrSplit } from "../src/cli/sskr-command.js";
 import { InputCancelled } from "../src/cli/terminal-input.js";
-import { crc32 } from "../src/sskr/checksum.js";
+import { JointRepair } from "../src/sskr/joint-repair.js";
+import { unrepairedShare } from "../src/sskr/repair.js";
+import { ShareRestore, variantsMessage } from "../src/sskr/share-restore.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
-import { transportToUr, urToTransport, writeShare } from "../src/sskr/transport.js";
-import "../src/sskr/share-platform-node.js";
+import { writeShare } from "../src/sskr/transport.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
+import { markUnits, VALUE_BYTE, wrongValue } from "./helpers/shares.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const FINGERPRINT = "73c5da0a";
@@ -106,24 +108,9 @@ const vectors = JSON.parse(
 const SHARES = vectors.deterministic[0]!.shares as [string, string, string];
 const PHRASE = entropyToMnemonic(Buffer.from(vectors.deterministic[0]!.entropy, "hex"), wordlist);
 const OTHER_SET_SHARE = vectors.deterministic[1]!.shares[0]!;
-/** A byte of the share value: the header, identifier and member numbers come before it. */
-const VALUE_BYTE = 10;
-/** The CRC-32 at the end of a share's transport bytes. */
-const CRC_BYTES = 4;
 const SHARES_PROMPT =
   "Shamir shares (separate shares with ;, ? for each unreadable code or digit):";
 const DATES_PROMPT = "Dates (up to 4, DD-MM-YYYY, ? for what is forgotten, separated by spaces):";
-
-/** `share` with one value byte flipped and its CRC-32 written anew: valid, but wrong. */
-function wrongValue(share: string): string {
-  const bytes = urToTransport(share);
-  bytes[VALUE_BYTE]! ^= 1;
-  new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(
-    bytes.length - CRC_BYTES,
-    crc32(bytes.slice(0, -CRC_BYTES)),
-  );
-  return transportToUr(bytes);
-}
 
 /** `share` with one Bytewords pair of its UR replaced: its checksum then fails. */
 function misread(share: string): string {
@@ -140,9 +127,7 @@ function withoutColour(line: string): string {
 
 /** The second share in colours with the elements at `marks` unreadable. */
 function marked(marks: readonly number[]): string {
-  const parts = writeShare(SHARES[1], "colors").split(" ");
-  for (const place of marks) parts[place] = "?";
-  return parts.join(" ");
+  return markUnits(SHARES[1], "colors", marks);
 }
 
 describe("shares on the private screen", () => {
@@ -360,7 +345,7 @@ describe("shares on the private screen", () => {
     terminal.choices = ["out"];
     await combine();
     expect(notices).toContain(
-      "Share 3 does not fit with the others: with it they give another phrase or none.",
+      "Share 3 does not fit with the others: with it they give another phrase or none. Leave it out, or check it.",
     );
     expect(terminal.labels).toEqual([["Leave share 3 out", "Type share 3 again"]]);
     expect(out).toContain(PHRASE);
@@ -402,7 +387,7 @@ describe("shares on the private screen", () => {
       ["Leave share 4 out", "Type share 4 again"],
     ]);
     expect(notices).toContain(
-      "Share 4 does not fit with the others: with it they give another phrase or none.",
+      "Share 4 does not fit with the others: with it they give another phrase or none. Leave it out, or check it.",
     );
     expect(promptsShown()).toEqual([SHARES_PROMPT]);
     expect(out).toContain(TEST_PHRASE);
@@ -414,12 +399,41 @@ describe("shares on the private screen", () => {
     terminal.choices = [false, "one", 2];
     await combine({ "max-tries": "1" });
     expect(terminal.questions[0]).toMatch(/^Search 65,536 combinations, .+\?$/u);
-    // Keys typed during the assessment do not answer the question.
-    expect(terminal.events[terminal.events.indexOf(terminal.questions[0]!) - 1]).toBe("drop");
+    // Keys typed during the assessment do not answer it: choose drops them (test/scan-fixes.test.ts).
     expect(terminal.questions.slice(1)).toEqual(["Which shares to change?", "Which share?"]);
     expect(terminal.labels[2]).toEqual(["Share 1", "Share 2"]);
     expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again:"]);
     expect(out).toContain(PHRASE);
+  });
+
+  it("wipes the plan of a search not made before the shares are typed again", async () => {
+    // Each wipe of a plan of marked shares is told among the questions and answers.
+    const plan = JointRepair.prototype.plan;
+    vi.spyOn(JointRepair.prototype, "plan").mockImplementation(async function (
+      this: JointRepair,
+      ...args: Parameters<typeof plan>
+    ) {
+      const made = await plan.apply(this, args);
+      return {
+        ...made,
+        wipe: () => {
+          terminal.events.push("wipe");
+          made.wipe();
+        },
+      };
+    });
+    terminal.answers = [`${SHARES[0]};${marked([5, 7])}\r`, `${SHARES[0]};${SHARES[1]}\r`];
+    // No to the search, then "Type every share again".
+    terminal.choices = [false, "all"];
+    await combine({ "max-tries": "1" });
+    expect(out).toContain(PHRASE);
+    const wipes = terminal.events.flatMap((event, at) => (event === "wipe" ? [at] : []));
+    const answers = terminal.events.flatMap((event, at) => (event === "answered" ? [at] : []));
+    // Once: after the search question, and before the person is asked what to change.
+    expect(wipes).toHaveLength(1);
+    expect(wipes[0]).toBeGreaterThan(terminal.events.indexOf(terminal.questions[0]!));
+    expect(wipes[0]).toBeLessThan(terminal.events.indexOf("Which shares to change?"));
+    expect(wipes[0]).toBeLessThan(answers[1]!);
   });
 
   it("goes back from the share question to the one after a wallet that nothing matched", async () => {
@@ -576,9 +590,8 @@ describe("shares on the private screen", () => {
 
     it("searches the dates after the marked elements, and says how much both take", async () => {
       // One unreadable colour of the second share, which the shares settle together.
-      const parts = writeShare(shares[1]!, "colors").split(" ");
-      parts[5] = "?";
-      terminal.answers = [`${shares[0]};${parts.join(" ")}\r`, "?3-09-2026\r", `${FINGERPRINT}\r`];
+      const marked = markUnits(shares[1]!, "colors", [5]);
+      terminal.answers = [`${shares[0]};${marked}\r`, "?3-09-2026\r", `${FINGERPRINT}\r`];
       terminal.choices = ["fingerprint"];
       await combine({ mode: "seedshift" });
       expect(
@@ -670,7 +683,7 @@ describe("shares on the private screen", () => {
 
     it("refuses dates from the command line beside --ask-secrets (AUD-010-SEC001)", async () => {
       await expect(combine({ mode: "seedshift", date: TEST_DATE })).rejects.toThrow(
-        "--ask-secrets cannot be combined with command-line dates.",
+        "--ask-secrets cannot be combined with --dates.",
       );
       expect(promptsShown()).toEqual([]);
     });
@@ -730,6 +743,29 @@ describe("shares on the private screen", () => {
       // The four variants, then the share typed again.
       expect(out).toHaveLength(5);
       expect(out.at(-1)).toBe(writeShare(SHARES[0], "indexes"));
+    });
+
+    it("shows each set that fits with its fingerprint when no wallet tells them apart", async () => {
+      // A second set beside the one the search finds: public shares of the test phrase. No two
+      // sets of real shares pass both the CRC-32 and the digest, so the step is given a second.
+      const others = (await splitSskrMnemonic(TEST_PHRASE, 2, 3)).slice(0, 2);
+      const other = { mnemonic: TEST_PHRASE, shares: others.map(unrepairedShare), unsettled: [] };
+      const phrases = ShareRestore.phrases;
+      vi.spyOn(ShareRestore, "phrases").mockImplementation(async (...args) => {
+        const found = await phrases.apply(ShareRestore, args);
+        if (found.kind !== "phrases") return found;
+        const extra = { set: other, mnemonic: TEST_PHRASE, held: TEST_PHRASE, repairs: [] };
+        return { ...found, phrases: [...found.phrases, extra], sets: [...found.sets, other] };
+      });
+      terminal.answers = [`${SHARES[0]};${marked([5])}\r`];
+      // "It cannot" at the wallet that would tell the right set.
+      terminal.choices = ["none"];
+      await runSskrExport({ "ask-secrets": true, format: "ur" });
+      expect(notices).toContain(variantsMessage(2));
+      expect(out).toContain(`Variant 1 of 2, original fingerprint ${masterFingerprint(PHRASE)}:`);
+      expect(out).toContain(`Variant 2 of 2, original fingerprint ${FINGERPRINT}:`);
+      const shown = out.join("\n");
+      for (const share of [SHARES[0], SHARES[1], ...others]) expect(shown).toContain(share);
     });
 
     it("saves nothing when the variants are left as they are", async () => {

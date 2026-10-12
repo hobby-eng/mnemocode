@@ -1,72 +1,77 @@
-import { createCardIdentity, sectorForTemplate } from "../export/card-identities.js";
+import { ExportDetails } from "../export/export-details.js";
+import { nodeRenderPlatform } from "../export/platform-node.js";
+import { DEFAULT_TEMPLATE_ID, findTemplate } from "../export/template-catalog.js";
 import {
   parsePageSize,
   parseOrientation,
   profileFields,
   validateProfile,
   type CardSettings,
+  COPY_FIELDS,
+  type CopyField,
+  type ProfileField,
 } from "../export/card-settings.js";
-import { resolveCardPresentation, type ResolvedCardPresentation } from "../export/card-copy.js";
-import { assertFlag, value, type ParsedArguments } from "./arguments.js";
-import { optionLabel } from "./option-copy.js";
+import { assertTextValues, value, type ParsedArguments } from "./arguments.js";
 
-export const cardCopyOptions = [
-  "studio-name",
-  "card-slogan",
-  "card-subtitle",
-  "card-footer",
-  "card-reference-label",
-] as const;
+/** The option of each text of a card design; studio-name has no card- before it. */
+export const COPY_OPTIONS: Readonly<Record<CopyField, string>> = Object.freeze({
+  studioName: "studio-name",
+  slogan: "card-slogan",
+  subtitle: "card-subtitle",
+  footer: "card-footer",
+  referenceLabel: "card-reference-label",
+});
+export const cardCopyOptions = COPY_FIELDS.map((field) => COPY_OPTIONS[field]);
+
+/** The option of a detail of the person on the cards, such as --card-name. */
+export function profileOption(field: ProfileField): string {
+  return `card-${field}`;
+}
+
+/** The card options whose text the person writes: the person's details and the design's texts. */
+export const TYPED_CARD_TEXT_OPTIONS = Object.freeze([
+  ...profileFields.map(profileOption),
+  ...cardCopyOptions,
+]);
 export const businessOptionNames = [
   "page-size",
   "orientation",
-  ...profileFields.map((field) => `card-${field}`),
-  ...cardCopyOptions,
+  ...TYPED_CARD_TEXT_OPTIONS,
   "card-qr",
 ] as const;
-const presentations = new WeakMap<ParsedArguments, ResolvedCardPresentation>();
 
 export function businessOptions(
   args: ParsedArguments,
-  templateHint = "business-architect",
+  templateHint = DEFAULT_TEMPLATE_ID,
 ): CardSettings {
-  for (const name of businessOptionNames) {
-    if (name !== "card-qr" && args[name] !== undefined && typeof args[name] !== "string")
-      throw new Error(`Provide exactly one value for the ${optionLabel(name)} setting.`);
-  }
-  assertFlag(args, "card-qr");
+  assertTextValues(
+    args,
+    businessOptionNames.filter((name) => name !== "card-qr"),
+  );
   const profile = validateProfile(
     Object.fromEntries(
       profileFields.flatMap((field) => {
-        const text = value(args, `card-${field}`);
+        const text = value(args, profileOption(field));
         return text === undefined ? [] : [[field, text]];
       }),
     ),
   );
-  let resolved = presentations.get(args);
-  if (resolved === undefined) {
-    resolved = resolveCardPresentation(profile, {
-      studioName: value(args, "studio-name"),
-      slogan: value(args, "card-slogan"),
-      subtitle: value(args, "card-subtitle"),
-      footer: value(args, "card-footer"),
-      referenceLabel: value(args, "card-reference-label"),
-    });
-    resolved = {
-      ...resolved,
-      profile: createCardIdentity(
-        profile,
-        args.all === true ? undefined : sectorForTemplate(value(args, "template") ?? templateHint),
-      ),
-    };
-    presentations.set(args, resolved);
-  }
+  // Drawn once for the options of a command, so that each of its outputs shows the same details.
+  const details = ExportDetails.drawnFor(
+    nodeRenderPlatform.randomInt,
+    args,
+    profile,
+    Object.fromEntries(COPY_FIELDS.map((field) => [field, value(args, COPY_OPTIONS[field])])),
+    // Every design (--all) takes an employer of any sector. An unknown design is refused where
+    // the cards are drawn (selectTemplate).
+    args.all === true ? undefined : findTemplate(value(args, "template") ?? templateHint)?.style,
+  );
   return {
     pageSize:
       value(args, "page-size") === undefined ? undefined : parsePageSize(value(args, "page-size")),
     orientation: parseOrientation(value(args, "orientation")),
-    profile: resolved.profile,
-    presentation: resolved.presentation,
+    profile: details.profile,
+    presentation: details.presentation,
     cardQr: args["card-qr"] === true,
   };
 }

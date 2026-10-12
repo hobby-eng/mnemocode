@@ -8,25 +8,24 @@
 // The API for the commands:
 // - askEncodedBackup({ args, seedshiftOnly, recordMode }): on the private screen, the encoded seed
 //   phrase, typed or read from --input-file or --qr-file, and everything that can be checked before
-//   the dates, in the order of BackupReading: the record header, the record's mode against --mode
-//   (offering the record's), a Shamir share typed by mistake, the format (asked when several fit;
-//   Esc asks for the codes again), the codes and their count, the mode when neither a record header
-//   nor --mode names it (the mode of the record read before, `recordMode`, or asked), and the
-//   container checksum of the checksum-valid modes (offering the Original Seedshift instead). A file
-//   that cannot be used offers another file, typing the phrase, or Stop. It returns the core's
-//   EncodedBackup (core/encoded-backup.ts), which holds the codes' own rules, and the mode that a
-//   record header named. typedAfterFile(args) gives the options for typing the phrase after a file.
+// the dates, in the order of BackupReading: the record header, the record's mode against --mode
+// (offering the record's), a Shamir share typed by mistake, the format (asked when several fit;
+// Esc asks for the codes again), the codes and their count, the mode when neither a record header
+// nor --mode names it (the mode of the record read before, `recordMode`, or asked), and the
+// container checksum of the checksum-valid modes (offering the Original Seedshift instead). A file
+// that cannot be used offers another file, typing the phrase, or Stop. It returns the core's
+// EncodedBackup (core/encoded-backup.ts), which holds the codes' own rules, and the mode that a
+// record header named. typedAfterFile(args) gives the options for typing the phrase after a file.
 // - showEncodedFingerprint(fingerprint): the encoded fingerprint, before the dates are asked.
 // - askDates(question) asks for the dates until they fit (the core's DatesAnswer.parse).
 // - searchDates(search): recover-date's search over the core's DateSearch, asked for first when it
-//   takes longer than twelve hours (DateSearch.needsQuestion), with its progress lines and Ctrl+C
-//   watch (dateSearchRun); it returns the matches, and every match for a candidate list.
+//   takes longer than twelve hours (DateSearch.plan, SearchPlan.ask), with its progress lines and
+//   Ctrl+C watch (dateSearchRun); it returns the matches, and every match for a candidate list.
 //   reportDateMatches and dateMatchNotes show them as recover-date does; matchesFitScreen tells
 //   whether they can all be read on the private screen, which keeps no scrollback.
 
-import { isatty } from "node:tty";
 import { BackupReading } from "../core/backup-reading.js";
-import { MAX_CANDIDATE_RECORDS } from "../core/candidate-list.js";
+import { LIST_KEEP, candidateListHolds } from "../core/candidate-list.js";
 import {
   DatesAnswer,
   DateSearch,
@@ -35,53 +34,87 @@ import {
   type DateSearchResult,
   type DateSearchRun,
   type DatesRules,
+  walletReason,
+  MAX_INCOMPLETE_DATES,
+  MAX_SHOWN_MATCHES,
+  walletNeeded,
 } from "../core/date-search.js";
 import type { SeedshiftMode } from "../core/date-recovery.js";
-import { maximumDates } from "../core/dates.js";
-import { RepairReport } from "../sskr/repair-report.js";
-import { EncodedBackup, MissingChecksum, type EncodedMode } from "../core/encoded-backup.js";
+import { EncodedBackup, MissingChecksum } from "../core/encoded-backup.js";
 import type { MissingCodes } from "../core/missing-codes.js";
-import { Masking, PHRASE_WORDS } from "../core/masking.js";
-import type { Bip39WordCount } from "../core/types.js";
-import { WORD_COUNT_SET } from "../core/words.js";
+import { Masking, PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
 import { masterFingerprint, walletCheckOf, type WalletEvidence } from "../bitcoin-evidence.js";
 import { parseRecord } from "../record.js";
-import { integerOption, value, type ParsedArguments } from "./arguments.js";
-import { askAfterFailure, askSecretUntil, askValueUntil, droppedPath } from "./ask.js";
-import type { CandidatesTarget } from "./candidates-file.js";
+import { integerOption, value, type ParsedArguments, choiceOption } from "./arguments.js";
+import {
+  askAfterFailure,
+  askSecretUntil,
+  askValueUntil,
+  droppedPath,
+  askWalletEvidence,
+  changeWalletAnswer,
+  checkWalletAnswer,
+  WHAT_NOW,
+  askOrCancel,
+} from "./ask.js";
+import type { CandidatesFile } from "./candidates-file.js";
 import {
   datesPrompt,
+  mostDates,
   encodedInput,
-  inputFormat,
+  givenInputFormat,
   readBoundedTextFile,
-  type EncodedFormat,
-  type TransformMode,
+  detectedFormat,
+  SHARE_READER,
 } from "./input.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
+import {
+  SEEDSHIFT_CHOICES,
+  ENCODED_SEEDSHIFT_QUESTION,
+  WHICH_SEEDSHIFT_QUESTION,
+  ENCODED_SEEDSHIFT_CHOICES,
+} from "./seedshift-choices.js";
 import { evidenceLabel } from "./option-copy.js";
-import { onPrivateScreen } from "./private-screen.js";
+import { onPrivateScreen, closingRows } from "./private-screen.js";
+import { linesFitPrivateScreen } from "./screen-fit.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import {
   ProgressLine,
-  terminalColor,
-  terminalHint,
-  terminalMore,
   terminalNotice,
   terminalResultHeader,
-  terminalStatus,
+  readmeLink,
+  resultHeaderLines,
+  noticeLines,
+  moreLine,
 } from "./terminal.js";
-import { choose, type Choice } from "./terminal-choice.js";
-import {
-  dropTypedAhead,
-  InputCancelled,
-  rowsOfOutputLine,
-  terminalColumns,
-  terminalRows,
-  withCtrlCWatch,
-} from "./terminal-input.js";
+import { choose, type Choice, type Explanation, rowsOf } from "./terminal-choice.js";
+import { askToSearch, type SearchRefusal, allowedBy } from "./search-consent.js";
+import { withCtrlCWatch, refusal, nodeTurn } from "./terminal-input.js";
+import { counted } from "../core/search-plan.js";
+import { DATE_FORMAT_TEXT } from "../core/dates.js";
+import { numberWord } from "../core/prose.js";
+import { type WalletPlace } from "./bitcoin-options.js";
+import { reportFingerprint, plainFingerprintLine } from "./fingerprint-report.js";
 
 // The core's limits, rule and types, under the names that the commands and their tests use.
-export { HARD_MAX_COMBINATIONS, MAX_INCOMPLETE_DATES, walletNeeded } from "../core/date-search.js";
+export {
+  HARD_MAX_COMBINATIONS,
+  MAX_INCOMPLETE_DATES,
+  walletNeeded,
+  walletReason,
+} from "../core/date-search.js";
+import type { EncodedFormat } from "../core/types.js";
+
+/**
+ * Why the wallet is asked for before a date search in `mode`, shown with the question: the
+ * library's reason (walletReason), the command's own `extraLines`, and where to read more.
+ */
+export function walletExplanation(
+  mode: MaskingMode | undefined,
+  extraLines: readonly string[] = [],
+): Explanation {
+  return { lines: [walletReason(mode), ...extraLines], more: [readmeLink("date-recovery-helper")] };
+}
 export type { DateMatch, DateSearchResult, DatesRules } from "../core/date-search.js";
 
 /**
@@ -91,6 +124,15 @@ export type { DateMatch, DateSearchResult, DatesRules } from "../core/date-searc
 export function maxCandidatesOf(args: ParsedArguments): number | undefined {
   if (args["max-candidates"] === undefined) return undefined;
   return integerOption(args, "max-candidates", { min: 1, max: HARD_MAX_COMBINATIONS });
+}
+
+/** --max-results: the most matches of a date search shown; MAX_SHOWN_MATCHES without it. */
+export function maxResultsOf(args: ParsedArguments): number {
+  return integerOption(args, "max-results", {
+    defaultValue: MAX_SHOWN_MATCHES,
+    min: 1,
+    max: Number.MAX_SAFE_INTEGER,
+  });
 }
 
 // The encoded seed phrase, before its dates.
@@ -112,7 +154,7 @@ export interface BackupQuestion {
    * are undone as the record says rather than asked about. Never an answer given on the screen,
    * which the person may want to change by typing the codes again.
    */
-  readonly recordMode?: EncodedMode | undefined;
+  readonly recordMode?: MaskingMode | undefined;
   /** Codes marked with ? are read as codes to search (MissingCodes), as Decode searches them. */
   readonly marks?: boolean;
   /** A Shamir share given here is offered to the restore from shares, the share kept. */
@@ -125,20 +167,19 @@ export interface BackupQuestion {
 }
 
 /** What --input-kind reads a text as that may be a Shamir share. */
-export type InputKind = "codes" | "share";
+const INPUT_KINDS = Object.freeze(["codes", "share"] as const);
+export type InputKind = (typeof INPUT_KINDS)[number];
 
 /** --input-kind, checked before the first question. */
 export function inputKindOf(args: ParsedArguments): InputKind | undefined {
-  const given = value(args, "input-kind");
-  if (given === undefined || given === "codes" || given === "share") return given;
-  throw new Error("--input-kind must be codes or share.");
+  return choiceOption(args, "input-kind", INPUT_KINDS);
 }
 
 /** An encoded seed phrase as askEncodedBackup read it, with the mode its record named, if any. */
 export interface ReadCodes {
   readonly kind: "codes";
   readonly backup: EncodedBackup;
-  readonly recordMode: EncodedMode | undefined;
+  readonly recordMode: MaskingMode | undefined;
 }
 
 /**
@@ -150,7 +191,7 @@ export type ReadBackup =
   | {
       readonly kind: "missing";
       readonly codes: MissingCodes;
-      readonly recordMode: EncodedMode | undefined;
+      readonly recordMode: MaskingMode | undefined;
     }
   /** A Shamir share, with whether it was read from a QR code image, for the restore it goes to. */
   | { readonly kind: "share"; readonly text: string; readonly fromQr: boolean };
@@ -181,13 +222,11 @@ export function fromFile(args: ParsedArguments): boolean {
  */
 export function showEncodedFingerprint(fingerprint: string | undefined): void {
   if (fingerprint === undefined) return;
-  if (terminalColor("stderr")) {
-    terminalStatus(PHRASE_WORDS.encodedFingerprint, fingerprint);
-    terminalHint("Fingerprint uses an empty BIP39 passphrase.");
-  } else
-    console.error(
-      `Encoded BIP32 master fingerprint of the masked phrase (empty BIP39 passphrase): ${fingerprint}`,
-    );
+  reportFingerprint(
+    PHRASE_WORDS.encodedFingerprint,
+    fingerprint,
+    plainFingerprintLine("encoded", fingerprint, true),
+  );
 }
 
 /** The encoded fingerprint of `backup` with Node's PBKDF2 (masterFingerprint). */
@@ -218,7 +257,9 @@ class BackupSource {
       : { label: "Read another file", note: "or type the encoded seed phrase", value: "again" };
   }
 
-  /** The text of the next attempt; `problem`, shown first, is why the last one could not be used. */
+  /**
+   * The text of the next attempt; `problem`, shown first, is why the last one could not be used.
+   */
   async next(problem: string | undefined): Promise<string> {
     if (this.typed) {
       if (problem !== undefined) terminalNotice(problem, "warning");
@@ -242,12 +283,10 @@ class BackupSource {
     for (;;) {
       if (problem !== undefined) terminalNotice(problem, "warning");
       problem = undefined;
-      const next = await askAfterFailure("What now?", [
+      const next = await askOrCancel(WHAT_NOW, [
         { label: "Read another file", value: "file" },
         { label: "Type the encoded seed phrase", note: "or paste it", value: "typed" },
-        { label: "Stop", value: "stop" },
       ] as const);
-      if (next === "stop") throw new InputCancelled();
       if (next === "typed") {
         this.typed = true;
         return this.next(undefined);
@@ -265,23 +304,12 @@ class BackupSource {
   }
 }
 
-/** The warning for a refused answer or file; InputCancelled and other throws pass through. */
-function refusal(error: unknown): string {
-  if (error instanceof InputCancelled || !(error instanceof Error)) throw error;
-  return error.message;
-}
-
-/** A typed answer whose record header, if it has one, can be read. */
+/**
+ * A typed answer whose record header, if it has one, can be read; the record's refusal says what
+ * helps, such as a newer MnemoCode for a newer version.
+ */
 function recordText(text: string): string {
-  try {
-    parseRecord(text);
-  } catch (error) {
-    const message = refusal(error);
-    // Typing it again cannot help here; the message says so.
-    if (message.startsWith("Unsupported MnemoCode record version"))
-      throw new Error(`${message} A newer MnemoCode reads it.`, { cause: error });
-    throw error;
-  }
+  parseRecord(text);
   return text;
 }
 
@@ -289,9 +317,6 @@ function recordText(text: string): string {
 interface Again {
   readonly again: string | undefined;
 }
-
-/** Where the person reads Shamir shares, for a share typed in place of the codes. */
-const SHARE_READER = MENU_ENTRY_NAMES.restore.label;
 
 /**
  * Asks for the encoded seed phrase on the private screen, or reads the file given, and checks it as
@@ -374,18 +399,13 @@ async function checkedBackup(
   const settled = await settledMode(reading, question, source);
   if (settled === undefined) return { again: undefined };
   if (reading.marked) return markedBackup(reading, settled, question, source);
-  const format = await settledFormat(reading, question.args, source);
-  if (typeof format !== "string") return format;
-  let codes: EncodedBackup;
-  try {
-    // Read first as not masked, which has no rule beyond the codes and their count: codes that
-    // name no mode are asked about only once they are known to be a phrase's.
-    codes = reading.codes(format);
-  } catch (error) {
-    return { again: refusal(error) };
-  }
-  const mode = settled === "ask" ? await askedMode(question.seedshiftOnly) : settled;
-  if (mode === undefined) return { again: undefined };
+  // Read first as not masked, which has no rule beyond the codes and their count: codes that name
+  // no mode are asked about only once they are known to be a phrase's.
+  const read = await codesAndMode(reading, settled, question, source, false, (format) =>
+    reading.codes(format),
+  );
+  if ("again" in read) return read;
+  const { codes, mode } = read;
   const recordMode = reading.mode();
   try {
     return { kind: "codes", backup: codes.withMode(mode), recordMode };
@@ -408,38 +428,44 @@ async function checkedBackup(
  */
 async function markedBackup(
   reading: BackupReading,
-  settled: TransformMode | "ask",
+  settled: MaskingMode | "ask",
   question: BackupQuestion,
   source: BackupSource,
 ): Promise<ReadBackup | Again> {
   if (question.marks !== true)
     return { again: "Every code is needed here: Decode searches codes marked with ?." };
-  const format = await settledFormat(reading, question.args, source, true);
+  const read = await codesAndMode(reading, settled, question, source, true, (format) =>
+    reading.missingCodes(format),
+  );
+  if ("again" in read) return read;
+  return { kind: "missing", codes: read.codes.withMode(read.mode), recordMode: reading.mode() };
+}
+
+/**
+ * The codes of `reading`, `marked` or complete, read by `read` in their settled form, with their
+ * mode, `settled` or asked once they read; Again where the form, the codes or the mode are refused
+ * or left with Escape.
+ */
+async function codesAndMode<Codes>(
+  reading: BackupReading,
+  settled: MaskingMode | "ask",
+  question: BackupQuestion,
+  source: BackupSource,
+  marked: boolean,
+  read: (format: EncodedFormat) => Codes,
+): Promise<{ readonly codes: Codes; readonly mode: MaskingMode } | Again> {
+  const format = await settledFormat(reading, question.args, source, marked);
   if (typeof format !== "string") return format;
-  let codes: MissingCodes;
+  let codes: Codes;
   try {
-    codes = reading.missingCodes(format);
+    codes = read(format);
   } catch (error) {
     return { again: refusal(error) };
   }
   const mode = settled === "ask" ? await askedMode(question.seedshiftOnly) : settled;
   if (mode === undefined) return { again: undefined };
-  return { kind: "missing", codes: codes.withMode(mode), recordMode: reading.mode() };
+  return { codes, mode };
 }
-
-/** The variants of Seedshift that the menu offers, for codes that name none. */
-const SEEDSHIFT_CHOICES: readonly Choice<TransformMode>[] = [
-  {
-    label: "MnemoCode Seedshift",
-    note: "a valid BIP39 seed phrase again; recommended",
-    value: "seedshift",
-  },
-  {
-    label: "Original Seedshift",
-    note: "as the original program; checksum usually fails",
-    value: "seedshift-legacy",
-  },
-];
 
 /**
  * The mode of the codes: the record's, which wins over another --mode when the person agrees, or
@@ -450,8 +476,8 @@ async function settledMode(
   reading: BackupReading,
   question: BackupQuestion,
   source: BackupSource,
-): Promise<TransformMode | "ask" | undefined> {
-  const given = value(question.args, "mode") as TransformMode | undefined;
+): Promise<MaskingMode | "ask" | undefined> {
+  const given = value(question.args, "mode") as MaskingMode | undefined;
   const conflict = reading.modeConflict(given);
   if (conflict !== undefined) {
     const named = reading.mode()!;
@@ -472,39 +498,22 @@ async function settledMode(
   return reading.mode(given) ?? question.recordMode ?? "ask";
 }
 
-/** The answer for codes that were not masked, where they may not have been. */
-const NO_SEEDSHIFT: Choice<TransformMode> = {
-  label: "No",
-  note: "the codes stand for the words themselves",
-  value: "direct",
-};
-
 /**
  * How codes that name no mode were masked: which Seedshift, or, unless `seedshiftOnly`, whether
  * one was used at all, after saying that no record header names it. Undefined (Escape) asks for
  * the codes again.
  */
-async function askedMode(seedshiftOnly: boolean): Promise<TransformMode | undefined> {
+async function askedMode(seedshiftOnly: boolean): Promise<MaskingMode | undefined> {
   if (!seedshiftOnly)
     terminalNotice(
       "These codes have no MNC1 record header, so they do not say how they were made.",
     );
-  await dropTypedAhead();
   return choose(
-    seedshiftOnly ? "Which Seedshift was used?" : "Was Seedshift used when it was encoded?",
-    seedshiftOnly ? SEEDSHIFT_CHOICES : [NO_SEEDSHIFT, ...SEEDSHIFT_CHOICES],
+    seedshiftOnly ? WHICH_SEEDSHIFT_QUESTION : ENCODED_SEEDSHIFT_QUESTION,
+    seedshiftOnly ? SEEDSHIFT_CHOICES : ENCODED_SEEDSHIFT_CHOICES,
     { label: "Seedshift", quit: "asks for the codes again" },
   );
 }
-
-/** The format numbers of the menu and of --format. */
-const FORMAT_DIGITS: Readonly<Record<EncodedFormat, number>> = {
-  english: 1,
-  indexes: 2,
-  unicode: 3,
-  "colors-unicode": 4,
-  colors: 5,
-};
 
 /**
  * The format of the codes: the record's, --format, or the one that fits; asked when several fit.
@@ -516,8 +525,7 @@ async function settledFormat(
   source: BackupSource,
   marked = false,
 ): Promise<EncodedFormat | Again> {
-  const option = value(args, "format");
-  const given = option === undefined ? undefined : inputFormat(option);
+  const given = givenInputFormat(args);
   const conflict = reading.formatConflict(given);
   if (conflict !== undefined) {
     const [recorded] = reading.formats();
@@ -536,38 +544,21 @@ async function settledFormat(
   }
   // A record or --format names the format; only a detected one is announced.
   if (reading.hasRecord || given !== undefined) return fitting[0]!;
-  if (fitting.length > 1) await dropTypedAhead();
-  const format =
-    fitting.length === 1
-      ? fitting[0]
-      : await choose(
-          "The input fits more than one format. Which format was recorded?",
-          fitting.map((format) => ({ label: format, digit: FORMAT_DIGITS[format], value: format })),
-          { label: "Format", quit: "asks for the codes again" },
-        );
-  if (format === undefined) return { again: undefined };
-  terminalNotice(`Detected input format: ${format}.`);
-  return format;
+  const format = await detectedFormat(fitting, "asks for the codes again");
+  return format ?? { again: undefined };
 }
 
 // The dates.
 
-/** "up to N, " for a phrase of `wordCount` words; nothing when the count is not known yet. */
-function mostDates(wordCount: number | undefined): string {
-  return wordCount === undefined || !WORD_COUNT_SET.has(wordCount)
-    ? ""
-    : `up to ${maximumDates(wordCount as Bip39WordCount)}, `;
-}
-
 /** The question for dates that may hold ?, as recover-date asks it. */
 export function recoveryDatesPrompt(wordCount: number | undefined): string {
-  return `Dates with ? for what is forgotten (${mostDates(wordCount)}one to three of them incomplete):`;
+  return `Dates with ? for what is forgotten (${mostDates(wordCount)}one to ${numberWord(MAX_INCOMPLETE_DATES)} of them incomplete):`;
 }
 
 /** The question for dates: with ? where `patterns` allows it, otherwise as Encode asks. */
 export function datesQuestion(rules: DatesRules): string {
   return rules.patterns
-    ? `Dates (${mostDates(rules.wordCount)}DD-MM-YYYY, ? for what is forgotten, separated by spaces):`
+    ? `Dates (${mostDates(rules.wordCount)}${DATE_FORMAT_TEXT}, ? for what is forgotten, separated by spaces):`
     : datesPrompt(rules.wordCount);
 }
 
@@ -597,9 +588,6 @@ export async function askDates(question: DatesQuestion): Promise<DatesAnswer> {
 /** Date combinations between two progress lines, as recover-date writes them by default. */
 export const PROGRESS_EVERY = 1000;
 
-/** One more match than a list holds is kept, so that a search can tell that they are too many. */
-export const KEPT_FOR_LIST = MAX_CANDIDATE_RECORDS + 1;
-
 /** A search for the forgotten digits of the dates, with what the command line adds to it. */
 export interface DateSearchRequest {
   /** The encoded seed phrase's BIP39 indexes, 0 to 2047. */
@@ -616,14 +604,9 @@ export interface DateSearchRequest {
    */
   readonly limits: { readonly maxResults: number; readonly maxCandidates?: number | undefined };
   /** A candidate list to be saved: every match is kept for it, up to one more than a list holds. */
-  readonly target?: CandidatesTarget | undefined;
+  readonly target?: CandidatesFile | undefined;
   /** A progress line after every `progressEvery` combinations, as recover-date shows them. */
   readonly report: { readonly progressEvery: number };
-}
-
-/** The next turn of Node's event loop, after the input that waits, such as Ctrl+C read as a key. */
-function nextTurn(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve));
 }
 
 /**
@@ -638,12 +621,12 @@ export function dateSearchRun(
 ): DateSearchRun {
   return {
     progressEvery,
-    onProgress: ({ checked, combinations, matchCount }) =>
+    onProgress: ({ checked, total, matched }) =>
       progress.show(
-        `Checked ${checked}/${combinations} date combinations; found ${matchCount} ${matchCount === 1 ? "match" : "matches"}.`,
+        `Checked ${checked}/${total} date combinations; found ${matched} ${matched === 1 ? "match" : "matches"}.`,
       ),
     signal,
-    turn: nextTurn,
+    turn: nodeTurn,
   };
 }
 
@@ -659,14 +642,11 @@ export async function withDateProgress<T>(
   }
 }
 
-/** A search expected to take at least this long has its time said before it starts. */
-const TIMED_SEARCH_SECONDS = 60;
-
 /**
  * Runs the core's search for the forgotten digits with the wallet's Bitcoin evidence, if any,
  * after saying how large it is, and shows progress. A search of more combinations than
  * `limits.maxCandidates`, or without that limit one longer than twelve hours on this computer
- * (DateSearch.needsQuestion), is asked for first on the private screen and needs
+ * (DateSearch.plan, SearchPlan.ask), is asked for first on the private screen and needs
  * --max-candidates elsewhere. Ctrl+C is read as a key during the search's turns and stops it at
  * the next one (InputCancelled). Undefined when the person chose not to search.
  */
@@ -680,41 +660,39 @@ export async function searchDates(
     mode: request.mode,
     walletCheck,
     maxShown: request.limits.maxResults,
-    keep: request.target === undefined ? 0 : KEPT_FOR_LIST,
+    keep: request.target === undefined ? 0 : LIST_KEEP,
   });
-  const { combinations } = search;
-  const pace = await search.pace();
-  const seconds = search.estimatedSeconds(pace);
-  const time = seconds >= 1 ? `, ${RepairReport.duration(seconds)}` : "";
-  const size = RepairReport.counted(combinations, "date combination");
-  if (search.needsQuestion(pace, request.limits.maxCandidates)) {
+  const plan = search.plan(await search.pace(), request.limits.maxCandidates);
+  if (plan.ask) {
     if (!onPrivateScreen())
-      throw new Error(
-        `The search tries ${size}${time}. Allow it with --max-candidates ${combinations}.`,
-      );
-    // Keys typed while the wallet check was timed must not answer this.
-    await dropTypedAhead();
-    const start = await choose(
-      `Search ${size}${time}?`,
-      [
-        { label: "Yes", note: "Ctrl+C stops it", value: true },
-        { label: "No", note: "type the dates again", value: false },
-      ],
-      { label: "Search", quit: "types the dates again" },
-    );
-    if (start !== true) return undefined;
+      throw new Error(allowedBy(plan.extent(), [["max-candidates", plan.count]]));
+    // Keys typed while the wallet check was timed do not answer this (askToSearch).
+    if (!(await askToSearch(plan.question(), DATES_AGAIN))) return undefined;
   }
-  terminalNotice(
-    `Recovery search contains ${combinations.toLocaleString("en-US")} date combinations.`,
-  );
-  if (seconds >= TIMED_SEARCH_SECONDS)
-    terminalNotice(`It takes ${RepairReport.duration(seconds)}; progress is shown.`);
+  // The size is said once, and then the time where it is told (SearchPlan.tell).
+  terminalNotice(`Recovery search contains ${plan.size}.`);
+  if (plan.tell) terminalNotice(plan.timeNotice());
   return withDateProgress((progress) =>
     withCtrlCWatch((signal) =>
       search.run(dateSearchRun(signal, request.report.progressEvery, progress)),
     ),
   );
 }
+
+/**
+ * The answer that changes the wallet (changeWalletAnswer), with `value`, after a search that matched
+ * no phrase with the wallet given; nothing where none was given. Decode and recover-date offer it
+ * so (AUD-012-ARC001).
+ */
+function changeWalletChoice<T>(evidence: WalletEvidence | undefined, value: T): Choice<T>[] {
+  return evidence === undefined ? [] : [changeWalletAnswer(value)];
+}
+
+/** The answer No to a long date search, which asks for the dates again. */
+export const DATES_AGAIN: SearchRefusal = {
+  note: "type the dates again",
+  quit: "types the dates again",
+};
 
 /** How reportDateMatches shows a result. */
 export interface MatchesReport {
@@ -729,16 +707,12 @@ export interface MatchesReport {
  * wallet that none of the checksum-valid candidates matched, it says so.
  */
 export function reportDateMatches(result: DateSearchResult, report: MatchesReport): void {
-  terminalResultHeader("Date recovery", [
-    ["Phrases", `${PHRASE_WORDS.original}, for each set of dates`],
-    ["Mode", report.mode],
-    ["Matches", String(result.matchCount)],
-  ]);
+  terminalResultHeader(MATCHES_TITLE, matchFacts(result, report));
   if (result.matchCount === 0) {
     const { checksumValid: valid } = result;
     console.log(
       report.evidence !== undefined && valid > 0
-        ? `None of the ${valid.toLocaleString("en-US")} checksum-valid ${valid === 1 ? "candidate" : "candidates"} matched the requested ${evidenceLabel(report.evidence)}.`
+        ? `None of the ${counted(valid, "checksum-valid candidate")} matched the requested ${evidenceLabel(report.evidence)}.`
         : "No candidate with a valid BIP39 checksum was found.",
     );
     return;
@@ -750,6 +724,18 @@ export function reportDateMatches(result: DateSearchResult, report: MatchesRepor
     );
 }
 
+/** The title of the heading of reportDateMatches. */
+const MATCHES_TITLE = "Date recovery";
+
+/** The facts under the heading of reportDateMatches. */
+function matchFacts(result: DateSearchResult, report: MatchesReport): [string, string][] {
+  return [
+    ["Phrases", `${PHRASE_WORDS.original}, for each set of dates`],
+    ["Mode", report.mode],
+    ["Matches", String(result.matchCount)],
+  ];
+}
+
 /** A match as reportDateMatches prints it: its dates, its phrase and where the wallet matched. */
 function matchLine(match: DateMatch): string {
   const where = match.evidence === undefined ? "" : `\tmatched at ${match.evidence}`;
@@ -757,34 +743,126 @@ function matchLine(match: DateMatch): string {
 }
 
 /**
- * The rows that the screen shows with the matches of a search without a wallet: the blank line,
- * the heading and its two facts (reportDateMatches), the two lines of dateMatchNotes, and the
- * blank line and "Press Enter to clear this screen." that end the private screen.
+ * Whether the matches shown fit on the private screen with the lines around them, each measured
+ * as it is printed: the heading and its facts (reportDateMatches), the notes (dateMatchNotes),
+ * and what closes the private screen.
  */
-const ROWS_BESIDE_MATCHES = 8;
-
-/**
- * Whether the matches shown fit on the private screen with the lines around them: that screen
- * keeps no scrollback, so a match that scrolled off its top could not be read. Standard output in
- * a file or a pipe takes every match, as the main screen does with its scrollback.
- */
-export function matchesFitScreen(result: DateSearchResult): boolean {
-  if (!onPrivateScreen() || !isatty(1)) return true;
-  const columns = terminalColumns();
-  const rows = result.shown.reduce(
-    (total, match) => total + rowsOfOutputLine(matchLine(match), columns),
-    ROWS_BESIDE_MATCHES,
-  );
-  return rows <= terminalRows();
+export function matchesFitScreen(result: DateSearchResult, report: MatchesReport): boolean {
+  const beside =
+    rowsOf(resultHeaderLines(MATCHES_TITLE, matchFacts(result, report))) +
+    rowsOf(dateMatchNoteLines(report.evidence)) +
+    closingRows();
+  return linesFitPrivateScreen(result.shown.map(matchLine), beside);
 }
 
 /** The note after shown matches: what a valid checksum proves, or what the wallet check did. */
 export function dateMatchNotes(evidence: WalletEvidence | undefined): void {
-  if (evidence === undefined) {
-    terminalNotice("A valid checksum does not prove the date: compare an address.");
-    terminalMore("exact-local-recovery-checks");
-  } else
-    terminalNotice(
-      `Each displayed candidate matched the requested ${evidenceLabel(evidence)} locally.`,
-    );
+  for (const line of dateMatchNoteLines(evidence)) console.error(line);
+}
+
+/** The lines of dateMatchNotes. */
+function dateMatchNoteLines(evidence: WalletEvidence | undefined): string[] {
+  return evidence === undefined
+    ? [
+        ...noticeLines("A valid checksum does not prove the date: compare an address."),
+        moreLine("exact-local-recovery-checks"),
+      ]
+    : noticeLines(
+        `Each displayed candidate matched the requested ${evidenceLabel(evidence)} locally.`,
+      );
+}
+
+/** The choice that asks for the encoded seed phrase once more; after a file, it is typed. */
+export function backupChoice(args: ParsedArguments): Choice<"backup"> {
+  return fromFile(args)
+    ? { label: "Type the encoded seed phrase", note: "instead of the file", value: "backup" }
+    : { label: "Type the encoded seed phrase again", value: "backup" };
+}
+
+/** What comes after a date search: a step of the command, or a search with another wallet. */
+export type AfterDateSearch =
+  | "dates"
+  | "backup"
+  | "done"
+  | { readonly kind: "search"; readonly evidence: WalletEvidence | undefined };
+
+/** What the question after a date search needs from its command. */
+export interface AfterDateSearchQuestion {
+  readonly evidence: WalletEvidence | undefined;
+  readonly mode: SeedshiftMode;
+  readonly maxResults: number;
+  /** The answer that asks for the encoded seed phrase again (backupChoice). */
+  readonly again: Choice<"backup">;
+  /** How the wallet is asked for: why, and where it is looked for. */
+  readonly wallet: { readonly explanation: Explanation; readonly place: WalletPlace };
+  /** Whether a candidate list is written, which holds every match up to its limit. */
+  readonly listing?: boolean;
+}
+
+/** What the person may choose after a search: a step, or a wallet to ask for first. */
+type AfterSearchChoice = "dates" | "backup" | "done" | "wallet" | "change-wallet";
+
+/**
+ * Asks what to change after a date search whose result cannot be used: none matched, more than a
+ * list holds, or, without a wallet, more than are shown or than fit on the screen; "done" when the
+ * result is complete. A wallet asked for here is asked at once, and Escape there asks this again.
+ * Decode and recover-date ask it so.
+ */
+export async function askAfterDateSearch(
+  result: DateSearchResult,
+  question: AfterDateSearchQuestion,
+): Promise<AfterDateSearch> {
+  for (;;) {
+    const next = await afterSearchChoice(result, question);
+    if (next !== "wallet" && next !== "change-wallet") return next;
+    // "It cannot" only where it changes the search: in place of a wallet that matched none, where
+    // the mode can list the candidates without one. Asked for a wallet that was missing, it would
+    // run the same search again.
+    const answer = await askWalletEvidence({
+      optional: next === "change-wallet" && !walletNeeded(question.mode),
+      ...question.wallet,
+    });
+    if (answer.kind === "back") continue;
+    return { kind: "search", evidence: answer.kind === "wallet" ? answer.evidence : undefined };
+  }
+}
+
+/** The question itself, with the answers that fit the result. */
+async function afterSearchChoice(
+  result: DateSearchResult,
+  question: AfterDateSearchQuestion,
+): Promise<AfterSearchChoice> {
+  const done: Choice<AfterSearchChoice> = { label: "Stop", value: "done" };
+  const dates: Choice<AfterSearchChoice> = { label: "Change the dates", value: "dates" };
+  const checkWallet = checkWalletAnswer<AfterSearchChoice>("wallet");
+  if (result.matchCount === 0)
+    return askAfterFailure(WHAT_NOW, [
+      dates,
+      ...changeWalletChoice(question.evidence, "change-wallet" as const),
+      question.again,
+      done,
+    ]);
+  if (question.listing === true && !candidateListHolds(result.matchCount))
+    return askAfterFailure(WHAT_NOW, [
+      { label: "Give the wallet", note: "its fingerprint or an address", value: "wallet" },
+      dates,
+      { ...done, note: "no list is saved" },
+    ]);
+  // A list holds every match already; with a wallet, every match is one the wallet confirmed.
+  if (question.listing === true || question.evidence !== undefined) return "done";
+  const narrower = { ...dates, note: "fewer ? give fewer candidates" };
+  if (result.matchCount > question.maxResults)
+    return askAfterFailure(`Not every candidate is shown. ${WHAT_NOW}`, [
+      checkWallet,
+      narrower,
+      { ...done, label: "Done" },
+    ]);
+  // The private screen keeps no scrollback: matches above its top could not be read.
+  if (!matchesFitScreen(result, question))
+    return askAfterFailure(`Not every candidate fits on the screen. ${WHAT_NOW}`, [
+      checkWallet,
+      narrower,
+      { ...done, label: "Done" },
+    ]);
+  return "done";
 }

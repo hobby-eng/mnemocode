@@ -1,15 +1,15 @@
 // The command-line side of shares typed to restore or export a seed phrase: the questions for the
 // shares, a share typed again or left out, the lines of a repair's assessment and report, and the
-// question before a long search and its progress. On the private screen (--ask-secrets) a share that cannot be used is typed
-// again, or left out, while the others are kept (TypedShares, mendShares); elsewhere the problem
-// ends the command. What the shares are, and what is wrong with them, the library decides
-// (src/sskr/share-input.ts, share-set.ts, repair-report.ts, joint-repair.ts, share-unmasking.ts).
+// question before a long search and its progress. On the private screen (--ask-secrets) a share
+// that cannot be used is typed again, or left out, while the others are kept (TypedShares,
+// mendShares); elsewhere the problem ends the command. What the shares are, and what is wrong with
+// them, the library decides (src/sskr/share-input.ts, share-set.ts, repair-report.ts,
+// joint-repair.ts, share-unmasking.ts).
 
 import {
-  JointRepair,
-  MAX_SEARCH_BITS,
-  type JointPlan,
+  MAX_REPAIR_COMBINATIONS,
   type RepairedSet,
+  type RepairedShares,
 } from "../sskr/joint-repair.js";
 import {
   REPAIR_NOTES,
@@ -20,21 +20,37 @@ import {
 } from "../sskr/repair-report.js";
 import {
   ShareInput,
-  type CompleteOutcome,
   type ShareTrouble,
   type TypedShare,
+  SHARE_SEPARATOR,
 } from "../sskr/share-input.js";
 import { nodeSharePlatform } from "../sskr/share-platform-node.js";
+import {
+  searchDecision,
+  ShareRestore,
+  type MarkedShares,
+  type SearchLimits,
+  type SharesRead,
+} from "../sskr/share-restore.js";
 import { integerOption, type ParsedArguments } from "./arguments.js";
-import { askAfterFailure, askSecretUntil, askValueUntil, droppedPath } from "./ask.js";
+import {
+  askAfterFailure,
+  askSecretUntil,
+  askValueUntil,
+  droppedPath,
+  WHAT_NOW,
+  askOrCancel,
+} from "./ask.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import { choose, type Choice } from "./terminal-choice.js";
-import { dropTypedAhead, InputCancelled, withCtrlCWatch } from "./terminal-input.js";
+import { allowedBy, askToSearch, type SearchAllowance } from "./search-consent.js";
+import { withCtrlCWatch, nodeTurn } from "./terminal-input.js";
 import {
   printableText,
   ProgressLine,
+  SEARCH_PROGRESS_SECONDS,
   STYLE,
   TEXT_WIDTH,
   terminalColor,
@@ -44,17 +60,22 @@ import {
   terminalPaint,
   terminalStatus,
 } from "./terminal.js";
+import { counting } from "../core/search-plan.js";
+import { isMarked } from "../sskr/repair.js";
+
+/** The restore of shares with Node's SSKR library: it keeps nothing of a restore. */
+const SHARE_RESTORE = new ShareRestore(nodeSharePlatform);
 
 export type { DateWork, ShareTrouble, TypedShare };
 
-/** Seconds between two progress lines of a long search. */
-const PROGRESS_SECONDS = 10;
-
+/** How shares are typed in one answer, which every question for shares says. */
+const SHARE_SEPARATOR_HINT = `separate shares with ${SHARE_SEPARATOR}`;
+/** How shares are typed in one answer, with the marks of what cannot be read. */
+export const SHARE_ANSWER_HINT = `${SHARE_SEPARATOR_HINT}, ? for each unreadable code or digit`;
 /** The question for every share at once; a line break in a paste separates shares too (ask.ts). */
-const SHARES_PROMPT =
-  "Shamir shares (separate shares with ;, ? for each unreadable code or digit):";
+const SHARES_PROMPT = `Shamir shares (${SHARE_ANSWER_HINT}):`;
 /** The question for shares added to those typed. */
-const MORE_SHARES_PROMPT = "More shares (separate shares with ;):";
+const MORE_SHARES_PROMPT = `More shares (${SHARE_SEPARATOR_HINT}):`;
 
 /** A share that another command's question took, such as Decode's, and where it came from. */
 export interface FirstShare {
@@ -65,8 +86,6 @@ export interface FirstShare {
 
 /** How shares are given on the private screen. */
 type ShareSource = "typed" | "qr";
-
-const count = (value: number) => value.toLocaleString("en-US");
 
 /** Prints the lines of a report, each in the style of its kind. */
 function printLines(lines: readonly ReportLine[]): void {
@@ -88,18 +107,14 @@ function printLines(lines: readonly ReportLine[]): void {
 export class TypedShares {
   /**
    * The shares and their places, and every check of them; a seed phrase typed in place of a share
-   * is sent to the menu's entry that decodes it.
+   * is sent to the menu's entry that decodes it. The one handle of the typed shares that callers
+   * get, to ask it and to hand it to the library; only this class adds or replaces shares.
    */
   readonly input = new ShareInput({ decodeEntry: MENU_ENTRY_NAMES.decode.label });
-  /** Whether the last share came from a QR code image, so that the next is offered from one first. */
+  /**
+   * Whether the last share came from a QR code image, so that the next is offered from one first.
+   */
   #fromQr = false;
-
-  /** Shares given with the options, in their order; nothing is asked about them. */
-  static of(texts: readonly string[]): TypedShares {
-    const shares = new TypedShares();
-    shares.input.add(texts);
-    return shares;
-  }
 
   /**
    * The shares after `first`, one given where another question asked (Decode): it is checked as a
@@ -138,7 +153,7 @@ export class TypedShares {
     const texts = await askSecretUntil(
       SHARES_PROMPT,
       (answer) => this.input.sharesOfAnswer(answer),
-      { what: "the shares", pastedLineBreak: ";" },
+      { what: "the shares", pastedLineBreak: SHARE_SEPARATOR },
     );
     this.#fromQr = false;
     this.input.replaceAll(texts);
@@ -161,7 +176,7 @@ export class TypedShares {
     this.#fromQr = false;
     return askSecretUntil(MORE_SHARES_PROMPT, (answer) => this.input.sharesOfAnswer(answer, true), {
       what: "the shares to add",
-      pastedLineBreak: ";",
+      pastedLineBreak: SHARE_SEPARATOR,
     });
   }
 
@@ -184,14 +199,14 @@ export class TypedShares {
 
   /** How the next share is given: from another QR code image, or typed. Escape types it. */
   async #askSource(): Promise<ShareSource> {
-    await dropTypedAhead();
     const source = await choose(
       "The next share?",
       [
         { label: "Read another QR code image", note: "the PNG of one share", value: "qr" },
         {
           label: "Type the shares",
-          note: "separated by ;, ? for each unreadable code",
+          // Shorter than SHARE_ANSWER_HINT, so that the note fits its list.
+          note: `separated by ${SHARE_SEPARATOR}, ? for each unreadable code`,
           value: "typed",
         },
       ] as const,
@@ -243,7 +258,7 @@ export class TypedShares {
    */
   async leftOut(place: number): Promise<boolean> {
     const choice = await askAfterFailure(
-      "What now?",
+      WHAT_NOW,
       [
         { label: `Leave share ${place} out`, note: "the others are kept", value: "out" },
         { label: `Type share ${place} again`, value: "again" },
@@ -262,12 +277,11 @@ export class TypedShares {
   /** Asks which share, unless only one was typed; undefined when the person goes back (Escape). */
   private async chosenPlace(): Promise<number | undefined> {
     if (this.list.length === 1) return this.list[0]!.place;
-    await dropTypedAhead();
     return choose(
       "Which share?",
       this.list.map((share) => ({
         label: `Share ${share.place}`,
-        ...(share.text.includes("?") ? { note: "with ?" } : {}),
+        ...(isMarked(share.text) ? { note: "with ?" } : {}),
         value: share.place,
       })),
       { label: "Share", quit: "goes back" },
@@ -301,36 +315,37 @@ export class TypedShares {
 
 // What the shares give together.
 
-/** What the shares as typed give: the phrase of complete ones, or the assessment of marked ones. */
-export type SharesOutcome =
-  CompleteOutcome | { readonly kind: "repair"; readonly repair: ShareRepair };
-
 /**
- * What the shares as typed give, or their first problem. Complete shares are read and checked as a
- * set, copies left out with a note, and restored; shares with ? are assessed together
- * (planShareRepair, during which Ctrl+C is read as a key) and the assessment is shown. No
- * combination is searched yet.
+ * What the shares as typed give, or their first problem (ShareRestore.read): complete shares are
+ * read and checked as a set, copies left out with a note, and restored; shares with ? are assessed
+ * together, during which Ctrl+C is read as a key, and the assessment is shown. No combination is
+ * searched yet.
  */
-export async function assessShares(
-  shares: TypedShares,
-  assess: (texts: readonly string[]) => Promise<JointPlan>,
-): Promise<SharesOutcome> {
+export async function assessShares(shares: TypedShares): Promise<SharesRead> {
   const { input } = shares;
-  if (input.marked) {
-    const unreadable = input.firstUnreadable();
-    if (unreadable !== undefined) return { kind: "trouble", trouble: unreadable };
-    const repair = assessShareRepair(await assess(input.texts()), input.places());
-    const trouble = input.assessmentTrouble(repair.plan.assessment);
-    return trouble === undefined ? { kind: "repair", repair } : { kind: "trouble", trouble };
-  }
-  // The SSKR self-test ran before the first question (sskr-command.ts, recoverySettings).
-  const { outcome, copies } = await input.restoreComplete(nodeSharePlatform);
-  for (const copy of copies) terminalNotice(copy.message);
-  return outcome;
+  const read = await SHARE_RESTORE.read(
+    input,
+    (step) =>
+      withCtrlCWatch(async (signal) => {
+        const result = await step(signal);
+        // The assessment hears the signal at each of its turns (SearchTurns); a step that ends
+        // without hearing it, such as one that does not take it, is stopped here.
+        signal.throwIfAborted();
+        return result;
+      }),
+    nodeTurn,
+  );
+  printLines(read.lines);
+  return read;
 }
 
 /** What can be done about shares that restore nothing, or nothing that is wanted. */
-type ShareFix = "one" | "out" | "all" | "more" | "stop";
+type ShareFix = "one" | "out" | "all" | "more";
+
+/** The answer that asks for more shares after those typed (TypedShares.askMore), with `value`. */
+export function addMoreShares<T>(value: T): Choice<T> {
+  return { label: "Add more shares", value };
+}
 
 /** How askShareFix asks. */
 export interface ShareFixQuestion {
@@ -354,7 +369,7 @@ export async function askShareFix(
   shares: TypedShares,
   how: ShareFixQuestion = {},
 ): Promise<boolean> {
-  const question = how.question ?? "What now?";
+  const question = how.question ?? WHAT_NOW;
   for (;;) {
     const several = shares.list.length > 1;
     const choices: Choice<ShareFix>[] = [
@@ -363,15 +378,10 @@ export async function askShareFix(
         ? [{ label: "Leave a share out", note: "the others are kept", value: "out" as const }]
         : []),
       { label: "Type every share again", value: "all" },
-      { label: "Add more shares", value: "more" },
-      { label: "Stop", value: "stop" },
+      addMoreShares("more"),
     ];
-    const fix =
-      how.back === true
-        ? await chooseOrBack(question, choices)
-        : await askAfterFailure(question, choices);
+    const fix = await askOrCancel(question, choices, { back: how.back === true });
     if (fix === undefined) return false;
-    if (fix === "stop") throw new InputCancelled();
     if (fix === "all") {
       await shares.askAll();
       return true;
@@ -384,19 +394,6 @@ export async function askShareFix(
     const changed = fix === "out" ? await shares.leaveOutChosen() : await shares.retypeChosen();
     if (changed) return true;
   }
-}
-
-/**
- * The choice of a question reached from another, whose askAfterFailure has checked that there is a
- * terminal: undefined at Escape, q or the end of the input, which go back. At the end of the
- * input the question gone back to then picks its Stop, so that nothing loops.
- */
-async function chooseOrBack<T>(
-  question: string,
-  choices: readonly Choice<T>[],
-): Promise<T | undefined> {
-  await dropTypedAhead();
-  return choose(question, choices, { label: "Next", quit: "goes back" });
 }
 
 /**
@@ -421,79 +418,61 @@ export async function mendShares(
 
 // Shares with unreadable elements.
 
-/** A plan, and how fast this machine checks the digest. */
-export interface ShareRepair {
-  readonly plan: JointPlan;
-  readonly triesPerSecond: number;
-}
-
-/**
- * Prints the assessment of shares typed with ? marks (planShareRepair), naming each share by its
- * place in `places`. No combination is tried yet; a refusal is the plan's reason.
- */
-export function assessShareRepair(plan: JointPlan, places?: readonly number[]): ShareRepair {
-  const triesPerSecond = new JointRepair(nodeSharePlatform).triesPerSecond();
-  printLines(new RepairReport(plan.assessment, triesPerSecond, places).lines());
-  return { plan, triesPerSecond };
-}
-
 /**
  * The combinations that --max-tries allows without a question, read before any secret is asked;
- * undefined without it, when a search of up to AUTO_SECONDS (repair-report.ts) goes ahead.
+ * undefined without it, when a search of up to QUESTION_SECONDS (search-turns.ts) goes ahead.
  */
 export function searchLimit(args: ParsedArguments): number | undefined {
   if (args["max-tries"] === undefined) return undefined;
-  return integerOption(args, "max-tries", { min: 1, max: 2 ** MAX_SEARCH_BITS });
+  return integerOption(args, "max-tries", { min: 1, max: MAX_REPAIR_COMBINATIONS });
 }
 
 /**
- * Runs the search, after asking on the private screen when it is longer than allowed; elsewhere a
- * longer search needs --max-tries. With `dates`, the date search that follows for each phrase found
- * is counted in the time, and named in the question. Resolves with every phrase found, possibly
- * none, or undefined when the person chose not to search.
+ * Runs the search of marked shares, after asking on the private screen when it is longer than
+ * `limits` allow (searchDecision); elsewhere a longer search needs --max-tries. With `dates`, the
+ * date search that follows for each phrase found is counted in the time, and named in the
+ * question. Resolves with every phrase found, possibly none, or undefined when the person chose not
+ * to search; the caller then releases the read (releaseRead).
  */
 export async function searchShareRepair(
-  repair: ShareRepair,
-  limits: { readonly shares: number | undefined; readonly dates?: number | undefined },
+  marked: MarkedShares,
+  limits: SearchLimits,
   dates?: DateWork,
 ): Promise<RepairedSet[] | undefined> {
-  const report = new RepairReport(repair.plan.assessment, repair.triesPerSecond);
-  if (report.needsQuestion(limits.shares, dates, limits.dates)) {
+  const { report } = marked;
+  const decision = searchDecision(marked, dates, limits);
+  if (decision.question !== undefined) {
     if (!onPrivateScreen()) {
-      const allow = dates === undefined ? "" : ` and --max-candidates ${dates.combinations}`;
-      throw new Error(
-        `The search takes ${count(report.combinations)} checks, ${report.duration(dates)}. Allow it with --max-tries ${report.combinations}${allow}.`,
-      );
+      const allowances: SearchAllowance[] = [["max-tries", report.combinations]];
+      if (dates !== undefined) allowances.push(["max-candidates", dates.combinations]);
+      throw new Error(allowedBy(report.searchExtent(dates), allowances));
     }
-    // Keys typed during the assessment, which reads none after its watch, must not answer this.
-    await dropTypedAhead();
-    const start = await choose(
-      report.searchQuestion(dates),
-      [
-        { label: "Yes", note: "Ctrl+C stops it", value: true },
-        { label: "No", note: "change the shares", value: false },
-      ],
-      { label: "Search", quit: "changes the shares" },
-    );
-    if (start !== true) return undefined;
-  } else if (dates !== undefined) terminalNotice(report.searchNotice(dates));
-  let shown = Date.now();
-  const progress = new ProgressLine();
+    // Keys typed during the assessment, which reads none after its watch, do not answer this.
+    const start = await askToSearch(decision.question, {
+      note: "change the shares",
+      quit: "changes the shares",
+    });
+    if (!start) return undefined;
+  } else if (decision.notice !== undefined) terminalNotice(decision.notice);
+  const progress = new ProgressLine(SEARCH_PROGRESS_SECONDS);
   // Watched only now, after the question, which reads its own keys: Ctrl+C stops the search at
   // its next turn, which then rejects with InputCancelled.
   try {
-    return await withCtrlCWatch((signal) =>
-      repair.plan.search({
+    const found = await withCtrlCWatch((signal) =>
+      SHARE_RESTORE.search(marked, {
         signal,
-        onProgress: (done, total, phrases) => {
-          if (Date.now() - shown < PROGRESS_SECONDS * 1000 || done === total) return;
-          shown = Date.now();
-          progress.show(
-            `Checked ${Math.floor((100 * done) / total)}%: ${count(done)} of ${count(total)}; ${phrases} found.`,
+        turn: nodeTurn,
+        onProgress: ({ checked, total, found: phrases }) => {
+          // The end is said by the result, not by a last line of progress.
+          if (checked === total) return;
+          progress.showEvery(
+            () =>
+              `Checked ${Math.floor((100 * checked) / total)}%: ${counting(checked)} of ${counting(total)}; ${phrases} found.`,
           );
         },
       }),
     );
+    return found.kind === "sets" ? found.sets : [];
   } finally {
     progress.end();
   }
@@ -503,10 +482,7 @@ export async function searchShareRepair(
  * Says, share by share, what a repair filled in where ? marked an element (RepairReport
  * .repairLines), each share named by its place in `places`, by its index in the set.
  */
-export function reportRepairs(
-  set: Pick<RepairedSet, "shares" | "unsettled">,
-  places?: readonly number[],
-): void {
+export function reportRepairs(set: RepairedShares, places?: readonly number[]): void {
   const repairs = RepairReport.repairs(set, places);
   if (repairs.length === 0 || !terminalColor("stderr")) {
     printLines(RepairReport.repairLines(set, places));
@@ -515,8 +491,8 @@ export function reportRepairs(
   // On a terminal as a table, a row for each share, so that each element is found at a glance.
   terminalNotice(REPAIR_NOTES.heading, "warning");
   for (const row of repairRows(repairs)) console.error(row);
-  if (set.unsettled.length > 0) terminalNotice(REPAIR_NOTES.guesses, "warning");
-  terminalHint(REPAIR_NOTES.correct);
+  // The notes after the repairs, as the library tells them for every host.
+  printLines(RepairReport.notes(set));
 }
 
 /** Indent of the rows of repaired elements, under the text after the "!" of their heading. */

@@ -74,8 +74,9 @@ describe("Installed self-test integrity", () => {
 
 /**
  * Runs `expression` in a fresh Node.js process against the installation in `directory`, with `m`
- * the module `file` of its dist and `s` the host's services: the master fingerprint, PBKDF2 and the
- * SSKR library of Node.js, with the render platform configured. Gives its exit code and stderr.
+ * the module `file` of its dist and `s` the host's services: the master fingerprint, PBKDF2, the
+ * SSKR platform of Node.js (s.platform) and the Node.js card renderer (s.renderer). Gives its exit
+ * code and stderr.
  */
 async function runCheck(
   directory: string,
@@ -88,10 +89,15 @@ async function runCheck(
     const [dist, file, expression] = process.argv.slice(1);
     const { MasterFingerprintCheck } = await import(dist + "/core/master-fingerprint.js");
     const { nodeSharePlatform } = await import(dist + "/sskr/share-platform-node.js");
-    await import(dist + "/export/platform-node.js");
+    const { nodeCardRenderer } = await import(dist + "/export/platform-node.js");
     const pbkdf2 = (p, salt, r, b) => new Uint8Array(pbkdf2Sync(p, salt, r, b, "sha512"));
     const fingerprints = new MasterFingerprintCheck(pbkdf2);
-    const s = { fingerprint: (m) => fingerprints.fingerprint(m), pbkdf2, platform: nodeSharePlatform };
+    const s = {
+      fingerprint: (m) => fingerprints.fingerprint(m),
+      pbkdf2,
+      platform: nodeSharePlatform,
+      renderer: nodeCardRenderer,
+    };
     const m = await import(dist + "/" + file);
     await new Function("m", "s", "return " + expression)(m, s);
   `;
@@ -215,7 +221,7 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
     from: '98854aa000";',
     to: '98854aa001";',
     module: "core/candidate-encryption-self-test.js",
-    run: "m.checkCandidateEncryption()",
+    run: "m.checkCandidateEncryptionQuick()",
     fails: /Candidate file to the session key mismatch/u,
   },
   {
@@ -287,7 +293,7 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
     from: '"Any 2 of the 3 Shamir shares',
     to: '"Any 3 of the 3 Shamir shares',
     module: "export/heir-sheet-self-test.js",
-    run: "m.HEIR_SHEET_SELF_TEST.startup()",
+    run: "m.heirSheetSelfTest(s.renderer).startup()",
     fails: /Heir sheet for shares mismatch/u,
   },
   {
@@ -296,7 +302,7 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
     from: '"4BBF-1-1 4BBF-1-2"',
     to: '"4BBF-1-1 4BBF-1-3"',
     module: "export/sskr-render-self-test.js",
-    run: "m.SHARE_CARDS_SELF_TEST.startup()",
+    run: "m.shareCardsSelfTest(s.renderer).startup()",
     fails: /Share card references mismatch/u,
   },
 ];
@@ -318,16 +324,16 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "an age file at another scrypt work factor",
     file: "dist/core/candidate-encryption.js",
-    from: "if (expected === SCRYPT_STANZA && stanzas[0][2] !== String(SCRYPT_LOG_N))",
+    from: 'if (lock === "passphrase" && stanzas[0][2] !== String(SCRYPT_LOG_N))',
     to: "if (false)",
     module: "core/candidate-encryption-self-test.js",
-    run: "m.checkCandidateEncryption()",
+    run: "m.checkCandidateEncryptionQuick()",
     fails: /scrypt work factor 16 was accepted/u,
   },
   {
     name: "dates beyond the safety limit",
     file: "dist/core/date-search.js",
-    from: "if (this.combinations > HARD_MAX_COMBINATIONS)",
+    from: "if (this.#combinations > HARD_MAX_COMBINATIONS)",
     to: "if (false)",
     module: "core/date-search-self-test.js",
     run: "m.checkDateSearchStartup()",
@@ -354,8 +360,8 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "a share with seven marks",
     file: "dist/sskr/repair.js",
-    from: "markCount(text) > MAX_MARKED_ELEMENTS)",
-    to: "false)",
+    from: "if (exceedsMarks(text, MAX_MARKED_ELEMENTS))",
+    to: "if (false)",
     module: "sskr/repair-self-test.js",
     run: "m.checkShareRepairStartup()",
     fails: /A share with seven marks was refused for another reason/u,
@@ -371,7 +377,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   },
   {
     name: "an Ethereum address with a wrong EIP-55 checksum",
-    file: "dist/core/coins/evm.js",
+    file: "dist/core/coins/ethereum.js",
     from: 'throw invalidAddress("its EIP-55 checksum, the mix of capital and small letters, is wrong")',
     to: "void 0",
     module: "core/coins-self-test.js",
@@ -380,11 +386,11 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   },
   {
     name: "a heir sheet for shares of the Original Seedshift",
-    file: "dist/export/heir-sheet-text.js",
-    from: 'throw new Error("Shares cannot use the original Seedshift.")',
+    file: "dist/core/masking.js",
+    from: "throw new Error(SPLIT_MODES_ONLY)",
     to: "void 0",
     module: "export/heir-sheet-self-test.js",
-    run: "m.HEIR_SHEET_SELF_TEST.startup()",
+    run: "m.heirSheetSelfTest(s.renderer).startup()",
     fails: /Heir sheet for shares of the Original Seedshift was accepted/u,
   },
   {
@@ -393,7 +399,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
     from: 'throw new Error("Share QR does not match the printed references.")',
     to: "void 0",
     module: "export/sskr-render-self-test.js",
-    run: "m.SHARE_CARDS_SELF_TEST.check.run()",
+    run: "m.shareCardsSelfTest(s.renderer).check.run()",
     fails: /A QR code of another share was accepted/u,
   },
 ];

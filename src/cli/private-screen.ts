@@ -2,24 +2,27 @@
 // shows a file and as `mhfe` shows a phrase (src/bin/mhfe/terminal.rs): nothing of it reaches the
 // main screen or its scrollback, and after Enter the alternate screen is cleared and the terminal
 // returns to where it was. On this private screen the secrets are shown as they are typed, so that
-// the person can check them (input.ts, askSecret). A script or a pipe on standard input gets
+// the person can check them (input.ts, askSecretUntil). A script or a pipe on standard input gets
 // none of this, and output sent to a file or a pipe is written there as before.
 
-import { waitForEnter } from "./terminal-choice.js";
+import { rowsOf, waitForEnter } from "./terminal-choice.js";
 import { terminalAvailable } from "./terminal-input.js";
+import { CLEAR_SCREEN, ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN } from "./terminal.js";
+import { CANCELLED_EXIT_CODE } from "./exit-codes.js";
 
-/** Switches to the alternate screen, clears it and moves to its top left (xterm control
- * sequences, also understood by tmux and most terminals). */
-const ENTER_ALTERNATE_SCREEN = "\x1b[?1049h\x1b[2J\x1b[H";
-/** Clears the alternate screen, then returns to the main screen with its earlier content. The
- * clear comes first, so that the words also vanish where there is no alternate screen. */
-const LEAVE_ALTERNATE_SCREEN = "\x1b[2J\x1b[H\x1b[?1049l";
+/** What the private screen asks before it is cleared, after a blank line. */
+const CLEAR_PROMPT = "Press Enter to clear this screen.";
 
-/** Clears the screen and moves to its top left (VT100 "erase in display" and "home"). */
-const CLEAR_SCREEN = "\x1b[2J\x1b[H";
+/**
+ * The rows that close the private screen under a result: the blank line and CLEAR_PROMPT, which
+ * a check of the room on the screen counts with the result.
+ */
+export function closingRows(): number {
+  return rowsOf(["", CLEAR_PROMPT]);
+}
 
-/** The exit code of a tool stopped by Ctrl+C: 128 plus SIGINT (2). */
-export const CANCELLED_EXIT_CODE = 130;
+// The exit code of a tool stopped by Ctrl+C, here too for the modules that take it from here.
+export { CANCELLED_EXIT_CODE };
 
 /**
  * Whether a person at a terminal answers and reads: standard input and standard error are a
@@ -69,7 +72,7 @@ export async function withPrivateScreen<T>(body: () => Promise<T>): Promise<T> {
     const result = await body();
     await flushed(process.stdout);
     process.stderr.write("\n");
-    await waitForEnter("Press Enter to clear this screen.");
+    await waitForEnter(CLEAR_PROMPT);
     return result;
   } finally {
     active = false;

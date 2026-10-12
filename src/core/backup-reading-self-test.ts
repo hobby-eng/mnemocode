@@ -15,6 +15,7 @@ import { BackupReading } from "./backup-reading.js";
 import { EncodedBackup } from "./encoded-backup.js";
 import { MissingCodes } from "./missing-codes.js";
 import { expectRefused, expectSame } from "./self-test-check.js";
+import type { PhraseFingerprint } from "./wallet-check.js";
 
 /**
  * The public phrase masked with MnemoCode Seedshift and 23-09-2026 (vectors/mnemocode-v1.json,
@@ -167,9 +168,7 @@ export function checkBackupReadingStartup(): void {
  * fingerprint, the encoded fingerprint of the masked phrase and the search of marked codes that it
  * decides, which keeps exactly the codes written.
  */
-export async function checkBackupReading(
-  fingerprint: (mnemonic: string) => string | PromiseLike<string>,
-): Promise<void> {
+export async function checkBackupReading(fingerprint: PhraseFingerprint): Promise<void> {
   checkBackupReadingStartup();
   checkMarked(MARKED_COLOR);
   expectSame(

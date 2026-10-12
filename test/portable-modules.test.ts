@@ -18,12 +18,35 @@ const BIP39_PACKAGES = [
 /** Packages for PDF documents: pdf-lib draws them, and fontkit embeds the bundled font. */
 const PDF_PACKAGES = ["pdf-lib", "@pdf-lib/fontkit"];
 
-/** What every coin family reaches through core/coins/coin.ts: the hashes of keys and the curve. */
+/**
+ * The hashes and the curve that the coin families reach together: coin.ts the SHA-256 and the
+ * RIPEMD-160 of HASH160, keccak-account.ts Keccak-256, and taproot.ts and keccak-account.ts the
+ * curve.
+ */
 const COIN_PACKAGES = [
+  // Base58Check checksums and HASH160 (with RIPEMD-160).
   "@noble/hashes/sha2.js",
   "@noble/hashes/legacy.js",
+  // Keccak-256 for Ethereum-style accounts.
   "@noble/hashes/sha3.js",
+  // Taproot output keys, and the uncompressed keys that Keccak accounts hash.
   "@noble/curves/secp256k1.js",
+];
+/**
+ * Every package the coin families reach together, with Base58, Bech32, Bech32m and hexadecimal:
+ * each family module is held to this shared ceiling.
+ */
+const COIN_FAMILY_PACKAGES = ["@scure/base", ...COIN_PACKAGES];
+/** The coin families' self-tests, which derive their keys with BIP32 too. */
+const COIN_SELF_TEST_PACKAGES = [...COIN_FAMILY_PACKAGES, "@scure/bip32"];
+/**
+ * The parts that the renderers of share cards are built on: the render platform, the texts of a
+ * design, and the forms of a share (transport.ts), which they write the cards in.
+ */
+const CARD_RENDERER_PARTS = [
+  "src/export/platform.ts",
+  "src/export/card-copy.ts",
+  "src/sskr/transport.ts",
 ];
 
 interface Part {
@@ -40,7 +63,7 @@ interface Part {
  * and no part uses itself back through the others.
  */
 const PARTS: Readonly<Record<string, Part>> = {
-  // Host services: the parts take them as parameters, or read the one the host configured.
+  // Host services: the parts take them as parameters; none reads one configured beforehand.
   "src/sskr/share-platform.ts": { uses: [] },
   "src/export/platform.ts": { uses: [] },
   // The master fingerprint alone, with the host's PBKDF2: what a host for one coin takes without
@@ -55,16 +78,7 @@ const PARTS: Readonly<Record<string, Part>> = {
   // The coins whose receiving addresses are compared with a phrase, and their address forms.
   "src/core/coins.ts": {
     uses: [],
-    packages: [
-      // Base58, Bech32, Bech32m and hexadecimal.
-      "@scure/base",
-      // Base58Check checksums, HASH160 (with RIPEMD-160), and Keccak-256 for Ethereum-style accounts.
-      "@noble/hashes/sha2.js",
-      "@noble/hashes/legacy.js",
-      "@noble/hashes/sha3.js",
-      // Taproot output keys, and the uncompressed keys that Keccak accounts hash.
-      "@noble/curves/secp256k1.js",
-    ],
+    packages: COIN_FAMILY_PACKAGES,
   },
   // Wallet evidence, with the host's PBKDF2.
   // An address of one coin given itself: what a host of one coin family takes, such as the
@@ -76,15 +90,12 @@ const PARTS: Readonly<Record<string, Part>> = {
     packages: ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
   },
   "src/core/wallet-evidence.ts": {
-    uses: [
-      "src/core/master-fingerprint.ts",
-      "src/core/coins.ts",
-      "src/core/coin-address-evidence.ts",
-    ],
+    // The coins come from the host; of the coin families it takes Bitcoin's alone.
+    uses: ["src/core/master-fingerprint.ts", "src/core/coin-address-evidence.ts"],
     packages: [
       // The master key from the seed, its account keys, and extended keys in every form.
       "@scure/bip32",
-      // Bitcoin addresses of the four profiles, and WIF private keys.
+      // WIF private keys; Bitcoin's addresses are read and compared by its coin.
       "@scure/btc-signer",
       // Whether a public key or the key of a WIF is a valid secp256k1 key.
       "@noble/curves/secp256k1.js",
@@ -104,7 +115,6 @@ const PARTS: Readonly<Record<string, Part>> = {
       "src/core/encoded-backup.ts",
       "src/core/masking.ts",
       "src/core/missing-codes.ts",
-      "src/sskr/repair-report.ts",
     ],
   },
   "src/core/backup-reading.ts": {
@@ -125,12 +135,18 @@ const PARTS: Readonly<Record<string, Part>> = {
   "src/core/candidate-list.ts": { uses: [] },
   // Only the encryption of candidate lists imports age.
   "src/core/candidate-encryption.ts": { uses: [], packages: ["age-encryption"] },
+  // The writing of a list: its phrases as entropy, encoded and protected, every copy wiped.
+  "src/core/candidate-list-writer.ts": {
+    uses: ["src/core/candidate-list.ts", "src/core/candidate-encryption.ts"],
+  },
   // Shamir shares: their forms, the repair of marked ones and what it tells, the split, a share
   // set, the shares as typed, and the phrases that restored sets give with their dates.
   "src/sskr/transport.ts": { uses: [] },
   "src/sskr/joint-repair.ts": { uses: ["src/sskr/share-platform.ts", "src/sskr/transport.ts"] },
   "src/sskr/repair-report.ts": { uses: ["src/sskr/joint-repair.ts"] },
-  "src/sskr/split.ts": { uses: ["src/sskr/share-platform.ts", "src/sskr/transport.ts"] },
+  "src/sskr/split.ts": {
+    uses: ["src/core/masking.ts", "src/sskr/share-platform.ts", "src/sskr/transport.ts"],
+  },
   "src/sskr/share-set.ts": {
     uses: ["src/sskr/joint-repair.ts", "src/sskr/repair-report.ts", "src/sskr/transport.ts"],
   },
@@ -147,10 +163,25 @@ const PARTS: Readonly<Record<string, Part>> = {
   "src/core/backup-options.ts": { uses: ["src/core/masking.ts", "src/sskr/split.ts"] },
   "src/core/backup-check.ts": {
     uses: [
+      "src/core/backup-reading.ts",
       "src/core/date-search.ts",
       "src/core/encoded-backup.ts",
       "src/sskr/share-set.ts",
       "src/sskr/share-input.ts",
+    ],
+  },
+  // The restore of a phrase from shares and the repair of shares, in the steps of every host.
+  "src/sskr/share-restore.ts": {
+    uses: [
+      "src/core/date-search.ts",
+      "src/core/encoded-backup.ts",
+      "src/core/masking.ts",
+      "src/sskr/joint-repair.ts",
+      "src/sskr/repair-report.ts",
+      "src/sskr/share-input.ts",
+      "src/sskr/share-set.ts",
+      "src/sskr/share-unmasking.ts",
+      "src/sskr/transport.ts",
     ],
   },
   // The known answers of SSKR, checked through the host's library.
@@ -199,7 +230,7 @@ const PARTS: Readonly<Record<string, Part>> = {
   // Every coin family's self-test as one row.
   "src/core/coins-self-test.ts": {
     uses: ["src/core/coin-address-evidence.ts", "src/core/master-fingerprint-self-test.ts"],
-    packages: ["@scure/base", ...COIN_PACKAGES],
+    packages: COIN_FAMILY_PACKAGES,
   },
   // The self-test of the rules, which a host runs on the person's request.
   "src/core/self-test.ts": {
@@ -222,24 +253,31 @@ const PARTS: Readonly<Record<string, Part>> = {
   // Cards of shares, the texts of a card design, and the sheet for heirs.
   "src/export/card-copy.ts": { uses: ["src/export/platform.ts"] },
   "src/export/sskr-render.ts": {
-    uses: ["src/export/platform.ts", "src/export/card-copy.ts", "src/sskr/transport.ts"],
+    uses: CARD_RENDERER_PARTS,
     packages: PDF_PACKAGES,
   },
   "src/export/heir-sheet.ts": { uses: ["src/export/platform.ts"], packages: PDF_PACKAGES },
+  // The formats of the files of cards and the rules that draw a page as an image.
+  "src/export/document-formats.ts": { uses: [] },
+  // A card PDF read back as drawing steps, which a host without Poppler paints as an image.
+  "src/export/card-drawing.ts": { uses: [], packages: PDF_PACKAGES },
+  // How saved share cards are kept, without PDF: what the shares restore and where each one is.
+  "src/export/sskr-keeping-text.ts": { uses: ["src/core/masking.ts", "src/sskr/transport.ts"] },
   // Sample cards drawn with the public test phrase.
   "src/export/card-preview.ts": {
-    // The renderers it draws with write share cards too, in the forms of transport.ts.
-    uses: ["src/export/platform.ts", "src/export/card-copy.ts", "src/sskr/transport.ts"],
+    uses: CARD_RENDERER_PARTS,
     packages: PDF_PACKAGES,
   },
   // The self-test check of the card renderers, which a host adds to its self-test.
   "src/export/cards-self-test.ts": {
-    // The renderers it draws with write share cards too, in the forms of transport.ts.
-    uses: ["src/export/platform.ts", "src/export/card-copy.ts", "src/sskr/transport.ts"],
+    uses: CARD_RENDERER_PARTS,
     packages: PDF_PACKAGES,
   },
-  // The words of the sheet name the share forms (ShareFormat) by their looks.
-  "src/export/heir-sheet-text.ts": { uses: ["src/export/heir-sheet.ts", "src/sskr/transport.ts"] },
+  // The words of the sheet name the share forms (ShareFormat) by their looks; the modes it takes
+  // are Masking's.
+  "src/export/heir-sheet-text.ts": {
+    uses: ["src/core/masking.ts", "src/export/heir-sheet.ts", "src/sskr/transport.ts"],
+  },
   // The checks of the sheet for heirs and of share cards, which a host adds when it offers them.
   "src/export/heir-sheet-self-test.ts": {
     uses: ["src/export/heir-sheet.ts", "src/export/heir-sheet-text.ts"],
@@ -263,37 +301,62 @@ const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   "src/core/date-recovery.ts": [],
   "src/core/wallet-check.ts": [],
   "src/core/search-turns.ts": [],
+  "src/core/search-plan.ts": [],
   "src/core/places.ts": [],
+  // The sizes of a BIP39 phrase, which every module takes without a word list, and the English
+  // words alone, which the share modules take without the Traditional Chinese list.
+  "src/core/bip39-sizes.ts": [],
+  "src/core/english-words.ts": [],
   "src/core/white-space.ts": [],
+  // Text and lists cut into pieces of one width, which the readers of codes and bits share.
+  "src/core/pieces.ts": [],
   "src/core/address-scan.ts": ["@scure/bip32"],
+  "src/core/bip32-limits.ts": [],
+  "src/core/typed-number.ts": [],
+  // How codes are written as text, which every reader of codes and shares lexes through.
+  "src/core/code-text.ts": [],
+  "src/core/prose.ts": [],
+  "src/core/redacted.ts": [],
+  // What a thrown value says, which readers of input and the self-tests share.
+  "src/core/refusal.ts": [],
   // What every self-test check is made of, which the checks beside each feature share.
   "src/core/self-test-check.ts": [],
   "src/sskr/repair.ts": [],
   "src/export/study-backdrops.ts": ["pdf-lib"],
   "src/export/card-codes.ts": [],
+  // The units of a page, which every renderer and the file formats share.
+  "src/export/page-units.ts": [],
+  // The installed designs and their styles, which the card texts, the share cards and a page read
+  // without the renderers.
+  "src/export/template-catalog.ts": [],
   // The coin families of core/coins.ts, each of which a host can take without the others.
+  "src/core/coins/address-sizes.ts": [],
   "src/core/coins/address-types.ts": ["@noble/hashes/sha2.js", "@noble/hashes/legacy.js"],
   "src/core/coins/taproot.ts": COIN_PACKAGES,
   "src/core/coins/keccak-account.ts": COIN_PACKAGES,
-  "src/core/coins/coin.ts": ["@scure/base", ...COIN_PACKAGES],
+  "src/core/coins/coin.ts": COIN_FAMILY_PACKAGES,
   "src/core/coins/base58-check.ts": ["@scure/base", "@noble/hashes/sha2.js"],
   "src/core/coins/other-forms.ts": ["@scure/base", "@noble/hashes/sha2.js"],
-  "src/core/coins/base58.ts": ["@scure/base", ...COIN_PACKAGES],
+  "src/core/coins/base58.ts": COIN_FAMILY_PACKAGES,
   "src/core/coins/bech32.ts": ["@scure/base"],
-  "src/core/coins/bitcoin-like.ts": ["@scure/base", ...COIN_PACKAGES],
-  "src/core/coins/bitcoin-cash.ts": ["@scure/base", ...COIN_PACKAGES],
-  "src/core/coins/dash.ts": ["@scure/base", ...COIN_PACKAGES],
-  "src/core/coins/evm.ts": ["@scure/base", ...COIN_PACKAGES],
-  "src/core/coins/cosmos.ts": ["@scure/base", ...COIN_PACKAGES],
-  "src/core/coins/xrp.ts": ["@scure/base", ...COIN_PACKAGES],
+  "src/core/coins/bitcoin-like.ts": COIN_FAMILY_PACKAGES,
+  "src/core/coins/bitcoin-cash.ts": COIN_FAMILY_PACKAGES,
+  // Bitcoin's version bytes, which Bitcoin Cash takes without Bitcoin's coin.
+  "src/core/coins/bitcoin-versions.ts": [],
+  "src/core/coins/dash.ts": COIN_FAMILY_PACKAGES,
+  "src/core/coins/ethereum.ts": COIN_FAMILY_PACKAGES,
+  "src/core/coins/evm.ts": COIN_FAMILY_PACKAGES,
+  "src/core/coins/cosmos.ts": COIN_FAMILY_PACKAGES,
+  "src/core/coins/xrp.ts": COIN_FAMILY_PACKAGES,
   // The self-test of each coin family, which a host of that family alone takes.
-  "src/core/coins/coin-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
-  "src/core/coins/bitcoin-like-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
-  "src/core/coins/bitcoin-cash-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
-  "src/core/coins/cosmos-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
-  "src/core/coins/dash-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
-  "src/core/coins/evm-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
-  "src/core/coins/xrp-self-test.ts": ["@scure/base", "@scure/bip32", ...COIN_PACKAGES],
+  "src/core/coins/coin-self-test.ts": COIN_SELF_TEST_PACKAGES,
+  "src/core/coins/bitcoin-like-self-test.ts": COIN_SELF_TEST_PACKAGES,
+  "src/core/coins/bitcoin-cash-self-test.ts": COIN_SELF_TEST_PACKAGES,
+  "src/core/coins/cosmos-self-test.ts": COIN_SELF_TEST_PACKAGES,
+  "src/core/coins/dash-self-test.ts": COIN_SELF_TEST_PACKAGES,
+  "src/core/coins/ethereum-self-test.ts": COIN_SELF_TEST_PACKAGES,
+  "src/core/coins/evm-self-test.ts": COIN_SELF_TEST_PACKAGES,
+  "src/core/coins/xrp-self-test.ts": COIN_SELF_TEST_PACKAGES,
 };
 
 /**
@@ -454,6 +517,29 @@ describe("Parts for other hosts, each imported alone", () => {
     }
   });
 
+  it("use exactly the parts that docs/ARCHITECTURE.md names for each", () => {
+    const name = (path: string): string => path.replace(/^src\//u, "").replace(/\.ts$/u, "");
+    // The self-tests are described there by the rule they follow, not one by one.
+    const isSelfTest = (path: string): boolean =>
+      path.endsWith("-self-test.ts") || path === "src/core/self-test.ts";
+    const expected = Object.fromEntries(
+      Object.entries(PARTS)
+        .filter(([path]) => !isSelfTest(path))
+        .map(([path, part]) => [name(path), part.uses.map(name).sort()]),
+    );
+    const documented = Object.fromEntries(
+      [
+        ...readFileSync("docs/ARCHITECTURE.md", "utf8").matchAll(/^- `([^`]+)` uses (.+)\.$/gmu),
+      ].map(([, part, uses]) => [
+        part,
+        uses === "no other part"
+          ? []
+          : [...uses!.matchAll(/`([^`]+)`/gu)].map((match) => match[1]!).sort(),
+      ]),
+    );
+    expect(documented).toEqual(expected);
+  });
+
   it("each have a package export of their own, and the package exports no other module", () => {
     const { exports } = JSON.parse(readFileSync("package.json", "utf8")) as {
       exports: Record<string, { types: string; import: string }>;
@@ -469,6 +555,22 @@ describe("Parts for other hosts, each imported alone", () => {
     );
     expect(parts).toEqual(expected);
     expect(Object.keys(exports)).toEqual(expect.arrayContaining(COMPATIBILITY_EXPORTS));
+  });
+});
+
+describe("Ethereum for a host of Ethereum alone", () => {
+  it("reaches neither the module of Ethereum Classic and Tron nor their names", () => {
+    for (const entry of ["src/core/coins/ethereum.ts", "src/core/coins/ethereum-self-test.ts"]) {
+      const modules = reachable(entry);
+      expect([...modules.keys()], entry).not.toContain("src/core/coins/evm.ts");
+      expect([...modules.keys()], entry).not.toContain("src/core/coins/evm-self-test.ts");
+      for (const name of modules.keys()) {
+        // Code only: a comment that names them is not built in.
+        const source = code(readFileSync(name, "utf8"));
+        for (const other of ["Ethereum Classic", "Tron", "0xFA22515E", "TUEZSdKs", "TTD7MudE"])
+          expect([name, source.includes(other)]).toEqual([name, false]);
+      }
+    }
   });
 });
 

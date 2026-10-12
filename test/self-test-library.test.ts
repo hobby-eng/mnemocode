@@ -6,8 +6,9 @@ import { COIN_ADDRESS_SELF_TEST } from "../src/core/coins-self-test.js";
 import { MasterFingerprintCheck, type Pbkdf2HmacSha512 } from "../src/core/master-fingerprint.js";
 import { MnemoCodeSelfTest, type SelfTestFeature } from "../src/core/self-test.js";
 import { WALLET_EVIDENCE_SELF_TEST } from "../src/core/wallet-evidence-self-test.js";
-import { HEIR_SHEET_SELF_TEST } from "../src/export/heir-sheet-self-test.js";
-import { SHARE_CARDS_SELF_TEST } from "../src/export/sskr-render-self-test.js";
+import { heirSheetSelfTest } from "../src/export/heir-sheet-self-test.js";
+import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { shareCardsSelfTest } from "../src/export/sskr-render-self-test.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 
 // The host services a page would give, here from Node.js, and the published vectors file.
@@ -37,8 +38,8 @@ const LIBRARY_ROWS = [
 const FEATURES = [
   WALLET_EVIDENCE_SELF_TEST,
   COIN_ADDRESS_SELF_TEST,
-  HEIR_SHEET_SELF_TEST,
-  SHARE_CARDS_SELF_TEST,
+  heirSheetSelfTest(nodeCardRenderer),
+  shareCardsSelfTest(nodeCardRenderer),
 ];
 const FEATURE_ROWS = ["Wallet evidence", "Coin addresses", "Heir sheet", "Share cards"];
 
@@ -67,7 +68,7 @@ describe("The self-test as a library (core/self-test.ts)", () => {
     expect(order).toEqual(["first", "last"]);
     expect(report.publicVectors).toBeGreaterThanOrEqual(7);
     expect(report.roundTrips).toBe(75);
-  }, 60_000);
+  });
 
   it("leaves out what needs a host service it does not get, as its rows say", async () => {
     const report = await new MnemoCodeSelfTest({
@@ -81,7 +82,7 @@ describe("The self-test as a library (core/self-test.ts)", () => {
     expect(detail("BIP39 seed")).not.toContain("24 BIP39 vectors");
     expect(detail("Share repair")).not.toContain("shares together");
     expect(detail("Backup check")).not.toContain("shares");
-  }, 60_000);
+  });
 
   it("stops at the first check that fails, and refuses a damaged vectors file", async () => {
     const failing = new MnemoCodeSelfTest({
@@ -95,7 +96,7 @@ describe("The self-test as a library (core/self-test.ts)", () => {
     });
     await expect(empty.run()).rejects.toThrow(/missing required vector/u);
     expect(() => new MnemoCodeSelfTest({ publicVectors } as never)).toThrow(TypeError);
-  }, 60_000);
+  });
 
   it("fails when the host's PBKDF2 gives another seed than a BIP39 vector's", async () => {
     const wrongSeeds = new MnemoCodeSelfTest({
@@ -105,7 +106,7 @@ describe("The self-test as a library (core/self-test.ts)", () => {
       pbkdf2: (password, _salt, rounds, bytes) => pbkdf2(password, "mnemonic", rounds, bytes),
     });
     await expect(wrongSeeds.run()).rejects.toThrow(/BIP39 seed vector mismatch/u);
-  }, 60_000);
+  });
 
   it("has a quick core check that needs nothing from the host", () => {
     expect(() => MnemoCodeSelfTest.core()).not.toThrow();
@@ -113,15 +114,26 @@ describe("The self-test as a library (core/self-test.ts)", () => {
   });
 
   it("runs the quick checks of every feature without the render platform (AUD-010-API002)", () => {
-    // The tests install the Node.js render platform for every file (vitest.config.ts), so the
-    // quick checks run in a process of their own, which imports none.
+    // In a process of its own, which loads no Node.js platform: the card features get a renderer
+    // whose every service throws, so a quick check that used one would fail.
     const script = `
       const { MnemoCodeSelfTest } = await import("./src/core/self-test.ts");
+      const { CardRenderer } = await import("./src/export/card-renderer.ts");
+      const refuse = () => {
+        throw new Error("A quick check used the render platform.");
+      };
+      const renderer = new CardRenderer({
+        readAsset: refuse,
+        randomInt: refuse,
+        decodePng: refuse,
+        encodePng: refuse,
+        qrModules: refuse,
+      });
       const features = [
         (await import("./src/core/wallet-evidence-self-test.ts")).WALLET_EVIDENCE_SELF_TEST,
         (await import("./src/core/coins-self-test.ts")).COIN_ADDRESS_SELF_TEST,
-        (await import("./src/export/heir-sheet-self-test.ts")).HEIR_SHEET_SELF_TEST,
-        (await import("./src/export/sskr-render-self-test.ts")).SHARE_CARDS_SELF_TEST,
+        (await import("./src/export/heir-sheet-self-test.ts")).heirSheetSelfTest(renderer),
+        (await import("./src/export/sskr-render-self-test.ts")).shareCardsSelfTest(renderer),
       ];
       MnemoCodeSelfTest.core(features);
       console.log("quick checks passed");

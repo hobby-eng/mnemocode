@@ -8,15 +8,18 @@ import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { crc32 } from "../src/sskr/checksum.js";
 import { planJointRepair, type RepairedSet } from "../src/sskr/joint-repair.js";
-import { AUTO_SECONDS, REPAIR_NOTES, RepairReport } from "../src/sskr/repair-report.js";
+import { REPAIR_NOTES, RepairReport } from "../src/sskr/repair-report.js";
+import { QUESTION_SECONDS } from "../src/core/search-turns.js";
 import { ShareInput, type TypedShare } from "../src/sskr/share-input.js";
+import { ShareRestore, signalWatch } from "../src/sskr/share-restore.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import type { SharePlatform } from "../src/sskr/share-platform.js";
 import { SHARE_FORMAT_NAMES, ShareExport, ShareSet } from "../src/sskr/share-set.js";
 import { ShareSplit } from "../src/sskr/split.js";
-import { transportToUr, urToTransport, writeShare } from "../src/sskr/transport.js";
+import { writeShare } from "../src/sskr/transport.js";
+import { counted, duration } from "../src/core/search-plan.js";
+import { markUnits, wrongValue } from "./helpers/shares.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const vectors = JSON.parse(
@@ -36,27 +39,9 @@ const PHRASE = entropyToMnemonic(bytes(vectors.deterministic[0]!.entropy), wordl
 const OTHER_SET_SHARE = vectors.deterministic[1]!.shares[0]!;
 /** The host's reader of an encoded seed phrase, which a phrase typed as a share is sent to. */
 const TEXTS = { decodeEntry: "The Decode tab" };
-/** A byte of the share value: the header, identifier and member numbers come before it. */
-const VALUE_BYTE = 10;
-/** The CRC-32 at the end of a share's transport bytes. */
-const CRC_BYTES = 4;
-
-/** `share` with one value byte flipped and its CRC-32 written anew: valid, but wrong. */
-function wrongValue(share: string): string {
-  const transport = urToTransport(share);
-  transport[VALUE_BYTE]! ^= 1;
-  new DataView(transport.buffer, transport.byteOffset, transport.byteLength).setUint32(
-    transport.length - CRC_BYTES,
-    crc32(transport.slice(0, -CRC_BYTES)),
-  );
-  return transportToUr(transport);
-}
-
 /** The second share in colours with the elements at `marks` unreadable. */
 function marked(marks: readonly number[]): string {
-  const parts = writeShare(SHARES[1], "colors").split(" ");
-  for (const place of marks) parts[place] = "?";
-  return parts.join(" ");
+  return markUnits(SHARES[1], "colors", marks);
 }
 
 /** The Node.js platform, counting what is asked of it. */
@@ -102,7 +87,8 @@ describe("ShareSplit", () => {
     const shares = await new ShareSplit(platform, (seed) => seed.fill(7)).split(TEST_PHRASE, 2, 3);
     expect(shares).toHaveLength(3);
     expect(platform.created).toBe(1);
-    expect(platform.combined).toBe(1);
+    // The first two shares restore the phrase, and the third, in place of one of them, again.
+    expect(platform.combined).toBe(2);
     const short: SharePlatform = {
       ...nodeSharePlatform,
       createShares: async (...args) => (await nodeSharePlatform.createShares(...args)).slice(1),
@@ -127,11 +113,11 @@ describe("ShareSplit", () => {
       [2.5, 3],
     ] as const)
       expect(() => ShareSplit.validateThreshold(threshold, count)).toThrow(
-        "SSKR requires 2 <= threshold <= shares <= 16.",
+        "A split needs a threshold from 2 to the number of shares, and at most 16 shares: with a threshold of 1 no share would be checked.",
       );
     await expect(
       new ShareSplit(nodeSharePlatform, () => {}).split(`${TEST_PHRASE} abandon`, 2, 3),
-    ).rejects.toThrow("Enter 12, 15, 18, 21, or 24 English BIP39 words.");
+    ).rejects.toThrow("Enter 12, 15, 18, 21 or 24 English BIP39 words.");
   });
 });
 
@@ -211,7 +197,7 @@ describe("ShareSet", () => {
     expect(set.mnemonic).toBe(PHRASE);
     expect(set.shares[1]!.repaired).toBe(true);
     expect(set.backupForm).toBe("english");
-    const plan = await planJointRepair([SHARES[0], marked([5])]);
+    const plan = await planJointRepair([SHARES[0], marked([5])], { platform: nodeSharePlatform });
     const [found] = await plan.search();
     const taken = ShareSet.of(found!);
     expect(taken.toRepairedSet()).toEqual(found);
@@ -222,6 +208,45 @@ describe("ShareSet", () => {
     expect(() => (taken.shares as unknown[]).pop()).toThrow(TypeError);
     expect(() => (handed.shares[1]!.filled as unknown[]).pop()).toThrow(TypeError);
     expect(taken.mnemonic).toBe(PHRASE);
+  });
+});
+
+describe("ShareRestore", () => {
+  function markedInput(): ShareInput {
+    const input = new ShareInput(TEXTS);
+    input.add([SHARES[0], marked([5])]);
+    return input;
+  }
+
+  it.each([undefined, new AbortController().signal])(
+    "reads and searches marked shares with optional signal %s",
+    async (signal) => {
+      const restore = new ShareRestore(nodeSharePlatform);
+      const read = await restore.read(markedInput(), signalWatch(signal));
+      expect(read.kind).toBe("marked");
+      if (read.kind !== "marked") throw new Error("Expected marked shares.");
+      const found = await restore.search(read, { signal });
+      expect(found.kind).toBe("sets");
+      expect(found.kind === "sets" && found.sets.map((set) => set.mnemonic)).toEqual([PHRASE]);
+    },
+  );
+
+  it("passes the host's stop to the assessment", async () => {
+    const stop = new AbortController();
+    stop.abort(new Error("Assessment stopped."));
+    await expect(
+      new ShareRestore(nodeSharePlatform).read(markedInput(), signalWatch(stop.signal)),
+    ).rejects.toThrow("Assessment stopped.");
+  });
+
+  it("passes the host's stop to the search", async () => {
+    const restore = new ShareRestore(nodeSharePlatform);
+    const read = await restore.read(markedInput());
+    expect(read.kind).toBe("marked");
+    if (read.kind !== "marked") throw new Error("Expected marked shares.");
+    const stop = new AbortController();
+    stop.abort(new Error("Search stopped."));
+    await expect(restore.search(read, { signal: stop.signal })).rejects.toThrow("Search stopped.");
   });
 });
 
@@ -337,7 +362,8 @@ describe("ShareInput", () => {
       trouble: {
         kind: "odd",
         place: 3,
-        message: "Share 3 does not fit with the others: with it they give another phrase or none.",
+        message:
+          "Share 3 does not fit with the others: with it they give another phrase or none. Leave it out, or check it.",
       },
     });
   });
@@ -398,7 +424,7 @@ describe("ShareInput", () => {
     input.add([marked([5]), "?".repeat(3)]);
     expect(input.firstUnreadable()).toBeUndefined();
     input.leaveOut(2);
-    const plan = await planJointRepair(input.texts());
+    const plan = await planJointRepair(input.texts(), { platform: nodeSharePlatform });
     expect(input.assessmentTrouble(plan.assessment)).toEqual({
       kind: "few",
       message: "Too few shares: the threshold of this set needs more of them.",
@@ -414,16 +440,18 @@ describe("ShareInput", () => {
 
 describe("RepairReport", () => {
   it("says a time and a count in words", () => {
-    expect(RepairReport.duration(0.5)).toBe("under a second");
-    expect(RepairReport.duration(1)).toBe("about 1 second");
-    expect(RepairReport.duration(90)).toBe("about 2 minutes");
-    expect(RepairReport.duration(3 * 86_400)).toBe("about 3 days");
-    expect(RepairReport.counted(1, "share combination")).toBe("1 share combination");
-    expect(RepairReport.counted(65_536, "date combination")).toBe("65,536 date combinations");
+    expect(duration(0.5)).toBe("under a second");
+    expect(duration(1)).toBe("about 1 second");
+    expect(duration(90)).toBe("about 2 minutes");
+    expect(duration(3 * 86_400)).toBe("about 3 days");
+    expect(counted(1, "share combination")).toBe("1 share combination");
+    expect(counted(65_536, "date combination")).toBe("65,536 date combinations");
   });
 
   it("gives the lines of an assessment, and when to ask before the search", async () => {
-    const settled = await planJointRepair([SHARES[0], marked([5])]);
+    const settled = await planJointRepair([SHARES[0], marked([5])], {
+      platform: nodeSharePlatform,
+    });
     expect(new RepairReport(settled.assessment, 1).lines()).toEqual([
       {
         kind: "status",
@@ -432,7 +460,9 @@ describe("RepairReport", () => {
         good: true,
       },
     ]);
-    const open = await planJointRepair([SHARES[0], marked([5, 7])]);
+    const open = await planJointRepair([SHARES[0], marked([5, 7])], {
+      platform: nodeSharePlatform,
+    });
     const report = new RepairReport(open.assessment, 65_536, [1, 4]);
     const lines = report.lines();
     expect(lines[0]).toEqual({
@@ -463,9 +493,11 @@ describe("RepairReport", () => {
       "Search 3,600 date combinations for each of the 3 phrases, about 18 hours?",
     );
     // Asked for first only when it takes longer than twelve hours at this pace.
-    expect(AUTO_SECONDS).toBe(43_200);
-    expect(new RepairReport(open.assessment, 65_536 / AUTO_SECONDS).needsQuestion()).toBe(false);
-    expect(new RepairReport(open.assessment, 65_536 / (AUTO_SECONDS + 1)).needsQuestion()).toBe(
+    expect(QUESTION_SECONDS).toBe(43_200);
+    expect(new RepairReport(open.assessment, 65_536 / QUESTION_SECONDS).needsQuestion()).toBe(
+      false,
+    );
+    expect(new RepairReport(open.assessment, 65_536 / (QUESTION_SECONDS + 1)).needsQuestion()).toBe(
       true,
     );
     const dates = { combinations: 10, secondsEach: 6 };
@@ -484,7 +516,7 @@ describe("RepairReport", () => {
   });
 
   it("says what a repair filled in, by the place of each share", async () => {
-    const plan = await planJointRepair([SHARES[0], marked([5])]);
+    const plan = await planJointRepair([SHARES[0], marked([5])], { platform: nodeSharePlatform });
     const [set] = await plan.search();
     const lines = RepairReport.repairLines(set!, [1, 3]);
     expect(lines[0]).toMatchObject({ kind: "warning" });

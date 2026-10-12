@@ -13,6 +13,9 @@
 - Each executable comes with a file of license notices for Node.js and every library it contains, and a release draft is made only after the complete CI has passed.
 - GitHub signs the build provenance of every release file: `gh attestation verify` shows that a download was built from this repository by its release workflow.
 - The `SHA256SUMS` of every release is signed with the maintainer's OpenPGP key, fingerprint `28FC51B1DB80DF2101128CB30EDD4814591DD095`, which GitHub also shows at https://github.com/hobby-eng.gpg. A tag creates a draft release, which the maintainer checks and signs on their own computer with `scripts/sign-release.mjs` before publishing it with `SHA256SUMS.asc` and `RELEASE-SIGNING-KEY.asc`; [Releasing](docs/RELEASING.md) describes the steps.
+- More parts of the library have an entry point of their own: `mnemocode/core/candidate-list-writer` writes a candidate list as the command line does, `mnemocode/sskr/share-restore` takes a page through the restore from shares step by step, `mnemocode/export/document-formats` names the kinds of card files, `mnemocode/export/card-drawing` reads the pages of card PDFs as drawing steps for a page without Poppler, and `mnemocode/export/sskr-keeping-text` says how saved shares are kept.
+- The SSKR engine names its two share encodings, `ShareEncoding.CompactUr` and `ShareEncoding.Bytewords`, instead of bare numbers. Its refusals name no host: "SSKR requires exactly 32 bytes of fresh randomness." and, for either encoding, "Enter at least one SSKR share."
+- The package and the executable no longer carry the font subset for the Traditional Chinese BIP39 words, which no card used.
 
 ### Formats
 
@@ -49,6 +52,21 @@
 - A date needs a four-digit year. `23-09-26` was read as the year 23 and is now an error.
 - A record header whose version is written with leading zeros, such as `MNC01:`, is refused instead of being read as `MNC1:`.
 - A damaged candidate list is refused with the reason that age gives, such as a wrong tag, in a browser too, where it was replaced by the browser's own error.
+- `--share-file` reads shares one per line or separated by `;`, as they are typed, and joins a share that is wrapped over several lines. A file that holds a seed phrase instead of shares is refused, as a typed one is. A share written with commas between its elements is read like one written with spaces.
+- The type of a testnet address is described as "testnet, …", such as "testnet, Taproot (BIP86)", for every coin, Dash Core addresses included.
+- When more than 100 sets of codes with `?` fit, Decode says how many fit; before, the count stopped at 100.
+- When `recover-date` cannot show every candidate, it also offers to change the dates, as Decode does.
+- A message about a date no longer writes "BIP39" as "bIP39".
+- Several refusals say more plainly what is wrong:
+  - A split: "A split needs a threshold from 2 to the number of shares, and at most 16 shares: with a threshold of 1 no share would be checked." `--threshold` and `--shares` outside that range are refused as numbers "from 2 through 16".
+  - A `--mode` or `--format` that differs from the record: "The record was made with …, not with …." and "The record holds … codes, not …."
+  - A share that does not fit with the others: "Share N does not fit with the others: with it they give another phrase or none. Leave it out, or check it."
+  - `--list-candidates` and `--encoded-fingerprint` name their option: "--list-candidates: a list holds at most 16 candidates; …" and "--encoded-fingerprint: these codes keep no checksum, so their encoded fingerprint cannot tell them."
+  - Codes that fit no form: "These codes fit no form of an encoded seed phrase.", as for codes with `?`.
+  - An address of Bitcoin, Litecoin, Bitcoin Cash or Dash that is not the address of a single key: "it is not the address of a single key; only … can be checked".
+  - Color Unicode with a code missing: "Color Unicode needs two four-digit codes for every color", with the numbers of codes allowed.
+  - A candidate file that the Scanner key or the passphrase does not open: "This Scanner key does not open the candidate file, or its header is damaged (…)"; one whose contents only are damaged: "The candidate file is damaged (…)".
+  - Lists of choices in messages have no comma before "or", such as "12, 15, 18, 21 or 24".
 
 ### Secret handling
 
@@ -70,6 +88,7 @@
 - Before a secret, MnemoCode warns when swap is not encrypted (Linux) and when a file would be saved into a folder that a cloud service synchronises.
 - On Linux the temporary files of PNG and JPEG export stay in memory (`/dev/shm`).
 - The folder that holds the separate cards of one Shamir share can be read only by your user account, like the other export folders.
+- A command refuses an output folder that cannot be written before it asks for a secret, as the menu already did. An output given as `-` or left empty is refused with "The … needs a path; - and empty paths are not accepted."
 
 ### Card exports
 
@@ -88,6 +107,12 @@
 - Each Shamir share has its own page, and a QR code holds exactly one share.
 - Other programs can render the same cards through the `mnemocode/cards` entry point, which has no Node.js dependency. A card session keeps the same invented person, company and studio for every export of one working session.
 - Text on business cards is aligned with its icon or logo, and a role no longer touches the name above it.
+- The dated Unicode card and its options `--event` and `--events` are removed: no card design ever printed it. Codes written as Unicode codes (format 3) have no cards: "Card export requires format 4 or 5."
+- A glass card of a seed phrase prints the series `01`, as the sheets do (`01 / 01-02`), instead of "Collection reference".
+- The colours of a glass card fill each ribbon up to the edges of the card, where the frosted glass left them pale and showed some of the photographed gold.
+- After shares are saved, one note says how many of them restore the phrase, or with Seedshift only the masked phrase, and where each share is in what was saved. It replaces the notes "Each PDF contains ONE SSKR share…" and "Each folder is one share…".
+- Separate sample cards show one design: `preview --all --cards-dir` is refused with "Separate sample cards show one design: choose one design.", before the folder is checked.
+- The glass design with four cards in one photograph reads its artwork again after a failed read, instead of failing every later export.
 
 ### Toolchain and dependencies
 

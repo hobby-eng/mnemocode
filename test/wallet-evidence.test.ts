@@ -10,7 +10,6 @@ import {
   defaultAddressCount,
   MAX_ADDRESS_COUNT,
   WalletEvidenceCheck,
-  assertBitcoinEvidence,
   bitcoinProfiles,
   parseBitcoinAddress,
   parseMasterFingerprint,
@@ -20,14 +19,19 @@ import {
   type EvidenceMatch,
   type Pbkdf2HmacSha512,
 } from "../src/core/wallet-evidence.js";
-import { masterFingerprint, matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
+import {
+  masterFingerprint,
+  matchBitcoinEvidence,
+  assertBitcoinEvidence,
+} from "../src/bitcoin-evidence.js";
+import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
 
 const publicMnemonic = "abandon ".repeat(11) + "about";
 
 /** The pure JavaScript PBKDF2 that @scure/bip39 uses, as a page passes it. */
 const noblePbkdf2 = ((password, salt, rounds, bytes) =>
   pbkdf2(sha512, password, salt, { c: rounds, dkLen: bytes })) satisfies Pbkdf2HmacSha512;
-const browserCheck = new WalletEvidenceCheck(noblePbkdf2);
+const browserCheck = new WalletEvidenceCheck(noblePbkdf2, [BITCOIN]);
 
 /** The BIP84 vectors of the public phrase (BIP-0084, "Test vectors"). */
 const BIP84 = {
@@ -104,7 +108,7 @@ function recordingHost() {
     seeds.push(seed);
     return seed;
   };
-  return { check: new WalletEvidenceCheck(host), calls, seeds };
+  return { check: new WalletEvidenceCheck(host, [BITCOIN]), calls, seeds };
 }
 
 describe("every kind of wallet evidence, with a page's PBKDF2", () => {
@@ -318,17 +322,19 @@ describe("the host's PBKDF2", () => {
 
   it("must give 64 bytes", () => {
     const short = new Uint8Array(32).fill(1);
-    const check = new WalletEvidenceCheck(() => short);
+    const check = new WalletEvidenceCheck(() => short, [BITCOIN]);
     expect(() => check.fingerprint(publicMnemonic)).toThrow("gave 32 bytes, not 64");
     expect(short.every((byte) => byte === 0)).toBe(true);
-    const text = new WalletEvidenceCheck((() => "seed") as unknown as Pbkdf2HmacSha512);
+    const text = new WalletEvidenceCheck((() => "seed") as unknown as Pbkdf2HmacSha512, [BITCOIN]);
     expect(() => text.fingerprint(publicMnemonic)).toThrow(TypeError);
-    expect(() => new WalletEvidenceCheck(undefined as never)).toThrow(TypeError);
+    expect(() => new WalletEvidenceCheck(undefined as never, [BITCOIN])).toThrow(TypeError);
   });
 
   it("can be node:crypto's, with the same result", () => {
-    const node = new WalletEvidenceCheck((password, salt, rounds, bytes) =>
-      Uint8Array.from(pbkdf2Sync(password, salt, rounds, bytes, "sha512")),
+    const node = new WalletEvidenceCheck(
+      (password, salt, rounds, bytes) =>
+        Uint8Array.from(pbkdf2Sync(password, salt, rounds, bytes, "sha512")),
+      [BITCOIN],
     );
     for (const passphrase of ["", "TREZOR", "😀 two words"])
       expect(node.fingerprint(publicMnemonic, passphrase)).toBe(
@@ -351,7 +357,7 @@ describe("a PBKDF2 that answers later, as WebCrypto's does", () => {
     );
     return new Uint8Array(bits);
   };
-  const webCheck = new WalletEvidenceCheck(webCryptoPbkdf2);
+  const webCheck = new WalletEvidenceCheck(webCryptoPbkdf2, [BITCOIN]);
 
   it("matches and fingerprints with matchAsync and fingerprintAsync, as the synchronous forms do", async () => {
     await expect(webCheck.fingerprintAsync(publicMnemonic)).resolves.toBe("73c5da0a");
@@ -379,11 +385,11 @@ describe("a PBKDF2 that answers later, as WebCrypto's does", () => {
 
   it("checks the phrase before the host's work, and the bytes it gives", async () => {
     const pbkdf2Spy = vi.fn(webCryptoPbkdf2);
-    await expect(new WalletEvidenceCheck(pbkdf2Spy).fingerprintAsync("abandon")).rejects.toThrow(
-      "Invalid mnemonic",
-    );
+    await expect(
+      new WalletEvidenceCheck(pbkdf2Spy, [BITCOIN]).fingerprintAsync("abandon"),
+    ).rejects.toThrow("Invalid mnemonic");
     expect(pbkdf2Spy).not.toHaveBeenCalled();
-    const short = new WalletEvidenceCheck(async () => new Uint8Array(32));
+    const short = new WalletEvidenceCheck(async () => new Uint8Array(32), [BITCOIN]);
     await expect(short.fingerprintAsync(publicMnemonic)).rejects.toThrow(
       "The host's PBKDF2 gave 32 bytes, not 64.",
     );
@@ -414,7 +420,9 @@ describe("the validators, which need no phrase", () => {
         "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3",
         "mainnet",
       ),
-    ).toThrow("This address belongs to a script, not to one key");
+    ).toThrow(
+      "The address cannot be used for the check: it is not the address of a single key; only bc1q with 42 characters or bc1p can be checked.",
+    );
   });
 
   it("accept every kind that a wallet can match", () => {
@@ -476,7 +484,7 @@ describe("several addresses in a row, from the location's index on", () => {
       { ...located("account-xpub", BIP84.accountZpub, ["native-segwit"]), addresses: 1 },
     ] as BitcoinEvidence[])
       expect(() => assertBitcoinEvidence(evidence), evidence.kind).toThrow(
-        "Only an address, a compressed public key or a WIF is compared with several addresses.",
+        "Only an address, an address of another coin, a compressed public key or a WIF is compared with several addresses.",
       );
     expect(defaultAddressCount(0)).toBe(DEFAULT_ADDRESS_COUNT);
     expect(defaultAddressCount(0x7fffffff)).toBe(1);
@@ -504,7 +512,10 @@ describe("the keys that a comparison derives", () => {
   it("hold no private key when it returns, on the way to the key it compares too", async () => {
     const roots = vi.spyOn(HDKey, "fromMasterSeed");
     const children = vi.spyOn(HDKey.prototype, "deriveChild");
-    const later = new WalletEvidenceCheck(async (...parameters) => noblePbkdf2(...parameters));
+    const later = new WalletEvidenceCheck(
+      async (...parameters) => noblePbkdf2(...parameters),
+      [BITCOIN],
+    );
     // The Taproot ones are found in the last of the four profiles, after the other three paths.
     const evidence = [
       located("address", BIP86.firstReceiving, bitcoinProfiles),

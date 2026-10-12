@@ -13,6 +13,8 @@ export-*/
 exports/
 # Cards written by scripts/check-card-output.mjs and scripts/business-goldens.mjs.
 goldens/
+# Bytecode that Python writes beside the scripts and audit harnesses it imports.
+__pycache__/
 
 # Audit evidence stays local; only the harness scripts are published (docs/audits/README.md).
 docs/audits/*-evidence/

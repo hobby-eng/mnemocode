@@ -10,15 +10,23 @@
 // Does not: restore or repair the shares (ShareSet, JointRepair), ask for the dates or the
 // wallet, or show anything.
 
-import { DatesAnswer, DateSearch, type DateSearchRun } from "../core/date-search.js";
+import {
+  DatesAnswer,
+  DateSearch,
+  type DateSearchRun,
+  walletNeeded,
+  secondsEach,
+} from "../core/date-search.js";
 import { EncodedBackup } from "../core/encoded-backup.js";
-import { Masking } from "../core/masking.js";
-import type { WalletCheck } from "../core/wallet-check.js";
+import { Masking, type SplitMode } from "../core/masking.js";
+import { askWallet, type WalletCheck } from "../core/wallet-check.js";
 import type { RepairedSet } from "./joint-repair.js";
 import type { DateWork } from "./repair-report.js";
+import { Redacted } from "../core/redacted.js";
+import { BIP39_WORD_COUNTS } from "../core/bip39-sizes.js";
 
 /** The two modes in which shares are made: SSKR splits the entropy of a valid BIP39 phrase. */
-export type ShareMode = "direct" | "seedshift";
+export type ShareMode = SplitMode;
 
 /** What a restore of shares is unmasked with. */
 export interface UnmaskingOptions {
@@ -53,23 +61,21 @@ export type Unmasked =
     }
   | { readonly kind: "dates"; readonly message: string };
 
-/** What toString, toJSON and Node.js's inspect show: never a date. */
-const REDACTED = "[ShareUnmasking: redacted]";
 /**
  * A phrase length for the wallet checks of one date combination: MnemoCode Seedshift gives one
  * valid phrase for every date, whatever the number of words, and the time of a search is told
  * before the shares say how many words their phrase has.
  */
-const ANY_WORD_COUNT = 12;
+const ANY_WORD_COUNT = BIP39_WORD_COUNTS[0];
 /** The longest phrase, which the decoding of the dates is timed with (secondsPerCombination). */
-const LONGEST_PHRASE = 24;
+const LONGEST_PHRASE = BIP39_WORD_COUNTS.at(-1)!;
 
 /**
  * How the sets of one restore are turned into seed phrases. A class, so that a host builds it once
  * with the mode, the dates and its wallet check, and the time it announces and the search it runs
  * follow from the same; it keeps the dates out of toString, toJSON and Node.js's inspect.
  */
-export class ShareUnmasking {
+export class ShareUnmasking extends Redacted {
   readonly #mode: ShareMode;
   readonly #dates: DatesAnswer | undefined;
   readonly #walletCheck: WalletCheck | undefined;
@@ -77,12 +83,13 @@ export class ShareUnmasking {
   readonly #keep: number | undefined;
 
   constructor(options: UnmaskingOptions) {
-    if (options.mode !== "direct" && options.mode !== "seedshift")
-      throw new Error("Shares are made without Seedshift or with MnemoCode Seedshift.");
-    if (options.mode === "seedshift" && !(options.dates instanceof DatesAnswer))
+    super("ShareUnmasking");
+    Masking.assertSplitMode(options.mode);
+    const masked = Masking.isMaskedMode(options.mode);
+    if (masked && !(options.dates instanceof DatesAnswer))
       throw new TypeError("A Seedshift phrase is unmasked with its dates, a DatesAnswer.");
     this.#mode = options.mode;
-    this.#dates = options.mode === "direct" ? undefined : options.dates;
+    this.#dates = masked ? options.dates : undefined;
     this.#walletCheck = options.walletCheck;
     this.#maxShown = options.maxShown;
     this.#keep = options.keep;
@@ -91,6 +98,19 @@ export class ShareUnmasking {
   /** Whether a date holds ?, so that each phrase of the shares is searched. */
   get searches(): boolean {
     return this.#dates?.hasForgottenDigits === true;
+  }
+
+  /**
+   * The date combinations that each phrase is searched with, which a wallet that no phrase matches
+   * is said against (ShareSet.walletMismatch); undefined without a search.
+   */
+  get searchedCombinations(): number | undefined {
+    return this.searches ? this.#dates!.combinations : undefined;
+  }
+
+  /** Whether the search needs the wallet to tell the right dates (walletNeeded). */
+  get needsWallet(): boolean {
+    return this.searches && walletNeeded(this.#mode);
   }
 
   /**
@@ -103,15 +123,15 @@ export class ShareUnmasking {
   async dateWork(): Promise<DateWork | undefined> {
     // Only a masked phrase has dates to search.
     const mode = this.#mode;
-    if (!this.searches || mode === "direct") return undefined;
+    if (!this.searches || !Masking.isMaskedMode(mode)) return undefined;
     const dates = this.#dates!;
     // The shares do not say yet how long their phrase is; every count of dates fits 24 words.
-    const decoding = DateSearch.secondsPerCombination(mode, dates, LONGEST_PHRASE);
+    const perCombination = DateSearch.secondsPerCombination(mode, dates, LONGEST_PHRASE);
     if (this.#walletCheck === undefined)
-      return { combinations: dates.combinations, secondsEach: decoding };
+      return { combinations: dates.combinations, secondsEach: perCombination };
+    const pace = { perCombination, perCheck: await DateSearch.secondsPerCheck(this.#walletCheck) };
     const checks = Masking.of(mode).checksPerCombination(ANY_WORD_COUNT);
-    const secondsPerCheck = await DateSearch.secondsPerCheck(this.#walletCheck);
-    return { combinations: dates.combinations, secondsEach: decoding + checks * secondsPerCheck };
+    return { combinations: dates.combinations, secondsEach: secondsEach(pace, checks) };
   }
 
   /**
@@ -123,12 +143,13 @@ export class ShareUnmasking {
   async unmask(sets: readonly RepairedSet[], run: DateSearchRun = {}): Promise<Unmasked> {
     const phrases: UnmaskedPhrase[] = [];
     const listed: string[] = [];
+    const mode = this.#mode;
     for (const set of sets) {
-      if (this.#dates === undefined) {
+      if (this.#dates === undefined || !Masking.isMaskedMode(mode)) {
         if (await this.#matches(set.mnemonic)) phrases.push({ set, mnemonic: set.mnemonic });
         continue;
       }
-      const backup = EncodedBackup.read(set.mnemonic, "english", "seedshift");
+      const backup = EncodedBackup.read(set.mnemonic, "english", mode);
       const tooMany = this.#dates.tooManyFor(backup.indexes.length);
       if (tooMany !== undefined) return { kind: "dates", message: tooMany };
       if (!this.#dates.hasForgottenDigits) {
@@ -140,7 +161,7 @@ export class ShareUnmasking {
       const result = await new DateSearch({
         indexes: backup.indexes,
         dates: this.#dates,
-        mode: "seedshift",
+        mode,
         walletCheck: this.#walletCheck,
         maxShown: this.#maxShown,
         keep,
@@ -162,18 +183,8 @@ export class ShareUnmasking {
 
   /** Whether `mnemonic` is the wallet's; every phrase is without a wallet check. */
   async #matches(mnemonic: string): Promise<boolean> {
-    return this.#walletCheck === undefined || (await this.#walletCheck(mnemonic)).matched;
-  }
-
-  toString(): string {
-    return REDACTED;
-  }
-
-  toJSON(): string {
-    return REDACTED;
-  }
-
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED;
+    return (
+      this.#walletCheck === undefined || (await askWallet(this.#walletCheck, mnemonic)).matched
+    );
   }
 }

@@ -22,6 +22,9 @@ export const MENU_ENTRY_NAMES = {
   quit: { digit: 0, label: "Quit" },
 } as const satisfies Readonly<Record<string, MenuEntryName>>;
 
+/** The answer of the menu that types an encoded seed phrase in, which the sheet for heirs names. */
+export const TYPED_SOURCE = "Type or paste it";
+
 /** An entry as the menu shows it, its digit before its label: "2 Decode numbers, …". */
 export function shownEntry(entry: MenuEntryName): string {
   return `${entry.digit} ${entry.label}`;

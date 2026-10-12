@@ -1,21 +1,70 @@
-import { link, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
+/** Owner-only access to a file of a backup: read and write for its owner, nothing for others. */
+const PRIVATE_FILE_MODE = 0o600;
+/** Owner-only access to a folder of a backup's files. */
+const PRIVATE_FOLDER_MODE = 0o700;
+
 /**
- * Replace an export only after its complete contents have been written privately.
- * The temporary directory is on the destination filesystem so rename is atomic.
- * A new file replaces the destination itself, including an existing symlink;
- * this never writes through the symlink into some other file.
+ * Writes `bytes` as a new file at `path` that only its owner may read; fails with EEXIST when
+ * something is there already, so that nothing is ever written over or through it.
  */
-export async function replacePrivateFile(path: string, bytes: Uint8Array): Promise<void> {
-  const destination = resolve(path);
+export async function writeNewPrivateFile(path: string, bytes: Uint8Array): Promise<void> {
+  await writeFile(path, bytes, { flag: "wx", mode: PRIVATE_FILE_MODE });
+}
+
+/** Makes the new folder `path`, which only its owner may open. */
+export async function makePrivateFolder(path: string): Promise<void> {
+  await mkdir(path, { mode: PRIVATE_FOLDER_MODE });
+}
+
+/**
+ * A file saved in full whose private staging folder, which holds a copy of it, could not be
+ * removed afterwards. Not a failed save: the file is complete, and the person is told that it is
+ * saved and that the folder is to be deleted, never left unaware of the copy (AUD-014,
+ * adjudication "Cleanup can fail after file publication").
+ */
+export class LeftStagingCopy extends Error {
+  readonly saved: string;
+  readonly staging: string;
+
+  constructor(saved: string, staging: string, cause: unknown) {
+    super(
+      `Saved ${saved}, but its private staging folder ${staging}, which holds a copy of it, could not be removed: delete it.`,
+      { cause },
+    );
+    this.name = "LeftStagingCopy";
+    this.saved = saved;
+    this.staging = staging;
+  }
+}
+
+/**
+ * Writes `bytes` to a new private file in a staging folder beside `destination`, on its file
+ * system, so that a link to it or a rename of it is atomic, and hands it to `publish`; the staging
+ * folder is removed afterwards, whatever happens. A removal that fails after the file was
+ * published is a LeftStagingCopy, not a failed save.
+ */
+async function withStagedFile(
+  destination: string,
+  bytes: Uint8Array,
+  publish: (temporary: string) => Promise<void>,
+): Promise<void> {
   const staging = await mkdtemp(join(dirname(destination), ".mnemocode-export-"));
+  let published = false;
   try {
     const temporary = join(staging, "document");
-    await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
-    await rename(temporary, destination);
+    await writeNewPrivateFile(temporary, bytes);
+    await publish(temporary);
+    published = true;
   } finally {
-    await rm(staging, { recursive: true, force: true });
+    try {
+      await rm(staging, { recursive: true, force: true });
+    } catch (error) {
+      if (!published) throw error;
+      throw new LeftStagingCopy(destination, staging, error);
+    }
   }
 }
 
@@ -32,15 +81,12 @@ const NO_HARD_LINKS = new Set(["EPERM", "ENOTSUP", "EOPNOTSUPP", "ENOSYS"]);
  */
 export async function publishNewPrivateFile(path: string, bytes: Uint8Array): Promise<void> {
   const destination = resolve(path);
-  const staging = await mkdtemp(join(dirname(destination), ".mnemocode-export-"));
-  try {
-    const temporary = join(staging, "document");
-    await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
+  await withStagedFile(destination, bytes, async (temporary) => {
     try {
       await link(temporary, destination);
     } catch (error) {
       if (!NO_HARD_LINKS.has((error as NodeJS.ErrnoException).code ?? "")) throw error;
-      await writeFile(destination, new Uint8Array(), { flag: "wx", mode: 0o600 });
+      await writeNewPrivateFile(destination, new Uint8Array());
       try {
         await rename(temporary, destination);
       } catch (renameError) {
@@ -49,7 +95,83 @@ export async function publishNewPrivateFile(path: string, bytes: Uint8Array): Pr
         throw renameError;
       }
     }
-  } finally {
+  });
+}
+
+/** What is at `path`: nothing, a folder, or something else; a link is not followed. */
+export async function entryAt(path: string): Promise<"none" | "folder" | "other"> {
+  try {
+    return (await lstat(path)).isDirectory() ? "folder" : "other";
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "none";
+    throw error;
+  }
+}
+
+/**
+ * `path` resolved, when nothing is there yet, not even a link; otherwise refused with `taken`. Its
+ * parent may be missing. A blank path, which would be the current folder, is refused. Every new
+ * folder of an export is checked so, before the secrets are read and again when it is published.
+ */
+export async function absentPath(path: string, taken: string): Promise<string> {
+  if (path.trim() === "") throw new Error("A new folder needs a path; an empty one is refused.");
+  const target = resolve(path);
+  if ((await entryAt(target)) !== "none") throw new Error(taken);
+  return target;
+}
+
+/**
+ * Publishes a new private folder at `target`: `write` fills a staging folder beside it, made with
+ * `prefix` on the same file system, which becomes `target` only while nothing is there yet
+ * (absentPath, refused with `taken`), then readable by its owner alone. On any failure the staging
+ * folder is removed and no part of the export is left. Resolves with what `write` returns.
+ */
+export async function publishNewFolder<T>(
+  target: string,
+  prefix: string,
+  taken: string,
+  write: (staging: string) => Promise<T>,
+): Promise<T> {
+  await mkdir(dirname(target), { recursive: true });
+  const staging = await mkdtemp(join(dirname(target), prefix));
+  try {
+    const result = await write(staging);
+    // Private before it is published: the rename is the step that publishes it, and nothing can
+    // fail after it (AUD-012-FUN005).
+    await chmod(staging, PRIVATE_FOLDER_MODE);
+    await absentPath(target, taken);
+    await rename(staging, target);
+    return result;
+  } catch (error) {
     await rm(staging, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+/**
+ * A new folder of an export, claimed before anything is rendered and published afterwards under
+ * the same name. A class, so that the folder that is checked first is the one published, both
+ * refused with the same `taken` message.
+ */
+export class NewFolder {
+  readonly #target: string;
+  readonly #taken: string;
+
+  private constructor(target: string, taken: string) {
+    this.#target = target;
+    this.#taken = taken;
+  }
+
+  /** Claims `directory`, refused with `taken` when something is there already (absentPath). */
+  static async claim(directory: string, taken: string): Promise<NewFolder> {
+    return new NewFolder(await absentPath(directory, taken), taken);
+  }
+
+  /**
+   * Has `write` fill a private staging folder named from `prefix`, then publishes it under the
+   * claimed name, refused when something took the name meanwhile (publishNewFolder).
+   */
+  publish<T>(prefix: string, write: (staging: string) => Promise<T>): Promise<T> {
+    return publishNewFolder(this.#target, prefix, this.#taken, write);
   }
 }

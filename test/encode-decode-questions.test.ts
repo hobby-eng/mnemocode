@@ -93,12 +93,12 @@ import {
 } from "../src/core.js";
 import { backupCheckAnswer, offerEncodedCheck, offerShareCheck } from "../src/cli/backup-check.js";
 import { runDecode } from "../src/cli/decode-command.js";
-import { exportQrPayload } from "../src/cli/qr-export.js";
+import { exportQrPayload } from "../src/export/qr-image.js";
 import { runEncode } from "../src/cli/encode-command.js";
 import { DatesAnswer } from "../src/core/date-search.js";
 import { promptedEncodeInputs } from "../src/cli/input.js";
 import { InputCancelled } from "../src/cli/terminal-input.js";
-import { bytewords } from "../src/sskr/bytewords-list.js";
+import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
@@ -207,19 +207,12 @@ describe("encode, decode and the backup check on the private screen", () => {
       expect(notices.join("\n")).not.toMatch(/abandon|23-9-2026|31-09/u);
     });
 
-    it("asks no dates without Seedshift, and wants a date for each event label", async () => {
+    it("asks no dates without Seedshift", async () => {
       terminal.answers = [`${TEST_PHRASE}\r`];
       expect(await promptedEncodeInputs({ "ask-secrets": true }, "direct")).toEqual({
         mnemonic: TEST_PHRASE,
         dates: [],
       });
-      terminal.answers = [`${TEST_PHRASE}\r`, `${DATE}\r`, `${DATE} 24-09-2026\r`];
-      const inputs = await promptedEncodeInputs(
-        { "ask-secrets": true, event: ["Wedding", "Trip"] },
-        "seedshift",
-      );
-      expect(inputs?.dates).toHaveLength(2);
-      expect(notices).toEqual(["There are 2 event labels (--event): type a date for each."]);
     });
 
     it("keeps the result when a file cannot be saved, and saves it under another name", async () => {
@@ -553,7 +546,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       terminal.choices = ["encoded"];
       await runDecode({ "ask-secrets": true, mode: "seedshift", "list-candidates": true });
       expect(notices).toContain(
-        "--list-candidates lists at most 16 candidates; these codes have about 128 candidates.",
+        "--list-candidates: a list holds at most 16 candidates; these codes have about 128 candidates.",
       );
     });
 
@@ -1013,7 +1006,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const body = shares[1]!.slice(SSKR_UR_PREFIX.length);
       const at = 2 * 6;
       const pair = body.slice(at, at + 2);
-      const other = bytewords.map((word) => `${word[0]}${word[3]}`).find((word) => word !== pair)!;
+      const other = MINIMAL_BYTEWORDS.find((word) => word !== pair)!;
       const changed = `${SSKR_UR_PREFIX}${body.slice(0, at)}${other}${body.slice(at + 2)}`;
       terminal.answers = [`${shares[0]};${changed}\r`, `${shares[1]}\r`, `${DATE}\r`];
       terminal.choices = [true];

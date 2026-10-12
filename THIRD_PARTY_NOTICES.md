@@ -51,17 +51,12 @@ which is MIT licensed. The standalone CLI's local PNG QR reader uses
 MIT licensed. Their pinned versions are recorded in `package.json` and the
 lockfile after installation.
 
-## Embedded Droid Sans Fallback subset
-
-`assets/fonts/DroidSansFallback-BIP39.ttf` is a generated subset of Droid Sans Fallback
-covering the Traditional Chinese BIP39 symbols. Droid Sans Fallback is licensed under Apache License 2.0. The
-upstream notice and full license are included as `assets/fonts/DroidSansFallback-NOTICE`.
-The reproducible subset script is `scripts/build-cjk-font.py`; it does not alter
-the character outlines.
+## Embedded DejaVu Sans subset
 
 `assets/fonts/DejaVuSans-UI.ttf` is a generated subset of DejaVu Sans covering
-ASCII and Cyrillic text used by headings and event labels. Its upstream license
-notice is included as `assets/fonts/DejaVuSans-NOTICE`.
+Latin and Cyrillic text used by the cards and sheets. Its upstream license
+notice is included as `assets/fonts/DejaVuSans-NOTICE`. The reproducible subset
+script is `scripts/build-ui-font.py`; it does not alter the character outlines.
 
 ## World map
 

@@ -6,12 +6,15 @@
 // result and goes on with the others. Elsewhere the failure ends the command, as every failure
 // there does.
 
-import { askAfterFailure, askValueUntil, droppedPath } from "./ask.js";
-import { cloudServiceOf } from "./cloud-folders.js";
+import { askAfterFailure, askValueUntil, droppedPath, WHAT_NOW } from "./ask.js";
+import { warnOfCloudCopy } from "./cloud-folders.js";
 import { discardRenamedOutput } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
-import { terminalMore, terminalNotice } from "./terminal.js";
+import { terminalNotice } from "./terminal.js";
 import { InputCancelled } from "./terminal-input.js";
+import { lowerFirst } from "../core/prose.js";
+import { describeError } from "../core/refusal.js";
+import { LeftStagingCopy } from "../export/private-file.js";
 
 /** Plain words for the errors of a file system that a save may meet (errno names). */
 const SAVE_FAILURES: Readonly<Record<string, string>> = {
@@ -40,18 +43,20 @@ export interface Saving {
   readonly checkName: (path: string) => Promise<void>;
 }
 
-/** `text` with its first letter made small, unless it begins an abbreviation such as PDF. */
-function lowerFirst(text: string): string {
-  return /^[A-Z]{2}/u.test(text) ? text : `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
-}
-
 /** Why a save failed, in one line that names the file but nothing it holds. */
 function saveFailure(what: string, path: string, error: unknown): string {
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
-  const reason =
-    (code === undefined ? undefined : SAVE_FAILURES[code]) ??
-    (error instanceof Error ? lowerFirst(error.message.replace(/\.$/u, "")) : String(error));
-  return `${what} could not be saved as ${path}: ${reason}.`;
+  const known = code === undefined ? undefined : SAVE_FAILURES[code];
+  return `${what} could not be saved as ${path}: ${known ?? otherFailure(error)}.`;
+}
+
+/**
+ * Any other failure in the words of describeError: an Error's message is a sentence of its own,
+ * which inside this one starts in lower case and loses its full stop.
+ */
+function otherFailure(error: unknown): string {
+  const described = describeError(error);
+  return error instanceof Error ? lowerFirst(described.replace(/\.$/u, "")) : described;
 }
 
 /**
@@ -69,12 +74,22 @@ async function askOtherName(saving: Saving): Promise<string | undefined> {
     },
     { what: saving.kind === "file" ? "the name of a new file" : "the name of a new folder" },
   );
-  const service = path === undefined ? undefined : cloudServiceOf(path);
-  if (service !== undefined) {
-    terminalNotice(`${service} keeps a copy of ${path}`, "warning");
-    terminalMore("cloud-folders");
-  }
+  warnOfCloudCopy(path);
   return path;
+}
+
+/**
+ * Runs `write`, the save of one result. A file saved in full whose private staging copy could not
+ * be removed (LeftStagingCopy) is saved: the person is told so and to delete the copy, and the
+ * save is not tried again. Every save of the command line goes through it.
+ */
+export async function writeSaved(write: () => Promise<unknown>): Promise<void> {
+  try {
+    await write();
+  } catch (error) {
+    if (!(error instanceof LeftStagingCopy)) throw error;
+    terminalNotice(error.message, "warning");
+  }
 }
 
 /**
@@ -87,7 +102,7 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined>
   for (let write = true; ;) {
     if (write)
       try {
-        await saving.write(path);
+        await writeSaved(() => saving.write(path));
         // A name chosen after a failure is not the numbered one that the options were given.
         if (path !== saving.path) discardRenamedOutput(saving.path);
         return path;
@@ -96,7 +111,7 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined>
         terminalNotice(saveFailure(saving.what, path, error), "warning");
       }
     const next = await askAfterFailure(
-      "What now?",
+      WHAT_NOW,
       [
         { label: "Try again", value: "again" },
         { label: `Another ${saving.kind} name`, value: "other" },

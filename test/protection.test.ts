@@ -8,6 +8,7 @@ import { parseArguments } from "../src/cli/arguments.js";
 import { cloudServiceOf } from "../src/cli/cloud-folders.js";
 import { neededPermissions, PROTECTION_FLAGS } from "../src/cli/protection.js";
 import { unencryptedSwap } from "../src/cli/swap-check.js";
+import { COMMAND_FACTS, type CommandName } from "../src/cli/command-options.js";
 
 const execute = promisify(execFile);
 
@@ -109,8 +110,8 @@ describe("cloud folders", () => {
 
 describe("process protection", () => {
   it("lets a command write and run programs only when it saves files or draws images", () => {
-    const needs = (command: string, items: string[]) =>
-      neededPermissions(command, parseArguments(items));
+    const needs = (command: CommandName, items: string[]) =>
+      neededPermissions(COMMAND_FACTS[command].alwaysWrites, parseArguments(items));
     expect(needs("decode", ["--ask-secrets"])).toEqual({ writes: false, runsPrograms: false });
     expect(needs("encode", ["--ask-secrets", "--pdf", "cards.pdf"])).toEqual({
       writes: true,
@@ -160,7 +161,7 @@ describe("process protection", () => {
     const script = `
       import("./dist/cli/protection.js").then(async (protection) => {
         await protection.hardenProcess();
-        protection.dropUnneeded("decode", {});
+        protection.dropUnneeded(false, {});
         console.log(protection.protectionSummary());
       });`;
     const { stdout } = await execute(process.execPath, [

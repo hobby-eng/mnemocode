@@ -368,7 +368,7 @@ describe("recover-date on the private screen", () => {
       await recover({ "input-file": bad, mode: "seedshift", "master-fingerprint": FINGERPRINT });
       // Another file, dragged in with quotes.
       expect(terminal.questions).toEqual(["What now?"]);
-      expect(notices).toContain("Enter 12, 15, 18, 21, or 24 English BIP39 words.");
+      expect(notices).toContain("Enter 12, 15, 18, 21 or 24 English BIP39 words.");
       expect(out).toEqual([FOUND]);
 
       // Stop at "What now?" cancels.

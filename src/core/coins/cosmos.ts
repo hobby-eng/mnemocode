@@ -6,26 +6,26 @@
 // @scure/base (test/portable-modules.test.ts).
 
 import { bech32 } from "@scure/base";
-import type { AddressType } from "./address-types.js";
-import { decodeBech32 } from "./bech32.js";
+import { HASH160_BYTES, type AddressType } from "./address-types.js";
+import { bech32Groups, decodeBech32, Bech32Prefixes } from "./bech32.js";
 import {
   asciiLowercase,
   Coin,
-  DAMAGED,
   invalidAddress,
   WRONG_LENGTH,
   type CoinAddress,
   type CoinDescription,
   type CoinRules,
+  unreadableAddress,
 } from "./coin.js";
-import { keccakAccount } from "./keccak-account.js";
+import { KECCAK_RULES } from "./keccak-account.js";
 
 /** A 160-bit account is exactly 32 five-bit groups, with no padding. */
-const ACCOUNT_GROUPS = 32;
+const ACCOUNT_GROUPS = bech32Groups(HASH160_BYTES);
 
 /** A Cosmos SDK chain: its account prefix and how its account commits to the key. */
 class Bech32AccountCoin extends Coin {
-  readonly #prefix: string;
+  readonly #prefixes: Bech32Prefixes;
   readonly #type: AddressType;
 
   constructor(
@@ -33,19 +33,20 @@ class Bech32AccountCoin extends Coin {
       CoinRules & { readonly prefix: string; readonly type: AddressType },
   ) {
     super(description);
-    this.#prefix = description.prefix;
+    this.#prefixes = new Bech32Prefixes(description.prefix);
     this.#type = description.type;
   }
 
   protected override get ownPrefixes(): readonly string[] {
-    return [`${this.#prefix}1`];
+    return this.#prefixes.starts;
   }
 
   protected read(text: string): CoinAddress {
     // Bech32, never Bech32m: the same data with the other checksum is no account.
     const decoded = decodeBech32(text, bech32);
-    if (!decoded) throw invalidAddress(DAMAGED);
-    if (decoded.prefix !== this.#prefix) throw this.notOurs();
+    if (!decoded) throw unreadableAddress();
+    // Its own prefix only: a Cosmos SDK account has no test-network form of its own here.
+    if (this.#prefixes.testnetOf(decoded.prefix) === undefined) throw this.notOurs();
     // Counted in groups, so that an extra group under a valid checksum is refused for its length.
     if (decoded.words.length !== ACCOUNT_GROUPS) throw invalidAddress(WRONG_LENGTH);
     return this.address(this.#type, bech32.fromWords(decoded.words), asciiLowercase(text));
@@ -69,5 +70,5 @@ export const INJECTIVE = new Bech32AccountCoin({
   prefix: "inj",
   type: "keccak",
   // Ethereum's account, written as Cosmos accounts are.
-  commitments: { keccak: keccakAccount },
+  ...KECCAK_RULES,
 });

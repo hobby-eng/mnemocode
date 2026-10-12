@@ -3,7 +3,9 @@
 // names the services give them; this is a warning, not a guarantee in either direction.
 
 import { homedir } from "node:os";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { relative, resolve, sep } from "node:path";
+import { pathWithin } from "./path-within.js";
+import { terminalMore, terminalNotice } from "./terminal.js";
 
 /** Folder names, compared without case, and the service they belong to. */
 const CLOUD_FOLDER_NAMES: readonly (readonly [RegExp, string])[] = [
@@ -22,11 +24,6 @@ const CLOUD_FOLDER_NAMES: readonly (readonly [RegExp, string])[] = [
 /** Environment variables in which Windows names the OneDrive folders. */
 const ONEDRIVE_VARIABLES = ["OneDrive", "OneDriveConsumer", "OneDriveCommercial"] as const;
 
-function inside(folder: string, path: string): boolean {
-  const relation = relative(resolve(folder), resolve(path));
-  return relation === "" || (!relation.startsWith("..") && !isAbsolute(relation));
-}
-
 /** The cloud service that synchronises `path`, or undefined when none is recognised. */
 export function cloudServiceOf(
   path: string,
@@ -36,19 +33,32 @@ export function cloudServiceOf(
   const absolute = resolve(path);
   for (const variable of ONEDRIVE_VARIABLES) {
     const folder = environment[variable];
-    if (folder !== undefined && folder !== "" && inside(folder, absolute)) return "OneDrive";
+    if (folder !== undefined && folder !== "" && pathWithin(folder, absolute)) return "OneDrive";
   }
   // Every folder below macOS's ~/Library/CloudStorage belongs to a service, named in its own name.
   const cloudStorage = resolve(home, "Library", "CloudStorage");
-  if (inside(cloudStorage, absolute) && absolute !== cloudStorage) {
+  if (pathWithin(cloudStorage, absolute) && absolute !== cloudStorage) {
     const provider = relative(cloudStorage, absolute).split(sep)[0]!;
     const known = CLOUD_FOLDER_NAMES.find(([pattern]) => pattern.test(provider))?.[1];
     return known ?? provider.split("-")[0];
   }
-  // The folders above the file or new folder; its own name says nothing.
-  for (const folder of absolute.split(/[\\/]/u).slice(0, -1)) {
+  // The folders above the file or new folder; its own name says nothing. A resolved path holds
+  // the separator of this system only: on Linux and macOS a backslash is part of a name
+  // (path-within.ts).
+  for (const folder of absolute.split(sep).slice(0, -1)) {
     const service = CLOUD_FOLDER_NAMES.find(([pattern]) => pattern.test(folder))?.[1];
     if (service !== undefined) return service;
   }
   return undefined;
+}
+
+/**
+ * Warns, with a link to the README, when a cloud service copies the folder that `path` is saved
+ * in: for every name a result is saved under, given with an option or typed after a failed save.
+ */
+export function warnOfCloudCopy(path: string | undefined): void {
+  const service = path === undefined ? undefined : cloudServiceOf(path);
+  if (service === undefined) return;
+  terminalNotice(`${service} keeps a copy of ${path!}`, "warning");
+  terminalMore("cloud-folders");
 }

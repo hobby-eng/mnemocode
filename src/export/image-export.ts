@@ -1,44 +1,56 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import {
-  chmod,
-  lstat,
-  mkdir,
-  mkdtemp,
-  readFile,
-  readdir,
-  rename,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { accessSync, constants } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { PDFDocument } from "pdf-lib";
+import { pageFileName } from "./card-codes.js";
+import { NewFolder, writeNewPrivateFile } from "./private-file.js";
+import {
+  coveredPixels,
+  DEFAULT_DOCUMENT_FORMAT,
+  DEFAULT_IMAGE_FORMAT,
+  DOCUMENT_FORMAT_FACTS,
+  IMAGE_DPI,
+  IMAGE_FORMATS,
+  isImageFormat,
+  parseImageFormat,
+  type DocumentFormat,
+  type ImageFormat,
+} from "./document-formats.js";
 
-export type ImageFormat = "png" | "jpg";
-export type DocumentFormat = "pdf" | ImageFormat;
+// The formats and the drawing rules are document-formats.ts's, which a page takes too; here too
+// for the modules of the command line that take them from here.
+export {
+  DEFAULT_DOCUMENT_FORMAT,
+  IMAGE_FORMATS,
+  isImageFormat,
+  parseImageFormat,
+  type DocumentFormat,
+  type ImageFormat,
+};
 const execute = promisify(execFile);
-const IMAGE_DPI = 300;
-const POINTS_PER_INCH = 72;
+/** The file of one page that the renderer writes, in any image format. */
+const PAGE_FILE = new RegExp(`^page-\\d+\\.(?:${IMAGE_FORMATS.join("|")})$`, "u");
 
 // Both come with Poppler. pdftocairo can leave the paper transparent, which pdftoppm cannot.
 const IMAGE_RENDERER = "pdftocairo";
+/** How long the renderer may take to say its version: long enough for a slow first start. */
+const PROBE_TIMEOUT_MS = 10_000;
+/** How long the renderer may take to draw one page. */
+const PAGE_TIMEOUT_MS = 120_000;
+/** The renderer's own messages kept: its pages go to files, so only a few lines come back. */
+const RENDERER_OUTPUT_BYTES = 64 * 1024;
 
-/**
- * Whole pixels that a page covers completely.
- *
- * Poppler rounds the image size up, so the last row and column of pixels are covered only
- * in part and show the paper as a thin line. Rounding down leaves them out.
- */
-function coveredPixels(points: number): number {
-  return Math.max(1, Math.floor((points * IMAGE_DPI) / POINTS_PER_INCH));
-}
 let renderer: Promise<void> | undefined;
 
 /** Optional local Poppler adapter; never downloads a renderer or sends data online. */
 export function assertImageRenderer(): Promise<void> {
-  return (renderer ??= execute(IMAGE_RENDERER, ["-v"], { timeout: 10_000, maxBuffer: 64 * 1024 })
+  return (renderer ??= execute(IMAGE_RENDERER, ["-v"], {
+    timeout: PROBE_TIMEOUT_MS,
+    maxBuffer: RENDERER_OUTPUT_BYTES,
+  })
     .then(() => undefined)
     .catch(() => {
       renderer = undefined;
@@ -48,16 +60,16 @@ export function assertImageRenderer(): Promise<void> {
     }));
 }
 
-export async function requireNewImageDirectory(path: string): Promise<string> {
-  if (!path.trim() || path === "-") throw new Error("Image export requires a new folder path.");
-  const target = resolve(path);
-  try {
-    await lstat(target);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return target;
-    throw error;
-  }
-  throw new Error("The image folder already exists. Choose a new folder for the exported images.");
+/** Why an image folder is refused: something is there already. */
+export const IMAGE_FOLDER_TAKEN =
+  "The image folder already exists. Choose a new folder for the exported images.";
+
+/**
+ * Claims the new image folder `directory`, refused with IMAGE_FOLDER_TAKEN (NewFolder). A claim
+ * makes nothing, so the command line also asks it early, before anything is rendered.
+ */
+export function claimImageFolder(directory: string): Promise<NewFolder> {
+  return NewFolder.claim(directory, IMAGE_FOLDER_TAKEN);
 }
 
 /**
@@ -79,18 +91,19 @@ function rasterFolder(): string {
 export async function writeRenderedDocument(
   bytes: Uint8Array,
   basePath: string,
-  format: DocumentFormat = "pdf",
+  format: DocumentFormat = DEFAULT_DOCUMENT_FORMAT,
 ): Promise<number> {
   if (format === "pdf") {
-    await writeFile(`${basePath}.pdf`, bytes, { flag: "wx", mode: 0o600 });
+    await writeNewPrivateFile(pageFileName(basePath, 0, 1, format), bytes);
     return 1;
   }
-  if (format !== "png" && format !== "jpg") throw new Error("Image format must be png or jpg.");
+  // A JavaScript host may pass any value: it is read as a person's answer is.
+  const image = parseImageFormat(format);
   await assertImageRenderer();
   const temporary = await mkdtemp(join(rasterFolder(), "mnemocode-raster-"));
   try {
     const input = join(temporary, "document.pdf");
-    await writeFile(input, bytes, { flag: "wx", mode: 0o600 });
+    await writeNewPrivateFile(input, bytes);
     const pages = (await PDFDocument.load(bytes)).getPages();
     // Pages can differ in size, so each one is rendered with its own image size.
     for (const [index, page] of pages.entries()) {
@@ -106,23 +119,24 @@ export async function writeRenderedDocument(
           ...["-H", String(coveredPixels(page.getHeight()))],
           // Unpainted paper, such as the rounded corners of a separate card, stays
           // transparent in PNG. JPEG has no transparency and shows it white.
-          ...(format === "png" ? ["-png", "-transp"] : ["-jpeg", "-jpegopt", "quality=90"]),
+          ...(DOCUMENT_FORMAT_FACTS[image].transparentPaper
+            ? ["-png", "-transp"]
+            : ["-jpeg", "-jpegopt", `quality=${DOCUMENT_FORMAT_FACTS[image].qualityPercent}`]),
           input,
           join(temporary, `page-${number}`),
         ],
-        { timeout: 120_000, maxBuffer: 64 * 1024 },
+        { timeout: PAGE_TIMEOUT_MS, maxBuffer: RENDERER_OUTPUT_BYTES },
       );
     }
     const files = (await readdir(temporary))
-      .filter((file) => /^page-\d+\.(png|jpg)$/u.test(file))
+      .filter((file) => PAGE_FILE.test(file))
       .sort((a, b) => Number(a.match(/\d+/u)![0]) - Number(b.match(/\d+/u)![0]));
     if (!files.length) throw new Error("The local PDF renderer produced no images.");
     for (const [index, file] of files.entries()) {
-      const suffix = files.length === 1 ? "" : `-${String(index + 1).padStart(2, "0")}`;
-      await writeFile(`${basePath}${suffix}.${format}`, await readFile(join(temporary, file)), {
-        flag: "wx",
-        mode: 0o600,
-      });
+      await writeNewPrivateFile(
+        pageFileName(basePath, index, files.length, image),
+        await readFile(join(temporary, file)),
+      );
     }
     return files.length;
   } catch (error) {
@@ -138,20 +152,11 @@ export async function writeRenderedDocument(
 export async function exportPageImages(
   bytes: Uint8Array,
   directory: string,
-  format: ImageFormat = "png",
+  format: ImageFormat = DEFAULT_IMAGE_FORMAT,
 ): Promise<number> {
   await assertImageRenderer();
-  const target = await requireNewImageDirectory(directory);
-  await mkdir(dirname(target), { recursive: true });
-  const staging = await mkdtemp(join(dirname(target), ".mnemocode-images-"));
-  try {
-    const count = await writeRenderedDocument(bytes, join(staging, "page"), format);
-    await requireNewImageDirectory(target);
-    await rename(staging, target);
-    await chmod(target, 0o700);
-    return count;
-  } catch (error) {
-    await rm(staging, { recursive: true, force: true });
-    throw error;
-  }
+  const folder = await claimImageFolder(directory);
+  return folder.publish(".mnemocode-images-", (staging) =>
+    writeRenderedDocument(bytes, join(staging, "page"), format),
+  );
 }

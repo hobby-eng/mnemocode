@@ -43,7 +43,7 @@ export const BITCOIN_CASH_ADDRESS_SELF_TEST = coinFamilySelfTest({
     {
       coin: BITCOIN_CASH,
       address: "bitcoincash:pqkh9ahfj069qv8l6eysyufazpe4fdjq3u4hna323j",
-      because: /only single-key addresses/u,
+      because: /not the address of a single key; only bitcoincash:q… or 1…/u,
     },
   ],
 });

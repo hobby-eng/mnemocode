@@ -1,8 +1,10 @@
 // The self-test of the encryption of candidate lists (core/candidate-encryption.ts,
 // docs/CANDIDATES.md, "Encryption"): the published age files opened with the public test key and
 // passphrase, a file to two keys and one at another work factor refused, one changed by a byte or
-// opened with another key refused, and a list encrypted here opened again. It is slow, from the
-// scrypt of the passphrase, so it runs only in the full self-test (core/self-test.ts).
+// opened with another key refused, and a list encrypted here opened again. All but the file with
+// the passphrase are quick (checkCandidateEncryptionQuick), which a host may run at its start; the
+// scrypt of the passphrase is slow, so the whole check runs only in the full self-test
+// (core/self-test.ts).
 //
 // From the host it needs what candidate-encryption.ts needs: crypto.getRandomValues and WebCrypto.
 // It holds public test keys and data, no secret.
@@ -11,12 +13,38 @@
 // self-test modules.
 
 import {
+  CandidateFileRefused,
   createSessionIdentity,
   decryptCandidates,
   encryptCandidates,
+  type CandidateFileProblem,
 } from "./candidate-encryption.js";
 import { THREE_PHRASES_LIST } from "./candidate-list-self-test.js";
 import { bytesOfHex, expectRefusedLater, expectSame, hexOfBytes } from "./self-test-check.js";
+
+/**
+ * `open` refused as a CandidateFileRefused with `problem` and a message that `because` matches;
+ * a refusal of another class or problem is another reason.
+ */
+function expectFileRefused(
+  open: () => Promise<unknown>,
+  problem: CandidateFileProblem,
+  because: RegExp,
+  name: string,
+): Promise<void> {
+  return expectRefusedLater(
+    async () => {
+      try {
+        await open();
+      } catch (error) {
+        if (error instanceof CandidateFileRefused && error.problem === problem) throw error;
+        throw new Error("refused for another reason");
+      }
+    },
+    because,
+    name,
+  );
+}
 
 /**
  * vectors/candidates-v1.json, "age": a public test key and passphrase, never for anything real,
@@ -43,36 +71,34 @@ function changedLastByte(hex: string): Uint8Array {
 }
 
 /**
- * Every check: the published files opened, the files refused, and a list encrypted to a one-time
- * key and opened again with it but not with another.
+ * The quick checks, without scrypt: the published file to the session key opened, the files to
+ * two keys and at another work factor refused before any scrypt, one changed by a byte refused,
+ * and a list encrypted to a one-time key opened again with it but not with another. Asynchronous,
+ * since WebCrypto answers later; it needs crypto.getRandomValues and WebCrypto.
  */
-export async function checkCandidateEncryption(): Promise<void> {
+export async function checkCandidateEncryptionQuick(): Promise<void> {
   const identity = { identity: TEST_IDENTITY };
   expectSame(
     hexOfBytes(await decryptCandidates(bytesOfHex(TO_THE_SESSION_KEY), identity)),
     THREE_PHRASES_LIST,
     "Candidate file to the session key",
   );
-  expectSame(
-    hexOfBytes(
-      await decryptCandidates(bytesOfHex(WITH_THE_PASSPHRASE), { passphrase: TEST_PASSPHRASE }),
-    ),
-    THREE_PHRASES_LIST,
-    "Candidate file with the passphrase",
-  );
-  await expectRefusedLater(
+  await expectFileRefused(
     () => decryptCandidates(bytesOfHex(TO_TWO_KEYS), identity),
+    "unsupported",
     /exactly one X25519 recipient/u,
     "A candidate file to two keys",
   );
-  await expectRefusedLater(
+  await expectFileRefused(
     () => decryptCandidates(bytesOfHex(SCRYPT_WORK_FACTOR_16), { passphrase: TEST_PASSPHRASE }),
+    "unsupported",
     /scrypt work factor 18/u,
     "A candidate file at the scrypt work factor 16",
   );
   // The words of age-encryption 0.3.1: the Poly1305 tag of the changed chunk does not fit.
-  await expectRefusedLater(
+  await expectFileRefused(
     () => decryptCandidates(changedLastByte(TO_THE_SESSION_KEY), identity),
+    "damaged",
     /invalid tag/u,
     "A candidate file changed by a byte",
   );
@@ -83,9 +109,22 @@ export async function checkCandidateEncryption(): Promise<void> {
     THREE_PHRASES_LIST,
     "Candidate file encrypted to a one-time key",
   );
-  await expectRefusedLater(
+  await expectFileRefused(
     () => decryptCandidates(encrypted, identity),
+    "key",
     /no identity matched/u,
     "A candidate file opened with another key",
+  );
+}
+
+/** Every check: the quick ones, and the published file opened with the passphrase (scrypt). */
+export async function checkCandidateEncryption(): Promise<void> {
+  await checkCandidateEncryptionQuick();
+  expectSame(
+    hexOfBytes(
+      await decryptCandidates(bytesOfHex(WITH_THE_PASSPHRASE), { passphrase: TEST_PASSPHRASE }),
+    ),
+    THREE_PHRASES_LIST,
+    "Candidate file with the passphrase",
   );
 }

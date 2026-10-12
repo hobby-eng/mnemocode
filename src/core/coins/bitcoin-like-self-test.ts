@@ -161,7 +161,7 @@ export const BITCOIN_LIKE_ADDRESS_SELF_TEST = coinFamilySelfTest({
     {
       coin: BITCOIN,
       address: "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3",
-      because: /only single-key addresses/u,
+      because: /not the address of a single key; only bc1q with 42 characters or bc1p/u,
     },
     {
       coin: LITECOIN,

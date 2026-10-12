@@ -21,14 +21,14 @@ describe("what a backup can be made of", () => {
       backupCheck: false,
       heirSheet: false,
     });
-    expect(() => capabilities("toString" as never)).toThrow("Unknown transformation mode");
+    expect(() => capabilities("toString" as never)).toThrow("Unsupported Seedshift mode.");
   });
 
   it("writes shares in the form of the seed phrase, standard Bytewords for English words", () => {
     expect(shareFormatOf("english")).toBe("words");
     for (const form of ["indexes", "unicode", "colors", "colors-unicode"] as const)
       expect(shareFormatOf(form)).toBe(form);
-    expect(() => shareFormatOf("json" as never)).toThrow("Unknown encoded format");
+    expect(() => shareFormatOf("json" as never)).toThrow("Unsupported encoded format: json.");
   });
 
   it("always masks English words and word numbers, and calls the other forms weak unmasked", () => {
@@ -57,7 +57,7 @@ describe("what a backup can be made of", () => {
       [2, 17],
       [2.5, 3],
     ])
-      expect(() => ShareSetChoice.of(threshold!, count!)).toThrow("SSKR requires");
+      expect(() => ShareSetChoice.of(threshold!, count!)).toThrow("A split needs a threshold");
   });
 
   it("reads a typed set of one's own and says what fits when it cannot be used", () => {

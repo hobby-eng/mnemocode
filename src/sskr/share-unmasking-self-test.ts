@@ -14,10 +14,11 @@ import { mnemonicToEntropy } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { DatesAnswer } from "../core/date-search.js";
 import { expectSame } from "../core/self-test-check.js";
-import { JointRepair, type RepairedSet } from "./joint-repair.js";
+import { JointRepair, searchOnce, type RepairedSet } from "./joint-repair.js";
 import { SEED_BYTES, type SharePlatform } from "./share-platform.js";
 import { ShareUnmasking } from "./share-unmasking.js";
 import { writeShare } from "./transport.js";
+import { fingerprintWalletCheck, type PhraseFingerprint } from "../core/wallet-check.js";
 
 const PUBLIC_MNEMONIC =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -69,7 +70,7 @@ async function unmasked(
  * the masked phrase repaired together and unmasked with the forgotten digit.
  */
 export async function checkShareUnmasking(
-  fingerprint: (mnemonic: string) => string | PromiseLike<string>,
+  fingerprint: PhraseFingerprint,
   platform?: SharePlatform,
 ): Promise<void> {
   expectSame(
@@ -87,9 +88,7 @@ export async function checkShareUnmasking(
   const forgottenDigit = new ShareUnmasking({
     mode: "seedshift",
     dates: DatesAnswer.parse("23-09-202?", { patterns: true }),
-    walletCheck: async (mnemonic) => ({
-      matched: (await fingerprint(mnemonic)) === PUBLIC_FINGERPRINT,
-    }),
+    walletCheck: fingerprintWalletCheck(fingerprint, PUBLIC_FINGERPRINT),
   });
   expectSame(
     await unmasked(forgottenDigit),
@@ -127,5 +126,5 @@ async function repairedMaskedShares(platform: SharePlatform): Promise<RepairedSe
     return colors.join(" ");
   });
   const plan = await new JointRepair(platform).plan(marked);
-  return plan.search();
+  return searchOnce(plan);
 }

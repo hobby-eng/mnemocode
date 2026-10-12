@@ -20,7 +20,12 @@
 
 import { CoinAddressCheck } from "../coin-address-evidence.js";
 import { PUBLIC_MNEMONIC, PUBLIC_PHRASE_SEEDS } from "../master-fingerprint-self-test.js";
-import { expectRefused, expectSame, type SelfTestFeature } from "../self-test-check.js";
+import {
+  expectRefused,
+  expectSame,
+  selfTestFeature,
+  type SelfTestFeature,
+} from "../self-test-check.js";
 import type { AddressLocation, Coin } from "./coin.js";
 
 /** Where the wallet of the public phrase has an address of a coin, with its BIP39 passphrase. */
@@ -54,8 +59,12 @@ export interface CoinFamilyAnswers {
 
 const checks = new CoinAddressCheck(PUBLIC_PHRASE_SEEDS);
 
-/** The account, branch and index of a path: its last three steps, DIP17's hardened ones too. */
-function locationOf(path: string): AddressLocation {
+/**
+ * The account, branch and index of a path: its last three steps, DIP17's hardened ones too. Its
+ * own simple reading, not address-scan's, so that the self-test stays independent; the unit tests
+ * read their vectors' paths with it too.
+ */
+export function locationOf(path: string): AddressLocation {
   const [account, branch, index] = path
     .split("/")
     .slice(-3)
@@ -108,12 +117,10 @@ export function coinFamilySelfTest(answers: CoinFamilyAnswers): SelfTestFeature 
     for (const { coin, address, because } of answers.refused)
       expectRefused(() => coin.parse(address), because, `A refused ${coin.name} address`);
   };
-  return Object.freeze({
+  return selfTestFeature({
+    name: answers.name,
+    detail: `${answers.vectors.length} addresses, another place, ${answers.scanned === undefined ? "" : "a scan, "}refusals`,
     startup,
-    check: Object.freeze({
-      name: answers.name,
-      detail: `${answers.vectors.length} addresses, another place, ${answers.scanned === undefined ? "" : "a scan, "}refusals`,
-      run,
-    }),
+    run,
   });
 }

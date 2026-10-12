@@ -1,5 +1,10 @@
+import { BITS_PER_BYTE } from "../core/bip39-sizes.js";
+
 const CRC32_INITIAL = 0xffffffff;
 const CRC32_REFLECTED_POLYNOMIAL = 0xedb88320;
+
+/** The bytes of a CRC-32, as transports and lists store it (big-endian). */
+export const CRC32_BYTES = 4;
 
 /** Bytewords transport checksum; error detection, not authentication. */
 export function crc32(bytes: Uint8Array): number {
@@ -12,6 +17,17 @@ export function crc32(bytes: Uint8Array): number {
     }
   }
   return (crc ^ CRC32_INITIAL) >>> 0;
+}
+
+/**
+ * The CRC-32 stored big-endian at `at` in `bytes`: how every form of a share keeps its checksum.
+ * The reader of shares checks it, and the repair of marked ones solves for it, through this read.
+ */
+export function checksumAt(bytes: ArrayLike<number>, at: number): number {
+  let value = 0;
+  for (let index = 0; index < CRC32_BYTES; index += 1)
+    value = value * 2 ** BITS_PER_BYTE + bytes[at + index]!;
+  return value;
 }
 
 /** Public, reversible mixing used by the color and word share layouts; not encryption. */

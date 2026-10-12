@@ -11,11 +11,17 @@
 //
 // It keeps nothing: every seed and master key it derives is wiped before it returns.
 //
-// Host-neutral: it imports only @scure/bip32 and core/white-space.ts (test/portable-modules.test.ts).
+// Host-neutral, with @scure/bip32 (test/portable-modules.test.ts).
 
-import { HDKey } from "@scure/bip32";
-import type { WalletMatch } from "./wallet-check.js";
-import { trimWhiteSpace } from "./white-space.js";
+import { isBip39WordCount } from "./bip39-sizes.js";
+import { HDKey, type Versions } from "@scure/bip32";
+import {
+  FINGERPRINT_WARNING,
+  FINGERPRINT_HEX_DIGITS,
+  fingerprintMatch,
+  parseMasterFingerprint,
+  type WalletMatch,
+} from "./wallet-check.js";
 
 /**
  * PBKDF2-HMAC-SHA512 of `password` under `salt`, with `rounds` iterations and `bytes` bytes of
@@ -34,25 +40,10 @@ export type Pbkdf2HmacSha512 = (
 const SEED_ROUNDS = 2048;
 const SEED_BYTES = 64;
 const SEED_SALT_PREFIX = "mnemonic";
-const BIP39_WORD_COUNTS: ReadonlySet<number> = new Set([12, 15, 18, 21, 24]);
 
-/** The eight hexadecimal characters of a BIP32 master fingerprint. */
-const FINGERPRINT_PATTERN = /^[0-9a-f]{8}$/u;
-
-/** What the person should know of a fingerprint that matched. */
-export const FINGERPRINT_WARNING =
-  "A master fingerprint is only 32 bits and is a filter, not proof of recovery.";
-
-/**
- * A master fingerprint as typed, in lower case; refused unless it is eight hexadecimal characters.
- * A host checks an answer with it at once: no secret is needed.
- */
-export function parseMasterFingerprint(value: string): string {
-  const fingerprint = trimWhiteSpace(value).toLowerCase();
-  if (!FINGERPRINT_PATTERN.test(fingerprint))
-    throw new Error("A master fingerprint must be eight hexadecimal characters.");
-  return fingerprint;
-}
+// The text rule of a fingerprint and its comparison belong to wallet-check.ts, which a search
+// takes without this module and its packages; here too for every caller of this module.
+export { FINGERPRINT_WARNING, fingerprintMatch, parseMasterFingerprint };
 
 /** Whether the host's PBKDF2 answered with a promise rather than with the bytes. */
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
@@ -84,7 +75,7 @@ function seedInput(
   passphrase: string,
 ): { readonly phrase: string; readonly salt: string } {
   const phrase = nfkd(mnemonic);
-  if (!BIP39_WORD_COUNTS.has(phrase.split(" ").length)) throw new Error("Invalid mnemonic");
+  if (!isBip39WordCount(phrase.split(" ").length)) throw new Error("Invalid mnemonic");
   // Checked before the template below would turn it into text.
   if (typeof passphrase !== "string") throw new TypeError("expected a string passphrase");
   return { phrase, salt: nfkd(`${SEED_SALT_PREFIX}${passphrase}`) };
@@ -138,29 +129,49 @@ export class Bip39Seed {
     const { phrase, salt } = seedInput(mnemonic, passphrase);
     return checkedSeed(await this.#pbkdf2(phrase, salt, SEED_ROUNDS, SEED_BYTES));
   }
+  /**
+   * What `use` makes of the master key of the wallet of `mnemonic`, from a PBKDF2 that answers at once:
+   * the seed and the key are wiped once `use` returns, so `use` must not keep the key or answer
+   * later. `versions` are the root's version bytes; BIP32's default ones by default.
+   */
+  withRoot<T>(
+    mnemonic: string,
+    passphrase: string,
+    use: (root: HDKey) => T,
+    versions?: Versions,
+  ): T {
+    return useRoot(this.now(mnemonic, passphrase), use, versions);
+  }
+
+  /** The same as withRoot, with a PBKDF2 that may answer later. */
+  async withRootLater<T>(
+    mnemonic: string,
+    passphrase: string,
+    use: (root: HDKey) => T,
+    versions?: Versions,
+  ): Promise<T> {
+    return useRoot(await this.later(mnemonic, passphrase), use, versions);
+  }
 }
 
-/** The fingerprint of a master key as lowercase hexadecimal. */
-export function fingerprintOfKey(root: HDKey): string {
-  return root.fingerprint.toString(16).padStart(8, "0");
-}
-
-/**
- * The master fingerprint of `seed`, which is wiped. The fingerprint hashes the public key alone,
- * so the version bytes of the key do not change it, and the default ones serve every coin.
- */
-function fingerprintOfSeed(seed: Uint8Array): string {
+/** What `use` makes of the master key of `seed`; the seed and the key are wiped, whatever happens. */
+function useRoot<T>(seed: Uint8Array, use: (root: HDKey) => T, versions?: Versions): T {
   let root: HDKey;
   try {
-    root = HDKey.fromMasterSeed(seed);
+    root = HDKey.fromMasterSeed(seed, versions);
   } finally {
     seed.fill(0);
   }
   try {
-    return fingerprintOfKey(root);
+    return use(root);
   } finally {
     root.wipePrivateData();
   }
+}
+
+/** The fingerprint of a master key as lowercase hexadecimal. */
+export function fingerprintOfKey(root: HDKey): string {
+  return root.fingerprint.toString(16).padStart(FINGERPRINT_HEX_DIGITS, "0");
 }
 
 /**
@@ -177,11 +188,12 @@ export class MasterFingerprintCheck {
 
   /** The standard four-byte BIP32 master fingerprint as lowercase hexadecimal. */
   fingerprint(mnemonic: string, passphrase = ""): string {
-    return fingerprintOfSeed(this.#seed.now(mnemonic, passphrase));
+    // The fingerprint hashes the public key alone: BIP32's default version bytes serve every coin.
+    return this.#seed.withRoot(mnemonic, passphrase, fingerprintOfKey);
   }
 
   async fingerprintAsync(mnemonic: string, passphrase = ""): Promise<string> {
-    return fingerprintOfSeed(await this.#seed.later(mnemonic, passphrase));
+    return this.#seed.withRootLater(mnemonic, passphrase, fingerprintOfKey);
   }
 
   /**
@@ -191,15 +203,11 @@ export class MasterFingerprintCheck {
    */
   match(mnemonic: string, expected: string, passphrase = ""): WalletMatch {
     const wanted = parseMasterFingerprint(expected);
-    return matchOf(this.fingerprint(mnemonic, passphrase), wanted);
+    return fingerprintMatch(this.fingerprint(mnemonic, passphrase), wanted);
   }
 
   async matchAsync(mnemonic: string, expected: string, passphrase = ""): Promise<WalletMatch> {
     const wanted = parseMasterFingerprint(expected);
-    return matchOf(await this.fingerprintAsync(mnemonic, passphrase), wanted);
+    return fingerprintMatch(await this.fingerprintAsync(mnemonic, passphrase), wanted);
   }
-}
-
-function matchOf(derived: string, expected: string): WalletMatch {
-  return Object.freeze({ matched: derived === expected, path: "m", warning: FINGERPRINT_WARNING });
 }

@@ -22,6 +22,8 @@ const script = vi.hoisted(() => ({
   cutNotes: [] as string[],
   /** Whether pdftocairo, which images need, is missing. */
   noImages: false,
+  /** The value and the key of each answer, by the question last asked with them. */
+  digits: {} as Record<string, { value: unknown; digit?: number }[]>,
 }));
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/cli/terminal-choice.js")>();
@@ -38,6 +40,9 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => {
       const labels = choices.map((choice) => choice.label);
       script.asked.push({ question, count: choices.length, labels, warning: options.warning });
       script.lists.push(actual.listLines(choices as never, place));
+      script.digits[question] = (choices as readonly { value: unknown; digit?: number }[]).map(
+        ({ value, digit }) => ({ value, digit }),
+      );
       const room = actual.notesRoom(choices as never);
       for (const choice of choices as readonly { label: string; note?: string; example?: string }[])
         for (const text of [choice.note, choice.example])
@@ -82,11 +87,14 @@ import { businessOptions } from "../src/cli/business-options.js";
 import { validateCardOptions } from "../src/cli/card-options.js";
 import { commandOptions, isCommandName } from "../src/cli/command-options.js";
 import { imageFormat } from "../src/cli/image-options.js";
-import { ANSWER_LABEL_WIDTH, LINE_WIDTH, type LineQuestion } from "../src/cli/terminal-choice.js";
+import { ANSWER_LABEL_WIDTH, type LineQuestion } from "../src/cli/terminal-choice.js";
+import { TEXT_WIDTH } from "../src/cli/terminal.js";
 import { HEIR_MENU } from "../src/cli/heir-sheet.js";
+import { SHARE_SEEDSHIFT_QUESTION } from "../src/cli/seedshift-choices.js";
 import { commandDisplay, MENU_ENTRIES, typedCommand } from "../src/cli/menu.js";
 import { resolveSskrLayout } from "../src/export/sskr-content.js";
 import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
+import { formatNumber } from "../src/cli/format-numbers.js";
 
 /** Questions whose answers all lead to command lines of the same shape; only the first is taken. */
 const SAME_SHAPE = new Set(["Which card design?"]);
@@ -188,7 +196,6 @@ function assertCardOptions(command: string, parsed: ReturnType<typeof parseArgum
     validateCardOptions(
       parsed,
       FORM_OF_NUMBER[value(parsed, "format") as keyof typeof FORM_OF_NUMBER],
-      value(parsed, "mode")!,
     );
 }
 
@@ -239,10 +246,10 @@ describe("start menu", () => {
         if (["encode", "decode", "sskr-split", "sskr-combine", "recover-word"].includes(command!))
           expect(parsed["ask-secrets"], typedCommand(run)).toBe(true);
       }
-      // Lists and explanations fit a terminal of 80 columns unwrapped (LINE_WIDTH), and no note of a
+      // Lists and explanations fit a terminal of 80 columns unwrapped (TEXT_WIDTH), and no note of a
       // list is cut to fit.
       for (const line of [...script.lists.flat(), ...script.explanations.flat()])
-        expect([...line].length, line).toBeLessThanOrEqual(LINE_WIDTH);
+        expect([...line].length, line).toBeLessThanOrEqual(TEXT_WIDTH);
       expect([...new Set(script.cutNotes)]).toEqual([]);
       // Every question names its line in the record of answers, within the label column.
       for (const label of script.labels)
@@ -324,6 +331,16 @@ describe("start menu", () => {
       "--heir-sheet-size",
       "a5",
     ]);
+  });
+
+  it("answers each form by its --format number, in any order the forms are listed (S028)", async () => {
+    // English words, listed last, are form 1, as the command built says.
+    expect(await runOf(1, [4, 1, 0])).toContain("1");
+    const forms = script.digits["Which form should the seed phrase take?"]!;
+    expect(forms.map(({ value, digit }) => digit === formatNumber(value as never))).not.toContain(
+      false,
+    );
+    expect(forms.at(-1)).toEqual({ value: "english", digit: 1 });
   });
 
   it("always masks word numbers and words, and calls an unmasked copy weak", async () => {
@@ -546,6 +563,16 @@ describe("start menu", () => {
         "Label before each code",
       ]);
     });
+  });
+
+  it("asks whether shares were masked as entry 4 and the commands of shares ask it", async () => {
+    // Entry 5, a code of a share, the wallet's fingerprint, then the share question: Yes.
+    const run = await runOf(5, [2, 0, 1]);
+    const questions = script.asked.map((asked) => asked.question);
+    expect(questions).toContain(SHARE_SEEDSHIFT_QUESTION);
+    expect(run).toEqual(expect.arrayContaining(["sskr-export", "--mode", "seedshift"]));
+    await runOf(4, [1]);
+    expect(script.asked.map((asked) => asked.question)).toEqual([SHARE_SEEDSHIFT_QUESTION]);
   });
 
   describe("typed answers are checked at once and asked again", () => {

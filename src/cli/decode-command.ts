@@ -9,23 +9,16 @@
 // no secret: the wallet, the encoded fingerprint, whether to list the candidates, the limits, and
 // what a text that may be a Shamir share is read as.
 
-import { parseInput, type DateShiftDate, type DecodedResult, type SeedshiftMode } from "../core.js";
-import {
-  MAX_SHOWN_MATCHES,
-  walletNeeded,
-  type DatesAnswer,
-  type DateSearchResult,
-} from "../core/date-search.js";
-import type { EncodedBackup, EncodedMode } from "../core/encoded-backup.js";
+import { type DateShiftDate, type DecodedResult } from "../core.js";
+import { walletNeeded, type DatesAnswer } from "../core/date-search.js";
+import type { EncodedBackup } from "../core/encoded-backup.js";
 import { Masking, PHRASE_WORDS } from "../core/masking.js";
 import {
-  assertWalletEvidence,
   masterFingerprint,
   parseMasterFingerprint,
   type WalletEvidence,
 } from "../bitcoin-evidence.js";
-import { parseRecord } from "../record.js";
-import { assertFlag, integerOption, type ParsedArguments, value, values } from "./arguments.js";
+import { type ParsedArguments, value } from "./arguments.js";
 import { commandOptions } from "./command-options.js";
 import {
   reportFound,
@@ -33,55 +26,44 @@ import {
   type MissingCodesAnswers,
 } from "./missing-codes-search.js";
 import { restoreFromShare } from "./sskr-command.js";
-import {
-  askAfterFailure,
-  askWalletEvidence,
-  assertWalletPlaceUsed,
-  walletPlaceOf,
-  type WalletPlace,
-} from "./ask.js";
+import { askAfterFailure, askWalletEvidence, WHAT_NOW } from "./ask.js";
 import { searchLimit } from "./share-repair.js";
-import { bip39Passphrase, walletEvidence } from "./bitcoin-options.js";
+import { WALLET_EVIDENCE_OPTIONS, type WalletPlace, givenWallet } from "./bitcoin-options.js";
 import {
   askDates,
   askEncodedBackup,
   dateMatchNotes,
   encodedFingerprintOf,
-  fromFile,
   inputKindOf,
-  matchesFitScreen,
   maxCandidatesOf,
   PROGRESS_EVERY,
   reportDateMatches,
   searchDates,
   showEncodedFingerprint,
   typedAfterFile,
+  walletExplanation,
+  walletReason,
+  maxResultsOf,
+  askAfterDateSearch,
+  backupChoice,
 } from "./date-search.js";
 import {
+  assertAskedEncodedInput,
   assertOneEncodedSource,
   dates,
-  encodedInput,
-  inputFormat,
-  recordedInputFormat,
+  givenInputFormat,
+  backupFromOptions,
   transformMode,
-  type EncodedFormat,
-  type TransformMode,
 } from "./input.js";
 import { clearPrivateScreen } from "./private-screen.js";
+import { terminalColor, terminalResultHeader, terminalNotice, terminalStatus } from "./terminal.js";
+import type { Explanation } from "./terminal-choice.js";
 import {
-  capitalized,
-  FINGERPRINT_NOTE,
-  readmeLink,
-  terminalColor,
-  terminalFingerprint,
-  terminalHint,
-  terminalPart,
-  terminalPhrase,
-  terminalResultHeader,
-  terminalNotice,
-  terminalStatus,
-} from "./terminal.js";
-import type { Choice, Explanation } from "./terminal-choice.js";
+  CHECKSUM_INVALID,
+  reportOriginalFingerprint,
+  showOriginalPhrase,
+} from "./fingerprint-report.js";
+import type { MaskingMode, EncodedFormat } from "../core/types.js";
 
 export async function runDecode(arguments_: ParsedArguments): Promise<void> {
   if (arguments_["ask-secrets"] === true) return decodeWithQuestions(arguments_);
@@ -93,21 +75,7 @@ export async function runDecode(arguments_: ParsedArguments): Promise<void> {
  * from the command line, with complete codes and dates, nothing would use them.
  */
 const SCREEN_ANSWERS = [
-  "scan-gap",
-  "bitcoin-address",
-  "coin-address",
-  "coin",
-  "master-xpub",
-  "account-xpub",
-  "compressed-public-key",
-  "master-fingerprint",
-  "wif-file",
-  "network",
-  "bitcoin-profile",
-  "account",
-  "branch",
-  "index",
-  "bip39-passphrase-file",
+  ...WALLET_EVIDENCE_OPTIONS,
   "encoded-fingerprint",
   "list-candidates",
   "max-candidates",
@@ -123,20 +91,15 @@ async function decodeFromOptions(arguments_: ParsedArguments): Promise<void> {
     throw new Error(
       `--${unused} answers a question of decode --ask-secrets, where the dates or the codes may hold ?.`,
     );
-  const rawEncoded = await encodedInput(arguments_);
-  const record = parseRecord(rawEncoded);
-  const mode = transformMode(arguments_, record?.mode);
-  const enteredDates = dates(arguments_);
-  if (mode === "direct" && enteredDates.length > 0)
-    throw new Error("Dates cannot be used in direct mode.");
-  if (mode !== "direct" && enteredDates.length === 0)
-    throw new Error(`${mode} requires at least one date.`);
-  const encoded = record?.payload ?? rawEncoded;
-  const format = await recordedInputFormat(arguments_, encoded, record);
-  const masking = Masking.of(mode);
-  const results = masking.undo(parseInput(encoded, format), enteredDates);
-  if (masking.givesSeveral) showLegacyValidCandidates(results);
-  else showRecovered(results[0]!, mode, format);
+  let enteredDates: readonly DateShiftDate[] = [];
+  // The dates are counted as soon as the mode is known, so that a wrong count is refused before
+  // the form of the codes is asked about.
+  const { backup, mode } = await backupFromOptions(arguments_, false, (known) => {
+    enteredDates = dates(arguments_);
+    Masking.of(known).assertDateCount(enteredDates.length);
+  });
+  if (backup.givesSeveral) showLegacyValidCandidates(backup.candidates(enteredDates));
+  else showRecovered(backup.decode(enteredDates), mode, backup.format);
 }
 
 /** Every phrase that a record with a replaced last word may hold, each with its fingerprint. */
@@ -147,12 +110,12 @@ function showLegacyValidCandidates(candidates: readonly DecodedResult[]): void {
     );
   }
   console.error(
-    `Recovered ${candidates.length} checksum-valid candidates for the original seed phrase, the wallet's. The final column is the original BIP32 master fingerprint for an empty BIP39 passphrase.`,
+    `Recovered ${candidates.length} checksum-valid candidates for ${PHRASE_WORDS.original}. The final column is the original BIP32 master fingerprint for an empty BIP39 passphrase.`,
   );
 }
 
 /** The recovered seed phrase, its checksum and, when the checksum is valid, its fingerprint. */
-function showRecovered(result: DecodedResult, mode: TransformMode, format: EncodedFormat): void {
+function showRecovered(result: DecodedResult, mode: MaskingMode, format: EncodedFormat): void {
   const parts = terminalResultHeader("Recovered result", [
     ["Mode", mode],
     ["Input format", format],
@@ -167,19 +130,7 @@ function showRecovered(result: DecodedResult, mode: TransformMode, format: Encod
  * when the checksum is valid, its fingerprint, each apart, as a restore from shares shows them.
  */
 function showRecoveredParts(result: DecodedResult): void {
-  const phrase = result.recoveredMnemonic;
-  terminalPart(capitalized(PHRASE_WORDS.original), true);
-  terminalPhrase(phrase);
-  console.log("");
-  if (!result.checksumValid) {
-    terminalStatus("BIP39 checksum", "invalid - dates or input may be wrong", false);
-    return;
-  }
-  terminalFingerprint(
-    PHRASE_WORDS.originalFingerprint,
-    masterFingerprint(phrase),
-    FINGERPRINT_NOTE,
-  );
+  showOriginalPhrase(result.recoveredMnemonic, result.checksumValid);
 }
 
 /** The phrase on one line, then its checksum and fingerprint, for a file or a pipe. */
@@ -187,23 +138,13 @@ function showRecoveredPlain(result: DecodedResult): void {
   console.log(result.recoveredMnemonic);
   if (terminalColor("stderr")) {
     console.error("");
-    if (result.checksumValid) terminalStatus("BIP39 checksum", "valid");
-    else terminalStatus("BIP39 checksum", "invalid - dates or input may be wrong", false);
-    if (result.checksumValid) {
-      terminalStatus(PHRASE_WORDS.originalFingerprint, masterFingerprint(result.recoveredMnemonic));
-      terminalHint("Fingerprint uses an empty BIP39 passphrase.");
-    }
-  } else {
-    console.error(
-      result.checksumValid
-        ? "BIP39 checksum: valid."
-        : "BIP39 checksum: invalid — dates or input may be wrong.",
+    terminalStatus(
+      "BIP39 checksum",
+      result.checksumValid ? "valid" : CHECKSUM_INVALID,
+      result.checksumValid,
     );
-    if (result.checksumValid)
-      console.error(
-        `Original BIP32 master fingerprint (empty BIP39 passphrase): ${masterFingerprint(result.recoveredMnemonic)}`,
-      );
-  }
+  } else console.error(`BIP39 checksum: ${result.checksumValid ? "valid" : CHECKSUM_INVALID}.`);
+  if (result.checksumValid) reportOriginalFingerprint(result.recoveredMnemonic);
 }
 
 // On the private screen.
@@ -212,18 +153,12 @@ function showRecoveredPlain(result: DecodedResult): void {
  * Why the wallet is asked for before a search, shown with the question. Where the checksum leaves
  * only some dates, the wallet is optional, as the menu asks it for recover-date.
  */
-function walletExplanation(mode: TransformMode, passphrase: string): Explanation {
-  return {
-    lines: [
-      walletNeeded(mode)
-        ? "Each guessed date gives a valid phrase; the wallet tells which is yours."
-        : "Several guessed dates may give a valid phrase; the wallet tells which is yours.",
-      passphrase === ""
-        ? "Decode compares it without a BIP39 passphrase."
-        : "Decode compares it with the BIP39 passphrase of --bip39-passphrase-file.",
-    ],
-    more: [readmeLink("date-recovery-helper")],
-  };
+function decodeWalletExplanation(mode: MaskingMode, passphrase: string): Explanation {
+  return walletExplanation(mode, [
+    passphrase === ""
+      ? "Decode compares it without a BIP39 passphrase."
+      : "Decode compares it with the BIP39 passphrase of --bip39-passphrase-file.",
+  ]);
 }
 
 /** What is asked or done next on the private screen. */
@@ -242,28 +177,21 @@ interface GivenAnswers extends MissingCodesAnswers {
  * fingerprint, whether to list the candidates, and the limits.
  */
 function givenAnswers(args: ParsedArguments): GivenAnswers {
-  const evidence = walletEvidence(args);
-  if (evidence !== undefined) assertWalletEvidence(evidence);
-  assertWalletPlaceUsed(args, evidence);
+  const { evidence, place, passphrase } = givenWallet(args);
   // Read only by a restore from shares, after a share typed here: checked now all the same.
   searchLimit(args);
-  assertFlag(args, "list-candidates");
   const list = args["list-candidates"] === true;
   if (list && evidence !== undefined)
     throw new Error("--list-candidates lists the candidates instead of a wallet check.");
   const fingerprint = value(args, "encoded-fingerprint");
   return {
     evidence,
-    place: walletPlaceOf(evidence, args),
-    passphrase: bip39Passphrase(args),
+    place,
+    passphrase,
     encodedFingerprint: fingerprint === undefined ? undefined : parseMasterFingerprint(fingerprint),
     list,
     maxCandidates: maxCandidatesOf(args),
-    maxResults: integerOption(args, "max-results", {
-      defaultValue: MAX_SHOWN_MATCHES,
-      min: 1,
-      max: Number.MAX_SAFE_INTEGER,
-    }),
+    maxResults: maxResultsOf(args),
   };
 }
 
@@ -271,13 +199,6 @@ function givenAnswers(args: ParsedArguments): GivenAnswers {
 function handedToRestore(args: ParsedArguments): ParsedArguments {
   const taken = new Set<string>(commandOptions["sskr-combine"]);
   return Object.fromEntries(Object.entries(args).filter(([key]) => taken.has(key)));
-}
-
-/** The choice that asks for the encoded seed phrase once more; after a file, it is typed. */
-function backupChoice(args: ParsedArguments): Choice<"backup"> {
-  return fromFile(args)
-    ? { label: "Type the encoded seed phrase", note: "instead of the file", value: "backup" }
-    : { label: "Type the encoded seed phrase again", value: "backup" };
 }
 
 /** The step after the dates: the search when a date holds ?, otherwise the decoding. */
@@ -293,21 +214,17 @@ function afterDates(dates: DatesAnswer): Step {
  * what to type again; every other answer is kept.
  */
 async function decodeWithQuestions(args: ParsedArguments): Promise<void> {
-  if (value(args, "input") !== undefined || values(args, "date").length > 0)
-    throw new Error(
-      "--ask-secrets cannot be combined with direct encoded text or command-line dates.",
-    );
+  assertAskedEncodedInput(args);
   // The values of the options are checked before the first question, so that none is lost to them.
   assertOneEncodedSource(args);
   transformMode(args);
-  const format = value(args, "format");
-  if (format !== undefined) inputFormat(format);
+  givenInputFormat(args);
   const given = givenAnswers(args);
   const inputKind = inputKindOf(args);
   let backupArgs = args;
   let backup: EncodedBackup | undefined;
   // The mode that a record header named, for codes typed after it without one.
-  let recordMode: EncodedMode | undefined;
+  let recordMode: MaskingMode | undefined;
   let typedDates: DatesAnswer | undefined;
   let evidence: WalletEvidence | undefined = given.evidence;
   // "It cannot" at the wallet question, or --list-candidates, kept for dates typed again; a mode
@@ -355,7 +272,7 @@ async function decodeWithQuestions(args: ParsedArguments): Promise<void> {
           continue;
         }
       } else backup = read.backup;
-      if (backup.mode === "direct") step = "decode";
+      if (!Masking.of(backup.mode).masked) step = "decode";
       else {
         showEncodedFingerprint(encodedFingerprintOf(backup));
         // Dates kept from before still count if the new phrase takes them.
@@ -369,14 +286,14 @@ async function decodeWithQuestions(args: ParsedArguments): Promise<void> {
       const needed = walletNeeded(backup!.mode);
       if (needed && given.list && evidence === undefined)
         terminalNotice(
-          "--list-candidates does not apply here: every date gives a valid phrase, so the wallet tells the right one.",
+          `--list-candidates does not apply here. ${walletReason(backup!.mode)}`,
           "warning",
         );
       if (evidence !== undefined || (withoutWallet && !needed)) step = "search";
       else {
         const answer = await askWalletEvidence({
           optional: !needed,
-          explanation: walletExplanation(backup!.mode, given.passphrase),
+          explanation: decodeWalletExplanation(backup!.mode, given.passphrase),
           place: given.place,
         });
         if (answer.kind === "wallet") evidence = answer.evidence;
@@ -424,8 +341,10 @@ async function decodeAndShow(
   foundCodes?.();
   showRecovered(result, mode, format);
   if (result.checksumValid) return "done";
-  return askAfterFailure<Step>("What now?", [
-    ...(mode === "direct" ? [] : [{ label: "Type the dates again", value: "dates" } as const]),
+  return askAfterFailure<Step>(WHAT_NOW, [
+    ...(Masking.of(mode).masked
+      ? [{ label: "Type the dates again", value: "dates" } as const]
+      : []),
     backupChoice(backupArgs),
     { label: "Done", note: "keep this result", value: "done" },
   ]);
@@ -449,7 +368,8 @@ async function searchAndShow(
   backupArgs: ParsedArguments,
   given: GivenAnswers,
 ): Promise<Searched> {
-  const mode = backup.mode as SeedshiftMode;
+  const { mode } = backup;
+  Masking.assertMaskedMode(mode);
   const { maxResults } = given;
   const result = await searchDates({
     indexes: backup.indexes,
@@ -467,60 +387,14 @@ async function searchAndShow(
   if (result === undefined) return { step: "dates", evidence };
   reportDateMatches(result, { mode, evidence, maxResults });
   if (result.matchCount > 0) dateMatchNotes(evidence);
-  for (;;) {
-    const next = await afterSearch(result, evidence, backupArgs, maxResults);
-    if (next !== "wallet" && next !== "change-wallet") return { step: next, evidence };
-    // "It cannot" only in place of a wallet that matched none, where the mode can list the
-    // candidates without one.
-    const answer = await askWalletEvidence({
-      optional: next === "change-wallet" && !walletNeeded(mode),
-      explanation: walletExplanation(mode, given.passphrase),
-      place: given.place,
-    });
-    if (answer.kind === "back") continue;
-    return { step: "search", evidence: answer.kind === "wallet" ? answer.evidence : undefined };
-  }
-}
-
-/** A step after a search, or "change-wallet" for another wallet in place of one that matched none. */
-type AfterSearch = Exclude<Step, "search"> | "change-wallet";
-
-/** What the person changes after a search whose result is not complete; "done" when it is. */
-async function afterSearch(
-  result: DateSearchResult,
-  evidence: WalletEvidence | undefined,
-  backupArgs: ParsedArguments,
-  maxResults: number,
-): Promise<AfterSearch> {
-  if (result.matchCount === 0) {
-    const wallet: Choice<AfterSearch>[] =
-      evidence === undefined
-        ? []
-        : [
-            {
-              label: "Change the wallet",
-              note: "the fingerprint or the address",
-              value: "change-wallet",
-            },
-          ];
-    return askAfterFailure("What now?", [
-      { label: "Change the dates", value: "dates" },
-      ...wallet,
-      backupChoice(backupArgs),
-      { label: "Stop", value: "done" },
-    ]);
-  }
-  // With a wallet, every match is one the wallet confirmed.
-  if (evidence !== undefined) return "done";
-  let question: string;
-  if (result.matchCount > maxResults) question = "Not every candidate is shown. What now?";
-  // The private screen keeps no scrollback: matches above its top could not be read.
-  else if (!matchesFitScreen(result))
-    question = "Not every candidate fits on the screen. What now?";
-  else return "done";
-  return askAfterFailure(question, [
-    { label: "Check them against the wallet", note: "only those that match", value: "wallet" },
-    { label: "Change the dates", note: "fewer ? give fewer candidates", value: "dates" },
-    { label: "Done", value: "done" },
-  ]);
+  const next = await askAfterDateSearch(result, {
+    evidence,
+    mode,
+    maxResults,
+    again: backupChoice(backupArgs),
+    wallet: { explanation: decodeWalletExplanation(mode, given.passphrase), place: given.place },
+  });
+  return typeof next === "string"
+    ? { step: next, evidence }
+    : { step: "search", evidence: next.evidence };
 }

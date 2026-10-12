@@ -15,121 +15,113 @@
 //
 // Host-neutral: it imports only other core modules (test/portable-modules.test.ts).
 
+import { codeTokens, fitsPattern, hexUnits, UNICODE_CODE_DIGITS } from "./code-text.js";
 import {
   EVERY_WORD,
-  MAX_SEARCH_COMBINATIONS,
+  placeCombinations,
   searchCandidates,
   wordPlaceOf,
   type WordPlace,
+  assertSearchable,
+  expectedCandidates,
+  searchCombinations,
+  unknownPlacesOf,
 } from "./candidates.js";
-import { COLOR_UNICODE_BASE, COLOR_UNICODE_WIDTH, wordPositionPatterns } from "./colors.js";
-import { EncodedBackup, type EncodedFormat, type EncodedMode } from "./encoded-backup.js";
+import {
+  WORD_NUMBERS_THROUGH,
+  WORD_NUMBER_DIGITS,
+  wordNumberOf,
+  isBip39WordCount,
+  WORD_COUNTS_TEXT,
+} from "./bip39-sizes.js";
+import {
+  colorOfUnicodePair,
+  COLOR_UNICODE_PAIRS,
+  COLOR_UNICODE_POINTS_PER_COLOR,
+  wordPositionPatterns,
+  markedColorSymbols,
+  RGB_HEX_DIGITS,
+} from "./colors.js";
+import { EncodedBackup, type EncodedFormat } from "./encoded-backup.js";
 import { Masking } from "./masking.js";
-import { nextTask, TURN_MILLISECONDS } from "./search-turns.js";
+import { ENCODED_FORMATS, type MaskingMode } from "./types.js";
+import { SearchTurns, keptCount, type SearchProgress, type SearchRun } from "./search-turns.js";
 import {
   BIP39_DICTIONARY_SIZE,
-  traditionalChineseWordlist,
-  unicodeHex,
-  WORD_COUNT_SET,
+  englishTokens,
+  unicodeCodesFitting,
+  wordIndexOfNumber,
 } from "./words.js";
+import { Redacted } from "./redacted.js";
+
+/** What makes a search of marked codes smaller, in the words of its refusal (assertSearchable). */
+const NARROW_MARKED_CODES = "read a few letters or digits of the codes, or mark fewer";
 
 /** Codes found that a search keeps by default: more than any person compares by eye. */
 export const MAX_FOUND_CODES = 100;
-/** The forms whose codes may be marked, in the order that detection tries them. */
-const MARKED_FORMATS: readonly EncodedFormat[] = [
-  "english",
-  "indexes",
-  "unicode",
-  "colors",
-  "colors-unicode",
-];
-/** The digits of a word number, 1 to 2048, and of a Unicode code. */
-const MAX_NUMBER_DIGITS = 4;
-const CODE_DIGITS = 4;
-/** Two four-digit Private Use codes make one color in Color Unicode (core/colors.ts). */
-const CODES_PER_COLOR = 2;
-const REDACTED = "[MissingCodes: redacted]";
-const UNICODE_CODES = traditionalChineseWordlist.map(unicodeHex);
-
-/** Whether `written` fits `pattern`, of the same length, a ? in the pattern fitting any symbol. */
-function fits(pattern: string, written: string): boolean {
-  if (pattern.length !== written.length) return false;
-  for (let index = 0; index < pattern.length; index += 1)
-    if (pattern[index] !== "?" && pattern[index] !== written[index]) return false;
-  return true;
-}
 
 /** The words whose 1-based number fits `pattern`, as typed or as four digits of a color. */
 function wordsOfNumber(pattern: string, padded: boolean): WordPlace {
   const words: number[] = [];
   for (let index = 0; index < BIP39_DICTIONARY_SIZE; index += 1) {
-    const number = String(index + 1);
-    if (fits(pattern, padded ? number.padStart(MAX_NUMBER_DIGITS, "0") : number)) words.push(index);
+    const number = String(wordNumberOf(index));
+    if (fitsPattern(pattern, padded ? number.padStart(WORD_NUMBER_DIGITS, "0") : number))
+      words.push(index);
   }
   return words;
+}
+
+/** A word number with ? for unread digits: at most the digits of 2048. */
+const MARKED_WORD_NUMBER = new RegExp(`^[0-9?]{1,${WORD_NUMBER_DIGITS}}$`, "u");
+
+/** The refusal of word number `place`, which no number of a word fits. */
+function noWordNumber(place: number): Error {
+  return new Error(`Word number ${place} is no number from ${WORD_NUMBERS_THROUGH}.`);
 }
 
 /** The words that one word number allows: a number, a lone ?, or a number with ? for a digit. */
 function numberPlace(written: string, place: number): WordPlace {
   if (written === "?") return EVERY_WORD;
-  if (/^[0-9?]{1,4}$/u.test(written)) {
+  // A known number is read as complete codes read it, leading zeros included.
+  if (!written.includes("?")) {
+    try {
+      return [wordIndexOfNumber(written)];
+    } catch {
+      throw noWordNumber(place);
+    }
+  }
+  if (MARKED_WORD_NUMBER.test(written)) {
     const words = wordsOfNumber(written, false);
     if (words.length > 0) return words;
   }
-  throw new Error(`Word number ${place} is no number from 1 through 2048.`);
+  throw noWordNumber(place);
 }
 
 /** The words that one Unicode code allows: a code, a lone ?, or a code with ? for a digit. */
 function codePlace(written: string, place: number): WordPlace {
   if (written === "?") return EVERY_WORD;
-  if (written.length === CODE_DIGITS && /^[0-9A-F?]+$/u.test(written)) {
-    const words = UNICODE_CODES.flatMap((code, index) => (fits(written, code) ? [index] : []));
+  if (written.length === UNICODE_CODE_DIGITS && /^[0-9A-F?]+$/u.test(written)) {
+    const words = unicodeCodesFitting(written);
     if (words.length > 0) return words;
   }
   throw new Error(`Code ${place} is no Unicode code of the word list.`);
 }
 
-/** Text split at spaces, commas and semicolons, upper case. */
-function tokensOf(text: string, extra = ""): string[] {
-  return text
-    .toUpperCase()
-    .split(new RegExp(`[\\s,;${extra}]+`, "u"))
-    .filter(Boolean);
-}
-
-/**
- * Units of `width` hexadecimal digits written apart, or run together where each ? stands for a
- * whole unit; undefined when the text is neither.
- */
-function hexUnits(text: string, width: number, extra = ""): string[] | undefined {
-  const tokens = tokensOf(text, extra);
-  const unit = new RegExp(`^(?:\\?|[0-9A-F?]{${width}})$`, "u");
-  if (tokens.length > 1 && tokens.every((token) => unit.test(token))) return tokens;
-  const compact = tokens.join("");
-  const units = compact.match(new RegExp(`[0-9A-F]{${width}}|\\?`, "gu"));
-  return units !== null && units.join("") === compact ? units : undefined;
-}
-
 /** The colors of Color Unicode codes, each undefined where one of its two codes cannot be read. */
 function unicodeColors(text: string): (string | undefined)[] {
   // The codes may also be the Private Use symbols themselves.
-  const symbols = Array.from(text.replace(/\s+/gu, ""));
-  const points =
-    symbols.length > 0 && symbols.every((symbol) => symbol === "?" || /^[-]$/u.test(symbol))
-      ? symbols.map((symbol) =>
-          symbol === "?" ? "?" : symbol.codePointAt(0)!.toString(16).toUpperCase(),
-        )
-      : hexUnits(text, CODE_DIGITS);
-  if (points === undefined || points.length % CODES_PER_COLOR !== 0)
-    throw new Error("Color Unicode needs two four-digit codes for every color.");
-  return Array.from({ length: points.length / CODES_PER_COLOR }, (_, color) => {
-    const pair = points.slice(color * CODES_PER_COLOR, (color + 1) * CODES_PER_COLOR);
+  const points = markedColorSymbols(text) ?? hexUnits(text, UNICODE_CODE_DIGITS);
+  if (points === undefined || points.length % COLOR_UNICODE_POINTS_PER_COLOR !== 0)
+    throw new Error(COLOR_UNICODE_PAIRS);
+  return Array.from({ length: points.length / COLOR_UNICODE_POINTS_PER_COLOR }, (_, color) => {
+    const pair = points.slice(
+      color * COLOR_UNICODE_POINTS_PER_COLOR,
+      (color + 1) * COLOR_UNICODE_POINTS_PER_COLOR,
+    );
     // A code with ? among its digits leaves its color unknown: its digits are no digits of it.
     if (pair.some((code) => code.includes("?"))) return undefined;
-    const [high, low] = pair.map((code) => Number.parseInt(code, 16) - COLOR_UNICODE_BASE);
-    if ([high!, low!].some((part) => part < 0 || part >= COLOR_UNICODE_WIDTH))
-      throw new Error("Color Unicode uses only MnemoCode Private Use Area code points.");
-    return `#${(high! * COLOR_UNICODE_WIDTH + low!).toString(16).toUpperCase().padStart(6, "0")}`;
+    const [high, low] = pair.map((code) => Number.parseInt(code, 16));
+    return colorOfUnicodePair(high!, low!);
   });
 }
 
@@ -146,23 +138,17 @@ function colorPlaces(colors: readonly (string | undefined)[]): WordPlace[] {
 function placesOf(text: string, format: EncodedFormat): WordPlace[] {
   switch (format) {
     case "english":
-      return text
-        .normalize("NFKD")
-        .toLowerCase()
-        .trim()
-        .split(/\s+/u)
-        .filter(Boolean)
-        .map((word, index) => wordPlaceOf(word, index + 1));
+      return englishTokens(text).map((word, index) => wordPlaceOf(word, index + 1));
     case "indexes":
-      return tokensOf(text).map((token, index) => numberPlace(token, index + 1));
+      return codeTokens(text).map((token, index) => numberPlace(token, index + 1));
     case "unicode": {
-      const codes = hexUnits(text, CODE_DIGITS);
+      const codes = hexUnits(text, UNICODE_CODE_DIGITS);
       if (codes === undefined)
         throw new Error("Unicode codes have four hexadecimal digits each, or ? where unread.");
       return codes.map((code, index) => codePlace(code, index + 1));
     }
     case "colors": {
-      const colors = hexUnits(text, 6, "#");
+      const colors = hexUnits(text, RGB_HEX_DIGITS);
       if (colors === undefined || colors.some((color) => color !== "?" && color.includes("?")))
         throw new Error("Mark a color that cannot be read with one ? in place of the whole color.");
       return colorPlaces(colors.map((color) => (color === "?" ? undefined : `#${color}`)));
@@ -174,23 +160,21 @@ function placesOf(text: string, format: EncodedFormat): WordPlace[] {
   }
 }
 
-/** How a search for missing codes runs, with the host's services. */
-export interface MissingCodesRun {
+/**
+ * How the check of every candidate of marked codes runs, with the host's services (MissingCodes
+ * run). The search of one way (missing-codes-search.ts) builds it.
+ */
+export interface CodesCheckRun extends SearchRun {
   /** Whether the codes, BIP39 indexes from 0 to 2047, are the right ones; may answer later. */
   readonly check: (codes: readonly number[]) => boolean | Promise<boolean>;
   /** How many codes that passed are kept; MAX_FOUND_CODES by default. */
   readonly maxFound?: number | undefined;
   /** Called at each turn with the candidates checked and those that passed. */
-  readonly onProgress?:
-    ((progress: { readonly count: number; readonly found: number }) => void) | undefined;
-  /** Stops the search at its next turn; the signal's reason is thrown. */
-  readonly signal?: AbortSignal | undefined;
-  /** How the search lets the host's event loop run; a zero timeout by default. */
-  readonly turn?: (() => Promise<void>) | undefined;
+  readonly onProgress?: ((progress: SearchProgress) => void) | undefined;
 }
 
-/** What a search for missing codes found. */
-export interface MissingCodesResult {
+/** What the check of every candidate of marked codes found (MissingCodes run). */
+export interface CodesCheckResult {
   /** The codes that passed the check, in the order searched, at most maxFound of them. */
   readonly found: readonly EncodedBackup[];
   /** How many passed, all of them. */
@@ -204,25 +188,27 @@ export interface MissingCodesResult {
  * because the places are read and checked once, and then tell their size, are searched and give
  * EncodedBackups; toString, toJSON and Node's inspect show none of the codes.
  */
-export class MissingCodes {
+export class MissingCodes extends Redacted {
   readonly #places: readonly WordPlace[];
   readonly #format: EncodedFormat;
-  readonly #mode: EncodedMode;
+  readonly #masking: Masking;
   readonly #combinations: number;
 
-  private constructor(places: readonly WordPlace[], format: EncodedFormat, mode: EncodedMode) {
-    if (!WORD_COUNT_SET.has(places.length))
-      throw new Error(`These are ${places.length} codes; a seed phrase has 12, 15, 18, 21 or 24.`);
+  private constructor(places: readonly WordPlace[], format: EncodedFormat, mode: MaskingMode) {
+    super("MissingCodes");
+    // A JavaScript host may pass any value, which would be refused only by a later operation
+    // (AUD-014-API006): refused here by the guard that complete codes have (EncodedBackup).
+    const masking = Masking.of(mode);
+    if (!isBip39WordCount(places.length))
+      throw new Error(`These are ${places.length} codes; a seed phrase has ${WORD_COUNTS_TEXT}.`);
     if (places.every((place) => place.length === 1))
       throw new Error("No code is marked: mark each code that cannot be read with ?.");
-    const combinations = places.reduce((all, place) => all * place.length, 1);
-    if (combinations > MAX_SEARCH_COMBINATIONS)
-      throw new Error(
-        `The marks leave ${combinations.toLocaleString("en-US")} combinations; at most ${MAX_SEARCH_COMBINATIONS.toLocaleString("en-US")} can be searched. Read a few letters or digits of the codes, or mark fewer.`,
-      );
+    // Counted and bounded as the word search counts and bounds its places (candidates.ts).
+    const combinations = searchCombinations({ kind: "unknown-words", places });
+    assertSearchable(combinations, NARROW_MARKED_CODES);
     this.#places = Object.freeze(places.map((place) => Object.freeze([...place])));
     this.#format = format;
-    this.#mode = mode;
+    this.#masking = masking;
     this.#combinations = combinations;
   }
 
@@ -236,9 +222,10 @@ export class MissingCodes {
 
   /** Every form that the marked codes may be in, for a host that asks for one when several fit. */
   static formats(text: string): EncodedFormat[] {
-    return MARKED_FORMATS.filter((format) => {
+    // Codes of every form may be marked; detection tries them in their order.
+    return ENCODED_FORMATS.filter((format) => {
       try {
-        return WORD_COUNT_SET.has(placesOf(text, format).length);
+        return isBip39WordCount(placesOf(text, format).length);
       } catch {
         return false;
       }
@@ -246,12 +233,12 @@ export class MissingCodes {
   }
 
   /** Reads the marked codes of `text` in `format`, taken with `mode`; throws why they cannot be. */
-  static read(text: string, format: EncodedFormat, mode: EncodedMode): MissingCodes {
+  static read(text: string, format: EncodedFormat, mode: MaskingMode): MissingCodes {
     return new MissingCodes(placesOf(text, format), format, mode);
   }
 
   /** The same codes taken with another mode. */
-  withMode(mode: EncodedMode): MissingCodes {
+  withMode(mode: MaskingMode): MissingCodes {
     return new MissingCodes(this.#places, this.#format, mode);
   }
 
@@ -259,8 +246,8 @@ export class MissingCodes {
     return this.#format;
   }
 
-  get mode(): EncodedMode {
-    return this.#mode;
+  get mode(): MaskingMode {
+    return this.#masking.mode;
   }
 
   get wordCount(): number {
@@ -269,7 +256,7 @@ export class MissingCodes {
 
   /** The places, counted from 1, whose code is not known. */
   get missingPlaces(): number[] {
-    return this.#places.flatMap((place, index) => (place.length > 1 ? [index + 1] : []));
+    return unknownPlacesOf(this.#places).map((index) => index + 1);
   }
 
   /** The combinations of codes that the marks leave. */
@@ -279,7 +266,7 @@ export class MissingCodes {
 
   /** Whether the codes keep a BIP39 checksum of their own, which the search then holds them to. */
   get checksummed(): boolean {
-    const masking = Masking.of(this.#mode);
+    const masking = this.#masking;
     // Codes without Seedshift are the phrase itself, whose checksum BIP39 keeps: Masking says
     // otherwise for them only because such a phrase typed with a wrong checksum is still decoded
     // and shown with a warning, not refused.
@@ -292,8 +279,7 @@ export class MissingCodes {
    */
   get expected(): number {
     if (!this.checksummed) return this.#combinations;
-    const checksumBits = this.wordCount / 3;
-    return Math.max(1, Math.round(this.#combinations / 2 ** checksumBits));
+    return expectedCandidates({ kind: "unknown-words", places: this.#places }).count;
   }
 
   /** The candidates, as BIP39 indexes, in a steady order; each array is a fresh copy. */
@@ -303,58 +289,27 @@ export class MissingCodes {
         yield [...words];
       return;
     }
-    const chosen = this.#places.map(() => 0);
-    for (;;) {
-      yield chosen.map((choice, place) => this.#places[place]![choice]!);
-      let place = this.#places.length - 1;
-      while (place >= 0 && chosen[place] === this.#places[place]!.length - 1) {
-        chosen[place] = 0;
-        place -= 1;
-      }
-      if (place < 0) return;
-      chosen[place] = chosen[place]! + 1;
-    }
+    for (const codes of placeCombinations(this.#places)) yield [...codes];
   }
 
   /**
    * Checks every candidate with the host's check, letting its event loop run now and then, and
    * keeps the first maxFound that pass, as EncodedBackups of this form and mode.
    */
-  async run(run: MissingCodesRun): Promise<MissingCodesResult> {
-    const maxFound = run.maxFound ?? MAX_FOUND_CODES;
-    if (!Number.isSafeInteger(maxFound) || maxFound < 1)
-      throw new RangeError("maxFound must be a whole number of 1 or more.");
-    const turn = run.turn ?? nextTask;
+  async run(run: CodesCheckRun): Promise<CodesCheckResult> {
+    const maxFound = keptCount(run.maxFound, MAX_FOUND_CODES, "maxFound", 1);
     const found: EncodedBackup[] = [];
     let count = 0;
     let passed = 0;
-    run.signal?.throwIfAborted();
-    let lastTurn = Date.now();
+    const turns = SearchTurns.of(run);
     for (const codes of this.candidates()) {
       count += 1;
       if (await run.check(codes)) {
         passed += 1;
-        if (found.length < maxFound) found.push(EncodedBackup.of(codes, this.#format, this.#mode));
+        if (found.length < maxFound) found.push(EncodedBackup.of(codes, this.#format, this.mode));
       }
-      if (Date.now() - lastTurn >= TURN_MILLISECONDS) {
-        await turn();
-        run.signal?.throwIfAborted();
-        run.onProgress?.({ count, found: passed });
-        lastTurn = Date.now();
-      }
+      if (await turns.due()) run.onProgress?.({ checked: count, found: passed });
     }
     return { found, passed, count };
-  }
-
-  toString(): string {
-    return REDACTED;
-  }
-
-  toJSON(): string {
-    return REDACTED;
-  }
-
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED;
   }
 }

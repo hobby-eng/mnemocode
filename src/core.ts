@@ -1,7 +1,11 @@
 /** Stable public API. Implementations are grouped by responsibility in core/. */
 export {
   BIP39_WORD_COUNTS,
+  ENCODED_FORMATS,
+  MASKING_MODES,
   type Bip39WordCount,
+  type EncodedFormat,
+  type MaskingMode,
   type OutputFormat,
   type DateShiftDate,
   type EncodedResult,
@@ -14,7 +18,10 @@ export {
   unicodeHex,
   mappingRow,
   allMappingRows,
-  recoverMissingWord,
+  wordTableRow,
+  wordTableText,
+  UNICODE_CODE_HINT,
+  type WordTableLookup,
   recoverLegacyValidLastWords,
 } from "./core/words.js";
 export {
@@ -45,15 +52,16 @@ export {
   type DateCandidate,
   type SeedshiftMode,
 } from "./core/date-recovery.js";
+// The arithmetic of each mode, one function per mode: compatibility exports kept for existing
+// callers. New code encodes and decodes through Masking.of(mode) (index level) or EncodedBackup
+// (codes as text), which dispatch over every mode.
 export {
   encodeMnemonic,
   encodeMnemonicLegacy,
   legacyChecksumValidResult,
   representMnemonic,
-  decodeIndexes,
   decodeIndexesLegacy,
-  decodeIndexesLegacyValid,
-  decodeInput,
   decodeInputLegacy,
   decodeInputDirect,
 } from "./core/seedshift.js";
+export { decodeIndexes, decodeIndexesLegacyValid, decodeInput } from "./core/masking.js";

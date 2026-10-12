@@ -109,6 +109,10 @@
       "types": "./dist/core/candidate-list.d.ts",
       "import": "./dist/core/candidate-list.js"
     },
+    "./core/candidate-list-writer": {
+      "types": "./dist/core/candidate-list-writer.d.ts",
+      "import": "./dist/core/candidate-list-writer.js"
+    },
     "./core/candidate-list-self-test": {
       "types": "./dist/core/candidate-list-self-test.d.ts",
       "import": "./dist/core/candidate-list-self-test.js"
@@ -169,6 +173,10 @@
       "types": "./dist/sskr/share-unmasking.d.ts",
       "import": "./dist/sskr/share-unmasking.js"
     },
+    "./sskr/share-restore": {
+      "types": "./dist/sskr/share-restore.d.ts",
+      "import": "./dist/sskr/share-restore.js"
+    },
     "./sskr/share-unmasking-self-test": {
       "types": "./dist/sskr/share-unmasking-self-test.d.ts",
       "import": "./dist/sskr/share-unmasking-self-test.js"
@@ -193,6 +201,18 @@
       "types": "./dist/export/heir-sheet.d.ts",
       "import": "./dist/export/heir-sheet.js"
     },
+    "./export/document-formats": {
+      "types": "./dist/export/document-formats.d.ts",
+      "import": "./dist/export/document-formats.js"
+    },
+    "./export/card-drawing": {
+      "types": "./dist/export/card-drawing.d.ts",
+      "import": "./dist/export/card-drawing.js"
+    },
+    "./export/sskr-keeping-text": {
+      "types": "./dist/export/sskr-keeping-text.d.ts",
+      "import": "./dist/export/sskr-keeping-text.js"
+    },
     "./export/heir-sheet-text": {
       "types": "./dist/export/heir-sheet-text.d.ts",
       "import": "./dist/export/heir-sheet-text.js"
@@ -212,15 +232,7 @@
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
     "sskr-wasm",
-    "docs/SSKR.md",
-    "docs/card-designs.md",
-    "docs/card-identities.md",
-    "docs/ARCHITECTURE.md",
-    "docs/SEEDSHIFT_CONSTRUCTION.md",
-    "docs/HEIRS.md",
-    "docs/CANDIDATES.md",
-    "docs/RELEASING.md",
-    "docs/ROADMAP.md",
+    "docs/*.md",
     "docs/audits/README.md",
     "CHANGELOG.md"
   ],
@@ -229,7 +241,8 @@
     "build": "pnpm clean && tsc -p tsconfig.json",
     "check:toolchain": "node scripts/verify-toolchain.mjs",
     "check:markdown": "node scripts/verify-markdown.mjs",
-    "check": "pnpm check:toolchain && pnpm check:markdown && tsc --noEmit && tsc -p tsconfig.tests.json && tsc --noEmit -p tsconfig.cards.json && tsc -p tsconfig.strict-consumers.json",
+    "check:copies": "node scripts/verify-no-copies.mjs",
+    "check": "pnpm check:toolchain && pnpm check:markdown && pnpm check:copies && tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p tsconfig.cards.json && tsc -p tsconfig.strict-consumers.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

@@ -6,9 +6,9 @@
 import { assertSskrSelfTest } from "./self-test.js";
 import { planJointRepair, type JointPlan, type RepairedSet } from "./joint-repair.js";
 import { ShareSet } from "./share-set.js";
-// Also configures the platform that the older functions of joint-repair.ts read without one.
+// The Node.js platform and randomness that the functions below pass to the share modules.
 import { nodeFillRandom, nodeSharePlatform } from "./share-platform-node.js";
-import { MAX_SHARES, ShareSplit } from "./split.js";
+import { type BackupSplit, type BackupSplitRequest, MAX_SHARES, ShareSplit } from "./split.js";
 import { assertShareCount, normalizeShare } from "./transport.js";
 
 export { MAX_SHARES };
@@ -27,10 +27,22 @@ export async function splitSskrMnemonic(
   return new ShareSplit(nodeSharePlatform, nodeFillRandom).split(mnemonic, threshold, count);
 }
 
-/** The phrase of complete shares, each as read, in the shape of a repair. */
-export async function restoreShareSet(records: readonly string[]): Promise<RepairedSet> {
+/** The shares of a backup, masked first in its mode (ShareSplit.splitBackup). */
+export async function splitSskrBackup(request: BackupSplitRequest): Promise<BackupSplit> {
+  ShareSplit.validateThreshold(request.threshold, request.count);
+  await assertSskrSelfTest();
+  return new ShareSplit(nodeSharePlatform, nodeFillRandom).splitBackup(request);
+}
+
+/** Refuses too few or too many shares, and checks the SSKR engine, before any share is read. */
+async function assertCheckedRecords(records: readonly string[]): Promise<void> {
   assertShareCount(records.length);
   await assertSskrSelfTest();
+}
+
+/** The phrase of complete shares, each as read, in the shape of a repair. */
+export async function restoreShareSet(records: readonly string[]): Promise<RepairedSet> {
+  await assertCheckedRecords(records);
   return (await ShareSet.restore(records, nodeSharePlatform)).toRepairedSet();
 }
 
@@ -43,8 +55,7 @@ export async function planShareRepair(
   records: readonly string[],
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<JointPlan> {
-  assertShareCount(records.length);
-  await assertSskrSelfTest();
+  await assertCheckedRecords(records);
   return planJointRepair(records, { ...options, platform: nodeSharePlatform });
 }
 
@@ -55,8 +66,7 @@ export async function planShareRepair(
  * unchecked shares and unsettled elements, so that a caller can report them honestly.
  */
 export async function combineSskrShareSet(records: readonly string[]): Promise<RepairedSet> {
-  assertShareCount(records.length);
-  await assertSskrSelfTest();
+  await assertCheckedRecords(records);
   return (await ShareSet.combine(records, nodeSharePlatform)).toRepairedSet();
 }
 
@@ -65,8 +75,7 @@ export async function combineSskrShareSet(records: readonly string[]): Promise<R
  * callers that need partial recovery use combineSskrShareSet and report its metadata (AUD-008-FUN001).
  */
 export async function combineSskrShares(records: readonly string[]): Promise<string> {
-  assertShareCount(records.length);
-  await assertSskrSelfTest();
+  await assertCheckedRecords(records);
   const restored = await ShareSet.combine(records, nodeSharePlatform);
   if (!restored.checked)
     throw new Error(

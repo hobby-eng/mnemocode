@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderIndividualCards, selectTemplate, type CardContent } from "../src/cards.js";
 import { indexesToColors } from "../src/core.js";
+import { nodeCardRenderer } from "../src/export/platform-node.js";
 
 // Reading the printed text needs Poppler; without it the check is skipped, not faked.
 const hasPoppler = spawnSync("pdftotext", ["-v"]).error === undefined;
@@ -26,7 +27,11 @@ function printedText(bytes: Uint8Array): string {
 describe.skipIf(!hasPoppler)("numbers on separate cards", () => {
   for (const template of ["business-it", "material-tile", "business-glass-4in1"])
     it(`prints the position of every reference on ${template} cards`, async () => {
-      const cards = await renderIndividualCards(selectTemplate(template, "colors"), { ...content });
+      const cards = await renderIndividualCards(
+        nodeCardRenderer,
+        selectTemplate(template, "colors"),
+        { ...content },
+      );
       const perCard = selectTemplate(template, "colors").referencesPerCard ?? 1;
       expect(cards).toHaveLength(Math.ceil(colors.length / perCard));
       for (const [cardIndex, card] of cards.entries()) {

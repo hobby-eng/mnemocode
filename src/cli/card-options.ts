@@ -1,79 +1,77 @@
 import { businessOptionNames, businessOptions } from "./business-options.js";
-import { askSecretUntil } from "./ask.js";
-import { terminalAvailable } from "./terminal-input.js";
-import { formatDate, type DateShiftDate } from "../core.js";
-import { selectTemplate } from "../export/templates.js";
-import type { EncodedFormat } from "./input.js";
-import { value, values, type ParsedArguments } from "./arguments.js";
+import { selectTemplate, type CardTemplate } from "../export/templates.js";
+import { NoCardTemplate } from "../export/template-catalog.js";
+import { type CardKind, type EncodedFormat } from "../core/types.js";
 
-export function validateCardOptions(
-  args: ParsedArguments,
-  format: EncodedFormat,
-  mode: string,
-): void {
-  const pdf = value(args, "pdf") ?? value(args, "images-dir");
-  const directory = value(args, "cards-dir");
-  if (args["cards-dir"] !== undefined && typeof args["cards-dir"] !== "string")
-    throw new Error("Provide the individual-card output folder once, using a non-empty path.");
-  if (directory !== undefined) {
-    if (!directory.trim())
-      throw new Error("The individual-card output folder path must not be empty.");
-    if (!["colors", "colors-unicode"].includes(format))
-      throw new Error("Individual cards are available only for RGB color formats 4 and 5.");
-    if (!selectTemplate(value(args, "template"), "colors").renderIndividual)
-      throw new Error("This template does not support individual cards.");
-  }
-  if (pdf === undefined && directory === undefined) {
-    if (
-      value(args, "template") !== undefined ||
-      value(args, "title") !== undefined ||
-      values(args, "event").length ||
-      businessOptionNames.some((name) => args[name] !== undefined)
-    ) {
-      throw new Error(
-        "Card design settings require a PDF file, an image output folder, or an individual-card output folder.",
-      );
-    }
-    return;
-  }
-  if (!["unicode", "colors", "colors-unicode"].includes(format))
-    throw new Error("Card export requires format 3, 4, or 5.");
-  if (format === "unicode" && mode === "direct")
-    throw new Error(
-      "To export a card with dates, select a Seedshift mode. The dates will be visible on the card.",
-    );
-  if (format !== "unicode" && values(args, "event").length)
-    throw new Error("Event labels apply only to dated Unicode cards.");
-  businessOptions(args);
-  if (format === "unicode" && businessOptionNames.some((name) => args[name] !== undefined))
-    throw new Error("Page and business-card settings do not apply to dated Unicode cards.");
-  selectTemplate(value(args, "template"), format === "unicode" ? "unicode" : "colors");
+import { value, type ParsedArguments } from "./arguments.js";
+import {
+  COLOR_FORMAT_NUMBERS,
+  CARD_FORMAT_NUMBERS,
+  noCardTemplateMessage,
+} from "./format-numbers.js";
+import { cardKindOf, writtenInColors } from "../core/backup-options.js";
+import { assertIndividualTemplate } from "../export/render.js";
+
+/** The card outputs that the options name: sheets (a PDF or page images), and separate cards. */
+export interface CardOutputs {
+  readonly sheets: boolean;
+  readonly cards: boolean;
+}
+
+/** Which card outputs the options name. */
+export function cardOutputs(args: ParsedArguments): CardOutputs {
+  return {
+    sheets: value(args, "pdf") !== undefined || value(args, "images-dir") !== undefined,
+    cards: value(args, "cards-dir") !== undefined,
+  };
 }
 
 /**
- * One event label for each date of a dated card: those given with --event, then the others asked
- * on the private screen, where an empty label is asked again. A label stands next to its date on
- * the card, so it is asked like the date, as a secret. With --ask-secrets the dates question
- * already wants a date for each label given (promptedEncodeInputs), so the first check below
- * refuses only dates given with --dates.
+ * The card outputs that the options name, after refusing a folder of separate cards given twice,
+ * and any of `settings`, the card settings of a command, given without a card output that would
+ * use them; a blank path is refused with every output (validateOutputPaths). Encode and the
+ * commands of shares each pass their own settings.
  */
-export async function completeEventLabels(
-  dates: readonly DateShiftDate[],
-  supplied: readonly string[],
-): Promise<string[]> {
-  if (supplied.length > dates.length)
-    throw new Error("Provide exactly one event label for every card date.");
-  const labels = supplied.map((label) => label.trim());
-  if (labels.some((label) => !label)) throw new Error("Card event labels must not be empty.");
-  if (labels.length === dates.length) return labels;
-  // terminalAvailable, as every question asks it: also TERM=dumb asks nothing.
-  if (!terminalAvailable())
-    throw new Error("To export a dated card, provide one event label for every date.");
-  for (const date of dates.slice(labels.length))
-    labels.push(
-      await askSecretUntil(`Event label for ${formatDate(date)}:`, (label) => label, {
-        what: "a label for this date",
-      }),
+export function assertCardOutput(args: ParsedArguments, settings: readonly string[]): CardOutputs {
+  if (args["cards-dir"] !== undefined && typeof args["cards-dir"] !== "string")
+    throw new Error("Provide the individual-card output folder once, using a non-empty path.");
+  const outputs = cardOutputs(args);
+  if (!outputs.sheets && !outputs.cards && settings.some((name) => args[name] !== undefined))
+    throw new Error(
+      "Card settings require a PDF file, an image output folder or an individual-card output folder.",
     );
-  return labels;
+  return outputs;
+}
+
+/** Encode's card settings, which a card output must use (assertCardOutput). */
+const ENCODE_CARD_SETTINGS = ["template", "title", ...businessOptionNames] as const;
+
+/** Refuses card options that cannot draw cards of codes in `format`, before a secret is asked. */
+export function validateCardOptions(args: ParsedArguments, format: EncodedFormat): void {
+  const { sheets, cards } = assertCardOutput(args, ENCODE_CARD_SETTINGS);
+  if (cards) {
+    if (!writtenInColors(format))
+      throw new Error(
+        `Individual cards are available only for RGB color formats ${COLOR_FORMAT_NUMBERS}.`,
+      );
+    assertIndividualTemplate(selectTemplate(value(args, "template"), "colors"));
+  }
+  if (!sheets && !cards) return;
+  const kind = cardKindOf(format);
+  if (kind === undefined) throw new Error(`Card export requires format ${CARD_FORMAT_NUMBERS}.`);
+  businessOptions(args);
+  cardTemplate(args, kind);
+}
+
+/**
+ * The design of cards of `kind` that --template names. A kind that no design draws is refused with
+ * the --format numbers of the forms that have one (noCardTemplateMessage).
+ */
+export function cardTemplate(args: ParsedArguments, kind: CardKind): CardTemplate {
+  try {
+    return selectTemplate(value(args, "template"), kind);
+  } catch (error) {
+    if (error instanceof NoCardTemplate) throw new Error(noCardTemplateMessage(error));
+    throw error;
+  }
 }

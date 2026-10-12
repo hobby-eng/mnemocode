@@ -4,26 +4,24 @@ import {
   bytewordsToUr,
   normalizeShare,
   readShare,
+  SHARE_FORMATS,
   urToBytewords,
   writeShare,
 } from "../src/sskr/transport.js";
-
-/** The bridge's share encodings (sskr-wasm/rust/src/lib.rs). */
-const ENCODING_COMPACT_UR = 0;
-const ENCODING_BYTEWORDS = 1;
+import { SEED_BYTES } from "../src/sskr/share-platform.js";
 
 describe("SSKR shares written in Bytewords", () => {
   it("match the words the SSKR bridge writes for the same shares", async () => {
     const engine = await sskrEngine();
     // Public test data: a counting secret and a fixed seed, so both encodings get the same shares.
     const secret = () => Uint8Array.from({ length: 16 }, (_, index) => index);
-    const seed = () => new Uint8Array(32).fill(7);
+    const seed = () => new Uint8Array(SEED_BYTES).fill(7);
     const groups = Uint8Array.of(2, 3);
     const urs = engine
-      .create_sskr_shares_formatted(secret(), 1, groups, seed(), ENCODING_COMPACT_UR)
+      .create_sskr_shares_formatted(secret(), 1, groups, seed(), engine.ShareEncoding.CompactUr)
       .split("\n");
     const words = engine
-      .create_sskr_shares_formatted(secret(), 1, groups, seed(), ENCODING_BYTEWORDS)
+      .create_sskr_shares_formatted(secret(), 1, groups, seed(), engine.ShareEncoding.Bytewords)
       .split("\n");
     expect(urs).toHaveLength(3);
     expect(urs.map(urToBytewords)).toEqual(words);
@@ -32,7 +30,12 @@ describe("SSKR shares written in Bytewords", () => {
   it("read back to the same share, also through the input of sskr-combine", async () => {
     const engine = await sskrEngine();
     const urs = engine
-      .create_sskr_shares(new Uint8Array(32).fill(1), 1, Uint8Array.of(3, 5), new Uint8Array(32))
+      .create_sskr_shares(
+        new Uint8Array(32).fill(1),
+        1,
+        Uint8Array.of(3, 5),
+        new Uint8Array(SEED_BYTES),
+      )
       .split("\n");
     for (const ur of urs) {
       const words = urToBytewords(ur);
@@ -44,8 +47,6 @@ describe("SSKR shares written in Bytewords", () => {
 });
 
 describe("SSKR shares written in the form of the seed phrase", () => {
-  const FORMS = ["ur", "words", "indexes", "unicode", "colors", "colors-unicode"] as const;
-
   it("read back to the same share in every form, and say which form it was", async () => {
     const engine = await sskrEngine();
     // Public test data: every secret length, from a 12-word to a 24-word phrase.
@@ -55,11 +56,11 @@ describe("SSKR shares written in the form of the seed phrase", () => {
           new Uint8Array(length).fill(3),
           1,
           Uint8Array.of(2, 3),
-          new Uint8Array(32),
+          new Uint8Array(SEED_BYTES),
         )
         .split("\n");
       for (const ur of urs)
-        for (const format of FORMS) {
+        for (const format of SHARE_FORMATS) {
           const written = writeShare(ur, format);
           expect(readShare(written), `${format}: ${written}`).toEqual({ ur, format });
         }
@@ -69,7 +70,12 @@ describe("SSKR shares written in the form of the seed phrase", () => {
   it("look like the form: word numbers up to 2048, Unicode codes of BIP39 words", async () => {
     const engine = await sskrEngine();
     const [ur] = engine
-      .create_sskr_shares(new Uint8Array(16).fill(5), 1, Uint8Array.of(2, 3), new Uint8Array(32))
+      .create_sskr_shares(
+        new Uint8Array(16).fill(5),
+        1,
+        Uint8Array.of(2, 3),
+        new Uint8Array(SEED_BYTES),
+      )
       .split("\n");
     const numbers = writeShare(ur!, "indexes").split(" ").map(Number);
     expect(numbers.every((number) => number >= 1 && number <= 2048)).toBe(true);
@@ -80,7 +86,7 @@ describe("SSKR shares written in the form of the seed phrase", () => {
   it("remove the constant prefix in these public fixtures, without requiring unique starts", async () => {
     const engine = await sskrEngine();
     // Two sets of the same public secret; the seeds are fixed, so the shares are too.
-    const sets = [new Uint8Array(32), new Uint8Array(32).fill(9)].map((seed) =>
+    const sets = [new Uint8Array(SEED_BYTES), new Uint8Array(SEED_BYTES).fill(9)].map((seed) =>
       engine
         .create_sskr_shares(new Uint8Array(16).fill(5), 1, Uint8Array.of(2, 3), seed)
         .split("\n"),
@@ -94,7 +100,12 @@ describe("SSKR shares written in the form of the seed phrase", () => {
   it("refuse a share with one number changed: the checksum no longer fits", async () => {
     const engine = await sskrEngine();
     const [ur] = engine
-      .create_sskr_shares(new Uint8Array(16).fill(5), 1, Uint8Array.of(2, 3), new Uint8Array(32))
+      .create_sskr_shares(
+        new Uint8Array(16).fill(5),
+        1,
+        Uint8Array.of(2, 3),
+        new Uint8Array(SEED_BYTES),
+      )
       .split("\n");
     const numbers = writeShare(ur!, "indexes").split(" ");
     numbers[8] = numbers[8] === "1" ? "2" : "1";

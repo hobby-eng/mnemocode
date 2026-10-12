@@ -1,5 +1,6 @@
 import { terminalResultHeader } from "./terminal.js";
-import { allMappingRows, mappingRow } from "../core.js";
+import { mappingRow, wordTableRow, wordTableText } from "../core/words.js";
+import { WORD_NUMBER_RANGE } from "../core/bip39-sizes.js";
 import { integerOption, type ParsedArguments, value } from "./arguments.js";
 
 function printRow(row: ReturnType<typeof mappingRow>): void {
@@ -11,9 +12,7 @@ function printRow(row: ReturnType<typeof mappingRow>): void {
 
 export function runTable(arguments_: ParsedArguments): void {
   if (arguments_.all === true) {
-    console.log("index\tenglish\tunicode_hex");
-    for (const row of allMappingRows())
-      console.log(`${row.index}\t${row.english}\t${row.unicodeHex}`);
+    process.stdout.write(wordTableText());
     return;
   }
   const indexValue = value(arguments_, "index");
@@ -24,11 +23,8 @@ export function runTable(arguments_: ParsedArguments): void {
       "Choose exactly one lookup value: a word index, a BIP39 word, or a Unicode value. Request the full table instead when no lookup is needed.",
     );
   }
+  // A number is read as every whole-number option is (arguments.ts); the row from the table.
   if (indexValue !== undefined)
-    return printRow(mappingRow(integerOption(arguments_, "index", { min: 1, max: 2048 })));
-  const row = allMappingRows().find(
-    (item) => item.english === word || item.unicodeHex === unicode?.toUpperCase(),
-  );
-  if (row === undefined) throw new Error("No matching BIP39 mapping entry was found.");
-  printRow(row);
+    return printRow(mappingRow(integerOption(arguments_, "index", WORD_NUMBER_RANGE)));
+  printRow(word !== undefined ? wordTableRow("word", word) : wordTableRow("unicode", unicode!));
 }

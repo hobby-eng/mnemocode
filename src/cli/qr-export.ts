@@ -1,24 +1,11 @@
-// QR code images: the encoded backup or a share as a PNG that Decode and Restore read back
-// (--qr-file, --share-qr). Drawn with the qrcode package of Node.js; a page draws its own.
+// QR code images beside the sheets that print them: the encoded backup or a share as a PNG that
+// Decode and Restore read back (--qr-file, --share-qr), under a name that is free. Each is saved
+// as every result is (save-retry.ts, writeSaved), so a staging copy left behind is warned of.
 
 import { basename, dirname, extname, join } from "node:path";
-import QRCode from "qrcode";
-import { publishNewPrivateFile } from "../export/private-file.js";
+import { exportQrPayload } from "../export/qr-image.js";
 import { firstFreeName } from "./output-paths.js";
-
-/** Pixels of the image's side: a QR code of a whole share still reads at a glance. */
-const QR_IMAGE_PIXELS = 720;
-
-export async function exportQrPayload(payload: string, path: string): Promise<void> {
-  if (payload.length === 0) throw new Error("QR payload must not be empty.");
-  const png = await QRCode.toBuffer(payload, {
-    errorCorrectionLevel: "M",
-    margin: 1,
-    type: "png",
-    width: QR_IMAGE_PIXELS,
-  });
-  await publishNewPrivateFile(path, png);
-}
+import { writeSaved } from "./save-retry.js";
 
 /**
  * The image of a QR code that a sheet prints, saved where the sheet is: beside the PDF `sheet`,
@@ -28,13 +15,13 @@ export async function exportQrPayload(payload: string, path: string): Promise<vo
 export async function saveQrBeside(payload: string, sheet: string, suffix = ""): Promise<string> {
   const name = basename(sheet, extname(sheet));
   const path = await firstFreeName(join(dirname(sheet), `${name}${suffix}-qr.png`));
-  await exportQrPayload(payload, path);
+  await writeSaved(() => exportQrPayload(payload, path));
   return path;
 }
 
 /** The same, inside the folder `folder` of the sheets, as "qr.png" or "<name>-qr.png". */
 export async function saveQrInside(payload: string, folder: string, name = ""): Promise<string> {
   const path = await firstFreeName(join(folder, name === "" ? "qr.png" : `${name}-qr.png`));
-  await exportQrPayload(payload, path);
+  await writeSaved(() => exportQrPayload(payload, path));
   return path;
 }

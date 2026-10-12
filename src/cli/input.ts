@@ -1,45 +1,68 @@
-import { validateMnemonic } from "@scure/bip39";
 import { terminalNotice } from "./terminal.js";
 import { askSecretUntil } from "./ask.js";
 import { choose } from "./terminal-choice.js";
 import { InputCancelled, terminalAvailable } from "./terminal-input.js";
 import {
-  detectInputFormats,
+  ENCODED_FORMATS,
+  MASKING_MODES,
   maximumDates,
   parseDate,
-  parseInput,
-  type Bip39WordCount,
   type DateShiftDate,
-  type OutputFormat,
 } from "../core.js";
+import { BackupReading, modeConflictOf } from "../core/backup-reading.js";
+import type { EncodedBackup } from "../core/encoded-backup.js";
+import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { DatesAnswer } from "../core/date-search.js";
-import { Masking } from "../core/masking.js";
-import { canonicalEnglishWords, englishWordlist, WORD_COUNT_SET } from "../core/words.js";
-import { readBoundedDescriptor, readBoundedFile } from "./bounded-read.js";
+import { DATE_COUNT_WORDS, Masking, type DateCountWords } from "../core/masking.js";
+import { validatedEnglishWords } from "../core/words.js";
+import { MAX_TEXT_INPUT_BYTES, readBoundedDescriptor, readFileOrRefuse } from "./bounded-read.js";
 import { decodeQrPngFile } from "./qr-input.js";
-import { type MnemoCodeRecord, type RecordMode } from "../record.js";
-import { type ParsedArguments, value, values } from "./arguments.js";
+import { strictUtf8Text } from "./utf8.js";
 
-export type EncodedFormat = Exclude<OutputFormat, "json">;
-export type TransformMode = RecordMode;
+import { type ParsedArguments, value, values, assertAskedNotGiven } from "./arguments.js";
+import { formatNumber, formatLegend, numberedForms } from "./format-numbers.js";
+import { WORD_NUMBERS_SPAN, isBip39WordCount } from "../core/bip39-sizes.js";
+import { englishTokens } from "../core/english-words.js";
+import { listInWords } from "../core/places.js";
+import { DATE_FORMAT_TEXT } from "../core/dates.js";
+import type { MaskingMode, EncodedFormat } from "../core/types.js";
 
-const MAX_TEXT_INPUT_BYTES = 1024 * 1024;
+/** Standard input, as its refusals name it. */
+const STANDARD_INPUT = "Text input";
+/** The file descriptor of standard input. */
+const STANDARD_INPUT_DESCRIPTOR = 0;
 
-function readBoundedStdin(): string {
-  const tooLarge = "Text input exceeds the 1 MiB safety limit.";
-  return readBoundedDescriptor(0, MAX_TEXT_INPUT_BYTES, tooLarge).toString("utf8");
+/**
+ * The text of `bytes`, read from `what`, as strictUtf8Text decodes it: a byte order mark and line
+ * breaks are kept for the caller to treat by its own rule. The bytes may hold a secret, such as a
+ * passphrase, and are wiped once decoded, also when they are refused.
+ */
+function decodedText(bytes: Buffer, what: string): string {
+  try {
+    return strictUtf8Text(bytes, what);
+  } finally {
+    bytes.fill(0);
+  }
 }
 
+function readBoundedStdin(): string {
+  return decodedText(
+    readBoundedDescriptor(STANDARD_INPUT_DESCRIPTOR, MAX_TEXT_INPUT_BYTES, STANDARD_INPUT),
+    STANDARD_INPUT,
+  );
+}
+
+/** The text of the file at `path`, at most MAX_TEXT_INPUT_BYTES of valid UTF-8 (decodedText). */
 export function readBoundedTextFile(path: string, inputName = "The text input"): string {
-  try {
-    const tooLarge = `${inputName} exceeds the 1 MiB safety limit.`;
-    return readBoundedFile(path, MAX_TEXT_INPUT_BYTES, tooLarge).toString("utf8");
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("exceeds the 1 MiB safety limit")) {
-      throw error;
-    }
-    throw new Error(`${inputName} could not be read. Check that the file exists and is readable.`);
-  }
+  return decodedText(
+    readFileOrRefuse(
+      path,
+      MAX_TEXT_INPUT_BYTES,
+      inputName,
+      `${inputName} could not be read. Check that the file exists and is readable.`,
+    ),
+    inputName,
+  );
 }
 
 export function textInput(arguments_: ParsedArguments, key: "input" | "mnemonic"): string {
@@ -61,6 +84,24 @@ export function textInput(arguments_: ParsedArguments, key: "input" | "mnemonic"
   );
 }
 
+/**
+ * Refuses encoded text or dates on the command line with --ask-secrets, whose questions ask for
+ * both on the private screen; a file or a QR image of the codes may still be named. Decode and
+ * recover-date check it before their first question.
+ */
+export function assertAskedEncodedInput(arguments_: ParsedArguments): void {
+  assertAskedNotGiven(arguments_, [...ENCODED_SECRET_OPTIONS, DATES_OPTION]);
+}
+
+/**
+ * The options that give an encoded seed phrase as text; a file or a QR image is no secret typed.
+ */
+const ENCODED_SECRET_OPTIONS = Object.freeze(["input"] as const);
+/** The options that give a seed phrase. */
+export const PHRASE_SECRET_OPTIONS = Object.freeze(["mnemonic", "mnemonic-file"] as const);
+/** The option that gives dates, which --ask-secrets asks for on the private screen too. */
+export const DATES_OPTION = "date";
+
 /** Refuses a QR image together with encoded text or a text file: only one source is read. */
 export function assertOneEncodedSource(arguments_: ParsedArguments): void {
   if (
@@ -76,109 +117,119 @@ export async function encodedInput(arguments_: ParsedArguments): Promise<string>
   return qrPath === undefined ? textInput(arguments_, "input") : decodeQrPngFile(qrPath);
 }
 
+// The numbers of the forms, here too for the questions that take them with the input.
+export { formatNumber };
+
+/** The form that --format names, by its number or its name. */
 export function inputFormat(value_: string): EncodedFormat {
-  const aliases: Readonly<Record<string, OutputFormat>> = {
-    "1": "english",
-    "2": "indexes",
-    "3": "unicode",
-    "4": "colors-unicode",
-    "5": "colors",
-  };
-  const format = aliases[value_] ?? value_;
-  if (!(Object.values(aliases) as string[]).includes(format)) {
-    const numbered = Object.entries(aliases).map(([number, name]) => `${number} ${name}`);
-    throw new Error(
-      `The representation format must be one of: ${numbered.join(", ")}. Use the number or the name.`,
-    );
-  }
-  return format as EncodedFormat;
-}
-
-async function chooseInputFormat(candidates: readonly EncodedFormat[]): Promise<EncodedFormat> {
-  if (!terminalAvailable()) {
-    if (candidates.length === 0) {
-      throw new Error(
-        "The input representation could not be detected. Choose the recorded format explicitly and check the source data.",
-      );
-    }
-    throw new Error(
-      `The input matches several formats (${candidates.join(", ")}). Choose the recorded format explicitly.`,
-    );
-  }
-  const numbers: Readonly<Record<EncodedFormat, number>> = {
-    english: 1,
-    indexes: 2,
-    unicode: 3,
-    "colors-unicode": 4,
-    colors: 5,
-  };
-  const choices =
-    candidates.length === 0 ? (Object.keys(numbers) as EncodedFormat[]) : [...candidates];
-  const selected = await choose(
-    candidates.length === 0
-      ? "The format could not be recognised. Which format was recorded?"
-      : "The input fits more than one format. Which format was recorded?",
-    choices.map((format) => ({ label: format, digit: numbers[format], value: format })),
-    { label: "Format", quit: "cancels" },
+  const format = ENCODED_FORMATS.find(
+    (name) => value_ === name || value_ === String(formatNumber(name)),
   );
-  // Escape is the person leaving, as the hint says, not an error of MnemoCode.
-  if (selected === undefined) throw new InputCancelled();
-  return selected;
+  if (format === undefined) {
+    throw new Error(
+      `The representation format must be one of: ${formatLegend()}. Use the number or the name.`,
+    );
+  }
+  return format;
 }
 
-export async function recordedInputFormat(
+/**
+ * The form that --format names, checked by inputFormat; undefined without the option. What a
+ * record or the codes say against it is the library's to tell (BackupReading.formatConflict).
+ */
+export function givenInputFormat(arguments_: ParsedArguments): EncodedFormat | undefined {
+  const option = value(arguments_, "format");
+  return option === undefined ? undefined : inputFormat(option);
+}
+
+/** Where the person reads Shamir shares, for a share given in place of the codes. */
+export const SHARE_READER = MENU_ENTRY_NAMES.restore.label;
+
+/** The question of a form when codes fit several, as every reader of codes asks it. */
+const WHICH_FORMAT = "The input fits more than one format. Which format was recorded?";
+
+/**
+ * The form of codes that `fitting` forms read, as detected: the one, or the one the person picks,
+ * each said in one line. Undefined when the person leaves with Escape, which `quit` names.
+ */
+export async function detectedFormat(
+  fitting: readonly EncodedFormat[],
+  quit: string,
+): Promise<EncodedFormat | undefined> {
+  const format =
+    fitting.length === 1
+      ? fitting[0]
+      : await choose(
+          WHICH_FORMAT,
+          numberedForms(fitting.map((form) => ({ label: form, value: form }))),
+          { label: "Format", quit },
+        );
+  if (format !== undefined) terminalNotice(`Detected input format: ${format}.`);
+  return format;
+}
+
+/**
+ * The encoded seed phrase given with the options, read as the screen reads typed codes
+ * (BackupReading, EncodedBackup): a share, a header that cannot be read or codes that fit no form
+ * are refused with the library's reason, and a mode or form that the record contradicts too. Codes
+ * that fit several forms are asked about on a terminal; anywhere else they end the command.
+ * `modeKnown` is called with the mode as soon as it is settled, before the form is: a refusal by
+ * the mode, such as a wrong number of dates, comes before any question about the form.
+ */
+export async function backupFromOptions(
   arguments_: ParsedArguments,
-  encoded: string,
-  record?: MnemoCodeRecord,
-): Promise<EncodedFormat> {
-  const explicit = value(arguments_, "format");
-  if (record !== undefined) {
-    if (explicit !== undefined && inputFormat(explicit) !== record.format) {
+  seedshiftOnly: boolean,
+  modeKnown?: (mode: MaskingMode) => void,
+): Promise<{ readonly backup: EncodedBackup; readonly mode: MaskingMode }> {
+  const reading = BackupReading.of(await encodedInput(arguments_), {
+    seedshiftOnly,
+    shareReader: SHARE_READER,
+  });
+  const mode = transformMode(arguments_, reading.mode());
+  modeKnown?.(mode);
+  const given = givenInputFormat(arguments_);
+  const conflict = reading.formatConflict(given);
+  if (conflict !== undefined) throw new Error(conflict);
+  const fitting = reading.formats(given);
+  let format = fitting[0]!;
+  // A record or --format names the form; only a detected one is announced.
+  if (!reading.hasRecord && given === undefined) {
+    if (fitting.length > 1 && !terminalAvailable())
       throw new Error(
-        `The selected format (${inputFormat(explicit)}) conflicts with the format stored in the record (${record.format}).`,
+        `The input matches several formats (${fitting.join(", ")}). Choose the recorded format explicitly.`,
       );
-    }
-    return record.format;
+    const chosen = await detectedFormat(fitting, "cancels");
+    // Escape is the person leaving, as the hint says, not an error of MnemoCode.
+    if (chosen === undefined) throw new InputCancelled();
+    format = chosen;
   }
-  if (explicit !== undefined) return inputFormat(explicit);
-  const candidates = detectInputFormats(encoded);
-  const detected = candidates.length === 1 ? candidates[0]! : await chooseInputFormat(candidates);
-  terminalNotice(`Detected input format: ${detected}.`);
-  return detected;
+  return { backup: reading.codes(format).withMode(mode), mode };
 }
 
 export function encodeFormat(value_: string | undefined): EncodedFormat {
   return value_ === undefined ? "english" : inputFormat(value_);
 }
 
-export function transformMode(
-  arguments_: ParsedArguments,
-  embedded?: TransformMode,
-): TransformMode {
+export function transformMode(arguments_: ParsedArguments, embedded?: MaskingMode): MaskingMode {
   const explicit = value(arguments_, "mode");
   if (explicit !== undefined && !Masking.isMode(explicit)) {
-    throw new Error(
-      "The transformation mode must be direct, seedshift, seedshift-legacy, or seedshift-legacy-valid.",
-    );
+    throw new Error(`The transformation mode must be ${listInWords(MASKING_MODES, "or")}.`);
   }
-  if (explicit !== undefined && embedded !== undefined && explicit !== embedded) {
-    throw new Error(
-      `The selected transformation mode (${explicit}) conflicts with the mode stored in the record (${embedded}).`,
-    );
-  }
-  if (explicit !== undefined) return explicit as TransformMode;
+  const conflict = modeConflictOf(embedded, explicit as MaskingMode | undefined);
+  if (conflict !== undefined) throw new Error(conflict);
+  if (explicit !== undefined) return explicit as MaskingMode;
   if (embedded !== undefined) return embedded;
   return values(arguments_, "date").length > 0 ? "seedshift" : "direct";
 }
 
-export function encodedOutputLabel(format: EncodedFormat, mode: TransformMode): string {
+export function encodedOutputLabel(format: EncodedFormat, mode: MaskingMode): string {
   return `${FORM_LABELS[format]} of ${Masking.of(mode).holds}`;
 }
 
 /** The forms of encoded output, as a result names them. */
 const FORM_LABELS: Readonly<Record<EncodedFormat, string>> = {
   english: "English BIP39 words",
-  indexes: "BIP39 word indexes (1-2048)",
+  indexes: `BIP39 word indexes (${WORD_NUMBERS_SPAN})`,
   unicode: "Unicode code points",
   colors: "BIP39Colors RGB hexadecimal codes",
   "colors-unicode": "MnemoCode color Unicode code points",
@@ -189,49 +240,20 @@ export function dates(arguments_: ParsedArguments): DateShiftDate[] {
 }
 
 /**
- * Asks for a secret at a prompt on the terminal (terminal-input.ts), the same on Linux, macOS and
- * Windows. On the private screen, which is cleared afterwards, the answer is shown as it is typed,
- * so that it can be checked; anywhere else nothing typed or pasted is shown. An empty answer is
- * asked again, as every answer of askSecretUntil (ask.ts) is; the answer is trimmed.
- */
-export async function askSecret(prompt: string): Promise<string> {
-  return askSecretUntil(prompt, (answer) => answer);
-}
-
-/**
  * "up to N, " for a seed phrase of `wordCount` words, which takes one date for every three words
- * (maximumDates); nothing when the count is not known yet.
+ * (maximumDates); nothing when the count is not known yet. Every question for dates says it so.
  */
-function mostDates(wordCount: number | undefined): string {
-  return wordCount !== undefined && WORD_COUNT_SET.has(wordCount)
-    ? `up to ${maximumDates(wordCount as Bip39WordCount)}, `
+export function mostDates(wordCount: number | undefined): string {
+  return wordCount !== undefined && isBip39WordCount(wordCount)
+    ? `up to ${maximumDates(wordCount)}, `
     : "";
 }
 
-/** The question for dates, which says how many the seed phrase takes; the answer is split at spaces. */
-export function datesPrompt(wordCount: number | undefined): string {
-  return `Dates (${mostDates(wordCount)}DD-MM-YYYY, separated by spaces):`;
-}
-
-/** The number of words in typed text, such as a seed phrase. */
-export function wordCountOf(text: string): number {
-  return text.split(/\s+/u).filter(Boolean).length;
-}
-
 /**
- * How many words an encoded seed phrase stands for, when that can be told before its form is
- * settled: from the form given, or when every form that fits it gives the same count.
+ * The question for dates, which says how many the seed phrase takes; the answer is split at spaces.
  */
-export function encodedWordCount(encoded: string, format?: EncodedFormat): number | undefined {
-  const counts = new Set<number>();
-  for (const candidate of format === undefined ? detectInputFormats(encoded) : [format]) {
-    try {
-      counts.add(parseInput(encoded, candidate).length);
-    } catch {
-      // A form that does not fit says nothing about the count.
-    }
-  }
-  return counts.size === 1 ? [...counts][0] : undefined;
+export function datesPrompt(wordCount: number | undefined): string {
+  return `Dates (${mostDates(wordCount)}${DATE_FORMAT_TEXT}, separated by spaces):`;
 }
 
 /**
@@ -240,10 +262,7 @@ export function encodedWordCount(encoded: string, format?: EncodedFormat): numbe
  * no word is repeated.
  */
 function typedSeedPhrase(answer: string): string {
-  const words = canonicalEnglishWords(answer);
-  if (!validateMnemonic(words.join(" "), englishWordlist))
-    throw new Error("These words fail the BIP39 checksum: check each word and their order.");
-  return words.join(" ");
+  return validatedEnglishWords(answer).join(" ");
 }
 
 /**
@@ -256,39 +275,44 @@ function typedDates(line: string, wordCount: number | undefined): DateShiftDate[
 }
 
 /**
+ * The seed phrase and the dates of a backup, for encode and for a split into shares: asked on the
+ * private screen with --ask-secrets, or read from the options. The dates are counted for the mode
+ * before the phrase is read: the library's rule (Masking.assertDateCount), refused early in the
+ * command's `words`.
+ */
+export async function phraseAndDates(
+  args: ParsedArguments,
+  mode: MaskingMode,
+  words: DateCountWords = DATE_COUNT_WORDS.codes,
+): Promise<{ readonly mnemonic: string; readonly dates: readonly DateShiftDate[] }> {
+  const prompted = await promptedEncodeInputs(args, mode);
+  const dateValues = prompted?.dates ?? dates(args);
+  Masking.of(mode).assertDateCount(dateValues.length, false, words);
+  return { mnemonic: prompted?.mnemonic ?? textInput(args, "mnemonic"), dates: dateValues };
+}
+
+/**
  * The seed phrase and the dates of Encode with --ask-secrets, each asked again until it can be
  * used (askSecretUntil): the phrase first, checked at once, then the dates alone, which a second
- * try asks without the phrase. Event labels given with --event need a date each.
+ * try asks without the phrase.
  */
 export async function promptedEncodeInputs(
   arguments_: ParsedArguments,
-  mode: TransformMode,
+  mode: MaskingMode,
 ): Promise<{ readonly mnemonic: string; readonly dates: DateShiftDate[] } | undefined> {
   if (arguments_["ask-secrets"] !== true) return undefined;
-  if (
-    value(arguments_, "mnemonic") !== undefined ||
-    value(arguments_, "mnemonic-file") !== undefined ||
-    values(arguments_, "date").length > 0
-  ) {
-    throw new Error(
-      "--ask-secrets cannot be combined with a mnemonic supplied on the command line, a mnemonic file, or command-line dates.",
-    );
-  }
+  assertAskedNotGiven(arguments_, [...PHRASE_SECRET_OPTIONS, DATES_OPTION]);
   const mnemonic = await askSecretUntil("Seed phrase (English BIP39 words):", typedSeedPhrase, {
     what: "the words of the seed phrase",
   });
-  if (mode === "direct") return { mnemonic, dates: [] };
-  const wordCount = wordCountOf(mnemonic);
-  const labels = values(arguments_, "event").length;
+  if (!Masking.of(mode).masked) return { mnemonic, dates: [] };
+  const wordCount = englishTokens(mnemonic).length;
   const dates = await askSecretUntil(
     datesPrompt(wordCount),
-    (line) => {
-      const typed = typedDates(line, wordCount);
-      if (typed.length < labels)
-        throw new Error(`There are ${labels} event labels (--event): type a date for each.`);
-      return typed;
+    (line) => typedDates(line, wordCount),
+    {
+      what: "the dates",
     },
-    { what: "the dates" },
   );
   return { mnemonic, dates };
 }

@@ -3,8 +3,9 @@ import { runCommandLine } from "./cli/command-line.js";
 import { menuAvailable, runMenu } from "./cli/menu.js";
 import { hardenProcess, relaunchProtected, underProtection } from "./cli/protection.js";
 import { CANCELLED_EXIT_CODE } from "./cli/private-screen.js";
-import { dumbTerminal, InputCancelled, terminalsAttached } from "./cli/terminal-input.js";
+import { dumbTerminalReason, InputCancelled, terminalTooDumb } from "./cli/terminal-input.js";
 import { terminalFailure, terminalHint } from "./cli/terminal.js";
+import { describeError } from "./core/refusal.js";
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
@@ -18,17 +19,16 @@ async function main(): Promise<void> {
   // script or a pipe gets the help, as before.
   if (argv.length === 0 && menuAvailable()) return runMenu();
   // A terminal that says TERM=dumb cannot draw the menu: the help comes, with the reason.
-  if (argv.length === 0 && terminalsAttached() && dumbTerminal())
-    terminalHint("The menu needs a terminal that can clear its screen; this one says TERM=dumb.");
+  if (argv.length === 0 && terminalTooDumb()) terminalHint(dumbTerminalReason("The menu"));
   return runCommandLine(argv);
 }
 
 void main().catch((error: unknown) => {
   if (error instanceof InputCancelled) {
-    terminalHint("Cancelled.");
+    terminalHint(error.message);
     process.exitCode = CANCELLED_EXIT_CODE;
     return;
   }
-  terminalFailure(error instanceof Error ? error.message : String(error));
+  terminalFailure(describeError(error));
   process.exitCode = 1;
 });

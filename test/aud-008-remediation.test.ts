@@ -20,9 +20,17 @@ import { readRepairableShare } from "../src/sskr/repair.js";
 import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { sskrEngine } from "../src/sskr/runtime.js";
 import { combineSskrShares } from "../src/sskr/shares.js";
-import { transportToUr, urToTransport, writeShare } from "../src/sskr/transport.js";
+import {
+  CHECKSUM_BYTES,
+  transportToUr,
+  UR_SSKR_PREFIX,
+  urToTransport,
+  writeShare,
+} from "../src/sskr/transport.js";
 import { bytewords } from "../src/sskr/bytewords-list.js";
-import "../src/sskr/share-platform-node.js";
+import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
+import { SEED_BYTES } from "../src/sskr/share-platform.js";
+import { joinUnits } from "./helpers/shares.js";
 
 const publicMnemonic = "abandon ".repeat(11) + "about";
 const vectors = JSON.parse(
@@ -41,7 +49,7 @@ function withCrc(body: Uint8Array): Uint8Array {
 
 /** A share changed by `change`, with its CRC32 written anew so that only the change is wrong. */
 function altered(share: string, change: (body: Uint8Array) => void): string {
-  const body = urToTransport(share).slice(0, -4);
+  const body = urToTransport(share).slice(0, -CHECKSUM_BYTES);
   change(body);
   return transportToUr(withCrc(body));
 }
@@ -196,7 +204,7 @@ describe("AUD-008-FUN001: every share given must agree with the restored secret"
     // One group is enough for a set of two groups with threshold 1: the second is a surplus group.
     const engine = await sskrEngine();
     const secret = Buffer.from(vectors.deterministic[0]!.entropy, "hex");
-    const seed = new Uint8Array(32).fill(7);
+    const seed = new Uint8Array(SEED_BYTES).fill(7);
     const shares = engine
       .create_sskr_shares(secret, 1, Uint8Array.of(2, 3, 2, 3), seed)
       .trim()
@@ -215,7 +223,9 @@ describe("AUD-008-API006: every share layout that is read whole is also repaired
   const share = vector.shares[0]!;
   // A UR whose CBOR carries the SSKR tag, which transport.ts reads as well.
   const tagged = (tag: readonly number[]) =>
-    transportToUr(withCrc(Uint8Array.from([...tag, ...urToTransport(share).slice(0, -4)])));
+    transportToUr(
+      withCrc(Uint8Array.from([...tag, ...urToTransport(share).slice(0, -CHECKSUM_BYTES)])),
+    );
   // Bytewords of the untagged bytes, as earlier tools wrote them.
   const untaggedWords = [...urToTransport(share)].map((byte) => bytewords[byte]).join(" ");
   const layouts: [string, string][] = [
@@ -226,11 +236,11 @@ describe("AUD-008-API006: every share layout that is read whole is also repaired
 
   it.each(layouts)("%s, one element marked at the start, middle and end", (_, text) => {
     const isUr = text.startsWith("ur:");
-    const units = isUr ? text.slice("ur:sskr/".length).match(/../gu)! : text.split(" ");
+    const units = isUr ? text.slice(UR_SSKR_PREFIX.length).match(/../gu)! : text.split(" ");
     for (const place of [1, Math.floor(units.length / 2), units.length - 2]) {
       const marked = [...units];
       marked[place] = "?";
-      const typed = isUr ? `ur:sskr/${marked.join("")}` : marked.join(" ");
+      const typed = joinUnits(marked, isUr ? "ur" : "words");
       expect(readRepairableShare(typed).ur).toBe(readRepairableShare(text).ur);
     }
   });
@@ -244,7 +254,7 @@ describe("AUD-008-API006: every share layout that is read whole is also repaired
       [untaggedWords, marked],
       [marked, untaggedWords],
     ]) {
-      const found = await (await planJointRepair(typed)).search();
+      const found = await (await planJointRepair(typed, { platform: nodeSharePlatform })).search();
       expect(found.map((set) => set.mnemonic)).toEqual([expected]);
     }
   });

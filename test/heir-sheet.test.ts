@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { heirSheetText, type HeirSheetFacts } from "../src/cli/heir-sheet.js";
 import { A5, A6, renderHeirSheet } from "../src/export/heir-sheet.js";
 import { HeirInstructions, type HeirRoute } from "../src/export/heir-sheet-text.js";
+import { nodeCardRenderer } from "../src/export/platform-node.js";
 
 // The public BIP39 test phrase and public dates of the examples.
 const PHRASE = `${"abandon ".repeat(11)}about`;
@@ -168,10 +169,18 @@ describe("instructions for heirs", () => {
         mode: "direct",
         dates: 1,
       }),
-    ).toThrow("no dates in direct mode");
+    ).toThrow("Dates cannot be used in direct mode.");
     expect(() => instructions.text({ ...facts, mode: "seedshift-legacy" })).toThrow(
-      "Shares cannot use the original Seedshift.",
+      "Shares are made without Seedshift or with MnemoCode Seedshift.",
     );
+    // A mode for which no sheet is made, refused at run time too.
+    expect(() =>
+      instructions.text({
+        ...facts,
+        mode: "seedshift-legacy-valid" as never,
+        backup: { kind: "encoded", format: "english" },
+      }),
+    ).toThrow("A sheet for heirs cannot be made");
   });
 
   it("fits every kind of backup on one sheet, both sides, in A5 and in A6", async () => {
@@ -179,7 +188,7 @@ describe("instructions for heirs", () => {
     for (const format of [A5, A6])
       for (const facts of EVERY_SHEET) {
         const document = await PDFDocument.load(
-          await renderHeirSheet(heirSheetText(facts), format),
+          await renderHeirSheet(nodeCardRenderer, heirSheetText(facts), format),
         );
         expect(document.getPageCount(), JSON.stringify(facts)).toBe(2);
         expect(document.getTitle() ?? "").toBe("");
@@ -262,6 +271,8 @@ describe("instructions for heirs", () => {
       join(tmpdir(), "mnc-heirs-refused.pdf"),
     ]);
     expect(refused.status).not.toBe(0);
-    expect(refused.stderr).toContain("not available with the legacy checksum-word replacement");
+    expect(refused.stderr).toContain(
+      "A sheet for heirs cannot be made for the Original Seedshift with a valid last word",
+    );
   });
 });

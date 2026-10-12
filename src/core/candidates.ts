@@ -22,12 +22,35 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import {
   BIP39_DICTIONARY_SIZE,
   BIP39_INDEX_BITS,
+  englishTokens,
   englishWordlist,
   ENGLISH_INDEX,
+  phraseOfIndexes,
 } from "./words.js";
-import { BIP39_WORD_COUNTS } from "./types.js";
-import { keptCount, nextTask, TURN_MILLISECONDS } from "./search-turns.js";
-import type { WalletCheck, WalletMatch } from "./wallet-check.js";
+import {
+  checksumBits,
+  checksumPassShare,
+  entropyBytes,
+  areWordIndexes,
+  assertPhraseIndexes,
+  assertWordIndexes,
+  isWordIndex,
+  isBip39WordCount,
+  WORD_COUNTS_TEXT,
+  WORD_COUNTS_LESS_ONE_TEXT,
+} from "./bip39-sizes.js";
+import { BITS_PER_BYTE, lastWordChecksumBits, wipeAll } from "./bits.js";
+import {
+  assertStillRunning,
+  keptCount,
+  SearchTurns,
+  type SearchProgress,
+  type SearchRun,
+} from "./search-turns.js";
+import { askWallet, type WalletCheck, type WalletMatch } from "./wallet-check.js";
+import { Redacted } from "./redacted.js";
+import { counting } from "./search-plan.js";
+import { inWholeRange, wholeNumbersFrom } from "./typed-number.js";
 
 /** Combinations that one search may check; at a few microseconds each, about a minute. */
 export const MAX_SEARCH_COMBINATIONS = 2 ** 24;
@@ -37,11 +60,29 @@ export const MAX_SEARCH_COMBINATIONS = 2 ** 24;
  * that shows only those that match.
  */
 export const MAX_SHOWN_CANDIDATES = 2_048;
+/** The numbers of candidates, counted from 1 among those of their search. */
+const CANDIDATE_NUMBERS = wholeNumbersFrom(1);
 /** How a word search with too many combinations or candidates is narrowed, in every message. */
 export const NARROW_WORD_SEARCH = "give more of the words, or a few letters of them";
-/** BIP39 adds one checksum bit for every 32 bits of entropy, and a word is 11 bits. */
-const ENTROPY_BITS_PER_CHECKSUM_BIT = 32;
-const BYTE_BITS = 8;
+/** How candidates that are not shown are told apart: by the wallet. */
+const CHECK_AGAINST_WALLET = "check them against the wallet's fingerprint or an address";
+/** How candidates that are not shown become fewer. */
+const GIVE_LETTERS = "give a few letters of the words";
+
+/**
+ * What a host says of `count` candidates that it does not show: that they do not fit on its
+ * screen, or that they are too many to show (MAX_SHOWN_CANDIDATES). `save` is the host's own
+ * advice for saving them as a list, such as an option of its command; without it they are too
+ * many to save as well.
+ */
+export function unshownCandidatesNotice(count: number, save?: string): string {
+  const counted = counting(count);
+  if (count <= MAX_SHOWN_CANDIDATES)
+    return `${counted} candidates do not fit on this screen: ${CHECK_AGAINST_WALLET}, or ${GIVE_LETTERS}.`;
+  return save !== undefined
+    ? `${counted} candidates are too many to show: ${save}, or ${CHECK_AGAINST_WALLET}.`
+    : `${counted} candidates are too many to show or to save: ${CHECK_AGAINST_WALLET}, or ${GIVE_LETTERS}.`;
+}
 
 /** The words a place may hold, as ascending indexes in the BIP39 English list; one if known. */
 export type WordPlace = readonly number[];
@@ -62,28 +103,13 @@ export interface ExpectedCandidates {
   readonly exact: boolean;
 }
 
-const REDACTED_CANDIDATE = "[WordCandidate: redacted]";
-const REDACTED_SEARCH = "[WordCandidateSearch: redacted]";
 /**
- * Every word, for a place marked with ?. Frozen: parseUnknownWords hands this one list out in its
- * search, and a host that changed it there would change every later search.
+ * Every word, for a place marked with ? or one that cannot be read at all. Frozen: the searches
+ * hand this one list out, and a host that changed it there would change every later search.
  */
-const ALL_WORDS: WordPlace = Object.freeze(
+export const EVERY_WORD: WordPlace = Object.freeze(
   Array.from({ length: BIP39_DICTIONARY_SIZE }, (_, index) => index),
 );
-/** Every word, for a place that cannot be read at all, as one shared frozen list. */
-export const EVERY_WORD: WordPlace = ALL_WORDS;
-const PHRASE_LENGTHS = new Set<number>(BIP39_WORD_COUNTS);
-
-/** The checksum bits at the end of a phrase of `wordCount` words: one for every three words. */
-function checksumBitCount(wordCount: number): number {
-  return (wordCount * BIP39_INDEX_BITS) / (ENTROPY_BITS_PER_CHECKSUM_BIT + 1);
-}
-
-/** Lower-case NFKD words, as BIP39 compares them. */
-function wordsOf(text: string): string[] {
-  return text.normalize("NFKD").toLowerCase().trim().split(/\s+/u).filter(Boolean);
-}
 
 /**
  * The words that one written place allows: a word, ?, a prefix with *, or words joined by |; the
@@ -91,10 +117,10 @@ function wordsOf(text: string): string[] {
  */
 export function wordPlaceOf(written: string, position: number): WordPlace {
   const where = `place ${position}`;
-  if (written === "?") return ALL_WORDS;
+  if (written === "?") return EVERY_WORD;
   if (written.endsWith("*")) {
     const prefix = written.slice(0, -1);
-    const indexes = ALL_WORDS.filter((index) => englishWordlist[index]!.startsWith(prefix));
+    const indexes = EVERY_WORD.filter((index) => englishWordlist[index]!.startsWith(prefix));
     // The letters are part of a secret word: the message names only their place.
     if (prefix === "" || /[*?|]/u.test(prefix) || indexes.length === 0)
       throw new Error(`No BIP39 word starts with the letters at ${where}.`);
@@ -109,9 +135,9 @@ export function wordPlaceOf(written: string, position: number): WordPlace {
 
 /** Reads a phrase with unknown words at known places; at least one place must be unknown. */
 export function parseUnknownWords(text: string): WordSearch {
-  const written = wordsOf(text);
-  if (!PHRASE_LENGTHS.has(written.length))
-    throw new Error("Enter 12, 15, 18, 21 or 24 places: words, ?, a prefix with *, or a|b.");
+  const written = englishTokens(text);
+  if (!isBip39WordCount(written.length))
+    throw new Error(`Enter ${WORD_COUNTS_TEXT} places: words, ?, a prefix with *, or a|b.`);
   const places = written.map((word, index) => wordPlaceOf(word, index + 1));
   if (places.every((place) => place.length === 1))
     throw new Error("Mark each forgotten word with ?, a prefix with *, or a|b.");
@@ -120,22 +146,15 @@ export function parseUnknownWords(text: string): WordSearch {
 
 /** Reads a phrase with one word missing at an unknown place: one word fewer than a valid length. */
 export function parseMissingWord(text: string): WordSearch {
-  const written = wordsOf(text);
-  if (!PHRASE_LENGTHS.has(written.length + 1))
-    throw new Error("Enter the 11, 14, 17, 20 or 23 words you have, in their order.");
+  const written = englishTokens(text);
+  if (!isBip39WordCount(written.length + 1))
+    throw new Error(`Enter the ${WORD_COUNTS_LESS_ONE_TEXT} words you have, in their order.`);
   const indexes = written.map((word, index) => {
     const found = ENGLISH_INDEX.get(word);
     if (found === undefined) throw new Error(`Unknown English BIP39 word at place ${index + 1}.`);
     return found;
   });
   return { kind: "missing-word", written: indexes };
-}
-
-/** Whether a word index is one of the BIP39 list. */
-function isWordIndex(value: unknown): boolean {
-  return (
-    Number.isInteger(value) && (value as number) >= 0 && (value as number) < BIP39_DICTIONARY_SIZE
-  );
 }
 
 /**
@@ -163,21 +182,23 @@ function isPlace(place: unknown): boolean {
   );
 }
 
+/** Why a search is refused whose kind a JavaScript host made up. */
+const UNKNOWN_SEARCH_KIND = "Unknown kind of word search.";
+
 /**
  * Refuses a search that the parsers above could not have made: another host may build its own,
  * and an empty place, for one, would never end (AUD-008-API003).
  */
 function assertSearch(search: WordSearch): void {
   if (search.kind === "missing-word") {
-    if (!Array.isArray(search.written) || !PHRASE_LENGTHS.has(search.written.length + 1))
+    if (!Array.isArray(search.written) || !isBip39WordCount(search.written.length + 1))
       throw new Error("A missing-word search needs one word fewer than a valid phrase length.");
-    if (!everyElement(search.written, isWordIndex))
-      throw new Error("A written word is not a BIP39 index.");
+    if (!areWordIndexes(search.written)) throw new Error("A written word is not a BIP39 index.");
     return;
   }
-  if (search.kind !== "unknown-words") throw new Error("Unknown kind of word search.");
-  if (!Array.isArray(search.places) || !PHRASE_LENGTHS.has(search.places.length))
-    throw new Error("A word search needs 12, 15, 18, 21 or 24 places.");
+  if (search.kind !== "unknown-words") throw new Error(UNKNOWN_SEARCH_KIND);
+  if (!Array.isArray(search.places) || !isBip39WordCount(search.places.length))
+    throw new Error(`A word search needs ${WORD_COUNTS_TEXT} places.`);
   if (!everyElement(search.places, isPlace))
     throw new Error("Every place needs one or more BIP39 indexes in ascending order.");
 }
@@ -189,11 +210,20 @@ export function searchCombinations(search: WordSearch): number {
   return search.places.reduce((product, place) => product * place.length, 1);
 }
 
-/** The refusal of a search with more combinations than MAX_SEARCH_COMBINATIONS. */
-function tooManyCombinations(): Error {
-  return new Error(
-    `This search has more than ${MAX_SEARCH_COMBINATIONS.toLocaleString("en-US")} combinations: ${NARROW_WORD_SEARCH}.`,
-  );
+/**
+ * Refuses a search of more combinations than MAX_SEARCH_COMBINATIONS, with `narrow`, what makes it
+ * smaller in the words of its search: the word search and the search of marked codes say it so.
+ */
+export function assertSearchable(combinations: number, narrow: string = NARROW_WORD_SEARCH): void {
+  if (combinations > MAX_SEARCH_COMBINATIONS)
+    throw new Error(
+      `This search has more than ${counting(MAX_SEARCH_COMBINATIONS)} combinations: ${narrow}.`,
+    );
+}
+
+/** The places, counted from 0, that a search tries several words in. */
+export function unknownPlacesOf(places: readonly WordPlace[]): number[] {
+  return places.flatMap((place, index) => (place.length > 1 ? [index] : []));
 }
 
 /**
@@ -205,24 +235,30 @@ export function expectedCandidates(search: WordSearch): ExpectedCandidates {
   const combinations = searchCombinations(search);
   const wordCount =
     search.kind === "unknown-words" ? search.places.length : search.written.length + 1;
-  const passing = combinations / 2 ** checksumBitCount(wordCount);
+  const passing = combinations * checksumPassShare(wordCount);
   const exact =
     search.kind === "unknown-words" && search.places.at(-1)!.length === BIP39_DICTIONARY_SIZE;
-  return { count: exact ? passing : Math.round(passing), exact };
+  // At least one: the right phrase is always among the candidates, and the time of a search is
+  // planned by this count.
+  return { count: exact ? passing : Math.max(1, Math.round(passing)), exact };
 }
 
-/** The BIP39 entropy that the words carry, without their checksum bits. */
+/**
+ * The BIP39 entropy that the words carry, without their checksum bits. A deliberate fast path of
+ * bits.ts's bitsOfIndexes and bitsToBytes, packed in a number rather than a string because the
+ * word search calls it for every combination; test/candidates.test.ts keeps it in step with
+ * @scure/bip39's own checksum.
+ */
 export function entropyOfWords(words: CandidateWords): Uint8Array {
-  const entropyBits = words.length * BIP39_INDEX_BITS - checksumBitCount(words.length);
-  const entropy = new Uint8Array(entropyBits / BYTE_BITS);
+  const entropy = new Uint8Array(entropyBytes(words.length));
   let buffer = 0;
   let bits = 0;
   let filled = 0;
   for (const word of words) {
     buffer = (buffer << BIP39_INDEX_BITS) | word;
     bits += BIP39_INDEX_BITS;
-    while (bits >= BYTE_BITS && filled < entropy.length) {
-      bits -= BYTE_BITS;
+    while (bits >= BITS_PER_BYTE && filled < entropy.length) {
+      bits -= BITS_PER_BYTE;
       entropy[filled++] = (buffer >>> bits) & 0xff;
     }
     buffer &= (1 << bits) - 1;
@@ -230,29 +266,54 @@ export function entropyOfWords(words: CandidateWords): Uint8Array {
   return entropy;
 }
 
-/** Whether the last bits of the last word are the BIP39 checksum of the entropy before them. */
+/**
+ * Whether `words`, a phrase of BIP39 word indexes, ends with the checksum of its entropy. A host
+ * may pass anything at run time, so the indexes are checked first (assertPhraseIndexes): an index
+ * out of range is no phrase at all, not one of a valid or wrong checksum.
+ */
 export function checksumValid(words: CandidateWords): boolean {
-  const checksumBits = checksumBitCount(words.length);
-  const entropy = entropyOfWords(words);
-  const expected = sha256(entropy)[0]! >>> (BYTE_BITS - checksumBits);
-  entropy.fill(0);
-  return (words.at(-1)! & ((1 << checksumBits) - 1)) === expected;
-}
-
-/** The English phrase of word indexes. */
-export function phraseOfWords(words: CandidateWords): string {
-  return words.map((index) => englishWordlist[index]!).join(" ");
-}
-
-function wipeAll(entropies: readonly Uint8Array[]): void {
-  for (const entropy of entropies) entropy.fill(0);
+  // One copy, checked and computed alike: a host's list may answer differently when read again.
+  const copy = Array.from(words);
+  assertPhraseIndexes(copy);
+  return checksumFits(copy);
 }
 
 /**
- * Every combination of the unknown places, in lexicographic order of their words with the last
- * place changing fastest, as a mixed-radix counter.
+ * Whether the last bits of the last word are the BIP39 checksum of the entropy before them. The
+ * fast path of the searches, for indexes they made themselves; checksumValid checks a caller's.
  */
-function* unknownWordCombinations(places: readonly WordPlace[]): Generator<number[]> {
+function checksumFits(words: CandidateWords): boolean {
+  const checksumLength = checksumBits(words.length);
+  const entropy = entropyOfWords(words);
+  const expected = sha256(entropy)[0]! >>> (BITS_PER_BYTE - checksumLength);
+  entropy.fill(0);
+  return (words.at(-1)! & ((1 << checksumLength) - 1)) === expected;
+}
+
+/** The English phrase of word indexes (words.ts). */
+export const phraseOfWords: (words: CandidateWords) => string = phraseOfIndexes;
+
+/**
+ * Every combination of the places, in lexicographic order of their words with the last place
+ * changing fastest, as a mixed-radix counter. The word search and the search of marked codes both
+ * count through it. It yields one array, changed in place for the next combination: a caller that
+ * keeps a combination copies it. The places are checked first: each holds at least one word, so
+ * that the counter ends (AUD-012-API001).
+ */
+export function placeCombinations(places: readonly WordPlace[]): Generator<readonly number[]> {
+  // Copied first, then checked: Array.from turns holes into undefined, which is refused.
+  const owned = Array.from(places, (place) => {
+    if (!Array.isArray(place) || place.length === 0)
+      throw new Error("Every place of a search needs at least one word.");
+    const words = Array.from(place);
+    assertWordIndexes(words);
+    return Object.freeze(words);
+  });
+  return combinationsOf(owned);
+}
+
+/** The counter of placeCombinations, on places already checked. */
+function* combinationsOf(places: readonly WordPlace[]): Generator<readonly number[]> {
   const counters = places.map(() => 0);
   const words = places.map((place) => place[0]!);
   for (;;) {
@@ -297,18 +358,52 @@ export function insertedPlace(written: readonly number[], words: CandidateWords)
  * is valid. A yielded array may be reused for the next one; copy it to keep it.
  */
 export function* searchCandidates(search: WordSearch): Generator<CandidateWords> {
-  if (searchCombinations(search) > MAX_SEARCH_COMBINATIONS) throw tooManyCombinations();
+  assertSearchable(searchCombinations(search));
   const combinations =
     search.kind === "unknown-words"
-      ? unknownWordCombinations(search.places)
+      ? combinationsOf(search.places)
       : missingWordCombinations(search.written);
-  for (const words of combinations) if (checksumValid(words)) yield words;
+  for (const words of combinations) if (checksumFits(words)) yield words;
 }
 
-/** How a word search runs, with the host's services. */
-export interface WordSearchRun {
+/**
+ * The wallet's answers about candidates as they are compared: how many matched, and the first
+ * warning of the check, such as that a fingerprint is only a filter. A class, because a search
+ * adds the answers one by one; the word search and a host's short list of phrases both count so.
+ */
+export class MatchTally {
+  #matched = 0;
+  #warning: string | undefined;
+
+  /** Adds what the wallet check said of one candidate; nothing where none was compared. */
+  add(match: WalletMatch | undefined): void {
+    if (match?.matched === true) this.#matched += 1;
+    this.#warning ??= match?.warning;
+  }
+
+  /** The candidates that matched the wallet. */
+  get matched(): number {
+    return this.#matched;
+  }
+
+  /** The first warning of the wallet check. */
+  get warning(): string | undefined {
+    return this.#warning;
+  }
+}
+
+/**
+ * How far a word search has come (SearchProgress): the candidates so far, each a phrase whose
+ * checksum holds, and those that the wallet matched.
+ */
+export interface WordSearchProgress extends SearchProgress {
+  readonly matched: number;
+}
+
+/** How a word search runs, with the host's services; `M` is what its wallet check answers. */
+export interface WordSearchRun<M extends WalletMatch = WalletMatch> extends SearchRun {
   /** Compares each candidate with the wallet; without it no candidate is compared. */
-  readonly walletCheck?: WalletCheck | undefined;
+  readonly walletCheck?: WalletCheck<M> | undefined;
   /** How many candidates are kept to be shown, besides those that matched; MAX_SHOWN_CANDIDATES. */
   readonly maxShown?: number | undefined;
   /** How many entropies are kept for a candidate list; 0, the default, keeps none. */
@@ -316,24 +411,19 @@ export interface WordSearchRun {
   /** Called once when the candidates are more than `keep`; throw to stop the search. */
   readonly onListFull?: (() => void) | undefined;
   /** Called at each turn with the candidates so far and those that matched. */
-  readonly onProgress?:
-    ((progress: { readonly count: number; readonly matched: number }) => void) | undefined;
-  /** Stops the search at its next turn; the signal's reason is thrown. */
-  readonly signal?: AbortSignal | undefined;
-  /** How the search lets the host's event loop run; a zero timeout by default. */
-  readonly turn?: (() => Promise<void>) | undefined;
+  readonly onProgress?: ((progress: WordSearchProgress) => void) | undefined;
 }
 
 /** A candidate kept to be shown, with what the wallet check said of it. */
-export interface ShownCandidate {
+export interface ShownCandidate<M extends WalletMatch = WalletMatch> {
   readonly candidate: WordCandidate;
-  readonly match?: WalletMatch;
+  readonly match?: M;
 }
 
 /** What a word search found. */
-export interface WordSearchResult {
+export interface WordSearchResult<M extends WalletMatch = WalletMatch> {
   /** The first `maxShown` candidates, and every later one that matched the wallet. */
-  readonly shown: readonly ShownCandidate[];
+  readonly shown: readonly ShownCandidate<M>[];
   /** The entropy of every candidate for a list, record N for candidate N; the caller wipes them. */
   readonly entropies: Uint8Array[];
   /** The candidates found, all of them. */
@@ -352,22 +442,23 @@ export interface WordSearchResult {
  * its words through toString, toJSON or Node's inspect, and it tells its phrase, its entropy and
  * its checksum bits itself, so that every host shows the same.
  */
-export class WordCandidate {
+export class WordCandidate extends Redacted {
   readonly #number: number;
   readonly #words: readonly number[];
 
   constructor(number: number, words: CandidateWords) {
-    if (!Number.isSafeInteger(number) || number < 1)
+    super("WordCandidate");
+    if (!inWholeRange(number, CANDIDATE_NUMBERS))
       throw new RangeError("A candidate's number counts from 1.");
-    if (
-      !Array.isArray(words) ||
-      !PHRASE_LENGTHS.has(words.length) ||
-      !everyElement(words, isWordIndex)
-    )
-      throw new Error("A candidate needs 12, 15, 18, 21 or 24 BIP39 indexes.");
+    if (!Array.isArray(words))
+      throw new Error(`A candidate needs ${WORD_COUNTS_TEXT} BIP39 indexes.`);
+    // A copy, checked itself: a search reuses its array for the next combination, and a getter
+    // cannot give the check one value and the copy another.
+    const copy = Array.from(words);
+    if (!isBip39WordCount(copy.length) || !areWordIndexes(copy))
+      throw new Error(`A candidate needs ${WORD_COUNTS_TEXT} BIP39 indexes.`);
     this.#number = number;
-    // A copy: a search reuses its array for the next combination.
-    this.#words = Object.freeze([...words]);
+    this.#words = Object.freeze(copy);
   }
 
   /** Its number among the candidates of its search, counting from 1, the same in every host. */
@@ -392,23 +483,7 @@ export class WordCandidate {
 
   /** The checksum bits at the end of its last word, as a candidate table shows them. */
   get checksumBits(): string {
-    return this.#words
-      .at(-1)!
-      .toString(2)
-      .padStart(BIP39_INDEX_BITS, "0")
-      .slice(-checksumBitCount(this.#words.length));
-  }
-
-  toString(): string {
-    return REDACTED_CANDIDATE;
-  }
-
-  toJSON(): string {
-    return REDACTED_CANDIDATE;
-  }
-
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED_CANDIDATE;
+    return lastWordChecksumBits(this.#words.at(-1)!, this.#words.length);
   }
 }
 
@@ -419,13 +494,14 @@ export class WordCandidate {
  * size and the candidates it will find before it runs, as a page shows them while the person
  * types; and it keeps the known words private.
  */
-export class WordCandidateSearch {
+export class WordCandidateSearch extends Redacted {
   readonly #search: WordSearch;
   readonly #combinations: number;
   /** The places, counting from 0, that may hold more than one word. */
   readonly #unknownPlaces: readonly number[];
 
   private constructor(search: WordSearch) {
+    super("WordCandidateSearch");
     assertSearch(search);
     // A copy, so that the caller's arrays cannot change the search once it is checked.
     const copy: WordSearch =
@@ -433,13 +509,10 @@ export class WordCandidateSearch {
         ? { kind: search.kind, places: search.places.map((place) => [...place]) }
         : { kind: search.kind, written: [...search.written] };
     const combinations = searchCombinations(copy);
-    if (combinations > MAX_SEARCH_COMBINATIONS) throw tooManyCombinations();
+    assertSearchable(combinations);
     this.#search = copy;
     this.#combinations = combinations;
-    this.#unknownPlaces =
-      copy.kind === "unknown-words"
-        ? copy.places.flatMap((place, index) => (place.length > 1 ? [index] : []))
-        : [];
+    this.#unknownPlaces = copy.kind === "unknown-words" ? unknownPlacesOf(copy.places) : [];
   }
 
   /**
@@ -449,7 +522,7 @@ export class WordCandidateSearch {
   static parse(text: string, kind: WordSearch["kind"]): WordCandidateSearch {
     if (kind === "unknown-words") return new WordCandidateSearch(parseUnknownWords(text));
     if (kind === "missing-word") return new WordCandidateSearch(parseMissingWord(text));
-    throw new Error("Unknown kind of word search.");
+    throw new Error(UNKNOWN_SEARCH_KIND);
   }
 
   /** Takes a search that a host made itself, after the same checks as a parsed one. */
@@ -516,19 +589,18 @@ export class WordCandidateSearch {
    * search; otherwise the entropies kept are wiped and the search goes on without them. The
    * entropies are wiped too when the search is stopped or fails.
    */
-  async run(run: WordSearchRun = {}): Promise<WordSearchResult> {
+  async run<M extends WalletMatch = WalletMatch>(
+    run: WordSearchRun<M> = {},
+  ): Promise<WordSearchResult<M>> {
     const maxShown = keptCount(run.maxShown, MAX_SHOWN_CANDIDATES, "maxShown");
     const keep = keptCount(run.keep, 0, "keep");
-    const turn = run.turn ?? nextTask;
-    const shown: ShownCandidate[] = [];
+    const shown: ShownCandidate<M>[] = [];
     let entropies: Uint8Array[] = [];
     let count = 0;
-    let matched = 0;
-    let warning: string | undefined;
+    const tally = new MatchTally();
     let listFull = false;
     try {
-      run.signal?.throwIfAborted();
-      let lastTurn = Date.now();
+      const turns = SearchTurns.of(run);
       for (const candidate of this.candidates()) {
         count += 1;
         if (keep > 0 && !listFull && count > keep) {
@@ -538,35 +610,23 @@ export class WordCandidateSearch {
           run.onListFull?.();
         }
         const match =
-          run.walletCheck === undefined ? undefined : await run.walletCheck(candidate.phrase);
-        if (match?.matched === true) matched += 1;
-        warning ??= match?.warning;
+          run.walletCheck === undefined
+            ? undefined
+            : await askWallet(run.walletCheck, candidate.phrase);
+        tally.add(match);
         if (keep > 0 && !listFull) entropies.push(candidate.entropy());
         if (count <= maxShown || match?.matched === true)
           shown.push(match === undefined ? { candidate } : { candidate, match });
-        if (Date.now() - lastTurn >= TURN_MILLISECONDS) {
-          await turn();
-          run.signal?.throwIfAborted();
-          run.onProgress?.({ count, matched });
-          lastTurn = Date.now();
-        }
+        // Every candidate is a phrase whose checksum holds: each one checked is one found.
+        if (await turns.due())
+          run.onProgress?.({ checked: count, found: count, matched: tally.matched });
       }
+      assertStillRunning(run);
     } catch (error) {
       wipeAll(entropies);
       throw error;
     }
+    const { matched, warning } = tally;
     return { shown, entropies, count, matched, warning, listFull };
-  }
-
-  toString(): string {
-    return REDACTED_SEARCH;
-  }
-
-  toJSON(): string {
-    return REDACTED_SEARCH;
-  }
-
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED_SEARCH;
   }
 }

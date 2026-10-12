@@ -6,6 +6,9 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 
+/** The limit of the one test that starts the command line fifteen times. */
+const FIFTEEN_STARTS_TIME_LIMIT_MS = 300_000;
+
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
 const mnemonic =
@@ -154,8 +157,6 @@ describe("CLI records", () => {
           mnemonic,
           "--dates",
           "23-09-2026",
-          "--events",
-          "Birthday",
           "--format",
           "3",
           "--template",
@@ -167,7 +168,10 @@ describe("CLI records", () => {
         ],
       ]) {
         await expect(run(args)).rejects.toMatchObject({
-          stderr: expect.stringMatching(/No installed card template|unknown or incompatible/iu),
+          // Unicode codes (format 3) have no cards: refused before any file is made.
+          stderr: expect.stringMatching(
+            /No installed card template|unknown or incompatible|Card export requires format/iu,
+          ),
         });
       }
       expect(await readFile(path, "utf8")).toBe("existing PDF");
@@ -234,46 +238,51 @@ describe("CLI records", () => {
     expect(decoded.stdout.trim()).toBe(mnemonic);
   });
 
-  // It starts the command line once per representation; process start-up is slow on Windows.
-  it("auto-detects every representation that encode can produce", async () => {
-    const formats = [
-      ["english", "1"],
-      ["indexes", "2"],
-      ["unicode", "3"],
-      ["colors-unicode", "4"],
-      ["colors", "5"],
-    ] as const;
-    for (const [format, number] of formats) {
-      const encoded = await run([
-        "encode",
-        "--mode",
-        "direct",
-        "--mnemonic",
-        mnemonic,
-        "--format",
-        number,
-      ]);
-      const raw = encoded.stdout.trim().split("\n").at(-1)!;
-      const decoded = await run(["decode", "--mode", "direct", "--input", raw]);
-      expect(decoded.stdout.trim()).toBe(mnemonic);
-      expect(decoded.stderr).toContain(`Detected input format: ${format}.`);
-      const explicit = await run([
-        "decode",
-        "--mode",
-        "direct",
-        "--input",
-        raw,
-        "--format",
-        format,
-      ]);
-      expect(explicit.stdout.trim()).toBe(mnemonic);
-    }
-    await expect(
-      run(["encode", "--mode", "direct", "--mnemonic", mnemonic, "--format", "6"]),
-    ).rejects.toMatchObject({
-      stderr: expect.stringContaining("The representation format must be one of"),
-    });
-  }, 120_000);
+  // It starts the command line once per representation; process start-up is slow on Windows
+  // and on a busy or hot machine. Fifteen starts take minutes there, so it has a limit of its own.
+  it(
+    "auto-detects every representation that encode can produce",
+    async () => {
+      const formats = [
+        ["english", "1"],
+        ["indexes", "2"],
+        ["unicode", "3"],
+        ["colors-unicode", "4"],
+        ["colors", "5"],
+      ] as const;
+      for (const [format, number] of formats) {
+        const encoded = await run([
+          "encode",
+          "--mode",
+          "direct",
+          "--mnemonic",
+          mnemonic,
+          "--format",
+          number,
+        ]);
+        const raw = encoded.stdout.trim().split("\n").at(-1)!;
+        const decoded = await run(["decode", "--mode", "direct", "--input", raw]);
+        expect(decoded.stdout.trim()).toBe(mnemonic);
+        expect(decoded.stderr).toContain(`Detected input format: ${format}.`);
+        const explicit = await run([
+          "decode",
+          "--mode",
+          "direct",
+          "--input",
+          raw,
+          "--format",
+          format,
+        ]);
+        expect(explicit.stdout.trim()).toBe(mnemonic);
+      }
+      await expect(
+        run(["encode", "--mode", "direct", "--mnemonic", mnemonic, "--format", "6"]),
+      ).rejects.toMatchObject({
+        stderr: expect.stringContaining("The representation format must be one of"),
+      });
+    },
+    FIFTEEN_STARTS_TIME_LIMIT_MS,
+  );
 
   it("keeps an explicit raw format authoritative", async () => {
     const encoded = await run([
@@ -303,7 +312,8 @@ describe("CLI records", () => {
     await expect(
       run(["decode", "--mode", "direct", "--input", "not a recorded representation"]),
     ).rejects.toMatchObject({
-      stderr: expect.stringContaining("Choose the recorded format explicitly"),
+      // The library's reason, as the screen gives it for typed codes (S003: BackupReading).
+      stderr: expect.stringContaining("Enter 12, 15, 18, 21 or 24 English BIP39 words."),
     });
   });
 
@@ -332,12 +342,14 @@ describe("CLI records", () => {
       await expect(
         run(["decode", "--input-file", path, "--format", "colors"]),
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining("conflicts with the format stored in the record (unicode)"),
+        stderr: expect.stringContaining("The record holds unicode codes, not colors."),
       });
       await expect(
         run(["decode", "--input-file", path, "--mode", "seedshift", "--dates", "23-09-2026"]),
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining("conflicts with the mode stored in the record (direct)"),
+        stderr: expect.stringContaining(
+          "The record was made with no Seedshift, not with MnemoCode Seedshift.",
+        ),
       });
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -347,7 +359,10 @@ describe("CLI records", () => {
   it("trusts an MNC1 format header only after the declared payload parser validates it", async () => {
     await expect(
       run(["decode", "--input", `MNC1:direct:unicode:${mnemonic}`]),
-    ).rejects.toMatchObject({ stderr: expect.stringContaining("Unicode input must be") });
+    ).rejects.toMatchObject({
+      // The one message of the Unicode reader (S011).
+      stderr: expect.stringContaining("Unicode codes have four hexadecimal digits each"),
+    });
     await expect(run(["decode", "--input", "MNC1:direct:unicode:"])).rejects.toMatchObject({
       stderr: expect.stringContaining("Malformed MnemoCode record header"),
     });

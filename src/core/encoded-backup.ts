@@ -16,71 +16,66 @@
 //
 // Host-neutral: it imports only @scure/bip39 and the core modules above.
 
-import { validateMnemonic } from "@scure/bip39";
 import { serializeRecord } from "../record.js";
-import { Masking, type MaskingMode } from "./masking.js";
-import { formatEncoded, parseInput, resultFromIndexes } from "./representations.js";
-import type { DateShiftDate, DecodedResult, OutputFormat } from "./types.js";
-import { BIP39_DICTIONARY_SIZE, englishWordlist, WORD_COUNT_SET } from "./words.js";
+import { Masking, type MaskingMode, MissingChecksum } from "./masking.js";
+import { parseInput } from "./representations.js";
+import {
+  type DateShiftDate,
+  type DecodedResult,
+  type EncodedFormat,
+  type EncodedResult,
+} from "./types.js";
+import { phraseOfIndexes } from "./words.js";
+import { fingerprintOfValidPhrase } from "./english-words.js";
+import { Redacted } from "./redacted.js";
+import { isBip39WordCount, WORD_COUNTS_TEXT } from "./bip39-sizes.js";
+import { EncodedForm } from "./encoded-form.js";
+import { refusalMessage } from "./refusal.js";
 
-/** How the codes were made: not masked, or one of the Seedshift variants (core/masking.ts). */
+/**
+ * How the codes were made: not masked, or one of the Seedshift variants (core/masking.ts).
+ * @deprecated Use MaskingMode; kept because hosts such as the Deriver import it.
+ */
 export type EncodedMode = MaskingMode;
-/** The forms that codes are written in. */
-export type EncodedFormat = Exclude<OutputFormat, "json">;
+/** The forms that codes are written in (ENCODED_FORMATS). */
+export type { EncodedFormat };
+
+/** The start of the refusal of codes that fit no form, complete or marked (BackupReading). */
+export const FIT_NO_FORM = "These codes fit no form of an encoded seed phrase";
 
 /** The modes by the names that the menu and the help use (Masking.name). */
-export const ENCODED_MODE_NAMES: Readonly<Record<EncodedMode, string>> = Object.freeze(
+export const ENCODED_MODE_NAMES: Readonly<Record<MaskingMode, string>> = Object.freeze(
   Object.fromEntries(Masking.MODES.map((mode) => [mode, Masking.of(mode).name])) as Record<
-    EncodedMode,
+    MaskingMode,
     string
   >,
 );
 
-/** What toString, toJSON and Node.js's inspect show of an encoded backup: never its codes. */
-const REDACTED = "[EncodedBackup: redacted]";
-/** The forms that encode writes codes in. */
-const FORMATS: ReadonlySet<string> = new Set<EncodedFormat>([
-  "english",
-  "indexes",
-  "unicode",
-  "colors",
-  "colors-unicode",
-]);
-
-/** The codes read as English BIP39 words, joined by spaces. */
-function wordsOf(indexes: readonly number[]): string {
-  return indexes.map((index) => englishWordlist[index]!).join(" ");
+/** What Encode makes of a seed phrase (EncodedBackup.encode), for a host to save and show. */
+export interface Encoding {
+  /** The codes in their form, with the mode that their record names. */
+  readonly backup: EncodedBackup;
+  /** What the codes hold, with a replaced last word where one was replaced. */
+  readonly result: EncodedResult;
+  /** The masking as asked, before any replacement of the last word. */
+  readonly base: EncodedResult;
+  /** For the Original Seedshift: the result with a checksum-valid last word, chosen or not. */
+  readonly validLastWord?: EncodedResult | undefined;
+  /** Whether that last word differs from the shifted one: only then is anything replaced. */
+  readonly lastWordChanged: boolean;
+  /** Whether the last word was replaced: asked for, and changed; the record then names the mode that keeps it. */
+  readonly replaced: boolean;
 }
 
-/** What a format's codes are called in a message about their count. */
-function unitOf(format: EncodedFormat): string {
-  if (format === "indexes") return "word numbers";
-  return format === "english" ? "words" : "codes";
+/** What Encode is asked for besides the mode and the dates. */
+export interface EncodeOptions {
+  /** For the Original Seedshift: replace the shifted last word by one with a valid checksum. */
+  readonly validLastWord?: boolean | undefined;
 }
 
-/** The format that typed codes most likely are, judged by their characters. */
-function likelyFormat(text: string): EncodedFormat {
-  if (text.includes("#")) return "colors";
-  // MnemoCode's colour codes are characters of the Private Use Areas (colors.ts).
-  if (/[\u{E000}-\u{F8FF}\u{F0000}-\u{10FFFD}]/u.test(text)) return "colors-unicode";
-  if (/^[\d\s,]+$/u.test(text)) return "indexes";
-  if (/^[\s0-9a-f]+$/iu.test(text)) return "unicode";
-  return "english";
-}
-
-/**
- * Codes that lack the BIP39 checksum that their mode gives them: they were mistyped, or made with
- * the Original Seedshift, whose codes usually lack it. A host offers that mode or asks again.
- */
-export class MissingChecksum extends Error {
-  readonly mode: EncodedMode;
-
-  constructor(mode: EncodedMode) {
-    super(`These codes lack the BIP39 checksum that ${Masking.of(mode).name} gives them.`);
-    this.name = "MissingChecksum";
-    this.mode = mode;
-  }
-}
+// The refusal is Masking's, which checks it (Masking.assertCodes); here too for the hosts that
+// take it with the backup.
+export { MissingChecksum };
 
 /**
  * The codes of one encoded seed phrase with their format and mode. A class pays off here: it is
@@ -89,33 +84,30 @@ export class MissingChecksum extends Error {
  * (`withMode` gives another); and it keeps the codes, which without Seedshift are the seed phrase
  * itself, out of toString, toJSON and Node.js's inspect.
  */
-export class EncodedBackup {
+export class EncodedBackup extends Redacted {
   readonly #indexes: readonly number[];
   readonly #format: EncodedFormat;
-  readonly #mode: EncodedMode;
+  readonly #mode: MaskingMode;
 
   /**
    * Holds the codes to the rules of `of`. They are checked here, not in `of` alone: a private
    * constructor is private to TypeScript only, and a JavaScript host can call it (AUD-009-API002).
    */
-  private constructor(indexes: readonly number[], format: EncodedFormat, mode: EncodedMode) {
+  private constructor(indexes: readonly number[], format: EncodedFormat, mode: MaskingMode) {
+    super("EncodedBackup");
     // A JavaScript host may pass any value; another mode would silently decode another way.
     const masking = Masking.of(mode);
-    if (!FORMATS.has(format)) throw new Error("Unsupported encoded format.");
+    // Refuses a value that names no form, with the form's own refusal.
+    const form = EncodedForm.of(format);
     // Copied first and the copy checked: Array.from turns holes into undefined, which is refused,
     // where some() alone would skip them, and a getter cannot give the check one value and the
     // copy another.
     const codes = Array.from(indexes);
-    if (!WORD_COUNT_SET.has(codes.length))
+    if (!isBip39WordCount(codes.length))
       throw new Error(
-        `These are ${codes.length} ${unitOf(format)}; an encoded seed phrase has 12, 15, 18, 21 or 24.`,
+        `These are ${codes.length} ${form.unit}; an encoded seed phrase has ${WORD_COUNTS_TEXT}.`,
       );
-    if (
-      codes.some((index) => !Number.isInteger(index) || index < 0 || index >= BIP39_DICTIONARY_SIZE)
-    )
-      throw new Error("Every BIP39 index must be an integer from 0 through 2047.");
-    if (masking.keepsChecksum && !validateMnemonic(wordsOf(codes), englishWordlist))
-      throw new MissingChecksum(mode);
+    masking.assertCodes(codes);
     this.#indexes = Object.freeze(codes);
     this.#format = format;
     this.#mode = mode;
@@ -125,44 +117,89 @@ export class EncodedBackup {
    * Reads codes written in `format` as the codes of a seed phrase made with `mode`. Throws why
    * they cannot be, naming places and counts only; MissingChecksum for a checksum-keeping mode.
    */
-  static read(text: string, format: EncodedFormat, mode: EncodedMode): EncodedBackup {
+  static read(text: string, format: EncodedFormat, mode: MaskingMode): EncodedBackup {
     return EncodedBackup.of(parseInput(text, format), format, mode);
   }
 
+  /**
+   * Refuses what Encode cannot make, before any secret is read: the Original Seedshift with a
+   * valid last word comes only from the Original Seedshift with its replacement (`validLastWord`),
+   * which no other mode has.
+   */
+  static assertEncodable(mode: MaskingMode, options: EncodeOptions = {}): void {
+    const masking = Masking.of(mode);
+    if (!masking.encodable)
+      throw new Error(
+        "To create a legacy checksum-valid record, select legacy Seedshift and enable the checksum-word replacement.",
+      );
+    if (options.validLastWord === true && masking.withValidLastWord === undefined)
+      throw new Error(
+        "The legacy checksum-word replacement is available only in legacy Seedshift mode.",
+      );
+  }
+
+  /**
+   * Encodes `mnemonic` with `mode` and `dates`, its codes written in `format`. With
+   * `validLastWord`, the Original Seedshift's shifted last word, which usually fails the checksum,
+   * is replaced by one with a valid checksum, and the record then names the mode that keeps it
+   * (seedshift-legacy-valid); a last word that already fits is kept, and the record stays the
+   * Original Seedshift's. The command line and a page encode through it, so that both write the
+   * same codes and the same record.
+   */
+  static encode(
+    mnemonic: string,
+    dates: readonly DateShiftDate[],
+    format: EncodedFormat,
+    mode: MaskingMode,
+    options: EncodeOptions = {},
+  ): Encoding {
+    EncodedBackup.assertEncodable(mode, options);
+    const masking = Masking.of(mode);
+    masking.assertDateCount(dates.length);
+    const base = masking.encode(mnemonic, dates);
+    const replacement = masking.withValidLastWord;
+    const validLastWord = replacement?.encode(mnemonic, dates);
+    const lastWordChanged =
+      validLastWord !== undefined &&
+      validLastWord.shiftedIndexes.at(-1) !== base.shiftedIndexes.at(-1);
+    const replaced = options.validLastWord === true && lastWordChanged;
+    const result = replaced ? validLastWord! : base;
+    const recordMode: MaskingMode = replaced ? replacement!.mode : mode;
+    return {
+      backup: EncodedBackup.of(result.shiftedIndexes, format, recordMode),
+      result,
+      base,
+      validLastWord,
+      lastWordChanged,
+      replaced,
+    };
+  }
+
   /** Codes read elsewhere, as BIP39 indexes from 0 to 2047, held to the same rules as `read`. */
-  static of(indexes: readonly number[], format: EncodedFormat, mode: EncodedMode): EncodedBackup {
+  static of(indexes: readonly number[], format: EncodedFormat, mode: MaskingMode): EncodedBackup {
     return new EncodedBackup(indexes, format, mode);
   }
 
   /**
-   * Why codes that fit no format cannot be read: as the format that their characters most likely
+   * Why codes that fit no form cannot be read: as the format that their characters most likely
    * are, naming places or the count only.
    */
   static whyUnreadable(text: string): string {
-    const format = likelyFormat(text);
+    const format = EncodedForm.likely(text);
     try {
       EncodedBackup.read(text, format, "direct");
     } catch (error) {
-      if (error instanceof Error) return error.message;
-      throw error;
+      return refusalMessage(error);
     }
-    return "These codes fit no format of an encoded seed phrase.";
-  }
-
-  /**
-   * Whether `mode` writes codes that are a valid BIP39 phrase themselves. Such a mode gives a
-   * valid phrase for every date too, so that only the wallet tells the right dates.
-   */
-  static keepsChecksum(mode: EncodedMode): boolean {
-    return Masking.of(mode).keepsChecksum;
+    return `${FIT_NO_FORM}.`;
   }
 
   /** The same codes as made with `mode`, held to the rules of `of`. */
-  withMode(mode: EncodedMode): EncodedBackup {
+  withMode(mode: MaskingMode): EncodedBackup {
     return EncodedBackup.of(this.#indexes, this.#format, mode);
   }
 
-  get mode(): EncodedMode {
+  get mode(): MaskingMode {
     return this.#mode;
   }
 
@@ -188,13 +225,12 @@ export class EncodedBackup {
    * showed, it shows a mistyped code before any date is typed.
    */
   fingerprint<T>(fingerprintOf: (mnemonic: string) => T): T | undefined {
-    const words = wordsOf(this.#indexes);
-    return validateMnemonic(words, englishWordlist) ? fingerprintOf(words) : undefined;
+    return fingerprintOfValidPhrase(phraseOfIndexes(this.#indexes), fingerprintOf);
   }
 
   /** The codes written in their form, as encode writes them. */
   text(): string {
-    return formatEncoded(resultFromIndexes([], this.#indexes, [], []), this.#format);
+    return EncodedForm.of(this.#format).codes(this.#indexes);
   }
 
   /** The codes as an MNC1 record, which names their mode and form (record.ts). */
@@ -217,17 +253,5 @@ export class EncodedBackup {
   /** Every phrase that the codes and the complete `dates` may give: one unless givesSeveral. */
   candidates(dates: readonly DateShiftDate[]): DecodedResult[] {
     return Masking.of(this.#mode).undo(this.#indexes, dates);
-  }
-
-  toString(): string {
-    return REDACTED;
-  }
-
-  toJSON(): string {
-    return REDACTED;
-  }
-
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return REDACTED;
   }
 }

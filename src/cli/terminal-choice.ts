@@ -7,27 +7,35 @@
 // (askLine); only Escape goes back.
 
 import {
-  answerEndRow,
-  displayWidth,
   dropRestOfPaste,
   dropTypedAhead,
-  InputCancelled,
   readKey,
   readLine,
-  rowsOfText,
-  terminalColumns,
   UnusableAnswer,
   withRawTerminal,
+  refusal,
   type NextByte,
+  ESCAPE_ALIASES,
+  NOT_UTF8,
 } from "./terminal-input.js";
-import { STYLE, terminalPaint, wrapText } from "./terminal.js";
-
-/**
- * The widest line of a list or an explanation: the width of running text in terminal.ts, so that
- * a list fits a terminal of 80 columns unwrapped. A narrower terminal wraps a longer line onto
- * further rows, which rowsOf counts.
- */
-export const LINE_WIDTH = 78;
+import {
+  answerEndRow,
+  displayWidth,
+  rowsOfText,
+  terminalColumns,
+  terminalRows,
+} from "./terminal-geometry.js";
+import {
+  STYLE,
+  terminalPaint,
+  CLEAR_SCREEN,
+  markedLines,
+  TEXT_WIDTH,
+  cursorUp,
+  ERASE_BELOW,
+} from "./terminal.js";
+import { factLine, STYLE_CODES } from "./terminal-style.js";
+import { isContinuation, validCharacters } from "./utf8.js";
 
 /** Marker, number and the gaps before a label: "› 1  ". */
 const LABEL_INDENT = 5;
@@ -48,42 +56,42 @@ const paint = (code: string, text: string): string => terminalPaint("stderr", co
 /** Moves the cursor up `lines` lines to the start of the line, then clears to the end of the
  * screen (VT100 "cursor up" and "erase in display"). Written raw: NO_COLOR does not remove it. */
 function redrawFrom(lines: number): void {
-  if (lines > 0) process.stderr.write(`\x1b[${lines}A\r\x1b[J`);
+  if (lines > 0) process.stderr.write(`${cursorUp(lines)}\r${ERASE_BELOW}`);
 }
-
-/** Moves the cursor to the top left of the screen and clears all of it (VT100 "cursor position"
- * and "erase in display", 2). Written raw, as redrawFrom. */
-const CLEAR_SCREEN = "\x1b[H\x1b[2J";
-
-/** Terminal height when the terminal does not say: a VT100's 24 rows. */
-const DEFAULT_ROWS = 24;
-
-/** The rows of the terminal on standard error, read anew each time, as its width. */
-function terminalRows(): number {
-  const rows = process.stderr.rows;
-  return rows !== undefined && rows > 0 ? rows : DEFAULT_ROWS;
-}
-
-/** Colour codes (SGR sequences), which take no room on the screen. */
-const STYLE_CODES = /\x1b\[[0-9;]*m/gu;
 
 /**
- * The terminal rows that `lines` take. A terminal narrower than LINE_WIDTH wraps a long line onto
+ * The terminal rows that `lines` take. A terminal narrower than TEXT_WIDTH wraps a long line onto
  * further rows, a wide character that does not fit at the right edge whole onto the next one
  * (rowsOfText), and a redraw that moved up by lines would leave the extra rows behind
  * (AUD-008-UI001). The width is read at each redraw, so that a resized terminal is counted anew.
  */
 export function rowsOf(lines: readonly string[]): number {
-  return lines.reduce((rows, line) => rows + rowsOfText(line.replace(STYLE_CODES, "")), 0);
+  // A line may start with a line break of its own, as the heading of a result does.
+  return lines
+    .flatMap((line) => line.split("\n"))
+    .reduce((rows, line) => rows + rowsOfText(line.replace(STYLE_CODES, "")), 0);
+}
+
+/**
+ * The rows that `question` with `choices` takes while it waits, as choose draws it: a blank line,
+ * the question, the list, a blank line, the key hint (what Escape does: `quit`) and the row of
+ * the cursor under it. A check of the room on the screen counts a question to come so.
+ */
+export function listQuestionRows<T>(
+  question: string,
+  choices: readonly Choice<T>[],
+  quit = "goes back",
+): number {
+  return rowsOf(["", question, ...listLines(choices, 0), "", keyHint(choices, quit), ""]);
 }
 
 /**
  * The characters that a note or an example of `choices` has beside the longest label within
- * LINE_WIDTH; a longer one is cut (shortened), which a list of the program must never need.
+ * TEXT_WIDTH; a longer one is cut (shortened), which a list of the program must never need.
  */
 export function notesRoom<T>(choices: readonly Choice<T>[]): number {
   const labelWidth = Math.max(...choices.map((choice) => [...choice.label].length));
-  return LINE_WIDTH - LABEL_INDENT - labelWidth - 2;
+  return TEXT_WIDTH - LABEL_INDENT - labelWidth - 2;
 }
 
 /** `text` cut to `room` characters with "…" at the end, so that it cannot wrap the line. */
@@ -134,9 +142,11 @@ function keyHint<T>(choices: readonly Choice<T>[], quit: string): string {
 }
 
 /**
- * Width of the grey labels in the record of answers, as in a result (terminal.ts): the longest
- * label that a question of the menu uses, "Fingerprint", so that every answer starts in the same
- * column. A longer label would push its answer out of line; test/menu.test.ts checks them all.
+ * Width of the grey labels in the record of answers and of the facts of the private screen: the
+ * longest label that a question of the menu uses, "Fingerprint", so that every answer starts in
+ * the same column, as a result's facts do (factLine). A result widens its column to its longest
+ * label instead (resultLines), since its labels are known when it is printed; the record's are
+ * not. A longer label would push its answer out of line; test/menu.test.ts checks them all.
  */
 export const ANSWER_LABEL_WIDTH = 11;
 
@@ -146,7 +156,7 @@ const LINK_INDENT = "    ";
 
 /**
  * Text shown between a question and its entries: short `lines` in the normal colour, each at most
- * LINE_WIDTH minus its indent, and links to read `more`, grey under "More:".
+ * TEXT_WIDTH minus its indent, and links to read `more`, grey under "More:".
  */
 export interface Explanation {
   readonly lines: readonly string[];
@@ -182,8 +192,7 @@ const answerLines: AnswerLine[] = [];
 /** A line of the record as it shows: a grey label and the answer in cyan, indented as the facts of
  * a result (terminalResultHeader) and the summary lines of `mhfe`. */
 function shownAnswer(line: AnswerLine): string {
-  const name = line.label.padEnd(ANSWER_LABEL_WIDTH);
-  return `${TEXT_INDENT}${paint(STYLE.muted, name)} ${paint(STYLE.accent, line.answer)}`;
+  return factLine(process.stderr, line.label, paint(STYLE.accent, line.answer), ANSWER_LABEL_WIDTH);
 }
 
 /** The rows that lines of the record take now (rowsOf leaves out their colours). */
@@ -260,16 +269,9 @@ function questionRows(question: string): number {
   return 1 + rowsOf([question]);
 }
 
-/** The yellow "!" and the space before the text of a warning, as terminalNotice writes them. */
-const WARNING_MARK_WIDTH = 2;
-
-/** A warning in the lines of a question, as terminalNotice shows one: a yellow "!", wrapped. */
+/** A warning in the lines of a question, as terminalNotice shows one in colour (markedLines). */
 function warningLines(message: string | undefined): string[] {
-  if (message === undefined) return [];
-  return wrapText(message, LINE_WIDTH - WARNING_MARK_WIDTH).map(
-    (line, index) =>
-      `${index === 0 ? paint(STYLE.warning, "!") : " "} ${paint(STYLE.warning, line)}`,
-  );
+  return message === undefined ? [] : markedLines(message, "warning");
 }
 
 /** How choose asks. */
@@ -298,6 +300,9 @@ export async function choose<T>(
   choices: readonly Choice<T>[],
   options: ChooseOptions,
 ): Promise<T | undefined> {
+  // Keys pressed before the question showed, such as the rest of a paste, are dropped and wiped:
+  // only keys pressed for it answer it.
+  await dropTypedAhead();
   let selected = options.initial ?? 0;
   const hint = paint(STYLE.muted, keyHint(choices, options.quit ?? "goes back"));
   const explanation = explanationLines(options.explanation);
@@ -371,6 +376,39 @@ export interface LineQuestion {
   readonly check?: (answer: string) => string | Promise<string>;
 }
 
+/** What a question asks for where it does not say: any answer. */
+const ANY_ANSWER = "an answer";
+
+/**
+ * The line after an empty answer: what to type, and how the question is left instead, with Escape
+ * (`back`) or, for a secret, with Ctrl+C (`stop`).
+ */
+export function typeHint(what: string | undefined, leave: "back" | "stop"): string {
+  const how = leave === "back" ? "press Esc to go back" : "press Ctrl+C to stop";
+  return `Type ${what ?? ANY_ANSWER}, or ${how}.`;
+}
+
+/** What a typed answer, trimmed, gives before it is checked (enteredAnswer). */
+export type Entered =
+  | { readonly kind: "text"; readonly text: string }
+  | { readonly kind: "left-out" }
+  | { readonly kind: "refused"; readonly reason: string };
+
+/**
+ * What a typed answer, trimmed, gives, by the one rule of every question for a typed answer: the
+ * text typed; Enter alone the `fallback`, or leaves out an `optional` answer, or asks again with
+ * the hint (typeHint). The answer is checked afterwards, as each question checks it.
+ */
+export function enteredAnswer(
+  typed: string,
+  rules: Pick<LineQuestion, "fallback" | "optional" | "what"> & { readonly leave: "back" | "stop" },
+): Entered {
+  if (typed !== "") return { kind: "text", text: typed };
+  if (rules.optional !== undefined) return { kind: "left-out" };
+  if (rules.fallback !== undefined) return { kind: "text", text: rules.fallback };
+  return { kind: "refused", reason: typeHint(rules.what, rules.leave) };
+}
+
 /** What one asking of a typed question gave. */
 type LineOutcome =
   | { readonly kind: "answer"; readonly answer: string }
@@ -378,89 +416,14 @@ type LineOutcome =
   /** The answer could not be used: why, shown above the question when it is asked again. */
   | { readonly kind: "refused"; readonly reason: string };
 
-const CONTINUATION_MASK = 0b1100_0000;
-const CONTINUATION = 0b1000_0000;
-
 /** The bytes that start a character on the screen: not a control byte, not a UTF-8 continuation. */
 function startsCharacter(byte: number): boolean {
-  return byte >= 0x20 && byte !== 0x7f && (byte & CONTINUATION_MASK) !== CONTINUATION;
+  return byte >= 0x20 && byte !== 0x7f && !isContinuation(byte);
 }
 
 /**
- * The bytes of the UTF-8 character that `first` starts, or 0 for a byte that starts none (RFC 3629,
- * section 4): a continuation byte; C0 and C1, which only overlong forms use; F5 to FF, which would
- * lie beyond U+10FFFF.
- */
-function characterLength(first: number): number {
-  if (first < 0x80) return 1;
-  if (first >= 0xc2 && first <= 0xdf) return 2;
-  if (first >= 0xe0 && first <= 0xef) return 3;
-  if (first >= 0xf0 && first <= 0xf4) return 4;
-  return 0;
-}
-
-/** Decodes UTF-8 as readLine decodes an answer: anything else, such as a surrogate, throws. */
-const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
-
-/** Whether `bytes`, one character's, are valid UTF-8. */
-function isValidCharacter(bytes: readonly number[]): boolean {
-  try {
-    STRICT_UTF8.decode(Uint8Array.from(bytes));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Why an answer is refused that held bytes of no UTF-8 character, as readLine says it. */
-const NOT_UTF8 = "The answer is not valid UTF-8 text.";
-
-/** A reader for readLine that passes on only valid UTF-8 (validCharacters). */
-interface CharacterReader {
-  readonly next: NextByte;
-  /** Whether a byte was left out. */
-  readonly leftOut: () => boolean;
-}
-
-/**
- * Reads `next` and passes on the control bytes and whole characters of valid UTF-8 only, each
- * character once all of its bytes have come; any other byte, such as é from a terminal set to
- * Latin-1, is left out and noted. readLine would show such a byte, which each terminal draws in
- * its own way, and refuse the answer only at its end, when the rows that it took could no longer
- * be counted. Left out, the answer read is the answer shown, and askLine refuses it at Enter.
- */
-function validCharacters(next: NextByte): CharacterReader {
-  let leftOut = false;
-  // The rest of a character whose first byte was passed on.
-  const rest: number[] = [];
-  const read: NextByte = async () => {
-    if (rest.length > 0) return rest.shift();
-    let byte = await next();
-    for (;;) {
-      if (byte === undefined) return undefined;
-      const length = characterLength(byte);
-      if (length === 1) return byte;
-      const character = [byte];
-      while (character.length < length) {
-        byte = await next();
-        if (byte === undefined || (byte & CONTINUATION_MASK) !== CONTINUATION) break;
-        character.push(byte);
-      }
-      const whole = length > 0 && character.length === length;
-      if (whole && isValidCharacter(character)) {
-        rest.push(...character.slice(1));
-        return character[0];
-      }
-      leftOut = true;
-      // A byte that cut a character short starts what comes next; after the rest, read on.
-      if (length === 0 || whole) byte = await next();
-    }
-  };
-  return { next: read, leftOut: () => leftOut };
-}
-
-/**
- * Asks for a visible answer, such as a file name, until it can be used: Enter alone takes the
+ * Asks for a visible answer, such as a file name, until it can be used (the menu's questions; a
+ * command's ask through ask.ts, whose question stays on the screen): Enter alone takes the
  * `fallback`, or leaves out an `optional` answer (""), and asks again with a hint where there is
  * neither; an answer that is not UTF-8 (validCharacters) or that readLine refuses as too long, or
  * that `check` refuses, is explained in one warning line above the same question. Returns
@@ -473,6 +436,9 @@ export async function askLine(
   label: string,
   options: LineQuestion = {},
 ): Promise<string | undefined> {
+  // The end of the input goes back here, as Escape does: the menu then leaves at its own question,
+  // whose last answer the end of the input picks. A command's question cancels instead
+  // (askValueUntil), since nothing can answer it any more.
   const enter = options.fallback ?? options.optional;
   const shown = enter === undefined ? `${question}: ` : `${question} (Enter: ${enter}): `;
   let warning = options.warning;
@@ -548,28 +514,20 @@ async function settledAnswer(
   label: string,
   options: LineQuestion,
 ): Promise<LineOutcome> {
-  if (typed === "" && options.optional !== undefined) {
-    writeAnswer(label, options.optional);
+  const entered = enteredAnswer(typed, { ...options, leave: "back" });
+  if (entered.kind === "left-out") {
+    writeAnswer(label, options.optional!);
     return { kind: "answer", answer: "" };
   }
-  const answer = typed === "" ? options.fallback : typed;
-  if (answer === undefined)
-    return {
-      kind: "refused",
-      reason: `Type ${options.what ?? "an answer"}, or press Esc to go back.`,
-    };
+  if (entered.kind === "refused") return entered;
   try {
-    const accepted = options.check === undefined ? answer : await options.check(answer);
+    const accepted = options.check === undefined ? entered.text : await options.check(entered.text);
     writeAnswer(label, accepted);
     return { kind: "answer", answer: accepted };
   } catch (error) {
-    if (error instanceof InputCancelled || !(error instanceof Error)) throw error;
-    return { kind: "refused", reason: error.message };
+    return { kind: "refused", reason: refusal(error) };
   }
 }
-
-/** The bytes that readKey takes for Escape besides it: q, Q and Ctrl+D (terminal-input.ts). */
-const ESCAPE_ALIASES: ReadonlySet<number> = new Set([0x71, 0x51, 0x04]);
 
 /** `next` for one key that readKey reads, with ESCAPE_ALIASES left out where the key starts. */
 function withoutEscapeAliases(next: NextByte): NextByte {

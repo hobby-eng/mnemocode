@@ -12,6 +12,12 @@ vi.mock("../src/cli/qr-export.js", async (importOriginal) => {
       const path = await original.saveQrBeside(payload, sheet, suffix);
       return qr.wrongName ? path.replace("-qr", "") : path;
     },
+  };
+});
+vi.mock("../src/export/qr-image.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../src/export/qr-image.js")>();
+  return {
+    ...original,
     // An empty QR image accepted.
     exportQrPayload: async (payload: string, path: string) =>
       qr.acceptEmpty && payload === "" ? undefined : original.exportQrPayload(payload, path),

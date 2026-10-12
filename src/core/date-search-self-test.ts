@@ -14,6 +14,7 @@ import { dateRecoveryCandidates } from "./date-recovery.js";
 import { DatesAnswer, DateSearch } from "./date-search.js";
 import { formatDate } from "./dates.js";
 import { expectRefused, expectSame } from "./self-test-check.js";
+import { fingerprintWalletCheck, type PhraseFingerprint } from "./wallet-check.js";
 
 const PUBLIC_MNEMONIC =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -176,19 +177,14 @@ function checkShiftsTriedOnce(): void {
  * Every check: the quick ones, and the date search with the wallet, which the host's master
  * fingerprint tells: of the ten checksum-valid phrases, only that of 23-09-2026 is the wallet's.
  */
-export async function checkDateSearch(
-  fingerprint: (mnemonic: string) => string | PromiseLike<string>,
-): Promise<void> {
+export async function checkDateSearch(fingerprint: PhraseFingerprint): Promise<void> {
   checkDateSearchStartup();
   checkCombinations(SLOW_COMBINATIONS);
   const result = await new DateSearch({
     indexes: MASKED_INDEXES,
     dates: DatesAnswer.parse(FORGOTTEN_LAST_DIGIT, TWELVE_WORDS),
     mode: "seedshift",
-    walletCheck: async (mnemonic) => ({
-      matched: (await fingerprint(mnemonic)) === PUBLIC_FINGERPRINT,
-      path: "m",
-    }),
+    walletCheck: fingerprintWalletCheck(fingerprint, PUBLIC_FINGERPRINT),
   }).run();
   expectSame(result.combinations, 10, "Date search combinations");
   // MnemoCode Seedshift gives a valid phrase for every date: only the wallet tells them apart.

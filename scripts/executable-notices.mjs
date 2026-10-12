@@ -6,17 +6,20 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { ASSETS_FOLDER, SSKR_ENGINE_FOLDER } from "../src/bundled-file-paths.ts";
 
 /** File names that hold a package's license or notice text. */
 const LICENSE_FILE = /^(licen[cs]e|copying|notice)(\.(md|txt))?$/iu;
 
 const PROJECT_FILES = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"];
-const SSKR_FILES = ["sskr-wasm/LICENSE", "sskr-wasm/NOTICE.md", "sskr-wasm/UPSTREAM_NOTICES.md"];
-const ASSET_FILES = [
-  "assets/fonts/DejaVuSans-NOTICE",
-  "assets/fonts/DroidSansFallback-NOTICE",
-  "assets/maps/NOTICE",
-];
+// The notices of the SSKR engine and of the bundled assets, in the folders that the executable
+// embeds them from (bundled-file-paths.ts), as build-executable.mjs reads them.
+const SSKR_FILES = ["LICENSE", "NOTICE.md", "UPSTREAM_NOTICES.md"].map(
+  (file) => `${SSKR_ENGINE_FOLDER}${file}`,
+);
+const ASSET_FILES = ["fonts/DejaVuSans-NOTICE", "maps/NOTICE"].map(
+  (file) => `${ASSETS_FOLDER}${file}`,
+);
 
 function heading(title) {
   return `\n${"=".repeat(78)}\n${title}\n${"=".repeat(78)}\n`;

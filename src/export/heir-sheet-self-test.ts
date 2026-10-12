@@ -4,14 +4,18 @@
 // (SelfTestHost.features, MnemoCodeSelfTest.core), so that a build without the sheet carries none
 // of it.
 //
-// From the host it needs, for the PDF only, the render platform that the renderer reads its font
-// from (export/platform.ts, configureRenderPlatform), set before the full check runs. It writes no
-// file and holds no secret.
+// From the host it needs, for the PDF only, the source of the bundled font: its render platform or
+// CardRenderer (export/platform.ts). It writes no file and holds no secret.
 //
 // Host-neutral: it imports only other export modules, core/self-test-check.ts and pdf-lib.
 
 import { PDFDocument } from "pdf-lib";
-import { expectRefused, expectRefusedLater, expectSame } from "../core/self-test-check.js";
+import {
+  expectRefused,
+  expectRefusedLater,
+  expectSame,
+  selfTestFeature,
+} from "../core/self-test-check.js";
 import type { SelfTestFeature } from "../core/self-test-check.js";
 import {
   HeirInstructions,
@@ -20,6 +24,7 @@ import {
   type HeirSheetFacts,
 } from "./heir-sheet-text.js";
 import { A5, A6, renderHeirSheet, type HeirSheetFormat, type HeirSheetText } from "./heir-sheet.js";
+import type { AssetSource } from "./platform.js";
 
 /**
  * An address reserved for examples (RFC 2606), the one the test route prints, without http(s)://
@@ -111,13 +116,22 @@ function checkHeirTextStartup(): void {
   );
   expectRefused(
     () => instructions.text({ ...SHARES, mode: "seedshift-legacy" }),
-    /Shares cannot use the original Seedshift/u,
+    /Shares are made without Seedshift or with MnemoCode Seedshift/u,
     "Heir sheet for shares of the Original Seedshift",
   );
   expectRefused(
     () => instructions.text({ ...PHRASE, dates: 1 }),
-    /no dates in direct mode/u,
+    /Dates cannot be used in direct mode/u,
     "Heir sheet with dates and no Seedshift",
+  );
+  expectRefused(
+    () =>
+      instructions.text({
+        ...SHARES,
+        backup: { kind: "shares", format: "colors", threshold: 4, count: 3 },
+      }),
+    /needs a threshold from 1 to the number of shares/u,
+    "Heir sheet for more shares than there are",
   );
   const twoAddresses = new HeirInstructions({
     ...TEST_ROUTE,
@@ -131,11 +145,11 @@ function checkHeirTextStartup(): void {
 }
 
 /** Every check: the quick ones, the PDF in A5 and A6, and a sheet whose back overflows refused. */
-async function checkHeirSheet(): Promise<void> {
+async function checkHeirSheet(assets: AssetSource): Promise<void> {
   checkHeirTextStartup();
   const text = instructions.text(SHARES);
   for (const [format, width, height, name] of PAGE_SIZES) {
-    const pdf = await PDFDocument.load(await renderHeirSheet(text, format));
+    const pdf = await PDFDocument.load(await renderHeirSheet(assets, text, format));
     expectSame(pdf.getPageCount(), SHEET_PAGES, `Heir sheet ${name} pages`);
     for (const page of pdf.getPages())
       if (
@@ -146,18 +160,21 @@ async function checkHeirSheet(): Promise<void> {
   }
   const overflowing = { ...text, steps: Array<string>(OVERFLOWING_STEPS).fill(OPEN_WALLET) };
   await expectRefusedLater(
-    () => renderHeirSheet(overflowing, A6),
+    () => renderHeirSheet(assets, overflowing, A6),
     /do not fit on the back/u,
     "Heir sheet whose steps overflow",
   );
 }
 
-/** The checks of the sheet for heirs, for a host that offers it. */
-export const HEIR_SHEET_SELF_TEST: SelfTestFeature = Object.freeze({
-  startup: checkHeirTextStartup,
-  check: Object.freeze({
+/**
+ * The checks of the sheet for heirs, its PDF drawn with the font from the host's `assets`, for a
+ * host that offers it.
+ */
+export function heirSheetSelfTest(assets: AssetSource): SelfTestFeature {
+  return selfTestFeature({
     name: "Heir sheet",
     detail: "words for a backup and for shares, refusals; A5, A6 PDF",
-    run: checkHeirSheet,
-  }),
-});
+    startup: checkHeirTextStartup,
+    run: () => checkHeirSheet(assets),
+  });
+}

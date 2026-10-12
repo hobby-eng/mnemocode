@@ -57,19 +57,22 @@ function encrypted(root: string, name: string, depth = 0): boolean {
   return slaves.length > 0 && slaves.every((slave) => encrypted(root, slave, depth + 1));
 }
 
+/** Where Linux lists the swap areas in use, below the file-system root. */
+const SWAP_TABLE = "proc/swaps";
+
+/** The start of the warning about swap, for areas that are not encrypted or not known to be. */
+const SWAP_RISK = "Swap may write this memory to the disk unencrypted";
+
 /**
  * The swap areas that are not encrypted, or of which MnemoCode cannot tell, by their path in
  * /proc/swaps; empty without swap and on other systems. `root` is the file-system root, so that
- * tests can give a /proc and /sys of their own.
+ * tests can give a /proc and /sys of their own. Throws when /proc/swaps cannot be read, as under a
+ * permission model that denies it: then nothing is known about swap, which is not the same as no
+ * swap (swapWarning, AUD-014-SEC002).
  */
 export function unencryptedSwap(root = "/"): string[] {
   if (root === "/" && process.platform !== "linux") return [];
-  let table: string;
-  try {
-    table = readFileSync(join(root, "proc/swaps"), "utf8");
-  } catch {
-    return [];
-  }
+  const table = readFileSync(join(root, SWAP_TABLE), "utf8");
   const risky: string[] = [];
   // The first line names the columns: Filename Type Size Used Priority.
   for (const line of table.split("\n").slice(1)) {
@@ -80,4 +83,20 @@ export function unencryptedSwap(root = "/"): string[] {
     if (name === undefined || !encrypted(root, name)) risky.push(path);
   }
   return risky;
+}
+
+/**
+ * The warning about swap that comes before a secret: the areas that may write memory to a disk
+ * unencrypted, or that MnemoCode cannot tell at all because it cannot read /proc/swaps; undefined
+ * when there is no swap or all of it is safe. Any failure to read the table warns: a warning too
+ * many is safe, a missing one is not.
+ */
+export function swapWarning(root = "/"): string | undefined {
+  let risky: string[];
+  try {
+    risky = unencryptedSwap(root);
+  } catch {
+    return `${SWAP_RISK}: MnemoCode cannot read /${SWAP_TABLE} to tell`;
+  }
+  return risky.length === 0 ? undefined : `${SWAP_RISK}: ${risky.join(", ")}`;
 }

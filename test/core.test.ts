@@ -52,7 +52,7 @@ describe("original Seedshift compatibility mode", () => {
         "table dial lion ginger smile science impact certain melody life limit silver",
         dates,
       ),
-    ).toThrow("invalid BIP39 checksum");
+    ).toThrow("fail the BIP39 checksum");
   });
 
   it("rejects a source word outside the English BIP39 list", () => {

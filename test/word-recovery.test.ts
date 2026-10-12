@@ -1,8 +1,25 @@
 import { entropyToMnemonic, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { describe, expect, it } from "vitest";
-import { recoverLegacyValidLastWords, recoverMissingWord } from "../src/core.js";
+import { recoverLegacyValidLastWords } from "../src/core.js";
+import { WordCandidateSearch } from "../src/core/candidates.js";
 import { matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
+
+/**
+ * The candidates for `text`, a phrase with ? for one forgotten word, as the word search finds them:
+ * each its phrase, the word at the place of the ?, its number and its checksum bits.
+ */
+function forgotten(text: string) {
+  const search = WordCandidateSearch.parse(text, "unknown-words");
+  const [place] = search.unknownPlaces;
+  return [...search.candidates()].map((candidate) => ({
+    position: place! + 1,
+    word: wordlist[candidate.words[place!]!]!,
+    wordIndex: candidate.words[place!]! + 1,
+    mnemonic: candidate.phrase,
+    checksumBits: candidate.checksumBits,
+  }));
+}
 
 const zeroMnemonic =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -21,7 +38,7 @@ describe("forgotten BIP39 word recovery", () => {
       for (const missingIndex of sourceWords.keys()) {
         const incomplete = [...sourceWords];
         incomplete[missingIndex] = "?";
-        const candidates = recoverMissingWord(incomplete.join(" "));
+        const candidates = forgotten(incomplete.join(" "));
 
         expect(candidates.map((candidate) => candidate.mnemonic)).toContain(mnemonic);
         expect(new Set(candidates.map((candidate) => candidate.word)).size).toBe(candidates.length);
@@ -34,7 +51,6 @@ describe("forgotten BIP39 word recovery", () => {
         }
       }
     },
-    60_000,
   );
 
   it.each([
@@ -49,12 +65,12 @@ describe("forgotten BIP39 word recovery", () => {
       const mnemonic = entropyToMnemonic(new Uint8Array(entropyLength), wordlist);
       const words = mnemonic.split(" ");
       words[words.length - 1] = "?";
-      expect(recoverMissingWord(words.join(" "))).toHaveLength(count);
+      expect(forgotten(words.join(" "))).toHaveLength(count);
     },
   );
 
   it("reports the word index and exact checksum bits for the public zero vector", () => {
-    const candidates = recoverMissingWord(zeroMnemonic.replace(/about$/u, "?"));
+    const candidates = forgotten(zeroMnemonic.replace(/about$/u, "?"));
     expect(candidates).toHaveLength(128);
     expect(candidates).toContainEqual({
       position: 12,
@@ -66,7 +82,7 @@ describe("forgotten BIP39 word recovery", () => {
   });
 
   it("identifies only the public zero vector from its BIP44 legacy address", () => {
-    const candidates = recoverMissingWord(zeroMnemonic.replace(/about$/u, "?"));
+    const candidates = forgotten(zeroMnemonic.replace(/about$/u, "?"));
     const matches = candidates.filter(
       (candidate) =>
         matchBitcoinEvidence(candidate.mnemonic, {
@@ -94,20 +110,16 @@ describe("forgotten BIP39 word recovery", () => {
     ).toBe(true);
   });
 
-  it("requires exactly one placeholder and rejects unknown known words", () => {
-    expect(() => recoverMissingWord(zeroMnemonic)).toThrow(/exactly one/u);
-    expect(() => recoverMissingWord(zeroMnemonic.replaceAll("abandon", "?"))).toThrow(
-      /exactly one/u,
-    );
+  it("rejects an unknown known word by its place", () => {
     expect(() =>
-      recoverMissingWord(zeroMnemonic.replace("abandon", "notaword").replace("about", "?")),
-    ).toThrow(/position 1/u);
+      forgotten(zeroMnemonic.replace("abandon", "notaword").replace("about", "?")),
+    ).toThrow(/place 1/u);
   });
 
   it("returns an empty set when the known words admit no checksum-valid completion", () => {
     const words = Array<string>(24).fill("abandon");
     words[4] = "?";
     words[23] = "sure";
-    expect(recoverMissingWord(words.join(" "))).toEqual([]);
+    expect(forgotten(words.join(" "))).toEqual([]);
   });
 });

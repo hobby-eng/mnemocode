@@ -23,9 +23,23 @@
 // scripts/verify-terminal-input.py drives all of this in a pseudo-terminal.
 
 import { isatty } from "node:tty";
+import { MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
+import {
+  characterSize,
+  displayWidthOf,
+  placedAfter,
+  terminalColumns,
+} from "./terminal-geometry.js";
+import { CANCELLED_MESSAGE } from "./exit-codes.js";
+import { isContinuation, STRICT_UTF8, notUtf8Text } from "./utf8.js";
+import { cursorUp, cursorRight, ERASE_BELOW } from "./terminal.js";
+import { dumbTerminal } from "./terminal-style.js";
+import { refusalMessage } from "../core/refusal.js";
 
-/** The longest answer, the 1 MiB limit of a text file (input.ts): no valid answer is that long. */
-export const MAX_ANSWER_BYTES = 1024 * 1024;
+/**
+ * The longest answer: the limit of every text input (bounded-read.ts); no valid one is that long.
+ */
+export const MAX_ANSWER_BYTES = MAX_TEXT_INPUT_BYTES;
 
 /** Raw terminal bytes that this module acts on. */
 const KEY = {
@@ -44,15 +58,45 @@ const KEY = {
   ESCAPE: 0x1b,
   CTRL_BACKSLASH: 0x1c,
   SPACE: 0x20,
+  DIGIT_0: 0x30,
+  DIGIT_9: 0x39,
+  /** The final bytes of the escape sequences of the up and down arrows (ESC [ A, ESC [ B). */
+  ARROW_UP: 0x41,
+  ARROW_DOWN: 0x42,
+  LOWER_Q: 0x71,
+  UPPER_Q: 0x51,
   DELETE: 0x7f,
 } as const;
 
-/** Thrown when Ctrl+C cancels a question; the tool then stops with exit code 130, as for SIGINT. */
+/**
+ * The bytes that readKey takes for Escape besides it: q and Q, for a keyboard layout without an
+ * Escape that is easy to reach, and Ctrl+D, the end of the input. A question that must not go back
+ * on them leaves them out (terminal-choice.ts).
+ */
+export const ESCAPE_ALIASES: ReadonlySet<number> = new Set([KEY.LOWER_Q, KEY.UPPER_Q, KEY.CTRL_D]);
+
+/**
+ * Thrown when Ctrl+C cancels a question; the tool then stops with CANCELLED_EXIT_CODE, as for
+ * SIGINT.
+ */
 export class InputCancelled extends Error {
   constructor() {
-    super("Cancelled.");
+    super(CANCELLED_MESSAGE);
   }
 }
+
+/**
+ * The warning for an answer, a file or codes that were refused, to be asked again with it: the
+ * message of the Error. InputCancelled, which is the person leaving, and anything thrown that is
+ * no Error pass through. Every question that asks again classifies a refusal with it.
+ */
+export function refusal(error: unknown): string {
+  if (error instanceof InputCancelled) throw error;
+  return refusalMessage(error);
+}
+
+/** Why an answer is refused that holds bytes of no UTF-8 character. */
+export const NOT_UTF8 = notUtf8Text("The answer");
 
 /**
  * Thrown by readLine for an answer that no question can use: longer than its limit, or not UTF-8
@@ -92,9 +136,21 @@ export function terminalsAttached(): boolean {
   return isatty(0) && isatty(2);
 }
 
-/** Whether the terminal says it cannot move the cursor or clear the screen: TERM=dumb. */
-export function dumbTerminal(): boolean {
-  return process.env.TERM === "dumb";
+// The rule is terminal-style's, which colour asks too; here for the modules that take it here.
+export { dumbTerminal };
+
+/** Whether terminals are attached that say they cannot clear the screen (TERM=dumb). */
+export function terminalTooDumb(): boolean {
+  return terminalsAttached() && dumbTerminal();
+}
+
+/** Where a secret can come from without a terminal, as the refusals of a question say it. */
+export const SECRET_SOURCE_ADVICE =
+  "read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-)";
+
+/** Why `subject`, such as "The menu", cannot be used on a terminal that says TERM=dumb. */
+export function dumbTerminalReason(subject: string): string {
+  return `${subject} needs a terminal that can clear its screen; this one says TERM=dumb.`;
 }
 
 /**
@@ -227,7 +283,7 @@ export async function withRawTerminal<T>(
   const input = process.stdin;
   if (input.isTTY !== true) {
     throw new Error(
-      "This needs a terminal on standard input. Run the command in a terminal, or read the secret from a protected local file (--mnemonic-file, --input-file or --share-file) or from standard input (-).",
+      `This needs a terminal on standard input. Run the command in a terminal, or ${SECRET_SOURCE_ADVICE}.`,
     );
   }
   let wake: (() => void) | undefined;
@@ -352,6 +408,15 @@ function suspendJob(controller: AbortController): void {
   }
 }
 
+/**
+ * The next turn of Node's event loop, after the input that waits, such as Ctrl+C read as a key:
+ * the turn that every search of the command line takes (SearchTurns). setImmediate runs once the
+ * waiting input has been handled, which the core's default, a timer, does not promise.
+ */
+export function nodeTurn(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 /** Runs `search` with the signal of watchForCtrlC and stops watching when it ends or fails. */
 export async function withCtrlCWatch<T>(search: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const watch = watchForCtrlC();
@@ -446,8 +511,9 @@ export async function readKey(next: NextByte, moreWithin?: MoreWithin): Promise<
   if (byte === undefined) return { kind: "back" };
   if (byte === KEY.CTRL_C) throw new InputCancelled();
   if (byte === KEY.CARRIAGE_RETURN || byte === KEY.LINE_FEED) return { kind: "enter" };
-  if (byte >= 0x30 && byte <= 0x39) return { kind: "digit", digit: byte - 0x30 };
-  if (byte === 0x71 || byte === 0x51 || byte === KEY.CTRL_D) return { kind: "back" };
+  if (byte >= KEY.DIGIT_0 && byte <= KEY.DIGIT_9)
+    return { kind: "digit", digit: byte - KEY.DIGIT_0 };
+  if (ESCAPE_ALIASES.has(byte)) return { kind: "back" };
   if (byte !== KEY.ESCAPE) return { kind: "other" };
   if (more !== undefined && !(await more(ESCAPE_DELAY_MS))) return { kind: "back" };
   const sequence = await readEscapeSequence(take, more);
@@ -458,14 +524,16 @@ export async function readKey(next: NextByte, moreWithin?: MoreWithin): Promise<
   }
   // Only an arrow key without parameters counts.
   if (sequence.kind === "alt" || sequence.parameters !== "") return { kind: "other" };
-  if (sequence.final === 0x41) return { kind: "up" };
-  if (sequence.final === 0x42) return { kind: "down" };
+  if (sequence.final === KEY.ARROW_UP) return { kind: "up" };
+  if (sequence.final === KEY.ARROW_DOWN) return { kind: "down" };
   return { kind: "other" };
 }
 
 /** How readLine reads an answer. */
 export interface LineOptions {
-  /** Shows the answer as it is typed and lets the keys at the top edit it; otherwise nothing shows. */
+  /**
+   * Shows the answer as it is typed and lets the keys at the top edit it; otherwise nothing shows.
+   */
   readonly echo: boolean;
   readonly limit?: number;
   /** Tells Escape alone from the start of a key's escape sequence. */
@@ -486,8 +554,15 @@ export interface LineOptions {
    * follow at once (PASTE_GAP_MS) is inside a paste; it needs `moreWithin`. Without this option,
    * or for a line break typed at the end, the line ends there.
    */
-  readonly pastedLineBreak?: " " | ";";
+  readonly pastedLineBreak?: PastedLineBreak;
 }
+
+/**
+ * What a line break inside a paste becomes: a space, or ";", the separator between shares
+ * (SHARE_SEPARATOR, which this module does not import, to stay free of the share modules; a
+ * changed separator no longer fits this type where it is passed).
+ */
+export type PastedLineBreak = " " | ";";
 
 /**
  * How long after an Escape alone, which a question for a secret ignores, the rest of a key's
@@ -706,51 +781,14 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
       // Any other control character is left out: shown, it would move the cursor.
     }
     moveToEnd();
-    return new TextDecoder("utf-8", { fatal: true }).decode(line.subarray(0, length));
+    return STRICT_UTF8.decode(line.subarray(0, length));
   } catch (error) {
-    if (error instanceof TypeError) throw new UnusableAnswer("The answer is not valid UTF-8 text.");
+    if (error instanceof TypeError) throw new UnusableAnswer(NOT_UTF8);
     throw error;
   } finally {
     line.fill(0);
     readAgain.fill(0);
   }
-}
-
-/** Terminal width when the terminal does not say. */
-const DEFAULT_COLUMNS = 80;
-
-/** The width of the terminal on standard error, at which a visible answer wraps. */
-export function terminalColumns(): number {
-  const columns = process.stderr.columns;
-  return columns !== undefined && columns > 0 ? columns : DEFAULT_COLUMNS;
-}
-
-/** Terminal height when the terminal does not say: a VT100's 24 rows. */
-const DEFAULT_ROWS = 24;
-
-/** The height of the terminal on standard error, read anew each time, as its width. */
-export function terminalRows(): number {
-  const rows = process.stderr.rows;
-  return rows !== undefined && rows > 0 ? rows : DEFAULT_ROWS;
-}
-
-/** A tab moves on to the next of the stops that terminals set every 8 columns. */
-const TAB_STOP = 8;
-
-/**
- * The rows that one line of plain output, such as a row of a result table, takes on a terminal
- * `columns` wide: each tab moves on to the next tab stop, then the line wraps (rowsOfText). The
- * stops are counted along the whole line, as they fall on a terminal whose width is a multiple of
- * eight, such as 80; elsewhere a tab after the first row may be a few columns off.
- */
-export function rowsOfOutputLine(line: string, columns: number = terminalColumns()): number {
-  const [first = "", ...rest] = line.split("\t");
-  let shown = first;
-  for (const part of rest) {
-    const toStop = TAB_STOP - (displayWidth(shown) % TAB_STOP);
-    shown += `${" ".repeat(toStop)}${part}`;
-  }
-  return rowsOfText(shown, columns);
 }
 
 /**
@@ -803,18 +841,14 @@ class ShownLine {
       return;
     }
     const out = process.stderr;
-    out.write(
-      `${this.cursorRow > 0 ? `\x1b[${this.cursorRow}A` : ""}\r${this.right(this.start)}\x1b[J`,
-    );
+    out.write(`${cursorUp(this.cursorRow)}\r${cursorRight(this.start)}${ERASE_BELOW}`);
     out.write(this.line.subarray(0, length));
     this.countedBytes = 0;
     this.countedEnd = this.start;
     const endRow = this.settle(this.endOf(length));
     const target = this.cellOf(cursor, length);
     const row = Math.floor(target / this.columns);
-    out.write(
-      `${endRow > row ? `\x1b[${endRow - row}A` : ""}\r${this.right(target % this.columns)}`,
-    );
+    out.write(`${cursorUp(endRow - row)}\r${cursorRight(target % this.columns)}`);
     this.cursorRow = row;
   }
 
@@ -860,92 +894,19 @@ class ShownLine {
     if (offset > 0 && offset % this.columns === 0) process.stderr.write("\r\n");
     return Math.floor(offset / this.columns);
   }
-
-  private right(columns: number): string {
-    return columns > 0 ? `\x1b[${columns}C` : "";
-  }
-}
-
-/**
- * Where a terminal `columns` wide puts the cursor after the UTF-8 characters between `from` and
- * `to`, written from `offset`; offsets count cells from the start of a row, row after row. A
- * character goes at the cursor, except a wide one at the last column of a row, which does not fit
- * there: xterm, VTE, Konsole, Windows Terminal and tmux leave that column empty and put it whole
- * at the start of the next row. An offset at a row's end (a multiple of `columns`) is where the
- * next character goes, at the start of the next row.
- */
-function placedAfter(
-  line: Buffer,
-  from: number,
-  to: number,
-  offset: number,
-  columns: number,
-): number {
-  let end = offset;
-  for (let index = from; index < to;) {
-    const size = characterSize(line[index]!);
-    if (index + size > to) break;
-    const width = codePointWidth(codePointAt(line, index, size));
-    const column = end % columns;
-    if (column > 0 && column + width > columns) end += columns - column;
-    end += width;
-    index += size;
-  }
-  return end;
-}
-
-/** Placement of `text` from `offset` on a terminal `columns` wide (placedAfter). */
-function placedTextAfter(text: string, offset: number, columns: number): number {
-  const bytes = Buffer.from(text, "utf8");
-  return placedAfter(bytes, 0, bytes.length, offset, columns);
-}
-
-/**
- * The rows that one line of `text` takes on a terminal `columns` wide when it starts at the left
- * edge, wrapping a wide character whole as terminals do (placedAfter); an empty line takes one.
- * For lines without colour codes; count a list's rows with it at each redraw.
- */
-export function rowsOfText(text: string, columns: number = terminalColumns()): number {
-  return Math.max(1, Math.ceil(placedTextAfter(text, 0, columns) / columns));
-}
-
-/**
- * The row of the cursor after a visible answer that readLine showed after a prompt of
- * `promptWidth` columns, counted from the first row of the prompt, as readLine leaves it at Enter
- * or Escape: just after the answer's end, on the next row when it ends at the right edge. The
- * prompt is taken to hold narrow characters only, as every prompt of MnemoCode does.
- */
-export function answerEndRow(
-  promptWidth: number,
-  answer: string,
-  columns: number = terminalColumns(),
-): number {
-  const start = promptWidth % columns;
-  return (
-    Math.floor(promptWidth / columns) +
-    Math.floor(placedTextAfter(answer, start, columns) / columns)
-  );
-}
-
-const CONTINUATION_MASK = 0b1100_0000;
-const CONTINUATION = 0b1000_0000;
-
-/** The bytes of the UTF-8 character that starts with `first` (RFC 3629, section 3). */
-function characterSize(first: number): number {
-  return first < 0x80 ? 1 : first >= 0xf0 ? 4 : first >= 0xe0 ? 3 : 2;
 }
 
 /** Where the UTF-8 character before `position` starts: its continuation bytes, then its first. */
 function previousCharacter(line: Buffer, position: number): number {
   let start = position;
-  while (start > 0 && (line[start - 1]! & CONTINUATION_MASK) === CONTINUATION) start -= 1;
+  while (start > 0 && isContinuation(line[start - 1]!)) start -= 1;
   return Math.max(0, start - 1);
 }
 
 /** Where the UTF-8 character at `position` ends. */
 function nextCharacter(line: Buffer, position: number, length: number): number {
   let end = position + 1;
-  while (end < length && (line[end]! & CONTINUATION_MASK) === CONTINUATION) end += 1;
+  while (end < length && isContinuation(line[end]!)) end += 1;
   return Math.min(end, length);
 }
 
@@ -965,52 +926,9 @@ function nextWord(line: Buffer, position: number, length: number): number {
   return end;
 }
 
-/**
- * Columns that East Asian wide characters take, such as the Chinese words of BIP39 (Unicode
- * Standard Annex 11: the main wide ranges).
- */
-const WIDE_RANGES: readonly (readonly [number, number])[] = [
-  [0x1100, 0x115f],
-  [0x2e80, 0xa4cf],
-  [0xac00, 0xd7a3],
-  [0xf900, 0xfaff],
-  [0xfe30, 0xfe4f],
-  [0xff00, 0xff60],
-  [0xffe0, 0xffe6],
-  [0x20000, 0x3fffd],
-];
-
-function codePointWidth(point: number): number {
-  return WIDE_RANGES.some(([first, last]) => point >= first && point <= last) ? 2 : 1;
-}
-
-/** The code point of the UTF-8 character of `size` bytes at `index` (RFC 3629, section 3). */
-function codePointAt(line: Buffer, index: number, size: number): number {
-  const first = line[index]!;
-  let point = size === 1 ? first : first & (0xff >> (size + 1));
-  for (let part = 1; part < size; part += 1) point = (point << 6) | (line[index + part]! & 0x3f);
-  return point;
-}
-
-/** The columns that the UTF-8 text between `from` and `to` takes on a terminal. */
-function displayWidthOf(line: Buffer, from: number, to: number): number {
-  let width = 0;
-  for (let index = from; index < to;) {
-    const size = characterSize(line[index]!);
-    width += codePointWidth(codePointAt(line, index, size));
-    index += size;
-  }
-  return width;
-}
-
-/** The columns that a prompt takes on a terminal. */
-export function displayWidth(text: string): number {
-  return displayWidthOf(Buffer.from(text, "utf8"), 0, Buffer.byteLength(text, "utf8"));
-}
-
 /** Whether the bytes up to `length` end with a complete UTF-8 character. */
 function isCharacterEnd(line: Buffer, length: number): boolean {
   let start = length - 1;
-  while (start > 0 && (line[start]! & CONTINUATION_MASK) === CONTINUATION) start -= 1;
+  while (start > 0 && isContinuation(line[start]!)) start -= 1;
   return length - start === characterSize(line[start]!);
 }

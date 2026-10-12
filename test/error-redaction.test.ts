@@ -20,7 +20,8 @@ describe("Errors identify the position without echoing unrecognized input", () =
   );
 
   it("does not echo an unmapped Unicode value", () => {
-    expect(() => parseInput("DEAD", "unicode")).toThrow("Unicode code point at position 1");
+    // The one message of a Unicode code that names no word (S011): its place, never its value.
+    expect(() => parseInput("DEAD", "unicode")).toThrow("Unicode code 1 is not a BIP39 word.");
     try {
       parseInput("DEAD", "unicode");
     } catch (error) {

@@ -114,7 +114,7 @@ import {
   startRecord,
   waitForEnter,
 } from "../src/cli/terminal-choice.js";
-import { displayWidth } from "../src/cli/terminal-input.js";
+import { displayWidth } from "../src/cli/terminal-geometry.js";
 import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
 
 const ESCAPE = "\x1b";
@@ -558,7 +558,7 @@ describe("a typed answer leaves only its line in the record of answers", () => {
 
 describe("going back from an entry of the start menu", () => {
   const MENU_QUESTION = "What do you want to do?";
-  // Narrower than LINE_WIDTH, so that lists, prompts and lines of the record wrap.
+  // Narrower than TEXT_WIDTH, so that lists, prompts and lines of the record wrap.
   const COLUMNS = 40;
   const SHARE_COUNT = "How many shares in all? (2 to 16)";
 

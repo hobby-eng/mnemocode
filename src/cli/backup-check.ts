@@ -11,6 +11,7 @@
 // place, and the person chooses to type only that part again, to see the result again, or to
 // stop; the other parts are kept. --backup-check yes or no answers whether to check at all.
 
+import type { SplitMode } from "../core/masking.js";
 import {
   EncodedBackupCheck,
   KeptShares,
@@ -21,22 +22,22 @@ import {
   type BackupVerdict,
   type EncodedOriginal,
   type RestoredShares,
-  type WrittenCodes,
+  nextFinding,
+  type PartChecks,
 } from "../core/backup-check.js";
 import type { DateShiftDate } from "../core.js";
 import { nodeSharePlatform } from "../sskr/share-platform-node.js";
 import { assertSskrSelfTest } from "../sskr/self-test.js";
-import { value, type ParsedArguments } from "./arguments.js";
-import { askAfterFailure, askSecretUntil } from "./ask.js";
+import { type ParsedArguments, choiceOption } from "./arguments.js";
+import { askAfterFailure, askSecretUntil, WHAT_NOW } from "./ask.js";
 import { askDates } from "./date-search.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { choose } from "./terminal-choice.js";
-import { dropTypedAhead } from "./terminal-input.js";
-import { terminalNotice } from "./terminal.js";
-
-/** Clears the private screen and moves to its top left (VT100). */
-const CLEAR_SCREEN = "\x1b[2J\x1b[H";
+import { CLEAR_SCREEN, terminalNotice } from "./terminal.js";
+import { SHARE_SEPARATOR } from "../sskr/share-input.js";
+import { SHARE_ANSWER_HINT } from "./share-repair.js";
+import { refusalMessage } from "../core/refusal.js";
 
 /** A seed phrase typed in place of the shares is sent to the menu's entry that decodes it. */
 const SHARE_CHECK_TEXTS = { decodeEntry: MENU_ENTRY_NAMES.decode.label };
@@ -56,7 +57,7 @@ export type CheckResult = BackupVerdict;
 export async function checkShareBackup(
   original: string,
   typed: string,
-  mode: "direct" | "seedshift",
+  mode: SplitMode,
   dateLine: string,
 ): Promise<CheckResult> {
   try {
@@ -85,7 +86,7 @@ type AfterMismatch = "again" | "show" | "stop";
 /** Says what does not fit, in one line, and asks what to do. */
 async function afterMismatch(found: BackupFinding): Promise<AfterMismatch> {
   terminalNotice(found.message, "warning");
-  return askAfterFailure("What now?", [
+  return askAfterFailure(WHAT_NOW, [
     { label: AGAIN[found.part], value: "again" },
     { label: "Show the result again", value: "show" },
     { label: "Stop checking", value: "stop" },
@@ -106,28 +107,40 @@ async function askBackupDates(wordCount: number): Promise<readonly DateShiftDate
   return (await askDates({ wordCount, patterns: false })).known;
 }
 
-/** One check of an encoded backup: the codes, then the dates, each typed again until they fit. */
-async function checkCodes(check: EncodedBackupCheck): Promise<CheckEnd> {
-  let codes: WrittenCodes | undefined;
+/**
+ * One check of a backup in the library's order (nextFinding): what was written down, asked with
+ * `ask`, then the dates, each compared at once and typed again, as the person chooses after a
+ * mismatch, until they fit; what still fits is kept.
+ */
+async function runCheck<Written>(
+  steps: PartChecks<Written>,
+  ask: () => Promise<Written>,
+): Promise<CheckEnd> {
+  let written: Written | undefined;
   let dates: readonly DateShiftDate[] | undefined;
   for (;;) {
-    codes ??= await askSecretUntil(
-      "Your backup, as written down:",
-      (typed) => check.readCodes(typed),
-      { what: "the codes you wrote down" },
-    );
-    let found = check.compareCodes(codes);
-    if (found === undefined && check.dated) {
-      dates ??= await askBackupDates(check.wordCount);
-      found = check.compareDates(dates);
+    written ??= await ask();
+    let found =
+      dates === undefined ? nextFinding(steps, written) : nextFinding(steps, written, dates);
+    if (found === "dates") {
+      dates = await askBackupDates(steps.wordCount);
+      found = nextFinding(steps, written, dates);
     }
-    found ??= check.compareRestored(codes, dates ?? []);
     if (found === undefined) return restores();
     const next = await afterMismatch(found);
     if (next !== "again") return next === "show" ? "show" : "done";
     if (found.part === "dates") dates = undefined;
-    else codes = undefined;
+    else written = undefined;
   }
+}
+
+/** One check of an encoded backup: the codes, then the dates, each typed again until they fit. */
+function checkCodes(check: EncodedBackupCheck): Promise<CheckEnd> {
+  return runCheck(check.steps, () =>
+    askSecretUntil("Your backup, as written down:", (typed) => check.readCodes(typed), {
+      what: "the codes you wrote down",
+    }),
+  );
 }
 
 /** What a check asks for, in the note of the question that offers it. */
@@ -139,16 +152,16 @@ interface CheckedParts {
 }
 
 /** The answer of --backup-check to "Check the backup now?"; undefined asks it. */
-export type BackupCheckAnswer = "yes" | "no" | undefined;
+const BACKUP_CHECK_ANSWERS = Object.freeze(["yes", "no"] as const);
+export type BackupCheckAnswer = (typeof BACKUP_CHECK_ANSWERS)[number] | undefined;
 
 /**
  * --backup-check, checked before any secret is asked: it answers a question of the private screen,
  * and a record with a replaced last word has no check to answer.
  */
 export function backupCheckAnswer(args: ParsedArguments): BackupCheckAnswer {
-  const given = value(args, "backup-check");
+  const given = choiceOption(args, "backup-check", BACKUP_CHECK_ANSWERS);
   if (given === undefined) return undefined;
-  if (given !== "yes" && given !== "no") throw new Error("--backup-check must be yes or no.");
   if (args["ask-secrets"] !== true)
     throw new Error("--backup-check answers a question of --ask-secrets, after the result.");
   if (args["legacy-valid-last-word"] === true)
@@ -199,7 +212,6 @@ export async function offerEncodedCheck(
 async function askToCheck(parts: CheckedParts): Promise<boolean> {
   console.error("");
   // Only a key pressed for this question answers it, not an Enter typed during a long save.
-  await dropTypedAhead();
   const wanted = await choose(
     "Check the backup now?",
     [
@@ -225,9 +237,9 @@ async function askToCheck(parts: CheckedParts): Promise<boolean> {
 async function askShares(check: ShareBackupCheck, problem: string | undefined): Promise<string[]> {
   if (problem !== undefined) terminalNotice(problem, "warning");
   const shares = await askSecretUntil(
-    `${check.threshold} shares as written down (separate with ;, ? for each unreadable code or digit):`,
+    `${check.threshold} shares as written down (${SHARE_ANSWER_HINT}):`,
     (answer) => check.sharesOf(answer),
-    { what: "the shares", pastedLineBreak: ";" },
+    { what: "the shares", pastedLineBreak: SHARE_SEPARATOR },
   );
   for (;;) {
     const place = shares.findIndex(
@@ -258,8 +270,7 @@ async function askRestoredShares(check: ShareBackupCheck): Promise<RestoredShare
     try {
       return await check.restore(kept);
     } catch (error) {
-      if (!(error instanceof Error)) throw error;
-      problem = error.message;
+      problem = refusalMessage(error);
     }
   }
 }
@@ -268,22 +279,7 @@ async function askRestoredShares(check: ShareBackupCheck): Promise<RestoredShare
 async function checkShares(check: ShareBackupCheck): Promise<CheckEnd> {
   // The split ran it before the shares were shown; a check on its own runs it too.
   await assertSskrSelfTest();
-  let restored: RestoredShares | undefined;
-  let dates: readonly DateShiftDate[] | undefined;
-  for (;;) {
-    restored ??= await askRestoredShares(check);
-    let found = check.compareShares(restored);
-    if (found === undefined && check.dated) {
-      dates ??= await askBackupDates(check.wordCount);
-      found = check.compareDates(restored, dates);
-    }
-    found ??= check.compareChecked(restored);
-    if (found === undefined) return restores();
-    const next = await afterMismatch(found);
-    if (next !== "again") return next === "show" ? "show" : "done";
-    if (found.part === "dates") dates = undefined;
-    else restored = undefined;
-  }
+  return runCheck(check.steps, () => askRestoredShares(check));
 }
 
 /**
@@ -292,7 +288,7 @@ async function checkShares(check: ShareBackupCheck): Promise<CheckEnd> {
  */
 export async function offerShareCheck(
   original: string,
-  mode: "direct" | "seedshift",
+  mode: SplitMode,
   threshold: number,
   show: () => void,
   answer: BackupCheckAnswer,

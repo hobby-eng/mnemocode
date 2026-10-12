@@ -101,7 +101,6 @@ describe("Candidate searches", () => {
       for (const phrase of phrases.slice(0, 300))
         expect(validateMnemonic(phrase, wordlist)).toBe(true);
     },
-    60_000,
   );
 
   it("checks the checksum as @scure/bip39 does, for every length", () => {
@@ -304,7 +303,6 @@ describe("Candidate file encryption", () => {
         : { identity: vectors.age.identity };
       expect(await decryptCandidates(fromHex(file), key)).toEqual(plain);
     },
-    30_000,
   );
 
   it.each(vectors.age.refuse.map((file) => [file.name, file.file] as const))(
@@ -317,7 +315,6 @@ describe("Candidate file encryption", () => {
         /exactly one|work factor/u,
       );
     },
-    30_000,
   );
 
   it("refuses a post-quantum file even with the key that opens it", async () => {
@@ -421,5 +418,5 @@ describe("Candidate file encryption", () => {
     await expect(decryptCandidates(file, session)).rejects.toThrow(missing);
     const locked = await new PassphraseProtection(LIST_PASSPHRASE).protect(plain);
     expect(await decryptCandidates(locked, { passphrase: LIST_PASSPHRASE })).toEqual(plain);
-  }, 30_000);
+  });
 });

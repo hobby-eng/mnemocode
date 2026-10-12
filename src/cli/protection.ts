@@ -19,11 +19,12 @@
 
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { constants } from "node:os";
+import { exitCodeOfSignal } from "./exit-codes.js";
 import { isSea } from "node:sea";
 import { type ParsedArguments } from "./arguments.js";
-import { SAVED_OPTIONS } from "./output-options.js";
+import { DRAWING_OPTIONS, SAVED_OPTIONS } from "./output-options.js";
 import protectionFlags from "./protection-flags.json" with { type: "json" };
+import { describeError } from "../core/refusal.js";
 
 /**
  * The Node.js options that a start outside the permission model runs again with
@@ -56,7 +57,7 @@ async function exitCodeOf(child: ReturnType<typeof spawn>): Promise<number> {
   try {
     const [code, signal] = (await once(child, "exit")) as [number | null, NodeJS.Signals | null];
     if (code !== null) return code;
-    return 128 + (signal === null ? 0 : (constants.signals[signal] ?? 0));
+    return exitCodeOfSignal(signal);
   } finally {
     process.off("SIGINT", ignore);
   }
@@ -142,7 +143,7 @@ export async function hardenProcess(): Promise<void> {
     }
     coreDumpsOff = true;
   } catch (error) {
-    hardeningFailure = error instanceof Error ? error.message : String(error);
+    hardeningFailure = describeError(error);
   } finally {
     if (underProtection()) process.permission!.drop("ffi");
   }
@@ -158,25 +159,24 @@ export function assertProtected(): void {
     );
 }
 
-/** Options that draw images with pdftocairo. */
-const DRAWING_OPTIONS = ["images-dir", "image-format"] as const;
-
-/** What a command line needs beyond reading: writing files, and running pdftocairo. */
+/**
+ * What a command line needs beyond reading: writing files, which a command that `alwaysWrites`
+ * does whatever its options say (the self-test, to a temporary folder), and running pdftocairo.
+ */
 export function neededPermissions(
-  command: string,
+  alwaysWrites: boolean,
   args: ParsedArguments,
 ): { readonly writes: boolean; readonly runsPrograms: boolean } {
   return {
-    // The self-test writes its cards to a temporary folder.
-    writes: command === "self-test" || SAVED_OPTIONS.some((key) => args[key] !== undefined),
+    writes: alwaysWrites || SAVED_OPTIONS.some((key) => args[key] !== undefined),
     runsPrograms: DRAWING_OPTIONS.some((key) => args[key] !== undefined),
   };
 }
 
-/** Gives up what `command` does not need (neededPermissions); it cannot be taken back. */
-export function dropUnneeded(command: string, args: ParsedArguments): void {
+/** Gives up what a command does not need (neededPermissions); it cannot be taken back. */
+export function dropUnneeded(alwaysWrites: boolean, args: ParsedArguments): void {
   if (!underProtection()) return;
-  const needed = neededPermissions(command, args);
+  const needed = neededPermissions(alwaysWrites, args);
   if (!needed.runsPrograms) process.permission!.drop("child");
   if (!needed.writes) process.permission!.drop("fs.write");
 }

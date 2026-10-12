@@ -38,11 +38,10 @@ import {
   askSecretUntil,
   askValueUntil,
   askWalletEvidence,
-  assertWalletPlaceUsed,
   droppedPath,
-  walletPlaceOf,
 } from "../src/cli/ask.js";
-import { askSecret } from "../src/cli/input.js";
+import { assertWalletPlaceUsed, walletPlaceOf } from "../src/cli/bitcoin-options.js";
+import { LAST_NORMAL_INDEX } from "../src/core/address-scan.js";
 import { InputCancelled } from "../src/cli/terminal-input.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
 
@@ -225,10 +224,10 @@ describe("questions asked again until the answer can be used", () => {
     expect(notices).toEqual(["The answer is not valid UTF-8 text."]);
   });
 
-  it("keeps askSecret as it was called, on the same reader", async () => {
+  it("asks a secret again after an empty answer and trims the answer", async () => {
     at("Seed phrase:", "\r");
     at("Seed phrase:", `  ${TEST_PHRASE}  \r`);
-    expect(await askSecret("Seed phrase:")).toBe(TEST_PHRASE);
+    expect(await askSecretUntil("Seed phrase:", (answer) => answer)).toBe(TEST_PHRASE);
     expect(notices).toEqual(["Type an answer, or press Ctrl+C to stop."]);
   });
 
@@ -316,6 +315,25 @@ describe("questions asked again until the answer can be used", () => {
     expect(await askWalletEvidence({ optional: true })).toEqual({ kind: "back" });
     terminal.choices = ["none"];
     expect(await askWalletEvidence({ optional: true })).toEqual({ kind: "none" });
+  });
+
+  it("offers a count that fits at the last index of a branch (AUD-012-UI001)", async () => {
+    const location = {
+      network: "mainnet" as const,
+      account: 0,
+      branch: 0,
+      index: LAST_NORMAL_INDEX,
+    };
+    terminal.choices = ["address"];
+    at(
+      `Bitcoin address (one of the addresses from m/.../0'/0/${LAST_NORMAL_INDEX}):`,
+      `${FIRST_ADDRESS}\r`,
+    );
+    at(`Compare with how many addresses from m/.../0'/0/${LAST_NORMAL_INDEX} (Enter: 1):`, "\r");
+    expect(
+      await askWalletEvidence({ optional: false, place: { location, profiles: bitcoinProfiles } }),
+    ).toMatchObject({ evidence: { kind: "address", location, addresses: 1 } });
+    expect(notices).toEqual([]);
   });
 
   it("looks for another wallet where the one given was, and refuses such options without it", async () => {

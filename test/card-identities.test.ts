@@ -13,6 +13,7 @@ import {
   sectorRoles,
   type CompanySector,
 } from "../src/export/card-identities.js";
+import { nodeRenderPlatform } from "../src/export/platform-node.js";
 
 const CARD_WIDTH_MM = 90;
 const longest = (values: readonly string[]) => [...values].sort((a, b) => b.length - a.length)[0]!;
@@ -28,7 +29,11 @@ describe("invented card details", () => {
     for (const sector of Object.keys(employers) as CompanySector[]) {
       const role = longest([...sectorRoles[sector], ...commonRoles]);
       for (const company of employers[sector]) {
-        const profile = createCardIdentity({ name, company, role }, sector);
+        const profile = createCardIdentity(
+          nodeRenderPlatform.randomInt,
+          { name, company, role },
+          sector,
+        );
         // The mixed template shows every design, so every employer meets every design.
         for (const style of businessStyles)
           for (const field of businessFields(style, profile))
@@ -49,14 +54,20 @@ describe("invented card details", () => {
   });
 
   it("end in the reserved example domain and shorten a long company name", () => {
-    const identity = createCardIdentity({ company: "Northern Harbour Business Services" });
+    const identity = createCardIdentity(nodeRenderPlatform.randomInt, {
+      company: "Northern Harbour Business Services",
+    });
     expect(identity.website).toBe("northernharbour.example");
     expect(identity.email).toBe("contact@northernharbour.example");
     // One long word has no shorter form, so it is cut.
-    expect(createCardIdentity({ company: "Abcdefghijklmnopqrstuvwxyz" }).website).toBe(
-      "abcdefghijklmnopqr.example",
-    );
+    expect(
+      createCardIdentity(nodeRenderPlatform.randomInt, { company: "Abcdefghijklmnopqrstuvwxyz" })
+        .website,
+    ).toBe("abcdefghijklmnopqr.example");
     // A supplied address is printed as given.
-    expect(createCardIdentity({ company: "Any", website: "any.org" }).website).toBe("any.org");
+    expect(
+      createCardIdentity(nodeRenderPlatform.randomInt, { company: "Any", website: "any.org" })
+        .website,
+    ).toBe("any.org");
   });
 });

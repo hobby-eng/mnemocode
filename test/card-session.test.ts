@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createCardSession } from "../src/cards.js";
+import { nodeRenderPlatform } from "../src/export/platform-node.js";
 
 describe("card session", () => {
   it("gives the same invented details for every export of one session", () => {
-    const session = createCardSession();
+    const session = createCardSession(nodeRenderPlatform.randomInt);
     const first = session.settingsFor("business-it");
     for (let attempt = 0; attempt < 20; attempt += 1)
       expect(session.settingsFor("business-it")).toEqual(first);
@@ -18,14 +19,16 @@ describe("card session", () => {
   it("starts again with a new session", () => {
     const seen = new Set<string>();
     for (let attempt = 0; attempt < 40; attempt += 1) {
-      const { profile, presentation } = createCardSession().settingsFor("business-it");
+      const { profile, presentation } = createCardSession(nodeRenderPlatform.randomInt).settingsFor(
+        "business-it",
+      );
       seen.add(`${profile.name}|${profile.company}|${presentation.studioName}`);
     }
     expect(seen.size).toBeGreaterThan(1);
   });
 
   it("prints what the user supplies and keeps the rest", () => {
-    const session = createCardSession();
+    const session = createCardSession(nodeRenderPlatform.randomInt);
     const invented = session.settingsFor("business-it");
     const own = session.settingsFor(
       "business-it",

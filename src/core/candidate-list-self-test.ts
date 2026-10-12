@@ -7,7 +7,12 @@
 //
 // Host-neutral: it imports only core/candidate-list.ts and core/self-test-check.ts.
 
-import { decodeCandidateList, encodeCandidateList, padmeLength } from "./candidate-list.js";
+import {
+  decodeCandidateList,
+  encodeCandidateList,
+  OpenedCandidateList,
+  padmeLength,
+} from "./candidate-list.js";
 import { bytesOfHex, expectRefused, expectSame, hexOfBytes } from "./self-test-check.js";
 
 /**
@@ -22,6 +27,24 @@ export const THREE_PHRASES_ENTROPY = [
 ] as const;
 export const THREE_PHRASES_LIST =
   "4d4e434c01001000000003000000000000000000000000000000007f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7fffffffffffffffffffffffffffffffff98854aa000";
+
+/**
+ * vectors/candidates-v1.json, "a passphrase for all": the three phrases with the list passphrase
+ * TREZOR, which every record takes.
+ */
+const LIST_PASSPHRASE_LIST =
+  "4d4e434c0101100000000300065452455a4f52000000000000000000000000000000007f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7fffffffffffffffffffffffffffffffff969c8d9700";
+const LIST_PASSPHRASE = "TREZOR";
+
+/**
+ * vectors/candidates-v1.json, "passphrases of their own, the second falling back to the one for
+ * all": the list passphrase TREZOR, the first and third records with passphrases of their own, the
+ * second with an empty field; and the passphrase each candidate is checked with by the rule of
+ * docs/CANDIDATES.md, written by hand from that rule.
+ */
+const OWN_PASSPHRASES_LIST =
+  "4d4e434c0103100000000300065452455a4f5200000000000000000000000000000000000a70c3a4737377c3b672647f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f0000ffffffffffffffffffffffffffffffff0011efbd90efbd81efbd93efbd9320f09f9491801cb406";
+const OWN_PASSPHRASES = ["pässwörd", "TREZOR", "ｐａｓｓ 🔑"] as const;
 
 /** Lists that a reader refuses (vectors/candidates-v1.json, "invalidLists"), and why. */
 const REFUSED_LISTS: readonly (readonly [string, string, RegExp])[] = [
@@ -63,4 +86,24 @@ export function checkCandidateListStartup(): void {
     expectSame(padmeLength(length), padded, `Padmé length of ${length}`);
   for (const [name, bytes, because] of REFUSED_LISTS)
     expectRefused(() => decodeCandidateList(bytesOfHex(bytes)), because, `A list with ${name}`);
+  expectSame(
+    hexOfBytes(encodeCandidateList({ passphrase: LIST_PASSPHRASE, records })),
+    LIST_PASSPHRASE_LIST,
+    "Candidate list with a passphrase for all",
+  );
+  expectSame(
+    decodeCandidateList(bytesOfHex(LIST_PASSPHRASE_LIST)).passphrase,
+    LIST_PASSPHRASE,
+    "Candidate list passphrase for all",
+  );
+  const opened = OpenedCandidateList.fromBytes(bytesOfHex(OWN_PASSPHRASES_LIST));
+  expectSame(
+    opened
+      .candidates()
+      .map((candidate) => candidate.passphrase)
+      .join("|"),
+    OWN_PASSPHRASES.join("|"),
+    "Candidate list passphrase of each record",
+  );
+  opened.wipe();
 }

@@ -2,27 +2,26 @@
 // Litecoin also SegWit in Bech32 or Bech32m (BIP173, BIP350). Bitcoin, Litecoin, Dogecoin and the
 // transparent addresses of Zcash.
 //
-// Host-neutral: it imports only base58.ts, coin.ts, address-types.ts, taproot.ts and @scure/base
-// (test/portable-modules.test.ts).
+// Host-neutral, with @scure/base (test/portable-modules.test.ts).
 
 import { bech32, bech32m } from "@scure/base";
 import { HASH160_BYTES, type AddressType } from "./address-types.js";
 import { Base58Coin, type Base58CoinDescription } from "./base58.js";
 import {
   asciiLowercase,
-  DAMAGED,
-  invalidAddress,
   startsWithAny,
   type CoinAddress,
   type CoinRules,
+  unreadableAddress,
 } from "./coin.js";
 import { nestedSegwitHash, taprootOutputKey, X_ONLY_KEY_BYTES } from "./taproot.js";
+import { Bech32Prefixes, BECH32_SEPARATOR } from "./bech32.js";
+import { BITCOIN_P2PKH_VERSION, BITCOIN_P2SH_VERSION } from "./bitcoin-versions.js";
 
 /** The human-readable parts of a coin's SegWit addresses, and whether it has Taproot. */
 interface SegwitPrefixes {
-  readonly mainnet: string;
-  /** Bitcoin's testnet and signet; a coin without one leaves it out. */
-  readonly testnet?: string;
+  /** Its SegWit strings' prefixes: Bitcoin's testnet and signet too, a coin without one not. */
+  readonly prefixes: Bech32Prefixes;
   readonly taproot: boolean;
 }
 
@@ -42,7 +41,8 @@ const SEGWIT_RULES: CoinRules = {
   commitments: { "p2sh-p2wpkh": nestedSegwitHash, p2tr: taprootOutputKey },
   purposes: { "p2sh-p2wpkh": 49, p2wpkh: 84, p2tr: 86 },
 };
-const LEGACY_PURPOSE = 44;
+/** The characters of a P2WPKH address besides its prefix: separator, version, key hash, checksum. */
+const P2WPKH_CHARACTERS_AFTER_PREFIX = 40;
 const TYPE_NAMES: Readonly<Partial<Record<AddressType, string>>> = {
   p2pkh: "legacy",
   "p2sh-p2wpkh": "nested SegWit",
@@ -59,47 +59,40 @@ class SegwitCoin extends Base58Coin {
     this.#segwit = description.segwit;
   }
 
-  protected override get ownPrefixes(): readonly string[] {
-    const { mainnet, testnet } = this.#segwit;
-    return [mainnet, ...(testnet === undefined ? [] : [testnet])].map((prefix) => `${prefix}1`);
+  /** The SegWit forms of one key: ltc1q with 43 characters, and on Bitcoin bc1p for Taproot. */
+  protected override get singleKeyForms(): string {
+    const { prefixes, taproot } = this.#segwit;
+    const start = `${prefixes.mainnet}${BECH32_SEPARATOR}`;
+    const keyHash = `${start}q with ${prefixes.mainnet.length + P2WPKH_CHARACTERS_AFTER_PREFIX} characters`;
+    return taproot ? `${keyHash} or ${start}p` : keyHash;
   }
 
-  /** Such as "testnet, nested SegWit (BIP49)". */
-  override describe(type: AddressType, testnet: boolean): string {
-    const network = testnet ? "testnet, " : "";
-    const purpose = SEGWIT_RULES.purposes?.[type] ?? LEGACY_PURPOSE;
-    return `${network}${TYPE_NAMES[type]} (BIP${purpose})`;
+  protected override get ownPrefixes(): readonly string[] {
+    return this.#segwit.prefixes.starts;
+  }
+
+  /** Such as "nested SegWit (BIP49)". */
+  override describe(type: AddressType): string {
+    return `${TYPE_NAMES[type]} (BIP${this.purposeOf(type)})`;
   }
 
   protected override read(text: string): CoinAddress {
-    const { mainnet, testnet } = this.#segwit;
-    const prefixes = testnet === undefined ? [mainnet] : [mainnet, testnet];
-    return startsWithAny(
-      text,
-      prefixes.map((prefix) => `${prefix}1`),
-    )
-      ? this.#readSegwit(text)
-      : this.readBase58(text);
+    return startsWithAny(text, this.ownPrefixes) ? this.#readSegwit(text) : this.readBase58(text);
   }
 
   #readSegwit(text: string): CoinAddress {
     const decoded = decodeSegwit(text);
-    if (decoded === undefined) throw invalidAddress(DAMAGED);
+    if (decoded === undefined) throw unreadableAddress();
     const { prefix, version, program } = decoded;
     // BIP173 allows an address all in capitals, as in QR codes; the decoder refused mixed case.
-    let testnet: boolean;
-    if (prefix === this.#segwit.mainnet) testnet = false;
-    else if (prefix === this.#segwit.testnet) testnet = true;
-    else throw this.notOurs();
+    const testnet = this.#segwit.prefixes.testnetOf(prefix);
+    if (testnet === undefined) throw this.notOurs();
     // The single-key programs: version 0 with the key's HASH160, version 1 with a Taproot key.
     let type: AddressType;
     if (version === 0 && program.length === HASH160_BYTES) type = "p2wpkh";
     else if (version === 1 && program.length === X_ONLY_KEY_BYTES && this.#segwit.taproot)
       type = "p2tr";
-    else
-      throw invalidAddress(
-        "only single-key addresses (bc1q with 42 characters, bc1p or ltc1q) can be checked",
-      );
+    else throw this.singleKeyOnly();
     return this.address(type, program, asciiLowercase(text), testnet);
   }
 }
@@ -137,8 +130,7 @@ class ZcashCoin extends Base58Coin {
   }
 
   protected override read(text: string): CoinAddress {
-    if (startsWithAny(text, ZCASH_SHIELDED_PREFIXES))
-      throw invalidAddress("it is shielded; use a transparent t1… address of the same wallet");
+    if (startsWithAny(text, ZCASH_SHIELDED_PREFIXES)) throw this.shielded("a transparent t1…");
     return this.readBase58(text);
   }
 }
@@ -151,12 +143,12 @@ export const BITCOIN = new SegwitCoin({
   addressForms: "1…, 3…, bc1q… or bc1p…",
   coinTypes: [0],
   versions: [
-    { prefix: [0x00], type: "p2pkh", testnet: false },
-    { prefix: [0x05], type: "p2sh-p2wpkh", testnet: false },
+    { prefix: [BITCOIN_P2PKH_VERSION], type: "p2pkh", testnet: false },
+    { prefix: [BITCOIN_P2SH_VERSION], type: "p2sh-p2wpkh", testnet: false },
     { prefix: [0x6f], type: "p2pkh", testnet: true },
     { prefix: [0xc4], type: "p2sh-p2wpkh", testnet: true },
   ],
-  segwit: { mainnet: "bc", testnet: "tb", taproot: true },
+  segwit: { prefixes: new Bech32Prefixes("bc", "tb"), taproot: true },
 });
 
 export const LITECOIN = new SegwitCoin({
@@ -168,9 +160,9 @@ export const LITECOIN = new SegwitCoin({
   versions: [
     { prefix: [0x30], type: "p2pkh", testnet: false },
     { prefix: [0x32], type: "p2sh-p2wpkh", testnet: false },
-    { prefix: [0x05], type: "p2sh-p2wpkh", testnet: false },
+    { prefix: [BITCOIN_P2SH_VERSION], type: "p2sh-p2wpkh", testnet: false },
   ],
-  segwit: { mainnet: "ltc", taproot: false },
+  segwit: { prefixes: new Bech32Prefixes("ltc"), taproot: false },
 });
 
 export const DOGECOIN = new Base58Coin({

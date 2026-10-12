@@ -6,3 +6,26 @@
 export const FILE_OUTPUTS = ["output", "pdf", "qr", "heir-sheet", "candidates-file"] as const;
 export const FOLDER_OUTPUTS = ["cards-dir", "images-dir"] as const;
 export const SAVED_OPTIONS = [...FILE_OUTPUTS, ...FOLDER_OUTPUTS] as const;
+
+/**
+ * Options that name a file the command reads: no output may overlap one, and an output is never
+ * renamed to the name of one (output-paths.ts). A test keeps every option that names a file or a
+ * folder in exactly one of these lists.
+ */
+export const FILE_INPUTS = [
+  "mnemonic-file",
+  "input-file",
+  "share-file",
+  "share-qr",
+  "candidates-key-file",
+  "candidates-passphrase-file",
+  "bip39-passphrase-file",
+  "wif-file",
+  "qr-file",
+] as const;
+
+/**
+ * Options that draw images, with pdftocairo: the commands that save cards take them, and they
+ * allow the program to be run (protection.ts).
+ */
+export const DRAWING_OPTIONS = ["images-dir", "image-format"] as const;

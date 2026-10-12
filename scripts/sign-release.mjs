@@ -11,86 +11,59 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+// The palette and colour rule of the command line; Node strips the types of this leaf module.
+import {
+  STYLE,
+  failureLine,
+  headingLine,
+  markedLines,
+  paint,
+  resultLines,
+  statusLine,
+} from "../src/cli/terminal-style.ts";
+import { CANCELLED_EXIT_CODE, CANCELLED_MESSAGE } from "../src/cli/exit-codes.ts";
+import { typedLine } from "../src/cli/shell-command.ts";
+import { describeError } from "../src/core/refusal.ts";
+// SHA256SUMS joins the checksum files of build-executable.mjs; their lines and names come from here.
+import { CHECKSUM_LINE, releaseFilePrefix } from "./executable-files.mjs";
+import { SIGNING_KEY } from "./release-key.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 /** The repository whose draft release and build attestations are checked. */
 const REPOSITORY = "hobby-eng/mnemocode";
-/** The owner's OpenPGP release key; README.md and docs/RELEASING.md show the same fingerprint. */
-const SIGNING_KEY = "28FC51B1DB80DF2101128CB30EDD4814591DD095";
 const CHECKSUMS = "SHA256SUMS";
 const SIGNATURE = "SHA256SUMS.asc";
 const PUBLIC_KEY = "RELEASE-SIGNING-KEY.asc";
-/** A tag as the release workflow accepts it: "v" and the version in package.json. */
-const TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 /**
- * A line of SHA256SUMS as the release workflow writes it: 64 hex digits, two spaces and a plain
- * file name. A name may not start with "-" or ".", so that it can never pass for an option or a
- * hidden file, and never holds a path.
+ * The form of a release tag: "v" and a semantic version. That it is the version in package.json
+ * is the release workflow's check, not this one's.
  */
-const CHECKSUM_LINE = /^[0-9a-f]{64} {2}([A-Za-z0-9_][A-Za-z0-9._-]*)$/u;
-
-/** SGR codes of the shared palette, the same as STYLE in src/cli/terminal.ts. */
-const STYLE = {
-  heading: "1;36",
-  accent: "36",
-  strong: "1",
-  muted: "90",
-  good: "1;32",
-  warning: "1;33",
-  bad: "1;31",
-};
-
-/** Whether `stream` gets colour, decided as terminalColor in src/cli/terminal.ts decides it. */
-function colorOn(stream) {
-  const environment = process.env;
-  if (environment.NO_COLOR !== undefined && environment.NO_COLOR !== "") return false;
-  const force = environment.CLICOLOR_FORCE;
-  if (force !== undefined && force !== "" && force !== "0") return true;
-  if (stream.isTTY !== true) return false;
-  if (environment.TERM === "dumb") return false;
-  return environment.CLICOLOR !== "0";
-}
-
-function paint(stream, code, text) {
-  return colorOn(stream) ? `\x1b[${code}m${text}\x1b[0m` : text;
-}
+const TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 
 /** A checked fact after a green ✓, with its value in bold. */
 function passed(label, value) {
-  const { stderr } = process;
-  console.error(`${paint(stderr, STYLE.good, "✓")} ${label} ${paint(stderr, STYLE.strong, value)}`);
+  console.error(statusLine(process.stderr, label, value));
 }
 
+/** A warning after a yellow !, as the command line shows one (markedLines). */
 function warn(message) {
-  const { stderr } = process;
-  console.error(`${paint(stderr, STYLE.warning, "!")} ${paint(stderr, STYLE.warning, message)}`);
+  for (const line of markedLines(process.stderr, message, "warning")) console.error(line);
 }
 
 /** One line after a red "✗ Error:"; without colour, the plain form of src/cli/terminal.ts. */
 function fail(message) {
-  if (!colorOn(process.stderr)) console.error(`sign-release: ${message}`);
-  else console.error(`${paint(process.stderr, STYLE.bad, "✗ Error:")} ${message}`);
+  console.error(failureLine(process.stderr, "sign-release", message));
 }
 
 /** "MnemoCode · <title>" and its facts as grey labels with their values. */
 function printResult(title, rows) {
-  const { stdout } = process;
-  const dot = paint(stdout, STYLE.muted, "·");
-  console.log(
-    `\n${paint(stdout, STYLE.heading, "MnemoCode")} ${dot} ${paint(stdout, STYLE.strong, title)}`,
-  );
-  const width = Math.max(10, ...rows.map(([label]) => label.length));
-  for (const [label, value] of rows) {
-    console.log(`  ${paint(stdout, STYLE.muted, label.padEnd(width))} ${value}`);
-  }
+  for (const line of resultLines(process.stdout, title, rows)) console.log(line);
 }
 
-/** A command as it would be typed in a shell: an argument with special characters is quoted. */
+/** A command of COMMANDS as it would be typed in a shell, quoted by the menu's rule. */
 function shellLine([command, args]) {
-  const quote = (part) =>
-    /^[\w@%+=:,./-]+$/u.test(part) ? part : `'${part.replaceAll("'", "'\\''")}'`;
-  return [command, ...args].map(quote).join(" ");
+  return typedLine([command, ...args]);
 }
 
 /**
@@ -256,7 +229,7 @@ function printHelp() {
   const muted = (text) => paint(stdout, STYLE.muted, text);
   console.log(
     [
-      `${heading("MnemoCode")} ${muted("·")} sign a draft release with the owner's OpenPGP key`,
+      headingLine(stdout, "sign a draft release with the owner's OpenPGP key"),
       "",
       "Downloads the draft release, checks every file against SHA256SUMS and its",
       "GitHub build attestation, signs SHA256SUMS, uploads the signature and the",
@@ -380,7 +353,7 @@ function listedFiles(folderPath, version) {
     if (name === undefined) {
       throw new Error(`${CHECKSUMS} line ${index + 1} is not "<sha-256>  <file>".`);
     }
-    if (!name.startsWith(`mnemocode-${version}-`)) {
+    if (!name.startsWith(releaseFilePrefix(version))) {
       throw new Error(`${CHECKSUMS} lists ${name}, which is no file of version ${version}.`);
     }
     return name;
@@ -503,10 +476,10 @@ try {
   await main(process.argv.slice(2));
 } catch (error) {
   if (error instanceof Cancelled) {
-    console.error("Cancelled.");
-    process.exitCode = 130;
+    console.error(CANCELLED_MESSAGE);
+    process.exitCode = CANCELLED_EXIT_CODE;
   } else {
-    fail(error instanceof Error ? error.message : String(error));
+    fail(describeError(error));
     process.exitCode = 1;
   }
 }

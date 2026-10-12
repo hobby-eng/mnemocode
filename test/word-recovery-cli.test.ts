@@ -145,7 +145,7 @@ describe("recover-word CLI", () => {
     const many = await run(["recover-word", "--mnemonic", `? ${"abandon ".repeat(10)}?`]);
     expect(many.stdout.trim()).toBe("");
     expect(many.stderr).toContain("262,144 candidates are too many to show");
-  }, 60_000);
+  });
 
   it("marks evidence matches without removing non-matching candidates", async () => {
     const result = await run([

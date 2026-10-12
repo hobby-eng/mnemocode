@@ -12,8 +12,7 @@ import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { Masking } from "../src/core/masking.js";
 import { encodeMnemonicLegacy, legacyChecksumValidResult } from "../src/core/seedshift.js";
 import type { DatePattern } from "../src/core/types.js";
-import { resolvePresentationFor } from "../src/export/card-copy.js";
-import { resolveIdentityFor } from "../src/export/card-identities.js";
+import { ExportDetails } from "../src/export/export-details.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import { JointRepair } from "../src/sskr/joint-repair.js";
 import { RepairReport } from "../src/sskr/repair-report.js";
@@ -22,6 +21,7 @@ import { ShareExport, ShareSet } from "../src/sskr/share-set.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { pageOperators } from "./helpers/pdf-content.js";
+import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 
 // Public data only: the all-zero entropy's phrase, synthetic dates, and the public SSKR vectors.
 const PHRASE = `${"abandon ".repeat(11)}about`;
@@ -165,7 +165,7 @@ describe("AUD-009 follow-up: every DatesAnswer holds the limits it was checked a
           { key: "k", years: [2020], months: [1], days: [1] },
         ],
       ),
-    ).toThrow(/^Date 2: its pattern has the key of an earlier one that allows other dates\.$/u);
+    ).toThrow(/^Date 2: a date pattern has the key of an earlier one that allows other dates\.$/u);
     // The same dates in another order are the same pattern.
     const same = DatesAnswer.of(
       [],
@@ -234,7 +234,7 @@ describe("AUD-009 follow-up: codes are checked before an object holds them", () 
     const Raw = EncodedBackup as unknown as Constructible<EncodedBackup>;
     expect(() => new Raw(new Array<number>(12), "indexes", "direct")).toThrow(/integer from 0/u);
     expect(() => new Raw(zeros(), "indexes", "seedshift")).toThrow(/lack the BIP39 checksum/u);
-    expect(() => new Raw(zeros(), "bad", "direct")).toThrow("Unsupported encoded format.");
+    expect(() => new Raw(zeros(), "bad", "direct")).toThrow("Unsupported encoded format: bad.");
   });
 
   it("writes no colors for indexes with holes, which were left out without a word", () => {
@@ -391,19 +391,25 @@ describe("AUD-009 follow-up: nothing a library object hands out changes it", () 
     // The drawing of the page; the bytes of the file differ from one render to the next.
     const drawn = async (cards: ShareCardSet) =>
       pageOperators(await PDFDocument.load(await cards.renderShare(0)), 0);
-    const cards = new ShareCardSet([SHARES[0]!], settings);
+    const cards = new ShareCardSet(nodeCardRenderer, [SHARES[0]!], settings);
     const first = await drawn(cards);
     presentation.studioName = "Another Studio";
     // Before: the later render showed the caller's new studio name.
     expect(await drawn(cards)).toBe(first);
     // The name is printed: a set built with the new one draws another page.
-    expect(await drawn(new ShareCardSet([SHARES[0]!], settings))).not.toBe(first);
+    expect(await drawn(new ShareCardSet(nodeCardRenderer, [SHARES[0]!], settings))).not.toBe(first);
   });
 
   it("hands out the details settled for an export frozen, as every page shares them", () => {
     const settings = {};
-    expect(Object.isFrozen(resolvePresentationFor(settings))).toBe(true);
-    expect(Object.isFrozen(resolveIdentityFor(settings))).toBe(true);
-    expect(resolveIdentityFor(settings)).toBe(resolveIdentityFor(settings));
+    expect(
+      Object.isFrozen(ExportDetails.of(nodeRenderPlatform.randomInt, settings).presentation),
+    ).toBe(true);
+    expect(Object.isFrozen(ExportDetails.of(nodeRenderPlatform.randomInt, settings).profile)).toBe(
+      true,
+    );
+    expect(ExportDetails.of(nodeRenderPlatform.randomInt, settings)).toBe(
+      ExportDetails.of(nodeRenderPlatform.randomInt, settings),
+    );
   });
 });

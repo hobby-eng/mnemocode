@@ -21,12 +21,14 @@
 // Host-neutral: it imports only other host-neutral modules, @scure/bip39 with its word lists and
 // @noble/hashes (test/portable-modules.test.ts).
 
+import { BIP39_ENTROPY_BYTES } from "./bip39-sizes.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { entropyToMnemonic, validateMnemonic } from "@scure/bip39";
+import { entropyToMnemonic } from "@scure/bip39";
+import { phraseChecksumValid } from "./english-words.js";
 import { wordlist as englishWordlist } from "@scure/bip39/wordlists/english.js";
 import { wordlist as traditionalChineseWordlist } from "@scure/bip39/wordlists/traditional-chinese.js";
 import type { SharePlatform } from "../sskr/share-platform.js";
-import { checkSskrKnownAnswers } from "../sskr/known-answers.js";
+import { checkSskrKnownAnswers, checkSskrTransportStartup } from "../sskr/known-answers.js";
 import { checkShareRepair, checkShareRepairStartup } from "../sskr/repair-self-test.js";
 import { checkShareUnmasking } from "../sskr/share-unmasking-self-test.js";
 import { checkBackupCheck, checkBackupCheckStartup } from "./backup-check-self-test.js";
@@ -43,21 +45,24 @@ import {
   checkMasterFingerprintStartup,
 } from "./master-fingerprint-self-test.js";
 import { formatEncoded } from "./representations.js";
+import { checkRepresentationStartup } from "./representations-self-test.js";
 import {
   expectSame as equal,
   type SelfTestCheck,
   type SelfTestFeature,
 } from "./self-test-check.js";
 import {
-  decodeInput,
   decodeInputDirect,
   decodeInputLegacy,
   encodeMnemonic,
   encodeMnemonicLegacy,
   representMnemonic,
 } from "./seedshift.js";
-import type { OutputFormat } from "./types.js";
-import { recoverLegacyValidLastWords, recoverMissingWord } from "./words.js";
+import { ENCODED_FORMATS } from "./types.js";
+import { recoverLegacyValidLastWords } from "./words.js";
+import { hexOfBytes } from "./bits.js";
+import { Masking, decodeInput } from "./masking.js";
+import { isFingerprintText, type PhraseFingerprint } from "./wallet-check.js";
 
 export type { SelfTestCheck, SelfTestFeature };
 
@@ -74,13 +79,6 @@ const LEGACY_ENGLISH =
 /** SHA-256 of each BIP39 word list joined by line feeds, as @scure/bip39 ships them. */
 const CHINESE_WORDLIST_SHA256 = "407312f9014543242bd157c255125a753ac60128fc15883a33b8685a9328b0cc";
 const WORDLIST_SHA256 = "187db04a869dd9bc7be80d21a86497d692c0db6abd3aa8cb6be5d618ff757fae";
-const FORMATS = [
-  "english",
-  "indexes",
-  "unicode",
-  "colors",
-  "colors-unicode",
-] as const satisfies readonly Exclude<OutputFormat, "json">[];
 
 /** A check that passed, with the time it took. */
 export interface SelfTestRow {
@@ -100,7 +98,7 @@ export interface SelfTestReport {
 /** What a self-test takes from its host. */
 export interface SelfTestHost {
   /** The master fingerprint of a phrase with an empty BIP39 passphrase. */
-  readonly fingerprint: (mnemonic: string) => string | PromiseLike<string>;
+  readonly fingerprint: PhraseFingerprint;
   /** vectors/mnemocode-v1.json, parsed. */
   readonly publicVectors: unknown;
   /**
@@ -128,7 +126,7 @@ export interface SelfTestHost {
 /** SHA-256 of a word list joined by line feeds, as hexadecimal. */
 function wordlistDigest(words: readonly string[]): string {
   const digest = sha256(new TextEncoder().encode(words.join("\n")));
-  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return hexOfBytes(digest);
 }
 
 /** The word lists and the fixed forward and reverse vectors: quick enough before every command. */
@@ -142,18 +140,16 @@ function runCoreChecks(): void {
     "Traditional Chinese BIP39 word-list SHA-256",
   );
 
-  const direct = representMnemonic(PUBLIC_MNEMONIC);
-  equal(
-    decodeInputDirect(formatEncoded(direct, "unicode"), "unicode").recoveredMnemonic,
-    PUBLIC_MNEMONIC,
-    "Direct Unicode round trip",
+  checkRepresentationStartup();
+  checkSskrTransportStartup();
+  // Forgotten words are the word search's, which checkWordSearchStartup checks at startup; the
+  // valid last words of the public vector are known answers of the final-word path.
+  const about = recoverLegacyValidLastWords(PUBLIC_MNEMONIC).find(
+    (candidate) => candidate.word === "about",
   );
-  const recoveredWords = recoverMissingWord(PUBLIC_MNEMONIC.replace(/about$/u, "?"));
-  equal(recoveredWords.length, 128, "Forgotten final-word candidate count");
-  const recoveredAbout = recoveredWords.find((candidate) => candidate.word === "about");
-  equal(recoveredAbout?.wordIndex, 4, "Forgotten-word BIP39 index");
-  equal(recoveredAbout?.checksumBits, "0011", "Forgotten-word checksum bits");
-  equal(recoveredAbout?.mnemonic, PUBLIC_MNEMONIC, "Forgotten-word public vector");
+  equal(about?.wordIndex, 4, "Final-word BIP39 index");
+  equal(about?.checksumBits, "0011", "Final-word checksum bits");
+  equal(about?.mnemonic, PUBLIC_MNEMONIC, "Final-word public vector");
 
   const legacyLastWords = recoverLegacyValidLastWords(LEGACY_ENGLISH);
   equal(legacyLastWords.length, 128, "Legacy final-word candidate count");
@@ -169,7 +165,7 @@ function runCoreChecks(): void {
     CHECKSUM_VALID_ENGLISH,
     "Checksum-valid Seedshift vector",
   );
-  if (!validateMnemonic(shifted.shiftedEnglish.join(" "), englishWordlist))
+  if (!phraseChecksumValid(shifted.shiftedEnglish.join(" ")))
     throw new Error("Checksum-valid Seedshift produced an invalid BIP39 checksum.");
   equal(
     decodeInput(CHECKSUM_VALID_ENGLISH, "english", CHECKSUM_VALID_DATE).recoveredMnemonic,
@@ -186,9 +182,20 @@ function runCoreChecks(): void {
   );
 }
 
+/**
+ * The modes that the public vectors are of: seedshift-legacy-valid has none. Each is encoded below
+ * by its own engine, not through Masking, so that the vectors check Masking's choice too.
+ */
+const VECTOR_MODES = Object.freeze(["direct", "seedshift", "seedshift-legacy"] as const);
+type VectorMode = (typeof VECTOR_MODES)[number];
+
+function isVectorMode(mode: string): mode is VectorMode {
+  return (VECTOR_MODES as readonly string[]).includes(mode);
+}
+
 interface PublicVector {
   readonly name: string;
-  readonly mode: "direct" | "seedshift" | "seedshift-legacy";
+  readonly mode: VectorMode;
   readonly sourceMnemonic: string;
   readonly dates: readonly string[];
   readonly english: string;
@@ -232,19 +239,21 @@ function validateVector(value: unknown, index: number): PublicVector {
   const label = `vectors[${index}]`;
   if (!isObject(value)) throw new Error(`${label} must be an object.`);
   const mode = requiredString(value, "mode", label);
-  if (mode !== "direct" && mode !== "seedshift" && mode !== "seedshift-legacy")
-    throw new Error(`${label}.mode is unsupported.`);
+  if (!isVectorMode(mode)) throw new Error(`${label}.mode is unsupported.`);
   const sourceMnemonic = requiredString(value, "sourceMnemonic", label);
-  if (!validateMnemonic(sourceMnemonic, englishWordlist))
+  if (!phraseChecksumValid(sourceMnemonic))
     throw new Error(`${label}.sourceMnemonic must be a valid English BIP39 mnemonic.`);
   const dates = requiredStrings(value, "dates", label);
-  if ((mode === "direct" && dates.length !== 0) || (mode !== "direct" && dates.length === 0))
+  try {
+    Masking.of(mode).assertDateCount(dates.length);
+  } catch {
     throw new Error(`${label}.dates does not match its mode.`);
+  }
   dates.forEach(parseDate);
   const fingerprint = (key: "sourceFingerprint" | "encodedFingerprint") => {
     const candidate = value[key];
     if (candidate === undefined) return undefined;
-    if (typeof candidate !== "string" || !/^[0-9a-f]{8}$/u.test(candidate))
+    if (typeof candidate !== "string" || !isFingerprintText(candidate))
       throw new Error(`${label}.${key} must be eight lowercase hexadecimal characters.`);
     return candidate;
   };
@@ -316,7 +325,7 @@ async function checkPublicVectors(host: SelfTestHost): Promise<number> {
 
 /** Every phrase length in every form and mode, forward and back; gives the round trips made. */
 function checkAllLengthsAndFormats(): number {
-  const entropySizes = [16, 20, 24, 28, 32] as const;
+  const entropySizes = BIP39_ENTROPY_BYTES;
   const dates = [parseDate("23-09-2026"), parseDate("08-08-1988"), parseDate("07-11-1951")];
   let count = 0;
   for (const entropySize of entropySizes) {
@@ -324,7 +333,7 @@ function checkAllLengthsAndFormats(): number {
       Uint8Array.from({ length: entropySize }, (_, index) => index),
       englishWordlist,
     );
-    for (const format of FORMATS) {
+    for (const format of ENCODED_FORMATS) {
       const direct = representMnemonic(mnemonic);
       equal(
         decodeInputDirect(formatEncoded(direct, format), format).recoveredMnemonic,
@@ -471,7 +480,10 @@ export class MnemoCodeSelfTest {
     if (platform !== undefined)
       library.push({
         name: "SSKR integrity",
-        detail: [host.shareLibrary, "official grouped vector and color transport"]
+        detail: [
+          host.shareLibrary,
+          "official grouped recovery, exact creation, transport and refusals",
+        ]
           .filter(Boolean)
           .join(", "),
         run: () => checkSskrKnownAnswers(platform),

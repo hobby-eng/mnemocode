@@ -1,9 +1,7 @@
-import { MM } from "./business-layout.js";
+import { MM, centredRunStart, type MmRect } from "./business-layout.js";
 import { materialPageLayout, materialGridLayout } from "./material-layout.js";
 import { readRenderAsset } from "./platform.js";
-import fontkit from "@pdf-lib/fontkit";
 import {
-  PDFDocument,
   PDFName,
   rgb,
   pushGraphicsState,
@@ -21,19 +19,16 @@ import {
   type PDFPage,
   type PDFImage,
 } from "pdf-lib";
-import { colorsToIndexes, unicodeToColors } from "../core/colors.js";
-import { assertShareQr } from "../sskr/transport.js";
-import type { CardContent } from "./templates.js";
+import type { CardContent } from "./backup-cards.js";
+import type { CardDrawing } from "./templates.js";
 import type { SskrCardContent } from "./sskr-content.js";
-import { resolveIdentityFor } from "./card-identities.js";
-import { resolvePresentationFor } from "./card-copy.js";
+import { ExportDetails } from "./export-details.js";
 import { clearDocumentMetadata } from "./document-metadata.js";
 import {
-  collectionSheetLayout,
-  drawStudyCaption,
-  drawStudyFrame,
-  drawStudyShadow,
-  studyCaptionWidth,
+  drawCollectionStudy,
+  MAX_SHEET_CARDS,
+  preparedForLine,
+  separateCardIndex,
 } from "./collection-sheet.js";
 import {
   chooseMaterialSamples,
@@ -44,8 +39,14 @@ import {
   type MaterialSample,
   type MaterialStyle,
 } from "./material-artwork.js";
-import { printedCode } from "./card-codes.js";
-export type MaterialPageSize = "business" | "a6" | "a4";
+import { numberedCode } from "./card-codes.js";
+import { assertColorCards, EMPTY_CARD_COLLECTION } from "./card-content.js";
+import { centredText, pdfRect } from "./business-render-primitives.js";
+import { rgbChannels } from "./color-math.js";
+import { documentWithFont } from "./pdf-documents.js";
+import { type CardPageSize, isCardPageSize, resolvePageSize } from "./card-settings.js";
+/** The sizes of a material card's page: those of every card (CardPageSize). */
+export type MaterialPageSize = CardPageSize;
 export interface MaterialCardOptions {
   readonly pageSize?: MaterialPageSize;
   readonly individualIndex?: number;
@@ -59,6 +60,8 @@ const TYPE_LAYOUT = {
   // Leaves a visible gap below the 5.5 pt reference line, which is 1.94 mm tall.
   finishOffset: 2.6,
   footerInset: 3.2,
+  // The lines across the page keep this margin on each side.
+  sideMargin: 4,
   minimumFont: 3.8,
 } as const;
 
@@ -78,14 +81,6 @@ function useTintState(page: PDFPage): PDFName {
   return TINT_STATE;
 }
 
-/** A rectangle in millimetres from the top left corner of the page. */
-interface Area {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
-
 /** The aspect of a finish's crop, width over height. */
 function cropAspect(image: PDFImage, finish: MaterialFinish): number {
   const [, , cw, ch] = finish.crop;
@@ -93,7 +88,7 @@ function cropAspect(image: PDFImage, finish: MaterialFinish): number {
 }
 
 /** Where a sample's photograph lies in a box: as large as fits, centred, in millimetres. */
-function sampleArea(image: PDFImage, finish: MaterialFinish, box: Area): Area {
+function sampleArea(image: PDFImage, finish: MaterialFinish, box: MmRect): MmRect {
   const aspect = cropAspect(image, finish);
   const width = Math.min(box.width, box.height * aspect);
   const height = width / aspect;
@@ -118,11 +113,11 @@ function drawSample(
   const [cx, cy, cw, ch] = sample.finish.crop;
   const area = sampleArea(image, sample.finish, { x, y: top, width, height });
   const [dw, dh] = [area.width, area.height];
-  const left = area.x * MM;
-  const bottom = page.getHeight() - (area.y + dh) * MM;
+  const placed = pdfRect(page, area);
+  const [left, bottom] = [placed.x, placed.y];
   page.pushOperators(
     pushGraphicsState(),
-    rectangle(left, bottom, dw * MM, dh * MM),
+    rectangle(left, bottom, placed.width, placed.height),
     clip(),
     endPath(),
   );
@@ -145,7 +140,7 @@ function drawSample(
       ...Array.from({ length: ring.length / 2 - 1 }, (_, i) => lineTo(...at(ring, 2 * i + 2))),
       closePath(),
     ]);
-    const [r, g, b] = [0, 2, 4].map((i) => parseInt(sample.tint!.slice(i, i + 2), 16) / 255);
+    const [r, g, b] = rgbChannels(sample.tint!);
     page.pushOperators(
       ...outline,
       // Even-odd, so that a hole in the outline, such as a screw, stays untinted.
@@ -153,7 +148,7 @@ function drawSample(
       endPath(),
       setGraphicsState(useTintState(page)),
       setFillingRgbColor(r!, g!, b!),
-      rectangle(left, bottom, dw * MM, dh * MM),
+      rectangle(left, bottom, placed.width, placed.height),
       fill(),
     );
   }
@@ -162,91 +157,70 @@ function drawSample(
 
 type MaterialRenderContext = Awaited<ReturnType<typeof createRenderContext>>;
 
+/** What the material cards draw with (CardDrawing): their photographs, font, QR codes, choices. */
+type MaterialDrawing = Pick<CardDrawing, "readAsset" | "qrModules" | "randomInt">;
+
 /** Front: ordered exact references. QR belongs only to a collection study. */
 export async function renderMaterialCard(
+  drawing: MaterialDrawing,
   style: MaterialStyle,
   content: CardContent | SskrCardContent,
   options: MaterialCardOptions = {},
 ): Promise<Uint8Array> {
-  const context = await createRenderContext(style, content, options);
-  if (context.individual === undefined) drawMaterialStudy(context);
+  const context = await createRenderContext(drawing, style, content, options);
+  if (context.individual === undefined) await drawMaterialStudy(context);
   else drawMaterialFront(context);
   return context.doc.save();
 }
 
 async function createRenderContext(
+  drawing: MaterialDrawing,
   style: MaterialStyle,
   content: CardContent | SskrCardContent,
   options: MaterialCardOptions,
 ) {
-  if (content.kind !== "colors" && content.kind !== "sskr")
-    throw new Error("Material cards require color references.");
-  const share = content.kind === "sskr";
-  if (share) {
-    assertShareQr(content.colors, content.payload, content.labels);
-  } else {
-    colorsToIndexes(content.colors);
-    if (
-      content.payload !== content.colors.join(" ") &&
-      unicodeToColors(content.payload).join(" ") !== content.colors.join(" ")
-    )
-      throw new Error("Collection QR does not match its references.");
-  }
-  if (content.colors.length < 1 || content.colors.length > 16)
-    throw new Error("Material cards support at most 16 references.");
-  const size = options.pageSize ?? content.pageSize ?? "business";
-  if (!["business", "a6", "a4"].includes(size))
-    throw new Error("Material page size must be business, a6 or a4.");
-  const individual = options.individualIndex;
-  if (
-    individual !== undefined &&
-    (!Number.isInteger(individual) || individual < 0 || individual >= content.colors.length)
-  )
-    throw new Error("Invalid material card index.");
+  assertColorCards(content);
+  if (content.colors.length === 0) throw new Error(EMPTY_CARD_COLLECTION);
+  if (content.colors.length > MAX_SHEET_CARDS)
+    throw new Error(`Material cards support at most ${MAX_SHEET_CARDS} references.`);
+  // Material cards are of the business size unless another is asked for.
+  // A study keeps the business size too, unlike the other families' A6 sheet: a change of what
+  // is drawn, which waits for the card output checks (scan finding S100).
+  const size = resolvePageSize(options.pageSize ?? content.pageSize, true);
+  const individual = separateCardIndex(content, options.individualIndex, content.colors.length);
   const { width, height, portrait, scale } = materialPageLayout(size, content.orientation);
   const artwork = materialArtwork[style];
-  const presentation = resolvePresentationFor(content);
-  const includeQr = content.cardQr === true || (share && content.qrCard === true);
-  const profile = resolveIdentityFor(content);
-  const doc = await PDFDocument.create();
-  doc.registerFontkit(fontkit);
-  const font = await doc.embedFont(await readRenderAsset("fonts/DejaVuSans-UI.ttf"), {
-    subset: true,
-  });
-  const image = await doc.embedJpg(await readRenderAsset(`images/material-${style}.jpg`));
+  // Through an export the content carries the details settled for it, which come back unchanged.
+  // A material card suits an employer of any sector.
+  const { profile, presentation } = ExportDetails.of(drawing.randomInt, content);
+  const { doc, font } = await documentWithFont(drawing);
+  const image = await doc.embedJpg(await readRenderAsset(drawing, `images/material-${style}.jpg`));
   // Chosen for all references of the card together, so that no two of them look alike and an
   // individual fragment shows the same sample as the whole card.
   const samples = chooseMaterialSamples(style, content.colors);
   const ink = artwork.dark ? rgb(0.94, 0.92, 0.87) : rgb(0.15, 0.16, 0.16);
   const muted = artwork.dark ? rgb(0.73, 0.72, 0.67) : rgb(0.38, 0.38, 0.35);
   clearDocumentMetadata(doc);
+  // Each line is centred in the room it may take: the page within its margins, or a sample's cell.
   const drawText = (
     page: PDFPage,
     value: string,
     top: number,
     desired: number,
-    maxWidth: number,
-    center: number,
+    left: number,
+    width: number,
     subdued = false,
-  ) => {
-    const supported = font.getCharacterSet();
-    if ([...value].some((c) => !supported.includes(c.codePointAt(0)!)))
-      throw new Error("Card text contains a character not supported by the font.");
-    const fs = Math.min(
-      desired * scale,
-      (maxWidth * MM) / Math.max(font.widthOfTextAtSize(value, 1), 0.01),
-    );
-    if (fs < TYPE_LAYOUT.minimumFont * scale)
-      throw new Error("Card text is too long to fit legibly; shorten the company or name.");
-    page.drawText(value, {
-      x: center * MM - font.widthOfTextAtSize(value, fs) / 2,
-      // Preserve the one-font-size line box used by the other card renderers.
-      y: page.getHeight() - top * MM - fs,
-      size: fs,
+  ) =>
+    centredText(
+      page,
       font,
-      color: subdued ? muted : ink,
-    });
-  };
+      value,
+      { left, top, width },
+      desired * scale,
+      TYPE_LAYOUT.minimumFont * scale,
+      "Card text",
+      subdued ? muted : ink,
+    );
   const makePage = () => {
     const p = doc.addPage([width * MM, height * MM]);
     p.drawRectangle({
@@ -259,6 +233,7 @@ async function createRenderContext(
     return p;
   };
   return {
+    qr: drawing,
     doc,
     font,
     size,
@@ -273,7 +248,6 @@ async function createRenderContext(
     profile,
     image,
     samples,
-    includeQr,
     drawText,
     makePage,
   };
@@ -296,22 +270,24 @@ function drawMaterialFront(context: MaterialRenderContext): void {
     makePage,
   } = context;
   const page = makePage();
+  const side = TYPE_LAYOUT.sideMargin * scale;
+  const lineWidth = width - 2 * side;
   drawText(
     page,
     presentation.studioName.toUpperCase(),
     TYPE_LAYOUT.studioTop * scale,
     8,
-    width - 8 * scale,
-    width / 2,
+    side,
+    lineWidth,
   );
-  drawText(page, artwork.title, TYPE_LAYOUT.titleTop * scale, 4.8, width - 8 * scale, width / 2);
+  drawText(page, artwork.title, TYPE_LAYOUT.titleTop * scale, 4.8, side, lineWidth);
   drawText(
     page,
-    `Prepared for ${profile.name}`,
+    preparedForLine(profile.name),
     TYPE_LAYOUT.ownerTop * scale,
     4.5,
-    width - 8 * scale,
-    width / 2,
+    side,
+    lineWidth,
     true,
   );
   const entries =
@@ -329,8 +305,8 @@ function drawMaterialFront(context: MaterialRenderContext): void {
   for (let i = 0; i < entries.length; i++) {
     const sample = samples[entries[i]!.index]!;
     const countThisRow = Math.min(columns, entries.length - Math.floor(i / columns) * columns);
-    const centeredStart = (width - (countThisRow * cellWidth + (countThisRow - 1) * gap)) / 2;
-    const x = centeredStart + (i % columns) * (cellWidth + gap);
+    const x =
+      centredRunStart(width, countThisRow, cellWidth, gap) + (i % columns) * (cellWidth + gap);
     const top = areaTop + Math.floor(i / columns) * cellHeight;
     const labelsHeight = TYPE_LAYOUT.labelsHeight * scale;
     const imageHeight = cellHeight - labelsHeight;
@@ -338,19 +314,19 @@ function drawMaterialFront(context: MaterialRenderContext): void {
     // Both captions share the physical center of the image, including incomplete rows.
     drawText(
       page,
-      `${String(entries[i]!.index + 1).padStart(2, "0")}  ${printedCode(content, entries[i]!.index)}`,
+      numberedCode(content, entries[i]!.index),
       top + imageHeight + TYPE_LAYOUT.referenceOffset * scale,
       5.5,
+      x,
       cellWidth,
-      x + cellWidth / 2,
     );
     drawText(
       page,
       sample.label,
       top + imageHeight + TYPE_LAYOUT.finishOffset * scale,
       4.8,
+      x,
       cellWidth,
-      x + cellWidth / 2,
       true,
     );
   }
@@ -359,47 +335,33 @@ function drawMaterialFront(context: MaterialRenderContext): void {
     presentation.subtitle,
     height - TYPE_LAYOUT.footerInset * scale,
     4.5,
-    width - 8 * scale,
-    width / 2,
+    side,
+    lineWidth,
     true,
   );
 }
 
-function drawMaterialStudy(context: MaterialRenderContext): void {
-  const { doc, font, content, size, artwork, image, samples, presentation, profile, includeQr } =
-    context;
-  const payload = includeQr ? content.payload : undefined;
-  const compact = size === "business";
-  // Compact studies prioritize exact recovery references over decorative finish names.
-  const captions = content.colors.map((_, index) => [
-    `${String(index + 1).padStart(2, "0")}  ${printedCode(content, index)}`,
-    ...(compact ? [] : [samples[index]!.label]),
-  ]);
-  const layout = collectionSheetLayout(
-    { ...content, pageSize: size },
-    content.colors.length,
-    // The finishes of one material are cropped alike, so every box takes the shape of a sample.
-    cropAspect(image, artwork.finishes[0]!),
-    compact ? 1 : 2,
-    payload,
-    studyCaptionWidth(font, captions.flat()),
-  );
-  const page = doc.addPage([layout.width * MM, layout.height * MM]);
-  drawStudyFrame(
-    page,
+async function drawMaterialStudy(context: MaterialRenderContext): Promise<void> {
+  const { qr, doc, font, content, size, artwork, image, samples, presentation, profile } = context;
+  const compact = isCardPageSize(size);
+  await drawCollectionStudy({
+    doc,
     font,
-    layout,
+    qr,
+    settings: { ...content, pageSize: size },
+    content,
     presentation,
-    content.title ?? presentation.studioName,
-    content.kind === "sskr" ? content.collectionReference : "01",
-    profile.name,
-    payload,
-    artwork.studyTheme,
-  );
-  for (const box of layout.cards) {
-    const sample = samples[box.index]!;
-    drawStudyShadow(page, { ...box, ...sampleArea(image, sample.finish, box) }, artwork.studyTheme);
-    drawSample(page, image, artwork, sample, box.x, box.y, box.width, box.height);
-    drawStudyCaption(page, font, layout, box, captions[box.index]!, artwork.studyTheme);
-  }
+    preparedFor: profile.name,
+    theme: artwork.studyTheme,
+    // The finishes of one material are cropped alike, so every box takes the shape of a sample.
+    aspect: cropAspect(image, artwork.finishes[0]!),
+    // Compact studies prioritize exact recovery references over decorative finish names.
+    captions: content.colors.map((_, index) => [
+      numberedCode(content, index),
+      ...(compact ? [] : [samples[index]!.label]),
+    ]),
+    paint: (page, box) =>
+      drawSample(page, image, artwork, samples[box.index]!, box.x, box.y, box.width, box.height),
+    pictureArea: (box) => sampleArea(image, samples[box.index]!.finish, box),
+  });
 }

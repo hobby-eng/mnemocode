@@ -1,11 +1,16 @@
-import "./platform-node.js";
-import { replacePrivateFile } from "./private-file.js";
+import { nodeCardRenderer } from "./platform-node.js";
+import { publishNewPrivateFile } from "./private-file.js";
 import { renderCards, type CardJob } from "./render.js";
 
 export { renderCards, type CardJob } from "./render.js";
 
+/**
+ * Renders `jobs` as one PDF and publishes it as a new private file at `path`, never over anything
+ * that is there: a name that appears after the preflight chose it is refused with EEXIST, which a
+ * save on the private screen offers to answer with another name (AUD-014-FUN003).
+ */
 export async function exportCards(jobs: readonly CardJob[], path: string): Promise<void> {
   // Render completely before opening the destination, including for preview --all.
-  const bytes = await renderCards(jobs);
-  await replacePrivateFile(path, bytes);
+  const bytes = await renderCards(nodeCardRenderer, jobs);
+  await publishNewPrivateFile(path, bytes);
 }

@@ -1,4 +1,4 @@
-// Ctrl+C during the assessment of shares marked with ? (sskr-command.ts, assessMarkedShares): it is
+// Ctrl+C during the assessment of shares marked with ? (share-repair.ts, assessShares): it is
 // read as a key, as during the search, so that it stops the tool where a Windows pseudo-console
 // sends no SIGINT. Public test vectors only (vectors/sskr-v1.json, synthetic entropy).
 import { EventEmitter } from "node:events";
@@ -36,23 +36,23 @@ vi.mock("../src/cli/ask.js", async (importOriginal) => ({
 }));
 vi.mock("../src/sskr/joint-repair.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../src/sskr/joint-repair.js")>();
-  return {
-    ...original,
-    planJointRepair: (records: readonly string[], options?: { readonly signal?: AbortSignal }) => {
-      terminal.signals.push(options?.signal);
+  // The restore assesses through JointRepair (sskr/share-restore.ts); its plan is watched here.
+  class JointRepair extends original.JointRepair {
+    override plan(records: readonly string[], options: { readonly signal?: AbortSignal } = {}) {
+      terminal.signals.push(options.signal);
       terminal.modesAtAssessments.push([...terminal.rawModes]);
       terminal.atAssessment?.();
-      const plan = original.planJointRepair(records, terminal.passSignal ? options : {});
+      const plan = super.plan(records, terminal.passSignal ? options : {});
       plan.catch((error: unknown) => terminal.assessmentErrors.push(error));
       return plan;
-    },
-  };
+    }
+  }
+  return { ...original, JointRepair };
 });
 
 import { runSskrCombine, runSskrExport } from "../src/cli/sskr-command.js";
 import { InputCancelled } from "../src/cli/terminal-input.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
-import "../src/sskr/share-platform-node.js";
 import { writeShare } from "../src/sskr/transport.js";
 
 const CTRL_C = "\x03";

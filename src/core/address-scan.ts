@@ -3,9 +3,17 @@
 // key, and how many addresses in a row a person compares when unsure which one they have. Every
 // key derived is wiped once compared.
 //
-// Host-neutral: it imports only @scure/bip32 (test/portable-modules.test.ts).
+// It also reads, as a person types them, the place of an address (account, branch, index), which
+// a page's fields read through it (parsePlaceNumber), and how many are compared, which the command
+// line's questions and a page read through it (parseAddressCount).
+//
+// Host-neutral, with @scure/bip32 (test/portable-modules.test.ts).
 
-import { HARDENED_OFFSET, type HDKey } from "@scure/bip32";
+import type { HDKey } from "@scure/bip32";
+import { HARDENED_OFFSET, LAST_NORMAL_INDEX, NORMAL_INDEX_RANGE } from "./bip32-limits.js";
+import { inWholeRange, typedWholeNumber, type WholeRange, integerRefusal } from "./typed-number.js";
+
+export { LAST_NORMAL_INDEX };
 
 /**
  * How many addresses a person compares when unsure which one they have: the first 20, BIP44's gap
@@ -17,15 +25,31 @@ export const DEFAULT_ADDRESS_COUNT = 20;
  * phrase that a search tries, and no wallet hands out more in a row without a used one between.
  */
 export const MAX_ADDRESS_COUNT = 1_000;
-/** BIP32: the highest index of an address that is not hardened, 2^31 − 1. */
-const LAST_ADDRESS_INDEX = 0x7fffffff;
+/** How many addresses one piece of evidence is compared with: one through MAX_ADDRESS_COUNT. */
+export const ADDRESS_COUNT_RANGE: WholeRange = Object.freeze({ min: 1, max: MAX_ADDRESS_COUNT });
 
 /**
  * The addresses compared from `first` on when the person names no number: the first 20
  * (DEFAULT_ADDRESS_COUNT), or as many as there are up to the last index.
  */
 export function defaultAddressCount(first: number): number {
-  return Math.max(1, Math.min(DEFAULT_ADDRESS_COUNT, LAST_ADDRESS_INDEX - first + 1));
+  return Math.max(1, Math.min(DEFAULT_ADDRESS_COUNT, LAST_NORMAL_INDEX - first + 1));
+}
+
+/**
+ * An account, a branch or an index as typed: a whole number from 0 through LAST_NORMAL_INDEX,
+ * leading zeros allowed; otherwise refused with a line that says what fits.
+ */
+export function parsePlaceNumber(answer: string): number {
+  return typedWholeNumber(answer, NORMAL_INDEX_RANGE);
+}
+
+/**
+ * How many addresses are compared, as typed: a whole number from 1 through MAX_ADDRESS_COUNT,
+ * leading zeros allowed, which from `first` on stays below the hardened indexes (addressCount).
+ */
+export function parseAddressCount(answer: string, first = 0): number {
+  return addressCount(typedWholeNumber(answer, ADDRESS_COUNT_RANGE), first);
 }
 
 /** What a check derives from a node and its public key when it is the evidence's key. */
@@ -50,21 +74,23 @@ export interface AddressRange {
  */
 export function addressCount(requested: number | undefined, first: number): number {
   if (requested === undefined) return 1;
-  if (!Number.isSafeInteger(requested) || requested < 1 || requested > MAX_ADDRESS_COUNT)
-    throw new Error(
-      `The number of addresses compared must be an integer from 1 through ${MAX_ADDRESS_COUNT}.`,
-    );
-  if (first + requested - 1 > LAST_ADDRESS_INDEX)
-    throw new Error(`The addresses compared would pass index ${LAST_ADDRESS_INDEX}.`);
+  if (!inWholeRange(requested, ADDRESS_COUNT_RANGE))
+    throw new Error(integerRefusal("The number of addresses compared", ADDRESS_COUNT_RANGE));
+  if (first + requested - 1 > LAST_NORMAL_INDEX)
+    throw new Error(`The addresses compared would pass index ${LAST_NORMAL_INDEX}.`);
   return requested;
 }
 
 /** The key at `path` compared by `matchOf`; it is wiped once compared. */
 export function matchAtPath(root: HDKey, path: string, matchOf: KeyMatch): FoundKey | undefined {
-  const node = deriveWiping(root, path);
+  const derived = matchWiping(deriveWiping(root, path), matchOf);
+  return derived === undefined ? undefined : { derived, path };
+}
+
+/** What `matchOf` says of `node`, which is wiped once compared, whatever the comparison does. */
+function matchWiping(node: HDKey, matchOf: KeyMatch): string | undefined {
   try {
-    const derived = matchOf(node, publicKeyOf(node));
-    return derived === undefined ? undefined : { derived, path };
+    return matchOf(node, publicKeyOf(node));
   } finally {
     node.wipePrivateData();
   }
@@ -84,13 +110,8 @@ export function scanBranch(
   const branch = deriveWiping(root, branchPath);
   try {
     for (let index = range.first; index < range.first + range.count; index += 1) {
-      const node = branch.deriveChild(index);
-      try {
-        const derived = matchOf(node, publicKeyOf(node));
-        if (derived !== undefined) return { derived, path: `${branchPath}/${index}` };
-      } finally {
-        node.wipePrivateData();
-      }
+      const derived = matchWiping(branch.deriveChild(index), matchOf);
+      if (derived !== undefined) return { derived, path: `${branchPath}/${index}` };
     }
     return undefined;
   } finally {

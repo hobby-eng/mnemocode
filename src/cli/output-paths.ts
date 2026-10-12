@@ -1,38 +1,41 @@
-import { constants } from "node:fs";
+import { constants, type Stats } from "node:fs";
 import { access, lstat, realpath, stat } from "node:fs/promises";
-import { basename, dirname, extname, isAbsolute, relative, resolve } from "node:path";
+import { entryAt } from "../export/private-file.js";
+import { basename, dirname, extname, resolve, sep } from "node:path";
+import { pathsOverlap } from "./path-within.js";
 import { value, values, type ParsedArguments } from "./arguments.js";
 import { optionLabel } from "./option-copy.js";
 import { terminalNotice } from "./terminal.js";
-import { FILE_OUTPUTS, FOLDER_OUTPUTS, SAVED_OPTIONS } from "./output-options.js";
+import { FILE_INPUTS, FILE_OUTPUTS, FOLDER_OUTPUTS, SAVED_OPTIONS } from "./output-options.js";
 
-/** Options that name a file the command reads. */
-const INPUT_OPTIONS = [
-  "mnemonic-file",
-  "input-file",
-  "share-file",
-  "share-qr",
-  "candidates-key-file",
-  "candidates-passphrase-file",
-  "bip39-passphrase-file",
-  "wif-file",
-  "qr-file",
-] as const;
 /** More numbered copies of one name than this are surely a mistake. */
 const MAX_COPY_NUMBER = 999;
 
 /** Results saved under another name: the name used, and the name given. */
 const renamedOutputs = new Map<string, string>();
 
-/** What is at `path`: nothing, a folder, or something else. */
-async function entryAt(path: string): Promise<"none" | "folder" | "other"> {
-  try {
-    return (await lstat(path)).isDirectory() ? "folder" : "other";
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "none";
-    throw error;
-  }
+/**
+ * Whether `path`, given for an output, names none: a blank one, which as a path would be the
+ * current folder, or "-", which the command line reads as standard input or output.
+ */
+export function isUnusableOutputPath(path: string): boolean {
+  return path.trim() === "" || path === "-";
 }
+
+/** Refuses the output `key` given as no path (isUnusableOutputPath). */
+export function assertUsableOutputPath(key: string, path: string): void {
+  if (isUnusableOutputPath(path))
+    throw new Error(
+      `The ${optionLabel(key)} needs a path; - and empty paths are not accepted. Results always appear in the terminal.`,
+    );
+}
+
+/**
+ * The separators at the end of a path, as a folder may be given: on Windows a backslash and "/",
+ * elsewhere "/" alone, since a backslash is a character of a name there (path-within.ts), and a
+ * name that ends with one keeps it in its numbered copy (AUD-014-API011).
+ */
+const TRAILING_SEPARATORS = sep === "\\" ? /[\\/]+$/u : /\/+$/u;
 
 /**
  * "name-1.pdf", or "name-1" for a folder: without the space and the brackets of a file manager's
@@ -40,7 +43,7 @@ async function entryAt(path: string): Promise<"none" | "folder" | "other"> {
  * the QR code images named after it, can be typed in a command without quotes.
  */
 function numberedName(path: string, number: number, folder: boolean): string {
-  const trimmed = path.replace(/[\\/]+$/u, "");
+  const trimmed = path.replace(TRAILING_SEPARATORS, "");
   const extension = folder ? "" : extname(trimmed);
   return `${trimmed.slice(0, trimmed.length - extension.length)}-${number}${extension}`;
 }
@@ -52,8 +55,16 @@ function numberedName(path: string, number: number, folder: boolean): string {
  */
 export async function firstFreeName(path: string): Promise<string> {
   if ((await entryAt(path)) === "none") return path;
+  return firstFreeNumberedName(path, false);
+}
+
+/**
+ * The first numbered name of `path`, a file's or a `folder`'s, at which nothing is: "name-1.pdf",
+ * then "name-2.pdf", up to MAX_COPY_NUMBER, past which the person chooses another name.
+ */
+async function firstFreeNumberedName(path: string, folder: boolean): Promise<string> {
   for (let number = 1; number <= MAX_COPY_NUMBER; number += 1) {
-    const free = numberedName(path, number, false);
+    const free = numberedName(path, number, folder);
     if ((await entryAt(free)) === "none") return free;
   }
   throw new Error(`${path} has too many numbered copies already. Choose another name.`);
@@ -69,7 +80,7 @@ export async function firstFreeName(path: string): Promise<string> {
  */
 export async function settleOutputPaths(args: ParsedArguments): Promise<void> {
   const inputs = new Set<string>();
-  for (const key of INPUT_OPTIONS)
+  for (const key of FILE_INPUTS)
     for (const source of values(args, key))
       if (source !== "-") inputs.add(await realpath(resolve(source)).catch(() => resolve(source)));
   for (const [keys, folder] of [
@@ -78,18 +89,12 @@ export async function settleOutputPaths(args: ParsedArguments): Promise<void> {
   ] as const) {
     for (const key of keys) {
       const path = value(args, key);
-      if (path === undefined || !path.trim() || path === "-") continue;
+      if (path === undefined || isUnusableOutputPath(path)) continue;
       const taken = await entryAt(path);
       if (taken === "none" || (taken === "folder" && !folder)) continue;
       // A dangling or looping link is a taken name like any other.
       if (inputs.has(await realpath(resolve(path)).catch(() => resolve(path)))) continue;
-      let number = 1;
-      while ((await entryAt(numberedName(path, number, folder))) !== "none") {
-        number += 1;
-        if (number > MAX_COPY_NUMBER)
-          throw new Error(`${path} has too many numbered copies already. Choose another name.`);
-      }
-      const free = numberedName(path, number, folder);
+      const free = await firstFreeNumberedName(path, folder);
       renamedOutputs.set(free, path);
       args[key] = free;
     }
@@ -108,27 +113,54 @@ export function reportRenamedOutputs(): void {
   renamedOutputs.clear();
 }
 
-function contains(parent: string, child: string): boolean {
-  const relation = relative(resolve(parent), resolve(child));
-  return relation === "" || (relation.split(/[\\/]/u)[0] !== ".." && !isAbsolute(relation));
-}
-
 async function effectiveOutputPath(path: string): Promise<string> {
   const absolute = resolve(path);
-  let ancestor = dirname(absolute);
+  const found = await nearestExisting(dirname(absolute));
+  if (found === undefined) throw new Error("The output path could not be resolved safely.");
+  return resolve(found.real, ...found.missing, basename(absolute));
+}
+
+/**
+ * The nearest of `folder` and the folders above it that exists, its links resolved, and the names
+ * below it that do not exist yet, from the top; undefined when one cannot be looked at. The path
+ * of an output is resolved so, and a new folder checked where it would be made.
+ */
+async function nearestExisting(
+  folder: string,
+): Promise<{ readonly real: string; readonly missing: readonly string[] } | undefined> {
   const missing: string[] = [];
-  while (true) {
+  for (let ancestor = folder; ;) {
     try {
-      return resolve(await realpath(ancestor), ...missing.reverse(), basename(absolute));
+      return { real: await realpath(ancestor), missing: [...missing].reverse() };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw new Error("The output path could not be resolved safely.");
-      }
       const parent = dirname(ancestor);
-      if (parent === ancestor) throw new Error("The output path could not be resolved safely.");
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT" || parent === ancestor)
+        return undefined;
       missing.push(basename(ancestor));
       ancestor = parent;
     }
+  }
+}
+
+/** Why a new folder cannot be made where it is to go. */
+const FOLDER_UNWRITABLE =
+  "MnemoCode may not make a folder there; choose a folder you can write to.";
+
+/**
+ * Refuses a new folder that could not be made: where a file stands on its way, or under a folder
+ * that may not be written. The folders of its path that do not exist yet are made with it, so the
+ * nearest that exists is checked. A preflight, as for a file: the export checks again that nothing
+ * is there when it publishes the folder (absentPath).
+ */
+export async function preflightFolderDestination(path: string): Promise<void> {
+  const found = await nearestExisting(dirname(resolve(path)));
+  if (found === undefined) throw new Error(FOLDER_UNWRITABLE);
+  if (!(await stat(found.real)).isDirectory())
+    throw new Error("A file stands where a folder of this name should be; choose another name.");
+  try {
+    await access(found.real, constants.W_OK);
+  } catch (error) {
+    throw new Error(FOLDER_UNWRITABLE, { cause: error });
   }
 }
 
@@ -148,55 +180,66 @@ export async function validateOutputPaths(args: ParsedArguments): Promise<void> 
     const path = value(args, key);
     return path === undefined ? [] : [{ key, path }];
   });
+  for (const { key, path } of outputs) assertUsableOutputPath(key, path);
   const effectiveOutputs = await Promise.all(
     outputs.map(async (output) => ({ ...output, path: await effectiveOutputPath(output.path) })),
   );
   for (const [index, left] of effectiveOutputs.entries()) {
     for (const right of effectiveOutputs.slice(index + 1)) {
-      if (contains(left.path, right.path) || contains(right.path, left.path))
+      if (pathsOverlap(left.path, right.path))
         throw new Error(
           `The ${optionLabel(left.key)} and ${optionLabel(right.key)} must use separate, non-overlapping paths.`,
         );
     }
-    for (const key of INPUT_OPTIONS) {
+    for (const key of FILE_INPUTS) {
       for (const source of values(args, key)) {
         if (source === "-") continue;
         const effectiveSource = await effectiveSourcePath(source, key);
-        if (contains(left.path, effectiveSource) || contains(effectiveSource, left.path))
+        if (pathsOverlap(left.path, effectiveSource))
           throw new Error(`The ${optionLabel(left.key)} must not overlap the ${optionLabel(key)}.`);
       }
     }
   }
 }
 
-/** This is a preflight; the writer still enforces exclusive or atomic publication. */
+/** Why a file cannot be saved where it is to go: its folder is a file. */
+const FOLDER_IS_A_FILE = "The folder containing the output file is not a directory.";
+/** Why a file cannot be saved where it is to go: its folder is missing or may not be written. */
+const FOLDER_UNWRITABLE_FOR_FILE =
+  "The folder containing the output file must already exist and be writable.";
+
+/**
+ * This is a preflight; the writer still enforces exclusive or atomic publication. Every refusal is
+ * in words: an error of the file system would name the path and the system call instead.
+ */
 export async function preflightFileDestination(
   path: string,
   allowOverwrite: boolean,
 ): Promise<void> {
-  if (!path.trim() || path === "-")
+  if (isUnusableOutputPath(path))
     throw new Error(
       "File export requires a file path; - and empty paths are not accepted. Results always appear in the terminal.",
     );
+  let existing: Stats | undefined;
   try {
-    const existing = await lstat(path);
+    existing = await lstat(path);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    // A name under a file, or a folder that cannot be looked into.
+    if (code === "ENOTDIR") throw new Error(FOLDER_IS_A_FILE, { cause: error });
+    if (code !== "ENOENT") throw new Error(FOLDER_UNWRITABLE_FOR_FILE, { cause: error });
+  }
+  if (existing !== undefined) {
     if (!allowOverwrite) throw new Error("The output file already exists. Choose a new path.");
     if (existing.isDirectory()) throw new Error("The output path must be a file, not a directory.");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
   const parent = dirname(resolve(path));
+  let isDirectory: boolean;
   try {
-    if (!(await stat(parent)).isDirectory())
-      throw new Error("The folder containing the output file is not a directory.");
-    await access(parent, constants.W_OK);
+    isDirectory = (await stat(parent)).isDirectory();
+    if (isDirectory) await access(parent, constants.W_OK);
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "The folder containing the output file is not a directory."
-    ) {
-      throw error;
-    }
-    throw new Error("The folder containing the output file must already exist and be writable.");
+    throw new Error(FOLDER_UNWRITABLE_FOR_FILE, { cause: error });
   }
+  if (!isDirectory) throw new Error(FOLDER_IS_A_FILE);
 }

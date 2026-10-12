@@ -117,10 +117,12 @@ def finishes(style):
     text = SOURCE.read_text()
     block = text[text.index(f"  {style}: {{") :]
     block = block[: block.index("\n  },")]
-    # The arguments may be wrapped onto separate lines by the formatter.
-    pattern = r'finish\(\s*"([^"]+)",\s*"[0-9A-F]{6}"' + r",\s*(\d+)" * 6
+    # The size of the style's photograph is stated once, before its rows; each row gives a
+    # finish's crop in its pixels. The formatter may wrap the arguments onto separate lines.
+    width, height = re.search(r"photographed\(\s*(\d+),\s*(\d+)", block).groups()
+    pattern = r'finish\(\s*"([^"]+)",\s*"[0-9A-F]{6}"' + r",\s*(\d+)" * 4
     for name, *numbers in re.findall(pattern, block):
-        yield name, [int(n) for n in numbers]
+        yield name, [int(n) for n in numbers] + [int(width), int(height)]
 
 
 def crop_of(image, numbers):

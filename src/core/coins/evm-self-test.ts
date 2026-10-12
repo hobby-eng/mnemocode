@@ -1,27 +1,20 @@
-// The self-test of the addresses of Ethereum, Ethereum Classic and Tron (evm.ts), for a host that
-// builds them in, through core/coins-self-test.ts. The vectors' sources are in coin-self-test.ts.
+// The self-test of the addresses of Ethereum Classic and Tron (evm.ts), and of the three EVM coins
+// together with Ethereum's (ethereum-self-test.ts), for a host that builds them in, through
+// core/coins-self-test.ts. A host of Ethereum alone takes ethereum-self-test.ts instead. The
+// vectors' sources are in coin-self-test.ts.
 //
-// Host-neutral: it imports only evm.ts and coin-self-test.ts.
+// Host-neutral: it imports only evm.ts, ethereum-self-test.ts, coin-self-test.ts and
+// self-test-check.ts.
 
 import { coinFamilySelfTest } from "./coin-self-test.js";
-import { ETHEREUM, ETHEREUM_CLASSIC, TRON } from "./evm.js";
+import { ETHEREUM_ADDRESS_SELF_TEST } from "./ethereum-self-test.js";
+import { ETHEREUM_CLASSIC, TRON } from "./evm.js";
+import { combinedFeature } from "../self-test-check.js";
 
-/** The checks of the addresses of Ethereum, Ethereum Classic and Tron. */
-export const EVM_ADDRESS_SELF_TEST = coinFamilySelfTest({
-  name: "Ethereum, Ethereum Classic and Tron addresses",
+/** The checks of the addresses of Ethereum Classic and Tron. */
+export const ETHEREUM_CLASSIC_AND_TRON_ADDRESS_SELF_TEST = coinFamilySelfTest({
+  name: "Ethereum Classic and Tron addresses",
   vectors: [
-    {
-      coin: ETHEREUM,
-      passphrase: "",
-      path: "m/44'/60'/0'/0/0",
-      address: "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
-    },
-    {
-      coin: ETHEREUM,
-      passphrase: "",
-      path: "m/44'/60'/3'/1/7",
-      address: "0xc1A30611797762aea209daC2aC7E900f0cE95f9e",
-    },
     {
       coin: ETHEREUM_CLASSIC,
       passphrase: "",
@@ -49,14 +42,17 @@ export const EVM_ADDRESS_SELF_TEST = coinFamilySelfTest({
     },
   ],
   // One vector of each coin.
-  startup: [0, 2, 4],
-  elsewhere: 1,
+  startup: [0, 2],
+  elsewhere: 3,
   refused: [
-    // The EIP-55 vector with one letter's case changed.
-    {
-      coin: ETHEREUM,
-      address: "0x9858efFD232B4033E47d90003D41EC34EcaEda94",
-      because: /EIP-55 checksum/u,
-    },
+    // Tron's first address with its last character changed: its Base58Check checksum fails.
+    { coin: TRON, address: "TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdJ", because: /checksum or format/u },
   ],
 });
+
+/** The checks of the addresses of Ethereum, Ethereum Classic and Tron, as one row. */
+export const EVM_ADDRESS_SELF_TEST = combinedFeature(
+  "Ethereum, Ethereum Classic and Tron addresses",
+  "Ethereum's, then Ethereum Classic's and Tron's: their addresses, another place, refusals",
+  [ETHEREUM_ADDRESS_SELF_TEST, ETHEREUM_CLASSIC_AND_TRON_ADDRESS_SELF_TEST],
+);

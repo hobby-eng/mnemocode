@@ -5,29 +5,28 @@ import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { indexesToColors, representMnemonic, colorsToUnicode } from "../src/core.js";
 import { MM } from "../src/export/business-layout.js";
-import { resolveProfile, validateProfile, parsePageSize } from "../src/export/card-settings.js";
+import { validateProfile, parsePageSize } from "../src/export/card-settings.js";
+import { createCardIdentity } from "../src/export/card-identities.js";
 import { selectTemplate } from "../src/export/templates.js";
 import { renderCards } from "../src/export/pdf.js";
 import { parseArguments } from "../src/cli/arguments.js";
 import { businessOptions } from "../src/cli/business-options.js";
 import { validateCardOptions } from "../src/cli/card-options.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
+import { cardExportCheck } from "../src/export/cards-self-test.js";
+import { nodeCardRenderer } from "../src/export/platform-node.js";
 
 const colors = indexesToColors(
   representMnemonic(entropyToMnemonic(new Uint8Array(32), wordlist)).shiftedIndexes,
 );
 
 describe("business card collections", () => {
-  it("uses defaults only for omitted fields and validates Latin names", () => {
-    const profile = resolveProfile("architect", { name: " Alex Morgan ", email: "me@example.com" });
+  it("keeps every detail given, trimmed, and validates Latin names", () => {
+    const profile = createCardIdentity(() => 0, { name: " Alex Morgan ", email: "me@example.com" });
     expect(profile.name).toBe("Alex Morgan");
-    expect(resolveProfile("it", { name: "Jean-Luc D’Angelo" }).name).toBe("Jean-Luc D’Angelo");
-    expect(() => validateProfile({ name: "Νίκος Παππάς" })).toThrow("Latin letters only");
-    expect(profile.role).toBe("ARCHITECT");
     expect(profile.email).toBe("me@example.com");
-    expect(profile.website).toBe("vector.example");
-    expect(resolveProfile("it").name).toBe("Alex Morgan");
-    expect(resolveProfile("it").role).toBe("IT SOLUTIONS DIRECTOR");
+    expect(validateProfile({ name: "Jean-Luc D’Angelo" }).name).toBe("Jean-Luc D’Angelo");
+    expect(() => validateProfile({ name: "Νίκος Παππάς" })).toThrow("Latin letters only");
   });
 
   it("rejects silent fallbacks for invalid or repeated options and requires a PDF", () => {
@@ -39,14 +38,10 @@ describe("business card collections", () => {
       businessOptions(parseArguments(["--card-name", "One", "--card-name", "Two"])),
     ).toThrow("Provide exactly one value for the card name setting.");
     expect(() =>
-      validateCardOptions(parseArguments(["--card-email", "me@example.com"]), "colors", "direct"),
+      validateCardOptions(parseArguments(["--card-email", "me@example.com"]), "colors"),
     ).toThrow("require a PDF file");
     expect(() =>
-      validateCardOptions(
-        parseArguments(["--pdf", "a.pdf", "--page-size", "a3"]),
-        "colors",
-        "direct",
-      ),
+      validateCardOptions(parseArguments(["--pdf", "a.pdf", "--page-size", "a3"]), "colors"),
     ).toThrow("Page size");
   });
 
@@ -55,7 +50,7 @@ describe("business card collections", () => {
       ["business-architect", "a6", colors.join(" ")],
       ["business-it", "a4", colorsToUnicode(colors)],
     ] as const) {
-      const bytes = await renderCards([
+      const bytes = await renderCards(nodeCardRenderer, [
         {
           template: selectTemplate(id),
           content: {
@@ -64,7 +59,7 @@ describe("business card collections", () => {
             payload,
             pageSize: size,
             cardQr: true,
-            presentation: resolveCardPresentation({}, {}, () => 0).presentation,
+            presentation: resolveCardPresentation(() => 0, {}),
             profile: {
               name: "Alex Morgan",
               email: "me@example.com",
@@ -91,12 +86,14 @@ describe("business card collections", () => {
   it("fails on mismatched QR data and unprintable personal fields before returning a PDF", async () => {
     const template = selectTemplate("business-it");
     const content = { kind: "colors" as const, colors, payload: colors.join(" ") };
-    await expect(template.render({ ...content, payload: "MNC1:secret" })).rejects.toThrow();
-    await expect(template.render({ ...content, profile: { company: "🛸" } })).rejects.toThrow(
-      "not supported",
-    );
     await expect(
-      template.render({ ...content, profile: { email: "x".repeat(95) } }),
+      template.render(nodeCardRenderer, { ...content, payload: "MNC1:secret" }),
+    ).rejects.toThrow();
+    await expect(
+      template.render(nodeCardRenderer, { ...content, profile: { company: "🛸" } }),
+    ).rejects.toThrow("not supported");
+    await expect(
+      template.render(nodeCardRenderer, { ...content, profile: { email: "x".repeat(95) } }),
     ).rejects.toThrow("too long");
   });
 
@@ -117,11 +114,12 @@ describe("business card collections", () => {
       kind: "colors" as const,
       colors,
       payload: colors.join(" "),
-      presentation: resolveCardPresentation({}, {}, () => 0).presentation,
-      profile: resolveProfile("it", { name: "Alex Morgan" }),
+      presentation: resolveCardPresentation(() => 0, {}),
+      profile: createCardIdentity(() => 0, { name: "Alex Morgan" }),
     };
     const withQr = await PDFDocument.load(
       await template.renderIndividual!(
+        nodeCardRenderer,
         {
           ...content,
           cardQr: true,
@@ -131,6 +129,7 @@ describe("business card collections", () => {
     );
     const withoutQr = await PDFDocument.load(
       await template.renderIndividual!(
+        nodeCardRenderer,
         {
           ...content,
           cardQr: false,
@@ -140,5 +139,11 @@ describe("business card collections", () => {
     );
     expect(withQr.getPageCount()).toBe(1);
     expect(pageOperators(withQr, 0)).toBe(pageOperators(withoutQr, 0));
+  });
+});
+
+describe("the card renderers' self-test", () => {
+  it("draws a sheet of every artwork family (cardExportCheck)", async () => {
+    await expect(cardExportCheck(nodeCardRenderer).run()).resolves.toBeUndefined();
   });
 });

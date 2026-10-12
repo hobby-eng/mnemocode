@@ -6,22 +6,19 @@ import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { searchCandidates, searchCombinations, type WordSearch } from "../src/core/candidates.js";
-import { crc32 } from "../src/sskr/checksum.js";
 import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { sskrEngine } from "../src/sskr/runtime.js";
 import { combineSskrShares, restoreShareSet } from "../src/sskr/shares.js";
-import { transportToUr, urToTransport, writeShare } from "../src/sskr/transport.js";
-import "../src/sskr/share-platform-node.js";
+import { writeShare } from "../src/sskr/transport.js";
+import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
+import { SEED_BYTES } from "../src/sskr/share-platform.js";
+import { markUnits, wrongValue } from "./helpers/shares.js";
 
 /** Synthetic entropy and engine randomness, as the task of this follow-up names them. */
 const SECRET_BYTE = 0x42;
 const SEED_BYTE = 0x07;
 const SECRET_BYTES = 16;
-const SEED_BYTES = 32;
 const PHRASE = entropyToMnemonic(new Uint8Array(SECRET_BYTES).fill(SECRET_BYTE), wordlist);
-/** A byte of the share value: the header, identifier and member numbers come before it. */
-const VALUE_BYTE = 10;
-const CRC_BYTES = 4;
 
 /** The shares of PHRASE in `groups`, each [member threshold, member count], from the engine. */
 async function sharesOf(groupThreshold: number, groups: readonly number[][]): Promise<string[]> {
@@ -37,17 +34,6 @@ async function sharesOf(groupThreshold: number, groups: readonly number[][]): Pr
     secret.fill(0);
     seed.fill(0);
   }
-}
-
-/** `share` with one value byte flipped and its CRC-32 written anew: valid, but wrong. */
-function wrongValue(share: string): string {
-  const bytes = urToTransport(share);
-  bytes[VALUE_BYTE]! ^= 1;
-  new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(
-    bytes.length - CRC_BYTES,
-    crc32(bytes.slice(0, -CRC_BYTES)),
-  );
-  return transportToUr(bytes);
 }
 
 function permutations<T>(items: readonly T[]): T[][] {
@@ -341,7 +327,7 @@ describe("AUD-008 follow-up: the refusal of a share that cannot be read", () => 
     words[5] = "?";
     words[6] = words[6] === "1" ? "2" : "1";
     const typed = words.join(" ");
-    const plan = await planJointRepair([typed, second]);
+    const plan = await planJointRepair([typed, second], { platform: nodeSharePlatform });
     expect(plan.assessment.verdict).toBe("no-fit");
     expect(plan.assessment.reason).toBe(
       "Share 1 cannot be read as a share: check the elements marked with ?, and the others.",
@@ -358,15 +344,16 @@ describe("AUD-008 follow-up: the refusal of a share that cannot be read", () => 
     const words = writeShare(first, "indexes").split(" ");
     // A typing error that the checksum finds, beside a share with one element marked.
     words[6] = words[6] === "1" ? "2" : "1";
-    const marked = writeShare(second, "indexes").split(" ");
-    marked[5] = "?";
+    const marked = markUnits(second, "indexes", [5]);
     for (const typed of [words.join(" "), "not a share at all"]) {
-      const plan = await planJointRepair([typed, marked.join(" ")]);
+      const plan = await planJointRepair([typed, marked], {
+        platform: nodeSharePlatform,
+      });
       expect(plan.assessment.verdict).toBe("no-fit");
       expect(plan.assessment.reason).toBe(
         "Share 1 cannot be read as a share: check each of its elements.",
       );
-      await expect(combineSskrShares([typed, marked.join(" ")])).rejects.toThrow(
+      await expect(combineSskrShares([typed, marked])).rejects.toThrow(
         "Share 1 cannot be read as a share: check each of its elements.",
       );
     }

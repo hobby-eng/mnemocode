@@ -2,9 +2,16 @@
 // (`mhfe --help` is the model): cyan headings and options, grey values and notes, two columns
 // of a command and what it does. The text itself is in help-pages.ts.
 
-import { cardTemplates } from "../export/templates.js";
+import { cardTemplates, templateNumber } from "../export/templates.js";
 import { MNEMOCODE_VERSION } from "../version.js";
-import { type CommandName, isCommandName } from "./command-options.js";
+import {
+  type CommandName,
+  isCommandName,
+  COMMAND_FACTS,
+  flagPair,
+  HELP_FLAGS,
+  VERSION_FLAGS,
+} from "./command-options.js";
 import {
   commandHelp,
   TEST_PHRASE,
@@ -38,7 +45,7 @@ const heading = (text: string): string => paint(STYLE.heading, text);
  * "    --mode <MODE>": the option in the accent colour and its value in grey. An option without a
  * short form is moved right by the width of "-h, ", so that the long forms line up, as in clap.
  */
-function optionLabel(option: HelpOption): string {
+function flagLabel(option: HelpOption): string {
   const value = option.value === undefined ? "" : ` ${paint(STYLE.muted, `<${option.value}>`)}`;
   return `${shortFormGap(option)}${paint(STYLE.accent, option.flag)}${value}`;
 }
@@ -170,18 +177,18 @@ function usageLine(command: string, rest: string = ""): string {
 }
 
 const SHORT_HELP_OPTION: HelpOption = {
-  flag: "-h, --help",
+  flag: flagPair(HELP_FLAGS),
   summary: "Print help (see more with '--help')",
 };
 const LONG_HELP_OPTION: HelpOption = {
-  flag: "-h, --help",
+  flag: flagPair(HELP_FLAGS),
   summary: "Print help (see a summary with '-h')",
 };
 
 /** `mnemocode`, `mnemocode --help` and `mnemocode help`. */
 export function printUsage(): void {
   const commands: HelpRow[] = (Object.keys(commandHelp) as CommandName[])
-    .filter((name) => name !== "sskr-split")
+    .filter((name) => COMMAND_FACTS[name].listed)
     .map((name) => [name, commandHelp[name].summary]);
   commands.push(
     ["version", "Print the version"],
@@ -218,8 +225,8 @@ export function printUsage(): void {
     section(
       "Options:",
       columns([
-        ["-h, --help", "Print help; after a command, its help"],
-        ["-V, --version", "Print the version"],
+        [flagPair(HELP_FLAGS), "Print help; after a command, its help"],
+        [flagPair(VERSION_FLAGS), "Print the version"],
       ]),
     ),
     examples(mainExamples),
@@ -261,13 +268,13 @@ export function printCommandHelp(name: CommandName, detailed: boolean): void {
 function optionLines(options: readonly HelpOption[], detailed: boolean): string[] {
   if (!detailed)
     return labelledColumns(
-      options.map((option) => [optionLabel(option), optionWidth(option), option.summary]),
+      options.map((option) => [flagLabel(option), optionWidth(option), option.summary]),
     );
   // As clap prints `--help`: the option on its own line, then its paragraphs indented below it.
   const lines: string[] = [];
   options.forEach((option, index) => {
     if (index > 0) lines.push("");
-    lines.push(`${" ".repeat(OPTION_INDENT)}${optionLabel(option)}`);
+    lines.push(`${" ".repeat(OPTION_INDENT)}${flagLabel(option)}`);
     // A sentence of its own here; the -h line keeps clap's form, which ends in a parenthesis.
     const summary = option.summary.endsWith(")") ? option.summary : `${option.summary}.`;
     const texts = [summary, ...(option.details ?? [])];
@@ -280,10 +287,13 @@ function optionLines(options: readonly HelpOption[], detailed: boolean): string[
   return lines;
 }
 
+/** The installed designs by the numbers that --template takes, with their ids and names. */
 function templateRows(): string[] {
+  const numberWidth = String(cardTemplates.length).length;
+  const idWidth = Math.max(...cardTemplates.map((template) => template.id.length));
   return cardTemplates.map(
-    (template, index) =>
-      `  ${paint(STYLE.accent, String(index + 1).padStart(2))}  ${template.id.padEnd(24)} ${paint(STYLE.muted, template.name)}`,
+    (template) =>
+      `  ${paint(STYLE.accent, String(templateNumber(template)).padStart(numberWidth))}  ${template.id.padEnd(idWidth)}  ${paint(STYLE.muted, template.name)}`,
   );
 }
 

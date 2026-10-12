@@ -1,6 +1,21 @@
-import { isCardPageSize, type CardPageSize, type CardSettings } from "./card-settings.js";
+import {
+  isCardPageSize,
+  type CardPageSize,
+  type CardSettings,
+  assertSeparateCardSize,
+} from "./card-settings.js";
 
-export type SskrCardLayout = "qr" | "collection" | "individual";
+/** The layouts of share cards that a caller may ask for. */
+export const SSKR_CARD_LAYOUTS = Object.freeze(["qr", "collection", "individual"] as const);
+export type SskrCardLayout = (typeof SSKR_CARD_LAYOUTS)[number];
+
+/** `value` as a layout of share cards; undefined stays undefined, for the page size to decide. */
+export function parseSskrLayout(value: string | undefined): SskrCardLayout | undefined {
+  if (value === undefined) return undefined;
+  if (!(SSKR_CARD_LAYOUTS as readonly string[]).includes(value))
+    throw new Error(`The card layout must be one of: ${SSKR_CARD_LAYOUTS.join(", ")}.`);
+  return value as SskrCardLayout;
+}
 /**
  * The page size decides the layout, as for ordinary cards: a sheet size gives one
  * collection sheet per share, a card size gives separate numbered cards. A QR card
@@ -16,10 +31,7 @@ export function resolveSskrLayout(
     throw new Error(
       "The business page size gives separate cards. Choose the A6 or A4 size for a collection sheet.",
     );
-  if (requested === "individual" && pageSize !== undefined && !cards)
-    throw new Error(
-      "Separate cards have the business size. Choose the business size, or leave the size out.",
-    );
+  if (requested === "individual") assertSeparateCardSize(pageSize);
   return requested ?? (cards ? "individual" : "collection");
 }
 

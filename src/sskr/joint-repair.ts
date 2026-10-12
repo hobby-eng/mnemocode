@@ -1,6 +1,6 @@
 // Repairs the shares of one SSKR set together, each with elements marked with ? where they are
 // unreadable. Every share alone gives an affine space of solutions over the bits of its marks
-// (repair.ts, readingSpace). Across shares more is known, and all of it is linear over GF(2): the
+// (repair.ts, ReadingSpace). Across shares more is known, and all of it is linear over GF(2): the
 // shares carry the same identifier and thresholds, each its member number, and every share beyond
 // the first `threshold` lies on their polynomial (gf256.ts; multiplying by a known constant is
 // GF(2)-linear). Solving all of it together settles what no share settles alone. What is still
@@ -11,75 +11,90 @@
 // Only sets of one group are repaired, which is all that MnemoCode writes. JointRepair, at the
 // end, is the entry: built with the host's SharePlatform (share-platform.ts), whose HMAC-SHA256
 // checks each candidate and whose SSKR library restores it, it assesses the shares and searches
-// them. Long work gives the host a turn now and then, so that it can show progress or stop it.
-// The functions before it stay for the hosts that already call them; without a platform of their
-// own they use the one configured with configureSharePlatform, as the Node.js entry configures it.
+// them. Long work gives the host a turn now and then (SearchTurns, as every search of the library
+// does), so that it can show progress or stop it. Joint and Branch, private here, are one reading
+// of every share and a solved way to read them; each owns what it computes and the arrays of the
+// secret that it holds. The functions before JointRepair stay for the hosts that already call
+// them, and take the host's SharePlatform as JointRepair does: no platform is read from elsewhere.
 //
-// Needs from the host: its SharePlatform, and an AbortSignal and a progress callback for a search.
-// Does not: ask whether to search, say what a repair filled in (repair-report.ts), or name shares
-// by where they were typed (share-input.ts).
+// Needs from the host: its SharePlatform, the places at which the shares were typed, by which its
+// refusals name them, and an AbortSignal, a turn and a progress callback for a search.
+// Does not: ask whether to search, say what a repair filled in (repair-report.ts), or tell which
+// shares a person typed (share-input.ts).
 
-import { entropyToMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { TURN_MILLISECONDS } from "../core/search-turns.js";
-import { bytesToBits, solve, topBit } from "./gf2.js";
+import { wipeAll, BITS_PER_BYTE, xorInto } from "../core/bits.js";
+import { BIP39_ENTROPY_BYTES } from "../core/bip39-sizes.js";
+import {
+  SearchTurns,
+  startTimer,
+  type SearchProgress,
+  type SearchRun,
+} from "../core/search-turns.js";
+import {
+  BitFields,
+  bytesToBits,
+  combination,
+  linearize,
+  PivotBasis,
+  solve,
+  unitVectors,
+} from "./gf2.js";
 import { DIGEST_X, gfMultiply, lagrangeCoefficients, SECRET_X } from "./gf256.js";
 import {
-  candidateCounts,
-  choicesAt,
-  reachesMetadata,
+  AMBIGUOUS_MARK_WIDTHS,
+  AmbiguousMarksError,
+  everyPick,
   markCount,
-  markedReadings,
+  MarkedReading,
   markProblem,
-  MAX_REPAIR_TEXT_LENGTH,
   placesWithin,
-  METADATA_BYTES,
-  readingSpace,
-  type FilledElement,
   type ReadingSpace,
   type ReadRepairableShare,
+  exceedsMarks,
+  markLimit,
 } from "./repair.js";
-import { sharePlatform, type SharePlatform } from "./share-platform.js";
-import { readShare, validateShareSet, type ShareFormat } from "./transport.js";
+import type { SharePlatform } from "./share-platform.js";
+import { type ShareFormat, assertShareCount } from "./transport.js";
+import { withoutCopies } from "./set-topology.js";
+import {
+  GROUP_BYTE,
+  LOW_NIBBLE,
+  MEMBER_BYTE,
+  MEMBER_THRESHOLD_BYTE,
+  NIBBLE_BITS,
+  SHARE_METADATA_BYTES,
+  MIN_DIGEST_THRESHOLD,
+  storedCount,
+} from "./share-layout.js";
+import { restoreCompleteShares, uncheckedField } from "./complete-shares.js";
+import { afterPlace } from "../core/prose.js";
+import { placeOf } from "../core/places.js";
 
 /** Marked elements on one share. The other shares settle most of them; see the assessment. */
 export const MAX_JOINT_MARKED_ELEMENTS = 64;
-/** The most ? on one share: a ? for each of the six digits of every color it may mark. */
-const MAX_JOINT_MARK_SYMBOLS = MAX_JOINT_MARKED_ELEMENTS * 6;
 /**
  * Combinations that a search may try, 2^40 in all: they take weeks, and leave about 2^8 phrases
  * that pass by chance.
  */
 export const MAX_SEARCH_BITS = 40;
+/** The combinations that a repair may search, MAX_SEARCH_BITS as a count. */
+export const MAX_REPAIR_COMBINATIONS = 2 ** MAX_SEARCH_BITS;
 /** The digest bits that bc-shamir compares (bc-shamir 0.13.0, shamir.rs, recover_secret). */
 export const DIGEST_BITS = 32;
-const DIGEST_BYTES = DIGEST_BITS / 8;
-/** Ways to read the shares (forms and member numbers) that are solved before refusing. */
-const MAX_BRANCHES = 4096;
-/** Unsettled bits of the thresholds and member numbers; 2^12 = MAX_BRANCHES. */
+const DIGEST_BYTES = DIGEST_BITS / BITS_PER_BYTE;
+/** Unsettled bits of the thresholds and member numbers, which MAX_BRANCHES follows from. */
 const MAX_LABEL_BITS = 12;
+/** Ways to read the shares (forms and member numbers) that are solved before refusing. */
+const MAX_BRANCHES = 2 ** MAX_LABEL_BITS;
 /** Values of undetermined elements tried until the shares read; they do not change the phrase. */
 const MAX_HIDDEN_TRIES_BITS = 8;
 /**
- * Digest checks between two turns of the event loop, so that progress shows and a stop is heard.
- * A turn costs about a millisecond (the least delay of setTimeout), so they are some 50 ms apart.
+ * Digest checks between two reports of progress, each followed by a look at the search's turns
+ * (SearchTurns.due). A deliberate fast path: each check is a synchronous HMAC-SHA256 of a
+ * microsecond or so, and asking for a turn after every one of up to 2^40 of them would add a
+ * microtask to each.
  */
-const TRIES_PER_TURN = 16_384;
-const BYTE_BITS = 8;
-const NIBBLE_BITS = 4;
-const NIBBLE = 0x0f;
-/** SSKR metadata (sskr encoding.rs): identifier, group thresholds, group and member threshold. */
-const GROUP_BYTE = 2;
-const MEMBER_THRESHOLD_BYTE = 3;
-const MEMBER_BYTE = 4;
-/** Secret lengths of BIP39 entropy, 12 to 24 words. */
-const BIP39_ENTROPY_BYTES = new Set([16, 20, 24, 28, 32]);
-
-/** Lets the host run: progress, a stop, Ctrl+C. setTimeout exists in every host. */
-function nextTurn(signal: AbortSignal | undefined): Promise<void> {
-  signal?.throwIfAborted();
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
+const TRIES_PER_PROGRESS = 16_384;
 
 /** A marked element: its share and place, both counted from 1. */
 export interface MarkedElement {
@@ -117,6 +132,8 @@ export interface JointAssessment {
   readonly moreShares: number;
   /** Elements whose reading would leave fewer bits open, best first. */
   readonly helps: readonly ElementHelp[];
+  /** The share, counted from 1, that no reading fits: the one that a "no-fit" refusal names. */
+  readonly unfit?: number;
   /**
    * "determined": no bit is open, and the search checks one candidate per way to read the shares;
    * "search": the digest decides among `combinations`; the others refuse, with `reason`.
@@ -125,12 +142,16 @@ export interface JointAssessment {
   readonly reason?: string;
 }
 
-/** A phrase that the shares restore, with every share as repaired. */
-export interface RepairedSet {
-  readonly mnemonic: string;
+/** The shares of a set as written again, and what a repair left unsettled in them. */
+export interface RepairedShares {
   readonly shares: readonly ReadRepairableShare[];
   /** Elements that the phrase does not depend on and nothing settles: their values are a guess. */
   readonly unsettled: readonly MarkedElement[];
+}
+
+/** A phrase that the shares restore, with every share as repaired. */
+export interface RepairedSet extends RepairedShares {
+  readonly mnemonic: string;
   /**
    * Shares, counted from 1, that took no part and were not checked: members of a group with fewer
    * than its threshold, in a set of several groups.
@@ -138,108 +159,330 @@ export interface RepairedSet {
   readonly unchecked?: readonly number[];
 }
 
-export interface SearchOptions {
+/** How far a search of marked shares has come: digest checks made, of all, and phrases found. */
+export interface RepairProgress extends SearchProgress {
+  readonly total: number;
+}
+
+/** How a host runs a search: its signal and turn (SearchRun), and its progress. */
+export interface SearchOptions extends SearchRun {
   /** Called now and then with the checks made, of all, and the phrases found so far. */
-  readonly onProgress?: (done: number, total: number, found: number) => void;
-  /** Stops the search between two turns; it then rejects with the signal's reason. */
-  readonly signal?: AbortSignal;
+  readonly onProgress?: ((progress: RepairProgress) => void) | undefined;
 }
 
 export interface JointPlan {
   readonly assessment: JointAssessment;
   /** Tries every open combination; resolves with every phrase that passes, possibly none. */
   readonly search: (options?: SearchOptions) => Promise<RepairedSet[]>;
+  /** Wipes what the search keeps of the shares' secret; the plan searches no more after it. */
+  readonly wipe: () => void;
 }
 
-/** One reading per share, and joint coordinates: bit offsets[s] + j is basis vector j of share s. */
-interface Joint {
-  readonly spaces: readonly ReadingSpace[];
-  readonly offsets: readonly number[];
-  readonly dimensions: number;
-  readonly secretBytes: number;
+/** The phrases of `plan`'s one search; what the plan kept of the secret is wiped after it. */
+export async function searchOnce(plan: JointPlan, options?: SearchOptions): Promise<RepairedSet[]> {
+  try {
+    return await plan.search(options);
+  } finally {
+    plan.wipe();
+  }
 }
 
-/** A solved way to read the shares. */
-interface Branch {
+/**
+ * One reading of every share, and their joint coordinates: bit offsets[s] + j is basis vector j of
+ * share s. A class, so that the coordinates are laid out once and every question in them, a
+ * share's marked bits or its payload at a joint point, is answered from that layout.
+ */
+class Joint {
+  readonly #spaces: readonly ReadingSpace[];
+  readonly #offsets: readonly number[];
+  readonly #secretBytes: number;
+
+  constructor(spaces: readonly ReadingSpace[], secretBytes: number) {
+    this.#spaces = spaces;
+    this.#offsets = spaces.map((_, share) =>
+      spaces.slice(0, share).reduce((sum, space) => sum + space.basis.length, 0),
+    );
+    this.#secretBytes = secretBytes;
+  }
+
+  /** The reading of each share. */
+  get spaces(): readonly ReadingSpace[] {
+    return this.#spaces;
+  }
+
+  /** The bytes of the secret that every reading is of. */
+  get secretBytes(): number {
+    return this.#secretBytes;
+  }
+
+  /** The joint coordinates: every basis vector of every share. */
+  get dimensions(): number {
+    return this.#offsets.at(-1)! + this.#spaces.at(-1)!.basis.length;
+  }
+
+  /** The change that joint direction `z` makes to the marked bits of share `share`. */
+  holeChange(share: number, z: bigint): bigint {
+    return combination(this.#spaces[share]!.basis, this.#own(share, z));
+  }
+
+  /**
+   * `use` applied to every share's payload at joint point `z`, which are wiped once it has its
+   * answer: each holds a share's part of the secret, and only the answer is kept.
+   */
+  withPayloadsAt<T>(z: bigint, use: (payloads: readonly Uint8Array[]) => T): T {
+    const payloads = this.#spaces.map((space, share) => space.payloadAt(this.#own(share, z)));
+    try {
+      return use(payloads);
+    } finally {
+      for (const payload of payloads) payload.fill(0);
+    }
+  }
+
+  /** The arrays of every reading that hold a share's part of the secret. */
+  secretArrays(): Uint8Array[] {
+    return this.#spaces.flatMap((space) => space.secretArrays());
+  }
+
+  /** The bits of joint point `z` that pick share `share`'s basis vectors. */
+  #own(share: number, z: bigint): bigint {
+    return z >> BigInt(this.#offsets[share]!);
+  }
+}
+
+/** What a solved way to read the shares is made of (Branch). */
+interface BranchParts {
   readonly joint: Joint;
   readonly threshold: number;
   readonly members: readonly number[];
-  /** The first `threshold` shares with distinct members, which the polynomial is taken from. */
-  readonly base: readonly number[];
   readonly particular: bigint;
   /** Directions that change the secret or the digest, each with the change it makes to them. */
   readonly visible: readonly bigint[];
   readonly visibleDeltas: readonly Uint8Array[];
   /** Directions that change neither. */
   readonly hidden: readonly bigint[];
+  /** The secret and the digest share at `particular`, S then D. */
   readonly secretAndDigest: Uint8Array;
 }
 
-/** Bit fields packed into one vector, the first at bit 0. */
-class Fields {
-  vector = 0n;
-  width = 0;
+/**
+ * A solved way to read the shares: a threshold, a member number for each share, and the affine
+ * space of the joint points that fit them, split into the directions that the digest decides and
+ * those that it does not. A class because it holds a share's part of the secret, its (S, D) and
+ * the changes to them, which it names for wiping (secretArrays), and because every question of
+ * the plan and its search about one way to read the shares is answered by it.
+ */
+class Branch {
+  readonly #parts: BranchParts;
 
-  add(value: number, bits: number): void {
-    this.vector |= BigInt(value & ((1 << bits) - 1)) << BigInt(this.width);
-    this.width += bits;
+  constructor(parts: BranchParts) {
+    this.#parts = parts;
+  }
+
+  /** The member threshold of this way to read the shares. */
+  get threshold(): number {
+    return this.#parts.threshold;
+  }
+
+  /** The bytes of the secret. */
+  get secretBytes(): number {
+    return this.#parts.joint.secretBytes;
+  }
+
+  /** Bits that only the digest can decide. */
+  get openBits(): number {
+    return this.#parts.visible.length;
+  }
+
+  /** The combinations that a search of this branch tries. */
+  get combinations(): number {
+    return 2 ** this.openBits;
+  }
+
+  /** The readings of the shares that the branch was solved from. */
+  get spaces(): readonly ReadingSpace[] {
+    return this.#parts.joint.spaces;
+  }
+
+  /** The branch's own arrays that hold a share's part of the secret: its (S, D) and changes. */
+  secretArrays(): Uint8Array[] {
+    return [this.#parts.secretAndDigest, ...this.#parts.visibleDeltas];
+  }
+
+  /** Those of the branch with those of the readings it was solved from. */
+  allSecretArrays(): Uint8Array[] {
+    return [...this.secretArrays(), ...this.#parts.joint.secretArrays()];
+  }
+
+  /** Open bits of this branch if marked element `hole` of share `share` were read. */
+  openBitsIfRead(share: number, hole: number): number {
+    const { joint, visible, visibleDeltas, hidden } = this.#parts;
+    const mask = joint.spaces[share]!.unitMask(hole);
+    // Each direction with the change it makes in (S, D): a pair, typed as one so that a host that
+    // compiles with noUncheckedIndexedAccess reads both of its parts as present.
+    const directions: (readonly [bigint, bigint])[] = [
+      ...visible.map((direction, i): readonly [bigint, bigint] => [
+        direction,
+        bytesToBits(visibleDeltas[i]!),
+      ]),
+      ...hidden.map((direction): readonly [bigint, bigint] => [direction, 0n]),
+    ];
+    // The combinations of directions that leave this element as it is, with their images in
+    // (S, D). Each pivot is a change to the element, with the image in (S, D) of the directions
+    // behind it.
+    const parts = new PivotBasis();
+    const kept: bigint[] = [];
+    for (const [direction, image] of directions) {
+      const reduced = parts.add(joint.holeChange(share, direction) & mask, image);
+      if (reduced.vector === 0n) kept.push(reduced.companion);
+    }
+    return basisOf(kept).length;
+  }
+
+  /**
+   * About how many more shares would settle what this branch leaves open. Each share beyond the
+   * threshold adds as many equations as the secret has bits, and `threshold` shares without marks
+   * settle everything; the marks of the new shares, or equations that depend on others, can make
+   * one more needed.
+   */
+  sharesToSettle(shares: readonly ShareAssessment[]): number {
+    const { threshold, members } = this.#parts;
+    if (this.openBits === 0) return 0;
+    const clean = new Set(members.filter((_, share) => shares[share]!.marks === 0)).size;
+    const byEquations = Math.ceil(this.openBits / (BITS_PER_BYTE * this.secretBytes));
+    return Math.max(1, Math.min(threshold - clean, byEquations));
+  }
+
+  /**
+   * Tries every open combination of this branch against the digest, in Gray code order so that
+   * each step adds one known change to (S, D); each candidate that passes is read and restored by
+   * the SSKR library, and given to `found`. `tried` is told of every try; it may return a promise,
+   * such as a turn of the host, which is awaited before the next try.
+   */
+  async searchDigest(
+    platform: SharePlatform,
+    found: (set: RepairedSet) => void,
+    tried: () => Promise<void> | undefined,
+  ): Promise<void> {
+    const { particular, visible, visibleDeltas } = this.#parts;
+    const current = Uint8Array.from(this.#parts.secretAndDigest);
+    try {
+      for (let step = 0; step < this.combinations; step += 1) {
+        if (step > 0) {
+          xorInto(current, visibleDeltas[lowestBit(step)]!);
+        }
+        if (digestFits(current, this.secretBytes, platform.hmacSha256)) {
+          const gray = BigInt(step) ^ (BigInt(step) >> 1n);
+          const repaired = await this.#confirm(particular ^ combination(visible, gray), platform);
+          if (repaired !== undefined) found(repaired);
+        }
+        const turn = tried();
+        if (turn !== undefined) await turn;
+      }
+    } finally {
+      current.fill(0);
+    }
+  }
+
+  /** Elements that a hidden direction changes. */
+  unsettledElements(): MarkedElement[] {
+    const { joint, hidden } = this.#parts;
+    return joint.spaces.flatMap((space, share) => {
+      const changed = hidden.reduce(
+        (bits, direction) => bits | joint.holeChange(share, direction),
+        0n,
+      );
+      return space
+        .holesChangedBy(changed)
+        .map((place) => ({ share: share + 1, position: place + 1 }));
+    });
+  }
+
+  /** Every share at joint point `z`, read as an ordinary share; undefined if one does not read. */
+  #readCandidate(z: bigint): ReadRepairableShare[] | undefined {
+    const { joint } = this.#parts;
+    const shares: ReadRepairableShare[] = [];
+    for (const [share, space] of joint.spaces.entries()) {
+      const values = space.valuesAt(space.particular ^ joint.holeChange(share, z));
+      const read = space.reading.solvedShare(values);
+      if (read === undefined) return undefined;
+      shares.push(read);
+    }
+    return shares;
+  }
+
+  /**
+   * Reads the shares of a candidate that passed the digest and restores the phrase. Undetermined
+   * elements do not change the phrase; the first of their values with which every share reads are
+   * taken, and they are reported as unsettled.
+   */
+  async #confirm(z: bigint, platform: SharePlatform): Promise<RepairedSet | undefined> {
+    const { hidden } = this.#parts;
+    const hiddenBits = Math.min(hidden.length, MAX_HIDDEN_TRIES_BITS);
+    for (let choice = 0; choice < 2 ** hiddenBits; choice += 1) {
+      const shares = this.#readCandidate(z ^ combination(hidden, BigInt(choice)));
+      if (shares === undefined) continue;
+      const restored = await restore(shares, platform);
+      if (restored === undefined) return undefined;
+      const { mnemonic, unchecked } = restored;
+      return {
+        mnemonic,
+        shares,
+        unsettled: this.unsettledElements(),
+        ...uncheckedField(unchecked),
+      };
+    }
+    return undefined;
   }
 }
 
-/** The XOR of `vectors[i]` for every bit i set in `choice`. */
-function combine(vectors: readonly bigint[], choice: bigint): bigint {
-  let sum = 0n;
-  vectors.forEach((vector, index) => {
-    if ((choice >> BigInt(index)) & 1n) sum ^= vector;
-  });
-  return sum;
-}
+/**
+ * The arrays that hold a share's part of the secret, made while the shares are assessed: the
+ * payloads of their readings with the changes to them, and the secret and digest of each branch
+ * with the changes to those. A class because one owner gathers them wherever they are made, so
+ * that once the plan is made every array that its search does not keep is wiped: the readings and
+ * branches that a better reading replaced, those of a refusal or of an assessment too open to
+ * search, and all of them when the assessment is stopped (AUD-012-SEC004). Each reading and branch
+ * names its own arrays (secretArrays), so that what is gathered and what is kept are one list.
+ */
+class AssessmentSecrets {
+  readonly #made = new Set<Uint8Array>();
 
-/** The change that joint direction `z` makes to the marked bits of share `share`. */
-function holeChange(joint: Joint, share: number, z: bigint): bigint {
-  return combine(joint.spaces[share]!.basis, z >> BigInt(joint.offsets[share]!));
-}
+  /** Readings of the shares, solved for the assessment. */
+  addSpaces(spaces: readonly ReadingSpace[]): void {
+    for (const array of spaces.flatMap((space) => space.secretArrays())) this.#made.add(array);
+  }
 
-function payloadsAt(joint: Joint, z: bigint): Uint8Array[] {
-  return joint.spaces.map((space, share) => {
-    const payload = Uint8Array.from(space.payload);
-    const own = z >> BigInt(joint.offsets[share]!);
-    space.payloadDeltas.forEach((delta, j) => {
-      if ((own >> BigInt(j)) & 1n)
-        for (let index = 0; index < payload.length; index += 1) payload[index]! ^= delta[index]!;
-    });
-    return payload;
-  });
-}
+  /** A way to read the shares, solved for the assessment. */
+  addBranch(branch: Branch): void {
+    for (const array of branch.secretArrays()) this.#made.add(array);
+  }
 
-/** An affine map at `origin`, and its change along each of `directions`. */
-function linearize(
-  map: (z: bigint) => bigint,
-  origin: bigint,
-  directions: readonly bigint[],
-): { readonly value: bigint; readonly columns: bigint[] } {
-  const value = map(origin);
-  return { value, columns: directions.map((direction) => map(origin ^ direction) ^ value) };
+  /** Wipes every array made but those that `kept`, the branches of the plan's search, hold. */
+  wipeAllBut(kept: readonly Branch[]): void {
+    const keep = new Set(kept.flatMap((branch) => branch.allSecretArrays()));
+    for (const array of this.#made) if (!keep.has(array)) array.fill(0);
+    this.#made.clear();
+  }
 }
 
 /** Rows that hold for every reading of a set of one group: one group, and the same metadata. */
 function sharedResidual(payloads: readonly Uint8Array[]): bigint {
-  const fields = new Fields();
+  const fields = new BitFields();
   const first = payloads[0]!;
   // One group of one: group threshold and count 1, group index 0.
-  fields.add(first[GROUP_BYTE]!, BYTE_BITS);
+  fields.add(first[GROUP_BYTE]!, BITS_PER_BYTE);
   fields.add(first[MEMBER_THRESHOLD_BYTE]! >>> NIBBLE_BITS, NIBBLE_BITS);
   for (const payload of payloads.slice(1))
     for (let byte = 0; byte < MEMBER_BYTE; byte += 1)
-      fields.add(payload[byte]! ^ first[byte]!, BYTE_BITS);
+      fields.add(payload[byte]! ^ first[byte]!, BITS_PER_BYTE);
   return fields.vector;
 }
 
 /** The member threshold, less one, then the member number of every share, 4 bits each. */
 function labelsOf(payloads: readonly Uint8Array[]): bigint {
-  const fields = new Fields();
-  fields.add(payloads[0]![MEMBER_THRESHOLD_BYTE]! & NIBBLE, NIBBLE_BITS);
-  for (const payload of payloads) fields.add(payload[MEMBER_BYTE]! & NIBBLE, NIBBLE_BITS);
+  const fields = new BitFields();
+  fields.add(payloads[0]![MEMBER_THRESHOLD_BYTE]! & LOW_NIBBLE, NIBBLE_BITS);
+  for (const payload of payloads) fields.add(payload[MEMBER_BYTE]! & LOW_NIBBLE, NIBBLE_BITS);
   return fields.vector;
 }
 
@@ -250,20 +493,20 @@ function polynomialResidual(
   base: readonly number[],
   secretBytes: number,
 ): bigint {
-  const fields = new Fields();
+  const fields = new BitFields();
   const xs = base.map((share) => members[share]!);
   payloads.forEach((payload, share) => {
     if (base.includes(share)) return;
     const copyOf = base.find((other) => members[other] === members[share]);
     const lambdas = copyOf === undefined ? lagrangeCoefficients(xs, members[share]!) : [];
-    for (let k = METADATA_BYTES; k < METADATA_BYTES + secretBytes; k += 1) {
+    for (let k = SHARE_METADATA_BYTES; k < SHARE_METADATA_BYTES + secretBytes; k += 1) {
       let value = payload[k]!;
       if (copyOf !== undefined) value ^= payloads[copyOf]![k]!;
       else
         base.forEach((other, i) => {
           value ^= gfMultiply(lambdas[i]!, payloads[other]![k]!);
         });
-      fields.add(value, BYTE_BITS);
+      fields.add(value, BITS_PER_BYTE);
     }
   });
   return fields.vector;
@@ -282,37 +525,44 @@ function secretAndDigest(
   const out = new Uint8Array(2 * secretBytes);
   for (let k = 0; k < secretBytes; k += 1)
     base.forEach((share, i) => {
-      const y = payloads[share]![METADATA_BYTES + k]!;
+      const y = payloads[share]![SHARE_METADATA_BYTES + k]!;
       out[k]! ^= gfMultiply(toSecret[i]!, y);
       out[secretBytes + k]! ^= gfMultiply(toDigest[i]!, y);
     });
   return out;
 }
 
-type Hmac = (key: Uint8Array, message: Uint8Array) => Uint8Array;
+type Hmac = SharePlatform["hmacSha256"];
 
 /** bc-shamir's check: HMAC-SHA256(key: D[4..], message: S) begins with D[0..4]. */
 function digestFits(secretAndDigestBytes: Uint8Array, secretBytes: number, hmac: Hmac): boolean {
   const secret = secretAndDigestBytes.subarray(0, secretBytes);
   const digest = secretAndDigestBytes.subarray(secretBytes);
   const mac = hmac(digest.subarray(DIGEST_BYTES), secret);
-  for (let index = 0; index < DIGEST_BYTES; index += 1)
-    if (mac[index] !== digest[index]) return false;
-  return true;
+  // The MAC is the caller's (SharePlatform.hmacSha256): it is made from the secret, so it is wiped
+  // once compared; the key and the message stay with their owner.
+  try {
+    for (let index = 0; index < DIGEST_BYTES; index += 1)
+      if (mac[index] !== digest[index]) return false;
+    return true;
+  } finally {
+    mac.fill(0);
+  }
 }
 
 /**
  * Digest checks per second in this host, from a short run on zero bytes, with `platform`'s
- * HMAC-SHA256; without it, with the configured platform (JointRepair.triesPerSecond).
+ * HMAC-SHA256 (JointRepair.triesPerSecond).
  */
-export function measureTriesPerSecond(platform: SharePlatform = sharePlatform()): number {
+export function measureTriesPerSecond(platform: Pick<SharePlatform, "hmacSha256">): number {
   const { hmacSha256 } = platform;
-  const secretBytes = 32;
+  // The longest secret, so that the rate holds for every phrase.
+  const secretBytes = Math.max(...BIP39_ENTROPY_BYTES);
   const sample = new Uint8Array(2 * secretBytes);
   const tries = 10_000;
-  const start = performance.now();
+  const elapsed = startTimer();
   for (let index = 0; index < tries; index += 1) digestFits(sample, secretBytes, hmacSha256);
-  const seconds = (performance.now() - start) / 1000;
+  const seconds = elapsed();
   return tries / Math.max(seconds, 1e-6);
 }
 
@@ -323,38 +573,50 @@ function splitByDigest(
   origin: bigint,
 ): { visible: bigint[]; visibleDeltas: Uint8Array[]; hidden: bigint[] } {
   const sd0 = sdAt(origin);
-  const deltaOf = (direction: bigint) =>
-    sdAt(origin ^ direction).map((byte, index) => byte ^ sd0[index]!);
-  const pivots = new Map<number, { image: bigint; direction: bigint }>();
+  // Each (S, D) made here becomes its change from sd0 in place, which its caller wipes; sd0 is
+  // wiped at the end.
+  const deltaOf = (direction: bigint) => {
+    const delta = sdAt(origin ^ direction);
+    xorInto(delta, sd0);
+    return delta;
+  };
+  /** The change of `direction` as bits; the bytes of the change are wiped once read. */
+  const bitsOfDelta = (direction: bigint) => {
+    const delta = deltaOf(direction);
+    try {
+      return bytesToBits(delta);
+    } finally {
+      delta.fill(0);
+    }
+  };
+  // Each pivot is a change to (S, D), with the direction that makes it.
+  const images = new PivotBasis();
   const visible: bigint[] = [];
   const visibleDeltas: Uint8Array[] = [];
   const hidden: bigint[] = [];
-  for (const original of directions) {
-    let direction = original;
-    let image = bytesToBits(deltaOf(direction));
-    while (image !== 0n && pivots.has(topBit(image))) {
-      const pivot = pivots.get(topBit(image))!;
-      image ^= pivot.image;
-      direction ^= pivot.direction;
+  try {
+    for (const original of directions) {
+      const { vector: image, companion: direction } = images.add(bitsOfDelta(original), original);
+      if (image === 0n) hidden.push(direction);
+      else {
+        visible.push(direction);
+        visibleDeltas.push(deltaOf(direction));
+      }
     }
-    if (image === 0n) hidden.push(direction);
-    else {
-      pivots.set(topBit(image), { image, direction });
-      visible.push(direction);
-      visibleDeltas.push(deltaOf(direction));
-    }
+  } catch (error) {
+    for (const delta of visibleDeltas) delta.fill(0);
+    throw error;
+  } finally {
+    sd0.fill(0);
   }
   return { visible, visibleDeltas, hidden };
 }
 
 /** A basis of the span of `vectors`. */
 function basisOf(vectors: readonly bigint[]): bigint[] {
-  const pivots = new Map<number, bigint>();
-  for (let vector of vectors) {
-    while (vector !== 0n && pivots.has(topBit(vector))) vector ^= pivots.get(topBit(vector))!;
-    if (vector !== 0n) pivots.set(topBit(vector), vector);
-  }
-  return [...pivots.values()];
+  const basis = new PivotBasis();
+  for (const vector of vectors) basis.add(vector);
+  return basis.vectors;
 }
 
 /** The first `threshold` shares with distinct members, or undefined when there are fewer. */
@@ -365,16 +627,32 @@ function baseOf(members: readonly number[], threshold: number): number[] | undef
   return base.length === threshold ? base : undefined;
 }
 
-interface JointSolution {
+/** What solving readings of the shares tells of the ways to read them, one or many solved. */
+interface SolvedWays {
   readonly branches: Branch[];
   /** The rows that every reading shares have no solution: another set, or a misread element. */
   readonly conflict: boolean;
-  /** The thresholds and member numbers leave too many possibilities to solve each. */
-  readonly tooMany: boolean;
   /** Some possibility had as many distinct members as its threshold. */
   readonly enoughMembers: boolean;
   /** Some possibility gave two shares the same member number. */
   readonly duplicates: boolean;
+}
+
+/** What `more` adds to `ways`: its branches, and each fact that it tells too. */
+function withWays<Ways extends SolvedWays>(ways: Ways, more: SolvedWays): Ways {
+  return {
+    ...ways,
+    branches: [...ways.branches, ...more.branches],
+    conflict: ways.conflict || more.conflict,
+    enoughMembers: ways.enoughMembers || more.enoughMembers,
+    duplicates: ways.duplicates || more.duplicates,
+  };
+}
+
+/** What solving one reading of every share gives (solveJoint). */
+interface JointSolution extends SolvedWays {
+  /** The thresholds and member numbers leave too many possibilities to solve each. */
+  readonly tooMany: boolean;
 }
 
 /**
@@ -392,7 +670,8 @@ interface WorkBudget {
  */
 async function solveJoint(
   joint: Joint,
-  signal: AbortSignal | undefined,
+  turns: SearchTurns,
+  secrets: AssessmentSecrets,
   budget?: WorkBudget,
 ): Promise<JointSolution> {
   const solution: JointSolution = {
@@ -402,11 +681,18 @@ async function solveJoint(
     enoughMembers: false,
     duplicates: false,
   };
-  const units = Array.from({ length: joint.dimensions }, (_, bit) => 1n << BigInt(bit));
-  const shared = linearize((z) => sharedResidual(payloadsAt(joint, z)), 0n, units);
+  const shared = linearize(
+    (z) => joint.withPayloadsAt(z, sharedResidual),
+    0n,
+    unitVectors(joint.dimensions),
+  );
   const common = solve(shared.columns, shared.value);
   if (common === undefined) return { ...solution, conflict: true };
-  const labels = linearize((z) => labelsOf(payloadsAt(joint, z)), common.particular, common.free);
+  const labels = linearize(
+    (z) => joint.withPayloadsAt(z, labelsOf),
+    common.particular,
+    common.free,
+  );
   const labelBasis = basisOf(labels.columns);
   if (labelBasis.length > MAX_LABEL_BITS) return { ...solution, tooMany: true };
   if (budget !== undefined) {
@@ -418,101 +704,56 @@ async function solveJoint(
   const shares = joint.spaces.length;
   const labelWidth = BigInt(NIBBLE_BITS * (shares + 1));
   let { enoughMembers, duplicates } = solution;
-  let turned = Date.now();
   for (let choice = 0; choice < 2 ** labelBasis.length; choice += 1) {
     // A turn now and then, not for each choice: a turn costs about a millisecond.
-    signal?.throwIfAborted();
-    if (Date.now() - turned >= TURN_MILLISECONDS) {
-      await nextTurn(signal);
-      turned = Date.now();
-    }
-    const label = labels.value ^ combine(labelBasis, BigInt(choice));
-    const threshold = Number(label & BigInt(NIBBLE)) + 1;
+    await turns.due();
+    const label = labels.value ^ combination(labelBasis, BigInt(choice));
+    const threshold = storedCount(Number(label & BigInt(LOW_NIBBLE)));
     const members = Array.from({ length: shares }, (_, share) =>
-      Number((label >> BigInt(NIBBLE_BITS * (share + 1))) & BigInt(NIBBLE)),
+      Number((label >> BigInt(NIBBLE_BITS * (share + 1))) & BigInt(LOW_NIBBLE)),
     );
     duplicates ||= new Set(members).size < shares;
     // A threshold of 1 keeps no digest, so nothing would be checked.
-    const base = threshold < 2 ? undefined : baseOf(members, threshold);
+    const base = threshold < MIN_DIGEST_THRESHOLD ? undefined : baseOf(members, threshold);
     if (base === undefined) continue;
     enoughMembers = true;
-    const residual = (z: bigint) => {
-      const payloads = payloadsAt(joint, z);
-      const polynomial = polynomialResidual(payloads, members, base, joint.secretBytes);
-      return (labelsOf(payloads) ^ label) | (polynomial << labelWidth);
-    };
+    const residual = (z: bigint) =>
+      joint.withPayloadsAt(z, (payloads) => {
+        const polynomial = polynomialResidual(payloads, members, base, joint.secretBytes);
+        return (labelsOf(payloads) ^ label) | (polynomial << labelWidth);
+      });
     const local = linearize(residual, common.particular, common.free);
     const solved = solve(local.columns, local.value);
     if (solved === undefined) continue;
-    const particular = common.particular ^ combine(common.free, solved.particular);
-    const free = solved.free.map((direction) => combine(common.free, direction));
+    const particular = common.particular ^ combination(common.free, solved.particular);
+    const free = solved.free.map((direction) => combination(common.free, direction));
     const sdAt = (z: bigint) =>
-      secretAndDigest(payloadsAt(joint, z), members, base, joint.secretBytes);
-    solution.branches.push({
+      joint.withPayloadsAt(z, (payloads) =>
+        secretAndDigest(payloads, members, base, joint.secretBytes),
+      );
+    const branch = new Branch({
       joint,
       threshold,
       members,
-      base,
       particular,
       ...splitByDigest(free, sdAt, particular),
       secretAndDigest: sdAt(particular),
     });
+    secrets.addBranch(branch);
+    solution.branches.push(branch);
   }
   return { ...solution, enoughMembers, duplicates };
 }
 
-/** Whether a share plainly belongs to a set of several groups. */
+/**
+ * Whether a share plainly belongs to a set of several groups: its group byte is set in every
+ * reading.
+ */
 function severalGroups(spaces: readonly ReadingSpace[]): boolean {
-  return spaces.every(
-    (space) =>
-      space.payload[GROUP_BYTE] !== 0 &&
-      space.payloadDeltas.every((delta) => delta[GROUP_BYTE] === 0),
-  );
-}
-
-/** Every way to pick one item of each list, or undefined past `limit`. */
-function picks<T>(lists: readonly (readonly T[])[], limit: number): T[][] | undefined {
-  let all: T[][] = [[]];
-  for (const list of lists) {
-    all = all.flatMap((prefix) => list.map((item) => [...prefix, item]));
-    if (all.length > limit) return undefined;
-  }
-  return all;
-}
-
-/** The places of the marked elements of a reading, in the order of their bits. */
-function holesOf(space: ReadingSpace): number[] {
-  return space.reading.values.flatMap((value, index) => (value === undefined ? [index] : []));
-}
-
-/** Open bits of `branch` if marked element `hole` of share `share` were read. */
-function openBitsIfRead(branch: Branch, share: number, hole: number): number {
-  const width = BigInt(branch.joint.spaces[share]!.reading.unitBits);
-  const mask = ((1n << width) - 1n) << (BigInt(hole) * width);
-  // Each direction with the change it makes in (S, D): a pair, typed as one so that a host that
-  // compiles with noUncheckedIndexedAccess reads both of its parts as present.
-  const directions: (readonly [bigint, bigint])[] = [
-    ...branch.visible.map((direction, i): readonly [bigint, bigint] => [
-      direction,
-      bytesToBits(branch.visibleDeltas[i]!),
-    ]),
-    ...branch.hidden.map((direction): readonly [bigint, bigint] => [direction, 0n]),
-  ];
-  // The combinations of directions that leave this element as it is, with their images in (S, D).
-  const pivots = new Map<number, { part: bigint; image: bigint }>();
-  const kept: bigint[] = [];
-  for (const [direction, original] of directions) {
-    let part = holeChange(branch.joint, share, direction) & mask;
-    let image = original;
-    while (part !== 0n && pivots.has(topBit(part))) {
-      const pivot = pivots.get(topBit(part))!;
-      part ^= pivot.part;
-      image ^= pivot.image;
-    }
-    if (part === 0n) kept.push(image);
-    else pivots.set(topBit(part), { part, image });
-  }
-  return basisOf(kept).length;
+  return spaces.every((space) => {
+    const groups = space.fixedPayloadByte(GROUP_BYTE);
+    return groups !== undefined && groups !== 0;
+  });
 }
 
 /**
@@ -522,30 +763,56 @@ function openBitsIfRead(branch: Branch, share: number, hole: number): number {
  */
 async function helpfulElements(
   branches: readonly Branch[],
-  signal: AbortSignal | undefined,
+  turns: SearchTurns,
 ): Promise<ElementHelp[]> {
   const widest = branches.reduce((most, branch) =>
-    branch.visible.length > most.visible.length ? branch : most,
+    branch.openBits > most.openBits ? branch : most,
   );
-  const openBits = widest.visible.length;
+  const { openBits } = widest;
   if (openBits === 0) return [];
   const helps: ElementHelp[] = [];
-  for (const [share, space] of widest.joint.spaces.entries()) {
-    await nextTurn(signal);
-    for (const [hole, place] of holesOf(space).entries())
+  for (const [share, space] of widest.spaces.entries()) {
+    // A turn for each share: they are few, and each takes a while for many marks.
+    await turns.take();
+    for (const [hole, place] of space.holes.entries())
       helps.push({
         share: share + 1,
         position: place + 1,
-        openBits: openBitsIfRead(widest, share, hole),
+        openBits: widest.openBitsIfRead(share, hole),
       });
   }
   return helps.filter((help) => help.openBits < openBits).sort((a, b) => a.openBits - b.openBits);
+}
+
+/**
+ * Why the share at `place`, counted from 1, holds more marks than a joint repair takes, or
+ * undefined: the early check of a share as it is typed and the bound of planJointRepair.
+ */
+export function jointMarkLimitProblem(place: number, text: string): string | undefined {
+  return exceedsMarks(text, MAX_JOINT_MARKED_ELEMENTS)
+    ? afterPlace("Share", place, `${markLimit(MAX_JOINT_MARKED_ELEMENTS)}.`)
+    : undefined;
+}
+
+/**
+ * Every reading of the share at `place`, counted from 1 (MarkedReading.of); a share whose marks
+ * fit too many ways is refused by that place.
+ */
+function readingsOf(place: number, text: string): MarkedReading[] {
+  try {
+    return MarkedReading.of(text);
+  } catch (error) {
+    if (error instanceof AmbiguousMarksError)
+      throw new Error(afterPlace("Share", place, AMBIGUOUS_MARK_WIDTHS));
+    throw error;
+  }
 }
 
 function refusal(
   shares: readonly ShareAssessment[],
   verdict: JointAssessment["verdict"],
   reason: string,
+  unfit?: number,
 ): JointPlan {
   return {
     assessment: {
@@ -558,23 +825,11 @@ function refusal(
       helps: [],
       verdict,
       reason,
+      ...(unfit === undefined ? {} : { unfit }),
     },
     search: async () => [],
+    wipe: () => undefined,
   };
-}
-
-/**
- * About how many more shares would settle what `branch` leaves open. Each share beyond the
- * threshold adds as many equations as the secret has bits, and `threshold` shares without marks
- * settle everything; the marks of the new shares, or equations that depend on others, can make
- * one more needed.
- */
-function sharesToSettle(branch: Branch, shares: readonly ShareAssessment[]): number {
-  const openBits = branch.visible.length;
-  if (openBits === 0) return 0;
-  const clean = new Set(branch.members.filter((_, share) => shares[share]!.marks === 0)).size;
-  const byEquations = Math.ceil(openBits / (BYTE_BITS * branch.joint.secretBytes));
-  return Math.max(1, Math.min(branch.threshold - clean, byEquations));
 }
 
 /** The value of a field when every branch agrees on it. */
@@ -584,27 +839,24 @@ function agreed<T>(branches: readonly Branch[], field: (branch: Branch) => T): T
 }
 
 /**
- * The refusal of a share, counted from 0, that no reading fits. Its marks are named only when it
- * has any: a share without them is typed wrong, or is no share. A code marked with the wrong
- * number of symbols is named (markProblem).
+ * The refusal of a share that no reading fits, named "Share `name`": a code marked with the wrong
+ * number of symbols is named (markProblem); otherwise its marks are named only when it has any,
+ * since a share without them is typed wrong, or is no share. The plan names a share by the place
+ * it was typed at (PlanOptions.places), or by its index where none is given.
  */
-function unreadableShare(share: number, marks: number, text: string): string {
+function unreadableShareMessage(name: number, marks: number, text: string): string {
   const problem = markProblem(text);
-  if (problem !== undefined) return `Share ${share + 1}: ${problem}`;
+  if (problem !== undefined) return afterPlace("Share", name, problem);
   return marks === 0
-    ? `Share ${share + 1} cannot be read as a share: check each of its elements.`
-    : `Share ${share + 1} cannot be read as a share: check the elements marked with ?, and the others.`;
+    ? `Share ${name} cannot be read as a share: check each of its elements.`
+    : `Share ${name} cannot be read as a share: check the elements marked with ?, and the others.`;
 }
 
-/** What solving every combination of the shares' readings gives (solveReadings). */
-interface Solved {
-  readonly branches: Branch[];
-  /** The rows that every reading shares had no solution in some combination. */
-  readonly conflict: boolean;
-  /** Some possibility had as many distinct members as its threshold. */
-  readonly enoughMembers: boolean;
-  /** Some possibility gave two shares the same member number. */
-  readonly duplicates: boolean;
+/**
+ * What solving every combination of the shares' readings gives (solveReadings): the ways of every
+ * combination, a conflict where the rows that every reading shares had no solution in some.
+ */
+interface Solved extends SolvedWays {
   /** Some length of the secret is one that every share can be read in. */
   readonly sameLength: boolean;
   /** Why the shares cannot be assessed at all, when they cannot. */
@@ -617,32 +869,27 @@ interface Solved {
  */
 async function solveReadings(
   spacesOf: readonly (readonly ReadingSpace[])[],
-  signal: AbortSignal | undefined,
+  turns: SearchTurns,
+  secrets: AssessmentSecrets,
   budget?: WorkBudget,
 ): Promise<Solved> {
-  const branches: Branch[] = [];
-  let conflict = false;
-  let enoughMembers = false;
-  let duplicates = false;
+  let ways: SolvedWays = { branches: [], conflict: false, enoughMembers: false, duplicates: false };
   let sameLength = false;
   const solved = (refused?: Solved["refused"]): Solved => ({
-    branches,
-    conflict,
-    enoughMembers,
-    duplicates,
+    ...ways,
     sameLength,
     ...(refused === undefined ? {} : { refused }),
   });
   const lengths = new Set(spacesOf[0]!.map((space) => space.reading.structure.payloadLength));
   for (const payloadLength of lengths) {
-    const secretBytes = payloadLength - METADATA_BYTES;
-    if (!BIP39_ENTROPY_BYTES.has(secretBytes)) continue;
+    const secretBytes = payloadLength - SHARE_METADATA_BYTES;
+    if (!BIP39_ENTROPY_BYTES.includes(secretBytes)) continue;
     const choices = spacesOf.map((spaces) =>
       spaces.filter((space) => space.reading.structure.payloadLength === payloadLength),
     );
     if (choices.some((options) => options.length === 0)) continue;
     sameLength = true;
-    const readings = picks(choices, MAX_BRANCHES);
+    const readings = everyPick(choices, MAX_BRANCHES);
     if (readings === undefined)
       return solved({
         verdict: "too-uncertain",
@@ -654,22 +901,15 @@ async function solveReadings(
       new Set(spaces.map((space) => space.reading.format)).size;
     readings.sort((a, b) => formsIn(a) - formsIn(b));
     for (const spaces of readings) {
-      const offsets = spaces.map((_, share) =>
-        spaces.slice(0, share).reduce((sum, space) => sum + space.basis.length, 0),
-      );
-      const dimensions = offsets.at(-1)! + spaces.at(-1)!.basis.length;
-      const joint = await solveJoint({ spaces, offsets, dimensions, secretBytes }, signal, budget);
+      const joint = await solveJoint(new Joint(spaces, secretBytes), turns, secrets, budget);
       if (joint.tooMany)
         return solved({
           verdict: "too-uncertain",
           reason:
             "The member numbers of these shares cannot be told; read more of their first elements.",
         });
-      conflict ||= joint.conflict;
-      enoughMembers ||= joint.enoughMembers;
-      duplicates ||= joint.duplicates;
-      branches.push(...joint.branches);
-      if (branches.length > MAX_BRANCHES)
+      ways = withWays(ways, joint);
+      if (ways.branches.length > MAX_BRANCHES)
         return solved({
           verdict: "too-uncertain",
           reason: "Too many ways fit these shares; mark fewer.",
@@ -681,7 +921,7 @@ async function solveReadings(
 
 /** The combinations that a search of `branches` tries. */
 function combinationsOf(branches: readonly Branch[]): number {
-  return branches.reduce((sum, branch) => sum + 2 ** branch.visible.length, 0);
+  return branches.reduce((sum, branch) => sum + branch.combinations, 0);
 }
 
 /**
@@ -705,17 +945,18 @@ const TRIAL_WORK = 2 ** 19;
 async function refined(
   spacesOf: readonly (readonly ReadingSpace[])[],
   before: number,
-  signal: AbortSignal | undefined,
+  turns: SearchTurns,
+  secrets: AssessmentSecrets,
 ): Promise<Branch[] | undefined> {
   if (before <= 1) return undefined;
   const units = spacesOf.flatMap((spaces, share) => {
     const reading = spaces.find((space) => space.reading.candidates !== undefined)?.reading;
     return reading === undefined
       ? []
-      : candidateCounts(reading).map((unit) => ({
+      : reading.candidateCounts().map((unit) => ({
           ...unit,
           share,
-          metadata: reachesMetadata(reading, unit.place),
+          metadata: reading.reachesMetadata(unit.place),
         }));
   });
   // The codes that reach the metadata first, which tell the member numbers; then those with the
@@ -725,102 +966,154 @@ async function refined(
   if (chosen.length === 0) return undefined;
   const expanded: ReadingSpace[][] = [];
   for (const [share, spaces] of spacesOf.entries()) {
-    await nextTurn(signal);
+    await turns.take();
     const places = chosen.filter((unit) => unit.share === share).map((unit) => unit.place);
-    expanded.push(
-      spaces.flatMap((space) =>
-        choicesAt(space.reading, places)
-          .map(readingSpace)
-          .filter((tried): tried is ReadingSpace => tried !== undefined),
-      ),
+    const tried = spaces.flatMap((space) =>
+      space.reading
+        .choicesAt(places)
+        .map((reading) => reading.space())
+        .filter((reading): reading is ReadingSpace => reading !== undefined),
     );
+    secrets.addSpaces(tried);
+    expanded.push(tried);
   }
   if (expanded.some((spaces) => spaces.length === 0)) return undefined;
-  const solved = await solveReadings(expanded, signal, { left: TRIAL_WORK });
+  const solved = await solveReadings(expanded, turns, secrets, { left: TRIAL_WORK });
   if (solved.refused !== undefined || solved.branches.length === 0) return undefined;
   return combinationsOf(solved.branches) < before ? solved.branches : undefined;
 }
 
 /** How planJointRepair assesses the shares. */
-export interface PlanOptions {
-  /** Stops the assessment, which can take a while for many marks. */
-  readonly signal?: AbortSignal | undefined;
+export interface PlanOptions extends SearchRun {
+  /** The host's services, with which the search checks and restores each candidate. */
+  readonly platform: SharePlatform;
   /**
-   * The host's services, with which the search checks and restores each candidate; the platform
-   * configured with configureSharePlatform when none is given (JointRepair passes its own).
+   * The place at which each share was typed, by its index among `records`, by which a refusal
+   * names it; by its index, counted from 1, where none is given.
    */
-  readonly platform?: SharePlatform | undefined;
+  readonly places?: readonly number[] | undefined;
 }
 
 /**
  * Assesses the shares as typed, with ? for each unreadable element, and returns a plan whose search
- * finds every phrase they can restore. Nothing is tried before `search` is called. `signal` stops
- * the assessment, which can take a while for many marks.
+ * finds every phrase they can restore. Nothing is tried before `search` is called. The run's
+ * signal stops the assessment, which can take a while for many marks, and its turn lets the host
+ * run now and then (SearchTurns).
  */
 export async function planJointRepair(
   records: readonly string[],
-  options: PlanOptions = {},
+  options: PlanOptions,
 ): Promise<JointPlan> {
-  const { signal } = options;
-  signal?.throwIfAborted();
-  const { platform } = options;
-  const texts = records.map((record) => record.trim());
-  for (const [index, text] of texts.entries())
-    if (
-      text.length > MAX_REPAIR_TEXT_LENGTH ||
-      (text.match(/\?/gu) ?? []).length > MAX_JOINT_MARK_SYMBOLS ||
-      markCount(text) > MAX_JOINT_MARKED_ELEMENTS
-    )
-      throw new Error(
-        `Share ${index + 1}: mark at most ${MAX_JOINT_MARKED_ELEMENTS} unreadable elements with ?.`,
-      );
-  const spacesOf: ReadingSpace[][] = [];
-  for (const text of texts) {
-    // A turn between the shares: reading one is quick, but many add up.
-    await nextTurn(signal);
-    spacesOf.push(
-      markedReadings(text)
-        .map(readingSpace)
-        .filter((space): space is ReadingSpace => space !== undefined),
-    );
+  // A host's platform is checked before its signal: without it no search could follow.
+  checkedPlatform(options?.platform);
+  // Refuses a signal that is already aborted before anything else.
+  const turns = SearchTurns.of(options);
+  // The bound of every set of shares, before any record is read (AUD-012-API002).
+  assertShareCount(records.length);
+  const { platform, places } = options;
+  const texts = Array.from(records, (record) => record.trim());
+  for (const [index, text] of texts.entries()) {
+    const problem = jointMarkLimitProblem(placeOf(places, index + 1), text);
+    if (problem !== undefined) throw new Error(problem);
   }
+  // A plan that can search keeps the arrays of its branches for its searches; every other array
+  // made for the assessment is wiped, all of them when it is stopped (AUD-012-SEC004).
+  const secrets = new AssessmentSecrets();
+  let assessed: Assessed | undefined;
+  try {
+    const spacesOf: ReadingSpace[][] = [];
+    for (const [index, text] of texts.entries()) {
+      // A turn between the shares, however quick: reading one is quick, but many add up, and a
+      // stop typed meanwhile is heard (SearchTurns.take).
+      await turns.take();
+      const spaces = readingsOf(placeOf(places, index + 1), text)
+        .map((reading) => reading.space())
+        .filter((space): space is ReadingSpace => space !== undefined);
+      secrets.addSpaces(spaces);
+      spacesOf.push(spaces);
+    }
+    assessed = await assessReadings(spacesOf, texts, { platform, places, turns, secrets });
+    return assessed.plan;
+  } finally {
+    const verdict = assessed?.plan.assessment.verdict;
+    const searched = verdict === "search" || verdict === "determined";
+    secrets.wipeAllBut(searched ? assessed!.kept : []);
+  }
+}
+
+/** A plan, and the branches that its search keeps: none for a refusal. */
+interface Assessed {
+  readonly plan: JointPlan;
+  readonly kept: readonly Branch[];
+}
+
+/** What an assessment runs with: the host's platform and places, its turns, and its secrets. */
+interface AssessmentRun {
+  readonly platform: SharePlatform;
+  readonly places: readonly number[] | undefined;
+  readonly turns: SearchTurns;
+  readonly secrets: AssessmentSecrets;
+}
+
+/** The assessment of the readings of every share, and the plan of the search that it allows. */
+async function assessReadings(
+  spacesOf: readonly ReadingSpace[][],
+  texts: readonly string[],
+  run: AssessmentRun,
+): Promise<Assessed> {
+  const { platform, places, turns, secrets } = run;
   const shares: ShareAssessment[] = spacesOf.map((spaces, index) => ({
     marks: markCount(texts[index]!),
     forms: [...new Set(spaces.map((space) => space.reading.format))],
     openAlone: spaces.length === 0 ? 0 : Math.min(...spaces.map((space) => space.basis.length)),
   }));
+  const refuse = (
+    verdict: JointAssessment["verdict"],
+    reason: string,
+    unfit?: number,
+  ): Assessed => ({
+    plan: refusal(shares, verdict, reason, unfit),
+    kept: [],
+  });
+  const plan = async (branches: readonly Branch[]): Promise<Assessed> => ({
+    plan: await planOf(shares, branches, platform, turns),
+    kept: branches,
+  });
   const unfit = spacesOf.findIndex((spaces) => spaces.length === 0);
-  if (unfit >= 0)
-    return refusal(shares, "no-fit", unreadableShare(unfit, shares[unfit]!.marks, texts[unfit]!));
+  if (unfit >= 0) {
+    const message = unreadableShareMessage(
+      placeOf(places, unfit + 1),
+      shares[unfit]!.marks,
+      texts[unfit]!,
+    );
+    return refuse("no-fit", message, unfit + 1);
+  }
   if (spacesOf.some(severalGroups))
-    return refusal(
-      shares,
+    return refuse(
       "no-fit",
       "These shares belong to a set of several groups; only sets of one group are repaired.",
     );
-  const solved = await solveReadings(spacesOf, signal);
+  const solved = await solveReadings(spacesOf, turns, secrets);
   if (solved.refused !== undefined) {
     // The digits read of partly read codes may tell what the codes unknown as a whole cannot.
     const tried =
       solved.refused.verdict === "too-uncertain"
-        ? await refined(spacesOf, Number.POSITIVE_INFINITY, signal)
+        ? await refined(spacesOf, Number.POSITIVE_INFINITY, turns, secrets)
         : undefined;
-    if (tried === undefined) return refusal(shares, solved.refused.verdict, solved.refused.reason);
-    return planOf(shares, tried, platform, signal);
+    if (tried === undefined) return refuse(solved.refused.verdict, solved.refused.reason);
+    return plan(tried);
   }
   if (!solved.sameLength)
-    return refusal(shares, "no-fit", "These shares are of different lengths: not of one set.");
+    return refuse("no-fit", "These shares are of different lengths: not of one set.");
   if (solved.branches.length === 0) {
     // The common rows fail for shares of another set, or for a misread identifier or threshold:
     // more shares would not help.
     if (solved.enoughMembers || solved.conflict)
-      return refusal(
-        shares,
+      return refuse(
         "no-fit",
         "These shares do not fit together: check the marks, and that all belong to one set.",
       );
-    return refusal(
-      shares,
+    return refuse(
       "not-enough",
       solved.duplicates
         ? "The same share is given more than once: the threshold of this set needs more shares."
@@ -830,22 +1123,22 @@ export async function planJointRepair(
   // Partly read Unicode codes are tried word by word where that shortens the search; the verdicts
   // above come from the codes unknown as a whole, which a wrong word cannot mislead.
   const branches =
-    (await refined(spacesOf, combinationsOf(solved.branches), signal)) ?? solved.branches;
-  return planOf(shares, branches, platform, signal);
+    (await refined(spacesOf, combinationsOf(solved.branches), turns, secrets)) ?? solved.branches;
+  return plan(branches);
 }
 
 /** The assessment of `branches` and the search of them, with the host's platform. */
 async function planOf(
   shares: readonly ShareAssessment[],
   branches: readonly Branch[],
-  platform: SharePlatform | undefined,
-  signal: AbortSignal | undefined,
+  platform: SharePlatform,
+  turns: SearchTurns,
 ): Promise<JointPlan> {
-  const openBits = Math.max(...branches.map((branch) => branch.visible.length));
+  const openBits = Math.max(...branches.map((branch) => branch.openBits));
   const combinations = combinationsOf(branches);
   const threshold = agreed(branches, (branch) => branch.threshold);
-  const secretBytes = agreed(branches, (branch) => branch.joint.secretBytes);
-  const tooOpen = combinations > 2 ** MAX_SEARCH_BITS;
+  const secretBytes = agreed(branches, (branch) => branch.secretBytes);
+  const tooOpen = combinations > MAX_REPAIR_COMBINATIONS;
   const assessment: JointAssessment = {
     shares,
     ...(secretBytes === undefined ? {} : { secretBytes }),
@@ -854,8 +1147,8 @@ async function planOf(
     openBits,
     combinations,
     expectedFalse: (combinations - 1) / 2 ** DIGEST_BITS,
-    moreShares: Math.max(...branches.map((branch) => sharesToSettle(branch, shares))),
-    helps: await helpfulElements(branches, signal),
+    moreShares: Math.max(...branches.map((branch) => branch.sharesToSettle(shares))),
+    helps: await helpfulElements(branches, turns),
     verdict: tooOpen ? "too-uncertain" : openBits === 0 ? "determined" : "search",
     ...(tooOpen
       ? {
@@ -863,11 +1156,11 @@ async function planOf(
         }
       : {}),
   };
-  if (tooOpen) return { assessment, search: async () => [] };
-  // The configured platform is read only by a search, which the assessment alone does not need.
+  if (tooOpen) return { assessment, search: async () => [], wipe: () => undefined };
   return {
     assessment,
-    search: (options) => searchBranches(branches, platform ?? sharePlatform(), options),
+    search: (options) => searchBranches(branches, platform, options),
+    wipe: () => wipeAll(branches.flatMap((branch) => branch.allSecretArrays())),
   };
 }
 
@@ -879,49 +1172,34 @@ function lowestBit(value: number): number {
 }
 
 /**
- * Tries every open combination of every branch against the digest, in Gray code order so that
- * each step adds one known change to (S, D); a candidate that passes is read and restored by the
- * SSKR library. Resolves with every distinct phrase.
+ * Tries every open combination of every branch against the digest (Branch.searchDigest); a
+ * candidate that passes is read and restored by the SSKR library. Resolves with every distinct
+ * phrase. Progress is told every TRIES_PER_PROGRESS checks and after the last, and the host's
+ * turns are asked for at each report.
  */
 async function searchBranches(
   branches: readonly Branch[],
   platform: SharePlatform,
   options: SearchOptions = {},
 ): Promise<RepairedSet[]> {
-  options.signal?.throwIfAborted();
-  const total = branches.reduce((sum, branch) => sum + 2 ** branch.visible.length, 0);
+  // Refuses a signal that is already aborted before any check.
+  const turns = SearchTurns.of(options);
+  const total = combinationsOf(branches);
   const found = new Map<string, RepairedSet>();
+  const progress = (checked: number): RepairProgress => ({ checked, total, found: found.size });
   let done = 0;
-  for (const branch of branches) {
-    const secretBytes = branch.joint.secretBytes;
-    const current = Uint8Array.from(branch.secretAndDigest);
-    const count = 2 ** branch.visible.length;
-    try {
-      for (let step = 0; step < count; step += 1) {
-        if (step > 0) {
-          const delta = branch.visibleDeltas[lowestBit(step)]!;
-          for (let index = 0; index < current.length; index += 1) current[index]! ^= delta[index]!;
-        }
-        if (digestFits(current, secretBytes, platform.hmacSha256)) {
-          const gray = BigInt(step) ^ (BigInt(step) >> 1n);
-          const z = branch.particular ^ combine(branch.visible, gray);
-          const repaired = await confirm(branch, z, platform);
-          if (repaired !== undefined) {
-            const known = found.get(repaired.mnemonic);
-            found.set(repaired.mnemonic, known === undefined ? repaired : merged(known, repaired));
-          }
-        }
-        done += 1;
-        if (done % TRIES_PER_TURN === 0) {
-          options.onProgress?.(done, total, found.size);
-          await nextTurn(options.signal);
-        }
-      }
-    } finally {
-      current.fill(0);
-    }
-  }
-  options.onProgress?.(total, total, found.size);
+  const tried = (): Promise<void> | undefined => {
+    done += 1;
+    if (done % TRIES_PER_PROGRESS !== 0) return undefined;
+    options.onProgress?.(progress(done));
+    return turns.due().then(() => undefined);
+  };
+  const add = (repaired: RepairedSet): void => {
+    const known = found.get(repaired.mnemonic);
+    found.set(repaired.mnemonic, known === undefined ? repaired : merged(known, repaired));
+  };
+  for (const branch of branches) await branch.searchDigest(platform, add, tried);
+  options.onProgress?.(progress(total));
   return [...found.values()];
 }
 
@@ -953,115 +1231,51 @@ function merged(first: RepairedSet, other: RepairedSet): RepairedSet {
   };
 }
 
-/** Elements that a hidden direction changes. */
-function unsettledElements(branch: Branch): MarkedElement[] {
-  return branch.joint.spaces.flatMap((space, share) => {
-    const width = BigInt(space.reading.unitBits);
-    const mask = (1n << width) - 1n;
-    const changed = branch.hidden.reduce(
-      (bits, direction) => bits | holeChange(branch.joint, share, direction),
-      0n,
-    );
-    return holesOf(space).flatMap((place, hole) =>
-      (changed >> (BigInt(hole) * width)) & mask ? [{ share: share + 1, position: place + 1 }] : [],
-    );
-  });
-}
-
-/** Every share at joint point `z`, read as an ordinary share; undefined if one does not read. */
-function readCandidate(branch: Branch, z: bigint): ReadRepairableShare[] | undefined {
-  const shares: ReadRepairableShare[] = [];
-  for (const [share, space] of branch.joint.spaces.entries()) {
-    const values = space.valuesAt(space.particular ^ holeChange(branch.joint, share, z));
-    const reading = space.reading;
-    if (reading.fits !== undefined && !reading.fits(values)) return undefined;
-    let read;
-    try {
-      read = readShare(reading.text(values));
-    } catch {
-      return undefined;
-    }
-    if (read.format !== reading.format) return undefined;
-    const filled: FilledElement[] = holesOf(space).map((place) => ({
-      position: place + 1,
-      value: reading.unitText(values[place]!),
-    }));
-    shares.push({ ur: read.ur, format: read.format, repaired: filled.length > 0, filled });
-  }
-  return shares;
-}
-
 /**
- * Restores the phrase with the SSKR library, once from the base and once more for every other
- * member together with the first `threshold - 1` of the base, so that every share is checked to
- * lie on the polynomial; copies of one member must be the same share. Undefined when any fails.
+ * Restores the phrase from the shares read, as complete shares are restored (complete-shares.ts):
+ * each copy once, every surplus member checked against the others, two different shares of one
+ * member refused. Undefined when the shares do not restore one phrase.
  */
 async function restore(
-  branch: Branch,
   shares: readonly ReadRepairableShare[],
   platform: SharePlatform,
-): Promise<string | undefined> {
-  const { base, members, threshold } = branch;
-  const firstOf = new Map<number, number>();
-  members.forEach((member, share) => {
-    if (!firstOf.has(member)) firstOf.set(member, share);
-  });
-  if (members.some((member, share) => shares[share]!.ur !== shares[firstOf.get(member)!]!.ur))
+): Promise<{ readonly mnemonic: string; readonly unchecked: readonly number[] } | undefined> {
+  // Each copy once, the first typed (withoutCopies): the places of the shares kept, in order.
+  const kept = withoutCopies(shares.map((share, place) => ({ place, ur: share.ur }))).map(
+    (share) => share.place,
+  );
+  try {
+    const { mnemonic, unchecked } = await restoreCompleteShares(
+      kept.map((place) => shares[place]!.ur),
+      platform,
+    );
+    // The places among the shares read, counted from 0, of the shares kept that took no part.
+    return { mnemonic, unchecked: unchecked.map((index) => kept[index]!) };
+  } catch {
+    // A refusal of the set: this reading of the shares is not one of it.
     return undefined;
-  const others = [...firstOf.values()].filter((share) => !base.includes(share));
-  const windows = [base, ...others.map((share) => [...base.slice(0, threshold - 1), share])];
-  let restored: string | undefined;
-  for (const window of windows) {
-    let entropy: Uint8Array | undefined;
-    try {
-      const records = validateShareSet(window.map((share) => shares[share]!.ur));
-      entropy = await platform.combineShares(records);
-      const mnemonic = entropyToMnemonic(entropy, wordlist);
-      if (restored !== undefined && restored !== mnemonic) return undefined;
-      restored = mnemonic;
-    } catch {
-      return undefined;
-    } finally {
-      entropy?.fill(0);
-    }
   }
-  return restored;
 }
 
 /**
- * Reads the shares of a candidate that passed the digest and restores the phrase. Undetermined
- * elements do not change the phrase; the first of their values with which every share reads are
- * taken, and they are reported as unsettled.
+ * `platform`, refused unless it has what a repair calls: the digest check and the restore of the
+ * SSKR library. A host written in JavaScript may leave it out, which the types alone do not stop.
  */
-async function confirm(
-  branch: Branch,
-  z: bigint,
-  platform: SharePlatform,
-): Promise<RepairedSet | undefined> {
-  const hiddenBits = Math.min(branch.hidden.length, MAX_HIDDEN_TRIES_BITS);
-  for (let choice = 0; choice < 2 ** hiddenBits; choice += 1) {
-    const shares = readCandidate(branch, z ^ combine(branch.hidden, BigInt(choice)));
-    if (shares === undefined) continue;
-    const mnemonic = await restore(branch, shares, platform);
-    return mnemonic === undefined
-      ? undefined
-      : { mnemonic, shares, unsettled: unsettledElements(branch) };
-  }
-  return undefined;
+function checkedPlatform(platform: SharePlatform | undefined): SharePlatform {
+  if (typeof platform?.hmacSha256 !== "function" || typeof platform.combineShares !== "function")
+    throw new TypeError("A share repair needs the host's SharePlatform.");
+  return platform;
 }
 
 /**
  * The repair of marked shares with the host's services. A class, so that a page binds its
- * SharePlatform once and every assessment, search and measure of its pace uses it, and never a
- * platform configured elsewhere.
+ * SharePlatform once and every assessment, search and measure of its pace uses it.
  */
 export class JointRepair {
   readonly #platform: SharePlatform;
 
   constructor(platform: SharePlatform) {
-    if (typeof platform?.hmacSha256 !== "function" || typeof platform.combineShares !== "function")
-      throw new TypeError("A share repair needs the host's SharePlatform.");
-    this.#platform = platform;
+    this.#platform = checkedPlatform(platform);
   }
 
   /** Marked elements on one share that a repair takes (MAX_JOINT_MARKED_ELEMENTS). */
@@ -1069,11 +1283,12 @@ export class JointRepair {
 
   /**
    * Assesses `records`, the shares as typed with ? for each unreadable element, and returns the
-   * plan whose search finds every phrase they can restore (planJointRepair).
+   * plan whose search finds every phrase they can restore (planJointRepair). `places` names each
+   * share in a refusal by the place it was typed at.
    */
   plan(
     records: readonly string[],
-    options: { readonly signal?: AbortSignal } = {},
+    options: Omit<PlanOptions, "platform"> = {},
   ): Promise<JointPlan> {
     return planJointRepair(records, { ...options, platform: this.#platform });
   }

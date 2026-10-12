@@ -1,5 +1,6 @@
 import { rgb, type PDFPage } from "pdf-lib";
 import { MM } from "./business-layout.js";
+import { pdfPoint, pdfRect } from "./business-render-primitives.js";
 
 /**
  * Pages behind a material's design study, each from the world the material belongs to: a car
@@ -54,10 +55,9 @@ function line(
   width: number,
   opacity: number,
 ): void {
-  const height = page.getHeight();
   page.drawLine({
-    start: { x: from[0] * MM, y: height - from[1] * MM },
-    end: { x: to[0] * MM, y: height - to[1] * MM },
+    start: pdfPoint(page, ...from),
+    end: pdfPoint(page, ...to),
     color,
     thickness: width,
     opacity,
@@ -86,10 +86,7 @@ function verticalGradient(
   const band = height / GRADIENT_BANDS;
   for (let i = 0; i < GRADIENT_BANDS; i++) {
     page.drawRectangle({
-      x: 0,
-      y: page.getHeight() - ((i + 1) * band + BAND_OVERLAP_MM) * MM,
-      width: width * MM,
-      height: (band + BAND_OVERLAP_MM) * MM,
+      ...pdfRect(page, { x: 0, y: i * band, width, height: band + BAND_OVERLAP_MM }),
       color: colourAt((i + 0.5) / GRADIENT_BANDS),
     });
   }
@@ -114,8 +111,7 @@ function drawStudio(page: PDFPage, width: number, height: number): void {
   for (let k = 0; k < rings; k++) {
     const share = 1 - k / rings;
     page.drawEllipse({
-      x: (width / 2) * MM,
-      y: page.getHeight() - height * 0.3 * MM,
+      ...pdfPoint(page, width / 2, height * 0.3),
       xScale: width * 0.5 * share * MM,
       yScale: height * 0.28 * share * MM,
       color: rgb(1, 1, 1),
@@ -148,19 +144,13 @@ function drawConcrete(page: PDFPage, width: number, height: number): void {
         Math.abs(shade(column, row)) * 0.08,
       );
       page.drawRectangle({
-        x: x * MM,
-        y: page.getHeight() - (y + panelHeight) * MM,
-        width: panelWidth * MM,
-        height: panelHeight * MM,
+        ...pdfRect(page, { x, y, width: panelWidth, height: panelHeight }),
         color: tone,
       });
       // Six ties per panel, in two rows of three.
       for (const across of [1 / 6, 1 / 2, 5 / 6]) {
         for (const down of [1 / 4, 3 / 4]) {
-          const centre = {
-            x: (x + across * panelWidth) * MM,
-            y: page.getHeight() - (y + down * panelHeight) * MM,
-          };
+          const centre = pdfPoint(page, x + across * panelWidth, y + down * panelHeight);
           page.drawCircle({ ...centre, size: radius * 1.35 * MM, color: light, opacity: 0.4 });
           page.drawCircle({ ...centre, size: radius * MM, color: hole, opacity: 0.4 });
         }
@@ -199,10 +189,7 @@ function drawTiles(page: PDFPage, width: number, height: number): void {
       const h = tileHeight - grout;
       const s = shade(column, row);
       page.drawRectangle({
-        x: x * MM,
-        y: page.getHeight() - (y + h) * MM,
-        width: w * MM,
-        height: h * MM,
+        ...pdfRect(page, { x, y, width: w, height: h }),
         color: mix(base, s > 0 ? light : dark, Math.abs(s) * 0.12),
       });
       // A glaze catches the light along the top edge and darkens along the bottom one.

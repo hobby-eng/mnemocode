@@ -4,6 +4,7 @@
 
 export {
   splitSskrMnemonic,
+  splitSskrBackup,
   combineSskrShares,
   combineSskrShareSet,
   restoreShareSet,
@@ -24,6 +25,7 @@ export type { ReadRepairableShare } from "./repair.js";
 // The classes of the host-neutral share modules, with the Node.js platform to build them with.
 export { ShareSet, ShareExport } from "./share-set.js";
 export { ShareSplit } from "./split.js";
+export type { BackupSplit, BackupSplitRequest } from "./split.js";
 export { ShareInput } from "./share-input.js";
 export { RepairReport } from "./repair-report.js";
 export { nodeFillRandom, nodeSharePlatform } from "./share-platform-node.js";

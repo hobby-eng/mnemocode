@@ -1,10 +1,10 @@
 import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { CandidatesFile } from "../src/cli/candidates-file.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeMnemonic, encodeMnemonicLegacy, parseDate } from "../src/core.js";
 import { HARD_MAX_COMBINATIONS, reportDateMatches, searchDates } from "../src/cli/date-search.js";
-import { NoProtection } from "../src/core/candidate-encryption.js";
 import { DatesAnswer, DateSearch } from "../src/core/date-search.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 
@@ -98,10 +98,20 @@ describe("the date search", () => {
     const matched = (await searchDates({
       ...search,
       evidence: { kind: "master-fingerprint", value: FINGERPRINT, network: "mainnet" },
-      target: { path: "unused.age", protection: new NoProtection() },
+      target: await CandidatesFile.of({
+        "candidates-file": "unused.age",
+        "plaintext-candidates": true,
+      }),
     }))!;
     expect(matched).toMatchObject({ checksumValid: 10, matchCount: 1, kept: [TEST_PHRASE] });
-    expect(matched.shown).toEqual([{ dates: "23-09-2026", mnemonic: TEST_PHRASE, evidence: "m" }]);
+    expect(matched.shown).toEqual([
+      {
+        dates: "23-09-2026",
+        allDates: [{ year: 2026, month: 9, day: 23 }],
+        mnemonic: TEST_PHRASE,
+        evidence: "m",
+      },
+    ]);
     // The size of each search first, then its progress.
     expect(lines).toEqual([
       "err Recovery search contains 10 date combinations.",
@@ -137,7 +147,10 @@ describe("the date search", () => {
       limits: { maxResults: 100, maxCandidates: 10 },
     });
     expect(allowed).toMatchObject({ matchCount: 1 });
+    // The size is said once, then the time alone (CC-09).
+    expect(lines).toContain("err Recovery search contains 10 date combinations.");
     expect(lines).toContain("err It takes about 14 hours; progress is shown.");
+    expect(lines.filter((line) => line.startsWith("err The search tries"))).toEqual([]);
   });
 
   it("says that no candidate matched the wallet when there were checksum-valid ones", () => {
@@ -403,7 +416,7 @@ describe("the date search", () => {
       );
       expect(lines.slice(-2)).toEqual([
         "out None of the 10 checksum-valid candidates matched the requested master fingerprint.",
-        "err No candidate to save; no file was written.",
+        "err No candidate to save, so no list was written.",
       ]);
       expect(await readdir(directory)).toEqual([]);
     } finally {

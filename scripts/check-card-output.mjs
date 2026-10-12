@@ -2,39 +2,37 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { PDFDocument } from "pdf-lib";
-import { PNG } from "pngjs";
-import jsQR from "jsqr";
-import { indexesToColors, representMnemonic } from "../dist/core.js";
-import { entropyToMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english.js";
-import "../dist/export/platform-node.js";
-import { cardTemplates, selectTemplate } from "../dist/export/templates.js";
-import { urToBytewords } from "../dist/sskr/transport.js";
-import { renderBusinessCards } from "../dist/export/business-cards.js";
-import { renderGlassCards } from "../dist/export/glass-cards.js";
+import {
+  loadCardRenderer,
+  officialShareContent,
+  ordinaryContent,
+  QR_DPI,
+  qrOfPdfPage,
+  REVIEW_TEXTS,
+} from "./card-fixtures.mjs";
 const destination = resolve(process.argv[2] ?? "goldens/current");
 await mkdir(destination, { recursive: true });
-const colors = indexesToColors(
-  representMnemonic(
-    entropyToMnemonic(
-      Uint8Array.from({ length: 32 }, (_, i) => i),
-      wordlist,
-    ),
-  ).shiftedIndexes,
-);
+// This checkout's build, which the command below runs too.
+const root = fileURLToPath(new URL("..", import.meta.url));
+const renderer = await loadCardRenderer(root);
+const {
+  cardTemplates,
+  drawing,
+  selectTemplate,
+  urToBytewords,
+  renderBusinessCards,
+  renderGlassCards,
+} = renderer;
 const presentation = {
   studioName: "Orven Studio",
   slogan: "Details, deliberately.",
-  subtitle: "Colour options for review.",
-  footer: "CLIENT REVIEW",
-  referenceLabel: "Ref.",
+  ...REVIEW_TEXTS,
 };
 const base = {
-  kind: "colors",
-  colors,
-  payload: colors.join(" "),
+  ...ordinaryContent(renderer, 32, "business"),
   presentation,
   profile: {
     company: "VECTOR SYSTEMS",
@@ -42,19 +40,9 @@ const base = {
     name: "Alex Morgan",
     email: "alex@vector.com",
   },
-  pageSize: "business",
   cardQr: true,
 };
-const vector = JSON.parse(await readFile("vectors/sskr-v1.json", "utf8"));
-const share = {
-  ...base,
-  kind: "sskr",
-  colors: vector.official.firstShareColors,
-  payload: vector.official.firstShareColors.join(" "),
-  collectionReference: "PUBLIC-1-1",
-  qrCard: true,
-  pageSize: "business",
-};
+const share = { ...base, ...officialShareContent(renderer) };
 const cases = [
   ["business-full", () => renderBusinessCards("it", base), base.payload],
   [
@@ -63,10 +51,10 @@ const cases = [
     undefined,
   ],
   ["business-sskr", () => renderBusinessCards("it", share, 0), share.payload],
-  ["material-full", () => selectTemplate("material-kitchen").render(base), base.payload],
+  ["material-full", () => selectTemplate("material-kitchen").render(drawing, base), base.payload],
   [
     "material-fragment",
-    () => selectTemplate("material-switch").renderIndividual(base, 1),
+    () => selectTemplate("material-switch").renderIndividual(drawing, base, 1),
     undefined,
   ],
   ["glass-four", () => renderGlassCards(base, 0), undefined],
@@ -75,7 +63,7 @@ const cases = [
   ["glass-eight-sskr", () => renderGlassCards(share, undefined, 8), share.payload],
   ...cardTemplates.map((template) => [
     template.id + "-study",
-    () => template.render({ ...base, pageSize: "business", orientation: "landscape" }),
+    () => template.render(drawing, { ...base, pageSize: "business", orientation: "landscape" }),
     base.payload,
   ]),
 ];
@@ -89,22 +77,13 @@ for (const [name, render, expected] of cases) {
   await writeFile(path, bytes, { mode: 0o600 });
   const page = pdf.getPageCount();
   assert.equal(page, 1, name + " must remain a single page");
-  const prefix = resolve(destination, name);
-  execFileSync(
-    "pdftoppm",
-    ["-f", String(page), "-l", String(page), "-singlefile", "-r", "200", "-png", path, prefix],
-    { stdio: "pipe" },
-  );
-  const png = PNG.sync.read(await readFile(prefix + ".png"));
-  const result = jsQR(new Uint8ClampedArray(png.data), png.width, png.height, {
-    inversionAttempts: "dontInvert",
-  });
+  const code = await qrOfPdfPage(path, page, resolve(destination, name));
   if (expected === undefined) {
-    assert.equal(result, null, name + " must not contain an individual-card QR");
+    assert.equal(code, undefined, name + " must not contain an individual-card QR");
     report.push(`${name}: ${page} page, no individual-card QR`);
   } else {
-    assert.equal(result?.data, expected, name + " QR mismatch");
-    report.push(`${name}: ${page} page, exact collection QR round-trip at 200 dpi`);
+    assert.equal(code, expected, name + " QR mismatch");
+    report.push(`${name}: ${page} page, exact collection QR round-trip at ${QR_DPI} dpi`);
   }
   console.log(report.at(-1));
 }
@@ -116,21 +95,27 @@ for (const id of [
   "business-glass-8in1",
 ]) {
   const doc = await PDFDocument.load(
-    await selectTemplate(id).render({ ...base, pageSize: "a6", cardQr: false }),
+    await selectTemplate(id).render(drawing, { ...base, pageSize: "a6", cardQr: false }),
   );
   assert.equal(doc.getPageCount(), 1, id + " default A6 page count");
   report.push(`${id}: default A6 without QR, 1 page`);
 }
 // The reported CLI regression: one member per page and the same-page QR in both export targets.
+// The cards carry the details of the fixtures above, each given by its option.
+const { COPY_OPTIONS, profileOption } = await renderer.load("dist/cli/business-options.js");
+const detailOptions = [
+  ...Object.entries(base.profile).flatMap(([field, text]) => [`--${profileOption(field)}`, text]),
+  ...Object.entries(presentation).flatMap(([field, text]) => [`--${COPY_OPTIONS[field]}`, text]),
+];
 const cliDirectory = await mkdtemp(resolve(destination, "sskr-command-"));
-const shares = vector.deterministic[0].shares;
+const shares = renderer.vector.deterministic[0].shares;
 const shareFile = resolve(cliDirectory, "public-shares.txt");
 const proposal = resolve(cliDirectory, "sskr-2of3-study.pdf");
 await writeFile(shareFile, shares.join("\n") + "\n", { mode: 0o600 });
 execFileSync(
   process.execPath,
   [
-    "dist/mnemocode.js",
+    resolve(root, "dist/mnemocode.js"),
     "sskr-export",
     "--share-file",
     shareFile,
@@ -144,18 +129,7 @@ execFileSync(
     "a6",
     "--orientation",
     "landscape",
-    "--studio-name",
-    "Orven Studio",
-    "--card-name",
-    "Alex Morgan",
-    "--card-company",
-    "VECTOR SYSTEMS",
-    "--card-role",
-    "IT Solutions Director",
-    "--card-subtitle",
-    "Colour options for review.",
-    "--card-footer",
-    "CLIENT REVIEW",
+    ...detailOptions,
     "--pdf",
     proposal,
     "--cards-dir",
@@ -166,26 +140,8 @@ execFileSync(
 const combined = await PDFDocument.load(await readFile(proposal));
 assert.equal(combined.getPageCount(), shares.length);
 for (let i = 0; i < shares.length; i++) {
-  const prefix = resolve(cliDirectory, "page-" + (i + 1));
-  execFileSync(
-    "pdftoppm",
-    [
-      "-f",
-      String(i + 1),
-      "-l",
-      String(i + 1),
-      "-singlefile",
-      "-r",
-      "200",
-      "-png",
-      proposal,
-      prefix,
-    ],
-    { stdio: "pipe" },
-  );
-  const png = PNG.sync.read(await readFile(prefix + ".png"));
   assert.equal(
-    jsQR(new Uint8ClampedArray(png.data), png.width, png.height)?.data,
+    await qrOfPdfPage(proposal, i + 1, resolve(cliDirectory, "page-" + (i + 1))),
     // A share given as ur:sskr is printed, and so held in the QR code, as its Bytewords.
     urToBytewords(shares[i]),
     "SSKR study must contain only its own member",

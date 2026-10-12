@@ -3,21 +3,21 @@
 // that write all their addresses so are instances of Base58Coin; the families that write some in
 // another form extend it.
 //
-// Host-neutral: it imports only coin.ts, address-types.ts, base58-check.ts and @scure/base
-// (test/portable-modules.test.ts).
+// Host-neutral, with @scure/base (test/portable-modules.test.ts).
 
 import { base58, type BytesCoder } from "@scure/base";
 import { HASH160_BYTES, type AddressType } from "./address-types.js";
 import { checkedData } from "./base58-check.js";
 import {
   Coin,
-  DAMAGED,
   invalidAddress,
   WRONG_LENGTH,
   type CoinAddress,
   type CoinDescription,
   type CoinRules,
+  unreadableAddress,
 } from "./coin.js";
+import { equalBytes } from "../bits.js";
 
 /** One version prefix of a coin's addresses, and what it names. */
 export interface Base58Version {
@@ -52,9 +52,9 @@ export class Base58Coin extends Coin {
   /** `text` as a Base58Check address of one of the coin's versions. */
   protected readBase58(text: string): CoinAddress {
     const data = checkedData(text, this.#alphabet);
-    if (data === undefined) throw invalidAddress(DAMAGED);
+    if (data === undefined) throw unreadableAddress();
     const version = this.#versions.find(({ prefix }) =>
-      prefix.every((byte, position) => data[position] === byte),
+      equalBytes(data.subarray(0, prefix.length), prefix),
     );
     if (version === undefined) throw this.notOurs();
     const hash = data.subarray(version.prefix.length);
