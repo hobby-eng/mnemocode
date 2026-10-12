@@ -1,0 +1,28 @@
+# Drives the menu and the hidden prompts in a pseudo-terminal (scripts/verify-terminal-input.py):
+# a Unix pseudo-terminal on Linux and macOS, a Windows pseudo-console on Windows, whose Python
+# package is installed first. The calling step sets the time limit, which a composite step cannot.
+name: Drive the menu and the hidden prompts
+description: scripts/verify-terminal-input.py in this system's pseudo-terminal
+inputs:
+  target:
+    description: The program to drive; dist/mnemocode.js when empty
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        python=python3
+        if [ "$RUNNER_OS" = Windows ]; then
+          python=python
+          # Only the exact files listed with their SHA-256 in the requirements file are accepted.
+          python -m pip install --require-hashes -r scripts/verify-terminal-input-requirements.txt
+        fi
+        if [ -n "$TARGET" ]; then
+          "$python" scripts/verify-terminal-input.py "$TARGET"
+        else
+          "$python" scripts/verify-terminal-input.py
+        fi

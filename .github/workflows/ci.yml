@@ -19,26 +19,19 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-      - run: pnpm format:check
+      - uses: ./.github/actions/setup-node-pnpm
       # Poppler before the tests: without it the card tests that rasterize PDFs are skipped.
       - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends poppler-utils
-      - run: pnpm build
-      - run: pnpm test
-      - name: Drive the menu and the hidden prompts in a Unix pseudo-terminal
+      # The same checks as a release's (package.json verify), so that a check added there runs here.
+      - run: pnpm verify
+      - name: Drive the menu and the hidden prompts in a pseudo-terminal
         timeout-minutes: 10
-        run: python3 scripts/verify-terminal-input.py
+        uses: ./.github/actions/terminal-input
       # A real PDF-to-image-to-QR round trip of the card and SSKR exports, with public data only.
       - run: node scripts/check-card-output.mjs output/card-output-check
       - run: pnpm audit --audit-level high
@@ -56,22 +49,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-node-pnpm
       - run: pnpm build
       - run: pnpm test
-      - name: Drive the menu and the hidden prompts in a Unix pseudo-terminal
-        if: runner.os == 'macOS'
+      - name: Drive the menu and the hidden prompts in a pseudo-terminal
         timeout-minutes: 10
-        run: python3 scripts/verify-terminal-input.py
-      - name: Drive the menu and the hidden prompts in a Windows pseudo-console
-        if: runner.os == 'Windows'
-        timeout-minutes: 10
-        run: |
-          # Only the exact files listed with their SHA-256 in the requirements file are accepted.
-          python -m pip install --require-hashes -r scripts/verify-terminal-input-requirements.txt
-          python scripts/verify-terminal-input.py
+        uses: ./.github/actions/terminal-input
