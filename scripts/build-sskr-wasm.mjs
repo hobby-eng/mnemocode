@@ -20,8 +20,8 @@ const manifestPath = join(bridge, "integrity.json");
 const stem = "recovery_sskr_wasm";
 const checkOnly = process.argv.includes("--check");
 
-// The declaration style of tooling/offline-wasm-declarations.mjs in multi-chain-wallet-tools, so
-// that both projects write the same bytes for the same build.
+// The style that the generated declarations were first written in, kept so that a rebuild writes
+// the same bytes (integrity.json).
 const declarationStyle = {
   parser: "typescript",
   singleQuote: true,

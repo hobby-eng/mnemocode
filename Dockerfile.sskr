@@ -2,10 +2,9 @@
 # scripts/build-sskr-wasm.mjs runs it with sskr-wasm/rust as the build context and turns the
 # output into sskr-wasm/generated. The image is x86-64 (linux/amd64) on every host.
 #
-# The toolchain stage is a word-for-word copy of the one in Dockerfile.reproducible of
-# multi-chain-wallet-tools (revision 8964b65): the same base image, clang, Rust and wasm-bindgen
-# give the same bytes there and here, and Docker can reuse the layers it already built. Change it
-# only together with that file.
+# What decides the bytes: the base image digest, clang, wasi-libc, Rust, wasm-bindgen, the folder
+# that the crate is built in and the Rust flags below. Each version is declared once here;
+# scripts/verify-toolchain.mjs checks the pins that other files hold too.
 FROM buildpack-deps:noble@sha256:cf0b8fb7b19c45ef68523a0c8a32a742b5f2c0839b1e8ca0061f73d6b1a19062 AS toolchain
 
 ARG NODE_VERSION=26.10.0
@@ -14,6 +13,9 @@ ARG RUSTUP_VERSION=1.29.1
 ARG RUSTUP_INIT_SHA256=dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71
 ARG CLANG_VERSION=1:18.0-59~exp2
 ARG WASI_LIBC_VERSION=0.0~git20230113.4362b18-3
+ARG RUST_VERSION=1.99.0
+ARG WASM_BINDGEN_VERSION=0.2.129
+ARG PNPM_VERSION=12.8.1
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends "clang=${CLANG_VERSION}" "wasi-libc=${WASI_LIBC_VERSION}" \
@@ -40,34 +42,33 @@ RUN curl --fail --silent --show-error --location \
       --output /tmp/rustup-init \
     && echo "${RUSTUP_INIT_SHA256}  /tmp/rustup-init" | sha256sum --check --strict \
     && chmod 0755 /tmp/rustup-init \
-    && /tmp/rustup-init -y --profile minimal --default-toolchain 1.99.0 --target wasm32-unknown-unknown \
+    && /tmp/rustup-init -y --profile minimal --default-toolchain "${RUST_VERSION}" --target wasm32-unknown-unknown \
     && rm /tmp/rustup-init \
     && cargo --version \
     && rustc --version
 
 RUN git config --system http.version HTTP/1.1 \
-    && npm install --global pnpm@12.8.1 \
-    && cargo install wasm-bindgen-cli --version 0.2.129 --locked \
-    && test "$(pnpm --version)" = '12.8.1' \
-    && test "$(cargo --version | cut -d ' ' -f 1-2)" = 'cargo 1.99.0' \
-    && test "$(wasm-bindgen --version | cut -d ' ' -f 1-2)" = 'wasm-bindgen 0.2.129'
+    && npm install --global "pnpm@${PNPM_VERSION}" \
+    && cargo install wasm-bindgen-cli --version "${WASM_BINDGEN_VERSION}" --locked \
+    && test "$(pnpm --version)" = "${PNPM_VERSION}" \
+    && test "$(cargo --version | cut -d ' ' -f 1-2)" = "cargo ${RUST_VERSION}" \
+    && test "$(wasm-bindgen --version | cut -d ' ' -f 1-2)" = "wasm-bindgen ${WASM_BINDGEN_VERSION}"
 
 FROM toolchain AS dependencies
-# The folder that multi-chain-wallet-tools builds the same crate in, so that both builds see the
-# same paths.
+# The folder that the crate is built in: its path is part of the bytes, so it stays as it is.
 WORKDIR /workspace/packages/recovery-sskr-wasm/rust
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 RUN cargo fetch --locked
 
 FROM dependencies AS built
-# The flags of tooling/rust-toolchain.mjs and tooling/build-recovery-sskr-wasm.mjs in
-# multi-chain-wallet-tools: Cargo and Rustup homes are written as /cargo and /rustup, and getrandom
-# takes its randomness from the JavaScript host. Cargo reads the list separated by 0x1F (octal 037).
+# Cargo and Rustup homes are written as /cargo and /rustup, taken from their ENV values above, and
+# getrandom takes its randomness from the JavaScript host. Cargo reads the list separated by 0x1F
+# (octal 037).
 RUN --network=none \
     CARGO_ENCODED_RUSTFLAGS="$(printf '%s\037%s\037%s\037%s\037%s' \
-      '--remap-path-prefix=/root/.cargo=/cargo' \
-      '--remap-path-prefix=/root/.rustup=/rustup' \
+      "--remap-path-prefix=${CARGO_HOME}=/cargo" \
+      "--remap-path-prefix=${RUSTUP_HOME}=/rustup" \
       '--remap-path-prefix=/workspace=/workspace' \
       '--cfg' 'getrandom_backend="wasm_js"')" \
     cargo build --target wasm32-unknown-unknown --release --locked --offline \
