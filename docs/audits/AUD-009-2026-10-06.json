@@ -217,7 +217,7 @@
       "kind": "finding",
       "title": "Caller-owned dates can alter checked state and falsely approve an SSKR backup",
       "severity": "medium",
-      "status": "fixed",
+      "status": "verified",
       "releaseBlocking": true,
       "affectedFiles": [
         "src/core/date-search.ts:111",
@@ -241,7 +241,7 @@
       "kind": "finding",
       "title": "DatesAnswer.of accepts invalid calendars and empty search patterns",
       "severity": "low",
-      "status": "fixed",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "src/core/date-search.ts:162"
@@ -260,7 +260,7 @@
       "kind": "finding",
       "title": "EncodedBackup.of accepts sparse index arrays",
       "severity": "low",
-      "status": "fixed",
+      "status": "verified",
       "releaseBlocking": false,
       "affectedFiles": [
         "src/core/encoded-backup.ts:121"
@@ -278,24 +278,24 @@
   "remediation": [
     {
       "id": "AUD-009-FUN001",
-      "status": "fixed",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Owned frozen copies of dates and patterns (core/dates.ts ownedDate/ownedPattern) in DatesAnswer, DateSearch, EncodedBackupCheck and ShareBackupCheck; ShareBackupCheck.compareDates confirms the actual recovery; limits checked in the DatesAnswer constructor; patterns sharing a key with other dates and duplicate pattern values refused; ShareBackupCheck refuses modes shares are not made in. test/aud-009-remediation.test.ts; sskr-boundaries.mjs 4/4 including the retained-date SSKR reproduction; core-invariants.ts 10/12, the two pattern-mutation checks now throw TypeError because the arrays are frozen (intended). Source fingerprint 837d75eec85234a0072f48c0e37840adce151b485df15f6bb1921336fd700dbe; not committed yet."
+      "status": "verified",
+      "fixCommit": "be33cc43becc065516f9b36fa7a15eb5fc10d8ae",
+      "verificationCommit": "7dd510b648015a4d553b5be24ab2564f6edbb6b2",
+      "evidence": "Owned frozen copies of dates and patterns (core/dates.ts ownedDate/ownedPattern) in DatesAnswer, DateSearch, EncodedBackupCheck and ShareBackupCheck; ShareBackupCheck.compareDates confirms the actual recovery; limits checked in the DatesAnswer constructor; patterns sharing a key with other dates and duplicate pattern values refused; ShareBackupCheck refuses modes shares are not made in. test/aud-009-remediation.test.ts; sskr-boundaries.mjs 4/4 including the retained-date SSKR reproduction; core-invariants.ts 10/12, the two pattern-mutation checks now throw TypeError because the arrays are frozen (intended). Source fingerprint 837d75eec85234a0072f48c0e37840adce151b485df15f6bb1921336fd700dbe. Update 2026-10-07 (AUD-010): the fixes are in signed commit be33cc43becc065516f9b36fa7a15eb5fc10d8ae, the first commit that carries them. Verified at signed commit 7dd510b648015a4d553b5be24ab2564f6edbb6b2 with a clean tree: AUD-009-harnesses/sskr-boundaries.mjs 4/4, core-invariants.ts 10/12 as recorded above (the two pattern-mutation checks throw TypeError on frozen arrays), AUD-010-harnesses/core-aud009-regressions.ts 12/12, and test/aud-009-remediation.test.ts in the full suite, which passed."
     },
     {
       "id": "AUD-009-API001",
-      "status": "fixed",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "DatesAnswer.of checks each date and pattern as parse does and names its place (Date N: ...); impossible calendar dates, empty or impossible patterns refused; leap day and ordinary patterns accepted. test/aud-009-remediation.test.ts; core-invariants.ts checks passed. Source fingerprint 837d75eec85234a0072f48c0e37840adce151b485df15f6bb1921336fd700dbe; not committed yet."
+      "status": "verified",
+      "fixCommit": "be33cc43becc065516f9b36fa7a15eb5fc10d8ae",
+      "verificationCommit": "7dd510b648015a4d553b5be24ab2564f6edbb6b2",
+      "evidence": "DatesAnswer.of checks each date and pattern as parse does and names its place (Date N: ...); impossible calendar dates, empty or impossible patterns refused; leap day and ordinary patterns accepted. test/aud-009-remediation.test.ts; core-invariants.ts checks passed. Source fingerprint 837d75eec85234a0072f48c0e37840adce151b485df15f6bb1921336fd700dbe. Update 2026-10-07 (AUD-010): the fixes are in signed commit be33cc43becc065516f9b36fa7a15eb5fc10d8ae, the first commit that carries them. Verified at signed commit 7dd510b648015a4d553b5be24ab2564f6edbb6b2 with a clean tree: AUD-009-harnesses/sskr-boundaries.mjs 4/4, core-invariants.ts 10/12 as recorded above (the two pattern-mutation checks throw TypeError on frozen arrays), AUD-010-harnesses/core-aud009-regressions.ts 12/12, and test/aud-009-remediation.test.ts in the full suite, which passed."
     },
     {
       "id": "AUD-009-API002",
-      "status": "fixed",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "EncodedBackup checks every position in its constructor (copy first, then check), so holes, undefined and out-of-range indexes are refused through of and the raw constructor alike; the same hole check in seedshift.ts, colors.ts, candidate-list.ts and DateSearch. test/aud-009-remediation.test.ts; core-invariants.ts check passed. Source fingerprint 837d75eec85234a0072f48c0e37840adce151b485df15f6bb1921336fd700dbe; not committed yet."
+      "status": "verified",
+      "fixCommit": "be33cc43becc065516f9b36fa7a15eb5fc10d8ae",
+      "verificationCommit": "7dd510b648015a4d553b5be24ab2564f6edbb6b2",
+      "evidence": "EncodedBackup checks every position in its constructor (copy first, then check), so holes, undefined and out-of-range indexes are refused through of and the raw constructor alike; the same hole check in seedshift.ts, colors.ts, candidate-list.ts and DateSearch. test/aud-009-remediation.test.ts; core-invariants.ts check passed. Source fingerprint 837d75eec85234a0072f48c0e37840adce151b485df15f6bb1921336fd700dbe. Update 2026-10-07 (AUD-010): the fixes are in signed commit be33cc43becc065516f9b36fa7a15eb5fc10d8ae, the first commit that carries them. Verified at signed commit 7dd510b648015a4d553b5be24ab2564f6edbb6b2 with a clean tree: AUD-009-harnesses/sskr-boundaries.mjs 4/4, core-invariants.ts 10/12 as recorded above (the two pattern-mutation checks throw TypeError on frozen arrays), AUD-010-harnesses/core-aud009-regressions.ts 12/12, and test/aud-009-remediation.test.ts in the full suite, which passed."
     }
   ],
   "limitations": [
@@ -542,6 +542,13 @@
     "sourceUnchanged": true
   },
   "assessment": "Three confirmed open findings: one medium and two low; no high/critical issue demonstrated. FUN001 blocks acceptance of the new recovery API until fixed and verified. Architecture moves in the right direction; no measured speed advantage over the previous release is established. Browser integration and release reproducibility remain unexecuted, so this is not release approval.",
+  "remediationUpdate": {
+    "date": "2026-10-07",
+    "by": "AUD-010",
+    "fixCommit": "be33cc43becc065516f9b36fa7a15eb5fc10d8ae",
+    "verificationCommit": "7dd510b648015a4d553b5be24ab2564f6edbb6b2",
+    "note": "Update 2026-10-07 (AUD-010): the fixes are in signed commit be33cc43becc065516f9b36fa7a15eb5fc10d8ae, the first commit that carries them. Verified at signed commit 7dd510b648015a4d553b5be24ab2564f6edbb6b2 with a clean tree: AUD-009-harnesses/sskr-boundaries.mjs 4/4, core-invariants.ts 10/12 as recorded above (the two pattern-mutation checks throw TypeError on frozen arrays), AUD-010-harnesses/core-aud009-regressions.ts 12/12, and test/aud-009-remediation.test.ts in the full suite, which passed."
+  },
   "privacyRedaction": {
     "kind": "privacy-only-metadata-redaction",
     "homePath": "/home/user",

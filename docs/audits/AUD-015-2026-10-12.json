@@ -1,0 +1,3210 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-015",
+  "auditNumber": 15,
+  "date": "2026-10-12",
+  "title": "AUD-014 remediation verification and residual edge review",
+  "reviewer": {
+    "name": "Codex coordinator and three scoped source reviewers",
+    "model": null,
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "2fc56164591bae26696cc15395bec18b064141c1",
+    "workingTree": "M .github/workflows/ci.yml\n M .github/workflows/executable.yml\n M .gitignore\n M .prettierignore\n M AGENTS.md\n M CHANGELOG.md\n M Dockerfile.sskr\n M README.md\n M SECURITY.md\n M THIRD_PARTY_NOTICES.md\n D assets/fonts/DroidSansFallback-BIP39.ttf\n D assets/fonts/DroidSansFallback-NOTICE\n M docs/ARCHITECTURE.md\n M docs/CANDIDATES.md\n M docs/SSKR.md\n M docs/audits/AUD-009-2026-10-06.json\n M docs/audits/AUD-009-2026-10-06.md\n M docs/audits/README.md\n M package.json\n M pnpm-lock.yaml\n D scripts/build-cjk-font.py\n M scripts/build-executable.mjs\n M scripts/build-sskr-wasm.mjs\n M scripts/business-goldens.mjs\n M scripts/candidate-vectors.mjs\n M scripts/check-card-output.mjs\n M scripts/compare-business-goldens.py\n M scripts/executable-files.mjs\n M scripts/executable-notices.mjs\n M scripts/sign-release.mjs\n M scripts/trace-material-outlines.py\n M scripts/verify-executable.mjs\n M scripts/verify-markdown.mjs\n M scripts/verify-terminal-input.py\n M scripts/verify-toolchain.mjs\n M src/bitcoin-evidence.ts\n M src/cards.ts\n M src/cli/arguments.ts\n M src/cli/ask.ts\n M src/cli/backup-check.ts\n M src/cli/bitcoin-options.ts\n M src/cli/bounded-read.ts\n M src/cli/business-options.ts\n M src/cli/candidates-file.ts\n M src/cli/card-options.ts\n M src/cli/cloud-folders.ts\n M src/cli/command-line.ts\n M src/cli/command-options.ts\n M src/cli/date-search.ts\n M src/cli/decode-command.ts\n M src/cli/encode-command.ts\n M src/cli/encode-export.ts\n M src/cli/encode-report.ts\n M src/cli/heir-sheet.ts\n M src/cli/help-pages.ts\n M src/cli/image-options.ts\n M src/cli/input.ts\n M src/cli/menu-entries.ts\n M src/cli/menu.ts\n M src/cli/missing-codes-search.ts\n M src/cli/option-copy.ts\n M src/cli/output-options.ts\n M src/cli/output-paths.ts\n M src/cli/preview-command.ts\n M src/cli/private-screen.ts\n M src/cli/protection.ts\n M src/cli/qr-export.ts\n M src/cli/qr-input.ts\n M src/cli/recover-date-command.ts\n M src/cli/recover-word-command.ts\n M src/cli/save-retry.ts\n M src/cli/self-test.ts\n M src/cli/share-repair.ts\n M src/cli/sskr-command.ts\n M src/cli/swap-check.ts\n M src/cli/table-command.ts\n M src/cli/terminal-choice.ts\n M src/cli/terminal-input.ts\n M src/cli/terminal.ts\n M src/cli/usage.ts\n M src/color-export.ts\n M src/core.ts\n M src/core/address-scan.ts\n M src/core/backup-check.ts\n M src/core/backup-options.ts\n M src/core/backup-reading-self-test.ts\n M src/core/backup-reading.ts\n M src/core/bits.ts\n M src/core/candidate-encryption-self-test.ts\n M src/core/candidate-encryption.ts\n M src/core/candidate-list-self-test.ts\n M src/core/candidate-list.ts\n M src/core/candidates-self-test.ts\n M src/core/candidates.ts\n M src/core/coin-address-evidence.ts\n M src/core/coins-self-test.ts\n M src/core/coins.ts\n M src/core/coins/address-types.ts\n M src/core/coins/base58-check.ts\n M src/core/coins/base58.ts\n M src/core/coins/bech32.ts\n M src/core/coins/bitcoin-cash-self-test.ts\n M src/core/coins/bitcoin-cash.ts\n M src/core/coins/bitcoin-like-self-test.ts\n M src/core/coins/bitcoin-like.ts\n M src/core/coins/coin-self-test.ts\n M src/core/coins/coin.ts\n M src/core/coins/cosmos.ts\n M src/core/coins/dash.ts\n M src/core/coins/evm-self-test.ts\n M src/core/coins/evm.ts\n M src/core/coins/keccak-account.ts\n M src/core/coins/other-forms.ts\n M src/core/colors.ts\n M src/core/date-recovery.ts\n M src/core/date-search-self-test.ts\n M src/core/date-search.ts\n M src/core/dates.ts\n M src/core/encoded-backup.ts\n M src/core/masking.ts\n M src/core/master-fingerprint.ts\n M src/core/missing-codes-search.ts\n M src/core/missing-codes.ts\n M src/core/places.ts\n M src/core/representations.ts\n M src/core/search-turns.ts\n M src/core/seedshift.ts\n M src/core/self-test-check.ts\n M src/core/self-test.ts\n M src/core/types.ts\n M src/core/wallet-check.ts\n M src/core/wallet-evidence-self-test.ts\n M src/core/wallet-evidence.ts\n M src/core/white-space.ts\n M src/core/words.ts\n M src/export/business-artwork.ts\n M src/export/business-cards.ts\n M src/export/business-designs.ts\n M src/export/business-layout.ts\n M src/export/business-render-primitives.ts\n M src/export/card-codes.ts\n M src/export/card-copy.ts\n M src/export/card-identities.ts\n M src/export/card-preview.ts\n M src/export/card-qr.ts\n M src/export/card-session.ts\n M src/export/card-settings.ts\n M src/export/cards-self-test.ts\n M src/export/collection-sheet.ts\n M src/export/color-math.ts\n M src/export/glass-artwork.ts\n M src/export/glass-cards.ts\n D src/export/glass-layout.ts\n M src/export/heir-sheet-self-test.ts\n M src/export/heir-sheet-text.ts\n M src/export/heir-sheet.ts\n M src/export/image-export.ts\n M src/export/individual-cards.ts\n M src/export/material-artwork.ts\n M src/export/material-cards.ts\n M src/export/material-layout.ts\n M src/export/pdf.ts\n M src/export/platform-node.ts\n M src/export/platform.ts\n M src/export/private-file.ts\n M src/export/render.ts\n M src/export/sskr-cards.ts\n M src/export/sskr-content.ts\n M src/export/sskr-render-self-test.ts\n M src/export/sskr-render.ts\n M src/export/study-backdrops.ts\n M src/export/templates.ts\n M src/index.ts\n M src/mnemocode.ts\n M src/record.ts\n M src/sskr/bytewords-list.ts\n M src/sskr/checksum.ts\n M src/sskr/gf2.ts\n M src/sskr/gf256.ts\n M src/sskr/index.ts\n M src/sskr/joint-repair.ts\n M src/sskr/known-answers.ts\n M src/sskr/repair-report.ts\n M src/sskr/repair-self-test.ts\n M src/sskr/repair.ts\n M src/sskr/runtime.ts\n M src/sskr/share-input.ts\n M src/sskr/share-platform-node.ts\n M src/sskr/share-platform.ts\n M src/sskr/share-set.ts\n M src/sskr/share-unmasking-self-test.ts\n M src/sskr/share-unmasking.ts\n M src/sskr/shares.ts\n M src/sskr/split.ts\n M src/sskr/transport.ts\n D src/unicode-card-export.ts\n M sskr-wasm/NOTICE.md\n M sskr-wasm/UPSTREAM_NOTICES.md\n M sskr-wasm/generated/recovery_sskr_wasm.d.ts\n M sskr-wasm/generated/recovery_sskr_wasm.js\n M sskr-wasm/generated/recovery_sskr_wasm_bg.wasm\n M sskr-wasm/integrity.json\n M sskr-wasm/rust/Cargo.lock\n M sskr-wasm/rust/Cargo.toml\n M sskr-wasm/rust/src/lib.rs\n M test/ask.test.ts\n M test/aud-002-remediation.test.ts\n M test/aud-008-final-fixes.test.ts\n M test/aud-008-followup.test.ts\n M test/aud-008-remediation.test.ts\n M test/aud-009-remediation.test.ts\n M test/aud-010-cli.test.ts\n M test/backup-check.test.ts\n M test/backup-options.test.ts\n M test/bip39-seed.test.ts\n M test/business-cards.test.ts\n M test/candidates.test.ts\n M test/card-copy.test.ts\n M test/card-identities.test.ts\n M test/card-numbering.test.ts\n M test/card-page-sizes.test.ts\n M test/card-preview.test.ts\n M test/card-qr.test.ts\n M test/card-session.test.ts\n M test/cli.test.ts\n M test/coins.test.ts\n M test/collection-sheet.test.ts\n M test/core.test.ts\n M test/date-search-core.test.ts\n M test/date-search-questions.test.ts\n M test/date-search.test.ts\n M test/encode-decode-questions.test.ts\n M test/encoded-backup.test.ts\n M test/error-redaction.test.ts\n M test/export.test.ts\n M test/heir-sheet.test.ts\n M test/help.test.ts\n M test/known-audit-defects.test.ts\n M test/masking.test.ts\n M test/master-fingerprint.test.ts\n M test/material-cards.test.ts\n M test/menu.test.ts\n M test/missing-codes-search.test.ts\n M test/missing-codes.test.ts\n M test/portable-modules.test.ts\n M test/private-file.test.ts\n M test/protection.test.ts\n M test/render-platform.test.ts\n M test/secret-input.test.ts\n M test/self-test-cli-checks.test.ts\n M test/self-test-integrity.test.ts\n M test/self-test-library.test.ts\n M test/share-platform-injection.test.ts\n M test/share-repair-ctrl-c.test.ts\n M test/sskr-cli-export.test.ts\n M test/sskr-joint-repair.test.ts\n M test/sskr-questions.test.ts\n M test/sskr-render.test.ts\n M test/sskr-repair.test.ts\n M test/sskr-share-modules.test.ts\n M test/sskr-vectors.test.ts\n M test/sskr-words.test.ts\n M test/terminal-choice-record.test.ts\n M test/terminal-input-ctrl-c.test.ts\n M test/terminal-input-echo.test.ts\n M test/terminal-input.test.ts\n M test/wallet-evidence.test.ts\n M test/word-recovery-cli.test.ts\n M test/word-recovery.test.ts\n M tsconfig.cards.json\n M tsconfig.tests.json\n M vitest.config.ts\n?? .github/actions/\n?? docs/audits/AUD-010-2026-10-07.json\n?? docs/audits/AUD-010-2026-10-07.md\n?? docs/audits/AUD-010-harnesses/\n?? docs/audits/AUD-011-2026-10-08.json\n?? docs/audits/AUD-011-2026-10-08.md\n?? docs/audits/AUD-011-harnesses/\n?? docs/audits/AUD-012-2026-10-08.json\n?? docs/audits/AUD-012-2026-10-08.md\n?? docs/audits/AUD-012-harnesses/\n?? docs/audits/AUD-013-2026-10-08.json\n?? docs/audits/AUD-013-2026-10-08.md\n?? docs/audits/AUD-013-harnesses/\n?? docs/audits/AUD-014-2026-10-12.json\n?? docs/audits/AUD-014-2026-10-12.md\n?? docs/audits/AUD-014-harnesses/\n?? scripts/build-ui-font.py\n?? scripts/card-fixtures.mjs\n?? scripts/glass-ribbons-reference.py\n?? scripts/release-key.mjs\n?? scripts/verify-no-copies.mjs\n?? src/bundled-file-paths.ts\n?? src/cli/encode-option-groups.ts\n?? src/cli/exit-codes.ts\n?? src/cli/fingerprint-report.ts\n?? src/cli/format-numbers.ts\n?? src/cli/menu-runner.ts\n?? src/cli/output-saving.ts\n?? src/cli/path-within.ts\n?? src/cli/qr-limits.ts\n?? src/cli/screen-fit.ts\n?? src/cli/search-consent.ts\n?? src/cli/seedshift-choices.ts\n?? src/cli/share-options.ts\n?? src/cli/shell-command.ts\n?? src/cli/sskr-export-command.ts\n?? src/cli/sskr-output.ts\n?? src/cli/sskr-restore-command.ts\n?? src/cli/sskr-split-command.ts\n?? src/cli/terminal-geometry.ts\n?? src/cli/terminal-style.ts\n?? src/cli/utf8.ts\n?? src/core/bip32-limits.ts\n?? src/core/bip39-sizes.ts\n?? src/core/candidate-list-writer.ts\n?? src/core/code-text.ts\n?? src/core/coins/address-sizes.ts\n?? src/core/coins/bitcoin-versions.ts\n?? src/core/coins/ethereum-self-test.ts\n?? src/core/coins/ethereum.ts\n?? src/core/encoded-form.ts\n?? src/core/english-words.ts\n?? src/core/pieces.ts\n?? src/core/prose.ts\n?? src/core/redacted.ts\n?? src/core/refusal.ts\n?? src/core/search-plan.ts\n?? src/core/typed-number.ts\n?? src/export/backup-cards.ts\n?? src/export/card-content.ts\n?? src/export/card-drawing.ts\n?? src/export/card-renderer.ts\n?? src/export/document-formats.ts\n?? src/export/export-details.ts\n?? src/export/glass-ribbons.ts\n?? src/export/page-units.ts\n?? src/export/pdf-documents.ts\n?? src/export/qr-image.ts\n?? src/export/self-test-cards.ts\n?? src/export/sskr-keeping-text.ts\n?? src/export/template-catalog.ts\n?? src/sskr/bridge.ts\n?? src/sskr/complete-shares.ts\n?? src/sskr/mixed-layout.ts\n?? src/sskr/set-topology.ts\n?? src/sskr/share-layout.ts\n?? src/sskr/share-restore.ts\n?? src/sskr/share-units.ts\n?? test/artwork-cache.test.ts\n?? test/aud-011-remediation.test.ts\n?? test/aud-012-remediation.test.ts\n?? test/aud-014-cli.test.ts\n?? test/aud-014-core.test.ts\n?? test/aud-014-export.test.ts\n?? test/aud-014-repair.test.ts\n?? test/aud-014-secrets.test.ts\n?? test/aud-014-shares.test.ts\n?? test/aud-014-staging.test.ts\n?? test/card-drawing.test.ts\n?? test/encode-card-content.test.ts\n?? test/final-review-cli.test.ts\n?? test/glass-ribbons.test.ts\n?? test/helpers/shares.ts\n?? test/joint-repair-secrets.test.ts\n?? test/release-key-fingerprints.test.ts\n?? test/scan-fixes.test.ts\n?? test/sskr-repair-engine.test.ts",
+    "sourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+    "sourceFiles": 424,
+    "capturedAt": "2026-10-12T01:41:13.161206+00:00",
+    "completedAt": "2026-10-12T01:52:34.654848+00:00"
+  },
+  "scope": "Verify AUD-014 remediation claims and staging tests; inspect related new bugs and residual semantic duplication. Targeted checks only.",
+  "procedureHashes": {
+    "docs/FULL_AUDIT_GUIDE.md": "e1b2fb641e4a25ebf292548fc1e2ef0c25dbd01faa5c2b580c6ba75df2afcab7",
+    "docs/audits/AUDIT_STANDARD.md": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f",
+    "docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+    "docs/audit-report.schema.json": "989bf3de974d581579c1d1c1e143d5ab9fa232dc70cc8c6f84ad00531ae698fb"
+  },
+  "checks": [
+    {
+      "label": "aud015-environment",
+      "command": [
+        "node",
+        "--input-type=module",
+        "-e",
+        "import fs from \"node:fs\"; const pkg = JSON.parse(fs.readFileSync(\"package.json\", \"utf8\")); const names = [\"typescript\", \"vitest\", \"prettier\"]; const versions = Object.fromEntries(names.map(name => [name, JSON.parse(fs.readFileSync(`node_modules/${name}/package.json`, \"utf8\")).version])); console.log(JSON.stringify({node:process.version,nodePath:process.execPath,platform:process.platform,arch:process.arch,pnpmPin:pkg.packageManager,installedPackages:versions}, null, 2));"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T02:03:22.101230+00:00",
+      "endedAt": "2026-10-12T02:03:22.384796+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "3e193ae409e15b9b1b69dce6852921276f362c22e209fdd6d81698e8f81fb540",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 5304188928,
+          "total": 15819018240,
+          "swapUsed": 3578163200
+        },
+        {
+          "available": 5304188928,
+          "total": 15819018240,
+          "swapUsed": 3578163200
+        },
+        {
+          "available": 5283438592,
+          "total": 15819018240,
+          "swapUsed": 3578163200
+        }
+      ],
+      "minimumAvailableBytes": 5283438592,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/aud015-environment.log",
+        "sha256": "3e193ae409e15b9b1b69dce6852921276f362c22e209fdd6d81698e8f81fb540"
+      }
+    },
+    {
+      "label": "review-remediation-build",
+      "command": [
+        "pnpm",
+        "build"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:42:44.758497+00:00",
+      "endedAt": "2026-10-12T01:42:46.042801+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4598910976,
+          "total": 15819018240,
+          "swapUsed": 3577999360
+        },
+        {
+          "available": 4598910976,
+          "total": 15819018240,
+          "swapUsed": 3577999360
+        },
+        {
+          "available": 4558516224,
+          "total": 15819018240,
+          "swapUsed": 3577999360
+        },
+        {
+          "available": 4497825792,
+          "total": 15819018240,
+          "swapUsed": 3577909248
+        },
+        {
+          "available": 4386189312,
+          "total": 15819018240,
+          "swapUsed": 3577909248
+        },
+        {
+          "available": 4336934912,
+          "total": 15819018240,
+          "swapUsed": 3577892864
+        },
+        {
+          "available": 4530831360,
+          "total": 15819018240,
+          "swapUsed": 3577888768
+        }
+      ],
+      "minimumAvailableBytes": 4336934912,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-build.log",
+        "sha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494"
+      }
+    },
+    {
+      "label": "review-remediation-check-host",
+      "command": [
+        "pnpm",
+        "check"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:41:31.690497+00:00",
+      "endedAt": "2026-10-12T01:41:36.983965+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "69e85ec38dd195649017e8729de9ecae4fb2d69a37f719b83be992fd31ca1a0a",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4566106112,
+          "total": 15819018240,
+          "swapUsed": 3576389632
+        },
+        {
+          "available": 4566106112,
+          "total": 15819018240,
+          "swapUsed": 3576389632
+        },
+        {
+          "available": 4520841216,
+          "total": 15819018240,
+          "swapUsed": 3576389632
+        },
+        {
+          "available": 4488433664,
+          "total": 15819018240,
+          "swapUsed": 3576389632
+        },
+        {
+          "available": 4480204800,
+          "total": 15819018240,
+          "swapUsed": 3576332288
+        },
+        {
+          "available": 4443508736,
+          "total": 15819018240,
+          "swapUsed": 3576299520
+        },
+        {
+          "available": 4393181184,
+          "total": 15819018240,
+          "swapUsed": 3576274944
+        },
+        {
+          "available": 4350156800,
+          "total": 15819018240,
+          "swapUsed": 3576274944
+        },
+        {
+          "available": 4310097920,
+          "total": 15819018240,
+          "swapUsed": 3576274944
+        },
+        {
+          "available": 4276121600,
+          "total": 15819018240,
+          "swapUsed": 3576274944
+        },
+        {
+          "available": 4381495296,
+          "total": 15819018240,
+          "swapUsed": 3576274944
+        },
+        {
+          "available": 4316061696,
+          "total": 15819018240,
+          "swapUsed": 3576274944
+        },
+        {
+          "available": 4235005952,
+          "total": 15819018240,
+          "swapUsed": 3576274944
+        },
+        {
+          "available": 4182749184,
+          "total": 15819018240,
+          "swapUsed": 3576274944
+        },
+        {
+          "available": 4243886080,
+          "total": 15819018240,
+          "swapUsed": 3576258560
+        },
+        {
+          "available": 4182601728,
+          "total": 15819018240,
+          "swapUsed": 3576258560
+        },
+        {
+          "available": 4166025216,
+          "total": 15819018240,
+          "swapUsed": 3576258560
+        },
+        {
+          "available": 4108480512,
+          "total": 15819018240,
+          "swapUsed": 3576258560
+        },
+        {
+          "available": 4012023808,
+          "total": 15819018240,
+          "swapUsed": 3576258560
+        },
+        {
+          "available": 4334252032,
+          "total": 15819018240,
+          "swapUsed": 3576258560
+        },
+        {
+          "available": 4259225600,
+          "total": 15819018240,
+          "swapUsed": 3576258560
+        },
+        {
+          "available": 4175536128,
+          "total": 15819018240,
+          "swapUsed": 3576258560
+        },
+        {
+          "available": 4220092416,
+          "total": 15819018240,
+          "swapUsed": 3576176640
+        }
+      ],
+      "minimumAvailableBytes": 4012023808,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-check-host.log",
+        "sha256": "69e85ec38dd195649017e8729de9ecae4fb2d69a37f719b83be992fd31ca1a0a"
+      }
+    },
+    {
+      "label": "review-remediation-check",
+      "command": [
+        "pnpm",
+        "check"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:41:18.645170+00:00",
+      "endedAt": "2026-10-12T01:41:19.438875+00:00",
+      "exitCode": 1,
+      "stopReason": null,
+      "logSha256": "5ee4c12dd863837408cec37df2ba569350315269563d8ff45ab4b325839828ac",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4355117056,
+          "total": 15819018240,
+          "swapUsed": 3576299520
+        },
+        {
+          "available": 4355117056,
+          "total": 15819018240,
+          "swapUsed": 3576299520
+        },
+        {
+          "available": 4331454464,
+          "total": 15819018240,
+          "swapUsed": 3576299520
+        },
+        {
+          "available": 4312788992,
+          "total": 15819018240,
+          "swapUsed": 3576299520
+        },
+        {
+          "available": 4330389504,
+          "total": 15819018240,
+          "swapUsed": 3576221696
+        }
+      ],
+      "minimumAvailableBytes": 4312788992,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-check.log",
+        "sha256": "5ee4c12dd863837408cec37df2ba569350315269563d8ff45ab4b325839828ac"
+      }
+    },
+    {
+      "label": "review-remediation-cli",
+      "command": [
+        "node",
+        "docs/audits/AUD-014-harnesses/cli-probes.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:43:15.963659+00:00",
+      "endedAt": "2026-10-12T01:43:19.002912+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "dbd79f9a94ea2557ccb9246f5e29824e7a886d4f64f8a9e560a1a4df593c84d7",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4623286272,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4623286272,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4581613568,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4528459776,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4505026560,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4476014592,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4431179776,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4399607808,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4493328384,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4492296192,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4488187904,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4463149056,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4429938688,
+          "total": 15819018240,
+          "swapUsed": 3577798656
+        },
+        {
+          "available": 4487577600,
+          "total": 15819018240,
+          "swapUsed": 3577786368
+        }
+      ],
+      "minimumAvailableBytes": 4399607808,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-cli.log",
+        "sha256": "dbd79f9a94ea2557ccb9246f5e29824e7a886d4f64f8a9e560a1a4df593c84d7"
+      }
+    },
+    {
+      "label": "review-remediation-core-edges",
+      "command": [
+        "node",
+        "docs/audits/AUD-015-harnesses/core-probes.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:47:21.783994+00:00",
+      "endedAt": "2026-10-12T01:47:22.323256+00:00",
+      "exitCode": 1,
+      "stopReason": null,
+      "logSha256": "3536e87d1e4da6b48338e5881a9fc30ae1b29804ca899e1051e55009c10db6a5",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4846268416,
+          "total": 15819018240,
+          "swapUsed": 3582173184
+        },
+        {
+          "available": 4846010368,
+          "total": 15819018240,
+          "swapUsed": 3582173184
+        },
+        {
+          "available": 4838330368,
+          "total": 15819018240,
+          "swapUsed": 3582173184
+        },
+        {
+          "available": 4846137344,
+          "total": 15819018240,
+          "swapUsed": 3582173184
+        }
+      ],
+      "minimumAvailableBytes": 4838330368,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-core-edges.log",
+        "sha256": "3536e87d1e4da6b48338e5881a9fc30ae1b29804ca899e1051e55009c10db6a5"
+      }
+    },
+    {
+      "label": "review-remediation-export-tests",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "test/aud-014-export.test.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism",
+        "-t",
+        "AUD-014-API003|AUD-014-API012|recommendation 21"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:42:27.529956+00:00",
+      "endedAt": "2026-10-12T01:42:31.074454+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "24eb0f104126f26eba5b46455e8fb8285e83641ed65fe4d57bdeedb4f1ef7c48",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4545409024,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4545409024,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4500152320,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4479172608,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4414754816,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4426436608,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4400066560,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4388835328,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4368367616,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4331237376,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4333363200,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4315299840,
+          "total": 15819018240,
+          "swapUsed": 3578048512
+        },
+        {
+          "available": 4290883584,
+          "total": 15819018240,
+          "swapUsed": 3578044416
+        },
+        {
+          "available": 4293881856,
+          "total": 15819018240,
+          "swapUsed": 3578044416
+        },
+        {
+          "available": 4317884416,
+          "total": 15819018240,
+          "swapUsed": 3578093568
+        },
+        {
+          "available": 4537077760,
+          "total": 15819018240,
+          "swapUsed": 3578093568
+        }
+      ],
+      "minimumAvailableBytes": 4290883584,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-export-tests.log",
+        "sha256": "24eb0f104126f26eba5b46455e8fb8285e83641ed65fe4d57bdeedb4f1ef7c48"
+      }
+    },
+    {
+      "label": "review-remediation-format",
+      "command": [
+        "pnpm",
+        "format:check"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:45:19.638610+00:00",
+      "endedAt": "2026-10-12T01:45:30.442831+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4720316416,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4719874048,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4679598080,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4663496704,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4638789632,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4604571648,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4609478656,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4585701376,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4569980928,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4559237120,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4555227136,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4538785792,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4538540032,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4537282560,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4497997824,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4498755584,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4498755584,
+          "total": 15819018240,
+          "swapUsed": 3582652416
+        },
+        {
+          "available": 4466589696,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4448563200,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4447801344,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4447883264,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4426821632,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4433154048,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4431089664,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4429582336,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4429352960,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4425482240,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4423352320,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4425396224,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4422742016,
+          "total": 15819018240,
+          "swapUsed": 3582537728
+        },
+        {
+          "available": 4428627968,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4413874176,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4411412480,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4411162624,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4411170816,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4410396672,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4407881728,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4408139776,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4408217600,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4407955456,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4378025984,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4378570752,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4379279360,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4379021312,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        },
+        {
+          "available": 4638973952,
+          "total": 15819018240,
+          "swapUsed": 3582533632
+        }
+      ],
+      "minimumAvailableBytes": 4378025984,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-format.log",
+        "sha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2"
+      }
+    },
+    {
+      "label": "review-remediation-labels",
+      "command": [
+        "node",
+        "docs/audits/AUD-015-harnesses/labels-probes.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:45:49.509039+00:00",
+      "endedAt": "2026-10-12T01:45:51.796295+00:00",
+      "exitCode": 1,
+      "stopReason": null,
+      "logSha256": "4e8db69b9997c1a1f5a6789849a4481cde80f5408fd682d89c57854768b6e91a",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4769419264,
+          "total": 15819018240,
+          "swapUsed": 3582521344
+        },
+        {
+          "available": 4769419264,
+          "total": 15819018240,
+          "swapUsed": 3582521344
+        },
+        {
+          "available": 4761071616,
+          "total": 15819018240,
+          "swapUsed": 3582521344
+        },
+        {
+          "available": 4739747840,
+          "total": 15819018240,
+          "swapUsed": 3582521344
+        },
+        {
+          "available": 4697124864,
+          "total": 15819018240,
+          "swapUsed": 3582521344
+        },
+        {
+          "available": 4691193856,
+          "total": 15819018240,
+          "swapUsed": 3582521344
+        },
+        {
+          "available": 4652412928,
+          "total": 15819018240,
+          "swapUsed": 3582513152
+        },
+        {
+          "available": 4625465344,
+          "total": 15819018240,
+          "swapUsed": 3582513152
+        },
+        {
+          "available": 4597592064,
+          "total": 15819018240,
+          "swapUsed": 3582513152
+        },
+        {
+          "available": 4586987520,
+          "total": 15819018240,
+          "swapUsed": 3582513152
+        },
+        {
+          "available": 4658229248,
+          "total": 15819018240,
+          "swapUsed": 3582509056
+        }
+      ],
+      "minimumAvailableBytes": 4586987520,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-labels.log",
+        "sha256": "4e8db69b9997c1a1f5a6789849a4481cde80f5408fd682d89c57854768b6e91a"
+      }
+    },
+    {
+      "label": "review-remediation-metadata",
+      "command": [
+        "python3",
+        "docs/audits/AUD-014-harnesses/metadata-probes.py"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:45:14.758575+00:00",
+      "endedAt": "2026-10-12T01:45:15.042512+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "6e94d514bc9cf799700cd645980e02b43f102ce05b8bf287754ad59c1e53d50f",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4757422080,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        },
+        {
+          "available": 4757422080,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        },
+        {
+          "available": 4699537408,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        }
+      ],
+      "minimumAvailableBytes": 4699537408,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-metadata.log",
+        "sha256": "6e94d514bc9cf799700cd645980e02b43f102ce05b8bf287754ad59c1e53d50f"
+      }
+    },
+    {
+      "label": "review-remediation-old-export",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "docs/audits/AUD-014-harnesses/probe.config.ts"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:50:01.198057+00:00",
+      "endedAt": "2026-10-12T01:50:03.241655+00:00",
+      "exitCode": 1,
+      "stopReason": null,
+      "logSha256": "6971e986f86a07a12fa004a12c4489093e42f142ec3736e95a1223ff1d6c2925",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4876832768,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        },
+        {
+          "available": 4876402688,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        },
+        {
+          "available": 4832628736,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        },
+        {
+          "available": 4802297856,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        },
+        {
+          "available": 4755820544,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        },
+        {
+          "available": 4722388992,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        },
+        {
+          "available": 4674011136,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        },
+        {
+          "available": 4616462336,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        },
+        {
+          "available": 4599476224,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        },
+        {
+          "available": 4789288960,
+          "total": 15819018240,
+          "swapUsed": 3582083072
+        }
+      ],
+      "minimumAvailableBytes": 4599476224,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-old-export.log",
+        "sha256": "6971e986f86a07a12fa004a12c4489093e42f142ec3736e95a1223ff1d6c2925"
+      }
+    },
+    {
+      "label": "review-remediation-runtime",
+      "command": [
+        "node",
+        "docs/audits/AUD-014-harnesses/runtime-probes.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:44:24.892786+00:00",
+      "endedAt": "2026-10-12T01:44:25.678879+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "e3f9410c6f07f65667c7877e2eb63b35b3a9498c859cd88b96bdad997fc3b8f1",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4659793920,
+          "total": 15819018240,
+          "swapUsed": 3583053824
+        },
+        {
+          "available": 4659793920,
+          "total": 15819018240,
+          "swapUsed": 3583053824
+        },
+        {
+          "available": 4628824064,
+          "total": 15819018240,
+          "swapUsed": 3583053824
+        },
+        {
+          "available": 4613668864,
+          "total": 15819018240,
+          "swapUsed": 3583053824
+        },
+        {
+          "available": 4660056064,
+          "total": 15819018240,
+          "swapUsed": 3583053824
+        }
+      ],
+      "minimumAvailableBytes": 4613668864,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-runtime.log",
+        "sha256": "e3f9410c6f07f65667c7877e2eb63b35b3a9498c859cd88b96bdad997fc3b8f1"
+      }
+    },
+    {
+      "label": "review-remediation-sskr-edges-corrected",
+      "command": [
+        "node",
+        "docs/audits/AUD-015-harnesses/sskr-probes.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:49:04.754595+00:00",
+      "endedAt": "2026-10-12T01:49:05.046686+00:00",
+      "exitCode": 1,
+      "stopReason": null,
+      "logSha256": "5b0efd0ace979504a92db232695fbdad41a84ba8df61ac3a5ad4c768625ddc10",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4875579392,
+          "total": 15819018240,
+          "swapUsed": 3582099456
+        },
+        {
+          "available": 4875579392,
+          "total": 15819018240,
+          "swapUsed": 3582099456
+        },
+        {
+          "available": 4874264576,
+          "total": 15819018240,
+          "swapUsed": 3582099456
+        }
+      ],
+      "minimumAvailableBytes": 4874264576,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-sskr-edges-corrected.log",
+        "sha256": "5b0efd0ace979504a92db232695fbdad41a84ba8df61ac3a5ad4c768625ddc10"
+      }
+    },
+    {
+      "label": "review-remediation-sskr-edges",
+      "command": [
+        "node",
+        "docs/audits/AUD-015-harnesses/sskr-probes.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:48:39.141291+00:00",
+      "endedAt": "2026-10-12T01:48:39.433372+00:00",
+      "exitCode": 1,
+      "stopReason": null,
+      "logSha256": "bb77391093704bdfc2cbaf2abc7444139af5d01f7f2a9e82d7fe7e2806bc6d26",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4855488512,
+          "total": 15819018240,
+          "swapUsed": 3582132224
+        },
+        {
+          "available": 4855488512,
+          "total": 15819018240,
+          "swapUsed": 3582132224
+        },
+        {
+          "available": 4843786240,
+          "total": 15819018240,
+          "swapUsed": 3582132224
+        }
+      ],
+      "minimumAvailableBytes": 4843786240,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-sskr-edges.log",
+        "sha256": "bb77391093704bdfc2cbaf2abc7444139af5d01f7f2a9e82d7fe7e2806bc6d26"
+      }
+    },
+    {
+      "label": "review-remediation-sskr",
+      "command": [
+        "node",
+        "docs/audits/AUD-014-harnesses/sskr-probes.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:44:48.980495+00:00",
+      "endedAt": "2026-10-12T01:44:49.267719+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "c1fb1433c54619aed826bc019149791869b1b05614aa4223299e22513ff9556a",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4725272576,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        },
+        {
+          "available": 4725272576,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        },
+        {
+          "available": 4715429888,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        }
+      ],
+      "minimumAvailableBytes": 4715429888,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-sskr.log",
+        "sha256": "c1fb1433c54619aed826bc019149791869b1b05614aa4223299e22513ff9556a"
+      }
+    },
+    {
+      "label": "review-remediation-staging-probes",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "docs/audits/AUD-015-harnesses/probe.config.ts"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:44:19.908184+00:00",
+      "endedAt": "2026-10-12T01:44:24.201787+00:00",
+      "exitCode": 1,
+      "stopReason": null,
+      "logSha256": "8d8b4da32dae6a4123d88f54b1b54cd881621a6cce54efe6b5184469903f3d48",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4597800960,
+          "total": 15819018240,
+          "swapUsed": 3577602048
+        },
+        {
+          "available": 4597800960,
+          "total": 15819018240,
+          "swapUsed": 3577602048
+        },
+        {
+          "available": 4524826624,
+          "total": 15819018240,
+          "swapUsed": 3577602048
+        },
+        {
+          "available": 4487409664,
+          "total": 15819018240,
+          "swapUsed": 3577602048
+        },
+        {
+          "available": 4486590464,
+          "total": 15819018240,
+          "swapUsed": 3577602048
+        },
+        {
+          "available": 4553764864,
+          "total": 15819018240,
+          "swapUsed": 3578060800
+        },
+        {
+          "available": 4507635712,
+          "total": 15819018240,
+          "swapUsed": 3578200064
+        },
+        {
+          "available": 4480851968,
+          "total": 15819018240,
+          "swapUsed": 3578990592
+        },
+        {
+          "available": 4498075648,
+          "total": 15819018240,
+          "swapUsed": 3579236352
+        },
+        {
+          "available": 4460810240,
+          "total": 15819018240,
+          "swapUsed": 3581108224
+        },
+        {
+          "available": 4467380224,
+          "total": 15819018240,
+          "swapUsed": 3581198336
+        },
+        {
+          "available": 4426694656,
+          "total": 15819018240,
+          "swapUsed": 3581198336
+        },
+        {
+          "available": 4429627392,
+          "total": 15819018240,
+          "swapUsed": 3581652992
+        },
+        {
+          "available": 4403511296,
+          "total": 15819018240,
+          "swapUsed": 3581779968
+        },
+        {
+          "available": 4370239488,
+          "total": 15819018240,
+          "swapUsed": 3581779968
+        },
+        {
+          "available": 4386742272,
+          "total": 15819018240,
+          "swapUsed": 3582136320
+        },
+        {
+          "available": 4343369728,
+          "total": 15819018240,
+          "swapUsed": 3582869504
+        },
+        {
+          "available": 4329041920,
+          "total": 15819018240,
+          "swapUsed": 3583070208
+        },
+        {
+          "available": 4661010432,
+          "total": 15819018240,
+          "swapUsed": 3583070208
+        }
+      ],
+      "minimumAvailableBytes": 4329041920,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-staging-probes.log",
+        "sha256": "8d8b4da32dae6a4123d88f54b1b54cd881621a6cce54efe6b5184469903f3d48"
+      }
+    },
+    {
+      "label": "review-remediation-storage-tests",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "test/private-file.test.ts",
+        "test/private-file-fallback.test.ts",
+        "test/joint-repair-secrets.test.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:46:21.094963+00:00",
+      "endedAt": "2026-10-12T01:46:23.387430+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "7f84e7d9da8fdc18638af44106e4e76e949d811e25b7e750e3568973e93502b6",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4832763904,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4832763904,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4794101760,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4766445568,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4729937920,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4656754688,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4592144384,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4559613952,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4557119488,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4565819392,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        },
+        {
+          "available": 4750299136,
+          "total": 15819018240,
+          "swapUsed": 3582504960
+        }
+      ],
+      "minimumAvailableBytes": 4557119488,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-storage-tests.log",
+        "sha256": "7f84e7d9da8fdc18638af44106e4e76e949d811e25b7e750e3568973e93502b6"
+      }
+    },
+    {
+      "label": "review-remediation-templates",
+      "command": [
+        "node",
+        "docs/audits/AUD-014-harnesses/template-facts-probes.mjs"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:44:58.731672+00:00",
+      "endedAt": "2026-10-12T01:44:59.518328+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "5deb538f487c0d8baf2d8f9a22d0b58c34aae5dad9c9331a8b1b845601c8aee9",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4743892992,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        },
+        {
+          "available": 4743892992,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        },
+        {
+          "available": 4721647616,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        },
+        {
+          "available": 4700590080,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        },
+        {
+          "available": 4733849600,
+          "total": 15819018240,
+          "swapUsed": 3582656512
+        }
+      ],
+      "minimumAvailableBytes": 4700590080,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-templates.log",
+        "sha256": "5deb538f487c0d8baf2d8f9a22d0b58c34aae5dad9c9331a8b1b845601c8aee9"
+      }
+    },
+    {
+      "label": "review-remediation-terminal",
+      "command": [
+        "python3",
+        "docs/audits/AUD-014-harnesses/terminal-subset.py"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:50:26.391510+00:00",
+      "endedAt": "2026-10-12T01:50:38.949565+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "28c914fb072478b6aeb714e74ca6bad48a67f3f1a2b35d4b0f28aa252b61e177",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4957388800,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4957388800,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4923748352,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4878036992,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4862480384,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4821606400,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4785147904,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4769775616,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4740100096,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4715094016,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4703723520,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4661133312,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4622327808,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4610310144,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4576247808,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4575989760,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4788961280,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4845072384,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4807802880,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4787417088,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4774821888,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4723994624,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4716175360,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4708433920,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4683182080,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4803600384,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4792442880,
+          "total": 15819018240,
+          "swapUsed": 3582078976
+        },
+        {
+          "available": 4758626304,
+          "total": 15819018240,
+          "swapUsed": 3581980672
+        },
+        {
+          "available": 4742369280,
+          "total": 15819018240,
+          "swapUsed": 3581964288
+        },
+        {
+          "available": 4739657728,
+          "total": 15819018240,
+          "swapUsed": 3581960192
+        },
+        {
+          "available": 4737265664,
+          "total": 15819018240,
+          "swapUsed": 3581960192
+        },
+        {
+          "available": 4734574592,
+          "total": 15819018240,
+          "swapUsed": 3581943808
+        },
+        {
+          "available": 4715847680,
+          "total": 15819018240,
+          "swapUsed": 3581943808
+        },
+        {
+          "available": 4691025920,
+          "total": 15819018240,
+          "swapUsed": 3581943808
+        },
+        {
+          "available": 4690251776,
+          "total": 15819018240,
+          "swapUsed": 3581943808
+        },
+        {
+          "available": 4817334272,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4800245760,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4808265728,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4802846720,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4788887552,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4781182976,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4774809600,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4756488192,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4887412736,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4876365824,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4856127488,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4839337984,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4814061568,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4788256768,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4776902656,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4735356928,
+          "total": 15819018240,
+          "swapUsed": 3581939712
+        },
+        {
+          "available": 4807077888,
+          "total": 15819018240,
+          "swapUsed": 3581935616
+        }
+      ],
+      "minimumAvailableBytes": 4575989760,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-terminal.log",
+        "sha256": "28c914fb072478b6aeb714e74ca6bad48a67f3f1a2b35d4b0f28aa252b61e177"
+      }
+    },
+    {
+      "label": "review-remediation-tests",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "test/aud-014-staging.test.ts",
+        "test/aud-014-cli.test.ts",
+        "test/aud-014-core.test.ts",
+        "test/aud-014-secrets.test.ts",
+        "test/aud-014-shares.test.ts",
+        "test/aud-014-repair.test.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism"
+      ],
+      "cwd": "/home/user/Documents/bip_tools/mnemocode",
+      "startedAt": "2026-10-12T01:42:02.953496+00:00",
+      "endedAt": "2026-10-12T01:42:14.764477+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "b321b0385850430caaa132a125e4e36aad0c60d47acdba4df7049a7f7daf5fe1",
+      "nodeHeapMiB": 768,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 120,
+      "memorySamples": [
+        {
+          "available": 4573200384,
+          "total": 15819018240,
+          "swapUsed": 3576639488
+        },
+        {
+          "available": 4573200384,
+          "total": 15819018240,
+          "swapUsed": 3576639488
+        },
+        {
+          "available": 4525793280,
+          "total": 15819018240,
+          "swapUsed": 3576639488
+        },
+        {
+          "available": 4488974336,
+          "total": 15819018240,
+          "swapUsed": 3576639488
+        },
+        {
+          "available": 4493762560,
+          "total": 15819018240,
+          "swapUsed": 3576721408
+        },
+        {
+          "available": 4503212032,
+          "total": 15819018240,
+          "swapUsed": 3577122816
+        },
+        {
+          "available": 4464046080,
+          "total": 15819018240,
+          "swapUsed": 3577229312
+        },
+        {
+          "available": 4497211392,
+          "total": 15819018240,
+          "swapUsed": 3577516032
+        },
+        {
+          "available": 4500422656,
+          "total": 15819018240,
+          "swapUsed": 3577602048
+        },
+        {
+          "available": 4457730048,
+          "total": 15819018240,
+          "swapUsed": 3577999360
+        },
+        {
+          "available": 4443660288,
+          "total": 15819018240,
+          "swapUsed": 3578163200
+        },
+        {
+          "available": 4422627328,
+          "total": 15819018240,
+          "swapUsed": 3578163200
+        },
+        {
+          "available": 4431990784,
+          "total": 15819018240,
+          "swapUsed": 3578089472
+        },
+        {
+          "available": 4357677056,
+          "total": 15819018240,
+          "swapUsed": 3578089472
+        },
+        {
+          "available": 4410990592,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4372738048,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4342890496,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4340428800,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4335833088,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4270227456,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4250324992,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4191645696,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4189126656,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4178960384,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4159201280,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4147150848,
+          "total": 15819018240,
+          "swapUsed": 3578085376
+        },
+        {
+          "available": 4114268160,
+          "total": 15819018240,
+          "swapUsed": 3578081280
+        },
+        {
+          "available": 4090404864,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4235046912,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4292526080,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4272676864,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4291104768,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4290846720,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4287062016,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4287148032,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4292599808,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4291796992,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4291796992,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4291383296,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4336340992,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4314857472,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4330348544,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4304924672,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4314214400,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4366307328,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4322816000,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4344020992,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4329914368,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        },
+        {
+          "available": 4510605312,
+          "total": 15819018240,
+          "swapUsed": 3578077184
+        }
+      ],
+      "minimumAvailableBytes": 4090404864,
+      "sourceBefore": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "sourceAfter": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "changedFiles": [],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-tests.log",
+        "sha256": "b321b0385850430caaa132a125e4e36aad0c60d47acdba4df7049a7f7daf5fe1"
+      }
+    }
+  ],
+  "coverageLedger": [
+    {
+      "checkId": "CHECK-SEC-001",
+      "category": "SEC",
+      "group": "Threat model and ownership",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-SEC-002",
+      "category": "SEC",
+      "group": "Permissions and offline isolation",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-SEC-003",
+      "category": "SEC",
+      "group": "Network egress",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-SEC-004",
+      "category": "SEC",
+      "group": "Randomness and encryption",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-SEC-005",
+      "category": "SEC",
+      "group": "Secret exceptional paths",
+      "outcome": "failed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-SEC-006",
+      "category": "SEC",
+      "group": "Injection and persistence",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-SEC-007",
+      "category": "SEC",
+      "group": "Input and availability bounds",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-FUN-001",
+      "category": "FUN",
+      "group": "BIP39 and representations",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-FUN-002",
+      "category": "FUN",
+      "group": "Coin derivation",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-FUN-003",
+      "category": "FUN",
+      "group": "Unimplemented protocols",
+      "outcome": "not-applicable",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Protocol/transaction features are not implemented here."
+    },
+    {
+      "checkId": "CHECK-FUN-004",
+      "category": "FUN",
+      "group": "Address script classification",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-FUN-005",
+      "category": "FUN",
+      "group": "Unimplemented transaction inspection",
+      "outcome": "not-applicable",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Protocol/transaction features are not implemented here."
+    },
+    {
+      "checkId": "CHECK-FUN-006",
+      "category": "FUN",
+      "group": "Recovery and SSKR",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-FUN-007",
+      "category": "FUN",
+      "group": "Local address search",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-API-001",
+      "category": "API",
+      "group": "Runtime and dependency contracts",
+      "outcome": "failed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-API-002",
+      "category": "API",
+      "group": "Cancellation and ownership",
+      "outcome": "failed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-API-003",
+      "category": "API",
+      "group": "Export contracts",
+      "outcome": "failed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-API-004",
+      "category": "API",
+      "group": "Codec interoperability",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-BLD-001",
+      "category": "BLD",
+      "group": "Module composition",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-BLD-002",
+      "category": "BLD",
+      "group": "Portable source contracts",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-BLD-003",
+      "category": "BLD",
+      "group": "Pins and notices",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-BLD-004",
+      "category": "BLD",
+      "group": "SSKR source/output freshness",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-BLD-005",
+      "category": "BLD",
+      "group": "Workflows and artifact relationship",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-UI-001",
+      "category": "UI",
+      "group": "Terminal viewports",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-UI-002",
+      "category": "UI",
+      "group": "Terminal inputs and navigation",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-UI-003",
+      "category": "UI",
+      "group": "Help and privacy",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-ARC-001",
+      "category": "ARC",
+      "group": "Module and class ownership",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-ARC-002",
+      "category": "ARC",
+      "group": "Semantic duplication and dead code",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-ARC-003",
+      "category": "ARC",
+      "group": "Tests and comments",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-DOC-001",
+      "category": "DOC",
+      "group": "Capabilities and warnings",
+      "outcome": "not-run",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Outside this targeted follow-up; no current runtime/full acceptance evidence claimed."
+    },
+    {
+      "checkId": "CHECK-DOC-002",
+      "category": "DOC",
+      "group": "Commands and licensing",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    },
+    {
+      "checkId": "CHECK-DOC-003",
+      "category": "DOC",
+      "group": "Audit integrity",
+      "outcome": "passed",
+      "snapshot": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "method": "Bounded remediation source review and applicable recorded checks; no full acceptance.",
+      "reason": "Scoped evidence in command ledger and findings; pass does not mean exhaustive coverage."
+    }
+  ],
+  "environment": {
+    "node": "v26.10.0",
+    "nodePath": "/home/user/.local/share/nodejs/node-v26.10.0-linux-x64/bin/node",
+    "platform": "linux",
+    "arch": "x64",
+    "pnpmPin": "pnpm@12.8.1",
+    "installedPackages": {
+      "typescript": "7.0.2",
+      "vitest": "5.0.3",
+      "prettier": "3.9.9"
+    }
+  },
+  "harnessHashes": {
+    "docs/audits/AUD-015-harnesses/README.md": "8587bd85331960ac909a7ed90fda1464a04ecfd664740780081f39376befedd9",
+    "docs/audits/AUD-015-harnesses/core-probes.mjs": "ba3312a0fb55005a12828d8fe012d772b7e4410cb4a343d9dae4e6f1e2a35d11",
+    "docs/audits/AUD-015-harnesses/labels-probes.mjs": "42c2d1911150c659a6e8d9d2e9ecec0316bfd9d7ff76fd77340cb314b8bc71df",
+    "docs/audits/AUD-015-harnesses/probe.config.ts": "944deece4267a77721163b87106106dce9095fd299f704f7d8fc6f818f943eaa",
+    "docs/audits/AUD-015-harnesses/run.py": "8802176af42742b9ac58ec07f36fa2e8bec0ee03cb6807a5521d4faa0015204f",
+    "docs/audits/AUD-015-harnesses/sskr-probes.mjs": "ec8a9cb5974b26d83604376792d63262d37f5a08ea3e9170958cd249d195187c",
+    "docs/audits/AUD-015-harnesses/staging-probes.ts": "4131b16e2b53fd5cebd8ac414dfc24767e4bb058ff34d3891328c6fe6978246f",
+    "docs/audits/AUD-015-harnesses/validate-report.py": "5f7dd535d1cd43215d07c0223604a199b633d5c7d4555c9fd695ddf3ab1b8e73",
+    "docs/audits/AUD-015-harnesses/write-report.py": "03e6f15fa4b9214504d7f3d8808f067e2c457a8b0092ef5772ca15683f43d885"
+  },
+  "findings": [
+    {
+      "id": "AUD-015-API001",
+      "category": "API",
+      "kind": "finding",
+      "title": "The stronger no-late-publication claim misses the consuming continuation",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Limited robustness/cleanup issue; no direct secret compromise demonstrated.",
+      "affectedFiles": [
+        {
+          "path": "src/core/date-search.ts",
+          "line": 534,
+          "sha256": "7b7340fad82a1931f826fde37aa347ff6eb4eeac93ba8b306f262ef02e4aeb4c"
+        },
+        {
+          "path": "src/core/wallet-check.ts",
+          "line": 53,
+          "sha256": "2385dc22ecf0acd1fe314e669533a01017eca61cce039ac099dd5755cc92caee"
+        }
+      ],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-core-edges.log",
+        "sha256": "3536e87d1e4da6b48338e5881a9fc30ae1b29804ca899e1051e55009c10db6a5"
+      },
+      "reproduction": "One fixed date and the public zero-entropy phrase. The wallet callback schedules abort with two nested queueMicrotask calls and returns matched:true.",
+      "expected": "Under the strengthened askWallet/addendum promise, reject with the signal reason and publish no late match.",
+      "observed": "The run resolved with an aborted signal; onMatch ran once and observed that signal already aborted.",
+      "impact": "A host can receive a late recovery after stopping. SearchRun retains its weaker next-turn contract, so this is a limited inconsistency in the strengthened remediation claim rather than a demonstrated breach of the original contract. The native checker was not shown to produce a wrong wallet or leak a secret.",
+      "recommendedFix": "Check the signal in the caller immediately before result publication and final return, including after helper awaits. Keep the shared wallet-answer validator.",
+      "requiredVerification": "Zero onMatch calls, rejection with the same abort reason, and normal matched true/false controls for every search path.",
+      "relatedFindings": [],
+      "remediationUpdate": {
+        "date": "2026-10-12",
+        "status": "fixed",
+        "addendum": "Remediation addendum (2026-10-12)",
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef"
+      }
+    },
+    {
+      "id": "AUD-015-API002",
+      "category": "API",
+      "kind": "finding",
+      "title": "A split returns shares and original text from different input revisions",
+      "severity": "medium",
+      "status": "fixed",
+      "releaseBlocking": true,
+      "releaseBlockingReason": "Resolve supported asynchronous result ownership before release.",
+      "affectedFiles": [
+        {
+          "path": "src/sskr/split.ts",
+          "line": 103,
+          "sha256": "bfe6bee585552991cfe0c407eed1f10d2d805823eec647ab2ea8978f7eb8cf33"
+        }
+      ],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-sskr-edges-corrected.log",
+        "sha256": "5b0efd0ace979504a92db232695fbdad41a84ba8df61ac3a5ad4c768625ddc10"
+      },
+      "reproduction": "Gate createShares, start splitBackup for public phrase A in direct mode, change request.mnemonic to the valid public phrase B, then release the gate.",
+      "expected": "Return the original normalized phrase captured for this split, or reject a stale request.",
+      "observed": "held is phrase A and original is phrase B in the same successful BackupSplit. The real SSKR platform and split verification were used.",
+      "impact": "A browser/library host that edits its request during asynchronous WASM readiness can pair an unrelated displayed original with the actual backup. Immutable native CLI input is not affected by the demonstrated schedule.",
+      "recommendedFix": "Capture the normalized original and all operation inputs before awaiting, and build the result exclusively from that snapshot.",
+      "requiredVerification": "A gated ordinary-object edit must never mix revisions; keep both direct and Seedshift behavior and entropy cleanup.",
+      "relatedFindings": [
+        "AUD-014-API004"
+      ],
+      "remediationUpdate": {
+        "date": "2026-10-12",
+        "status": "fixed",
+        "addendum": "Remediation addendum (2026-10-12)",
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef"
+      }
+    },
+    {
+      "id": "AUD-015-API003",
+      "category": "API",
+      "kind": "finding",
+      "title": "Saved QR sidecars bypass the staging-copy warning handler",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Limited robustness/cleanup issue; no direct secret compromise demonstrated.",
+      "affectedFiles": [
+        {
+          "path": "src/cli/qr-export.ts",
+          "line": 16,
+          "sha256": "bcdfb2a94c9dd424e3f68e4a3fe8510fe0043da9d97b07b4d9fec9ceb3ea8852"
+        },
+        {
+          "path": "src/cli/qr-export.ts",
+          "line": 23,
+          "sha256": "bcdfb2a94c9dd424e3f68e4a3fe8510fe0043da9d97b07b4d9fec9ceb3ea8852"
+        },
+        {
+          "path": "src/cli/encode-command.ts",
+          "line": 174,
+          "sha256": "778345aa34181eb566d9b275ac3d2147d608a78fce7a3d64553a9c053c655ab5"
+        },
+        {
+          "path": "src/cli/sskr-output.ts",
+          "line": 218,
+          "sha256": "8a1c40627a585ec1fa5554ce02d4205cb8a9cd3031c75eff1303a4d96d462a60"
+        }
+      ],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-staging-probes.log",
+        "sha256": "8d8b4da32dae6a4123d88f54b1b54cd881621a6cce54efe6b5184469903f3d48"
+      },
+      "reproduction": "Fail only removal of .mnemocode-export-* after QR publication. Rendering/QR encoding return public opaque bytes; publication is real. Exercise both QR helpers and the real runEncode card-qr route.",
+      "expected": "The saved sidecar counts as saved, a warning identifies the remaining private staging copy, and the command completes without retrying the published result.",
+      "observed": "Both document and sidecar were present and complete, but runEncode rejected with LeftStagingCopy. Both QR helpers also rejected, with zero cleanup warnings through terminalNotice. Two common-save controls passed; all three sidecar cases failed.",
+      "impact": "The command reports an error after successful publication; a share-sidecar loop can stop before later files. The exception still names the private copy, so this is not a hidden-copy or file-content-loss claim.",
+      "recommendedFix": "Route sidecar publication through writeSaved while retaining the selected path and the warning. Do not suppress ordinary save failures.",
+      "requiredVerification": "Both sidecar helpers, Encode, and SSKR sidecar loops complete with exactly one warning per leftover; EEXIST and genuine failed writes still fail.",
+      "relatedFindings": [],
+      "remediationUpdate": {
+        "date": "2026-10-12",
+        "status": "fixed",
+        "addendum": "Remediation addendum (2026-10-12)",
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef"
+      }
+    },
+    {
+      "id": "AUD-015-UI001",
+      "category": "UI",
+      "kind": "finding",
+      "title": "Unknown prototype-named options print inherited object values",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Limited robustness/cleanup issue; no direct secret compromise demonstrated.",
+      "affectedFiles": [
+        {
+          "path": "src/cli/option-copy.ts",
+          "line": 72,
+          "sha256": "9c8149acff6010bd382959586c4b6d68410e5dc695a491050f6ba2c32da9bbbd"
+        },
+        {
+          "path": "src/cli/arguments.ts",
+          "line": 182,
+          "sha256": "75db30539b5909af3900a05fb567858ecf62b6bfaf8bea428847de80cc431565"
+        }
+      ],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-labels.log",
+        "sha256": "4e8db69b9997c1a1f5a6789849a4481cde80f5408fd682d89c57854768b6e91a"
+      },
+      "reproduction": "Call optionLabel for __proto__, constructor and toString; run the actual built CLI table --word abandon --__proto__ with a public value.",
+      "expected": "A string naming the typed unknown option, with the command refused.",
+      "observed": "The helper returned an object or function. The real CLI refused correctly but printed '[object Object] setting'. Known and ordinary unknown labels were correct.",
+      "impact": "Broken refusal text and a declared string-return contract. The parser fix is working; no prototype pollution or bypass of unknown-option refusal is demonstrated.",
+      "recommendedFix": "Use Object.hasOwn for label lookup or a null-prototype map, then retain the existing fallback.",
+      "requiredVerification": "Exact string labels and exact unknown/repeated/missing-value refusals for inherited names, with normal-label controls.",
+      "relatedFindings": [
+        "AUD-014-API010"
+      ],
+      "remediationUpdate": {
+        "date": "2026-10-12",
+        "status": "fixed",
+        "addendum": "Remediation addendum (2026-10-12)",
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef"
+      }
+    },
+    {
+      "id": "AUD-015-SEC001",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "Transport readers abandon internal share-byte arrays without wiping",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Limited robustness/cleanup issue; no direct secret compromise demonstrated.",
+      "affectedFiles": [
+        {
+          "path": "src/sskr/transport.ts",
+          "line": 163,
+          "sha256": "dad11904c682a234d5f01aebd11ab33a8c328356b092eb273cca4d86ee1b7511"
+        },
+        {
+          "path": "src/sskr/transport.ts",
+          "line": 229,
+          "sha256": "dad11904c682a234d5f01aebd11ab33a8c328356b092eb273cca4d86ee1b7511"
+        },
+        {
+          "path": "src/sskr/transport.ts",
+          "line": 382,
+          "sha256": "dad11904c682a234d5f01aebd11ab33a8c328356b092eb273cca4d86ee1b7511"
+        },
+        {
+          "path": "src/sskr/transport.ts",
+          "line": 472,
+          "sha256": "dad11904c682a234d5f01aebd11ab33a8c328356b092eb273cca4d86ee1b7511"
+        }
+      ],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-sskr-edges-corrected.log",
+        "sha256": "5b0efd0ace979504a92db232695fbdad41a84ba8df61ac3a5ad4c768625ddc10"
+      },
+      "reproduction": "Retain references to Uint8Array.from allocations while reading one published deterministic share. Also repair CRC32 after setting a reserved metadata bit, then exercise the intended metadata refusal.",
+      "expected": "Internal decoded arrays are wiped when their local job ends; a successfully returned caller-owned urToTransport array remains usable.",
+      "observed": "Nonzero internal arrays remained after readShare (1), Share.read (2), bytewordsToUr (1), and an Invalid SSKR share metadata refusal (1). The caller-owned-result control passed.",
+      "impact": "Best-effort cleanup is missing for transient typed arrays. No heap dump, secret theft, or guaranteed whole-memory-erasure claim; immutable share strings already have documented JavaScript limits.",
+      "recommendedFix": "Add try/finally wiping for discarded transports and wipe allocations on rejection, without wiping a transport returned to its caller.",
+      "requiredVerification": "Capture ended internal buffers on successful parsing and intended refusal, and preserve the caller-owned successful output.",
+      "relatedFindings": [],
+      "remediationUpdate": {
+        "date": "2026-10-12",
+        "status": "fixed",
+        "addendum": "Remediation addendum (2026-10-12)",
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef"
+      }
+    },
+    {
+      "id": "AUD-001-API001",
+      "category": "API",
+      "kind": "finding",
+      "title": "An exported share-format mirror still returns undefined for unknown forms",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Limited robustness/cleanup issue; no direct secret compromise demonstrated.",
+      "affectedFiles": [
+        {
+          "path": "src/sskr/transport.ts",
+          "line": 313,
+          "sha256": "dad11904c682a234d5f01aebd11ab33a8c328356b092eb273cca4d86ee1b7511"
+        }
+      ],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-sskr-edges-corrected.log",
+        "sha256": "5b0efd0ace979504a92db232695fbdad41a84ba8df61ac3a5ad4c768625ddc10"
+      },
+      "reproduction": "Call shareFormatMirroring with typo, null and 5; compare all five supported encoded forms.",
+      "expected": "Refuse an unsupported format before returning a ShareFormat.",
+      "observed": "All three invalid inputs returned undefined; all five supported controls passed. Share.write's original reproduction is now fixed.",
+      "impact": "Residual unchecked-format-discriminant scope under the original ID. A JavaScript host can get an unusable result rather than an actionable refusal; no alternate encoding or secret corruption demonstrated.",
+      "recommendedFix": "Validate through the existing encoded-format owner before finding the mirrored share form.",
+      "requiredVerification": "Wrong runtime types/discriminants refuse; all supported forms still map exactly.",
+      "relatedFindings": [],
+      "remediationUpdate": {
+        "date": "2026-10-12",
+        "status": "fixed",
+        "addendum": "Remediation addendum (2026-10-12)",
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef"
+      }
+    }
+  ],
+  "observations": [],
+  "informationalReview": [
+    {
+      "title": "Executable host getters are read again after validation",
+      "relatedFindings": [
+        "AUD-014-SEC001",
+        "AUD-014-API001"
+      ],
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-core-edges.log",
+        "sha256": "3536e87d1e4da6b48338e5881a9fc30ae1b29804ca899e1051e55009c10db6a5"
+      },
+      "assessment": "Informational robustness scope: changing kind getters selected NoProtection and real MNCL bytes; changing matched getters counted one match after validating boolean false. These require executable host objects, cannot come from JSON or typed native CLI input, and are not a security claim against a dishonest host. Ordinary original reproductions remain fixed. Snapshot validated fields or explicitly document stable-input assumptions."
+    },
+    {
+      "title": "Checked checksum resamples a getter-backed input",
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-core-edges.log",
+        "sha256": "3536e87d1e4da6b48338e5881a9fc30ae1b29804ca899e1051e55009c10db6a5"
+      },
+      "assessment": "An index getter returning 0 during validation and 1 later was read twice and produced false. This proves resampling, not invalid-index acceptance or incorrect checksum math. Copy once and validate/compute the same owned list, or state a stable-input precondition."
+    },
+    {
+      "title": "The historical cleanup probe has a narrower oracle than the adjudicated contract",
+      "evidence": {
+        "localOnly": true,
+        "log": "AUD-015-evidence/review-remediation-old-export.log",
+        "sha256": "6971e986f86a07a12fa004a12c4489093e42f142ec3736e95a1223ff1d6c2925"
+      },
+      "assessment": "Its overwrite-after-preflight case passed. Its old expect(failure).toBeUndefined still fails on LeftStagingCopy, while the two stronger new controls verify complete publication plus a warning and a real retained copy. Preserve that historical failure; do not make it green by hiding the copy."
+    },
+    {
+      "title": "aud-014-staging.test.ts is meaningful but covers only the common save path",
+      "assessment": "All three tests passed. They assert a typed cleanup outcome, saved bytes, a warning, ordinary silent success, and EEXIST refusal. Two audit controls additionally assert the retained document, exact staging path, warning kind, returned path and one write. They do not cover QR sidecars or prove every save goes through writeSaved."
+    },
+    {
+      "title": "Descriptor chunks and MACs have cleanup by source",
+      "assessment": "readBoundedDescriptor registers each chunk before readSync and wipes in finally; digestFits wipes the owned MAC in finally. Existing new UTF-8 tests observe returned buffers, not all descriptor chunks. Partial-read-then-throw allocation-capture tests would improve coverage without large input."
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "Reuse the existing positive-safe-integer rule",
+      "files": [
+        "src/core/pieces.ts:9",
+        "src/export/card-codes.ts:48",
+        "src/core/typed-number.ts:25"
+      ],
+      "change": "Delegate width/capacity predicates to inWholeRange with a positive safe range; retain contextual refusal messages."
+    },
+    {
+      "title": "Delegate the split's common quorum checks",
+      "files": [
+        "src/sskr/split.ts:61",
+        "src/sskr/share-layout.ts:101"
+      ],
+      "change": "Use isRecordedQuorum plus the split-specific minimum of two. Threshold-one imported shares remain a distinct supported recovery policy."
+    },
+    {
+      "title": "Define seconds per hour once",
+      "files": [
+        "src/core/search-turns.ts:19",
+        "src/core/search-plan.ts:24"
+      ],
+      "change": "Share the unit definition while keeping display-time and ask-before-search policies distinct."
+    },
+    {
+      "title": "Optional encapsulation hardening for PivotBasis",
+      "files": [
+        "src/sskr/gf2.ts:51"
+      ],
+      "change": "add returns its stored object. Its type is readonly and current callers do not mutate it. Freezing or returning a copy is optional runtime hardening, not a reproduced solver defect."
+    }
+  ],
+  "unexecutedHypotheses": [
+    "repairCandidates may ignore skipped too-open readings when another reading resolves. No fixture proving missed valid alternatives or wrong uniqueness was constructed.",
+    "renderCards spreads raw profile over settled details, while individual rendering uses settled details. Explicit undefined or whitespace could produce inconsistent identity inputs. No physical output discrepancy was tested.",
+    "Material/font caches, streaming full document sets and wallet-target caching require bounded profiling before a speed claim. Earlier optional deferrals remain in force."
+  ],
+  "remediation": [
+    {
+      "id": "AUD-014-SEC001",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-SEC002",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-FUN001",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-FUN002",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-FUN003",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API001",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API002",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API003",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API004",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API005",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API006",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API007",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API008",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API009",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API010",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API011",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-014-API012",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    },
+    {
+      "id": "AUD-001-API001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain. Its separate mirror-helper scope remains open under the original ID.",
+      "scopeStatus": {
+        "Share.write original reproduction": "fixed",
+        "shareFormatMirroring extension": "open"
+      }
+    },
+    {
+      "id": "AUD-012-SEC004",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "fixSourceFingerprint": "d36b710cf1ae73aad99208bf8a812b2fa5313b8b2a134f082a3e63ca0cec6768",
+      "evidence": "Original AUD-014 reproduction passes on this exact dirty tree; scoped new tests passed. Acceptance gaps remain."
+    }
+  ],
+  "limitations": [
+    "Targeted remediation follow-up with new bounded edge probes, not another fully executed end-to-end audit or release acceptance.",
+    "No PDF construction, full card generation, pixel comparison, full suites/vector replay, scrypt, canonical Docker/WASM rebuild, browser host or Windows/macOS executable run.",
+    "Six PDF-parsing cases in aud-014-export.test.ts were deliberately skipped by name filtering. All 105 selected ordinary tests passed in ten distinct files; do not add diagnostic probe totals to that count.",
+    "Protection, QR and export probes substitute only named expensive/failure seams and establish ownership/publication behavior, not actual image or PDF bytes.",
+    "The first new SSKR edge run built the negative fixture with a duplicate UR prefix and rejected too early. Its corrected rerun reached Invalid SSKR share metadata; original failed evidence is preserved.",
+    "The initial sandbox pnpm check failed with spawnSync git EPERM; the identical bounded host rerun passed. This environment block is not a code defect.",
+    "No commit exists for these fixes; historical AUD-014 status remains fixed, not blanket verified. Exact dirty source bytes identify this review.",
+    "Source unchanged throughout checks. No production/test/dependency/workflow/generated-WASM edits, commits, pushes, signing or release operations by this review.",
+    "Model and reasoning effort are not exposed. Public fixtures only; raw ignored local evidence is retained without anonymization, while published reports anonymize home paths."
+  ],
+  "artifactRelationship": {
+    "freshBuild": "review-remediation-build",
+    "manifest": "AUD-015-evidence/artifacts.json",
+    "localOnly": true,
+    "manifestSha256": "c50f7493d8a3b33f83ac7e1deb6a2e43f000fd42a3e63399c9d9ab24483eac24"
+  },
+  "baselineReportHashes": {
+    "AUD-014-2026-10-12.md": "96e9545c71d9d762d4da709e393804fa899cb421a65f226092f924a5bdbd6fd9",
+    "AUD-014-2026-10-12.json": "e0c12e6b3b1e2229e8c78c6dd0d5f4c313c562e0d66e2de34ac0bc71e5a70120"
+  },
+  "summary": {
+    "medium": 1,
+    "low": 5,
+    "originalReproductionsPassing": 19,
+    "ordinaryTestsPassed": 105,
+    "ordinaryTestFiles": 10,
+    "pdfCasesSkipped": 6,
+    "ptyCasesPassed": 4,
+    "remainingDuplicationGroups": 3
+  },
+  "evidenceStorage": "AUD-014's frozen recorder produced initial review-remediation records. AUD-015/run.py retained exact unchanged bytes in AUD-015-evidence. Originals remain local; replay uses fresh labels.",
+  "recordValidation": "AUD-014 schema passed; all 20 referenced remediation log hashes matched. Historical report bytes preserved.",
+  "remediationAddendum": {
+    "date": "2026-10-12",
+    "scope": "Remediation of the six findings, the informational getter and checksum observations, and the four recommendations of this report, made in the same working tree by the repository's coding assistant on the owner's request.",
+    "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef",
+    "fixSnapshot": {
+      "file": "AUD-015-evidence/aud015-remediation-2026-10-12-snapshot.json",
+      "localOnly": true
+    },
+    "statusRule": "fixed, not verified: no fix or verification commit exists yet, and the PDF-generating tests and the render comparison were not run.",
+    "reproductions": [
+      {
+        "label": "aud015-remediation-core-2",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/aud015-remediation-core-2.log",
+        "logSha256": "7b80dec4dd17180405d70bb9e71e770f6437179833ab33dc979a3cce15a18b9e",
+        "localOnly": true
+      },
+      {
+        "label": "aud015-remediation-sskr",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/aud015-remediation-sskr.log",
+        "logSha256": "8a9b95e08bf997d0cf47e0ad7137e5d9d1af632e8b1b5135adddbd8eae134f85",
+        "localOnly": true
+      },
+      {
+        "label": "aud015-remediation-labels",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/aud015-remediation-labels.log",
+        "logSha256": "9d88c23cbde6a4957d847ed135cff9a1dc4bfc5d7fc7a8a14fefdd684bb28ba1",
+        "localOnly": true
+      },
+      {
+        "label": "aud015-remediation-staging",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/aud015-remediation-staging.log",
+        "logSha256": "714ab40d641a7e7df70c112b27711a73e96a1b350862f0f5098c4b441bf57b87",
+        "localOnly": true
+      }
+    ],
+    "checks": [
+      {
+        "label": "remediation/tests-light-1",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/remediation/tests-light-1.log",
+        "logSha256": "78287628745e4c579cb299c53e4dd4c84b5adfaa87f9b273e850a7e5d1dc7b9c",
+        "localOnly": true
+      },
+      {
+        "label": "remediation/tests-light-2",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/remediation/tests-light-2.log",
+        "logSha256": "ab9274225585af494d81f9274dd623f10c2503f141f170a1a9591f7894d4fd35",
+        "localOnly": true
+      },
+      {
+        "label": "remediation/tests-light-3",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/remediation/tests-light-3.log",
+        "logSha256": "97895f5361d79df4a3aa6aa35052b5db88c74e15d072c6b3d89a066d68e0c94a",
+        "localOnly": true
+      },
+      {
+        "label": "remediation/tests-light-4",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/remediation/tests-light-4.log",
+        "logSha256": "bdc7ffb5e2c023c314585d5ba93c51ab9d2d53e6b099821b884167b40fd4fff6",
+        "localOnly": true
+      },
+      {
+        "label": "remediation/tests-sskr-repair",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/remediation/tests-sskr-repair.log",
+        "logSha256": "6b9c73d1dd5d274899598fdd339a84f0c1b080cfaf165064c1ad890604bd0b02",
+        "localOnly": true
+      },
+      {
+        "label": "remediation/tests-sskr-joint-repair",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/remediation/tests-sskr-joint-repair.log",
+        "logSha256": "3f4c3fa96c16c7319b2b37c31554443358fdcc7135a8bc54fc6990b8d745c96b",
+        "localOnly": true
+      },
+      {
+        "label": "remediation/tests-date-recovery-patterns",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/remediation/tests-date-recovery-patterns.log",
+        "logSha256": "8975ef1364965c7df0028059fb25bae97307c72f3d779ef0276ef7088fe93f49",
+        "localOnly": true
+      },
+      {
+        "label": "remediation/tests-word-search-run",
+        "exitCode": 0,
+        "log": "AUD-015-evidence/remediation/tests-word-search-run.log",
+        "logSha256": "c2f6b2851fc3e1c70de8d15db7c9e220f463c9f9b83d9856888360de65ea8096",
+        "localOnly": true
+      }
+    ],
+    "observations": [
+      {
+        "title": "Executable host getters are read again after validation",
+        "outcome": "fixed",
+        "what": "checkedChoice (src/core/candidate-encryption.ts) and askWallet (src/core/wallet-check.ts) copy the host's object once and check and keep the copy; tests in test/aud-015.test.ts; the core probe passes."
+      },
+      {
+        "title": "Checked checksum resamples a getter-backed input",
+        "outcome": "fixed",
+        "what": "checksumValid (src/core/candidates.ts) copies the words once and checks and computes that copy; test in test/aud-015.test.ts."
+      }
+    ],
+    "recommendations": [
+      {
+        "title": "Reuse the existing positive-safe-integer rule",
+        "outcome": "fixed",
+        "what": "pieces.ts and card-codes.ts check widths and capacities with inWholeRange and wholeNumbersFrom (core/typed-number.ts); their messages stay."
+      },
+      {
+        "title": "Delegate the split's common quorum checks",
+        "outcome": "fixed",
+        "what": "ShareSplit.validateThreshold asks isRecordedQuorum (sskr/share-layout.ts) plus the split's own MIN_THRESHOLD; its refusal stays."
+      },
+      {
+        "title": "Define seconds per hour once",
+        "outcome": "fixed",
+        "what": "SECONDS_PER_MINUTE, SECONDS_PER_HOUR and SECONDS_PER_DAY are defined once in core/search-turns.ts; search-plan.ts builds its time units and TELL_SECONDS from them."
+      },
+      {
+        "title": "Optional encapsulation hardening for PivotBasis",
+        "outcome": "fixed",
+        "what": "PivotBasis.add returns its reduced vector frozen, as it may be the stored pivot."
+      }
+    ],
+    "notRun": [
+      "Pixel comparison of card renders against the earlier baselines",
+      "test/cli.test.ts, test/collection-sheet.test.ts, test/card-drawing.test.ts, test/sskr-cli-export.test.ts and test/known-audit-defects.test.ts (they generate PDF sets)"
+    ],
+    "findings": [
+      {
+        "id": "AUD-015-API001",
+        "title": "The stronger no-late-publication claim misses the consuming continuation",
+        "originalSeverity": "low",
+        "status": "fixed",
+        "disposition": "source-fixed",
+        "fixCommit": null,
+        "verificationCommit": null,
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef",
+        "date": "2026-10-12",
+        "evidence": {
+          "change": "assertStillRunning(run) (src/core/search-turns.ts) is the one check that the host has not stopped the search; the date search asks it just before onMatch and before it returns, the word search and the search of marked codes before they return, after every wait. askWallet no longer takes a signal: the rule has one place.",
+          "files": [
+            "src/core/search-turns.ts",
+            "src/core/wallet-check.ts",
+            "src/core/date-search.ts",
+            "src/core/candidates.ts",
+            "src/core/missing-codes-search.ts"
+          ],
+          "tests": [
+            "AUD-015-API001: nothing found after a stop is published (3 tests, test/aud-015.test.ts)"
+          ],
+          "reproduction": {
+            "label": "aud015-remediation-core-2",
+            "exitCode": 0,
+            "log": "AUD-015-evidence/aud015-remediation-core-2.log",
+            "logSha256": "7b80dec4dd17180405d70bb9e71e770f6437179833ab33dc979a3cce15a18b9e",
+            "localOnly": true
+          }
+        },
+        "remainingGap": "No commit exists: fixCommit and verificationCommit are null and the fix is bound to the source fingerprint. PDF-generating test files and the render comparison were not run in this remediation at the owner's request."
+      },
+      {
+        "id": "AUD-015-API002",
+        "title": "A split returns shares and original text from different input revisions",
+        "originalSeverity": "medium",
+        "status": "fixed",
+        "disposition": "source-fixed",
+        "fixCommit": null,
+        "verificationCommit": null,
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef",
+        "date": "2026-10-12",
+        "evidence": {
+          "change": "ShareSplit.splitBackup reads the original phrase (normalized), the held phrase, the threshold and the count before the split waits, and builds the result from them alone.",
+          "files": [
+            "src/sskr/split.ts"
+          ],
+          "tests": [
+            "AUD-015-API002: a split is made of one request (direct and Seedshift, test/aud-015.test.ts)"
+          ],
+          "reproduction": {
+            "label": "aud015-remediation-sskr",
+            "exitCode": 0,
+            "log": "AUD-015-evidence/aud015-remediation-sskr.log",
+            "logSha256": "8a9b95e08bf997d0cf47e0ad7137e5d9d1af632e8b1b5135adddbd8eae134f85",
+            "localOnly": true
+          }
+        },
+        "remainingGap": "No commit exists: fixCommit and verificationCommit are null and the fix is bound to the source fingerprint. PDF-generating test files and the render comparison were not run in this remediation at the owner's request."
+      },
+      {
+        "id": "AUD-015-API003",
+        "title": "Saved QR sidecars bypass the staging-copy warning handler",
+        "originalSeverity": "low",
+        "status": "fixed",
+        "disposition": "source-fixed",
+        "fixCommit": null,
+        "verificationCommit": null,
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef",
+        "date": "2026-10-12",
+        "evidence": {
+          "change": "saveQrBeside and saveQrInside (src/cli/qr-export.ts) save through writeSaved, the command line's one save step, so a staging copy left after a complete QR file is warned of once and the command goes on; other failures still fail.",
+          "files": [
+            "src/cli/qr-export.ts"
+          ],
+          "tests": [
+            "a QR code saved beside its sheet, whose staging copy is left (2 tests, test/aud-014-staging.test.ts)"
+          ],
+          "reproduction": {
+            "label": "aud015-remediation-staging",
+            "exitCode": 0,
+            "log": "AUD-015-evidence/aud015-remediation-staging.log",
+            "logSha256": "714ab40d641a7e7df70c112b27711a73e96a1b350862f0f5098c4b441bf57b87",
+            "localOnly": true
+          }
+        },
+        "remainingGap": "No commit exists: fixCommit and verificationCommit are null and the fix is bound to the source fingerprint. PDF-generating test files and the render comparison were not run in this remediation at the owner's request."
+      },
+      {
+        "id": "AUD-015-UI001",
+        "title": "Unknown prototype-named options print inherited object values",
+        "originalSeverity": "low",
+        "status": "fixed",
+        "disposition": "source-fixed",
+        "fixCommit": null,
+        "verificationCommit": null,
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef",
+        "date": "2026-10-12",
+        "evidence": {
+          "change": "optionLabel (src/cli/option-copy.ts) takes only the table's own entries (Object.hasOwn); any other name, such as __proto__ or constructor, is labelled as typed.",
+          "files": [
+            "src/cli/option-copy.ts"
+          ],
+          "tests": [
+            "AUD-015-UI001: an option named like an object's own field is labelled as typed (test/aud-015.test.ts)"
+          ],
+          "reproduction": {
+            "label": "aud015-remediation-labels",
+            "exitCode": 0,
+            "log": "AUD-015-evidence/aud015-remediation-labels.log",
+            "logSha256": "9d88c23cbde6a4957d847ed135cff9a1dc4bfc5d7fc7a8a14fefdd684bb28ba1",
+            "localOnly": true
+          }
+        },
+        "remainingGap": "No commit exists: fixCommit and verificationCommit are null and the fix is bound to the source fingerprint. PDF-generating test files and the render comparison were not run in this remediation at the owner's request."
+      },
+      {
+        "id": "AUD-015-SEC001",
+        "title": "Transport readers abandon internal share-byte arrays without wiping",
+        "originalSeverity": "low",
+        "status": "fixed",
+        "disposition": "source-fixed",
+        "fixCommit": null,
+        "verificationCommit": null,
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef",
+        "date": "2026-10-12",
+        "evidence": {
+          "change": "New wipedAfter(bytes, use) (src/core/bits.ts) wipes bytes held only for a moment. urToTransport wipes its bytes when shareInfo refuses them; the UR reader, bytewordsToUr, urToBytewords, mixedUnits (with its mixed array), mixedToShare and the Share constructor wipe the transport they borrow; a transport returned to a caller stays the caller's.",
+          "files": [
+            "src/core/bits.ts",
+            "src/sskr/transport.ts"
+          ],
+          "tests": [
+            "AUD-015-SEC001: the share readers wipe the bytes they only borrow (3 tests, test/aud-015.test.ts)"
+          ],
+          "reproduction": {
+            "label": "aud015-remediation-sskr",
+            "exitCode": 0,
+            "log": "AUD-015-evidence/aud015-remediation-sskr.log",
+            "logSha256": "8a9b95e08bf997d0cf47e0ad7137e5d9d1af632e8b1b5135adddbd8eae134f85",
+            "localOnly": true
+          }
+        },
+        "remainingGap": "No commit exists: fixCommit and verificationCommit are null and the fix is bound to the source fingerprint. PDF-generating test files and the render comparison were not run in this remediation at the owner's request."
+      },
+      {
+        "id": "AUD-001-API001",
+        "title": "An exported share-format mirror still returns undefined for unknown forms",
+        "originalSeverity": "low",
+        "status": "fixed",
+        "disposition": "source-fixed",
+        "fixCommit": null,
+        "verificationCommit": null,
+        "fixSourceFingerprint": "c3da06153358ded064fdaff0d65bebaa6170274a2fe39eda30a19af4a5edd8ef",
+        "date": "2026-10-12",
+        "evidence": {
+          "change": "shareFormatMirroring (src/sskr/transport.ts) refuses a form that names none through the encoded forms' own rule, EncodedForm.of ('Unsupported encoded format: X.'), before it maps; every supported form maps as before.",
+          "files": [
+            "src/sskr/transport.ts"
+          ],
+          "tests": [
+            "AUD-001-API001: the share form that mirrors a form of codes refuses one that names none (test/aud-015.test.ts)"
+          ],
+          "reproduction": {
+            "label": "aud015-remediation-sskr",
+            "exitCode": 0,
+            "log": "AUD-015-evidence/aud015-remediation-sskr.log",
+            "logSha256": "8a9b95e08bf997d0cf47e0ad7137e5d9d1af632e8b1b5135adddbd8eae134f85",
+            "localOnly": true
+          }
+        },
+        "remainingGap": "No commit exists: fixCommit and verificationCommit are null and the fix is bound to the source fingerprint. PDF-generating test files and the render comparison were not run in this remediation at the owner's request."
+      }
+    ]
+  }
+}
