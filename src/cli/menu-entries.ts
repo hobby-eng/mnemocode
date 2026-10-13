@@ -14,7 +14,7 @@ export const MENU_ENTRY_NAMES = {
   decode: { digit: 2, label: "Decode numbers, codes or colors back into a seed phrase" },
   split: { digit: 3, label: "Split a seed phrase into standard Shamir shares" },
   restore: { digit: 4, label: "Restore a seed phrase from Shamir shares" },
-  recover: { digit: 5, label: "Find a forgotten word, a date digit or a share code" },
+  recover: { digit: 5, label: "Find a forgotten word, code, date digit or share code" },
   preview: { digit: 6, label: "Print sample cards with a test seed phrase" },
   table: { digit: 7, label: "Look up a seed word, its number or its Unicode code" },
   // As the self-test is named in mhfe too, so that the tools read alike (owner, 2026-10-13).

@@ -5,7 +5,8 @@
 //
 // The words were listed with grep over two other copies of the lists: the published BIP39 English
 // list (bitcoin/bips bip-0039/english.txt, SHA-256 187db04a…7fae) and the Bytewords of
-// BCR-2020-012. A word no list has must give no word, and a list out of order is refused.
+// BCR-2020-012, of which only "acid" begins with "ac". A word no list has must give no word, and
+// a list out of order is refused.
 //
 // Host-neutral: it imports only other core modules and the share forms.
 
@@ -45,6 +46,8 @@ const CASES: readonly (readonly [WordHints, string, string, string])[] = [
   [EncodedForm.typedWords, "7684 5728 CA", "nothing", "Unicode codes"],
   [SHARE_WORD_HINTS, "tuna acid; ta", "words taco task taxi", "Bytewords of a share"],
   [SHARE_WORD_HINTS, "q", "count 2 Bytewords begin with this letter", "Count of Bytewords"],
+  // Bytewords run together are read four letters at a time, the last begun one being typed.
+  [SHARE_WORD_HINTS, "tuna acid tunaac", "words acid", "Bytewords run together"],
   [SHARE_WORD_HINTS, "#1A2B3C AB", "nothing", "Share in colors"],
 ];
 

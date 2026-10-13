@@ -75,6 +75,9 @@ FINGERPRINT = "73c5da0a"
 FIRST_SHARE = "ur:sskr/gomuttaeadaernclmdemdtlftsswsospsrjnjpwzuetlfhdltahh"
 THIRD_SHARE = "ur:sskr/gomuttaeadaojytnhyvtpaqdmobwreoyykutjtkofedicanladwm"
 MISTYPED_SHARE = "ur:sskr/gomuttaeadaojytnhyvtaeqdmobwreoyykutjtkofedicanladwm"
+# The test phrase in Unicode codes without Seedshift (7684 is abandon, 5728 about), the third
+# code unread.
+MARKED_UNICODE = " ".join(["7684"] * 2 + ["?"] + ["7684"] * 8 + ["5728"])
 # The start of every share as text, a Uniform Resource of type sskr, before its bytewords.
 SHARE_PREFIX = "ur:sskr/"
 # Four bytewords in a row: the minimal bytewords of a share spell each byte with two letters. A
@@ -492,6 +495,56 @@ def check_word_hints():
     print("word hints in the menu: words below the line, Tab completes, gone after Enter")
 
 
+def check_share_word_hints():
+    session = Session()
+    try:
+        session.wait_for(MENU_SHOWN)
+        session.type(RESTORE_ENTRY)
+        session.wait_for("Was Seedshift used before it was split?")
+        session.type("1")
+        session.wait_for(SHARES)
+        # Bytewords are hinted as their reader takes them: apart, or four letters at a time.
+        session.type("tu")
+        session.wait_for("tuna")
+        session.type("na ac")
+        session.wait_for("acid")
+        session.type("idtunadr")
+        session.wait_for("draw")
+        # Ctrl+C at a question of an entry goes back to the menu.
+        session.type(CTRL_C)
+        session.wait_for(MENU_SHOWN)
+        session.type(ESCAPE)
+        code = session.wait_for_exit()
+        assert code == 0, f"Escape after the shares gave exit code {code}"
+    finally:
+        session.close()
+    print("Bytewords hints in the menu: words below a share, also run together")
+
+
+def check_marked_codes_entry():
+    session = Session()
+    try:
+        session.wait_for(MENU_SHOWN)
+        session.type("5")
+        session.wait_for("What is forgotten?")
+        session.type("2")
+        session.wait_for("How many words does the seed phrase have?")
+        session.type("1")
+        session.wait_for("Was Seedshift used when it was encoded?")
+        session.type("1")
+        session.wait_for(HIDDEN_RECORD)
+        session.type(MARKED_UNICODE + ENTER)
+        session.wait_for("Code 3 cannot be read")
+        session.type(CTRL_C)
+        session.wait_for(MENU_SHOWN)
+        session.type(ESCAPE)
+        code = session.wait_for_exit()
+        assert code == 0, f"Escape after the codes gave exit code {code}"
+    finally:
+        session.close()
+    print("entry 5: a code of an encoded seed phrase, typed with ?, is searched by decode")
+
+
 def check_long_line():
     session = Session()
     try:
@@ -839,6 +892,8 @@ def main():
     check_long_line()
     check_cursor_editing()
     check_word_hints()
+    check_share_word_hints()
+    check_marked_codes_entry()
     check_lines_pasted_as_one_answer()
     check_decode_dates_asked_again()
     check_restore_share_asked_again()

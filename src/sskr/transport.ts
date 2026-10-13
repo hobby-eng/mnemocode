@@ -48,7 +48,9 @@ import {
   type MixedForm,
 } from "./mixed-layout.js";
 import {
+  BYTEWORD_LETTERS,
   BYTEWORD_SEPARATORS,
+  bytewordUnits,
   SHARE_FORMATS,
   SHARE_UNITS,
   shareWordIndex,
@@ -63,7 +65,7 @@ import {
   unicodeToColorCodes,
   COLOR_UNICODE_SYMBOL_CLASS,
 } from "../core/colors.js";
-import { unicodeIndexesOf } from "../core/words.js";
+import { runTogetherNumbers, unicodeIndexesOf, WORD_NUMBERS_RUN_TOGETHER } from "../core/words.js";
 import { WORD_NUMBERS_THROUGH } from "../core/bip39-sizes.js";
 import { Redacted } from "../core/redacted.js";
 import { wipedAfter } from "../core/bits.js";
@@ -252,7 +254,7 @@ export function urToBytewords(ur: string): string {
 }
 
 export function bytewordsToUr(value: string): string {
-  const words = value.trim().toLowerCase().split(BYTEWORD_SEPARATORS);
+  const words = bytewordUnits(value);
   if (words.length > MAX_TRANSPORT_BYTES) throw new Error("SSKR record is too long.");
   return wipedAfter(
     decodedBytes(words, SHARE_UNITS.words, "Unknown SSKR Byteword."),
@@ -383,6 +385,7 @@ export function assertShareFormatHasCards(format: ShareFormat): void {
 
 function indexesToShare(value: string): string {
   const numbers = codeTokens(value);
+  if (numbers.some(runTogetherNumbers)) throw new Error(WORD_NUMBERS_RUN_TOGETHER);
   const indexes = numbers.map(shareWordIndex);
   if (numbers.length > MAX_COLOR_TEXT_LENGTH || indexes.some((index) => index === undefined))
     throw new Error(`Word numbers of a share are whole numbers from ${WORD_NUMBERS_THROUGH}.`);
@@ -454,7 +457,11 @@ const SHARE_READERS: readonly {
     format: "words",
     looks: (text) => text.length > 0,
     read: bytewordsToUr,
-    words: new WordList({ one: "Byteword", many: "Bytewords" }, bytewords),
+    // Hinted as bytewordUnits reads them: apart at any separator of Bytewords, or run together.
+    words: new WordList({ one: "Byteword", many: "Bytewords" }, bytewords, {
+      separators: BYTEWORD_SEPARATORS,
+      runTogether: BYTEWORD_LETTERS,
+    }),
   },
 ];
 

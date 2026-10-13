@@ -20,6 +20,7 @@ import { MarkedReading } from "../sskr/repair.js";
 import { Share } from "../sskr/transport.js";
 import { EncodedBackup, FIT_NO_FORM, type EncodedFormat } from "./encoded-backup.js";
 import { EncodedForm } from "./encoded-form.js";
+import { withJoinedMarksHint } from "./code-text.js";
 import { assertWordCount, type Bip39WordCount } from "./bip39-sizes.js";
 import { ENCODED_FORMATS } from "./types.js";
 import { Masking } from "./masking.js";
@@ -213,6 +214,16 @@ export class BackupReading extends Redacted {
     return this.#record?.format ?? given;
   }
 
+  /**
+   * Whether `text`, given where the words of a seed phrase were asked for, is the codes of an
+   * encoded seed phrase in a form other than words: complete, or marked with ? (MissingCodes). A
+   * host that reads words then says where codes are read instead.
+   */
+  static isCodes(text: string): boolean {
+    const forms = MissingCodes.marked(text) ? MissingCodes.formats(text) : detectInputFormats(text);
+    return forms.some((format) => format !== "english");
+  }
+
   /** Whether the codes mark some that cannot be read (MissingCodes.marked), to be searched. */
   get marked(): boolean {
     return MissingCodes.marked(this.#likelyPayload);
@@ -226,7 +237,11 @@ export class BackupReading extends Redacted {
     return this.#formatsOf(
       given,
       (payload) => MissingCodes.formats(payload),
-      () => `${FIT_NO_FORM}: mark each code that cannot be read with ?, in its place.`,
+      () =>
+        withJoinedMarksHint(
+          `${FIT_NO_FORM}: mark each code that cannot be read with ?, in its place.`,
+          this.#payload,
+        ),
     );
   }
 

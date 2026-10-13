@@ -51,7 +51,7 @@ Start MnemoCode by a double-click. It shows a menu: choose with the arrow keys a
 
 If something you typed cannot be right, MnemoCode says so in one line, names where, such as "Date 2" or "Share 3", and asks for it again; what you typed before is kept. A code or a word was probably mistyped: check each one against the paper.
 
-If you know a secret date but one of its digits is unclear, type `?` in place of that digit, such as `?3-09-2026`. MnemoCode then tries every possibility, both when it restores the backup and in the menu entry "Find a forgotten word, a date digit or a share code". To tell the right date, it usually asks for the wallet's fingerprint, eight characters such as `73c5da0a`, or one of its first receiving addresses.
+If you know a secret date but one of its digits is unclear, type `?` in place of that digit, such as `?3-09-2026`. MnemoCode then tries every possibility, both when it restores the backup and in the menu entry "Find a forgotten word, code, date digit or share code". To tell the right date, it usually asks for the wallet's fingerprint, eight characters such as `73c5da0a`, or one of its first receiving addresses.
 
 ## Opening the wallet
 

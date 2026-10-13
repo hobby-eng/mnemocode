@@ -83,7 +83,7 @@ function givenWay(
  * be corrected; the decode shows it again with its result.
  */
 export function reportFound(codes: MissingCodes, backup: EncodedBackup, foundDates?: string): void {
-  terminalStatus(`${MissingCodesSearch.placesText(codes.missingPlaces)} found:`, backup.text());
+  terminalStatus(`${MissingCodesSearch.placesText(codes)} found:`, backup.text());
   if (foundDates !== undefined) terminalStatus("Dates found:", foundDates);
   terminalHint(MISSING_CODES_TEXTS.correct);
 }

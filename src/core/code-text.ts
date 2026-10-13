@@ -7,8 +7,8 @@
 //
 // Host-neutral: it imports nothing (test/portable-modules.test.ts).
 
-/** The spacing between elements: white space, commas and semicolons. */
-const ELEMENT_SPACING = "\\s,;";
+/** The spacing between elements: white space, commas and semicolons, as a character class. */
+export const ELEMENT_SPACING = "\\s,;";
 
 /**
  * What separates the elements of one backup or share: the spacing, and the # before a color. A

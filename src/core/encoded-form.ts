@@ -241,6 +241,14 @@ export class EncodedForm {
     return this.#variant.write(indexes);
   }
 
+  /**
+   * What a place of a phrase is called in a message of this form: a code where each code is a
+   * word; a word where the codes are colours, each of which holds parts of several words.
+   */
+  get placeName(): string {
+    return this.#variant.elementUnit === "word" ? "Code" : "Word";
+  }
+
   /** How many elements of this form a seed phrase of `words` words has: one a word, or a colour. */
   elementCount(words: Bip39WordCount): number {
     if (this.#variant.elementUnit === "word") return words;

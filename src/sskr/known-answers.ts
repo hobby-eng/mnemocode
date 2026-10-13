@@ -14,6 +14,7 @@ import {
   normalizeShare,
   shareToColors,
   urToBytewords,
+  bytewordsToUr,
   urToTransport,
   transportToUr,
   validateShareSet,
@@ -86,6 +87,12 @@ export function checkSskrTransportStartup(): void {
     urToBytewords(sskrVector.shares[0]),
     sskrVector.firstShareBytewords,
     "SSKR published Bytewords",
+  );
+  // Every Byteword has four letters: run together they read as written apart (owner, 2026-10-13).
+  expectSame(
+    bytewordsToUr(sskrVector.firstShareBytewords.replaceAll(" ", "")),
+    sskrVector.shares[0],
+    "SSKR Bytewords run together",
   );
   expectSame(validateShareSet(sskrVector.shares).length, 5, "SSKR official grouped quorum");
   for (const [name, shares] of [

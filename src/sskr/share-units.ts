@@ -17,6 +17,7 @@ import { COLOR_FORM, WORD_FORM, type MixedForm } from "./mixed-layout.js";
 import { colorsToUnicode, RGB_HEX_DIGITS, rgbHex, unicodeToColorCodes } from "../core/colors.js";
 import { UNICODE_CODES, UNICODE_INDEX, wordIndexOf } from "../core/words.js";
 import { BITS_PER_BYTE, WORD_NUMBER_DIGITS, wordNumberOf } from "../core/bip39-sizes.js";
+import { ELEMENT_SPACING } from "../core/code-text.js";
 
 /** The forms that a share is written in, the standard UR first as the default. */
 export const SHARE_FORMATS = Object.freeze([
@@ -38,8 +39,32 @@ export const UR_SSKR_PREFIX = "ur:sskr/";
  * JavaScript folds case, the long s (U+017F) and the Kelvin sign (U+212A) match s and k too.
  */
 export const UR_SSKR_START = new RegExp(`^${UR_SSKR_PREFIX}`, "iu");
-/** What separates the words of a share in Bytewords: white space, or the dashes of other tools. */
-export const BYTEWORD_SEPARATORS = /[\s-]+/u;
+/**
+ * What separates the words of a share in Bytewords: the spacing between the elements of every
+ * form (core/code-text.ts), or the dashes of other tools.
+ */
+export const BYTEWORD_SEPARATORS = new RegExp(`[${ELEMENT_SPACING}-]+`, "u");
+/** The letters of every Byteword (BCR-2020-012): four, the first word's; a test checks the rest. */
+export const BYTEWORD_LETTERS = bytewords[0]!.length;
+/** A Byteword or a ? for a whole one, in Bytewords run together. */
+const BYTEWORD_OR_MARK = new RegExp(`[a-z]{${BYTEWORD_LETTERS}}|\\?`, "gu");
+
+/**
+ * The Bytewords of a share as written, in lower case: apart (BYTEWORD_SEPARATORS), or run
+ * together, four letters each, where a ? stands for a whole word, as hexadecimal codes run
+ * together are read (core/code-text.ts). Every word has four letters, so words run together are
+ * told apart without a doubt. The reader of a share and the repair of a marked one take Bytewords
+ * through it; text that is neither is given back apart, so that its reader names a word that it
+ * does not know.
+ */
+export function bytewordUnits(text: string): string[] {
+  const apart = text.toLowerCase().split(BYTEWORD_SEPARATORS).filter(Boolean);
+  const known = (unit: string): boolean => unit === "?" || BYTEWORD_VALUES.has(unit);
+  if (apart.every(known)) return apart;
+  const joined = apart.join("");
+  const units = joined.match(BYTEWORD_OR_MARK) ?? [];
+  return units.join("") === joined && units.every(known) ? units : apart;
+}
 
 /**
  * A word number of a share as written: at most the digits of 2048. Narrower than a phrase's on

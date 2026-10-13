@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { decodeCandidateList } from "../src/core/candidate-list.js";
+import { EncodedForm } from "../src/core/encoded-form.js";
 import { createSessionIdentity, decryptCandidates } from "../src/core/candidate-encryption.js";
 
 const execFileAsync = promisify(execFile);
@@ -25,6 +26,18 @@ async function run(arguments_: readonly string[]) {
 }
 
 describe("recover-word CLI", () => {
+  it("points codes typed in place of words to Decode, which reads them with ?", async () => {
+    // The public phrase's Unicode codes with its third code unreadable (owner, 2026-10-13).
+    const codes = EncodedForm.of("unicode")
+      .apartCodes(EncodedForm.of("unicode").codes([...Array<number>(11).fill(0), 3]))!
+      .map((code, place) => (place === 2 ? "?" : code));
+    await expect(run(["recover-word", "--mnemonic", codes.join(" ")])).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        "These are the codes of an encoded seed phrase, not its words: Decode numbers",
+      ),
+    });
+  });
+
   it("prints every checksum-valid candidate with word and checksum metadata", async () => {
     const result = await run(["recover-word", "--mnemonic", incomplete]);
     const lines = result.stdout.trim().split("\n");

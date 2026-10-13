@@ -881,19 +881,46 @@ async function decodeAction(): Promise<Action> {
   // Every answer gives --mode, No too: decode asks itself for codes that name no mode, and a typed
   // record that names another mode is questioned there, before any date is asked.
   if (source.options[0] !== "--input-file") {
-    // The menu says what follows rather than what each variant does: the variants are told apart
-    // where the codes are read (decode), and the explanation here says what Seedshift is.
-    const mode = await choose(
-      ENCODED_SEEDSHIFT_QUESTION,
-      ENCODED_SEEDSHIFT_CHOICES.map((choice) =>
-        choice.value === "direct" ? choice : { ...choice, note: "the dates are asked next" },
-      ),
-      { label: "Seedshift", explanation: SEEDSHIFT_EXPLANATION },
-    );
+    const mode = await askEncodedMode();
     if (mode === undefined) return undefined;
     run.push("--mode", mode);
   }
   return { run };
+}
+
+/**
+ * Which Seedshift masked the codes, for decode, which reads typed codes. The menu says what
+ * follows rather than what each variant does: the variants are told apart where the codes are
+ * read (decode), and the explanation here says what Seedshift is.
+ */
+function askEncodedMode(): Promise<Mode | undefined> {
+  return choose(
+    ENCODED_SEEDSHIFT_QUESTION,
+    ENCODED_SEEDSHIFT_CHOICES.map((choice) =>
+      choice.value === "direct" ? choice : { ...choice, note: "the dates are asked next" },
+    ),
+    { label: "Seedshift", explanation: SEEDSHIFT_EXPLANATION },
+  );
+}
+
+/**
+ * Entry 5, codes of an encoded seed phrase that cannot be read: typed with ? at their places, as
+ * Decode reads them, which searches the codes the marks leave open (owner, 2026-10-13).
+ */
+async function markedCodesAction(): Promise<Action> {
+  const words = await askPhraseWords();
+  if (words === undefined) return undefined;
+  const mode = await askEncodedMode();
+  if (mode === undefined) return undefined;
+  return {
+    run: [
+      "decode",
+      "--ask-secrets",
+      ...(words === null ? [] : ["--words", String(words)]),
+      "--mode",
+      mode,
+    ],
+  };
 }
 
 /**
@@ -1039,13 +1066,18 @@ async function recoverAction(): Promise<Action> {
     [
       { label: "A word of the seed phrase", note: "or several, or a missing one", value: "word" },
       {
+        label: "A code of the encoded seed phrase",
+        note: "typed with ? for each unread code",
+        value: "code",
+      },
+      {
         label: "A digit of a date",
-        note: "for a seed phrase masked with Seedshift",
+        note: "for a phrase masked with Seedshift",
         value: "date",
       },
       {
         label: "A code of a Shamir share",
-        note: "the share with ? for each code not read",
+        note: "the share with ? for each unread code",
         value: "share",
       },
     ] as const,
@@ -1053,6 +1085,7 @@ async function recoverAction(): Promise<Action> {
   );
   if (forgotten === undefined) return undefined;
   if (forgotten === "word") return wordRecoveryAction();
+  if (forgotten === "code") return markedCodesAction();
   // The shares come back whole, in their own form, without the seed phrase being shown.
   if (forgotten === "share") return shareRepairAction();
   const source = await askSource();

@@ -14,6 +14,7 @@
 import type { SeedshiftMode } from "./date-recovery.js";
 import { DateSearch, type DatesAnswer, type DateMatch } from "./date-search.js";
 import { EncodedBackup } from "./encoded-backup.js";
+import { EncodedForm } from "./encoded-form.js";
 import { Masking } from "./masking.js";
 import type { MissingCodes } from "./missing-codes.js";
 import {
@@ -172,9 +173,12 @@ export class MissingCodesSearch {
     this.#fingerprint = fingerprint;
   }
 
-  /** "Code 6", "Codes 6 and 9", "Codes 2, 6 and 9". */
-  static placesText(places: readonly number[]): string {
-    return placesNamed("Code", places);
+  /**
+   * The places of `codes` that cannot be read: "Code 6", "Codes 6 and 9"; "Words 10 and 11" for
+   * colours, whose marks leave words open (EncodedForm.placeName).
+   */
+  static placesText(codes: MissingCodes): string {
+    return placesNamed(EncodedForm.of(codes.format).placeName, codes.missingPlaces);
   }
 
   get codes(): MissingCodes {
@@ -184,7 +188,7 @@ export class MissingCodesSearch {
   /** What cannot be read, and how many candidates that leaves. */
   get unreadable(): string {
     const codes = this.#codes;
-    return `${MissingCodesSearch.placesText(codes.missingPlaces)} cannot be read: ${counted(codes.combinations, "combination")}, about ${counted(codes.expected, "candidate")}.`;
+    return `${MissingCodesSearch.placesText(codes)} cannot be read: ${counted(codes.combinations, "combination")}, about ${counted(codes.expected, "candidate")}.`;
   }
 
   /** Whether so many candidates are left that only a fingerprint or an address tells them. */

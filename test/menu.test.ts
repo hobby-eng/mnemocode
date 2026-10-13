@@ -91,7 +91,10 @@ import { imageFormat } from "../src/cli/image-options.js";
 import { ANSWER_LABEL_WIDTH, type LineQuestion } from "../src/cli/terminal-choice.js";
 import { TEXT_WIDTH } from "../src/cli/terminal.js";
 import { HEIR_MENU } from "../src/cli/heir-sheet.js";
-import { SHARE_SEEDSHIFT_QUESTION } from "../src/cli/seedshift-choices.js";
+import {
+  ENCODED_SEEDSHIFT_QUESTION,
+  SHARE_SEEDSHIFT_QUESTION,
+} from "../src/cli/seedshift-choices.js";
 import { commandDisplay, MENU_ENTRIES, typedCommand } from "../src/cli/menu.js";
 import { resolveSskrLayout } from "../src/export/sskr-content.js";
 import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
@@ -619,9 +622,20 @@ describe("start menu", () => {
     });
   });
 
+  it("finds a code of an encoded seed phrase as Decode does, from entry 5", async () => {
+    // A code of the encoded seed phrase: all the codes typed, then without Seedshift.
+    expect(await runOf(5, [1, 0, 0])).toEqual(["decode", "--ask-secrets", "--mode", "direct"]);
+    const questions = script.asked.map((asked) => asked.question);
+    expect(questions).toContain(ENCODED_SEEDSHIFT_QUESTION);
+    // The codes of a phrase of 12 words before the decoys of its cards, with MnemoCode Seedshift.
+    const twelve = await runOf(5, [1, 1, 1]);
+    expect(twelve?.slice(0, 4)).toEqual(["decode", "--ask-secrets", "--words", "12"]);
+    expect(twelve).toEqual(expect.arrayContaining(["--mode", "seedshift"]));
+  });
+
   it("asks whether shares were masked as entry 4 and the commands of shares ask it", async () => {
     // Entry 5, a code of a share, the wallet's fingerprint, then the share question: Yes.
-    const run = await runOf(5, [2, 0, 1]);
+    const run = await runOf(5, [3, 0, 1]);
     const questions = script.asked.map((asked) => asked.question);
     expect(questions).toContain(SHARE_SEEDSHIFT_QUESTION);
     expect(run).toEqual(expect.arrayContaining(["sskr-export", "--mode", "seedshift"]));
@@ -630,9 +644,8 @@ describe("start menu", () => {
   });
 
   describe("typed answers are checked at once and asked again", () => {
-    // Entry 5, a digit of a date, typed, MnemoCode Seedshift, then the wallet.
     // Entry 5, a digit of a date, typed, all the codes typed, MnemoCode Seedshift, then the wallet.
-    const DATE_WALLET = [1, 0, 0, 0];
+    const DATE_WALLET = [2, 0, 0, 0];
 
     it("asks the fingerprint and the address again until a wallet can have them", async () => {
       const fingerprint = await runOf(5, [...DATE_WALLET, 0], {

@@ -55,8 +55,10 @@ import { SearchTurns, keptCount, type SearchProgress, type SearchRun } from "./s
 import {
   BIP39_DICTIONARY_SIZE,
   englishTokens,
+  runTogetherNumbers,
   unicodeCodesFitting,
   wordIndexOfNumber,
+  WORD_NUMBERS_RUN_TOGETHER,
 } from "./words.js";
 import { Redacted } from "./redacted.js";
 
@@ -100,6 +102,7 @@ function numberPlace(written: string, place: number): WordPlace {
     const words = wordsOfNumber(written, false);
     if (words.length > 0) return words;
   }
+  if (runTogetherNumbers(written)) throw new Error(WORD_NUMBERS_RUN_TOGETHER);
   throw noWordNumber(place);
 }
 

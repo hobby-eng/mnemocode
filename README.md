@@ -78,7 +78,7 @@ What do you want to do?
   2  Decode numbers, codes or colors back into a seed phrase
   3  Split a seed phrase into standard Shamir shares
   4  Restore a seed phrase from Shamir shares
-  5  Find a forgotten word, a date digit or a share code
+  5  Find a forgotten word, code, date digit or share code
   6  Print sample cards with a test seed phrase
   7  Look up a seed word, its number or its Unicode code
   8  Run the self-test
@@ -234,8 +234,8 @@ mnemocode table --all
 | `--format`             | Form                                                                                                                                                                                                                                                                                              |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `english` / `1`        | English BIP39 words.                                                                                                                                                                                                                                                                              |
-| `indexes` / `2`        | The numbers of the words in the BIP39 list, from 1 through 2048, as in Seedshift.                                                                                                                              |
-| `unicode` / `3`        | Four-digit Unicode codes. Each word is replaced by the character with the same number in the Traditional Chinese BIP39 list, and only the code of that character is written.                                                                          |
+| `indexes` / `2`        | The numbers of the words in the BIP39 list, from 1 through 2048, as in Seedshift. Numbers are separated by spaces or commas: run together they cannot be told apart.                                                                                                                              |
+| `unicode` / `3`        | Four-digit Unicode codes. Each word is replaced by the character with the same number in the Traditional Chinese BIP39 list, and only the code of that character is written. Codes may be separated by spaces or joined.                                                                          |
 | `colors-unicode` / `4` | The codes of format 5, each written as two four-digit codes from Unicode's Private Use Area. Codes may be separated by spaces or joined.                                                                                                                                                          |
 | `colors` / `5`         | Color codes such as `#01AB63`: 8, 10, 12, 14 or 16 codes for 12, 15, 18, 21 or 24 words. The 12- and 24-word forms are compatible with BIP39Colors. Codes may be separated, joined with their `#` signs, or joined as one `RRGGBB` line. They may be kept in any order, but every code is needed. |
 

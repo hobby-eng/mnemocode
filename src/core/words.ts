@@ -7,6 +7,7 @@ import {
   checksumBits,
   lastWordEntropyBits,
   lastWordEntropyValues,
+  WORD_NUMBER_DIGITS,
   WORD_NUMBER_RANGE,
   WORD_NUMBERS_THROUGH,
   isBip39WordCount,
@@ -95,8 +96,29 @@ export function wordIndexOf(token: string, syntax: RegExp = WORD_NUMBER): number
   return number === undefined ? undefined : number - WORD_NUMBER_RANGE.min;
 }
 
+/**
+ * Why digits longer than any word number cannot be read: they are word numbers written together,
+ * which no reader can tell apart, as 1234 may be 1 234, 12 34 or 1234 itself. Codes of a fixed
+ * width, such as Unicode codes and colors, may be run together; word numbers may not.
+ */
+export const WORD_NUMBERS_RUN_TOGETHER =
+  "Word numbers run together cannot be told apart: write them apart, separated by spaces.";
+
+/**
+ * Whether `token`, digits and ? for unread ones, is word numbers run together: more digits than
+ * the highest word number has, and no word number with leading zeros, such as 00007.
+ */
+export function runTogetherNumbers(token: string): boolean {
+  return (
+    /^[0-9?]+$/u.test(token) &&
+    token.length > WORD_NUMBER_DIGITS &&
+    wordIndexOf(token) === undefined
+  );
+}
+
 /** wordIndexOf for a word number of a phrase; throws why it is none, its digits or its range. */
 export function wordIndexOfNumber(token: string): number {
+  if (runTogetherNumbers(token)) throw new Error(WORD_NUMBERS_RUN_TOGETHER);
   if (!WORD_NUMBER.test(token))
     throw new Error(`Indexes must be decimal integers from ${WORD_NUMBERS_THROUGH}.`);
   const index = wordIndexOf(token);

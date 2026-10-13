@@ -55,6 +55,20 @@ export interface WordNames {
 /** Letters and hyphens, as every word of a list has them; anything else is no word being typed. */
 const WORD_CHARACTERS = /^[A-Za-z-]+$/u;
 
+/** How the words of a list stand in a line, as the reader of that text takes them. */
+export interface WordSpacing {
+  /** What separates two words: white space where nothing else is said, as mhfe reads a line. */
+  readonly separators?: RegExp;
+  /**
+   * The letters of every word, where its reader also takes words run together, as Bytewords:
+   * a longer run of letters is then words of that length, the last of them being typed.
+   */
+  readonly runTogether?: number;
+}
+
+/** What separates words where a list says nothing else: white space. */
+const WHITE_SPACE = /\s/u;
+
 /** A sorted word list that typed words are hinted from. */
 export class WordList implements WordHints {
   /** The English BIP39 list: seed phrases and encoded seed phrases in English words. */
@@ -62,14 +76,17 @@ export class WordList implements WordHints {
 
   readonly #names: WordNames;
   readonly #words: readonly string[];
-  /** The length of the longest word: a longer typed word begins none. */
+  /** The length of the longest word: a longer typed word begins none, unless run together. */
   readonly #longest: number;
+  readonly #separators: RegExp;
+  readonly #runTogether: number | undefined;
 
   /**
-   * The list `words`, in lower case and in alphabetical order, which the search relies on; any
-   * other is refused.
+   * The list `words`, in lower case and in alphabetical order, which the search relies on, and
+   * how they stand in a line (`spacing`); any other list is refused, and so is a length of words
+   * run together that some word lacks.
    */
-  constructor(names: WordNames, words: readonly string[]) {
+  constructor(names: WordNames, words: readonly string[], spacing: WordSpacing = {}) {
     words.forEach((word, index) => {
       if (!WORD_CHARACTERS.test(word) || word !== word.toLowerCase())
         throw new Error("A word list holds lower-case letters and hyphens only.");
@@ -79,6 +96,10 @@ export class WordList implements WordHints {
     this.#names = Object.freeze({ ...names });
     this.#words = Object.freeze([...words]);
     this.#longest = Math.max(0, ...words.map((word) => word.length));
+    this.#separators = spacing.separators ?? WHITE_SPACE;
+    this.#runTogether = spacing.runTogether;
+    if (this.#runTogether !== undefined && words.some((word) => word.length !== this.#runTogether))
+      throw new Error("Words run together must all have the same length.");
   }
 
   /** The hint for the last word of `line`, the text typed so far. */
@@ -118,15 +139,20 @@ export class WordList implements WordHints {
   }
 
   /**
-   * The last word of `line` in lower case: after its last white space, letters and hyphens only.
-   * Undefined when no word is being typed: an empty line, white space at its end, or other
+   * The last word of `line` in lower case: after its last separator, letters and hyphens only.
+   * Undefined when no word is being typed: an empty line, a separator at its end, or other
    * characters, such as a ? or a code. A word longer than the longest of the list is "", which
-   * begins none (AUD-015-UI004 of mhfe).
+   * begins none (AUD-015-UI004 of mhfe); where words may be run together, it is words of their
+   * length, and the last of them, whole or begun, is the word being typed.
    */
   #lastWord(line: string): string | undefined {
-    const word = line.split(/\s/u).at(-1) ?? "";
+    const word = line.split(this.#separators).at(-1) ?? "";
     if (!WORD_CHARACTERS.test(word)) return undefined;
-    return word.length > this.#longest ? "" : word.toLowerCase();
+    if (word.length <= this.#longest) return word.toLowerCase();
+    const width = this.#runTogether;
+    if (width === undefined) return "";
+    const begun = word.length % width;
+    return word.slice(-(begun === 0 ? width : begun)).toLowerCase();
   }
 
   /** The words that begin with `letters`, in list order. */

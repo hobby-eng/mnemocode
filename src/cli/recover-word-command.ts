@@ -23,6 +23,8 @@ import {
   TooManyForList,
 } from "../core/candidate-list.js";
 import { englishWordlist } from "../core/words.js";
+import { BackupReading } from "../core/backup-reading.js";
+import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { WordList } from "../core/word-hints.js";
 import { walletCheckOf, type WalletEvidence, type EvidenceMatch } from "../bitcoin-evidence.js";
 import { type ParsedArguments, assertAskedNotGiven } from "./arguments.js";
@@ -101,6 +103,20 @@ interface PhraseRules {
  * surely finds more candidates than a list holds. The messages name only places.
  */
 function parsePhrase(text: string, rules: PhraseRules): PhraseSearch {
+  try {
+    return phraseOf(text, rules);
+  } catch (error) {
+    // Codes typed here are read by Decode, which finds those marked with ? (owner, 2026-10-13).
+    if (BackupReading.isCodes(text)) throw new Error(CODES_NOT_WORDS);
+    throw error;
+  }
+}
+
+/** Why codes cannot be searched where the words of a seed phrase are, and where they can. */
+const CODES_NOT_WORDS = `These are the codes of an encoded seed phrase, not its words: ${MENU_ENTRY_NAMES.decode.label} reads them, with ? for each unread code.`;
+
+/** The words of `text`, searched as `rules` say; throws why they cannot be. */
+function phraseOf(text: string, rules: PhraseRules): PhraseSearch {
   if (rules.legacy) {
     // recoverLegacyValidLastWords refuses a ?, which would read as an unknown word at its place.
     return { kind: "legacy", replacements: recoverLegacyValidLastWords(text) };

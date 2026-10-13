@@ -51,7 +51,7 @@ import {
   type MixedForm,
   type ZeroField,
 } from "./mixed-layout.js";
-import { BYTEWORD_SEPARATORS, SHARE_UNITS, UR_SSKR_START } from "./share-units.js";
+import { bytewordUnits, SHARE_UNITS, UR_SSKR_START } from "./share-units.js";
 import { unicodeCodesFitting } from "../core/words.js";
 import {
   COLOR_UNICODE_BASE,
@@ -409,7 +409,7 @@ function unitModels(text: string): UnitModel[] {
     return models;
   }
   addModel(models, "indexes", codeTokens(text));
-  addModel(models, "words", text.toLowerCase().split(BYTEWORD_SEPARATORS).filter(Boolean));
+  addModel(models, "words", bytewordUnits(text));
   addUnicodeModel(models, text);
   addColorModel(models, text);
   addColorUnicodeModels(models, text);

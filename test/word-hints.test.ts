@@ -121,6 +121,23 @@ describe("hints of a line in any form", () => {
   });
 });
 
+describe("hints of words run together", () => {
+  it("hints Bytewords run together, after dashes and commas, as their reader takes them", () => {
+    for (const line of ["tunaac", "tuna-ac", "tuna,ac", "acid tunaac"])
+      expect(listed(SHARE_WORD_HINTS, line), line).toEqual(["acid"]);
+    expect(listed(SHARE_WORD_HINTS, "tunaacid")).toBe("nothing");
+    expect(listed(SHARE_WORD_HINTS, "tunaxx")).toBe("no-word");
+    expect(completed(SHARE_WORD_HINTS, "tunaac")).toEqual(["id", true]);
+    // BIP39 words are never run together: a run longer than any word is no word, as in mhfe.
+    expect(listed(WordList.BIP39, "abandonab")).toBe("no-word");
+  });
+
+  it("refuses words run together of a length that some word lacks", () => {
+    const names = { one: "word", many: "words" };
+    expect(() => new WordList(names, ["ab", "abc"], { runTogether: 2 })).toThrow("same length");
+  });
+});
+
 describe("self-test of the hints", () => {
   it("passes", async () => {
     expect(() => WORD_HINTS_SELF_TEST.startup()).not.toThrow();

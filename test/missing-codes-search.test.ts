@@ -71,7 +71,12 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
       fingerprint,
     );
     expect(legacy.fits("encoded")).toBe(false);
-    expect(MissingCodesSearch.placesText([2, 6, 9])).toBe("Codes 2, 6 and 9");
+    // The last digit of three codes forgotten, few enough to search.
+    const digits = MASKED_TEXT.split(" ").map((code, place) =>
+      [1, 5, 8].includes(place) ? `${code.slice(0, -1)}?` : code,
+    );
+    const three = MissingCodes.read(digits.join(" "), "indexes", "seedshift");
+    expect(MissingCodesSearch.placesText(three)).toBe("Codes 2, 6 and 9");
     expect(() => new MissingCodesSearch(plain, undefined as never)).toThrow(TypeError);
   });
 
