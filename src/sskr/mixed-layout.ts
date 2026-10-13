@@ -189,6 +189,19 @@ export function fillingFields(packed: PackedUnits, end: number): ZeroField[] {
 }
 
 /**
+ * How many of `values`, the units of `form`, the share that they start with takes, by the length
+ * of its CBOR that its header gives; undefined where they are too few to hold a header. Units after
+ * them are no part of it, such as the decoys after a share's codes on its cards (owner,
+ * 2026-10-13); the checksum then tells whether the units before them are a share at all.
+ */
+export function ownUnitCount(form: MixedForm, values: readonly number[]): number | undefined {
+  const { bytes } = form.pack(values);
+  if (bytes.length < CRC32_BYTES + SHARE_HEADER_BYTES) return undefined;
+  const cborLength = unmixedBody(bytes, SHARE_HEADER_BYTES)[1]!;
+  return form.unitCount(CRC32_BYTES + SHARE_HEADER_BYTES + cborLength);
+}
+
+/**
  * The transport bytes, CBOR then checksum, of the share that `units` units of `form`, packed as
  * `packed`, hold; undefined when they hold none: the body must open with the form's version and a
  * CBOR length that the units hold exactly, and leave zero bits after the share. The checksum and

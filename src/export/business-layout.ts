@@ -45,7 +45,7 @@ export interface SeparateCardPage {
  * The page of a separate card of `cardWidth` x `cardHeight` millimetres and where the card lies on
  * it: the size and the orientation that `settings` ask for, the business size by default, checked
  * as every family checks them (pageDimensions); the card centred, and drawn smaller only where the
- * page is smaller than the card. The business and the glass cards place their separate cards so.
+ * page is smaller than the card. The business cards place their separate cards so.
  */
 export function separateCardPage(
   settings: Pick<CardSettings, "pageSize" | "orientation">,

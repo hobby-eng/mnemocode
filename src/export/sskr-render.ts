@@ -12,16 +12,17 @@
 import {
   Share,
   shareToColors,
-  type ColorShareFormat,
   isColorShareFormat,
   type ShareFormat,
   parseShareFormat,
+  assertShareFormatHasCards,
+  shareFormatHasCards,
 } from "../sskr/transport.js";
 import { ExportDetails } from "./export-details.js";
 import type { CardSettings } from "./card-settings.js";
-import { cardCount, printedCode, separateCardName } from "./card-codes.js";
-import { checkedChoice, type UniformChoice } from "./platform.js";
-import { catalogReferencesPerCard, renderCatalogDesign, type CardDrawing } from "./templates.js";
+import { printedCode, separateCardName } from "./card-codes.js";
+import type { UniformChoice } from "./platform.js";
+import { catalogSheetShape, renderCatalogDesign, type CardDrawing } from "./templates.js";
 import {
   resolveSskrLayout,
   type SskrCardContent,
@@ -30,17 +31,19 @@ import {
 } from "./sskr-content.js";
 import { joinedDocuments, type NamedDocument } from "./pdf-documents.js";
 import { designOfStyle, type CardStyle, type CatalogEntry } from "./template-catalog.js";
-import { RGB_MAX_VALUE, rgbHex } from "../core/colors.js";
 import { SHEET_PAGE_SIZE } from "./card-settings.js";
+import { codeColors } from "./card-palette.js";
+import { ownCards } from "./card-decoys.js";
+import { withPlannedDecoys, type SheetShaper } from "./card-plan.js";
 
 export interface SskrRenderOptions extends CardSettings {
   readonly style: CardStyle;
   /** Omitted: decided by the page size. */
   readonly layout?: SskrCardLayout;
   /**
-   * The form of the shares. A QR code holds what the cards print, so that a share read from it
-   * comes back as it was written: word numbers, Unicode codes or Bytewords (also for ur) as they
-   * are, the Unicode codes of colors as such, and the color codes otherwise.
+   * The form of the shares: colors, or Unicode codes, which the cards print, one to a card. A QR
+   * code holds what the cards print, so that a share read from it comes back as it was written.
+   * Word numbers, Bytewords and the UR have no cards (shareFormatHasCards).
    */
   readonly shareFormat?: ShareFormat;
 }
@@ -54,7 +57,7 @@ export interface ShareCardShare {
    * the folder of its fragments, and the QR code image of its sheets.
    */
   readonly name: string;
-  /** How many documents its cards take: one per fragment for separate cards, otherwise one. */
+  /** How many documents its cards take: one per card for separate cards, otherwise one. */
   readonly documents: number;
   /**
    * The folder that keeps its fragments together, such as collection-376C-1-2, or undefined when
@@ -66,65 +69,57 @@ export interface ShareCardShare {
 /** One document of a share. */
 export type ShareCardDocument = NamedDocument;
 
-/**
- * The forms in which the cards print the share's own codes, one per card, with colors that only
- * decorate them: word numbers, Unicode codes and Bytewords, which a share written as ur:sskr is
- * printed in too, word by word. The color forms print the colors, which are the share.
- */
-const LABELLED_FORMS = Object.freeze({
-  indexes: "indexes",
-  unicode: "unicode",
-  words: "words",
-  ur: "words",
-}) satisfies Readonly<Record<Exclude<ShareFormat, ColorShareFormat>, ShareFormat>>;
-/** How many colors a color code has: 2^24, six hexadecimal digits. */
-const COLOR_CODES = RGB_MAX_VALUE + 1;
-/**
- * The codes that one card prints in those forms. A collection sheet holds at most
- * MAX_SHEET_CARDS cards (collection-sheet.ts); three codes to a card keep the share of a 24-word
- * phrase within them: 33 word numbers or Unicode codes, or 41 Bytewords (a test checks it).
- */
-const CODES_PER_CARD = 3;
-
 type ResolvedOptions = Omit<SskrRenderOptions, "layout"> & { readonly layout: SskrCardLayout };
 
 interface Member {
   readonly share: ShareCardShare;
   readonly memberIndex: number;
   readonly content: SskrCardContent;
-  readonly colors: readonly string[];
 }
 
 /**
- * The cards of one set of shares. A class, so that the options, the shares and the invented
- * details are checked and settled once, in the constructor, and every document rendered from it
- * belongs to the same set. It renders on request and keeps no rendered document, only the shares
- * it was given, as text, for as long as it is kept.
+ * The cards of one set of shares. A class, so that the options, the shares, the invented details
+ * and the decoys are checked and settled once, as the set is made (ShareCardSet.create), and every
+ * document rendered from it belongs to the same set. It renders on request and keeps no rendered
+ * document, only the shares it was given, as text, for as long as it is kept.
  */
 export class ShareCardSet {
   readonly #drawing: CardDrawing;
   readonly #options: ResolvedOptions;
   /** The design of the cards, whose family draws them (template-catalog.ts). */
   readonly #design: CatalogEntry;
-  readonly #referencesPerCard: number;
   readonly #members: readonly Member[];
 
+  private constructor(
+    drawing: CardDrawing,
+    options: ResolvedOptions,
+    design: CatalogEntry,
+    members: readonly Member[],
+  ) {
+    this.#drawing = drawing;
+    this.#options = options;
+    this.#design = design;
+    this.#members = members;
+  }
+
   /**
-   * Checks the layout, the style and the shares, and settles the details of the cards, which are
-   * drawn with `drawing`, the host's CardRenderer. The decorative colors of the forms that print
-   * codes come from `randomInt`, the renderer's random integers below a limit unless a host, such
-   * as its self-test, gives its own.
+   * Checks the layout, the style and the shares, settles the details of the cards, which are drawn
+   * with `drawing`, the host's CardRenderer, and plans the decoys after each share's codes
+   * (withPlannedDecoys). The decoys come from `randomInt`, the renderer's random integers below a
+   * limit unless a host, such as its self-test, gives its own.
    */
-  constructor(
+  static async create(
     drawing: CardDrawing,
     records: readonly string[],
     requested: SskrRenderOptions,
     randomInt: UniformChoice = drawing.randomInt,
-  ) {
+  ): Promise<ShareCardSet> {
     parseSskrLayout(requested.layout);
     // Checked before any choice is made: another value would print the colors silently
     // (AUD-012-FUN007).
-    if (requested.shareFormat !== undefined) parseShareFormat(requested.shareFormat);
+    const format = requested.shareFormat ?? "colors";
+    parseShareFormat(format);
+    assertShareFormatHasCards(format);
     const layout = resolveSskrLayout(requested.layout, requested.pageSize);
     const options: ResolvedOptions = {
       ...requested,
@@ -142,42 +137,33 @@ export class ShareCardSet {
     // were.
     const { presentation, profile } = ExportDetails.of(drawing.randomInt, options, options.style);
     const shares = Share.readSet(records, false);
-    this.#drawing = drawing;
-    this.#options = options;
-    this.#design = design;
-    this.#referencesPerCard = catalogReferencesPerCard(design);
-    this.#members = shares.map((read) => {
-      const { info } = read;
-      const reference =
-        `${info.identifier.toString(16).padStart(4, "0")}-${info.groupIndex + 1}-${info.memberIndex + 1}`.toUpperCase();
-      const { labels, colors, payload } = cardFace(
-        read,
-        options.shareFormat ?? "colors",
-        randomInt,
-      );
-      const content: SskrCardContent = {
+    const separate = options.layout === "individual";
+    const shaper: SheetShaper = (shapeDrawing, cards, pageSize) =>
+      catalogSheetShape(design, shapeDrawing, cards, pageSize);
+    const members: Member[] = [];
+    for (const read of shares) {
+      const reference = shareReference(read);
+      const cards: SskrCardContent = {
         ...options,
         kind: "sskr",
-        colors,
-        ...(labels === undefined ? {} : { labels }),
-        payload,
+        ...shareCardFace(read, format),
         collectionReference: reference,
         qrCard: options.layout === "qr",
         cardQr: options.layout === "qr" || options.cardQr === true,
         presentation,
         profile,
       };
-      // A fragment contains only its own consecutive references; grouping restarts per member.
-      const fragments = options.layout === "individual";
+      const content = await withPlannedDecoys(shaper, drawing, cards, separate, randomInt);
       const name = `collection-${reference}`;
       const share: ShareCardShare = Object.freeze({
         reference,
         name,
-        documents: fragments ? cardCount(colors.length, this.#referencesPerCard) : 1,
-        folder: fragments ? name : undefined,
+        documents: separate ? content.colors.length : 1,
+        folder: separate ? name : undefined,
       });
-      return { share, memberIndex: info.memberIndex, content, colors };
-    });
+      members.push({ share, memberIndex: read.info.memberIndex, content });
+    }
+    return new ShareCardSet(drawing, options, design, members);
   }
 
   /**
@@ -213,12 +199,17 @@ export class ShareCardSet {
   }
 
   /**
-   * What the cards of the share at `place` (counted from 0) print, in order: the hex codes of its
-   * colors, or its codes in the form it is written in, a few to a card.
+   * What the cards of the share at `place` (counted from 0) print, in order, one code to a card:
+   * the hex codes of its colors, or its Unicode codes, then the decoys.
    */
   printedCodes(place: number): readonly string[] {
     const { content } = this.#member(place);
     return content.colors.map((_, index) => printedCode(content, index));
+  }
+
+  /** How many cards of the share at `place` print the share's own codes, before the decoys. */
+  ownCodes(place: number): number {
+    return ownCards(this.#member(place).content);
   }
 
   /** The documents of the share at `place` (counted from 0), rendered one at a time, in order. */
@@ -248,14 +239,14 @@ export class ShareCardSet {
 
   /**
    * The file name of the document `index` of `member`: a whole share is named after the share, a
-   * fragment after its place, counted from 01, and its first color without the #.
+   * card after its place, counted from 01, and the code it prints.
    */
   #documentName(member: Member, index: number): string {
     if (member.share.folder === undefined) return member.share.name;
-    return separateCardName(member.content, index, this.#referencesPerCard);
+    return separateCardName(member.content, index);
   }
 
-  /** The document `index` of `member`: a fragment, a collection sheet or a QR card. */
+  /** The document `index` of `member`: a separate card, a collection sheet or a QR card. */
   #render(member: Member, index: number): Promise<Uint8Array> {
     const { layout } = this.#options;
     // Only separate cards are asked for by their index; a sheet and a QR card are one document.
@@ -284,47 +275,34 @@ export class ShareCardSet {
 }
 
 /**
- * What the cards of a share print: its colors, which are the share, in a color form; otherwise its
- * codes, with colors that only decorate them. The QR code holds what the cards print, so that a
- * share read from it comes back as written.
+ * How many cards of `record`, a share, print its own codes in `format`, before the decoys: what
+ * the sheet for heirs tells (HeirBackup codes); undefined where the form has no cards.
  */
-function cardFace(
-  share: Share,
-  format: ShareFormat,
-  randomInt: UniformChoice,
-): { readonly labels?: string[]; readonly colors: string[]; readonly payload: string } {
-  if (isColorShareFormat(format))
-    return { colors: shareToColors(share.ur), payload: share.write(format) };
-  const labels = cardGroups(share.write(LABELLED_FORMS[format]).split(" "));
-  return { labels, colors: decorativeColors(labels.length, randomInt), payload: labels.join(" ") };
+export function ownShareCards(record: string, format: ShareFormat): number | undefined {
+  if (!shareFormatHasCards(format)) return undefined;
+  return shareCardFace(Share.read(record), format).colors.length;
 }
 
-/** `codes` in groups of CODES_PER_CARD, in their order, each group the text of one card. */
-function cardGroups(codes: readonly string[]): string[] {
-  const groups: string[] = [];
-  for (let start = 0; start < codes.length; start += CODES_PER_CARD)
-    groups.push(codes.slice(start, start + CODES_PER_CARD).join(" "));
-  return groups;
+/** The reference that the cards of `share` print: its set, group and member, such as 4BBF-1-2. */
+export function shareReference(share: Share): string {
+  const { identifier, groupIndex, memberIndex } = share.info;
+  return `${identifier.toString(16).padStart(4, "0")}-${groupIndex + 1}-${memberIndex + 1}`.toUpperCase();
 }
 
 /**
- * `count` colors drawn at random, none twice: decoration, which carries nothing of the share, so
- * that no code is tied to a color and the same code on two cards may have two colors.
+ * What the cards of a share in `format` print, before their decoys: its colors, which are the
+ * share, in a color form; in Unicode codes its codes, one to a card, with a color for each
+ * distinct code that only decorates it (codeColors). The QR code holds the share as written, so
+ * that a share read from it comes back as it was.
  */
-function decorativeColors(count: number, randomInt: UniformChoice): string[] {
-  const chosen = new Set<number>();
-  for (let card = 0; card < count; card++) {
-    // Only a color code ends the loop below with a valid code.
-    let color = checkedChoice(
-      randomInt,
-      COLOR_CODES,
-      "The random source of the card colors gave a number out of range.",
-    );
-    // A color drawn twice takes the next free one, so that even a poor random source ends.
-    while (chosen.has(color)) color = (color + 1) % COLOR_CODES;
-    chosen.add(color);
-  }
-  return [...chosen].map(rgbHex);
+export function shareCardFace(
+  share: Share,
+  format: ShareFormat,
+): { readonly labels?: string[]; readonly colors: string[]; readonly payload: string } {
+  const payload = share.write(format);
+  if (isColorShareFormat(format)) return { colors: shareToColors(share.ur), payload };
+  const labels = payload.split(" ");
+  return { labels, colors: codeColors(labels), payload };
 }
 
 /** The QR code that the sheets of one share print (ShareCardSet.qrCodes). */
@@ -346,5 +324,5 @@ export async function renderSskrPdf(
   records: readonly string[],
   options: SskrRenderOptions,
 ): Promise<Uint8Array> {
-  return new ShareCardSet(drawing, records, options).renderAll();
+  return (await ShareCardSet.create(drawing, records, options)).renderAll();
 }

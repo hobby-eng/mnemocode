@@ -391,13 +391,15 @@ describe("AUD-009 follow-up: nothing a library object hands out changes it", () 
     // The drawing of the page; the bytes of the file differ from one render to the next.
     const drawn = async (cards: ShareCardSet) =>
       pageOperators(await PDFDocument.load(await cards.renderShare(0)), 0);
-    const cards = new ShareCardSet(nodeCardRenderer, [SHARES[0]!], settings);
+    const cards = await ShareCardSet.create(nodeCardRenderer, [SHARES[0]!], settings);
     const first = await drawn(cards);
     presentation.studioName = "Another Studio";
     // Before: the later render showed the caller's new studio name.
     expect(await drawn(cards)).toBe(first);
     // The name is printed: a set built with the new one draws another page.
-    expect(await drawn(new ShareCardSet(nodeCardRenderer, [SHARES[0]!], settings))).not.toBe(first);
+    expect(
+      await drawn(await ShareCardSet.create(nodeCardRenderer, [SHARES[0]!], settings)),
+    ).not.toBe(first);
   });
 
   it("hands out the details settled for an export frozen, as every page shares them", () => {

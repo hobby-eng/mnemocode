@@ -47,7 +47,7 @@ interface FieldPlace {
   readonly dark: boolean;
 }
 
-/** How strongly the artwork takes a reference's colour (business-artwork.ts names the factors). */
+/** How strongly the artwork takes a reference's colour (business-tint.ts names the factors). */
 export type BusinessTint = "vivid" | "muted";
 
 /** The reference line of a separate card. */

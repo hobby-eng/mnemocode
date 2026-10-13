@@ -323,10 +323,8 @@ const PUBLIC_SHARE: string = JSON.parse(readFileSync("vectors/sskr-v1.json", "ut
   .deterministic[0].shares[0];
 
 describe("AUD-012-FUN004: the labels of color cards are one per color", () => {
-  const words = writeShare(PUBLIC_SHARE, "words").split(" ");
-  const labels = Array.from({ length: Math.ceil(words.length / 3) }, (_, index) =>
-    words.slice(index * 3, index * 3 + 3).join(" "),
-  );
+  // One Unicode code to a card (owner, 2026-10-13).
+  const labels = writeShare(PUBLIC_SHARE, "unicode").split(" ");
   const colorsFor = (count: number): string[] =>
     Array.from({ length: count }, (_, index) => `#${(index + 1).toString(16).padStart(6, "0")}`);
 
@@ -337,15 +335,36 @@ describe("AUD-012-FUN004: the labels of color cards are one per color", () => {
     ).not.toThrow();
     for (const count of [1, labels.length - 1, labels.length + 1])
       expect(() => assertColorCardContent({ ...share, colors: colorsFor(count) })).toThrow(
-        "A share's cards print one group of its codes for each color, in order.",
+        "Cards that print codes print one code for each color, in order.",
       );
   });
 
-  it("refuses labels on the cards of a phrase's colors", () => {
-    const colors = indexesToColors(Array.from({ length: 12 }, () => 0));
+  it("takes a phrase's Unicode codes as its labels, and refuses codes that are no phrase", () => {
+    const codes = Array.from({ length: 12 }, () => "7684");
+    const colors = colorsFor(12);
     expect(() =>
-      assertColorCardContent({ kind: "colors", colors, payload: colors.join(" "), labels: ["x"] }),
-    ).toThrow("Cards of a seed phrase's colors print the colors themselves, not labels.");
+      assertColorCardContent({ kind: "colors", colors, payload: codes.join(""), labels: codes }),
+    ).not.toThrow();
+    expect(() =>
+      assertColorCardContent({ kind: "colors", colors, payload: codes.join(""), labels: ["x"] }),
+    ).toThrow("Cards that print codes print one code for each color, in order.");
+    // Eleven codes are no phrase; and the QR code must hold the codes printed.
+    expect(() =>
+      assertColorCardContent({
+        kind: "colors",
+        colors: colors.slice(1),
+        payload: codes.join(""),
+        labels: codes.slice(1),
+      }),
+    ).toThrow("Expected 12, 15, 18, 21 or 24 word indexes.");
+    expect(() =>
+      assertColorCardContent({
+        kind: "colors",
+        colors,
+        payload: [...codes.slice(1), "5728"].join(""),
+        labels: codes,
+      }),
+    ).toThrow("Collection QR does not match the printed references.");
   });
 });
 
@@ -397,7 +416,7 @@ describe("AUD-012-FUN006, FUN007: card settings refuse what they cannot print", 
     const template = { id: "synthetic", kind: "colors", render, renderIndividual: render };
     const colors = indexesToColors(Array.from({ length: 12 }, () => 0));
     const content = { kind: "colors", colors, payload: colors.join(" ") } as const;
-    for (const settings of [{ orientation: "sideways" }, { pageSize: "a5" }])
+    for (const settings of [{ orientation: "sideways" }, { pageSize: "a3" }])
       await expect(
         renderCards(nodeCardRenderer, [
           { template: template as never, content: { ...content, ...settings } as never },
@@ -413,9 +432,9 @@ describe("AUD-012-FUN006, FUN007: card settings refuse what they cannot print", 
       shareFormat: "unsupported",
       profile: { name: "Public fixture" },
     };
-    expect(
-      () => new ShareCardSet(nodeCardRenderer, [PUBLIC_SHARE], options as never, () => 0),
-    ).toThrow(/The share format must be one of: /u);
+    await expect(
+      ShareCardSet.create(nodeCardRenderer, [PUBLIC_SHARE], options as never, () => 0),
+    ).rejects.toThrow(/The share format must be one of: /u);
   });
 });
 

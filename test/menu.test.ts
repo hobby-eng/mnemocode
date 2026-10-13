@@ -1,3 +1,4 @@
+import { BIP39_WORD_COUNTS } from "../src/core/bip39-sizes.js";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -103,7 +104,12 @@ const SAME_SHAPE = new Set(["Which card design?"]);
  * Questions whose other answers only add options of their own, the same under every path: they
  * are taken where the question is first asked, and elsewhere only its first answer.
  */
-const TAKEN_ONCE = new Set(["Type your own details for the cards?", "Which coin?"]);
+const TAKEN_ONCE = new Set([
+  "Type your own details for the cards?",
+  "Which coin?",
+  // Each other answer adds --orientation alone, the same for every layout of sheets.
+  "How should the sheets be turned?",
+]);
 
 /** The usual answer of each typed question without a fallback, as public test data. */
 const USUAL: Readonly<Record<string, string>> = {
@@ -179,7 +185,7 @@ async function everyPath(entry: (typeof MENU_ENTRIES)[number]): Promise<string[]
 }
 
 /** The --format numbers as the encoded forms that validateCardOptions takes. */
-const FORM_OF_NUMBER = { "4": "colors-unicode", "5": "colors" } as const;
+const FORM_OF_NUMBER = { "3": "unicode", "4": "colors-unicode", "5": "colors" } as const;
 
 /**
  * Checks the options of a command line for cards as the commands check them before asking for a
@@ -259,8 +265,8 @@ describe("start menu", () => {
 
   it("builds the command lines of the usual answers", async () => {
     // Colors, no Seedshift, no shares, as printable cards in the first design, in one PDF of A6
-    // sheets with a QR code each, with random details.
-    expect(await runOf(1, [2, 1, 0, 3, 0, 0, 0, 0])).toEqual([
+    // sheets turned the way the cards are largest, with a QR code each, with random details.
+    expect(await runOf(1, [2, 1, 0, 3, 0, 0, 2, 0, 0])).toEqual([
       "encode",
       "--ask-secrets",
       "--format",
@@ -333,14 +339,16 @@ describe("start menu", () => {
     ]);
   });
 
-  it("answers each form by its --format number, in any order the forms are listed (S028)", async () => {
-    // English words, listed last, are form 1, as the command built says.
-    expect(await runOf(1, [4, 1, 0])).toContain("1");
+  it("numbers the forms by their place in the list; the command names the --format number", async () => {
+    // English words, listed last, are answered with 5 and are form 1 of the command built.
+    const run = (await runOf(1, [4, 1, 0])) ?? [];
+    expect(run[run.indexOf("--format") + 1]).toBe(String(formatNumber("english")));
     const forms = script.digits["Which form should the seed phrase take?"]!;
-    expect(forms.map(({ value, digit }) => digit === formatNumber(value as never))).not.toContain(
-      false,
-    );
-    expect(forms.at(-1)).toEqual({ value: "english", digit: 1 });
+    expect(forms.map(({ digit }) => digit)).toEqual(forms.map(() => undefined));
+    const list = script.lists[0]!.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ""));
+    const places = list.map((line) => line.match(/^[›\s]\s(\d)\s/u)?.[1]).filter(Boolean);
+    expect(places).toEqual(["1", "2", "3", "4", "5"]);
+    expect(forms.at(-1)).toEqual({ value: "english", digit: undefined });
   });
 
   it("always masks word numbers and words, and calls an unmasked copy weak", async () => {
@@ -374,6 +382,13 @@ describe("start menu", () => {
       for (const answer of Object.values(steps.answers)) expect(question!.labels).toContain(answer);
     }
     expect((await asked(2)).asked[0]!.labels[0]).toBe(HEIR_MENU.decode.source);
+    // Typed codes: the question of how many words, with the answer the sheet gives.
+    await runOf(2, [0]);
+    const words = script.asked.find((item) => item.question === HEIR_MENU.decode.wordsQuestion);
+    expect(words?.labels).toEqual([
+      "All the codes I type",
+      ...BIP39_WORD_COUNTS.map((count) => `${count} words`),
+    ]);
     expect((await asked(HEIR_MENU.recover.digit)).entry).toBe(HEIR_MENU.recover.entry);
   });
 
@@ -396,18 +411,23 @@ describe("start menu", () => {
     expect(script.asked[2]!.labels).toEqual(["Words", "Short code"]);
   });
 
-  it("offers printable cards for a phrase in colors, and for shares in every form", async () => {
+  it("offers printable cards for a phrase and shares in colors or Unicode codes only", async () => {
     const destinations = async (answers: number[]) => {
       await runOf(1, answers);
       return script.asked.find((asked) => asked.question.startsWith("Where should"))!.labels;
     };
     // Word numbers, MnemoCode Seedshift, no shares: a record or a QR code, no cards.
     expect(await destinations([0, 0, 0])).not.toContain("Also as printable cards");
-    // Colors: cards too.
+    // Colors and Unicode codes: cards too.
     expect(await destinations([2, 1, 0])).toContain("Also as printable cards");
-    // Shares of word numbers print their numbers on cards, with colors that only decorate them;
-    // shares of colors print their colors.
+    expect(await destinations([1, 1, 0])).toContain("Also as printable cards");
+    // Shares of word numbers have no cards; shares of Unicode codes print their codes, with
+    // colors that only decorate them, and shares of colors print their colors.
     expect(await destinations([0, 0, 1, 0])).toEqual([
+      "Only on this screen",
+      "Also in a text file",
+    ]);
+    expect(await destinations([1, 1, 1, 0])).toEqual([
       "Only on this screen",
       "Also in a text file",
       "Also as printable cards",
@@ -436,12 +456,18 @@ describe("start menu", () => {
     }
 
     it("asks the kind of file, then the layout, then the design", async () => {
-      expect(await cardOptions(SINGLE, [0, 0, 0, 0])).toEqual([
+      expect(await cardOptions(SINGLE, [0, 0, 2, 0, 0])).toEqual([
         "--pdf",
         "mnemocode-cards.pdf",
         "--card-qr",
       ]);
-      expect(await cardOptions(SINGLE, [0, 1, 0, 1])).toEqual([
+      expect(await cardOptions(SINGLE, [0, 1, 2, 0, 1])).toEqual([
+        "--pdf",
+        "mnemocode-cards.pdf",
+        "--page-size",
+        "a5",
+      ]);
+      expect(await cardOptions(SINGLE, [0, 2, 2, 0, 1])).toEqual([
         "--pdf",
         "mnemocode-cards.pdf",
         "--page-size",
@@ -450,15 +476,43 @@ describe("start menu", () => {
       expect(script.asked.map((asked) => asked.question).slice(4)).toEqual([
         "Which kind of file?",
         "How should the cards be laid out?",
+        "How should the sheets be turned?",
         "Which card design?",
         "Add a QR code with all the codes of the sheet?",
         "Type your own details for the cards?",
         "Instructions for your heirs?",
       ]);
-      expect(await cardOptions(SHARES, [0, 0, 0, 1])).toEqual([
+      expect(await cardOptions(SHARES, [0, 0, 2, 0, 1])).toEqual([
         "--pdf",
         "mnemocode-share-cards.pdf",
       ]);
+    });
+
+    it("asks how the sheets are turned, landscape first, and never for separate cards", async () => {
+      expect(await cardOptions(SINGLE, [0, 0, 0, 0, 1])).toEqual([
+        "--pdf",
+        "mnemocode-cards.pdf",
+        "--orientation",
+        "landscape",
+      ]);
+      expect(await cardOptions(SINGLE, [1, 1, 1, 0, 1])).toEqual([
+        "--images-dir",
+        "mnemocode-cards-images",
+        "--image-format",
+        "png",
+        "--page-size",
+        "a5",
+        "--orientation",
+        "portrait",
+      ]);
+      const turns = script.asked.find((asked) =>
+        asked.question.startsWith("How should the sheets"),
+      );
+      expect(turns!.labels).toEqual(["Landscape", "Portrait", "Whichever gives larger cards"]);
+      await cardOptions(SINGLE, [0, 3, 0]);
+      expect(script.asked.map((asked) => asked.question)).not.toContain(
+        "How should the sheets be turned?",
+      );
     });
 
     it("saves separate business cards in a new folder, without a QR code", async () => {
@@ -467,7 +521,7 @@ describe("start menu", () => {
         [1, ["--image-format", "png"]],
         [2, ["--image-format", "jpg"]],
       ] as const) {
-        expect(await cardOptions(SINGLE, [kind, 2, 0])).toEqual([
+        expect(await cardOptions(SINGLE, [kind, 3, 0])).toEqual([
           "--cards-dir",
           "mnemocode-cards",
           ...format,
@@ -477,7 +531,7 @@ describe("start menu", () => {
         );
       }
       // Shares need the layout: without a page size, they would be sheets.
-      expect(await cardOptions(SHARES, [0, 2, 0])).toEqual([
+      expect(await cardOptions(SHARES, [0, 3, 0])).toEqual([
         "--cards-dir",
         "mnemocode-share-cards",
         "--card-layout",
@@ -485,15 +539,15 @@ describe("start menu", () => {
       ]);
     });
 
-    it("saves images of A6 or A4 sheets, and says at once when pdftocairo is missing", async () => {
-      expect(await cardOptions(SINGLE, [2, 0, 0, 0])).toEqual([
+    it("saves images of A6, A5 or A4 sheets, and says at once when pdftocairo is missing", async () => {
+      expect(await cardOptions(SINGLE, [2, 0, 2, 0, 0])).toEqual([
         "--images-dir",
         "mnemocode-cards-images",
         "--image-format",
         "jpg",
         "--card-qr",
       ]);
-      expect(await cardOptions(SINGLE, [1, 1, 0, 1])).toEqual([
+      expect(await cardOptions(SINGLE, [1, 2, 2, 0, 1])).toEqual([
         "--images-dir",
         "mnemocode-cards-images",
         "--image-format",
@@ -503,7 +557,7 @@ describe("start menu", () => {
       ]);
       script.noImages = true;
       // PNG first, then the first choice, a PDF, when the question is asked again.
-      expect(await cardOptions(SINGLE, [1, 0, 0, 0, 0])).toEqual([
+      expect(await cardOptions(SINGLE, [1, 0, 0, 2, 0, 0])).toEqual([
         "--pdf",
         "mnemocode-cards.pdf",
         "--card-qr",
@@ -529,7 +583,7 @@ describe("start menu", () => {
         Subtitle: [""],
         Footer: ["x".repeat(101), "Printed with care"],
       };
-      const run = (await runOf(1, [...SINGLE, 0, 0, 0, 0, 1], typed))!;
+      const run = (await runOf(1, [...SINGLE, 0, 0, 2, 0, 0, 1], typed))!;
       expect(run.slice(run.indexOf("--card-qr") + 1)).toEqual([
         "--card-name",
         "Ann Lee",
@@ -550,7 +604,7 @@ describe("start menu", () => {
       // A sheet shows no label before the codes; a separate business card does.
       expect(warningsAt("Label before each code")).toEqual([]);
       script.lines = [];
-      await runOf(1, [...SINGLE, 0, 2, 0, 1], {});
+      await runOf(1, [...SINGLE, 0, 3, 0, 1], {});
       expect(script.lines.map((line) => line.question)).toEqual([
         "Name of the new folder",
         "Name, in Latin letters",
@@ -577,7 +631,8 @@ describe("start menu", () => {
 
   describe("typed answers are checked at once and asked again", () => {
     // Entry 5, a digit of a date, typed, MnemoCode Seedshift, then the wallet.
-    const DATE_WALLET = [1, 0, 0];
+    // Entry 5, a digit of a date, typed, all the codes typed, MnemoCode Seedshift, then the wallet.
+    const DATE_WALLET = [1, 0, 0, 0];
 
     it("asks the fingerprint and the address again until a wallet can have them", async () => {
       const fingerprint = await runOf(5, [...DATE_WALLET, 0], {
@@ -654,7 +709,10 @@ describe("start menu", () => {
       const refused: [string, string][] = [
         ["-", "- is no file name here; type the name of a file."],
         ["-h", "A name that starts with - would be read as an option; type ./ before it."],
-        [folder, "The output path must be a file, not a directory."],
+        [
+          folder,
+          "A folder has this name; give the file another name, or a name inside that folder.",
+        ],
         [
           join(files, "no such folder", "qr.png"),
           "The folder containing the output file must already exist and be writable.",
@@ -691,7 +749,7 @@ describe("start menu", () => {
       // A new folder for cards may not hold a file of the same task either.
       script.lines = [];
       const cards = join(files, "cards");
-      await runOf(1, [2, 1, 0, 3, 0, 2, 0, 0, 1], {
+      await runOf(1, [2, 1, 0, 3, 0, 3, 0, 0, 1], {
         "Name of the new folder": [cards],
         [heirs]: [join(cards, "heirs.pdf"), join(files, "heirs.pdf")],
       });
@@ -728,8 +786,14 @@ describe("start menu", () => {
     it("takes a new folder where the nearest folder that exists may be written", async () => {
       // Entry 6 has no folder; entry 1's separate cards do. Missing folders are made by the command.
       const deep = join(files, "a", "b", "cards");
-      const run = await runOf(1, [2, 1, 0, 3, 0, 2, 0, 0], {
-        "Name of the new folder": [join(files, "record.txt", "cards"), "''", '" "', deep],
+      const run = await runOf(1, [2, 1, 0, 3, 0, 3, 0, 0], {
+        "Name of the new folder": [
+          join(files, "record.txt", "cards"),
+          "''",
+          '" "',
+          join(files, "cards.pdf"),
+          deep,
+        ],
       });
       expect(run).toEqual(expect.arrayContaining(["--cards-dir", deep]));
       // A quoted name of spaces leaves a blank one, which the command would refuse at its start.
@@ -739,6 +803,8 @@ describe("start menu", () => {
         "A file stands where a folder of this name should be; choose another name.",
         blank,
         blank,
+        // A folder named like a PDF would stand in the way of a PDF of that name later.
+        "A new folder needs a name without .pdf, which is the ending of a file; choose another name.",
       ]);
     });
   });
@@ -746,15 +812,24 @@ describe("start menu", () => {
   it("passes the answer about Seedshift to decode, No as --mode direct", async () => {
     // Typed, then No: --mode direct, so that decode does not ask again for codes that name no
     // mode; a typed record that names another mode is questioned by decode itself.
-    expect(await runOf(2, [0, 0])).toEqual(["decode", "--ask-secrets", "--mode", "direct"]);
+    expect(await runOf(2, [0, 0, 0])).toEqual(["decode", "--ask-secrets", "--mode", "direct"]);
     const question = script.asked.find((asked) => asked.question.startsWith("Was Seedshift"))!;
     expect(question.labels).toEqual(["No", "MnemoCode Seedshift", "Original Seedshift"]);
-    expect(await runOf(2, [0, 1])).toEqual(["decode", "--ask-secrets", "--mode", "seedshift"]);
-    expect(await runOf(2, [0, 2])).toEqual([
+    expect(await runOf(2, [0, 0, 1])).toEqual(["decode", "--ask-secrets", "--mode", "seedshift"]);
+    expect(await runOf(2, [0, 0, 2])).toEqual([
       "decode",
       "--ask-secrets",
       "--mode",
       "seedshift-legacy",
+    ]);
+    // Codes typed from printed cards: the number of words, which leaves out their decoys.
+    expect(await runOf(2, [0, 5, 0])).toEqual([
+      "decode",
+      "--ask-secrets",
+      "--words",
+      "24",
+      "--mode",
+      "direct",
     ]);
     // A QR code image the same.
     expect(await runOf(2, [2, 0])).toEqual([

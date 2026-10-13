@@ -373,6 +373,9 @@ def at_hidden_record_prompt(session):
     session.type(CTRL_UP + DOWN + UP + DOWN + ENTER)
     session.wait_for("Where is the encoded seed phrase?")
     session.type("1")
+    # All the codes typed: no decoys to leave out.
+    session.wait_for("How many words does the seed phrase have?")
+    session.type("1")
     session.wait_for("Was Seedshift used when it was encoded?")
     session.type("1")
     return session.wait_for(HIDDEN_RECORD)
@@ -477,8 +480,8 @@ def check_lines_pasted_as_one_answer():
         session.wait_for(MENU_SHOWN)
         session.type(ENCODE_ENTRY)
         session.wait_for("Which form should the seed phrase take?")
-        # Each form is chosen by its --format number: 2 for word numbers.
-        session.type("2")
+        # Each form is chosen by its place in the list: 1 for word numbers.
+        session.type("1")
         # Word numbers are always masked: the menu asks only which Seedshift.
         session.wait_for("Which Seedshift?")
         session.type("1")
@@ -538,6 +541,8 @@ def check_decode_dates_asked_again():
         session.wait_for(MENU_SHOWN)
         session.type(DECODE_ENTRY)
         session.wait_for("Where is the encoded seed phrase?")
+        session.type("1")
+        session.wait_for("How many words does the seed phrase have?")
         session.type("1")
         session.wait_for("Was Seedshift used when it was encoded?")
         # MnemoCode Seedshift, after No.
@@ -628,8 +633,8 @@ def at_card_files(session):
     up to the first question of how they are saved: the kind of file, then their layout."""
     session.type(ENCODE_ENTRY)
     session.wait_for("Which form should the seed phrase take?")
-    # Each form is chosen by its --format number: 5 for colors.
-    session.type("5")
+    # Each form is chosen by its place in the list: 3 for colors.
+    session.type("3")
     session.wait_for("Use Seedshift?")
     session.type("2")
     session.wait_for("Split it into Shamir shares?")
@@ -676,6 +681,9 @@ def check_card_questions():
             session.type("1")
             session.wait_for("How should the cards be laid out?")
             session.type("1")
+            # Landscape, the first answer, which names its orientation in the command.
+            session.wait_for("How should the sheets be turned?")
+            session.type("1")
             session.wait_for("PDF file name (Enter: mnemocode-cards.pdf):")
             session.type(ENTER)
             design = first_design(session)
@@ -697,7 +705,8 @@ def check_card_questions():
             # take when none is given, so none is named; nor is a detail left random with Enter.
             cards = ["mnemocode", "encode", "--ask-secrets", "--format", "5", "--mode", "direct"]
             cards += ["--template", design]
-            sheets = [*cards, "--pdf", "mnemocode-cards.pdf", "--card-qr", "--card-name", CARD_NAME]
+            sheets = [*cards, "--pdf", "mnemocode-cards.pdf", "--orientation", "landscape"]
+            sheets += ["--card-qr", "--card-name", CARD_NAME]
             if not WINDOWS:
                 assert command == sheets, f"the menu ran {command!r}"
 
@@ -706,7 +715,8 @@ def check_card_questions():
             asked = session.seen
             session.type("1")
             session.wait_for("How should the cards be laid out?")
-            session.type("3")
+            # A6, A5, A4, then separate business cards.
+            session.type("4")
             session.wait_for("Name of the new folder (Enter: mnemocode-cards):")
             session.type(ENTER)
             assert first_design(session) == design or WINDOWS, "another first design"

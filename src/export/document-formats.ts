@@ -64,6 +64,15 @@ export const JPEG_QUALITY = DOCUMENT_FORMAT_FACTS.jpg.qualityPercent!;
 /** Another name of jpg that a person may type. */
 const JPEG_ALIAS = "jpeg";
 
+/**
+ * The endings of the files that an export writes, without their point: a new folder never takes a
+ * name with one, which would look like such a file (FILE_NAME_FOR_FOLDER, cli/output-paths.ts).
+ */
+export const DOCUMENT_EXTENSIONS: readonly string[] = Object.freeze([
+  ...DOCUMENT_FORMATS,
+  JPEG_ALIAS,
+]);
+
 /** Whether `value` names an image format of IMAGE_FORMATS. */
 export function isImageFormat(value: unknown): value is ImageFormat {
   return (IMAGE_FORMATS as readonly unknown[]).includes(value);

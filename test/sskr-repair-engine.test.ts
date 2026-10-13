@@ -16,7 +16,13 @@ import { SearchTurns } from "../src/core/search-turns.js";
 import { checksumAt } from "../src/sskr/checksum.js";
 import { misfitMessage } from "../src/sskr/complete-shares.js";
 import { planJointRepair, searchOnce, type RepairProgress } from "../src/sskr/joint-repair.js";
-import { COLOR_FORM, mixedTransport, mixShare, WORD_FORM } from "../src/sskr/mixed-layout.js";
+import {
+  COLOR_FORM,
+  mixedTransport,
+  mixShare,
+  ownUnitCount,
+  WORD_FORM,
+} from "../src/sskr/mixed-layout.js";
 import { markCount, MarkedReading, ReadingSpace, readRepairableShare } from "../src/sskr/repair.js";
 import { NO_PHRASE_FITS, RepairReport, REPAIR_NOTES } from "../src/sskr/repair-report.js";
 import { SET_CONFLICT_TEXTS } from "../src/sskr/set-topology.js";
@@ -196,7 +202,10 @@ describe("S039: one mixed layout for the reader and the repair", () => {
     expect(mixedTransport(WORD_FORM, packed, WORD_FORM.unitCount(packed.bytes.length))).toBe(
       undefined,
     );
-    expect(() => readShare(writeShare(SHARE, "colors") + " #000000")).toThrow(COLOR_FORM.refusal);
+    // The reader stops at the share's own length, which its header gives: a color after it, such
+    // as a decoy of its cards, is left out (owner, 2026-10-13), while the layout above refuses it.
+    expect(readShare(writeShare(SHARE, "colors") + " #000000").ur).toBe(SHARE);
+    expect(ownUnitCount(COLOR_FORM, [...colors, 0])).toBe(colors.length);
   });
 
   it("reads a checksum big-endian, as an unsigned number", () => {

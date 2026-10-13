@@ -137,15 +137,17 @@ describe("single-page design studies", () => {
     );
     expect(shares).toHaveLength(3);
     expect(pdf.getPageCount()).toBe(3);
-    expect(payloads).toEqual(shares.map((share) => shareToColors(share).join(" ")));
-    expect(qrSpy.mock.calls.map((call) => call[1])).toEqual(matrices);
+    // Each share's code is made for the plan of its decoys, then for its sheet, which draws it.
+    const own = shares.map((share) => shareToColors(share).join(" "));
+    expect(payloads).toEqual([...own, ...own]);
+    expect(qrSpy.mock.calls.map((call) => call[1])).toEqual(matrices.slice(shares.length));
     const labels = textSpy.mock.calls.map(([label]) => label);
     expect(labels.filter((label) => label === "REVIEW STUDIO")).toHaveLength(3);
     // The footer line carries the slogan, the series of the share and the footer text.
     expect(new Set(labels.filter((label) => label.includes("Series "))).size).toBe(3);
   });
 
-  it.each(["business-it", "material-kitchen", "business-glass-8in1"])(
+  it.each(["business-it", "material-kitchen"])(
     "%s keeps artwork and QR together at every supported size and orientation",
     async (id) => {
       const template = cardTemplates.find((item) => item.id === id)!;
@@ -167,7 +169,7 @@ describe("single-page design studies", () => {
     },
   );
 
-  it("puts glass cards on a light sheet, business cards and enclosures on the dark one, other materials on their own backdrop", async () => {
+  it("puts business cards and enclosures on the dark sheet, other materials on their own backdrop", async () => {
     // The first thing drawn on a sheet is its background, a rectangle over the whole page.
     const background = async (id: string) => {
       const template = cardTemplates.find((item) => item.id === id)!;
@@ -182,8 +184,6 @@ describe("single-page design studies", () => {
       );
       return /^([\d.]+ [\d.]+ [\d.]+) rg$/mu.exec(pageOperators(document, 0))?.[1];
     };
-    for (const id of ["business-glass-4in1", "business-glass-6in1", "business-glass-8in1"])
-      expect(await background(id), id).toBe("0.78 0.81 0.85");
     for (const id of ["business-it", "business-architect", "material-enclosure"])
       expect(await background(id), id).toBe("0.043 0.047 0.059");
     // A showroom, a concrete wall, a tiled wall and an oak floor, each painted over its base colour.

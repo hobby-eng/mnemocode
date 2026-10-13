@@ -58,6 +58,30 @@ export function wholeMark(token: string): boolean {
   return /^\?+$/u.test(token);
 }
 
+/**
+ * What a ? means in codes run together, which the refusal of such codes adds: a whole code. One
+ * digit is marked only where the codes are written apart, as a screen shows them beside the
+ * joined text (owner, 2026-10-13).
+ */
+export const JOINED_MARKS_HINT =
+  "In codes run together, a ? stands for a whole code; to mark one digit, write the codes apart, as the screen shows them.";
+
+/** Whether `text` is hexadecimal codes run together with a ? among them (JOINED_MARKS_HINT). */
+export function joinedWithMarks(text: string): boolean {
+  const tokens = codeTokens(text);
+  return (
+    tokens.length === 1 &&
+    /^[0-9A-F?]+$/u.test(tokens[0]!) &&
+    tokens[0]!.includes("?") &&
+    !wholeMark(tokens[0]!)
+  );
+}
+
+/** `message`, with JOINED_MARKS_HINT after it where `text` is codes run together with marks. */
+export function withJoinedMarksHint(message: string, text: string): string {
+  return joinedWithMarks(text) ? `${message} ${JOINED_MARKS_HINT}` : message;
+}
+
 /** Whether `written` fits `pattern`, of the same length, a ? in the pattern fitting any symbol. */
 export function fitsPattern(pattern: string, written: string): boolean {
   if (pattern.length !== written.length) return false;

@@ -23,10 +23,10 @@ import {
   ALWAYS_MASKED_NOTE,
   alwaysMasked,
   capabilities,
+  cardKindOf,
   shareFormatOf,
   ShareSetChoice,
   UNMASKED_NOTE,
-  writtenInColors,
 } from "../core/backup-options.js";
 import { parseRecipient } from "../core/candidate-encryption.js";
 import { designTexts, resolveCardPresentation } from "../export/card-copy.js";
@@ -36,6 +36,10 @@ import {
   validateProfile,
   pageSizeLabel,
   SEPARATE_CARD_SIZE,
+  SHEET_PAGE_SIZE,
+  SHEET_PAGE_SIZES,
+  type SheetPageSize,
+  type CardOrientation,
   type CopyField,
   type ProfileField,
 } from "../export/card-settings.js";
@@ -51,7 +55,7 @@ import { droppedPath, askWalletEvidence, type WalletValueAsker } from "./ask.js"
 import { limitName, MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
 import { formatNumber } from "./input.js";
 import { MAX_PNG_BYTES } from "./qr-limits.js";
-import { WORD_NUMBERS } from "../core/bip39-sizes.js";
+import { BIP39_WORD_COUNTS, WORD_NUMBERS, type Bip39WordCount } from "../core/bip39-sizes.js";
 import {
   SEEDSHIFT_CHOICES,
   ENCODED_SEEDSHIFT_QUESTION,
@@ -61,7 +65,12 @@ import {
   type OfferedSeedshift,
   ENCODED_SEEDSHIFT_CHOICES,
 } from "./seedshift-choices.js";
-import { MENU_ENTRY_NAMES, TYPED_SOURCE } from "./menu-entries.js";
+import {
+  MENU_ENTRY_NAMES,
+  PHRASE_WORDS_QUESTION,
+  phraseWordsAnswer,
+  TYPED_SOURCE,
+} from "./menu-entries.js";
 import { PRIVATE_SCREEN_COMMANDS } from "./command-line.js";
 import {
   isUnusableOutputPath,
@@ -92,11 +101,10 @@ import {
   terminalPaint,
 } from "./terminal.js";
 import { printUsage } from "./usage.js";
-import { isColorShareFormat } from "../sskr/transport.js";
+import { isColorShareFormat, shareFormatHasCards } from "../sskr/transport.js";
 import { REPAIR_ANCHOR } from "../sskr/repair-report.js";
 import { walletNeeded } from "../core/date-search.js";
 import { walletExplanation } from "./date-search.js";
-import { numberedForms } from "./format-numbers.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { commandDisplay, typedCommand } from "./shell-command.js";
 import { runCommand } from "./menu-runner.js";
@@ -112,7 +120,6 @@ import {
 import { COPY_OPTIONS, profileOption } from "./business-options.js";
 import { describeError } from "../core/refusal.js";
 import { SAMPLE_FILE_BASE } from "../export/card-preview.js";
-import { textPieces } from "../core/pieces.js";
 
 /** The menu reads keys from a terminal and draws on one; anything else gets the help instead. */
 export function menuAvailable(): boolean {
@@ -141,8 +148,7 @@ const SOURCE_SAMPLE_ROOM = 25;
 function example(form: EncodedFormat): string {
   const written = formatEncoded(representMnemonic(EXAMPLE_PHRASE), form);
   // Forms written joined, as Unicode codes are, are spaced apart code by code.
-  const width = EncodedForm.of(form).joinedWidth;
-  return width === undefined ? written : textPieces(written, width).join(" ");
+  return EncodedForm.of(form).apartCodes(written)?.join(" ") ?? written;
 }
 
 /**
@@ -169,42 +175,42 @@ function withSamples<T>(choices: readonly Choice<T>[]): Choice<T>[] {
   );
 }
 
-/** The forms in the order of the question, the first three being the usual ones. */
+/**
+ * The forms in the order of the question, the first three being the usual ones, each answered by
+ * its place in the list; the command shown names the form by its --format number.
+ */
 function formChoices(): Choice<EncodedFormat>[] {
-  // Each answered by its --format number, which the command shown then takes.
-  return withSamples(
-    numberedForms([
-      {
-        label: "Word numbers",
-        note: "its place in the BIP39 word list, masked with your dates",
-        example: example("indexes"),
-        value: "indexes",
-      },
-      {
-        label: "Unicode codes",
-        note: "four-digit hexadecimal codes of the Chinese BIP39 words",
-        example: example("unicode"),
-        value: "unicode",
-      },
-      {
-        label: "Colors",
-        note: `color codes, ${COLOR_COUNTS_TEXT} for the whole seed phrase`,
-        example: example("colors"),
-        value: "colors",
-      },
-      {
-        label: "Colors as text",
-        note: "the same colors written as Unicode codes, no font needed",
-        example: example("colors-unicode"),
-        value: "colors-unicode",
-      },
-      {
-        label: "English words",
-        note: "the seed phrase itself, masked with your dates",
-        value: "english",
-      },
-    ]),
-  );
+  return withSamples([
+    {
+      label: "Word numbers",
+      note: "its place in the BIP39 word list, masked with your dates",
+      example: example("indexes"),
+      value: "indexes",
+    },
+    {
+      label: "Unicode codes",
+      note: "four-digit hexadecimal codes of the Chinese BIP39 words",
+      example: example("unicode"),
+      value: "unicode",
+    },
+    {
+      label: "Colors",
+      note: `color codes, ${COLOR_COUNTS_TEXT} for the whole seed phrase`,
+      example: example("colors"),
+      value: "colors",
+    },
+    {
+      label: "Colors as text",
+      note: "the same colors written as Unicode codes, no font needed",
+      example: example("colors-unicode"),
+      value: "colors-unicode",
+    },
+    {
+      label: "English words",
+      note: "the seed phrase itself, masked with your dates",
+      value: "english",
+    },
+  ]);
 }
 
 /** What Seedshift is, shown with the first question about it; the README explains it. */
@@ -421,17 +427,41 @@ async function askDesign(withEveryDesign: boolean): Promise<string | undefined> 
 }
 
 /** How the cards are laid out: on sheets of one size, or as separate business cards. */
-type CardLayout = "a6" | "a4" | "separate";
+type CardLayout = SheetPageSize | "separate";
 
 const CARD_LAYOUTS: readonly Choice<CardLayout>[] = [
-  { label: "A6 sheets", note: `${pageSizeLabel("a6")}, the usual choice`, value: "a6" },
-  { label: "A4 sheets", note: pageSizeLabel("a4"), value: "a4" },
+  ...SHEET_PAGE_SIZES.map((size) => ({
+    label: `${size.toUpperCase()} sheets`,
+    // The commands take this size when none is given.
+    note:
+      size === SHEET_PAGE_SIZE ? `${pageSizeLabel(size)}, the usual choice` : pageSizeLabel(size),
+    value: size,
+  })),
   {
     label: "Separate business cards",
     note: `${pageSizeLabel(SEPARATE_CARD_SIZE)}, one file each`,
     value: "separate",
   },
 ];
+
+/** How sheets are turned: wider or taller, or the way their cards are largest. */
+type SheetTurn = CardOrientation | "larger";
+
+const SHEET_TURNS: readonly Choice<SheetTurn>[] = [
+  { label: "Landscape", note: "wider than tall", value: "landscape" },
+  { label: "Portrait", note: "taller than wide", value: "portrait" },
+  // Without --orientation the commands turn each sheet the way its cards are largest.
+  { label: "Whichever gives larger cards", note: "chosen for each sheet", value: "larger" },
+];
+
+/** The options of how the sheets are turned (--orientation); none where their size decides. */
+async function askSheetTurn(): Promise<string[] | undefined> {
+  const turn = await choose("How should the sheets be turned?", SHEET_TURNS, {
+    label: "Orientation",
+  });
+  if (turn === undefined) return undefined;
+  return turn === "larger" ? [] : ["--orientation", turn];
+}
 
 /**
  * The options of the chosen way of saving, and whether it gives sheets, which may get a QR code.
@@ -466,8 +496,9 @@ async function askCardFiles(base: string, shares: boolean): Promise<CardFiles | 
     label: "Layout",
   });
   if (layout === undefined) return undefined;
-  // A6 is the page size that the commands take when none is given.
-  const size = layout === "a4" ? ["--page-size", "a4"] : [];
+  // The page size that the commands take when none is given is left out of the command.
+  const pageSize =
+    layout === "separate" || layout === SHEET_PAGE_SIZE ? [] : ["--page-size", layout];
   const image = kind === "pdf" ? [] : ["--image-format", kind];
   if (layout === "separate") {
     const folder = await askNewFolder(base);
@@ -482,6 +513,10 @@ async function askCardFiles(base: string, shares: boolean): Promise<CardFiles | 
       ],
     };
   }
+  // Sheets only: a separate card has the shape of a business card.
+  const turn = await askSheetTurn();
+  if (turn === undefined) return undefined;
+  const size = [...pageSize, ...turn];
   if (kind === "pdf") {
     const path = await askOutputFile("PDF file name", `${base}.pdf`);
     return path === undefined ? undefined : { sheets: true, options: ["--pdf", path, ...size] };
@@ -646,8 +681,8 @@ async function askCards(base: string, shares: boolean): Promise<string[] | undef
 }
 
 /**
- * Where an encoded result goes besides the screen. Cards print color codes, so they are offered
- * only for a result written in colors.
+ * Where an encoded result goes besides the screen. Cards print colors or Unicode codes, so they
+ * are offered only for a result written in a form with cards (cardKindOf).
  */
 async function askResultDestination(form: EncodedFormat): Promise<string[] | undefined> {
   const choices: Choice<"screen" | "record" | "qr" | "cards">[] = [
@@ -655,7 +690,7 @@ async function askResultDestination(form: EncodedFormat): Promise<string[] | und
     { label: "Also in a record file", note: "text that Decode reads back", value: "record" },
     { label: "Also as a QR code image", note: "a PNG file that Decode reads back", value: "qr" },
   ];
-  if (writtenInColors(form))
+  if (cardKindOf(form) !== undefined)
     choices.push({
       label: "Also as printable cards",
       note: "a PDF or images in a card design",
@@ -778,7 +813,27 @@ async function askHeirSheet(mode: Mode): Promise<string[] | undefined> {
 }
 
 /**
- * Where an encoded seed phrase is read from: typed on the private screen, or a file encode saved.
+ * How many words the seed phrase has, for codes typed from printed cards, which end with codes
+ * that belong to nothing (--words): null where all the codes typed are read, undefined for back.
+ */
+function askPhraseWords(): Promise<Bip39WordCount | null | undefined> {
+  return choose<Bip39WordCount | null>(
+    PHRASE_WORDS_QUESTION,
+    [
+      { label: "All the codes I type", note: "from paper or a record", value: null },
+      ...BIP39_WORD_COUNTS.map((words) => ({
+        label: phraseWordsAnswer(words),
+        note: "from printed cards",
+        value: words,
+      })),
+    ],
+    { label: "Words" },
+  );
+}
+
+/**
+ * Where an encoded seed phrase is read from: typed on the private screen, with how many words the
+ * phrase has, or a file encode saved.
  */
 async function askSource(): Promise<{ readonly options: string[] } | undefined> {
   const source = await choose(
@@ -797,7 +852,11 @@ async function askSource(): Promise<{ readonly options: string[] } | undefined> 
     { label: "Source" },
   );
   if (source === undefined) return undefined;
-  if (source === "typed") return { options: [] };
+  if (source === "typed") {
+    const words = await askPhraseWords();
+    if (words === undefined) return undefined;
+    return { options: words === null ? [] : ["--words", String(words)] };
+  }
   const path =
     source === "record"
       ? await askLine("Record file name", "File", {
@@ -888,8 +947,8 @@ async function askOtherShareSet(): Promise<ShareSetChoice | undefined> {
 }
 
 /**
- * Where the shares go, written in `shareFormat` (--share-format). Shares in colors can be printed
- * as cards that disguise them; the others as QR codes.
+ * Where the shares go, written in `shareFormat` (--share-format). Shares in colors or Unicode codes
+ * can be printed as cards (shareFormatHasCards); the others only as text.
  */
 async function askShares(
   set: ShareSetChoice,
@@ -897,23 +956,22 @@ async function askShares(
 ): Promise<string[] | undefined> {
   const options = ["--threshold", String(set.threshold), "--shares", String(set.count)];
   options.push("--share-format", shareFormat);
+  const destinations: Choice<"screen" | "file" | "cards">[] = [
+    { label: "Only on this screen", value: "screen" },
+    { label: "Also in a text file", note: "one share per line", value: "file" },
+  ];
   // Cards print each share in its form: its colors, or its codes beside colors that only decorate.
-  const printed: Choice<"cards"> = {
-    label: "Also as printable cards",
-    note: isColorShareFormat(shareFormat)
-      ? "disguised, one sheet per share"
-      : "its codes on cards, one sheet per share",
-    value: "cards",
-  };
-  const destination = await choose(
-    "Where should the shares go?",
-    [
-      { label: "Only on this screen", value: "screen" as const },
-      { label: "Also in a text file", note: "one share per line", value: "file" as const },
-      printed,
-    ],
-    { label: "Output" },
-  );
+  if (shareFormatHasCards(shareFormat))
+    destinations.push({
+      label: "Also as printable cards",
+      note: isColorShareFormat(shareFormat)
+        ? "disguised, one sheet per share"
+        : "its codes on cards, one sheet per share",
+      value: "cards",
+    });
+  const destination = await choose("Where should the shares go?", destinations, {
+    label: "Output",
+  });
   if (destination === undefined) return undefined;
   if (destination === "screen") return options;
   if (destination === "cards") {

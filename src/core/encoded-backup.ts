@@ -28,7 +28,12 @@ import {
 import { phraseOfIndexes } from "./words.js";
 import { fingerprintOfValidPhrase } from "./english-words.js";
 import { Redacted } from "./redacted.js";
-import { isBip39WordCount, WORD_COUNTS_TEXT } from "./bip39-sizes.js";
+import {
+  BIP39_WORD_COUNTS,
+  isBip39WordCount,
+  WORD_COUNTS_TEXT,
+  type Bip39WordCount,
+} from "./bip39-sizes.js";
 import { EncodedForm } from "./encoded-form.js";
 import { refusalMessage } from "./refusal.js";
 
@@ -212,6 +217,11 @@ export class EncodedBackup extends Redacted {
     return this.#indexes;
   }
 
+  /** How many words the seed phrase has: one code a word, as the constructor checked. */
+  get words(): Bip39WordCount {
+    return this.#indexes.length as Bip39WordCount;
+  }
+
   /** Whether complete dates still leave several phrases: the Original Seedshift's valid last word. */
   get givesSeveral(): boolean {
     return Masking.of(this.#mode).givesSeveral;
@@ -254,4 +264,30 @@ export class EncodedBackup extends Redacted {
   candidates(dates: readonly DateShiftDate[]): DecodedResult[] {
     return Masking.of(this.#mode).undo(this.#indexes, dates);
   }
+
+  /**
+   * The phrases of fewer words that the first codes give with `dates`, where their checksum is
+   * valid: what codes typed from printed cards may be, which end with decoys and so read as a
+   * longer phrase whose checksum fails (owner, 2026-10-13). None for a mode that gives several
+   * phrases; a shorter start that its mode refuses is left out.
+   */
+  shorterPhrases(dates: readonly DateShiftDate[]): ShorterPhrase[] {
+    if (this.givesSeveral) return [];
+    return BIP39_WORD_COUNTS.filter((words) => words < this.words).flatMap((words) => {
+      let result: DecodedResult;
+      try {
+        const start = EncodedBackup.of(this.#indexes.slice(0, words), this.#format, this.#mode);
+        result = start.decode(dates);
+      } catch {
+        return [];
+      }
+      return result.checksumValid ? [{ words, result }] : [];
+    });
+  }
+}
+
+/** A phrase of fewer words that the first codes of a backup give (EncodedBackup.shorterPhrases). */
+export interface ShorterPhrase {
+  readonly words: Bip39WordCount;
+  readonly result: DecodedResult;
 }

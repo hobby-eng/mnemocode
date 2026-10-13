@@ -17,6 +17,8 @@ import { readBoundedFile } from "../src/cli/bounded-read.js";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { publishNewPrivateFile } from "../src/export/private-file.js";
 import { exportSskrCards } from "../src/export/sskr-cards.js";
+import { ShareCardSet } from "../src/export/sskr-render.js";
+import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -281,11 +283,11 @@ describe("AUD-005 regression contracts", () => {
       try {
         const vectors = JSON.parse(await readFile("vectors/sskr-v1.json", "utf8"));
         const target = join(directory, "cards");
-        await exportSskrCards([vectors.official.shares[0]], {
+        const cards = await ShareCardSet.create(nodeCardRenderer, [vectors.official.shares[0]], {
           style: "it",
           pageSize: "business",
-          directory: target,
         });
+        await exportSskrCards(cards, target);
         const [folder] = await readdir(target);
         expect(folder).toMatch(/^collection-/u);
         expect((await stat(join(target, folder!))).mode & 0o777).toBe(0o700);

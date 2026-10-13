@@ -32,7 +32,7 @@ describe("business card collections", () => {
   it("rejects silent fallbacks for invalid or repeated options and requires a PDF", () => {
     for (const name of ["", "  ", "x\ny", "\x1b[0m", "x".repeat(101)])
       expect(() => validateProfile({ name })).toThrow();
-    expect(() => parsePageSize("wallet")).toThrow("a6, a4 or business");
+    expect(() => parsePageSize("wallet")).toThrow("a6, a5, a4 or business");
     expect(parsePageSize("business")).toBe("business");
     expect(() =>
       businessOptions(parseArguments(["--card-name", "One", "--card-name", "Two"])),
@@ -58,6 +58,9 @@ describe("business card collections", () => {
             colors,
             payload,
             pageSize: size,
+            // Given, as the sizes are checked below; without it a sheet is turned the way its
+            // cards are largest.
+            orientation: size === "a6" ? "landscape" : "portrait",
             cardQr: true,
             presentation: resolveCardPresentation(() => 0, {}),
             profile: {

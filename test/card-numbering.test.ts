@@ -25,27 +25,22 @@ function printedText(bytes: Uint8Array): string {
 }
 
 describe.skipIf(!hasPoppler)("numbers on separate cards", () => {
-  for (const template of ["business-it", "material-tile", "business-glass-4in1"])
+  for (const template of ["business-it", "material-tile"])
     it(`prints the position of every reference on ${template} cards`, async () => {
       const cards = await renderIndividualCards(
         nodeCardRenderer,
         selectTemplate(template, "colors"),
         { ...content },
       );
-      const perCard = selectTemplate(template, "colors").referencesPerCard ?? 1;
-      expect(cards).toHaveLength(Math.ceil(colors.length / perCard));
-      for (const [cardIndex, card] of cards.entries()) {
+      // The codes, then at least one decoy, numbered on.
+      expect(cards.length).toBeGreaterThan(colors.length);
+      for (const [index, card] of cards.entries()) {
         const text = printedText(card.bytes).replace(/\s+/gu, " ");
-        for (let offset = 0; offset < perCard; offset += 1) {
-          const index = cardIndex * perCard + offset;
-          const color = colors[index];
-          if (color === undefined) continue;
-          const number = String(index + 1).padStart(2, "0");
-          // The number stands directly before its code, possibly with the size of the set between them.
-          expect(text).toMatch(
-            new RegExp(`${number}(?: / \\d{2})? ${color.slice(1).toUpperCase()}`, "u"),
-          );
-        }
+        const number = String(index + 1).padStart(2, "0");
+        // The number stands directly before its code; no card names the size of the set.
+        const code = colors[index]?.slice(1).toUpperCase() ?? card.name.slice(3);
+        expect(text).toContain(`${number} ${code}`);
+        expect(text).not.toMatch(/\d{2} \/ \d{2}/u);
       }
     });
 });

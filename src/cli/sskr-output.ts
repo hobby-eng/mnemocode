@@ -4,7 +4,7 @@
 import { imageFormat, cardFileFormat, savedPagesNotice } from "./image-options.js";
 import { DEFAULT_SHARE_TEMPLATE_ID, resolveTemplateId } from "../export/template-catalog.js";
 import { resolveSskrLayout, parseSskrLayout } from "../export/sskr-content.js";
-import { terminalNotice, terminalResultHeader } from "./terminal.js";
+import { printCodes, terminalNotice, terminalResultHeader } from "./terminal.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import { value, type ParsedArguments } from "./arguments.js";
@@ -14,17 +14,18 @@ import {
   type ShareFormat,
   parseShareFormat,
   DEFAULT_SHARE_FORMAT,
+  assertShareFormatHasCards,
+  MIRRORED_FORM,
 } from "../sskr/transport.js";
 import { SHARE_FORMAT_NAMES, type WrittenShare } from "../sskr/share-set.js";
 import {
   exportSskrCards,
   exportSskrPdf,
   exportSskrImages,
+  nodeShareCards,
   type SskrExportOptions,
-  type SskrRenderOptions,
 } from "../export/sskr-cards.js";
-import { ShareCardSet, type ShareQrCode } from "../export/sskr-render.js";
-import { nodeCardRenderer } from "../export/platform-node.js";
+import type { ShareCardSet, ShareQrCode } from "../export/sskr-render.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
 import { saveOutput } from "./output-saving.js";
 import { assertCardOutput } from "./card-options.js";
@@ -51,6 +52,8 @@ export function exportOptions(
     sskrExportOptions.filter((key) => key !== "cards-dir"),
   );
   if (!sheets && !cards) return undefined;
+  // Before any secret is asked, as the cards would refuse it later.
+  assertShareFormatHasCards(shareFormat);
   const template = value(args, "template") ?? DEFAULT_SHARE_TEMPLATE_ID;
   const { style } = resolveTemplateId(template, "colors");
   const requested = parseSskrLayout(value(args, "card-layout"));
@@ -94,7 +97,8 @@ export function printShareBlock(
   if (holds !== undefined) facts.push(["Holds", holds]);
   if (!terminalResultHeader(title, facts))
     console.error(`${title} — ${form}${holds === undefined ? "" : `, holds ${holds}`}:`);
-  console.log(writeShare(ur, format));
+  // In Unicode codes and in colors as Unicode codes, apart and joined (printCodes).
+  printCodes(writeShare(ur, format), MIRRORED_FORM[format]);
 }
 
 /**
@@ -127,7 +131,9 @@ export async function saveShares(
   const shares = shown.map((share) => share.ur);
   const keep = (packaging: ShareCardPackaging): void =>
     terminalNotice(shareKeepingNote(shares, packaging, masked));
-  if (options !== undefined) await saveShareCards(shares, args, options, keep);
+  // One set of cards for every file, so that each shows the same decoys.
+  if (options !== undefined)
+    await saveShareCards(await nodeShareCards(shares, options), args, options, keep);
   // Each share in its form, as the terminal shows it.
   const lines = shown.map((share) => writeShare(share.ur, share.format));
   const output = await saveOutput(args, "output", "The file of the shares", (path) =>
@@ -143,17 +149,13 @@ export async function saveShares(
 }
 
 /** The QR codes of the shares saved in `folder`, a folder of cards or images just saved. */
-function saveShareQrsInside(
-  shares: readonly string[],
-  options: ShareCardOptions,
-  folder: string,
-): Promise<void> {
-  return saveShareQrs(shares, options, (code) => saveQrInside(code.payload, folder, code.name));
+function saveShareQrsInside(cards: ShareCardSet, folder: string): Promise<void> {
+  return saveShareQrs(cards, (code) => saveQrInside(code.payload, folder, code.name));
 }
 
-/** Saves the cards, the PDF and the images of the shares that the options name. */
+/** Saves the cards, the PDF and the images of the shares that the options name, from `set`. */
 async function saveShareCards(
-  shares: readonly string[],
+  set: ShareCardSet,
   args: ParsedArguments,
   options: ShareCardOptions,
   keep: (packaging: ShareCardPackaging) => void,
@@ -164,7 +166,7 @@ async function saveShareCards(
     "cards-dir",
     "The folder of share cards",
     async (path) => {
-      cards = await exportSskrCards(shares, { ...options, directory: path });
+      cards = await exportSskrCards(set, path, options.imageFormat);
     },
   );
   if (directory !== undefined) {
@@ -172,7 +174,7 @@ async function saveShareCards(
       `Saved ${cards} ${options.imageFormat.toUpperCase()} files to: ${directory}`,
       "success",
     );
-    await saveShareQrsInside(shares, options, directory);
+    await saveShareQrsInside(set, directory);
     keep(
       options.layout === "individual"
         ? "folders"
@@ -182,14 +184,12 @@ async function saveShareCards(
     );
   }
   const pdf = await saveOutput(args, "pdf", "The PDF of the shares", (path) =>
-    exportSskrPdf(shares, options, path),
+    exportSskrPdf(set, path),
   );
   if (pdf !== undefined) {
     terminalNotice(`Saved SSKR collection PDF: ${pdf}`, "success");
     keep("file");
-    await saveShareQrs(shares, options, (code) =>
-      saveQrBeside(code.payload, pdf, `-${code.reference}`),
-    );
+    await saveShareQrs(set, (code) => saveQrBeside(code.payload, pdf, `-${code.reference}`));
   }
   let pages = 0;
   const images = await saveOutput(
@@ -197,13 +197,13 @@ async function saveShareCards(
     "images-dir",
     "The folder of share images",
     async (path) => {
-      pages = await exportSskrImages(shares, options, path, imageFormat(args));
+      pages = await exportSskrImages(set, path, imageFormat(args));
     },
   );
   if (images !== undefined) {
     savedPagesNotice(args, pages, images, "SSKR");
     keep("folder");
-    await saveShareQrsInside(shares, options, images);
+    await saveShareQrsInside(set, images);
   }
 }
 
@@ -212,11 +212,10 @@ async function saveShareCards(
  * Restore reads back (--share-qr): one for each share, none when the sheets print no QR code.
  */
 async function saveShareQrs(
-  shares: readonly string[],
-  options: SskrRenderOptions,
+  cards: ShareCardSet,
   save: (code: ShareQrCode) => Promise<string>,
 ): Promise<void> {
-  const codes = new ShareCardSet(nodeCardRenderer, shares, options).qrCodes;
+  const codes = cards.qrCodes;
   for (const code of codes) await save(code);
   if (codes.length > 0)
     terminalNotice(

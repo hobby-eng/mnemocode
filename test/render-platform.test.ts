@@ -153,16 +153,18 @@ describe("platform-neutral card rendering", () => {
         pageSize: "business",
         cardQr: false,
       });
-      expect(cards.map((card) => card.name)).toEqual(
+      expect(cards.slice(0, content.colors.length).map((card) => card.name)).toEqual(
         content.colors.map(
           (color, index) => `${String(index + 1).padStart(2, "0")}-${color.slice(1).toUpperCase()}`,
         ),
       );
+      // Then the decoys, which the sheet of the design plans.
+      expect(cards.length).toBeGreaterThan(content.colors.length);
     }
   });
 
   it("offers every template to a host", () => {
-    expect(cardTemplates).toHaveLength(16);
-    expect(new Set(cardTemplates.map((template) => template.id)).size).toBe(16);
+    expect(cardTemplates).toHaveLength(13);
+    expect(new Set(cardTemplates.map((template) => template.id)).size).toBe(13);
   });
 });

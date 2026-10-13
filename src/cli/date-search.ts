@@ -65,6 +65,7 @@ import {
   givenInputFormat,
   readBoundedTextFile,
   detectedFormat,
+  phraseWords,
   SHARE_READER,
 } from "./input.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
@@ -392,6 +393,7 @@ async function checkedBackup(
     reading = BackupReading.of(text, {
       seedshiftOnly: question.seedshiftOnly,
       shareReader: SHARE_READER,
+      words: phraseWords(question.args),
     });
   } catch (error) {
     return { again: refusal(error) };

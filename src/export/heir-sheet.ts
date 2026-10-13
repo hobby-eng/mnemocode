@@ -75,7 +75,7 @@ export const HEIR_SHEET_FILE = "mnemocode-heirs.pdf";
  */
 export const HEIR_SHEET_MM: Readonly<Record<HeirSheetSize, readonly [number, number]>> =
   Object.freeze({
-    a5: Object.freeze([148, 210] as const),
+    a5: pageDimensions("a5", "portrait"),
     a6: pageDimensions("a6", "portrait"),
   });
 

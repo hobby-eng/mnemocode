@@ -18,12 +18,7 @@ import {
   wordPositionPatterns,
 } from "../src/core/colors.js";
 import { parseInput } from "../src/core/representations.js";
-import {
-  CHECKSUM_BYTES,
-  RGB_BYTES,
-  SHARE_HEADER_BYTES,
-  SHARE_LENGTHS,
-} from "../src/sskr/transport.js";
+import { SHARE_LENGTHS } from "../src/sskr/transport.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { cloudServiceOf } from "../src/cli/cloud-folders.js";
 import { pathWithin } from "../src/cli/path-within.js";
@@ -600,13 +595,8 @@ describe("AUD-011-ARC073, ARC074, ARC079, ARC085, ARC086, ARC087: card rules wit
     expect(twoDigits(7)).toBe("07");
     expect(numberedCode({ colors: ["#a3f09c"] }, 0)).toBe("01  A3F09C");
     expect(numberedCode({ colors: ["#a3f09c"], labels: ["2048"] }, 0, " ")).toBe("01 2048");
-    // S106: the count is a number, formatted in two digits here for every caller.
-    expect(numberedCode({ colors: ["#a3f09c"] }, 0, "  ", 7)).toBe("01 / 07  A3F09C");
-    expect(numberedCode({ colors: ["#a3f09c"] }, 0, "  ", 12)).toBe("01 / 12  A3F09C");
-    // A share's separate cards printed the count unpadded before; the smallest share (its CBOR byte
-    // string header without a tag) already has ten colors, so the printed number is unchanged.
-    const smallestShareBytes = SHARE_HEADER_BYTES + 1 + Math.min(...SHARE_LENGTHS) + CHECKSUM_BYTES;
-    expect(Math.ceil(smallestShareBytes / RGB_BYTES)).toBeGreaterThanOrEqual(10);
+    // No card names the count of its set (owner, 2026-10-13): the cards end with decoys.
+    expect(numberedCode({ colors: ["#a3f09c", "#000000"] }, 1)).toBe("02  000000");
     expect(collectionSeries({ kind: "sskr", collectionReference: "SET-1" })).toBe("SET-1");
     expect(collectionSeries({ kind: "colors" })).toBe("01");
     expect(collectionPayload({ kind: "colors", payload: "p", cardQr: true })).toBe("p");
@@ -618,7 +608,7 @@ describe("AUD-011-ARC073, ARC074, ARC079, ARC085, ARC086, ARC087: card rules wit
   it("reads page sizes and orientations through their parsers", () => {
     expect(parsePageSize(undefined)).toBe("a6");
     expect(parsePageSize("business")).toBe("business");
-    expect(() => parsePageSize("letter")).toThrow("Page size must be a6, a4 or business.");
+    expect(() => parsePageSize("letter")).toThrow("Page size must be a6, a5, a4 or business.");
     expect(parseOrientation(undefined)).toBeUndefined();
     expect(parseOrientation("portrait")).toBe("portrait");
     expect(() => parseOrientation("sideways")).toThrow(

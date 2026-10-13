@@ -15,7 +15,13 @@
 //
 // Host-neutral: it imports only other core modules (test/portable-modules.test.ts).
 
-import { codeTokens, fitsPattern, hexUnits, UNICODE_CODE_DIGITS } from "./code-text.js";
+import {
+  codeTokens,
+  fitsPattern,
+  hexUnits,
+  UNICODE_CODE_DIGITS,
+  withJoinedMarksHint,
+} from "./code-text.js";
 import {
   EVERY_WORD,
   placeCombinations,
@@ -112,7 +118,7 @@ function unicodeColors(text: string): (string | undefined)[] {
   // The codes may also be the Private Use symbols themselves.
   const points = markedColorSymbols(text) ?? hexUnits(text, UNICODE_CODE_DIGITS);
   if (points === undefined || points.length % COLOR_UNICODE_POINTS_PER_COLOR !== 0)
-    throw new Error(COLOR_UNICODE_PAIRS);
+    throw new Error(withJoinedMarksHint(COLOR_UNICODE_PAIRS, text));
   return Array.from({ length: points.length / COLOR_UNICODE_POINTS_PER_COLOR }, (_, color) => {
     const pair = points.slice(
       color * COLOR_UNICODE_POINTS_PER_COLOR,
@@ -144,7 +150,12 @@ function placesOf(text: string, format: EncodedFormat): WordPlace[] {
     case "unicode": {
       const codes = hexUnits(text, UNICODE_CODE_DIGITS);
       if (codes === undefined)
-        throw new Error("Unicode codes have four hexadecimal digits each, or ? where unread.");
+        throw new Error(
+          withJoinedMarksHint(
+            "Unicode codes have four hexadecimal digits each, or ? where unread.",
+            text,
+          ),
+        );
       return codes.map((code, index) => codePlace(code, index + 1));
     }
     case "colors": {

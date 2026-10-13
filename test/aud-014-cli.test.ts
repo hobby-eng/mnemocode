@@ -20,6 +20,8 @@ vi.mock("../src/export/render.js", () => ({
     await render.before?.();
     return new TextEncoder().encode(RENDERED);
   }),
+  // The decoys are planned with the real rule elsewhere; here the cards are taken as they are.
+  plannedCardJob: vi.fn(async (_drawing: unknown, job: unknown) => job),
 }));
 vi.mock("../src/export/image-export.js", async (original) => ({
   ...(await original<typeof import("../src/export/image-export.js")>()),

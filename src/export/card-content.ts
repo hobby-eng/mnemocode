@@ -2,8 +2,11 @@
 // family of cards checks its content here before it draws, and the palette export checks its QR
 // code with the same rule.
 
+import { assertPhraseIndexes } from "../core/bip39-sizes.js";
 import { colorsToIndexes, unicodeToColors } from "../core/colors.js";
+import { EncodedForm } from "../core/encoded-form.js";
 import { assertShareQr } from "../sskr/transport.js";
+import { ownCards } from "./card-decoys.js";
 // Types only, which leave no import behind: the card families import this module.
 import type { SskrCardContent } from "./sskr-content.js";
 import type { CardContent } from "./backup-cards.js";
@@ -36,44 +39,67 @@ export function payloadHoldsColors(colors: readonly string[], payload: string): 
   return payload === written || unicodeToColors(payload).join(" ") === written;
 }
 
-/** The content of color cards: the colors of a seed phrase, or a share with its codes. */
+/**
+ * The content of color cards: the colors of a seed phrase, or a share's, or the Unicode codes of
+ * either printed on cards whose colors decorate them; and how many of the last cards are decoys.
+ */
 export interface ColorCardContent {
   readonly kind: "colors" | "sskr";
   readonly colors: readonly string[];
   readonly payload: string;
   readonly labels?: readonly string[] | undefined;
+  readonly decoys?: number | undefined;
 }
 
 /**
- * Refuses labels that the cards cannot print one by one (PrintedCodes): the colors of a seed phrase
- * are printed themselves and take none; a share's codes are one label per color, in its order, so
- * that the cards together hold every code and nothing else (AUD-012-FUN004).
+ * Refuses labels that the cards cannot print one by one (PrintedCodes): one code per color, in
+ * order, so that the cards together hold every code and nothing else (AUD-012-FUN004).
  */
 function assertLabelsPerColor(content: ColorCardContent): void {
   const { labels } = content;
   if (labels === undefined) return;
-  if (content.kind === "colors")
-    throw new Error("Cards of a seed phrase's colors print the colors themselves, not labels.");
   const owned = Array.from(labels);
   if (
     owned.length !== content.colors.length ||
     !owned.every((label) => typeof label === "string" && label.trim() !== "")
   )
-    throw new Error("A share's cards print one group of its codes for each color, in order.");
+    throw new Error("Cards that print codes print one code for each color, in order.");
+}
+
+/** The form whose codes a seed phrase's cards print in place of its colors. */
+const PRINTED_PHRASE_FORM = EncodedForm.of("unicode");
+
+/**
+ * Refuses Unicode codes of a seed phrase that are not the phrase its QR code holds: codes of the
+ * words of a whole phrase, and the same codes in `payload`.
+ */
+function assertPhraseCodes(codes: readonly string[], payload: string): void {
+  const indexes = PRINTED_PHRASE_FORM.read(codes.join(" "));
+  assertPhraseIndexes(indexes);
+  if (PRINTED_PHRASE_FORM.read(payload).join(" ") !== indexes.join(" "))
+    throw new Error("Collection QR does not match the printed references.");
 }
 
 /**
- * Refuses content whose QR code holds another backup than the cards print: for a share, the share
- * of its colors or codes (assertShareQr); for a seed phrase, colors that are a phrase's, held by
- * the QR code (payloadHoldsColors).
+ * Refuses content whose QR code holds another backup than the cards print before their decoys:
+ * for a share, the share of its colors or codes (assertShareQr); for a seed phrase, colors that are
+ * a phrase's, or the Unicode codes of a phrase, held by the QR code (payloadHoldsColors,
+ * assertPhraseCodes). The decoys after them are refused only for their count (assertDecoys).
  */
 export function assertColorCardContent(content: ColorCardContent): void {
   assertLabelsPerColor(content);
+  const own = ownCards(content);
+  const colors = content.colors.slice(0, own);
+  const labels = content.labels?.slice(0, own);
   if (content.kind === "sskr") {
-    assertShareQr(content.colors, content.payload, content.labels);
+    assertShareQr(colors, content.payload, labels);
     return;
   }
-  colorsToIndexes(content.colors);
-  if (!payloadHoldsColors(content.colors, content.payload))
+  if (labels !== undefined) {
+    assertPhraseCodes(labels, content.payload);
+    return;
+  }
+  colorsToIndexes(colors);
+  if (!payloadHoldsColors(colors, content.payload))
     throw new Error("Collection QR does not match the printed references.");
 }

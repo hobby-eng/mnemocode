@@ -48,8 +48,8 @@ export class ExportDetails {
   }
 
   /**
-   * As `of`, with the person chosen before the texts: the order in which the business and glass
-   * designs choose them when they are drawn directly, not through an export, kept so that a fixed
+   * As `of`, with the person chosen before the texts: the order in which the business designs
+   * choose them when they are drawn directly, not through an export, kept so that a fixed
    * seed gives the same cards there too. Through an export they receive settled texts and choose
    * none, so the order matters only there; making it that of `of` is the owner's decision.
    */

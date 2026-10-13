@@ -87,7 +87,8 @@ export interface DatePattern {
 }
 
 /**
- * How a form prints on cards: its colors, the one kind that installed designs draw. A form without
- * a kind has no cards (EncodedForm.cardKind). A new kind comes with its first approved design.
+ * How a form prints on cards: coloured cards, the one kind that installed designs draw, which print
+ * its colors or its codes. A form without a kind has no cards (EncodedForm.cardKind). A new kind
+ * comes with its first approved design.
  */
 export type CardKind = "colors";

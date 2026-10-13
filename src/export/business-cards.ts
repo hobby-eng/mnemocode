@@ -15,7 +15,7 @@ import type { CardContent } from "./backup-cards.js";
 import type { CardDrawing } from "./templates.js";
 import type { SskrCardContent } from "./sskr-content.js";
 import { MM, separateCardPage, type CardBox } from "./business-layout.js";
-import { drawCollectionStudy, separateCardIndex } from "./collection-sheet.js";
+import { drawCollectionStudy, separateCardIndex, type SheetShape } from "./collection-sheet.js";
 import {
   parsePageSize,
   type BusinessStyle,
@@ -26,6 +26,7 @@ import {
 import { numberedCode } from "./card-codes.js";
 import { assertColorCards, type ColorCards } from "./card-content.js";
 import { peakRelativeLuma } from "./color-math.js";
+import { artworkBrightness } from "./business-tint.js";
 import { documentWithFont } from "./pdf-documents.js";
 
 /** The top of the reference line's box on a separate card, in millimetres. */
@@ -33,8 +34,9 @@ const REFERENCE_TOP = 46;
 /** The least size of the reference line, in points. */
 const REFERENCE_MINIMUM_SIZE = 4.2;
 /**
- * Above this peakRelativeLuma a reference's colour is light enough for the dark ink; below it the
- * curves design writes white on it.
+ * Above this lightness of the artwork a reference's colour is light enough for the dark ink; below
+ * it the curves design writes white on it. The lightness is the hue's (peakRelativeLuma) at the
+ * brightness the artwork takes from the reference (artworkBrightness).
  */
 const LIGHT_REFERENCE_LUMA = 0.48;
 
@@ -87,7 +89,9 @@ export async function renderBusinessCards(
   const fieldColor = (dark: boolean | undefined, index: number) => {
     if (!dark) return white;
     if (businessDesigns[designOf(index)].darkFieldInk === "fixed") return ink;
-    return peakRelativeLuma(content.colors[index]!) > LIGHT_REFERENCE_LUMA ? ink : white;
+    const color = content.colors[index]!;
+    const lightness = peakRelativeLuma(color) * artworkBrightness(color);
+    return lightness > LIGHT_REFERENCE_LUMA ? ink : white;
   };
   const fieldsFor = (index: number) => buildFields(designOf(index), profile, font);
   // Scoped to one PDF: shared images never retain user data across exports.
@@ -152,11 +156,10 @@ async function renderSingle(context: RenderContext, individualIndex: number): Pr
     height: CARD.height,
     index: individualIndex,
   });
-  // Every separate card shows its number and the size of the set, so a missing card is noticed.
-  const total = content.colors.length;
+  // Every separate card shows its number; a share's also the share it belongs to.
   const reference = share
-    ? `${numberedCode(content, individualIndex, "  ", total)}  |  ${content.collectionReference}`
-    : numberedCode(content, individualIndex, "  ", total);
+    ? `${numberedCode(content, individualIndex)}  |  ${content.collectionReference}`
+    : numberedCode(content, individualIndex);
   const referenceText = `${presentation.referenceLabel} ${reference}`.trim();
   const design = designOf(individualIndex);
   const placement = referencePlacement(font, referenceText, design);
@@ -195,6 +198,27 @@ export function referencePlacement(
   return { x, size };
 }
 
+/** The lines under the first `count` cards of a sheet: each card's number and code. */
+function studyCaptions(content: ColorCards, count: number): string[][] {
+  return Array.from({ length: count }, (_, index) => [numberedCode(content, index)]);
+}
+
+/**
+ * The shape of a sheet of business cards of `content`, which a plan of its decoys lays out
+ * (planCollectionSheet): the shape of a card, and the captions that its sheet prints.
+ */
+export async function businessSheetShape(
+  drawing: Pick<CardDrawing, "readAsset">,
+  content: ColorCards,
+): Promise<SheetShape> {
+  const { font } = await documentWithFont(drawing);
+  return {
+    font,
+    aspect: CARD.width / CARD.height,
+    captions: (count) => studyCaptions(content, count),
+  };
+}
+
 async function renderCollection(context: RenderContext): Promise<void> {
   const { qr, doc, font, content, profile, presentation, style } = context;
   await drawCollectionStudy({
@@ -207,7 +231,7 @@ async function renderCollection(context: RenderContext): Promise<void> {
     preparedFor: profile.name,
     theme: studyThemeOf(style),
     aspect: CARD.width / CARD.height,
-    captions: content.colors.map((_, index) => [numberedCode(content, index)]),
+    captions: studyCaptions(content, content.colors.length),
     paint: (page, box) => drawCardFace(context, page, box),
   });
 }

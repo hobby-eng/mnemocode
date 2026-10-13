@@ -18,6 +18,7 @@ import {
 import { clearPrivateScreen } from "./private-screen.js";
 import {
   FINGERPRINT_NOTE,
+  printCodes,
   terminalColor,
   terminalFingerprint,
   terminalNotice,
@@ -25,6 +26,8 @@ import {
   terminalResultHeader,
   wrapText,
 } from "./terminal.js";
+import { EncodedForm } from "../core/encoded-form.js";
+import type { EncodedFormat } from "../core/types.js";
 import {
   assertSingleValues,
   value,
@@ -621,11 +624,11 @@ function reportSet(phrase: RestoredPhrase, place: RestoredPlace, spaced: boolean
 function restoredBackup(
   phrase: RestoredPhrase,
   mode: SplitMode,
-): { readonly label: string; readonly text: string } | undefined {
+): { readonly label: string; readonly text: string; readonly form: EncodedFormat } | undefined {
   const { backup } = phrase;
   return backup === undefined
     ? undefined
-    : { label: encodedOutputLabel(backup.form, mode), text: backup.text };
+    : { label: encodedOutputLabel(backup.form, mode), text: backup.text, form: backup.form };
 }
 
 /**
@@ -661,8 +664,11 @@ function showRestoredParts(phrase: RestoredPhrase, mode: SplitMode, place: Resto
   const backup = restoredBackup(phrase, mode);
   if (backup !== undefined) {
     terminalPart(backup.label);
-    // Wrapped at its spaces: the terminal would break a long line inside a word.
-    for (const line of wrapText(backup.text)) console.log(line);
+    // Codes written joined apart and numbered, beside the joined text (printCodes); other forms
+    // wrapped at their spaces, as the terminal would break a long line inside a word.
+    if (EncodedForm.of(backup.form).apartCodes(backup.text) === undefined)
+      for (const line of wrapText(backup.text)) console.log(line);
+    else printCodes(backup.text, backup.form);
     // Only a masked phrase has a fingerprint of its own; another form is the phrase below.
     const encoded = Masking.of(mode).masked
       ? ShareSet.of(phrase.set).fingerprint(masterFingerprint)

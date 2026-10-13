@@ -192,7 +192,7 @@ export async function runEncode(args: ParsedArguments): Promise<void> {
   // A record with a replaced last word never gets a sheet (validateEncodeOptions).
   if (Masking.isHeirSheetMode(backup.mode))
     await saveHeirSheetOutput(args, {
-      backup: { kind: "encoded", format: backup.format },
+      backup: { kind: "encoded", format: backup.format, words: backup.words },
       mode: backup.mode,
       dates: outcome.enteredDates.length,
     });

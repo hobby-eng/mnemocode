@@ -3,7 +3,7 @@ import { listInWords } from "../core/places.js";
 import { capitalized } from "../core/prose.js";
 
 /** Print layout is independent of the visual template and the encoded format. */
-export const CARD_PAGE_SIZES = Object.freeze(["a6", "a4", "business"] as const);
+export const CARD_PAGE_SIZES = Object.freeze(["a6", "a5", "a4", "business"] as const);
 export type CardPageSize = (typeof CARD_PAGE_SIZES)[number];
 export const CARD_ORIENTATIONS = Object.freeze(["portrait", "landscape"] as const);
 export type CardOrientation = (typeof CARD_ORIENTATIONS)[number];
@@ -48,9 +48,20 @@ export interface CardSettings {
 export type { BusinessStyle, MaterialStyle };
 
 /** The size of a sheet of cards when none is given. */
-export const SHEET_PAGE_SIZE: CardPageSize = "a6";
+export const SHEET_PAGE_SIZE = "a6" satisfies CardPageSize;
 /** The size of a separate card: that of a real business card. */
 export const SEPARATE_CARD_SIZE = "business" satisfies CardPageSize;
+/** A size of a sheet that holds the whole collection: every size but a separate card's. */
+export type SheetPageSize = Exclude<CardPageSize, typeof SEPARATE_CARD_SIZE>;
+/** The sheet sizes, in the order of CARD_PAGE_SIZES. */
+export const SHEET_PAGE_SIZES: readonly SheetPageSize[] = Object.freeze(
+  CARD_PAGE_SIZES.filter((size): size is SheetPageSize => size !== SEPARATE_CARD_SIZE),
+);
+/** The sheet sizes as messages name them: "A6, A5 or A4". */
+export const SHEET_SIZES_TEXT = listInWords(
+  SHEET_PAGE_SIZES.map((size) => size.toUpperCase()),
+  "or",
+);
 
 /**
  * The size that `value` names; a sheet's when none is given (SHEET_PAGE_SIZE). Every export reads
@@ -70,14 +81,15 @@ export function parsePageSize(value: string | undefined): CardPageSize {
  */
 export const BUSINESS_CARD_MM = Object.freeze({ width: 90, height: 50 } as const);
 /**
- * A card of ISO/IEC 7810 ID-1, the size of a bank card, in millimetres: the compact glass
- * photographs and the material layout are drawn for it.
+ * A card of ISO/IEC 7810 ID-1, the size of a bank card, in millimetres: the material layout is
+ * drawn for it.
  */
 export const ID1_CARD_MM = Object.freeze({ width: 85.6, height: 54 } as const);
 
-/** Width and height in millimetres, in the natural orientation of each size. */
+/** Width and height in millimetres, in the natural orientation of each size (ISO 216 for A). */
 const PAGE_DIMENSIONS: Readonly<Record<CardPageSize, readonly [number, number]>> = {
   a4: [210, 297],
+  a5: [148, 210],
   a6: [148, 105],
   business: [BUSINESS_CARD_MM.width, BUSINESS_CARD_MM.height],
 };
@@ -112,7 +124,7 @@ export function assertPageSettings(settings: Pick<CardSettings, "pageSize" | "or
 
 /**
  * The business size is the size of a real card, so every card becomes its own numbered
- * page. A6 and A4 are sheets that hold the whole collection on one page.
+ * page. The sheet sizes hold the whole collection on one page (SHEET_PAGE_SIZES).
  */
 export function isCardPageSize(size: CardPageSize | undefined): size is typeof SEPARATE_CARD_SIZE {
   return size === SEPARATE_CARD_SIZE;
@@ -140,7 +152,7 @@ export function assertSeparateCardSize(size: CardPageSize | undefined): void {
 export function assertSheetQr(card: { readonly kind: string } & CardSettings): void {
   if (card.kind === "colors" && isCardPageSize(card.pageSize) && card.cardQr === true)
     throw new Error(
-      "A QR code is printed on a sheet only. Choose the A6 or A4 size for a QR code; separate cards never carry one.",
+      `A QR code is printed on a sheet only. Choose the ${SHEET_SIZES_TEXT} size for a QR code; separate cards never carry one.`,
     );
 }
 

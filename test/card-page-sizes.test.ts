@@ -26,31 +26,36 @@ async function pages(template: string, settings: Partial<CardContent>) {
 describe("page size decides between a sheet and separate cards", () => {
   it("names only the business size as a card size", () => {
     expect(
-      [undefined, "a6", "a4", "wallet", "business"].map((size) => isCardPageSize(size as never)),
-    ).toEqual([false, false, false, false, true]);
+      [undefined, "a6", "a5", "a4", "wallet", "business"].map((size) =>
+        isCardPageSize(size as never),
+      ),
+    ).toEqual([false, false, false, false, false, true]);
   });
 
-  it("puts the whole collection on one A6 sheet when no size is given", async () => {
-    for (const template of ["business-it", "material-tile", "business-glass-4in1"])
-      expect(await pages(template, {}), template).toEqual([[148, 105]]);
+  it("puts the whole collection on one A6 sheet when no size is given, turned as given", async () => {
+    // Without an orientation the sheet is turned the way its cards are largest.
+    for (const template of ["business-it", "material-tile"]) {
+      const [page, ...more] = await pages(template, {});
+      expect(more, template).toEqual([]);
+      expect([...page!].sort(), template).toEqual([105, 148]);
+      expect(await pages(template, { orientation: "landscape" }), template).toEqual([[148, 105]]);
+      expect(await pages(template, { orientation: "portrait" }), template).toEqual([[105, 148]]);
+    }
     expect(await pages("business-it", { pageSize: "a4" })).toHaveLength(1);
+    expect(await pages("business-it", { pageSize: "a5", orientation: "portrait" })).toEqual([
+      [148, 210],
+    ]);
   });
 
-  it("gives one page per card for a card size", async () => {
-    expect(await pages("business-it", { pageSize: "business" })).toEqual(
-      colors.map(() => [90, 50]),
-    );
-    expect(await pages("material-tile", { pageSize: "business" })).toEqual(
-      colors.map(() => [90, 50]),
-    );
+  it("gives one page per card for a card size, decoys after the codes", async () => {
+    for (const template of ["business-it", "material-tile"]) {
+      const cards = await pages(template, { pageSize: "business" });
+      expect(cards.length, template).toBeGreaterThan(colors.length);
+      expect(new Set(cards.map(String)), template).toEqual(new Set(["90,50"]));
+    }
     await expect(pages("business-it", { pageSize: "wallet" as never })).rejects.toThrow(
-      "a6, a4 or business",
+      "a6, a5, a4 or business",
     );
-    // Four references share one glass card, so eight references need two cards.
-    expect(await pages("business-glass-4in1", { pageSize: "business" })).toEqual([
-      [90, 50],
-      [90, 50],
-    ]);
   });
 
   it("refuses separate cards of a sheet size", async () => {
@@ -60,9 +65,9 @@ describe("page size decides between a sheet and separate cards", () => {
       await expect(
         renderIndividualCards(nodeCardRenderer, template, { ...content, pageSize }),
       ).rejects.toThrow("Separate cards have the business size.");
-    expect(await renderIndividualCards(nodeCardRenderer, template, { ...content })).toHaveLength(
-      colors.length,
-    );
+    expect(
+      (await renderIndividualCards(nodeCardRenderer, template, { ...content })).length,
+    ).toBeGreaterThan(colors.length);
   });
 
   it("knows the size of every page in both orientations", async () => {
@@ -74,7 +79,7 @@ describe("page size decides between a sheet and separate cards", () => {
     expect(pageDimensions("business", "portrait")).toEqual([50, 90]);
   });
 
-  it.each(["business-it", "business-glass-4in1", "business-glass-6in1", "business-glass-8in1"])(
+  it.each(["business-it", "business-architect"])(
     "gives a separate %s card rounded corners and paints nothing outside them",
     async (id) => {
       const template = selectTemplate(id, "colors");
@@ -112,24 +117,34 @@ describe("page size decides the layout of Shamir share cards", () => {
     );
   });
 
-  it("prints one sheet per share on A6 and one page per card for a card size", async () => {
-    const { splitSskrMnemonic } = await import("../src/sskr/shares.js");
-    const { shareToColors } = await import("../src/sskr/transport.js");
-    const { renderSskrPdf } = await import("../src/export/sskr-cards.js");
-    // Public BIP39 test vector; never a real wallet.
-    const shares = await splitSskrMnemonic(`${"abandon ".repeat(11)}about`, 2, 3);
-    const sheets = await PDFDocument.load(
-      await renderSskrPdf(nodeCardRenderer, shares, { style: "it" }),
-    );
-    expect(sheets.getPageCount()).toBe(shares.length);
-    const cards = await PDFDocument.load(
-      await renderSskrPdf(nodeCardRenderer, shares, { style: "it", pageSize: "business" }),
-    );
-    const references = shares.reduce((sum, share) => sum + shareToColors(share).length, 0);
-    expect(cards.getPageCount()).toBe(references);
-    const { width, height } = cards.getPage(0).getSize();
-    expect([Math.round(width / MM), Math.round(height / MM)]).toEqual([90, 50]);
-  });
+  it(
+    "prints one sheet per share on A6 and one page per card for a card size",
+    { timeout: 240_000 },
+    async () => {
+      const { splitSskrMnemonic } = await import("../src/sskr/shares.js");
+      const { ShareCardSet } = await import("../src/export/sskr-render.js");
+      const { renderSskrPdf } = await import("../src/export/sskr-cards.js");
+      // Public BIP39 test vector; never a real wallet.
+      const shares = await splitSskrMnemonic(`${"abandon ".repeat(11)}about`, 2, 3);
+      const sheets = await PDFDocument.load(
+        await renderSskrPdf(nodeCardRenderer, shares, { style: "it" }),
+      );
+      expect(sheets.getPageCount()).toBe(shares.length);
+      const set = await ShareCardSet.create(nodeCardRenderer, shares, {
+        style: "it",
+        pageSize: "business",
+      });
+      const cards = await PDFDocument.load(await set.renderAll());
+      // One page for every card of every share, its decoys included.
+      const references = set.shares.reduce((sum, share) => sum + share.documents, 0);
+      expect(cards.getPageCount()).toBe(references);
+      expect(references).toBeGreaterThan(
+        shares.reduce((sum, _, place) => sum + set.ownCodes(place), 0),
+      );
+      const { width, height } = cards.getPage(0).getSize();
+      expect([Math.round(width / MM), Math.round(height / MM)]).toEqual([90, 50]);
+    },
+  );
 
   it("prints the QR card of a share as a compact sheet of the business size", async () => {
     const { splitSskrMnemonic } = await import("../src/sskr/shares.js");

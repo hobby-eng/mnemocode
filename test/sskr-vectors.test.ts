@@ -96,11 +96,12 @@ describe("Published SSKR v1 vectors", () => {
     const badTag = Uint8Array.from([0xd9, 0, 1, ...body]);
     expect(() => shareInfo(recheck(badTag))).toThrow(/tag/u);
   });
-  it("rejects nonzero padding, unknown versions, trailing colors and invalid Bytewords", () => {
+  it("rejects nonzero padding, unknown versions and invalid Bytewords; leaves out trailing colors", () => {
     const codes = vectors.official.firstShareColors as string[];
     expect(() => colorsToShare([...codes.slice(0, -1), "#420001"].join(" "))).toThrow();
     expect(() => colorsToShare(["#A21A55", ...codes.slice(1)].join(" "))).toThrow();
-    expect(() => colorsToShare([...codes, "#000000"].join(" "))).toThrow();
+    // A color after the share's own length, such as a decoy of its cards, belongs to no share.
+    expect(colorsToShare([...codes, "#000000"].join(" "))).toBe(colorsToShare(codes.join(" ")));
     for (const input of ["ur:sskr/1-2/abcd", "ur:sskr/zz", "tuna unknown", "", "#A11A5"])
       expect(() => normalizeShare(input)).toThrow();
   });

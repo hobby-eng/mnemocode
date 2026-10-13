@@ -1,26 +1,33 @@
 // The self-test of share cards (export/sskr-render.ts): the references and QR codes of the cards of
-// two shares of the official SSKR vector, in colors and in Unicode codes, none for separate cards,
-// a damaged share refused, and the PDF of a share's cards with the QR code its colors print. A
-// host that offers share cards adds it to its self-test (SelfTestHost.features,
-// MnemoCodeSelfTest.core), so that a build without them carries none of it.
+// two shares of the official SSKR vector, in colors and in Unicode codes, one color for each
+// distinct code, no cards for word numbers or Bytewords, a damaged share refused; and in the full
+// self-test the decoys after a share's codes, none for its QR code, and the PDF of a share's cards
+// with the QR code its colors print. A host that offers share cards adds it to its self-test
+// (SelfTestHost.features, MnemoCodeSelfTest.core), so that a build without them carries none of it.
 //
 // From the host it needs its CardRenderer (card-renderer.ts), which the cards are drawn with: the
-// details of the cards and the source of their decorative colors are given here, so that nothing
-// printed is chosen at random, and the quick checks call none of the renderer's services
-// (AUD-010-API002), only the PDF does. It writes no file and holds no secret.
+// details of the cards and the source of their decoys are given here, so that nothing printed is
+// chosen at random. The quick checks call none of the renderer's services (AUD-010-API002), only
+// the full ones do. It writes no file and holds no secret.
 //
 // Host-neutral: it imports only other export and sskr modules, core/self-test-check.ts and pdf-lib.
 
 import { PDFDocument } from "pdf-lib";
 import {
   expectRefused,
+  expectRefusedLater,
   expectSame,
   selfTestFeature,
   type SelfTestFeature,
 } from "../core/self-test-check.js";
 import { sskrVector } from "../sskr/known-answers.js";
-import { assertShareQr } from "../sskr/transport.js";
-import { ShareCardSet, type SskrRenderOptions } from "./sskr-render.js";
+import { assertShareQr, Share, shareFormatHasCards, SHARE_FORMATS } from "../sskr/transport.js";
+import {
+  ShareCardSet,
+  shareCardFace,
+  shareReference,
+  type SskrRenderOptions,
+} from "./sskr-render.js";
 import type { CardDrawing } from "./templates.js";
 import {
   A6_WIDTH_POINTS,
@@ -38,17 +45,20 @@ const SHARES = [
  * (BCR-2020-011): identifier 4BBF, group 1, members 1 and 2.
  */
 const REFERENCES = "4BBF-1-1 4BBF-1-2";
+/** The share forms with cards: colors and Unicode codes (owner, 2026-10-13). */
+const FORMS_WITH_CARDS = "unicode colors colors-unicode";
 /**
- * The source of the decorative colors of cards that print codes: fixed, so that the quick check
- * draws nothing at random; colors that repeat take the next free one.
+ * The source of the decoys: fixed, so that the full check draws nothing at random. The word of
+ * index 0 has the Unicode code 7684 (core/words.ts), and the color of 0 is #000000.
  */
-const FIXED_DECORATION = (): number => 0;
+const FIXED_DECOYS = (): number => 0;
 /**
- * The details of the cards, given, so that nothing is chosen at random; the glass design, the
- * quickest to draw (cards-self-test.ts draws every design).
+ * The details of the cards, given, so that nothing is chosen at random; a material design, which
+ * tints its samples in the PDF without recoloring a photograph (cards-self-test.ts draws every
+ * design).
  */
 const OPTIONS: SskrRenderOptions = {
-  style: "glass-4in1",
+  style: "tile",
   layout: "qr",
   pageSize: "a6",
   orientation: "landscape",
@@ -61,62 +71,72 @@ function qrCodesOf(set: ShareCardSet): string {
 }
 
 /**
- * The quick known answers: the references and QR codes of the cards in colors and in Unicode
- * codes, none for separate cards, and a damaged share refused.
+ * The quick known answers: the references of the cards, what they print and their QR codes hold
+ * in colors and in Unicode codes, one color for each distinct code, the forms with cards, and a
+ * damaged share refused.
  */
-function checkShareCardsStartup(drawing: CardDrawing): void {
-  const cards = new ShareCardSet(drawing, SHARES, OPTIONS);
+function checkShareCardsStartup(): void {
+  const shares = Share.readSet(SHARES, false);
+  expectSame(shares.map(shareReference).join(" "), REFERENCES, "Share card references");
+  const colors = shareCardFace(shares[0]!, "colors");
+  expectSame(colors.payload, sskrVector.firstShareColors.join(" "), "Share card QR code in colors");
+  expectSame(colors.labels, undefined, "Share cards in colors print their colors");
+  const codes = shareCardFace(shares[0]!, "unicode");
+  expectSame(codes.payload, sskrVector.firstShareUnicode, "Share card QR code in Unicode codes");
+  expectSame(codes.labels?.join(" "), sskrVector.firstShareUnicode, "Share card Unicode codes");
+  // One color for each distinct code, and the same color for the same code.
+  const distinct = new Set(codes.labels).size;
+  expectSame(new Set(codes.colors).size, distinct, "Colors of the Unicode codes");
   expectSame(
-    cards.shares.map((share) => share.reference).join(" "),
-    REFERENCES,
-    "Share card references",
-  );
-  expectSame(
-    qrCodesOf(cards).split("; ")[0],
-    `4BBF-1-1: ${sskrVector.firstShareColors.join(" ")}`,
-    "Share card QR code in colors",
-  );
-  expectSame(
-    qrCodesOf(
-      new ShareCardSet(drawing, SHARES, { ...OPTIONS, shareFormat: "unicode" }, FIXED_DECORATION),
-    ).split("; ")[0],
-    `4BBF-1-1: ${sskrVector.firstShareUnicode}`,
-    "Share card QR code in Unicode codes",
-  );
-  // In word numbers the cards print the numbers, three to a card, and the QR code holds them all.
-  const numbers = new ShareCardSet(
-    drawing,
-    SHARES,
-    { ...OPTIONS, shareFormat: "indexes" },
-    FIXED_DECORATION,
-  );
-  expectSame(
-    numbers.printedCodes(0)[0],
-    sskrVector.firstShareNumbers.split(" ").slice(0, 3).join(" "),
-    "Share card codes in word numbers",
-  );
-  expectSame(
-    qrCodesOf(numbers).split("; ")[0],
-    `4BBF-1-1: ${sskrVector.firstShareNumbers}`,
-    "Share card QR code in word numbers",
-  );
-  expectSame(
-    new ShareCardSet(drawing, SHARES, { ...OPTIONS, layout: "individual", pageSize: "business" })
-      .qrCodes.length,
-    0,
-    "QR codes of separate cards",
+    SHARE_FORMATS.filter(shareFormatHasCards).join(" "),
+    FORMS_WITH_CARDS,
+    "Share forms with cards",
   );
   expectRefused(
-    () => new ShareCardSet(drawing, [SHARES[0]!.replace(/w$/u, "y"), SHARES[1]!], OPTIONS),
+    () => Share.readSet([SHARES[0]!.replace(/w$/u, "y"), SHARES[1]!], false),
     /checksum|Bytewords/u,
     "Share cards of a damaged share",
   );
 }
 
-/** Every check: the quick ones, and the A6 PDF of the first share with the QR code it prints. */
+/**
+ * Every check: the quick ones, the decoys after a share's codes and none in its QR code, no QR
+ * code on separate cards, no cards for word numbers, and the A6 PDF of the first share with the
+ * QR code it prints.
+ */
 async function checkShareCards(drawing: CardDrawing): Promise<void> {
-  checkShareCardsStartup(drawing);
-  const cards = new ShareCardSet(drawing, SHARES, OPTIONS);
+  checkShareCardsStartup();
+  const cards = await ShareCardSet.create(drawing, SHARES, OPTIONS, FIXED_DECOYS);
+  const printed = cards.printedCodes(0);
+  const own = sskrVector.firstShareColors.map((color) => color.slice(1));
+  expectSame(cards.ownCodes(0), own.length, "Own codes of a share's cards");
+  expectSame(printed.slice(0, own.length).join(" "), own.join(" "), "Codes of a share's cards");
+  if (printed.length <= own.length) throw new Error("Share cards have no decoy.");
+  expectSame(printed.at(-1), "000000", "Decoy of a share's colors");
+  const unicode = await ShareCardSet.create(
+    drawing,
+    SHARES,
+    { ...OPTIONS, shareFormat: "unicode" },
+    FIXED_DECOYS,
+  );
+  expectSame(unicode.printedCodes(0).at(-1), "7684", "Decoy of a share's Unicode codes");
+  expectSame(
+    qrCodesOf(unicode).split("; ")[0],
+    `4BBF-1-1: ${sskrVector.firstShareUnicode}`,
+    "Share card QR code without decoys",
+  );
+  const separate = await ShareCardSet.create(
+    drawing,
+    SHARES,
+    { ...OPTIONS, layout: "individual", pageSize: "business" },
+    FIXED_DECOYS,
+  );
+  expectSame(separate.qrCodes.length, 0, "QR codes of separate cards");
+  await expectRefusedLater(
+    () => ShareCardSet.create(drawing, SHARES, { ...OPTIONS, shareFormat: "indexes" }),
+    /have no cards/u,
+    "Share cards in word numbers",
+  );
   const pdf = await PDFDocument.load(await cards.renderShare(0));
   if (pdf.getPageCount() < 1) throw new Error("Share card PDF has no page.");
   for (const page of pdf.getPages())
@@ -129,17 +149,11 @@ async function checkShareCards(drawing: CardDrawing): Promise<void> {
     /does not match/u,
     "A QR code of another share",
   );
-  // Cards that print word numbers: the QR code must hold the share those spell.
-  const numbers = new ShareCardSet(
-    drawing,
-    SHARES,
-    { ...OPTIONS, shareFormat: "indexes" },
-    FIXED_DECORATION,
-  );
+  // Cards that print Unicode codes: the QR code must hold the share those spell.
   expectRefused(
-    () => assertShareQr([], cards.qrCodes[1]!.payload, numbers.printedCodes(0)),
+    () => assertShareQr([], unicode.qrCodes[1]!.payload, sskrVector.firstShareUnicode.split(" ")),
     /does not match/u,
-    "A QR code of another share beside word numbers",
+    "A QR code of another share beside Unicode codes",
   );
 }
 
@@ -147,8 +161,8 @@ async function checkShareCards(drawing: CardDrawing): Promise<void> {
 export function shareCardsSelfTest(drawing: CardDrawing): SelfTestFeature {
   return selfTestFeature({
     name: "Share cards",
-    detail: "references, codes and QR codes in three forms, refusals; A6 PDF",
-    startup: () => checkShareCardsStartup(drawing),
+    detail: "references, codes, colors, decoys and QR codes in colors and Unicode codes; A6 PDF",
+    startup: checkShareCardsStartup,
     run: () => checkShareCards(drawing),
   });
 }

@@ -1,6 +1,7 @@
 import { masterFingerprint } from "../bitcoin-evidence.js";
 import { EncodedBackup } from "../core/encoded-backup.js";
 import {
+  printCodes,
   terminalColor,
   terminalHint,
   terminalMore,
@@ -60,7 +61,7 @@ export function printEncodedBackup(backup: EncodedBackup): void {
     ])
   )
     console.log(`${label}:`);
-  console.log(backup.text());
+  printCodes(backup.text(), backup.format);
 }
 
 /** Reporting is separate from transformation and file side effects. */

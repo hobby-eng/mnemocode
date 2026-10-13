@@ -1,5 +1,6 @@
 // S077: every card output of Encode draws the same content, built once by the library
-// (backupCardContent). The renderers are replaced, so that no PDF is drawn.
+// (backupCardContent) and planned once with its decoys (plannedCardJob). The renderers are
+// replaced, so that no PDF is drawn.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CardJob } from "../src/export/render.js";
@@ -33,6 +34,8 @@ const { saveEncodeResult } = await import("../src/cli/encode-export.js");
 const { EncodedBackup } = await import("../src/core/encoded-backup.js");
 const { backupCardContent } = await import("../src/export/backup-cards.js");
 const { parseDate } = await import("../src/core/dates.js");
+const { EncodedForm } = await import("../src/core/encoded-form.js");
+const { codeColors } = await import("../src/export/card-palette.js");
 
 const PHRASE = `${"abandon ".repeat(11)}about`;
 const DATES = [parseDate("23-09-2026")];
@@ -47,12 +50,15 @@ describe("the cards of Encode", () => {
     const outcome = { encoding, mode: "seedshift" as const, enteredDates: DATES };
     // One object of options for the run, as Encode keeps it (onlyResult), so that the random card
     // details are drawn once.
-    const saving: Record<string, string> = { "page-size": "business", title: "Cards" };
-    for (const output of ["pdf", "images-dir", "cards-dir"]) {
-      for (const other of ["pdf", "images-dir", "cards-dir"]) delete saving[other];
-      saving[output] = `unused-${output}`;
-      await saveEncodeResult(saving, outcome);
-    }
+    // Every output of one run, which plans the decoys once for all of them.
+    const saving: Record<string, string> = {
+      "page-size": "business",
+      title: "Cards",
+      pdf: "unused-pdf",
+      "images-dir": "unused-images-dir",
+      "cards-dir": "unused-cards-dir",
+    };
+    await saveEncodeResult(saving, outcome);
     expect(drawn.map((entry) => entry.output)).toEqual(["pdf", "images", "cards"]);
     const [first, ...others] = drawn.map(({ job }) => job);
     for (const job of others) {
@@ -65,13 +71,21 @@ describe("the cards of Encode", () => {
       title: "Cards",
       pageSize: "business",
     });
+    // The colors of the backup first, then at least one decoy.
+    expect(first!.content.colors.slice(0, 8).join(" ")).toBe(encoding.backup.text());
+    expect(first!.content.decoys).toBeGreaterThan(0);
   });
 
-  it("refuses a form that no card prints, Unicode codes among them", () => {
+  it("prints Unicode codes in colors that decorate them, and refuses a form without cards", () => {
     const dates = [parseDate("23-09-2026")];
     const unicode = EncodedBackup.encode(PHRASE, dates, "unicode", "seedshift").backup;
-    expect(() => backupCardContent(unicode)).toThrow("No card prints codes written as unicode.");
+    const content = backupCardContent(unicode);
+    expect(content.labels).toEqual(EncodedForm.of("unicode").cardCodes(unicode.indexes));
+    expect(content.colors).toEqual(codeColors(content.labels!));
+    expect(content.payload).toBe(unicode.text());
     const words = EncodedBackup.encode(PHRASE, [], "english", "direct").backup;
     expect(() => backupCardContent(words)).toThrow("No card prints codes written as english.");
+    const numbers = EncodedBackup.encode(PHRASE, dates, "indexes", "seedshift").backup;
+    expect(() => backupCardContent(numbers)).toThrow("No card prints codes written as indexes.");
   });
 });

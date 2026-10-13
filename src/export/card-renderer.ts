@@ -7,7 +7,6 @@
 // Does not: draw cards itself, or keep any card, reference or detail it was asked to draw.
 
 import { BusinessArtwork } from "./business-artwork.js";
-import { GlassArtwork } from "./glass-artwork.js";
 import type { QrModules, RenderAsset, RenderPlatform, UniformChoice } from "./platform.js";
 import type { CardDrawing } from "./templates.js";
 
@@ -25,7 +24,7 @@ const PLATFORM_SERVICES: Readonly<Record<keyof RenderPlatform, true>> = Object.f
 
 /**
  * What the card renderers draw with on one host. A class, because it owns the bundled artwork
- * that it prepares with its platform (BusinessArtwork, GlassArtwork): read and decoded once for
+ * that it prepares with its platform (BusinessArtwork): read and decoded once for
  * as long as the renderer is kept, and never mixed with that of another platform. It holds only
  * public artwork.
  */
@@ -34,7 +33,6 @@ export class CardRenderer implements CardDrawing {
   readonly randomInt: UniformChoice;
   readonly qrModules: (payload: string) => QrModules;
   readonly businessArtwork: BusinessArtwork;
-  readonly glassArtwork: GlassArtwork;
 
   constructor(platform: RenderPlatform) {
     for (const service of Object.keys(PLATFORM_SERVICES))
@@ -46,7 +44,6 @@ export class CardRenderer implements CardDrawing {
     this.randomInt = (upperExclusive) => platform.randomInt(upperExclusive);
     this.qrModules = (payload) => platform.qrModules(payload);
     this.businessArtwork = new BusinessArtwork(platform);
-    this.glassArtwork = new GlassArtwork(platform);
     Object.freeze(this);
   }
 }

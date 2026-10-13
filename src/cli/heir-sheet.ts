@@ -20,7 +20,13 @@ import {
   type HeirShareMode,
 } from "../export/heir-sheet-text.js";
 import { type ParsedArguments, value } from "./arguments.js";
-import { MENU_ENTRY_NAMES, shownEntry, TYPED_SOURCE } from "./menu-entries.js";
+import {
+  MENU_ENTRY_NAMES,
+  PHRASE_WORDS_QUESTION,
+  phraseWordsAnswer,
+  shownEntry,
+  TYPED_SOURCE,
+} from "./menu-entries.js";
 import { MNEMOCODE_VERSION } from "../version.js";
 import { README_URL, terminalNotice } from "./terminal.js";
 import {
@@ -31,6 +37,7 @@ import {
   ENCODED_SEEDSHIFT_CHOICES,
 } from "./seedshift-choices.js";
 import { SHARE_SEPARATOR } from "../sskr/share-input.js";
+import type { Bip39WordCount } from "../core/bip39-sizes.js";
 
 export type { HeirBackup, HeirSheetFacts } from "../export/heir-sheet-text.js";
 
@@ -43,6 +50,7 @@ export const HEIR_MENU = {
   decode: {
     entry: shownEntry(MENU_ENTRY_NAMES.decode),
     source: TYPED_SOURCE,
+    wordsQuestion: PHRASE_WORDS_QUESTION,
     question: ENCODED_SEEDSHIFT_QUESTION,
     answers: {
       direct: answerLabel(ENCODED_SEEDSHIFT_CHOICES, "direct"),
@@ -81,10 +89,10 @@ const MENU_ROUTE: HeirRoute = {
     `On a computer you trust, open ${README_URL}, download MnemoCode under "Releases" and check it as the guide for heirs there says.`,
     "Go offline, then start MnemoCode by a double-click: it shows a menu.",
   ],
-  decode(mode: HeirMode, dates: string | undefined): string[] {
-    const { entry, source, question, answers } = HEIR_MENU.decode;
+  decode(mode: HeirMode, words: Bip39WordCount, dates: string | undefined): string[] {
+    const { entry, source, wordsQuestion, question, answers } = HEIR_MENU.decode;
     return [
-      `Choose "${entry}", then "${source}". To "${question}" answer "${answers[mode]}".`,
+      `Choose "${entry}", then "${source}". To "${wordsQuestion}" answer "${phraseWordsAnswer(words)}", and to "${question}" answer "${answers[mode]}".`,
       `Type the backup${thenDates(dates)}. MnemoCode shows the seed phrase.`,
     ];
   },

@@ -39,7 +39,14 @@ import {
 } from "./share-layout.js";
 import { checksumAt, CRC32_BYTES, crc32 } from "./checksum.js";
 import { SET_CONFLICT_TEXTS, SetTopology } from "./set-topology.js";
-import { COLOR_FORM, mixedTransport, mixShare, WORD_FORM, type MixedForm } from "./mixed-layout.js";
+import {
+  COLOR_FORM,
+  mixedTransport,
+  mixShare,
+  ownUnitCount,
+  WORD_FORM,
+  type MixedForm,
+} from "./mixed-layout.js";
 import {
   BYTEWORD_SEPARATORS,
   SHARE_FORMATS,
@@ -269,8 +276,13 @@ function mixedUnits(ur: string, form: MixedForm): number[] {
  * The share that `values`, the units of a mixed share in `form`, hold, as its UR; refused with the
  * form's reason when they hold none (mixedTransport).
  */
+/**
+ * The share that `values`, units of `form`, start with: the units after its own length, such as
+ * the decoys of its cards, are left out (ownUnitCount).
+ */
 function mixedToShare(form: MixedForm, values: readonly number[]): string {
-  const transport = mixedTransport(form, form.pack(values), values.length);
+  const own = values.slice(0, ownUnitCount(form, values) ?? values.length);
+  const transport = mixedTransport(form, form.pack(own), own.length);
   if (transport === undefined) throw new Error(form.refusal);
   return wipedAfter(transport, transportToUr);
 }
@@ -349,6 +361,24 @@ export function isColorShareFormat(format: ShareFormat): format is ColorShareFor
   return (COLOR_SHARE_FORMATS as readonly ShareFormat[]).includes(format);
 }
 
+/**
+ * Whether shares in `format` have cards: those that look like a form of a seed phrase with cards
+ * (EncodedForm cardKind), its colors or its Unicode codes. Word numbers, Bytewords and the UR have
+ * none (owner, 2026-10-13). A format that names none is refused (assertShareFormat).
+ */
+export function shareFormatHasCards(format: ShareFormat): boolean {
+  assertShareFormat(format);
+  return EncodedForm.of(MIRRORED_FORM[format]).cardKind !== undefined;
+}
+
+/** Refuses cards of shares written in `format` where it has none (shareFormatHasCards). */
+export function assertShareFormatHasCards(format: ShareFormat): void {
+  if (!shareFormatHasCards(format))
+    throw new Error(
+      `Shares written as ${format} have no cards: cards print shares in colors or in Unicode codes.`,
+    );
+}
+
 function indexesToShare(value: string): string {
   const numbers = codeTokens(value);
   const indexes = numbers.map(shareWordIndex);
@@ -418,6 +448,7 @@ const SHARE_READERS: readonly {
   // Any other text is read as Bytewords, the standard form in words.
   { format: "words", looks: (text) => text.length > 0, read: bytewordsToUr },
 ];
+
 
 /** A share in any form MnemoCode writes, as its UR, and the form it was written in. */
 export function readShare(value: string): { readonly ur: string; readonly format: ShareFormat } {

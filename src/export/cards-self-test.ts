@@ -23,8 +23,8 @@ const PUBLIC_MNEMONIC =
 
 async function checkCardExports(drawing: CardDrawing): Promise<void> {
   const colors = indexesToColors(representMnemonic(PUBLIC_MNEMONIC).shiftedIndexes);
-  // Mixed covers the seven business artworks. Material families and glass 4/6/8
-  // each have independent artwork paths; exercise each without repeating business styles.
+  // Mixed covers the seven business artworks. Each material has its own artwork path;
+  // exercise each without repeating business styles.
   for (const template of cardTemplates.filter(
     (item) => item.style === "mixed" || item.family !== "business",
   )) {

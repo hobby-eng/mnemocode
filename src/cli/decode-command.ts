@@ -99,7 +99,31 @@ async function decodeFromOptions(arguments_: ParsedArguments): Promise<void> {
     Masking.of(known).assertDateCount(enteredDates.length);
   });
   if (backup.givesSeveral) showLegacyValidCandidates(backup.candidates(enteredDates));
-  else showRecovered(backup.decode(enteredDates), mode, backup.format);
+  else {
+    const result = backup.decode(enteredDates);
+    showRecovered(result, mode, backup.format);
+    if (!result.checksumValid) reportShorterPhrases(backup, enteredDates);
+  }
+}
+
+/**
+ * Where the checksum failed, the phrases of fewer words that the first codes give with a valid
+ * checksum, each by its fingerprint, never by its words: codes typed from printed cards end with
+ * decoys, which --words leaves out.
+ */
+function reportShorterPhrases(backup: EncodedBackup, dates: readonly DateShiftDate[]): void {
+  const shorter = backup.shorterPhrases(dates);
+  if (shorter.length === 0) return;
+  const listed = shorter
+    .map(
+      ({ words, result }) =>
+        `${words} words, fingerprint ${masterFingerprint(result.recoveredMnemonic)}`,
+    )
+    .join("; ");
+  terminalNotice(
+    `The first codes give a phrase with a valid checksum: ${listed}. Printed cards end with codes that belong to nothing; give the number of words of the phrase (--words ${shorter[0]!.words}).`,
+    "warning",
+  );
 }
 
 /** Every phrase that a record with a replaced last word may hold, each with its fingerprint. */
@@ -341,6 +365,7 @@ async function decodeAndShow(
   foundCodes?.();
   showRecovered(result, mode, format);
   if (result.checksumValid) return "done";
+  reportShorterPhrases(backup, known);
   return askAfterFailure<Step>(WHAT_NOW, [
     ...(Masking.of(mode).masked
       ? [{ label: "Type the dates again", value: "dates" } as const]

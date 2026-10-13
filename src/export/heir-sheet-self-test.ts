@@ -25,6 +25,7 @@ import {
 } from "./heir-sheet-text.js";
 import { A5, A6, renderHeirSheet, type HeirSheetFormat, type HeirSheetText } from "./heir-sheet.js";
 import type { AssetSource } from "./platform.js";
+import type { Bip39WordCount } from "../core/bip39-sizes.js";
 
 /**
  * An address reserved for examples (RFC 2606), the one the test route prints, without http(s)://
@@ -36,8 +37,8 @@ const TEST_ROUTE: HeirRoute = Object.freeze({
   subtitle: "Made by the self-test.",
   address: ROUTE_ADDRESS,
   start: [`Open ${ROUTE_ADDRESS} offline.`],
-  decode: (mode: HeirMode, dates: string | undefined) => [
-    `Decode ${mode}; ${dates ?? "no dates"}.`,
+  decode: (mode: HeirMode, words: number, dates: string | undefined) => [
+    `Decode ${words} words ${mode}; ${dates ?? "no dates"}.`,
   ],
   restore: (mode: string, threshold: number, dates: string | undefined) => [
     `Restore ${threshold} shares ${mode}; ${dates ?? "no dates"}.`,
@@ -46,17 +47,23 @@ const TEST_ROUTE: HeirRoute = Object.freeze({
 });
 const instructions = new HeirInstructions(TEST_ROUTE);
 
-/** Shares in colors, any 2 of 3, masked with two dates. */
+/** Shares in colors, any 2 of 3, masked with two dates, 10 colors each on their cards. */
 const SHARES: HeirSheetFacts = {
-  backup: { kind: "shares", format: "colors", threshold: 2, count: 3 },
+  backup: { kind: "shares", format: "colors", threshold: 2, count: 3, codes: 10 },
   mode: "seedshift",
   dates: 2,
 };
-/** The seed phrase itself in English words, not masked. */
+/** The seed phrase itself in 12 English words, not masked. */
 const PHRASE: HeirSheetFacts = {
-  backup: { kind: "encoded", format: "english" },
+  backup: { kind: "encoded", format: "english", words: 12 },
   mode: "direct",
   dates: 0,
+};
+/** A 24-word phrase in colors, masked with one date: 16 colors, which its cards print first. */
+const COLORS: HeirSheetFacts = {
+  backup: { kind: "encoded", format: "colors", words: 24 },
+  mode: "seedshift",
+  dates: 1,
 };
 
 /**
@@ -66,6 +73,7 @@ const PHRASE: HeirSheetFacts = {
 const OPEN_WALLET = "Open the wallet with this seed phrase in a wallet program (see below).";
 const SHARES_LINES = [
   "Any 2 of the 3 Shamir shares, written as color codes such as #1EAB91, on paper or on printed cards.",
+  "On printed cards each share is the first 10 codes; the cards after them belong to nothing.",
   "The owner's 2 secret dates (see the back). They are written nowhere; the hint may lead to them.",
   `Open ${ROUTE_ADDRESS} offline.`,
   "Restore 2 shares seedshift; the secret dates as day-month-year (23-09-2026).",
@@ -74,10 +82,17 @@ const SHARES_LINES = [
   "Never type the backup, the dates or the seed phrase into a website or send them to anyone.",
 ] as const;
 const PHRASE_LINES = [
-  "The seed phrase itself: English words, not masked.",
+  "The seed phrase itself: 12 English words, not masked.",
   "No secret dates are needed.",
   OPEN_WALLET,
   "Never type the backup or the seed phrase into a website or send them to anyone.",
+] as const;
+const COLORS_LINES = [
+  "The backup: color codes such as #1EAB91, on paper or on printed cards.",
+  "The seed phrase has 24 words. On printed cards its backup is the first 16 codes; the cards after them belong to nothing.",
+  "The owner's secret date (see the back). It is written nowhere; the hint may lead to it.",
+  `Open ${ROUTE_ADDRESS} offline.`,
+  "Decode 24 words seedshift; the secret date as day-month-year (23-09-2026).",
 ] as const;
 
 /** ISO 216 page sizes in PDF points, 72 to the inch: A5 is 148 × 210 mm, A6 105 × 148 mm. */
@@ -113,6 +128,20 @@ function checkHeirTextStartup(): void {
     [...phraseText.needs, ...phraseText.steps, phraseText.warning].join("\n"),
     PHRASE_LINES.join("\n"),
     "Heir sheet for the phrase itself",
+  );
+  expectSame(
+    [...instructions.text(COLORS).needs, ...instructions.text(COLORS).steps.slice(0, 2)].join("\n"),
+    COLORS_LINES.join("\n"),
+    "Heir sheet for a phrase in colors",
+  );
+  expectRefused(
+    () =>
+      instructions.text({
+        ...COLORS,
+        backup: { kind: "encoded", format: "colors", words: 13 as Bip39WordCount },
+      }),
+    /Expected 12, 15, 18, 21 or 24/u,
+    "Heir sheet for a phrase of 13 words",
   );
   expectRefused(
     () => instructions.text({ ...SHARES, mode: "seedshift-legacy" }),
@@ -173,7 +202,7 @@ async function checkHeirSheet(assets: AssetSource): Promise<void> {
 export function heirSheetSelfTest(assets: AssetSource): SelfTestFeature {
   return selfTestFeature({
     name: "Heir sheet",
-    detail: "words for a backup and for shares, refusals; A5, A6 PDF",
+    detail: "words for a backup and for shares, their codes before decoys, refusals; A5, A6 PDF",
     startup: checkHeirTextStartup,
     run: () => checkHeirSheet(assets),
   });

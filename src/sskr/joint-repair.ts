@@ -22,6 +22,7 @@
 // Does not: ask whether to search, say what a repair filled in (repair-report.ts), or tell which
 // shares a person typed (share-input.ts).
 
+import { withJoinedMarksHint } from "../core/code-text.js";
 import { wipeAll, BITS_PER_BYTE, xorInto } from "../core/bits.js";
 import { BIP39_ENTROPY_BYTES } from "../core/bip39-sizes.js";
 import {
@@ -849,7 +850,10 @@ function unreadableShareMessage(name: number, marks: number, text: string): stri
   if (problem !== undefined) return afterPlace("Share", name, problem);
   return marks === 0
     ? `Share ${name} cannot be read as a share: check each of its elements.`
-    : `Share ${name} cannot be read as a share: check the elements marked with ?, and the others.`;
+    : withJoinedMarksHint(
+        `Share ${name} cannot be read as a share: check the elements marked with ?, and the others.`,
+        text,
+      );
 }
 
 /**

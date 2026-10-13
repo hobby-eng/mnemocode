@@ -34,19 +34,8 @@ export const MATERIAL_STYLES = Object.freeze([
 ] as const);
 export type MaterialStyle = (typeof MATERIAL_STYLES)[number];
 
-/**
- * How many references a frosted-glass card holds, in the order of the designs: four in the
- * photographed design, six or eight in the compact ones.
- */
-export const GLASS_REFERENCES = Object.freeze([4, 6, 8] as const);
-export type GlassReferencesPerCard = (typeof GLASS_REFERENCES)[number];
-/** The photographed frosted-glass design, which recolors its ink ribbons: the default. */
-export const PHOTOGRAPHED_GLASS_REFERENCES = GLASS_REFERENCES[0];
-/** The frosted-glass designs, by the references that one card holds. */
-export type GlassStyle = `glass-${GlassReferencesPerCard}in1`;
-
-/** How a design draws: a business style, a material, or frosted glass. */
-export type CardStyle = BusinessStyle | MaterialStyle | GlassStyle;
+/** How a design draws: a business style or a material. */
+export type CardStyle = BusinessStyle | MaterialStyle;
 /** The families of designs, each drawn by its own renderer. */
 export type CardFamily = CatalogEntry["family"];
 
@@ -54,11 +43,6 @@ export type CardFamily = CatalogEntry["family"];
 export type CatalogEntry = { readonly id: string; readonly kind: CardKind } & (
   | { readonly family: "business"; readonly style: BusinessStyle }
   | { readonly family: "material"; readonly style: MaterialStyle }
-  | {
-      readonly family: "glass";
-      readonly style: GlassStyle;
-      readonly referencesPerCard: GlassReferencesPerCard;
-    }
 );
 
 /** The designs, in the order that the list of designs shows and numbers them, from 1. */
@@ -75,13 +59,6 @@ export const TEMPLATE_CATALOG: readonly CatalogEntry[] = Object.freeze(
       kind: "colors",
       family: "material",
       style,
-    })),
-    ...GLASS_REFERENCES.map((referencesPerCard): CatalogEntry => ({
-      id: `business-glass-${referencesPerCard}in1`,
-      kind: "colors",
-      family: "glass",
-      style: `glass-${referencesPerCard}in1`,
-      referencesPerCard,
     })),
   ].map((entry) => Object.freeze(entry)),
 );

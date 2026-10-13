@@ -7,39 +7,14 @@ import {
   type PngCodec,
   type RasterImage,
 } from "./platform.js";
-import {
-  businessDesigns,
-  type BusinessTint,
-  type PhysicalBusinessStyle,
-} from "./business-designs.js";
-import { hueAndSaturation, pixelHsv, rgbOfHsv } from "./color-math.js";
+import { businessDesigns, type PhysicalBusinessStyle } from "./business-designs.js";
+import { pixelHsv, rgbOfHsv } from "./color-math.js";
+import { ReferenceTint } from "./business-tint.js";
 import { rgbReferenceDigits } from "../core/colors.js";
 import { BUSINESS_CARD_MM } from "./card-settings.js";
 
 /** Pixels per millimetre of the business artwork: 254 dpi, 900 x 500 on a business card. */
 const ARTWORK_PIXELS_PER_MM = 10;
-
-/**
- * How strongly a design's coloured parts take the reference's colour: the factor of their
- * saturation, from the reference's saturation, and of their value. The muted designs keep a
- * quieter, darker tint; the approved artwork was drawn with these numbers.
- */
-const TINTS: Readonly<
-  Record<BusinessTint, { readonly saturation: (target: number) => number; readonly value: number }>
-> = Object.freeze({
-  vivid: { saturation: (target) => Math.max(0.65, target), value: 1 },
-  muted: { saturation: (target) => Math.max(0.35, Math.min(0.68, target * 0.75)), value: 0.86 },
-});
-/**
- * A pixel of the artwork less saturated than this, or darker than NEUTRAL_PIXEL_VALUE, keeps its
- * colour: the black paper, the white lettering and icons, and the highlights stay neutral.
- */
-const NEUTRAL_PIXEL_SATURATION = 0.2;
-const NEUTRAL_PIXEL_VALUE = 0.08;
-/** Below this saturation a reference counts as grey: the artwork turns grey and darker. */
-const GREY_REFERENCE_SATURATION = 0.08;
-/** The factor of the value of a grey reference's artwork. */
-const GREY_VALUE = 0.6;
 
 /** The approved photograph of a design, decoded, as cards draw it: resampled to a card. */
 function resampled(original: RasterImage): RasterImage {
@@ -88,24 +63,20 @@ export class BusinessArtwork {
   }
 
   /**
-   * The artwork of `style` for the reference `hex`, as PNG bytes. Decorative hue follows the
-   * reference approximately. The printed HEX remains exact.
+   * The artwork of `style` for the reference `hex`, as PNG bytes. Decorative hue, saturation and
+   * brightness follow the reference approximately. The printed HEX remains exact.
    */
   async recoloured(style: PhysicalBusinessStyle, hex: string): Promise<Uint8Array> {
     rgbReferenceDigits(hex);
     const base = await this.#photographs.get(`images/business-${style}-v1.png`);
     const { hueOrigin, tint } = businessDesigns[style];
-    const [targetHue, targetSaturation] = hueAndSaturation(hex);
+    const reference = new ReferenceTint(hex);
     const out = createRasterImage(base.width, base.height);
     out.data.set(base.data);
     for (let p = 0; p < out.data.length; p += RGBA_CHANNELS) {
-      const [h, s, v] = pixelHsv(out.data, p);
-      if (s < NEUTRAL_PIXEL_SATURATION || v < NEUTRAL_PIXEL_VALUE) continue;
-      const hue = (((h + targetHue - hueOrigin) % 1) + 1) % 1;
-      const grey = targetSaturation < GREY_REFERENCE_SATURATION;
-      const sat = grey ? 0 : s * TINTS[tint].saturation(targetSaturation);
-      const value = v * (grey ? GREY_VALUE : TINTS[tint].value);
-      const [red, green, blue] = rgbOfHsv(hue, sat, value);
+      const pixel = pixelHsv(out.data, p);
+      if (ReferenceTint.keeps(pixel)) continue;
+      const [red, green, blue] = rgbOfHsv(...reference.pixel(pixel, tint, hueOrigin));
       out.data[p] = red;
       out.data[p + 1] = green;
       out.data[p + 2] = blue;

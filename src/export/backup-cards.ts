@@ -1,13 +1,14 @@
-// The content of the cards of an encoded backup: its colours. Every way of saving the cards (a PDF,
-// page images, separate card files, the dry run of Encode, the sample cards, a page) builds it
-// here, so that each draws the same backup.
+// The content of the cards of an encoded backup: its colours, or its Unicode codes in colours that
+// decorate them. Every way of saving the cards (a PDF, page images, separate card files, the dry
+// run of Encode, the sample cards, a page) builds it here, so that each draws the same backup.
 //
-// Host-neutral: it imports only the core and card-settings.ts. A backup is
+// Host-neutral: it imports only the core, card-settings.ts and card-palette.ts. A backup is
 // taken by its shape (CardBackup), which EncodedBackup has, so that this module needs no backup
 // class and the renderers do not reach it.
 
 import { indexesToColors } from "../core/colors.js";
 import { EncodedForm } from "../core/encoded-form.js";
+import { codeColors } from "./card-palette.js";
 import type { EncodedFormat } from "../core/types.js";
 import type { CardSettings } from "./card-settings.js";
 
@@ -29,28 +30,39 @@ export interface CardDetails {
 }
 
 /**
- * The content of the colour cards of a seed phrase: its colours, and the codes their QR code holds.
- * Every card template draws it (templates.ts); defined here, beside the one function that builds
- * it, so that this module needs no renderer.
+ * The content of the cards of a seed phrase: the colour of each card, the codes printed in place
+ * of the colours where those only decorate the cards (Unicode codes), the codes that its QR code
+ * holds, and how many of the last cards are decoys (card-decoys.ts). Every card template draws
+ * it (templates.ts); defined here, beside the one function that builds it, so that this module
+ * needs no renderer.
  */
 export type CardContent = CardSettings & {
   readonly kind: "colors";
   readonly colors: readonly string[];
+  readonly labels?: readonly string[];
   readonly payload: string;
   readonly title?: string;
+  /** How many of the last cards are decoys; undefined until a plan adds them (card-plan.ts). */
+  readonly decoys?: number;
 };
 
 /**
- * The content of the cards of `backup`: its colours with `details.settings`. Refuses a form that
- * no card prints (EncodedForm cardKind).
+ * The content of the cards of `backup` with `details.settings`: its colours, or its Unicode codes
+ * in the colours that decorate them (codeColors), without decoys yet (card-plan.ts). Refuses a
+ * form that no card prints (EncodedForm cardKind).
  */
 export function backupCardContent(backup: CardBackup, details: CardDetails = {}): CardContent {
-  const kind = EncodedForm.of(backup.format).cardKind;
+  const form = EncodedForm.of(backup.format);
+  const kind = form.cardKind;
   if (kind === undefined) throw new Error(`No card prints codes written as ${backup.format}.`);
+  const codes = form.cardCodes(backup.indexes);
   return Object.freeze({
     ...details.settings,
     kind,
-    colors: Object.freeze(indexesToColors(backup.indexes)),
+    colors: Object.freeze(
+      codes === undefined ? indexesToColors(backup.indexes) : codeColors(codes),
+    ),
+    ...(codes === undefined ? {} : { labels: Object.freeze(codes) }),
     payload: backup.text(),
     ...(details.title === undefined ? {} : { title: details.title }),
   });

@@ -2,7 +2,7 @@ import { imageFormat, cardFileFormat, savedPagesNotice } from "./image-options.j
 import { exportPageImages } from "../export/image-export.js";
 import { exportCards, renderCards } from "../export/pdf.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
-import type { CardJob } from "../export/render.js";
+import { plannedCardJob, type CardJob } from "../export/render.js";
 import { backupCardContent } from "../export/backup-cards.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
@@ -27,11 +27,17 @@ function cardJob(arguments_: ParsedArguments, outcome: EncodeOutcome): CardJob {
   return { template: cardTemplate(arguments_, content.kind), content };
 }
 
-/** Every destination receives the same completed transformation. */
+/**
+ * Every destination receives the same completed transformation, and every card file the same
+ * cards: their decoys are planned once, when the first of them is saved.
+ */
 export async function saveEncodeResult(
   arguments_: ParsedArguments,
   outcome: EncodeOutcome,
 ): Promise<void> {
+  let planned: Promise<CardJob> | undefined;
+  const plannedJob = (): Promise<CardJob> =>
+    (planned ??= plannedCardJob(nodeCardRenderer, cardJob(arguments_, outcome)));
   const { backup } = outcome.encoding;
   const { format } = backup;
   const pdfPath = value(arguments_, "pdf");
@@ -48,19 +54,19 @@ export async function saveEncodeResult(
     console.error(colorCards(indexesToColors(backup.indexes)));
   }
   if (pdfPath !== undefined) {
-    await exportCards([cardJob(arguments_, outcome)], pdfPath);
+    await exportCards([await plannedJob()], pdfPath);
     terminalNotice(`Saved PDF: ${pdfPath}`, "success");
   }
   if (imageDirectory !== undefined) {
     // The rendered cards show the backup: wiped once their images are written.
     const count = await wipedAfterAsync(
-      await renderCards(nodeCardRenderer, [cardJob(arguments_, outcome)]),
+      await renderCards(nodeCardRenderer, [await plannedJob()]),
       (document) => exportPageImages(document, imageDirectory, imageFormat(arguments_)),
     );
     savedPagesNotice(arguments_, count, imageDirectory);
   }
   if (cardDirectory !== undefined) {
-    const { template, content } = cardJob(arguments_, outcome);
+    const { template, content } = await plannedJob();
     const count = await exportIndividualCards(
       template,
       content,

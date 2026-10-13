@@ -5,8 +5,11 @@ import { assertCardIndex } from "./card-codes.js";
 import { drawCollectionQr, qrSizeForModuleMm } from "./card-qr.js";
 import type { QrModules, QrSource } from "./platform.js";
 import {
+  CARD_ORIENTATIONS,
   pageDimensions,
+  parseOrientation,
   parsePageSize,
+  type CardOrientation,
   type CardSettings,
   type CardPresentation,
   type CardPageSize,
@@ -14,7 +17,7 @@ import {
 } from "./card-settings.js";
 import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from "./world-map.js";
 import { WORLD_MAP_LAND } from "./world-map-data.js";
-import { drawMaterialBackdrop, type MaterialBackdrop } from "./study-backdrops.js";
+import { drawMaterialBackdrop, type CardGrid, type MaterialBackdrop } from "./study-backdrops.js";
 
 export interface StudyBox extends CardBox {
   readonly captionTop: number;
@@ -61,6 +64,9 @@ export interface StudySheetMetrics {
 export interface StudyLayout {
   readonly width: number;
   readonly height: number;
+  /** The cards in a row, and the rows. */
+  readonly columns: number;
+  readonly rows: number;
   /** The measures of the sheet's page size. */
   readonly metrics: StudySheetMetrics;
   /** Where the cards may start: below the heading, or below the QR code and its caption. */
@@ -68,12 +74,20 @@ export interface StudyLayout {
   /** A card-sized page: the heading sits beside the QR code, and there is no rule or slogan. */
   readonly compact: boolean;
   readonly cards: readonly StudyBox[];
+  /** The pitch of the cards, which a material's backdrop lays its pattern out by. */
+  readonly grid: CardGrid;
   readonly qr?: { readonly x: number; readonly y: number; readonly size: number };
 }
 
-export type StudyTheme = "cool" | "warm" | "noir" | "mist" | MaterialBackdrop;
+export type StudyTheme = "cool" | "warm" | "noir" | MaterialBackdrop;
 
 const COLLECTION_QR_MODULE_MM = 0.3;
+/**
+ * The least side of a sheet's QR code, in millimetres: its caption, COLLECTION QR, is 11.5 mm wide
+ * at the least size that a sheet prints (MINIMUM_FONT), and the code of 24 Unicode codes is
+ * smaller than that (a test keeps the caption within it).
+ */
+const COLLECTION_QR_MINIMUM_MM = 12;
 
 /**
  * The smallest size, in points, that a sheet prints: the captions, the QR caption and the frame of
@@ -86,10 +100,12 @@ const MINIMUM_FONT = 4;
  * into points for fit() never leaves the caption a rounding error below MINIMUM_FONT.
  */
 const CAPTION_WIDTH_SLACK_MM = 0.1;
-/** The smallest size of the frame of an A6 or A4 sheet, in points. */
+/** The smallest size of the frame of a sheet of A size, in points. */
 const SHEET_FRAME_MINIMUM_FONT = 4.5;
 /** How far the plate behind the QR code reaches beyond it on each side, in millimetres. */
 const QR_PLATE_MARGIN = 0.6;
+/** The least height of a card's picture on a sheet, in millimetres: below it no design shows. */
+const MINIMUM_CARD_HEIGHT = 2;
 
 /**
  * The measures of a sheet of each page size. A card-sized page is laid out tighter than a sheet,
@@ -130,6 +146,23 @@ const STUDY_METRICS: Readonly<Record<CardPageSize, StudySheetMetrics>> = Object.
     footerBaseline: 5.2,
     frameMinimumFont: SHEET_FRAME_MINIMUM_FONT,
   },
+  // Between A6 and A4, as A5 lies between them (owner, 2026-10-13).
+  a5: {
+    margin: 7,
+    headingHeight: 28,
+    footer: 11,
+    fontSize: 7,
+    lineHeight: 3.5,
+    gap: 4.5,
+    captionPad: 1.2,
+    captionOffset: 1,
+    rows: { title: 7.2, kind: 15.2, subtitle: 19.4, rule: 23.7 },
+    titleSize: 16,
+    headingScale: 0.95,
+    footerScale: 0.9,
+    footerBaseline: 6.3,
+    frameMinimumFont: SHEET_FRAME_MINIMUM_FONT,
+  },
   a4: {
     margin: 10,
     headingHeight: 33,
@@ -149,26 +182,50 @@ const STUDY_METRICS: Readonly<Record<CardPageSize, StudySheetMetrics>> = Object.
 });
 
 /**
- * The most cards that one sheet lays out: the 16 colours of a 24-word phrase, one box per card.
- * The codes of a share are grouped on its cards so that they fit too (sskr-render.ts).
+ * The most cards that one sheet lays out, one box per card: more than the 33 Unicode codes of the
+ * longest share with MAX_DECOYS decoys (card-decoys.ts; a test checks it).
  */
-export const MAX_SHEET_CARDS = 16;
+export const MAX_SHEET_CARDS = 64;
+/** The most cards in one row of a sheet. */
+const MAX_COLUMNS = 10;
+/**
+ * How much larger, as a share of its area, a card of one plan must be to win over another: less
+ * is a rounding error, and then fewer decoys and the page's own orientation win.
+ */
+const LARGER_CARD = 0.001;
+/** Why no layout fits the cards on a page. */
+const NO_ROOM =
+  "The cards and their codes cannot fit legibly on this page; choose a larger page size, such as A6.";
+
+/**
+ * The lines that each caption is given room for: a count, or the count in a column `width` mm wide
+ * at the sheet's caption size `size` in points, where long lines take two (StudyCaptions).
+ */
+export type CaptionLines = number | ((width: number, size: number) => number);
 
 /**
  * A collection is a single design proposal, never a stack of duplex print cards. `code` is the QR
- * code that the sheet prints, if any, whose size the layout makes room for.
+ * code that the sheet prints, if any, whose size the layout makes room for. Of the column counts
+ * whose rows are all full, the one with the largest cards; a sheet whose last row is short looks
+ * unfinished (owner, 2026-10-13), and only where no such count fits, the largest cards of any.
  */
 export function collectionSheetLayout(
   settings: CardSettings,
   count: number,
   aspect: number,
-  captionLines: number,
+  captionLines: CaptionLines,
   code?: QrModules,
   minimumCaptionWidth = 0,
 ): StudyLayout {
   if (Number.isInteger(count) && count > MAX_SHEET_CARDS)
     throw new Error(`A sheet holds at most ${MAX_SHEET_CARDS} cards.`);
-  if (!Number.isInteger(count) || count < 1 || aspect <= 0 || captionLines < 1)
+  const linesIn = typeof captionLines === "number" ? () => captionLines : captionLines;
+  if (
+    !Number.isInteger(count) ||
+    count < 1 ||
+    aspect <= 0 ||
+    (typeof captionLines === "number" && captionLines < 1)
+  )
     throw new Error("Invalid design study layout.");
   const size = parsePageSize(settings.pageSize);
   const [width, height] = pageDimensions(size, settings.orientation);
@@ -177,7 +234,10 @@ export function collectionSheetLayout(
   const compact = isCardPageSize(size);
   const metrics = STUDY_METRICS[size];
   const { margin, headingHeight, footer, lineHeight, gap } = metrics;
-  const qrSize = code === undefined ? 0 : qrSizeForModuleMm(code, 0, COLLECTION_QR_MODULE_MM);
+  const qrSize =
+    code === undefined
+      ? 0
+      : qrSizeForModuleMm(code, COLLECTION_QR_MINIMUM_MM, COLLECTION_QR_MODULE_MM);
   const qr =
     code === undefined
       ? undefined
@@ -201,27 +261,36 @@ export function collectionSheetLayout(
       availableHeight = height - contentTop - footer;
     }
   }
-  const captionHeight = captionLines * lineHeight + metrics.captionPad;
-  let best:
-    | { columns: number; rows: number; cellWidth: number; imageHeight: number; area: number }
-    | undefined;
-  for (let columns = 1; columns <= Math.min(count, 6); columns++) {
+  type Grid = {
+    columns: number;
+    rows: number;
+    cellWidth: number;
+    imageHeight: number;
+    captionHeight: number;
+  };
+  const grids: Grid[] = [];
+  for (let columns = 1; columns <= Math.min(count, MAX_COLUMNS); columns++) {
     const rows = Math.ceil(count / columns);
     const cellWidth = runCellSize(availableWidth, columns, gap);
     if (cellWidth < minimumCaptionWidth) continue;
+    // The narrower the column, the more caption lines may take two lines each.
+    const captionHeight = linesIn(cellWidth, metrics.fontSize) * lineHeight + metrics.captionPad;
     const imageHeight = Math.min(
       cellWidth / aspect,
       runCellSize(availableHeight, rows, gap) - captionHeight,
     );
-    const area = imageHeight * imageHeight * aspect;
-    if (imageHeight > 2 && (!best || area > best.area))
-      best = { columns, rows, cellWidth, imageHeight, area };
+    if (imageHeight > MINIMUM_CARD_HEIGHT)
+      grids.push({ columns, rows, cellWidth, imageHeight, captionHeight });
   }
-  if (!best)
-    throw new Error(
-      "The cards and their codes cannot fit legibly on this page; choose a larger page size, such as A6.",
-    );
-  const { columns, rows, cellWidth, imageHeight } = best;
+  const full = grids.filter((grid) => count % grid.columns === 0);
+  // The largest card, the first such grid on a tie; every card has the same aspect.
+  const best = (full.length > 0 ? full : grids).reduce<Grid | undefined>(
+    (chosen, grid) =>
+      chosen === undefined || grid.imageHeight > chosen.imageHeight ? grid : chosen,
+    undefined,
+  );
+  if (!best) throw new Error(NO_ROOM);
+  const { columns, rows, cellWidth, imageHeight, captionHeight } = best;
   const cellHeight = imageHeight + captionHeight;
   const top = contentTop + centredRunStart(availableHeight, rows, cellHeight, gap);
   const cards = Array.from({ length: count }, (_, index): StudyBox => {
@@ -247,12 +316,94 @@ export function collectionSheetLayout(
   return {
     width,
     height,
+    columns,
+    rows,
     metrics,
     header: contentTop,
     compact,
     cards,
+    // The middle of the gap before the first full row's first card and above the first row.
+    grid: {
+      left: margin + centredRunStart(availableWidth, columns, cellWidth, gap) - gap / 2,
+      top: top - gap / 2,
+      columnPitch: cellWidth + gap,
+      rowPitch: cellHeight + gap,
+    },
     ...(qr === undefined ? {} : { qr }),
   };
+}
+
+/** What the sheet of a design is planned from: its font, the shape of a card and the captions. */
+export interface SheetShape {
+  readonly font: PDFFont;
+  /** The shape of a card's box, width over height. */
+  readonly aspect: number;
+  /**
+   * The lines under each of the first `count` cards; throws why the design cannot show so many,
+   * such as more codes than a material has samples.
+   */
+  readonly captions: (count: number) => readonly (readonly string[])[];
+}
+
+/** How many cards a sheet holds, decoys included, and how it is turned (planCollectionSheet). */
+export interface SheetPlan {
+  readonly count: number;
+  readonly orientation: CardOrientation;
+}
+
+/** The orientation in which a page of `size` is first listed (pageDimensions). */
+function ownOrientation(size: CardPageSize): CardOrientation {
+  const [width, height] = pageDimensions(size);
+  return width >= height ? "landscape" : "portrait";
+}
+
+/**
+ * The sheet for `own` codes of a backup in the design `shape`, on the page size of `settings`:
+ * at least one decoy, at most as many as give `most` cards in all, all rows full, and the largest
+ * cards (owner, 2026-10-13). The orientation is the one given, or the one with the larger cards,
+ * the page's own on a tie; on a tie of sizes, fewer decoys. `code` is the QR code it prints.
+ */
+export function planCollectionSheet(
+  settings: Pick<CardSettings, "pageSize" | "orientation">,
+  own: number,
+  most: number,
+  shape: SheetShape,
+  code?: QrModules,
+): SheetPlan {
+  const size = parsePageSize(settings.pageSize);
+  const given = parseOrientation(settings.orientation);
+  const first = ownOrientation(size);
+  const orientations =
+    given === undefined
+      ? [first, ...CARD_ORIENTATIONS.filter((orientation) => orientation !== first)]
+      : [given];
+  let best: (SheetPlan & { readonly area: number }) | undefined;
+  let refusal: unknown;
+  for (const orientation of orientations)
+    for (let count = own + 1; count <= Math.min(most, MAX_SHEET_CARDS); count++) {
+      let layout: StudyLayout;
+      try {
+        // Measured as the sheet measures them (drawCollectionStudy), so that it draws this plan.
+        const room = new StudyCaptions(shape.font, shape.captions(count));
+        layout = collectionSheetLayout(
+          { pageSize: size, orientation },
+          count,
+          shape.aspect,
+          (width, lineSize) => room.lines(width, lineSize),
+          code,
+          room.minimumWidth,
+        );
+      } catch (error) {
+        refusal ??= error;
+        continue;
+      }
+      if (count % layout.columns !== 0) continue;
+      const area = layout.cards[0]!.width * layout.cards[0]!.height;
+      if (best === undefined || area > best.area * (1 + LARGER_CARD))
+        best = { count, orientation, area };
+    }
+  if (best === undefined) throw refusal instanceof Error ? refusal : new Error(NO_ROOM);
+  return { count: best.count, orientation: best.orientation };
 }
 
 type Color = ReturnType<typeof rgb>;
@@ -310,19 +461,6 @@ const PALETTES: Readonly<Record<StudyTheme, SheetPalette>> = {
     captionMuted: rgb(0.63, 0.55, 0.46),
   },
   noir: { ...COOL, cardEdge: rgb(0.18, 0.22, 0.26), shadowOpacity: 0.5 },
-  // A light page for the light glass cards, which a dark page made look cut out.
-  mist: {
-    background: rgb(0.78, 0.81, 0.85),
-    backdrop: { land: rgb(0.7, 0.74, 0.78), coast: rgb(0.63, 0.67, 0.71) },
-    plate: rgb(0.91, 0.93, 0.95),
-    plateBorder: rgb(0.48, 0.52, 0.57),
-    ink: rgb(0.13, 0.15, 0.18),
-    muted: rgb(0.34, 0.38, 0.43),
-    caption: rgb(0.13, 0.15, 0.18),
-    captionMuted: rgb(0.34, 0.38, 0.43),
-    cardEdge: rgb(0.57, 0.61, 0.65),
-    shadowOpacity: 0.22,
-  },
   // The light material pages carry dark ink; their own backdrop covers the background.
   studio: {
     background: rgb(0.86, 0.87, 0.88),
@@ -435,7 +573,7 @@ function drawStudyFrame(
     color: palette.background,
   });
   if (typeof palette.backdrop === "string")
-    drawMaterialBackdrop(page, palette.backdrop, width, height);
+    drawMaterialBackdrop(page, palette.backdrop, width, height, layout.grid);
   else drawWorldMap(page, palette.backdrop, width, height, margin);
 
   // A QR code occupies the top right corner. On a sheet the heading stays centred on the page
@@ -581,6 +719,84 @@ export function studyCaptionWidth(font: PDFFont, lines: readonly string[]): numb
   return widest / MM + CAPTION_WIDTH_SLACK_MM;
 }
 
+/** One line of a caption, measured in points at 1 pt, and the halves it may be split into. */
+interface MeasuredLine {
+  readonly text: string;
+  readonly width: number;
+  /** The two halves that balance best, split at a space, and the wider half's width; none if one word. */
+  readonly halves?: { readonly texts: readonly [string, string]; readonly width: number };
+}
+
+/** `text` with the two halves that balance best, split at a space, as `measure` measures them. */
+function measuredLine(text: string, measure: (text: string) => number): MeasuredLine {
+  const words = text.split(" ").filter((word) => word !== "");
+  let halves: MeasuredLine["halves"];
+  for (let cut = 1; cut < words.length; cut++) {
+    const texts = [words.slice(0, cut).join(" "), words.slice(cut).join(" ")] as const;
+    const width = Math.max(...texts.map(measure));
+    if (halves === undefined || width < halves.width) halves = { texts, width };
+  }
+  return { text, width: measure(text), ...(halves === undefined ? {} : { halves }) };
+}
+
+/**
+ * The captions under the cards of one sheet, measured once in its font: how many lines each takes
+ * in a column of a given width, and those lines. The first line of a caption, the card's number and
+ * its code, always stays one line; a later one, such as the name of a finish, that would print
+ * smaller than the sheet's caption size is split in two at the space that balances the halves best
+ * (owner, 2026-10-13: two lines rather than small print, in every design). A class, so that each
+ * text is measured once while a layout tries its columns, and the sheet draws what it measured.
+ */
+export class StudyCaptions {
+  readonly #captions: readonly (readonly MeasuredLine[])[];
+  readonly #minimumWidth: number;
+
+  /** The captions `captions`, one list of lines per card, in the order of the cards. */
+  constructor(font: PDFFont, captions: readonly (readonly string[])[]) {
+    // Widths at 1 pt, which grow in proportion to the size.
+    const widths = new Map<string, number>();
+    const measure = (text: string): number => {
+      let width = widths.get(text);
+      if (width === undefined) widths.set(text, (width = font.widthOfTextAtSize(text, 1)));
+      return width;
+    };
+    this.#captions = captions.map((lines) => lines.map((line) => measuredLine(line, measure)));
+    // The narrowest column that still prints every line, split where it may be, at MINIMUM_FONT.
+    const narrowest = this.#captions.flatMap((lines) =>
+      lines.map((line, index) =>
+        index === 0 || line.halves === undefined || line.width <= line.halves.width
+          ? [line.text]
+          : line.halves.texts,
+      ),
+    );
+    this.#minimumWidth = studyCaptionWidth(font, narrowest.flat());
+  }
+
+  /** The least width of a column in millimetres, below which a caption would not print. */
+  get minimumWidth(): number {
+    return this.#minimumWidth;
+  }
+
+  /** The most lines that a caption takes in a column `width` mm wide at `size` points. */
+  lines(width: number, size: number): number {
+    return Math.max(1, ...this.#captions.map((lines) => this.#split(lines, width, size).length));
+  }
+
+  /** The lines of the caption of card `index` in a column `width` mm wide at `size` points. */
+  wrapped(index: number, width: number, size: number): string[] {
+    return this.#split(this.#captions[index] ?? [], width, size);
+  }
+
+  #split(lines: readonly MeasuredLine[], width: number, size: number): string[] {
+    const room = width * MM;
+    return lines.flatMap((line, index) =>
+      index === 0 || line.halves === undefined || line.width * size <= room
+        ? [line.text]
+        : [...line.halves.texts],
+    );
+  }
+}
+
 /** What a collection sheet of color cards is made from: a seed phrase's colors, or a share's. */
 export interface CollectionContent {
   readonly kind: "colors" | "sskr";
@@ -595,7 +811,7 @@ export interface CollectionContent {
 
 /**
  * The series of the cards and sheets of a seed phrase's colors, which has no set to name: every
- * family prints it alike (owner, 2026-10-09: the glass card too, in place of a placeholder text).
+ * family prints it alike (owner, 2026-10-09).
  */
 const PHRASE_SERIES = "01";
 
@@ -671,11 +887,6 @@ export interface CollectionStudy {
   readonly aspect: number;
   /** The lines under each card, in the order of the cards. */
   readonly captions: readonly (readonly string[])[];
-  /**
-   * The lines that each caption is given room for: the longest caption's unless a design keeps
-   * the room of a full card for every card, as the glass cards do.
-   */
-  readonly captionLines?: number;
   /** Draws card `box.index` in its box, after its shadow and before its caption. */
   readonly paint: (page: PDFPage, box: StudyBox) => void | Promise<void>;
   /** Where the picture of a card lies in its box, which the shadow follows; the box by default. */
@@ -692,15 +903,15 @@ export async function drawCollectionStudy(study: CollectionStudy): Promise<Study
   const payload = collectionPayload(content);
   // One matrix for the room that the layout keeps and for the code drawn in it.
   const code = payload === undefined ? undefined : study.qr.qrModules(payload);
+  // The captions decide how narrow a column may be, and how many lines they take in it.
+  const room = new StudyCaptions(font, captions);
   const layout = collectionSheetLayout(
     study.settings,
     captions.length,
     study.aspect,
-    study.captionLines ?? Math.max(...captions.map((lines) => lines.length)),
+    (width, size) => room.lines(width, size),
     code,
-    // The captions decide how narrow a column may be: the three words of a share's code are
-    // wider than a color code, and on a card-sized page they take fewer cards to a row.
-    studyCaptionWidth(font, captions.flat()),
+    room.minimumWidth,
   );
   const page = addCollectionPage(
     doc,
@@ -715,7 +926,8 @@ export async function drawCollectionStudy(study: CollectionStudy): Promise<Study
   for (const box of layout.cards) {
     drawStudyShadow(page, study.pictureArea?.(box) ?? box, theme);
     await study.paint(page, box);
-    drawStudyCaption(page, font, layout, box, captions[box.index]!, theme);
+    const lines = room.wrapped(box.index, box.captionWidth, layout.metrics.fontSize);
+    drawStudyCaption(page, font, layout, box, lines, theme);
   }
   return layout;
 }

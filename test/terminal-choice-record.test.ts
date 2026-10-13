@@ -604,6 +604,7 @@ describe("going back from an entry of the start menu", () => {
     "Which card design?",
     "Add a QR code with all the codes of the sheet?",
     "Which coin?",
+    "How should the sheets be turned?",
   ]);
 
   /**
@@ -780,15 +781,16 @@ describe("going back on a terminal shorter than the record of answers", () => {
 
   it("draws the menu anew from the top where answers scrolled out of reach", async () => {
     const quit = await onShortScreen("", [ESCAPE]);
-    // Encode: colors, no Seedshift, no shares, printable cards as a PDF of A6 sheets under its
-    // usual name, in the first design, a QR code, and own details, each left random; then Escape at
-    // the question about heirs, under 22 lines of answers.
+    // Encode: colors, no Seedshift, no shares, printable cards as a PDF of A6 sheets turned as
+    // first offered, under its usual name, in the first design, a QR code, and own details, each
+    // left random; then Escape at the question about heirs, under 23 lines of answers.
     const deep = await onShortScreen(SHELL, [
       "1",
       `${DOWN.repeat(2)}${ENTER}`,
       `${DOWN}${ENTER}`,
       ENTER,
       `${DOWN.repeat(3)}${ENTER}`,
+      ENTER,
       ENTER,
       ENTER,
       ENTER,

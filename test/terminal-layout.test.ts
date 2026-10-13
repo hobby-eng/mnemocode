@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { printableText, ProgressLine, terminalPhrase } from "../src/cli/terminal.js";
+import { printableText, printCodes, ProgressLine, terminalPhrase } from "../src/cli/terminal.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 
@@ -91,6 +91,34 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
       "On one line, for copying:",
       TEST_PHRASE,
     ]);
+  });
+
+  it("shows codes written joined apart, then joined, and one line in a pipe", () => {
+    // The public phrase in Unicode codes, which are written joined.
+    const unicode = `${"7684".repeat(11)}5728`;
+    printCodes(unicode, "unicode");
+    expect(out).toEqual([unicode]);
+    out.length = 0;
+    vi.stubEnv("NO_COLOR", "");
+    vi.stubEnv("CLICOLOR_FORCE", "1");
+    printCodes(unicode, "unicode");
+    expect(out.map((line) => line.replace(/\x1b\[[0-9;]*m/gu, ""))).toEqual([
+      `${"7684 ".repeat(11)}5728`,
+      "Joined, for copying:",
+      unicode,
+    ]);
+    // A share's Unicode codes, written apart, also get the joined line.
+    out.length = 0;
+    printCodes("7A0B 971E 80CC", "unicode");
+    expect(out.at(-1)).toBe("7A0B971E80CC");
+    out.length = 0;
+    printCodes("E000E064E13AE191", "colors-unicode");
+    // Code by code, as a ? stands for one code in every reader.
+    expect(out[0]!.replace(/\x1b\[[0-9;]*m/gu, "")).toBe("E000 E064 E13A E191");
+    // Forms written apart already are shown as they are.
+    out.length = 0;
+    printCodes(TEST_PHRASE, "english");
+    expect(out).toEqual([TEST_PHRASE]);
   });
 });
 

@@ -4,12 +4,8 @@ import { NoCardTemplate } from "../export/template-catalog.js";
 import { type CardKind, type EncodedFormat } from "../core/types.js";
 
 import { value, type ParsedArguments } from "./arguments.js";
-import {
-  COLOR_FORMAT_NUMBERS,
-  CARD_FORMAT_NUMBERS,
-  noCardTemplateMessage,
-} from "./format-numbers.js";
-import { cardKindOf, writtenInColors } from "../core/backup-options.js";
+import { CARD_FORMAT_NUMBERS, noCardTemplateMessage } from "./format-numbers.js";
+import { cardKindOf } from "../core/backup-options.js";
 import { assertIndividualTemplate } from "../export/render.js";
 
 /** The card outputs that the options name: sheets (a PDF or page images), and separate cards. */
@@ -49,16 +45,10 @@ const ENCODE_CARD_SETTINGS = ["template", "title", ...businessOptionNames] as co
 /** Refuses card options that cannot draw cards of codes in `format`, before a secret is asked. */
 export function validateCardOptions(args: ParsedArguments, format: EncodedFormat): void {
   const { sheets, cards } = assertCardOutput(args, ENCODE_CARD_SETTINGS);
-  if (cards) {
-    if (!writtenInColors(format))
-      throw new Error(
-        `Individual cards are available only for RGB color formats ${COLOR_FORMAT_NUMBERS}.`,
-      );
-    assertIndividualTemplate(selectTemplate(value(args, "template"), "colors"));
-  }
   if (!sheets && !cards) return;
   const kind = cardKindOf(format);
   if (kind === undefined) throw new Error(`Card export requires format ${CARD_FORMAT_NUMBERS}.`);
+  if (cards) assertIndividualTemplate(selectTemplate(value(args, "template"), kind));
   businessOptions(args);
   cardTemplate(args, kind);
 }

@@ -23,7 +23,6 @@ import {
 import { ENCODED_FORMATS } from "../src/core/types.js";
 import { assertAllowedArguments, parseArguments } from "../src/cli/arguments.js";
 import { optionLabel } from "../src/cli/option-copy.js";
-import { assertReferencesPerCard } from "../src/export/card-codes.js";
 import { crc32 } from "../src/sskr/checksum.js";
 import { PivotBasis } from "../src/sskr/gf2.js";
 import { MEMBER_BYTE } from "../src/sskr/share-layout.js";
@@ -217,13 +216,10 @@ describe("AUD-001-API001: the share form that mirrors a form of codes refuses on
 });
 
 describe("AUD-015 recommendations: one rule for whole counts, one quorum owner, one hour", () => {
-  it("refuses widths and capacities with their own words through the shared whole-number rule", () => {
+  it("refuses widths with their own words through the shared whole-number rule", () => {
     for (const width of [0, -1, 0.5, Number.NaN])
       expect(() => textPieces("abcd", width)).toThrow("A piece needs a whole width of at least 1.");
     expect(textPieces("abcd", 2)).toEqual(["ab", "cd"]);
-    for (const perCard of [0, 1.5, Number.POSITIVE_INFINITY])
-      expect(() => assertReferencesPerCard(perCard)).toThrow("at least 1");
-    expect(() => assertReferencesPerCard(4)).not.toThrow();
   });
 
   it("keeps a split's refusal and its least threshold of two", () => {

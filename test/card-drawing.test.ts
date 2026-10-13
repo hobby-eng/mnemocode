@@ -35,7 +35,7 @@ import { SSKR_CARD_LAYOUTS } from "../src/export/sskr-content.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import type { CardStyle } from "../src/export/template-catalog.js";
 import { cardTemplates, type CardTemplate } from "../src/export/templates.js";
-import { SHARE_FORMATS } from "../src/sskr/transport.js";
+import { SHARE_FORMATS, shareFormatHasCards } from "../src/sskr/transport.js";
 
 // The reader of card PDFs that a host without Poppler, such as a browser page, paints cards with
 // (export/card-drawing.ts). Every renderer family draws public sample cards through the Node.js
@@ -83,11 +83,7 @@ async function expectCardPages(pdf: Uint8Array, what: string): Promise<CardPageD
 
 describe("Card pages read back as drawing steps (export/card-drawing.ts)", () => {
   it("knows a design of every family", () => {
-    expect(FAMILY_DESIGNS.map((template) => template.family)).toEqual([
-      "business",
-      "material",
-      "glass",
-    ]);
+    expect(FAMILY_DESIGNS.map((template) => template.family)).toEqual(["business", "material"]);
   });
 
   it(
@@ -143,7 +139,7 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
     async () => {
       for (const template of FAMILY_DESIGNS)
         for (const layout of SSKR_CARD_LAYOUTS) {
-          const cards = new ShareCardSet(nodeCardRenderer, SHARES, {
+          const cards = await ShareCardSet.create(nodeCardRenderer, SHARES, {
             style: styleOf(template),
             layout,
             cardQr: true,
@@ -159,11 +155,11 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
   );
 
   it(
-    "reads share cards in every form of a share",
+    "reads share cards in every form of a share that has cards",
     async () => {
       const [business] = FAMILY_DESIGNS;
-      for (const shareFormat of SHARE_FORMATS) {
-        const cards = new ShareCardSet(nodeCardRenderer, SHARES, {
+      for (const shareFormat of SHARE_FORMATS.filter(shareFormatHasCards)) {
+        const cards = await ShareCardSet.create(nodeCardRenderer, SHARES, {
           style: styleOf(business!),
           shareFormat,
         });

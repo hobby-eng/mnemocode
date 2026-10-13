@@ -61,13 +61,3 @@ export function formatLegend(names?: Readonly<Record<EncodedFormat, string>>): s
     (format) => `${formatNumber(format)} ${names?.[format] ?? format}`,
   ).join(", ");
 }
-
-/**
- * `choices` of forms, each answered by its --format number, in any order they are listed: a key
- * pressed in a question is the number the command line takes.
- */
-export function numberedForms<C extends { readonly value: EncodedFormat }>(
-  choices: readonly C[],
-): (C & { readonly digit: number })[] {
-  return choices.map((choice) => ({ ...choice, digit: formatNumber(choice.value) }));
-}

@@ -44,11 +44,6 @@ for (const [name, style, content, index] of fixtures) {
 }
 
 await writeFile(
-  resolve(destination, "glass8.pdf"),
-  await renderer.renderGlassCards(fixed({ ...ordinary(32, "business"), cardQr: true }), 0, 8),
-);
-console.log("glass8");
-await writeFile(
   resolve(destination, "material.pdf"),
   await renderer.renderMaterialCard("tile", fixed({ ...ordinary(32, "business"), cardQr: true })),
 );

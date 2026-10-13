@@ -44,6 +44,7 @@ The first start may need one more step, because the file does not come from an a
 
 Start MnemoCode by a double-click. It shows a menu: choose with the arrow keys and Enter, or press the number. Follow the steps on the sheet; it names the menu entries and the answers to choose.
 
+- Printed cards end with a few codes that belong to nothing. The sheet says how many words the seed phrase has, or how many codes each share has: type only the codes from the first card on. When MnemoCode asks how many words the seed phrase has, give the number from the sheet.
 - Shares are typed one after another, separated by a semicolon (`;`).
 - When MnemoCode asks for "Dates", type the secret dates as day-month-year, such as `23-09-2026`, separated by spaces.
 - What you type is shown so that you can check it. When you press Enter at the end, the screen is cleared again.

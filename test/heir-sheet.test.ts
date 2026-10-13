@@ -33,16 +33,17 @@ async function pageSize(path: string): Promise<number[]> {
 
 /** Every kind of backup the sheet describes, with the longest wording of each. */
 const EVERY_SHEET: readonly HeirSheetFacts[] = [
-  ...(["words", "ur", "colors"] as const).flatMap((format) =>
+  ...(["words", "ur", "colors", "unicode"] as const).flatMap((format) =>
     (["direct", "seedshift"] as const).map((mode) => ({
-      backup: { kind: "shares" as const, format, threshold: 16, count: 16 },
+      // The most codes of a share on its cards: the Unicode codes of a 24-word share.
+      backup: { kind: "shares" as const, format, threshold: 16, count: 16, codes: 33 },
       mode,
       dates: mode === "direct" ? 0 : MOST_DATES,
     })),
   ),
   ...(["english", "indexes", "unicode", "colors", "colors-unicode"] as const).flatMap((format) =>
     (["direct", "seedshift", "seedshift-legacy"] as const).map((mode) => ({
-      backup: { kind: "encoded" as const, format },
+      backup: { kind: "encoded" as const, format, words: 24 as const },
       mode,
       dates: mode === "direct" ? 0 : MOST_DATES,
     })),
@@ -78,13 +79,58 @@ describe("instructions for heirs", () => {
     expect(words).toContain("https://github.com/hobby-eng/mnemocode,");
     expect(text.steps.join(" ")).toContain('answer "Yes"');
     const direct = heirSheetText({
-      backup: { kind: "encoded", format: "indexes" },
+      backup: { kind: "encoded", format: "indexes", words: 12 },
       mode: "direct",
       dates: 0,
     });
-    expect(direct.needs[1]).toBe("No secret dates are needed.");
+    // Word numbers have no cards: the sheet names the words alone.
+    expect(direct.needs[1]).toBe("The seed phrase has 12 words.");
+    expect(direct.needs[2]).toBe("No secret dates are needed.");
     expect(direct.warning).not.toContain("dates");
     expect(direct.basics.map((section) => section.heading)).not.toContain("Secret dates");
+  });
+
+  it("says how many codes are the backup, as printed cards end with decoys", () => {
+    const unicode = heirSheetText({
+      backup: { kind: "encoded", format: "unicode", words: 24 },
+      mode: "seedshift",
+      dates: 1,
+    });
+    expect(unicode.needs[1]).toBe(
+      "The seed phrase has 24 words. On printed cards its backup is the first 24 codes; the cards after them belong to nothing.",
+    );
+    // The menu asks the number of words, and the sheet gives the answer.
+    expect(unicode.steps.join(" ")).toContain(
+      'To "How many words does the seed phrase have?" answer "24 words"',
+    );
+    const colors = heirSheetText({
+      backup: { kind: "encoded", format: "colors", words: 15 },
+      mode: "direct",
+      dates: 0,
+    });
+    expect(colors.needs[1]).toContain("the first 10 codes");
+    const shares = heirSheetText({
+      backup: { kind: "shares", format: "unicode", threshold: 2, count: 3, codes: 21 },
+      mode: "direct",
+      dates: 0,
+    });
+    expect(shares.needs[1]).toBe(
+      "On printed cards each share is the first 21 codes; the cards after them belong to nothing.",
+    );
+    // Shares in Bytewords have no cards, and the sheet says nothing of them.
+    const words = heirSheetText({
+      backup: { kind: "shares", format: "words", threshold: 2, count: 3, codes: 21 },
+      mode: "direct",
+      dates: 0,
+    });
+    expect(words.needs.join(" ")).not.toContain("printed cards each share");
+    expect(() =>
+      heirSheetText({
+        backup: { kind: "shares", format: "unicode", threshold: 2, count: 3, codes: 0 },
+        mode: "direct",
+        dates: 0,
+      }),
+    ).toThrow("a whole number of codes");
   });
 
   it("leads through the route of any program, which prints its own address once", () => {
@@ -165,7 +211,7 @@ describe("instructions for heirs", () => {
     expect(() => instructions.text({ ...facts, dates: 0 })).toThrow("at least one");
     expect(() =>
       instructions.text({
-        backup: { kind: "encoded", format: "unicode" },
+        backup: { kind: "encoded", format: "unicode", words: 24 },
         mode: "direct",
         dates: 1,
       }),
@@ -178,7 +224,7 @@ describe("instructions for heirs", () => {
       instructions.text({
         ...facts,
         mode: "seedshift-legacy-valid" as never,
-        backup: { kind: "encoded", format: "english" },
+        backup: { kind: "encoded", format: "english", words: 12 },
       }),
     ).toThrow("A sheet for heirs cannot be made");
   });

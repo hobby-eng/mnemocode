@@ -11,6 +11,30 @@ export type MaterialBackdrop = "studio" | "concrete" | "tiled" | "parquet";
 
 type Color = ReturnType<typeof rgb>;
 
+/**
+ * The pitch of the cards on a sheet, in millimetres from the top left corner of the page: the
+ * middle of the gap before the first column and above the first row, and how far one column or
+ * one row is from the next. A backdrop lays its joints out by it, so that they run between the
+ * cards and every card sits in the middle of its panel or tile: joints laid out by the page alone
+ * ran along the edges of some samples, which made the samples look shifted (2026-10-13).
+ */
+export interface CardGrid {
+  readonly left: number;
+  readonly top: number;
+  readonly columnPitch: number;
+  readonly rowPitch: number;
+}
+
+/** The whole number of `pitch` nearest to `size`, at least one: a pattern's step on the grid. */
+function stepOnGrid(size: number, pitch: number): number {
+  return Math.max(1, Math.round(size / pitch)) * pitch;
+}
+
+/** Where a run of `step` that has a joint at `joint` starts, at or before the page's edge. */
+function runStart(joint: number, step: number): number {
+  return joint - Math.ceil(joint / step) * step;
+}
+
 const mix = (a: Color, b: Color, t: number): Color =>
   rgb(
     a.red + (b.red - a.red) * t,
@@ -94,7 +118,7 @@ function verticalGradient(
 
 /**
  * A showroom: a pale wall with a soft light on it, meeting a polished grey floor that reflects
- * the light in a band along the horizon.
+ * the light in a band along the horizon. It has no joints, so it follows no grid.
  */
 function drawStudio(page: PDFPage, width: number, height: number): void {
   // Where the wall meets the floor, as a share of the height from the top.
@@ -123,12 +147,15 @@ function drawStudio(page: PDFPage, width: number, height: number): void {
 }
 
 /** Exposed concrete: formwork panels with their joints and the holes of the form ties. */
-function drawConcrete(page: PDFPage, width: number, height: number): void {
-  const columns = 4;
-  // Formwork panels are twice as wide as they are high.
-  const panelWidth = width / columns;
-  const panelHeight = panelWidth / 2;
-  const rows = Math.ceil(height / panelHeight);
+function drawConcrete(page: PDFPage, width: number, height: number, grid: CardGrid): void {
+  // About four panels across the page, each a whole number of columns of cards wide; formwork
+  // panels are about twice as wide as they are high, a whole number of rows of cards.
+  const panelWidth = stepOnGrid(width / 4, grid.columnPitch);
+  const panelHeight = stepOnGrid(panelWidth / 2, grid.rowPitch);
+  const left = runStart(grid.left, panelWidth);
+  const top = runStart(grid.top, panelHeight);
+  const columns = Math.ceil((width - left) / panelWidth);
+  const rows = Math.ceil((height - top) / panelHeight);
   const base = rgb(0.8, 0.79, 0.765);
   const joint = rgb(0.6, 0.59, 0.57);
   const light = rgb(0.9, 0.89, 0.87);
@@ -136,8 +163,8 @@ function drawConcrete(page: PDFPage, width: number, height: number): void {
   const radius = panelWidth * 0.022;
   for (let row = 0; row < rows; row++) {
     for (let column = 0; column < columns; column++) {
-      const x = column * panelWidth;
-      const y = row * panelHeight;
+      const x = left + column * panelWidth;
+      const y = top + row * panelHeight;
       const tone = mix(
         base,
         shade(column, row) > 0 ? light : joint,
@@ -159,32 +186,40 @@ function drawConcrete(page: PDFPage, width: number, height: number): void {
   }
   // The joints: a dark line with a light one beside it, as an edge that catches the light.
   for (let column = 1; column < columns; column++) {
-    const x = column * panelWidth;
+    const x = left + column * panelWidth;
     line(page, [x, 0], [x, height], joint, 0.5, 0.45);
     line(page, [x + 0.35, 0], [x + 0.35, height], light, 0.4, 0.6);
   }
   for (let row = 1; row < rows; row++) {
-    const y = row * panelHeight;
+    const y = top + row * panelHeight;
     line(page, [0, y], [width, y], joint, 0.5, 0.45);
     line(page, [0, y + 0.35], [width, y + 0.35], light, 0.4, 0.6);
   }
 }
 
-/** A wall of large limestone-coloured tiles in a running bond, with light grout. */
-function drawTiles(page: PDFPage, width: number, height: number): void {
-  const tileWidth = width / 4.5;
-  const tileHeight = tileWidth / 2;
+/**
+ * A wall of large limestone-coloured tiles with light grout: in a running bond where half a tile
+ * is a whole number of columns of cards, so that its joints still run between them, and otherwise
+ * stacked.
+ */
+function drawTiles(page: PDFPage, width: number, height: number, grid: CardGrid): void {
+  // About four and a half tiles across the page, and half as high as they are wide.
+  const tileWidth = stepOnGrid(width / 4.5, grid.columnPitch);
+  const tileHeight = stepOnGrid(tileWidth / 2, grid.rowPitch);
+  const bond = Math.round(tileWidth / grid.columnPitch) % 2 === 0 ? tileWidth / 2 : 0;
   const grout = tileWidth * 0.012;
   const base = rgb(0.85, 0.83, 0.8);
   const light = rgb(0.92, 0.905, 0.88);
   const dark = rgb(0.74, 0.72, 0.69);
-  const rows = Math.ceil(height / tileHeight);
+  const left = runStart(grid.left, tileWidth);
+  const top = runStart(grid.top, tileHeight);
+  const rows = Math.ceil((height - top) / tileHeight);
   for (let row = 0; row < rows; row++) {
-    // Every other row moves by half a tile.
-    const offset = row % 2 === 0 ? 0 : -tileWidth / 2;
+    // Every other row moves by half a tile, where the bond does.
+    const offset = left - (row % 2 === 0 ? 0 : bond);
     for (let column = 0; offset + column * tileWidth < width; column++) {
       const x = offset + column * tileWidth + grout / 2;
-      const y = row * tileHeight + grout / 2;
+      const y = top + row * tileHeight + grout / 2;
       const w = tileWidth - grout;
       const h = tileHeight - grout;
       const s = shade(column, row);
@@ -199,9 +234,13 @@ function drawTiles(page: PDFPage, width: number, height: number): void {
   }
 }
 
-/** A light oak floor laid in chevron: planks cut at an angle and meeting along straight seams. */
-function drawParquet(page: PDFPage, width: number, height: number): void {
-  const columnWidth = width / 6;
+/**
+ * A light oak floor laid in chevron: planks cut at an angle and meeting along straight seams, in
+ * columns of about a sixth of the page that divide a column of cards evenly.
+ */
+function drawParquet(page: PDFPage, width: number, height: number, grid: CardGrid): void {
+  const columnWidth = grid.columnPitch / Math.max(1, Math.round(grid.columnPitch / (width / 6)));
+  const start = runStart(grid.left, columnWidth);
   const half = columnWidth / 2;
   // Planks meet at 45 degrees, so each half column rises by its own width.
   const rise = half;
@@ -211,8 +250,8 @@ function drawParquet(page: PDFPage, width: number, height: number): void {
   const dark = rgb(0.78, 0.71, 0.61);
   const edge = { color: rgb(0.62, 0.55, 0.45), width: 0.3, opacity: 0.45 };
   const rows = Math.ceil((height + rise) / plank) + 1;
-  for (let column = 0; column * columnWidth < width; column++) {
-    const left = column * columnWidth;
+  for (let column = 0; start + column * columnWidth < width; column++) {
+    const left = start + column * columnWidth;
     const middle = left + half;
     const right = left + columnWidth;
     for (let row = -1; row < rows; row++) {
@@ -248,7 +287,7 @@ function drawParquet(page: PDFPage, width: number, height: number): void {
 }
 
 const PAINTERS: Readonly<
-  Record<MaterialBackdrop, (page: PDFPage, width: number, height: number) => void>
+  Record<MaterialBackdrop, (page: PDFPage, width: number, height: number, grid: CardGrid) => void>
 > = {
   studio: drawStudio,
   concrete: drawConcrete,
@@ -256,12 +295,16 @@ const PAINTERS: Readonly<
   parquet: drawParquet,
 };
 
-/** Draws a material's backdrop over the whole page; width and height are in millimetres. */
+/**
+ * Draws a material's backdrop over the whole page, its joints between the cards of `grid`; width
+ * and height are in millimetres.
+ */
 export function drawMaterialBackdrop(
   page: PDFPage,
   backdrop: MaterialBackdrop,
   width: number,
   height: number,
+  grid: CardGrid,
 ): void {
-  PAINTERS[backdrop](page, width, height);
+  PAINTERS[backdrop](page, width, height, grid);
 }

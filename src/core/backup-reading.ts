@@ -19,6 +19,9 @@ import { parseRecord, type MnemoCodeRecord } from "../record.js";
 import { MarkedReading } from "../sskr/repair.js";
 import { Share } from "../sskr/transport.js";
 import { EncodedBackup, FIT_NO_FORM, type EncodedFormat } from "./encoded-backup.js";
+import { EncodedForm } from "./encoded-form.js";
+import { assertWordCount, type Bip39WordCount } from "./bip39-sizes.js";
+import { ENCODED_FORMATS } from "./types.js";
 import { Masking } from "./masking.js";
 import { MissingCodes } from "./missing-codes.js";
 import { detectInputFormats } from "./representations.js";
@@ -36,6 +39,11 @@ export interface ReadingRules {
   readonly seedshiftOnly: boolean;
   /** Where the host reads Shamir shares, for the refusal of a share typed here. */
   readonly shareReader: string;
+  /**
+   * The words of the seed phrase, where the person gave them: only the codes of so many words
+   * from the start are read, as printed cards end with decoys (EncodedForm.leadingCodes).
+   */
+  readonly words?: Bip39WordCount | undefined;
 }
 
 /**
@@ -59,11 +67,17 @@ const SURE_SHARE_UNKNOWN_BITS = CRC32_BYTES * BITS_PER_BYTE;
 export class BackupReading extends Redacted {
   readonly #record: MnemoCodeRecord | undefined;
   readonly #payload: string;
+  readonly #words: Bip39WordCount | undefined;
 
-  private constructor(record: MnemoCodeRecord | undefined, payload: string) {
+  private constructor(
+    record: MnemoCodeRecord | undefined,
+    payload: string,
+    words: Bip39WordCount | undefined,
+  ) {
     super("BackupReading");
     this.#record = record;
     this.#payload = payload;
+    this.#words = words;
   }
 
   /**
@@ -72,6 +86,7 @@ export class BackupReading extends Redacted {
    * Seedshift will do, and a Shamir share where an encoded seed phrase was asked for.
    */
   static of(text: string, rules: ReadingRules): BackupReading {
+    if (rules.words !== undefined) assertWordCount(rules.words);
     const record = parseRecord(text);
     if (record !== undefined && !Masking.isMaskedMode(record.mode) && rules.seedshiftOnly)
       throw new Error("Date recovery is available only for records created with Seedshift.");
@@ -82,7 +97,30 @@ export class BackupReading extends Redacted {
       throw new Error(
         `This is a Shamir share, not an encoded seed phrase: ${rules.shareReader} reads it.`,
       );
-    return new BackupReading(record, payload);
+    return new BackupReading(record, payload, rules.words);
+  }
+
+  /**
+   * The text of the codes in `format`: with the words of the phrase given, only the codes of so
+   * many words from the start (EncodedForm.leadingCodes); all of them otherwise.
+   */
+  #payloadIn(format: EncodedFormat): string {
+    if (this.#words === undefined) return this.#payload;
+    return EncodedForm.of(format).leadingCodes(this.#payload, this.#words);
+  }
+
+  /** The text of the codes in the form that their characters most likely are (#payloadIn). */
+  get #likelyPayload(): string {
+    return this.#payloadIn(EncodedForm.likely(this.#payload));
+  }
+
+  /**
+   * The forms that `detect` finds the codes to fit, each tried on its own leading codes where the
+   * words of the phrase were given (#payloadIn).
+   */
+  #fitting(detect: (payload: string) => EncodedFormat[]): EncodedFormat[] {
+    if (this.#words === undefined) return detect(this.#payload);
+    return ENCODED_FORMATS.filter((format) => detect(this.#payloadIn(format)).includes(format));
   }
 
   /**
@@ -146,7 +184,7 @@ export class BackupReading extends Redacted {
    */
   formats(given?: EncodedFormat): EncodedFormat[] {
     return this.#formatsOf(given, detectInputFormats, () =>
-      EncodedBackup.whyUnreadable(this.#payload),
+      EncodedBackup.whyUnreadable(this.#likelyPayload),
     );
   }
 
@@ -161,7 +199,7 @@ export class BackupReading extends Redacted {
   ): EncodedFormat[] {
     const named = this.#namedFormat(given);
     if (named !== undefined) return [named];
-    const fitting = detect(this.#payload);
+    const fitting = this.#fitting(detect);
     if (fitting.length === 0) throw new Error(none());
     return fitting;
   }
@@ -177,7 +215,7 @@ export class BackupReading extends Redacted {
 
   /** Whether the codes mark some that cannot be read (MissingCodes.marked), to be searched. */
   get marked(): boolean {
-    return MissingCodes.marked(this.#payload);
+    return MissingCodes.marked(this.#likelyPayload);
   }
 
   /**
@@ -194,7 +232,7 @@ export class BackupReading extends Redacted {
 
   /** The marked codes in `format`, taken as not masked until the host gives their mode. */
   missingCodes(format: EncodedFormat): MissingCodes {
-    return MissingCodes.read(this.#payload, format, "direct");
+    return MissingCodes.read(this.#payloadIn(format), format, "direct");
   }
 
   /**
@@ -203,7 +241,7 @@ export class BackupReading extends Redacted {
    * may find the checksum missing (MissingChecksum).
    */
   codes(format: EncodedFormat): EncodedBackup {
-    return EncodedBackup.read(this.#payload, format, "direct");
+    return EncodedBackup.read(this.#payloadIn(format), format, "direct");
   }
 }
 

@@ -2,6 +2,7 @@
 // saved where the options say (sskr-output.ts).
 
 import { terminalNotice, terminalResultHeader } from "./terminal.js";
+import { ownShareCards } from "../export/sskr-render.js";
 import { reportRenamedOutputs } from "./output-paths.js";
 import { assertSingleValues, integerOption, value, type ParsedArguments } from "./arguments.js";
 import { encodeFormat, phraseAndDates, transformMode } from "./input.js";
@@ -64,8 +65,9 @@ export async function runSskrSplit(args: ParsedArguments, integrated = false): P
   // A save that fails is offered again or skipped (saveWithRetry): the shares are shown below
   // either way, and only once every save is settled, so that none is lost to a failure.
   await saveShares(inForm(shares, format), args, options, Masking.of(mode).masked);
+  const codes = ownShareCards(shares[0]!, format);
   await saveHeirSheetOutput(args, {
-    backup: { kind: "shares", format, threshold, count },
+    backup: { kind: "shares", format, threshold, count, ...(codes === undefined ? {} : { codes }) },
     mode,
     dates: dateValues.length,
   });

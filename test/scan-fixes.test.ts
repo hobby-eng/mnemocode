@@ -138,7 +138,6 @@ import {
 import {
   CARD_FORMAT_NUMBERS,
   COLOR_FORMAT_NUMBERS,
-  formatNumber,
   noCardTemplateMessage,
 } from "../src/cli/format-numbers.js";
 import { ENCODED_FORMATS, isEncodedFormat, isMaskingMode } from "../src/core/types.js";
@@ -160,7 +159,6 @@ import {
   encodeMnemonic,
   formatEncoded,
   representMnemonic,
-  indexesToColors,
 } from "../src/core.js";
 import { listInWords } from "../src/core/places.js";
 import { parseSskrLayout, resolveSskrLayout } from "../src/export/sskr-content.js";
@@ -296,13 +294,7 @@ import { designTexts, resolveCardPresentation } from "../src/export/card-copy.js
 import { ExportDetails } from "../src/export/export-details.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
-import {
-  cardCount,
-  ONE_REFERENCE_PER_CARD,
-  assertCardIndex,
-  pageFileName,
-  separateCardName,
-} from "../src/export/card-codes.js";
+import { assertCardIndex, pageFileName, separateCardName } from "../src/export/card-codes.js";
 import { validateCardOptions, cardOutputs } from "../src/cli/card-options.js";
 import { exportOptions } from "../src/cli/sskr-output.js";
 import { cardFileFormat } from "../src/cli/image-options.js";
@@ -325,6 +317,7 @@ import { NOT_UTF8, InputCancelled } from "../src/cli/terminal-input.js";
 import {
   isUnusableOutputPath,
   validateOutputPaths,
+  preflightFileDestination,
   preflightFolderDestination,
 } from "../src/cli/output-paths.js";
 import {
@@ -356,7 +349,7 @@ import {
 } from "../src/export/collection-sheet.js";
 import * as cardQrModule from "../src/export/card-qr.js";
 import { renderBusinessCards } from "../src/export/business-cards.js";
-import { renderGlassCards } from "../src/export/glass-cards.js";
+import { MAX_DECOYS } from "../src/export/card-decoys.js";
 import { separateCardPage } from "../src/export/business-layout.js";
 import { renderMaterialCard } from "../src/export/material-cards.js";
 import { materialArtwork } from "../src/export/material-artwork.js";
@@ -1117,14 +1110,14 @@ describe("S016: which forms print on cards, in one place", () => {
     expect(ENCODED_FORMATS.map((format) => cardKindOf(format))).toEqual([
       undefined,
       undefined,
-      // Unicode codes have no cards (owner, 2026-10-09).
-      undefined,
+      // Unicode codes have cards, whose colors decorate them (owner, 2026-10-13).
+      "colors",
       "colors",
       "colors",
     ]);
     expect(ENCODED_FORMATS.filter(writtenInColors)).toEqual(["colors-unicode", "colors"]);
     expect(COLOR_FORMAT_NUMBERS).toBe("4 and 5");
-    expect(CARD_FORMAT_NUMBERS).toBe("4 or 5");
+    expect(CARD_FORMAT_NUMBERS).toBe("3, 4 or 5");
     expect(isColorShareFormat("colors-unicode")).toBe(true);
     expect(isColorShareFormat("unicode")).toBe(false);
   });
@@ -1297,7 +1290,7 @@ describe("S030: each list of values has one source", () => {
     expect(parseImageFormat("jpeg")).toBe("jpg");
     expect(parseImageFormat(undefined)).toBe("png");
     expect(() => parseImageFormat("gif")).toThrow("one of: png, jpg; jpeg is accepted");
-    expect(() => parsePageSize("letter")).toThrow("Page size must be a6, a4 or business.");
+    expect(() => parsePageSize("letter")).toThrow("Page size must be a6, a5, a4 or business.");
     expect(choiceOption({ "input-kind": "share" }, "input-kind", ["codes", "share"])).toBe("share");
     expect(() => choiceOption({ "backup-check": "maybe" }, "backup-check", ["yes", "no"])).toThrow(
       "--backup-check must be yes or no.",
@@ -1395,7 +1388,9 @@ describe("S036: each form of codes knows its own facts", () => {
     }
     expect(EncodedForm.likely("\u{E000}\u{E001}")).toBe("colors-unicode");
     expect(EncodedForm.of("indexes").unit).toBe("word numbers");
-    expect(EncodedForm.of("unicode").cardKind).toBeUndefined();
+    expect(EncodedForm.of("unicode").cardKind).toBe("colors");
+    expect(EncodedForm.of("unicode").writtenInColors).toBe(false);
+    expect(EncodedForm.of("indexes").cardKind).toBeUndefined();
     expect(EncodedForm.of("english").alwaysMasked).toBe(true);
     expect(() => EncodedForm.of("json" as never)).toThrow("Unsupported encoded format: json.");
   });
@@ -1801,9 +1796,12 @@ describe("S078: the rules of printable cards have one owner", () => {
 
   it("draws the dry run with the longest sample phrase in the form of the codes", () => {
     expect(LONGEST_SAMPLE_WORDS).toBe(Math.max(...SAMPLE_WORD_COUNTS));
-    expect(() => new CardPreviewClass(nodeCardRenderer, { colorForm: "unicode" })).toThrow(
-      "Colour cards are not written as unicode.",
+    expect(() => new CardPreviewClass(nodeCardRenderer, { colorForm: "indexes" })).toThrow(
+      "Colour cards are not written as indexes.",
     );
+    // Unicode codes have cards, which print them.
+    const unicode = new CardPreviewClass(nodeCardRenderer, { colorForm: "unicode" });
+    expect(unicode.content(CardPreviewClass.templates[0]!).labels).toBeDefined();
     const preview = new CardPreviewClass(nodeCardRenderer, { colorForm: "colors-unicode" });
     const colors = CardPreviewClass.templates.find((template) => template.kind === "colors")!;
     const content = preview.content(colors);
@@ -1828,9 +1826,6 @@ describe("S079: one catalog of designs and one reader of their numbers", () => {
       "material-tile",
       "material-switch",
       "material-kitchen",
-      "business-glass-4in1",
-      "business-glass-6in1",
-      "business-glass-8in1",
     ]);
     expect(cardTemplates.map((template) => template.id)).toEqual(
       TEMPLATE_CATALOG.map((entry) => entry.id),
@@ -1859,27 +1854,16 @@ describe("S079: one catalog of designs and one reader of their numbers", () => {
 });
 
 describe("S080: one list of the styles of the designs", () => {
-  it("derives the business styles, the texts of a design and the share card styles from it", () => {
+  it("derives the business styles, the texts of a design and the share card styles from it", async () => {
     expect(businessStyles).toEqual(BUSINESS_STYLES.filter((style) => style !== "mixed"));
     expect(designTexts("material-tile", false)).toEqual(["studioName", "subtitle"]);
-    expect(designTexts("business-glass-6in1", false)).toEqual([]);
     expect(designTexts("business-it", false)).toEqual(["referenceLabel"]);
     expect(designTexts("11", false)).toEqual(["studioName", "subtitle"]);
     for (const entry of TEMPLATE_CATALOG) expect(designOfStyle(entry.style)).toBe(entry);
     expect(designOfStyle("business-it")).toBeUndefined();
-    expect(() => new ShareCardSet(nodeCardRenderer, [], { style: "nowhere" as never })).toThrow(
-      "Unsupported SSKR card style.",
-    );
-  });
-});
-
-describe("S081: one count of cards", () => {
-  it("counts the cards of every design alike", () => {
-    expect(cardCount(12)).toBe(12);
-    expect(cardCount(12, 8)).toBe(2);
-    expect(cardCount(16, 8)).toBe(2);
-    expect(cardCount(17, 8)).toBe(3);
-    expect(ONE_REFERENCE_PER_CARD).toBe(1);
+    await expect(
+      ShareCardSet.create(nodeCardRenderer, [], { style: "nowhere" as never }),
+    ).rejects.toThrow("Unsupported SSKR card style.");
   });
 });
 
@@ -2018,6 +2002,17 @@ describe("S090: one owner of the rules of output paths", () => {
       await expect(
         preflightFolderDestination(join(root, "a", "b", "cards")),
       ).resolves.toBeUndefined();
+      // A folder named like a file that an export writes is refused, whatever its case.
+      for (const name of ["cards.pdf", "pages.PNG", "pages.jpg", "pages.jpeg/"])
+        await expect(preflightFolderDestination(join(root, name)), name).rejects.toThrow(
+          "A new folder needs a name without .",
+        );
+      await expect(preflightFolderDestination(join(root, "cards.v2"))).resolves.toBeUndefined();
+      // A file named like a folder that stands in its way: the message says so.
+      await mkdir(join(root, "taken.pdf"));
+      await expect(preflightFileDestination(join(root, "taken.pdf"), true)).rejects.toThrow(
+        "A folder has this name; give the file another name, or a name inside that folder.",
+      );
       expect(await entryAt(file)).toBe("other");
       await expect(absentPath(" ", "taken")).rejects.toThrow("A new folder needs a path");
     } finally {
@@ -2114,13 +2109,13 @@ describe("S101: the sizes of cards and paper are named once", () => {
 });
 
 describe("S107 and S109: the sheet capacity and the separate cards have one owner each", () => {
-  it("fits the cards of the longest share on one sheet in every form that prints codes", () => {
+  it("fits the cards of the longest share and its decoys on one sheet in every form with cards", async () => {
     const { deterministic } = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
       deterministic: { shares: string[] }[];
     };
     const longest = deterministic.at(-1)!.shares;
-    for (const shareFormat of ["indexes", "unicode", "words", "ur"] as const) {
-      const cards = new ShareCardSet(nodeCardRenderer, longest, {
+    for (const shareFormat of ["unicode", "colors", "colors-unicode"] as const) {
+      const cards = await ShareCardSet.create(nodeCardRenderer, longest, {
         style: "architect",
         layout: "individual",
         shareFormat,
@@ -2131,10 +2126,8 @@ describe("S107 and S109: the sheet capacity and the separate cards have one owne
   });
 
   it("names a separate card by its place and first code", () => {
-    expect(separateCardName({ colors: ["#a3f09c", "#000000"] }, 0, 1)).toBe("01-A3F09C");
-    expect(separateCardName({ colors: ["#000000"], labels: ["12 345 6"] }, 0, 4)).toBe(
-      "01-12-345-6",
-    );
+    expect(separateCardName({ colors: ["#a3f09c", "#000000"] }, 1)).toBe("02-000000");
+    expect(separateCardName({ colors: ["#000000"], labels: ["12 345 6"] }, 0)).toBe("01-12-345-6");
   });
 });
 
@@ -2216,7 +2209,7 @@ describe("S111: the invented details of an export have one owner", () => {
     ExportDetails.of(choose, {}, "it");
     expect(limits).toEqual([37, 30, 5, 6, 5, 60, 16]);
     limits.length = 0;
-    // The business and glass designs choose the person first (ExportDetails.ofPersonFirst).
+    // The business designs choose the person first (ExportDetails.ofPersonFirst).
     ExportDetails.ofPersonFirst(choose, {}, "it");
     expect(limits).toEqual([5, 60, 16, 37, 30, 5, 6]);
   });
@@ -2227,11 +2220,10 @@ describe("S114: a kind of card without a design is refused by its kind", () => {
     expect(new NoCardTemplate(undefined).message).toBe("No card template is installed.");
     expect(new NoCardTemplate("colors").kind).toBe("colors");
     expect(new NoCardTemplate("colors").message).not.toMatch(/\d/u);
-    expect(noCardTemplateMessage(new NoCardTemplate("colors"))).toContain("use format 4 or 5");
-    // Unicode codes have no cards (owner, 2026-10-09): their refusal names the forms that do.
-    const drawn = ENCODED_FORMATS.filter(writtenInColors).map(formatNumber);
-    expect(() => validateCardOptions({ pdf: "cards.pdf" }, "unicode")).toThrow(
-      `Card export requires format ${drawn.join(" or ")}.`,
+    expect(noCardTemplateMessage(new NoCardTemplate("colors"))).toContain("use format 3, 4 or 5");
+    // Word numbers have no cards: their refusal names the forms that do.
+    expect(() => validateCardOptions({ pdf: "cards.pdf" }, "indexes")).toThrow(
+      `Card export requires format ${CARD_FORMAT_NUMBERS}.`,
     );
   });
 });
@@ -2249,7 +2241,7 @@ describe("S115: the sizes of the sheet for heirs are the library's", () => {
 describe("S116: every printed heading of the sheet for heirs is in its text", () => {
   it("names the headings in the text and points the front to the back's titles", () => {
     const text = heirSheetText({
-      backup: { kind: "encoded", format: "indexes" },
+      backup: { kind: "encoded", format: "indexes", words: 12 },
       mode: "seedshift",
       dates: 1,
     });
@@ -2762,20 +2754,21 @@ describe("G1-016 and G1-017: one source of the files of cards and of drawing the
 });
 
 describe("G1-022: a set of share cards says the layout it resolved to", () => {
-  it("gives separate cards for the business size, a sheet for A6, and QR cards when asked", () => {
+  it("gives separate cards for the business size, a sheet for A6, and QR cards when asked", async () => {
     const { deterministic } = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
       deterministic: { shares: string[] }[];
     };
     const shares = deterministic[0]!.shares;
     expect(
-      new ShareCardSet(nodeCardRenderer, shares, { style: "it", pageSize: "business" }).layout,
+      (await ShareCardSet.create(nodeCardRenderer, shares, { style: "it", pageSize: "business" }))
+        .layout,
     ).toBe("individual");
-    expect(new ShareCardSet(nodeCardRenderer, shares, { style: "it", pageSize: "a6" }).layout).toBe(
-      "collection",
-    );
-    expect(new ShareCardSet(nodeCardRenderer, shares, { style: "it", layout: "qr" }).layout).toBe(
-      "qr",
-    );
+    expect(
+      (await ShareCardSet.create(nodeCardRenderer, shares, { style: "it", pageSize: "a6" })).layout,
+    ).toBe("collection");
+    expect(
+      (await ShareCardSet.create(nodeCardRenderer, shares, { style: "it", layout: "qr" })).layout,
+    ).toBe("qr");
   });
 });
 
@@ -3035,12 +3028,11 @@ describe("S104: one conversion to PDF points and one centring of text and of run
     ).toThrow("Line is too long");
   });
 
-  it("draws a card's artwork inside its rounded clip, the image where it is asked", () => {
+  it("draws a card's artwork inside its rounded clip, in the card's box", () => {
     const { page, drawn } = recordingPage(50);
     const box = { x: 5, y: 5, width: 40, height: 20 };
-    const wider = { ...box, x: 4, width: 42 };
-    drawClippedArtwork(page, {} as PDFImage, box, wider);
-    expect(drawn.images).toEqual([pdfRect(page, wider)]);
+    drawClippedArtwork(page, {} as PDFImage, box);
+    expect(drawn.images).toEqual([pdfRect(page, box)]);
     expect(drawn.operators[0]).toBe("q");
     expect(drawn.operators.at(-1)).toBe("Q");
   });
@@ -3103,9 +3095,6 @@ describe("S096: one rule decides between a separate card and a sheet", () => {
     await expect(renderBusinessCards(nodeCardRenderer, "it", share, 99)).rejects.toThrow(
       "There is no card 100",
     );
-    await expect(renderGlassCards(nodeCardRenderer, share, 99, 4)).rejects.toThrow(
-      "There is no card 100",
-    );
     await expect(
       renderMaterialCard(nodeCardRenderer, "tile", share, { individualIndex: 99 }),
     ).rejects.toThrow("There is no card 100");
@@ -3124,12 +3113,11 @@ describe("S096: one rule decides between a separate card and a sheet", () => {
     });
     const sheets = [
       await renderBusinessCards(renderer, "it", share, 0),
-      await renderGlassCards(renderer, share, 0, 4),
       // Before the rule was shared, the material family drew a separate card here.
       await renderMaterialCard(renderer, "tile", share, { individualIndex: 0 }),
     ];
-    expect(qr).toHaveBeenCalledTimes(3);
-    expect(payloads).toEqual(Array(3).fill(share.payload));
+    expect(qr).toHaveBeenCalledTimes(2);
+    expect(payloads).toEqual(Array(2).fill(share.payload));
     for (const bytes of sheets) {
       const { width, height } = (await ScanPdfDocument.load(bytes)).getPage(0).getSize();
       expect([width, height].map((side) => Math.round(side / LAYOUT_MM))).toEqual(
@@ -3179,9 +3167,6 @@ describe("S097: one driver draws the collection sheet of every family", () => {
     expect(doc.getPageCount()).toBe(1);
     const width = studyCaptionWidth(font, captions.flat());
     expect(layout).toEqual(collectionSheetLayout({ pageSize: "a6" }, 2, 1.8, 2, undefined, width));
-    // A design may keep more room for each caption than its captions take.
-    const roomier = await drawCollectionStudy({ ...study, captionLines: 4 });
-    expect(roomier).toEqual(collectionSheetLayout({ pageSize: "a6" }, 2, 1.8, 4, undefined, width));
   });
 });
 
@@ -3248,24 +3233,6 @@ describe("S098, S099: a separate card is one card centred on its page", () => {
     expect(() => separateCardPage({ pageSize: "wallet" as never }, width, height)).toThrow(
       "Page size must be",
     );
-  });
-
-  it("draws a separate card of six references at the business size", async () => {
-    const colors = indexesToColors(
-      representMnemonic(
-        "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-      ).shiftedIndexes,
-    );
-    const bytes = await renderGlassCards(
-      nodeCardRenderer,
-      { kind: "colors", colors, payload: colors.join(" ") },
-      0,
-      6,
-    );
-    const pdf = await ScanPdfDocument.load(bytes);
-    expect(pdf.getPageCount()).toBe(1);
-    const { width, height } = pdf.getPage(0).getSize();
-    expect([width / LAYOUT_MM, height / LAYOUT_MM].map(Math.round)).toEqual([90, 50]);
   });
 });
 
@@ -3342,7 +3309,7 @@ describe("S108: the renderers and the share modules keep no platform of their ow
     ]);
   });
 
-  it("draws share cards with the renderer given: its details, and decoration unless given", () => {
+  it("draws share cards with the renderer given: its details, and decoys unless given", async () => {
     const limits: number[] = [];
     const renderer = new CardRenderer({
       ...nodeRenderPlatform,
@@ -3351,16 +3318,17 @@ describe("S108: the renderers and the share modules keep no platform of their ow
         return 0;
       },
     });
-    const options = { style: "it", shareFormat: "words" } as const;
-    new ShareCardSet(renderer, [PUBLIC_SHARE], options);
-    // The invented person and texts, then one decorative colour (2^24 codes) per card.
-    const decorations = limits.filter((limit) => limit === 2 ** 24).length;
-    expect(decorations).toBeGreaterThan(0);
-    expect(limits.length).toBeGreaterThan(decorations);
+    // Colors, whose decoys are random colors (2^24 codes).
+    const options = { style: "it" } as const;
+    await ShareCardSet.create(renderer, [PUBLIC_SHARE], options);
+    // The invented person and texts, then the pool of decoys (MAX_DECOYS colors).
+    const decoys = limits.filter((limit) => limit === 2 ** 24).length;
+    expect(decoys).toBe(MAX_DECOYS);
+    expect(limits.length).toBeGreaterThan(decoys);
     limits.length = 0;
     const own: number[] = [];
-    new ShareCardSet(renderer, [PUBLIC_SHARE], options, (limit) => own.push(limit) && 0);
-    expect(own.length).toBe(decorations);
+    await ShareCardSet.create(renderer, [PUBLIC_SHARE], options, (limit) => own.push(limit) && 0);
+    expect(own.length).toBe(decoys);
     expect(limits).not.toContain(2 ** 24);
     expect(limits.length).toBeGreaterThan(0);
   });
@@ -3374,7 +3342,7 @@ describe("S108: the renderers and the share modules keep no platform of their ow
       },
     };
     const text = heirSheetText({
-      backup: { kind: "encoded", format: "english" },
+      backup: { kind: "encoded", format: "english", words: 12 },
       mode: "direct",
       dates: 0,
     });

@@ -40,9 +40,9 @@ export function cardKindOf(form: EncodedFormat): CardKind | undefined {
   return EncodedForm.of(form).cardKind;
 }
 
-/** Whether `form` is written in colors: its cards show colors, and the terminal colour cards. */
+/** Whether `form` is written in colors: its cards print colors, and the terminal colour cards. */
 export function writtenInColors(form: EncodedFormat): boolean {
-  return cardKindOf(form) === "colors";
+  return EncodedForm.of(form).writtenInColors;
 }
 
 /**

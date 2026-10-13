@@ -12,7 +12,7 @@
 // (src/cli/heir-sheet.ts), a page through its tabs.
 // Does not: lay out the sheet (export/heir-sheet.ts renders these words in A5 or A6) or save it.
 
-import { WORD_NUMBERS } from "../core/bip39-sizes.js";
+import { assertWordCount, WORD_NUMBERS, type Bip39WordCount } from "../core/bip39-sizes.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { Masking, type HeirSheetMode, type SplitMode } from "../core/masking.js";
 import {
@@ -20,7 +20,7 @@ import {
   MAX_GROUP_MEMBERS,
   MIN_RECORDED_THRESHOLD,
 } from "../sskr/share-layout.js";
-import { parseShareFormat, type ShareFormat } from "../sskr/transport.js";
+import { parseShareFormat, shareFormatHasCards, type ShareFormat } from "../sskr/transport.js";
 import type { HeirSheetSection, HeirSheetText } from "./heir-sheet.js";
 import type { EncodedFormat } from "../core/types.js";
 
@@ -30,14 +30,20 @@ export type HeirMode = HeirSheetMode;
 /** How shares may have been masked before the split: a heir-sheet mode in which shares are made. */
 export type HeirShareMode = Extract<HeirSheetMode, SplitMode>;
 
-/** What was made: the seed phrase in one encoded form, or Shamir shares of it. */
+/**
+ * What was made: the seed phrase of `words` words in one encoded form, or Shamir shares of it, each
+ * of `codes` codes on its cards where its form has cards. The sheet says how many codes are the
+ * backup, as printed cards end with decoys that belong to nothing (owner, 2026-10-13).
+ */
 export type HeirBackup =
-  | { readonly kind: "encoded"; readonly format: EncodedFormat }
+  | { readonly kind: "encoded"; readonly format: EncodedFormat; readonly words: Bip39WordCount }
   | {
       readonly kind: "shares";
       readonly format: ShareFormat;
       readonly threshold: number;
       readonly count: number;
+      /** The codes of one share on its cards, before the decoys; where its form has cards. */
+      readonly codes?: number;
     };
 
 export interface HeirSheetFacts {
@@ -60,10 +66,11 @@ export interface HeirRoute {
   /** The steps that get the program and start it offline. */
   readonly start: readonly string[];
   /**
-   * The steps that open the restore of an encoded backup made in `mode` and type it, then
-   * `dates` (such as "the secret date as day-month-year (23-09-2026)") unless it was not masked.
+   * The steps that open the restore of an encoded backup of `words` words made in `mode` and type
+   * it, then `dates` (such as "the secret date as day-month-year (23-09-2026)") unless it was not
+   * masked.
    */
-  decode(mode: HeirMode, dates: string | undefined): readonly string[];
+  decode(mode: HeirMode, words: Bip39WordCount, dates: string | undefined): readonly string[];
   /** The steps that open the restore from shares and type `threshold` of them, then `dates`. */
   restore(mode: HeirShareMode, threshold: number, dates: string | undefined): readonly string[];
   /** What to do when a digit of a date cannot be read, or undefined where nothing searches it. */
@@ -115,6 +122,22 @@ function wholeAddress(address: string): RegExp | undefined {
   return new RegExp(`${escaped}(?=$|[\\s,"]|[.;:!?)](?:\\s|$))`, "gu");
 }
 
+/** What printed cards end with: decoys, which the sheet tells apart by their count. */
+const DECOYS_AFTER = "the cards after them belong to nothing";
+
+/** The line that says how many codes of printed cards are the backup, or none without cards. */
+function printedCodesLine(backup: HeirBackup): string[] {
+  if (backup.kind === "shares")
+    return backup.codes !== undefined && shareFormatHasCards(backup.format)
+      ? [`On printed cards each share is the first ${backup.codes} codes; ${DECOYS_AFTER}.`]
+      : [];
+  const form = EncodedForm.of(backup.format);
+  const words = `The seed phrase has ${backup.words} words.`;
+  if (form.cardKind === undefined) return [words];
+  const codes = form.elementCount(backup.words);
+  return [`${words} On printed cards its backup is the first ${codes} codes; ${DECOYS_AFTER}.`];
+}
+
 function needs({ backup, mode, dates }: HeirSheetFacts): string[] {
   const lines =
     backup.kind === "shares"
@@ -122,8 +145,9 @@ function needs({ backup, mode, dates }: HeirSheetFacts): string[] {
           `Any ${backup.threshold} of the ${backup.count} Shamir shares, written as ${SHARE_LOOKS[backup.format]}.`,
         ]
       : !Masking.of(mode).masked && backup.format === "english"
-        ? ["The seed phrase itself: English words, not masked."]
-        : [`The backup: ${ENCODED_LOOKS[backup.format]}.`];
+        ? [`The seed phrase itself: ${backup.words} English words, not masked.`]
+        : [`The backup: ${ENCODED_LOOKS[backup.format]}.`, ...printedCodesLine(backup)];
+  if (backup.kind === "shares") lines.push(...printedCodesLine(backup));
   lines.push(
     !Masking.of(mode).masked
       ? "No secret dates are needed."
@@ -195,10 +219,13 @@ function assertBackup(backup: HeirBackup): void {
   switch (backup?.kind) {
     case "encoded":
       EncodedForm.of(backup.format);
+      assertWordCount(backup.words);
       return;
     case "shares":
       parseShareFormat(backup.format);
       assertQuorum(backup.threshold, backup.count);
+      if (backup.codes !== undefined && (!Number.isSafeInteger(backup.codes) || backup.codes < 1))
+        throw new Error("A sheet for heirs needs a whole number of codes for each share.");
       return;
     default:
       throw new Error("A sheet for heirs is made for an encoded backup or for Shamir shares.");
@@ -301,7 +328,7 @@ export class HeirInstructions {
     const open =
       backup.kind === "shares"
         ? route.restore(mode as HeirShareMode, backup.threshold, typedDates)
-        : route.decode(mode, typedDates);
+        : route.decode(mode, backup.words, typedDates);
     return [...route.start, ...open, OPEN_WALLET];
   }
 

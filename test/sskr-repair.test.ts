@@ -313,16 +313,56 @@ describe("Unreadable digits inside a color or a Unicode code", () => {
     ).toBe(share);
   });
 
+  it("reads a ? for a digit of a Color Unicode code written apart, and its color's candidates", () => {
+    const codes = shareUnits(share, "colors-unicode").flatMap((color) => color.match(/.{4}/gu)!);
+    const digit = (code: string, at: number) => `${code.slice(0, at)}?${code.slice(at + 1)}`;
+    // One digit, two digits of one code, a digit beside a code that cannot be read at all.
+    for (const marked of [
+      codes.map((code, i) => (i === 3 ? digit(code, 2) : code)),
+      codes.map((code, i) => (i === 4 ? digit(digit(code, 1), 2) : code)),
+      codes.map((code, i) => (i === 6 ? "?" : i === 7 ? digit(code, 0) : code)),
+      codes.map((code, i) => (i === 1 ? digit(code, 3) : i === 12 ? digit(code, 0) : code)),
+    ]) {
+      const repaired = readRepairableShare(marked.join(" "));
+      expect(repaired.ur).toBe(share);
+      // Each marked color is filled in as its two codes, by its place among the colors.
+      for (const element of repaired.filled)
+        expect(element.value).toBe(
+          codes[(element.position - 1) * 2]! + codes[(element.position - 1) * 2 + 1]!,
+        );
+    }
+    // A code read in part counts as one element; a digit that no code fits leaves no share.
+    expect(markCount(codes.map((code, i) => (i === 3 ? digit(code, 2) : code)).join(" "))).toBe(1);
+    expect(() =>
+      readRepairableShare(codes.map((code, i) => (i === 3 ? "1?00" : code)).join(" ")),
+    ).toThrow();
+  });
+
+  it("says what a ? means in codes run together where it marks a digit", () => {
+    const codes = shareUnits(share, "colors-unicode").flatMap((color) => color.match(/.{4}/gu)!);
+    const joined = codes.map((code, i) =>
+      i === 3 ? `${code.slice(0, 2)}?${code.slice(3)}` : code,
+    );
+    expect(() => readRepairableShare(joined.join(""))).toThrow(
+      "In codes run together, a ? stands for a whole code; to mark one digit, write the codes apart, as the screen shows them.",
+    );
+    // Written apart, the same mark is a digit.
+    expect(readRepairableShare(joined.join(" ")).ur).toBe(share);
+  });
+
   it("names a misplaced ? by the form the other codes are in", () => {
     const colors = shareUnits(share, "colors");
     const joined = colors.map((color, i) => (i === 2 ? color.slice(0, 4) + "?" : color)).join("");
     expect(markProblem(joined)).toBe(
       "color 3 has 4 of 6 symbols: write a ? for each digit that cannot be read, or a lone ? for the whole color.",
     );
-    const colorCodes = shareUnits(share, "colors-unicode");
-    colorCodes[4] = `${colorCodes[4]!.slice(0, 3)}?`;
+    // Color Unicode codes take a ? for a digit too, but keep their four symbols.
+    const colorCodes = shareUnits(share, "colors-unicode").flatMap((color) =>
+      color.match(/.{4}/gu)!,
+    );
+    colorCodes[4] = `${colorCodes[4]!.slice(0, 2)}?`;
     expect(markProblem(colorCodes.join(" "))).toBe(
-      "code 5 has a ? among its digits: Color Unicode codes take only a lone ? for a whole code.",
+      "code 5 has 3 of 4 symbols: write a ? for each digit that cannot be read, or a lone ? for the whole code.",
     );
     const numbers = shareUnits(share, "indexes");
     numbers[2] = `${numbers[2]!.slice(0, -1)}?`;

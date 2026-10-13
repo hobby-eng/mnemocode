@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDict, PDFDocument, rgb } from "pdf-lib";
 import { pageOperators } from "./helpers/pdf-content.js";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -40,9 +40,9 @@ const fixedIdentity = {
 };
 
 describe("export infrastructure", () => {
-  it("ships sixteen approved templates with individual export", () => {
-    expect(cardTemplates).toHaveLength(16);
-    expect(new Set(cardTemplates.map((t) => t.id)).size).toBe(16);
+  it("ships thirteen approved templates with individual export", () => {
+    expect(cardTemplates).toHaveLength(13);
+    expect(new Set(cardTemplates.map((t) => t.id)).size).toBe(13);
     for (const template of cardTemplates) expect(template.renderIndividual).toBeTypeOf("function");
   });
 
@@ -52,9 +52,6 @@ describe("export infrastructure", () => {
     "material-tile",
     "material-switch",
     "material-kitchen",
-    "business-glass-4in1",
-    "business-glass-6in1",
-    "business-glass-8in1",
   ])("keeps an enabled collection QR off the individual %s front", async (id) => {
     const template = selectTemplate(id);
     for (const pageSize of [undefined, "business"] as const) {
@@ -102,9 +99,22 @@ describe("export infrastructure", () => {
     };
     const jobs = [{ template, content }];
     const original = await PDFDocument.load(bytes);
-    const preview = await PDFDocument.load(await renderCards(nodeCardRenderer, jobs), {
-      updateMetadata: false,
-    });
+    const previewBytes = await renderCards(nodeCardRenderer, jobs);
+    const preview = await PDFDocument.load(previewBytes, { updateMetadata: false });
+    // No information dictionary is written, so no time of the export either (owner, 2026-10-13):
+    // none in the trailer, and no object of the file, compressed or not, holds a date.
+    const undated = async (file: Uint8Array) => {
+      const document = await PDFDocument.load(file, { updateMetadata: false });
+      expect(document.context.trailerInfo.Info).toBeUndefined();
+      expect(document.getCreationDate()).toBeUndefined();
+      const keys = document.context
+        .enumerateIndirectObjects()
+        .flatMap(([, object]) => (object instanceof PDFDict ? object.keys() : []))
+        .map((key) => key.asString());
+      for (const key of ["/CreationDate", "/ModDate", "/Producer"])
+        expect(keys, key).not.toContain(key);
+    };
+    await undated(previewBytes);
     const verify = (document: PDFDocument) => {
       expect(document.getPageCount()).toBe(original.getPageCount());
       expect(document.getPage(0).getSize()).toEqual(original.getPage(0).getSize());
@@ -124,7 +134,9 @@ describe("export infrastructure", () => {
     try {
       const path = join(directory, "test.pdf");
       await exportCards(jobs, path);
-      verify(await PDFDocument.load(await readFile(path), { updateMetadata: false }));
+      const saved = await readFile(path);
+      await undated(saved);
+      verify(await PDFDocument.load(saved, { updateMetadata: false }));
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

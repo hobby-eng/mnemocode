@@ -162,30 +162,34 @@ describe("material selection cards", () => {
     expect((operators(pdf)[0].match(/\nW\*\nn\n/gu) ?? []).length).toBe(tints);
   });
 
-  it.each(["business", "a6", "a4"] as const)("honors both orientations for %s", async (size) => {
-    const expected: Record<MaterialPageSize, [number, number]> = {
-      business: [90, 50],
-      a6: [148, 105],
-      a4: [297, 210],
-    };
-    for (const orientation of ["landscape", "portrait"] as const) {
-      const pdf = await PDFDocument.load(
-        await renderMaterialCard(
-          nodeCardRenderer,
-          "vehicle",
-          { ...content, orientation },
-          { pageSize: size },
-        ),
-      );
-      const dimensions =
-        orientation === "portrait" ? [...expected[size]].reverse() : expected[size];
-      expect(pdf.getPageCount()).toBe(1);
-      for (const page of pdf.getPages()) {
-        expect((page.getWidth() * 25.4) / 72).toBeCloseTo(dimensions[0], 3);
-        expect((page.getHeight() * 25.4) / 72).toBeCloseTo(dimensions[1], 3);
+  it.each(["business", "a6", "a5", "a4"] as const)(
+    "honors both orientations for %s",
+    async (size) => {
+      const expected: Record<MaterialPageSize, [number, number]> = {
+        business: [90, 50],
+        a6: [148, 105],
+        a5: [210, 148],
+        a4: [297, 210],
+      };
+      for (const orientation of ["landscape", "portrait"] as const) {
+        const pdf = await PDFDocument.load(
+          await renderMaterialCard(
+            nodeCardRenderer,
+            "vehicle",
+            { ...content, orientation },
+            { pageSize: size },
+          ),
+        );
+        const dimensions =
+          orientation === "portrait" ? [...expected[size]].reverse() : expected[size];
+        expect(pdf.getPageCount()).toBe(1);
+        for (const page of pdf.getPages()) {
+          expect((page.getWidth() * 25.4) / 72).toBeCloseTo(dimensions[0], 3);
+          expect((page.getHeight() * 25.4) / 72).toBeCloseTo(dimensions[1], 3);
+        }
       }
-    }
-  });
+    },
+  );
 
   it("prints exact ordered references and finish names on the same study page as the QR", async () => {
     const texts = textSpy();
@@ -203,7 +207,8 @@ describe("material selection cards", () => {
     expect(texts()).not.toContain("NORTHLINE STUDIO");
     for (const [i, code] of colors.entries()) {
       expect(texts()).toContain(`${String(i + 1).padStart(2, "0")}  ${code.slice(1)}`);
-      expect(texts()).toContain(chooseMaterialSamples("vehicle", colors)[i]!.label);
+      // A long name may take two lines, drawn one after the other (StudyCaptions).
+      expect(texts().join(" ")).toContain(chooseMaterialSamples("vehicle", colors)[i]!.label);
     }
     const streams = operators(pdf);
     expect(streams).toHaveLength(1);

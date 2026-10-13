@@ -56,7 +56,7 @@ The last four write a share with the same signs as the form of an encoded phrase
 
 Color codes may be separated by spaces or joined, with or without `#`. **Their order matters.** A share in colors has its own colors: they are not the colors of the phrase itself.
 
-Share cards print each share in its form. A share in colors prints its colors. A share in word numbers, Unicode codes or Bytewords prints those, three to a card, in order; the colors of those cards are drawn at random, none twice, and only decorate them, so that the same code may stand on a card of any color. A share written as `ur:sskr` prints its Bytewords. A QR code on the sheet holds what the cards print.
+Share cards print a share in colors as its colors, and a share in Unicode codes as its codes, one code to a card; the colors of the cards of Unicode codes only decorate them, one color for each code. A few decoy cards that belong to nothing follow the share's own. A QR code on the sheet holds the share alone, without the decoys. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards.
 
 The forms in colors, word numbers and Unicode codes are only other ways to write a share, not encryption. For developers of compatible programs, a share is written in colors in five steps:
 
@@ -74,7 +74,7 @@ Word numbers and Unicode codes are made the same way with the version byte `A2`,
 
 ## Share cards
 
-Shares can be printed as cards with every template. `sskr-export` prints existing shares and never makes new ones:
+Shares written in colors (`colors`, `colors-unicode`) or in Unicode codes (`unicode`) can be printed as cards with every template, one code to a card. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards: write them on paper or keep the text file. `sskr-export` prints existing shares and never makes new ones:
 
 ```bash
 mnemocode sskr-export --share-file ./shares.txt \
@@ -85,15 +85,15 @@ mnemocode sskr-export --share-file ./shares.txt \
 
 The page size decides what is printed, as for ordinary cards. `--card-layout` is needed only for a QR card.
 
-| `--page-size`          | `--card-layout` | Printed for each share                           | What counts as one share                    |
-| ---------------------- | --------------- | ------------------------------------------------ | ------------------------------------------- |
-| `a6` (default) or `a4` | `collection`    | One collection sheet; `--card-qr` adds a QR code | All codes on the sheet, or its QR code      |
-| `business`             | `individual`    | Numbered cards without a QR code                 | Every card of that share, in numbered order |
-| any (see below)        | `qr`            | One document with a QR code                      | The QR code                                 |
+| `--page-size`                | `--card-layout` | Printed for each share                           | What counts as one share                         |
+| ---------------------------- | --------------- | ------------------------------------------------ | ------------------------------------------------ |
+| `a6` (default), `a5` or `a4` | `collection`    | One collection sheet; `--card-qr` adds a QR code | The first codes on the sheet, or its QR code     |
+| `business`                   | `individual`    | Numbered cards without a QR code                 | The first cards of that share, in numbered order |
+| any                          | `qr`            | One document with a QR code                      | The QR code                                      |
 
-A QR code holds one share, in the form its cards print: word numbers, Unicode codes or Bytewords (also for a share written as `ur:sskr`) as they are, `colors-unicode` as such, and `colors` as color codes. No QR code holds several shares.
+The cards of a share end with a few random codes that belong to nothing, so that every row of a sheet is full. A share says how long it is, so the restore stops at its end: the extra codes may be typed or left out. The sheet for heirs says how many codes each share has. A QR code holds one share alone, without the extra codes, in the form its cards print: Unicode codes as they are, `colors-unicode` as such, and `colors` as color codes. No QR code holds several shares.
 
-On the business size, the Bytewords of a 24-word share usually do not fit legibly beside the QR code, except in the glass designs: choose `a6` or `a4` for them. Word numbers and Unicode codes fit.
+In Unicode codes, the cards of one code have one color, and different codes get colors that look as different as possible. The colors only decorate the cards; the printed codes are the share.
 
 Each file or folder in `--cards-dir` holds one share: keep them in different places. A file written with `--pdf` and a folder written with `--images-dir` hold **all** shares. Existing files and folders are never replaced; a taken name is numbered as `name-1`.
 
@@ -131,7 +131,7 @@ For library callers, `combineSskrShares` returns a phrase only when no supplied 
 
 Replace each unreadable element of a share with `?`, keeping its place: a word number, a four-digit Unicode code, a color code, a color Unicode code or pair, a Bytewords word, or a two-letter pair inside `ur:sskr/...`. In Color Unicode codes run together, each `?` stands for one code or for a whole color, and both kinds may be mixed in one share; marks that fit more than 256 ways are refused, so read more of those codes. `sskr-combine`, `sskr-export` and the backup check fill them in. Spaces are needed around a missing word or number; fixed-width codes and UR pairs may stay joined. Do not remove the element. Any of the shares may have marks, up to 64 on one share, and a share may be given twice when two damaged copies of it are kept.
 
-In colors and in the four-digit Unicode codes of words, written apart by spaces, commas, semicolons or `#` (in a list of shares, a semicolon separates the shares), a `?` inside a code stands for one digit, and the digits that can be read are used: `#B5?0??` misses three digits of a color, `4E?0` one digit of a word's code. A lone `?` stands for the whole color or code, and so does a code all of whose digits are `?`, such as `??????` or `????`; a `?` joined to a whole code, as in `?4E00` or `#?#1F9121`, is still one whole element. A code with a `?` keeps all its symbols, six for a color and four for a Unicode code, or the share is refused with the code's place. The digits of a color are bits of the share, so the digits read become equations of their own: two unreadable digits leave 8 bits open instead of 24. The digits of a Unicode code are not bits of its word number: such a code is unknown as a whole, and only a word whose code fits the digits read can fill it. One unreadable digit leaves about 2.5 of the 2,048 words on average, two digits about 19, three about 200. Where that shortens the search, the codes with the fewest fitting words are also tried word by word, those in the first codes of a share first, since they tell the member numbers: up to 64 combinations of words over all the shares, and a bounded amount of work, so that the assessment takes seconds at most. Color Unicode codes, word numbers, Bytewords and `ur` take a `?` only for a whole element, and a share that marks one of their digits is refused with the code's place.
+In colors, in the four-digit Unicode codes of words and in the four-digit codes of Color Unicode, written apart by spaces, commas, semicolons or `#` (in a list of shares, a semicolon separates the shares), a `?` inside a code stands for one digit, and the digits that can be read are used: `#B5?0??` misses three digits of a color, `4E?0` one digit of a word's code. A lone `?` stands for the whole color or code, and so does a code all of whose digits are `?`, such as `??????` or `????`; a `?` joined to a whole code, as in `?4E00` or `#?#1F9121`, is still one whole element. A code with a `?` keeps all its symbols, six for a color and four for a Unicode code, or the share is refused with the code's place. The digits of a color are bits of the share, so the digits read become equations of their own: two unreadable digits leave 8 bits open instead of 24. The digits of a Unicode code are not bits of its word number: such a code is unknown as a whole, and only a word whose code fits the digits read can fill it. One unreadable digit leaves about 2.5 of the 2,048 words on average, two digits about 19, three about 200. Where that shortens the search, the codes with the fewest fitting words are also tried word by word, those in the first codes of a share first, since they tell the member numbers: up to 64 combinations of words over all the shares, and a bounded amount of work, so that the assessment takes seconds at most. The digits of a Color Unicode code are not bits of its color either, which is a quotient and a remainder of 6,400: a color with a code read in part is unknown as a whole, and only a color whose two codes fit the digits read can fill it, at most 16 for one unreadable digit. Word numbers, Bytewords and `ur` take a `?` only for a whole element, and a share that marks one of their digits is refused with the code's place. In codes run together a `?` stands for a whole code, so a digit is marked only in codes written apart; the screen shows Unicode and Color Unicode codes apart beside the joined text, and a refusal of joined codes with a `?` among them says so.
 
 All the shares are repaired together, as one system of linear equations over GF(2) in the bits of the marked elements (`src/sskr/joint-repair.ts`):
 

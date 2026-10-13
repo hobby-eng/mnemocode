@@ -1,4 +1,4 @@
-// AUD-014, the exports group: the capacity of a card design made by a host (AUD-014-API003), the
+// AUD-014, the exports group: a card design made by a host (AUD-014-API003), the
 // facts of a sheet for heirs (AUD-014-API012), and the shared operations of recommendations 20 to
 // 22, whose public messages must stay as they were. Public test data only.
 
@@ -12,7 +12,7 @@ import { CardRenderer } from "../src/export/card-renderer.js";
 import { HeirInstructions, type HeirSheetFacts } from "../src/export/heir-sheet-text.js";
 import { checkedChoice, pickWith } from "../src/export/platform.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
-import { renderCards, renderIndividualCards } from "../src/export/render.js";
+import { renderIndividualCards } from "../src/export/render.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import { cardTemplates, type CardTemplate } from "../src/export/templates.js";
 import type { CardContent } from "../src/export/backup-cards.js";
@@ -43,8 +43,8 @@ function countingRenderer(): { renderer: CardRenderer; choices: () => number } {
 /** Thrown by a template's drawing, to stop the test before any card is drawn. */
 const sentinel = new Error("audit stopped before rendering");
 
-/** A stock design with its drawing replaced and the capacity `referencesPerCard`. */
-function hostTemplate(referencesPerCard: number): { template: CardTemplate; calls: () => number } {
+/** A stock design with its drawing replaced, as a host may make one. */
+function hostTemplate(): { template: CardTemplate; calls: () => number } {
   const base = cardTemplates.find(
     (template) => template.kind === "colors" && template.renderIndividual,
   )!;
@@ -54,59 +54,42 @@ function hostTemplate(referencesPerCard: number): { template: CardTemplate; call
     throw sentinel;
   };
   return {
-    template: { ...base, referencesPerCard, render: draw, renderIndividual: draw },
+    template: { ...base, render: draw, renderIndividual: draw },
     calls: () => calls,
   };
 }
 
-const REFERENCES_PER_CARD_REFUSAL =
-  "The references that one card holds must be a whole number, at least 1.";
-
-describe("AUD-014-API003: the capacity of a card design made by a host", () => {
-  // The audit's reproduction (docs/audits/AUD-014-harnesses/template-facts-probes.mjs).
-  it.each([-1, 0, 0.5, Infinity, Number.NaN])(
-    "refuses %s references per card before any choice or drawing",
-    async (referencesPerCard) => {
-      const { template, calls } = hostTemplate(referencesPerCard);
-      const { renderer, choices } = countingRenderer();
-      await expect(renderIndividualCards(renderer, template, content)).rejects.toThrow(
-        REFERENCES_PER_CARD_REFUSAL,
-      );
-      // The cards of a page size and a sheet are refused the same way, through renderCards.
-      for (const pageSize of ["business", "a6"] as const)
-        await expect(
-          renderCards(renderer, [{ template, content: { ...content, pageSize } }]),
-        ).rejects.toThrow(REFERENCES_PER_CARD_REFUSAL);
-      expect(calls()).toBe(0);
-      expect(choices()).toBe(0);
-    },
-  );
-
-  it("draws a design of one reference per card, the valid control", async () => {
-    const { template, calls } = hostTemplate(1);
+// The capacity that AUD-014-API003 checked is gone with the designs that held several codes to a
+// card (owner, 2026-10-13): every card holds one code, whatever a host's design says.
+describe("AUD-014-API003: a card design made by a host", () => {
+  it("draws a design made by a host, the valid control", async () => {
+    const { template, calls } = hostTemplate();
     await expect(
       renderIndividualCards(countingRenderer().renderer, template, content),
     ).rejects.toBe(sentinel);
     expect(calls()).toBe(1);
   });
 
-  it("keeps a capacity that no stock design has: three references, three cards", async () => {
-    // The eight colors of the fixture, three to a card: 3, 3 and 2.
+  it("gives every code a card of its own, even where a host's design asks for several", async () => {
     expect(colors).toHaveLength(8);
-    const base = hostTemplate(3).template;
     const indexes: number[] = [];
-    const template: CardTemplate = {
-      ...base,
-      renderIndividual: async (_drawing, _content, index) => {
+    const template = {
+      ...hostTemplate().template,
+      // What a JavaScript host of an older version may still pass: not read.
+      referencesPerCard: 3,
+      renderIndividual: async (_drawing: unknown, _content: unknown, index: number) => {
         indexes.push(index);
         return new Uint8Array([index]);
       },
-    };
+    } as CardTemplate;
     const cards = await renderIndividualCards(countingRenderer().renderer, template, content);
-    expect(indexes).toEqual([0, 1, 2]);
-    // Each card is named after the first reference it holds: 1, 4 and 7.
-    expect(cards.map((card) => card.name)).toEqual(
-      [0, 3, 6].map((first, card) => `0${card + 1}-${colors[first]!.slice(1).toUpperCase()}`),
+    // One card for each code, then the decoys that the design's sheet plans.
+    expect(indexes.slice(0, colors.length)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(indexes.length).toBeGreaterThan(colors.length);
+    expect(indexes).toEqual(indexes.map((_, index) => index));
+    // Each card is named after its place and the code it prints.
+    expect(cards.slice(0, colors.length).map((card) => card.name)).toEqual(
+      colors.map((color, card) => `0${card + 1}-${color.slice(1).toUpperCase()}`),
     );
   });
 });
@@ -151,7 +134,7 @@ describe("AUD-014-API012: the facts of a sheet for heirs", () => {
     expect(needs(16, 16)).toMatch(/^Any 16 of the 16 Shamir shares/u);
     // A split never makes them (ShareSplit.validateThreshold), but a restore reads them.
     expect(needs(1, 2)).toMatch(/^Any 1 of the 2 Shamir shares/u);
-    expect(heirSheetText(facts({ kind: "encoded", format: "colors" })).needs[0]).toMatch(
+    expect(heirSheetText(facts({ kind: "encoded", format: "colors", words: 12 })).needs[0]).toMatch(
       /^The backup: color codes/u,
     );
     // The library's class refuses as the command line's route does.
@@ -180,15 +163,15 @@ describe("AUD-014 recommendation 21: one checked uniform choice", () => {
     expect(() => pickWith(["a", "b"], () => 2)).toThrow("Invalid random selection for a card.");
   });
 
-  it("keeps the refusal of the decorative colors of share cards", () => {
-    // The shares are written as words, whose cards take decorative colors.
+  it("keeps the refusal of a random source out of range, now that it draws the decoys", async () => {
+    // The shares are written as Unicode codes, whose decoys are the codes of random words.
     const shares = sskrFixture();
-    const options = { style: "it", shareFormat: "words" } as const;
+    const options = { style: "it", shareFormat: "unicode" } as const;
+    await expect(
+      ShareCardSet.create(countingRenderer().renderer, shares, options, () => 1 << 24),
+    ).rejects.toThrow("The random source of the decoy cards gave a number out of range.");
     expect(
-      () => new ShareCardSet(countingRenderer().renderer, shares, options, () => 1 << 24),
-    ).toThrow("The random source of the card colors gave a number out of range.");
-    expect(
-      new ShareCardSet(countingRenderer().renderer, shares, options, () => 0).shares,
+      (await ShareCardSet.create(countingRenderer().renderer, shares, options, () => 0)).shares,
     ).toHaveLength(shares.length);
   });
 });

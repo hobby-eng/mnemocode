@@ -97,25 +97,39 @@
 
 - The QR code that `--card-qr` prints on the sheets is also saved as a PNG image where they go: beside the PDF, or in the folder of the images or card files, one image per share for Shamir shares. Decode reads it back with `--qr-file`, Restore with `--share-qr`.
 - Every collection, including A4, is one page laid out as a design proposal.
-- A collection sheet has a centred heading and the slogan in the bottom line. Business cards lie on a dark page with a grey world map, light cards on a light one, and material samples on a backdrop of their own setting.
+- A collection sheet has a centred heading and the slogan in the bottom line. Business cards lie on a dark page with a grey world map, and material samples on a backdrop of their own setting.
 - A material sample shows a colour that the material is really made in, near its reference, laid over the photograph. Two different codes never get the same sample on one sheet.
 - The optional QR code of a collection has its own corner on the same page. No separate QR page is made.
 - Individual cards have no QR code.
-- In the menu, "Also as printable cards" asks how to save the cards: one PDF of A6 or A4 sheets, separate business cards in a new folder as PDF, PNG or JPEG, or images of the sheets as PNG or JPEG; it says at once when images need `pdftocairo` and it is missing. For sheets it asks whether to add a QR code with all the codes of the sheet, and for all cards whether to type your own details. The names and details on cards are a decoy, random unless typed.
-- `--page-size business` gives separate numbered cards, one per page. `a6` and `a4` give one sheet, and `a6` is the default for every template. The `wallet` size is removed.
+- In the menu, "Also as printable cards" asks how to save the cards: one PDF of A6, A5 or A4 sheets, separate business cards in a new folder as PDF, PNG or JPEG, or images of the sheets as PNG or JPEG; it says at once when images need `pdftocairo` and it is missing. For sheets it asks whether to add a QR code with all the codes of the sheet, and for all cards whether to type your own details. The names and details on cards are a decoy, random unless typed.
+- `--page-size business` gives separate numbered cards, one per page. `a6`, `a5` and `a4` give one sheet, and `a6` is the default for every template. The `wallet` size is removed.
 - Images are made with the Poppler program `pdftocairo`. The rounded corners of a separate card are transparent in PNG.
-- Separate business cards print their number and the size of the set before the code.
+- Separate business cards print their number before the code. No card prints the size of the set.
 - Invented email and website addresses end in `.example`, so they cannot belong to a real company.
 - `--cards-dir` is refused together with a sheet size.
 - Each Shamir share has its own page, and a QR code holds exactly one share.
 - Other programs can render the same cards through the `mnemocode/cards` entry point, which has no Node.js dependency. A card session keeps the same invented person, company and studio for every export of one working session.
 - Text on business cards is aligned with its icon or logo, and a role no longer touches the name above it.
-- The dated Unicode card and its options `--event` and `--events` are removed: no card design ever printed it. Codes written as Unicode codes (format 3) have no cards: "Card export requires format 4 or 5."
-- A glass card of a seed phrase prints the series `01`, as the sheets do (`01 / 01-02`), instead of "Collection reference".
-- The colours of a glass card fill each ribbon up to the edges of the card, where the frosted glass left them pale and showed some of the photographed gold.
+- The dated Unicode card and its options `--event` and `--events` are removed: no card design ever printed it.
+- Codes written as Unicode codes (format 3) have cards, for the phrase and for its shares: one code to a card, in every template, size and layout. The color of a card only decorates it: one code always has one color, and the different codes of a set get colors that look as different as possible on every design, compared in OKLab as each design shows them. Card export now requires format 3, 4 or 5.
+- Shares written as word numbers, Bytewords or a `ur:sskr` code have no cards; shares in colors or Unicode codes print one code to a card. Cards of shares in another form are refused before a secret is asked: "Shares written as words have no cards: cards print shares in colors or in Unicode codes."
+- A set of cards ends with a few random codes that belong to nothing: at least one, then as many as fill every row of the sheet with the largest cards that fit on one page. Without `--orientation` a sheet is turned the way its cards are largest. Separate cards get as many as the sheet of their design, and a PDF, its images and its card files of one export show the same cards. The QR code holds only the real codes.
+- The sheet for heirs says how many words the seed phrase has, or how many codes each share has, so that the codes after them on printed cards are left out. `decode --words` and `recover-date --words` read only the codes of so many words from the start, and the menu asks for the number when codes are typed. A decode whose checksum fails names the shorter starts of the codes whose checksum is valid, by their fingerprints.
+- A share is read up to its own length, which its first codes say: codes typed after it, such as the extra codes of its cards, are left out.
+- Business cards take the brightness of their color as well as its hue, and a wider range of its saturation, so that pale, deep and dark colors of one set look apart. The curves design chooses its ink by the brightness too.
+- The three frosted glass designs are removed: every card holds one code. There are thirteen templates.
+- The A5 page size, 148 × 210 mm, gives one sheet, as A6 and A4 do.
+- Saved PDFs carry no document information: no creation or modification time, no producer.
+- The QR code of a sheet is at least 12 mm wide, so that its caption fits under it.
+- A long name under a sample, such as the name of a finish, takes two lines at the size of the sheet instead of shrinking into small print, in every design. The line with the number and the code always stays whole.
+- The concrete panels, wall tiles and parquet behind material samples are laid out around the samples: their joints run between them, and every sample sits in the middle of its panel or tile, on every page size. Joints laid out by the page alone ran along the edges of some samples.
+- In the menu, sheets ask how they are turned: landscape, portrait, or whichever gives larger cards (`--orientation`; without it, the larger cards).
+- Entry 8 of the menu and the summary of `self-test` read "Run the self-test", as in mhfe.
+- A share in Color Unicode codes written apart takes a `?` for one digit of a code, such as `E1?A`, as colors and Unicode codes take it: its color is filled in from the colors whose codes fit the digits read. Color Unicode codes are shown apart code by code, four digits each. A share whose codes are run together with a `?` among the digits is refused with what such a `?` means: a whole code; to mark one digit, write the codes apart.
+- On a terminal, Unicode codes and colors as Unicode codes, which are written joined, are shown apart, separated by spaces, and then joined on one line, for copying: the encoded result, its shares and a backup restored from shares. A file or a pipe keeps the one joined line.
+- A new folder for cards or images may not have a name that ends in `.pdf`, `.png`, `.jpg` or `.jpeg`, which would later stand in the way of a file of that name. A file whose name a folder has is refused with "A folder has this name; give the file another name, or a name inside that folder."
 - After shares are saved, one note says how many of them restore the phrase, or with Seedshift only the masked phrase, and where each share is in what was saved. It replaces the notes "Each PDF contains ONE SSKR share…" and "Each folder is one share…".
 - Separate sample cards show one design: `preview --all --cards-dir` is refused with "Separate sample cards show one design: choose one design.", before the folder is checked.
-- The glass design with four cards in one photograph reads its artwork again after a failed read, instead of failing every later export.
 
 ### Toolchain and dependencies
 

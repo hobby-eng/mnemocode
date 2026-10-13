@@ -23,6 +23,9 @@ import {
 import { rgbBytes } from "../export/color-math.js";
 import { MILLISECONDS_PER_SECOND } from "../core/search-turns.js";
 import { capitalized } from "../core/prose.js";
+import { compactCode } from "../core/code-text.js";
+import { EncodedForm } from "../core/encoded-form.js";
+import type { EncodedFormat } from "../core/types.js";
 
 // The palette, under the name every module of the command line takes it by.
 export { STYLE };
@@ -152,31 +155,73 @@ export function terminalPart(label: string, strong: boolean = false): void {
   console.log(`\n${terminalPaint("stdout", strong ? STYLE.strong : STYLE.muted, label)}`);
 }
 
+/** The number before an item of a numbered row, such as " 12.", with the space after it. */
+const NUMBER_CELL = 5;
+/** The indent of a numbered row. */
+const ROW_INDENT = "  ";
+
 /**
- * A seed phrase for a person to write down, as `mhfe` shows one: numbered, four words to a row,
- * the numbers grey and the words bold; then on one plain line, for copying. Returns false without
+ * `items` numbered from 1, `perRow` to a row, the numbers grey and the items bold, each padded to
+ * `width` to line up the next; then `copy` on one plain line, for copying. Returns false without
  * printing when stdout has no colour; the caller then prints its plain form.
  */
-export function terminalPhrase(phrase: string): boolean {
+function terminalNumbered(
+  items: readonly string[],
+  width: number,
+  perRow: number,
+  copy: string,
+): boolean {
   if (!terminalColor("stdout")) return false;
-  const words = phrase.split(" ");
-  for (let start = 0; start < words.length; start += WORDS_PER_ROW) {
-    const row = words.slice(start, start + WORDS_PER_ROW);
-    const cells = row.map((word, column) => {
+  for (let start = 0; start < items.length; start += perRow) {
+    const row = items.slice(start, start + perRow);
+    const cells = row.map((item, column) => {
       const number = terminalPaint(
         "stdout",
         STYLE.muted,
-        `${String(start + column + 1).padStart(3)}.`,
+        `${String(start + column + 1).padStart(NUMBER_CELL - 2)}.`,
       );
-      // The last word of a row needs no padding to line up the next one.
-      const padded = column === row.length - 1 ? word : word.padEnd(LONGEST_WORD);
+      // The last item of a row needs no padding to line up the next one.
+      const padded = column === row.length - 1 ? item : item.padEnd(width);
       return `${number} ${terminalPaint("stdout", STYLE.strong, padded)}`;
     });
-    console.log(`  ${cells.join(" ".repeat(WORD_GAP))}`);
+    console.log(`${ROW_INDENT}${cells.join(" ".repeat(WORD_GAP))}`);
   }
   console.log(terminalPaint("stdout", STYLE.muted, "On one line, for copying:"));
-  console.log(phrase);
+  console.log(copy);
   return true;
+}
+
+/**
+ * A seed phrase for a person to write down, as `mhfe` shows one: numbered, four words to a row;
+ * then on one plain line, for copying (terminalNumbered). False without colour.
+ */
+export function terminalPhrase(phrase: string): boolean {
+  return terminalNumbered(phrase.split(" "), LONGEST_WORD, WORDS_PER_ROW, phrase);
+}
+
+/**
+ * Codes written joined, such as Unicode codes, shown apart, separated by spaces and wrapped at
+ * them, so that a person sees each code and which one to mark with ?; then `joined`, the text as
+ * written, on one plain line, for copying (owner, 2026-10-13: both views, without numbers).
+ * False without colour.
+ */
+export function terminalCodes(codes: readonly string[], joined: string): boolean {
+  if (!terminalColor("stdout")) return false;
+  for (const line of wrapText(codes.join(" ")))
+    console.log(terminalPaint("stdout", STYLE.strong, line));
+  console.log(terminalPaint("stdout", STYLE.muted, "Joined, for copying:"));
+  console.log(joined);
+  return true;
+}
+
+/**
+ * `text`, codes written in `format`, on standard output: on a terminal, where the form writes its
+ * codes joined, apart and numbered beside the joined text (terminalCodes); as written otherwise,
+ * and always for a file or a pipe, which keep one plain line.
+ */
+export function printCodes(text: string, format: EncodedFormat): void {
+  const apart = EncodedForm.of(format).apartCodes(text);
+  if (apart === undefined || !terminalCodes(apart, compactCode(text))) console.log(text);
 }
 
 /**

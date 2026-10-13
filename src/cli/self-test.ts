@@ -15,6 +15,7 @@ import { MnemoCodeSelfTest, type SelfTestCheck, type SelfTestFeature } from "../
 import { expectRefusedLater, expectSame } from "../core/self-test-check.js";
 import { WALLET_EVIDENCE_SELF_TEST } from "../core/wallet-evidence-self-test.js";
 import { cardExportCheck } from "../export/cards-self-test.js";
+import { cardSetsSelfTest } from "../export/card-sets-self-test.js";
 import { heirSheetSelfTest } from "../export/heir-sheet-self-test.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
 import { shareCardsSelfTest } from "../export/sskr-render-self-test.js";
@@ -42,6 +43,7 @@ const FEATURES: readonly SelfTestFeature[] = [
   COIN_ADDRESS_SELF_TEST,
   heirSheetSelfTest(nodeCardRenderer),
   shareCardsSelfTest(nodeCardRenderer),
+  cardSetsSelfTest(nodeCardRenderer),
 ];
 
 /**

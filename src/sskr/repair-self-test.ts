@@ -1,5 +1,6 @@
 // The self-test of the repair of damaged Shamir shares (sskr/repair.ts, sskr/joint-repair.ts,
-// sskr/share-set.ts): elements marked with ?, a whole color or code, or one digit of it, filled in
+// sskr/share-set.ts): elements marked with ?, a whole color or code, or one digit of it (also of a
+// Color Unicode code), filled in
 // from the checksum of one share; the marks that are refused; and, with the host's SSKR library,
 // shares repaired together, also one of which nothing could be read. core/self-test.ts runs the
 // quick part before every command of the command line and all of it in the full self-test.
@@ -13,11 +14,19 @@ import { expectRefused, expectRefusedLater, expectSame } from "../core/self-test
 import { JointRepair, searchOnce } from "./joint-repair.js";
 import { sskrSetVector, sskrVector } from "./known-answers.js";
 import { MAX_MARKED_ELEMENTS, readRepairableShare } from "./repair.js";
+import { colorsToUnicode } from "../core/colors.js";
+import { UNICODE_CODE_DIGITS } from "../core/code-text.js";
+import { textPieces } from "../core/pieces.js";
 import { ShareSet } from "./share-set.js";
 import type { SharePlatform } from "./share-platform.js";
 
 /** The first share of the official vector in colors, Unicode codes and word numbers. */
 const OFFICIAL_COLORS = sskrVector.firstShareColors.join(" ");
+/** The same share's colors as Color Unicode codes, four digits each (core/colors.ts). */
+const OFFICIAL_COLOR_CODES = textPieces(
+  colorsToUnicode(sskrVector.firstShareColors),
+  UNICODE_CODE_DIGITS,
+);
 const OFFICIAL_UNICODE = sskrVector.firstShareUnicode;
 const OFFICIAL_NUMBERS = sskrVector.firstShareNumbers;
 const { shares: SET_SHARES, colors: SET_COLORS, phrase: SET_PHRASE } = sskrSetVector;
@@ -41,7 +50,8 @@ function checkRepair(text: string, ur: string, filled: string, name: string): vo
 
 /**
  * The quick known answers: the official first share repaired from a whole color and two digits of
- * another unread, and from a whole Unicode code and one digit of another; and the shares refused,
+ * another unread, from a whole Unicode code and one digit of another, and from a digit in each of
+ * two Color Unicode codes; and the shares refused,
  * with an unmarked error, too many marks, or a ? for a digit of a word number.
  */
 export function checkShareRepairStartup(): void {
@@ -57,6 +67,22 @@ export function checkShareRepairStartup(): void {
     official,
     "6:7642 12:77FD",
     "Unicode codes with a digit and a whole code marked",
+  );
+  // A digit of the low code of the second color and the first digit of the high code of the
+  // sixth, written apart: each color is filled in as its two codes.
+  const codes = OFFICIAL_COLOR_CODES;
+  const digits = codes.map((code, place) =>
+    place === 3
+      ? `${code.slice(0, 2)}?${code.slice(3)}`
+      : place === 10
+        ? `?${code.slice(1)}`
+        : code,
+  );
+  checkRepair(
+    digits.join(" "),
+    official,
+    `2:${codes[2]}${codes[3]} 6:${codes[10]}${codes[11]}`,
+    "Color Unicode codes with two digits marked",
   );
   expectRefused(
     () => readRepairableShare(marked(marked(OFFICIAL_COLORS, "#42D1F0"), "#0981D6", "#0981D7")),

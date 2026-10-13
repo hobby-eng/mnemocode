@@ -142,17 +142,9 @@ function clipCard(page: PDFPage, box: MmRect) {
   );
 }
 
-/**
- * The photograph `image` of the card in `box`, clipped to the card's rounded corners. It fills
- * `imageRect`, the box itself unless the photograph reaches beyond the card (a glass plate).
- */
-export function drawClippedArtwork(
-  page: PDFPage,
-  image: PDFImage,
-  box: MmRect,
-  imageRect: MmRect = box,
-): void {
+/** The photograph `image` of the card in `box`, clipped to the card's rounded corners. */
+export function drawClippedArtwork(page: PDFPage, image: PDFImage, box: MmRect): void {
   clipCard(page, box);
-  page.drawImage(image, pdfRect(page, imageRect));
+  page.drawImage(image, pdfRect(page, box));
   page.pushOperators(popGraphicsState());
 }

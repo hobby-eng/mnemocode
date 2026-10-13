@@ -18,14 +18,7 @@ await mkdir(destination, { recursive: true });
 // This checkout's build, which the command below runs too.
 const root = fileURLToPath(new URL("..", import.meta.url));
 const renderer = await loadCardRenderer(root);
-const {
-  cardTemplates,
-  drawing,
-  selectTemplate,
-  urToBytewords,
-  renderBusinessCards,
-  renderGlassCards,
-} = renderer;
+const { cardTemplates, drawing, selectTemplate, writeShare, renderBusinessCards } = renderer;
 const presentation = {
   studioName: "Orven Studio",
   slogan: "Details, deliberately.",
@@ -57,10 +50,6 @@ const cases = [
     () => selectTemplate("material-switch").renderIndividual(drawing, base, 1),
     undefined,
   ],
-  ["glass-four", () => renderGlassCards(base, 0), undefined],
-  ["glass-six", () => renderGlassCards(base, 0, 6), undefined],
-  ["glass-eight", () => renderGlassCards({ ...base, pageSize: "business" }, 0, 8), undefined],
-  ["glass-eight-sskr", () => renderGlassCards(share, undefined, 8), share.payload],
   ...cardTemplates.map((template) => [
     template.id + "-study",
     () => template.render(drawing, { ...base, pageSize: "business", orientation: "landscape" }),
@@ -70,9 +59,14 @@ const cases = [
 const report = [];
 for (const [name, render, expected] of cases) {
   const bytes = await render();
-  const pdf = await PDFDocument.load(bytes);
-  assert.equal(pdf.getCreator() ?? "", "");
-  assert.equal(pdf.getTitle() ?? "", "");
+  // Loaded as it is: pdf-lib would otherwise write its own creator and dates into what it reads.
+  const pdf = await PDFDocument.load(bytes, { updateMetadata: false });
+  // No document information at all: no creator, no title, no dates (card-sets-self-test.ts).
+  assert.equal(
+    pdf.context.trailerInfo.Info,
+    undefined,
+    name + " must carry no document information",
+  );
   const path = resolve(destination, name + ".pdf");
   await writeFile(path, bytes, { mode: 0o600 });
   const page = pdf.getPageCount();
@@ -87,13 +81,7 @@ for (const [name, render, expected] of cases) {
   }
   console.log(report.at(-1));
 }
-for (const id of [
-  "business-it",
-  "material-kitchen",
-  "business-glass-4in1",
-  "business-glass-6in1",
-  "business-glass-8in1",
-]) {
+for (const id of ["business-it", "material-kitchen"]) {
   const doc = await PDFDocument.load(
     await selectTemplate(id).render(drawing, { ...base, pageSize: "a6", cardQr: false }),
   );
@@ -111,7 +99,9 @@ const cliDirectory = await mkdtemp(resolve(destination, "sskr-command-"));
 const shares = renderer.vector.deterministic[0].shares;
 const shareFile = resolve(cliDirectory, "public-shares.txt");
 const proposal = resolve(cliDirectory, "sskr-2of3-study.pdf");
-await writeFile(shareFile, shares.join("\n") + "\n", { mode: 0o600 });
+// Cards print shares in colors or in Unicode codes only (owner, 2026-10-13): given in colors.
+const colorShares = shares.map((share) => writeShare(share, "colors"));
+await writeFile(shareFile, colorShares.join("\n") + "\n", { mode: 0o600 });
 execFileSync(
   process.execPath,
   [
@@ -142,8 +132,8 @@ assert.equal(combined.getPageCount(), shares.length);
 for (let i = 0; i < shares.length; i++) {
   assert.equal(
     await qrOfPdfPage(proposal, i + 1, resolve(cliDirectory, "page-" + (i + 1))),
-    // A share given as ur:sskr is printed, and so held in the QR code, as its Bytewords.
-    urToBytewords(shares[i]),
+    // Each page's QR code holds its own share as written, in colors, without the decoys.
+    colorShares[i],
     "SSKR study must contain only its own member",
   );
 }

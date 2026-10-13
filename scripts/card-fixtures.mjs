@@ -16,7 +16,7 @@ const RENDER_PLATFORM_MODULE = "dist/export/platform-node.js";
 /** The card renderer of a build that passes it to every render (scan finding S108). */
 const CARD_RENDERER_MODULE = "dist/export/card-renderer.js";
 /** The family renderers, which take the card renderer first in such a build. */
-const FAMILY_RENDERERS = ["renderBusinessCards", "renderGlassCards", "renderMaterialCard"];
+const FAMILY_RENDERERS = ["renderBusinessCards", "renderMaterialCard"];
 
 /**
  * The renderers of the build in `moduleRoot` and its SSKR vectors. They come from that root, not
@@ -38,7 +38,6 @@ export async function loadCardRenderer(moduleRoot) {
     [
       "dist/core.js",
       "dist/export/business-cards.js",
-      "dist/export/glass-cards.js",
       "dist/export/material-cards.js",
       "dist/export/templates.js",
       "dist/sskr/transport.js",

@@ -19,13 +19,41 @@ import { MAX_TEXT_INPUT_BYTES, readBoundedDescriptor, readFileOrRefuse } from ".
 import { decodeQrPngFile } from "./qr-input.js";
 import { strictUtf8Text } from "./utf8.js";
 
-import { type ParsedArguments, value, values, assertAskedNotGiven } from "./arguments.js";
-import { formatNumber, formatLegend, numberedForms } from "./format-numbers.js";
-import { WORD_NUMBERS_SPAN, isBip39WordCount } from "../core/bip39-sizes.js";
+import {
+  type ParsedArguments,
+  value,
+  values,
+  assertAskedNotGiven,
+  integerOption,
+} from "./arguments.js";
+import { formatNumber, formatLegend } from "./format-numbers.js";
+import {
+  BIP39_WORD_COUNTS,
+  WORD_COUNTS_TEXT,
+  WORD_NUMBERS_SPAN,
+  isBip39WordCount,
+  type Bip39WordCount,
+} from "../core/bip39-sizes.js";
 import { englishTokens } from "../core/english-words.js";
 import { listInWords } from "../core/places.js";
 import { DATE_FORMAT_TEXT } from "../core/dates.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
+
+/**
+ * The words of the seed phrase that --words gives, or undefined: of codes from printed cards, which
+ * end with decoys, only those of so many words from the start are read (BackupReading).
+ */
+export function phraseWords(args: ParsedArguments): Bip39WordCount | undefined {
+  if (value(args, "words") === undefined) return undefined;
+  const words = integerOption(args, "words", {
+    min: BIP39_WORD_COUNTS[0],
+    max: BIP39_WORD_COUNTS.at(-1)!,
+    label: "mnemonic word count",
+  });
+  if (!isBip39WordCount(words))
+    throw new Error(`The mnemonic word count must be ${WORD_COUNTS_TEXT}.`);
+  return words;
+}
 
 /** Standard input, as its refusals name it. */
 const STANDARD_INPUT = "Text input";
@@ -161,7 +189,7 @@ export async function detectedFormat(
       ? fitting[0]
       : await choose(
           WHICH_FORMAT,
-          numberedForms(fitting.map((form) => ({ label: form, value: form }))),
+          fitting.map((form) => ({ label: form, value: form })),
           { label: "Format", quit },
         );
   if (format !== undefined) terminalNotice(`Detected input format: ${format}.`);
@@ -184,6 +212,7 @@ export async function backupFromOptions(
   const reading = BackupReading.of(await encodedInput(arguments_), {
     seedshiftOnly,
     shareReader: SHARE_READER,
+    words: phraseWords(arguments_),
   });
   const mode = transformMode(arguments_, reading.mode());
   modeKnown?.(mode);

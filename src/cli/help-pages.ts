@@ -55,7 +55,7 @@ import { MIN_THRESHOLD, MAX_SHARES } from "../sskr/split.js";
 import { DEFAULT_ADDRESS_COUNT } from "../core/address-scan.js";
 import { MIN_LIST_PASSPHRASE_LENGTH } from "../core/candidate-encryption.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../sskr/joint-repair.js";
-import { COLOR_COUNTS_TEXT } from "../core/colors.js";
+import { COLOR_COUNTS_TEXT, RGB_REFERENCE_COUNTS } from "../core/colors.js";
 import { COINS } from "../core/coins.js";
 import { SHARE_SEPARATOR } from "../sskr/share-input.js";
 import {
@@ -234,6 +234,15 @@ const decodeFormat: HelpOption = {
   ],
 };
 
+const phraseWords: HelpOption = {
+  flag: "--words",
+  value: BIP39_WORD_COUNTS.join("|"),
+  summary: "The words of the seed phrase: read only the codes of so many words",
+  details: [
+    `Printed cards end with a few random codes that belong to nothing. The sheet for heirs states the number of words; with it, only the codes of so many words from the start are read, and the cards after them may be typed or left out. In colors, ${BIP39_WORD_COUNTS[0]} words are ${RGB_REFERENCE_COUNTS[0]} codes and ${BIP39_WORD_COUNTS.at(-1)!} words ${RGB_REFERENCE_COUNTS.at(-1)!}.`,
+  ],
+};
+
 const maxCandidates: HelpOption = {
   flag: "--max-candidates",
   value: "N",
@@ -305,9 +314,9 @@ const imageFormat: HelpOption = {
 const pageSize: HelpOption = {
   flag: "--page-size",
   value: CARD_PAGE_SIZES.join("|"),
-  summary: "a6 (default) or a4 for one sheet, business for separate cards",
+  summary: "a6 (default), a5 or a4 for one sheet, business for separate cards",
   details: [
-    `a6 is ${pageSizeLabel("a6")} and a4 ${pageSizeLabel("a4")}: the whole collection on one sheet, scaled to the page, a design proposal that cannot be cut into cards. business gives real ${pageSizeLabel("business")} cards, numbered, one per page or file. Print at 100% / actual size.`,
+    `a6 is ${pageSizeLabel("a6")}, a5 ${pageSizeLabel("a5")} and a4 ${pageSizeLabel("a4")}: the whole collection on one sheet, scaled to the page, a design proposal that cannot be cut into cards. business gives real ${pageSizeLabel("business")} cards, numbered, one per page or file. Print at 100% / actual size.`,
   ],
 };
 
@@ -391,8 +400,8 @@ const cardLayout: HelpOption = {
   value: SSKR_CARD_LAYOUTS.join("|"),
   summary: "How each share is printed; follows the page size if omitted",
   details: [
-    "qr: one document with a QR code per share, in any page size; the Bytewords of a 24-word share usually need A6 or A4, except in the glass designs. collection: one sheet per share (a6 or a4); --card-qr adds a QR code. individual: numbered business cards without a QR code; every card of a share is needed to rebuild that share.",
-    "The cards print each share in the form it is written in: its colors, or its word numbers, Unicode codes or Bytewords, three to a card, beside colors drawn at random that only decorate them. A share written as ur:sskr prints its Bytewords.",
+    "qr: one document with a QR code per share, in any page size. collection: one sheet per share (a6, a5 or a4); --card-qr adds a QR code. individual: numbered business cards without a QR code; every card of a share is needed to rebuild that share.",
+    "Cards print shares written in colors or in Unicode codes, one code to a card, with a few decoys after them: a share in colors as its colors, a share in Unicode codes as its codes on cards whose colors only decorate them. Shares in word numbers, Bytewords or ur:sskr have no cards.",
   ],
 };
 
@@ -627,7 +636,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             value: "FORMAT",
             summary: `The form of the result, ${FORMAT_NUMBER_RANGE} or its name; default ${formatNumber("english")} (english)`,
             details: [
-              `${formatLegend(FORMAT_LEGEND_NAMES)}. Cards need ${CARD_FORMAT_NUMBERS}, ${formatNumber("unicode")} only with dates. See mnemocode help formats. With --sskr the whole phrase is shown beside the shares only when --format is given.`,
+              `${formatLegend(FORMAT_LEGEND_NAMES)}. Cards need ${CARD_FORMAT_NUMBERS}. See mnemocode help formats. With --sskr the whole phrase is shown beside the shares only when --format is given.`,
             ],
           },
           {
@@ -667,7 +676,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         ],
       },
       {
-        heading: `Cards (formats ${COLOR_FORMAT_NUMBERS}):`,
+        heading: `Cards (formats ${CARD_FORMAT_NUMBERS}):`,
         options: [
           template,
           pdf,
@@ -769,7 +778,16 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     groups: [
       {
         heading: "Options:",
-        options: [askSecrets, encodedFile, encodedQr, encodedText, dates, decodeMode, decodeFormat],
+        options: [
+          askSecrets,
+          encodedFile,
+          encodedQr,
+          encodedText,
+          dates,
+          decodeMode,
+          decodeFormat,
+          phraseWords,
+        ],
       },
       {
         heading: "Answers for the private screen (--ask-secrets), where dates or codes hold ?:",
@@ -892,6 +910,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           },
           { ...decodeMode, summary: listInWords(MASKED_MODES, "or") },
           decodeFormat,
+          phraseWords,
         ],
       },
       evidenceGroup,
@@ -1065,7 +1084,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     ],
     notes: [
       "Individual cards of one share must all be present, in numbered order, to rebuild that share.",
-      `Replace each unreadable element with ? at its place, on any of the shares, up to ${MAX_JOINT_MARKED_ELEMENTS} on one share. In a color or the Unicode code of a word written apart, a ? may also stand for one digit, such as #B5?0?? or 4E?0, and the digits read are used; other forms take a ? only for a whole element. The shares are solved together: their checksums, the data they share and every share beyond the threshold settle most marks without trying anything, and the hash stored with the secret decides the rest. How many combinations are left, how long they take and what would help is shown first. More than one answer is listed, never chosen.`,
+      `Replace each unreadable element with ? at its place, on any of the shares, up to ${MAX_JOINT_MARKED_ELEMENTS} on one share. In a color, the Unicode code of a word or a Color Unicode code written apart, a ? may also stand for one digit, such as #B5?0??, 4E?0 or E1?A, and the digits read are used; in codes run together a ? stands for a whole code, and the other forms take a ? only for a whole element. The shares are solved together: their checksums, the data they share and every share beyond the threshold settle most marks without trying anything, and the hash stored with the secret decides the rest. How many combinations are left, how long they take and what would help is shown first. More than one answer is listed, never chosen.`,
       `A share file holds shares one per line or separated by ${SHARE_SEPARATOR}. A share that a narrow column wrapped over lines is joined again, as when it is pasted.`,
     ],
   },
@@ -1305,9 +1324,10 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   },
 
   "self-test": {
-    summary: "Run the full self-test",
+    // As the menu and mhfe name it.
+    summary: "Run the self-test",
     about: [
-      "Checks every phrase length, format and mode, the sorting of dates, the public test vectors, the 24 English BIP39 seed vectors, the date and word searches with a wallet, encrypted candidate lists, the check of a written backup, marked Shamir shares repaired together and with dates, every coin address vector, the sheet for heirs, share cards, QR images beside a sheet and card export with every kind of artwork and font. The check of each feature is also given a case it must refuse. Run it before using a newly built or copied installation.",
+      "Checks every phrase length, format and mode, the sorting of dates, the public test vectors, the 24 English BIP39 seed vectors, the date and word searches with a wallet, encrypted candidate lists, the check of a written backup, marked Shamir shares repaired together and with dates, every coin address vector, the sheet for heirs, share cards, the colors and decoys of card sets, QR images beside a sheet and card export with every kind of artwork and font. The check of each feature is also given a case it must refuse. Run it before using a newly built or copied installation.",
       `A smaller core self-test runs before every command that processes data, in less than half a second: it checks both BIP39 word lists and fixed test phrases in every mode, and compares each feature with known answers: the BIP39 seed and fingerprint, dates with ? and |, codes and shares marked with ?, the word search, the candidate list, the check of a written backup, wallet evidence and the addresses of the ${numberWord(COINS.length)} coins, the sheet for heirs and share cards. A failure stops the command before any input is read.`,
     ],
     usage: "",
@@ -1408,20 +1428,22 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "What a card holds:",
         paragraphs: [
-          `In formats ${COLOR_FORMAT_NUMBERS} the phrase is a short list of color codes. A template places them into a familiar document, such as a print studio proposal with sample business cards. Each card shows one color and its code, such as Ref. 01AB63. The printed codes are the whole value: decode turns them back into the phrase.`,
+          `In formats ${COLOR_FORMAT_NUMBERS} the phrase is a short list of color codes, in format ${formatNumber("unicode")} one Unicode code a word. A template places them into a familiar document, such as a print studio proposal with sample business cards. Each card shows one code: a color and its code, such as Ref. 01AB63, or a Unicode code in a color that only decorates it, the same color for the same code. The printed codes are the whole value: decode turns them back into the phrase.`,
+          "A set ends with a few random codes that belong to nothing, at least one, so that every row of a sheet is full and the cards are as large as the page allows; separate cards end with as many. No card says how many cards there are. The QR code holds only the real codes, and the sheet for heirs says how many words the phrase has: decode --words reads only the codes of so many words.",
           "The names, companies and contact details are a decoy that makes the cards look ordinary, invented at random unless given with --card-name and the other details. Like the photographs, they are not needed for recovery.",
         ],
       },
       {
         heading: "In the menu:",
         paragraphs: [
-          'After "Also as printable cards", the menu asks how to save the cards: one PDF of A6 or A4 sheets, separate business cards in a new folder as PDF, PNG or JPEG, or images of the sheets as PNG or JPEG. Images need pdftocairo. For sheets it then asks whether to add a QR code with all the codes of the sheet. Last, for every way of saving, it asks whether to type your own details; Enter on a detail keeps it random.',
+          'After "Also as printable cards", the menu asks how to save the cards: one PDF of A6, A5 or A4 sheets, separate business cards in a new folder as PDF, PNG or JPEG, or images of the sheets as PNG or JPEG. Images need pdftocairo. For sheets it then asks how they are turned, landscape, portrait or whichever gives larger cards, and whether to add a QR code with all the codes of the sheet. Last, for every way of saving, it asks whether to type your own details; Enter on a detail keeps it random.',
         ],
       },
       {
         heading: "Page sizes:",
         rows: [
           ["a6", `${pageSizeLabel("a6")}: one sheet with the whole collection (the default)`],
+          ["a5", `${pageSizeLabel("a5")}: one sheet`],
           ["a4", `${pageSizeLabel("a4")}: one sheet`],
           [
             "business",

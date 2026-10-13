@@ -22,6 +22,8 @@
 import {
   apartHexUnits,
   codeTokens,
+  fitsPattern,
+  withJoinedMarksHint,
   hexCodePoint,
   hexUnits,
   joinedHexUnits,
@@ -54,6 +56,7 @@ import { unicodeCodesFitting } from "../core/words.js";
 import {
   COLOR_UNICODE_BASE,
   COLOR_UNICODE_POINTS_PER_COLOR,
+  COLOR_UNICODE_WIDTH,
   isColorUnicodePoint,
   markedColorSymbols,
   RGB_HEX_DIGITS,
@@ -410,6 +413,7 @@ function unitModels(text: string): UnitModel[] {
   addUnicodeModel(models, text);
   addColorModel(models, text);
   addColorUnicodeModels(models, text);
+  addColorUnicodeDigitModel(models, text);
   return models;
 }
 
@@ -630,6 +634,72 @@ function addColorUnicodeModels(models: UnitModel[], text: string): void {
         }),
     });
   }
+}
+
+/** The Color Unicode code points, in their order, as four hexadecimal digits each. */
+const COLOR_CODE_POINTS: readonly string[] = Array.from(
+  { length: COLOR_UNICODE_WIDTH },
+  (_, index) => hexCodePoint(COLOR_UNICODE_BASE + index),
+);
+
+/**
+ * The colors whose two Color Unicode codes fit `pair`, its codes with a ? for each digit that
+ * cannot be read: every high code that fits, with every low code that fits, that writes a color.
+ */
+function colorsFitting(pair: readonly string[]): number[] {
+  const [high, low] = pair.map((code) =>
+    COLOR_CODE_POINTS.filter((point) => fitsPattern(code, point)),
+  );
+  const { valueOf } = SHARE_UNITS["colors-unicode"];
+  return high!.flatMap((first) => low!.flatMap((second) => valueOf(first + second) ?? []));
+}
+
+/**
+ * Colors written as Unicode codes apart, two codes a color, with a ? for each digit that cannot be
+ * read, such as E1?A, as colors and the Unicode codes of words take them (owner, 2026-10-13). The
+ * digits of a code are no bits of its color, which is a quotient and a remainder of
+ * COLOR_UNICODE_WIDTH (core/colors.ts): a color with a code read in part is unknown as a whole,
+ * and the colors whose codes fit what was read are its candidates, as the words of a partly read
+ * Unicode code are (addUnicodeModel). A code that cannot be read at all leaves its color unknown,
+ * with no candidates; text without a digit marked is read by addColorUnicodeModels alone.
+ */
+function addColorUnicodeDigitModel(models: UnitModel[], text: string): void {
+  const codes = withinRepair(apartHexUnits(text, CODE_DIGITS));
+  if (codes === undefined || !codes.some(readInPart)) return;
+  if (codes.length % COLOR_UNICODE_POINTS_PER_COLOR !== 0) return;
+  const pairs = listPieces(codes, COLOR_UNICODE_POINTS_PER_COLOR);
+  const { valueOf, unitText } = SHARE_UNITS["colors-unicode"];
+  const values: (number | undefined)[] = [];
+  const candidates: (number[] | undefined)[] = [];
+  for (const pair of pairs) {
+    if (pair.some(isMarked)) {
+      values.push(undefined);
+      // Only a color whose codes are all read in part or in full narrows to its candidates.
+      const narrow = pair.some(readInPart) && !pair.some(wholeMark);
+      const fitting = narrow ? colorsFitting(pair) : undefined;
+      if (fitting?.length === 0) return;
+      candidates.push(fitting);
+    } else {
+      const value = valueOf(pair.join(""));
+      if (value === undefined) return;
+      values.push(value);
+      candidates.push(undefined);
+    }
+  }
+  const fitting = candidates.map((colors) => (colors === undefined ? undefined : new Set(colors)));
+  models.push({
+    format: "colors-unicode",
+    values,
+    structures: structuresOf("colors-unicode", pairs.length),
+    ...(candidates.some((colors) => colors !== undefined) ? { candidates } : {}),
+    // A solution keeps every digit read, also beside a code that cannot be read.
+    fits: (filled) =>
+      pairs.every((pair, index) => {
+        if (fitting[index] !== undefined) return fitting[index]!.has(filled[index]!);
+        const written = unitText(filled[index]!).match(CODE_POINT_TEXT)!;
+        return pair.every((code, half) => wholeMark(code) || fitsPattern(code, written[half]!));
+      }),
+  });
 }
 
 /**
@@ -1064,7 +1134,7 @@ export function markLimit(maxElements: number): string {
   return `mark at most ${maxElements} unreadable elements with ?`;
 }
 
-/** Code points of the Color Unicode codes (core/colors.ts), which take a ? only for a whole code. */
+/** Code points of the Color Unicode codes (core/colors.ts). */
 const COLOR_UNICODE_CODE = (token: string): boolean =>
   WHOLE_CODE.test(token) && isColorUnicodePoint(parseInt(token, 16));
 
@@ -1079,8 +1149,8 @@ interface CodeForm {
 
 /**
  * The forms written as codes apart, as markProblem tells them by the codes that can be read:
- * colors and the Unicode codes of words take a ? for a digit; Color Unicode codes and word numbers
- * only for a whole code.
+ * colors, the Unicode codes of words and Color Unicode codes take a ? for a digit; word numbers
+ * only for a whole number.
  */
 const CODE_FORMS: readonly CodeForm[] = [
   {
@@ -1095,7 +1165,8 @@ const CODE_FORMS: readonly CodeForm[] = [
     digits: CODE_DIGITS,
     reads: (token) => SHARE_UNITS.unicode.valueOf(token) !== undefined,
   },
-  { name: "code", plural: "Color Unicode codes", reads: COLOR_UNICODE_CODE },
+  // Their digits are no bits of a color, but they narrow it (addColorUnicodeDigitModel).
+  { name: "code", plural: "Color Unicode codes", digits: CODE_DIGITS, reads: COLOR_UNICODE_CODE },
   {
     name: "word number",
     plural: "word numbers",
@@ -1210,7 +1281,10 @@ export function repairCandidates(
     throw new Error(
       tooMany
         ? "Too many elements are marked for this form: the checksum cannot tell them. Mark fewer, or use another share."
-        : "No valid share fits the marked elements. Check their places and the other elements.",
+        : withJoinedMarksHint(
+            "No valid share fits the marked elements. Check their places and the other elements.",
+            text,
+          ),
     );
   return [...found.values()];
 }

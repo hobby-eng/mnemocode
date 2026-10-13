@@ -1,11 +1,11 @@
 // S105: bundled card artwork is read once, and a read that failed is tried again on the next
-// render instead of failing every later one (the four-reference glass design kept its failure).
+// render instead of failing every later one.
 // S108: the artwork belongs to the platform that read it: each CardRenderer keeps its own.
 
 import { describe, expect, it } from "vitest";
 import { BundledAssetCache, type RenderPlatform } from "../src/export/platform.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
-import { GlassArtwork } from "../src/export/glass-artwork.js";
+import { BusinessArtwork } from "../src/export/business-artwork.js";
 import { CardRenderer } from "../src/export/card-renderer.js";
 
 /** The Node.js platform whose first read of each file fails. */
@@ -26,7 +26,7 @@ describe("bundled artwork", () => {
   it("names the file of a failed read, tries it again, then keeps it", async () => {
     const { platform, reads } = failingOnce();
     const cache = new BundledAssetCache(platform, (bytes) => bytes.length);
-    const path = "images/business-glass-6in1.jpg";
+    const path = "images/material-tile.jpg";
     await expect(cache.get(path)).rejects.toThrow(
       `Cannot load card artwork ${path}: Error: not yet`,
     );
@@ -36,14 +36,11 @@ describe("bundled artwork", () => {
     expect(reads).toEqual([path, path]);
   });
 
-  it("draws a glass card after its artwork failed to load once", async () => {
+  it("draws a business card after its artwork failed to load once", async () => {
     const { platform } = failingOnce();
-    const artwork = new GlassArtwork(platform);
-    await expect(artwork.of(["#112233"], 8)).rejects.toThrow("Cannot load card artwork");
-    expect((await artwork.of(["#112233"], 8)).length).toBeGreaterThan(0);
-    // The photographed design kept a failed read for good before.
-    await expect(artwork.of(["#112233"], 4)).rejects.toThrow("Cannot load card artwork");
-    expect((await artwork.of(["#112233"], 4)).length).toBeGreaterThan(0);
+    const artwork = new BusinessArtwork(platform);
+    await expect(artwork.recoloured("it", "#112233")).rejects.toThrow("Cannot load card artwork");
+    expect((await artwork.recoloured("it", "#112233")).length).toBeGreaterThan(0);
   });
 
   it("keeps the artwork of each renderer apart, read through its own platform only", async () => {
@@ -56,13 +53,13 @@ describe("bundled artwork", () => {
       },
     });
     const [first, second] = reads.map((log) => new CardRenderer(counting(log)));
-    const path = "images/business-glass-8in1.jpg";
-    await first!.glassArtwork.of(["#112233"], 8);
-    await first!.glassArtwork.of(["#445566"], 8);
+    const path = "images/business-it-v1.png";
+    await first!.businessArtwork.recoloured("it", "#112233");
+    await first!.businessArtwork.recoloured("it", "#445566");
     expect(reads).toEqual([[path], []]);
     // The second renderer reads its own copy through its own platform, once.
-    await second!.glassArtwork.of(["#112233"], 8);
-    await second!.glassArtwork.of(["#112233"], 8);
+    await second!.businessArtwork.recoloured("it", "#112233");
+    await second!.businessArtwork.recoloured("it", "#112233");
     expect(reads).toEqual([[path], [path]]);
   });
 

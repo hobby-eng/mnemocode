@@ -1,5 +1,4 @@
-import { renderMaterialCard } from "./material-cards.js";
-import { renderGlassCards } from "./glass-cards.js";
+import { materialSheetShape, renderMaterialCard } from "./material-cards.js";
 import type { CardKind } from "../core/types.js";
 import type { BusinessStyle } from "./card-settings.js";
 import {
@@ -9,15 +8,19 @@ import {
   type CardStyle,
   type CatalogEntry,
 } from "./template-catalog.js";
-import { renderBusinessCards } from "./business-cards.js";
-import { pageSizeLabel, SEPARATE_CARD_SIZE } from "./card-settings.js";
+import { businessSheetShape, renderBusinessCards } from "./business-cards.js";
+import {
+  pageSizeLabel,
+  SEPARATE_CARD_SIZE,
+  SHEET_SIZES_TEXT,
+  type CardPageSize,
+} from "./card-settings.js";
+import type { SheetShape } from "./collection-sheet.js";
 import { capitalized } from "../core/prose.js";
 import type { BusinessArtwork } from "./business-artwork.js";
-import type { GlassArtwork } from "./glass-artwork.js";
 import type { AssetSource, QrSource, RandomSource } from "./platform.js";
 import type { CardContent } from "./backup-cards.js";
 import type { ColorCards } from "./card-content.js";
-import { ONE_REFERENCE_PER_CARD } from "./card-codes.js";
 
 // The kinds of cards are the core's (core/types.ts).
 export type { CardKind };
@@ -31,7 +34,6 @@ export type { CardKind };
  */
 export interface CardDrawing extends AssetSource, RandomSource, QrSource {
   readonly businessArtwork: BusinessArtwork;
-  readonly glassArtwork: GlassArtwork;
 }
 
 export interface CardTemplate {
@@ -53,7 +55,15 @@ export interface CardTemplate {
     content: CardContent,
     index: number,
   ) => Promise<Uint8Array>;
-  readonly referencesPerCard?: number;
+  /**
+   * The shape of its sheet of `pageSize` for `content`, from which the decoys after the codes are
+   * planned (card-plan.ts). A design that a host makes may have none, and its cards get no decoys.
+   */
+  readonly sheetShape?: (
+    drawing: CardDrawing,
+    content: ColorCards,
+    pageSize: CardPageSize,
+  ) => Promise<SheetShape>;
 }
 
 const businessNames: Record<BusinessStyle, string> = {
@@ -93,14 +103,22 @@ export function renderCatalogDesign(
         content,
         fragment === undefined ? {} : { individualIndex: fragment },
       );
-    case "glass":
-      return renderGlassCards(drawing, content, fragment, entry.referencesPerCard);
   }
 }
 
-/** The references that one card of `entry` holds: a glass design's own count, otherwise one. */
-export function catalogReferencesPerCard(entry: CatalogEntry): number {
-  return entry.family === "glass" ? entry.referencesPerCard : ONE_REFERENCE_PER_CARD;
+/** The shape of a sheet of `pageSize` for `content` in the design `entry`, by its family. */
+export function catalogSheetShape(
+  entry: CatalogEntry,
+  drawing: CardDrawing,
+  content: ColorCards,
+  pageSize: CardPageSize,
+): Promise<SheetShape> {
+  switch (entry.family) {
+    case "business":
+      return businessSheetShape(drawing, content);
+    case "material":
+      return materialSheetShape(drawing, entry.style, content, pageSize);
+  }
 }
 
 /** What the list of designs says of a design of the catalog, by its family. */
@@ -112,8 +130,8 @@ function wordsOf(entry: CatalogEntry): Pick<CardTemplate, "name" | "description"
         name: `${businessNames[style]} card collection`,
         description:
           style === "mixed"
-            ? "One identity across all approved designs; A6, A4 or individual cards."
-            : `Editable contact details; A6 collection, A4 sheets or individual ${pageSizeLabel(SEPARATE_CARD_SIZE)} cards.`,
+            ? `One identity across all approved designs; ${SHEET_SIZES_TEXT} sheets or individual cards.`
+            : `Editable contact details; ${SHEET_SIZES_TEXT} sheets or individual ${pageSizeLabel(SEPARATE_CARD_SIZE)} cards.`,
       };
     }
     case "material":
@@ -122,13 +140,6 @@ function wordsOf(entry: CatalogEntry): Pick<CardTemplate, "name" | "description"
         description:
           "Photographic material samples with finish names and exact references; optional collection QR. All page sizes and individual fragments.",
       };
-    case "glass": {
-      const { referencesPerCard } = entry;
-      return {
-        name: `Frosted glass / ${referencesPerCard}-reference palette`,
-        description: `${referencesPerCard} ordered references per card; all page sizes and individual files. Optional QR is reserved for the collection study.`,
-      };
-    }
   }
 }
 
@@ -141,10 +152,11 @@ function templateOf(entry: CatalogEntry): CardTemplate {
     style,
     family,
     ...wordsOf(entry),
-    ...(family === "glass" ? { referencesPerCard: entry.referencesPerCard } : {}),
     render: (drawing, content) => renderCatalogDesign(entry, drawing, content),
     renderIndividual: (drawing, content, index) =>
       renderCatalogDesign(entry, drawing, content, index),
+    sheetShape: (drawing, content, pageSize) =>
+      catalogSheetShape(entry, drawing, content, pageSize),
   };
 }
 

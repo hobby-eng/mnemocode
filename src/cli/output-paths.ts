@@ -7,6 +7,7 @@ import { value, values, type ParsedArguments } from "./arguments.js";
 import { optionLabel } from "./option-copy.js";
 import { terminalNotice } from "./terminal.js";
 import { FILE_INPUTS, FILE_OUTPUTS, FOLDER_OUTPUTS, SAVED_OPTIONS } from "./output-options.js";
+import { DOCUMENT_EXTENSIONS } from "../export/document-formats.js";
 
 /** More numbered copies of one name than this are surely a mistake. */
 const MAX_COPY_NUMBER = 999;
@@ -147,12 +148,26 @@ const FOLDER_UNWRITABLE =
   "MnemoCode may not make a folder there; choose a folder you can write to.";
 
 /**
+ * Refuses a name for a new folder that ends like a file an export writes, such as cards.pdf: the
+ * folder would later be taken for that file, and a PDF of that name refused because a folder has
+ * it, as a folder of images named so once did (2026-10-13).
+ */
+function assertFolderName(path: string): void {
+  const ending = extname(path.replace(TRAILING_SEPARATORS, "")).slice(1).toLowerCase();
+  if (DOCUMENT_EXTENSIONS.includes(ending))
+    throw new Error(
+      `A new folder needs a name without .${ending}, which is the ending of a file; choose another name.`,
+    );
+}
+
+/**
  * Refuses a new folder that could not be made: where a file stands on its way, or under a folder
  * that may not be written. The folders of its path that do not exist yet are made with it, so the
  * nearest that exists is checked. A preflight, as for a file: the export checks again that nothing
  * is there when it publishes the folder (absentPath).
  */
 export async function preflightFolderDestination(path: string): Promise<void> {
+  assertFolderName(path);
   const found = await nearestExisting(dirname(resolve(path)));
   if (found === undefined) throw new Error(FOLDER_UNWRITABLE);
   if (!(await stat(found.real)).isDirectory())
@@ -231,7 +246,10 @@ export async function preflightFileDestination(
   }
   if (existing !== undefined) {
     if (!allowOverwrite) throw new Error("The output file already exists. Choose a new path.");
-    if (existing.isDirectory()) throw new Error("The output path must be a file, not a directory.");
+    if (existing.isDirectory())
+      throw new Error(
+        "A folder has this name; give the file another name, or a name inside that folder.",
+      );
   }
   const parent = dirname(resolve(path));
   let isDirectory: boolean;

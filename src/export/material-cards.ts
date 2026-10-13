@@ -3,6 +3,7 @@ import { materialPageLayout, materialGridLayout } from "./material-layout.js";
 import { readRenderAsset } from "./platform.js";
 import {
   PDFName,
+  type PDFDocument,
   rgb,
   pushGraphicsState,
   popGraphicsState,
@@ -29,6 +30,7 @@ import {
   MAX_SHEET_CARDS,
   preparedForLine,
   separateCardIndex,
+  type SheetShape,
 } from "./collection-sheet.js";
 import {
   chooseMaterialSamples,
@@ -40,7 +42,7 @@ import {
   type MaterialStyle,
 } from "./material-artwork.js";
 import { numberedCode } from "./card-codes.js";
-import { assertColorCards, EMPTY_CARD_COLLECTION } from "./card-content.js";
+import { assertColorCards, EMPTY_CARD_COLLECTION, type ColorCards } from "./card-content.js";
 import { centredText, pdfRect } from "./business-render-primitives.js";
 import { rgbChannels } from "./color-math.js";
 import { documentWithFont } from "./pdf-documents.js";
@@ -194,7 +196,7 @@ async function createRenderContext(
   // A material card suits an employer of any sector.
   const { profile, presentation } = ExportDetails.of(drawing.randomInt, content);
   const { doc, font } = await documentWithFont(drawing);
-  const image = await doc.embedJpg(await readRenderAsset(drawing, `images/material-${style}.jpg`));
+  const image = await embeddedPhotograph(doc, drawing, style);
   // Chosen for all references of the card together, so that no two of them look alike and an
   // individual fragment shows the same sample as the whole card.
   const samples = chooseMaterialSamples(style, content.colors);
@@ -341,6 +343,57 @@ function drawMaterialFront(context: MaterialRenderContext): void {
   );
 }
 
+/**
+ * The lines under the first `count` samples of a sheet: each one's number and code, and on a sheet
+ * larger than a card the name of its sample. Compact studies keep the exact references and leave
+ * out the decorative names.
+ */
+function studyCaptions(
+  content: ColorCards,
+  samples: readonly MaterialSample[],
+  compact: boolean,
+  count: number,
+): string[][] {
+  return Array.from({ length: count }, (_, index) => [
+    numberedCode(content, index),
+    ...(compact ? [] : [samples[index]!.label]),
+  ]);
+}
+
+/** The photograph of `style`, embedded in `doc`. */
+async function embeddedPhotograph(
+  doc: PDFDocument,
+  drawing: MaterialDrawing,
+  style: MaterialStyle,
+): Promise<PDFImage> {
+  return doc.embedJpg(await readRenderAsset(drawing, `images/material-${style}.jpg`));
+}
+
+/**
+ * The shape of a sheet of `pageSize` with the samples of `content` in `style`, which a plan of its
+ * decoys lays out (planCollectionSheet): the shape of a sample, and the captions of the first
+ * cards, whose samples are chosen for those cards alone, as their sheet chooses them. A material
+ * with fewer samples than the distinct codes refuses them.
+ */
+export async function materialSheetShape(
+  drawing: MaterialDrawing,
+  style: MaterialStyle,
+  content: ColorCards,
+  pageSize: CardPageSize,
+): Promise<SheetShape> {
+  const { doc, font } = await documentWithFont(drawing);
+  const image = await embeddedPhotograph(doc, drawing, style);
+  const compact = isCardPageSize(pageSize);
+  return {
+    font,
+    aspect: cropAspect(image, materialArtwork[style].finishes[0]!),
+    captions: (count) => {
+      const samples = chooseMaterialSamples(style, content.colors.slice(0, count));
+      return studyCaptions(content, samples, compact, count);
+    },
+  };
+}
+
 async function drawMaterialStudy(context: MaterialRenderContext): Promise<void> {
   const { qr, doc, font, content, size, artwork, image, samples, presentation, profile } = context;
   const compact = isCardPageSize(size);
@@ -355,11 +408,7 @@ async function drawMaterialStudy(context: MaterialRenderContext): Promise<void> 
     theme: artwork.studyTheme,
     // The finishes of one material are cropped alike, so every box takes the shape of a sample.
     aspect: cropAspect(image, artwork.finishes[0]!),
-    // Compact studies prioritize exact recovery references over decorative finish names.
-    captions: content.colors.map((_, index) => [
-      numberedCode(content, index),
-      ...(compact ? [] : [samples[index]!.label]),
-    ]),
+    captions: studyCaptions(content, samples, compact, content.colors.length),
     paint: (page, box) =>
       drawSample(page, image, artwork, samples[box.index]!, box.x, box.y, box.width, box.height),
     pictureArea: (box) => sampleArea(image, samples[box.index]!.finish, box),

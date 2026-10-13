@@ -114,7 +114,7 @@ describe("CLI records", () => {
     expect(listed.stdout).toContain("business-architect");
     expect(listed.stdout).toContain("business-it");
     const rows = listed.stdout.trimEnd().split("\n");
-    expect(rows).toHaveLength(16);
+    expect(rows).toHaveLength(13);
     expect(rows.every((row) => /^(\S+) {3,}(\S+) {3,}(.+?) {3,}(.+)$/u.test(row))).toBe(true);
     expect(new Set(rows.map((row) => row.indexOf("colors"))).size).toBe(1);
     await expect(
