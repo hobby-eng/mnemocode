@@ -71,6 +71,7 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 | `cli/private-screen.ts`  | The alternate screen for typed secrets and their results, cleared after Enter   |
 | `cli/protection.ts`      | No core dumps, the permission model, and what a command gives up before it runs |
 | `cli/system-sandbox.ts`  | What the operating system enforces below the permission model, read back        |
+| `cli/sandbox-record.ts`  | The interface of a system's sandbox, and the record of what held and what not   |
 | `cli/sandbox-linux.ts`   | seccomp and Landlock for every thread, locked memory                            |
 | `cli/sandbox-macos.ts`   | No debugger attach, the macOS sandbox                                           |
 | `cli/sandbox-windows.ts` | Crash reports without the heap, mitigation policies, a job object               |

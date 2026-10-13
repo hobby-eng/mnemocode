@@ -1,10 +1,14 @@
 // The Linux kernel's own boundaries for a MnemoCode process, as mhfe sets them
-// (src/bin/mhfe/protect.rs), with one difference that Node.js imposes: it has started its threads,
+// (src/bin/mhfe/protect.rs and its core dump check), with one difference that Node.js imposes: it has started its threads,
 // the pool of libuv that runs file operations among them, before any script runs. Each boundary is
 // therefore applied to every thread at once (SECCOMP_FILTER_FLAG_TSYNC, LANDLOCK_RESTRICT_SELF_TSYNC),
 // and a kernel that cannot do so gets none of it, rather than one that holds for one thread only.
 //
-// - no_new_privs, which both need: no program started afterwards gains privileges.
+// - No core dumps, at start: setrlimit(RLIMIT_CORE, 0) and prctl(PR_SET_DUMPABLE, 0), read back.
+//   A crash cannot write the memory, the seed phrase included, to the disk, as systemd-coredump or
+//   apport would; and other programs of the same user cannot attach a debugger or read
+//   /proc/PID/mem.
+// - no_new_privs, which seccomp and Landlock need: no program started afterwards gains privileges.
 // - seccomp refuses new sockets, new io_uring instances and, where the command starts no program,
 //   execve. socketpair stays allowed: libuv makes the pipes of a child's standard streams with it
 //   (stty around a command of the menu, pdftocairo), and such a pair reaches nothing outside. The
@@ -22,12 +26,19 @@
 
 import { readFileSync } from "node:fs";
 import {
-  SandboxGaps,
+  noLimit,
+  RLIMIT_CORE,
+  SandboxRecord,
+  switchOffCoreDumps,
+  type CoreDumps,
+  type Found,
   type NodeFfi,
   type SandboxNeeds,
+  type SystemAccess,
   type SystemSandbox,
-} from "./system-sandbox.js";
+} from "./sandbox-record.js";
 
+/** The C library, which holds every call below. */
 const LIBC = "libc.so.6";
 
 /** The error number that the filter and Landlock give a refused call: EACCES (errno-base.h). */
@@ -71,6 +82,8 @@ const SECCOMP_FILTER_FLAG_TSYNC = 1;
 const FILTER_PROGRAM_BYTES = 16;
 const FILTER_POINTER_OFFSET = 8;
 
+const PR_GET_DUMPABLE = 3;
+const PR_SET_DUMPABLE = 4;
 const PR_SET_NO_NEW_PRIVS = 38;
 const PR_GET_NO_NEW_PRIVS = 39;
 
@@ -173,6 +186,7 @@ const NO_PROGRAM = "/dev/null/mnemocode-probe";
 const LIBC_FUNCTIONS = {
   syscall: { arguments: ["i64", "pointer", "pointer", "pointer"], return: "i64" },
   prctl: { arguments: ["i32", "u64", "u64", "u64", "u64"], return: "i32" },
+  setrlimit: { arguments: ["i32", "buffer"], return: "i32" },
   getrlimit: { arguments: ["i32", "buffer"], return: "i32" },
   mlockall: { arguments: ["i32"], return: "i32" },
   socket: { arguments: ["i32", "i32", "i32"], return: "i32" },
@@ -225,54 +239,63 @@ class Libc {
   }
 }
 
-/** What a probe of one boundary found. */
-type Found = "holds" | "broken" | "unknown";
-
 /** The Linux kernel's boundaries, as described at the top. */
 export class LinuxSandbox implements SystemSandbox {
-  readonly #gaps = new SandboxGaps();
-  /** The boundaries that the kernel enforces and a probe confirmed. */
-  readonly #kernel: string[] = [];
+  /** The boundaries that the kernel enforces and a probe confirmed, and what it did not. */
+  readonly #record = new SandboxRecord();
   readonly #libc: Libc | undefined;
+  #coreDumps: CoreDumps;
   #memoryLocked = false;
 
-  constructor(ffi: NodeFfi) {
-    let libc: Libc | undefined;
-    this.#gaps.attempt("the C library", () => {
-      libc = new Libc(ffi);
-    });
-    this.#libc = libc;
+  constructor(access: SystemAccess) {
+    this.#libc = this.#record.reach("the C library", access, (ffi) => new Libc(ffi));
+    this.#coreDumps = this.#record.coreDumpsNotOff();
   }
 
   start(): void {
     const libc = this.#libc;
-    if (libc !== undefined) this.#gaps.attempt("memory", () => this.#lockMemory(libc));
+    if (libc === undefined) return;
+    this.#coreDumps = switchOffCoreDumps(() => {
+      if (libc.call.setrlimit(RLIMIT_CORE, noLimit()) !== 0)
+        throw new Error("setrlimit refused RLIMIT_CORE 0");
+      if (libc.call.prctl(PR_SET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0) throw new Error("prctl refused");
+      if (libc.call.prctl(PR_GET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0)
+        throw new Error("the process is still dumpable");
+    });
+    this.#record.attempt("memory", () => this.#lockMemory(libc));
   }
 
   restrict(needs: SandboxNeeds): void {
     const libc = this.#libc;
     if (libc === undefined) return;
-    this.#gaps.attempt("no_new_privs", () => {
+    this.#record.attempt("no_new_privs", () => {
       const set = libc.call.prctl(PR_SET_NO_NEW_PRIVS, 1n, 0n, 0n, 0n);
       if (set !== 0 || libc.call.prctl(PR_GET_NO_NEW_PRIVS, 0n, 0n, 0n, 0n) !== 1)
         throw new Error("refused, so neither seccomp nor Landlock can be used");
     });
     if (libc.call.prctl(PR_GET_NO_NEW_PRIVS, 0n, 0n, 0n, 0n) !== 1) return;
-    this.#gaps.attempt("seccomp", () => this.#filter(libc, !needs.runsPrograms));
-    if (!needs.writes) this.#gaps.attempt("Landlock", () => this.#forbidWrites(libc));
+    this.#record.attempt("seccomp", () => this.#filter(libc, !needs.runsPrograms));
+    if (!needs.writes) this.#record.attempt("Landlock", () => this.#forbidWrites(libc));
   }
 
   held(): readonly string[] {
-    const kernel = this.#kernel.length > 0 ? [`kernel: ${this.#kernel.join(", ")}`] : [];
-    return [...kernel, ...(this.#memoryLocked ? ["memory locked"] : [])];
+    const kernel = this.#record.held;
+    return [
+      ...(kernel.length > 0 ? [`kernel: ${kernel.join(", ")}`] : []),
+      ...(this.#memoryLocked ? ["memory locked"] : []),
+    ];
   }
 
   missing(): readonly string[] {
-    return this.#gaps.reasons;
+    return this.#record.reasons;
   }
 
   keepsMemoryFromSwap(): boolean {
     return this.#memoryLocked;
+  }
+
+  coreDumps(): CoreDumps {
+    return this.#coreDumps;
   }
 
   /** Locks every page where nothing limits it, and reads the locked size back. */
@@ -312,9 +335,9 @@ export class LinuxSandbox implements SystemSandbox {
     // A positive result names a thread that could not take the filter; nothing was installed.
     if (result !== 0n)
       throw new Error(`refused for every thread (${libc.failure(result) ?? `thread ${result}`})`);
-    this.#claim("no sockets", sockets(libc), "a socket or an io_uring was not refused");
+    this.#record.claim("no sockets", sockets(libc), "a socket or an io_uring was not refused");
     if (refuseExec)
-      this.#claim("no other programs", programs(libc), "starting a program was not refused");
+      this.#record.claim("no other programs", programs(libc), "starting a program was not refused");
   }
 
   /** Refuses every change to the file system on every thread, then probes it. */
@@ -335,14 +358,7 @@ export class LinuxSandbox implements SystemSandbox {
     } finally {
       libc.call.close(Number(ruleset));
     }
-    this.#claim("no file writes", writes(libc), "/dev/null opened for writing");
-  }
-
-  /** Names `boundary` among the kernel's when `found` says it holds; otherwise says why not. */
-  #claim(boundary: string, found: Found, broken: string): void {
-    if (found === "holds") this.#kernel.push(boundary);
-    else if (found === "broken") this.#gaps.lack(`${boundary} did not hold: ${broken}`);
-    else this.#gaps.lack(`${boundary} could not be checked`);
+    this.#record.claim("no file writes", writes(libc), "/dev/null opened for writing");
   }
 }
 

@@ -1,0 +1,1173 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-019",
+  "auditNumber": 19,
+  "date": "2026-10-13",
+  "title": "Full-scope MnemoCode audit after the card redesign, word hints, the system sandbox and codes apart or run together",
+  "reviewer": {
+    "name": "Claude Code, single reviewer",
+    "model": "claude-opus-5-5",
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "6a0701507c9b01283b083b4840667683a08de10b",
+    "commitComplete": true,
+    "capturedOn": {
+      "commit": "fa948b6a0ef651b14ce64d2dfc721b16d87f917d",
+      "workingTree": [
+        "M CHANGELOG.md",
+        " M README.md",
+        " D assets/images/business-glass-4in1.png",
+        " D assets/images/business-glass-6in1.jpg",
+        " D assets/images/business-glass-8in1.jpg",
+        " M docs/ARCHITECTURE.md",
+        " M docs/CANDIDATES.md",
+        " M docs/HEIRS.md",
+        " M docs/SSKR.md",
+        " M docs/audits/AUD-010-2026-10-07.json",
+        " M docs/audits/AUD-010-2026-10-07.md",
+        " M docs/audits/README.md",
+        " M docs/card-designs.md",
+        " M package.json",
+        " M scripts/business-goldens.mjs",
+        " M scripts/card-fixtures.mjs",
+        " M scripts/check-card-output.mjs",
+        " D scripts/glass-ribbons-reference.py",
+        " M scripts/verify-executable.mjs",
+        " M scripts/verify-terminal-input.py",
+        " M src/cli/ask.ts",
+        " M src/cli/backup-check.ts",
+        " M src/cli/card-options.ts",
+        " M src/cli/command-line.ts",
+        " M src/cli/command-options.ts",
+        " M src/cli/date-search.ts",
+        " M src/cli/decode-command.ts",
+        " M src/cli/encode-command.ts",
+        " M src/cli/encode-export.ts",
+        " M src/cli/encode-report.ts",
+        " M src/cli/format-numbers.ts",
+        " M src/cli/heir-sheet.ts",
+        " M src/cli/help-pages.ts",
+        " M src/cli/input.ts",
+        " M src/cli/menu-entries.ts",
+        " M src/cli/menu.ts",
+        " M src/cli/missing-codes-search.ts",
+        " M src/cli/output-paths.ts",
+        " M src/cli/protection.ts",
+        " M src/cli/qr-input.ts",
+        " M src/cli/recover-word-command.ts",
+        " M src/cli/self-test.ts",
+        " M src/cli/share-repair.ts",
+        " M src/cli/sskr-output.ts",
+        " M src/cli/sskr-restore-command.ts",
+        " M src/cli/sskr-split-command.ts",
+        " M src/cli/terminal-choice.ts",
+        " M src/cli/terminal-input.ts",
+        " M src/cli/terminal.ts",
+        " M src/core/backup-options.ts",
+        " M src/core/backup-reading.ts",
+        " M src/core/bits.ts",
+        " M src/core/candidate-encryption-self-test.ts",
+        " M src/core/candidate-encryption.ts",
+        " M src/core/candidate-list-self-test.ts",
+        " M src/core/candidate-list.ts",
+        " M src/core/code-text.ts",
+        " M src/core/encoded-backup.ts",
+        " M src/core/encoded-form.ts",
+        " M src/core/missing-codes-search.ts",
+        " M src/core/missing-codes.ts",
+        " M src/core/types.ts",
+        " M src/core/words.ts",
+        " M src/export/backup-cards.ts",
+        " M src/export/business-artwork.ts",
+        " M src/export/business-cards.ts",
+        " M src/export/business-designs.ts",
+        " M src/export/business-layout.ts",
+        " M src/export/business-render-primitives.ts",
+        " M src/export/card-codes.ts",
+        " M src/export/card-content.ts",
+        " M src/export/card-copy.ts",
+        " M src/export/card-renderer.ts",
+        " M src/export/card-settings.ts",
+        " M src/export/cards-self-test.ts",
+        " M src/export/collection-sheet.ts",
+        " M src/export/color-math.ts",
+        " M src/export/document-formats.ts",
+        " M src/export/document-metadata.ts",
+        " M src/export/export-details.ts",
+        " D src/export/glass-artwork.ts",
+        " D src/export/glass-cards.ts",
+        " D src/export/glass-ribbons.ts",
+        " M src/export/heir-sheet-self-test.ts",
+        " M src/export/heir-sheet-text.ts",
+        " M src/export/heir-sheet.ts",
+        " M src/export/image-export.ts",
+        " M src/export/individual-cards.ts",
+        " M src/export/material-cards.ts",
+        " M src/export/pdf.ts",
+        " M src/export/platform.ts",
+        " M src/export/qr-image.ts",
+        " M src/export/render.ts",
+        " M src/export/sskr-cards.ts",
+        " M src/export/sskr-content.ts",
+        " M src/export/sskr-render-self-test.ts",
+        " M src/export/sskr-render.ts",
+        " M src/export/study-backdrops.ts",
+        " M src/export/template-catalog.ts",
+        " M src/export/templates.ts",
+        " M src/sskr/joint-repair.ts",
+        " M src/sskr/known-answers.ts",
+        " M src/sskr/mixed-layout.ts",
+        " M src/sskr/repair-self-test.ts",
+        " M src/sskr/repair.ts",
+        " M src/sskr/share-input.ts",
+        " M src/sskr/share-units.ts",
+        " M src/sskr/transport.ts",
+        " M test/artwork-cache.test.ts",
+        " M test/aud-009-remediation.test.ts",
+        " M test/aud-011-remediation.test.ts",
+        " M test/aud-012-remediation.test.ts",
+        " M test/aud-014-cli.test.ts",
+        " M test/aud-014-export.test.ts",
+        " M test/aud-015.test.ts",
+        " M test/business-cards.test.ts",
+        " M test/card-drawing.test.ts",
+        " M test/card-numbering.test.ts",
+        " M test/card-page-sizes.test.ts",
+        " M test/cli.test.ts",
+        " M test/collection-sheet.test.ts",
+        " M test/encode-card-content.test.ts",
+        " M test/export.test.ts",
+        " D test/glass-ribbons.test.ts",
+        " M test/heir-sheet.test.ts",
+        " M test/known-audit-defects.test.ts",
+        " M test/material-cards.test.ts",
+        " M test/menu.test.ts",
+        " M test/missing-codes-search.test.ts",
+        " M test/portable-modules.test.ts",
+        " M test/render-platform.test.ts",
+        " M test/scan-fixes.test.ts",
+        " M test/self-test-integrity.test.ts",
+        " M test/sskr-render.test.ts",
+        " M test/sskr-repair-engine.test.ts",
+        " M test/sskr-repair.test.ts",
+        " M test/sskr-vectors.test.ts",
+        " M test/terminal-choice-record.test.ts",
+        " M test/terminal-input-echo.test.ts",
+        " M test/terminal-layout.test.ts",
+        " M test/word-recovery-cli.test.ts",
+        "?? docs/audits/AUD-018-2026-10-12.json",
+        "?? docs/audits/AUD-018-2026-10-12.md",
+        "?? docs/audits/AUD-018-harnesses/",
+        "?? docs/audits/AUD-019-harnesses/",
+        "?? scripts/card-palette-reference.py",
+        "?? src/cli/sandbox-linux.ts",
+        "?? src/cli/sandbox-macos.ts",
+        "?? src/cli/sandbox-windows.ts",
+        "?? src/cli/system-sandbox.ts",
+        "?? src/cli/typed-hints.ts",
+        "?? src/core/candidate-file-admission.ts",
+        "?? src/core/candidate-file-refusal.ts",
+        "?? src/core/word-hints-self-test.ts",
+        "?? src/core/word-hints.ts",
+        "?? src/export/business-tint.ts",
+        "?? src/export/card-decoys.ts",
+        "?? src/export/card-palette.ts",
+        "?? src/export/card-plan.ts",
+        "?? src/export/card-sets-self-test.ts",
+        "?? test/aud-018.test.ts",
+        "?? test/candidate-file-admission.test.ts",
+        "?? test/card-sets.test.ts",
+        "?? test/codes-apart-and-joined.test.ts",
+        "?? test/saved-documents-wiped.test.ts",
+        "?? test/system-sandbox.test.ts",
+        "?? test/word-hints.test.ts"
+      ],
+      "uncommittedDiffSha256": "19496a432ec323f82c269f9f9599cded287b51fa49fe034e54d7f3cb161a1009"
+    },
+    "workingTree": "Captured as the uncommitted tree on its parent commit; committed unchanged as the reviewed commit, whose files outside docs/audits/ have the same source fingerprint.",
+    "sourceFingerprint": "c6d8bf300529e6b5d41787b791a627352ea2473cd443da4dcda1427bca77692d",
+    "sourceFingerprintMethod": "SHA-256 of the JSON list of {path, sha256} of every tracked or untracked, not ignored file outside docs/audits/ (audit.py source)",
+    "capturedAt": "2026-10-13T02:11:37.402672+00:00",
+    "finalCheckAt": "2026-10-13T02:19:19.529082+00:00",
+    "files": 447
+  },
+  "scope": "Full scope of the 32 CHECK items, executed in part on Linux: the library, CLI, cards, SSKR engine, system sandbox, workflows, documents and audit records, with the changes since AUD-018 reviewed first. Baseline review without changes; the fixes followed in a separate phase, recorded in the remediation addendum.",
+  "procedureHashes": {
+    "FULL_AUDIT_GUIDE.md": "e1b2fb641e4a25ebf292548fc1e2ef0c25dbd01faa5c2b580c6ba75df2afcab7",
+    "audits/AUDIT_STANDARD.md": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f",
+    "audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+    "audit-report.schema.json": "989bf3de974d581579c1d1c1e143d5ab9fa232dc70cc8c6f84ad00531ae698fb"
+  },
+  "environment": {
+    "os": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "node": "v26.10.0",
+    "pnpm": "12.8.1",
+    "python": "Python 3.14.4",
+    "installedPackages": {
+      "typescript": "7.0.2",
+      "vitest": "5.0.3",
+      "prettier": "3.9.9",
+      "@noble/curves": "2.4.0",
+      "@noble/hashes": "2.4.0",
+      "@pdf-lib/fontkit": "1.1.1",
+      "@scure/base": "2.4.0",
+      "@scure/bip32": "2.4.0",
+      "@scure/bip39": "2.4.0",
+      "@scure/btc-signer": "2.4.1",
+      "age-encryption": "0.3.1",
+      "jsqr": "1.4.0",
+      "pdf-lib": "1.17.1",
+      "pngjs": "7.0.0",
+      "qrcode": "1.5.4"
+    },
+    "lockfileSha256": "e097d32adb912b153c402cbb7c2d899f5580a14eb1d290695843ac1513b9e234"
+  },
+  "checks": [
+    {
+      "label": "source-check",
+      "command": "pnpm check",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:11:43.207619+00:00",
+      "endedAt": "2026-10-13T02:11:45.486420+00:00",
+      "summary": "Toolchain pins, tight Markdown lists in 15 files, copy gate (50 tokens, 254 files), four TypeScript configurations",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/source-check.log",
+        "sha256": "ae826a7ee1e2d5de24f2103d68ff3cadc41873556e52ec93f9bda6b3132d08bb",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "format-check",
+      "command": "pnpm format:check",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:11:45.525895+00:00",
+      "endedAt": "2026-10-13T02:11:50.055885+00:00",
+      "summary": "Prettier over the repository (docs/audits excluded by design)",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/format-check.log",
+        "sha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "build",
+      "command": "pnpm build",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:11:50.092042+00:00",
+      "endedAt": "2026-10-13T02:11:50.619319+00:00",
+      "summary": "Fresh dist/ from the reviewed snapshot",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/build.log",
+        "sha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "all-tests",
+      "command": "npx vitest run --maxWorkers=4 --testTimeout=180000",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:11:50.658646+00:00",
+      "endedAt": "2026-10-13T02:15:45.546009+00:00",
+      "summary": "The whole collection, the PDF-rendering files included: 110 files, 2,079 passed, 4 skipped by their own condition (slow seedshift-legacy-valid multi-pattern cases)",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/all-tests.log",
+        "sha256": "457a06b79cf2250e3d860a0b8e70afce95ad8c0aa80ca33784d032dd55d81848",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "cli-self-test",
+      "command": "node dist/mnemocode.js self-test",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:15:45.588749+00:00",
+      "endedAt": "2026-10-13T02:15:52.621987+00:00",
+      "summary": "Full CLI self-test: PASS, 7 public vectors, 75 representation round trips, card, share-card, heir-sheet and QR exports",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/cli-self-test.log",
+        "sha256": "83c41cb9253a0e0ce859cae40e10b43f925d62525502dbfa84e92f5a2e8969eb",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "terminal-input",
+      "command": "python3 scripts/verify-terminal-input.py",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:15:52.669453+00:00",
+      "endedAt": "2026-10-13T02:16:26.742940+00:00",
+      "summary": "Real pseudo-terminal: menu, hidden prompts, word and Bytewords hints, entry 5 with codes, Ctrl+C paths: all passed",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/terminal-input.log",
+        "sha256": "1e2e7cba9d2a38a23c03b77633fd61f2fc5556c7c26574f68a2d0fb13e9b0dd8",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "card-output",
+      "command": "node scripts/check-card-output.mjs ../tmp/mnemocode/aud-019/card-output",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:16:26.796726+00:00",
+      "endedAt": "2026-10-13T02:17:33.409292+00:00",
+      "summary": "Card export of every template family, sheets and SSKR members, with exact QR round trips at 200 dpi: completed",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/card-output.log",
+        "sha256": "3612a9d082effaa4f490ee3c7d5b24a0ec6edee591c5d21bda99c50c38eb5e46",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "executable",
+      "command": "pnpm build:executable",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:17:33.449503+00:00",
+      "endedAt": "2026-10-13T02:17:46.991203+00:00",
+      "summary": "Single executable built and checked: version, full self-test, held by the system's sandbox (no sockets), masking, 2-of-3 restore, card PDF, help, licence notices",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/executable.log",
+        "sha256": "75af714fedf24637da1a8eb242e180d039a732b1aa79d9e62ea685da19149c41",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "package-contents",
+      "command": "npm pack --dry-run --json --ignore-scripts",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:17:47.034300+00:00",
+      "endedAt": "2026-10-13T02:17:48.067596+00:00",
+      "summary": "npm pack dry run: 530 files; no test, harness or evidence file",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/package-contents.log",
+        "sha256": "5e9bb74590a76579c239748c3ec1c90770594acc0f0a73750f38dc521f8f2318",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "dependency-advisories",
+      "command": "pnpm audit --audit-level high",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:17:48.113525+00:00",
+      "endedAt": "2026-10-13T02:17:49.640198+00:00",
+      "summary": "pnpm audit --audit-level high: no known vulnerabilities",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/dependency-advisories.log",
+        "sha256": "15950a68a7ed99c59779717acefdceb3f69cfd31bde67d2c954f2a3cea4d7955",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "private-reporting",
+      "command": "gh api repos/hobby-eng/mnemocode/private-vulnerability-reporting",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:17:49.680299+00:00",
+      "endedAt": "2026-10-13T02:17:50.965511+00:00",
+      "summary": "GitHub private vulnerability reporting: enabled (read-only API)",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/private-reporting.log",
+        "sha256": "26b3426b2593763c96d0890b4a77a0bbf66d13fc512b0c6b138a23c290f30a2a",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "sskr-manifest",
+      "command": "python3 docs/audits/AUD-019-harnesses/sskr-manifest.py",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:17:51.003485+00:00",
+      "endedAt": "2026-10-13T02:17:51.276586+00:00",
+      "summary": "All 7 SSKR engine files match sskr-wasm/integrity.json; nothing unlisted",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/sskr-manifest.log",
+        "sha256": "eefed7ef7f49a95b32c6e2ea4b098e6eeb0a0b8575a71ad8c55d38c0fb45c494",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "record-integrity",
+      "command": "python3 docs/audits/AUD-019-harnesses/record-integrity.py",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:17:51.315779+00:00",
+      "endedAt": "2026-10-13T02:17:51.591982+00:00",
+      "summary": "59 audit documents, 79 commit citations (12 explained by the index, 2 in multi-chain-wallet-tools), 1,059 relative links: 0 problems, 20 warnings (dead links to removed files, observation)",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/record-integrity.log",
+        "sha256": "679a7d22c5e845e5b906ac1c43fa1c595241019af1ffe9aa7579da84abd1461d",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "readme-examples",
+      "command": "python3 docs/audits/AUD-019-harnesses/readme-examples.py",
+      "exitCode": 1,
+      "startedAt": "2026-10-13T02:17:51.634070+00:00",
+      "endedAt": "2026-10-13T02:18:21.445259+00:00",
+      "summary": "README command examples without a secret prompt or PDF: 19 passed, 15 skipped, 2 failed (both read a file that a skipped secret-prompt example writes: a harness limit, as in AUD-018)",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/readme-examples.log",
+        "sha256": "c235cc19d7800ac0f7cf5129a067fb72a0423ac1e77e567dd35a9e5c40749d2c",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "readme-secret-arguments",
+      "command": "python3 docs/audits/AUD-019-harnesses/readme-secret-arguments.py",
+      "exitCode": 0,
+      "startedAt": "2026-10-13T02:18:21.487081+00:00",
+      "endedAt": "2026-10-13T02:18:40.527980+00:00",
+      "summary": "Every README example with --ask-secrets accepted up to its terminal check: 0 refused",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/readme-secret-arguments.log",
+        "sha256": "1e6907ddd7e47b46f90b8b37ef75b94af9fd341058af74a3f88629559d01a801",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "short-copies",
+      "command": "node scripts/verify-no-copies.mjs --tokens 35",
+      "exitCode": 1,
+      "startedAt": "2026-10-13T02:15:39.721928+00:00",
+      "endedAt": "2026-10-13T02:15:40.498058+00:00",
+      "summary": "Diagnostic copy scan at 35 tokens: 2 repetitions, the claim of a probed boundary in two sandboxes (AUD-019-ARC001) and overload declarations in ask.ts (rejected as a copy)",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/short-copies.log",
+        "sha256": "616e869f15d75efb996cc6d6f1f49d58bdb732ecbbe1a1c73ba28694eb07effa",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "probes",
+      "command": "npx vitest run --config docs/audits/AUD-019-harnesses/probe.config.ts",
+      "exitCode": 1,
+      "startedAt": "2026-10-13T02:19:10.244893+00:00",
+      "endedAt": "2026-10-13T02:19:11.018972+00:00",
+      "summary": "AUD-019 probes: AUD-019-SEC001 reproduces (1 failed: the hint was given up to 12 words), the Linux kernel control passes (1 passed)",
+      "sourceUnchanged": true,
+      "evidence": {
+        "log": "AUD-019-evidence/probes.log",
+        "sha256": "fb4a1ebb17842a15157222371dbf418358f70855d84226532f8daf8358149496",
+        "localOnly": true
+      }
+    }
+  ],
+  "coverageLedger": [
+    {
+      "checkId": "CHECK-SEC-001",
+      "group": "SEC / Threat model and ownership",
+      "outcome": "passed",
+      "method": "Secret inputs traced from argument, file, standard input, private screen and QR image to their consumers, and the new paths: word hints on secret prompts (AUD-019-SEC001), codes read apart or run together, entry 5, decoy codes"
+    },
+    {
+      "checkId": "CHECK-SEC-002",
+      "group": "SEC / Permissions and offline isolation",
+      "outcome": "passed",
+      "method": "Permission model and the new system sandbox read: Linux seccomp and Landlock for every thread, locked memory, core dumps off and read back; the kernel control probe and the executable check show sockets and programs refused. macOS and Windows code reviewed only; the menu's sandbox nesting (observation, fixed)"
+    },
+    {
+      "checkId": "CHECK-SEC-003",
+      "group": "SEC / Network egress",
+      "outcome": "passed",
+      "method": "No fetch, HTTP, socket, DNS or storage API in src/; seccomp refuses new sockets on Linux; the CLI runs without network permission"
+    },
+    {
+      "checkId": "CHECK-SEC-004",
+      "group": "SEC / Randomness and encryption",
+      "outcome": "passed",
+      "method": "Only node:crypto (randomInt, the fill for SSKR) and crypto.getRandomValues; decoy codes and card colours through the checked UniformChoice of the render platform; age X25519/scrypt unchanged"
+    },
+    {
+      "checkId": "CHECK-SEC-005",
+      "group": "SEC / Secret exceptional paths",
+      "outcome": "failed",
+      "method": "AUD-019-SEC001: each redraw of a hint decoded the whole answer typed so far into a new string; the other paths wipe as documented"
+    },
+    {
+      "checkId": "CHECK-SEC-006",
+      "group": "SEC / Injection and persistence",
+      "outcome": "passed",
+      "method": "No DOM, dynamic code or browser storage; saved PDFs carry no document information (check-card-output asserts it); console output only in src/cli"
+    },
+    {
+      "checkId": "CHECK-SEC-007",
+      "group": "SEC / Input and availability bounds",
+      "outcome": "passed",
+      "method": "Run-together reading stays under the text limits; marked codes 2^24 combinations; date attempts 2^31; candidate-file ceilings unchanged"
+    },
+    {
+      "checkId": "CHECK-FUN-001",
+      "group": "FUN / BIP39 and representations",
+      "outcome": "passed",
+      "method": "Startup and full self-test vectors; codes apart, run together and cut by a line break for every form in decode, check, marked codes and recover-word (test/codes-apart-and-joined.test.ts)"
+    },
+    {
+      "checkId": "CHECK-FUN-002",
+      "group": "FUN / Coin derivation",
+      "outcome": "passed",
+      "method": "Coin vectors in the self-test; README recover-date examples matched a native SegWit address, a zpub, an Ethereum address and a Taproot key"
+    },
+    {
+      "checkId": "CHECK-FUN-003",
+      "group": "FUN / BIP85, BIP38, messages, Silent Payments",
+      "outcome": "not-applicable",
+      "method": "MnemoCode implements none of them"
+    },
+    {
+      "checkId": "CHECK-FUN-004",
+      "group": "FUN / Scripts and descriptors",
+      "outcome": "not-applicable",
+      "method": "Only address-script classification for wallet checks, covered by FUN-002; no descriptor, Miniscript or multisig compiler"
+    },
+    {
+      "checkId": "CHECK-FUN-005",
+      "group": "FUN / Transactions and PSBT",
+      "outcome": "not-applicable",
+      "method": "No transaction or PSBT feature"
+    },
+    {
+      "checkId": "CHECK-FUN-006",
+      "group": "FUN / Recovery and SSKR",
+      "outcome": "passed",
+      "method": "Published SSKR vectors, Bytewords run together (new known answer), repair, joint repair and recovery suites; full self-test"
+    },
+    {
+      "checkId": "CHECK-FUN-007",
+      "group": "FUN / Local address search",
+      "outcome": "passed",
+      "method": "Local bounded comparisons only; providers and accounting not applicable"
+    },
+    {
+      "checkId": "CHECK-API-001",
+      "group": "API / Runtime and dependency contracts",
+      "outcome": "passed",
+      "method": "Package exports resolve in dist/; new APIs reviewed: WordList spacing, bytewordUnits, BackupReading.isCodes, EncodedForm.placeName, card decoys and plans"
+    },
+    {
+      "checkId": "CHECK-API-002",
+      "group": "API / Cancellation and ownership",
+      "outcome": "passed",
+      "method": "AUD-014 to AUD-018 regression suites and the Ctrl+C terminal cases passed"
+    },
+    {
+      "checkId": "CHECK-API-003",
+      "group": "API / Export contracts",
+      "outcome": "passed",
+      "method": "All PDF-rendering test files and check-card-output.mjs ran this time; exact QR round trips"
+    },
+    {
+      "checkId": "CHECK-API-004",
+      "group": "API / Codec interoperability",
+      "outcome": "passed",
+      "method": "Bytewords, UR, CBOR, representation and record round trips with literal vectors"
+    },
+    {
+      "checkId": "CHECK-BLD-001",
+      "group": "BLD / Module composition",
+      "outcome": "passed",
+      "method": "Portable-module and strict-consumer checks; export map complete; the sandbox modules only in src/cli"
+    },
+    {
+      "checkId": "CHECK-BLD-002",
+      "group": "BLD / Portable source and matrix",
+      "outcome": "skipped",
+      "method": "Linux only: the macOS and Windows sandbox code was never executed; CI runs it after the push"
+    },
+    {
+      "checkId": "CHECK-BLD-003",
+      "group": "BLD / Pins, lockfile and notices",
+      "outcome": "passed",
+      "method": "Exact pins, frozen lockfile, toolchain pins and documented versions agree; advisory scan clean; executable licence notices present. No full transitive licence audit"
+    },
+    {
+      "checkId": "CHECK-BLD-004",
+      "group": "BLD / SSKR source and output freshness",
+      "outcome": "skipped",
+      "method": "Manifest matches all 7 files; no Docker rebuild (pnpm verify:sskr)"
+    },
+    {
+      "checkId": "CHECK-BLD-005",
+      "group": "BLD / Workflows and artifacts",
+      "outcome": "skipped",
+      "method": "The Linux executable was built and passed its own checks; workflows read; no CI run or release operation"
+    },
+    {
+      "checkId": "CHECK-UI-001",
+      "group": "UI / Terminal viewports",
+      "outcome": "skipped",
+      "method": "Pseudo-terminal at its default size only"
+    },
+    {
+      "checkId": "CHECK-UI-002",
+      "group": "UI / Terminal inputs and navigation",
+      "outcome": "passed",
+      "method": "verify-terminal-input.py passed, with the new Bytewords hints and entry 5 cases; menu and prompt tests"
+    },
+    {
+      "checkId": "CHECK-UI-003",
+      "group": "UI / Help and privacy",
+      "outcome": "passed",
+      "method": "Every README option exists in the commands' --help; menu labels and notes fit their column; private-screen tests passed"
+    },
+    {
+      "checkId": "CHECK-ARC-001",
+      "group": "ARC / Module and class ownership",
+      "outcome": "passed",
+      "method": "Logic in library modules; code readers own their spacing rules; one sandbox class per system behind one interface"
+    },
+    {
+      "checkId": "CHECK-ARC-002",
+      "group": "ARC / Duplication and dead code",
+      "outcome": "failed",
+      "method": "AUD-019-ARC001: core-dump calls and the claim of a probed boundary written in more than one place; copy gate at 50 tokens passed"
+    },
+    {
+      "checkId": "CHECK-ARC-003",
+      "group": "ARC / Tests and comments",
+      "outcome": "passed",
+      "method": "Every new feature brings its startup known answers, full self-test row, unit tests and terminal case; the AUD-014 to AUD-018 regressions present and passing"
+    },
+    {
+      "checkId": "CHECK-DOC-001",
+      "group": "DOC / Capabilities and warnings",
+      "outcome": "failed",
+      "method": "AUD-019-DOC001 (changelog and release notes describe cards that no longer exist) and AUD-019-DOC002 (SECURITY.md denies the system's limits)"
+    },
+    {
+      "checkId": "CHECK-DOC-002",
+      "group": "DOC / Commands, links and licensing",
+      "outcome": "passed",
+      "method": "README examples run or are skipped only for a secret prompt or a PDF; 0 refused with --ask-secrets; the 2 failures are the harness limit"
+    },
+    {
+      "checkId": "CHECK-DOC-003",
+      "group": "DOC / Audit records",
+      "outcome": "passed",
+      "method": "record-integrity.py: 0 problems; 20 dead links of AUD-011 and AUD-012 to removed files (observation)"
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUD-019-SEC001",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "A word hint is given the whole answer typed so far, which a secret prompt copies into strings that cannot be wiped",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Low: needs access to the process memory; the typed answer itself becomes a string once it is read.",
+      "affectedFiles": [
+        "src/cli/terminal-input.ts (readLine, typedBefore)",
+        "src/core/word-hints.ts (WordList.hint, completion)"
+      ],
+      "reproduction": "docs/audits/AUD-019-harnesses/probes.ts, first case: the public phrase abandon \u2026 about is typed key by key into readLine with the production BIP39 hints, wrapped to count the words of each text a hint is given.",
+      "expected": "The hint needs the word being typed and enough of the words before it to tell the form of the line; SECURITY.md: temporary copies of the phrase data are cleared as far as possible.",
+      "observed": "typedBefore decoded line.subarray(0, cursor): each redraw built a string of the whole answer so far, up to all 12 words; the probe fails with 12 > 4.",
+      "impact": "While a seed phrase is typed on the private screen, every pause leaves another copy of the words typed so far in the heap until the memory is reused: a few dozen strings for a 24-word phrase. Core dumps are off, so reading them needs access to the process memory, swap or a hibernation image.",
+      "evidence": "AUD-019-evidence/probes.log (local), probes.command.json exit 1",
+      "recommendedFix": "Give the hint only the word being typed and a few before it (a named constant), decoded from the buffer that readLine owns and wipes; add the probe as a regression test.",
+      "requiredVerification": "The probe's first case passes; the word-hint and terminal tests and verify-terminal-input.py still pass."
+    },
+    {
+      "id": "AUD-019-ARC001",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "Core-dump calls and the claim of a probed boundary are written in more than one place",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Low: both copies behave the same today; the risk is a later change to one of them.",
+      "affectedFiles": [
+        "src/cli/protection.ts (switchOffCoreDumps, C_LIBRARY, RLIMIT_CORE, PR_SET_DUMPABLE)",
+        "src/cli/sandbox-linux.ts (libc, its probe claims)",
+        "src/cli/sandbox-macos.ts (libSystem, its probe claims)",
+        "src/cli/system-sandbox.ts"
+      ],
+      "reproduction": "node scripts/verify-no-copies.mjs --tokens 35: src/cli/sandbox-linux.ts:343-350 = src/cli/sandbox-macos.ts:170-177 (39 tokens). Reading protection.ts beside sandbox-linux.ts and sandbox-macos.ts: both open the same C library by its own literal name, and protection.ts keeps setrlimit and prctl apart from the sandbox of its system.",
+      "expected": "AGENTS.md, no repetition: a rule, constant or library name has one source; a protection of a system belongs to that system's type (delegation).",
+      "observed": "The code that records a probe's result as held, broken or unknown is written twice; RLIMIT_CORE, the struct rlimit size and the C library names appear in protection.ts and in the sandbox modules; protection.ts decides by platform whether core dumps exist, which the sandbox of that platform knows.",
+      "impact": "A change to the rule of one platform, such as how a failed probe is reported, can miss the other copy, and a new system needs edits in protection.ts as well as its own module.",
+      "evidence": "AUD-019-evidence/short-copies.log (local), short-copies.command.json exit 1; source review",
+      "recommendedFix": "One SandboxRecord type for held boundaries and their reasons, with claim and reach; core dumps switched off and read back by each system's sandbox in start(), asked through coreDumps(); protection.ts asks the sandbox instead of keeping its own calls.",
+      "requiredVerification": "The 35-token scan finds no sandbox copy; the sandbox and protection tests, the executable check and the CLI self-test pass; a protected process without node:ffi still refuses a secret."
+    },
+    {
+      "id": "AUD-019-DOC001",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The changelog and the release notes still describe share cards in every form, which the card redesign removed",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Low and not blocking for the code; the release text must be corrected before v0.1.0 is published, since it is copied into the release.",
+      "affectedFiles": [
+        "CHANGELOG.md, line 38",
+        "docs/releases/v0.1.0.md, line 33 and its card and secret-handling sections"
+      ],
+      "reproduction": "Read CHANGELOG.md line 38 and docs/releases/v0.1.0.md beside src/export/card-codes.ts and the refusal \"Shares written as words have no cards\"; compare the release notes with the CHANGELOG entries of 2026-10-12 and 2026-10-13.",
+      "expected": "The changelog and the release notes say what the code does; the release notes carry the changes of the release.",
+      "observed": "Both say that share cards print word numbers, Unicode codes or Bytewords, three to a card, beside random colours; the code refuses cards of shares in words. The release notes also say that separate cards print the size of the set, which they no longer do, and lack the redesign, the word hints, the system sandbox, the wiping of saved documents and QR input, and codes read apart or run together.",
+      "impact": "A reader of the release expects cards that the program refuses, and does not learn of new protections and inputs.",
+      "evidence": "Source and document review recorded in this report",
+      "recommendedFix": "Rewrite the changelog line for cards of colours and Unicode codes only; bring the release notes in line with the changelog.",
+      "requiredVerification": "The changelog and release notes agree with the code and with each other; pnpm check (Markdown lists) passes."
+    },
+    {
+      "id": "AUD-019-DOC002",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "SECURITY.md says that no limit of the operating system applies, though the system sandbox now enforces some",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Low: it understates the protection rather than overstating it.",
+      "affectedFiles": [
+        "SECURITY.md, section on what limits MnemoCode, and the swap warning"
+      ],
+      "reproduction": "Read SECURITY.md lines 22-27 beside src/cli/system-sandbox.ts and the executable check \"is held by the system's sandbox (kernel: no sockets)\".",
+      "expected": "SECURITY.md describes the limits as they are: where the system enforces some, which differ by system and version, and what stays usable.",
+      "observed": "\"Neither is a limit of the operating system\" and \"MnemoCode is not a sandbox\"; the swap warning does not say that it is left out when all memory is locked.",
+      "impact": "A reader judges the protection by a wrong description; a person on a system with the sandbox does not learn that descriptors opened before it, such as the terminal, stay usable.",
+      "evidence": "Source and document review recorded in this report",
+      "recommendedFix": "Say that MnemoCode is not a complete sandbox, that only the limits the system enforces stop a compromised program from connecting, that they differ by system and version, and that descriptors opened before them stay usable; name the locked-memory case of the swap warning.",
+      "requiredVerification": "SECURITY.md agrees with system-sandbox.ts and protection.ts; pnpm check passes."
+    }
+  ],
+  "observations": [],
+  "informationalNotes": [
+    "Observation, fixed with ARC001: the start menu restricted the system sandbox for the widest needs of any command before it starts each command as a process of its own. On macOS a process inherits the sandbox of the process that starts it, and a second profile applied inside it may be refused, so a command could have run under the menu's wider profile only. Found in review, not executed (no macOS host). The menu now gives up node:ffi and file writes of the permission model only, and each command applies its own sandbox.",
+    "AUD-011 and AUD-012 link 20 times to the frosted glass sources (src/export/glass-cards.ts, glass-artwork.ts, glass-layout.ts) that the card redesign removed; the links pointed at the reviewed state. Future reports should link a commit-pinned URL.",
+    "readme-examples.py runs each command alone, so the two examples that read a file written by a skipped secret-prompt example fail (decode --input-file direct-unicode.txt, decode --qr-file my-palette-qr.png); a harness limit, recorded as in AUD-018.",
+    "The 35-token copy diagnostic finds the overload signatures of askOrCancel in src/cli/ask.ts: declarations, not behaviour, as in AUD-018.",
+    "The working tree of 2026-10-12 held another agent's README rewording together with later edits in the same paragraphs, and no copy of it survives; the states of AUD-018's baseline and remediation could therefore not be rebuilt as commits of their own. The reviewed source was committed as five commits ending at the reviewed commit; docs/ARCHITECTURE.md and test/portable-modules.test.ts match the AUD-018 baseline hashes.",
+    "Node.js 26's libuv opens its io_uring rings at start, before MnemoCode runs, so seccomp can refuse io_uring_setup but not io_uring_enter on those rings; recorded in sandbox-linux.ts.",
+    "The encode prompt for a seed phrase takes words only; whether it should also take codes is the owner's open question and not a finding."
+  ],
+  "remediation": [
+    {
+      "id": "AUD-014-SEC001",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-SEC002",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-FUN001",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-FUN002",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-FUN003",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API001",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API002",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API003",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API004",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API005",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API006",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API007",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API008",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API009",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API010",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API011",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-014-API012",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-001-API001",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-012-SEC004",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-015-API001",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-015-API002",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-015-API003",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-015-UI001",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-015-SEC001",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-016-API001",
+      "status": "verified",
+      "fixCommit": "368fd0c71cc89d04cdd720d5975b890fcb325b59",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-017-DOC001",
+      "status": "verified",
+      "fixCommit": "fa948b6a0ef651b14ce64d2dfc721b16d87f917d",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-018-SEC001",
+      "status": "verified",
+      "fixCommit": "ad91504be050764e497c748a714d114802ec360e",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-018-DOC002",
+      "status": "verified",
+      "fixCommit": "ad91504be050764e497c748a714d114802ec360e",
+      "verificationCommit": "6a0701507c9b01283b083b4840667683a08de10b",
+      "evidence": "Verified at 6a0701507c9b: every file outside docs/audits/ of that commit is the audited snapshot byte for byte (source fingerprint below). The regression tests of these findings (test/aud-014-*.test.ts, aud-015, aud-016, aud-017, aud-018) passed in all-tests, the PDF-rendering files included, and check-card-output passed; AUD-017-DOC001 by the check records of AUD-018 and this audit, which bind the source before and after each command; AUD-018-DOC002 by record-integrity.py with 0 problems. The render comparison that AUD-014 and AUD-015 named compared cards before and after their fixes; the card redesign has changed the renders on purpose since, and the PDF tests and the export round trip were run instead."
+    },
+    {
+      "id": "AUD-018-DOC001",
+      "status": "fixed",
+      "fixCommit": "ad91504be050764e497c748a714d114802ec360e",
+      "verificationCommit": null,
+      "evidence": "Fixed, not verified: every README example with --ask-secrets is accepted up to its prompt (0 refused), but the manual run with the prompts that its required verification names was not made."
+    },
+    {
+      "id": "AUD-019-SEC001",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Remediation addendum (2026-10-13). Fixed, not verified: the fixes are committed together with this record, and no later commit has verified them yet."
+    },
+    {
+      "id": "AUD-019-ARC001",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Remediation addendum (2026-10-13). Fixed, not verified: the fixes are committed together with this record, and no later commit has verified them yet."
+    },
+    {
+      "id": "AUD-019-DOC001",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Remediation addendum (2026-10-13). Fixed, not verified: the fixes are committed together with this record, and no later commit has verified them yet."
+    },
+    {
+      "id": "AUD-019-DOC002",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Remediation addendum (2026-10-13). Fixed, not verified: the fixes are committed together with this record, and no later commit has verified them yet."
+    }
+  ],
+  "limitations": [
+    "Single reviewer (Claude Code, no subagents, no independent skeptic) at the owner's request; the same reviewer made the fixes.",
+    "Not run: macOS and Windows (their sandbox code was reviewed only and runs first in CI after the push), the Docker rebuild of the SSKR engine, CI and any release step.",
+    "The README examples that ask for secrets or draw PDFs were not run; the terminal check types secrets through a pseudo-terminal at its default size only.",
+    "The source review was risk-based: the changes since AUD-018 (card redesign and decoys, word hints, the system sandbox, codes apart and joined, entry 5), input and secret paths, documents and records; not every line was read.",
+    "The audited snapshot was the uncommitted tree on fa948b6; its files outside docs/audits/ were then committed unchanged as five signed commits ending at the reviewed commit."
+  ],
+  "summary": {
+    "findings": {
+      "low": 4
+    },
+    "releaseBlocking": 0,
+    "testsPassed": 2079,
+    "testsSkipped": 4,
+    "testFiles": 110
+  },
+  "remediationAddendum": {
+    "date": "2026-10-13",
+    "commit": "fa948b6a0ef651b14ce64d2dfc721b16d87f917d",
+    "sourceFingerprint": "936b5ed2104987fd645907b311f3aeacef24b9e6dfebfd2dc4d013fe601e0a66",
+    "uncommittedDiffSha256": "92a612cb9cf05e645c6c8a49bc4fb739f9bec1b957574ebcb4ea16160f1955ba",
+    "capturedAt": "2026-10-13T02:27:07.658026+00:00",
+    "statusRule": "Fixed, not verified: the fixes are committed together with this record, and no later commit has verified them yet.",
+    "fixes": [
+      {
+        "id": "AUD-019-SEC001",
+        "files": [
+          "src/cli/terminal-input.ts",
+          "test/terminal-input-echo.test.ts"
+        ],
+        "change": "HINT_CONTEXT_WORDS = 4: typedBefore decodes only from the fourth word before the cursor, enough to tell Bytewords after the codes of another share or English words among codes. A regression test types abandon \u2026 about and asserts that no hint sees more than four words."
+      },
+      {
+        "id": "AUD-019-ARC001",
+        "files": [
+          "src/cli/sandbox-record.ts (new)",
+          "src/cli/system-sandbox.ts",
+          "src/cli/sandbox-linux.ts",
+          "src/cli/sandbox-macos.ts",
+          "src/cli/sandbox-windows.ts",
+          "src/cli/protection.ts",
+          "test/system-sandbox.test.ts",
+          "test/protection.test.ts",
+          "docs/ARCHITECTURE.md"
+        ],
+        "change": "sandbox-record.ts holds the interface, SandboxRecord (hold, lack, attempt, reach, claim) and switchOffCoreDumps with RLIMIT_CORE; each system's sandbox switches core dumps off in start() and reports them through coreDumps(); protection.ts keeps no system call of its own and refuses a secret when coreDumps() failed. Tests cover the record, claim and a protected process without node:ffi."
+      },
+      {
+        "id": "AUD-019-DOC001",
+        "files": [
+          "CHANGELOG.md",
+          "docs/releases/v0.1.0.md"
+        ],
+        "change": "The changelog line now names cards of colours and Unicode codes only; the release notes drop the stale lines and carry the redesign, word hints, system sandbox, wiping of saved documents and QR input, entry 5 and codes read apart or run together."
+      },
+      {
+        "id": "AUD-019-DOC002",
+        "files": [
+          "SECURITY.md"
+        ],
+        "change": "MnemoCode is not a complete sandbox; only the limits the system enforces, which differ by system and version, stop a compromised program from connecting, and descriptors opened before them stay usable; the swap warning is left out when all memory is locked."
+      }
+    ],
+    "checks": [
+      {
+        "label": "remediation-source-check",
+        "command": "pnpm check",
+        "exitCode": 0,
+        "startedAt": "2026-10-13T02:27:07.767599+00:00",
+        "endedAt": "2026-10-13T02:27:10.042644+00:00",
+        "summary": "pnpm check passed: copy gate at 50 tokens over 255 files",
+        "evidence": {
+          "log": "AUD-019-evidence/remediation-source-check.log",
+          "sha256": "e899500960d7b20c4a2405c0d50184757d48e21574f0bc45e4d647004c75ee25",
+          "localOnly": true
+        }
+      },
+      {
+        "label": "remediation-format-check",
+        "command": "pnpm format:check",
+        "exitCode": 0,
+        "startedAt": "2026-10-13T02:27:10.092791+00:00",
+        "endedAt": "2026-10-13T02:27:15.120946+00:00",
+        "summary": "pnpm format:check passed",
+        "evidence": {
+          "log": "AUD-019-evidence/remediation-format-check.log",
+          "sha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2",
+          "localOnly": true
+        }
+      },
+      {
+        "label": "remediation-build",
+        "command": "pnpm build",
+        "exitCode": 0,
+        "startedAt": "2026-10-13T02:27:15.168245+00:00",
+        "endedAt": "2026-10-13T02:27:15.942484+00:00",
+        "summary": "Fresh build",
+        "evidence": {
+          "log": "AUD-019-evidence/remediation-build.log",
+          "sha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494",
+          "localOnly": true
+        }
+      },
+      {
+        "label": "remediation-all-tests",
+        "command": "npx vitest run --maxWorkers=4 --testTimeout=180000",
+        "exitCode": 0,
+        "startedAt": "2026-10-13T02:27:15.981817+00:00",
+        "endedAt": "2026-10-13T02:31:27.655233+00:00",
+        "summary": "The whole collection: 110 files, 2,083 passed, 4 skipped by their own condition",
+        "evidence": {
+          "log": "AUD-019-evidence/remediation-all-tests.log",
+          "sha256": "05e73f884535f8c5e53bf880941653e19dee81ca88d0c7b2088b38796c4ae881",
+          "localOnly": true
+        }
+      },
+      {
+        "label": "remediation-cli-self-test",
+        "command": "node dist/mnemocode.js self-test",
+        "exitCode": 0,
+        "startedAt": "2026-10-13T02:31:27.705157+00:00",
+        "endedAt": "2026-10-13T02:31:36.481868+00:00",
+        "summary": "Full CLI self-test PASS",
+        "evidence": {
+          "log": "AUD-019-evidence/remediation-cli-self-test.log",
+          "sha256": "7a5f241ecd4272f0346df0e7b4e317fdee92c4c6823ff7de544668c2ec5e181a",
+          "localOnly": true
+        }
+      },
+      {
+        "label": "remediation-terminal-input",
+        "command": "python3 scripts/verify-terminal-input.py",
+        "exitCode": 0,
+        "startedAt": "2026-10-13T02:31:36.533969+00:00",
+        "endedAt": "2026-10-13T02:32:16.112165+00:00",
+        "summary": "Real pseudo-terminal: all cases passed",
+        "evidence": {
+          "log": "AUD-019-evidence/remediation-terminal-input.log",
+          "sha256": "1e2e7cba9d2a38a23c03b77633fd61f2fc5556c7c26574f68a2d0fb13e9b0dd8",
+          "localOnly": true
+        }
+      },
+      {
+        "label": "remediation-probes",
+        "command": "npx vitest run --config docs/audits/AUD-019-harnesses/probe.config.ts",
+        "exitCode": 0,
+        "startedAt": "2026-10-13T02:32:16.153277+00:00",
+        "endedAt": "2026-10-13T02:32:17.180718+00:00",
+        "summary": "Both probe cases pass: AUD-019-SEC001 no longer reproduces",
+        "evidence": {
+          "log": "AUD-019-evidence/remediation-probes.log",
+          "sha256": "2a56e8450c798c643ea6037baec1a02a9b8b85bc963453c3781fb61c7367d145",
+          "localOnly": true
+        }
+      },
+      {
+        "label": "remediation-short-copies",
+        "command": "node scripts/verify-no-copies.mjs --tokens 35",
+        "exitCode": 1,
+        "startedAt": "2026-10-13T02:32:17.228505+00:00",
+        "endedAt": "2026-10-13T02:32:18.005190+00:00",
+        "summary": "Exit 1 for one repetition left: the overload declarations of ask.ts (rejected as a copy); the sandbox copy is gone",
+        "evidence": {
+          "log": "AUD-019-evidence/remediation-short-copies.log",
+          "sha256": "a7e24bf6e6f46e3e7ccc3afa22a38708dbb8ca5a48f476aca9b57a8524898120",
+          "localOnly": true
+        }
+      },
+      {
+        "label": "remediation-executable",
+        "command": "pnpm build:executable",
+        "exitCode": 0,
+        "startedAt": "2026-10-13T02:32:18.051520+00:00",
+        "endedAt": "2026-10-13T02:32:33.848925+00:00",
+        "summary": "Single executable built and its checks passed, the system's sandbox included",
+        "evidence": {
+          "log": "AUD-019-evidence/remediation-executable.log",
+          "sha256": "a7814ff6b786a2c241bf11c64d5bbe2587d3b1272acfbb79e07c5e962b08ebee",
+          "localOnly": true
+        }
+      }
+    ]
+  }
+}

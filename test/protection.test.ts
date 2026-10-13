@@ -157,6 +157,29 @@ describe("process protection", () => {
     SELF_TEST_TIMEOUT_MS,
   );
 
+  it.runIf(process.platform === "linux" || process.platform === "darwin")(
+    "asks for no secret where core dumps could not be switched off, as without node:ffi",
+    async () => {
+      // A caller's permission model without --allow-ffi: the sandbox cannot reach the system.
+      const script = `
+        import("./dist/cli/protection.js").then(async (protection) => {
+          await protection.hardenProcess();
+          protection.dropUnneeded(false, {});
+          try { protection.assertProtected(); console.log("protected"); }
+          catch (error) { console.log(error.message); }
+        });`;
+      const { stdout } = await execute(process.execPath, [
+        "--permission",
+        "--allow-fs-read=*",
+        "--input-type=module",
+        "-e",
+        script,
+      ]);
+      expect(stdout).toContain("MnemoCode could not switch off core dumps (");
+      expect(stdout).toContain("--allow-ffi");
+    },
+  );
+
   it("gives up file writes when a command saves nothing", async () => {
     const script = `
       import("./dist/cli/protection.js").then(async (protection) => {

@@ -522,6 +522,32 @@ describe("hints below a visible answer, as in mhfe", () => {
     expect(after[35]!.cursor).toEqual([0, 13]);
   });
 
+  it("gives a hint the last words typed only, never the phrase typed so far (AUD-019-SEC001)", async () => {
+    process.stderr.columns = 80;
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const seen: string[] = [];
+    const phrase = `${"abandon ".repeat(11)}about`;
+    const keys = [...Buffer.from(`${phrase}\r`)];
+    let read = 0;
+    const answer = await readLine(async () => keys[read++], {
+      echo: true,
+      // A pause after every key: the hint is drawn each time.
+      moreWithin: async () => false,
+      hints: {
+        hint: (line) => {
+          seen.push(line);
+          return WordList.BIP39.hint(line);
+        },
+        completion: (line) => WordList.BIP39.completion(line),
+      },
+    });
+    vi.restoreAllMocks();
+    expect(answer).toBe(phrase);
+    const most = Math.max(...seen.map((line) => line.trim().split(/\s+/u).length));
+    expect(most).toBe(4);
+    expect(seen.at(-1)).toBe("abandon abandon abandon about");
+  });
+
   it("shows no hint where the terminal is too narrow or the answer hidden", async () => {
     expect((await typeWithHints(["a", "b"], 23)).after[1]!.rows).toEqual(["PPPPPPab"]);
     process.stderr.columns = 80;

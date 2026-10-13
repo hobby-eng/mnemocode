@@ -629,6 +629,12 @@ async function readLateSequence(
   return { readAgain: rest };
 }
 
+/**
+ * The words that a hint is given: the word being typed and three before it, enough to tell the
+ * form of the line, Bytewords after the codes of another share or English words among codes.
+ */
+const HINT_CONTEXT_WORDS = 4;
+
 /** The keys of a visible answer that move the cursor or delete, read from their escape sequence. */
 type EditKey = "left" | "right" | "word-left" | "word-right" | "home" | "end" | "delete" | "other";
 
@@ -705,12 +711,17 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
     hintDue = hints !== undefined;
     shown?.update(length, cursor);
   };
-  // The text before the cursor, which the hint and Tab are about, while the cursor ends a word;
-  // otherwise none.
+  // The words before the cursor that the hint and Tab are about, while the cursor ends a word;
+  // otherwise none: the word being typed and a few before it (HINT_CONTEXT_WORDS), which tell
+  // the form of the line. No more of the answer, which may be a secret, becomes a string, which
+  // nothing could wipe (AUD-019-SEC001).
   const typedBefore = (): string => {
     if (cursor < length && line[cursor] !== KEY.SPACE) return "";
+    let start = cursor;
+    for (let words = 0; words < HINT_CONTEXT_WORDS && start > 0; words += 1)
+      start = previousWord(line, start);
     try {
-      return STRICT_UTF8.decode(line.subarray(0, cursor));
+      return STRICT_UTF8.decode(line.subarray(start, cursor));
     } catch {
       return "";
     }

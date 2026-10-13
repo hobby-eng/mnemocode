@@ -8,7 +8,7 @@ import {
   type SeccompArchitecture,
 } from "../src/cli/sandbox-linux.js";
 import { macSandboxProfile } from "../src/cli/sandbox-macos.js";
-import { SandboxGaps } from "../src/cli/system-sandbox.js";
+import { SandboxRecord, switchOffCoreDumps } from "../src/cli/sandbox-record.js";
 
 const execute = promisify(execFile);
 
@@ -101,15 +101,36 @@ describe("the macOS sandbox profile", () => {
   });
 });
 
-describe("what a sandbox lacks", () => {
+describe("the record of a sandbox", () => {
   it("records a step that throws as the reason, and goes on", () => {
-    const gaps = new SandboxGaps();
-    gaps.attempt("seccomp", () => {
+    const record = new SandboxRecord();
+    record.attempt("seccomp", () => {
       throw new Error("refused");
     });
-    gaps.attempt("Landlock", () => undefined);
-    gaps.lack("memory: not locked");
-    expect(gaps.reasons).toEqual(["seccomp: refused", "memory: not locked"]);
+    record.attempt("Landlock", () => undefined);
+    record.lack("memory: not locked");
+    expect(record.reasons).toEqual(["seccomp: refused", "memory: not locked"]);
+  });
+
+  it("holds a boundary only where its probe found it to hold", () => {
+    const record = new SandboxRecord();
+    record.claim("no sockets", "holds", "a socket opened");
+    record.claim("no file writes", "broken", "/dev/null opened for writing");
+    record.claim("no other programs", "unknown", "a program started");
+    expect(record.held).toEqual(["no sockets"]);
+    expect(record.reasons).toEqual([
+      "no file writes did not hold: /dev/null opened for writing",
+      "no other programs could not be checked",
+    ]);
+  });
+
+  it("says why core dumps are not off", () => {
+    expect(switchOffCoreDumps(() => undefined)).toEqual({ state: "off" });
+    expect(
+      switchOffCoreDumps(() => {
+        throw new Error("setrlimit refused RLIMIT_CORE 0");
+      }),
+    ).toEqual({ state: "failed", reason: "setrlimit refused RLIMIT_CORE 0" });
   });
 });
 

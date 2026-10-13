@@ -11,14 +11,17 @@
 //
 // Windows offers no program a way to refuse its own network or file writes without an
 // administrator or a new process; the permission model alone refuses them. Each protection is read
-// back from Windows before the summary names it.
+// back from Windows before the summary names it. Core dumps are left as they are: Windows writes
+// none unless an administrator set one up.
 
 import {
-  SandboxGaps,
+  SandboxRecord,
+  type CoreDumps,
   type NodeFfi,
   type SandboxNeeds,
+  type SystemAccess,
   type SystemSandbox,
-} from "./system-sandbox.js";
+} from "./sandbox-record.js";
 
 const KERNEL32 = "kernel32.dll";
 
@@ -66,28 +69,25 @@ type Kernel32 = ReturnType<typeof loadKernel32>;
 
 /** Windows's protections, as described at the top. */
 export class WindowsSandbox implements SystemSandbox {
-  readonly #gaps = new SandboxGaps();
-  #kernel32: Kernel32 | undefined;
-  /** What Windows confirmed, in the order applied. */
-  readonly #held: string[] = [];
+  /** What Windows confirmed, in the order applied, and what it did not. */
+  readonly #record = new SandboxRecord();
+  readonly #kernel32: Kernel32 | undefined;
 
-  constructor(ffi: NodeFfi) {
-    this.#gaps.attempt("kernel32", () => {
-      this.#kernel32 = loadKernel32(ffi);
-    });
+  constructor(access: SystemAccess) {
+    this.#kernel32 = this.#record.reach("kernel32", access, loadKernel32);
   }
 
   start(): void {
     const kernel32 = this.#kernel32;
     if (kernel32 === undefined) return;
-    this.#gaps.attempt("crash reports", () => {
+    this.#record.attempt("crash reports", () => {
       if (kernel32.WerSetFlags(WER_NO_HEAP) !== 0) throw new Error("WerSetFlags refused");
       const flags = Buffer.alloc(4);
       if (kernel32.WerGetFlags(kernel32.GetCurrentProcess(), flags) !== 0)
         throw new Error("WerGetFlags refused");
       if ((flags.readUInt32LE(0) & WER_NO_HEAP) === 0)
         throw new Error("the heap is still reported");
-      this.#held.push("no heap in crash reports");
+      this.#record.hold("no heap in crash reports");
     });
     this.#policy(
       kernel32,
@@ -106,17 +106,17 @@ export class WindowsSandbox implements SystemSandbox {
   restrict(needs: SandboxNeeds): void {
     const kernel32 = this.#kernel32;
     if (kernel32 !== undefined && !needs.runsPrograms)
-      this.#gaps.attempt("job object", () => this.#forbidPrograms(kernel32));
+      this.#record.attempt("job object", () => this.#forbidPrograms(kernel32));
     const refused = needs.writes ? "network is" : "network and file writes are";
-    this.#gaps.lack(`${refused} refused by the permission model only`);
+    this.#record.lack(`${refused} refused by the permission model only`);
   }
 
   held(): readonly string[] {
-    return [...this.#held];
+    return this.#record.held;
   }
 
   missing(): readonly string[] {
-    return this.#gaps.reasons;
+    return this.#record.reasons;
   }
 
   /** The memory is not locked here: swap may hold some of it. */
@@ -124,9 +124,14 @@ export class WindowsSandbox implements SystemSandbox {
     return false;
   }
 
+  /** Left as Windows has them: it writes no dump unless an administrator set one up. */
+  coreDumps(): CoreDumps {
+    return { state: "untouched" };
+  }
+
   /** Sets the mitigation `policy` to `flags` and reads it back. */
   #policy(kernel32: Kernel32, policy: number, flags: number, boundary: string): void {
-    this.#gaps.attempt(boundary, () => {
+    this.#record.attempt(boundary, () => {
       const wanted = Buffer.alloc(POLICY_BYTES);
       wanted.writeUInt32LE(flags, 0);
       if (kernel32.SetProcessMitigationPolicy(policy, wanted, BigInt(POLICY_BYTES)) === 0)
@@ -136,7 +141,7 @@ export class WindowsSandbox implements SystemSandbox {
       if (kernel32.GetProcessMitigationPolicy(current, policy, read, BigInt(POLICY_BYTES)) === 0)
         throw new Error(`not readable (error ${kernel32.GetLastError()})`);
       if ((read.readUInt32LE(0) & flags) !== flags) throw new Error("not in force");
-      this.#held.push(boundary);
+      this.#record.hold(boundary);
     });
   }
 
@@ -171,7 +176,7 @@ export class WindowsSandbox implements SystemSandbox {
       (read.readUInt32LE(LIMIT_FLAGS_OFFSET) & JOB_OBJECT_LIMIT_ACTIVE_PROCESS) !== 0 &&
       read.readUInt32LE(ACTIVE_PROCESS_LIMIT_OFFSET) === 1;
     if (!joined || !limited) throw new Error("its limit could not be read back");
-    this.#held.push("Windows: no other programs");
+    this.#record.hold("Windows: no other programs");
   }
 }
 

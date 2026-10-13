@@ -1,24 +1,20 @@
-// The protection of a MnemoCode process that handles secrets, as far as Node.js allows it; the
+// The protection of a MnemoCode process that handles secrets, as far as the system allows it; the
 // counterpart of mhfe's src/bin/mhfe/protect.rs.
 //
-// - No core dumps. A crash must not write the memory, the seed phrase included, to the disk, as
-//   systemd-coredump or apport would. Linux: setrlimit(RLIMIT_CORE, 0) and prctl(PR_SET_DUMPABLE,
-//   0); the latter also keeps other programs of the same user from attaching a debugger or
-//   reading /proc/PID/mem. macOS: setrlimit. Node.js 26 calls them through its node:ffi module.
-//   Windows writes no crash dump unless an administrator set one up; MnemoCode changes nothing
-//   there.
+// - The system's own protections (system-sandbox.ts): no core dumps on Linux and macOS, so that a
+//   crash cannot write the memory, the seed phrase included, to the disk, and no secret without
+//   that; then, as the system offers them, seccomp and Landlock for every thread on Linux, as mhfe
+//   isolates itself, no debugger and the sandbox on macOS, a job object and mitigation policies on
+//   Windows. They are applied with the same needs as the permission model, while node:ffi is
+//   still granted, and FFI is given up right after them, before anything is read. What a system
+//   lacks is left out, without a refusal (owner, 2026-10-13).
 // - The Node.js permission model. A start outside it runs again with PROTECTION_FLAGS, which the
 //   executable has built in: no network, no worker threads, native addons or WASI. A process
 //   that already runs under the model is not started again, so a right that its caller granted
 //   on purpose, such as --allow-net, stays. Before a command runs, it gives up writing files when
 //   it saves nothing, and running other programs when it draws no images (dropUnneeded). Node.js
-//   enforces this, not the kernel, and documents it as a safety belt for trusted code rather than
-//   a boundary against malicious code.
-// - The system's own sandbox (system-sandbox.ts): on Linux seccomp and Landlock for every thread,
-//   as mhfe isolates itself, on macOS its sandbox, on Windows a job object and mitigation policies.
-//   It is applied with the same needs as the permission model, while node:ffi is still granted,
-//   and FFI is given up right after it, before anything is read. What a system lacks is left out,
-//   without a refusal (owner, 2026-10-13).
+//   enforces this itself, and documents it as a safety belt for trusted code rather than a boundary
+//   against malicious code.
 // - The library uses none of this: it has the rights of the program that imports it.
 
 import { spawn } from "node:child_process";
@@ -30,10 +26,9 @@ import { DRAWING_OPTIONS, SAVED_OPTIONS } from "./output-options.js";
 import protectionFlags from "./protection-flags.json" with { type: "json" };
 import { describeError } from "../core/refusal.js";
 import {
-  noSandbox,
   systemSandbox,
-  type NodeFfi,
   type SandboxNeeds,
+  type SystemAccess,
   type SystemSandbox,
 } from "./system-sandbox.js";
 
@@ -105,87 +100,39 @@ export async function runInOwnProcess(run: readonly string[]): Promise<number> {
   return exitCodeOf(spawn(process.execPath, args, { stdio: "inherit" }));
 }
 
-/** RLIMIT_CORE is 4 on Linux and macOS (sys/resource.h); PR_SET_DUMPABLE is 4 (linux/prctl.h). */
-const RLIMIT_CORE = 4;
-const PR_GET_DUMPABLE = 3;
-const PR_SET_DUMPABLE = 4;
-/** struct rlimit: the soft and the hard limit, two 64-bit values, both 0 here. */
-const RLIMIT_BYTES = 16;
-
-/** The C library that holds setrlimit and prctl. */
-const C_LIBRARY: Readonly<Partial<Record<NodeJS.Platform, string>>> = {
-  linux: "libc.so.6",
-  darwin: "/usr/lib/libSystem.B.dylib",
-};
-
-let coreDumpsOff = false;
-let hardeningFailure: string | undefined;
-/** The system's sandbox: started with the process, restricted with the command (dropUnneeded). */
-let sandbox: SystemSandbox = noSandbox("the process was not hardened");
+/**
+ * The system's sandbox: started with the process (hardenProcess), restricted with the command
+ * (dropUnneeded). Before it starts, core dumps count as not switched off.
+ */
+let sandbox: SystemSandbox = systemSandbox("the process was not hardened");
 
 /**
- * Switches off core dumps as described at the top and starts the system's sandbox; node:ffi stays
- * granted until the command's needs restrict the sandbox (dropUnneeded, dropForMenu). Never
- * throws: a failure is kept, and assertProtected refuses a secret afterwards.
+ * Starts the system's sandbox, which switches off core dumps first (system-sandbox.ts); node:ffi
+ * stays granted until the command's needs restrict the sandbox (dropUnneeded). Never throws: a
+ * failure is kept, and assertProtected refuses a secret afterwards.
  */
 export async function hardenProcess(): Promise<void> {
-  let ffi: NodeFfi;
+  let access: SystemAccess;
   try {
-    ffi = await import("node:ffi");
+    access = await import("node:ffi");
   } catch (error) {
-    hardeningFailure = describeError(error);
-    sandbox = noSandbox(`node:ffi is not available (${hardeningFailure})`);
-    return;
+    access = `node:ffi is not available (${describeError(error)})`;
   }
-  const library = C_LIBRARY[process.platform];
-  try {
-    if (library !== undefined) {
-      switchOffCoreDumps(ffi, library);
-      coreDumpsOff = true;
-    }
-  } catch (error) {
-    hardeningFailure = describeError(error);
-  }
-  sandbox = systemSandbox(ffi);
+  sandbox = systemSandbox(access);
   sandbox.start();
 }
 
-/** setrlimit(RLIMIT_CORE, 0) and, on Linux, prctl(PR_SET_DUMPABLE, 0), each read back. */
-function switchOffCoreDumps(ffi: NodeFfi, library: string): void {
-  const limits = ffi.dlopen(library, {
-    setrlimit: { arguments: ["i32", "buffer"], return: "i32" },
-  } as const);
-  try {
-    if (limits.functions.setrlimit(RLIMIT_CORE, Buffer.alloc(RLIMIT_BYTES)) !== 0)
-      throw new Error("setrlimit refused RLIMIT_CORE 0");
-  } finally {
-    limits.lib.close();
-  }
-  if (process.platform !== "linux") return;
-  // prctl exists on Linux only, so it is looked up apart from setrlimit.
-  const control = ffi.dlopen(library, {
-    prctl: { arguments: ["i32", "u64", "u64", "u64", "u64"], return: "i32" },
-  } as const);
-  try {
-    const { prctl } = control.functions;
-    if (prctl(PR_SET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0) throw new Error("prctl refused");
-    if (prctl(PR_GET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0)
-      throw new Error("the process is still dumpable");
-  } finally {
-    control.lib.close();
-  }
-}
-
 /**
- * Refuses to go on with a secret when core dumps could not be switched off where they exist, or
- * while native code could still be called (FFI, which dropUnneeded gives up).
+ * Refuses to go on with a secret when core dumps could not be switched off where the system can,
+ * or while native code could still be called (FFI, which dropUnneeded gives up).
  */
 export function assertProtected(): void {
   if (!underProtection())
     throw new Error("MnemoCode runs without its protection settings; it asks for no secret so.");
-  if (C_LIBRARY[process.platform] !== undefined && !coreDumpsOff)
+  const dumps = sandbox.coreDumps();
+  if (dumps.state === "failed")
     throw new Error(
-      `MnemoCode could not switch off core dumps (${hardeningFailure ?? "unknown reason"}); it asks for no secret without that.`,
+      `MnemoCode could not switch off core dumps (${dumps.reason ?? "unknown reason"}); it asks for no secret without that.`,
     );
   if (process.permission!.has("ffi"))
     throw new Error("MnemoCode could still call native code; it asks for no secret so.");
@@ -215,12 +162,13 @@ export function dropUnneeded(alwaysWrites: boolean, args: ParsedArguments): void
 }
 
 /**
- * The start menu writes nothing; it keeps only the right to start a command's own process. Its
- * sandbox keeps what a command may need, since each command inherits it and restricts itself.
+ * The start menu writes nothing; it keeps only the right to start a command's own process. It
+ * handles no secret, and leaves the system's sandbox to each command, which applies its own: a
+ * command would inherit a sandbox of the menu, which on macOS it might not be able to tighten.
  */
 export function dropForMenu(): void {
   if (!underProtection()) return;
-  restrictThenDropFfi({ writes: true, runsPrograms: true });
+  process.permission!.drop("ffi");
   process.permission!.drop("fs.write");
 }
 
@@ -242,7 +190,7 @@ export function permissionSummary(): string {
 /** No core dumps, and what the permission model refuses. */
 function permissionParts(): string[] {
   const parts: string[] = [];
-  if (coreDumpsOff) parts.push("no core dumps");
+  if (sandbox.coreDumps().state === "off") parts.push("no core dumps");
   if (underProtection()) {
     const permission = process.permission!;
     if (!permission.has("net")) parts.push("no network");
