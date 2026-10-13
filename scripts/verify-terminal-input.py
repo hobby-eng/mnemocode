@@ -40,11 +40,13 @@ It checks that
 import codecs
 import os
 from pathlib import Path
+import queue
 import re
 import shlex
 import shutil
 import sys
 import tempfile
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -151,6 +153,11 @@ class Session:
             self.process = PtyProcess.spawn(
                 command, cwd=folder, env=environment, dimensions=(TERMINAL_ROWS, TERMINAL_COLUMNS)
             )
+            # pywinpty's read waits until the tool writes something, so it is read on a thread of
+            # its own: a tool that stops writing then fails the wait that expected more, with the
+            # screen so far, instead of holding the check until the CI step's time limit.
+            self.chunks = queue.Queue()
+            threading.Thread(target=self.read_windows, daemon=True).start()
         else:
             import fcntl
             import pty
@@ -168,12 +175,22 @@ class Session:
             os.set_blocking(self.fd, False)
             self.decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
+    def read_windows(self):
+        """On Windows, passes on what the tool writes, until its pseudo-console closes."""
+        while True:
+            try:
+                self.chunks.put(self.process.read(4096))
+            except EOFError:
+                return
+
     def read_some(self, wait=0.05):
-        """Adds what the tool has written to `output`, waiting up to `wait` seconds on POSIX."""
+        """Adds what the tool has written to `output`, waiting up to `wait` seconds for it."""
         if WINDOWS:
             try:
-                self.output += self.process.read(4096)
-            except EOFError:
+                self.output += self.chunks.get(timeout=wait)
+                while True:
+                    self.output += self.chunks.get_nowait()
+            except queue.Empty:
                 pass
             return
         import select
