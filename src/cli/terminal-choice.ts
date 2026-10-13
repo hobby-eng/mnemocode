@@ -36,6 +36,7 @@ import {
 } from "./terminal.js";
 import { factLine, STYLE_CODES } from "./terminal-style.js";
 import { isContinuation, validCharacters } from "./utf8.js";
+import type { WordHints } from "../core/word-hints.js";
 
 /** Marker, number and the gaps before a label: "› 1  ". */
 const LABEL_INDENT = 5;
@@ -374,6 +375,8 @@ export interface LineQuestion {
    * question asked again; it must not repeat a secret, and no answer here is one.
    */
   readonly check?: (answer: string) => string | Promise<string>;
+  /** The hints below a word being typed, and Tab's completion (core/word-hints.ts). */
+  readonly hints?: WordHints;
 }
 
 /** What a question asks for where it does not say: any answer. */
@@ -489,6 +492,7 @@ async function askLineOnce(
         onBack: (_columns, row) => {
           endRow = row;
         },
+        ...(options.hints === undefined ? {} : { hints: options.hints }),
       });
     } catch (error) {
       if (!(error instanceof UnusableAnswer)) throw error;

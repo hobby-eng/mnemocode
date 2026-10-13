@@ -35,7 +35,8 @@ import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { choose } from "./terminal-choice.js";
 import { CLEAR_SCREEN, terminalNotice } from "./terminal.js";
-import { SHARE_SEPARATOR } from "../sskr/share-input.js";
+import { SHARE_SEPARATOR, SHARE_WORD_HINTS } from "../sskr/share-input.js";
+import { EncodedForm } from "../core/encoded-form.js";
 import { SHARE_ANSWER_HINT } from "./share-repair.js";
 import { refusalMessage } from "../core/refusal.js";
 
@@ -139,6 +140,7 @@ function checkCodes(check: EncodedBackupCheck): Promise<CheckEnd> {
   return runCheck(check.steps, () =>
     askSecretUntil("Your backup, as written down:", (typed) => check.readCodes(typed), {
       what: "the codes you wrote down",
+      hints: EncodedForm.typedWords,
     }),
   );
 }
@@ -239,7 +241,7 @@ async function askShares(check: ShareBackupCheck, problem: string | undefined): 
   const shares = await askSecretUntil(
     `${check.threshold} shares as written down (${SHARE_ANSWER_HINT}):`,
     (answer) => check.sharesOf(answer),
-    { what: "the shares", pastedLineBreak: SHARE_SEPARATOR },
+    { what: "the shares", pastedLineBreak: SHARE_SEPARATOR, hints: SHARE_WORD_HINTS },
   );
   for (;;) {
     const place = shares.findIndex(
@@ -254,7 +256,7 @@ async function askShares(check: ShareBackupCheck, problem: string | undefined): 
         if (reason !== undefined) throw new Error(reason);
         return answer;
       },
-      { what: `share ${place + 1}` },
+      { what: `share ${place + 1}`, hints: SHARE_WORD_HINTS },
     );
   }
 }

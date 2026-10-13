@@ -9,7 +9,9 @@
 //
 // A visible answer is also edited as in a shell: the arrow keys, Home and End (Ctrl+A, Ctrl+E) and
 // Ctrl with an arrow move the cursor, Delete deletes the character under it, Ctrl+K what follows it
-// and Ctrl+W the word before it, and what is typed goes in at the cursor.
+// and Ctrl+W the word before it, and what is typed goes in at the cursor. Where a question takes
+// words of a list, the words that begin like the one being typed show below it, as in mhfe, and
+// Tab completes it (LineOptions.hints).
 //
 // A terminal's line mode would otherwise act on further keys and, on Linux, cut a line after 4095
 // bytes. While a long search runs, no question reads the terminal: watchForCtrlC reads it then,
@@ -32,7 +34,9 @@ import {
 } from "./terminal-geometry.js";
 import { CANCELLED_MESSAGE } from "./exit-codes.js";
 import { isContinuation, STRICT_UTF8, notUtf8Text } from "./utf8.js";
-import { cursorUp, cursorRight, ERASE_BELOW } from "./terminal.js";
+import { cursorDown, cursorUp, cursorRight, ERASE_BELOW } from "./terminal.js";
+import type { WordHint, WordHints } from "../core/word-hints.js";
+import { hintRows } from "./typed-hints.js";
 import { dumbTerminal } from "./terminal-style.js";
 import { refusalMessage } from "../core/refusal.js";
 
@@ -555,6 +559,11 @@ export interface LineOptions {
    * or for a line break typed at the end, the line ends there.
    */
   readonly pastedLineBreak?: PastedLineBreak;
+  /**
+   * Hints for the word being typed, shown below a visible answer (typed-hints.ts), where Tab then
+   * completes the word. A Tab inside a paste still separates as a space does.
+   */
+  readonly hints?: WordHints;
 }
 
 /**
@@ -666,6 +675,10 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
   // Where the next character goes; always at the start of a character.
   let cursor = 0;
   const shown = echo ? new ShownLine(line, options.promptWidth ?? 0) : undefined;
+  // Only where the answer shows, as in mhfe: a hint tells what is typed.
+  const hints = echo ? options.hints : undefined;
+  // Whether the hint below the answer is behind what the answer shows.
+  let hintDue = false;
   const insert = (byte: number): void => {
     if (length === limit)
       throw new UnusableAnswer(
@@ -674,6 +687,7 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
     line.copyWithin(cursor + 1, cursor, length);
     line[cursor++] = byte;
     length += 1;
+    hintDue = hints !== undefined;
     // A character of several bytes is shown once it is complete.
     if (shown !== undefined && isCharacterEnd(line, cursor))
       shown.update(length, cursor, cursor === length);
@@ -683,11 +697,32 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
     length -= to - from;
     line.fill(0, length, length + (to - from));
     cursor = from;
+    hintDue = hints !== undefined;
     shown?.update(length, cursor);
   };
   const moveTo = (position: number): void => {
     cursor = position;
+    hintDue = hints !== undefined;
     shown?.update(length, cursor);
+  };
+  // The text before the cursor, which the hint and Tab are about, while the cursor ends a word;
+  // otherwise none.
+  const typedBefore = (): string => {
+    if (cursor < length && line[cursor] !== KEY.SPACE) return "";
+    try {
+      return STRICT_UTF8.decode(line.subarray(0, cursor));
+    } catch {
+      return "";
+    }
+  };
+  // Tab: the letters that every word beginning like the typed one has next, and a space once one
+  // word is left.
+  const complete = (completing: WordHints): void => {
+    const { letters, wordEnds } = completing.completion(typedBefore());
+    for (let at = 0; at < letters.length; at += 1) insert(letters.charCodeAt(at));
+    if (!wordEnds) return;
+    if (cursor < length && line[cursor] === KEY.SPACE) moveTo(cursor + 1);
+    else insert(KEY.SPACE);
   };
   // As End would; nothing is drawn when the cursor is there already.
   const moveToEnd = (): void => {
@@ -714,6 +749,11 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
     moreWithin && (async (milliseconds) => readAgain.length > 0 || moreWithin(milliseconds));
   try {
     for (;;) {
+      // Drawn once no key follows at once, so that a paste is hinted once, at its end.
+      if (hintDue && (more === undefined || !(await more(PASTE_GAP_MS)))) {
+        shown!.showHint(hints!.hint(typedBefore()), length, cursor);
+        hintDue = false;
+      }
       const byte = await take();
       // Only the byte right after an ignored Escape can continue its sequence.
       const late =
@@ -773,8 +813,11 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
       } else if (byte === KEY.CTRL_W) {
         if (cursor > 0) remove(previousWord(line, cursor), cursor);
       } else if (byte === KEY.TAB) {
-        // A pasted Tab between words separates them as a space does, and is shown as one.
-        insert(KEY.SPACE);
+        // Tab completes a word where words are hinted; a pasted Tab between words or codes
+        // separates them as a space does, and is shown as one.
+        if (hints !== undefined && !(more !== undefined && (await more(PASTE_GAP_MS))))
+          complete(hints);
+        else insert(KEY.SPACE);
       } else if (byte >= KEY.SPACE) {
         insert(byte);
       }
@@ -786,6 +829,8 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
     if (error instanceof TypeError) throw new UnusableAnswer(NOT_UTF8);
     throw error;
   } finally {
+    // Before the answer is wiped: its width says where the hint is.
+    shown?.clearHint(length);
     line.fill(0);
     readAgain.fill(0);
   }
@@ -814,6 +859,8 @@ class ShownLine {
    */
   private countedBytes = 0;
   private countedEnd: number;
+  /** Whether a hint shows below the answer. */
+  private hintShown = false;
 
   constructor(
     private readonly line: Buffer,
@@ -842,6 +889,8 @@ class ShownLine {
     }
     const out = process.stderr;
     out.write(`${cursorUp(this.cursorRow)}\r${cursorRight(this.start)}${ERASE_BELOW}`);
+    // Erased with the answer: the next hint is drawn anew.
+    this.hintShown = false;
     out.write(this.line.subarray(0, length));
     this.countedBytes = 0;
     this.countedEnd = this.start;
@@ -850,6 +899,40 @@ class ShownLine {
     const row = Math.floor(target / this.columns);
     out.write(`${cursorUp(endRow - row)}\r${cursorRight(target % this.columns)}`);
     this.cursorRow = row;
+  }
+
+  /**
+   * Shows `hint` below the answer of `length` bytes, in place of the one before, and puts the
+   * cursor back at `cursor`. The rows are written from the end of the answer with line breaks, so
+   * that the screen scrolls for them, and the cursor goes back up with relative moves.
+   */
+  showHint(hint: WordHint, length: number, cursor: number): void {
+    const rows = hintRows(hint, this.columns);
+    if (rows.length === 0 && !this.hintShown) return;
+    const end = this.endOf(length);
+    const endRow = Math.floor(end / this.columns);
+    // Typing at the end needs no count from the start (endOf).
+    const target = cursor === length ? end : this.cellOf(cursor, length);
+    const below = rows.map((row) => `\r\n${row}`).join("");
+    process.stderr.write(
+      `${this.toEnd(end)}${ERASE_BELOW}${below}` +
+        `${cursorUp(rows.length + endRow - this.cursorRow)}\r${cursorRight(target % this.columns)}`,
+    );
+    this.hintShown = rows.length > 0;
+  }
+
+  /** Takes the hint off the screen, which leaves the cursor at the end of the answer. */
+  clearHint(length: number): void {
+    if (!this.hintShown) return;
+    const end = this.endOf(length);
+    process.stderr.write(`${this.toEnd(end)}${ERASE_BELOW}`);
+    this.cursorRow = Math.floor(end / this.columns);
+    this.hintShown = false;
+  }
+
+  /** The moves from the cursor to `end`, the cell after the answer. */
+  private toEnd(end: number): string {
+    return `${cursorDown(Math.floor(end / this.columns) - this.cursorRow)}\r${cursorRight(end % this.columns)}`;
   }
 
   /**

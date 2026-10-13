@@ -86,7 +86,7 @@ What do you want to do?
   0  Quit
 ```
 
-Choose with the arrow keys and Enter, or press the number. Escape returns to the menu; there it quits, as does `q`. Questions appear one at a time. Encode shows examples of the forms, asks about Seedshift, optional shares (2 of 3, 3 of 5, or another set up to 16), output files and [instructions for heirs](#instructions-for-heirs).
+Choose with the arrow keys and Enter, or press the number. Escape returns to the menu; there it quits, as does `q`. Questions appear one at a time. Where you type words, such as a seed phrase, a word to look up, English codes or shares in Bytewords, the words that begin like the one you type appear below it, as in mhfe: after one letter how many, from two letters the words themselves. Tab completes the word. Encode shows examples of the forms, asks about Seedshift, optional shares (2 of 3, 3 of 5, or another set up to 16), output files and [instructions for heirs](#instructions-for-heirs).
 
 The menu always masks word numbers and English words with Seedshift, because anyone with the BIP39 list can read them. Unicode codes and colors may stay unmasked. Shares use the chosen form; the [sharing section](#splitting-a-mnemonic-into-shares) explains what they restore. You may also show the whole encoded phrase beside the shares, with a warning, to keep it as a backup to them.
 

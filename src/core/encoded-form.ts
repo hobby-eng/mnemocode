@@ -1,6 +1,6 @@
 // The forms that the codes of an encoded seed phrase are written in, each with what it is: how its
 // codes are read and written, what they are called, how text in it looks, how it prints on cards,
-// and whether a seed phrase in it is always masked. A new form is one more variant here, and the
+// which list its words are typed from, and whether a seed phrase in it is always masked. A new form is one more variant here, and the
 // compiler asks for each of its facts; every reader, writer and question asks the form.
 //
 // Host-neutral: it reaches only the core's words and colors.
@@ -26,6 +26,7 @@ import {
   unicodeToColors,
 } from "./colors.js";
 import { englishTokens, indexesOfWords, wordsOfIndexes } from "./english-words.js";
+import { LineWordHints, WordList, type WordHints } from "./word-hints.js";
 import {
   ENCODED_FORMATS,
   isEncodedFormat,
@@ -84,11 +85,14 @@ interface Variant {
    * with the BIP39 list reads word numbers, so unmasked they would protect nothing.
    */
   readonly alwaysMasked: boolean;
+  /** The list that the form's words are typed from, for the hints below codes being typed. */
+  readonly words?: WordList;
 }
 
 const VARIANTS = Object.freeze({
   english: {
     read: (text) => indexesOfWords(canonicalEnglishWords(text)),
+    words: WordList.BIP39,
     write: (indexes) => wordsOfIndexes(indexes).join(" "),
     unit: "words",
     // What looks like no other form is taken for words.
@@ -201,6 +205,14 @@ export class EncodedForm {
     if (!isEncodedFormat(format)) throw new Error(`Unsupported encoded format: ${String(format)}.`);
     return EncodedForm.#values[format];
   }
+
+  /**
+   * The hints below codes being typed in any form: the words of the form that the line so far
+   * most likely is, English words only.
+   */
+  static readonly typedWords: WordHints = new LineWordHints(
+    (line) => EncodedForm.of(EncodedForm.likely(line)).#variant.words,
+  );
 
   /** The form that typed text most likely is, judged by its characters. */
   static likely(text: string): EncodedFormat {

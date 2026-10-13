@@ -23,6 +23,7 @@ import {
   type ShareTrouble,
   type TypedShare,
   SHARE_SEPARATOR,
+  SHARE_WORD_HINTS,
 } from "../sskr/share-input.js";
 import { nodeSharePlatform } from "../sskr/share-platform-node.js";
 import {
@@ -153,7 +154,7 @@ export class TypedShares {
     const texts = await askSecretUntil(
       SHARES_PROMPT,
       (answer) => this.input.sharesOfAnswer(answer),
-      { what: "the shares", pastedLineBreak: SHARE_SEPARATOR },
+      { what: "the shares", pastedLineBreak: SHARE_SEPARATOR, hints: SHARE_WORD_HINTS },
     );
     this.#fromQr = false;
     this.input.replaceAll(texts);
@@ -176,6 +177,7 @@ export class TypedShares {
     this.#fromQr = false;
     return askSecretUntil(MORE_SHARES_PROMPT, (answer) => this.input.sharesOfAnswer(answer, true), {
       what: "the shares to add",
+      hints: SHARE_WORD_HINTS,
       pastedLineBreak: SHARE_SEPARATOR,
     });
   }
@@ -243,6 +245,7 @@ export class TypedShares {
       }
       const text = await askSecretUntil(`Share ${place} again:`, (answer) => answer, {
         what: `share ${place}`,
+        hints: SHARE_WORD_HINTS,
       });
       problem = this.input.readProblem(place, text);
       if (problem === undefined) {

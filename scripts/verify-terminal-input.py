@@ -264,7 +264,7 @@ CONTROL_SEQUENCE = re.compile(r"\x1b\[([0-9;?]*)([@-~])")
 class Screen:
     """The rows that a terminal `columns` wide shows after `text`, for what the menu draws: text,
     which waits at the right edge before it wraps, carriage return, line feed, and the sequences
-    for cursor up, cursor right and erase to the end of the screen. Rows never scroll away. Any
+    for cursor up, cursor down, cursor right and erase to the end of the screen. Rows never scroll away. Any
     other escape sequence fails the check."""
 
     def __init__(self, columns, text):
@@ -314,6 +314,8 @@ class Screen:
         count = int(parameters or "1")
         if final == "A":
             self.move(self.row - count, self.column)
+        elif final == "B":
+            self.move(self.row + count, self.column)
         elif final == "C":
             self.move(self.row, self.column + count)
         elif final == "J" and parameters == "":
@@ -455,6 +457,39 @@ def check_cursor_editing():
     finally:
         session.close()
     print("an answer edited at the cursor with Home, Delete and End")
+
+
+def check_word_hints():
+    session = Session()
+    try:
+        session.wait_for(MENU_SHOWN)
+        session.type("7")
+        session.wait_for("What do you want to look up?")
+        session.type("1")
+        session.wait_for("Word: ")
+        # Two letters list the words that begin with them, below the line (src/cli/typed-hints.ts).
+        session.type("ab")
+        session.wait_for("abstract")
+        # Tab completes "abou" to the one word left, and Enter looks it up. A Tab that more keys
+        # follow at once is part of a paste, where it separates as a space does: Enter waits.
+        session.type("ou")
+        session.wait_for("ou")
+        session.type("\t")
+        session.wait_for("t ")
+        session.type(ENTER)
+        session.wait_for("english:     about")
+        session.wait_for("unicode hex: 5728")
+        session.wait_for("Press Enter to return to the menu")
+        session.type(ESCAPE)
+        code = session.wait_for_exit()
+        assert code == 0, f"Escape after the lookup gave exit code {code}"
+        # The pseudo-console redraws the screen itself: its output is not what the tool wrote.
+        if not WINDOWS:
+            shown = screen_at_exit(session)
+            assert not any("absurd" in line for line in shown), f"a hint stayed in {shown!r}"
+    finally:
+        session.close()
+    print("word hints in the menu: words below the line, Tab completes, gone after Enter")
 
 
 def check_long_line():
@@ -803,6 +838,7 @@ def main():
     check_menu_ctrl_c()
     check_long_line()
     check_cursor_editing()
+    check_word_hints()
     check_lines_pasted_as_one_answer()
     check_decode_dates_asked_again()
     check_restore_share_asked_again()

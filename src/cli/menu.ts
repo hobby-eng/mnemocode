@@ -106,6 +106,7 @@ import { REPAIR_ANCHOR } from "../sskr/repair-report.js";
 import { walletNeeded } from "../core/date-search.js";
 import { walletExplanation } from "./date-search.js";
 import { EncodedForm } from "../core/encoded-form.js";
+import { WordList, type WordHints } from "../core/word-hints.js";
 import { commandDisplay, typedCommand } from "./shell-command.js";
 import { runCommand } from "./menu-runner.js";
 import { COLOR_COUNTS_TEXT } from "../core/colors.js";
@@ -1225,6 +1226,8 @@ interface Lookup {
   readonly label: string;
   readonly what: string;
   readonly check: (answer: string) => string;
+  /** The hints below the answer being typed, for a word. */
+  readonly hints?: WordHints;
 }
 
 const LOOKUPS: Readonly<Record<"word" | "index" | "unicode", Lookup>> = {
@@ -1234,6 +1237,7 @@ const LOOKUPS: Readonly<Record<"word" | "index" | "unicode", Lookup>> = {
     what: "a word of the English BIP39 list",
     // Given as the table writes it, in lower case.
     check: (answer) => wordTableRow("word", answer).english,
+    hints: WordList.BIP39,
   },
   index: {
     question: "Word number",
@@ -1268,8 +1272,12 @@ async function tableAction(): Promise<Action> {
   );
   if (lookup === undefined) return undefined;
   if (lookup === "all") return { run: ["table", "--all"] };
-  const { question, label, what, check } = LOOKUPS[lookup];
-  const answer = await askLine(question, label, { what, check });
+  const { question, label, what, check, hints } = LOOKUPS[lookup];
+  const answer = await askLine(question, label, {
+    what,
+    check,
+    ...(hints === undefined ? {} : { hints }),
+  });
   if (answer === undefined) return undefined;
   return { run: ["table", `--${lookup}`, answer] };
 }

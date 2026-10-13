@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readLine, type LineOptions } from "../src/cli/terminal-input.js";
+import { WordList } from "../src/core/word-hints.js";
 import { answerEndRow, rowsOfText, terminalColumns } from "../src/cli/terminal-geometry.js";
 
 const LEFT = "\x1b[D";
@@ -128,6 +129,8 @@ class Screen {
   private control(final: string, count: number): void {
     this.pending = false;
     if (final === "A") this.row = Math.max(0, this.row - count);
+    else if (final === "B") this.row += count;
+    else if (final === "m") return;
     else if (final === "C") this.column = Math.min(this.columns - 1, this.column + count);
     else if (final === "J") {
       this.cells[this.row]?.splice(this.column);
@@ -167,6 +170,15 @@ class Screen {
       }),
     );
     return { text, at };
+  }
+
+  /** The text of each row, the empty cells as spaces, without the spaces at the end. */
+  rows(): string[] {
+    return this.cells.map((cells) =>
+      Array.from(cells, (cell) => cell ?? " ")
+        .join("")
+        .trimEnd(),
+    );
   }
 
   /** Where the cursor is: a cursor waiting at the right edge has not wrapped yet. */
@@ -386,5 +398,146 @@ describe("visible answer on the terminal", () => {
     expect(terminalColumns()).toBe(80);
     (process.stderr as { columns?: number }).columns = undefined;
     expect(terminalColumns()).toBe(80);
+  });
+});
+
+/**
+ * Types `keys` one at a time into readLine with BIP39 hints after a prompt of `promptWidth`
+ * letters, on a Screen `columns` wide, and gives the rows of the screen and the cursor after each
+ * key, once it is drawn, and the answer.
+ */
+async function typeWithHints(keys: readonly string[], columns: number, promptWidth = 6) {
+  process.stderr.columns = columns;
+  const screen = new Screen(columns);
+  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    screen.write(Buffer.from(chunk as Uint8Array).toString("utf8"));
+    return true;
+  });
+  screen.write("P".repeat(promptWidth));
+  const pending = [...keys.map((key) => Buffer.from(key, "utf8")), Buffer.from("\r")];
+  const after: { readonly rows: string[]; readonly cursor: readonly number[] }[] = [];
+  let bytes: number[] = [];
+  let started = false;
+  const next = async (): Promise<number | undefined> => {
+    if (bytes.length === 0) {
+      if (started) after.push({ rows: screen.rows(), cursor: screen.cursor() });
+      started = true;
+      bytes = [...(pending.shift() ?? [])];
+    }
+    return bytes.shift();
+  };
+  const answer = await readLine(next, {
+    echo: true,
+    moreWithin: async () => bytes.length > 0,
+    promptWidth,
+    hints: WordList.BIP39,
+  });
+  const end = screen.rows();
+  vi.restoreAllMocks();
+  return { answer, after, end };
+}
+
+describe("hints below a visible answer, as in mhfe", () => {
+  const originalColumns = process.stderr.columns;
+  beforeEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.stderr.columns = originalColumns;
+  });
+
+  it("shows how many words begin with a letter, then the words, and a word no word begins like", async () => {
+    const { answer, after, end } = await typeWithHints(["a", "b", "x", BACKSPACE, " "], 80);
+    expect(after[0]!.rows).toEqual(["PPPPPPa", "  136 BIP39 words begin with this letter"]);
+    expect(after[1]!.rows).toEqual([
+      "PPPPPPab",
+      "  abandon   ability   able      about     above     absent    absorb",
+      "  abstract  absurd    abuse",
+    ]);
+    expect(after[2]!.rows).toEqual(["PPPPPPabx", "  ! No BIP39 word begins like this."]);
+    expect(after[3]!.rows).toHaveLength(3);
+    // After a space no word is being typed.
+    expect(after[4]!.rows).toEqual(["PPPPPPab"]);
+    // The cursor stays where the next character goes.
+    expect(after.map(({ cursor }) => cursor)).toEqual([
+      [0, 7],
+      [0, 8],
+      [0, 9],
+      [0, 8],
+      [0, 9],
+    ]);
+    // Enter takes the hint off the screen.
+    expect(answer).toBe("ab ");
+    expect(end).toEqual(["PPPPPPab"]);
+  });
+
+  it("completes a word with Tab as far as the words agree, and ends it with a space", async () => {
+    const { answer, after } = await typeWithHints([..."abou", "\t", ..."abs", "\t"], 80);
+    expect(after[4]!.rows).toEqual(["PPPPPPabout"]);
+    expect(after[4]!.cursor).toEqual([0, 12]);
+    // The words that begin with "abs" differ at once: Tab adds nothing, and the hint stays.
+    expect(after[8]!.rows).toEqual(["PPPPPPabout abs", "  absent    absorb    abstract  absurd"]);
+    expect(answer).toBe("about abs");
+  });
+
+  it("keeps a pasted Tab a space, and draws a paste's hint once, at its end", async () => {
+    process.stderr.columns = 80;
+    const written: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      written.push(Buffer.from(chunk as Uint8Array).toString("utf8"));
+      return true;
+    });
+    const keys = keyboard("abandon\tabandon ab");
+    const done = readLine(keys.next, {
+      echo: true,
+      moreWithin: keys.moreWithin,
+      hints: WordList.BIP39,
+    });
+    const answer = await done;
+    vi.restoreAllMocks();
+    expect(answer).toBe("abandon abandon ab");
+    // The hint of "ab" once, and the erasure of it at the end of the input.
+    expect(written.filter((chunk) => chunk.includes("abstract"))).toHaveLength(1);
+  });
+
+  it("hints the word before the cursor inside a long answer, below its last row", async () => {
+    const { after } = await typeWithHints(
+      [..."abandon abandon abandon ab", HOME, ...Array<string>(8).fill("\x1b[C"), LEFT],
+      30,
+    );
+    // 6 + 26 columns: two rows, the hint below the second, two words to a row.
+    const answer = ["PPPPPPabandon abandon abandon", "ab"];
+    expect(after[25]!.rows).toEqual([
+      ...answer,
+      "  abandon   ability",
+      "  able      about",
+      "  above     absent",
+      "  and 4 more",
+    ]);
+    expect(after[25]!.cursor).toEqual([1, 2]);
+    // Home, then eight right: the cursor stands on a word, which is not being typed.
+    expect(after[34]!.rows).toEqual(answer);
+    expect(after[34]!.cursor).toEqual([0, 14]);
+    // One left: the cursor ends "abandon", a whole word, which needs no hint.
+    expect(after[35]!.rows).toEqual(answer);
+    expect(after[35]!.cursor).toEqual([0, 13]);
+  });
+
+  it("shows no hint where the terminal is too narrow or the answer hidden", async () => {
+    expect((await typeWithHints(["a", "b"], 23)).after[1]!.rows).toEqual(["PPPPPPab"]);
+    process.stderr.columns = 80;
+    const written: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    const keys = keyboard("ab\t\r");
+    expect(
+      await readLine(keys.next, {
+        echo: false,
+        moreWithin: keys.moreWithin,
+        hints: WordList.BIP39,
+      }),
+    ).toBe("ab\t");
+    expect(written).toEqual([]);
   });
 });

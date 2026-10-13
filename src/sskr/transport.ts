@@ -69,6 +69,8 @@ import { Redacted } from "../core/redacted.js";
 import { wipedAfter } from "../core/bits.js";
 import { type EncodedFormat } from "../core/types.js";
 import { EncodedForm } from "../core/encoded-form.js";
+import { WordList } from "../core/word-hints.js";
+import { bytewords } from "./bytewords-list.js";
 
 export const CHECKSUM_BYTES = CRC32_BYTES;
 export const MAX_TRANSPORT_BYTES = 128;
@@ -431,6 +433,8 @@ const SHARE_READERS: readonly {
   readonly format: ShareFormat;
   readonly looks: (text: string) => boolean;
   readonly read: (text: string) => string;
+  /** The list that the form's words are typed from, for the hints below a share being typed. */
+  readonly words?: WordList;
 }[] = [
   {
     format: "ur",
@@ -446,9 +450,22 @@ const SHARE_READERS: readonly {
     read: (text) => colorsToShare(unicodeToColorCodes(text).join(" ")),
   },
   // Any other text is read as Bytewords, the standard form in words.
-  { format: "words", looks: (text) => text.length > 0, read: bytewordsToUr },
+  {
+    format: "words",
+    looks: (text) => text.length > 0,
+    read: bytewordsToUr,
+    words: new WordList({ one: "Byteword", many: "Bytewords" }, bytewords),
+  },
 ];
 
+/**
+ * The list that a share typed so far is written in the words of: Bytewords where the share looks
+ * like no other form, as readShare takes it; none for a share in codes, colors or a UR.
+ */
+export function shareWordList(share: string): WordList | undefined {
+  const text = share.trim();
+  return SHARE_READERS.find((reader) => reader.looks(text))?.words;
+}
 
 /** A share in any form MnemoCode writes, as its UR, and the form it was written in. */
 export function readShare(value: string): { readonly ur: string; readonly format: ShareFormat } {

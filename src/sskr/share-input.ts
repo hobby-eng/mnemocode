@@ -30,9 +30,11 @@ import {
 } from "./repair.js";
 import type { SharePlatform } from "./share-platform.js";
 import { copiesAmong, ShareExport, ShareSet } from "./share-set.js";
+import { LineWordHints, type WordHints } from "../core/word-hints.js";
 import {
   assertShareCount,
   readShare,
+  shareWordList,
   shareCountProblem,
   type ShareFormat,
   Share,
@@ -54,6 +56,15 @@ const MAX_WRAPPED_LINES = 8;
 export const SHARE_SEPARATOR = ";";
 /** What separates the shares of one answer: SHARE_SEPARATOR (no regular-expression character), or a line break. */
 const SHARE_SEPARATORS = new RegExp(`${SHARE_SEPARATOR}|\\r?\\n`, "u");
+
+/**
+ * The hints below shares being typed: the words of the list that the share being typed, after
+ * the shares before it, is written in (shareWordList), for every question that takes shares.
+ */
+export const SHARE_WORD_HINTS: WordHints = new LineWordHints(
+  shareWordList,
+  (line) => line.split(SHARE_SEPARATORS).at(-1) ?? "",
+);
 
 /** A share as typed, and its place among the shares typed, by which every message names it. */
 export interface TypedShare {

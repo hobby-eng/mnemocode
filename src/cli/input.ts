@@ -13,6 +13,7 @@ import { BackupReading, modeConflictOf } from "../core/backup-reading.js";
 import type { EncodedBackup } from "../core/encoded-backup.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { DatesAnswer } from "../core/date-search.js";
+import { WordList } from "../core/word-hints.js";
 import { DATE_COUNT_WORDS, Masking, type DateCountWords } from "../core/masking.js";
 import { validatedEnglishWords } from "../core/words.js";
 import { MAX_TEXT_INPUT_BYTES, readBoundedDescriptor, readFileOrRefuse } from "./bounded-read.js";
@@ -333,6 +334,7 @@ export async function promptedEncodeInputs(
   assertAskedNotGiven(arguments_, [...PHRASE_SECRET_OPTIONS, DATES_OPTION]);
   const mnemonic = await askSecretUntil("Seed phrase (English BIP39 words):", typedSeedPhrase, {
     what: "the words of the seed phrase",
+    hints: WordList.BIP39,
   });
   if (!Masking.of(mode).masked) return { mnemonic, dates: [] };
   const wordCount = englishTokens(mnemonic).length;

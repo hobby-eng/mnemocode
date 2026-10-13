@@ -320,6 +320,10 @@ const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   "src/core/address-scan.ts": ["@scure/bip32"],
   "src/core/bip32-limits.ts": [],
   "src/core/typed-number.ts": [],
+  // The hints below a word being typed, which every front end that takes typed words shows.
+  "src/core/word-hints.ts": [],
+  // Its checks, which a host that shows the hints adds.
+  "src/core/word-hints-self-test.ts": [],
   // How codes are written as text, which every reader of codes and shares lexes through.
   "src/core/code-text.ts": [],
   "src/core/prose.ts": [],

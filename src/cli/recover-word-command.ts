@@ -23,6 +23,7 @@ import {
   TooManyForList,
 } from "../core/candidate-list.js";
 import { englishWordlist } from "../core/words.js";
+import { WordList } from "../core/word-hints.js";
 import { walletCheckOf, type WalletEvidence, type EvidenceMatch } from "../bitcoin-evidence.js";
 import { type ParsedArguments, assertAskedNotGiven } from "./arguments.js";
 import {
@@ -279,7 +280,10 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<void>
   const read = async (): Promise<PhraseSearch> => {
     const rules = { legacy, missing, listed: target !== undefined };
     if (!asked) return parsePhrase(textInput(arguments_, "mnemonic"), rules);
-    return askSecretUntil(prompt, (text) => parsePhrase(text, rules), { what: "the words" });
+    return askSecretUntil(prompt, (text) => parsePhrase(text, rules), {
+      what: "the words",
+      hints: WordList.BIP39,
+    });
   };
   let phrase = await read();
   // Only once the phrase can be searched: a list passphrase typed for nothing is lost work.

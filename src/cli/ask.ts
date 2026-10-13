@@ -8,8 +8,9 @@
 // before it showed (dropTypedAhead), so that only keys pressed for it answer it.
 //
 // The API for the commands:
-// - askSecretUntil(prompt, parse, { what, pastedLineBreak }): a secret, asked until `parse`
-//   returns. An Error from `parse` is its one warning line. An empty answer or Ctrl+D asks again
+// - askSecretUntil(prompt, parse, { what, pastedLineBreak, hints }): a secret, asked until
+//   `parse` returns. An Error from `parse` is its one warning line; `hints` shows the words of a
+//   list below the words being typed. An empty answer or Ctrl+D asks again
 //   with "Type <what>, or press Ctrl+C to stop."; a real end of the input cancels.
 // - askValueUntil(prompt, parse, { what, fallback }): the same for a visible value that is no
 //   secret, such as a fingerprint or a file name; Escape goes back (undefined), and Enter alone
@@ -74,6 +75,7 @@ import { displayWidth } from "./terminal-geometry.js";
 import { trimWhiteSpace } from "../core/white-space.js";
 import { isFirstReceiving } from "../core/wallet-evidence.js";
 import { validCharacters } from "./utf8.js";
+import type { WordHints } from "../core/word-hints.js";
 
 /** How a question is asked again. */
 export interface AskOptions {
@@ -89,6 +91,11 @@ export interface ValueAskOptions extends AskOptions {
 
 /** How a secret question is asked again. */
 export interface SecretAskOptions extends AskOptions {
+  /**
+   * The hints below the words being typed on the private screen, and Tab's completion
+   * (core/word-hints.ts): where the answer is words of a list, such as a seed phrase.
+   */
+  readonly hints?: WordHints;
   /**
    * What a line break inside a paste of several lines becomes (readLine): a space by default, so
    * that words, codes or dates pasted one per line are one answer; ";" between shares.
@@ -134,6 +141,7 @@ async function readAnswer(
     readonly echo: boolean;
     readonly back: boolean;
     readonly pastedLineBreak?: PastedLineBreak;
+    readonly hints?: WordHints | undefined;
   },
 ): Promise<Reading> {
   return withRawTerminal(async (next, moreWithin) => {
@@ -159,6 +167,7 @@ async function readAnswer(
           wentBack = true;
         },
         ...(how.pastedLineBreak === undefined ? {} : { pastedLineBreak: how.pastedLineBreak }),
+        ...(how.hints === undefined ? {} : { hints: how.hints }),
       });
       // An answer given with Enter that held a byte of no character is refused; Escape still goes
       // back.
@@ -193,6 +202,7 @@ export async function askSecretUntil<T>(
       echo: onPrivateScreen(),
       back: false,
       pastedLineBreak: options.pastedLineBreak ?? " ",
+      hints: options.hints,
     });
     return turnOfReading(reading, { ...options, leave: "stop" });
   });

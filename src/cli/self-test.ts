@@ -14,6 +14,7 @@ import { COIN_ADDRESS_SELF_TEST } from "../core/coins-self-test.js";
 import { MnemoCodeSelfTest, type SelfTestCheck, type SelfTestFeature } from "../core/self-test.js";
 import { expectRefusedLater, expectSame } from "../core/self-test-check.js";
 import { WALLET_EVIDENCE_SELF_TEST } from "../core/wallet-evidence-self-test.js";
+import { WORD_HINTS_SELF_TEST } from "../core/word-hints-self-test.js";
 import { cardExportCheck } from "../export/cards-self-test.js";
 import { cardSetsSelfTest } from "../export/card-sets-self-test.js";
 import { heirSheetSelfTest } from "../export/heir-sheet-self-test.js";
@@ -44,6 +45,7 @@ const FEATURES: readonly SelfTestFeature[] = [
   heirSheetSelfTest(nodeCardRenderer),
   shareCardsSelfTest(nodeCardRenderer),
   cardSetsSelfTest(nodeCardRenderer),
+  WORD_HINTS_SELF_TEST,
 ];
 
 /**

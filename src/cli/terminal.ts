@@ -46,6 +46,11 @@ export function cursorUp(lines: number): string {
   return lines > 0 ? `\x1b[${lines}A` : "";
 }
 
+/** Moves the cursor down `lines` lines (VT100 "cursor down"); nothing for none. */
+export function cursorDown(lines: number): string {
+  return lines > 0 ? `\x1b[${lines}B` : "";
+}
+
 /** Moves the cursor right `columns` columns (VT100 "cursor forward"); nothing for none. */
 export function cursorRight(columns: number): string {
   return columns > 0 ? `\x1b[${columns}C` : "";

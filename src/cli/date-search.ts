@@ -105,6 +105,7 @@ export {
   walletReason,
 } from "../core/date-search.js";
 import type { EncodedFormat } from "../core/types.js";
+import { EncodedForm } from "../core/encoded-form.js";
 
 /**
  * Why the wallet is asked for before a date search in `mode`, shown with the question: the
@@ -266,6 +267,7 @@ class BackupSource {
       if (problem !== undefined) terminalNotice(problem, "warning");
       return askSecretUntil("Encoded seed phrase or record:", recordText, {
         what: "the encoded seed phrase or its record",
+        hints: EncodedForm.typedWords,
       });
     }
     if (this.reads === 0) {
