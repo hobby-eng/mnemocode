@@ -9,33 +9,33 @@
 // From the host it needs crypto.getRandomValues and, for X25519 only, WebCrypto (crypto.subtle),
 // which a browser offers only on a secure page; without it the X25519 operations refuse at once
 // with one line, while the passphrase operations work, since age takes scrypt and its ciphers from
-// @noble. It reads and writes no file and asks nothing; its only import is age-encryption, nothing
-// of Node.js.
+// @noble. It reads and writes no file and asks nothing; its only package import is age-encryption,
+// and its shared admission policy is host-neutral too.
 
-import { wipeAll } from "./bits.js";
 import { Decrypter, Encrypter, generateX25519Identity, identityToRecipient } from "age-encryption";
 import { Redacted } from "./redacted.js";
 import { withoutByteOrderMark } from "./white-space.js";
 import { describeError } from "./refusal.js";
 import { listInWords } from "./places.js";
+import {
+  CandidateFileAdmission,
+  SCRYPT_LOG_N,
+  type ListFileLock,
+} from "./candidate-file-admission.js";
+import { CandidateFileRefused } from "./candidate-file-refusal.js";
 
-/** The stanza types that the two kinds of file have, each the only one in its header. */
-const X25519_STANZA = "X25519";
-const SCRYPT_STANZA = "scrypt";
-/** log2 of the scrypt work factor: about 1.3 s and 256 MiB, which a browser page still manages. */
-export const SCRYPT_LOG_N = 18;
+// Keep the existing import paths valid for hosts that already use this module.
+export { CandidateFileRefused, type CandidateFileProblem } from "./candidate-file-refusal.js";
+export { SCRYPT_LOG_N, type ListFileLock } from "./candidate-file-admission.js";
+
 /** An X25519 recipient: "age1", then 58 Bech32 characters (age-encryption.org/v1). */
 const X25519_RECIPIENT = /^age1[02-9ac-hj-np-z]{58}$/u;
-/** age's binary header starts with this line and ends with the line of its MAC. */
-const AGE_FIRST_LINE = "age-encryption.org/v1";
-const MAC_LINE_START = "---";
-const STANZA_LINE_START = "-> ";
-/** More than any header with one stanza needs. */
-const MAX_HEADER_BYTES = 64 * 1024;
 /** Shorter list passphrases are refused: the passphrase is all that protects the seed phrases. */
 export const MIN_LIST_PASSPHRASE_LENGTH = 12;
 const NO_WEBCRYPTO =
   "An age key (X25519) needs WebCrypto (crypto.subtle), which is missing here: a browser offers it only on a secure page, opened as a file, from localhost or over https.";
+/** Bound age's temporary reads: its nonce reader concatenates the input chunks it receives. */
+const ENCRYPTED_READ_CHUNK_BYTES = 64 * 1024;
 
 /**
  * Refuses X25519 where WebCrypto is missing, as on a page served over plain http from another
@@ -83,6 +83,7 @@ export function parseRecipient(text: string): string {
 
 /** Encrypts a list to the Scanner's one-time key. */
 export async function encryptCandidates(plain: Uint8Array, recipient: string): Promise<Uint8Array> {
+  CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
   requireWebCryptoX25519();
   const encrypter = new Encrypter();
   encrypter.addRecipient(parseRecipient(recipient));
@@ -111,46 +112,12 @@ export async function encryptCandidatesWithPassphrase(
   plain: Uint8Array,
   passphrase: string,
 ): Promise<Uint8Array> {
+  CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
   if (passphrase === "") throw new Error("The passphrase for the candidates is empty.");
   const encrypter = new Encrypter();
   encrypter.setPassphrase(passphrase);
   encrypter.setScryptWorkFactor(SCRYPT_LOG_N);
   return encrypter.encrypt(plain);
-}
-
-/**
- * Why a candidate file was refused, by the step it failed at: its header is not that of a list
- * (`unsupported`), the key given does not open it (`key`), or its contents were changed or cut
- * (`damaged`).
- */
-export type CandidateFileProblem = "unsupported" | "key" | "damaged";
-
-/**
- * Thrown when a candidate file cannot be opened, with why (`problem`), so that a host can add its
- * own words where it knows more, such as which page a key belongs to. age's own error, where it
- * failed, is the `cause`.
- */
-export class CandidateFileRefused extends Error {
-  readonly problem: CandidateFileProblem;
-
-  constructor(problem: CandidateFileProblem, message: string, cause?: unknown) {
-    super(message, cause === undefined ? undefined : { cause });
-    this.problem = problem;
-  }
-}
-
-/** The stanzas of a binary age file's header, each as its type followed by its arguments. */
-function ageStanzas(file: Uint8Array): string[][] {
-  const header = new TextDecoder("latin1").decode(file.subarray(0, MAX_HEADER_BYTES));
-  const lines = header.split("\n");
-  if (lines[0] !== AGE_FIRST_LINE)
-    throw new CandidateFileRefused("unsupported", "This is not a binary age file.");
-  const end = lines.findIndex((line) => line.startsWith(MAC_LINE_START));
-  if (end < 0) throw new CandidateFileRefused("unsupported", "The age header has no end.");
-  return lines
-    .slice(1, end)
-    .filter((line) => line.startsWith(STANZA_LINE_START))
-    .map((line) => line.slice(STANZA_LINE_START.length).split(" "));
 }
 
 /**
@@ -161,43 +128,9 @@ export type ListProtectionChoice =
   | { readonly kind: "passphrase"; readonly passphrase: string }
   | { readonly kind: "none" };
 
-/** The kind of key that opens a list file: the Scanner's key, or a passphrase. */
-export type ListFileLock = Exclude<ListProtectionChoice["kind"], "none">;
-
-/** The stanza type of each kind of list file. */
-const LOCK_STANZAS: Readonly<Record<ListFileLock, string>> = Object.freeze({
-  key: X25519_STANZA,
-  passphrase: SCRYPT_STANZA,
-});
-
-/**
- * The kind of key that opens the list `file`, read from its age header: exactly one stanza, X25519
- * for the Scanner's key or scrypt at the fixed work factor for a passphrase. Anything else is
- * refused with why, before any key is asked for.
- */
+/** The shared admission policy, retained under the original public function name. */
 export function listFileLock(file: Uint8Array): ListFileLock {
-  const stanzas = ageStanzas(file);
-  const type = stanzas[0]?.[0];
-  const lock = (Object.keys(LOCK_STANZAS) as ListFileLock[]).find(
-    (kind) => LOCK_STANZAS[kind] === type,
-  );
-  if (lock === undefined)
-    throw new CandidateFileRefused(
-      "unsupported",
-      `The candidate file must have exactly one ${X25519_STANZA} or ${SCRYPT_STANZA} recipient.`,
-    );
-  if (stanzas.length !== 1)
-    throw new CandidateFileRefused(
-      "unsupported",
-      `The candidate file must have exactly one ${type} recipient.`,
-    );
-  // An scrypt stanza is "scrypt <salt> <log2 of the work factor>".
-  if (lock === "passphrase" && stanzas[0]![2] !== String(SCRYPT_LOG_N))
-    throw new CandidateFileRefused(
-      "unsupported",
-      `The candidate file must use the scrypt work factor ${SCRYPT_LOG_N}.`,
-    );
-  return lock;
+  return CandidateFileAdmission.lock(file);
 }
 
 /**
@@ -209,13 +142,9 @@ export async function decryptCandidates(
   file: Uint8Array,
   key: { readonly identity: string } | { readonly passphrase: string },
 ): Promise<Uint8Array> {
-  if ("identity" in key) requireWebCryptoX25519();
   const given: ListFileLock = "identity" in key ? "key" : "passphrase";
-  if (listFileLock(file) !== given)
-    throw new CandidateFileRefused(
-      "unsupported",
-      `The candidate file must have exactly one ${LOCK_STANZAS[given]} recipient.`,
-    );
+  CandidateFileAdmission.assertLock(file, given);
+  if (given === "key") requireWebCryptoX25519();
   const decrypter = new Decrypter();
   if ("identity" in key) decrypter.addIdentity(key.identity);
   else decrypter.addPassphrase(key.passphrase);
@@ -236,8 +165,9 @@ export async function decryptCandidates(
     );
   }
   try {
-    return await readWhole(stream);
+    return await CandidateFileAdmission.readPlaintext(stream);
   } catch (error) {
+    if (error instanceof CandidateFileRefused) throw error;
     // The contents: every chunk carries its own tag, so a changed or cut file fails here.
     throw new CandidateFileRefused(
       "damaged",
@@ -247,38 +177,17 @@ export async function decryptCandidates(
   }
 }
 
-/** `bytes` as a stream of one chunk. */
+/** Borrowed ciphertext views: age never needs a temporary copy of the entire file to read a nonce. */
 function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  let offset = 0;
   return new ReadableStream({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
+    pull(controller) {
+      const end = Math.min(bytes.byteLength, offset + ENCRYPTED_READ_CHUNK_BYTES);
+      if (end > offset) controller.enqueue(bytes.subarray(offset, end));
+      offset = end;
+      if (offset === bytes.byteLength) controller.close();
     },
   });
-}
-
-/** Every chunk of `stream` joined, read to its end; the chunks are wiped once copied. */
-async function readWhole(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = [];
-  const reader = stream.getReader();
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-    }
-    const whole = new Uint8Array(chunks.reduce((length, chunk) => length + chunk.length, 0));
-    let offset = 0;
-    for (const chunk of chunks) {
-      whole.set(chunk, offset);
-      offset += chunk.length;
-    }
-    return whole;
-  } finally {
-    // The list is a secret: no copy stays behind, also when the file is refused part way.
-    wipeAll(chunks);
-    reader.releaseLock();
-  }
 }
 
 /**
@@ -365,6 +274,7 @@ export class NoProtection implements ListProtection {
 
   /** The list itself, the same bytes. */
   protect(list: Uint8Array): Promise<Uint8Array> {
+    CandidateFileAdmission.assertSize(list.byteLength, "plaintext");
     return Promise.resolve(list);
   }
 }

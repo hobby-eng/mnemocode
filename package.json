@@ -121,6 +121,10 @@
       "types": "./dist/core/candidate-encryption.d.ts",
       "import": "./dist/core/candidate-encryption.js"
     },
+    "./core/candidate-file-admission": {
+      "types": "./dist/core/candidate-file-admission.d.ts",
+      "import": "./dist/core/candidate-file-admission.js"
+    },
     "./core/candidate-encryption-self-test": {
       "types": "./dist/core/candidate-encryption-self-test.d.ts",
       "import": "./dist/core/candidate-encryption-self-test.js"

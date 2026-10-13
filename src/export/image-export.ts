@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { PDFDocument } from "pdf-lib";
 import { pageFileName } from "./card-codes.js";
 import { NewFolder, writeNewPrivateFile } from "./private-file.js";
+import { wipedAfterAsync } from "../core/bits.js";
 import {
   coveredPixels,
   DEFAULT_DOCUMENT_FORMAT,
@@ -133,9 +134,9 @@ export async function writeRenderedDocument(
       .sort((a, b) => Number(a.match(/\d+/u)![0]) - Number(b.match(/\d+/u)![0]));
     if (!files.length) throw new Error("The local PDF renderer produced no images.");
     for (const [index, file] of files.entries()) {
-      await writeNewPrivateFile(
-        pageFileName(basePath, index, files.length, image),
-        await readFile(join(temporary, file)),
+      // The page shows what the document shows: its bytes are wiped once written.
+      await wipedAfterAsync(await readFile(join(temporary, file)), (page) =>
+        writeNewPrivateFile(pageFileName(basePath, index, files.length, image), page),
       );
     }
     return files.length;

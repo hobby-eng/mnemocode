@@ -17,10 +17,18 @@ import {
   createSessionIdentity,
   decryptCandidates,
   encryptCandidates,
+  listFileLock,
   type CandidateFileProblem,
 } from "./candidate-encryption.js";
 import { THREE_PHRASES_LIST } from "./candidate-list-self-test.js";
-import { bytesOfHex, expectRefusedLater, expectSame, hexOfBytes } from "./self-test-check.js";
+import {
+  bytesOfHex,
+  expectRefused,
+  expectRefusedLater,
+  expectSame,
+  hexOfBytes,
+} from "./self-test-check.js";
+import { CandidateFileAdmission } from "./candidate-file-admission.js";
 
 /**
  * `open` refused as a CandidateFileRefused with `problem` and a message that `because` matches;
@@ -77,6 +85,16 @@ function changedLastByte(hex: string): Uint8Array {
  * since WebCrypto answers later; it needs crypto.getRandomValues and WebCrypto.
  */
 export async function checkCandidateEncryptionQuick(): Promise<void> {
+  // Independent Python arithmetic: maximum MNCL v1 bytes plus the age v1 STREAM framing.
+  const admission = CandidateFileAdmission.parameters();
+  expectSame(admission.headerBytes, 65_536, "Maximum age header prefix bytes");
+  expectSame(admission.encryptedBytes, 155_292_688, "Maximum encrypted candidate file bytes");
+  expectSame(listFileLock(bytesOfHex(WITH_THE_PASSPHRASE)), "passphrase", "A scrypt header");
+  expectRefused(
+    () => CandidateFileAdmission.assertSize(admission.encryptedBytes + 1, "age"),
+    /supported limit/u,
+    "An oversized encrypted candidate file",
+  );
   const identity = { identity: TEST_IDENTITY };
   expectSame(
     hexOfBytes(await decryptCandidates(bytesOfHex(TO_THE_SESSION_KEY), identity)),

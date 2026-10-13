@@ -7,6 +7,7 @@ import {
 } from "./image-export.js";
 import { join } from "node:path";
 import { NewFolder } from "./private-file.js";
+import { wipeAll } from "../core/bits.js";
 import type { CardContent } from "./backup-cards.js";
 import type { CardTemplate } from "./templates.js";
 
@@ -33,10 +34,15 @@ export async function exportIndividualCards(
   const folder = await claimCardFolder(directory);
   // Every card is rendered before anything is written.
   const cards = await renderIndividualCards(nodeCardRenderer, template, content);
-  return folder.publish(".card-collection-", async (staging) => {
-    let files = 0;
-    for (const card of cards)
-      files += await writeRenderedDocument(card.bytes, join(staging, card.name), format);
-    return files;
-  });
+  try {
+    return await folder.publish(".card-collection-", async (staging) => {
+      let files = 0;
+      for (const card of cards)
+        files += await writeRenderedDocument(card.bytes, join(staging, card.name), format);
+      return files;
+    });
+  } finally {
+    // The cards show the backup: wiped once written, also when a card or the folder failed.
+    wipeAll(cards.map((card) => card.bytes));
+  }
 }

@@ -6,6 +6,7 @@ import { DEFAULT_SHARE_TEMPLATE_ID, resolveTemplateId } from "../export/template
 import { resolveSskrLayout, parseSskrLayout } from "../export/sskr-content.js";
 import { terminalNotice, terminalResultHeader } from "./terminal.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
+import { wipedAfterAsync } from "../core/bits.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { businessOptions, businessOptionNames } from "./business-options.js";
 import {
@@ -130,7 +131,10 @@ export async function saveShares(
   // Each share in its form, as the terminal shows it.
   const lines = shown.map((share) => writeShare(share.ur, share.format));
   const output = await saveOutput(args, "output", "The file of the shares", (path) =>
-    publishNewPrivateFile(path, new TextEncoder().encode(lines.join("\n") + "\n")),
+    // The shares in the open: their bytes are wiped once this attempt has saved or failed.
+    wipedAfterAsync(new TextEncoder().encode(lines.join("\n") + "\n"), (bytes) =>
+      publishNewPrivateFile(path, bytes),
+    ),
   );
   if (output !== undefined) {
     terminalNotice(`Saved SSKR records: ${output} (one complete share per line).`, "success");

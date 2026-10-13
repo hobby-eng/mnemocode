@@ -53,6 +53,21 @@ export function wipedAfter<T>(bytes: Uint8Array, use: (bytes: Uint8Array) => T):
   }
 }
 
+/**
+ * wipedAfter for a `use` that finishes later, such as saving a file: the bytes are wiped once it
+ * has settled, saved or refused, never while it may still read them.
+ */
+export async function wipedAfterAsync<T>(
+  bytes: Uint8Array,
+  use: (bytes: Uint8Array) => Promise<T>,
+): Promise<T> {
+  try {
+    return await use(bytes);
+  } finally {
+    bytes.fill(0);
+  }
+}
+
 export function modulo(value: number, divisor: number): number {
   const remainder = value % divisor;
   return remainder < 0 ? remainder + divisor : remainder;

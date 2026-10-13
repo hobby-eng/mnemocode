@@ -4,7 +4,7 @@ import { MAX_PNG_BYTES, MAX_PNG_DIMENSION, MAX_PNG_PIXELS, MEGAPIXEL } from "./q
 // that reads none starts without the QR decoder (AUD-012-ARC002). The PNG reader is also the one
 // that the cards are drawn with (export/platform-node.ts), which a command that draws loads anyway.
 import type { PNG } from "pngjs";
-import { equalBytes } from "../core/bits.js";
+import { equalBytes, wipedAfter } from "../core/bits.js";
 
 const PNG_SIGNATURE = Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10);
 /**
@@ -40,25 +40,18 @@ function assertPngDimensions(bytes: Uint8Array): void {
   }
 }
 
-/** Reads a QR code from a PNG file saved by the local palette exporter. */
+/**
+ * Reads a QR code from a PNG file saved by the local palette exporter. The image holds an encoded
+ * backup or a share, so the file's bytes and the decoded pixels are wiped once the code is read,
+ * also when it is refused, as a text input is (AUD-018-SEC001). jsQR's own working copies and the
+ * text it returns cannot be wiped.
+ */
 export async function decodeQrPngFile(path: string): Promise<string> {
-  const bytes = readFileOrRefuse(
-    path,
-    MAX_PNG_BYTES,
-    "QR PNG input",
-    "The QR PNG input could not be read.",
-  );
-  assertPngDimensions(bytes);
+  // Loaded first, so that the secret bytes are read, decoded and wiped in one step without a wait.
   const [{ PNG: reader }, { default: jsQRModule }] = await Promise.all([
     import("pngjs"),
     import("jsqr"),
   ]);
-  let image: ReturnType<typeof PNG.sync.read>;
-  try {
-    image = reader.sync.read(bytes);
-  } catch {
-    throw new Error("The QR input is not a valid PNG file.");
-  }
   // jsQR ships a legacy CommonJS wrapper whose NodeNext import type is exposed
   // as a namespace despite its runtime default export being the scanner.
   const scan = jsQRModule as unknown as (
@@ -67,12 +60,29 @@ export async function decodeQrPngFile(path: string): Promise<string> {
     height: number,
     options: { inversionAttempts: "attemptBoth" },
   ) => { data: string } | null;
-  const decoded = scan(
-    new Uint8ClampedArray(image.data.buffer, image.data.byteOffset, image.data.byteLength),
-    image.width,
-    image.height,
-    { inversionAttempts: "attemptBoth" },
+  const bytes = readFileOrRefuse(
+    path,
+    MAX_PNG_BYTES,
+    "QR PNG input",
+    "The QR PNG input could not be read.",
   );
-  if (decoded === null) throw new Error("No readable QR code was found in the PNG file.");
-  return decoded.data;
+  return wipedAfter(bytes, () => {
+    assertPngDimensions(bytes);
+    let image: ReturnType<typeof PNG.sync.read>;
+    try {
+      image = reader.sync.read(bytes);
+    } catch {
+      throw new Error("The QR input is not a valid PNG file.");
+    }
+    return wipedAfter(image.data, (pixels) => {
+      const decoded = scan(
+        new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength),
+        image.width,
+        image.height,
+        { inversionAttempts: "attemptBoth" },
+      );
+      if (decoded === null) throw new Error("No readable QR code was found in the PNG file.");
+      return decoded.data;
+    });
+  });
 }

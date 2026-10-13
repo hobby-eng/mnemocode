@@ -13,6 +13,7 @@ import {
 } from "./image-export.js";
 import { claimCardFolder } from "./individual-cards.js";
 import { publishNewPrivateFile, makePrivateFolder } from "./private-file.js";
+import { wipedAfterAsync } from "../core/bits.js";
 import { renderSskrPdf, ShareCardSet, type SskrRenderOptions } from "./sskr-render.js";
 import { DEFAULT_IMAGE_FORMAT } from "./document-formats.js";
 
@@ -39,10 +40,13 @@ export async function exportSskrCards(
       // Private like the staging folder: the card names carry the share's references.
       if (share.folder !== undefined) await makePrivateFolder(shareFolder);
       for await (const document of cards.documents(place))
-        files += await writeRenderedDocument(
-          document.bytes,
-          join(shareFolder, document.name),
-          options.imageFormat ?? DEFAULT_DOCUMENT_FORMAT,
+        // Each document shows a share: its bytes are wiped once written.
+        files += await wipedAfterAsync(document.bytes, (bytes) =>
+          writeRenderedDocument(
+            bytes,
+            join(shareFolder, document.name),
+            options.imageFormat ?? DEFAULT_DOCUMENT_FORMAT,
+          ),
         );
     }
     return files;
@@ -54,7 +58,9 @@ export async function exportSskrPdf(
   options: SskrRenderOptions,
   path: string,
 ): Promise<void> {
-  await publishNewPrivateFile(path, await renderSskrPdf(nodeCardRenderer, records, options));
+  await wipedAfterAsync(await renderSskrPdf(nodeCardRenderer, records, options), (document) =>
+    publishNewPrivateFile(path, document),
+  );
 }
 
 export async function exportSskrImages(
@@ -63,9 +69,7 @@ export async function exportSskrImages(
   directory: string,
   format: ImageFormat = DEFAULT_IMAGE_FORMAT,
 ): Promise<number> {
-  return exportPageImages(
-    await renderSskrPdf(nodeCardRenderer, records, options),
-    directory,
-    format,
+  return wipedAfterAsync(await renderSskrPdf(nodeCardRenderer, records, options), (document) =>
+    exportPageImages(document, directory, format),
   );
 }

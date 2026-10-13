@@ -323,7 +323,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   },
   {
     name: "an age file at another scrypt work factor",
-    file: "dist/core/candidate-encryption.js",
+    file: "dist/core/candidate-file-admission.js",
     from: 'if (lock === "passphrase" && stanzas[0][2] !== String(SCRYPT_LOG_N))',
     to: "if (false)",
     module: "core/candidate-encryption-self-test.js",

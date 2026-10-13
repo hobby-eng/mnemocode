@@ -1165,7 +1165,7 @@
     "suiteNote": "At 16ccca1 the full suite passed 1,417 of 1,418 tests: test/card-preview.test.ts, which draws every design into one PDF, hit its 120-second timeout under the load of other sessions (it also did in the remediation run) and passed alone in 52 s (verify-suite-rerun-card-preview). The first verification at 03374a0 passed the whole suite."
   },
   "limitations": [
-    "The schema file changed during the audit by formatting alone: another session reformatted it in the multi-chain-wallet-tools working tree (d47df012… at the start, 989bf3de… at the end; both parse to the same JSON as its commit c76141fb2890dfeb515c2abe0aac0ed941f48238). This record validates against the file at the end; AUD-009's own validator, which compares its recorded hashes, now stops at that hash for the same reason.",
+    "The schema file changed during the audit by formatting alone: another session reformatted it in the multi-chain-wallet-tools working tree (d47df012… at the start, 989bf3de… at the end; both parse to the same JSON as its commit c82bcace05eed8840610312a498b05528965baa7). This record validates against the file at the end; AUD-009's own validator, which compares its recorded hashes, now stops at that hash for the same reason.",
     "No canonical Docker rebuild of the SSKR WASM; its integrity pins were checked statically.",
     "No Windows or macOS run on this machine; GitHub CI after the push is the check of BLD001 and BLD002.",
     "No browser run here: the Deriver's browser run of API001 and API005 is the multi-chain-wallet-tools session's.",

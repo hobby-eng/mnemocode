@@ -10,6 +10,7 @@
 import {
   decodeCandidateList,
   encodeCandidateList,
+  MAX_CANDIDATE_LIST_BYTES,
   OpenedCandidateList,
   padmeLength,
 } from "./candidate-list.js";
@@ -73,6 +74,14 @@ const PADME_LENGTHS: readonly (readonly [number, number])[] = [
 
 /** The list of three phrases written and read, the padded lengths, and the lists refused. */
 export function checkCandidateListStartup(): void {
+  // Independent Python arithmetic for the maximum MNCL v1 fields, CRC and Padmé padding.
+  expectSame(MAX_CANDIDATE_LIST_BYTES, 155_189_248, "Maximum candidate list bytes");
+  OpenedCandidateList.assertSize(MAX_CANDIDATE_LIST_BYTES);
+  expectRefused(
+    () => OpenedCandidateList.assertSize(MAX_CANDIDATE_LIST_BYTES + 1),
+    /supported limit/u,
+    "An oversized candidate list",
+  );
   const records = THREE_PHRASES_ENTROPY.map((entropy) => ({ entropy: bytesOfHex(entropy) }));
   expectSame(hexOfBytes(encodeCandidateList({ records })), THREE_PHRASES_LIST, "Candidate list");
   const list = decodeCandidateList(bytesOfHex(THREE_PHRASES_LIST));

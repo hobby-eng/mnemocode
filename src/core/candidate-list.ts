@@ -14,6 +14,7 @@ import { entropyToMnemonic } from "@scure/bip39";
 import { englishWordlist } from "./english-words.js";
 import { Redacted } from "./redacted.js";
 import { equalBytes } from "./bits.js";
+import { assertCandidateFileSize } from "./candidate-file-refusal.js";
 
 /** "MNCL": MnemoCode candidate list. */
 const MAGIC = [0x4d, 0x4e, 0x43, 0x4c] as const;
@@ -92,6 +93,16 @@ export function padmeLength(length: number): number {
   const step = 2 ** (e - (floorLog2(e) + 1));
   return Math.ceil(length / step) * step;
 }
+
+/** Largest MNCL v1 list: both passphrase fields, maximum entropy and records, CRC, then Padmé. */
+export const MAX_CANDIDATE_LIST_BYTES = padmeLength(
+  HEADER_BYTES +
+    LENGTH_BYTES +
+    MAX_PASSPHRASE_BYTES +
+    MAX_CANDIDATE_RECORDS *
+      (Math.max(...BIP39_ENTROPY_BYTES) + LENGTH_BYTES + MAX_PASSPHRASE_BYTES) +
+    CRC_BYTES,
+);
 
 const encoder = new TextEncoder();
 
@@ -206,6 +217,7 @@ function listBytes(
 
 /** Reads a list, refusing it as a whole when anything in it is out of place. */
 export function decodeCandidateList(bytes: Uint8Array): CandidateList {
+  OpenedCandidateList.assertSize(bytes.byteLength);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   // ignoreBOM: a passphrase is kept as stored, with a leading U+FEFF if it has one.
   const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
@@ -283,6 +295,11 @@ export interface ListCandidate {
  * them: each candidate's phrase and its BIP39 passphrase. Its text shows no record.
  */
 export class OpenedCandidateList extends Redacted {
+  /** The same admission rule for a plaintext file, encryption input, or decrypted output. */
+  static assertSize(size: number): void {
+    assertCandidateFileSize(size, MAX_CANDIDATE_LIST_BYTES, "plaintext candidate list");
+  }
+
   readonly #records: readonly CandidateRecord[];
   /** The passphrase for every record without one of its own; "" for none. */
   readonly #passphrase: string;

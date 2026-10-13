@@ -134,7 +134,14 @@ const PARTS: Readonly<Record<string, Part>> = {
   },
   "src/core/candidate-list.ts": { uses: [] },
   // Only the encryption of candidate lists imports age.
-  "src/core/candidate-encryption.ts": { uses: [], packages: ["age-encryption"] },
+  "src/core/candidate-file-admission.ts": {
+    uses: ["src/core/candidate-list.ts"],
+    packages: ["@scure/base"],
+  },
+  "src/core/candidate-encryption.ts": {
+    uses: ["src/core/candidate-file-admission.ts"],
+    packages: ["age-encryption"],
+  },
   // The writing of a list: its phrases as entropy, encoded and protected, every copy wiped.
   "src/core/candidate-list-writer.ts": {
     uses: ["src/core/candidate-list.ts", "src/core/candidate-encryption.ts"],
@@ -319,6 +326,7 @@ const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   "src/core/redacted.ts": [],
   // What a thrown value says, which readers of input and the self-tests share.
   "src/core/refusal.ts": [],
+  "src/core/candidate-file-refusal.ts": [],
   // What every self-test check is made of, which the checks beside each feature share.
   "src/core/self-test-check.ts": [],
   "src/sskr/repair.ts": [],

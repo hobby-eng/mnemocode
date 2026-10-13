@@ -5,6 +5,7 @@ import { nodeCardRenderer } from "../export/platform-node.js";
 import type { CardJob } from "../export/render.js";
 import { backupCardContent } from "../export/backup-cards.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
+import { wipedAfterAsync } from "../core/bits.js";
 import { exportIndividualCards } from "../export/individual-cards.js";
 import { cardTemplate } from "./card-options.js";
 import { businessOptions } from "./business-options.js";
@@ -38,7 +39,9 @@ export async function saveEncodeResult(
   const cardDirectory = value(arguments_, "cards-dir");
   const outputPath = value(arguments_, "output");
   if (outputPath !== undefined) {
-    await publishNewPrivateFile(outputPath, Buffer.from(`${backup.record()}\n`, "utf8"));
+    await wipedAfterAsync(Buffer.from(`${backup.record()}\n`, "utf8"), (record) =>
+      publishNewPrivateFile(outputPath, record),
+    );
     terminalNotice(`Saved MnemoCode record: ${outputPath}`, "success");
   }
   if (arguments_.cards === true) {
@@ -49,10 +52,10 @@ export async function saveEncodeResult(
     terminalNotice(`Saved PDF: ${pdfPath}`, "success");
   }
   if (imageDirectory !== undefined) {
-    const count = await exportPageImages(
+    // The rendered cards show the backup: wiped once their images are written.
+    const count = await wipedAfterAsync(
       await renderCards(nodeCardRenderer, [cardJob(arguments_, outcome)]),
-      imageDirectory,
-      imageFormat(arguments_),
+      (document) => exportPageImages(document, imageDirectory, imageFormat(arguments_)),
     );
     savedPagesNotice(arguments_, count, imageDirectory);
   }
