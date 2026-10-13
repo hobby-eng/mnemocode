@@ -24,7 +24,7 @@ import { sskrVector } from "../sskr/known-answers.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
 import { exportQrPayload } from "../export/qr-image.js";
-import { assertProtected, protectionSummary } from "./protection.js";
+import { assertProtected, permissionSummary, sandboxReport } from "./protection.js";
 import { nodeSharePlatform } from "../sskr/share-platform-node.js";
 import { MNEMOCODE_VERSION } from "../version.js";
 import { readBundledFile } from "../bundled-files.js";
@@ -142,7 +142,12 @@ export async function runSelfTest(): Promise<void> {
     shareLibrary: "pinned WASM",
     features: FEATURES,
     // Built here, not at load: the protection is in place only once the command has started.
-    before: [{ name: "Process protection", detail: protectionSummary(), run: assertProtected }],
+    before: [
+      { name: "Process protection", detail: permissionSummary(), run: assertProtected },
+      // A report of what the system enforces, which never fails: a system without a boundary
+      // runs without it (system-sandbox.ts).
+      { name: "System sandbox", detail: sandboxReport(), run: () => undefined },
+    ],
     after: [QR_CHECK, QR_BESIDE_CHECK, cardExportCheck(nodeCardRenderer)],
   }).run();
   const rows = report.rows.map(

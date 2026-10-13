@@ -65,7 +65,16 @@ const check = (condition, what) => {
 
 try {
   check(run("--version") === `mnemocode ${version}\n`, `prints version ${version}`);
-  check(run("self-test").includes("PASS"), "passes the full self-test");
+  const selfTest = run("self-test");
+  check(selfTest.includes("PASS"), "passes the full self-test");
+  // The system's own sandbox, as every runner of CI offers it (src/cli/system-sandbox.ts).
+  const sandboxMark = {
+    linux: "kernel: no sockets",
+    darwin: "sandbox: no network",
+    win32: "no heap in crash reports",
+  }[process.platform];
+  if (sandboxMark !== undefined)
+    check(selfTest.includes(sandboxMark), `is held by the system's sandbox (${sandboxMark})`);
   const shifted = run(
     "encode",
     "--mnemonic",

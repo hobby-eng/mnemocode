@@ -623,11 +623,17 @@ The public test data is in [`vectors/mnemocode-v1.json`](vectors/mnemocode-v1.js
 
 ### Protection while it runs
 
-Every run is protected as far as Node.js allows: core dumps are off on Linux and macOS, and MnemoCode runs under the Node.js permission model. That model allows no network, and a command that does not need them cannot write files or start other programs. If you start MnemoCode under that model yourself and grant a right on purpose, such as `--allow-net`, it keeps that right. The library has the rights of the program that uses it. Node.js enforces the model, not the operating system, so it is not a sandbox. Before a secret is asked, the private screen shows this protection, and a warning if swap is not encrypted or a file would be saved into a cloud folder.
+Every run is protected as far as the system allows: core dumps are off on Linux and macOS, and MnemoCode runs under the Node.js permission model. That model allows no network, and a command that does not need them cannot write files or start other programs. If you start MnemoCode under that model yourself and grant a right on purpose, such as `--allow-net`, it keeps that right. The library has the rights of the program that uses it. Node.js enforces the model itself, so the operating system enforces what it can below it:
+
+- Linux: seccomp refuses new sockets and, where a command starts no program, starting one. Landlock refuses file writes where a command saves nothing, on kernels that can apply it to every thread at once, such as Linux 7.0. Memory is locked out of swap where the system lets a program lock all of it, which usually needs root.
+- macOS: no debugger can attach, and the system sandbox refuses the network and, where a command starts none, other programs.
+- Windows: crash reports leave out the heap, extension DLLs and DLLs from network shares are refused, and a job object refuses other programs.
+
+Each of these is checked by trying what it forbids before MnemoCode names it. What a system does not offer is left out, without a refusal; `mnemocode self-test` says what was not available and why. Before a secret is asked, the private screen shows this protection, and a warning if swap is not encrypted or a file would be saved into a cloud folder.
 
 ### Unencrypted swap
 
-When memory runs short, the system can write part of the memory of MnemoCode, the seed phrase included, to the swap area on the disk, where it can stay for years. On Linux MnemoCode warns before a secret when swap is not encrypted, or when it cannot tell. Use encrypted swap or none at all; a live USB system is best. Swap on dm-crypt, also below LVM, and zram, which stays in memory, count as safe.
+When memory runs short, the system can write part of the memory of MnemoCode, the seed phrase included, to the swap area on the disk, where it can stay for years. On Linux MnemoCode warns before a secret when swap is not encrypted, or when it cannot tell, unless its memory is locked. Use encrypted swap or none at all; a live USB system is best. Swap on dm-crypt, also below LVM, and zram, which stays in memory, count as safe.
 
 ### Cloud folders
 
