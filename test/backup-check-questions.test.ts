@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { formatEncoded, parseDate, representMnemonic } from "../src/core.js";
 import { backupCheckAnswer, offerEncodedCheck, offerShareCheck } from "../src/cli/backup-check.js";
-import { InputCancelledError } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { matching } from "./helpers/matchers.js";

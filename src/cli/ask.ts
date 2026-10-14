@@ -59,12 +59,9 @@ import {
 import {
   dropRestOfPaste,
   dropTypedAhead,
-  InputCancelledError,
   readLine,
   terminalAvailable,
-  UnusableAnswerError,
   withRawTerminal,
-  type NextByte,
   refusal,
   type PastedLineBreak,
   NOT_UTF8,
@@ -72,6 +69,7 @@ import {
   dumbTerminalReason,
   SECRET_SOURCE_ADVICE,
 } from "./terminal-input.js";
+import { InputCancelledError, UnusableAnswerError, type NextByte } from "./terminal-keys.js";
 import { displayWidth } from "./terminal-geometry.js";
 import { trimWhiteSpace } from "../core/white-space.js";
 import { isFirstReceiving } from "../core/wallet-evidence.js";

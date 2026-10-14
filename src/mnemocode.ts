@@ -3,7 +3,8 @@ import { runCommandLine } from "./cli/command-line.js";
 import { menuAvailable, runMenu } from "./cli/menu.js";
 import { hardenProcess, relaunchProtected, underProtection } from "./cli/protection.js";
 import { CANCELLED_EXIT_CODE } from "./cli/private-screen.js";
-import { dumbTerminalReason, InputCancelledError, terminalTooDumb } from "./cli/terminal-input.js";
+import { dumbTerminalReason, terminalTooDumb } from "./cli/terminal-input.js";
+import { InputCancelledError } from "./cli/terminal-keys.js";
 import { terminalFailure, terminalHint } from "./cli/terminal.js";
 import { describeError } from "./core/refusal.js";
 

@@ -43,7 +43,7 @@ import {
 } from "../src/cli/ask.js";
 import { assertWalletPlaceUsed, walletPlaceOf } from "../src/cli/bitcoin-options.js";
 import { LAST_NORMAL_INDEX } from "../src/core/address-scan.js";
-import { InputCancelledError } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;

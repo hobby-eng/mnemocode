@@ -21,57 +21,39 @@
 // A question is answered only by keys pressed after it shows: dropTypedAhead wipes what was typed
 // or pasted before, such as the rest of a paste or a second Enter. A paste of several lines may
 // be one answer (LineOptions.pastedLineBreak), and a visible answer wraps a wide character whole
-// onto the next row, as terminals do (ShownLine).
+// onto the next row, as terminals do (ShownLine). The keys and the refusals of a question are
+// terminal-keys.ts, the escape sequences of keys key-sequences.ts, and the answer being edited,
+// with what shows of it, typed-answer.ts.
 // scripts/verify-terminal-input.py drives all of this in a pseudo-terminal.
 
 import { isatty } from "node:tty";
 import { MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
-import {
-  characterSize,
-  displayWidthOf,
-  placedAfter,
-  terminalColumns,
-} from "./terminal-geometry.js";
-import { CANCELLED_MESSAGE } from "./exit-codes.js";
-import { isContinuation, STRICT_UTF8, notUtf8Text } from "./utf8.js";
-import { cursorDown, cursorUp, cursorRight, ERASE_BELOW } from "./terminal.js";
-import type { WordHint, WordHints } from "../core/word-hints.js";
-import { hintRows } from "./typed-hints.js";
+import { notUtf8Text } from "./utf8.js";
+import type { WordHints } from "../core/word-hints.js";
 import { dumbTerminal } from "./terminal-style.js";
 import { refusalMessage } from "../core/refusal.js";
 import { defined } from "../core/defined.js";
+import {
+  ESCAPE_DELAY_MS,
+  InputCancelledError,
+  KEY,
+  type MoreWithin,
+  type NextByte,
+  PASTE_GAP_MS,
+  UnusableAnswerError,
+} from "./terminal-keys.js";
+import {
+  editKeyOf,
+  mayBeLateSequence,
+  readEscapeSequence,
+  readLateSequence,
+} from "./key-sequences.js";
+import { TypedAnswer } from "./typed-answer.js";
 
 /**
  * The longest answer: the limit of every text input (bounded-read.ts); no valid one is that long.
  */
 export const MAX_ANSWER_BYTES = MAX_TEXT_INPUT_BYTES;
-
-/** Raw terminal bytes that this module acts on. */
-const KEY = {
-  CTRL_A: 0x01,
-  CTRL_C: 0x03,
-  CTRL_D: 0x04,
-  CTRL_E: 0x05,
-  BACKSPACE: 0x08,
-  TAB: 0x09,
-  LINE_FEED: 0x0a,
-  CTRL_K: 0x0b,
-  CARRIAGE_RETURN: 0x0d,
-  CTRL_U: 0x15,
-  CTRL_W: 0x17,
-  CTRL_Z: 0x1a,
-  ESCAPE: 0x1b,
-  CTRL_BACKSLASH: 0x1c,
-  SPACE: 0x20,
-  DIGIT_0: 0x30,
-  DIGIT_9: 0x39,
-  /** The final bytes of the escape sequences of the up and down arrows (ESC [ A, ESC [ B). */
-  ARROW_UP: 0x41,
-  ARROW_DOWN: 0x42,
-  LOWER_Q: 0x71,
-  UPPER_Q: 0x51,
-  DELETE: 0x7f,
-} as const;
 
 /**
  * The bytes that readKey takes for Escape besides it: q and Q, for a keyboard layout without an
@@ -79,22 +61,6 @@ const KEY = {
  * on them leaves them out (terminal-choice.ts).
  */
 export const ESCAPE_ALIASES: ReadonlySet<number> = new Set([KEY.LOWER_Q, KEY.UPPER_Q, KEY.CTRL_D]);
-
-/** The codes of the errors of terminal input: a question cancelled, an answer it cannot use. */
-export type TerminalInputErrorCode = "cancelled" | "unusable-answer";
-
-/**
- * Thrown when Ctrl+C cancels a question; the tool then stops with CANCELLED_EXIT_CODE, as for
- * SIGINT.
- */
-export class InputCancelledError extends Error {
-  readonly code: TerminalInputErrorCode = "cancelled";
-
-  constructor() {
-    super(CANCELLED_MESSAGE);
-    this.name = "InputCancelledError";
-  }
-}
 
 /**
  * The warning for an answer, a file or codes that were refused, to be asked again with it: the
@@ -108,32 +74,6 @@ export function refusal(error: unknown): string {
 
 /** Why an answer is refused that holds bytes of no UTF-8 character. */
 export const NOT_UTF8 = notUtf8Text("The answer");
-
-/**
- * Thrown by readLine for an answer that no question can use: longer than its limit, or not UTF-8
- * text. The message says why without repeating the answer.
- */
-export class UnusableAnswerError extends Error {
-  readonly code: TerminalInputErrorCode = "unusable-answer";
-
-  constructor(message: string) {
-    super(message);
-    this.name = "UnusableAnswerError";
-  }
-}
-
-/** The next byte typed, or undefined at the end of the input. */
-export type NextByte = () => Promise<number | undefined>;
-
-/** Whether another byte arrives within `milliseconds`, without taking it. */
-export type MoreWithin = (milliseconds: number) => Promise<boolean>;
-
-/**
- * How long a lone Escape waits for the rest of an escape sequence. The Escape key sends one byte,
- * an arrow key three that arrive together; a remote connection may split them, so this waits a
- * little longer than a local terminal needs (ncurses waits up to a second, vim 100 ms).
- */
-const ESCAPE_DELAY_MS = 100;
 
 export type Key =
   | { readonly kind: "up" | "down" | "enter" | "back" | "other" }
@@ -221,7 +161,9 @@ const COMPACT_AFTER = 4096;
  * drops it. Kept between questions.
  */
 const typedAhead = new ByteQueue();
+
 let inputEnded = false;
+
 /** How many withRawTerminal calls are running: dropTypedAhead reads the terminal only in one. */
 let rawSessions = 0;
 
@@ -231,13 +173,6 @@ let rawSessions = 0;
  * drawn before, so no key pressed for the question can be among them.
  */
 const TYPED_AHEAD_SETTLE_MS = 15;
-
-/**
- * How long the rest of a paste may take after one of its bytes: a paste arrives in one burst, in
- * chunks microseconds apart, while no person types two keys this fast. A line break followed this
- * soon is inside a paste; an answer refused halfway is dropped until a gap this long.
- */
-const PASTE_GAP_MS = 20;
 
 /**
  * Bytes that readKey read after an ESC that started no key's sequence, in the order typed: they
@@ -268,7 +203,7 @@ export async function dropTypedAhead(): Promise<void> {
   if (wipeTypedAhead()) throw new InputCancelledError();
 }
 
-function settle(): Promise<void> {
+export function settle(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, TYPED_AHEAD_SETTLE_MS));
 }
 
@@ -445,72 +380,6 @@ export async function withCtrlCWatch<T>(search: (signal: AbortSignal) => Promise
   }
 }
 
-/** The bytes after ESC that start a control sequence (CSI, "[") or a single shift (SS3, "O"). */
-const CSI_INTRODUCER = 0x5b;
-const SS3_INTRODUCER = 0x4f;
-/** ECMA-48's parameter bytes (0 to 9, ; and the like) between the introducer and the final byte. */
-const PARAMETER_FIRST = 0x30;
-const PARAMETER_LAST = 0x3f;
-/** ECMA-48's final bytes, @ to ~, one of which ends a sequence. */
-const FINAL_FIRST = 0x40;
-const FINAL_LAST = 0x7e;
-/** The printable ASCII characters, space to ~; ESC before one of them is Alt with that key. */
-const PRINTABLE_FIRST = 0x20;
-const PRINTABLE_LAST = 0x7e;
-/** Longer than any key's sequence, such as ESC [ 2 4 ; 5 ~ (Ctrl+F12). */
-const MAX_KEY_SEQUENCE_BYTES = 8;
-
-/** What followed an ESC that more bytes followed at once. */
-type EscapeSequence =
-  /** A whole sequence: its introducer, its parameter bytes as text and its final byte. */
-  | {
-      readonly kind: "sequence";
-      readonly introducer: number;
-      readonly parameters: string;
-      readonly final: number;
-    }
-  /** A printable character, as Alt with that key sends it: no key of MnemoCode's. */
-  | { readonly kind: "alt" }
-  /** No key's sequence: the bytes to read again as typed, in order. */
-  | { readonly kind: "none"; readonly readAgain: number[] };
-
-/**
- * Reads what follows an ESC that more bytes followed at once: a key's sequence as ECMA-48 shapes
- * it, [ or O, parameter bytes and one final byte. A terminal sends a key's whole sequence at once,
- * so one that stops short is no key: at a byte that cannot stand in it, such as a space, Enter,
- * Backspace or Ctrl+C, after MAX_KEY_SEQUENCE_BYTES, at the end of the input or, with
- * `moreWithin`, after a pause of ESCAPE_DELAY_MS. The bytes read after the [ or O are then given
- * back (readAgain), the one that ended it included, so that each keeps its meaning: Alt+[, or
- * Escape and [ pressed quickly, loses no digit typed after it, and Enter still ends the answer and
- * Ctrl+C still cancels. A control key or a non-ASCII character right after ESC, such as Alt+Enter
- * or a second Escape, is given back the same way.
- */
-async function readEscapeSequence(
-  next: NextByte,
-  moreWithin: MoreWithin | undefined,
-): Promise<EscapeSequence> {
-  const introducer = await next();
-  if (introducer === undefined) return { kind: "none", readAgain: [] };
-  if (introducer !== CSI_INTRODUCER && introducer !== SS3_INTRODUCER) {
-    const printable = introducer >= PRINTABLE_FIRST && introducer <= PRINTABLE_LAST;
-    return printable ? { kind: "alt" } : { kind: "none", readAgain: [introducer] };
-  }
-  const read: number[] = [];
-  while (read.length < MAX_KEY_SEQUENCE_BYTES) {
-    if (moreWithin !== undefined && !(await moreWithin(ESCAPE_DELAY_MS))) break;
-    const byte = await next();
-    if (byte === undefined) break;
-    read.push(byte);
-    if (byte >= FINAL_FIRST && byte <= FINAL_LAST) {
-      const parameters = String.fromCharCode(...read.slice(0, -1));
-      read.fill(0);
-      return { kind: "sequence", introducer, parameters, final: byte };
-    }
-    if (byte < PARAMETER_FIRST || byte > PARAMETER_LAST) break;
-  }
-  return { kind: "none", readAgain: read };
-}
-
 /**
  * Reads one key. The arrow keys send the VT escape sequences ESC [ A and ESC [ B, or ESC O A and
  * ESC O B in a terminal's application mode; Node.js gives Windows consoles the same sequences.
@@ -588,181 +457,19 @@ export interface LineOptions {
 export type PastedLineBreak = " " | ";";
 
 /**
- * How long after an Escape alone, which a question for a secret ignores, the rest of a key's
- * sequence is still read as that key: a slow remote link may deliver ESC and "[B" of an arrow key
- * apart, and "[B" must not become part of the answer.
- */
-const LATE_SEQUENCE_MS = 1000;
-
-/** Whether `byte` may start the rest of the sequence of an Escape ignored at `ignoredAt`. */
-function mayBeLateSequence(byte: number, ignoredAt: number | undefined): boolean {
-  return (
-    (byte === CSI_INTRODUCER || byte === SS3_INTRODUCER) &&
-    ignoredAt !== undefined &&
-    Date.now() - ignoredAt <= LATE_SEQUENCE_MS
-  );
-}
-
-/**
- * The final bytes of the sequences that keys send (xterm's ctlseqs, "PC-Style Function Keys"):
- * the arrows A to D, E (keypad 5), F and H (End, Home), G (keypad 5 on some terminals), P to S
- * (F1 to F4), Z (Shift+Tab) and ~ (Insert, Delete, Page Up and Down, F5 and up). After SS3 only
- * those without parameters; MnemoCode never switches the keypad to its application mode, whose
- * SS3 sequences end in letters that text also has.
- */
-const CSI_KEY_FINALS = new Set(Array.from("ABCDEFGHPQRSZ~", (final) => final.charCodeAt(0)));
-const SS3_KEY_FINALS = new Set(Array.from("ABCDFHPQRS", (final) => final.charCodeAt(0)));
-
-/**
- * Reads the bytes after `introducer`, a [ or O typed soon after an ignored Escape, and tells
- * whether they are the rest of that Escape's key: a terminal sends a key's whole sequence at once,
- * and nothing follows it at once unless it is a paste. Typed text comes key by key, and pasted
- * text goes on after the final byte. A key's sequence gives the key; anything else gives back the
- * bytes read after the introducer, which are then read as typed (the introducer is text).
- */
-async function readLateSequence(
-  introducer: number,
-  next: NextByte,
-  moreWithin: MoreWithin,
-): Promise<{ readonly key: EditKey } | { readonly readAgain: number[] }> {
-  const rest: number[] = [];
-  const finals = introducer === CSI_INTRODUCER ? CSI_KEY_FINALS : SS3_KEY_FINALS;
-  while (rest.length < MAX_KEY_SEQUENCE_BYTES && (await moreWithin(PASTE_GAP_MS))) {
-    const byte = await next();
-    if (byte === undefined) break;
-    rest.push(byte);
-    if (finals.has(byte)) {
-      if (await moreWithin(PASTE_GAP_MS)) break;
-      const parameters = String.fromCharCode(...rest.slice(0, -1));
-      rest.fill(0);
-      return { key: editKeyOf(introducer, parameters, byte) };
-    }
-    const parameter = byte >= PARAMETER_FIRST && byte <= PARAMETER_LAST;
-    if (introducer !== CSI_INTRODUCER || !parameter) break;
-  }
-  return { readAgain: rest };
-}
-
-/**
- * The words that a hint is given: the word being typed and three before it, enough to tell the
- * form of the line, Bytewords after the codes of another share or English words among codes.
- */
-const HINT_CONTEXT_WORDS = 4;
-
-/** The keys of a visible answer that move the cursor or delete, read from their escape sequence. */
-type EditKey = "left" | "right" | "word-left" | "word-right" | "home" | "end" | "delete" | "other";
-
-/** The xterm modifier numbers of Alt and Ctrl, as in ESC [ 1 ; 5 D for Ctrl+Left. */
-const WORD_MODIFIERS = new Set(["3", "5"]);
-
-/**
- * Which editing key sent the whole sequence of `introducer`, `parameters` and `final`, as
- * readEscapeSequence and readLateSequence read it.
- */
-function editKeyOf(introducer: number, parameters: string, final: number): EditKey {
-  if (introducer === SS3_INTRODUCER) {
-    if (final === 0x43) return "right";
-    if (final === 0x44) return "left";
-    if (final === 0x48) return "home";
-    if (final === 0x46) return "end";
-    return "other";
-  }
-  const [code, modifier] = parameters.split(";");
-  const word = modifier !== undefined && WORD_MODIFIERS.has(modifier);
-  if (final === 0x43) return word ? "word-right" : "right";
-  if (final === 0x44) return word ? "word-left" : "left";
-  if (final === 0x48) return "home";
-  if (final === 0x46) return "end";
-  if (final === 0x7e) {
-    if (code === "1" || code === "7") return "home";
-    if (code === "4" || code === "8") return "end";
-    if (code === "3") return "delete";
-  }
-  return "other";
-}
-
-/**
  * Reads one line from raw bytes as described at the top. Returns undefined when the input ends
  * before anything was typed, or at Escape where it goes back. A visible answer leaves the cursor
  * just after its end, wherever it was moved before, so that a caller can count the rows of the
  * question and the answer up from there.
  */
 export async function readLine(next: NextByte, options: LineOptions): Promise<string | undefined> {
-  const { echo, limit = MAX_ANSWER_BYTES, moreWithin } = options;
-  // Reserved at its largest size and never grown, so that no unwiped copy of a secret is left.
-  const line = Buffer.alloc(limit);
-  let length = 0;
-  // Where the next character goes; always at the start of a character.
-  let cursor = 0;
-  const shown = echo ? new ShownLine(line, options.promptWidth ?? 0) : undefined;
-  // Only where the answer shows, as in mhfe: a hint tells what is typed.
-  const hints = echo ? options.hints : undefined;
-  // Whether the hint below the answer is behind what the answer shows.
-  let hintDue = false;
-  const insert = (byte: number): void => {
-    if (length === limit)
-      throw new UnusableAnswerError(
-        `An answer is longer than ${limit} bytes; no valid answer is that long.`,
-      );
-    line.copyWithin(cursor + 1, cursor, length);
-    line[cursor++] = byte;
-    length += 1;
-    hintDue = hints !== undefined;
-    // A character of several bytes is shown once it is complete.
-    if (shown !== undefined && isCharacterEnd(line, cursor))
-      shown.update(length, cursor, cursor === length);
-  };
-  const remove = (from: number, to: number): void => {
-    line.copyWithin(from, to, length);
-    length -= to - from;
-    line.fill(0, length, length + (to - from));
-    cursor = from;
-    hintDue = hints !== undefined;
-    shown?.update(length, cursor);
-  };
-  const moveTo = (position: number): void => {
-    cursor = position;
-    hintDue = hints !== undefined;
-    shown?.update(length, cursor);
-  };
-  // The words before the cursor that the hint and Tab are about, while the cursor ends a word;
-  // otherwise none: the word being typed and a few before it (HINT_CONTEXT_WORDS), which tell
-  // the form of the line. No more of the answer, which may be a secret, becomes a string, which
-  // nothing could wipe (AUD-019-SEC001).
-  const typedBefore = (): string => {
-    if (cursor < length && line[cursor] !== KEY.SPACE) return "";
-    let start = cursor;
-    for (let words = 0; words < HINT_CONTEXT_WORDS && start > 0; words += 1)
-      start = previousWord(line, start);
-    try {
-      return STRICT_UTF8.decode(line.subarray(start, cursor));
-    } catch {
-      return "";
-    }
-  };
-  // Tab: the letters that every word beginning like the typed one has next, and a space once one
-  // word is left.
-  const complete = (completing: WordHints): void => {
-    const { letters, wordEnds } = completing.completion(typedBefore());
-    for (let at = 0; at < letters.length; at += 1) insert(letters.charCodeAt(at));
-    if (!wordEnds) return;
-    if (cursor < length && line[cursor] === KEY.SPACE) moveTo(cursor + 1);
-    else insert(KEY.SPACE);
-  };
-  // As End would; nothing is drawn when the cursor is there already.
-  const moveToEnd = (): void => {
-    if (cursor !== length) moveTo(length);
-  };
-  const edit = (key: EditKey): void => {
-    if (key === "left" && cursor > 0) moveTo(previousCharacter(line, cursor));
-    else if (key === "right" && cursor < length) moveTo(nextCharacter(line, cursor, length));
-    else if (key === "word-left") moveTo(previousWord(line, cursor));
-    else if (key === "word-right") moveTo(nextWord(line, cursor, length));
-    else if (key === "home") moveTo(0);
-    else if (key === "end") moveTo(length);
-    else if (key === "delete" && cursor < length)
-      remove(cursor, nextCharacter(line, cursor, length));
-  };
+  const { echo, moreWithin } = options;
+  const answer = new TypedAnswer(
+    options.limit ?? MAX_ANSWER_BYTES,
+    echo,
+    options.promptWidth ?? 0,
+    options.hints,
+  );
   const lineBreak = options.pastedLineBreak?.charCodeAt(0);
   // When Escape alone was last ignored, for the rest of its sequence that a slow link split off.
   let escapeIgnoredAt: number | undefined;
@@ -772,51 +479,50 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
   const take: NextByte = async () => (readAgain.length > 0 ? readAgain.shift() : next());
   const more: MoreWithin | undefined =
     moreWithin && (async (milliseconds) => readAgain.length > 0 || moreWithin(milliseconds));
+  /** Whether no key follows within PASTE_GAP_MS: the end of a paste, or a key typed alone. */
+  const quiet = async (): Promise<boolean> => more === undefined || !(await more(PASTE_GAP_MS));
+  /** Bytes that turned out to be no key's sequence, read again before the next. */
+  const giveBack = (bytes: number[]): void => {
+    readAgain.unshift(...bytes);
+    bytes.fill(0);
+  };
   try {
     for (;;) {
       // Drawn once no key follows at once, so that a paste is hinted once, at its end.
-      if (hintDue && (more === undefined || !(await more(PASTE_GAP_MS)))) {
-        defined(shown).showHint(defined(hints).hint(typedBefore()), length, cursor);
-        hintDue = false;
-      }
+      await answer.hintWhen(quiet);
       const byte = await take();
       // Only the byte right after an ignored Escape can continue its sequence.
       const late =
         byte !== undefined && more !== undefined && mayBeLateSequence(byte, escapeIgnoredAt);
       escapeIgnoredAt = undefined;
       if (byte === undefined) {
-        if (length === 0) return undefined;
+        if (answer.length === 0) return undefined;
         break;
       }
       if (byte === KEY.CARRIAGE_RETURN || byte === KEY.LINE_FEED) {
-        if (lineBreak === undefined || more === undefined || !(await more(PASTE_GAP_MS))) break;
+        if (lineBreak === undefined || (await quiet())) break;
         // One separator for a run of line breaks, such as CR LF or a blank line, and none at the
         // start or after a separator typed before it.
-        if (cursor > 0 && line[cursor - 1] !== lineBreak) insert(lineBreak);
+        if (answer.cursor > 0 && answer.before !== lineBreak) answer.insert(lineBreak);
         continue;
       }
       if (byte === KEY.CTRL_C) throw new InputCancelledError();
-      if (byte === KEY.BACKSPACE || byte === KEY.DELETE) {
-        if (cursor > 0) remove(previousCharacter(line, cursor), cursor);
-      } else if (byte === KEY.CTRL_U) {
-        if (cursor > 0) remove(0, cursor);
-      } else if (byte === KEY.CTRL_D && length === 0) {
-        return undefined;
-      } else if (!echo) {
-        insert(byte);
-      } else if (late) {
+      if (byte === KEY.CTRL_D && answer.length === 0) return undefined;
+      if (byte === KEY.BACKSPACE || byte === KEY.DELETE || byte === KEY.CTRL_U)
+        answer.control(byte);
+      else if (!echo) answer.insert(byte);
+      else if (late) {
         const sequence = await readLateSequence(byte, take, defined(more));
-        if ("key" in sequence) edit(sequence.key);
+        if ("key" in sequence) answer.edit(sequence.key);
         else {
-          insert(byte);
-          readAgain.unshift(...sequence.readAgain);
-          sequence.readAgain.fill(0);
+          answer.insert(byte);
+          giveBack(sequence.readAgain);
         }
       } else if (byte === KEY.ESCAPE) {
         if (more !== undefined && !(await more(ESCAPE_DELAY_MS))) {
           if (options.escapeGoesBack === true) {
-            moveToEnd();
-            options.onBack?.(displayWidthOf(line, 0, length), shown?.rowFromPrompt ?? 0);
+            answer.moveToEnd();
+            options.onBack?.(answer.columns, answer.rowFromPrompt);
             return undefined;
           }
           escapeIgnoredAt = Date.now();
@@ -824,218 +530,26 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
         }
         const sequence = await readEscapeSequence(take, more);
         if (sequence.kind === "sequence")
-          edit(editKeyOf(sequence.introducer, sequence.parameters, sequence.final));
-        else if (sequence.kind === "none") {
-          readAgain.unshift(...sequence.readAgain);
-          sequence.readAgain.fill(0);
-        }
-      } else if (byte === KEY.CTRL_A) {
-        moveTo(0);
-      } else if (byte === KEY.CTRL_E) {
-        moveTo(length);
-      } else if (byte === KEY.CTRL_K) {
-        if (cursor < length) remove(cursor, length);
-      } else if (byte === KEY.CTRL_W) {
-        if (cursor > 0) remove(previousWord(line, cursor), cursor);
+          answer.edit(editKeyOf(sequence.introducer, sequence.parameters, sequence.final));
+        else if (sequence.kind === "none") giveBack(sequence.readAgain);
+      } else if (answer.control(byte)) {
+        // Edited.
       } else if (byte === KEY.TAB) {
         // Tab completes a word where words are hinted; a pasted Tab between words or codes
         // separates them as a space does, and is shown as one.
-        if (hints !== undefined && !(more !== undefined && (await more(PASTE_GAP_MS))))
-          complete(hints);
-        else insert(KEY.SPACE);
-      } else if (byte >= KEY.SPACE) {
-        insert(byte);
-      }
+        const { hints } = answer;
+        if (hints !== undefined && (await quiet())) answer.complete(hints);
+        else answer.insert(KEY.SPACE);
+      } else if (byte >= KEY.SPACE) answer.insert(byte);
       // Any other control character is left out: shown, it would move the cursor.
     }
-    moveToEnd();
-    return STRICT_UTF8.decode(line.subarray(0, length));
+    answer.moveToEnd();
+    return answer.text();
   } catch (error) {
     if (error instanceof TypeError) throw new UnusableAnswerError(NOT_UTF8);
     throw error;
   } finally {
-    // Before the answer is wiped: its width says where the hint is.
-    shown?.clearHint(length);
-    line.fill(0);
+    answer.wipe();
     readAgain.fill(0);
   }
-}
-
-/**
- * The visible answer on the terminal, which wraps a long answer onto further rows. Every change
- * but typing at the end redraws the answer from its first row, with relative moves only, so that
- * it stays right when the screen scrolls. `cursorRow` is the row of the cursor below that first
- * row; the answer starts on it after the prompt. Positions are counted as a terminal places the
- * characters (placedAfter): a wide character that does not fit at the right edge goes whole to the
- * next row.
- */
-class ShownLine {
-  readonly #columns: number;
-  readonly #start: number;
-  /** The rows of the prompt above the row on which the answer starts. */
-  readonly #promptRows: number;
-  #cursorRow = 0;
-  /**
-   * The first `countedBytes` bytes of the answer are whole characters, after which the terminal
-   * has the cursor at `countedEnd`, counted in cells from the start of the answer's first row.
-   * Typing at the end counts on from them: counting the whole answer again for every key would
-   * make a long paste fall behind, and a macOS pseudo-terminal, which buffers about 1 KiB each
-   * way, then blocks both the terminal and this program. A redraw counts from the start.
-   */
-  #countedBytes = 0;
-  #countedEnd: number;
-  /** Whether a hint shows below the answer. */
-  #hintShown = false;
-  readonly #line: Buffer;
-
-  constructor(line: Buffer, promptWidth: number) {
-    this.#line = line;
-    this.#columns = terminalColumns();
-    this.#start = promptWidth % this.#columns;
-    this.#promptRows = Math.floor(promptWidth / this.#columns);
-    this.#countedEnd = this.#start;
-    // A prompt that ends at the right edge leaves the cursor waiting there; this settles it.
-    if (promptWidth > 0 && this.#start === 0) process.stderr.write("\r\n");
-  }
-
-  /** The row of the cursor counted from the first row of the prompt, as answerEndRow gives it. */
-  get rowFromPrompt(): number {
-    return this.#promptRows + this.#cursorRow;
-  }
-
-  /** Shows the answer of `length` bytes with the cursor at `cursor`; `typedAtEnd` only adds. */
-  update(length: number, cursor: number, typedAtEnd = false): void {
-    if (typedAtEnd) {
-      const end = this.#endOf(length);
-      process.stderr.write(this.#line.subarray(previousCharacter(this.#line, cursor), cursor));
-      this.#cursorRow = this.#settle(end);
-      return;
-    }
-    const out = process.stderr;
-    out.write(`${cursorUp(this.#cursorRow)}\r${cursorRight(this.#start)}${ERASE_BELOW}`);
-    // Erased with the answer: the next hint is drawn anew.
-    this.#hintShown = false;
-    out.write(this.#line.subarray(0, length));
-    this.#countedBytes = 0;
-    this.#countedEnd = this.#start;
-    const endRow = this.#settle(this.#endOf(length));
-    const target = this.#cellOf(cursor, length);
-    const row = Math.floor(target / this.#columns);
-    out.write(`${cursorUp(endRow - row)}\r${cursorRight(target % this.#columns)}`);
-    this.#cursorRow = row;
-  }
-
-  /**
-   * Shows `hint` below the answer of `length` bytes, in place of the one before, and puts the
-   * cursor back at `cursor`. The rows are written from the end of the answer with line breaks, so
-   * that the screen scrolls for them, and the cursor goes back up with relative moves.
-   */
-  showHint(hint: WordHint, length: number, cursor: number): void {
-    const rows = hintRows(hint, this.#columns);
-    if (rows.length === 0 && !this.#hintShown) return;
-    const end = this.#endOf(length);
-    const endRow = Math.floor(end / this.#columns);
-    // Typing at the end needs no count from the start (endOf).
-    const target = cursor === length ? end : this.#cellOf(cursor, length);
-    const below = rows.map((row) => `\r\n${row}`).join("");
-    process.stderr.write(
-      `${this.#toEnd(end)}${ERASE_BELOW}${below}` +
-        `${cursorUp(rows.length + endRow - this.#cursorRow)}\r${cursorRight(target % this.#columns)}`,
-    );
-    this.#hintShown = rows.length > 0;
-  }
-
-  /** Takes the hint off the screen, which leaves the cursor at the end of the answer. */
-  clearHint(length: number): void {
-    if (!this.#hintShown) return;
-    const end = this.#endOf(length);
-    process.stderr.write(`${this.#toEnd(end)}${ERASE_BELOW}`);
-    this.#cursorRow = Math.floor(end / this.#columns);
-    this.#hintShown = false;
-  }
-
-  /** The moves from the cursor to `end`, the cell after the answer. */
-  #toEnd(end: number): string {
-    return `${cursorDown(Math.floor(end / this.#columns) - this.#cursorRow)}\r${cursorRight(end % this.#columns)}`;
-  }
-
-  /**
-   * The cell of the character at `cursor`, where the cursor is shown on it: after the characters
-   * before it, or at the start of the next row for a wide one that the right edge pushed there.
-   * At the end of the answer, where the next character would go.
-   */
-  #cellOf(cursor: number, length: number): number {
-    const before = placedAfter(this.#line, 0, cursor, this.#start, this.#columns);
-    if (cursor === length) return before;
-    const end = nextCharacter(this.#line, cursor, length);
-    const after = placedAfter(this.#line, cursor, end, before, this.#columns);
-    return after - displayWidthOf(this.#line, cursor, end);
-  }
-
-  /**
-   * Where the terminal has the cursor after the first `length` bytes, counted on from the
-   * characters already counted. Only typing at the end adds bytes between two redraws, so what is
-   * counted stays as it was. A character not complete yet is counted the next time.
-   */
-  #endOf(length: number): number {
-    while (this.#countedBytes < length) {
-      const size = characterSize(defined(this.#line[this.#countedBytes]));
-      if (this.#countedBytes + size > length) break;
-      this.#countedEnd = placedAfter(
-        this.#line,
-        this.#countedBytes,
-        this.#countedBytes + size,
-        this.#countedEnd,
-        this.#columns,
-      );
-      this.#countedBytes += size;
-    }
-    return this.#countedEnd;
-  }
-
-  /**
-   * The row the cursor is on after writing up to `offset`. At the right edge a terminal waits
-   * before it wraps; a new line moves the cursor to where the next character would go.
-   */
-  #settle(offset: number): number {
-    if (offset > 0 && offset % this.#columns === 0) process.stderr.write("\r\n");
-    return Math.floor(offset / this.#columns);
-  }
-}
-
-/** Where the UTF-8 character before `position` starts: its continuation bytes, then its first. */
-function previousCharacter(line: Buffer, position: number): number {
-  let start = position;
-  while (start > 0 && isContinuation(defined(line[start - 1]))) start -= 1;
-  return Math.max(0, start - 1);
-}
-
-/** Where the UTF-8 character at `position` ends. */
-function nextCharacter(line: Buffer, position: number, length: number): number {
-  let end = position + 1;
-  while (end < length && isContinuation(defined(line[end]))) end += 1;
-  return Math.min(end, length);
-}
-
-/** The start of the word before `position`: back over spaces, then over the word. */
-function previousWord(line: Buffer, position: number): number {
-  let start = position;
-  while (start > 0 && line[start - 1] === KEY.SPACE) start -= 1;
-  while (start > 0 && line[start - 1] !== KEY.SPACE) start -= 1;
-  return start;
-}
-
-/** The end of the word after `position`: on over spaces, then over the word. */
-function nextWord(line: Buffer, position: number, length: number): number {
-  let end = position;
-  while (end < length && line[end] === KEY.SPACE) end += 1;
-  while (end < length && line[end] !== KEY.SPACE) end += 1;
-  return end;
-}
-
-/** Whether the bytes up to `length` end with a complete UTF-8 character. */
-function isCharacterEnd(line: Buffer, length: number): boolean {
-  let start = length - 1;
-  while (start > 0 && isContinuation(defined(line[start]))) start -= 1;
-  return length - start === characterSize(defined(line[start]));
 }

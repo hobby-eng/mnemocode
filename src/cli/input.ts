@@ -1,7 +1,8 @@
 import { terminalNotice } from "./terminal.js";
 import { askSecretUntil } from "./ask.js";
 import { choose } from "./terminal-choice.js";
-import { InputCancelledError, terminalAvailable } from "./terminal-input.js";
+import { terminalAvailable } from "./terminal-input.js";
+import { InputCancelledError } from "./terminal-keys.js";
 import {
   ENCODED_FORMATS,
   MASKING_MODES,

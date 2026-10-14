@@ -35,7 +35,8 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
 import { searchShareRepair } from "../src/cli/share-repair.js";
-import { InputCancelledError, watchForCtrlC, withCtrlCWatch } from "../src/cli/terminal-input.js";
+import { watchForCtrlC, withCtrlCWatch } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import { writeShare } from "../src/sskr/transport.js";
 
 const TEST_PHRASE =

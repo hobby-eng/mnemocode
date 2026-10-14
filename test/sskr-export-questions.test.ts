@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { runSskrExport, runSskrSplit } from "../src/cli/sskr-command.js";
-import { InputCancelledError } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import { unrepairedShare } from "../src/sskr/repair.js";
 import { ShareRestore, variantsMessage } from "../src/sskr/share-restore.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";

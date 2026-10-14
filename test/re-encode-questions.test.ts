@@ -49,7 +49,7 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
 
 import { NO_SUCH_LAST_WORD } from "../src/core/re-encoding.js";
 import { runReEncode } from "../src/cli/re-encode-command.js";
-import { InputCancelledError } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 
 // Public test data only: the BIP39 test phrase masked with 23-09-2026 by the Original Seedshift
 // with a valid last word, as word numbers, as `mnemocode encode --mode seedshift-legacy

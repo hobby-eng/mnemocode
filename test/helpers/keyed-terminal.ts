@@ -6,7 +6,7 @@
 // this module imports no module that a test replaces.
 
 import type * as ChildProcess from "node:child_process";
-import type { MoreWithin, NextByte } from "../../src/cli/terminal-input.js";
+import type { MoreWithin, NextByte } from "../../src/cli/terminal-keys.js";
 
 type ImageExport = typeof import("../../src/export/image-export.js");
 type Protection = typeof import("../../src/cli/protection.js");

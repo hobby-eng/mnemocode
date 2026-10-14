@@ -43,7 +43,7 @@ import {
   transformMode,
 } from "./input.js";
 import { terminalNotice } from "./terminal.js";
-import { InputCancelledError } from "./terminal-input.js";
+import { InputCancelledError } from "./terminal-keys.js";
 import { counting } from "../core/search-plan.js";
 import type { MaskingMode } from "../core/types.js";
 import { defined } from "../core/defined.js";

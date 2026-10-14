@@ -51,7 +51,7 @@ vi.mock("../src/sskr/joint-repair.js", async (importOriginal) => {
 });
 
 import { runSskrCombine, runSskrExport } from "../src/cli/sskr-command.js";
-import { InputCancelledError } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
 import { writeShare } from "../src/sskr/transport.js";
 

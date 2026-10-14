@@ -41,7 +41,7 @@ import { datesPrompt } from "../src/cli/input.js";
 
 /** The answer as typed: the secret questions take a reading of it, here none. */
 const typed = (answer: string) => answer;
-import { InputCancelledError } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 
 const TEST_PHRASE =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";

@@ -12,7 +12,7 @@ vi.mock("node:tty", async (importOriginal) => ({
 
 import { clearPrivateScreen, withPrivateScreen } from "../src/cli/private-screen.js";
 import { waitForEnter } from "../src/cli/terminal-choice.js";
-import { InputCancelledError } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 
 const ENTER = "\r";
 const ESCAPE = "\x1b";

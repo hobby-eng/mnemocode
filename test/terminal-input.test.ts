@@ -1,13 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  dropTypedAhead,
-  InputCancelledError,
-  readKey,
-  readLine,
-  type Key,
-  type MoreWithin,
-  type NextByte,
-} from "../src/cli/terminal-input.js";
+import { dropTypedAhead, readKey, readLine, type Key } from "../src/cli/terminal-input.js";
+import { InputCancelledError, type MoreWithin, type NextByte } from "../src/cli/terminal-keys.js";
 import { rowsOfOutputLine } from "../src/cli/terminal-geometry.js";
 
 /** The bytes of `text` as a terminal in raw mode delivers them, then the end of the input. */

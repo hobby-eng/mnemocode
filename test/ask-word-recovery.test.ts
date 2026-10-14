@@ -70,7 +70,7 @@ vi.mock("../src/export/private-file.js", async (importOriginal) => {
 import { decryptCandidates } from "../src/core/candidate-encryption.js";
 import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
-import { InputCancelledError } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
 import { matching } from "./helpers/matchers.js";
 

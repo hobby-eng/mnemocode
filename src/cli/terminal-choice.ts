@@ -11,13 +11,12 @@ import {
   dropTypedAhead,
   readKey,
   readLine,
-  UnusableAnswerError,
   withRawTerminal,
   refusal,
-  type NextByte,
   ESCAPE_ALIASES,
   NOT_UTF8,
 } from "./terminal-input.js";
+import { UnusableAnswerError, type NextByte } from "./terminal-keys.js";
 import {
   answerEndRow,
   displayWidth,

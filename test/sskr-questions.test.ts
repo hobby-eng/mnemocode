@@ -7,7 +7,7 @@ import type { ParsedArguments } from "../src/cli/arguments.js";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
 import { runSskrCombine } from "../src/cli/sskr-command.js";
-import { InputCancelledError } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import { JointRepair } from "../src/sskr/joint-repair.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";

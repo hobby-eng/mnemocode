@@ -11,7 +11,7 @@ import { warnOfCloudCopy } from "./cloud-folders.js";
 import { discardRenamedOutput } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { terminalNotice } from "./terminal.js";
-import { InputCancelledError } from "./terminal-input.js";
+import { InputCancelledError } from "./terminal-keys.js";
 import { lowerFirst } from "../core/prose.js";
 import { describeError } from "../core/refusal.js";
 import { LeftStagingCopyError } from "../export/private-file.js";

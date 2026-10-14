@@ -59,7 +59,7 @@ import {
 } from "./re-encode-options.js";
 import { readmeLink, terminalNotice, terminalPart, type NoticeKind } from "./terminal.js";
 import { waitForEnter, type Choice, type Explanation } from "./terminal-choice.js";
-import { InputCancelledError } from "./terminal-input.js";
+import { InputCancelledError } from "./terminal-keys.js";
 import { defined } from "../core/defined.js";
 
 /** The options of the old backup by Decode's names, and those of the new one by Encode's. */

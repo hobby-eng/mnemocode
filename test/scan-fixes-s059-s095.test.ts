@@ -91,7 +91,8 @@ import {
   cursorUp,
   cursorRight,
 } from "../src/cli/terminal.js";
-import { NOT_UTF8, InputCancelledError } from "../src/cli/terminal-input.js";
+import { NOT_UTF8 } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import {
   isUnusableOutputPath,
   validateOutputPaths,
