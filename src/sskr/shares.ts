@@ -4,7 +4,8 @@
 // JointRepair (joint-repair.ts).
 
 import { assertSskrSelfTest } from "./self-test.js";
-import { planJointRepair, type JointPlan, type RepairedSet } from "./joint-repair.js";
+import { planJointRepair, type JointPlan } from "./joint-repair.js";
+import { type RepairedSet } from "./joint-results.js";
 import { ShareSet } from "./share-set.js";
 // The Node.js platform and randomness that the functions below pass to the share modules.
 import { nodeFillRandom, nodeSharePlatform } from "./share-platform-node.js";

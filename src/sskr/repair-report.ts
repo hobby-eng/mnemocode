@@ -11,9 +11,9 @@
 // own style (the command line: a status line, a grey hint, a warning, a README link).
 
 import { asksFirst } from "../core/search-turns.js";
-import type { JointAssessment } from "./joint-repair.js";
+import type { JointAssessment } from "./joint-results.js";
 import { CORRECT_WRITTEN_COPY, counted, counting, duration } from "../core/search-plan.js";
-import type { RepairedShares } from "./joint-repair.js";
+import type { RepairedShares } from "./joint-results.js";
 import { placeOf } from "../core/places.js";
 
 /** The refusal when the search of marked shares found no phrase. */

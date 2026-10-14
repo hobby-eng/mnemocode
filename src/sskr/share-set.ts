@@ -16,13 +16,8 @@ import { representMnemonic } from "../core/seedshift.js";
 import { wordCountOfEntropy, WORD_NUMBERS_SPAN } from "../core/bip39-sizes.js";
 import { fingerprintOfValidPhrase } from "../core/english-words.js";
 import type { EncodedFormat } from "../core/types.js";
-import {
-  JointRepair,
-  type MarkedElement,
-  type RepairedSet,
-  searchOnce,
-  type RepairedShares,
-} from "./joint-repair.js";
+import { JointRepair, searchOnce } from "./joint-repair.js";
+import { type MarkedElement, type RepairedSet, type RepairedShares } from "./joint-results.js";
 import type { ReadRepairableShare } from "./repair.js";
 import { NO_PHRASE_FITS } from "./repair-report.js";
 import type { SharePlatform } from "./share-platform.js";

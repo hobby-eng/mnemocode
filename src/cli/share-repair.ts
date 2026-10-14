@@ -6,11 +6,8 @@
 // them, the library decides (src/sskr/share-input.ts, share-set.ts, repair-report.ts,
 // joint-repair.ts, share-unmasking.ts).
 
-import {
-  MAX_REPAIR_COMBINATIONS,
-  type RepairedSet,
-  type RepairedShares,
-} from "../sskr/joint-repair.js";
+import { MAX_REPAIR_COMBINATIONS } from "../sskr/joint-repair.js";
+import { type RepairedSet, type RepairedShares } from "../sskr/joint-results.js";
 import {
   REPAIR_NOTES,
   RepairReport,

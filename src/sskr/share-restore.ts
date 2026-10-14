@@ -29,13 +29,8 @@ import {
 } from "../core/date-search.js";
 import { Masking } from "../core/masking.js";
 import type { WalletCheck } from "../core/wallet-check.js";
-import {
-  JointRepair,
-  searchOnce,
-  type JointPlan,
-  type RepairedSet,
-  type RepairedShares,
-} from "./joint-repair.js";
+import { JointRepair, searchOnce, type JointPlan } from "./joint-repair.js";
+import { type RepairedSet, type RepairedShares } from "./joint-results.js";
 import {
   NO_PHRASE_FITS,
   RepairReport,

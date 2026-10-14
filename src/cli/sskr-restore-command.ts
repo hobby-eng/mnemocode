@@ -41,7 +41,7 @@ import { DatesAnswer, MAX_SHOWN_MATCHES } from "../core/date-search.js";
 import { DATE_COUNT_WORDS, Masking, PHRASE_WORDS, type SplitMode } from "../core/masking.js";
 import { masterFingerprint, walletCheckOf, type WalletEvidence } from "../bitcoin-evidence.js";
 import { assertSskrSelfTest } from "../sskr/self-test.js";
-import type { RepairedSet } from "../sskr/joint-repair.js";
+import type { RepairedSet } from "../sskr/joint-results.js";
 import { NO_PHRASE_FITS, type DateWork } from "../sskr/repair-report.js";
 import { ShareSet } from "../sskr/share-set.js";
 import { ShareUnmasking } from "../sskr/share-unmasking.js";

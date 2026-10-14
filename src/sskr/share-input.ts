@@ -14,12 +14,8 @@
 import { phraseChecksumValid, phraseOfIndexes } from "../core/english-words.js";
 import { placesInWords } from "../core/places.js";
 import { detectInputFormats, parseInput } from "../core/representations.js";
-import {
-  type JointAssessment,
-  type RepairedSet,
-  jointMarkLimitProblem,
-  type RepairedShares,
-} from "./joint-repair.js";
+import { jointMarkLimitProblem } from "./joint-repair.js";
+import { type JointAssessment, type RepairedSet, type RepairedShares } from "./joint-results.js";
 import {
   markProblem,
   readRepairableShare,

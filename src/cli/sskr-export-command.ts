@@ -35,7 +35,7 @@ import {
   restorePhrases,
   typedShares,
 } from "./sskr-restore-command.js";
-import type { RepairedSet, RepairedShares } from "../sskr/joint-repair.js";
+import type { RepairedSet, RepairedShares } from "../sskr/joint-results.js";
 import { defined } from "../core/defined.js";
 
 /**

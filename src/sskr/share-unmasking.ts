@@ -20,7 +20,7 @@ import {
 import { EncodedBackup } from "../core/encoded-backup.js";
 import { Masking, type SplitMode } from "../core/masking.js";
 import { askWallet, type WalletCheck } from "../core/wallet-check.js";
-import type { RepairedSet } from "./joint-repair.js";
+import type { RepairedSet } from "./joint-results.js";
 import type { DateWork } from "./repair-report.js";
 import { Redacted } from "../core/redacted.js";
 import { BIP39_WORD_COUNTS } from "../core/bip39-sizes.js";

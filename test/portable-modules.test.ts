@@ -159,7 +159,7 @@ const PARTS: Readonly<Record<string, Part>> = {
   // set, the shares as typed, and the phrases that restored sets give with their dates.
   "src/sskr/transport.ts": { uses: [] },
   "src/sskr/joint-repair.ts": { uses: ["src/sskr/share-platform.ts", "src/sskr/transport.ts"] },
-  "src/sskr/repair-report.ts": { uses: ["src/sskr/joint-repair.ts"] },
+  "src/sskr/repair-report.ts": { uses: ["src/sskr/transport.ts"] },
   "src/sskr/split.ts": {
     uses: ["src/core/masking.ts", "src/sskr/share-platform.ts", "src/sskr/transport.ts"],
   },
@@ -171,8 +171,8 @@ const PARTS: Readonly<Record<string, Part>> = {
     uses: [
       "src/core/date-search.ts",
       "src/core/encoded-backup.ts",
-      "src/sskr/joint-repair.ts",
       "src/sskr/repair-report.ts",
+      "src/sskr/transport.ts",
     ],
   },
   // What a backup can be made of, and the check of a backup written down.

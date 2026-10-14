@@ -44,6 +44,8 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 | `sskr/repair-models.ts`       | The ways to read a marked share as units of one form, each element whole, in part or marked  |
 | `sskr/repair-units.ts`        | The digits and marks of a share's units, and the structures of its bytes that a count allows |
 | `sskr/joint-repair.ts`        | Solves marked shares of one set together; the digest search over what is open                |
+| `sskr/joint-solve.ts`         | One reading of every marked share, its equations, and each solved way to read the shares     |
+| `sskr/joint-results.ts`       | What a joint repair tells: each share alone, the shares together, the sets they restore      |
 | `sskr/gf2.ts`                 | Elimination over GF(2), with bit vectors in bigints                                          |
 | `sskr/gf256.ts`               | GF(256) arithmetic and Lagrange coefficients, as bc-shamir uses them                         |
 | `sskr/self-test.ts`           | Checks the published grouped vector                                                          |
@@ -181,11 +183,11 @@ The parts use each other in one direction only, from features to the services an
 - `core/candidate-list-writer` uses `core/candidate-list` and `core/candidate-encryption`.
 - `sskr/transport` uses no other part.
 - `sskr/joint-repair` uses `sskr/share-platform` and `sskr/transport`.
-- `sskr/repair-report` uses `sskr/joint-repair`.
+- `sskr/repair-report` uses `sskr/transport`.
 - `sskr/split` uses `core/masking`, `sskr/share-platform` and `sskr/transport`.
 - `sskr/share-set` uses `sskr/joint-repair`, `sskr/repair-report` and `sskr/transport`.
 - `sskr/share-input` uses `sskr/share-set`.
-- `sskr/share-unmasking` uses `core/date-search`, `core/encoded-backup`, `sskr/joint-repair` and `sskr/repair-report`.
+- `sskr/share-unmasking` uses `core/date-search`, `core/encoded-backup`, `sskr/repair-report` and `sskr/transport`.
 - `core/backup-options` uses `core/masking` and `sskr/split`.
 - `core/backup-check` uses `core/backup-reading`, `core/date-search`, `core/encoded-backup`, `sskr/share-set` and `sskr/share-input`.
 - `sskr/share-restore` uses `core/date-search`, `core/encoded-backup`, `core/masking`, `sskr/joint-repair`, `sskr/repair-report`, `sskr/share-input`, `sskr/share-set`, `sskr/share-unmasking` and `sskr/transport`.

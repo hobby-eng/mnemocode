@@ -10,7 +10,7 @@ export {
   restoreShareSet,
   validateThreshold,
 } from "./shares.js";
-export type { RepairedSet } from "./joint-repair.js";
+export type { RepairedSet } from "./joint-results.js";
 export {
   normalizeShare,
   shareToColors,
