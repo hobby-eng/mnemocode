@@ -1,12 +1,16 @@
 name: CI
 
+# A push or a pull request runs the fast checks only (CI-04): format, pnpm check, the build, the
+# startup self-test and the pseudo-terminal check on Linux, Windows and macOS. The whole suite, the
+# card round trip, the SSKR vector replay and the dependency audit run for a release tag, which the
+# executable workflow calls this one for, and on manual dispatch.
 on:
   # A tag gets this check through the executable workflow, not a second time here.
   push:
     branches: ["**"]
   pull_request:
-  # The executable workflow runs this whole check before it publishes a release.
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,29 +24,40 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    env:
+      FULL: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       # Poppler before the tests: without it the card tests that rasterize PDFs are skipped.
-      - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends poppler-utils
+      - if: env.FULL == 'true'
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends poppler-utils
       # Clippy and rustfmt for the SSKR engine's crate in pnpm check (RUST-02), at the version of its
       # rust-toolchain.toml and its container (scripts/verify-toolchain.mjs).
       - run: rustup toolchain install 1.99.0 --profile minimal --component clippy,rustfmt
-      # The same checks as a release's (package.json verify), so that a check added there runs here.
-      - run: pnpm verify
+      # The fast gates of CORE-43 on a push; a release's checks (package.json verify) otherwise.
+      - if: env.FULL != 'true'
+        run: pnpm format:check && pnpm check && pnpm build
+      - if: env.FULL == 'true'
+        run: pnpm verify
+      - run: node dist/mnemocode.js self-test
       - name: Drive the menu and the hidden prompts in a pseudo-terminal
         timeout-minutes: 10
         uses: ./.github/actions/terminal-input
       # A real PDF-to-image-to-QR round trip of the card and SSKR exports, with public data only.
-      - run: node scripts/check-card-output.mjs output/card-output-check
+      - if: env.FULL == 'true'
+        run: node scripts/check-card-output.mjs output/card-output-check
       # The SSKR vectors restored without the share engine that the known answers check.
-      - run: python3 scripts/verify-sskr-known-answers.py
-      - run: pnpm audit --audit-level high
+      - if: env.FULL == 'true'
+        run: python3 scripts/verify-sskr-known-answers.py
+      - if: env.FULL == 'true'
+        run: pnpm audit --audit-level high
 
-  # The command line and the library on Windows and macOS. Poppler is not installed here, so the card
-  # tests that rasterize PDFs are skipped; the Linux job runs them.
+  # The command line and the library on Windows and macOS: on a push the build, the startup
+  # self-test and the pseudo-terminal check; the whole suite for a release. Poppler is not installed
+  # here, so the card tests that rasterize PDFs are skipped; the Linux job runs them.
   portable:
     strategy:
       fail-fast: false
@@ -50,13 +65,17 @@ jobs:
         os: [windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      FULL: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - run: pnpm build
-      - run: pnpm test
+      - run: node dist/mnemocode.js self-test
+      - if: env.FULL == 'true'
+        run: pnpm test
       - name: Drive the menu and the hidden prompts in a pseudo-terminal
         timeout-minutes: 10
         uses: ./.github/actions/terminal-input

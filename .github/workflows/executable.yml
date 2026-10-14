@@ -7,11 +7,10 @@ name: Executable
 # written next to each of them and SHA256SUMS in a draft GitHub release, which the owner signs and
 # publishes (docs/RELEASING.md).
 
+# Three builds on three systems are no fast check (CI-04): a release tag and manual dispatch only.
 on:
   push:
-    branches: [main]
     tags: ["v*"]
-  pull_request:
   workflow_dispatch:
 
 permissions:

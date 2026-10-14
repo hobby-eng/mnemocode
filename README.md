@@ -1,7 +1,7 @@
 # MnemoCode
 
 [![CI](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml)
-[![Executable](https://github.com/hobby-eng/mnemocode/actions/workflows/executable.yml/badge.svg?branch=main)](https://github.com/hobby-eng/mnemocode/actions/workflows/executable.yml)
+[![Executable](https://github.com/hobby-eng/mnemocode/actions/workflows/executable.yml/badge.svg)](https://github.com/hobby-eng/mnemocode/actions/workflows/executable.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Build provenance: GitHub attestations](https://img.shields.io/badge/build%20provenance-GitHub%20attestations-2ea44f)](https://github.com/hobby-eng/mnemocode/attestations)
 
