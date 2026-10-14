@@ -198,6 +198,10 @@ export class TypedAnswer {
     this.#shown?.clearHint(this.#length);
     this.#line.fill(0);
   }
+
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
 }
 
 /**

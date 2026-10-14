@@ -327,6 +327,14 @@ export class AssessmentSecrets {
     for (const array of this.#made) if (!keep.has(array)) array.fill(0);
     this.#made.clear();
   }
+  /** Wipes every array made, when no search keeps any (TS-07). */
+  wipe(): void {
+    this.wipeAllBut([]);
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
 }
 
 /** Rows that hold for every reading of a set of one group: one group, and the same metadata. */

@@ -500,6 +500,10 @@ export class ReadingSpace {
   wipe(): void {
     for (const array of this.secretArrays()) array.fill(0);
   }
+
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
 }
 
 /**

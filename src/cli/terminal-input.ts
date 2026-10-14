@@ -145,10 +145,14 @@ class ByteQueue {
   }
 
   /** Wipes and forgets every byte. */
-  clear(): void {
+  wipe(): void {
     this.#bytes.fill(0);
     this.#bytes.length = 0;
     this.#head = 0;
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
@@ -184,7 +188,7 @@ const keyBytesAgain: number[] = [];
 /** Wipes and forgets the bytes typed ahead; true when Ctrl+C was among them. */
 function wipeTypedAhead(): boolean {
   const cancelled = typedAhead.includes(KEY.CTRL_C) || keyBytesAgain.includes(KEY.CTRL_C);
-  typedAhead.clear();
+  typedAhead.wipe();
   keyBytesAgain.fill(0);
   keyBytesAgain.length = 0;
   return cancelled;
@@ -278,10 +282,15 @@ export async function withRawTerminal<T>(
   try {
     return await body(next, moreWithin);
   } finally {
-    rawSessions -= 1;
     input.off("data", receive);
     input.off("end", end);
-    await leaveRawMode(input);
+    try {
+      await leaveRawMode(input);
+    } finally {
+      // Only once raw mode is left: a session that dropTypedAhead starts meanwhile would read a
+      // terminal whose mode is being changed under it.
+      rawSessions -= 1;
+    }
   }
 }
 

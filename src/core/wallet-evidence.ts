@@ -261,7 +261,7 @@ export class WalletEvidenceCheck {
    * before any secret is asked. Needs no seed phrase.
    */
   assert(evidence: WalletEvidence): void {
-    evidenceOf(evidence, this.#coins);
+    evidenceOf(evidence, this.#coins).wipe();
   }
 
   /**
@@ -270,12 +270,16 @@ export class WalletEvidenceCheck {
    */
   match(mnemonic: string, evidence: WalletEvidence, passphrase = ""): EvidenceMatch {
     const expected = evidenceOf(evidence, this.#coins);
-    return this.#seed.withRoot(
-      mnemonic,
-      passphrase,
-      (root) => expected.compare(root),
-      versionsOf(expected.network),
-    );
+    try {
+      return this.#seed.withRoot(
+        mnemonic,
+        passphrase,
+        (root) => expected.compare(root),
+        versionsOf(expected.network),
+      );
+    } finally {
+      expected.wipe();
+    }
   }
 
   /** The same as match, with a PBKDF2 that may answer later. */
@@ -285,12 +289,16 @@ export class WalletEvidenceCheck {
     passphrase = "",
   ): Promise<EvidenceMatch> {
     const expected = evidenceOf(evidence, this.#coins);
-    return this.#seed.withRootLater(
-      mnemonic,
-      passphrase,
-      (root) => expected.compare(root),
-      versionsOf(expected.network),
-    );
+    try {
+      return await this.#seed.withRootLater(
+        mnemonic,
+        passphrase,
+        (root) => expected.compare(root),
+        versionsOf(expected.network),
+      );
+    } finally {
+      expected.wipe();
+    }
   }
 
   /** The standard four-byte BIP32 master fingerprint as lowercase hexadecimal. */
@@ -357,7 +365,7 @@ function bitcoinAddressOn(value: string, network: BitcoinNetworkName): CoinAddre
  * WalletEvidenceCheck's `assert` takes its own. Needs no seed phrase.
  */
 export function assertWalletEvidence(evidence: WalletEvidence, coins: readonly Coin[]): void {
-  evidenceOf(evidence, new CoinList(coins));
+  evidenceOf(evidence, new CoinList(coins)).wipe();
 }
 
 /** One piece of evidence, refused when it is built unless some wallet can match it. */
@@ -366,6 +374,8 @@ interface Evidence {
   readonly network: BitcoinNetworkName;
   /** The comparison with the wallet whose master key is `root`; wipes every key it derives. */
   compare(root: HDKey): EvidenceMatch;
+  /** Wipes the secret that the evidence holds, a WIF's key (TS-07); public evidence holds none. */
+  wipe(): void;
 }
 
 /**
@@ -470,6 +480,9 @@ class MasterFingerprintEvidence implements Evidence {
     const derived = fingerprintOfKey(root);
     return { ...fingerprintMatch(derived, this.#expected), kind: "master-fingerprint", derived };
   }
+
+  /** Holds no secret: nothing to wipe. */
+  wipe(): void {}
 }
 
 /** The master extended public key, in any of its forms: only the key itself is compared. */
@@ -491,6 +504,9 @@ class MasterKeyEvidence implements Evidence {
       path: MASTER_KEY_PATH,
     };
   }
+
+  /** Holds no secret: nothing to wipe. */
+  wipe(): void {}
 }
 
 type LocatedBitcoinEvidence = Exclude<
@@ -544,6 +560,9 @@ abstract class LocatedEvidence implements Evidence {
     }
     return { matched: false, kind: this.#kind };
   }
+
+  /** A public key, address or account key: nothing to wipe; a WIF wipes its key. */
+  wipe(): void {}
 
   /** The derived value to show when `node`, in `profile`, is the key of the evidence. */
   protected abstract derivedFrom(
@@ -606,16 +625,16 @@ class PublicKeyEvidence extends LocatedEvidence {
 }
 
 /**
- * A WIF private key, given as its value. Only the text is kept: its key is decoded for each
- * comparison and wiped at once, as the derived key it is compared with.
+ * A WIF private key, given as its value. Its key is decoded into bytes at once and the text is not
+ * kept (TS-07); the owner of the evidence wipes the key (WalletEvidenceCheck), as each derived key
+ * it is compared with is wiped at once.
  */
 class WifEvidence extends LocatedEvidence {
-  readonly #value: string;
+  readonly #key: Uint8Array;
 
   constructor(evidence: Extract<BitcoinEvidence, { kind: "wif" }>) {
     super(evidence, "address");
-    this.#value = evidence.value;
-    wifKey(this.#value, this.network).fill(0);
+    this.#key = wifKey(evidence.value, this.network);
   }
 
   protected derivedFrom(node: HDKey) {
@@ -623,15 +642,21 @@ class WifEvidence extends LocatedEvidence {
     const derivedKey = node.privateKey;
     if (derivedKey === null)
       throw new Error("Unable to derive the private key for WIF comparison.");
-    const expected = wifKey(this.#value, this.network);
     try {
-      return equalBytes(derivedKey, expected)
+      return equalBytes(derivedKey, this.#key)
         ? WIF(networkParameters(this.network)).encode(derivedKey)
         : undefined;
     } finally {
-      expected.fill(0);
       derivedKey.fill(0);
     }
+  }
+
+  override wipe(): void {
+    this.#key.fill(0);
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
@@ -670,6 +695,9 @@ class CoinEvidence implements Evidence {
   compare(root: HDKey): EvidenceMatch {
     return { ...this.#comparison.compare(root), kind: "coin-address" };
   }
+
+  /** Holds no secret: nothing to wipe. */
+  wipe(): void {}
 }
 
 function assertNetwork(network: BitcoinNetworkName): void {
