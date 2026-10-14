@@ -91,6 +91,9 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 | `cli/screen-fit.ts`       | Whether a result fits on the private screen, which keeps no scrollback          |
 | `cli/terminal-style.ts`   | The palette and the colour rule, which the release-signing script also takes    |
 | `cli/save-retry.ts`       | A save that fails on the private screen: try again, another name, or skip       |
+| `cli/encode-questions.ts` | The questions of a new backup: its form, Seedshift, shares and where it goes    |
+| `cli/card-questions.ts`   | The questions of a backup's printable cards: design, layout, files and details  |
+| `cli/output-questions.ts` | The files and folders that those answers name, each checked and claimed once    |
 | `cli/menu-entries.ts`     | The entries of the start menu, by which every message and the sheet name them   |
 | `cli/backup-questions.ts` | The encoded seed phrase and its mode on the screen, checked before the dates    |
 | `cli/date-search.ts`      | The dates on the screen, the search, and what follows it                        |

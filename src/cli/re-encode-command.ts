@@ -46,7 +46,8 @@ import {
   type AfterDecoded,
 } from "./decode-command.js";
 import { prepareEncode, type PreparedEncode } from "./encode-command.js";
-import { askEncoding, forgetClaimedOutputs } from "./encode-questions.js";
+import { askEncoding } from "./encode-questions.js";
+import { forgetClaimedOutputs } from "./output-questions.js";
 import { CHECKSUM_INVALID, reportOriginalFingerprint } from "./fingerprint-report.js";
 import { settleOutputPaths } from "./output-paths.js";
 import { clearPrivateScreen, showProtection } from "./private-screen.js";

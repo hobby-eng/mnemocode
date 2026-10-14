@@ -73,19 +73,17 @@ import {
   RECORD_FILE,
   SEEDSHIFT_EXPLANATION,
   VARIANT_EXPLANATION,
-  askDesign,
   askEncoding,
   askHeirSheet,
-  askOutputFile,
   askSeedshift,
   askShareSet,
   askShares,
   example,
-  forgetClaimedOutputs,
-  inputFile,
   sampleOf,
   type Mode,
 } from "./encode-questions.js";
+import { askDesign } from "./card-questions.js";
+import { askOutputFile, forgetClaimedOutputs, inputFile } from "./output-questions.js";
 import { defined } from "../core/defined.js";
 
 /** The menu reads keys from a terminal and draws on one; anything else gets the help instead. */
