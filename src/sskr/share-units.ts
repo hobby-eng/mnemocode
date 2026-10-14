@@ -28,6 +28,7 @@ export const SHARE_FORMATS = Object.freeze([
   "colors",
   "colors-unicode",
 ] as const);
+/** A form that a share is written in (SHARE_FORMATS). */
 export type ShareFormat = (typeof SHARE_FORMATS)[number];
 
 /** What the UR of a share starts with (BCR-2020-005), before its bytewords. */

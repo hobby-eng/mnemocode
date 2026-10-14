@@ -22,10 +22,10 @@ import {
   SCRYPT_LOG_N,
   type ListFileLock,
 } from "./candidate-file-admission.js";
-import { CandidateFileRefused } from "./candidate-file-refusal.js";
+import { CandidateFileRefusedError } from "./candidate-file-refusal.js";
 
 // Keep the existing import paths valid for hosts that already use this module.
-export { CandidateFileRefused, type CandidateFileProblem } from "./candidate-file-refusal.js";
+export { CandidateFileRefusedError, type CandidateFileProblem } from "./candidate-file-refusal.js";
 export { SCRYPT_LOG_N, type ListFileLock } from "./candidate-file-admission.js";
 
 /** An X25519 recipient: "age1", then 58 Bech32 characters (age-encryption.org/v1). */
@@ -152,7 +152,7 @@ export async function decryptCandidates(
     } catch {
       // The decoder includes a malformed private identity in its error. Neither that diagnostic
       // nor its cause may reach a host's UI, inspection or logging.
-      throw new CandidateFileRefused("key", "This Scanner key is not a valid age identity.");
+      throw new CandidateFileRefusedError("key", "This Scanner key is not a valid age identity.");
     }
   } else decrypter.addPassphrase(key.passphrase);
   // Given bytes, age reads its output through a fetch Response, and a browser replaces any error
@@ -165,7 +165,7 @@ export async function decryptCandidates(
     stream = await decrypter.decrypt(streamOf(file));
   } catch (error) {
     const what = given === "key" ? "This Scanner key" : "This passphrase";
-    throw new CandidateFileRefused(
+    throw new CandidateFileRefusedError(
       "key",
       `${what} does not open the candidate file, or its header is damaged (${describeError(error)}).`,
       error,
@@ -174,9 +174,9 @@ export async function decryptCandidates(
   try {
     return await CandidateFileAdmission.readPlaintext(stream);
   } catch (error) {
-    if (error instanceof CandidateFileRefused) throw error;
+    if (error instanceof CandidateFileRefusedError) throw error;
     // The contents: every chunk carries its own tag, so a changed or cut file fails here.
-    throw new CandidateFileRefused(
+    throw new CandidateFileRefusedError(
       "damaged",
       `The candidate file is damaged (${describeError(error)}).`,
       error,

@@ -4,8 +4,13 @@ import { capitalized } from "../core/prose.js";
 
 /** Print layout is independent of the visual template and the encoded format. */
 export const CARD_PAGE_SIZES = Object.freeze(["a6", "a5", "a4", "business"] as const);
+/**
+ * A page size of cards: a sheet size, or the business size of a separate card (CARD_PAGE_SIZES).
+ */
 export type CardPageSize = (typeof CARD_PAGE_SIZES)[number];
+/** The orientations of a sheet of cards. */
 export const CARD_ORIENTATIONS = Object.freeze(["portrait", "landscape"] as const);
+/** An orientation of a sheet of cards (CARD_ORIENTATIONS). */
 export type CardOrientation = (typeof CARD_ORIENTATIONS)[number];
 /** The details of the person on the cards, in the order a host asks for them. */
 export const profileFields = [
@@ -17,11 +22,13 @@ export const profileFields = [
   "website",
   "location",
 ] as const;
+/** A detail of the person on the cards (profileFields). */
 export type ProfileField = (typeof profileFields)[number];
 /** How a detail of the person is named to the person and in a refusal: its field, capitalized. */
 export function profileFieldLabel(field: ProfileField): string {
   return capitalized(field);
 }
+/** The details of the person on the cards, each optional. */
 export type CardProfile = Readonly<Partial<Record<ProfileField, string>>>;
 
 /**
@@ -35,8 +42,15 @@ export const COPY_FIELDS = Object.freeze([
   "footer",
   "referenceLabel",
 ] as const);
+/** A text of a card design besides the person's details (COPY_FIELDS). */
 export type CopyField = (typeof COPY_FIELDS)[number];
+/** Every text of a card design besides the person's details. */
 export type CardPresentation = Readonly<Record<CopyField, string>>;
+/**
+ * How cards are printed: the page size and orientation, the person's details, the texts of the
+ * design, and whether a sheet carries its QR code. A size or orientation left undefined is chosen
+ * by the plan.
+ */
 export interface CardSettings {
   readonly pageSize?: CardPageSize | undefined;
   readonly orientation?: CardOrientation | undefined;
@@ -182,6 +196,10 @@ export function cardText(text: unknown, label: string, blankEnding: string): str
   return text.trim().normalize("NFC");
 }
 
+/**
+ * The details of the person, each trimmed and in NFC; refuses a detail that is empty, on more than
+ * one line, too long or holds a control character, and a name not in Latin letters.
+ */
 export function validateProfile(profile: CardProfile = {}): CardProfile {
   const result: Record<string, string> = {};
   for (const field of profileFields) {

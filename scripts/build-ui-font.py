@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build the distributable DejaVu Sans subset that cards and sheets print their text with."""
+"""Build the distributable DejaVu Sans subset that cards and sheets print their text with.
+
+It needs fontTools, installed with
+    python3 -m pip install --require-hashes -r scripts/build-ui-font-requirements.txt
+"""
 
 from pathlib import Path
 

@@ -43,6 +43,10 @@ import { codeColors } from "./card-palette.js";
 import { ownCards } from "./card-decoys.js";
 import { withPlannedDecoys, type SheetShaper } from "./card-plan.js";
 
+/**
+ * How the cards of shares are drawn: the design, the layout, unless the page size decides it, and
+ * the card settings.
+ */
 export interface SskrRenderOptions extends CardSettings {
   readonly style: CardStyle;
   /** Omitted: decided by the page size. */

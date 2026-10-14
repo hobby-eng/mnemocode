@@ -17,8 +17,11 @@ import { inWholeRange, wholeNumbersFrom } from "./typed-number.js";
 export const QUESTION_HOURS = 12;
 /** Seconds in a minute, an hour and a day: the units that search times are limited and said in. */
 export const SECONDS_PER_MINUTE = 60;
+/** Seconds in an hour. */
 export const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
+/** Seconds in a day. */
 export const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
+/** QUESTION_HOURS in seconds: a search expected to take longer is asked for first. */
 export const QUESTION_SECONDS = QUESTION_HOURS * SECONDS_PER_HOUR;
 
 /**

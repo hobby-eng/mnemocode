@@ -5,7 +5,7 @@
 import { base64nopad } from "@scure/base";
 import { wipeAll } from "./bits.js";
 import { MAX_CANDIDATE_LIST_BYTES, OpenedCandidateList } from "./candidate-list.js";
-import { assertCandidateFileSize, CandidateFileRefused } from "./candidate-file-refusal.js";
+import { assertCandidateFileSize, CandidateFileRefusedError } from "./candidate-file-refusal.js";
 
 /** More than any supported single-stanza binary age header needs. */
 const MAX_HEADER_BYTES = 64 * 1024;
@@ -27,7 +27,9 @@ const AGE_FIRST_LINE = "age-encryption.org/v1";
 const MAC_LINE_START = "--- ";
 const STANZA_LINE_START = "-> ";
 const LOCK_STANZAS = Object.freeze({ key: "X25519", passphrase: "scrypt" });
+/** How an encrypted list file is locked: with an age key (X25519) or with a passphrase (scrypt). */
 export type ListFileLock = keyof typeof LOCK_STANZAS;
+/** The form of a candidate file: the plain list, or the list encrypted with age. */
 export type CandidateFileForm = "plaintext" | "age";
 
 const PARAMETERS = Object.freeze({
@@ -54,7 +56,11 @@ export class CandidateFileAdmission {
     if (form === "plaintext") OpenedCandidateList.assertSize(size);
     else if (form === "age")
       assertCandidateFileSize(size, PARAMETERS.encryptedBytes, "encrypted candidate file");
-    else throw new CandidateFileRefused("unsupported", "The candidate file form is not supported.");
+    else
+      throw new CandidateFileRefusedError(
+        "unsupported",
+        "The candidate file form is not supported.",
+      );
   }
 
   /**
@@ -68,7 +74,7 @@ export class CandidateFileAdmission {
     const prefix = await readPrefix(length);
     try {
       if (prefix.byteLength !== length)
-        throw new CandidateFileRefused(
+        throw new CandidateFileRefusedError(
           "damaged",
           "The candidate file changed or ended while its header was being read.",
         );
@@ -120,8 +126,8 @@ export class CandidateFileAdmission {
     }
   }
 
-  static #recipientRefusal(type?: string): CandidateFileRefused {
-    return new CandidateFileRefused(
+  static #recipientRefusal(type?: string): CandidateFileRefusedError {
+    return new CandidateFileRefusedError(
       "unsupported",
       `The candidate file must have exactly one ${type ?? Object.values(LOCK_STANZAS).join(" or ")} recipient.`,
     );
@@ -130,11 +136,11 @@ export class CandidateFileAdmission {
   static #lock(prefix: Uint8Array): ListFileLock {
     const lines = new TextDecoder("latin1").decode(prefix).split("\n");
     if (lines[0] !== AGE_FIRST_LINE)
-      throw new CandidateFileRefused("unsupported", "This is not a binary age file.");
+      throw new CandidateFileRefusedError("unsupported", "This is not a binary age file.");
     const end = lines.findIndex((line) => line.startsWith(MAC_LINE_START));
     // A partial MAC line at the prefix boundary is not an end; age would keep reading past it.
     if (end < 0 || end === lines.length - 1)
-      throw new CandidateFileRefused("unsupported", "The age header has no end.");
+      throw new CandidateFileRefusedError("unsupported", "The age header has no end.");
     const stanzas = lines
       .slice(1, end)
       .filter((line) => line.startsWith(STANZA_LINE_START))
@@ -146,7 +152,7 @@ export class CandidateFileAdmission {
     if (lock === undefined) throw this.#recipientRefusal();
     if (stanzas.length !== 1) throw this.#recipientRefusal(type);
     if (lock === "passphrase" && stanzas[0]![2] !== String(SCRYPT_LOG_N))
-      throw new CandidateFileRefused(
+      throw new CandidateFileRefusedError(
         "unsupported",
         `The candidate file must use the scrypt work factor ${SCRYPT_LOG_N}.`,
       );
@@ -166,7 +172,7 @@ export class CandidateFileAdmission {
       )
         throw new Error("invalid supported header");
     } catch {
-      throw new CandidateFileRefused("unsupported", "The age header is malformed.");
+      throw new CandidateFileRefusedError("unsupported", "The age header is malformed.");
     }
     return lock;
   }

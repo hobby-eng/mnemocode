@@ -1,5 +1,5 @@
 import { closeSync, openSync, readSync } from "node:fs";
-import { InputTooLarge, MEBIBYTE } from "../core/byte-units.js";
+import { InputTooLargeError, MEBIBYTE } from "../core/byte-units.js";
 
 /**
  * The largest text that a command reads: a file, standard input or an answer typed or pasted at a
@@ -14,7 +14,7 @@ const CHUNK_BYTES = 64 * 1024;
 
 /**
  * Reads a file descriptor to its end, but never more than `limit` bytes: one byte more is refused
- * as InputTooLarge, naming `what`. The bound applies to what is actually read, so it also holds
+ * as InputTooLargeError, naming `what`. The bound applies to what is actually read, so it also holds
  * for pipes, devices and files that grow while they are read, whose reported size says nothing.
  * The input may be a secret: every chunk read is wiped before this returns or throws, and the one
  * copy returned is the caller's to wipe.
@@ -31,7 +31,7 @@ export function readBoundedDescriptor(descriptor: number, limit: number, what: s
       const length = readSync(descriptor, chunk, 0, chunk.length, null);
       if (length === 0) break;
       total += length;
-      if (total > limit) throw new InputTooLarge(what, limit);
+      if (total > limit) throw new InputTooLargeError(what, limit);
       parts.push(chunk.subarray(0, length));
     }
     return Buffer.concat(parts, total);
@@ -63,7 +63,7 @@ export function readFileOrRefuse(
   try {
     return readBoundedFile(path, limit, what);
   } catch (error) {
-    if (error instanceof InputTooLarge) throw error;
+    if (error instanceof InputTooLargeError) throw error;
     throw new Error(unreadable, { cause: error });
   }
 }

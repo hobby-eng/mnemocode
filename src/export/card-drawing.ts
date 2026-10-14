@@ -32,6 +32,9 @@ import {
 export type Matrix = readonly [a: number, b: number, c: number, d: number, e: number, f: number];
 const IDENTITY_MATRIX: Matrix = [1, 0, 0, 1, 0, 0];
 
+/**
+ * One step of a path: move or line to a point, a cubic curve with its two control points, or close.
+ */
 export type PathSegment =
   | { readonly to: "move" | "line"; readonly x: number; readonly y: number }
   | {
@@ -53,6 +56,9 @@ export type PathSegment =
     }
   | { readonly to: "close" };
 
+/**
+ * An image that a drawing places: its size in pixels and its pixels as RGB bytes or a JPEG file.
+ */
 export interface CardImage {
   readonly width: number;
   readonly height: number;
@@ -78,6 +84,10 @@ export interface GraphicsSettings {
   readonly blend?: BlendMode;
 }
 
+/**
+ * One step of the drawing of a card page: save or restore the state, transform, fill or stroke a
+ * path, clip, or draw an image.
+ */
 export type DrawingStep =
   | { readonly do: "save" | "restore" }
   | { readonly do: "transform"; readonly matrix: Matrix }
@@ -104,6 +114,10 @@ export type DrawingStep =
   /** Drawn into the square from (0, 0) to (1, 1) of the current transformation. */
   | { readonly do: "image"; readonly image: CardImage };
 
+/**
+ * The drawing of one card page, its size in PDF points and its steps, which a host replays on its
+ * own canvas.
+ */
 export interface CardPageDrawing {
   /** Page size in PDF points, 72 to an inch. */
   readonly width: number;

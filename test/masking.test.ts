@@ -14,7 +14,7 @@ import {
 import { BackupReading } from "../src/core/backup-reading.js";
 import { capabilities } from "../src/core/backup-options.js";
 import { DatesAnswer, DateSearch } from "../src/core/date-search.js";
-import { EncodedBackup, MissingChecksum } from "../src/core/encoded-backup.js";
+import { EncodedBackup, MissingChecksumError } from "../src/core/encoded-backup.js";
 import { Masking } from "../src/core/masking.js";
 import { parseRecord, serializeRecord } from "../src/record.js";
 import { Share, writeShare } from "../src/sskr/transport.js";
@@ -178,7 +178,7 @@ describe("BackupReading", () => {
     expect(codes.mode).toBe("direct");
     expect(() => codes.withMode("seedshift")).not.toThrow();
     const legacy = BackupReading.of(formatEncoded(LEGACY, "indexes"), rules).codes("indexes");
-    expect(() => legacy.withMode("seedshift")).toThrow(MissingChecksum);
+    expect(() => legacy.withMode("seedshift")).toThrow(MissingChecksumError);
     expect(() => BackupReading.of("1 2 3", rules).formats()).toThrow(
       "These are 3 word numbers; an encoded seed phrase has 12, 15, 18, 21 or 24.",
     );

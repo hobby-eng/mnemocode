@@ -5,7 +5,7 @@
 import { cardKindOf, writtenInColors } from "../core/backup-options.js";
 import { ENCODED_FORMATS, type EncodedFormat } from "../core/types.js";
 import { listInWords } from "../core/places.js";
-import { findTemplate, type NoCardTemplate } from "../export/template-catalog.js";
+import { findTemplate, type NoCardTemplateError } from "../export/template-catalog.js";
 
 /** The number of a form, as --format and every question of a form take it. */
 export function formatNumber(format: EncodedFormat): number {
@@ -36,7 +36,7 @@ export const CARD_FORMAT_NUMBERS = numbersOf(
  * The refusal of cards that no installed design draws, with the forms of that kind and those whose
  * cards a design draws, by their numbers: "… Format 3 has no template; use format 4 or 5."
  */
-export function noCardTemplateMessage(refusal: NoCardTemplate): string {
+export function noCardTemplateMessage(refusal: NoCardTemplateError): string {
   const own = ENCODED_FORMATS.filter((format) => cardKindOf(format) === refusal.kind);
   const drawn = ENCODED_FORMATS.filter((format) => {
     const kind = cardKindOf(format);

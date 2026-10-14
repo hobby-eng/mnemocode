@@ -26,7 +26,7 @@ vi.mock("../src/cli/terminal.js", async (original) => ({
   terminalNotice: (text: string) => state.notices.push(text),
 }));
 
-import { LeftStagingCopy, publishNewPrivateFile } from "../src/export/private-file.js";
+import { LeftStagingCopyError, publishNewPrivateFile } from "../src/export/private-file.js";
 import { writeSaved } from "../src/cli/save-retry.js";
 import { saveQrBeside, saveQrInside } from "../src/cli/qr-export.js";
 
@@ -46,13 +46,13 @@ async function newPath(): Promise<string> {
 }
 
 describe("a staging copy left after a complete save", () => {
-  it("is a LeftStagingCopy with the saved file complete, not an ordinary failure", async () => {
+  it("is a LeftStagingCopyError with the saved file complete, not an ordinary failure", async () => {
     const path = await newPath();
     state.failCleanup = true;
     const failure = await publishNewPrivateFile(path, BYTES).catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(LeftStagingCopy);
-    expect((failure as LeftStagingCopy).saved).toBe(path);
-    expect((failure as LeftStagingCopy).message).toMatch(/^Saved .*delete it\.$/u);
+    expect(failure).toBeInstanceOf(LeftStagingCopyError);
+    expect((failure as LeftStagingCopyError).saved).toBe(path);
+    expect((failure as LeftStagingCopyError).message).toMatch(/^Saved .*delete it\.$/u);
     expect(await readFile(path, "utf8")).toBe("public fixture");
   });
 

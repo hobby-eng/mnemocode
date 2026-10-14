@@ -79,23 +79,29 @@ const KEY = {
  */
 export const ESCAPE_ALIASES: ReadonlySet<number> = new Set([KEY.LOWER_Q, KEY.UPPER_Q, KEY.CTRL_D]);
 
+/** The codes of the errors of terminal input: a question cancelled, an answer it cannot use. */
+export type TerminalInputErrorCode = "cancelled" | "unusable-answer";
+
 /**
  * Thrown when Ctrl+C cancels a question; the tool then stops with CANCELLED_EXIT_CODE, as for
  * SIGINT.
  */
-export class InputCancelled extends Error {
+export class InputCancelledError extends Error {
+  readonly code: TerminalInputErrorCode = "cancelled";
+
   constructor() {
     super(CANCELLED_MESSAGE);
+    this.name = "InputCancelledError";
   }
 }
 
 /**
  * The warning for an answer, a file or codes that were refused, to be asked again with it: the
- * message of the Error. InputCancelled, which is the person leaving, and anything thrown that is
+ * message of the Error. InputCancelledError, which is the person leaving, and anything thrown that is
  * no Error pass through. Every question that asks again classifies a refusal with it.
  */
 export function refusal(error: unknown): string {
-  if (error instanceof InputCancelled) throw error;
+  if (error instanceof InputCancelledError) throw error;
   return refusalMessage(error);
 }
 
@@ -106,7 +112,14 @@ export const NOT_UTF8 = notUtf8Text("The answer");
  * Thrown by readLine for an answer that no question can use: longer than its limit, or not UTF-8
  * text. The message says why without repeating the answer.
  */
-export class UnusableAnswer extends Error {}
+export class UnusableAnswerError extends Error {
+  readonly code: TerminalInputErrorCode = "unusable-answer";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "UnusableAnswerError";
+  }
+}
 
 /** The next byte typed, or undefined at the end of the input. */
 export type NextByte = () => Promise<number | undefined>;
@@ -162,39 +175,39 @@ export function dumbTerminalReason(subject: string): string {
  * many wait, as for the rest of a long paste: Array.prototype.shift copies a large array each time.
  */
 class ByteQueue {
-  private bytes: number[] = [];
-  private head = 0;
+  #bytes: number[] = [];
+  #head = 0;
 
   get length(): number {
-    return this.bytes.length - this.head;
+    return this.#bytes.length - this.#head;
   }
 
   push(byte: number): void {
-    this.bytes.push(byte);
+    this.#bytes.push(byte);
   }
 
   shift(): number | undefined {
-    if (this.head === this.bytes.length) return undefined;
-    const byte = this.bytes[this.head]!;
+    if (this.#head === this.#bytes.length) return undefined;
+    const byte = this.#bytes[this.#head]!;
     // The byte may be part of a secret; its place is not needed any more.
-    this.bytes[this.head++] = 0;
+    this.#bytes[this.#head++] = 0;
     // Once most of the array is taken, the rest moves to its start, once for many bytes.
-    if (this.head >= COMPACT_AFTER && this.head * 2 >= this.bytes.length) {
-      this.bytes.splice(0, this.head);
-      this.head = 0;
+    if (this.#head >= COMPACT_AFTER && this.#head * 2 >= this.#bytes.length) {
+      this.#bytes.splice(0, this.#head);
+      this.#head = 0;
     }
     return byte;
   }
 
   includes(byte: number): boolean {
-    return this.bytes.indexOf(byte, this.head) >= 0;
+    return this.#bytes.indexOf(byte, this.#head) >= 0;
   }
 
   /** Wipes and forgets every byte. */
   clear(): void {
-    this.bytes.fill(0);
-    this.bytes.length = 0;
-    this.head = 0;
+    this.#bytes.fill(0);
+    this.#bytes.length = 0;
+    this.#head = 0;
   }
 }
 
@@ -244,14 +257,14 @@ function wipeTypedAhead(): boolean {
 /**
  * Drops and wipes what was typed or pasted before the next question is drawn: the rest of a
  * paste, a second Enter, keys pressed while a step ran that read no keys. Ctrl+C among them still
- * cancels the tool (InputCancelled). A question calls it inside withRawTerminal, before it draws
+ * cancels the tool (InputCancelledError). A question calls it inside withRawTerminal, before it draws
  * anything, as askLine and waitForEnter do; called outside, before choose, it reads the terminal
  * briefly itself.
  */
 export async function dropTypedAhead(): Promise<void> {
   if (rawSessions > 0) await settle();
   else if (terminalAvailable() && process.stdin.isTTY === true) await withRawTerminal(settle);
-  if (wipeTypedAhead()) throw new InputCancelled();
+  if (wipeTypedAhead()) throw new InputCancelledError();
 }
 
 function settle(): Promise<void> {
@@ -273,7 +286,7 @@ export async function dropRestOfPaste(
     if (typedAhead.length > 0) cancelled = wipeTypedAhead() || cancelled;
     else if ((await next()) === KEY.CTRL_C) cancelled = true;
   }
-  if (cancelled) throw new InputCancelled();
+  if (cancelled) throw new InputCancelledError();
 }
 
 /**
@@ -340,7 +353,7 @@ export async function withRawTerminal<T>(
 /** A stop for a long search, which Ctrl+C sets off. */
 export interface CtrlCWatch {
   /**
-   * Aborted with InputCancelled as its reason at Ctrl+C or Ctrl+\, and with the error when the
+   * Aborted with InputCancelledError as its reason at Ctrl+C or Ctrl+\, and with the error when the
    * terminal fails after Ctrl+Z: `signal.throwIfAborted()` throws it.
    */
   readonly signal: AbortSignal;
@@ -367,7 +380,7 @@ export function watchForCtrlC(): CtrlCWatch {
     for (const byte of chunk) {
       if (controller.signal.aborted) break;
       if (byte === KEY.CTRL_C || byte === KEY.CTRL_BACKSLASH)
-        controller.abort(new InputCancelled());
+        controller.abort(new InputCancelledError());
       else if (byte === KEY.CTRL_Z) suspendJob(controller);
     }
     // The chunk may hold a secret typed by mistake; it is not used.
@@ -513,7 +526,7 @@ export async function readKey(next: NextByte, moreWithin?: MoreWithin): Promise<
     moreWithin && (async (milliseconds) => keyBytesAgain.length > 0 || moreWithin(milliseconds));
   const byte = await take();
   if (byte === undefined) return { kind: "back" };
-  if (byte === KEY.CTRL_C) throw new InputCancelled();
+  if (byte === KEY.CTRL_C) throw new InputCancelledError();
   if (byte === KEY.CARRIAGE_RETURN || byte === KEY.LINE_FEED) return { kind: "enter" };
   if (byte >= KEY.DIGIT_0 && byte <= KEY.DIGIT_9)
     return { kind: "digit", digit: byte - KEY.DIGIT_0 };
@@ -687,7 +700,7 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
   let hintDue = false;
   const insert = (byte: number): void => {
     if (length === limit)
-      throw new UnusableAnswer(
+      throw new UnusableAnswerError(
         `An answer is longer than ${limit} bytes; no valid answer is that long.`,
       );
     line.copyWithin(cursor + 1, cursor, length);
@@ -781,7 +794,7 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
         if (cursor > 0 && line[cursor - 1] !== lineBreak) insert(lineBreak);
         continue;
       }
-      if (byte === KEY.CTRL_C) throw new InputCancelled();
+      if (byte === KEY.CTRL_C) throw new InputCancelledError();
       if (byte === KEY.BACKSPACE || byte === KEY.DELETE) {
         if (cursor > 0) remove(previousCharacter(line, cursor), cursor);
       } else if (byte === KEY.CTRL_U) {
@@ -837,7 +850,7 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
     moveToEnd();
     return STRICT_UTF8.decode(line.subarray(0, length));
   } catch (error) {
-    if (error instanceof TypeError) throw new UnusableAnswer(NOT_UTF8);
+    if (error instanceof TypeError) throw new UnusableAnswerError(NOT_UTF8);
     throw error;
   } finally {
     // Before the answer is wiped: its width says where the hint is.
@@ -856,11 +869,11 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
  * next row.
  */
 class ShownLine {
-  private readonly columns: number;
-  private readonly start: number;
+  readonly #columns: number;
+  readonly #start: number;
   /** The rows of the prompt above the row on which the answer starts. */
-  private readonly promptRows: number;
-  private cursorRow = 0;
+  readonly #promptRows: number;
+  #cursorRow = 0;
   /**
    * The first `countedBytes` bytes of the answer are whole characters, after which the terminal
    * has the cursor at `countedEnd`, counted in cells from the start of the answer's first row.
@@ -868,48 +881,47 @@ class ShownLine {
    * make a long paste fall behind, and a macOS pseudo-terminal, which buffers about 1 KiB each
    * way, then blocks both the terminal and this program. A redraw counts from the start.
    */
-  private countedBytes = 0;
-  private countedEnd: number;
+  #countedBytes = 0;
+  #countedEnd: number;
   /** Whether a hint shows below the answer. */
-  private hintShown = false;
+  #hintShown = false;
+  readonly #line: Buffer;
 
-  constructor(
-    private readonly line: Buffer,
-    promptWidth: number,
-  ) {
-    this.columns = terminalColumns();
-    this.start = promptWidth % this.columns;
-    this.promptRows = Math.floor(promptWidth / this.columns);
-    this.countedEnd = this.start;
+  constructor(line: Buffer, promptWidth: number) {
+    this.#line = line;
+    this.#columns = terminalColumns();
+    this.#start = promptWidth % this.#columns;
+    this.#promptRows = Math.floor(promptWidth / this.#columns);
+    this.#countedEnd = this.#start;
     // A prompt that ends at the right edge leaves the cursor waiting there; this settles it.
-    if (promptWidth > 0 && this.start === 0) process.stderr.write("\r\n");
+    if (promptWidth > 0 && this.#start === 0) process.stderr.write("\r\n");
   }
 
   /** The row of the cursor counted from the first row of the prompt, as answerEndRow gives it. */
   get rowFromPrompt(): number {
-    return this.promptRows + this.cursorRow;
+    return this.#promptRows + this.#cursorRow;
   }
 
   /** Shows the answer of `length` bytes with the cursor at `cursor`; `typedAtEnd` only adds. */
   update(length: number, cursor: number, typedAtEnd = false): void {
     if (typedAtEnd) {
-      const end = this.endOf(length);
-      process.stderr.write(this.line.subarray(previousCharacter(this.line, cursor), cursor));
-      this.cursorRow = this.settle(end);
+      const end = this.#endOf(length);
+      process.stderr.write(this.#line.subarray(previousCharacter(this.#line, cursor), cursor));
+      this.#cursorRow = this.#settle(end);
       return;
     }
     const out = process.stderr;
-    out.write(`${cursorUp(this.cursorRow)}\r${cursorRight(this.start)}${ERASE_BELOW}`);
+    out.write(`${cursorUp(this.#cursorRow)}\r${cursorRight(this.#start)}${ERASE_BELOW}`);
     // Erased with the answer: the next hint is drawn anew.
-    this.hintShown = false;
-    out.write(this.line.subarray(0, length));
-    this.countedBytes = 0;
-    this.countedEnd = this.start;
-    const endRow = this.settle(this.endOf(length));
-    const target = this.cellOf(cursor, length);
-    const row = Math.floor(target / this.columns);
-    out.write(`${cursorUp(endRow - row)}\r${cursorRight(target % this.columns)}`);
-    this.cursorRow = row;
+    this.#hintShown = false;
+    out.write(this.#line.subarray(0, length));
+    this.#countedBytes = 0;
+    this.#countedEnd = this.#start;
+    const endRow = this.#settle(this.#endOf(length));
+    const target = this.#cellOf(cursor, length);
+    const row = Math.floor(target / this.#columns);
+    out.write(`${cursorUp(endRow - row)}\r${cursorRight(target % this.#columns)}`);
+    this.#cursorRow = row;
   }
 
   /**
@@ -918,32 +930,32 @@ class ShownLine {
    * that the screen scrolls for them, and the cursor goes back up with relative moves.
    */
   showHint(hint: WordHint, length: number, cursor: number): void {
-    const rows = hintRows(hint, this.columns);
-    if (rows.length === 0 && !this.hintShown) return;
-    const end = this.endOf(length);
-    const endRow = Math.floor(end / this.columns);
+    const rows = hintRows(hint, this.#columns);
+    if (rows.length === 0 && !this.#hintShown) return;
+    const end = this.#endOf(length);
+    const endRow = Math.floor(end / this.#columns);
     // Typing at the end needs no count from the start (endOf).
-    const target = cursor === length ? end : this.cellOf(cursor, length);
+    const target = cursor === length ? end : this.#cellOf(cursor, length);
     const below = rows.map((row) => `\r\n${row}`).join("");
     process.stderr.write(
-      `${this.toEnd(end)}${ERASE_BELOW}${below}` +
-        `${cursorUp(rows.length + endRow - this.cursorRow)}\r${cursorRight(target % this.columns)}`,
+      `${this.#toEnd(end)}${ERASE_BELOW}${below}` +
+        `${cursorUp(rows.length + endRow - this.#cursorRow)}\r${cursorRight(target % this.#columns)}`,
     );
-    this.hintShown = rows.length > 0;
+    this.#hintShown = rows.length > 0;
   }
 
   /** Takes the hint off the screen, which leaves the cursor at the end of the answer. */
   clearHint(length: number): void {
-    if (!this.hintShown) return;
-    const end = this.endOf(length);
-    process.stderr.write(`${this.toEnd(end)}${ERASE_BELOW}`);
-    this.cursorRow = Math.floor(end / this.columns);
-    this.hintShown = false;
+    if (!this.#hintShown) return;
+    const end = this.#endOf(length);
+    process.stderr.write(`${this.#toEnd(end)}${ERASE_BELOW}`);
+    this.#cursorRow = Math.floor(end / this.#columns);
+    this.#hintShown = false;
   }
 
   /** The moves from the cursor to `end`, the cell after the answer. */
-  private toEnd(end: number): string {
-    return `${cursorDown(Math.floor(end / this.columns) - this.cursorRow)}\r${cursorRight(end % this.columns)}`;
+  #toEnd(end: number): string {
+    return `${cursorDown(Math.floor(end / this.#columns) - this.#cursorRow)}\r${cursorRight(end % this.#columns)}`;
   }
 
   /**
@@ -951,12 +963,12 @@ class ShownLine {
    * before it, or at the start of the next row for a wide one that the right edge pushed there.
    * At the end of the answer, where the next character would go.
    */
-  private cellOf(cursor: number, length: number): number {
-    const before = placedAfter(this.line, 0, cursor, this.start, this.columns);
+  #cellOf(cursor: number, length: number): number {
+    const before = placedAfter(this.#line, 0, cursor, this.#start, this.#columns);
     if (cursor === length) return before;
-    const end = nextCharacter(this.line, cursor, length);
-    const after = placedAfter(this.line, cursor, end, before, this.columns);
-    return after - displayWidthOf(this.line, cursor, end);
+    const end = nextCharacter(this.#line, cursor, length);
+    const after = placedAfter(this.#line, cursor, end, before, this.#columns);
+    return after - displayWidthOf(this.#line, cursor, end);
   }
 
   /**
@@ -964,29 +976,29 @@ class ShownLine {
    * characters already counted. Only typing at the end adds bytes between two redraws, so what is
    * counted stays as it was. A character not complete yet is counted the next time.
    */
-  private endOf(length: number): number {
-    while (this.countedBytes < length) {
-      const size = characterSize(this.line[this.countedBytes]!);
-      if (this.countedBytes + size > length) break;
-      this.countedEnd = placedAfter(
-        this.line,
-        this.countedBytes,
-        this.countedBytes + size,
-        this.countedEnd,
-        this.columns,
+  #endOf(length: number): number {
+    while (this.#countedBytes < length) {
+      const size = characterSize(this.#line[this.#countedBytes]!);
+      if (this.#countedBytes + size > length) break;
+      this.#countedEnd = placedAfter(
+        this.#line,
+        this.#countedBytes,
+        this.#countedBytes + size,
+        this.#countedEnd,
+        this.#columns,
       );
-      this.countedBytes += size;
+      this.#countedBytes += size;
     }
-    return this.countedEnd;
+    return this.#countedEnd;
   }
 
   /**
    * The row the cursor is on after writing up to `offset`. At the right edge a terminal waits
    * before it wraps; a new line moves the cursor to where the next character would go.
    */
-  private settle(offset: number): number {
-    if (offset > 0 && offset % this.columns === 0) process.stderr.write("\r\n");
-    return Math.floor(offset / this.columns);
+  #settle(offset: number): number {
+    if (offset > 0 && offset % this.#columns === 0) process.stderr.write("\r\n");
+    return Math.floor(offset / this.#columns);
   }
 }
 

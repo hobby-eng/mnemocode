@@ -20,6 +20,7 @@ import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from "./world-map.js";
 import { WORLD_MAP_LAND } from "./world-map-data.js";
 import { drawMaterialBackdrop, type CardGrid, type MaterialBackdrop } from "./study-backdrops.js";
 
+/** Where one card of a sheet goes, and where its caption goes below it, in millimetres. */
 export interface StudyBox extends CardBox {
   readonly captionTop: number;
   readonly captionWidth: number;
@@ -62,6 +63,10 @@ export interface StudySheetMetrics {
   readonly frameMinimumFont: number;
 }
 
+/**
+ * The layout of a collection sheet: its size, the grid of its cards, the box of each card and the
+ * place of its QR code, in millimetres.
+ */
 export interface StudyLayout {
   readonly width: number;
   readonly height: number;
@@ -80,6 +85,7 @@ export interface StudyLayout {
   readonly qr?: { readonly x: number; readonly y: number; readonly size: number };
 }
 
+/** The backdrop of a design study: one of the three plain themes, or a material's own. */
 export type StudyTheme = "cool" | "warm" | "noir" | MaterialBackdrop;
 
 const COLLECTION_QR_MODULE_MM = 0.3;
@@ -732,6 +738,9 @@ function drawStudyShadow(page: PDFPage, box: MmRect, theme: StudyTheme): void {
   });
 }
 
+/**
+ * Draws the caption `lines` of the card in `box` of `layout` on `page`, in the colors of `theme`.
+ */
 export function drawStudyCaption(
   page: PDFPage,
   font: PDFFont,
@@ -758,6 +767,10 @@ export function drawStudyCaption(
     );
 }
 
+/**
+ * The width in millimetres that the caption `lines` take at the smallest size of a caption, with
+ * room to spare.
+ */
 export function studyCaptionWidth(font: PDFFont, lines: readonly string[]): number {
   const widest = Math.max(...lines.map((line) => font.widthOfTextAtSize(line, MINIMUM_FONT)));
   return widest / MM + CAPTION_WIDTH_SLACK_MM;

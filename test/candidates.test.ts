@@ -22,7 +22,7 @@ import {
   decodeCandidateList,
   encodeCandidateList,
   padmeLength,
-  TooManyForList,
+  TooManyForListError,
   type CandidateList,
 } from "../src/core/candidate-list.js";
 import {
@@ -269,7 +269,7 @@ describe("Candidate lists", () => {
   );
 
   it("tell a search with more candidates than a list holds by its own type", () => {
-    const refusal = new TooManyForList(NARROW_WORD_SEARCH);
+    const refusal = new TooManyForListError(NARROW_WORD_SEARCH);
     expect(refusal).toBeInstanceOf(Error);
     expect(refusal.message).toBe(
       "More than 524,288 candidates, more than one list holds: give more of the words, or a few letters of them.",

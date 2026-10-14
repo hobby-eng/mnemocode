@@ -247,7 +247,8 @@ function copyRun(
   try {
     mkdirSync(join(root, "scripts"));
     mkdirSync(join(root, "src"));
-    copyFileSync("scripts/verify-no-copies.mjs", join(root, "scripts", "verify-no-copies.mjs"));
+    for (const script of ["verify-no-copies.mjs", "source-tokens.mjs"])
+      copyFileSync(join("scripts", script), join(root, "scripts", script));
     sources.forEach((source, index) => writeFileSync(join(root, "src", `${index}.ts`), source));
     const run = spawnSync(
       process.execPath,

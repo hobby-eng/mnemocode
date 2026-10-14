@@ -43,6 +43,10 @@ function eip55(account: Uint8Array): string {
     .join("");
 }
 
+/**
+ * Ethereum and the EVM networks that share its addresses (0x…), with the EIP-55 checksum where the
+ * case gives one.
+ */
 export const ETHEREUM = new HexCoin({
   id: "ethereum",
   name: "Ethereum and EVM networks",

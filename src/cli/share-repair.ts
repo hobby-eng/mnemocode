@@ -126,7 +126,7 @@ export class TypedShares {
     const shares = new TypedShares();
     shares.input.add([first.text]);
     if (first.fromQr) shares.#readFromQr();
-    await shares.retypeUnreadable();
+    await shares.#retypeUnreadable();
     return shares;
   }
 
@@ -158,7 +158,7 @@ export class TypedShares {
     );
     this.#fromQr = false;
     this.input.replaceAll(texts);
-    await this.retypeUnreadable();
+    await this.#retypeUnreadable();
   }
 
   /**
@@ -169,7 +169,7 @@ export class TypedShares {
     const texts = this.#fromQr ? await this.#askNextShare() : await this.#typeMore();
     this.input.add(texts);
     this.#showRead();
-    await this.retypeUnreadable();
+    await this.#retypeUnreadable();
   }
 
   /** More shares, typed in one answer. */
@@ -278,7 +278,7 @@ export class TypedShares {
   }
 
   /** Asks which share, unless only one was typed; undefined when the person goes back (Escape). */
-  private async chosenPlace(): Promise<number | undefined> {
+  async #chosenPlace(): Promise<number | undefined> {
     if (this.list.length === 1) return this.list[0]!.place;
     return choose(
       "Which share?",
@@ -293,7 +293,7 @@ export class TypedShares {
 
   /** Asks which share to type again, then for it; false when the person goes back (Escape). */
   async retypeChosen(): Promise<boolean> {
-    const place = await this.chosenPlace();
+    const place = await this.#chosenPlace();
     if (place === undefined) return false;
     await this.retype(place);
     return true;
@@ -301,14 +301,14 @@ export class TypedShares {
 
   /** Asks which share to leave out, and leaves it out; false when the person goes back (Escape). */
   async leaveOutChosen(): Promise<boolean> {
-    const place = await this.chosenPlace();
+    const place = await this.#chosenPlace();
     if (place === undefined) return false;
     this.leaveOut(place);
     return true;
   }
 
   /** Each share that cannot be read is typed again, with why, until it can be, or left out. */
-  private async retypeUnreadable(): Promise<void> {
+  async #retypeUnreadable(): Promise<void> {
     for (const share of [...this.list]) {
       const problem = this.input.readProblem(share.place, share.text);
       if (problem !== undefined) await this.retype(share.place, problem);
@@ -364,7 +364,7 @@ export interface ShareFixQuestion {
 /**
  * Asks which share to change after a refusal that names none or several, or a search without a
  * result: one share typed again, one left out (while others remain), every share typed again,
- * more shares, or Stop, which cancels (InputCancelled). A refusal may name shares to leave out,
+ * more shares, or Stop, which cancels (InputCancelledError). A refusal may name shares to leave out,
  * possibly more than one; each is left out by a choice of its own. Escape at the list of shares
  * asks again. True once the shares were changed; false when the person went back (`back`).
  */
@@ -459,7 +459,7 @@ export async function searchShareRepair(
   } else if (decision.notice !== undefined) terminalNotice(decision.notice);
   const progress = new ProgressLine(SEARCH_PROGRESS_SECONDS);
   // Watched only now, after the question, which reads its own keys: Ctrl+C stops the search at
-  // its next turn, which then rejects with InputCancelled.
+  // its next turn, which then rejects with InputCancelledError.
   try {
     const found = await withCtrlCWatch((signal) =>
       SHARE_RESTORE.search(marked, {

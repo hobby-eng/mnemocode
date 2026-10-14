@@ -260,7 +260,7 @@ export class BackupReading extends Redacted {
   /**
    * The codes in `format`, held to the rules that need no mode: their count, and that each is a
    * code of that form (EncodedBackup.read). The host then gives them their mode (withMode), which
-   * may find the checksum missing (MissingChecksum).
+   * may find the checksum missing (MissingChecksumError).
    */
   codes(format: EncodedFormat): EncodedBackup {
     return EncodedBackup.read(this.#payloadIn(format), format, "direct");

@@ -42,6 +42,7 @@ export const ONE_DESIGN_FOR_SEPARATE_CARDS =
 export const DEFAULT_SAMPLE_WORDS: SampleWordCount = BIP39_WORD_COUNTS[0];
 /** The longest sample phrase: the most codes, and the most cards, that a backup prints. */
 export const LONGEST_SAMPLE_WORDS: SampleWordCount = BIP39_WORD_COUNTS.at(-1)!;
+/** The length of a sample phrase, in words: one of BIP39's. */
 export type SampleWordCount = Bip39WordCount;
 
 /** The fixed public dates that the sample phrase is masked with. */

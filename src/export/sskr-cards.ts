@@ -29,6 +29,10 @@ export function nodeShareCards(
   return ShareCardSet.create(nodeCardRenderer, records, options);
 }
 
+/**
+ * What the cards of shares are exported with on Node.js: the render options, the folder of their
+ * files and its format.
+ */
 export interface SskrExportOptions extends SskrRenderOptions {
   readonly directory: string;
   /** The format of the card files: PDF by default (DEFAULT_DOCUMENT_FORMAT), or an image format. */

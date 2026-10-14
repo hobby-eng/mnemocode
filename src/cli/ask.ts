@@ -2,7 +2,7 @@
 // (private-screen.ts). Nowhere may a command end abruptly and lose what the person typed: a wrong
 // or unusable answer is explained in one warning line, which never repeats what was typed (a
 // position such as "date 2" or "place 11" is fine), and the same question is asked again, while the
-// caller keeps every earlier answer. Only the person leaves: Ctrl+C (InputCancelled, exit code
+// caller keeps every earlier answer. Only the person leaves: Ctrl+C (InputCancelledError, exit code
 // CANCELLED_EXIT_CODE), or the last choice of askAfterFailure. Inside a secret question Escape does
 // nothing, so that a slip of the finger loses nothing. Every question first drops what was typed
 // before it showed (dropTypedAhead), so that only keys pressed for it answer it.
@@ -59,10 +59,10 @@ import {
 import {
   dropRestOfPaste,
   dropTypedAhead,
-  InputCancelled,
+  InputCancelledError,
   readLine,
   terminalAvailable,
-  UnusableAnswer,
+  UnusableAnswerError,
   withRawTerminal,
   type NextByte,
   refusal,
@@ -178,7 +178,7 @@ async function readAnswer(
       if (ended) return { kind: "ended" };
       return { kind: wentBack ? "back" : "empty" };
     } catch (error) {
-      if (!(error instanceof UnusableAnswer)) throw error;
+      if (!(error instanceof UnusableAnswerError)) throw error;
       // The rest of a paste would otherwise answer the question when it is asked again.
       await dropRestOfPaste(next, moreWithin);
       return { kind: "unusable", reason: error.message };
@@ -232,7 +232,7 @@ function turnOf(typed: string, rules: TurnRules): Turn {
  * says so. Where it does not, as in a secret, an answer not given is empty.
  */
 function turnOfReading(reading: Reading, rules: TurnRules): Turn {
-  if (reading.kind === "ended") throw new InputCancelled();
+  if (reading.kind === "ended") throw new InputCancelledError();
   if (reading.kind === "unusable") return { warning: reading.reason };
   if (reading.kind === "back" && rules.leave === "back") return "back";
   return turnOf(reading.kind === "answer" ? reading.text : "", rules);
@@ -317,7 +317,7 @@ const STOPPED = "stop";
 
 /**
  * Asks what to do after a failure (askAfterFailure), with a Stop of its own as the last choice,
- * which cancels the command (InputCancelled): so Escape, q and the end of the input stop. With
+ * which cancels the command (InputCancelledError): so Escape, q and the end of the input stop. With
  * `back`, for a question reached from another, Escape goes back instead and gives undefined.
  */
 export async function askOrCancel<T>(
@@ -345,7 +345,7 @@ export async function askOrCancel<T>(
           ...(options.label === undefined ? {} : { label: options.label }),
           ...(options.explanation === undefined ? {} : { explanation: options.explanation }),
         });
-  if (chosen === STOPPED) throw new InputCancelled();
+  if (chosen === STOPPED) throw new InputCancelledError();
   return chosen as T | undefined;
 }
 

@@ -13,10 +13,19 @@ import { assertShareCount, normalizeShare } from "./transport.js";
 
 export { MAX_SHARES };
 
+/**
+ * Refuses a threshold and a count of shares that SSKR does not take together
+ * (ShareSplit.validateThreshold).
+ */
 export function validateThreshold(threshold: number, count: number): void {
   ShareSplit.validateThreshold(threshold, count);
 }
 
+/**
+ * The shares of `mnemonic`, `count` of them of which any `threshold` restore it, made after the
+ * engine's known answers with the system's randomness; refuses a threshold and a count that SSKR
+ * does not take.
+ */
 export async function splitSskrMnemonic(
   mnemonic: string,
   threshold: number,

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   dropTypedAhead,
-  InputCancelled,
+  InputCancelledError,
   readKey,
   readLine,
   type Key,
@@ -65,7 +65,7 @@ describe("terminal keys", () => {
   });
 
   it("cancels the tool at Ctrl+C", async () => {
-    await expect(readKey(typed("\x03"))).rejects.toBeInstanceOf(InputCancelled);
+    await expect(readKey(typed("\x03"))).rejects.toBeInstanceOf(InputCancelledError);
   });
 
   it("reads an escape sequence with parameters to its end, so that Ctrl+Up is no digit 5", async () => {
@@ -91,7 +91,7 @@ describe("terminal keys", () => {
       "up",
       "back",
     ]);
-    await expect(keys("\x1b[1;\x03")).rejects.toBeInstanceOf(InputCancelled);
+    await expect(keys("\x1b[1;\x03")).rejects.toBeInstanceOf(InputCancelledError);
     // No key's sequence is longer than eight bytes after the [.
     expect(await keys(`\x1b[${"1".repeat(9)}A`)).toEqual([
       "other",
@@ -126,7 +126,7 @@ describe("terminal keys", () => {
     await dropTypedAhead();
     expect(await readKey(typed(""))).toEqual({ kind: "back" });
     expect(await readKey(typed("\x1b[1\x03"))).toEqual({ kind: "other" });
-    await expect(dropTypedAhead()).rejects.toBeInstanceOf(InputCancelled);
+    await expect(dropTypedAhead()).rejects.toBeInstanceOf(InputCancelledError);
     expect(await readKey(typed(""))).toEqual({ kind: "back" });
   });
 });
@@ -155,7 +155,7 @@ describe("hidden line", () => {
 
   it("is cancelled by Ctrl+C", async () => {
     await expect(readLine(typed("secret\x03"), { echo: false })).rejects.toBeInstanceOf(
-      InputCancelled,
+      InputCancelledError,
     );
   });
 
@@ -280,7 +280,7 @@ describe("hidden line", () => {
     const cancelled = arriving("\x1b", "[\x03");
     await expect(
       readLine(cancelled.next, { echo: true, moreWithin: cancelled.moreWithin }),
-    ).rejects.toBeInstanceOf(InputCancelled);
+    ).rejects.toBeInstanceOf(InputCancelledError);
   });
 
   it("keeps what is typed after an ESC [ that is no key's sequence", async () => {
@@ -296,7 +296,7 @@ describe("hidden line", () => {
     expect(await readLine(typed("ab\x1b[1\x7f\r"), { echo: true })).toBe("ab");
     expect(await readLine(typed("abc\x1b\r"), { echo: true })).toBe("abc");
     await expect(readLine(typed("ab\x1b[1;\x03"), { echo: true })).rejects.toBeInstanceOf(
-      InputCancelled,
+      InputCancelledError,
     );
     // A whole sequence of a key that edits nothing, such as F9 (ESC [ 2 0 ~), is still left out.
     expect(await readLine(typed("ab\x1b[20~c\r"), { echo: true })).toBe("abc");

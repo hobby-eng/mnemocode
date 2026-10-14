@@ -76,8 +76,11 @@ const TESTNET_COIN_TYPE = 1;
 const BIP44_PURPOSE = 44;
 
 /** Why an address is refused, as the reasons below say it. */
-export function invalidAddress(reason: string, kind: AddressRefusalKind = "other"): AddressRefusal {
-  return new AddressRefusal(reason, kind);
+export function invalidAddress(
+  reason: string,
+  kind: AddressRefusalKind = "other",
+): AddressRefusalError {
+  return new AddressRefusalError(reason, kind);
 }
 
 /**
@@ -90,15 +93,15 @@ export type AddressRefusalKind = "not-single-key" | "unreadable" | "other";
  * The refusal of an address, with its `reason`, one of the reasons below or a family's own, so
  * that a caller tells the reasons apart by it and never by the words of the message.
  */
-export class AddressRefusal extends Error {
+export class AddressRefusalError extends Error {
   readonly reason: string;
-  readonly kind: AddressRefusalKind;
+  readonly code: AddressRefusalKind;
 
-  constructor(reason: string, kind: AddressRefusalKind = "other") {
+  constructor(reason: string, code: AddressRefusalKind = "other") {
     super(`The address cannot be used for the check: ${reason}.`);
-    this.name = "AddressRefusal";
+    this.name = "AddressRefusalError";
     this.reason = reason;
-    this.kind = kind;
+    this.code = code;
   }
 }
 
@@ -109,9 +112,10 @@ export const DAMAGED = "its checksum or format is wrong";
  * A refusal of text that this coin cannot read, damaged (`reason` DAMAGED) or of a form it does not
  * allow: parse makes it the address of another coin where the text is written as one.
  */
-export function unreadableAddress(reason: string = DAMAGED): AddressRefusal {
+export function unreadableAddress(reason: string = DAMAGED): AddressRefusalError {
   return invalidAddress(reason, "unreadable");
 }
+/** The reason of a refusal of an address with the wrong length, which several families give. */
 export const WRONG_LENGTH = "it has the wrong length";
 
 /**
@@ -200,8 +204,8 @@ export abstract class Coin implements CoinDescription {
       // What this coin cannot read but is valid in another coin's form is that coin's address;
       // with this coin's own prefix it is this coin's, damaged.
       if (
-        error instanceof AddressRefusal &&
-        error.kind === "unreadable" &&
+        error instanceof AddressRefusalError &&
+        error.code === "unreadable" &&
         !startsWithAny(trimmed, this.ownPrefixes) &&
         writtenAsAnAddress(trimmed)
       )

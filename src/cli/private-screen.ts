@@ -68,7 +68,7 @@ export function clearPrivateScreen(): boolean {
  * Runs `body` on the alternate screen when privateScreenAvailable(), waits for Enter after it
  * succeeds and then leaves the screen. When `body` fails, the screen is left at once, so that the
  * error is shown on the main screen. Ctrl+C also leaves it first: at a question and during a long
- * search it is read as a key (watchForCtrlC), and `body` fails with InputCancelled; SIGINT, from
+ * search it is read as a key (watchForCtrlC), and `body` fails with InputCancelledError; SIGINT, from
  * Ctrl+C while `body` computes something else or sent by other means, is handled here.
  */
 export async function withPrivateScreen<T>(body: () => Promise<T>): Promise<T> {

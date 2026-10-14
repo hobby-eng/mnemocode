@@ -10,6 +10,7 @@ import { inWholeRange, integerRefusal, rangeText, type WholeRange } from "./type
 
 /** BIP39's phrase lengths, in words. */
 export const BIP39_WORD_COUNTS = Object.freeze([12, 15, 18, 21, 24] as const);
+/** A BIP39 phrase length, in words. */
 export type Bip39WordCount = (typeof BIP39_WORD_COUNTS)[number];
 
 /** Whether a phrase of `count` words has a BIP39 length. */
@@ -27,6 +28,7 @@ export const WORD_COUNTS_LESS_ONE_TEXT = listInWords(
 
 /** Each word stands for 11 bits: an index into the 2,048 words. */
 export const BIP39_INDEX_BITS = 11;
+/** The number of words in a BIP39 word list: 2,048, one for each 11-bit index. */
 export const BIP39_DICTIONARY_SIZE = 2 ** BIP39_INDEX_BITS;
 /**
  * Word numbers as people write them, counted from 1 as Seedshift counts them: 1 through 2,048.

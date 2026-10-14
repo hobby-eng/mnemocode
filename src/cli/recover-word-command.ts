@@ -20,7 +20,7 @@ import {
 import {
   candidateListHolds,
   MAX_CANDIDATE_RECORDS,
-  TooManyForList,
+  TooManyForListError,
 } from "../core/candidate-list.js";
 import { englishWordlist } from "../core/words.js";
 import { BackupReading } from "../core/backup-reading.js";
@@ -124,7 +124,7 @@ function phraseOf(text: string, rules: PhraseRules): PhraseSearch {
   const search = WordCandidateSearch.parse(text, rules.missing ? "missing-word" : "unknown-words");
   const expected = search.expected;
   if (rules.listed && expected.exact && !candidateListHolds(expected.count))
-    throw new TooManyForList(NARROW_WORD_SEARCH);
+    throw new TooManyForListError(NARROW_WORD_SEARCH);
   return { kind: "words", search };
 }
 
@@ -195,7 +195,7 @@ interface Found {
  * Runs the search of `phrase` with the core's rules (WordCandidateSearch.run): every candidate is
  * counted and compared with the wallet, the first MAX_SHOWN_CANDIDATES and every one that matched
  * are kept for the screen, and a list keeps the entropy of every candidate, so that record N is
- * candidate N; past the most that a list holds the search stops (TooManyForList). Ctrl+C is read as
+ * candidate N; past the most that a list holds the search stops (TooManyForListError). Ctrl+C is read as
  * a key during the turns and stops it at the next one. The replacements of a legacy last word are
  * a short fixed list, each compared with the wallet.
  */
@@ -235,7 +235,7 @@ async function collect(phrase: PhraseSearch, context: SearchContext): Promise<Fo
       walletCheck,
       keep: context.target === undefined ? 0 : MAX_CANDIDATE_RECORDS,
       onListFull: () => {
-        throw new TooManyForList(NARROW_WORD_SEARCH);
+        throw new TooManyForListError(NARROW_WORD_SEARCH);
       },
       onProgress: ({ checked }) =>
         progress.showEvery(() => `${counting(checked)} candidates so far.`),
@@ -326,7 +326,7 @@ async function searchAndShow(
   try {
     found = await collect(phrase, context);
   } catch (error) {
-    if (!(error instanceof TooManyForList) || !asked) throw error;
+    if (!(error instanceof TooManyForListError) || !asked) throw error;
     terminalNotice(error.message, "warning");
     const next = await askNext(
       [

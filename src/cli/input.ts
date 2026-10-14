@@ -1,7 +1,7 @@
 import { terminalNotice } from "./terminal.js";
 import { askSecretUntil } from "./ask.js";
 import { choose } from "./terminal-choice.js";
-import { InputCancelled, terminalAvailable } from "./terminal-input.js";
+import { InputCancelledError, terminalAvailable } from "./terminal-input.js";
 import {
   ENCODED_FORMATS,
   MASKING_MODES,
@@ -204,7 +204,7 @@ export async function backupFromOptions(
       );
     const chosen = await detectedFormat(fitting, "cancels");
     // Escape is the person leaving, as the hint says, not an error of MnemoCode.
-    if (chosen === undefined) throw new InputCancelled();
+    if (chosen === undefined) throw new InputCancelledError();
     format = chosen;
   }
   return { backup: reading.codes(format).withMode(mode), mode };

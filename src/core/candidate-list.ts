@@ -1,6 +1,6 @@
 // The candidate list (docs/CANDIDATES.md, "The list"): BIP39 entropies with optional passphrases,
 // in the order of the search, padded with Padmé so that its size tells little, and the limit of
-// records one list holds (TooManyForList). Any search can fill one: it knows nothing of dates or
+// records one list holds (TooManyForListError). Any search can fill one: it knows nothing of dates or
 // shares, and of words only that a record's entropy is an English BIP39 phrase (OpenedCandidateList).
 //
 // It needs nothing from the host. It does not encrypt, which is a separate layer
@@ -27,6 +27,7 @@ const RECORD_PASSPHRASE_FLAG = 0b10;
  * last word; twice that leaves room to spare.
  */
 export const MAX_CANDIDATE_RECORDS = 2 ** 19;
+/** The longest BIP39 passphrase that a record of a list holds, in bytes of UTF-8. */
 export const MAX_PASSPHRASE_BYTES = 256;
 
 /**
@@ -67,14 +68,24 @@ const CRC_BYTES = CRC32_BYTES;
  * a wallet check without a list. `advice` says how the search that found them is narrowed, such as
  * "give more of the words, or a few letters of them".
  */
-export class TooManyForList extends Error {
+export class TooManyForListError extends Error {
+  readonly code: CandidateListErrorCode = "too-many-for-list";
+
   constructor(advice: string) {
     super(
       `More than ${counting(MAX_CANDIDATE_RECORDS)} candidates, more than one list holds: ${advice}.`,
     );
+    this.name = "TooManyForListError";
   }
 }
 
+/** The code of the refusal of more candidates than one list holds, this module's only error. */
+export type CandidateListErrorCode = "too-many-for-list";
+
+/**
+ * One candidate of a list: the entropy of a seed phrase and, where it has one, its own BIP39
+ * passphrase.
+ */
 export interface CandidateRecord {
   /** Byte data, also at runtime: Uint8Array, including Buffer and subarray views. */
   readonly entropy: Uint8Array;
@@ -82,6 +93,7 @@ export interface CandidateRecord {
   readonly passphrase?: string;
 }
 
+/** A list of candidate seed phrases, as it is written to a file and read back. */
 export interface CandidateList {
   /**
    * The BIP39 passphrase of every record without one of its own. An empty one is no passphrase:

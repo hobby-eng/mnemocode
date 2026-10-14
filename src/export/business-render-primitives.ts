@@ -82,6 +82,10 @@ export function pdfColor(color: string): RGB {
   return rgb(...rgbChannels(color));
 }
 
+/**
+ * Draws `value` on `page` in `font` at `size` points, `x` millimetres from the left edge and with
+ * its top `top` millimetres from the top, in `color`.
+ */
 export function text(
   page: PDFPage,
   font: PDFFont,

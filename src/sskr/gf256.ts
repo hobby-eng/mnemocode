@@ -25,8 +25,10 @@ const LOG = new Uint8Array(256);
 
 /** The x at which bc-shamir keeps the secret, and the one at which it keeps the digest share. */
 export const SECRET_X = 255;
+/** The x at which bc-shamir keeps the digest share. */
 export const DIGEST_X = 254;
 
+/** The product of `a` and `b` in GF(256), as bc-shamir multiplies. */
 export function gfMultiply(a: number, b: number): number {
   return a === 0 || b === 0 ? 0 : EXP[LOG[a]! + LOG[b]!]!;
 }

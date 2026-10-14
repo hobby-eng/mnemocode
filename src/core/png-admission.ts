@@ -3,7 +3,7 @@
 // remain unchanged until decoding ends; file readers own and wipe that input in one scope.
 
 import { BITS_PER_BYTE, equalBytes } from "./bits.js";
-import { InputTooLarge, MEBIBYTE } from "./byte-units.js";
+import { InputTooLargeError, MEBIBYTE } from "./byte-units.js";
 import { CRC32_BYTES, crc32 } from "../sskr/checksum.js";
 
 /** The largest QR code image that a host reads; the menu checks a file's size against it. */
@@ -37,6 +37,10 @@ const MAX_PALETTE_ENTRIES = 256;
 const MAX_PALETTE_BYTES = MAX_PALETTE_ENTRIES * PALETTE_ENTRY_BYTES;
 const INDEXED_COLOR = 3;
 const FILTER_BYTES_PER_ROW = 1;
+/**
+ * The refusal of a QR code image that is no valid PNG file, for a reason that the more specific
+ * refusals do not give.
+ */
 export const INVALID_PNG_INPUT = "The QR input is not a valid PNG file.";
 // The refusals of a damaged start, each with its own reason (AUD-002-API003, AUD-022-API001).
 const INCOMPLETE_PNG = "The QR input is not a complete PNG file.";
@@ -124,7 +128,8 @@ export class PngAdmission {
 
   /** Validates the whole chunk stream; a second IHDR can never replace admitted dimensions. */
   static read(bytes: Uint8Array): PngAdmission {
-    if (bytes.byteLength > MAX_PNG_BYTES) throw new InputTooLarge("QR PNG input", MAX_PNG_BYTES);
+    if (bytes.byteLength > MAX_PNG_BYTES)
+      throw new InputTooLargeError("QR PNG input", MAX_PNG_BYTES);
     if (bytes.length < SIGNATURE.length) throw new Error(INCOMPLETE_PNG);
     if (!PngAdmission.hasSignature(bytes)) throw new Error(NOT_PNG);
     if (bytes.length < DIMENSIONS_END) throw new Error(INCOMPLETE_PNG);

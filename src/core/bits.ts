@@ -68,15 +68,21 @@ export async function wipedAfterAsync<T>(
   }
 }
 
+/** `value` modulo `divisor`, from 0 up to `divisor`, also for a negative `value`. */
 export function modulo(value: number, divisor: number): number {
   const remainder = value % divisor;
   return remainder < 0 ? remainder + divisor : remainder;
 }
 
+/** `bytes` as a string of bits, eight for each byte, the most significant first. */
 export function bytesToBits(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(2).padStart(BITS_PER_BYTE, "0")).join("");
 }
 
+/**
+ * The bytes of `bits`, eight to a byte, the most significant first; refuses a count that is not a
+ * whole number of bytes or a character other than 0 and 1.
+ */
 export function bitsToBytes(bits: string): Uint8Array {
   if (bits.length % BITS_PER_BYTE !== 0 || !/^[01]+$/u.test(bits))
     throw new Error("Entropy must contain a whole number of bytes.");

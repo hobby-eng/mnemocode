@@ -127,6 +127,10 @@ function design(entry: BusinessDesign): BusinessDesign {
   return Object.freeze(entry);
 }
 
+/**
+ * The design of each business style that has artwork of its own: the hue of its photograph, its
+ * tint and the ink of its fields.
+ */
 export const businessDesigns: Readonly<Record<PhysicalBusinessStyle, BusinessDesign>> =
   Object.freeze({
     architect: design({

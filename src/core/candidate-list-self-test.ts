@@ -26,6 +26,10 @@ export const THREE_PHRASES_ENTROPY = [
   "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
   "ffffffffffffffffffffffffffffffff",
 ] as const;
+/**
+ * The bytes, in hexadecimal, of the list that the startup check writes of THREE_PHRASES: the known
+ * answer that the writer must give and the reader take back.
+ */
 export const THREE_PHRASES_LIST =
   "4d4e434c01001000000003000000000000000000000000000000007f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7fffffffffffffffffffffffffffffffff98854aa000";
 

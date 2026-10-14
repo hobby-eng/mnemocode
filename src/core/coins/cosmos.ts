@@ -53,6 +53,7 @@ class Bech32AccountCoin extends Coin {
   }
 }
 
+/** Cosmos: Bech32 account addresses (cosmos1…) of one secp256k1 key. */
 export const COSMOS = new Bech32AccountCoin({
   id: "cosmos",
   name: "Cosmos",
@@ -62,6 +63,7 @@ export const COSMOS = new Bech32AccountCoin({
   type: "p2pkh",
 });
 
+/** Injective: Bech32 account addresses (inj1…) of the Keccak-256 hash of one key, as Ethereum's. */
 export const INJECTIVE = new Bech32AccountCoin({
   id: "injective",
   name: "Injective",

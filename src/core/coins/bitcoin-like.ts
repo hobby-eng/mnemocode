@@ -137,6 +137,10 @@ class ZcashCoin extends Base58Coin {
 
 // Version bytes from each coin's chain parameters. A "3…" address is taken as nested SegWit, the
 // only single-key address of that form.
+/**
+ * Bitcoin: legacy, nested SegWit, native SegWit and Taproot addresses of one key, on the main
+ * network and the test network.
+ */
 export const BITCOIN = new SegwitCoin({
   id: "bitcoin",
   name: "Bitcoin",
@@ -152,6 +156,7 @@ export const BITCOIN = new SegwitCoin({
   segwit: { prefixes: new Bech32Prefixes("bc", "tb"), taproot: true },
 });
 
+/** Litecoin: legacy, nested SegWit and native SegWit addresses of one key. */
 export const LITECOIN = new SegwitCoin({
   id: "litecoin",
   name: "Litecoin",
@@ -166,6 +171,7 @@ export const LITECOIN = new SegwitCoin({
   segwit: { prefixes: new Bech32Prefixes("ltc"), taproot: false },
 });
 
+/** Dogecoin: legacy addresses of one key. */
 export const DOGECOIN = new Base58Coin({
   id: "dogecoin",
   name: "Dogecoin",
@@ -174,6 +180,7 @@ export const DOGECOIN = new Base58Coin({
   versions: [{ prefix: [0x1e], type: "p2pkh", testnet: false }],
 });
 
+/** Zcash: transparent addresses of one key (t1…). */
 export const ZCASH = new ZcashCoin({
   id: "zcash",
   name: "Zcash",

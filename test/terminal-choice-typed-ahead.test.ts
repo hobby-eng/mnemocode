@@ -12,7 +12,7 @@ vi.mock("node:tty", async (importOriginal) => ({
 
 import { clearPrivateScreen, withPrivateScreen } from "../src/cli/private-screen.js";
 import { waitForEnter } from "../src/cli/terminal-choice.js";
-import { InputCancelled } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-input.js";
 
 const ENTER = "\r";
 const ESCAPE = "\x1b";
@@ -30,7 +30,7 @@ class Keyboard extends EventEmitter {
   readonly isTTY = true;
   flowing = false;
   /** Bytes typed while nothing reads: the terminal keeps them until a question reads again. */
-  private held: Buffer[] = [];
+  #held: Buffer[] = [];
 
   setRawMode(): this {
     return this;
@@ -40,7 +40,7 @@ class Keyboard extends EventEmitter {
     this.flowing = true;
     // A terminal gives what it kept at the next read, a moment after reading starts.
     setImmediate(() => {
-      for (const chunk of this.held.splice(0)) this.emit("data", chunk);
+      for (const chunk of this.#held.splice(0)) this.emit("data", chunk);
     });
     return this;
   }
@@ -54,7 +54,7 @@ class Keyboard extends EventEmitter {
   type(keys: string): void {
     const chunk = Buffer.from(keys, "utf8");
     if (this.flowing) this.emit("data", chunk);
-    else this.held.push(chunk);
+    else this.#held.push(chunk);
   }
 }
 
@@ -123,7 +123,7 @@ describe("waitForEnter takes only keys pressed after its message", () => {
 
   it("still cancels at a Ctrl+C typed ahead", async () => {
     keys.type(`left over${CTRL_C}`);
-    await expect(waitForEnter("Press Enter.")).rejects.toBeInstanceOf(InputCancelled);
+    await expect(waitForEnter("Press Enter.")).rejects.toBeInstanceOf(InputCancelledError);
     expect(screen).not.toContain("Press Enter.");
   });
 

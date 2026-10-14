@@ -11,10 +11,10 @@ import { warnOfCloudCopy } from "./cloud-folders.js";
 import { discardRenamedOutput } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { terminalNotice } from "./terminal.js";
-import { InputCancelled } from "./terminal-input.js";
+import { InputCancelledError } from "./terminal-input.js";
 import { lowerFirst } from "../core/prose.js";
 import { describeError } from "../core/refusal.js";
-import { LeftStagingCopy } from "../export/private-file.js";
+import { LeftStagingCopyError } from "../export/private-file.js";
 
 /** Plain words for the errors of a file system that a save may meet (errno names). */
 const SAVE_FAILURES: Readonly<Record<string, string>> = {
@@ -80,14 +80,14 @@ async function askOtherName(saving: Saving): Promise<string | undefined> {
 
 /**
  * Runs `write`, the save of one result. A file saved in full whose private staging copy could not
- * be removed (LeftStagingCopy) is saved: the person is told so and to delete the copy, and the
+ * be removed (LeftStagingCopyError) is saved: the person is told so and to delete the copy, and the
  * save is not tried again. Every save of the command line goes through it.
  */
 export async function writeSaved(write: () => Promise<unknown>): Promise<void> {
   try {
     await write();
   } catch (error) {
-    if (!(error instanceof LeftStagingCopy)) throw error;
+    if (!(error instanceof LeftStagingCopyError)) throw error;
     terminalNotice(error.message, "warning");
   }
 }
@@ -107,7 +107,7 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined>
         if (path !== saving.path) discardRenamedOutput(saving.path);
         return path;
       } catch (error) {
-        if (!onPrivateScreen() || error instanceof InputCancelled) throw error;
+        if (!onPrivateScreen() || error instanceof InputCancelledError) throw error;
         terminalNotice(saveFailure(saving.what, path, error), "warning");
       }
     const next = await askAfterFailure(

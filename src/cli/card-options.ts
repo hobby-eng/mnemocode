@@ -1,6 +1,6 @@
 import { businessOptionNames, businessOptions } from "./business-options.js";
 import { selectTemplate, type CardTemplate } from "../export/templates.js";
-import { NoCardTemplate } from "../export/template-catalog.js";
+import { NoCardTemplateError } from "../export/template-catalog.js";
 import { type CardKind, type EncodedFormat } from "../core/types.js";
 
 import { value, type ParsedArguments } from "./arguments.js";
@@ -65,7 +65,7 @@ export function cardTemplate(args: ParsedArguments, kind: CardKind): CardTemplat
   try {
     return selectTemplate(value(args, "template"), kind);
   } catch (error) {
-    if (error instanceof NoCardTemplate) throw new Error(noCardTemplateMessage(error));
+    if (error instanceof NoCardTemplateError) throw new Error(noCardTemplateMessage(error));
     throw error;
   }
 }

@@ -3,7 +3,7 @@ import { Decrypter, Encrypter } from "age-encryption";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CandidateFileAdmission } from "../src/core/candidate-file-admission.js";
 import {
-  CandidateFileRefused,
+  CandidateFileRefusedError,
   decryptCandidates,
   encryptCandidates,
   encryptCandidatesWithPassphrase,
@@ -61,7 +61,7 @@ describe("Candidate file admission", () => {
     ] as const) {
       expect(() => CandidateFileAdmission.assertSize(maximum, form)).not.toThrow();
       expect(() => CandidateFileAdmission.assertSize(maximum + 1, form)).toThrow(
-        CandidateFileRefused,
+        CandidateFileRefusedError,
       );
     }
   });
@@ -71,7 +71,7 @@ describe("Candidate file admission", () => {
     async (size) => {
       const read = vi.fn();
       await expect(CandidateFileAdmission.inspect(size, read)).rejects.toMatchObject({
-        problem: "unsupported",
+        code: "unsupported",
       });
       expect(read).not.toHaveBeenCalled();
     },
@@ -115,7 +115,7 @@ describe("Candidate file admission", () => {
     const prefix = new Uint8Array(file.byteLength + difference).fill(1);
     await expect(
       CandidateFileAdmission.inspect(file.byteLength, async () => prefix),
-    ).rejects.toMatchObject({ problem: "damaged" });
+    ).rejects.toMatchObject({ code: "damaged" });
     expect(prefix.every((byte) => byte === 0)).toBe(true);
   });
 
@@ -147,7 +147,7 @@ describe("Candidate file admission", () => {
       const bytes = bytesOf(file);
       await expect(
         CandidateFileAdmission.inspect(bytes.byteLength, async () => bytes.slice()),
-      ).rejects.toMatchObject({ problem: "unsupported" });
+      ).rejects.toMatchObject({ code: "unsupported" });
     },
   );
 
@@ -177,7 +177,7 @@ describe("Candidate file admission", () => {
       await expect(
         decryptCandidates(encrypted, { identity: vectors.age.identity }),
       ).rejects.toMatchObject({
-        problem: "damaged",
+        code: "damaged",
       });
     },
   );
@@ -186,14 +186,14 @@ describe("Candidate file admission", () => {
     const bytes = announcedBytes(Uint8Array.of(1), parameters.plaintextBytes + 1);
     const encrypt = vi.spyOn(Encrypter.prototype, "encrypt");
     await expect(encryptCandidates(bytes, "invalid key")).rejects.toMatchObject({
-      problem: "unsupported",
+      code: "unsupported",
     });
     await expect(
       encryptCandidatesWithPassphrase(bytes, "public test passphrase"),
     ).rejects.toMatchObject({
-      problem: "unsupported",
+      code: "unsupported",
     });
-    expect(() => new NoProtection().protect(bytes)).toThrow(CandidateFileRefused);
+    expect(() => new NoProtection().protect(bytes)).toThrow(CandidateFileRefusedError);
     expect(encrypt).not.toHaveBeenCalled();
   });
 
@@ -203,7 +203,7 @@ describe("Candidate file admission", () => {
     await expect(
       decryptCandidates(bytes, { identity: vectors.age.identity }),
     ).rejects.toMatchObject({
-      problem: "unsupported",
+      code: "unsupported",
     });
     expect(decrypt).not.toHaveBeenCalled();
   });
@@ -239,8 +239,8 @@ describe("Candidate file admission", () => {
 
   it("rejects an oversized plaintext list before decoding and wipes an owned input", () => {
     const bytes = announcedBytes(Uint8Array.of(1, 2, 3), parameters.plaintextBytes + 1);
-    expect(() => decodeCandidateList(bytes)).toThrow(CandidateFileRefused);
-    expect(() => OpenedCandidateList.fromBytes(bytes)).toThrow(CandidateFileRefused);
+    expect(() => decodeCandidateList(bytes)).toThrow(CandidateFileRefusedError);
+    expect(() => OpenedCandidateList.fromBytes(bytes)).toThrow(CandidateFileRefusedError);
     expect([...bytes]).toEqual([0, 0, 0]);
   });
 
@@ -275,7 +275,7 @@ describe("Candidate file admission", () => {
       cancel,
     });
     await expect(CandidateFileAdmission.readPlaintext(stream)).rejects.toMatchObject({
-      problem: "unsupported",
+      code: "unsupported",
       message: expect.stringContaining(`limit of ${parameters.plaintextBytes} bytes`),
     });
     expect(cancel).toHaveBeenCalledOnce();
@@ -312,7 +312,7 @@ describe("Candidate file admission", () => {
     await expect(
       decryptCandidates(keyFile(), { identity: vectors.age.identity }),
     ).rejects.toMatchObject({
-      problem: "unsupported",
+      code: "unsupported",
     });
     expect([...chunk]).toEqual([0]);
     expect(stream.locked).toBe(false);

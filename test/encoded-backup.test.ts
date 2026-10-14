@@ -12,7 +12,7 @@ import {
 import {
   ENCODED_MODE_NAMES,
   EncodedBackup,
-  MissingChecksum,
+  MissingChecksumError,
   type EncodedFormat,
 } from "../src/core/encoded-backup.js";
 import { WalletEvidenceCheck } from "../src/core/wallet-evidence.js";
@@ -88,14 +88,14 @@ describe("EncodedBackup", () => {
       } catch (error) {
         refused = error;
       }
-      expect(refused).toBeInstanceOf(MissingChecksum);
-      expect((refused as MissingChecksum).mode).toBe(mode);
-      expect((refused as MissingChecksum).message).toBe(
+      expect(refused).toBeInstanceOf(MissingChecksumError);
+      expect((refused as MissingChecksumError).mode).toBe(mode);
+      expect((refused as MissingChecksumError).message).toBe(
         `These codes lack the BIP39 checksum that ${ENCODED_MODE_NAMES[mode]} gives them.`,
       );
     }
     const codes = EncodedBackup.of(legacy, "indexes", "direct");
-    expect(() => codes.withMode("seedshift")).toThrow(MissingChecksum);
+    expect(() => codes.withMode("seedshift")).toThrow(MissingChecksumError);
     const original = codes.withMode("seedshift-legacy");
     expect(original.mode).toBe("seedshift-legacy");
     // withMode gives another backup; the first keeps its mode.

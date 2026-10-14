@@ -70,7 +70,7 @@ vi.mock("../src/export/private-file.js", async (importOriginal) => {
 import { decryptCandidates } from "../src/core/candidate-encryption.js";
 import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
-import { InputCancelled } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-input.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
 
 const FINGERPRINT = "73c5da0a";
@@ -190,7 +190,7 @@ describe("recover-word on the private screen", () => {
   it("lets Ctrl+C at the list's passphrase cancel at once", async () => {
     terminal.answers = [`${LAST_FORGOTTEN}\r`, "public\x03"];
     await expect(recover({ "candidates-file": join(directory, "c.age") })).rejects.toBeInstanceOf(
-      InputCancelled,
+      InputCancelledError,
     );
     expect(notices.join("\n")).not.toContain("Try again");
   });

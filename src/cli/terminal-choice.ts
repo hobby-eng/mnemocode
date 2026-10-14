@@ -11,7 +11,7 @@ import {
   dropTypedAhead,
   readKey,
   readLine,
-  UnusableAnswer,
+  UnusableAnswerError,
   withRawTerminal,
   refusal,
   type NextByte,
@@ -509,7 +509,7 @@ async function askLineOnce(
         ...(options.hints === undefined ? {} : { hints: options.hints }),
       });
     } catch (error) {
-      if (!(error instanceof UnusableAnswer)) throw error;
+      if (!(error instanceof UnusableAnswerError)) throw error;
       // The rest of a paste would otherwise answer the question when it is asked again.
       await dropRestOfPaste(next, moreWithin);
       endRow = Math.floor((promptWidth + characters) / terminalColumns());

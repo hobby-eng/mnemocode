@@ -103,6 +103,7 @@ function bytesOf(groups: readonly number[]): number[] {
   return bytes;
 }
 
+/** Dash: legacy addresses of one key (X…) and Dash Platform addresses (dash1k…). */
 export const DASH = new DashCoin({
   id: "dash",
   name: "Dash",

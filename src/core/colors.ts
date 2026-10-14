@@ -134,6 +134,10 @@ export function parseColors(value: string): string[] {
   return colors;
 }
 
+/**
+ * The word numbers that `given` colors stand for, from 0; refuses a count of colors that no phrase
+ * has and a color that is no word's.
+ */
 export function colorsToIndexes(given: readonly string[]): number[] {
   // Array.from, so that a hole is a color that is refused rather than one that map skips.
   const colors = Array.from(given);
@@ -192,14 +196,26 @@ export function wordPositionPatterns(colors: readonly (string | undefined)[]): s
 
 // The BMP Private Use Area has 0x1900 scalars. Quotient/remainder in that radix
 // fits every 24-bit RGB value into two scalars without using surrogate code units.
+/**
+ * The first code point of Color Unicode, the start of the Private Use Area of the Basic
+ * Multilingual Plane.
+ */
 export const COLOR_UNICODE_BASE = 0xe000;
 
+/**
+ * How many code points Color Unicode uses: the 0x1900 of the Private Use Area, the radix in which a
+ * color is two code points.
+ */
 export const COLOR_UNICODE_WIDTH = 0x1900;
 /**
  * The digits of one Color Unicode code point, a code point of the Basic Multilingual Plane: four
  * hexadecimal digits, and a color takes two of them.
  */
 export const COLOR_UNICODE_CODE_POINT_DIGITS = UNICODE_CODE_DIGITS;
+/**
+ * How many code points stand for one color: two, the quotient and the remainder of its RGB value in
+ * COLOR_UNICODE_WIDTH.
+ */
 export const COLOR_UNICODE_POINTS_PER_COLOR = 2;
 /** Why Color Unicode is refused whose codes do not pair up into colors. */
 export const COLOR_UNICODE_PAIRS = "Color Unicode needs two four-digit codes for every color.";

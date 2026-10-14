@@ -171,6 +171,10 @@ export interface SearchOptions extends SearchRun {
   readonly onProgress?: ((progress: RepairProgress) => void) | undefined;
 }
 
+/**
+ * A planned joint repair of marked shares: what was assessed, the search over what is open, and the
+ * wipe of what it keeps of the secret.
+ */
 export interface JointPlan {
   readonly assessment: JointAssessment;
   /** Tries every open combination; resolves with every phrase that passes, possibly none. */

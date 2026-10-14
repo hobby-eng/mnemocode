@@ -17,7 +17,7 @@
 // Host-neutral: it imports only @scure/bip39 and the core modules above.
 
 import { serializeRecord } from "../record.js";
-import { Masking, type MaskingMode, MissingChecksum } from "./masking.js";
+import { Masking, type MaskingMode, MissingChecksumError } from "./masking.js";
 import { parseInput } from "./representations.js";
 import {
   type DateShiftDate,
@@ -80,7 +80,7 @@ export interface EncodeOptions {
 
 // The refusal is Masking's, which checks it (Masking.assertCodes); here too for the hosts that
 // take it with the backup.
-export { MissingChecksum };
+export { MissingChecksumError };
 
 /**
  * The codes of one encoded seed phrase with their format and mode. A class pays off here: it is
@@ -120,7 +120,7 @@ export class EncodedBackup extends Redacted {
 
   /**
    * Reads codes written in `format` as the codes of a seed phrase made with `mode`. Throws why
-   * they cannot be, naming places and counts only; MissingChecksum for a checksum-keeping mode.
+   * they cannot be, naming places and counts only; MissingChecksumError for a checksum-keeping mode.
    */
   static read(text: string, format: EncodedFormat, mode: MaskingMode): EncodedBackup {
     return EncodedBackup.of(parseInput(text, format), format, mode);

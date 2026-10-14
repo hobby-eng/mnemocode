@@ -50,7 +50,7 @@ import {
   type AddressLocation,
   type CoinAddress,
   type CoinId,
-  AddressRefusal,
+  AddressRefusalError,
 } from "./coins/coin.js";
 import { BITCOIN } from "./coins/bitcoin-like.js";
 import {
@@ -73,15 +73,21 @@ export type { AddressLocation, CoinId };
 
 /** The networks that evidence is compared on, mainnet first as the default. */
 export const BITCOIN_NETWORKS = Object.freeze(["mainnet", "testnet"] as const);
+/** A network that evidence is compared on (BITCOIN_NETWORKS). */
 export type BitcoinNetworkName = (typeof BITCOIN_NETWORKS)[number];
 /** The networks as a refusal names them: "mainnet or testnet". */
 export const BITCOIN_NETWORKS_TEXT = listInWords(BITCOIN_NETWORKS, "or");
+/**
+ * The Bitcoin address profiles that an address is checked across: legacy, nested SegWit, native
+ * SegWit and Taproot.
+ */
 export const bitcoinProfiles = Object.freeze([
   "legacy",
   "nested-segwit",
   "native-segwit",
   "taproot",
 ] as const);
+/** One of the Bitcoin address profiles (bitcoinProfiles). */
 export type BitcoinProfile = (typeof bitcoinProfiles)[number];
 
 /** Whether `value` names a network that the evidence is compared on. A host words its refusal. */
@@ -111,6 +117,7 @@ export function isFirstReceiving(location: AddressLocation): boolean {
   return location.account === account && location.branch === branch && location.index === index;
 }
 
+/** A place of an address on a network: its account, branch and index. */
 export interface DerivationLocation extends AddressLocation {
   readonly network: BitcoinNetworkName;
 }
@@ -333,7 +340,7 @@ function bitcoinAddressOn(value: string, network: BitcoinNetworkName): CoinAddre
     address = BITCOIN.parse(value);
   } catch (error) {
     // An address of a script is Bitcoin's, only of no single key: said as the coin says it.
-    if (error instanceof AddressRefusal && error.kind === "not-single-key") throw error;
+    if (error instanceof AddressRefusalError && error.code === "not-single-key") throw error;
     throw new Error(`The address is not valid for Bitcoin ${network}.`);
   }
   const on = networkNamed(address.testnet);

@@ -5,12 +5,16 @@ import {
   type MaskingMode,
 } from "./core/types.js";
 
+/** The version of the MNC1 record that this program writes, and the only one it reads. */
 export const MNEMOCODE_RECORD_VERSION = 1 as const;
 /** @deprecated Use MaskingMode; kept because index.ts exports it and hosts import it. */
 export type RecordMode = MaskingMode;
 /** @deprecated Use EncodedFormat; kept because index.ts exports it and hosts import it. */
 export type RecordFormat = EncodedFormat;
 
+/**
+ * An MNC1 record as it is read: its version, its mode, its form of codes and the codes themselves.
+ */
 export interface MnemoCodeRecord {
   readonly version: typeof MNEMOCODE_RECORD_VERSION;
   readonly mode: MaskingMode;

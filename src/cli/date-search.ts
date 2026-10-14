@@ -40,7 +40,7 @@ import {
   walletNeeded,
 } from "../core/date-search.js";
 import type { SeedshiftMode } from "../core/date-recovery.js";
-import { EncodedBackup, MissingChecksum } from "../core/encoded-backup.js";
+import { EncodedBackup, MissingChecksumError } from "../core/encoded-backup.js";
 import type { MissingCodes } from "../core/missing-codes.js";
 import { Masking, PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
 import { masterFingerprint, walletCheckOf, type WalletEvidence } from "../bitcoin-evidence.js";
@@ -238,23 +238,25 @@ export function encodedFingerprintOf(backup: EncodedBackup): string | undefined 
 
 /** Where the encoded seed phrase comes from: typed, or a file read again after a problem. */
 class BackupSource {
-  private typed: boolean;
-  private readonly qr: boolean;
-  private reads = 0;
+  #typed: boolean;
+  readonly #qr: boolean;
+  #reads = 0;
+  readonly #args: ParsedArguments;
 
-  constructor(private readonly args: ParsedArguments) {
-    this.qr = value(args, "qr-file") !== undefined;
-    this.typed = !this.qr && value(args, "input-file") === undefined;
+  constructor(args: ParsedArguments) {
+    this.#args = args;
+    this.#qr = value(args, "qr-file") !== undefined;
+    this.#typed = !this.#qr && value(args, "input-file") === undefined;
   }
 
   /** Whether the text read last came from a QR code image. */
   get readsQr(): boolean {
-    return !this.typed && this.qr;
+    return !this.#typed && this.#qr;
   }
 
   /** The choice that asks for the phrase again, for the questions after a problem. */
   againChoice(): Choice<"again"> {
-    return this.typed
+    return this.#typed
       ? { label: "Type the encoded seed phrase again", value: "again" }
       : { label: "Read another file", note: "or type the encoded seed phrase", value: "again" };
   }
@@ -263,26 +265,26 @@ class BackupSource {
    * The text of the next attempt; `problem`, shown first, is why the last one could not be used.
    */
   async next(problem: string | undefined): Promise<string> {
-    if (this.typed) {
+    if (this.#typed) {
       if (problem !== undefined) terminalNotice(problem, "warning");
       return askSecretUntil("Encoded seed phrase or record:", recordText, {
         what: "the encoded seed phrase or its record",
         hints: EncodedForm.typedWords,
       });
     }
-    if (this.reads === 0) {
-      this.reads += 1;
+    if (this.#reads === 0) {
+      this.#reads += 1;
       try {
-        return await encodedInput(this.args);
+        return await encodedInput(this.#args);
       } catch (error) {
         problem = refusal(error);
       }
     }
-    return this.otherSource(problem);
+    return this.#otherSource(problem);
   }
 
   /** After a file could not be used: another file, the phrase typed instead, or Stop. */
-  private async otherSource(problem: string | undefined): Promise<string> {
+  async #otherSource(problem: string | undefined): Promise<string> {
     for (;;) {
       if (problem !== undefined) terminalNotice(problem, "warning");
       problem = undefined;
@@ -291,14 +293,14 @@ class BackupSource {
         { label: "Type the encoded seed phrase", note: "or paste it", value: "typed" },
       ] as const);
       if (next === "typed") {
-        this.typed = true;
+        this.#typed = true;
         return this.next(undefined);
       }
       const text = await askValueUntil(
-        this.qr ? "QR code file name:" : "Record file name:",
+        this.#qr ? "QR code file name:" : "Record file name:",
         (answer) => {
           const path = droppedPath(answer);
-          return this.qr ? decodeQrPngFile(path) : readBoundedTextFile(path, "The file");
+          return this.#qr ? decodeQrPngFile(path) : readBoundedTextFile(path, "The file");
         },
         { what: "the name of the file" },
       );
@@ -414,7 +416,7 @@ async function checkedBackup(
   try {
     return { kind: "codes", backup: codes.withMode(mode), recordMode };
   } catch (error) {
-    if (!(error instanceof MissingChecksum)) throw error;
+    if (!(error instanceof MissingChecksumError)) throw error;
     const choice = await askAfterFailure(
       error.message,
       [{ label: "It was the Original Seedshift", value: "legacy" }, source.againChoice()] as const,
@@ -652,7 +654,7 @@ export async function withDateProgress<T>(
  * `limits.maxCandidates`, or without that limit one longer than twelve hours on this computer
  * (DateSearch.plan, SearchPlan.ask), is asked for first on the private screen and needs
  * --max-candidates elsewhere. Ctrl+C is read as a key during the search's turns and stops it at
- * the next one (InputCancelled). Undefined when the person chose not to search.
+ * the next one (InputCancelledError). Undefined when the person chose not to search.
  */
 export async function searchDates(
   request: DateSearchRequest,

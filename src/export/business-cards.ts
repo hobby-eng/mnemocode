@@ -71,6 +71,12 @@ interface RenderContext {
   fieldColor: (dark: boolean | undefined, index: number) => ReturnType<typeof rgb>;
 }
 
+/**
+ * Draws the business cards of `content` in `style` as a PDF: the sheet of the whole collection, or
+ * with `individualIndex` that one separate card; `styleOffset` turns the mixed design's styles
+ * further for each card. Refuses content that is not color cards and a page size that does not
+ * exist.
+ */
 export async function renderBusinessCards(
   drawing: BusinessDrawing,
   style: BusinessStyle,

@@ -138,62 +138,65 @@ const ENTER = "\r";
  * all of it, and colours. Any other sequence fails the test.
  */
 class Screen {
-  private rows: string[][] = [[]];
-  private row = 0;
-  private column = 0;
+  #rows: string[][] = [[]];
+  #row = 0;
+  #column = 0;
   /** Whether the cursor waits on the last column, where the next character wraps first. */
-  private waiting = false;
+  #waiting = false;
 
-  constructor(
-    private readonly columns: number,
-    private readonly height = Number.POSITIVE_INFINITY,
-  ) {}
+  readonly #columns: number;
+  readonly #height: number;
+
+  constructor(columns: number, height = Number.POSITIVE_INFINITY) {
+    this.#columns = columns;
+    this.#height = height;
+  }
 
   write(text: string): void {
     const characters = [...text];
     for (let index = 0; index < characters.length; index += 1) {
       const character = characters[index]!;
-      if (character === ESCAPE) index = this.control(characters, index);
-      else if (character === "\r") this.moveTo(this.row, 0);
-      else if (character === "\n") this.moveTo(this.row + 1, 0);
-      else this.put(character);
+      if (character === ESCAPE) index = this.#control(characters, index);
+      else if (character === "\r") this.#moveTo(this.#row, 0);
+      else if (character === "\n") this.#moveTo(this.#row + 1, 0);
+      else this.#put(character);
     }
   }
 
   /** The text of every row, without the spaces at the end, down to the row of the cursor. */
   lines(): string[] {
-    return this.rows.map((cells) => cells.join("").trimEnd());
+    return this.#rows.map((cells) => cells.join("").trimEnd());
   }
 
   cursor(): readonly [number, number] {
-    return [this.row, this.column];
+    return [this.#row, this.#column];
   }
 
-  private moveTo(row: number, column: number): void {
-    this.row = Math.max(0, row);
-    this.column = Math.min(this.columns - 1, column);
-    this.waiting = false;
-    while (this.rows.length <= this.row) this.rows.push([]);
+  #moveTo(row: number, column: number): void {
+    this.#row = Math.max(0, row);
+    this.#column = Math.min(this.#columns - 1, column);
+    this.#waiting = false;
+    while (this.#rows.length <= this.#row) this.#rows.push([]);
     // Below the last row the screen scrolls up, and the cursor stays on the last row.
-    while (this.rows.length > this.height) {
-      this.rows.shift();
-      this.row -= 1;
+    while (this.#rows.length > this.#height) {
+      this.#rows.shift();
+      this.#row -= 1;
     }
   }
 
-  private put(character: string): void {
+  #put(character: string): void {
     const width = displayWidth(character);
-    if (this.waiting || this.column + width > this.columns) this.moveTo(this.row + 1, 0);
-    const cells = this.rows[this.row]!;
-    while (cells.length < this.column) cells.push(" ");
+    if (this.#waiting || this.#column + width > this.#columns) this.#moveTo(this.#row + 1, 0);
+    const cells = this.#rows[this.#row]!;
+    while (cells.length < this.#column) cells.push(" ");
     // A wide character takes two cells; the second is left empty.
-    cells.splice(this.column, width, character, ...Array<string>(width - 1).fill(""));
-    if (this.column + width === this.columns) this.waiting = true;
-    else this.column += width;
+    cells.splice(this.#column, width, character, ...Array<string>(width - 1).fill(""));
+    if (this.#column + width === this.#columns) this.#waiting = true;
+    else this.#column += width;
   }
 
   /** Reads the sequence that starts at `at` (ECMA-48 CSI) and returns where it ends. */
-  private control(characters: readonly string[], at: number): number {
+  #control(characters: readonly string[], at: number): number {
     if (characters[at + 1] !== "[") throw new Error(`unexpected escape at ${at}`);
     let end = at + 2;
     let parameters = "";
@@ -201,15 +204,15 @@ class Screen {
       parameters += characters[end++];
     const final = characters[end];
     const count = Number(parameters === "" ? "1" : parameters);
-    if (final === "A") this.moveTo(this.row - count, this.column);
-    else if (final === "C") this.moveTo(this.row, this.column + count);
-    else if (final === "H" && parameters === "") this.moveTo(0, 0);
+    if (final === "A") this.#moveTo(this.#row - count, this.#column);
+    else if (final === "C") this.#moveTo(this.#row, this.#column + count);
+    else if (final === "H" && parameters === "") this.#moveTo(0, 0);
     else if (final === "J" && parameters === "") {
-      this.rows[this.row] = this.rows[this.row]!.slice(0, this.column);
-      this.rows.length = this.row + 1;
+      this.#rows[this.#row] = this.#rows[this.#row]!.slice(0, this.#column);
+      this.#rows.length = this.#row + 1;
     } else if (final === "J" && parameters === "2") {
       // Every row is cleared; those below the cursor count as never written.
-      this.rows = Array.from({ length: this.row + 1 }, () => []);
+      this.#rows = Array.from({ length: this.#row + 1 }, () => []);
     } else if (final !== "m") throw new Error(`unexpected sequence ESC [ ${parameters}${final}`);
     return end;
   }

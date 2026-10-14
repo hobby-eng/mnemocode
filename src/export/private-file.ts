@@ -19,13 +19,17 @@ export async function makePrivateFolder(path: string): Promise<void> {
   await mkdir(path, { mode: PRIVATE_FOLDER_MODE });
 }
 
+/** The code of a file saved whose staging copy was left behind, this module's own error. */
+export type PrivateFileErrorCode = "left-staging-copy";
+
 /**
  * A file saved in full whose private staging folder, which holds a copy of it, could not be
  * removed afterwards. Not a failed save: the file is complete, and the person is told that it is
  * saved and that the folder is to be deleted, never left unaware of the copy (AUD-014,
  * adjudication "Cleanup can fail after file publication").
  */
-export class LeftStagingCopy extends Error {
+export class LeftStagingCopyError extends Error {
+  readonly code: PrivateFileErrorCode = "left-staging-copy";
   readonly saved: string;
   readonly staging: string;
 
@@ -34,7 +38,7 @@ export class LeftStagingCopy extends Error {
       `Saved ${saved}, but its private staging folder ${staging}, which holds a copy of it, could not be removed: delete it.`,
       { cause },
     );
-    this.name = "LeftStagingCopy";
+    this.name = "LeftStagingCopyError";
     this.saved = saved;
     this.staging = staging;
   }
@@ -44,7 +48,7 @@ export class LeftStagingCopy extends Error {
  * Writes `bytes` to a new private file in a staging folder beside `destination`, on its file
  * system, so that a link to it or a rename of it is atomic, and hands it to `publish`; the staging
  * folder is removed afterwards, whatever happens. A removal that fails after the file was
- * published is a LeftStagingCopy, not a failed save.
+ * published is a LeftStagingCopyError, not a failed save.
  */
 async function withStagedFile(
   destination: string,
@@ -63,7 +67,7 @@ async function withStagedFile(
       await rm(staging, { recursive: true, force: true });
     } catch (error) {
       if (!published) throw error;
-      throw new LeftStagingCopy(destination, staging, error);
+      throw new LeftStagingCopyError(destination, staging, error);
     }
   }
 }

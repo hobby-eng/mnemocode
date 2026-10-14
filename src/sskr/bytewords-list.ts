@@ -1,5 +1,6 @@
 // Blockchain Commons Bytewords (BCR-2020-012); extracted from pinned bc-ur WASM.
 // Copyright Blockchain Commons; BSD-2-Clause-Patent. See sskr-wasm/NOTICE.md.
+/** The 256 Bytewords, each standing for the byte of its place in the list. */
 export const bytewords = [
   "able",
   "acid",
@@ -270,6 +271,7 @@ export const MINIMAL_BYTEWORDS: readonly string[] = Object.freeze(
 export const BYTEWORD_VALUES: ReadonlyMap<string, number> = new Map(
   bytewords.map((word, value) => [word, value]),
 );
+/** The byte that each minimal Byteword, the first and last letters of a Byteword, stands for. */
 export const MINIMAL_BYTEWORD_VALUES: ReadonlyMap<string, number> = new Map(
   MINIMAL_BYTEWORDS.map((pair, value) => [pair, value]),
 );

@@ -7,7 +7,7 @@
 import { Masking } from "../core/masking.js";
 import { type WalletEvidence } from "../bitcoin-evidence.js";
 import { type SeedshiftMode } from "../core.js";
-import { candidateListHolds, TooManyForList } from "../core/candidate-list.js";
+import { candidateListHolds, TooManyForListError } from "../core/candidate-list.js";
 import {
   DatesAnswer,
   NARROW_DATE_SEARCH,
@@ -43,7 +43,7 @@ import {
   transformMode,
 } from "./input.js";
 import { terminalNotice } from "./terminal.js";
-import { InputCancelled } from "./terminal-input.js";
+import { InputCancelledError } from "./terminal-input.js";
 import { counting } from "../core/search-plan.js";
 import type { MaskingMode } from "../core/types.js";
 
@@ -146,7 +146,7 @@ async function recoverFromOptions(args: ParsedArguments, settings: Settings): Pr
   // Asked on the private screen whether to make a search longer than allowed, the person said no.
   if (result === undefined) {
     if (settings.target !== undefined) settings.target.discard();
-    throw new InputCancelled();
+    throw new InputCancelledError();
   }
   reportDateMatches(result, { mode, evidence: settings.evidence, maxResults: settings.maxResults });
   if (result.matchCount === 0) {
@@ -154,7 +154,7 @@ async function recoverFromOptions(args: ParsedArguments, settings: Settings): Pr
     return;
   }
   if (settings.target !== undefined) {
-    if (!candidateListHolds(result.matchCount)) throw new TooManyForList(NARROW_DATE_SEARCH);
+    if (!candidateListHolds(result.matchCount)) throw new TooManyForListError(NARROW_DATE_SEARCH);
     await saveList(settings, result);
   }
   dateMatchNotes(settings.evidence);
@@ -250,7 +250,7 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
         listed = true;
         dateMatchNotes(evidence);
       } else if (!listable)
-        terminalNotice(new TooManyForList(NARROW_DATE_SEARCH).message, "warning");
+        terminalNotice(new TooManyForListError(NARROW_DATE_SEARCH).message, "warning");
       const next = await askAfterDateSearch(result, {
         evidence,
         mode,

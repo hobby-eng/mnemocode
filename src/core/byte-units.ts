@@ -6,10 +6,15 @@ export function limitName(bytes: number): string {
   return `${bytes / MEBIBYTE} MiB`;
 }
 
+/** The code of the refusal of an input larger than its limit, this module's only error. */
+export type ByteLimitErrorCode = "too-large";
+
 /** The refusal of an input larger than its limit: "`what` exceeds the 1 MiB safety limit." */
-export class InputTooLarge extends Error {
+export class InputTooLargeError extends Error {
+  readonly code: ByteLimitErrorCode = "too-large";
+
   constructor(what: string, limit: number) {
     super(`${what} exceeds the ${limitName(limit)} safety limit.`);
-    this.name = "InputTooLarge";
+    this.name = "InputTooLargeError";
   }
 }

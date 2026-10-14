@@ -16,6 +16,7 @@ import { CRC32_BYTES, shareMask } from "./checksum.js";
 export const SHARE_HEADER_BYTES = 2;
 /** The bytes of one color, #RRGGBB, red first. */
 export const RGB_BYTES = 3;
+/** The version byte of shares written in colors, MnemoCode's own form. */
 export const COLOR_VERSION = 0xa1;
 /** Shares written as BIP39 word numbers or Unicode codes: MnemoCode's own form, like colors. */
 export const WORD_VERSION = 0xa2;

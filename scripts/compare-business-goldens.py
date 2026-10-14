@@ -1,7 +1,9 @@
 """Compare rendered PDF pixels at fixed resolution, ignoring PDF timestamps.
 
 Every PDF of the two folders is compared: the fixtures are what business-goldens.mjs wrote, so a
-new fixture needs no list here, and a file found in only one folder is a failure.
+new fixture needs no list here, and a file found in only one folder is a failure. It needs Pillow,
+installed with
+    python3 -m pip install --require-hashes -r scripts/compare-business-goldens-requirements.txt
 """
 
 import argparse

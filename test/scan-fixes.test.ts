@@ -21,7 +21,7 @@ import {
   SAMPLE_FILE_BASE,
   SAMPLE_WORD_COUNTS,
 } from "../src/export/card-preview.js";
-import { MissingChecksum as EncodedBackupMissingChecksum } from "../src/core/encoded-backup.js";
+import { MissingChecksumError as EncodedBackupMissingChecksum } from "../src/core/encoded-backup.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { typedCommand, typedLine } from "../src/cli/shell-command.js";
 import { describeError, refusalMessage } from "../src/core/refusal.js";
@@ -91,7 +91,12 @@ import { parseArguments, choiceOption, assertAskedNotGiven, flagOf } from "../sr
 import { runDecode } from "../src/cli/decode-command.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
-import { Masking, SPLIT_MODES_ONLY, MissingChecksum, PHRASE_WORDS } from "../src/core/masking.js";
+import {
+  Masking,
+  SPLIT_MODES_ONLY,
+  MissingChecksumError,
+  PHRASE_WORDS,
+} from "../src/core/masking.js";
 import { wordTableRow, wordTableText, wordIndexOf, unicodeIndexesOf } from "../src/core/words.js";
 import { runTable } from "../src/cli/table-command.js";
 import {
@@ -199,8 +204,8 @@ import {
 } from "../src/core/colors.js";
 import { hexCodePoint } from "../src/core/code-text.js";
 import { parseRecord } from "../src/record.js";
-import { invalidAddress, DAMAGED, AddressRefusal, CoinList } from "../src/core/coins/coin.js";
-import { InputTooLarge } from "../src/core/byte-units.js";
+import { invalidAddress, DAMAGED, AddressRefusalError, CoinList } from "../src/core/coins/coin.js";
+import { InputTooLargeError } from "../src/core/byte-units.js";
 import { RESTORED_FORM } from "../src/sskr/share-set.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import { SearchPlan, TELL_SECONDS } from "../src/core/search-plan.js";
@@ -273,7 +278,7 @@ import {
   DEFAULT_TEMPLATE_ID,
   BUSINESS_STYLES,
   designOfStyle,
-  NoCardTemplate,
+  NoCardTemplateError,
 } from "../src/export/template-catalog.js";
 import {
   cardTemplates,
@@ -313,7 +318,7 @@ import {
   cursorUp,
   cursorRight,
 } from "../src/cli/terminal.js";
-import { NOT_UTF8, InputCancelled } from "../src/cli/terminal-input.js";
+import { NOT_UTF8, InputCancelledError } from "../src/cli/terminal-input.js";
 import {
   isUnusableOutputPath,
   validateOutputPaths,
@@ -372,7 +377,7 @@ import {
   encryptCandidates,
   encryptCandidatesWithPassphrase,
   NoProtection,
-  CandidateFileRefused,
+  CandidateFileRefusedError,
   decryptCandidates,
 } from "../src/core/candidate-encryption.js";
 import { OpenedCandidateList } from "../src/core/candidate-list.js";
@@ -1264,8 +1269,8 @@ describe("S026: one refusal of codes without the checksum their mode keeps", () 
     const codes = Array.from({ length: 12 }, () => 0);
     const message = "These codes lack the BIP39 checksum that MnemoCode Seedshift gives them.";
     expect(() => decodeIndexes(codes, [parseDate("01-01-2000")])).toThrow(message);
-    expect(() => EncodedBackup.of(codes, "indexes", "seedshift")).toThrow(MissingChecksum);
-    expect(EncodedBackupMissingChecksum).toBe(MissingChecksum);
+    expect(() => EncodedBackup.of(codes, "indexes", "seedshift")).toThrow(MissingChecksumError);
+    expect(EncodedBackupMissingChecksum).toBe(MissingChecksumError);
     expect(() => Masking.of("seedshift-legacy").assertCodes(codes)).not.toThrow();
   });
 });
@@ -1353,12 +1358,12 @@ describe("S035: refusals told apart by their kind, not their words", () => {
 
   it("gives an address refusal its reason, and too large input its own class", () => {
     const refusal = invalidAddress(DAMAGED);
-    expect(refusal).toBeInstanceOf(AddressRefusal);
+    expect(refusal).toBeInstanceOf(AddressRefusalError);
     expect(refusal.reason).toBe(DAMAGED);
     expect(refusal.message).toBe(
       "The address cannot be used for the check: its checksum or format is wrong.",
     );
-    expect(new InputTooLarge("Text input", 1024 * 1024).message).toBe(
+    expect(new InputTooLargeError("Text input", 1024 * 1024).message).toBe(
       "Text input exceeds the 1 MiB safety limit.",
     );
   });
@@ -1918,7 +1923,9 @@ describe("S085: one Stop that cancels, one question and one answer for more shar
     const stops = readdirSync("src", { recursive: true, encoding: "utf8" })
       .filter((file) => file.endsWith(".ts"))
       .filter((file) =>
-        /=== "stop"\) throw new InputCancelled\(\)/u.test(readFileSync(join("src", file), "utf8")),
+        /=== "stop"\) throw new InputCancelledError\(\)/u.test(
+          readFileSync(join("src", file), "utf8"),
+        ),
       );
     expect(stops).toEqual([]);
     expect(WHAT_NOW).toBe("What now?");
@@ -2050,7 +2057,7 @@ describe("S092: the shapes of terminal lines in the style leaf", () => {
     expect(factLine(plain, "Protection", "no network", 11)).toBe("  Protection  no network");
     expect(styledMarkedLinesForTest(plain, "Careful.", "warning")).toEqual(["! Careful."]);
     expect(styledNoticeLines(plain, "Careful.", "warning")).toEqual(["Careful."]);
-    expect(new InputCancelled().message).toBe(CANCELLED_MESSAGE);
+    expect(new InputCancelledError().message).toBe(CANCELLED_MESSAGE);
     expect(CANCELLED_EXIT_CODE).toBe(130);
   });
 });
@@ -2219,10 +2226,12 @@ describe("S111: the invented details of an export have one owner", () => {
 
 describe("S114: a kind of card without a design is refused by its kind", () => {
   it("names no form number in the library; the command line names the forms of cards", () => {
-    expect(new NoCardTemplate(undefined).message).toBe("No card template is installed.");
-    expect(new NoCardTemplate("colors").kind).toBe("colors");
-    expect(new NoCardTemplate("colors").message).not.toMatch(/\d/u);
-    expect(noCardTemplateMessage(new NoCardTemplate("colors"))).toContain("use format 3, 4 or 5");
+    expect(new NoCardTemplateError(undefined).message).toBe("No card template is installed.");
+    expect(new NoCardTemplateError("colors").kind).toBe("colors");
+    expect(new NoCardTemplateError("colors").message).not.toMatch(/\d/u);
+    expect(noCardTemplateMessage(new NoCardTemplateError("colors"))).toContain(
+      "use format 3, 4 or 5",
+    );
     // Word numbers have no cards: their refusal names the forms that do.
     expect(() => validateCardOptions({ pdf: "cards.pdf" }, "indexes")).toThrow(
       `Card export requires format ${CARD_FORMAT_NUMBERS}.`,
@@ -2845,12 +2854,12 @@ describe("G1-028: a candidate file is refused with why", () => {
         (error: unknown) => error,
       );
     const wrongKey = await refusal({ identity: other.identity }, file);
-    expect(wrongKey).toBeInstanceOf(CandidateFileRefused);
-    expect((wrongKey as CandidateFileRefused).problem).toBe("key");
+    expect(wrongKey).toBeInstanceOf(CandidateFileRefusedError);
+    expect((wrongKey as CandidateFileRefusedError).code).toBe("key");
     const changed = Uint8Array.from(file);
     changed[changed.length - 1]! ^= 1;
     const damaged = await refusal({ identity: session.identity }, changed);
-    expect((damaged as CandidateFileRefused).problem).toBe("damaged");
+    expect((damaged as CandidateFileRefusedError).code).toBe("damaged");
     expect((damaged as Error).message).toMatch(/invalid tag/u);
   });
 });

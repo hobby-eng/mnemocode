@@ -13,7 +13,7 @@
 // self-test modules.
 
 import {
-  CandidateFileRefused,
+  CandidateFileRefusedError,
   createSessionIdentity,
   decryptCandidates,
   encryptCandidates,
@@ -31,7 +31,7 @@ import {
 import { CandidateFileAdmission } from "./candidate-file-admission.js";
 
 /**
- * `open` refused as a CandidateFileRefused with `problem` and a message that `because` matches;
+ * `open` refused as a CandidateFileRefusedError with `problem` and a message that `because` matches;
  * a refusal of another class or problem is another reason.
  */
 function expectFileRefused(
@@ -45,7 +45,7 @@ function expectFileRefused(
       try {
         await open();
       } catch (error) {
-        if (error instanceof CandidateFileRefused && error.problem === problem) throw error;
+        if (error instanceof CandidateFileRefusedError && error.code === problem) throw error;
         throw new Error("refused for another reason");
       }
     },

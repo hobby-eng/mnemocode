@@ -424,13 +424,13 @@ export class Masking {
 
   /**
    * Refuses codes that this mode cannot have written: a phrase's count and BIP39 indexes, and,
-   * where the mode keeps the checksum (keepsChecksum), a valid one (MissingChecksum).
+   * where the mode keeps the checksum (keepsChecksum), a valid one (MissingChecksumError).
    */
   assertCodes(indexes: readonly number[]): void {
     // Checked before the words are looked up, which would report a bad index as a bad checksum.
     assertPhraseIndexes(indexes);
     if (this.keepsChecksum && !phraseChecksumValid(phraseOfIndexes(indexes)))
-      throw new MissingChecksum(this.#mode);
+      throw new MissingChecksumError(this.#mode);
   }
 
   /**
@@ -475,13 +475,17 @@ export class Masking {
   }
 }
 
+/** The code of the refusal of codes without their mode's checksum, this module's own error. */
+export type MaskingErrorCode = "missing-checksum";
+
 /** Codes that lack the BIP39 checksum that their mode gives every phrase it writes. */
-export class MissingChecksum extends Error {
+export class MissingChecksumError extends Error {
+  readonly code: MaskingErrorCode = "missing-checksum";
   readonly mode: MaskingMode;
 
   constructor(mode: MaskingMode) {
     super(`These codes lack the BIP39 checksum that ${Masking.of(mode).name} gives them.`);
-    this.name = "MissingChecksum";
+    this.name = "MissingChecksumError";
     this.mode = mode;
   }
 }

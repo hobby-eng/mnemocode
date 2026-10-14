@@ -42,6 +42,10 @@ export {
 // modules that already take the words.
 export { BIP39_DICTIONARY_SIZE, BIP39_INDEX_BITS };
 
+/**
+ * The English words of `mnemonic`, in their canonical form; refuses a count of words that BIP39
+ * does not have, a word that is not in its list and a failed checksum.
+ */
 export function validatedEnglishWords(mnemonic: string): string[] {
   const words = canonicalEnglishWords(mnemonic);
   assertWordCount(words.length);
@@ -56,6 +60,7 @@ export function validatedEnglishWords(mnemonic: string): string[] {
 export const UNICODE_CODES: readonly string[] = Object.freeze(
   traditionalChineseWordlist.map(unicodeHex),
 );
+/** The word number, from 0, of each Unicode code of the BIP39 Chinese word list. */
 export const UNICODE_INDEX: ReadonlyMap<string, number> = new Map(
   UNICODE_CODES.map((code, index) => [code, index]),
 );
@@ -70,6 +75,10 @@ export function unicodeCodesOfIndexes(indexes: readonly number[]): string[] {
   return indexes.map((index) => UNICODE_CODES[index]!);
 }
 
+/**
+ * The English words of `mnemonic`, lower case and NFKD as BIP39 takes them; refuses a count of
+ * words that BIP39 does not have and a word that is not in its list.
+ */
 export function canonicalEnglishWords(mnemonic: string): string[] {
   const words = englishTokens(mnemonic);
   if (!isBip39WordCount(words.length)) {
@@ -147,6 +156,10 @@ export function unicodeIndexesOf(text: string): number[] {
 // The count rule belongs to bip39-sizes.ts, which loads no word list; here too for its old callers.
 export { assertWordCount };
 
+/**
+ * The Unicode code of `symbol`, one Unicode scalar value, as four or more hexadecimal digits in
+ * capitals.
+ */
 export function unicodeHex(symbol: string): string {
   const points = Array.from(symbol);
   if (points.length !== 1)
@@ -154,6 +167,7 @@ export function unicodeHex(symbol: string): string {
   return hexCodePoint(points[0]!.codePointAt(0)!);
 }
 
+/** The row of the word table for word number `index`, from 1 through 2,048. */
 export function mappingRow(index: number): MappingRow {
   if (!inWholeRange(index, WORD_NUMBER_RANGE))
     throw new Error(`A wordlist index must be from ${WORD_NUMBERS_THROUGH}.`);
@@ -165,6 +179,7 @@ export function mappingRow(index: number): MappingRow {
   };
 }
 
+/** Every row of the word table, in the order of the word numbers. */
 export function allMappingRows(): MappingRow[] {
   return Array.from({ length: BIP39_DICTIONARY_SIZE }, (_, index) => mappingRow(index + 1));
 }

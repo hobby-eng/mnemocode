@@ -12,6 +12,10 @@ export function qrSizeMm(qr: QrModules, minimum = 28): number {
   return qrSizeForModuleMm(qr, minimum, MIN_MODULE_MM);
 }
 
+/**
+ * The side of the QR code `qr`, quiet zone included, in millimetres for modules `moduleMm` wide,
+ * and at least `minimum`; refuses a module size that is not a positive measurement.
+ */
 export function qrSizeForModuleMm(qr: QrModules, minimum: number, moduleMm: number): number {
   if (!Number.isFinite(moduleMm) || moduleMm <= 0)
     throw new Error("The QR module size must be a positive physical measurement.");

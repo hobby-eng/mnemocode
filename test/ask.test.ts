@@ -43,7 +43,7 @@ import {
 } from "../src/cli/ask.js";
 import { assertWalletPlaceUsed, walletPlaceOf } from "../src/cli/bitcoin-options.js";
 import { LAST_NORMAL_INDEX } from "../src/core/address-scan.js";
-import { InputCancelled } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-input.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
@@ -60,7 +60,7 @@ class Keyboard extends EventEmitter {
   readonly isTTY = true;
   flowing = false;
   /** Bytes typed while nothing reads: the terminal keeps them until a question reads again. */
-  private held: Buffer[] = [];
+  #held: Buffer[] = [];
 
   setRawMode(): this {
     return this;
@@ -70,7 +70,7 @@ class Keyboard extends EventEmitter {
     this.flowing = true;
     // A terminal gives what it kept at the next read, a moment after reading starts.
     setImmediate(() => {
-      for (const chunk of this.held.splice(0)) this.emit("data", chunk);
+      for (const chunk of this.#held.splice(0)) this.emit("data", chunk);
     });
     return this;
   }
@@ -84,7 +84,7 @@ class Keyboard extends EventEmitter {
   type(keys: string | Buffer): void {
     const chunk = typeof keys === "string" ? Buffer.from(keys, "utf8") : keys;
     if (this.flowing) this.emit("data", chunk);
-    else this.held.push(chunk);
+    else this.#held.push(chunk);
   }
 }
 
@@ -171,14 +171,14 @@ describe("questions asked again until the answer can be used", () => {
   it("lets Ctrl+C through, typed or thrown by the check, and anything not an Error", async () => {
     at("Phrase:", `abc${CTRL_C}`);
     await expect(askSecretUntil("Phrase:", (answer) => answer)).rejects.toBeInstanceOf(
-      InputCancelled,
+      InputCancelledError,
     );
     at("Phrase:", "abc\r");
     await expect(
       askSecretUntil("Phrase:", () => {
-        throw new InputCancelled();
+        throw new InputCancelledError();
       }),
-    ).rejects.toBeInstanceOf(InputCancelled);
+    ).rejects.toBeInstanceOf(InputCancelledError);
     at("Phrase:", "abc\r");
     await expect(
       askSecretUntil("Phrase:", () => {
@@ -195,7 +195,7 @@ describe("questions asked again until the answer can be used", () => {
     expect(notices).toEqual([]);
     keys.type(`typed ahead${CTRL_C}`);
     await expect(askSecretUntil("Dates:", (answer) => answer)).rejects.toBeInstanceOf(
-      InputCancelled,
+      InputCancelledError,
     );
   });
 
@@ -414,11 +414,11 @@ describe("questions asked again until the answer can be used", () => {
   it("ends as a cancel when the input ends, without asking again and again", async () => {
     const asked = askSecretUntil("Phrase:", (answer) => answer);
     setTimeout(() => keys.emit("end"), 30);
-    await expect(asked).rejects.toBeInstanceOf(InputCancelled);
+    await expect(asked).rejects.toBeInstanceOf(InputCancelledError);
     expect(screen.match(/Phrase: /gu)).toHaveLength(1);
     // The end stays: a later question cancels at once.
     await expect(askSecretUntil("Again:", (answer) => answer)).rejects.toBeInstanceOf(
-      InputCancelled,
+      InputCancelledError,
     );
   });
 });

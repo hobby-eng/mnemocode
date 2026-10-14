@@ -6,9 +6,15 @@ import { nodeRenderPlatform } from "./export/platform-node.js";
 import { selectTemplate, templatesOfKind } from "./export/templates.js";
 import { assertColorCardContent } from "./export/card-content.js";
 
+/** The id of a design of color cards, as the catalog names it (templates.ts). */
 export type ColorCardTemplateId = string;
+/** The designs that draw color cards, in the order of the catalog. */
 export const colorCardTemplates = templatesOfKind("colors");
 
+/**
+ * What exportColorPalette draws and saves: the colors, the QR code's text if it is not the colors
+ * themselves, the files to write, the design or designs, and the card settings.
+ */
 export interface ColorExportOptions extends CardSettings {
   readonly colors: readonly string[];
   readonly qrPayload?: string;
@@ -19,6 +25,11 @@ export interface ColorExportOptions extends CardSettings {
   readonly templates?: readonly ColorCardTemplateId[];
 }
 
+/**
+ * Draws the color cards of `options` into its PDF and saves its QR code image, each where a path is
+ * given; refuses colors that the cards cannot print or a QR text that holds others, and a design
+ * given both alone and in a list.
+ */
 export async function exportColorPalette(options: ColorExportOptions): Promise<void> {
   const payload = options.qrPayload ?? options.colors.join(" ");
   // Checked here too: the palette may write only its QR code, and draw no card.

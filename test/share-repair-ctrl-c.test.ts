@@ -51,7 +51,7 @@ vi.mock("../src/sskr/joint-repair.js", async (importOriginal) => {
 });
 
 import { runSskrCombine, runSskrExport } from "../src/cli/sskr-command.js";
-import { InputCancelled } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-input.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
 import { writeShare } from "../src/sskr/transport.js";
 
@@ -140,13 +140,15 @@ describe("Ctrl+C during the assessment of marked shares", () => {
   ])("stops it at its next turn when %s shares", async (_, run) => {
     // Typed once the assessment has begun: it arrives at the assessment's first turn.
     terminal.atAssessment = () => setTimeout(() => keys.type(CTRL_C), 0);
-    await expect(run({ share: markedShares(OPEN_MARKS) })).rejects.toBeInstanceOf(InputCancelled);
+    await expect(run({ share: markedShares(OPEN_MARKS) })).rejects.toBeInstanceOf(
+      InputCancelledError,
+    );
     // The watch ran during the assessment, gave it its signal, and the assessment stopped.
     expect(terminal.modesAtAssessments).toEqual([[true]]);
     expect(terminal.signals).toHaveLength(1);
     expect(terminal.signals[0]?.aborted).toBe(true);
     expect(terminal.assessmentErrors).toHaveLength(1);
-    expect(terminal.assessmentErrors[0]).toBeInstanceOf(InputCancelled);
+    expect(terminal.assessmentErrors[0]).toBeInstanceOf(InputCancelledError);
     expect(terminal.rawModes).toEqual([true, false]);
     expectTerminalGivenBack();
     // Nothing is shown or saved.
@@ -158,7 +160,7 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     terminal.atAssessment = () => keys.type(CTRL_C);
     terminal.passSignal = false;
     await expect(runSskrCombine({ share: markedShares(SETTLED_MARK) })).rejects.toBeInstanceOf(
-      InputCancelled,
+      InputCancelledError,
     );
     // The assessment ended without hearing it; the check after it did.
     expect(terminal.assessmentErrors).toEqual([]);

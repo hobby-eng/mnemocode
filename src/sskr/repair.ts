@@ -101,6 +101,10 @@ export interface FilledElement {
   readonly value: string;
 }
 
+/**
+ * A share as a repair reads it: its UR, its form, whether marked elements were filled in, and
+ * which.
+ */
 export interface ReadRepairableShare {
   readonly ur: string;
   readonly format: ShareFormat;
@@ -119,12 +123,17 @@ export function isMarked(text: string): boolean {
   return text.includes("?");
 }
 
+/** The codes of the errors of a share's repair: several shares fit, the marks fit too many ways. */
+export type ShareRepairErrorCode = "share-variants" | "ambiguous-marks";
+
 /**
  * Thrown when several shares fit the marked elements. The message names only their places: an
  * error may be shown where the screen is not private. The values are in `variants`, for the
  * caller to show where it shows secrets.
  */
 export class ShareVariantsError extends Error {
+  readonly code: ShareRepairErrorCode = "share-variants";
+
   constructor(readonly variants: readonly ReadRepairableShare[]) {
     const places = variants[0]!.filled.map((element) => element.position).join(", ");
     super(
@@ -562,8 +571,11 @@ export const AMBIGUOUS_MARK_WIDTHS =
  * of them is left out unsaid. A joint repair names the share by its place.
  */
 export class AmbiguousMarksError extends Error {
+  readonly code: ShareRepairErrorCode = "ambiguous-marks";
+
   constructor() {
     super(AMBIGUOUS_MARK_WIDTHS);
+    this.name = "AmbiguousMarksError";
   }
 }
 

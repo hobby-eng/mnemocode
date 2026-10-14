@@ -97,7 +97,7 @@ import { exportQrPayload } from "../src/export/qr-image.js";
 import { runEncode } from "../src/cli/encode-command.js";
 import { DatesAnswer } from "../src/core/date-search.js";
 import { promptedEncodeInputs } from "../src/cli/input.js";
-import { InputCancelled } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-input.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
@@ -1036,7 +1036,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       terminal.answers = ["12\x03"];
       terminal.choices = [true];
       await expect(offerEncodedCheck(original, () => undefined, undefined)).rejects.toBeInstanceOf(
-        InputCancelled,
+        InputCancelledError,
       );
     });
   });

@@ -26,6 +26,7 @@ export interface MaterialFinish {
   /** Shown only under a tint, because as photographed it looks too much like another finish. */
   readonly onlyTinted?: boolean;
 }
+/** A colour of a material's catalogue: its name and its #RRGGBB code. */
 export interface CatalogueColour {
   readonly name: string;
   readonly color: string;
@@ -44,6 +45,10 @@ export interface MaterialCatalogue {
    */
   readonly outline: readonly (readonly number[])[];
 }
+/**
+ * The artwork of a material design: the title and backdrop of its study, whether it is dark, its
+ * background colour, its finishes and its catalogue of colours.
+ */
 export interface MaterialArtwork {
   readonly title: string;
   /** The page of the design study: a backdrop from the material's own world. */
@@ -91,6 +96,7 @@ function surfaced(surface: string, scale: number, x: number, y: number): FinishD
 }
 const colours = (entries: Record<string, string>): CatalogueColour[] =>
   Object.entries(entries).map(([name, color]) => ({ name, color }));
+/** The artwork of each material design. */
 export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
   kitchen: {
     title: "KITCHEN / MATERIAL SELECTION",
@@ -467,6 +473,10 @@ function lab(hex: string): [number, number, number] {
   return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
 }
 
+/**
+ * A sample of a material that a card shows for a code: the finish, the catalogue colour laid over
+ * it if any, its label and how it looks.
+ */
 export interface MaterialSample {
   readonly finish: MaterialFinish;
   /** The catalogue colour laid over the photograph; none for a finish as photographed. */
@@ -476,8 +486,10 @@ export interface MaterialSample {
   readonly look: string;
 }
 
-// How strongly a tint covers its photograph; the little of the photograph's own colour that
-// shows through keeps the surface natural.
+/**
+ * How strongly a tint covers its photograph; the little of the photograph's own colour that shows
+ * through keeps the surface natural.
+ */
 export const TINT_OPACITY = 0.85;
 // Codes are far more colourful than any real finish: their colourfulness is scaled per material,
 // then capped near that of the most colourful samples, so that the hue decides the match.

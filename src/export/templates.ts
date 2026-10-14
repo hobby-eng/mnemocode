@@ -38,6 +38,10 @@ export interface CardDrawing extends AssetSource, RandomSource, QrSource {
   readonly businessArtwork: BusinessArtwork;
 }
 
+/**
+ * An installed card design: its id, the kind of codes it draws, its style and family, its name and
+ * description, and how it draws a sheet, a separate card and the plan of a sheet.
+ */
 export interface CardTemplate {
   readonly id: string;
   readonly kind: CardKind;

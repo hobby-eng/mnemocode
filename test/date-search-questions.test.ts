@@ -51,7 +51,7 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
 import { encodeMnemonic, encodeMnemonicLegacy, formatEncoded, parseDate } from "../src/core.js";
 import { askEncodedBackup } from "../src/cli/date-search.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
-import { InputCancelled } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-input.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
 
@@ -366,7 +366,7 @@ describe("recover-date on the private screen", () => {
       terminal.choices = ["stop"];
       await expect(
         recover({ "input-file": bad, mode: "seedshift", "master-fingerprint": FINGERPRINT }),
-      ).rejects.toBeInstanceOf(InputCancelled);
+      ).rejects.toBeInstanceOf(InputCancelledError);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -472,6 +472,6 @@ describe("recover-date on the private screen", () => {
     terminal.answers = [`${MASKED}\r`];
     await expect(
       recover({ mode: "seedshift", "master-fingerprint": FINGERPRINT }),
-    ).rejects.toBeInstanceOf(InputCancelled);
+    ).rejects.toBeInstanceOf(InputCancelledError);
   });
 });

@@ -16,6 +16,7 @@ import { assertColorCardContent, EMPTY_CARD_COLLECTION } from "./card-content.js
 import { withPlannedDecoys } from "./card-plan.js";
 import { SHEETS_ONLY, sheetsOnly } from "./template-catalog.js";
 
+/** One card output: the design that draws it and the content it draws. */
 export interface CardJob {
   readonly template: CardTemplate;
   readonly content: CardContent;

@@ -25,7 +25,11 @@ export type {
 
 /** Where MnemoCode knows no sandbox: nothing is enforced beyond the permission model. */
 class NoSandbox implements SystemSandbox {
-  constructor(private readonly reason: string) {}
+  readonly #reason: string;
+
+  constructor(reason: string) {
+    this.#reason = reason;
+  }
 
   start(): void {}
 
@@ -36,7 +40,7 @@ class NoSandbox implements SystemSandbox {
   }
 
   missing(): readonly string[] {
-    return [this.reason];
+    return [this.#reason];
   }
 
   coreDumps(): CoreDumps {

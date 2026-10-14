@@ -46,6 +46,9 @@ export type HeirBackup =
       readonly codes?: number;
     };
 
+/**
+ * What the sheet for heirs says of a backup: its form, its mode and how many dates mask the phrase.
+ */
 export interface HeirSheetFacts {
   readonly backup: HeirBackup;
   readonly mode: HeirMode;

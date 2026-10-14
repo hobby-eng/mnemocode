@@ -89,6 +89,10 @@ function polymod(groups: readonly number[]): bigint {
   return checksum ^ 1n;
 }
 
+/**
+ * Bitcoin Cash: CashAddr addresses (bitcoincash:q…) and the legacy ones (1…) of one key, on paths
+ * of its own coin type or of Bitcoin's.
+ */
 export const BITCOIN_CASH = new BitcoinCashCoin({
   id: "bitcoin-cash",
   name: "Bitcoin Cash",

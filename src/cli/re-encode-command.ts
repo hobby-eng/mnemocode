@@ -59,7 +59,7 @@ import {
 } from "./re-encode-options.js";
 import { readmeLink, terminalNotice, terminalPart, type NoticeKind } from "./terminal.js";
 import { waitForEnter, type Choice, type Explanation } from "./terminal-choice.js";
-import { InputCancelled } from "./terminal-input.js";
+import { InputCancelledError } from "./terminal-input.js";
 
 /** The options of the old backup by Decode's names, and those of the new one by Encode's. */
 interface SplitOptions {
@@ -98,7 +98,7 @@ async function ofOldBackup<T>(read: () => T | Promise<T>): Promise<T> {
   try {
     return await read();
   } catch (error) {
-    if (!(error instanceof Error) || error instanceof InputCancelled) throw error;
+    if (!(error instanceof Error) || error instanceof InputCancelledError) throw error;
     throw new Error(`${OLD_BACKUP_REFUSAL}${error.message}`, { cause: error });
   }
 }
@@ -282,7 +282,7 @@ async function askedReEncoding(
     decoded: (backup, dates) => confirmAndAsk(ReEncoding.of(backup, dates), backup),
     show: showOldPhrase,
   });
-  if (confirmed === undefined) throw new InputCancelled();
+  if (confirmed === undefined) throw new InputCancelledError();
   return confirmed;
 }
 
@@ -348,7 +348,7 @@ async function newBackupAskedUntilTaken(notices: Notices): Promise<PreparedEncod
     try {
       return await askedNewBackup(notices, refusal);
     } catch (error) {
-      if (error instanceof InputCancelled || !(error instanceof Error)) throw error;
+      if (error instanceof InputCancelledError || !(error instanceof Error)) throw error;
       refusal = error.message;
     }
   }
@@ -409,7 +409,7 @@ async function confirmation(
 ): Promise<Confirmation> {
   if (confirmed === "recognised") {
     if (!(await waitForEnter("Press Enter to make the new backup (Esc stops).")))
-      throw new InputCancelled();
+      throw new InputCancelledError();
     reEncoding.confirmByPerson();
     return { notices: RECOGNISED };
   }

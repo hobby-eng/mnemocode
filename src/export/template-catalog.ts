@@ -20,6 +20,7 @@ export const BUSINESS_STYLES = Object.freeze([
   "facets",
   "mixed",
 ] as const);
+/** A business card design style (BUSINESS_STYLES). */
 export type BusinessStyle = (typeof BUSINESS_STYLES)[number];
 /** The business designs that have artwork of their own: all but "mixed". */
 export type PhysicalBusinessStyle = Exclude<BusinessStyle, "mixed">;
@@ -32,6 +33,7 @@ export const MATERIAL_STYLES = Object.freeze([
   "switch",
   "kitchen",
 ] as const);
+/** A material design style (MATERIAL_STYLES). */
 export type MaterialStyle = (typeof MATERIAL_STYLES)[number];
 
 /** How a design draws: a business style or a material. */
@@ -117,11 +119,15 @@ const CARD_KIND_NAMES: Readonly<Record<CardKind, string>> = Object.freeze({
   colors: "color",
 });
 
+/** The code of the refusal of cards that no installed design draws, the catalog's own error. */
+export type TemplateCatalogErrorCode = "no-card-template";
+
 /**
  * Cards of `kind` that no installed design draws. The message names the kind only: a front end
  * adds how its person chooses another kind, such as the command line's form numbers.
  */
-export class NoCardTemplate extends Error {
+export class NoCardTemplateError extends Error {
+  readonly code: TemplateCatalogErrorCode = "no-card-template";
   readonly kind: CardKind | undefined;
 
   constructor(kind: CardKind | undefined) {
@@ -130,14 +136,14 @@ export class NoCardTemplate extends Error {
         ? "No card template is installed."
         : `No installed card template supports ${CARD_KIND_NAMES[kind]} cards yet.`,
     );
-    this.name = "NoCardTemplate";
+    this.name = "NoCardTemplateError";
     this.kind = kind;
   }
 }
 
 /** The design that `idOrNumber` names (findTemplate); refuses a kind without designs, or no fit. */
 export function resolveTemplateId(idOrNumber?: string, kind?: CardKind): CatalogEntry {
-  if (findTemplate(undefined, kind) === undefined) throw new NoCardTemplate(kind);
+  if (findTemplate(undefined, kind) === undefined) throw new NoCardTemplateError(kind);
   const found = findTemplate(idOrNumber, kind);
   if (found === undefined)
     throw new Error(

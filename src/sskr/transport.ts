@@ -74,7 +74,9 @@ import { EncodedForm } from "../core/encoded-form.js";
 import { WordList } from "../core/word-hints.js";
 import { bytewords } from "./bytewords-list.js";
 
+/** The bytes of the CRC32 checksum at the end of a share's bytes. */
 export const CHECKSUM_BYTES = CRC32_BYTES;
+/** The most bytes that a share's transport may have, its checksum included. */
 export const MAX_TRANSPORT_BYTES = 128;
 /** A single-part UR of a share: the prefix and bytewords, in any case, as the prefix is matched. */
 const UR_SSKR = new RegExp(`${UR_SSKR_START.source}([a-z]+)$`, UR_SSKR_START.flags);
@@ -133,6 +135,10 @@ function sharePayload(transport: Uint8Array): Uint8Array {
   return cbor.subarray(offset);
 }
 
+/**
+ * The metadata of a share: its identifier, its group and member, the thresholds and counts, and the
+ * length of its secret in bytes.
+ */
 export interface ShareInfo {
   readonly identifier: number;
   readonly groupThreshold: number;
@@ -184,6 +190,10 @@ function decodedBytes(tokens: readonly string[], units: ShareUnits, unknown: str
   return bytes;
 }
 
+/**
+ * The bytes of the share `value` written as a UR, its checksum checked; refuses a text that is no
+ * UR of a share, too long or with a wrong checksum.
+ */
 export function urToTransport(value: string): Uint8Array {
   const match = UR_SSKR.exec(value.trim());
   const body = match?.[1];
@@ -235,6 +245,7 @@ function writtenCbor(units: ShareUnits, prefix: readonly number[], cbor: Uint8Ar
   }
 }
 
+/** The share of `bytes` written as a UR; refuses bytes that are no share. */
 export function transportToUr(bytes: Uint8Array): string {
   shareInfo(bytes);
   // A UR's type supplies the CBOR tag. Standard Bytewords contains the tag explicitly.
@@ -253,6 +264,10 @@ export function urToBytewords(ur: string): string {
   );
 }
 
+/**
+ * The share of `value` written in Bytewords, as a UR; refuses words that are no Bytewords, too many
+ * and a wrong checksum.
+ */
 export function bytewordsToUr(value: string): string {
   const words = bytewordUnits(value);
   if (words.length > MAX_TRANSPORT_BYTES) throw new Error("SSKR record is too long.");
@@ -304,6 +319,7 @@ function parseColorValues(value: string): number[] {
   return codes.map((code) => SHARE_UNITS.colors.valueOf(code)!);
 }
 
+/** The share of `value` written in colors, as a UR; refuses colors that are no share. */
 export function colorsToShare(value: string): string {
   return mixedToShare(COLOR_FORM, parseColorValues(value));
 }
@@ -358,6 +374,7 @@ export function shareFormatMirroring(form: EncodedFormat): ShareFormat {
 
 /** The share forms written in colors, as --format writes a seed phrase in colors. */
 export const COLOR_SHARE_FORMATS = Object.freeze(["colors", "colors-unicode"] as const);
+/** A share form written in colors (COLOR_SHARE_FORMATS). */
 export type ColorShareFormat = (typeof COLOR_SHARE_FORMATS)[number];
 
 /** Whether a share in `format` is its colors: its cards print them, not codes beside them. */
@@ -489,6 +506,7 @@ export function readShare(value: string): { readonly ur: string; readonly format
   throw firstError instanceof Error ? firstError : new Error("This is not an SSKR share.");
 }
 
+/** The share of `value`, in any form, as a UR; refuses a text that is no share. */
 export function normalizeShare(value: string): string {
   return readShare(value).ur;
 }

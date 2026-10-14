@@ -49,7 +49,7 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
 
 import { NO_SUCH_LAST_WORD } from "../src/core/re-encoding.js";
 import { runReEncode } from "../src/cli/re-encode-command.js";
-import { InputCancelled } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-input.js";
 
 // Public test data only: the BIP39 test phrase masked with 23-09-2026 by the Original Seedshift
 // with a valid last word, as word numbers, as `mnemocode encode --mode seedshift-legacy
@@ -172,7 +172,7 @@ describe("re-encode on the private screen, for a backup with a valid last word",
 
   it("stops at Escape after a last word that ends no phrase, and re-encodes nothing", async () => {
     terminal.answers = [`${LEGACY_VALID}\r`, `${WRONG_DATE}\r`, `${LAST_WORD}\r`];
-    await expect(runReEncode({ ...ARGS })).rejects.toBeInstanceOf(InputCancelled);
+    await expect(runReEncode({ ...ARGS })).rejects.toBeInstanceOf(InputCancelledError);
     expect(terminal.questions).toEqual(["What now?"]);
     expect(out).not.toContain(UNICODE);
   });

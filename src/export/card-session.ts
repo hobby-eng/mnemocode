@@ -47,6 +47,10 @@ function ownCopy(copy: CardCopyOverrides, remembered: CardPresentation): CardCop
   return merged;
 }
 
+/**
+ * A session that keeps the invented details of the cards for its exports, chosen with `choose`, so
+ * that the outputs of one command show the same person; details given always replace them.
+ */
 export function createCardSession(choose: UniformChoice): CardSession {
   let name: string | undefined;
   let presentation: CardPresentation | undefined;

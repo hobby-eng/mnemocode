@@ -8,6 +8,10 @@ import { nodeSharePlatform } from "./share-platform-node.js";
 export { sskrVector } from "./known-answers.js";
 
 let passed = false;
+/**
+ * Runs the known answers of the share engine once a process (checkSskrKnownAnswers); refuses where
+ * one fails, so that no share is made or restored.
+ */
 export async function assertSskrSelfTest(): Promise<void> {
   if (passed) return;
   await checkSskrKnownAnswers(nodeSharePlatform);

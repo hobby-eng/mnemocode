@@ -11,7 +11,7 @@ import { INVALID_PNG_INPUT, PngAdmission, MAX_PNG_DIMENSION } from "../src/core/
 import { PNG_SIGNATURE, pngChunk, pngHeader, pngImage } from "../src/core/synthetic-png.js";
 import {
   decryptCandidates,
-  CandidateFileRefused,
+  CandidateFileRefusedError,
   createSessionIdentity,
 } from "../src/core/candidate-encryption.js";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
@@ -251,9 +251,9 @@ describe("AUD-021-SEC003: age identity failures disclose no private input", () =
     const error = await decryptCandidates(Buffer.from(KEY_FILE.file, "hex"), { identity }).catch(
       (error: unknown) => error,
     );
-    expect(error).toBeInstanceOf(CandidateFileRefused);
+    expect(error).toBeInstanceOf(CandidateFileRefusedError);
     expect(error).toMatchObject({
-      problem: "key",
+      code: "key",
       message: "This Scanner key is not a valid age identity.",
     });
     expect((error as Error).cause).toBeUndefined();
@@ -277,6 +277,6 @@ describe("AUD-021-SEC003: age identity failures disclose no private input", () =
     const other = await createSessionIdentity();
     await expect(
       decryptCandidates(Buffer.from(KEY_FILE.file, "hex"), { identity: other.identity }),
-    ).rejects.toMatchObject({ problem: "key" });
+    ).rejects.toMatchObject({ code: "key" });
   });
 });

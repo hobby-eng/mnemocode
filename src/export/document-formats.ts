@@ -11,11 +11,13 @@ import { POINTS_PER_INCH } from "./page-units.js";
 
 /** The formats of the files of cards: the PDF first, the default, then the image formats. */
 export const DOCUMENT_FORMATS = Object.freeze(["pdf", "png", "jpg"] as const);
+/** A format of the files of cards (DOCUMENT_FORMATS). */
 export type DocumentFormat = (typeof DOCUMENT_FORMATS)[number];
 /** The image formats, png first as the default. */
 export const IMAGE_FORMATS = Object.freeze(
   DOCUMENT_FORMATS.filter((format): format is Exclude<DocumentFormat, "pdf"> => format !== "pdf"),
 );
+/** An image format of the files of cards (IMAGE_FORMATS). */
 export type ImageFormat = (typeof IMAGE_FORMATS)[number];
 /** The format of the files of cards when none is chosen. */
 export const DEFAULT_DOCUMENT_FORMAT: DocumentFormat = DOCUMENT_FORMATS[0];

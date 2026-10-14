@@ -89,7 +89,7 @@ import type { ParsedArguments } from "../src/cli/arguments.js";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
 import { runSskrCombine, runSskrExport, runSskrSplit } from "../src/cli/sskr-command.js";
-import { InputCancelled } from "../src/cli/terminal-input.js";
+import { InputCancelledError } from "../src/cli/terminal-input.js";
 import { JointRepair } from "../src/sskr/joint-repair.js";
 import { unrepairedShare } from "../src/sskr/repair.js";
 import { ShareRestore, variantsMessage } from "../src/sskr/share-restore.js";
@@ -475,7 +475,7 @@ describe("shares on the private screen", () => {
   it("stops when the person chooses Stop", async () => {
     terminal.answers = [`${SHARES[0]};${marked([5, 7])}\r`];
     terminal.choices = [false, "stop"];
-    await expect(combine({ "max-tries": "1" })).rejects.toBeInstanceOf(InputCancelled);
+    await expect(combine({ "max-tries": "1" })).rejects.toBeInstanceOf(InputCancelledError);
     expect(out).toEqual([]);
   });
 
@@ -719,7 +719,7 @@ describe("shares on the private screen", () => {
           "master-fingerprint": FINGERPRINT,
           format: "indexes",
         }),
-      ).rejects.toBeInstanceOf(InputCancelled);
+      ).rejects.toBeInstanceOf(InputCancelledError);
       expect(terminal.questions).toEqual(["What now?"]);
       expect(out).toEqual([]);
     });
@@ -782,7 +782,7 @@ describe("shares on the private screen", () => {
         terminal.answers = [`${SHARES[0]};${writeShare(SHARES[2], "colors")}\r`];
         terminal.choices = ["stop"];
         await expect(runSskrExport({ "ask-secrets": true, pdf })).rejects.toBeInstanceOf(
-          InputCancelled,
+          InputCancelledError,
         );
         expect(terminal.questions).toEqual([
           "The shares are written in different forms. Which form should the cards show?",

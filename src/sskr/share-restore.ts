@@ -276,6 +276,10 @@ export type SearchedSets =
   | { readonly kind: "sets"; readonly sets: RepairedSet[]; readonly notes: readonly string[] }
   | { readonly kind: "none"; readonly message: string };
 
+/**
+ * What a restore of shares ends with: stopped, too few shares, or the phrases found, each with its
+ * notes.
+ */
 export type ShareRestoreOutcome =
   | ShareStop
   | FewShares
@@ -310,6 +314,7 @@ export interface ShareRepairRequest extends Omit<ShareRestoreRequest, "keep"> {
   readonly fingerprintOf: (mnemonic: string) => string;
 }
 
+/** What a repair of marked shares ends with: stopped, or the shares found, or why none was. */
 export type ShareRepairOutcome =
   | ShareStop
   | {

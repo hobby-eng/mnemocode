@@ -24,7 +24,8 @@ A sample shows its whole crop, so each crop holds its object in its middle: wher
 off the middle of its crop by more than a pixel, the script says so and prints where the crop
 starts that centres it. Move such a crop and run the script again for the outline and the
 placements of the centred crops. With --preview it also writes every crop with its outline drawn,
-to check the result by eye. It needs Python 3 with Pillow and NumPy.
+to check the result by eye. It needs Python 3 with Pillow and NumPy, installed with
+    python3 -m pip install --require-hashes -r scripts/trace-material-outlines-requirements.txt
 """
 
 import re

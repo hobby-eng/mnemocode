@@ -8,6 +8,7 @@ import {
 
 /** The layouts of share cards that a caller may ask for. */
 export const SSKR_CARD_LAYOUTS = Object.freeze(["qr", "collection", "individual"] as const);
+/** A layout of share cards (SSKR_CARD_LAYOUTS). */
 export type SskrCardLayout = (typeof SSKR_CARD_LAYOUTS)[number];
 
 /** `value` as a layout of share cards; undefined stays undefined, for the page size to decide. */
@@ -36,6 +37,10 @@ export function resolveSskrLayout(
   return requested ?? (cards ? "individual" : "collection");
 }
 
+/**
+ * The content of the cards of one share: its colors, the codes that the cards print where they are
+ * not its colors, the share as its QR code holds it, and the card settings.
+ */
 export interface SskrCardContent extends CardSettings {
   readonly kind: "sskr";
   /**

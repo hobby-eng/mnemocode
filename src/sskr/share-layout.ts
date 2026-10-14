@@ -65,10 +65,15 @@ export function payloadLayouts(
  * threshold and count less one. The high nibble of the member's byte is reserved and zero.
  */
 export const SHARE_METADATA_BYTES = 5;
+/** The byte of the metadata that holds the group threshold and the group count, a nibble each. */
 export const GROUP_BYTE = 2;
+/** The byte of the metadata that holds the group index and the member threshold, a nibble each. */
 export const MEMBER_THRESHOLD_BYTE = 3;
+/** The byte of the metadata that holds the member index in its low nibble. */
 export const MEMBER_BYTE = 4;
+/** The bits of a nibble, half a byte. */
 export const NIBBLE_BITS = 4;
+/** The mask of the low nibble of a byte. */
 export const LOW_NIBBLE = 0x0f;
 
 /**

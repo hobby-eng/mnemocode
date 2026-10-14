@@ -7,7 +7,7 @@ import { privateScreenAvailable } from "./private-screen.js";
 import { CANCELLED_EXIT_CODE, signalNameOf, stoppedBySignal } from "./exit-codes.js";
 import { runInOwnProcess } from "./protection.js";
 import { choose } from "./terminal-choice.js";
-import { dropTypedAhead, InputCancelled, terminalAvailable } from "./terminal-input.js";
+import { dropTypedAhead, InputCancelledError, terminalAvailable } from "./terminal-input.js";
 import { LEAVE_ALTERNATE_SCREEN } from "./terminal.js";
 import { WHAT_NOW } from "./ask.js";
 
@@ -20,7 +20,7 @@ async function dropAfterCommand(): Promise<void> {
   try {
     await dropTypedAhead();
   } catch (error) {
-    if (!(error instanceof InputCancelled)) throw error;
+    if (!(error instanceof InputCancelledError)) throw error;
   }
 }
 

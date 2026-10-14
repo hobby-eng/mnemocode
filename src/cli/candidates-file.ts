@@ -14,7 +14,7 @@ import {
   ScannerKeyProtection,
   type ListProtection,
 } from "../core/candidate-encryption.js";
-import { assertListPassphrase, TooManyForList } from "../core/candidate-list.js";
+import { assertListPassphrase, TooManyForListError } from "../core/candidate-list.js";
 import {
   CandidateListWriter,
   NO_CANDIDATE_TO_SAVE,
@@ -148,7 +148,7 @@ export class CandidatesFile {
       return;
     }
     // The searches refuse a list before this; here only a fault of MnemoCode would be refused.
-    if (outcome.kind === "full") throw new TooManyForList(NARROW_ANY_SEARCH);
+    if (outcome.kind === "full") throw new TooManyForListError(NARROW_ANY_SEARCH);
     const { list } = outcome;
     // A save that fails on the private screen is offered again, under another name, or skipped,
     // and the candidates stay on the screen (save-retry.ts).

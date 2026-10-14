@@ -61,7 +61,7 @@ export const HARD_MAX_COMBINATIONS = 2 ** 31;
 export const MAX_INCOMPLETE_DATES = 3;
 /** Matches that a search keeps to show unless the host asks for another number. */
 export const MAX_SHOWN_MATCHES = 100;
-/** How a date search with more matches than a candidate list holds is narrowed (TooManyForList). */
+/** How a date search with more matches than a candidate list holds is narrowed (TooManyForListError). */
 export const NARROW_DATE_SEARCH = "narrow the dates, or give the wallet's fingerprint";
 /**
  * A phrase to time the host's wallet check with: the one of all-zero entropy, "abandon … about",

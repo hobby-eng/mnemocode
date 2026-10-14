@@ -99,12 +99,16 @@ const WIDTHS = new Map(SAMPLES);
  */
 class Screen {
   /** The cells of each row: a character, "" for the second half of a wide one, or nothing. */
-  private readonly cells: (string | undefined)[][] = [[]];
+  readonly #cells: (string | undefined)[][] = [[]];
   row = 0;
   column = 0;
-  private pending = false;
+  #pending = false;
 
-  constructor(private readonly columns: number) {}
+  readonly #columns: number;
+
+  constructor(columns: number) {
+    this.#columns = columns;
+  }
 
   write(text: string): void {
     const characters = [...text];
@@ -114,47 +118,47 @@ class Screen {
         let parameter = "";
         index += 2; // ESC [
         while (/[0-9;]/u.test(characters[index]!)) parameter += characters[index++];
-        this.control(characters[index]!, parameter === "" ? 1 : Number(parameter));
+        this.#control(characters[index]!, parameter === "" ? 1 : Number(parameter));
       } else if (character === "\r") {
         this.column = 0;
-        this.pending = false;
+        this.#pending = false;
       } else if (character === "\n") {
         this.row += 1;
         this.column = 0;
-        this.pending = false;
-      } else this.put(character, WIDTHS.get(character) ?? 1);
+        this.#pending = false;
+      } else this.#put(character, WIDTHS.get(character) ?? 1);
     }
   }
 
-  private control(final: string, count: number): void {
-    this.pending = false;
+  #control(final: string, count: number): void {
+    this.#pending = false;
     if (final === "A") this.row = Math.max(0, this.row - count);
     else if (final === "B") this.row += count;
     else if (final === "m") return;
-    else if (final === "C") this.column = Math.min(this.columns - 1, this.column + count);
+    else if (final === "C") this.column = Math.min(this.#columns - 1, this.column + count);
     else if (final === "J") {
-      this.cells[this.row]?.splice(this.column);
-      this.cells.splice(this.row + 1);
+      this.#cells[this.row]?.splice(this.column);
+      this.#cells.splice(this.row + 1);
     } else throw new Error(`unexpected control sequence ${final}`);
   }
 
-  private put(character: string, width: number): void {
-    if (this.pending) {
+  #put(character: string, width: number): void {
+    if (this.#pending) {
       this.row += 1;
       this.column = 0;
-      this.pending = false;
+      this.#pending = false;
     }
-    if (width === 2 && this.column === this.columns - 1) {
+    if (width === 2 && this.column === this.#columns - 1) {
       this.row += 1;
       this.column = 0;
     }
-    const row = (this.cells[this.row] ??= []);
+    const row = (this.#cells[this.row] ??= []);
     row[this.column] = character;
     if (width === 2) row[this.column + 1] = "";
     this.column += width;
-    if (this.column >= this.columns) {
-      this.column = this.columns - 1;
-      this.pending = true;
+    if (this.column >= this.#columns) {
+      this.column = this.#columns - 1;
+      this.#pending = true;
     }
   }
 
@@ -162,7 +166,7 @@ class Screen {
   shown(): { readonly text: string; readonly at: readonly (readonly [number, number])[] } {
     let text = "";
     const at: [number, number][] = [];
-    this.cells.forEach((cells, row) =>
+    this.#cells.forEach((cells, row) =>
       cells.forEach((cell, column) => {
         if (cell === undefined || cell === "") return;
         text += cell;
@@ -174,7 +178,7 @@ class Screen {
 
   /** The text of each row, the empty cells as spaces, without the spaces at the end. */
   rows(): string[] {
-    return this.cells.map((cells) =>
+    return this.#cells.map((cells) =>
       Array.from(cells, (cell) => cell ?? " ")
         .join("")
         .trimEnd(),
@@ -183,7 +187,7 @@ class Screen {
 
   /** Where the cursor is: a cursor waiting at the right edge has not wrapped yet. */
   cursor(): readonly [number, number] {
-    return this.pending ? [this.row, this.columns] : [this.row, this.column];
+    return this.#pending ? [this.row, this.#columns] : [this.row, this.column];
   }
 }
 

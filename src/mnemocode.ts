@@ -3,7 +3,7 @@ import { runCommandLine } from "./cli/command-line.js";
 import { menuAvailable, runMenu } from "./cli/menu.js";
 import { hardenProcess, relaunchProtected, underProtection } from "./cli/protection.js";
 import { CANCELLED_EXIT_CODE } from "./cli/private-screen.js";
-import { dumbTerminalReason, InputCancelled, terminalTooDumb } from "./cli/terminal-input.js";
+import { dumbTerminalReason, InputCancelledError, terminalTooDumb } from "./cli/terminal-input.js";
 import { terminalFailure, terminalHint } from "./cli/terminal.js";
 import { describeError } from "./core/refusal.js";
 
@@ -24,7 +24,7 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  if (error instanceof InputCancelled) {
+  if (error instanceof InputCancelledError) {
     terminalHint(error.message);
     process.exitCode = CANCELLED_EXIT_CODE;
     return;

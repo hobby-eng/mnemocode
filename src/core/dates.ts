@@ -4,6 +4,7 @@ import { inWholeRange, integerRefusal, type WholeRange } from "./typed-number.js
 /** Seedshift shifts three words with each date: by its year, its month and its day. */
 const WORDS_PER_DATE = 3;
 
+/** The most dates that a phrase of `wordCount` words takes: one for every three words. */
 export function maximumDates(wordCount: Bip39WordCount): number {
   return wordCount / WORDS_PER_DATE;
 }
@@ -70,6 +71,7 @@ const FEBRUARY = 2;
 const LEAP_YEAR = 2000;
 const COMMON_YEAR = 2001;
 
+/** Whether `year` is a leap year of the Gregorian calendar. */
 export function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
@@ -99,6 +101,10 @@ function assertCalendarDate(date: DateShiftDate): void {
   }
 }
 
+/**
+ * The date that `value` writes as DD-MM-YYYY; refuses another layout and a date that the calendar
+ * does not have.
+ */
 export function parseDate(value: string): DateShiftDate {
   const date = readDateParts(value.trim(), (part, width) =>
     new RegExp(`^\\d{${width}}$`, "u").test(part) ? Number(part) : undefined,
@@ -202,6 +208,7 @@ export function ownedPatterns(patterns: readonly DatePattern[]): readonly DatePa
   return Object.freeze(owned);
 }
 
+/** `date` written as DD-MM-YYYY, with leading zeros. */
 export function formatDate(date: DateShiftDate): string {
   assertCalendarDate(date);
   return WRITTEN_ORDER.map((name) => String(date[name]).padStart(widthOf(name), "0")).join(
@@ -209,10 +216,15 @@ export function formatDate(date: DateShiftDate): string {
   );
 }
 
+/** `dates` in calendar order, earliest first; the given list is left as it is. */
 export function sortDates(dates: readonly DateShiftDate[]): DateShiftDate[] {
   return [...dates].sort(compareDates);
 }
 
+/**
+ * The shifts of the words of a phrase of `wordCount` words that `dates` give, in calendar order of
+ * the dates; refuses no date and more than the phrase takes.
+ */
 export function deriveShifts(dates: readonly DateShiftDate[], wordCount: Bip39WordCount): number[] {
   if (dates.length === 0) throw new Error(NO_DATE);
   if (dates.length > maximumDates(wordCount)) throw new Error(tooManyDatesMessage(wordCount));
@@ -254,6 +266,10 @@ function partMasks(part: string, width: number): string[] | undefined {
     : undefined;
 }
 
+/**
+ * The dates that `value` stands for, written as DD-MM-YYYY with ? for a digit that is forgotten, or
+ * ? for a whole date; refuses a pattern that no date fits.
+ */
 export function parseDatePattern(value: string): DatePattern {
   const typed = value.trim();
   // Each part with its values joined by |, in an order of DATE_ORDERS.
@@ -333,6 +349,7 @@ function countOf(pattern: DatePattern): number {
   return count;
 }
 
+/** How many combinations of dates `patterns` give together, counted no further than `stopAfter`. */
 export function datePatternCombinationCount(
   patterns: readonly DatePattern[],
   stopAfter = Number.MAX_SAFE_INTEGER,
@@ -410,6 +427,7 @@ export function compareDates(left: DateShiftDate, right: DateShiftDate): number 
   return left.year - right.year || left.month - right.month || left.day - right.day;
 }
 
+/** Every date that `pattern` stands for, in calendar order. */
 export function expandDatePattern(pattern: DatePattern): DateShiftDate[] {
   return [...datePatternCandidates(pattern)];
 }

@@ -13,6 +13,7 @@
 import { pickWith, type UniformChoice } from "./platform.js";
 import { type CardPresentation, cardText, COPY_FIELDS, type CopyField } from "./card-settings.js";
 
+/** The names of the invented print studios that a collection sheet names as its maker. */
 export const studioNames = [
   "Alder & Vale",
   "Luma Ridge Studio",
@@ -53,6 +54,7 @@ export const studioNames = [
   "Fallow & Reed",
 ] as const;
 
+/** The slogans that a card design may print, one chosen at random unless given. */
 export const cardSlogans = [
   "Print, done properly.",
   "Small studio. Careful work.",
@@ -85,6 +87,7 @@ export const cardSlogans = [
   "Form that fits in a pocket.",
 ] as const;
 
+/** The footers of a collection sheet, one chosen at random unless given. */
 export const cardFooters = [
   "PROOF SHEET",
   "CLIENT REVIEW",
@@ -94,6 +97,7 @@ export const cardFooters = [
   "SELECTION SHEET",
 ] as const;
 
+/** The subtitles of a collection sheet, one chosen at random unless given. */
 export const cardSubtitles = [
   "Colour options for review.",
   "Proof set, first round.",
