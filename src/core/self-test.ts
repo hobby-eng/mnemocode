@@ -230,9 +230,12 @@ function requiredString(record: Record<string, unknown>, key: string, label: str
 
 function requiredStrings(record: Record<string, unknown>, key: string, label: string): string[] {
   const value = record[key];
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string"))
-    throw new Error(`${label}.${key} must be an array of strings.`);
+  if (!isStringList(value)) throw new Error(`${label}.${key} must be an array of strings.`);
   return value;
+}
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 function validateVector(value: unknown, index: number): PublicVector {

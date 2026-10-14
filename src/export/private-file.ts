@@ -56,19 +56,19 @@ async function withStagedFile(
   publish: (temporary: string) => Promise<void>,
 ): Promise<void> {
   const staging = await mkdtemp(join(dirname(destination), ".mnemocode-export-"));
-  let published = false;
   try {
     const temporary = join(staging, "document");
     await writeNewPrivateFile(temporary, bytes);
     await publish(temporary);
-    published = true;
-  } finally {
-    try {
-      await rm(staging, { recursive: true, force: true });
-    } catch (error) {
-      if (!published) throw error;
-      throw new LeftStagingCopyError(destination, staging, error);
-    }
+  } catch (error) {
+    // A removal that fails is what the caller hears of, as the folder may hold a copy.
+    await rm(staging, { recursive: true, force: true });
+    throw error;
+  }
+  try {
+    await rm(staging, { recursive: true, force: true });
+  } catch (error) {
+    throw new LeftStagingCopyError(destination, staging, error);
   }
 }
 

@@ -117,7 +117,7 @@ export function isWordIndex(value: unknown): value is number {
  * which is refused, where every() alone would skip them. The one test of a list of word indexes:
  * assertWordIndexes refuses with it, and a caller with its own refusal asks it.
  */
-export function areWordIndexes(indexes: readonly unknown[]): boolean {
+export function areWordIndexes(indexes: readonly unknown[]): indexes is readonly number[] {
   return Array.from(indexes).every(isWordIndex);
 }
 
@@ -125,7 +125,9 @@ export function areWordIndexes(indexes: readonly unknown[]): boolean {
  * Refuses `indexes` unless each is a word index (areWordIndexes). Every decoder, the colors, the
  * backup of codes and the date search check the codes they are given with it.
  */
-export function assertWordIndexes(indexes: readonly unknown[]): void {
+export function assertWordIndexes(
+  indexes: readonly unknown[],
+): asserts indexes is readonly number[] {
   if (!areWordIndexes(indexes))
     throw new Error(integerRefusal("Every BIP39 index", WORD_INDEX_RANGE));
 }

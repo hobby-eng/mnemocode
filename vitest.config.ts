@@ -8,6 +8,7 @@ import { defineConfig } from "vitest/config";
  */
 const TEST_TIME_LIMIT_MS = 60_000;
 
+// oxlint-disable-next-line import/no-default-export -- Vitest reads its configuration from it
 export default defineConfig({
   test: {
     testTimeout: TEST_TIME_LIMIT_MS,

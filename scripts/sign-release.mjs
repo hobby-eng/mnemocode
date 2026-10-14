@@ -203,6 +203,7 @@ async function runInTerminal(what, step, cwd) {
 }
 
 function parseArguments(argv) {
+  /** @type {{ tag: string | undefined, publish: boolean, dryRun: boolean, help: boolean }} */
   const options = { tag: undefined, publish: false, dryRun: false, help: false };
   for (const argument of argv) {
     if (argument === "--publish") options.publish = true;

@@ -49,7 +49,9 @@ for (const { name, text } of workflows) {
       throw new Error(`${name}: job ${job} runs pnpm without .github/actions/setup-node-pnpm`);
 }
 if (checkoutPins.size !== 1)
-  throw new Error(`Every workflow must pin actions/checkout to one commit: ${[...checkoutPins]}`);
+  throw new Error(
+    `Every workflow must pin actions/checkout to one commit: ${[...checkoutPins].join(", ")}`,
+  );
 
 // The SSKR engine's container declares the versions of its tools once; those that other files pin
 // too must agree with them.

@@ -309,7 +309,7 @@ export function placeCombinations(places: readonly WordPlace[]): Generator<reado
   const owned = Array.from(places, (place) => {
     if (!Array.isArray(place) || place.length === 0)
       throw new Error("Every place of a search needs at least one word.");
-    const words = Array.from(place);
+    const words = Array.from<unknown>(place);
     assertWordIndexes(words);
     return Object.freeze(words);
   });
@@ -458,7 +458,7 @@ export class WordCandidate extends Redacted {
       throw new Error(`A candidate needs ${WORD_COUNTS_TEXT} BIP39 indexes.`);
     // A copy, checked itself: a search reuses its array for the next combination, and a getter
     // cannot give the check one value and the copy another.
-    const copy = Array.from(words);
+    const copy = Array.from<unknown>(words);
     if (!isBip39WordCount(copy.length) || !areWordIndexes(copy))
       throw new Error(`A candidate needs ${WORD_COUNTS_TEXT} BIP39 indexes.`);
     this.#number = number;

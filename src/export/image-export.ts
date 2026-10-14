@@ -117,10 +117,19 @@ export async function writeRenderedDocument(
         [
           "-r",
           String(IMAGE_DPI),
-          ...["-f", number, "-l", number, "-singlefile"],
-          ...["-x", "0", "-y", "0"],
-          ...["-W", String(coveredPixels(page.getWidth()))],
-          ...["-H", String(coveredPixels(page.getHeight()))],
+          "-f",
+          number,
+          "-l",
+          number,
+          "-singlefile",
+          "-x",
+          "0",
+          "-y",
+          "0",
+          "-W",
+          String(coveredPixels(page.getWidth())),
+          "-H",
+          String(coveredPixels(page.getHeight())),
           // Unpainted paper, such as the rounded corners of a separate card, stays
           // transparent in PNG. JPEG has no transparency and shows it white.
           ...(DOCUMENT_FORMAT_FACTS[image].transparentPaper

@@ -97,7 +97,7 @@ export async function encryptCandidates(plain: Uint8Array, recipient: string): P
 export function parseListPassphrase(text: string): string {
   const passphrase = withoutByteOrderMark(text).trim();
   // Characters as a person counts them: code points, not UTF-16 units.
-  if ([...passphrase].length < MIN_LIST_PASSPHRASE_LENGTH)
+  if (Array.from(passphrase).length < MIN_LIST_PASSPHRASE_LENGTH)
     throw new Error(
       `Use at least ${MIN_LIST_PASSPHRASE_LENGTH} characters for the passphrase: it is all that protects these seed phrases.`,
     );

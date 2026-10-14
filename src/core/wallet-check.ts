@@ -44,15 +44,14 @@ function readOnce(answer: unknown): Readonly<Record<keyof WalletMatch, unknown>>
 /** Checked fields are fixed data; the host's extra accessors/methods keep their original receiver. */
 function ownedAnswer(given: object, read: Readonly<Record<keyof WalletMatch, unknown>>): object {
   const fields = new Map<PropertyKey, PropertyDescriptor>();
-  for (const key of Reflect.ownKeys(read))
-    fields.set(key, { value: Reflect.get(read, key), enumerable: true });
+  for (const [key, value] of Object.entries(read)) fields.set(key, { value, enumerable: true });
 
-  const prototype: object | null = Object.getPrototypeOf(given);
+  const prototype = Reflect.getPrototypeOf(given);
   const seen = new Set<object>();
   for (
     let owner: object | null = given;
     owner !== null && owner !== Object.prototype && !seen.has(owner);
-    owner = Object.getPrototypeOf(owner) as object | null
+    owner = Reflect.getPrototypeOf(owner)
   ) {
     seen.add(owner);
     for (const key of Reflect.ownKeys(owner)) {
@@ -61,8 +60,9 @@ function ownedAnswer(given: object, read: Readonly<Record<keyof WalletMatch, unk
       const field = Object.getOwnPropertyDescriptor(owner, key);
       if (field === undefined) continue;
       if ("value" in field) {
-        if (typeof field.value === "function" && key !== "constructor")
-          field.value = field.value.bind(given);
+        const method: unknown = field.value;
+        if (typeof method === "function" && key !== "constructor")
+          field.value = (method as (...values: unknown[]) => unknown).bind(given);
       } else {
         // Reading other getters here could throw or perform work the caller never requested.
         // Bound accessors remain lazy and can read the original class's private fields.

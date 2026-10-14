@@ -93,13 +93,13 @@ export function listQuestionRows<T>(
  * TEXT_WIDTH; a longer one is cut (shortened), which a list of the program must never need.
  */
 export function notesRoom<T>(choices: readonly Choice<T>[]): number {
-  const labelWidth = Math.max(...choices.map((choice) => [...choice.label].length));
+  const labelWidth = Math.max(...choices.map((choice) => Array.from(choice.label).length));
   return TEXT_WIDTH - LABEL_INDENT - labelWidth - 2;
 }
 
 /** `text` cut to `room` characters with "…" at the end, so that it cannot wrap the line. */
 export function shortened(text: string, room: number): string {
-  const characters = [...text];
+  const characters = Array.from(text);
   if (characters.length <= room) return text;
   return `${characters.slice(0, Math.max(0, room - 1)).join("")}…`;
 }
@@ -112,7 +112,7 @@ function digitOf<T>(choice: Choice<T>, index: number): number | undefined {
 /** The lines of a list, without colours when the terminal has none; the chosen entry has a cyan
  * marker and a bold label, so that it stands out also without colours. */
 export function listLines<T>(choices: readonly Choice<T>[], selected: number): string[] {
-  const labelWidth = Math.max(...choices.map((choice) => [...choice.label].length));
+  const labelWidth = Math.max(...choices.map((choice) => Array.from(choice.label).length));
   const noteRoom = notesRoom(choices);
   const lines: string[] = [];
   choices.forEach((choice, index) => {
@@ -125,7 +125,7 @@ export function listLines<T>(choices: readonly Choice<T>[], selected: number): s
       lines.push(`${marker} ${number}  ${label}`);
     } else {
       // Padded by hand: the width of a painted label would count its colour codes.
-      const padding = " ".repeat(labelWidth - [...choice.label].length);
+      const padding = " ".repeat(labelWidth - Array.from(choice.label).length);
       lines.push(
         `${marker} ${number}  ${label}${padding}  ${paint(STYLE.muted, shortened(choice.note, noteRoom))}`,
       );

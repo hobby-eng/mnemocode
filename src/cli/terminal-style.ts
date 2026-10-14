@@ -53,6 +53,7 @@ export interface ColorStream {
 /** The SGR sequence that ends a painted run. */
 export const SGR_RESET = "\x1b[0m";
 /** Every colour code that paint writes (an SGR sequence), which takes no room on the screen. */
+// oxlint-disable-next-line no-control-regex -- an SGR sequence begins with ESC, which it must match
 export const STYLE_CODES = /\x1b\[[0-9;]*m/gu;
 
 /** `text` in the style `code` when `stream` gets colour, otherwise unchanged. */

@@ -86,12 +86,12 @@ export function example(form: EncodedFormat): string {
  * with " …", so that a list never cuts a code in half.
  */
 export function sampleOf(text: string, room: number): string {
-  if ([...text].length <= room) return text;
+  if (Array.from(text).length <= room) return text;
   let sample = "";
   for (const code of text.split(" ")) {
     const longer = sample === "" ? code : `${sample} ${code}`;
     // Two characters for " …".
-    if ([...longer].length + 2 > room) break;
+    if (Array.from(longer).length + 2 > room) break;
     sample = longer;
   }
   return `${sample} …`;
@@ -460,17 +460,15 @@ async function askCardFileKind(): Promise<DocumentFormat | undefined> {
   for (;;) {
     const kind = await choose(
       "Which kind of file?",
-      [
-        ...DOCUMENT_FORMATS.map((format) => {
-          const { name, note } = DOCUMENT_FORMAT_FACTS[format];
-          // Images are drawn from the PDF with pdftocairo, which the menu checks for below.
-          return {
-            label: name,
-            note: format === "pdf" ? note : `${note}; needs pdftocairo`,
-            value: format,
-          };
-        }),
-      ],
+      DOCUMENT_FORMATS.map((format) => {
+        const { name, note } = DOCUMENT_FORMAT_FACTS[format];
+        // Images are drawn from the PDF with pdftocairo, which the menu checks for below.
+        return {
+          label: name,
+          note: format === "pdf" ? note : `${note}; needs pdftocairo`,
+          value: format,
+        };
+      }),
       { label: "Files", warning },
     );
     if (kind === undefined || kind === "pdf") return kind;

@@ -115,6 +115,7 @@ export function resultHeaderLines(
  * Control characters: C0, DEL and C1, which move the cursor, erase or ring rather than show, and
  * the marks and controls of text direction, which reorder what is shown.
  */
+// oxlint-disable-next-line no-control-regex -- it finds the control characters to replace them
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu;
 
 /**

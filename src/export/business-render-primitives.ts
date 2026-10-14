@@ -38,7 +38,7 @@ export function fit(
   width: number,
   label: string,
 ): number {
-  const unsupported = [...text].find(
+  const unsupported = Array.from(text).find(
     (c) => !font.getCharacterSet().includes(defined(c.codePointAt(0))),
   );
   if (unsupported !== undefined)

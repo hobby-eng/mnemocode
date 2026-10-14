@@ -5,7 +5,7 @@
 
 /** After these tokens a slash starts a regular expression, not a division. */
 const BEFORE_REGEX = new Set([
-  ..."(,=:[!&|?{};+-*%<>~^",
+  ...Array.from("(,=:[!&|?{};+-*%<>~^"),
   "return",
   "typeof",
   "case",

@@ -20,7 +20,7 @@ export function pngUint32(value: number): number[] {
 
 /** One chunk: its length, its four-letter `type`, `data` and the CRC-32 of both (section 5.3). */
 export function pngChunk(type: string, data: ArrayLike<number>): Uint8Array {
-  const body = [...type].map((letter) => letter.charCodeAt(0)).concat(Array.from(data));
+  const body = Array.from(type, (letter) => letter.charCodeAt(0)).concat(Array.from(data));
   const checksum = crc32(Uint8Array.from(body));
   return Uint8Array.from([...pngUint32(data.length), ...body, ...pngUint32(checksum)]);
 }

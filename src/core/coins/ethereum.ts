@@ -35,7 +35,7 @@ export class HexCoin extends Coin {
 function eip55(account: Uint8Array): string {
   const lowercase = hex.encode(account);
   const hash = keccak_256(utf8.decode(lowercase));
-  return [...lowercase]
+  return Array.from(lowercase)
     .map((character, position) => {
       const byte = defined(hash[position >> 1]);
       const digit = position % 2 === 0 ? byte >> 4 : byte & 0x0f;

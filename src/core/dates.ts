@@ -79,7 +79,8 @@ export function isLeapYear(year: number): boolean {
 
 /** The days of `month` of `year`; refused for a month that is not 1 to 12. */
 export function daysInMonth(year: number, month: number): number {
-  if (!inWholeRange(month, DATE_PARTS.month)) throw new Error(`There is no month ${month}.`);
+  if (!inWholeRange(month, DATE_PARTS.month))
+    throw new Error(`There is no month ${String(month)}.`);
   if (month === 2) return isLeapYear(year) ? 29 : 28;
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }

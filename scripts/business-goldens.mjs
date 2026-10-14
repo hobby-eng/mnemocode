@@ -28,6 +28,10 @@ const presentation = {
   ...REVIEW_TEXTS,
 };
 const fixed = (content) => ({ ...content, profile, presentation });
+/**
+ * Each card's file name, design, content and, for a single card, its index.
+ * @type {readonly [string, string, unknown, number?][]}
+ */
 const fixtures = [
   ["words12-a6", "it", ordinary(16, "a6")],
   ["words24-a4", "mixed", ordinary(32, "a4")],

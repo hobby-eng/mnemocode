@@ -452,7 +452,7 @@ function checkLintExceptions(path, comments) {
     const directive = /\b(?:oxlint|eslint)-(?:disable|enable)(?:-next-line|-line)?\b(.*)/su.exec(
       comment.text,
     );
-    if (directive === null || /^-enable/u.test(directive[0].replace(/^\w+/u, ""))) continue;
+    if (directive === null || directive[0].replace(/^\w+/u, "").startsWith("-enable")) continue;
     if (!/^\s+[\w/@-]+(?:\s*,\s*[\w/@-]+)*\s+--\s+\S/u.test(directive[1]))
       report(
         path,

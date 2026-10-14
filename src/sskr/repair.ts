@@ -666,8 +666,8 @@ function colorUnicodePairings(
   );
   // The fewest and the most codes that the pieces from each one on stand for: a mark one code,
   // or at most a whole color.
-  const fewest = new Array<number>(pieces.length + 1).fill(0);
-  const most = new Array<number>(pieces.length + 1).fill(0);
+  const fewest = Array.from({ length: pieces.length + 1 }, () => 0);
+  const most = Array.from({ length: pieces.length + 1 }, () => 0);
   for (let piece = pieces.length - 1; piece >= 0; piece -= 1) {
     const current = defined(pieces[piece]);
     const marks = typeof current === "string" ? 0 : current.marks;
@@ -677,7 +677,7 @@ function colorUnicodePairings(
   // Whether the codes from each one on are decoys: valid colors only, complete ones unless the
   // share's own length is known, when a ? may stand for a code or a whole color of a decoy. A
   // malformed suffix must not become a decoy merely because an earlier prefix can be repaired.
-  const decoysFrom = new Array<boolean>(scalars.length + 1).fill(false);
+  const decoysFrom = Array.from({ length: scalars.length + 1 }, () => false);
   decoysFrom[scalars.length] = true;
   for (let at = scalars.length - 1; at >= 0; at -= 1) {
     const pair = scalars.slice(at, at + per);
@@ -717,7 +717,7 @@ function colorUnicodePairings(
     if (colorsFit(start)) then();
     codes.length = start;
   };
-  const marksOf = (length: number) => new Array<string>(length).fill("?");
+  const marksOf = (length: number) => Array.from({ length }, () => "?");
   const place = (piece: number): void => {
     steps += 1;
     if (steps > MAX_MARK_WIDTH_STEPS) throw new AmbiguousMarksError();

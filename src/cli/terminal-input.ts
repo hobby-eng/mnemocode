@@ -610,8 +610,8 @@ function mayBeLateSequence(byte: number, ignoredAt: number | undefined): boolean
  * those without parameters; MnemoCode never switches the keypad to its application mode, whose
  * SS3 sequences end in letters that text also has.
  */
-const CSI_KEY_FINALS = new Set([..."ABCDEFGHPQRSZ~"].map((final) => final.charCodeAt(0)));
-const SS3_KEY_FINALS = new Set([..."ABCDFHPQRS"].map((final) => final.charCodeAt(0)));
+const CSI_KEY_FINALS = new Set(Array.from("ABCDEFGHPQRSZ~", (final) => final.charCodeAt(0)));
+const SS3_KEY_FINALS = new Set(Array.from("ABCDFHPQRS", (final) => final.charCodeAt(0)));
 
 /**
  * Reads the bytes after `introducer`, a [ or O typed soon after an ignored Escape, and tells

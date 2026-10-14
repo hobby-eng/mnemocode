@@ -46,15 +46,16 @@ export function candidateListHolds(count: number): boolean {
 const ENTROPY_LENGTHS: ReadonlySet<number> = new Set(BIP39_ENTROPY_BYTES);
 // A genuine typed array may shadow byteLength with an own property. Its intrinsic getter reads
 // the actual storage, which the typed-array copy constructor copies too (ECMA-262 TypedArray).
-const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
-const intrinsicByteLength = defined(
-  defined(Object.getOwnPropertyDescriptor(typedArrayPrototype, "byteLength")).get,
-);
+const intrinsicByteLength = typedArrayGetter("byteLength");
 // instanceof trusts an object's replaceable prototype. The intrinsic tag getter reads the real
 // element kind, including byte arrays from another realm, without consulting a custom tag.
-const intrinsicArrayName = defined(
-  defined(Object.getOwnPropertyDescriptor(typedArrayPrototype, Symbol.toStringTag)).get,
-);
+const intrinsicArrayName = typedArrayGetter(Symbol.toStringTag);
+
+/** The getter `key` of every typed array, which is called on the array checked. */
+function typedArrayGetter(key: PropertyKey): (this: unknown) => unknown {
+  const typedArray = defined(Reflect.getPrototypeOf(Uint8Array.prototype));
+  return defined(defined(Reflect.getOwnPropertyDescriptor(typedArray, key)).get);
+}
 /** Magic, version, flags, entropy length and the 4-byte count. */
 const HEADER_BYTES = 11;
 const LENGTH_BYTES = 2;

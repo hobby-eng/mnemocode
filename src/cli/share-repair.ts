@@ -308,9 +308,12 @@ export class TypedShares {
     return true;
   }
 
-  /** Each share that cannot be read is typed again, with why, until it can be, or left out. */
+  /**
+   * Each share that cannot be read is typed again, with why, until it can be, or left out; over
+   * the list as it was, which `list` gives as a copy.
+   */
   async #retypeUnreadable(): Promise<void> {
-    for (const share of [...this.list]) {
+    for (const share of this.list) {
       const problem = this.input.readProblem(share.place, share.text);
       if (problem !== undefined) await this.retype(share.place, problem);
     }

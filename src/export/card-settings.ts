@@ -191,7 +191,7 @@ export const MAX_CARD_TEXT_LENGTH = 100;
 export function cardText(text: unknown, label: string, blankEnding: string): string {
   if (typeof text !== "string" || !text.trim() || /[\p{Cc}\p{Cf}]/u.test(text))
     throw new Error(`Card ${label} must be non-empty text on one line${blankEnding}`);
-  if ([...text].length > MAX_CARD_TEXT_LENGTH)
+  if (Array.from(text).length > MAX_CARD_TEXT_LENGTH)
     throw new Error(`Card ${label} is too long (maximum ${MAX_CARD_TEXT_LENGTH} characters).`);
   return text.trim().normalize("NFC");
 }

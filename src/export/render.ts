@@ -88,7 +88,7 @@ export async function renderCards(
   const pages: Uint8Array[] = [];
   for (const { template, content } of jobs) {
     if (template.kind !== content.kind)
-      throw new Error(`Template ${template.id} does not support ${content.kind}.`);
+      throw new Error(`Template ${template.id} does not support ${String(content.kind)}.`);
     // A design's own texts and details print over those of the export.
     const resolved: CardContent = {
       ...content,
