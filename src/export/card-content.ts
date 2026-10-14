@@ -3,7 +3,7 @@
 // code with the same rule.
 
 import { assertPhraseIndexes } from "../core/bip39-sizes.js";
-import { colorsToIndexes, unicodeToColors } from "../core/colors.js";
+import { colorsToIndexes, isRgbReference, unicodeToColors } from "../core/colors.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { assertShareQr } from "../sskr/transport.js";
 import { ownCards } from "./card-decoys.js";
@@ -32,11 +32,14 @@ export function assertColorCards(
 
 /**
  * Whether `payload`, the text of a QR code, holds `colors`: written as the colors themselves, or as
- * Color Unicode codes that decode to them.
+ * Color Unicode codes that decode to them. Other colors are other references, not Color Unicode
+ * to be refused as such; any other text is read as Color Unicode, which refuses what it is not.
  */
 export function payloadHoldsColors(colors: readonly string[], payload: string): boolean {
   const written = colors.join(" ");
-  return payload === written || unicodeToColors(payload).join(" ") === written;
+  if (payload === written) return true;
+  if (payload.trim().split(/\s+/u).every(isRgbReference)) return false;
+  return unicodeToColors(payload).join(" ") === written;
 }
 
 /**

@@ -266,7 +266,11 @@ describe("material selection cards", () => {
 
   it("rejects mismatched QR data", async () => {
     await expect(
-      renderMaterialCard(nodeCardRenderer, "tile", { ...content, payload: "MNC1:unrelated" }),
-    ).rejects.toThrow();
+      renderMaterialCard(nodeCardRenderer, "tile", {
+        ...content,
+        // The colors of other word numbers: a readable QR code of other references.
+        payload: indexesToColors(Array.from({ length: 24 }, (_, i) => i * 73 + 2)).join(" "),
+      }),
+    ).rejects.toThrow("Collection QR does not match the printed references.");
   });
 });
