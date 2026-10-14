@@ -1,8 +1,9 @@
 // The terminal of the tests of questions on the private screen, replaced: each question that reads
 // a line takes the next of `terminal.answers`, as a terminal in raw mode delivers it (a lone Escape
 // goes back), and each list question (choose) the next of `terminal.choices`, or Escape when none
-// is left. Standard output is a terminal only with `terminal.stdoutTerminal`. Nothing reads the
-// real terminal. A test file loads this module in vi.hoisted, and its vi.mock factories replace
+// is left; byLabel answers with the entry of that label. Standard output is a terminal only with
+// `terminal.stdoutTerminal`, and the private screen is on unless `terminal.privateScreen` is
+// false. Nothing reads the real terminal. A test file loads this module in vi.hoisted, and its vi.mock factories replace
 // each module with what is here; so this module imports no module that a test replaces.
 
 import type * as Tty from "node:tty";
@@ -31,7 +32,24 @@ export const terminal = {
   /** Saves that fail with ENOSPC, as on a full disk, before one succeeds (failingSave). */
   saveFailures: 0,
   stdoutTerminal: false,
+  privateScreen: true,
 };
+
+const LABEL = Symbol("label");
+
+/** A list answer given by the label of its entry, as a person picks it. */
+interface ByLabel {
+  readonly [LABEL]: string;
+}
+
+/** The answer of a list question that picks the entry labelled `label`; it fails without one. */
+export function byLabel(label: string): ByLabel {
+  return { [LABEL]: label };
+}
+
+function isByLabel(answer: unknown): answer is ByLabel {
+  return typeof answer === "object" && answer !== null && LABEL in answer;
+}
 
 /** What the questions wrote: the private screen (standard error), and the lines of each stream. */
 export const seen = {
@@ -47,9 +65,9 @@ export function replacedTty(actual: typeof Tty): typeof Tty {
   return { ...actual, isatty: (descriptor: number) => descriptor === 1 && terminal.stdoutTerminal };
 }
 
-/** The private screen, which is always on. */
+/** The private screen, which is on unless `terminal.privateScreen` is false. */
 export function replacedPrivateScreen(actual: PrivateScreen): PrivateScreen {
-  return { ...actual, onPrivateScreen: () => true };
+  return { ...actual, onPrivateScreen: () => terminal.privateScreen };
 }
 
 /** The terminal's input, which reads `terminal.answers` and watches no Ctrl-C. */
@@ -87,7 +105,11 @@ export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
     ...actual,
     choose: (async (
       question: string,
-      choices: readonly { readonly label: string; readonly note?: string }[],
+      choices: readonly {
+        readonly label: string;
+        readonly note?: string;
+        readonly value: unknown;
+      }[],
       options?: { readonly quit?: string },
     ) => {
       // Loaded here, once the replaced modules are in place: it measures with terminal-choice.
@@ -98,7 +120,11 @@ export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
       terminal.labels.push(choices.map((choice) => choice.label));
       terminal.notes.push(choices.map((choice) => choice.note));
       terminal.escapes.push(options?.quit);
-      return terminal.choices.shift();
+      const answer = terminal.choices.shift();
+      if (!isByLabel(answer)) return answer;
+      const entry = choices.find((choice) => choice.label === answer[LABEL]);
+      if (entry === undefined) throw new Error(`No entry ${answer[LABEL]} at ${question}`);
+      return entry.value;
     }) as TerminalChoice["choose"],
   };
 }
@@ -133,6 +159,7 @@ export function questionsOnPrivateScreen(): void {
       events: [],
       saveFailures: 0,
       stdoutTerminal: false,
+      privateScreen: true,
     });
     Object.assign(seen, { screen: "", out: [], notices: [] });
     vi.stubEnv("NO_COLOR", "1");

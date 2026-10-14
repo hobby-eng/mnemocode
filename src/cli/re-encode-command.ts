@@ -423,12 +423,12 @@ async function confirmation(
   const ways: Choice<Way>[] = [
     {
       label: "Yes, I recognise it",
-      note: "the seed phrase or its fingerprint above",
+      note: "the phrase or its fingerprint above",
       value: "person",
     },
     {
       label: "Check it against the wallet",
-      note: "an address of Bitcoin or another coin, or the fingerprint",
+      note: "an address or the fingerprint",
       value: "wallet",
     },
     ...(Masking.of(backup.mode).masked ? [datesAgainChoice()] : []),

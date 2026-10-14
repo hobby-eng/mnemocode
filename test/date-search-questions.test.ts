@@ -1,64 +1,33 @@
+// recover-date --ask-secrets on the private screen, with the terminal replaced
+// (test/helpers/question-terminal.ts). Standard output is a terminal only with
+// `terminal.stdoutTerminal`; the private screen then shows what fits in the window, which windowOf
+// sets.
+
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-// recover-date --ask-secrets on the private screen, with the terminal replaced: each question that
-// reads a line takes the next of `terminal.answers`, as a terminal in raw mode delivers it, and each
-// list question (choose) the next of `terminal.choices`, or Escape when none is left. Nothing reads
-// the real terminal. Standard output is a terminal only with `terminal.stdoutTerminal`; the private
-// screen then shows what fits in the window, which windowOf sets.
-const terminal = vi.hoisted(() => ({
-  answers: [] as string[],
-  choices: [] as unknown[],
-  questions: [] as string[],
-  /** The labels of each list question, in order. */
-  labels: [] as string[][],
-  stdoutTerminal: false,
-}));
-vi.mock("node:tty", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("node:tty")>()),
-  isatty: (descriptor: number) => descriptor === 1 && terminal.stdoutTerminal,
-}));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/private-screen.js")>()),
-  onPrivateScreen: () => true,
-}));
-vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/cli/terminal-input.js")>();
-  return {
-    ...actual,
-    terminalAvailable: () => true,
-    withRawTerminal: async <T>(body: (next: () => Promise<number | undefined>) => Promise<T>) => {
-      const bytes = [...Buffer.from(terminal.answers.shift() ?? "", "utf8")];
-      return body(async () => bytes.shift());
-    },
-    // The search watches no terminal here.
-    withCtrlCWatch: <T>(search: (signal: AbortSignal) => Promise<T>) =>
-      search(new AbortController().signal),
-  };
-});
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/terminal-choice.js")>()),
-  choose: async (question: string, choices: readonly { readonly label: string }[]) => {
-    recordCutNotes(question, choices as never);
-    terminal.questions.push(question);
-    terminal.labels.push(choices.map((choice) => choice.label));
-    return terminal.choices.shift();
-  },
-}));
-
+import { describe, expect, it, vi } from "vitest";
 import { encodeMnemonic, encodeMnemonicLegacy, formatEncoded, parseDate } from "../src/core.js";
 import { askEncodedBackup } from "../src/cli/backup-questions.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import { writeShare } from "../src/sskr/transport.js";
-import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
+import { MASKED } from "./helpers/phrase-questions.js";
+import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
-const FINGERPRINT = "73c5da0a";
-/** The test phrase masked with MnemoCode Seedshift and 23-09-2026, as word numbers. */
-const MASKED = "2027 10 24 2027 10 24 2027 10 24 2027 10 377";
+const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
+vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
+vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
+  harness.replacedPrivateScreen(await importOriginal()),
+);
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
+  harness.replacedTerminalInput(await importOriginal()),
+);
+vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
+  harness.replacedTerminalChoice(await importOriginal()),
+);
+
 const FOUND = `23-09-2026\t${TEST_PHRASE}\tmatched at m`;
 /** The test phrase masked with the Original Seedshift and 23-09-2026, as word numbers. */
 const LEGACY = formatEncoded(
@@ -68,16 +37,6 @@ const LEGACY = formatEncoded(
 const DATES_PROMPT =
   "Dates with ? for what is forgotten (up to 4, one to three of them incomplete):";
 
-let screen: string;
-let out: string[];
-let notices: string[];
-/** The window's size before a test, given back after it. */
-let window: { rows: number; columns: number };
-
-function windowOf(rows: number, columns: number): void {
-  Object.assign(process.stderr, { rows, columns });
-}
-
 /** Runs recover-date --ask-secrets with `options`, answering as the terminal says. */
 function recover(options: Record<string, string>): Promise<void> {
   return runRecoverDate({ "ask-secrets": true, ...options });
@@ -86,40 +45,13 @@ function recover(options: Record<string, string>): Promise<void> {
 /** Where each prompt appears on the screen, in order. */
 function promptsShown(): string[] {
   return [
-    ...screen.matchAll(
+    ...seen.screen.matchAll(
       /(Encoded seed phrase or record:|Dates with \?[^:]*:|Original fingerprint of the wallet[^:]*:)/gu,
     ),
   ].map((match) => match[1]!);
 }
 
-beforeEach(() => {
-  terminal.answers = [];
-  terminal.choices = [];
-  terminal.questions = [];
-  terminal.labels = [];
-  terminal.stdoutTerminal = false;
-  window = { rows: process.stderr.rows, columns: process.stderr.columns };
-  screen = "";
-  out = [];
-  notices = [];
-  vi.stubEnv("NO_COLOR", "1");
-  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-    screen += Buffer.from(chunk as Uint8Array).toString("utf8");
-    return true;
-  });
-  vi.spyOn(console, "log").mockImplementation((...line: unknown[]) => {
-    out.push(line.join(" "));
-  });
-  vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
-    notices.push(line.join(" "));
-  });
-});
-afterEach(() => {
-  Object.assign(process.stderr, window);
-  vi.restoreAllMocks();
-  vi.unstubAllEnvs();
-  expect(takeCutNotes(), "a note cut to fit its list").toEqual([]);
-});
+questionsOnPrivateScreen();
 
 describe("recover-date on the private screen", () => {
   it("asks again for each answer that cannot be used, keeping the others, and the wallet last", async () => {
@@ -129,12 +61,12 @@ describe("recover-date on the private screen", () => {
       "23-09-2026\r",
       "2?-09-2026\r",
       "zz\r",
-      `${FINGERPRINT}\r`,
+      `${TEST_FINGERPRINT}\r`,
     ];
     terminal.choices = ["fingerprint"];
     await recover({ mode: "seedshift" });
-    expect(out).toEqual([FOUND]);
-    expect(notices).toEqual(
+    expect(seen.out).toEqual([FOUND]);
+    expect(seen.notices).toEqual(
       expect.arrayContaining([
         "Detected input format: indexes.",
         "Date 1: use DD-MM-YYYY with a four-digit year, for example 23-09-2026.",
@@ -152,17 +84,17 @@ describe("recover-date on the private screen", () => {
     ]);
     expect(terminal.questions).toEqual(["How can MnemoCode recognise the wallet?"]);
     // The private screen shows what is typed; no warning repeats it.
-    expect(notices.join("\n")).not.toContain("2O26");
+    expect(seen.notices.join("\n")).not.toContain("2O26");
   });
 
   it("offers the record's mode when it differs from the one given", async () => {
     terminal.answers = [`MNC1:seedshift:indexes:${MASKED}\r`, "2?-09-2026\r"];
     terminal.choices = ["record"];
-    await recover({ mode: "seedshift-legacy", "master-fingerprint": FINGERPRINT });
+    await recover({ mode: "seedshift-legacy", "master-fingerprint": TEST_FINGERPRINT });
     expect(terminal.questions).toEqual([
       "The record was made with MnemoCode Seedshift, not with the Original Seedshift.",
     ]);
-    expect(out).toEqual([FOUND]);
+    expect(seen.out).toEqual([FOUND]);
   });
 
   it("asks for a direct record again before the dates", async () => {
@@ -172,8 +104,8 @@ describe("recover-date on the private screen", () => {
       `${MASKED}\r`,
       "2?-09-2026\r",
     ];
-    await recover({ mode: "seedshift", "master-fingerprint": FINGERPRINT });
-    expect(notices).toEqual(
+    await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
+    expect(seen.notices).toEqual(
       expect.arrayContaining([
         "Date recovery is available only for records created with Seedshift.",
         "Malformed MnemoCode record header.",
@@ -185,7 +117,7 @@ describe("recover-date on the private screen", () => {
       "Encoded seed phrase or record:",
       DATES_PROMPT,
     ]);
-    expect(out).toEqual([FOUND]);
+    expect(seen.out).toEqual([FOUND]);
   });
 
   it("asks again for codes that are no phrase, naming only a count or a place", async () => {
@@ -195,14 +127,14 @@ describe("recover-date on the private screen", () => {
       `${MASKED}\r`,
       "2?-09-2026\r",
     ];
-    await recover({ mode: "seedshift", "master-fingerprint": FINGERPRINT });
-    expect(notices).toEqual(
+    await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
+    expect(seen.notices).toEqual(
       expect.arrayContaining([
         "These are 10 word numbers; an encoded seed phrase has 12, 15, 18, 21 or 24.",
         "Indexes use Seedshift-compatible numbering from 1 through 2048.",
       ]),
     );
-    expect(out).toEqual([FOUND]);
+    expect(seen.out).toEqual([FOUND]);
   });
 
   it("says that a Shamir share is no encoded seed phrase, and which entry reads it", async () => {
@@ -211,11 +143,11 @@ describe("recover-date on the private screen", () => {
     ) as { deterministic: { shares: string[] }[] };
     const share = writeShare(vectors.deterministic[0]!.shares[0]!, "indexes");
     terminal.answers = [`${share}\r`, `${MASKED}\r`, "2?-09-2026\r"];
-    await recover({ mode: "seedshift", "master-fingerprint": FINGERPRINT });
-    expect(notices).toContain(
+    await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
+    expect(seen.notices).toContain(
       "This is a Shamir share, not an encoded seed phrase: Restore a seed phrase from Shamir shares reads it.",
     );
-    expect(out).toEqual([FOUND]);
+    expect(seen.out).toEqual([FOUND]);
   });
 });
 
@@ -229,14 +161,14 @@ describe("recover-date on the private screen", () => {
       "These codes lack the BIP39 checksum that MnemoCode Seedshift gives them.",
       "What now?",
     ]);
-    expect(out).toEqual(["No candidate with a valid BIP39 checksum was found."]);
+    expect(seen.out).toEqual(["No candidate with a valid BIP39 checksum was found."]);
   });
 
   it("says that none matched the wallet and lets the wallet change", async () => {
-    terminal.answers = [`${MASKED}\r`, "2?-09-2026\r", `${FINGERPRINT}\r`];
+    terminal.answers = [`${MASKED}\r`, "2?-09-2026\r", `${TEST_FINGERPRINT}\r`];
     terminal.choices = ["change-wallet", "fingerprint"];
     await recover({ mode: "seedshift", "master-fingerprint": "00000000" });
-    expect(out).toEqual([
+    expect(seen.out).toEqual([
       "None of the 10 checksum-valid candidates matched the requested master fingerprint.",
       FOUND,
     ]);
@@ -248,7 +180,7 @@ describe("recover-date on the private screen", () => {
   it("offers no wallet only where that changes the search", async () => {
     // The original Seedshift lists checksum-valid candidates without a wallet. Asked for one to
     // check those not shown, "It cannot" would run the same search again.
-    terminal.answers = [`${MASKED}\r`, "??-??-2026\r", `${FINGERPRINT}\r`];
+    terminal.answers = [`${MASKED}\r`, "??-??-2026\r", `${TEST_FINGERPRINT}\r`];
     terminal.choices = ["wallet", "fingerprint"];
     await recover({ mode: "seedshift-legacy", "max-results": "1" });
     expect(terminal.questions.slice(0, 2)).toEqual([
@@ -257,11 +189,11 @@ describe("recover-date on the private screen", () => {
     ]);
     expect(terminal.labels[1]).toEqual(["Fingerprint", "Address"]);
     const searches = () =>
-      notices.filter((line) => line.startsWith("Recovery search contains")).length;
+      seen.notices.filter((line) => line.startsWith("Recovery search contains")).length;
     expect(searches()).toBe(2);
 
     // In place of a wallet that matched none, no wallet lists every candidate: another search.
-    notices = [];
+    seen.notices = [];
     terminal.questions = [];
     terminal.labels = [];
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r"];
@@ -280,7 +212,7 @@ describe("recover-date on the private screen", () => {
     // than a window of 40 rows, which keeps no scrollback, can show.
     terminal.stdoutTerminal = true;
     windowOf(40, 80);
-    terminal.answers = [`${LEGACY}\r`, "2?-0?-202?\r", `${FINGERPRINT}\r`];
+    terminal.answers = [`${LEGACY}\r`, "2?-0?-202?\r", `${TEST_FINGERPRINT}\r`];
     terminal.choices = ["wallet", "fingerprint"];
     await recover({ mode: "seedshift-legacy" });
     expect(terminal.questions).toEqual([
@@ -292,9 +224,9 @@ describe("recover-date on the private screen", () => {
       "Change the dates",
       "Done",
     ]);
-    const listed = out.filter((line) => /^\d{2}-\d{2}-\d{4}\t/u.test(line));
+    const listed = seen.out.filter((line) => /^\d{2}-\d{2}-\d{4}\t/u.test(line));
     expect(listed.length).toBeGreaterThan(40);
-    expect(out.at(-1)).toBe(FOUND);
+    expect(seen.out.at(-1)).toBe(FOUND);
 
     // They fit in a taller window, and every one goes to a file whatever the window.
     for (const [rows, stdoutTerminal] of [
@@ -316,8 +248,8 @@ describe("recover-date on the private screen", () => {
     const other = formatEncoded(encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2025")]), "indexes");
     terminal.answers = [`${other}\r`, "2?-09-2026\r", `${MASKED}\r`];
     terminal.choices = ["backup"];
-    await recover({ mode: "seedshift", "master-fingerprint": FINGERPRINT });
-    expect(out).toEqual([
+    await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
+    expect(seen.out).toEqual([
       "None of the 10 checksum-valid candidates matched the requested master fingerprint.",
       FOUND,
     ]);
@@ -332,13 +264,17 @@ describe("recover-date on the private screen", () => {
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r", "2?-09-2026\r"];
     // No types the dates again; the same search is then asked for once more, and made.
     terminal.choices = [false, true];
-    await recover({ mode: "seedshift", "master-fingerprint": FINGERPRINT, "max-candidates": "5" });
+    await recover({
+      mode: "seedshift",
+      "master-fingerprint": TEST_FINGERPRINT,
+      "max-candidates": "5",
+    });
     expect(terminal.questions).toEqual([
       "Search 10 date combinations?",
       "Search 10 date combinations?",
     ]);
     expect(promptsShown()).toEqual(["Encoded seed phrase or record:", DATES_PROMPT, DATES_PROMPT]);
-    expect(out).toEqual([FOUND]);
+    expect(seen.out).toEqual([FOUND]);
   });
 
   it("asks which Seedshift for plain codes in a file, and offers another source for a bad file", async () => {
@@ -346,31 +282,35 @@ describe("recover-date on the private screen", () => {
     try {
       const plain = join(directory, "codes.txt");
       await writeFile(plain, `${MASKED}\n`);
-      terminal.answers = ["2?-09-2026\r", `${FINGERPRINT}\r`];
+      terminal.answers = ["2?-09-2026\r", `${TEST_FINGERPRINT}\r`];
       terminal.choices = ["seedshift", "fingerprint"];
       await recover({ "input-file": plain });
       expect(terminal.questions).toEqual([
         "Which Seedshift was used?",
         "How can MnemoCode recognise the wallet?",
       ]);
-      expect(out).toEqual([FOUND]);
+      expect(seen.out).toEqual([FOUND]);
 
       const bad = join(directory, "bad.txt");
       await writeFile(bad, "no codes here\n");
-      out = [];
+      seen.out = [];
       terminal.questions = [];
       terminal.answers = [`'${plain}'\r`, "2?-09-2026\r"];
       terminal.choices = ["file"];
-      await recover({ "input-file": bad, mode: "seedshift", "master-fingerprint": FINGERPRINT });
+      await recover({
+        "input-file": bad,
+        mode: "seedshift",
+        "master-fingerprint": TEST_FINGERPRINT,
+      });
       // Another file, dragged in with quotes.
       expect(terminal.questions).toEqual(["What now?"]);
-      expect(notices).toContain("Enter 12, 15, 18, 21 or 24 English BIP39 words.");
-      expect(out).toEqual([FOUND]);
+      expect(seen.notices).toContain("Enter 12, 15, 18, 21 or 24 English BIP39 words.");
+      expect(seen.out).toEqual([FOUND]);
 
       // Stop at "What now?" cancels.
       terminal.choices = ["stop"];
       await expect(
-        recover({ "input-file": bad, mode: "seedshift", "master-fingerprint": FINGERPRINT }),
+        recover({ "input-file": bad, mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT }),
       ).rejects.toBeInstanceOf(InputCancelledError);
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -398,7 +338,7 @@ describe("recover-date on the private screen", () => {
       expect((await decoding({ "input-file": plain })).backup.mode).toBe("seedshift");
       expect(terminal.questions).toEqual(["Was Seedshift used when it was encoded?"]);
       expect(terminal.labels[0]).toEqual(["No", "MnemoCode Seedshift", "Original Seedshift"]);
-      expect(notices).toContain(
+      expect(seen.notices).toContain(
         "These codes have no MNC1 record header, so they do not say how they were made.",
       );
 
@@ -433,9 +373,9 @@ describe("recover-date on the private screen", () => {
     const encoded =
       "Encoded BIP32 master fingerprint of the masked phrase (empty BIP39 passphrase): 0d05289e";
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r"];
-    await recover({ mode: "seedshift", "master-fingerprint": FINGERPRINT });
-    expect(out).toEqual([FOUND]);
-    expect(notices).toContain(encoded);
+    await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
+    expect(seen.out).toEqual([FOUND]);
+    expect(seen.notices).toContain(encoded);
     // Before the question for the dates, so that a mistyped code shows before a long search.
     const shownAt = vi
       .mocked(console.error)
@@ -449,20 +389,20 @@ describe("recover-date on the private screen", () => {
       vi.mocked(process.stderr).write.mock.invocationCallOrder[askedAt]!,
     );
     // Codes of the Original Seedshift, which usually lack the checksum, show none.
-    notices = [];
+    seen.notices = [];
     terminal.answers = [`${LEGACY}\r`, "2?-09-2026\r"];
     await recover({ mode: "seedshift-legacy" });
-    expect(notices.some((line) => line.startsWith("Encoded BIP32"))).toBe(false);
+    expect(seen.notices.some((line) => line.startsWith("Encoded BIP32"))).toBe(false);
   });
 
   it("asks which Seedshift for typed codes without --mode", async () => {
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r"];
     terminal.choices = ["seedshift"];
-    await recover({ "master-fingerprint": FINGERPRINT });
+    await recover({ "master-fingerprint": TEST_FINGERPRINT });
     expect(terminal.questions).toEqual(["Which Seedshift was used?"]);
     // A date search needs Seedshift: there is no No.
     expect(terminal.labels[0]).toEqual(["MnemoCode Seedshift", "Original Seedshift"]);
-    expect(out).toEqual([FOUND]);
+    expect(seen.out).toEqual([FOUND]);
   });
 
   it("refuses options that cannot be used before the first question", async () => {
@@ -472,7 +412,7 @@ describe("recover-date on the private screen", () => {
     await expect(recover({ mode: "seedshift", network: "testnet" })).rejects.toThrow(
       "--network applies to a wallet given as an option",
     );
-    expect(screen).toBe("");
+    expect(seen.screen).toBe("");
   });
 });
 
@@ -480,7 +420,7 @@ describe("recover-date on the private screen", () => {
   it("cancels when the input ends", async () => {
     terminal.answers = [`${MASKED}\r`];
     await expect(
-      recover({ mode: "seedshift", "master-fingerprint": FINGERPRINT }),
+      recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT }),
     ).rejects.toBeInstanceOf(InputCancelledError);
   });
 });
