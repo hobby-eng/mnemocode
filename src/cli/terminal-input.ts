@@ -281,9 +281,21 @@ export async function withRawTerminal<T>(
     rawSessions -= 1;
     input.off("data", receive);
     input.off("end", end);
-    input.pause();
-    input.setRawMode(false);
+    await leaveRawMode(input);
   }
+}
+
+/**
+ * Stops reading the terminal, then leaves raw mode. Node.js stops reading a paused terminal only
+ * at its next tick, and libuv, asked to change the mode of a terminal it still reads, reads it
+ * again in the new mode: on Windows a line-mode read (ReadConsoleW), which libuv then cancels with
+ * an Enter of its own, dropping the keys that read took, such as the one pressed for the next
+ * question. Raw mode is therefore left a turn of the event loop after the pause.
+ */
+async function leaveRawMode(input: typeof process.stdin): Promise<void> {
+  input.pause();
+  await nodeTurn();
+  input.setRawMode(false);
 }
 
 /** A stop for a long search, which Ctrl+C sets off. */
@@ -293,8 +305,8 @@ export interface CtrlCWatch {
    * terminal fails after Ctrl+Z: `signal.throwIfAborted()` throws it.
    */
   readonly signal: AbortSignal;
-  /** Gives the terminal back as it was; a second call does nothing. */
-  stop(): void;
+  /** Gives the terminal back as it was, once it resolves; a second call does nothing. */
+  stop(): Promise<void>;
 }
 
 /**
@@ -310,7 +322,7 @@ export interface CtrlCWatch {
  */
 export function watchForCtrlC(): CtrlCWatch {
   const controller = new AbortController();
-  if (!terminalAvailable()) return { signal: controller.signal, stop: () => undefined };
+  if (!terminalAvailable()) return { signal: controller.signal, stop: async () => undefined };
   const input = process.stdin;
   const receive = (chunk: Buffer): void => {
     for (const byte of chunk) {
@@ -328,13 +340,12 @@ export function watchForCtrlC(): CtrlCWatch {
   let watching = true;
   return {
     signal: controller.signal,
-    stop: () => {
+    stop: async () => {
       if (!watching) return;
       watching = false;
       // As withRawTerminal leaves the terminal.
       input.off("data", receive);
-      input.pause();
-      input.setRawMode(false);
+      await leaveRawMode(input);
     },
   };
 }
@@ -376,7 +387,7 @@ export async function withCtrlCWatch<T>(search: (signal: AbortSignal) => Promise
   try {
     return await search(watch.signal);
   } finally {
-    watch.stop();
+    await watch.stop();
   }
 }
 
