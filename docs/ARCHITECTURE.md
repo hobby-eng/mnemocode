@@ -68,33 +68,34 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 
 `mnemocode.ts` starts the menu (`cli/menu.ts`) when there is no command and a terminal, and otherwise `cli/command-line.ts`, which dispatches commands and rejects unsupported flags. The menu only builds a command line from its questions and runs it through the same dispatcher. `cli/input.ts` owns interactive and file input. `arguments.ts` and the option modules validate values.
 
-| Module                   | Responsibility                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------- |
-| `cli/terminal-input.ts`  | Raw terminal keys and typed answers, the same on Linux, macOS and Windows       |
-| `cli/terminal-keys.ts`   | The keys acted on, the readers of typed bytes, and the refusals of a question   |
-| `cli/key-sequences.ts`   | Escape sequences of keys read to their end, and the editing keys among them     |
-| `cli/typed-answer.ts`    | The answer being edited, wiped after it, and what shows of it on the terminal   |
-| `cli/terminal-choice.ts` | Lists chosen with the arrow keys, typed answers and the pause for Enter         |
-| `cli/private-screen.ts`  | The alternate screen for typed secrets and their results, cleared after Enter   |
-| `cli/protection.ts`      | No core dumps, the permission model, and what a command gives up before it runs |
-| `cli/system-sandbox.ts`  | What the operating system enforces below the permission model, read back        |
-| `cli/sandbox-record.ts`  | The interface of a system's sandbox, and the record of what held and what not   |
-| `cli/sandbox-linux.ts`   | No core dumps, seccomp and Landlock for every thread                            |
-| `cli/sandbox-macos.ts`   | No debugger attach, the macOS sandbox                                           |
-| `cli/sandbox-windows.ts` | Crash reports without the heap, mitigation policies, a job object               |
-| `cli/typed-hints.ts`     | The rows of the word hints below a line being typed                             |
-| `cli/swap-check.ts`      | Whether swap is encrypted (Linux)                                               |
-| `cli/cloud-folders.ts`   | Whether an output path lies in a cloud-synchronised folder                      |
-| `cli/menu.ts`            | The entries, their questions and the command line each answer builds            |
-| `cli/ask.ts`             | Questions asked again until their answer can be used                            |
-| `cli/search-consent.ts`  | The question before a long search, the same for every search                    |
-| `cli/screen-fit.ts`      | Whether a result fits on the private screen, which keeps no scrollback          |
-| `cli/terminal-style.ts`  | The palette and the colour rule, which the release-signing script also takes    |
-| `cli/save-retry.ts`      | A save that fails on the private screen: try again, another name, or skip       |
-| `cli/menu-entries.ts`    | The entries of the start menu, by which every message and the sheet name them   |
-| `cli/date-search.ts`     | The encoded seed phrase, its mode and its dates on the screen, and the search   |
-| `cli/backup-check.ts`    | The questions of the optional check of a backup typed again after Encode        |
-| `cli/heir-sheet.ts`      | The route through the menu that the sheet for heirs prints (`--heir-sheet`)     |
+| Module                    | Responsibility                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `cli/terminal-input.ts`   | Raw terminal keys and typed answers, the same on Linux, macOS and Windows       |
+| `cli/terminal-keys.ts`    | The keys acted on, the readers of typed bytes, and the refusals of a question   |
+| `cli/key-sequences.ts`    | Escape sequences of keys read to their end, and the editing keys among them     |
+| `cli/typed-answer.ts`     | The answer being edited, wiped after it, and what shows of it on the terminal   |
+| `cli/terminal-choice.ts`  | Lists chosen with the arrow keys, typed answers and the pause for Enter         |
+| `cli/private-screen.ts`   | The alternate screen for typed secrets and their results, cleared after Enter   |
+| `cli/protection.ts`       | No core dumps, the permission model, and what a command gives up before it runs |
+| `cli/system-sandbox.ts`   | What the operating system enforces below the permission model, read back        |
+| `cli/sandbox-record.ts`   | The interface of a system's sandbox, and the record of what held and what not   |
+| `cli/sandbox-linux.ts`    | No core dumps, seccomp and Landlock for every thread                            |
+| `cli/sandbox-macos.ts`    | No debugger attach, the macOS sandbox                                           |
+| `cli/sandbox-windows.ts`  | Crash reports without the heap, mitigation policies, a job object               |
+| `cli/typed-hints.ts`      | The rows of the word hints below a line being typed                             |
+| `cli/swap-check.ts`       | Whether swap is encrypted (Linux)                                               |
+| `cli/cloud-folders.ts`    | Whether an output path lies in a cloud-synchronised folder                      |
+| `cli/menu.ts`             | The entries, their questions and the command line each answer builds            |
+| `cli/ask.ts`              | Questions asked again until their answer can be used                            |
+| `cli/search-consent.ts`   | The question before a long search, the same for every search                    |
+| `cli/screen-fit.ts`       | Whether a result fits on the private screen, which keeps no scrollback          |
+| `cli/terminal-style.ts`   | The palette and the colour rule, which the release-signing script also takes    |
+| `cli/save-retry.ts`       | A save that fails on the private screen: try again, another name, or skip       |
+| `cli/menu-entries.ts`     | The entries of the start menu, by which every message and the sheet name them   |
+| `cli/backup-questions.ts` | The encoded seed phrase and its mode on the screen, checked before the dates    |
+| `cli/date-search.ts`      | The dates on the screen, the search, and what follows it                        |
+| `cli/backup-check.ts`     | The questions of the optional check of a backup typed again after Encode        |
+| `cli/heir-sheet.ts`       | The route through the menu that the sheet for heirs prints (`--heir-sheet`)     |
 
 `scripts/verify-terminal-input.py` drives the menu and the prompts for secrets in a real pseudo-terminal: a Unix one on Linux and macOS, a Windows pseudo-console through pywinpty. Its session and screen are `scripts/terminal_session.py`, the public answers it types are `scripts/terminal_answers.py`, and its checks are `scripts/terminal_menu_checks.py` and `scripts/terminal_secret_checks.py`.
 

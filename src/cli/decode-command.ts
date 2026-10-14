@@ -31,16 +31,11 @@ import { searchLimit } from "./share-repair.js";
 import { WALLET_EVIDENCE_OPTIONS, type WalletPlace, givenWallet } from "./bitcoin-options.js";
 import {
   askDates,
-  askEncodedBackup,
   dateMatchNotes,
-  encodedFingerprintOf,
-  inputKindOf,
   maxCandidatesOf,
   PROGRESS_EVERY,
   reportDateMatches,
   searchDates,
-  showEncodedFingerprint,
-  typedAfterFile,
   walletExplanation,
   walletReason,
   maxResultsOf,
@@ -48,6 +43,13 @@ import {
   backupChoice,
   datesAgainChoice,
 } from "./date-search.js";
+import {
+  askEncodedBackup,
+  encodedFingerprintOf,
+  inputKindOf,
+  showEncodedFingerprint,
+  typedAfterFile,
+} from "./backup-questions.js";
 import {
   assertAskedEncodedInput,
   assertOneEncodedSource,

@@ -67,10 +67,10 @@ import {
   withDateProgress,
   maxCandidatesOf,
   PROGRESS_EVERY,
-  showEncodedFingerprint,
   DATES_AGAIN,
   walletExplanation,
 } from "./date-search.js";
+import { showEncodedFingerprint } from "./backup-questions.js";
 import { choose, waitForEnter } from "./terminal-choice.js";
 import { askToSearch } from "./search-consent.js";
 import { SHARE_SEEDSHIFT_CHOICES, SHARE_SEEDSHIFT_QUESTION } from "./seedshift-choices.js";

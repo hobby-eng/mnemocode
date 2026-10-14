@@ -21,21 +21,23 @@ import { type WalletPlace, givenWallet } from "./bitcoin-options.js";
 import { CandidatesFile } from "./candidates-file.js";
 import {
   askDates,
-  askEncodedCodes,
   dateMatchNotes,
-  encodedFingerprintOf,
   maxCandidatesOf,
   PROGRESS_EVERY,
   recoveryDatesPrompt,
   reportDateMatches,
   searchDates,
-  showEncodedFingerprint,
-  typedAfterFile,
   walletExplanation,
   maxResultsOf,
   askAfterDateSearch,
   backupChoice,
 } from "./date-search.js";
+import {
+  askEncodedCodes,
+  encodedFingerprintOf,
+  showEncodedFingerprint,
+  typedAfterFile,
+} from "./backup-questions.js";
 import {
   assertAskedEncodedInput,
   givenInputFormat,
