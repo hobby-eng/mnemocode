@@ -32,6 +32,7 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
   },
 }));
 
+import { coinById, COINS } from "../src/core/coins.js";
 import { bitcoinProfiles, type BitcoinEvidence } from "../src/bitcoin-evidence.js";
 import {
   askAfterFailure,
@@ -100,6 +101,9 @@ let notices: string[] = [];
 function at(prompt: string, typed: string | Buffer): void {
   prompts.push({ prompt, keys: typed });
 }
+
+/** Bitcoin, as the question which coin an address is for gives it. */
+const BITCOIN = coinById("bitcoin");
 
 describe("questions asked again until the answer can be used", () => {
   beforeEach(() => {
@@ -268,7 +272,7 @@ describe("questions asked again until the answer can be used", () => {
     });
     expect(notices).toEqual(["A master fingerprint must be eight hexadecimal characters."]);
     notices = [];
-    terminal.choices = ["address"];
+    terminal.choices = ["address", BITCOIN];
     at("Bitcoin address (one of the first receiving ones):", `${TESTNET_ADDRESS}\r`);
     at("Bitcoin address (one of the first receiving ones):", `${FIRST_ADDRESS}\r`);
     // How many of the first addresses it is compared with: Enter takes the first 20.
@@ -287,7 +291,7 @@ describe("questions asked again until the answer can be used", () => {
       "The address is not valid for Bitcoin mainnet; it is a testnet address.",
     ]);
     notices = [];
-    terminal.choices = ["address"];
+    terminal.choices = ["address", BITCOIN];
     at("Bitcoin address (one of the first receiving ones):", `${FIRST_ADDRESS}\r`);
     at("Compare with how many addresses from the first (Enter: 20):", "0\r");
     at("Compare with how many addresses from the first (Enter: 20):", "1001\r");
@@ -301,7 +305,7 @@ describe("questions asked again until the answer can be used", () => {
     ]);
     notices = [];
     // --scan-gap answers the count, which is then not asked.
-    terminal.choices = ["address"];
+    terminal.choices = ["address", BITCOIN];
     at("Bitcoin address (one of the first 5 receiving ones):", `${FIRST_ADDRESS}\r`);
     expect(
       await askWalletEvidence({
@@ -324,7 +328,7 @@ describe("questions asked again until the answer can be used", () => {
       branch: 0,
       index: LAST_NORMAL_INDEX,
     };
-    terminal.choices = ["address"];
+    terminal.choices = ["address", BITCOIN];
     at(
       `Bitcoin address (one of the addresses from m/.../0'/0/${LAST_NORMAL_INDEX}):`,
       `${FIRST_ADDRESS}\r`,
@@ -344,18 +348,21 @@ describe("questions asked again until the answer can be used", () => {
       location: { network: "testnet", account: 1, branch: 0, index: 5 },
       addresses: 1,
     };
-    terminal.choices = ["address"];
+    terminal.choices = ["address", BITCOIN];
     at("Bitcoin address (m/.../1'/0/5):", `${TESTNET_ADDRESS}\r`);
     expect(await askWalletEvidence({ optional: false, place: walletPlaceOf(given, {}) })).toEqual({
       kind: "wallet",
       evidence: given,
     });
     expect(terminal.lists[0]).toContainEqual(
-      expect.objectContaining({
-        note: "its address at m/.../1'/0/5",
-        example: "m..., n..., 2..., tb1q... or tb1p...",
-      }),
+      expect.objectContaining({ note: "its address at m/.../1'/0/5" }),
     );
+    // Every coin in one list, as mhfe asks it; Bitcoin with the forms of the place's network.
+    expect(terminal.questions[1]!.question).toBe("Which coin is the address for?");
+    expect(terminal.lists[1]).toContainEqual(
+      expect.objectContaining({ label: "Bitcoin", note: "m…, n…, 2…, tb1q… or tb1p…" }),
+    );
+    expect((terminal.lists[1] as unknown[]).length).toBe(COINS.length);
     // A fingerprint keeps the network; an address after it is the first receiving one there.
     const fingerprint: BitcoinEvidence = {
       kind: "master-fingerprint",

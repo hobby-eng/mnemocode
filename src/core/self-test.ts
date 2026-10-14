@@ -1,6 +1,6 @@
 // The self-test of MnemoCode's rules: whether this copy encodes, decodes, recovers and checks as
 // the published vectors say, before a person trusts it with a seed phrase. A host runs it on the
-// person's request (menu entry 8, the command self-test, a page's button); the quick part of it
+// person's request (menu entry 9, the command self-test, a page's button); the quick part of it
 // (MnemoCodeSelfTest.core) also runs before every command of the command line.
 //
 // Each feature keeps its checks in a module beside it, named after it with -self-test, or
@@ -482,7 +482,7 @@ export class MnemoCodeSelfTest {
         name: "SSKR integrity",
         detail: [
           host.shareLibrary,
-          "official grouped recovery, exact creation, transport and refusals",
+          "official and 32-byte recovery, exact creation, transport and refusals",
         ]
           .filter(Boolean)
           .join(", "),

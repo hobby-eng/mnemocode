@@ -16,9 +16,9 @@ import { DatesAnswer } from "../core/date-search.js";
 import { WordList } from "../core/word-hints.js";
 import { DATE_COUNT_WORDS, Masking, type DateCountWords } from "../core/masking.js";
 import { validatedEnglishWords } from "../core/words.js";
-import { MAX_TEXT_INPUT_BYTES, readBoundedDescriptor, readFileOrRefuse } from "./bounded-read.js";
+import { MAX_TEXT_INPUT_BYTES, readBoundedDescriptor } from "./bounded-read.js";
+import { decodedText, readBoundedTextFile } from "./text-file.js";
 import { decodeQrPngFile } from "./qr-input.js";
-import { strictUtf8Text } from "./utf8.js";
 
 import {
   type ParsedArguments,
@@ -61,36 +61,10 @@ const STANDARD_INPUT = "Text input";
 /** The file descriptor of standard input. */
 const STANDARD_INPUT_DESCRIPTOR = 0;
 
-/**
- * The text of `bytes`, read from `what`, as strictUtf8Text decodes it: a byte order mark and line
- * breaks are kept for the caller to treat by its own rule. The bytes may hold a secret, such as a
- * passphrase, and are wiped once decoded, also when they are refused.
- */
-function decodedText(bytes: Buffer, what: string): string {
-  try {
-    return strictUtf8Text(bytes, what);
-  } finally {
-    bytes.fill(0);
-  }
-}
-
 function readBoundedStdin(): string {
   return decodedText(
     readBoundedDescriptor(STANDARD_INPUT_DESCRIPTOR, MAX_TEXT_INPUT_BYTES, STANDARD_INPUT),
     STANDARD_INPUT,
-  );
-}
-
-/** The text of the file at `path`, at most MAX_TEXT_INPUT_BYTES of valid UTF-8 (decodedText). */
-export function readBoundedTextFile(path: string, inputName = "The text input"): string {
-  return decodedText(
-    readFileOrRefuse(
-      path,
-      MAX_TEXT_INPUT_BYTES,
-      inputName,
-      `${inputName} could not be read. Check that the file exists and is readable.`,
-    ),
-    inputName,
   );
 }
 
@@ -125,7 +99,7 @@ export function assertAskedEncodedInput(arguments_: ParsedArguments): void {
 /**
  * The options that give an encoded seed phrase as text; a file or a QR image is no secret typed.
  */
-const ENCODED_SECRET_OPTIONS = Object.freeze(["input"] as const);
+export const ENCODED_SECRET_OPTIONS = Object.freeze(["input"] as const);
 /** The options that give a seed phrase. */
 export const PHRASE_SECRET_OPTIONS = Object.freeze(["mnemonic", "mnemonic-file"] as const);
 /** The option that gives dates, which --ask-secrets asks for on the private screen too. */
@@ -308,34 +282,42 @@ function typedDates(line: string, wordCount: number | undefined): DateShiftDate[
  * The seed phrase and the dates of a backup, for encode and for a split into shares: asked on the
  * private screen with --ask-secrets, or read from the options. The dates are counted for the mode
  * before the phrase is read: the library's rule (Masking.assertDateCount), refused early in the
- * command's `words`.
+ * command's `words`. A `known` phrase, which Re-encode decoded and confirmed, is neither asked nor
+ * read: only its dates are.
  */
 export async function phraseAndDates(
   args: ParsedArguments,
   mode: MaskingMode,
   words: DateCountWords = DATE_COUNT_WORDS.codes,
+  known?: string,
 ): Promise<{ readonly mnemonic: string; readonly dates: readonly DateShiftDate[] }> {
-  const prompted = await promptedEncodeInputs(args, mode);
+  const prompted = await promptedEncodeInputs(args, mode, known);
   const dateValues = prompted?.dates ?? dates(args);
   Masking.of(mode).assertDateCount(dateValues.length, false, words);
-  return { mnemonic: prompted?.mnemonic ?? textInput(args, "mnemonic"), dates: dateValues };
+  return {
+    mnemonic: prompted?.mnemonic ?? known ?? textInput(args, "mnemonic"),
+    dates: dateValues,
+  };
 }
 
 /**
  * The seed phrase and the dates of Encode with --ask-secrets, each asked again until it can be
- * used (askSecretUntil): the phrase first, checked at once, then the dates alone, which a second
- * try asks without the phrase.
+ * used (askSecretUntil): the phrase first, checked at once, unless it is `known`, then the dates
+ * alone, which a second try asks without the phrase.
  */
 export async function promptedEncodeInputs(
   arguments_: ParsedArguments,
   mode: MaskingMode,
+  known?: string,
 ): Promise<{ readonly mnemonic: string; readonly dates: DateShiftDate[] } | undefined> {
   if (arguments_["ask-secrets"] !== true) return undefined;
   assertAskedNotGiven(arguments_, [...PHRASE_SECRET_OPTIONS, DATES_OPTION]);
-  const mnemonic = await askSecretUntil("Seed phrase (English BIP39 words):", typedSeedPhrase, {
-    what: "the words of the seed phrase",
-    hints: WordList.BIP39,
-  });
+  const mnemonic =
+    known ??
+    (await askSecretUntil("Seed phrase (English BIP39 words):", typedSeedPhrase, {
+      what: "the words of the seed phrase",
+      hints: WordList.BIP39,
+    }));
   if (!Masking.of(mode).masked) return { mnemonic, dates: [] };
   const wordCount = englishTokens(mnemonic).length;
   const dates = await askSecretUntil(

@@ -23,14 +23,14 @@ corepack pnpm audit --audit-level high
 npm pack --dry-run --json --ignore-scripts
 ```
 
-The SSKR engine rebuild (`pnpm verify:sskr`) takes long and runs on GitHub for the tag, so it is not repeated here. Check that every commit since the last release is signed: `git cat-file -p <commit>` shows a `gpgsig` header. Push the release commit to `main` and wait for its CI.
+The SSKR engine rebuild (`pnpm verify:sskr`) takes long and runs on GitHub for the tag, so it is not repeated here. Check that every commit since the last release is signed: `git cat-file -p <commit>` shows a `gpgsig` header. Commits and the tag are made with `TZ=UTC`, so that their dates read `+0000` and publish no time zone: `git log --format='%ad %cd' --date=iso` shows `+0000` for every commit since the last release, as the tagger line of `git cat-file -p v0.1.0` does once the tag is made. Push the release commit to `main` and wait for its CI.
 
 ## Signed tag
 
 Make an annotated tag, signed like the commits with the SSH key that Git is set up with, and push it:
 
 ```sh
-git tag -s v0.1.0 -m "MnemoCode 0.1.0"
+TZ=UTC git tag -s v0.1.0 -m "MnemoCode 0.1.0"
 git cat-file -p v0.1.0
 git push origin v0.1.0
 ```

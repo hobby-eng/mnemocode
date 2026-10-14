@@ -48,6 +48,11 @@ export interface CoinDescription {
   /** How its supported addresses begin, such as "1…, 3…, bc1q… or bc1p…". */
   readonly addressForms: string;
   /**
+   * How they begin on its test network, where that differs and is supported, such as "m…, n…,
+   * 2…, tb1q… or tb1p…" for Bitcoin.
+   */
+  readonly testnetAddressForms?: string;
+  /**
    * The SLIP-44 coin types of its main network's paths. A coin that forked from another, such as
    * Bitcoin Cash from Bitcoin, has its own first and the other's second: its wallets use either.
    */
@@ -119,6 +124,7 @@ export abstract class Coin implements CoinDescription {
   readonly name: string;
   readonly addressForms: string;
   readonly coinTypes: readonly number[];
+  readonly #testnetAddressForms: string | undefined;
   readonly #commitments: Readonly<Partial<Record<AddressType, KeyCommitment>>>;
   readonly #purposes: Readonly<Partial<Record<AddressType, number>>>;
 
@@ -126,9 +132,18 @@ export abstract class Coin implements CoinDescription {
     this.id = description.id;
     this.name = description.name;
     this.addressForms = description.addressForms;
+    this.#testnetAddressForms = description.testnetAddressForms;
     this.coinTypes = Object.freeze([...description.coinTypes]);
     this.#commitments = Object.freeze({ ...description.commitments });
     this.#purposes = Object.freeze({ ...description.purposes });
+  }
+
+  /**
+   * How the coin's addresses begin on the main network, or on its test network where `testnet`
+   * and they differ there (testnetAddressForms): what a question names beside the coin.
+   */
+  addressFormsOn(testnet: boolean): string {
+    return testnet ? (this.#testnetAddressForms ?? this.addressForms) : this.addressForms;
   }
 
   /** What an address of `type` commits to for `publicKey`: its HASH160 unless the family says. */

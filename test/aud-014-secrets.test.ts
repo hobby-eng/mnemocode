@@ -19,7 +19,8 @@ import {
 import { CandidateListWriter } from "../src/core/candidate-list-writer.js";
 import { bip39Passphrase } from "../src/cli/bitcoin-options.js";
 import { CandidatesFile } from "../src/cli/candidates-file.js";
-import { givenInputFormat, readBoundedTextFile, textInput } from "../src/cli/input.js";
+import { givenInputFormat, textInput } from "../src/cli/input.js";
+import { readBoundedTextFile } from "../src/cli/text-file.js";
 import { strictUtf8Text } from "../src/cli/utf8.js";
 
 /** What the readers of bounded-read.ts returned, so that a test can see they were wiped. */

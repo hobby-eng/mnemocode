@@ -121,10 +121,11 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
   );
 
   it(
-    "reads a separate card of every family",
+    "reads a separate card of every family that has them",
     async () => {
       const preview = new CardPreview(nodeCardRenderer);
-      for (const template of FAMILY_DESIGNS) {
+      // The material designs are printed on sheets only (drawsSeparateCards).
+      for (const template of FAMILY_DESIGNS.filter((item) => item.renderIndividual)) {
         const { content } = preview.job(template.id);
         const [card] = await renderIndividualCards(nodeCardRenderer, template, content);
         const pages = await expectCardPages(card!.bytes, template.id);
@@ -139,6 +140,8 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
     async () => {
       for (const template of FAMILY_DESIGNS)
         for (const layout of SSKR_CARD_LAYOUTS) {
+          // The material designs are printed on sheets only (drawsSeparateCards).
+          if (layout === "individual" && !template.renderIndividual) continue;
           const cards = await ShareCardSet.create(nodeCardRenderer, SHARES, {
             style: styleOf(template),
             layout,

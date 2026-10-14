@@ -2,7 +2,8 @@ import { imageFormat, cardFileFormat, savedPagesNotice } from "./image-options.j
 import { exportPageImages } from "../export/image-export.js";
 import { exportCards, renderCards } from "../export/pdf.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
-import { plannedCardJob, type CardJob } from "../export/render.js";
+import { plannedCardJob, separateCardJob, type CardJob } from "../export/render.js";
+import { parseOrientation } from "../export/card-settings.js";
 import { backupCardContent } from "../export/backup-cards.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
@@ -27,17 +28,45 @@ function cardJob(arguments_: ParsedArguments, outcome: EncodeOutcome): CardJob {
   return { template: cardTemplate(arguments_, content.kind), content };
 }
 
+/** Retains the library's planned cards for the sequential saves and retries of one Encode run. */
+export class EncodeCardExport {
+  readonly #arguments: ParsedArguments;
+  readonly #outcome: EncodeOutcome;
+  #job: CardJob | undefined;
+
+  constructor(arguments_: ParsedArguments, outcome: EncodeOutcome) {
+    this.#arguments = arguments_;
+    this.#outcome = outcome;
+  }
+
+  /** Plans on the first card save, preserving when card details are drawn. */
+  async job(): Promise<CardJob> {
+    // Retain only a completed plan: a planning failure must still allow the destination's retry.
+    return (this.#job ??= await plannedCardJob(
+      nodeCardRenderer,
+      cardJob(this.#arguments, this.#outcome),
+    ));
+  }
+
+  /** The same cards as separate card files draw them: turned as the person asked, not as a sheet. */
+  async separateJob(): Promise<CardJob> {
+    return separateCardJob(
+      await this.job(),
+      parseOrientation(value(this.#arguments, "orientation")),
+    );
+  }
+}
+
 /**
- * Every destination receives the same completed transformation, and every card file the same
- * cards: their decoys are planned once, when the first of them is saved.
+ * Saves the named destinations. Separate calls in one run share `cards`, so every file and retry
+ * receives the same complete collection; a standalone call keeps its own collection. Shared
+ * `cards` belongs to this outcome and the run's one object of card options.
  */
 export async function saveEncodeResult(
   arguments_: ParsedArguments,
   outcome: EncodeOutcome,
+  cards = new EncodeCardExport(arguments_, outcome),
 ): Promise<void> {
-  let planned: Promise<CardJob> | undefined;
-  const plannedJob = (): Promise<CardJob> =>
-    (planned ??= plannedCardJob(nodeCardRenderer, cardJob(arguments_, outcome)));
   const { backup } = outcome.encoding;
   const { format } = backup;
   const pdfPath = value(arguments_, "pdf");
@@ -54,19 +83,19 @@ export async function saveEncodeResult(
     console.error(colorCards(indexesToColors(backup.indexes)));
   }
   if (pdfPath !== undefined) {
-    await exportCards([await plannedJob()], pdfPath);
+    await exportCards([await cards.job()], pdfPath);
     terminalNotice(`Saved PDF: ${pdfPath}`, "success");
   }
   if (imageDirectory !== undefined) {
     // The rendered cards show the backup: wiped once their images are written.
     const count = await wipedAfterAsync(
-      await renderCards(nodeCardRenderer, [await plannedJob()]),
+      await renderCards(nodeCardRenderer, [await cards.job()]),
       (document) => exportPageImages(document, imageDirectory, imageFormat(arguments_)),
     );
     savedPagesNotice(arguments_, count, imageDirectory);
   }
   if (cardDirectory !== undefined) {
-    const { template, content } = await plannedJob();
+    const { template, content } = await cards.separateJob();
     const count = await exportIndividualCards(
       template,
       content,

@@ -110,9 +110,9 @@ export class BackupReading extends Redacted {
     return EncodedForm.of(format).leadingCodes(this.#payload, this.#words);
   }
 
-  /** The text of the codes in the form that their characters most likely are (#payloadIn). */
+  /** The text in the record's form, or the form its characters most likely are (#payloadIn). */
   get #likelyPayload(): string {
-    return this.#payloadIn(EncodedForm.likely(this.#payload));
+    return this.#payloadIn(this.#record?.format ?? EncodedForm.likely(this.#payload));
   }
 
   /**
@@ -226,6 +226,13 @@ export class BackupReading extends Redacted {
 
   /** Whether the codes mark some that cannot be read (MissingCodes.marked), to be searched. */
   get marked(): boolean {
+    if (this.#record === undefined && this.#words !== undefined) {
+      // Hexadecimal Color Unicode also looks like word Unicode: a fitting form, rather than
+      // that guess, decides which codes precede the decoys when no record names the form.
+      const fitting = this.#fitting((payload) => MissingCodes.formats(payload));
+      if (fitting.length > 0)
+        return fitting.some((format) => MissingCodes.marked(this.#payloadIn(format)));
+    }
     return MissingCodes.marked(this.#likelyPayload);
   }
 

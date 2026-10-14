@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { businessOptions } from "../src/cli/business-options.js";
 import { parseArguments } from "../src/cli/arguments.js";
 import {
@@ -15,22 +16,34 @@ describe("export-level card presentation", () => {
     expect(new Set(studioNames).size).toBe(37);
     expect(studioNames).toContain("Alder & Vale");
     expect(studioNames).toContain("Fallow & Reed");
-    expect(cardSlogans).toHaveLength(30);
+    expect(cardSlogans).toHaveLength(29);
     expect(cardSubtitles).toHaveLength(5);
     expect(cardFooters).toHaveLength(6);
+  });
+  it("is counted in docs/card-identities.md as the pools are (AUD-022-DOC002)", () => {
+    const text = readFileSync("docs/card-identities.md", "utf8");
+    const numbers: Readonly<Record<string, number>> = { five: 5, six: 6 };
+    const counted = (what: string) => {
+      const written = new RegExp(`(\\d+|five|six) ${what}`, "u").exec(text)?.[1];
+      return written === undefined ? undefined : (numbers[written] ?? Number(written));
+    };
+    expect(counted("studio names")).toBe(studioNames.length);
+    expect(counted("slogans")).toBe(cardSlogans.length);
+    expect(counted("subtitles")).toBe(cardSubtitles.length);
+    expect(counted("footers")).toBe(cardFooters.length);
   });
   it("draws the sheet copy in its order, one choice for each text", () => {
     const choose = vi
       .fn()
       .mockReturnValueOnce(0)
-      .mockReturnValueOnce(29)
+      .mockReturnValueOnce(28)
       .mockReturnValueOnce(4)
       .mockReturnValueOnce(5);
     const presentation = resolveCardPresentation(choose, {});
-    expect(choose.mock.calls).toEqual([[37], [30], [5], [6]]);
+    expect(choose.mock.calls).toEqual([[37], [29], [5], [6]]);
     expect(presentation).toEqual({
       studioName: "Alder & Vale",
-      slogan: cardSlogans[29],
+      slogan: cardSlogans[28],
       subtitle: cardSubtitles[4],
       footer: cardFooters[5],
       referenceLabel: "Ref.",

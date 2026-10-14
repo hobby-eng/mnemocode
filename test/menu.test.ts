@@ -96,6 +96,7 @@ import {
   SHARE_SEEDSHIFT_QUESTION,
 } from "../src/cli/seedshift-choices.js";
 import { commandDisplay, MENU_ENTRIES, typedCommand } from "../src/cli/menu.js";
+import { MENU_ENTRY_NAMES as ENTRY, type MenuEntryName } from "../src/cli/menu-entries.js";
 import { resolveSskrLayout } from "../src/export/sskr-content.js";
 import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
 import { formatNumber } from "../src/cli/format-numbers.js";
@@ -109,7 +110,7 @@ const SAME_SHAPE = new Set(["Which card design?"]);
  */
 const TAKEN_ONCE = new Set([
   "Type your own details for the cards?",
-  "Which coin?",
+  "Which coin is the address for?",
   // Each other answer adds --orientation alone, the same for every layout of sheets.
   "How should the sheets be turned?",
 ]);
@@ -208,16 +209,16 @@ function assertCardOptions(command: string, parsed: ReturnType<typeof parseArgum
     );
 }
 
-/** The command line that `answers` give in `entry` (a digit), with `typed` for its typed questions. */
+/** The command line that `answers` give in `entry`, with `typed` for its typed questions. */
 async function runOf(
-  digit: number,
+  entry: MenuEntryName,
   answers: number[],
   typed: Record<string, string[]> = {},
 ): Promise<readonly string[] | undefined> {
   script.answers = answers;
   script.asked = [];
   script.typed = typed;
-  const action = await MENU_ENTRIES.find((entry) => entry.digit === digit)!.action();
+  const action = await MENU_ENTRIES.find((shown) => shown.digit === entry.digit)!.action();
   return typeof action === "object" ? action.run : undefined;
 }
 
@@ -227,14 +228,16 @@ function warningsAt(question: string): (string | undefined)[] {
 }
 
 describe("start menu", () => {
-  it("offers the agreed entries, numbered 1 to 9 and 0 for Quit", () => {
-    expect(MENU_ENTRIES.map((entry) => entry.digit)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
-    expect(MENU_ENTRIES[2]!.label).toBe("Split a seed phrase into standard Shamir shares");
+  it("offers the agreed entries, 1 to 9, 0 for help, and Quit without a digit", () => {
+    // Quit has no digit: Escape quits too (owner, 2026-10-13).
+    expect(MENU_ENTRIES.map((entry) => entry.digit)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 0, null]);
     expect(MENU_ENTRIES[0]!.label).toBe("Encode a seed phrase as numbers, codes or colors");
-    expect(MENU_ENTRIES[1]!.label).toBe("Decode numbers, codes or colors back into a seed phrase");
+    expect(MENU_ENTRIES[1]!.label).toBe("Re-encode a backup with other dates or in another form");
+    expect(MENU_ENTRIES[2]!.label).toBe("Decode numbers, codes or colors back into a seed phrase");
+    expect(MENU_ENTRIES[3]!.label).toBe("Split a seed phrase into standard Shamir shares");
     // The entries whose commands ask for a seed phrase or a share.
     expect(MENU_ENTRIES.filter((entry) => entry.asksSecrets).map((entry) => entry.digit)).toEqual([
-      1, 2, 3, 4, 5,
+      1, 2, 3, 4, 5, 6,
     ]);
   });
 
@@ -252,8 +255,15 @@ describe("start menu", () => {
         assertAllowedArguments(parsed, command!, commandOptions[command as never]);
         assertCardOptions(command!, parsed);
         // A secret never goes on the command line: a command that takes one asks for it.
-        if (["encode", "decode", "sskr-split", "sskr-combine", "recover-word"].includes(command!))
-          expect(parsed["ask-secrets"], typedCommand(run)).toBe(true);
+        const secret = [
+          "encode",
+          "re-encode",
+          "decode",
+          "sskr-split",
+          "sskr-combine",
+          "recover-word",
+        ];
+        if (secret.includes(command!)) expect(parsed["ask-secrets"], typedCommand(run)).toBe(true);
       }
       // Lists and explanations fit a terminal of 80 columns unwrapped (TEXT_WIDTH), and no note of a
       // list is cut to fit.
@@ -269,7 +279,7 @@ describe("start menu", () => {
   it("builds the command lines of the usual answers", async () => {
     // Colors, no Seedshift, no shares, as printable cards in the first design, in one PDF of A6
     // sheets turned the way the cards are largest, with a QR code each, with random details.
-    expect(await runOf(1, [2, 1, 0, 3, 0, 0, 2, 0, 0])).toEqual([
+    expect(await runOf(ENTRY.encode, [2, 1, 0, 3, 0, 0, 2, 0, 0])).toEqual([
       "encode",
       "--ask-secrets",
       "--format",
@@ -284,7 +294,7 @@ describe("start menu", () => {
     ]);
     // Word numbers, always masked, with MnemoCode Seedshift, split 2 of 3 into shares in word
     // numbers too, on the screen, with the whole seed phrase beside them (--format).
-    expect(await runOf(1, [0, 0, 1, 0, 1])).toEqual([
+    expect(await runOf(ENTRY.encode, [0, 0, 1, 0, 1])).toEqual([
       "encode",
       "--sskr",
       "--ask-secrets",
@@ -300,14 +310,14 @@ describe("start menu", () => {
       "2",
     ]);
     // Colors give color shares without a question about their look.
-    expect(await runOf(1, [2, 1, 1, 0])).toEqual(
+    expect(await runOf(ENTRY.encode, [2, 1, 1, 0])).toEqual(
       expect.arrayContaining(["--share-format", "colors"]),
     );
     expect(script.asked.map((asked) => asked.question)).not.toContain(
       "How should each share be written?",
     );
     // English words are always masked; the original Seedshift asks nothing about shares.
-    expect(await runOf(1, [4, 1, 0])).toEqual([
+    expect(await runOf(ENTRY.encode, [4, 1, 0])).toEqual([
       "encode",
       "--ask-secrets",
       "--format",
@@ -323,7 +333,7 @@ describe("start menu", () => {
     ]);
     // Unicode codes, no Seedshift, a threshold typed under Other, no whole copy, and a sheet for
     // heirs.
-    expect(await runOf(1, [1, 1, 7, 0, 0, 1])).toEqual([
+    expect(await runOf(ENTRY.encode, [1, 1, 7, 0, 0, 1])).toEqual([
       "encode",
       "--sskr",
       "--ask-secrets",
@@ -342,9 +352,33 @@ describe("start menu", () => {
     ]);
   });
 
+  it("re-encodes from the Re-encode entry: the old backup as Decode asks it, the rest on the private screen", async () => {
+    // Typed, all the codes, MnemoCode Seedshift: the codes, the dates, the confirmation and the new
+    // backup are asked by re-encode itself.
+    expect(await runOf(ENTRY.reEncode, [0, 0, 1])).toEqual([
+      "re-encode",
+      "--ask-secrets",
+      "--old-mode",
+      "seedshift",
+    ]);
+    expect(script.asked.map((asked) => asked.question)).toEqual([
+      "Where is the encoded seed phrase?",
+      "How many words does the seed phrase have?",
+      "Was Seedshift used when it was encoded?",
+    ]);
+    // A record file names its mode: none is asked.
+    const path = join(files, "record.txt");
+    expect(await runOf(ENTRY.reEncode, [1], { "Record file name": [path] })).toEqual([
+      "re-encode",
+      "--ask-secrets",
+      "--input-file",
+      path,
+    ]);
+  });
+
   it("numbers the forms by their place in the list; the command names the --format number", async () => {
     // English words, listed last, are answered with 5 and are form 1 of the command built.
-    const run = (await runOf(1, [4, 1, 0])) ?? [];
+    const run = (await runOf(ENTRY.encode, [4, 1, 0])) ?? [];
     expect(run[run.indexOf("--format") + 1]).toBe(String(formatNumber("english")));
     const forms = script.digits["Which form should the seed phrase take?"]!;
     expect(forms.map(({ digit }) => digit)).toEqual(forms.map(() => undefined));
@@ -356,14 +390,14 @@ describe("start menu", () => {
 
   it("always masks word numbers and words, and calls an unmasked copy weak", async () => {
     for (const form of [0, 4]) {
-      await runOf(1, [form]);
+      await runOf(ENTRY.encode, [form]);
       const questions = script.asked.map((asked) => asked.question);
       expect(questions).not.toContain("Use Seedshift?");
       expect(questions).toContain("Which Seedshift?");
     }
     // Unicode codes may stay unmasked, but the answer says how weak that is.
     script.lists = [];
-    await runOf(1, [1]);
+    await runOf(ENTRY.encode, [1]);
     expect(script.asked[1]!.question).toBe("Use Seedshift?");
     expect(script.lists[1]!.join(" ")).toContain("weak: only disguised");
   });
@@ -371,12 +405,12 @@ describe("start menu", () => {
   it("has the entries, questions and answers that the sheet for heirs names", async () => {
     const asked = async (digit: number) => {
       const entry = MENU_ENTRIES.find((item) => item.digit === digit)!;
-      await runOf(digit, []);
+      await runOf(entry, []);
       return { entry: `${entry.digit} ${entry.label}`, asked: script.asked };
     };
     for (const [digit, steps] of [
-      [2, HEIR_MENU.decode],
-      [4, HEIR_MENU.restore],
+      [3, HEIR_MENU.decode],
+      [5, HEIR_MENU.restore],
     ] as const) {
       const { entry, asked: questions } = await asked(digit);
       expect(entry).toBe(steps.entry);
@@ -384,9 +418,9 @@ describe("start menu", () => {
       expect(question, steps.question).toBeDefined();
       for (const answer of Object.values(steps.answers)) expect(question!.labels).toContain(answer);
     }
-    expect((await asked(2)).asked[0]!.labels[0]).toBe(HEIR_MENU.decode.source);
+    expect((await asked(3)).asked[0]!.labels[0]).toBe(HEIR_MENU.decode.source);
     // Typed codes: the question of how many words, with the answer the sheet gives.
-    await runOf(2, [0]);
+    await runOf(ENTRY.decode, [0]);
     const words = script.asked.find((item) => item.question === HEIR_MENU.decode.wordsQuestion);
     expect(words?.labels).toEqual([
       "All the codes I type",
@@ -395,9 +429,9 @@ describe("start menu", () => {
     expect((await asked(HEIR_MENU.recover.digit)).entry).toBe(HEIR_MENU.recover.entry);
   });
 
-  it("splits into standard shares in words or a short code from entry 3", async () => {
+  it("splits into standard shares in words or a short code from the Split entry", async () => {
     // MnemoCode Seedshift, 2 of 3, in Bytewords, on the screen; no "Which Seedshift?" question.
-    expect(await runOf(3, [0, 0, 0, 0, 0])).toEqual([
+    expect(await runOf(ENTRY.split, [0, 0, 0, 0, 0])).toEqual([
       "encode",
       "--sskr",
       "--ask-secrets",
@@ -416,7 +450,7 @@ describe("start menu", () => {
 
   it("offers printable cards for a phrase and shares in colors or Unicode codes only", async () => {
     const destinations = async (answers: number[]) => {
-      await runOf(1, answers);
+      await runOf(ENTRY.encode, answers);
       return script.asked.find((asked) => asked.question.startsWith("Where should"))!.labels;
     };
     // Word numbers, MnemoCode Seedshift, no shares: a record or a QR code, no cards.
@@ -434,12 +468,46 @@ describe("start menu", () => {
       "Only on this screen",
       "Also in a text file",
       "Also as printable cards",
+      "All of these",
     ]);
     expect(await destinations([2, 1, 1])).toEqual([
       "Only on this screen",
       "Also in a text file",
       "Also as printable cards",
+      "All of these",
     ]);
+  });
+
+  it("saves to every place at once with All of these, the screen included", async () => {
+    // Word numbers, MnemoCode Seedshift, no shares: a record file and a QR code, no cards.
+    expect(await runOf(ENTRY.encode, [0, 0, 0, 3, 0])).toEqual([
+      "encode",
+      "--ask-secrets",
+      "--format",
+      "2",
+      "--mode",
+      "seedshift",
+      "--output",
+      expect.any(String),
+      "--qr",
+      expect.any(String),
+    ]);
+    const all = script.asked.find((asked) => asked.question === "Where should the result go?")!;
+    expect(all.labels.at(-1)).toBe("All of these");
+    // Colors, no Seedshift, no shares: the record, the QR code, then the questions of the cards,
+    // a PDF of A6 sheets in the first design here.
+    const run = (await runOf(ENTRY.encode, [2, 1, 0, 4, 0, 0, 0, 0, 0, 0, 0]))!;
+    expect(run.slice(run.indexOf("--output"), run.indexOf("--qr") + 2)).toEqual([
+      "--output",
+      expect.any(String),
+      "--qr",
+      expect.any(String),
+    ]);
+    expect(run).toContain("--pdf");
+    // Shares of colors: a text file and their cards.
+    const shares = (await runOf(ENTRY.encode, [2, 1, 1, 3, 0, 0, 0, 0, 0, 0, 0]))!;
+    expect(shares[shares.indexOf("--output") + 1]).toEqual(expect.any(String));
+    expect(shares).toContain("--template");
   });
 
   describe("card questions after Also as printable cards", () => {
@@ -453,10 +521,22 @@ describe("start menu", () => {
      * kind of file, the layout, the design, then the QR code and the details on sheets.
      */
     async function cardOptions(start: number[], answers: number[]): Promise<readonly string[]> {
-      const run = (await runOf(1, [...start, ...answers]))!;
+      const run = (await runOf(ENTRY.encode, [...start, ...answers]))!;
       const end = run.indexOf("--heir-sheet");
       return run.slice(run.indexOf("--template") + 2, end < 0 ? undefined : end);
     }
+
+    it("offers only the business card designs for separate cards", async () => {
+      // A PDF, then Separate business cards (the fourth layout), in a new folder.
+      await runOf(ENTRY.encode, [...SINGLE, 0, 3]);
+      const design = script.asked.find((asked) => asked.question === "Which card design?")!;
+      expect(design.labels.length).toBeGreaterThan(0);
+      for (const label of design.labels) expect(label).toMatch(/card collection$/u);
+      // On sheets every design is offered, the material ones too.
+      await runOf(ENTRY.encode, [...SINGLE, 0, 0]);
+      const sheets = script.asked.find((asked) => asked.question === "Which card design?")!;
+      expect(sheets.labels.some((label) => label.endsWith("finish selection"))).toBe(true);
+    });
 
     it("asks the kind of file, then the layout, then the design", async () => {
       expect(await cardOptions(SINGLE, [0, 0, 2, 0, 0])).toEqual([
@@ -481,7 +561,7 @@ describe("start menu", () => {
         "How should the cards be laid out?",
         "How should the sheets be turned?",
         "Which card design?",
-        "Add a QR code with all the codes of the sheet?",
+        "Add a QR code with the codes of the backup, without the extra cards?",
         "Type your own details for the cards?",
         "Instructions for your heirs?",
       ]);
@@ -511,7 +591,7 @@ describe("start menu", () => {
       const turns = script.asked.find((asked) =>
         asked.question.startsWith("How should the sheets"),
       );
-      expect(turns!.labels).toEqual(["Landscape", "Portrait", "Whichever gives larger cards"]);
+      expect(turns!.labels).toEqual(["Landscape", "Portrait", "Whichever fills the sheet best"]);
       await cardOptions(SINGLE, [0, 3, 0]);
       expect(script.asked.map((asked) => asked.question)).not.toContain(
         "How should the sheets be turned?",
@@ -530,7 +610,7 @@ describe("start menu", () => {
           ...format,
         ]);
         expect(script.asked.map((asked) => asked.question)).not.toContain(
-          "Add a QR code with all the codes of the sheet?",
+          "Add a QR code with the codes of the backup, without the extra cards?",
         );
       }
       // Shares need the layout: without a page size, they would be sheets.
@@ -586,7 +666,7 @@ describe("start menu", () => {
         Subtitle: [""],
         Footer: ["x".repeat(101), "Printed with care"],
       };
-      const run = (await runOf(1, [...SINGLE, 0, 0, 2, 0, 0, 1], typed))!;
+      const run = (await runOf(ENTRY.encode, [...SINGLE, 0, 0, 2, 0, 0, 1], typed))!;
       expect(run.slice(run.indexOf("--card-qr") + 1)).toEqual([
         "--card-name",
         "Ann Lee",
@@ -607,7 +687,7 @@ describe("start menu", () => {
       // A sheet shows no label before the codes; a separate business card does.
       expect(warningsAt("Label before each code")).toEqual([]);
       script.lines = [];
-      await runOf(1, [...SINGLE, 0, 3, 0, 1], {});
+      await runOf(ENTRY.encode, [...SINGLE, 0, 3, 0, 1], {});
       expect(script.lines.map((line) => line.question)).toEqual([
         "Name of the new folder",
         "Name, in Latin letters",
@@ -622,33 +702,38 @@ describe("start menu", () => {
     });
   });
 
-  it("finds a code of an encoded seed phrase as Decode does, from entry 5", async () => {
+  it("finds a code of an encoded seed phrase as Decode does, from the Find entry", async () => {
     // A code of the encoded seed phrase: all the codes typed, then without Seedshift.
-    expect(await runOf(5, [1, 0, 0])).toEqual(["decode", "--ask-secrets", "--mode", "direct"]);
+    expect(await runOf(ENTRY.recover, [1, 0, 0])).toEqual([
+      "decode",
+      "--ask-secrets",
+      "--mode",
+      "direct",
+    ]);
     const questions = script.asked.map((asked) => asked.question);
     expect(questions).toContain(ENCODED_SEEDSHIFT_QUESTION);
     // The codes of a phrase of 12 words before the decoys of its cards, with MnemoCode Seedshift.
-    const twelve = await runOf(5, [1, 1, 1]);
+    const twelve = await runOf(ENTRY.recover, [1, 1, 1]);
     expect(twelve?.slice(0, 4)).toEqual(["decode", "--ask-secrets", "--words", "12"]);
     expect(twelve).toEqual(expect.arrayContaining(["--mode", "seedshift"]));
   });
 
-  it("asks whether shares were masked as entry 4 and the commands of shares ask it", async () => {
-    // Entry 5, a code of a share, the wallet's fingerprint, then the share question: Yes.
-    const run = await runOf(5, [3, 0, 1]);
+  it("asks whether shares were masked as the Restore entry and the commands of shares ask it", async () => {
+    // The Find entry, a code of a share, the wallet's fingerprint, then the share question: Yes.
+    const run = await runOf(ENTRY.recover, [3, 0, 1]);
     const questions = script.asked.map((asked) => asked.question);
     expect(questions).toContain(SHARE_SEEDSHIFT_QUESTION);
     expect(run).toEqual(expect.arrayContaining(["sskr-export", "--mode", "seedshift"]));
-    await runOf(4, [1]);
+    await runOf(ENTRY.restore, [1]);
     expect(script.asked.map((asked) => asked.question)).toEqual([SHARE_SEEDSHIFT_QUESTION]);
   });
 
   describe("typed answers are checked at once and asked again", () => {
-    // Entry 5, a digit of a date, typed, all the codes typed, MnemoCode Seedshift, then the wallet.
+    // The Find entry, a digit of a date, typed, all the codes typed, MnemoCode Seedshift, then the wallet.
     const DATE_WALLET = [2, 0, 0, 0];
 
     it("asks the fingerprint and the address again until a wallet can have them", async () => {
-      const fingerprint = await runOf(5, [...DATE_WALLET, 0], {
+      const fingerprint = await runOf(ENTRY.recover, [...DATE_WALLET, 0], {
         "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)": [
           "",
           "73c5da0",
@@ -665,7 +750,7 @@ describe("start menu", () => {
       ]);
       const address = "Bitcoin address (one of the first receiving ones)";
       // BIP173's testnet example, then the public phrase's first native SegWit address.
-      await runOf(5, [...DATE_WALLET, 1], {
+      await runOf(ENTRY.recover, [...DATE_WALLET, 1], {
         [address]: [
           "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx",
           "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
@@ -678,21 +763,21 @@ describe("start menu", () => {
     });
 
     it("asks the Scanner's key, the lookups and the numbers of shares again", async () => {
-      await runOf(5, [0, 0, 1, 0], {
+      await runOf(ENTRY.recover, [0, 0, 1, 0], {
         "Scanner key": ["age1", "age12d86zp9uj65df2snvl656uewdl82zrdfya8a2zgxu5rauaw7fsaqrr6w3x"],
       });
       expect(warningsAt("Scanner key")[1]).toContain("62 characters");
-      expect(await runOf(7, [0], { Word: ["Abandonn", "Abandon"] })).toEqual([
+      expect(await runOf(ENTRY.table, [0], { Word: ["Abandonn", "Abandon"] })).toEqual([
         "table",
         "--word",
         "abandon",
       ]);
-      expect(await runOf(7, [1], { "Word number": ["2049", "0", "007"] })).toEqual([
+      expect(await runOf(ENTRY.table, [1], { "Word number": ["2049", "0", "007"] })).toEqual([
         "table",
         "--index",
         "7",
       ]);
-      expect(await runOf(7, [2], { "Unicode code": ["FFFF", "5bf6"] })).toEqual([
+      expect(await runOf(ENTRY.table, [2], { "Unicode code": ["FFFF", "5bf6"] })).toEqual([
         "table",
         "--unicode",
         "5BF6",
@@ -701,7 +786,10 @@ describe("start menu", () => {
       const count = "How many shares in all? (2 to 16)";
       const threshold = "How many of them restore the seed phrase?";
       expect(
-        await runOf(1, [1, 1, 7, 0, 0, 0], { [count]: ["1", "17", "3"], [threshold]: ["4", "3"] }),
+        await runOf(ENTRY.encode, [1, 1, 7, 0, 0, 0], {
+          [count]: ["1", "17", "3"],
+          [threshold]: ["4", "3"],
+        }),
       ).toEqual(expect.arrayContaining(["--threshold", "3", "--shares", "3"]));
       expect(warningsAt(count)).toEqual([
         undefined,
@@ -716,7 +804,7 @@ describe("start menu", () => {
 
     it("refuses file names that the command could not use", async () => {
       const name = "QR code file name";
-      // Entry 1: word numbers, MnemoCode Seedshift, no shares, a QR code image.
+      // Encode: word numbers, MnemoCode Seedshift, no shares, a QR code image.
       const qr = [0, 0, 0, 2];
       const folder = join(files, "folder");
       const refused: [string, string][] = [
@@ -736,7 +824,7 @@ describe("start menu", () => {
         ],
       ];
       // A file dropped into the terminal arrives in quotes; a taken name is numbered later.
-      const run = await runOf(1, [...qr, 0], {
+      const run = await runOf(ENTRY.encode, [...qr, 0], {
         [name]: [...refused.map(([answer]) => answer), `'${join(files, "record.txt")}'`],
       });
       expect(run).toEqual(expect.arrayContaining(["--qr", join(files, "record.txt")]));
@@ -744,10 +832,10 @@ describe("start menu", () => {
     });
 
     it("refuses a second file of the same task in the place of the first", async () => {
-      // Entry 1: word numbers, MnemoCode Seedshift, no shares, a record file, and heirs on A5.
+      // Encode: word numbers, MnemoCode Seedshift, no shares, a record file, and heirs on A5.
       const record = join(files, "backup.txt");
       const heirs = "PDF file name";
-      const run = await runOf(1, [0, 0, 0, 1, 1], {
+      const run = await runOf(ENTRY.encode, [0, 0, 0, 1, 1], {
         "Record file name": [record],
         [heirs]: [record, join(files, "heirs.pdf")],
       });
@@ -757,12 +845,12 @@ describe("start menu", () => {
         "Another file of this task has this name or this folder; choose another one.",
       ]);
       // The next task starts afresh: the same name may be used again.
-      await runOf(1, [0, 0, 0, 1, 0], { "Record file name": [record] });
+      await runOf(ENTRY.encode, [0, 0, 0, 1, 0], { "Record file name": [record] });
       expect(warningsAt("Record file name")).toEqual([undefined, undefined]);
       // A new folder for cards may not hold a file of the same task either.
       script.lines = [];
       const cards = join(files, "cards");
-      await runOf(1, [2, 1, 0, 3, 0, 3, 0, 0, 1], {
+      await runOf(ENTRY.encode, [2, 1, 0, 3, 0, 3, 0, 0, 1], {
         "Name of the new folder": [cards],
         [heirs]: [join(cards, "heirs.pdf"), join(files, "heirs.pdf")],
       });
@@ -777,7 +865,7 @@ describe("start menu", () => {
       // A sparse file one byte larger than the 1 MiB that the command reads.
       await writeFile(large, "");
       await truncate(large, 1024 * 1024 + 1);
-      const run = await runOf(2, [1], {
+      const run = await runOf(ENTRY.decode, [1], {
         [name]: [
           join(files, "missing.txt"),
           join(files, "folder"),
@@ -797,9 +885,9 @@ describe("start menu", () => {
     });
 
     it("takes a new folder where the nearest folder that exists may be written", async () => {
-      // Entry 6 has no folder; entry 1's separate cards do. Missing folders are made by the command.
+      // Printing sample cards has no folder; Encode's separate cards do. Missing folders are made by the command.
       const deep = join(files, "a", "b", "cards");
-      const run = await runOf(1, [2, 1, 0, 3, 0, 3, 0, 0], {
+      const run = await runOf(ENTRY.encode, [2, 1, 0, 3, 0, 3, 0, 0], {
         "Name of the new folder": [
           join(files, "record.txt", "cards"),
           "''",
@@ -825,18 +913,28 @@ describe("start menu", () => {
   it("passes the answer about Seedshift to decode, No as --mode direct", async () => {
     // Typed, then No: --mode direct, so that decode does not ask again for codes that name no
     // mode; a typed record that names another mode is questioned by decode itself.
-    expect(await runOf(2, [0, 0, 0])).toEqual(["decode", "--ask-secrets", "--mode", "direct"]);
+    expect(await runOf(ENTRY.decode, [0, 0, 0])).toEqual([
+      "decode",
+      "--ask-secrets",
+      "--mode",
+      "direct",
+    ]);
     const question = script.asked.find((asked) => asked.question.startsWith("Was Seedshift"))!;
     expect(question.labels).toEqual(["No", "MnemoCode Seedshift", "Original Seedshift"]);
-    expect(await runOf(2, [0, 0, 1])).toEqual(["decode", "--ask-secrets", "--mode", "seedshift"]);
-    expect(await runOf(2, [0, 0, 2])).toEqual([
+    expect(await runOf(ENTRY.decode, [0, 0, 1])).toEqual([
+      "decode",
+      "--ask-secrets",
+      "--mode",
+      "seedshift",
+    ]);
+    expect(await runOf(ENTRY.decode, [0, 0, 2])).toEqual([
       "decode",
       "--ask-secrets",
       "--mode",
       "seedshift-legacy",
     ]);
     // Codes typed from printed cards: the number of words, which leaves out their decoys.
-    expect(await runOf(2, [0, 5, 0])).toEqual([
+    expect(await runOf(ENTRY.decode, [0, 5, 0])).toEqual([
       "decode",
       "--ask-secrets",
       "--words",
@@ -845,7 +943,7 @@ describe("start menu", () => {
       "direct",
     ]);
     // A QR code image the same.
-    expect(await runOf(2, [2, 0])).toEqual([
+    expect(await runOf(ENTRY.decode, [2, 0])).toEqual([
       "decode",
       "--ask-secrets",
       "--qr-file",
@@ -854,7 +952,7 @@ describe("start menu", () => {
       "direct",
     ]);
     // A record file names its own mode: nothing is asked about it.
-    expect(await runOf(2, [1])).toEqual([
+    expect(await runOf(ENTRY.decode, [1])).toEqual([
       "decode",
       "--ask-secrets",
       "--input-file",

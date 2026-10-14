@@ -34,6 +34,8 @@ jobs:
         uses: ./.github/actions/terminal-input
       # A real PDF-to-image-to-QR round trip of the card and SSKR exports, with public data only.
       - run: node scripts/check-card-output.mjs output/card-output-check
+      # The SSKR vectors restored without the share engine that the known answers check.
+      - run: python3 scripts/verify-sskr-known-answers.py
       - run: pnpm audit --audit-level high
 
   # The command line and the library on Windows and macOS. Poppler is not installed here, so the card

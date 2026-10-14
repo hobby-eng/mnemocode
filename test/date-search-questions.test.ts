@@ -252,11 +252,7 @@ describe("recover-date on the private screen", () => {
       "Not every candidate is shown. What now?",
       "How can MnemoCode recognise the wallet?",
     ]);
-    expect(terminal.labels[1]).toEqual([
-      "Fingerprint",
-      "Bitcoin address",
-      "Address of another coin",
-    ]);
+    expect(terminal.labels[1]).toEqual(["Fingerprint", "Address"]);
     const searches = () =>
       notices.filter((line) => line.startsWith("Recovery search contains")).length;
     expect(searches()).toBe(2);
@@ -272,12 +268,7 @@ describe("recover-date on the private screen", () => {
       "What now?",
       "How can MnemoCode recognise the wallet?",
     ]);
-    expect(terminal.labels[1]).toEqual([
-      "Fingerprint",
-      "Bitcoin address",
-      "Address of another coin",
-      "It cannot",
-    ]);
+    expect(terminal.labels[1]).toEqual(["Fingerprint", "Address", "It cannot"]);
     expect(searches()).toBe(2);
   });
 

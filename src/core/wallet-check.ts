@@ -24,6 +24,9 @@ export type WalletCheck<M extends WalletMatch = WalletMatch> = (
   mnemonic: string,
 ) => M | PromiseLike<M>;
 
+/** What the host's wallet check compared the phrase with, as a line about its match names it. */
+export type MatchedBy = "address" | "key" | "fingerprint";
+
 /** The refusal of an answer of a host's wallet check that is no WalletMatch. */
 export const MALFORMED_WALLET_ANSWER =
   "The wallet check must answer with an object whose matched field is true or false.";

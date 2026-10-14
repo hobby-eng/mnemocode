@@ -253,6 +253,12 @@ export class DatesAnswer extends Redacted {
     return this.#patterns.length > 0;
   }
 
+  /** Standalone date recovery needs a pattern; combined code recovery also accepts known dates. */
+  assertIncomplete(): void {
+    if (!this.hasForgottenDigits)
+      throw new Error("At least one date must contain a forgotten digit represented by ?.");
+  }
+
   /**
    * The combinations of dates that the answer stands for: 1 when every date is whole, and
    * HARD_MAX_COMBINATIONS + 1 for any count above that limit.

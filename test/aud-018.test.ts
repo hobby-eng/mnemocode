@@ -32,7 +32,7 @@ vi.mock("pngjs", async (original) => {
 });
 
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
-import { readBoundedTextFile } from "../src/cli/input.js";
+import { readBoundedTextFile } from "../src/cli/text-file.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
 
 /** The all-zero-entropy phrase "abandon … about" as a record of word numbers. */

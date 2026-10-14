@@ -48,11 +48,13 @@ describe("page size decides between a sheet and separate cards", () => {
   });
 
   it("gives one page per card for a card size, decoys after the codes", async () => {
-    for (const template of ["business-it", "material-tile"]) {
-      const cards = await pages(template, { pageSize: "business" });
-      expect(cards.length, template).toBeGreaterThan(colors.length);
-      expect(new Set(cards.map(String)), template).toEqual(new Set(["90,50"]));
-    }
+    const cards = await pages("business-it", { pageSize: "business" });
+    expect(cards.length).toBeGreaterThan(colors.length);
+    expect(new Set(cards.map(String))).toEqual(new Set(["90,50"]));
+    // A material design is printed on sheets only (drawsSeparateCards).
+    await expect(pages("material-tile", { pageSize: "business" })).rejects.toThrow(
+      "printed on sheets only",
+    );
     await expect(pages("business-it", { pageSize: "wallet" as never })).rejects.toThrow(
       "a6, a5, a4 or business",
     );

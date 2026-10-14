@@ -30,7 +30,7 @@ The shares are always shown in the terminal. `--output NEW_FILE` also saves them
 
 ```bash
 mnemocode encode --sskr --mode seedshift --ask-secrets \
-  --format 3 --threshold 2 --shares 3 \
+  --share-format unicode --threshold 2 --shares 3 \
   --template business-it --card-layout qr \
   --cards-dir ./property-shares --pdf ./property-shares.pdf
 ```
@@ -74,10 +74,10 @@ Word numbers and Unicode codes are made the same way with the version byte `A2`,
 
 ## Share cards
 
-Shares written in colors (`colors`, `colors-unicode`) or in Unicode codes (`unicode`) can be printed as cards with every template, one code to a card. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards: write them on paper or keep the text file. `sskr-export` prints existing shares and never makes new ones:
+Shares written in colors (`colors`, `colors-unicode`) can be printed as cards with every template, and shares in Unicode codes (`unicode`) with every template but the enclosure and tile materials, which have too few samples for the longest share; one code to a card. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards: write them on paper or keep the text file. `sskr-export` prints existing shares and never makes new ones; `--format` writes them in a form that has cards; here the `ur` shares saved above are printed in colors:
 
 ```bash
-mnemocode sskr-export --share-file ./shares.txt \
+mnemocode sskr-export --share-file ./shares.txt --format colors \
   --cards-dir ./share-cards --card-layout collection --template business-it
 ```
 
@@ -85,11 +85,11 @@ mnemocode sskr-export --share-file ./shares.txt \
 
 The page size decides what is printed, as for ordinary cards. `--card-layout` is needed only for a QR card.
 
-| `--page-size`                | `--card-layout` | Printed for each share                           | What counts as one share                         |
-| ---------------------------- | --------------- | ------------------------------------------------ | ------------------------------------------------ |
-| `a6` (default), `a5` or `a4` | `collection`    | One collection sheet; `--card-qr` adds a QR code | The first codes on the sheet, or its QR code     |
-| `business`                   | `individual`    | Numbered cards without a QR code                 | The first cards of that share, in numbered order |
-| any                          | `qr`            | One document with a QR code                      | The QR code                                      |
+| `--page-size`                | `--card-layout` | Printed for each share                                           | What counts as one share                         |
+| ---------------------------- | --------------- | ---------------------------------------------------------------- | ------------------------------------------------ |
+| `a6` (default), `a5` or `a4` | `collection`    | One collection sheet; `--card-qr` adds a QR code                 | The first codes on the sheet, or its QR code     |
+| `business`                   | `individual`    | Numbered cards without a QR code, in a business card design only | The first cards of that share, in numbered order |
+| any                          | `qr`            | One document with a QR code                                      | The QR code                                      |
 
 The cards of a share end with a few random codes that belong to nothing, so that every row of a sheet is full. A share says how long it is, so the restore stops at its end: the extra codes may be typed or left out. The sheet for heirs says how many codes each share has. A QR code holds one share alone, without the extra codes, in the form its cards print: Unicode codes as they are, `colors-unicode` as such, and `colors` as color codes. No QR code holds several shares.
 
@@ -164,7 +164,7 @@ Every phrase that passes is listed with its fingerprint, and none is chosen. Eac
 
 After a repair, MnemoCode names each filled-in element, by share and place, so that the written copy can be corrected. A repair proves that the shares fit their checks and the secret digest; it does not prove that the wallet is the intended one, so check the wallet that comes back.
 
-To write repaired shares down again without seeing the seed phrase, use entry 5 of the menu, or `mnemocode sskr-export --ask-secrets`, and enter the shares with their marks; each comes back in its own form, unless `--format` names another. With the threshold of shares, they are repaired together, and when more than one set of shares fits, each is shown with the fingerprint of the phrase it holds and none is saved; a wallet check keeps the right one. With fewer shares, each is repaired from its own checks alone: up to two word numbers or Unicode codes, one color, or three Bytewords or UR pairs (often four) on a share are repaired outright, and when several shares fit, each is shown and none is saved. A share that nothing settles, such as one that could not be read at all, is left out instead of being written down as a guess.
+To write repaired shares down again without seeing the seed phrase, use entry 6 of the menu, or `mnemocode sskr-export --ask-secrets`, and enter the shares with their marks; each comes back in its own form, unless `--format` names another. With the threshold of shares, they are repaired together, and when more than one set of shares fits, each is shown with the fingerprint of the phrase it holds and none is saved; a wallet check keeps the right one. With fewer shares, each is repaired from its own checks alone: up to two word numbers or Unicode codes, one color, or three Bytewords or UR pairs (often four) on a share are repaired outright, and when several shares fit, each is shown and none is saved. A share that nothing settles, such as one that could not be read at all, is left out instead of being written down as a guess.
 
 On paper, one share may span several lines. A share file may keep those lines as they are: as with a paste, lines that read as a share only together are joined again. Word numbers need separators; four-digit Unicode codes, six-digit RGB codes and Bytewords, four letters each, can be joined without spaces.
 

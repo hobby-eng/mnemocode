@@ -62,7 +62,7 @@ import {
   type Pbkdf2HmacSha512,
 } from "./master-fingerprint.js";
 import { trimWhiteSpace } from "./white-space.js";
-import { MASTER_KEY_PATH } from "./wallet-check.js";
+import { MASTER_KEY_PATH, type MatchedBy } from "./wallet-check.js";
 import { hexOfBytes, bytesOfHex, equalBytes, HEX_DIGITS_PER_BYTE } from "./bits.js";
 import { listInWords } from "./places.js";
 
@@ -362,7 +362,8 @@ interface Evidence {
 
 /**
  * Where the key that each kind of evidence names sits: the master key, an account key, or the key
- * of one address. Every fact of a kind follows from it, so that a new kind is one more row here.
+ * of one address. Every fact of a kind follows from it and from EVIDENCE_MATCHED_BY, so that a new
+ * kind is one more row in each.
  */
 export type EvidenceLevel = "master" | "account" | "address";
 const EVIDENCE_LEVELS = Object.freeze({
@@ -397,6 +398,20 @@ export function isPlacedKind(kind: string): boolean {
   const level = (EVIDENCE_LEVELS as Record<string, EvidenceLevel | undefined>)[kind];
   return level !== undefined && level !== "master";
 }
+
+/**
+ * What evidence of each kind compares the phrase with, as a line about its match names it, such
+ * as ReEncoding's confirmationLine: an address, the fingerprint, or else a key, a WIF included.
+ */
+export const EVIDENCE_MATCHED_BY = Object.freeze({
+  "master-fingerprint": "fingerprint",
+  "master-xpub": "key",
+  "account-xpub": "key",
+  address: "address",
+  "compressed-public-key": "key",
+  wif: "key",
+  "coin-address": "address",
+} satisfies Record<WalletEvidence["kind"], MatchedBy>);
 
 /**
  * The checked evidence of `evidence`, a coin address naming one of `coins`: the one place that

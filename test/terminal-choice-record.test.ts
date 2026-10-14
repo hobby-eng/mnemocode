@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { MENU_ENTRY_NAMES } from "../src/cli/menu-entries.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { format } from "node:util";
@@ -602,8 +603,8 @@ describe("going back from an entry of the start menu", () => {
   /** Lists whose entries all lead to the same questions: only the first is chosen. */
   const SAME_QUESTIONS = new Set([
     "Which card design?",
-    "Add a QR code with all the codes of the sheet?",
-    "Which coin?",
+    "Add a QR code with the codes of the backup, without the extra cards?",
+    "Which coin is the address for?",
     "How should the sheets be turned?",
   ]);
 
@@ -708,31 +709,34 @@ describe("going back from an entry of the start menu", () => {
     return { screen: { lines: screen.lines(), cursor: screen.cursor() }, above, askings, shown };
   }
 
-  it.each(MENU_ENTRIES.filter((entry) => entry.digit >= 1 && entry.digit <= 7))(
-    "$digit $label: Escape at any question shows the menu under the same record",
-    async (entry) => {
-      firstPath.clear();
-      const quit = await runEntry(undefined, []);
-      expect(quit.above).toHaveLength(1);
-      const pending: number[][] = [[]];
-      let backs = 0;
-      while (pending.length > 0) {
-        const answers = pending.pop()!;
-        const run = await runEntry(entry.digit, answers);
-        // The entry built its command line before a question for Escape came: nothing to check.
-        if (run.askings.length <= answers.length) continue;
-        backs += 1;
-        const path = run.askings.map((asking) => asking.question.question).join(" / ");
-        // No line of the task or of its answers is left above the menu, nor below it at the end.
-        expect(run.above, path).toEqual([quit.above[0], quit.above[0]]);
-        expect(run.screen, path).toEqual(quit.screen);
-        const next = run.askings[answers.length]!;
-        const count = answersOf(next.question, next.again, answers).length;
-        for (let place = 0; place < count; place += 1) pending.push([...answers, place]);
-      }
-      expect(backs).toBeGreaterThan(0);
-    },
-  );
+  // Every entry that asks questions: from Encode to the word table.
+  it.each(
+    MENU_ENTRIES.filter(
+      (entry) =>
+        entry.digit !== null && entry.digit >= 1 && entry.digit <= MENU_ENTRY_NAMES.table.digit,
+    ),
+  )("$digit $label: Escape at any question shows the menu under the same record", async (entry) => {
+    firstPath.clear();
+    const quit = await runEntry(undefined, []);
+    expect(quit.above).toHaveLength(1);
+    const pending: number[][] = [[]];
+    let backs = 0;
+    while (pending.length > 0) {
+      const answers = pending.pop()!;
+      const run = await runEntry(entry.digit ?? undefined, answers);
+      // The entry built its command line before a question for Escape came: nothing to check.
+      if (run.askings.length <= answers.length) continue;
+      backs += 1;
+      const path = run.askings.map((asking) => asking.question.question).join(" / ");
+      // No line of the task or of its answers is left above the menu, nor below it at the end.
+      expect(run.above, path).toEqual([quit.above[0], quit.above[0]]);
+      expect(run.screen, path).toEqual(quit.screen);
+      const next = run.askings[answers.length]!;
+      const count = answersOf(next.question, next.again, answers).length;
+      for (let place = 0; place < count; place += 1) pending.push([...answers, place]);
+    }
+    expect(backs).toBeGreaterThan(0);
+  });
 
   it("asks only the refused number of shares again, without it in the record", async () => {
     // Encode: word numbers, MnemoCode Seedshift, Other, then 1 share in all, which SSKR refuses.
@@ -825,8 +829,8 @@ describe("what the menu does when a command cannot run or stops", () => {
     return { asked: terminal.asked, shown };
   }
 
-  // Entry 7, a word, abandon: a command without a private screen.
-  const LOOK_UP = ["7", ENTER, `abandon${ENTER}`];
+  // The word table, a word, abandon: a command without a private screen.
+  const LOOK_UP = [String(MENU_ENTRY_NAMES.table.digit), ENTER, `abandon${ENTER}`];
 
   it("says that a signal stopped a command, and starts it again on request", async () => {
     const codes = [137, 130];
@@ -887,15 +891,13 @@ describe("what the menu does when a command cannot run or stops", () => {
     terminal.selfTestFails = true;
     const { asked, shown } = await menuWith([ESCAPE]);
     expect(asked[0]!.labels).toEqual(
-      MENU_ENTRIES.filter((entry) => entry.digit === 0 || entry.digit >= 6).map(
-        (entry) => entry.label,
-      ),
+      MENU_ENTRIES.filter((entry) => entry.asksSecrets !== true).map((entry) => entry.label),
     );
     expect(shown[0]!.join("\n")).toContain("CRITICAL: MnemoCode core self-test failed.");
-    // Entry 8 failing has the same effect for the rest of the session.
+    // The self-test's entry failing has the same effect for the rest of the session.
     terminal.selfTestFails = false;
     terminal.exit = async () => 1;
-    const after = await menuWith(["8", ENTER, ESCAPE]);
+    const after = await menuWith([String(MENU_ENTRY_NAMES.selfTest.digit), ENTER, ESCAPE]);
     expect(after.asked[0]!.labels).toHaveLength(MENU_ENTRIES.length);
     expect(after.asked[1]!.labels).toEqual(asked[0]!.labels);
     expect(after.shown[1]!.join("\n")).toContain("The self-test failed.");

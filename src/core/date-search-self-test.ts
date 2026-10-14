@@ -116,6 +116,12 @@ export function checkDateSearchStartup(): void {
     "A forgotten digit where dates are not searched",
   );
   const dates = DatesAnswer.parse(FORGOTTEN_LAST_DIGIT, TWELVE_WORDS);
+  dates.assertIncomplete();
+  expectRefused(
+    () => DatesAnswer.parse(MASKED_DATE, TWELVE_WORDS).assertIncomplete(),
+    /At least one date must contain a forgotten digit/u,
+    "Standalone date recovery with no incomplete date",
+  );
   let combinations = 0;
   const found: string[] = [];
   for (const candidates of dateRecoveryCandidates(

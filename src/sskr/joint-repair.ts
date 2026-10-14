@@ -631,10 +631,13 @@ function baseOf(members: readonly number[], threshold: number): number[] | undef
 /** What solving readings of the shares tells of the ways to read them, one or many solved. */
 interface SolvedWays {
   readonly branches: Branch[];
-  /** The rows that every reading shares have no solution: another set, or a misread element. */
-  readonly conflict: boolean;
-  /** Some possibility had as many distinct members as its threshold. */
-  readonly enoughMembers: boolean;
+  /**
+   * Some reading fits as far as its shares go: the rows that they all share have a solution, and
+   * no possibility has as many distinct members as its threshold. More shares may then settle it;
+   * where no reading fits, the shares are of another set or misread (AUD-022-FUN001: one reading
+   * that does not fit, such as a decoy prefix, no longer outvotes the one that does).
+   */
+  readonly needsMore: boolean;
   /** Some possibility gave two shares the same member number. */
   readonly duplicates: boolean;
 }
@@ -644,8 +647,7 @@ function withWays<Ways extends SolvedWays>(ways: Ways, more: SolvedWays): Ways {
   return {
     ...ways,
     branches: [...ways.branches, ...more.branches],
-    conflict: ways.conflict || more.conflict,
-    enoughMembers: ways.enoughMembers || more.enoughMembers,
+    needsMore: ways.needsMore || more.needsMore,
     duplicates: ways.duplicates || more.duplicates,
   };
 }
@@ -677,9 +679,8 @@ async function solveJoint(
 ): Promise<JointSolution> {
   const solution: JointSolution = {
     branches: [],
-    conflict: false,
+    needsMore: false,
     tooMany: false,
-    enoughMembers: false,
     duplicates: false,
   };
   const shared = linearize(
@@ -688,7 +689,8 @@ async function solveJoint(
     unitVectors(joint.dimensions),
   );
   const common = solve(shared.columns, shared.value);
-  if (common === undefined) return { ...solution, conflict: true };
+  // Another set, or a misread element: the reading does not fit.
+  if (common === undefined) return solution;
   const labels = linearize(
     (z) => joint.withPayloadsAt(z, labelsOf),
     common.particular,
@@ -704,7 +706,8 @@ async function solveJoint(
   }
   const shares = joint.spaces.length;
   const labelWidth = BigInt(NIBBLE_BITS * (shares + 1));
-  let { enoughMembers, duplicates } = solution;
+  let enoughMembers = false;
+  let { duplicates } = solution;
   for (let choice = 0; choice < 2 ** labelBasis.length; choice += 1) {
     // A turn now and then, not for each choice: a turn costs about a millisecond.
     await turns.due();
@@ -743,7 +746,7 @@ async function solveJoint(
     secrets.addBranch(branch);
     solution.branches.push(branch);
   }
-  return { ...solution, enoughMembers, duplicates };
+  return { ...solution, needsMore: !enoughMembers, duplicates };
 }
 
 /**
@@ -858,7 +861,7 @@ function unreadableShareMessage(name: number, marks: number, text: string): stri
 
 /**
  * What solving every combination of the shares' readings gives (solveReadings): the ways of every
- * combination, a conflict where the rows that every reading shares had no solution in some.
+ * combination, and whether some combination fits as far as its shares go.
  */
 interface Solved extends SolvedWays {
   /** Some length of the secret is one that every share can be read in. */
@@ -877,7 +880,7 @@ async function solveReadings(
   secrets: AssessmentSecrets,
   budget?: WorkBudget,
 ): Promise<Solved> {
-  let ways: SolvedWays = { branches: [], conflict: false, enoughMembers: false, duplicates: false };
+  let ways: SolvedWays = { branches: [], needsMore: false, duplicates: false };
   let sameLength = false;
   const solved = (refused?: Solved["refused"]): Solved => ({
     ...ways,
@@ -1110,9 +1113,9 @@ async function assessReadings(
   if (!solved.sameLength)
     return refuse("no-fit", "These shares are of different lengths: not of one set.");
   if (solved.branches.length === 0) {
-    // The common rows fail for shares of another set, or for a misread identifier or threshold:
-    // more shares would not help.
-    if (solved.enoughMembers || solved.conflict)
+    // No reading fits: the common rows fail for shares of another set, or for a misread
+    // identifier or threshold, and more shares would not help.
+    if (!solved.needsMore)
       return refuse(
         "no-fit",
         "These shares do not fit together: check the marks, and that all belong to one set.",

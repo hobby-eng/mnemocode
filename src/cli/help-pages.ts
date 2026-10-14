@@ -15,9 +15,10 @@ import {
   bitcoinProfilePurpose,
   bitcoinProfiles,
 } from "../core/wallet-evidence.js";
-import { limitName, MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
+import { MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
+import { limitName } from "../core/byte-units.js";
 import type { CommandName } from "./command-options.js";
-import { MAX_PNG_BYTES, MAX_PNG_DIMENSION } from "./qr-limits.js";
+import { MAX_PNG_BYTES, MAX_PNG_DIMENSION } from "../core/png-admission.js";
 import { ENCODED_FORMATS, type EncodedFormat, MASKING_MODES } from "../core/types.js";
 import {
   COLOR_FORMAT_NUMBERS,
@@ -44,10 +45,19 @@ import {
 } from "../core/dates.js";
 import { DEFAULT_SAMPLE_WORDS } from "../export/card-preview.js";
 import { IMAGE_FORMATS, IMAGE_DPI, JPEG_QUALITY } from "../export/document-formats.js";
-import { CARD_PAGE_SIZES, CARD_ORIENTATIONS, pageSizeLabel } from "../export/card-settings.js";
+import {
+  CARD_PAGE_SIZES,
+  CARD_ORIENTATIONS,
+  pageSizeLabel,
+  SEPARATE_CARD_SIZE,
+  SHEET_QR_HOLDS,
+  SHEET_SIZES_TEXT,
+} from "../export/card-settings.js";
+import { SHEET_PLAN_TEXT } from "../export/collection-sheet.js";
 import { SSKR_CARD_LAYOUTS } from "../export/sskr-content.js";
 import { PROGRESS_EVERY } from "./date-search.js";
 import { counting } from "../core/search-plan.js";
+import { MAX_SEARCH_COMBINATIONS, MAX_SHOWN_CANDIDATES } from "../core/candidates.js";
 import { Masking } from "../core/masking.js";
 import { QUESTION_HOURS } from "../core/search-turns.js";
 import { numberWord } from "../core/prose.js";
@@ -207,14 +217,18 @@ const encodedFile: HelpOption = {
   ],
 };
 
-const encodedQr: HelpOption = {
-  flag: "--qr-file",
-  value: "PNG",
-  summary: "Read the encoded record from a QR code in a PNG image",
-  details: [
-    `The image is read on this computer. It may be up to ${limitName(MAX_PNG_BYTES)} and ${MAX_PNG_DIMENSION} pixels on a side. A QR code holds no header, so give --mode for a masked record; without it, --ask-secrets asks how it was masked.`,
-  ],
-};
+/** The QR input of a record whose mode the option `modeFlag` gives (--old-mode in re-encode). */
+function encodedQrOf(modeFlag: string): HelpOption {
+  return {
+    flag: "--qr-file",
+    value: "PNG",
+    summary: "Read the encoded record from a QR code in a PNG image",
+    details: [
+      `The image is read on this computer. It may be up to ${limitName(MAX_PNG_BYTES)} and ${MAX_PNG_DIMENSION} pixels on a side. A QR code holds no header, so give ${modeFlag} for a masked record; without it, --ask-secrets asks how it was masked.`,
+    ],
+  };
+}
+const encodedQr = encodedQrOf("--mode");
 
 const decodeMode: HelpOption = {
   flag: "--mode",
@@ -225,14 +239,21 @@ const decodeMode: HelpOption = {
   ],
 };
 
-const decodeFormat: HelpOption = {
-  flag: "--format",
-  value: "FORMAT",
-  summary: `The record format, ${FORMAT_NUMBER_RANGE} or its name; usually found automatically`,
-  details: [
-    "MnemoCode picks the format itself when exactly one fits the whole record. Otherwise it asks in the terminal, and a script must pass --format. See mnemocode help formats.",
-  ],
-};
+/** The format of a record, given by the option `flag` (--old-format in re-encode). */
+function recordFormatOf(flag: string, summary: string): HelpOption {
+  return {
+    flag,
+    value: "FORMAT",
+    summary,
+    details: [
+      `MnemoCode picks the format itself when exactly one fits the whole record. Otherwise it asks in the terminal, and a script must pass ${flag}. See mnemocode help formats.`,
+    ],
+  };
+}
+const decodeFormat = recordFormatOf(
+  "--format",
+  `The record format, ${FORMAT_NUMBER_RANGE} or its name; usually found automatically`,
+);
 
 const phraseWords: HelpOption = {
   flag: "--words",
@@ -289,7 +310,7 @@ const cardsDir: HelpOption = {
   value: "NEW_FOLDER",
   summary: "Save one file per card in a new folder",
   details: [
-    "Files are named after their number and the codes they print, such as 01-ABCDEF.pdf or 01-tuna-next-keep.pdf; each holds only its own reference or group. Use it with --page-size business or without a page size. The folder must not exist yet: it is created only when every card is ready.",
+    "Files are named after their number and the code they print, such as 01-ABCDEF.pdf, or 01-7684.pdf in Unicode codes; each holds only its own code. Use it with --page-size business or without a page size. The folder must not exist yet: it is created only when every card is ready.",
   ],
 };
 
@@ -608,6 +629,101 @@ const heirSheetSize: HelpOption = {
   ],
 };
 
+// The options of Encode's new backup, which re-encode takes too.
+
+const encodeMode: HelpOption = {
+  flag: "--mode",
+  value: "MODE",
+  summary: `${listInWords(ENCODE_MODES, "or")}; see mnemocode help modes`,
+  details: ["Without --mode, MnemoCode uses seedshift when --dates is given and direct otherwise."],
+};
+
+const encodeFormat: HelpOption = {
+  flag: "--format",
+  value: "FORMAT",
+  summary: `The form of the result, ${FORMAT_NUMBER_RANGE} or its name; default ${formatNumber("english")} (english)`,
+  details: [
+    `${formatLegend(FORMAT_LEGEND_NAMES)}. Cards need ${CARD_FORMAT_NUMBERS}. See mnemocode help formats. With --sskr the whole phrase is shown beside the shares only when --format is given.`,
+  ],
+};
+
+const encodeLegacyValidLastWord: HelpOption = {
+  ...legacyValidLastWord,
+  details: [
+    "A legacy result usually fails the BIP39 checksum. With this option only the checksum bits of the last word are calculated again, as with the same option of the original Seedshift; the record becomes seedshift-legacy-valid. Its decoding lists every possible last word.",
+  ],
+};
+
+/** Where Encode's result goes, its cards and its shares: re-encode's new backup too. */
+const encodeOutputGroups: readonly HelpGroup[] = [
+  {
+    heading: "Where the result goes (it always appears in the terminal):",
+    options: [
+      {
+        flag: "--output",
+        value: "PATH",
+        summary: "Also save a versioned MNC1 record file",
+        details: [
+          "The record starts with MNC1:<mode>:<format>:, so decode needs only the file and the dates. Dates are never stored. A taken name is numbered, as record-1.txt, never replaced.",
+        ],
+      },
+      {
+        flag: "--cards",
+        summary: `Show the color codes as colored cards in the terminal (formats ${COLOR_FORMAT_NUMBERS})`,
+      },
+      {
+        flag: "--qr",
+        value: "PATH",
+        summary: "Save the result as a QR code in a PNG file",
+        details: [
+          "The QR code holds only the encoded data in the selected format: no header, mode, dates or fingerprints. decode --qr-file reads it back.",
+        ],
+      },
+      heirSheet,
+      heirSheetSize,
+      backupCheck,
+    ],
+  },
+  {
+    heading: `Cards (formats ${CARD_FORMAT_NUMBERS}):`,
+    options: [
+      template,
+      pdf,
+      cardsDir,
+      imagesDir,
+      imageFormat,
+      pageSize,
+      orientation,
+      cardQr,
+      title,
+    ],
+  },
+  identityGroup,
+  {
+    heading: "Shamir shares (see mnemocode help sskr-combine to restore):",
+    options: [
+      {
+        flag: "--sskr",
+        summary: "Split the result into Shamir shares (SSKR) as the last step",
+        details: [
+          "The shares use the Blockchain Commons SSKR format. Fewer shares than --threshold reveal nothing about the phrase. A BIP39 passphrase, the mode and the dates are not stored in the shares. The legacy modes cannot be used with shares.",
+        ],
+      },
+      threshold,
+      shares,
+      {
+        flag: "--share-format",
+        value: "FORMAT",
+        summary: "How the shares are shown: ur, words, indexes, unicode, colors, colors-unicode",
+        details: [
+          `ur (the default) is the standard short form, ur:sskr/...; words writes the same share in standard Bytewords, one English word per byte. Other SSKR programs read both. indexes, unicode, colors and colors-unicode write a share with the signs of --format ${formatNumber("indexes")}, ${formatNumber("unicode")}, ${formatNumber("colors")} and ${formatNumber("colors-unicode")}, so that it looks like that form; sskr-combine then shows the restored backup in that form again. Only MnemoCode reads these. A saved text file holds the shares in the same form.`,
+        ],
+      },
+      cardLayout,
+    ],
+  },
+];
+
 export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   encode: {
     summary: "Write a phrase in another form, masked with dates if given",
@@ -622,98 +738,13 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           askSecrets,
           mnemonicFile,
           mnemonicText,
-          {
-            flag: "--mode",
-            value: "MODE",
-            summary: `${listInWords(ENCODE_MODES, "or")}; see mnemocode help modes`,
-            details: [
-              "Without --mode, MnemoCode uses seedshift when --dates is given and direct otherwise.",
-            ],
-          },
+          encodeMode,
           dates,
-          {
-            flag: "--format",
-            value: "FORMAT",
-            summary: `The form of the result, ${FORMAT_NUMBER_RANGE} or its name; default ${formatNumber("english")} (english)`,
-            details: [
-              `${formatLegend(FORMAT_LEGEND_NAMES)}. Cards need ${CARD_FORMAT_NUMBERS}. See mnemocode help formats. With --sskr the whole phrase is shown beside the shares only when --format is given.`,
-            ],
-          },
-          {
-            ...legacyValidLastWord,
-            details: [
-              "A legacy result usually fails the BIP39 checksum. With this option only the checksum bits of the last word are calculated again, as with the same option of the original Seedshift; the record becomes seedshift-legacy-valid. Its decoding lists every possible last word.",
-            ],
-          },
+          encodeFormat,
+          encodeLegacyValidLastWord,
         ],
       },
-      {
-        heading: "Where the result goes (it always appears in the terminal):",
-        options: [
-          {
-            flag: "--output",
-            value: "PATH",
-            summary: "Also save a versioned MNC1 record file",
-            details: [
-              "The record starts with MNC1:<mode>:<format>:, so decode needs only the file and the dates. Dates are never stored. A taken name is numbered, as record-1.txt, never replaced.",
-            ],
-          },
-          {
-            flag: "--cards",
-            summary: `Show the color codes as colored cards in the terminal (formats ${COLOR_FORMAT_NUMBERS})`,
-          },
-          {
-            flag: "--qr",
-            value: "PATH",
-            summary: "Save the result as a QR code in a PNG file",
-            details: [
-              "The QR code holds only the encoded data in the selected format: no header, mode, dates or fingerprints. decode --qr-file reads it back.",
-            ],
-          },
-          heirSheet,
-          heirSheetSize,
-          backupCheck,
-        ],
-      },
-      {
-        heading: `Cards (formats ${CARD_FORMAT_NUMBERS}):`,
-        options: [
-          template,
-          pdf,
-          cardsDir,
-          imagesDir,
-          imageFormat,
-          pageSize,
-          orientation,
-          cardQr,
-          title,
-        ],
-      },
-      identityGroup,
-      {
-        heading: "Shamir shares (see mnemocode help sskr-combine to restore):",
-        options: [
-          {
-            flag: "--sskr",
-            summary: "Split the result into Shamir shares (SSKR) as the last step",
-            details: [
-              "The shares use the Blockchain Commons SSKR format. Fewer shares than --threshold reveal nothing about the phrase. A BIP39 passphrase, the mode and the dates are not stored in the shares. The legacy modes cannot be used with shares.",
-            ],
-          },
-          threshold,
-          shares,
-          {
-            flag: "--share-format",
-            value: "FORMAT",
-            summary:
-              "How the shares are shown: ur, words, indexes, unicode, colors, colors-unicode",
-            details: [
-              `ur (the default) is the standard short form, ur:sskr/...; words writes the same share in standard Bytewords, one English word per byte. Other SSKR programs read both. indexes, unicode, colors and colors-unicode write a share with the signs of --format ${formatNumber("indexes")}, ${formatNumber("unicode")}, ${formatNumber("colors")} and ${formatNumber("colors-unicode")}, so that it looks like that form; sskr-combine then shows the restored backup in that form again. Only MnemoCode reads these. A saved text file holds the shares in the same form.`,
-            ],
-          },
-          cardLayout,
-        ],
-      },
+      ...encodeOutputGroups,
     ],
     asks: [
       ["Phrase", "English BIP39 words"],
@@ -751,7 +782,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         "Split the phrase into 3 shares, any 2 of which restore it",
       ],
       [
-        "mnemocode encode --sskr --ask-secrets --threshold 2 --shares 3 --cards-dir ./share-cards --card-layout qr",
+        "mnemocode encode --sskr --ask-secrets --threshold 2 --shares 3 --share-format colors --cards-dir ./share-cards --card-layout qr",
         "Each share as its own QR document",
       ],
       [
@@ -884,6 +915,110 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     ],
   },
 
+  "re-encode": {
+    summary: "Make an encoded backup again, with other dates or in another form",
+    about: [
+      "Reads a backup that MnemoCode encoded, from text, a file or a QR code, and decodes it as decode does; then encodes its seed phrase again as encode does: with other dates, another mode or in another form, as cards or as Shamir shares. The seed phrase is never typed.",
+      "Its BIP39 checksum is no confirmation: with MnemoCode Seedshift every date gives a valid phrase. So the phrase is shown, and re-encoded only once you recognise it or your wallet matches it. With --ask-secrets you either recognise it or its fingerprint, or MnemoCode compares it with an address of your wallet, of Bitcoin or another coin, which confirms it, or with its fingerprint, which only accepts it: a fingerprint is a filter, not proof. On the command line give a wallet option or --recognised.",
+      "With --ask-secrets the codes are asked first, then at once their dates, then the phrase is shown to confirm; only then, unless options give it, the new backup is asked, with the questions of Encode in the menu. A backup of the original Seedshift with a valid last word keeps nothing of the original last word: give it, as you remember it.",
+      "Every code and date of the old backup is needed: decode and recover-date find what is forgotten. Afterwards the old backup still restores the same wallet.",
+    ],
+    usage: "[OPTIONS] (--ask-secrets | --input-file <PATH> | --qr-file <PNG> | --input <TEXT>)",
+    groups: [
+      {
+        heading: "The old backup:",
+        options: [
+          askSecrets,
+          encodedFile,
+          encodedQrOf("--old-mode"),
+          encodedText,
+          { ...dates, flag: "--old-dates", summary: "The dates of the old backup, DD-MM-YYYY" },
+          {
+            flag: "--old-mode",
+            value: "MODE",
+            summary: `The mode of the old backup: ${listInWords(MASKING_MODES, "or")}`,
+            details: [
+              "Needed for typed text and QR codes, which carry no header; without it, --ask-secrets asks how they were masked. A record file names its own mode.",
+            ],
+          },
+          recordFormatOf(
+            "--old-format",
+            `The format of the old backup, ${FORMAT_NUMBER_RANGE} or its name; usually found automatically`,
+          ),
+          phraseWords,
+          {
+            flag: "--last-word",
+            value: "WORD",
+            summary: "The last word of the original seed phrase, for seedshift-legacy-valid",
+            details: [
+              "Its backup gives a phrase for each possible last word; the original one picks it. With --ask-secrets it is asked on the private screen instead.",
+            ],
+          },
+        ],
+      },
+      {
+        heading:
+          "The new backup (without these, --ask-secrets asks it once the phrase is confirmed):",
+        options: [encodeMode, dates, encodeFormat, encodeLegacyValidLastWord],
+      },
+      ...encodeOutputGroups,
+      {
+        heading: "Confirmation of the seed phrase of the old backup:",
+        options: [
+          {
+            flag: "--recognised",
+            summary: "Answer that you recognise the seed phrase shown, instead of a wallet check",
+            details: [
+              "With --ask-secrets the phrase is still shown, and MnemoCode waits for Enter before the new backup. Without --ask-secrets, give it or a wallet option below: a valid checksum confirms nothing.",
+            ],
+          },
+        ],
+      },
+      {
+        ...evidenceGroup,
+        heading: "Wallet check that the seed phrase of the old backup must match:",
+      },
+    ],
+    asks: [
+      ["Old backup", "unless --input-file or --qr-file gives it"],
+      ["Format", "when the codes fit several forms, unless --old-format"],
+      ["Seedshift", "whether and which, for codes without a header, unless --old-mode"],
+      ["Old dates", "one line, right after the codes; none in direct mode"],
+      ["Last word", "of the original seed phrase, for seedshift-legacy-valid"],
+      [
+        "Confirmation",
+        "whether you recognise the seed phrase, or the wallet to compare it with, unless --recognised or a wallet option answers it",
+      ],
+      [
+        "New backup",
+        "form, Seedshift, shares, where it goes, cards and heirs, unless options of the new backup give it",
+      ],
+      ["New dates", "one line, such as 23-09-2026 08-08-1988; none in direct mode"],
+      ["Backup check", "whether to type the new backup again from paper, unless --backup-check"],
+    ],
+    examples: [
+      [
+        "mnemocode re-encode --ask-secrets --qr-file my-qr.png --old-mode seedshift",
+        "Dates, the phrase and the new backup asked on the private screen",
+      ],
+      [
+        "mnemocode re-encode --ask-secrets --input-file shifted.txt --mode seedshift --format 5",
+        "A record file masked again with new dates, as colors",
+      ],
+      [
+        `mnemocode re-encode --input "${SHIFTED_TEST_PHRASE}" --old-mode seedshift --old-dates 23-09-2026 --mode direct --format 3 --master-fingerprint ${TEST_FINGERPRINT}`,
+        "The test phrase unmasked as Unicode codes, accepted by its fingerprint (a filter, not proof)",
+      ],
+      [
+        "mnemocode re-encode --ask-secrets --mode seedshift --sskr --threshold 2 --shares 3",
+        "A typed backup split into 3 shares, any 2 of which restore it",
+      ],
+    ],
+    notes: [
+      "The original fingerprint of the new backup is that of the old one: it is the same wallet. Note the new encoded fingerprint.",
+    ],
+  },
+
   "recover-date": {
     summary: "Find a forgotten digit of a date",
     about: [
@@ -964,7 +1099,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   "recover-word": {
     summary: "Find forgotten words of a phrase",
     about: [
-      "Put ? in place of each forgotten word, ab* for a word that starts with ab, or rich|rice for one of a few words. MnemoCode tries every combination, up to 16,777,216, and lists those that pass the checksum test: for one forgotten word about 128 in a 12-word phrase, about 8 in 24 words. With one forgotten word each row shows the word, its number in the BIP39 list, the checksum bits and the whole phrase. A recovery check marks the matching rows; the other candidates are still shown. More than 2,048 candidates are not shown: save them with --candidates-file, or check them against the wallet.",
+      `Put ? in place of each forgotten word, ab* for a word that starts with ab, or rich|rice for one of a few words. MnemoCode tries every combination, up to ${counting(MAX_SEARCH_COMBINATIONS)}, and lists those that pass the checksum test: for one forgotten word about 128 in a 12-word phrase, about 8 in 24 words. With one forgotten word each row shows the word, its number in the BIP39 list, the checksum bits and the whole phrase. A recovery check marks the matching rows; the other candidates are still shown. More than ${counting(MAX_SHOWN_CANDIDATES)} candidates are not shown: save them with --candidates-file, or check them against the wallet.`,
     ],
     usage: "[OPTIONS] (--ask-secrets | --mnemonic-file <PATH> | --mnemonic <TEXT>)",
     groups: [
@@ -1168,15 +1303,15 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     ],
     examples: [
       [
-        "mnemocode sskr-export --share-file ./shares.txt --cards-dir ./share-cards --card-layout collection --template business-it",
+        "mnemocode sskr-export --share-file ./shares.txt --format colors --cards-dir ./share-cards --card-layout collection --template business-it",
         "One collection sheet per share",
       ],
       [
-        "mnemocode sskr-export --share-file ./shares.txt --cards-dir ./sskr-a6 --page-size a6 --orientation portrait",
+        "mnemocode sskr-export --share-file ./shares.txt --format colors --cards-dir ./sskr-a6 --page-size a6 --orientation portrait",
         "The same on portrait A6 sheets",
       ],
       [
-        "mnemocode sskr-export --share-file ./shares.txt --cards-dir ./share-qr --card-layout qr",
+        "mnemocode sskr-export --share-file ./shares.txt --format colors --cards-dir ./share-qr --card-layout qr",
         "One QR document per share",
       ],
     ],
@@ -1436,7 +1571,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "In the menu:",
         paragraphs: [
-          'After "Also as printable cards", the menu asks how to save the cards: one PDF of A6, A5 or A4 sheets, separate business cards in a new folder as PDF, PNG or JPEG, or images of the sheets as PNG or JPEG. Images need pdftocairo. For sheets it then asks how they are turned, landscape, portrait or whichever gives larger cards, and whether to add a QR code with all the codes of the sheet. Last, for every way of saving, it asks whether to type your own details; Enter on a detail keeps it random.',
+          `After "Also as printable cards", the menu asks about the files: which kind of file, PDF, PNG or JPEG (images need pdftocairo); how the cards are laid out, on ${SHEET_SIZES_TEXT} sheets in one PDF or as images of the sheets, or as separate business cards of ${pageSizeLabel(SEPARATE_CARD_SIZE)}, one file each in a new folder; for sheets, how they are turned, landscape, portrait or whichever fills the sheet best (${SHEET_PLAN_TEXT}); and the name of the PDF or of the folder. Then it asks for the design, for sheets whether to add a QR code with ${SHEET_QR_HOLDS}, and last, for every way of saving, whether to type your own details; Enter on a detail keeps it random.`,
         ],
       },
       {
@@ -1454,7 +1589,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "Separate cards:",
         paragraphs: [
-          "Three designs put four, six or eight codes on each card. Separate cards never carry a QR code. Every card is needed to recover the phrase, and each reveals part of it: this is not Shamir sharing.",
+          "Every card prints one code. Separate cards never carry a QR code. Every card is needed to recover the phrase, and each reveals part of it: this is not Shamir sharing.",
         ],
       },
     ],

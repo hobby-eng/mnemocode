@@ -15,19 +15,15 @@ type Color = ReturnType<typeof rgb>;
  * The pitch of the cards on a sheet, in millimetres from the top left corner of the page: the
  * middle of the gap before the first column and above the first row, and how far one column or
  * one row is from the next. A backdrop lays its joints out by it, so that they run between the
- * cards and every card sits in the middle of its panel or tile: joints laid out by the page alone
- * ran along the edges of some samples, which made the samples look shifted (2026-10-13).
+ * cards and every card sits in the middle of its own panel or tile: joints laid out by the page
+ * alone ran along the edges of some samples, and a panel two cards wide held each of them off its
+ * middle, which made the samples look shifted (owner, 2026-10-13).
  */
 export interface CardGrid {
   readonly left: number;
   readonly top: number;
   readonly columnPitch: number;
   readonly rowPitch: number;
-}
-
-/** The whole number of `pitch` nearest to `size`, at least one: a pattern's step on the grid. */
-function stepOnGrid(size: number, pitch: number): number {
-  return Math.max(1, Math.round(size / pitch)) * pitch;
 }
 
 /** Where a run of `step` that has a joint at `joint` starts, at or before the page's edge. */
@@ -146,12 +142,13 @@ function drawStudio(page: PDFPage, width: number, height: number): void {
   line(page, [0, height * horizon], [width, height * horizon], rgb(1, 1, 1), 0.5, 0.55);
 }
 
-/** Exposed concrete: formwork panels with their joints and the holes of the form ties. */
+/**
+ * Exposed concrete: formwork panels with their joints, one panel behind each card, and the holes of
+ * the form ties where the joints cross, in the gaps between the cards.
+ */
 function drawConcrete(page: PDFPage, width: number, height: number, grid: CardGrid): void {
-  // About four panels across the page, each a whole number of columns of cards wide; formwork
-  // panels are about twice as wide as they are high, a whole number of rows of cards.
-  const panelWidth = stepOnGrid(width / 4, grid.columnPitch);
-  const panelHeight = stepOnGrid(panelWidth / 2, grid.rowPitch);
+  const panelWidth = grid.columnPitch;
+  const panelHeight = grid.rowPitch;
   const left = runStart(grid.left, panelWidth);
   const top = runStart(grid.top, panelHeight);
   const columns = Math.ceil((width - left) / panelWidth);
@@ -160,7 +157,8 @@ function drawConcrete(page: PDFPage, width: number, height: number, grid: CardGr
   const joint = rgb(0.6, 0.59, 0.57);
   const light = rgb(0.9, 0.89, 0.87);
   const hole = rgb(0.6, 0.59, 0.57);
-  const radius = panelWidth * 0.022;
+  // Small enough to stay within the gaps between the cards.
+  const radius = Math.min(panelWidth, panelHeight) * 0.02;
   for (let row = 0; row < rows; row++) {
     for (let column = 0; column < columns; column++) {
       const x = left + column * panelWidth;
@@ -174,14 +172,6 @@ function drawConcrete(page: PDFPage, width: number, height: number, grid: CardGr
         ...pdfRect(page, { x, y, width: panelWidth, height: panelHeight }),
         color: tone,
       });
-      // Six ties per panel, in two rows of three.
-      for (const across of [1 / 6, 1 / 2, 5 / 6]) {
-        for (const down of [1 / 4, 3 / 4]) {
-          const centre = pdfPoint(page, x + across * panelWidth, y + down * panelHeight);
-          page.drawCircle({ ...centre, size: radius * 1.35 * MM, color: light, opacity: 0.4 });
-          page.drawCircle({ ...centre, size: radius * MM, color: hole, opacity: 0.4 });
-        }
-      }
     }
   }
   // The joints: a dark line with a light one beside it, as an edge that catches the light.
@@ -195,18 +185,23 @@ function drawConcrete(page: PDFPage, width: number, height: number, grid: CardGr
     line(page, [0, y], [width, y], joint, 0.5, 0.45);
     line(page, [0, y + 0.35], [width, y + 0.35], light, 0.4, 0.6);
   }
+  // The ties, over the crossings of the joints.
+  for (let row = 1; row < rows; row++) {
+    for (let column = 1; column < columns; column++) {
+      const centre = pdfPoint(page, left + column * panelWidth, top + row * panelHeight);
+      page.drawCircle({ ...centre, size: radius * 1.35 * MM, color: light, opacity: 0.4 });
+      page.drawCircle({ ...centre, size: radius * MM, color: hole, opacity: 0.4 });
+    }
+  }
 }
 
 /**
- * A wall of large limestone-coloured tiles with light grout: in a running bond where half a tile
- * is a whole number of columns of cards, so that its joints still run between them, and otherwise
- * stacked.
+ * A wall of large limestone-coloured tiles with light grout, stacked, one tile behind each card: a
+ * running bond would move every other row's joints through the cards.
  */
 function drawTiles(page: PDFPage, width: number, height: number, grid: CardGrid): void {
-  // About four and a half tiles across the page, and half as high as they are wide.
-  const tileWidth = stepOnGrid(width / 4.5, grid.columnPitch);
-  const tileHeight = stepOnGrid(tileWidth / 2, grid.rowPitch);
-  const bond = Math.round(tileWidth / grid.columnPitch) % 2 === 0 ? tileWidth / 2 : 0;
+  const tileWidth = grid.columnPitch;
+  const tileHeight = grid.rowPitch;
   const grout = tileWidth * 0.012;
   const base = rgb(0.85, 0.83, 0.8);
   const light = rgb(0.92, 0.905, 0.88);
@@ -215,10 +210,8 @@ function drawTiles(page: PDFPage, width: number, height: number, grid: CardGrid)
   const top = runStart(grid.top, tileHeight);
   const rows = Math.ceil((height - top) / tileHeight);
   for (let row = 0; row < rows; row++) {
-    // Every other row moves by half a tile, where the bond does.
-    const offset = left - (row % 2 === 0 ? 0 : bond);
-    for (let column = 0; offset + column * tileWidth < width; column++) {
-      const x = offset + column * tileWidth + grout / 2;
+    for (let column = 0; left + column * tileWidth < width; column++) {
+      const x = left + column * tileWidth + grout / 2;
       const y = top + row * tileHeight + grout / 2;
       const w = tileWidth - grout;
       const h = tileHeight - grout;

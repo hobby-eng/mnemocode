@@ -46,6 +46,7 @@ import { CHECKSUM_BYTES, MAX_TRANSPORT_BYTES, readShare, type ShareFormat } from
 import {
   fillingFields,
   headerFields,
+  ownUnitCount,
   SHARE_HEADER_BYTES,
   unmixedBody,
   type MixedForm,
@@ -161,6 +162,8 @@ interface ReadingUnits {
    * that fit the digits read: a solution takes one of them (fits), and withValues tries them.
    */
   readonly candidates?: readonly (readonly number[] | undefined)[];
+  /** Whether complete decoy cards follow these units, as a prefix of the text (addUnitModel). */
+  readonly decoys?: boolean;
 }
 
 /** The units of a share in one form, with every structure that their count allows. */
@@ -353,6 +356,21 @@ function markedCodes(text: string, digits: number): string[] | undefined {
   return withinRepair(hexUnits(text, digits, { foldWholeMarks: true }));
 }
 
+/**
+ * Whether reading `text` as codes of `digits` digits runs a code across a separator of the reader
+ * of codes (codeTokens: spaces, commas, semicolons or #): the text is not such codes written
+ * apart, and one of its elements is not such codes run together, as with word numbers or Unicode
+ * codes written apart read as colors. Such a reading is in another form than the one written and
+ * takes no decoy cards after a prefix (AUD-022-FUN001). Colors run together with their #, such as
+ * #37B8CA?#DB206C, keep every code within its element, so they are read in their own form.
+ */
+function readAcrossSeparators(text: string, digits: number): boolean {
+  return (
+    apartHexUnits(text, digits) === undefined &&
+    codeTokens(text).some((token) => joinedHexUnits(token, digits) === undefined)
+  );
+}
+
 /** Whether `code` has digits that can be read and digits that cannot. */
 function readInPart(code: string): boolean {
   return code !== "?" && code.includes("?");
@@ -385,6 +403,53 @@ function unitValues(
     : values;
 }
 
+/**
+ * The number of units that a share of `form` says it has, when the units of its checksum and
+ * header lead `values` and are all read; undefined otherwise. Every unit after it is a decoy.
+ */
+function ownCountRead(
+  form: MixedForm,
+  values: readonly (number | undefined)[],
+): number | undefined {
+  const headerUnits = form.unitCount(CHECKSUM_BYTES + SHARE_HEADER_BYTES);
+  if (values.length < headerUnits) return undefined;
+  const header = values.slice(0, headerUnits);
+  return header.every((value): value is number => value !== undefined)
+    ? ownUnitCount(form, header)
+    : undefined;
+}
+
+/**
+ * Adds every supported mixed prefix, keeping the text's already validated units after it as
+ * complete decoys. A fully read header fixes its length, and marks after it are decoy cards marked
+ * as unreadable, which carry nothing (AUD-022-FUN003); marks in the checksum or header leave every
+ * supported length in play, with no mark after the prefix. Each structure still checks the version,
+ * length, CRC and padding, and solvedShare checks the metadata. Standard forms, and a reading
+ * across the text's separators (`prefixes` false, readAcrossSeparators), keep their entire input.
+ */
+function addUnitModel(models: UnitModel[], units: ReadingUnits, prefixes = true): void {
+  const { format, values, readBits, candidates } = units;
+  if (values.length > MAX_REPAIR_UNITS) return;
+  const { mixed } = SHARE_UNITS[format];
+  if (mixed === undefined || !prefixes) {
+    models.push({ ...units, structures: structuresOf(format, values.length) });
+    return;
+  }
+  const own = ownCountRead(mixed, values);
+  for (const count of mixedUnitCounts(mixed)) {
+    if (count > values.length || (own !== undefined && count !== own)) continue;
+    if (own === undefined && values.slice(count).some((value) => value === undefined)) continue;
+    models.push({
+      ...units,
+      values: values.slice(0, count),
+      ...(readBits === undefined ? {} : { readBits: readBits.slice(0, count) }),
+      ...(candidates === undefined ? {} : { candidates: candidates.slice(0, count) }),
+      decoys: count < values.length,
+      structures: structuresOf(format, count),
+    });
+  }
+}
+
 /** A unit marked as a whole, by a lone ?: the only mark of a Byteword, a UR pair or a word number. */
 const loneMark = (unit: string): boolean => unit === "?";
 
@@ -397,7 +462,7 @@ function addModel(
   if (units === undefined) return;
   const values = unitValues(format, units, loneMark);
   if (values === undefined) return;
-  models.push({ format, values, structures: structuresOf(format, units.length) });
+  addUnitModel(models, { format, values });
 }
 
 /** Every way that `text` can be read as a share in one form, with marked elements. */
@@ -433,18 +498,23 @@ function addUnicodeModel(models: UnitModel[], text: string): void {
   );
   if (candidates.some((words) => words?.length === 0)) return;
   const fitting = candidates.map((words) => (words === undefined ? undefined : new Set(words)));
-  models.push({
-    format: "unicode",
-    values,
-    structures: structuresOf("unicode", codes.length),
-    ...(candidates.some((words) => words !== undefined)
-      ? {
-          candidates,
-          fits: (filled: readonly number[]) =>
-            fitting.every((words, place) => words?.has(filled[place]!) ?? true),
-        }
-      : {}),
-  });
+  addUnitModel(
+    models,
+    {
+      format: "unicode",
+      values,
+      ...(candidates.some((words) => words !== undefined)
+        ? {
+            candidates,
+            fits: (filled: readonly number[]) =>
+              fitting
+                .slice(0, filled.length)
+                .every((words, place) => words?.has(filled[place]!) ?? true),
+          }
+        : {}),
+    },
+    !readAcrossSeparators(text, CODE_DIGITS),
+  );
 }
 
 /**
@@ -458,14 +528,17 @@ function addColorModel(models: UnitModel[], text: string): void {
   const partly = colors.some(readInPart);
   // Every color not marked has six digits (markedCodes), so it has a value.
   const values = unitValues("colors", colors, isMarked)!;
-  models.push({
-    format: "colors",
-    values,
-    structures: structuresOf("colors", colors.length),
-    ...(partly
-      ? { readBits: colors.map((color) => (readInPart(color) ? digitBits(color) : undefined)) }
-      : {}),
-  });
+  addUnitModel(
+    models,
+    {
+      format: "colors",
+      values,
+      ...(partly
+        ? { readBits: colors.map((color) => (readInPart(color) ? digitBits(color) : undefined)) }
+        : {}),
+    },
+    !readAcrossSeparators(text, COLOR_DIGITS),
+  );
 }
 
 /**
@@ -546,14 +619,33 @@ function someColorFits(pair: readonly string[]): boolean {
  * be read, as colors: each mark one code, or a whole color that begins at the first code of a
  * color (docs/SSKR.md). A run of marks is expanded to each number of codes that it can stand for,
  * so that two ways to the same codes are one reading. A way is given up as soon as a color that
- * it makes fits no color, or the codes left cannot end at a number of colors that a share has.
- * Every way that is left is given, the fewest codes for each run first; AmbiguousMarksError when
- * there are more than MAX_MARK_WIDTH_READINGS, or the search takes more than its steps.
+ * it makes fits no color, or no supported share prefix can contain its marks. Complete valid
+ * colors after a prefix are decoys; when the colors of the checksum and header lead the codes
+ * read, the share's own length is known and whatever follows it, marks too, is decoys
+ * (AUD-022-FUN003), as addUnitModel takes them. Every way that is left is given, the fewest codes
+ * for each run first; AmbiguousMarksError when there are more than MAX_MARK_WIDTH_READINGS, or the
+ * search takes more than its steps. Prefixes share those bounds, rather than starting another
+ * search.
  */
-function colorUnicodePairings(scalars: readonly string[]): string[][][] {
+function colorUnicodePairings(
+  scalars: readonly string[],
+): { readonly pairs: string[][]; readonly decoys: boolean }[] {
+  if (scalars.length > MAX_REPAIR_UNITS * COLOR_UNICODE_POINTS_PER_COLOR) return [];
   const pieces = codePieces(scalars);
   const per = COLOR_UNICODE_POINTS_PER_COLOR;
-  const colorCounts = [...mixedUnitCounts(SHARE_UNITS["colors-unicode"].mixed!)];
+  const { mixed, valueOf } = SHARE_UNITS["colors-unicode"];
+  // The colors before the first mark are read as they stand: a mark alone may be a whole color.
+  const firstMark = scalars.indexOf("?");
+  const leading = firstMark < 0 ? scalars : scalars.slice(0, firstMark);
+  const own = ownCountRead(
+    mixed!,
+    listPieces(leading.slice(0, leading.length - (leading.length % per)), per).map((pair) =>
+      valueOf(pair.join("")),
+    ),
+  );
+  const colorCounts = [...mixedUnitCounts(mixed!)].filter(
+    (count) => own === undefined || count === own,
+  );
   // The fewest and the most codes that the pieces from each one on stand for: a mark one code,
   // or at most a whole color.
   const fewest = new Array<number>(pieces.length + 1).fill(0);
@@ -564,8 +656,29 @@ function colorUnicodePairings(scalars: readonly string[]): string[][][] {
     fewest[piece] = fewest[piece + 1]! + (marks === 0 ? 1 : marks);
     most[piece] = most[piece + 1]! + (marks === 0 ? 1 : marks * per);
   }
+  // Whether the codes from each one on are decoys: valid colors only, complete ones unless the
+  // share's own length is known, when a ? may stand for a code or a whole color of a decoy. A
+  // malformed suffix must not become a decoy merely because an earlier prefix can be repaired.
+  const decoysFrom = new Array<boolean>(scalars.length + 1).fill(false);
+  decoysFrom[scalars.length] = true;
+  for (let at = scalars.length - 1; at >= 0; at -= 1) {
+    const pair = scalars.slice(at, at + per);
+    decoysFrom[at] =
+      (own !== undefined && scalars[at] === "?" && decoysFrom[at + 1]!) ||
+      (pair.length === per &&
+        (own !== undefined || !pair.includes("?")) &&
+        someColorFits(pair) &&
+        decoysFrom[at + per]!);
+  }
+  // Where each piece begins among the codes as written.
+  const scalarAt = [0];
+  for (const piece of pieces)
+    scalarAt.push(scalarAt.at(-1)! + (typeof piece === "string" ? 1 : piece.marks));
+  let lastMark = -1;
+  for (let piece = 0; piece < pieces.length; piece += 1)
+    if (typeof pieces[piece] === "object") lastMark = piece;
   const codes: string[] = [];
-  const readings: string[][][] = [];
+  const readings: { pairs: string[][]; decoys: boolean }[] = [];
   let steps = 0;
   /** Whether the colors that the codes from `from` on touch each fit some color. */
   const colorsFit = (from: number): boolean => {
@@ -575,30 +688,46 @@ function colorUnicodePairings(scalars: readonly string[]): string[][][] {
     }
     return true;
   };
+  const read = (decoys: boolean): void => {
+    readings.push({ pairs: listPieces(codes, per), decoys });
+    if (readings.length > MAX_MARK_WIDTH_READINGS) throw new AmbiguousMarksError();
+  };
+  /** Places `placed` after the codes so far and, when the colors fit, goes on with `then`. */
+  const withPlaced = (placed: readonly string[], then: () => void): void => {
+    const start = codes.length;
+    codes.push(...placed);
+    if (colorsFit(start)) then();
+    codes.length = start;
+  };
+  const marksOf = (length: number) => new Array<string>(length).fill("?");
   const place = (piece: number): void => {
     steps += 1;
     if (steps > MAX_MARK_WIDTH_STEPS) throw new AmbiguousMarksError();
-    const least = codes.length + fewest[piece]!;
+    // Marks after a share of known length are decoys and need no place in it.
+    const required =
+      own === undefined && piece <= lastMark ? fewest[piece]! - fewest[lastMark + 1]! : 0;
+    const least = codes.length + required;
     const greatest = codes.length + most[piece]!;
     if (!colorCounts.some((count) => least <= count * per && count * per <= greatest)) return;
-    if (piece === pieces.length) {
-      readings.push(listPieces(codes, per));
-      if (readings.length > MAX_MARK_WIDTH_READINGS) throw new AmbiguousMarksError();
+    if (colorCounts.includes(codes.length / per) && decoysFrom[scalarAt[piece]!]) {
+      read(piece < pieces.length);
+      if (own !== undefined) return;
+    }
+    if (piece === pieces.length) return;
+    const current = pieces[piece]!;
+    if (typeof current === "string") {
+      withPlaced([current], () => place(piece + 1));
       return;
     }
-    const current = pieces[piece]!;
-    const placings =
-      typeof current === "string"
-        ? [[current]]
-        : runLengths(current.marks, codes.length).map((length) =>
-            new Array<string>(length).fill("?"),
-          );
-    for (const placed of placings) {
-      const start = codes.length;
-      codes.push(...placed);
-      if (colorsFit(start)) place(piece + 1);
-      codes.length = start;
-    }
+    for (const length of runLengths(current.marks, codes.length))
+      withPlaced(marksOf(length), () => place(piece + 1));
+    // A run of marks that goes on past the end of a share of known length: the share takes the
+    // first of them, and the others are decoys.
+    if (own !== undefined)
+      for (let taken = 1; taken < current.marks; taken += 1)
+        for (const length of runLengths(taken, codes.length))
+          if (codes.length + length === own * per && decoysFrom[scalarAt[piece]! + taken])
+            withPlaced(marksOf(length), () => read(true));
   };
   place(0);
   return readings;
@@ -615,7 +744,7 @@ function addColorUnicodeModels(models: UnitModel[], text: string): void {
   if (scalars === undefined) return;
   if (!scalars.every((code) => code === "?" || isColorUnicodePoint(parseInt(code, 16)))) return;
   const { unitText } = SHARE_UNITS["colors-unicode"];
-  for (const pairs of colorUnicodePairings(scalars)) {
+  for (const { pairs, decoys } of colorUnicodePairings(scalars)) {
     // Every color whose codes are all read is one (colorUnicodePairings); one with a mark in
     // either of its codes is unknown as a whole.
     const values = unitValues(
@@ -626,6 +755,7 @@ function addColorUnicodeModels(models: UnitModel[], text: string): void {
     models.push({
       format: "colors-unicode",
       values,
+      decoys,
       structures: structuresOf("colors-unicode", pairs.length),
       fits: (filled) =>
         pairs.every((pair, index) => {
@@ -687,14 +817,13 @@ function addColorUnicodeDigitModel(models: UnitModel[], text: string): void {
     }
   }
   const fitting = candidates.map((colors) => (colors === undefined ? undefined : new Set(colors)));
-  models.push({
+  addUnitModel(models, {
     format: "colors-unicode",
     values,
-    structures: structuresOf("colors-unicode", pairs.length),
     ...(candidates.some((colors) => colors !== undefined) ? { candidates } : {}),
     // A solution keeps every digit read, also beside a code that cannot be read.
     fits: (filled) =>
-      pairs.every((pair, index) => {
+      pairs.slice(0, filled.length).every((pair, index) => {
         if (fitting[index] !== undefined) return fitting[index]!.has(filled[index]!);
         const written = unitText(filled[index]!).match(CODE_POINT_TEXT)!;
         return pair.every((code, half) => wholeMark(code) || fitsPattern(code, written[half]!));
@@ -762,7 +891,10 @@ export class MarkedReading {
     );
   }
 
-  /** Every reading of `text`: each form it can be in, with each structure its length allows. */
+  /**
+   * Every reading of `text`: each form and structure of a supported prefix before complete card
+   * decoys, or of the entire input for a standard form. Every genuine mark stays in the prefix.
+   */
   static of(text: string): MarkedReading[] {
     return unitModels(text).flatMap(({ structures, ...units }) =>
       structures.map((structure) => new MarkedReading(units, structure)),
@@ -772,6 +904,11 @@ export class MarkedReading {
   /** The form that the text is read in. */
   get format(): ShareFormat {
     return this.#units.format;
+  }
+
+  /** Whether the reading takes decoy cards after a prefix of the text (addUnitModel). */
+  get withDecoys(): boolean {
+    return this.#units.decoys === true;
   }
 
   /** The bits of one unit of the form. */
@@ -1265,21 +1402,51 @@ export function repairCandidates(
     throw new Error(`${capitalized(markLimit(MAX_MARKED_ELEMENTS))}, each at its place.`);
   const problem = markProblem(text);
   if (problem !== undefined) throw new Error(capitalized(problem));
+  const outcomes = MarkedReading.of(text)
+    .flatMap((reading) => triedReadings(reading, freeBits))
+    .map((model) => {
+      const solved = solutions(model, freeBits);
+      return {
+        withDecoys: model.withDecoys,
+        tooMany: solved.tooMany,
+        shares: solved.found.flatMap((values) => model.solvedShare(values) ?? []),
+      };
+    });
+  return sharesOfReadings(outcomes, text);
+}
+
+/** What one reading of a marked share gave (repairCandidates). */
+export interface ReadingOutcome {
+  /** Whether the reading takes decoy cards after a prefix of the text. */
+  readonly withDecoys: boolean;
+  /** Whether its search stopped at the cap, with filters left that it could not apply. */
+  readonly tooMany: boolean;
+  /** The shares it solved. */
+  readonly shares: readonly ReadRepairableShare[];
+}
+
+/**
+ * The shares that the readings of the marked share `text` gave, each once, by their outcomes. A
+ * capped reading of the whole text keeps uniqueness from being established, since the cap stops
+ * its remaining filters: it refuses with "Too many elements" whatever the others solved. One that
+ * takes decoy cards after a prefix is only one hypothesis more and leaves a solved reading
+ * standing (AUD-022-FUN001). Without a share, the refusal says why.
+ */
+export function sharesOfReadings(
+  outcomes: readonly ReadingOutcome[],
+  text: string,
+): ReadRepairableShare[] {
   const found = new Map<string, ReadRepairableShare>();
   let tooMany = false;
-  for (const model of MarkedReading.of(text).flatMap((reading) =>
-    triedReadings(reading, freeBits),
-  )) {
-    const solved = solutions(model, freeBits);
-    tooMany ||= solved.tooMany;
-    for (const values of solved.found) {
-      const share = model.solvedShare(values);
-      if (share !== undefined) found.set(share.ur, share);
-    }
+  let cappedDecoys = false;
+  for (const outcome of outcomes) {
+    if (outcome.withDecoys) cappedDecoys ||= outcome.tooMany;
+    else tooMany ||= outcome.tooMany;
+    for (const share of outcome.shares) found.set(share.ur, share);
   }
-  if (found.size === 0)
+  if (tooMany || found.size === 0)
     throw new Error(
-      tooMany
+      tooMany || cappedDecoys
         ? "Too many elements are marked for this form: the checksum cannot tell them. Mark fewer, or use another share."
         : withJoinedMarksHint(
             "No valid share fits the marked elements. Check their places and the other elements.",

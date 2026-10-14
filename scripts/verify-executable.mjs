@@ -1,7 +1,7 @@
 // Runs a built executable (scripts/build-executable.mjs) from an empty folder, away from the
 // checkout, and checks that it works on its own: version, full self-test, a seedshift encoding,
-// a Shamir split and recovery, a card PDF, the help and the license notices next to it. Public test
-// data only.
+// a re-encoding of the masked phrase, a Shamir split and recovery, a card PDF, the help and the
+// license notices next to it. Public test data only.
 //
 //   node scripts/verify-executable.mjs [executable or its folder]   (default release)
 //   node scripts/verify-executable.mjs --print-path   (only prints release/<this system's executable>)
@@ -85,6 +85,22 @@ try {
     "1",
   );
   check(shifted.includes(SHIFTED), "masks the test phrase with a date");
+  // The masked phrase made again without Seedshift, confirmed by the test phrase's fingerprint:
+  // the Unicode codes of its words (7684 is abandon, 5728 about).
+  const reEncoded = run(
+    "re-encode",
+    "--input",
+    SHIFTED,
+    "--old-mode",
+    "seedshift",
+    "--old-dates",
+    "23-09-2026",
+    "--format",
+    "3",
+    "--master-fingerprint",
+    "73c5da0a",
+  );
+  check(reEncoded.includes(`${"7684".repeat(11)}5728`), "re-encodes the masked phrase");
   run(
     "encode",
     "--sskr",

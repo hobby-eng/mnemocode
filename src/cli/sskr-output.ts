@@ -2,7 +2,11 @@
 // QR codes that the options name, each saved with a choice after a failure (save-retry.ts).
 
 import { imageFormat, cardFileFormat, savedPagesNotice } from "./image-options.js";
-import { DEFAULT_SHARE_TEMPLATE_ID, resolveTemplateId } from "../export/template-catalog.js";
+import {
+  assertSeparateCards,
+  DEFAULT_SHARE_TEMPLATE_ID,
+  resolveTemplateId,
+} from "../export/template-catalog.js";
 import { resolveSskrLayout, parseSskrLayout } from "../export/sskr-content.js";
 import { printCodes, terminalNotice, terminalResultHeader } from "./terminal.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
@@ -25,7 +29,8 @@ import {
   nodeShareCards,
   type SskrExportOptions,
 } from "../export/sskr-cards.js";
-import type { ShareCardSet, ShareQrCode } from "../export/sskr-render.js";
+import { ShareCardSet, type ShareQrCode } from "../export/sskr-render.js";
+import { nodeCardRenderer } from "../export/platform-node.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
 import { saveOutput } from "./output-saving.js";
 import { assertCardOutput } from "./card-options.js";
@@ -55,18 +60,27 @@ export function exportOptions(
   // Before any secret is asked, as the cards would refuse it later.
   assertShareFormatHasCards(shareFormat);
   const template = value(args, "template") ?? DEFAULT_SHARE_TEMPLATE_ID;
-  const { style } = resolveTemplateId(template, "colors");
+  const design = resolveTemplateId(template, "colors");
   const requested = parseSskrLayout(value(args, "card-layout"));
   const settings = businessOptions(args, template);
+  // Resolved here so that the messages below describe what is actually written.
+  const layout = resolveSskrLayout(requested, settings.pageSize);
+  if (layout === "individual") assertSeparateCards(design);
   return {
     ...settings,
-    style,
-    // Resolved here so that the messages below describe what is actually written.
-    layout: resolveSskrLayout(requested, settings.pageSize),
+    style: design.style,
+    layout,
     directory: value(args, "cards-dir") ?? "",
     imageFormat: cardFileFormat(args),
     shareFormat,
   };
+}
+
+/** ShareCardSet.assertPrintable with this host's renderer, where share cards are asked for. */
+export async function assertShareCardsPrintable(
+  options: ShareCardOptions | undefined,
+): Promise<void> {
+  if (options !== undefined) await ShareCardSet.assertPrintable(nodeCardRenderer, options);
 }
 
 export function shareFormat(args: ParsedArguments): ShareFormat {

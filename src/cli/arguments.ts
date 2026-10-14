@@ -21,6 +21,7 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
     "missing-word",
     "list-candidates",
     "plaintext-candidates",
+    "recognised",
   ]);
   for (let index = 0; index < items.length; index += 1) {
     const item = items[index]!;
@@ -64,9 +65,13 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
   return parsed;
 }
 
+/** The key of the dates of the old backup, which Re-encode reads beside the new backup's. */
+export const OLD_DATES_KEY = "old-date";
+
 /** The options that take a list of values: the flag typed, and the key they are kept under. */
 const LIST_OPTIONS: Readonly<Record<string, string>> = Object.freeze({
   dates: "date",
+  "old-dates": OLD_DATES_KEY,
 });
 
 /** The flag of the option kept under `key`, as it is typed: "--dates" for "date". */
@@ -145,7 +150,7 @@ export function integerOption(
 }
 
 /** The options that may be given more than once; every other option takes one value. */
-const REPEATABLE_OPTIONS: readonly string[] = ["date", ...SHARE_SOURCE_OPTIONS];
+const REPEATABLE_OPTIONS: readonly string[] = ["date", OLD_DATES_KEY, ...SHARE_SOURCE_OPTIONS];
 
 /**
  * Refuses an option given more than once, unless it is one of `repeatable`: every option that may

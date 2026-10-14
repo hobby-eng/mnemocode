@@ -15,7 +15,7 @@ Most wallets keep that secret as a **seed phrase**: a list of 12, 15, 18, 21 or 
 A seed phrase written on paper is easy to recognise, and whoever finds it can take everything. So the owner had MnemoCode change how it looks. The sheet says which of these the owner chose:
 
 - **Another form.** The words were written as numbers (each word's place in the list), as short codes of digits and letters, or as color codes such as `#1EAB91`, sometimes printed on cards that look like ordinary design samples.
-- **Secret dates (Seedshift).** The words were masked with one or more dates that the owner picked when making the backup: dates that meant something to the owner, such as a birthday or a wedding day. The year, month and day of each date move the words forward along the BIP39 list of 2048 words: with the date 23-09-2026 the first word moves 2026 places, the second 9, the third 23, then again 2026, and so on. "abandon", the first word of the list, becomes "wool". This works like a simple cipher whose key is the dates: only the same dates, typed into MnemoCode, move the words back. Every move gives real words again, so wrong dates give another seed phrase, not an error. The dates have nothing to do with today's date, the day the backup was made, or the day you open the wallet. They are written nowhere; the owner may have left a hint on the sheet.
+- **Secret dates (Seedshift).** The words were masked with one or more dates meaningful to the owner, such as a birthday. Their year, month and day shift the words along the BIP39 list: with 23-09-2026, "abandon" becomes "wool". Use the owner's dates to undo the shift. MnemoCode Seedshift gives a valid seed phrase even for wrong dates; the Original Seedshift may instead report a checksum error. A valid checksum does not confirm the owner's wallet. The dates have nothing to do with today, the backup date or the day you open the wallet. They are written nowhere; the owner may have left a hint on the sheet.
 - **Shamir shares.** The backup was split into several shares, kept in different places. A certain number of them, for example any 3 of 5, restore it; fewer reveal nothing at all.
 
 MnemoCode undoes all of this on your computer, without the internet.
@@ -61,7 +61,7 @@ Install a well-known wallet program, downloaded only from its own official websi
 
 If the wallet looks empty:
 
-- **A secret date may be wrong.** With a wrong date MnemoCode usually shows no error: it gives another valid seed phrase, and the wallet of that phrase is empty. Check the secret dates, and that each is written day-month-year.
+- **A secret date may be wrong.** A wrong date can give another valid seed phrase; the Original Seedshift can also report a checksum error. Neither a valid phrase nor an empty-looking wallet proves that the dates are right. Check the secret dates, and that each is written day-month-year; compare a known address or fingerprint if one is available.
 - **The owner may have used a BIP39 passphrase**: an extra word or sentence, sometimes called the 25th word. It is not part of the backup, and MnemoCode does not keep it. The hint on the sheet may mention it.
 - **The owner may have used another program or another cryptocurrency.** Different programs can look at different parts of the same wallet. Try the program the owner used, if you know it.
 

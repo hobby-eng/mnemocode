@@ -11,7 +11,7 @@
 // Each command is a module of its own; this one gathers them for the command line.
 
 export { sskrExportOptions } from "./sskr-output.js";
-export { runSskrSplit } from "./sskr-split-command.js";
+export { prepareSskrSplit, runSskrSplit } from "./sskr-split-command.js";
 export {
   givenShares,
   restoreFromShare,

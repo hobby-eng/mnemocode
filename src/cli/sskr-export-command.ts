@@ -21,6 +21,7 @@ import { mendShares, reportRepairs, addMoreShares } from "./share-repair.js";
 import { askAfterFailure, askOrCancel, WHAT_NOW } from "./ask.js";
 import { preflightOutputs } from "./output-saving.js";
 import {
+  assertShareCardsPrintable,
   exportOptions,
   printShareBlock,
   printShares,
@@ -204,6 +205,8 @@ export async function runSskrExport(args: ParsedArguments): Promise<void> {
   const given = value(args, "format") === undefined ? undefined : shareFormat(args);
   const checked = exportOptions(args, given ?? "colors");
   await preflightOutputs(args);
+  // In colors where the shares keep their own form, which is known only once they are typed.
+  await assertShareCardsPrintable(checked);
   const settings = await recoverySettings(args);
   // Refused before the shares are asked.
   const refusal = ShareRestore.repairRefusal(settings.mode, settings.evidence !== undefined);

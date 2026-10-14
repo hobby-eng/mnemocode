@@ -296,16 +296,25 @@ export function unicodeToColorCodes(value: string): string[] {
 
 /**
  * Color Unicode written as the Private Use symbols themselves, with a ? where one cannot be read:
- * each symbol as its four hexadecimal digits, or ?; undefined when the text is empty or holds
- * anything else, such as the codes written in digits. The reading of marked codes and the repair
- * of marked shares take such text through it.
+ * the symbols and the ? marks, white space left out; undefined when the text is empty or holds
+ * anything else, such as the codes written in digits.
  */
-export function markedColorSymbols(text: string): string[] | undefined {
+export function colorSymbolsOf(text: string): string[] | undefined {
   const symbols = Array.from(text.replace(/\s+/gu, ""));
   if (
     symbols.length === 0 ||
     !symbols.every((symbol) => symbol === "?" || isColorUnicodeSymbol(symbol))
   )
     return undefined;
-  return symbols.map((symbol) => (symbol === "?" ? "?" : hexCodePoint(symbol.codePointAt(0)!)));
+  return symbols;
+}
+
+/**
+ * The symbols of colorSymbolsOf, each as its four hexadecimal digits, or ?. The reading of marked
+ * codes and the repair of marked shares take such text through it.
+ */
+export function markedColorSymbols(text: string): string[] | undefined {
+  return colorSymbolsOf(text)?.map((symbol) =>
+    symbol === "?" ? "?" : hexCodePoint(symbol.codePointAt(0)!),
+  );
 }

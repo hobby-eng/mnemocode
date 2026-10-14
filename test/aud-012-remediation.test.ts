@@ -48,7 +48,6 @@ import { bitsToBytes, hexOfBytes } from "../src/core/bits.js";
 import { failureLine, resultLines, statusLine } from "../src/cli/terminal-style.js";
 import { assertColorCardContent } from "../src/export/card-content.js";
 import { pageDimensions } from "../src/export/card-settings.js";
-import { materialPageLayout } from "../src/export/material-layout.js";
 import type { DatePattern } from "../src/core/types.js";
 import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
@@ -401,12 +400,15 @@ describe("AUD-012-FUN005: a folder that cannot be made private is not published"
 
 describe("AUD-012-FUN006, FUN007: card settings refuse what they cannot print", () => {
   it("refuses an orientation that is not one, in every family's layout", () => {
+    // Every family lays its pages out through pageDimensions, the material sheets too, since
+    // they are drawn as collection studies only.
     expect(pageDimensions("business")).toEqual(pageDimensions("business", "landscape"));
-    expect(materialPageLayout("a6")).toEqual(materialPageLayout("a6", "landscape"));
-    expect(materialPageLayout("a6", "portrait").portrait).toBe(true);
+    expect(pageDimensions("a6", "portrait")[1]).toBeGreaterThan(
+      pageDimensions("a6", "portrait")[0],
+    );
     for (const wrong of ["sideways", null, 90]) {
       expect(() => pageDimensions("business", wrong as never)).toThrow(/Orientation must/u);
-      expect(() => materialPageLayout("a6", wrong as never)).toThrow(/Orientation must/u);
+      expect(() => pageDimensions("a6", wrong as never)).toThrow(/Orientation must/u);
     }
   });
 

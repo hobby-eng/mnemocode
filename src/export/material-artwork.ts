@@ -98,38 +98,30 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
     dark: false,
     background: [0.928, 0.915, 0.886],
     finishes: photographed(1580, 996, (finish) => [
-      finish("Ivory limestone", "E3DCCF", 52, 187, 346, 250),
-      finish("Smoked walnut", "795A42", 430, 187, 346, 250),
-      finish(
-        "Cashmere matte",
-        "AAA092",
-        810,
-        187,
-        346,
-        250,
-        surfaced("matte", 0.99, -0.001, 0.013),
-      ),
-      finish("Graphite matte", "383C3D", 1190, 187, 346, 250, surfaced("matte", 1, 0, 0)),
+      finish("Ivory limestone", "E3DCCF", 49, 186, 346, 250),
+      finish("Smoked walnut", "795A42", 427, 187, 346, 250),
+      finish("Cashmere matte", "AAA092", 807, 186, 346, 250, surfaced("matte", 0.99, 0.008, 0.009)),
+      finish("Graphite matte", "383C3D", 1191, 185, 346, 250, surfaced("matte", 1, 0, 0)),
       finish(
         "Champagne satin",
         "A89273",
-        52,
-        507,
+        48,
+        506,
         346,
         250,
-        surfaced("satin", 0.995, -0.009, 0.007),
+        surfaced("satin", 0.995, 0.005, 0.002),
       ),
       finish(
         "Olive lacquer",
         "747968",
-        430,
-        507,
+        428,
+        505,
         346,
         250,
-        surfaced("lacquer", 1.005, -0.005, 0.006),
+        surfaced("lacquer", 1.005, 0.003, 0.006),
       ),
-      finish("Warm travertine", "D2C0A2", 810, 507, 346, 250),
-      finish("Smoked glass", "87928F", 1190, 507, 346, 250),
+      finish("Warm travertine", "D2C0A2", 807, 509, 346, 250),
+      finish("Smoked glass", "87928F", 1191, 508, 346, 250),
     ]),
     // Lacquer colours of kitchen fronts, quiet enough for a kitchen; walnut, stone and glass are
     // shown only as photographed.
@@ -168,8 +160,8 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
       surfaceFirst: false,
       outline: [
         [
-          0.034, 0.035, 0.969, 0.035, 0.972, 0.064, 0.978, 0.072, 0.972, 0.088, 0.972, 0.944, 0.963,
-          0.953, 0.061, 0.953, 0.049, 0.969, 0.043, 0.969, 0.028, 0.944, 0.028, 0.043,
+          0.031, 0.043, 0.966, 0.043, 0.969, 0.072, 0.975, 0.08, 0.969, 0.097, 0.969, 0.953, 0.96,
+          0.961, 0.058, 0.961, 0.046, 0.977, 0.04, 0.977, 0.025, 0.953, 0.025, 0.051,
         ],
       ],
     },
@@ -180,22 +172,30 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
     dark: false,
     background: [0.916, 0.904, 0.875],
     finishes: photographed(1536, 1024, (finish) => [
-      finish("Matte charcoal", "35383B", 84, 251, 335, 232, surfaced("matte", 1.005, 0.001, 0.006)),
-      finish("Satin black", "181B20", 433, 251, 335, 232, surfaced("satin", 1, 0, 0)),
-      finish("Cement gray", "8A9094", 784, 251, 335, 232, surfaced("matte", 1.005, -0.017, -0.002)),
-      finish("Ivory white", "E8E4DC", 1124, 251, 335, 232, surfaced("satin", 0.98, 0.01, 0.009)),
-      finish("Desert sand", "BAA17C", 82, 544, 335, 233, surfaced("matte", 1.015, 0.002, 0.028)),
-      finish("Army olive", "59624B", 431, 544, 335, 233, surfaced("matte", 1.015, 0.002, 0.019)),
+      finish(
+        "Matte charcoal",
+        "35383B",
+        82,
+        251,
+        335,
+        232,
+        surfaced("matte", 1.005, -0.002, -0.002),
+      ),
+      finish("Satin black", "181B20", 430, 249, 335, 232, surfaced("satin", 1, 0, 0)),
+      finish("Cement gray", "8A9094", 776, 249, 335, 232, surfaced("matte", 1.005, -0.002, -0.002)),
+      finish("Ivory white", "E8E4DC", 1121, 248, 335, 232, surfaced("satin", 0.98, 0.01, 0.014)),
+      finish("Desert sand", "BAA17C", 82, 549, 335, 233, surfaced("matte", 1.015, -0.007, -0.003)),
+      finish("Army olive", "59624B", 431, 547, 335, 233, surfaced("matte", 1.015, -0.007, -0.003)),
       finish(
         "Midnight blue",
         "263E59",
-        779,
-        544,
+        776,
+        547,
         335,
         233,
-        surfaced("satin", 1.015, -0.007, 0.019),
+        surfaced("satin", 1.015, -0.007, -0.003),
       ),
-      finish("Warm taupe", "8D8073", 1121, 544, 335, 233, surfaced("matte", 1.015, 0.005, 0.019)),
+      finish("Warm taupe", "8D8073", 1122, 547, 335, 233, surfaced("matte", 1.015, -0.007, -0.003)),
     ]),
     // Wrap film colours; cars carry them far more vividly than tiles or switches.
     catalogue: {
@@ -236,11 +236,11 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
       surfaceFirst: true,
       outline: [
         [
-          0.861, 0.045, 0.867, 0.045, 0.876, 0.062, 0.921, 0.205, 0.927, 0.248, 0.933, 0.334, 0.933,
-          0.584, 0.927, 0.653, 0.918, 0.7, 0.882, 0.774, 0.843, 0.83, 0.822, 0.843, 0.787, 0.881,
-          0.712, 0.916, 0.56, 0.933, 0.399, 0.929, 0.237, 0.907, 0.181, 0.869, 0.142, 0.83, 0.082,
-          0.748, 0.061, 0.705, 0.049, 0.623, 0.049, 0.381, 0.058, 0.222, 0.103, 0.071, 0.118, 0.05,
-          0.228, 0.088, 0.324, 0.106, 0.422, 0.114, 0.557, 0.114, 0.718, 0.093, 0.825, 0.062,
+          0.87, 0.054, 0.876, 0.054, 0.885, 0.071, 0.93, 0.213, 0.936, 0.256, 0.942, 0.343, 0.942,
+          0.593, 0.936, 0.662, 0.927, 0.709, 0.891, 0.782, 0.852, 0.838, 0.831, 0.851, 0.796, 0.89,
+          0.721, 0.925, 0.569, 0.942, 0.407, 0.938, 0.246, 0.916, 0.19, 0.877, 0.151, 0.838, 0.091,
+          0.756, 0.07, 0.713, 0.058, 0.631, 0.058, 0.39, 0.067, 0.231, 0.112, 0.08, 0.127, 0.058,
+          0.237, 0.097, 0.333, 0.114, 0.431, 0.123, 0.566, 0.123, 0.727, 0.101, 0.834, 0.071,
         ],
       ],
     },
@@ -318,16 +318,24 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
     dark: true,
     background: [0.235, 0.228, 0.209],
     finishes: photographed(1578, 996, (finish) => [
-      finish("Travertine", "BDA78B", 77, 125, 336, 319),
-      finish("Ivory limestone", "D4C6AD", 446, 125, 336, 319),
-      finish("White marble", "DAD8D0", 808, 125, 336, 319),
-      finish("Black marble", "383A39", 1175, 125, 336, 319),
-      finish("Olive glaze", "81856A", 77, 497, 336, 319, { surface: "glaze" }),
-      finish("Petrol glaze", "335D64", 446, 497, 336, 319, { surface: "glaze" }),
-      finish("Terracotta", "A66E52", 808, 497, 336, 319, { surface: "clay" }),
+      finish("Travertine", "BDA78B", 72, 123, 336, 319),
+      finish("Ivory limestone", "D4C6AD", 437, 123, 336, 319),
+      finish("White marble", "DAD8D0", 803, 123, 336, 319),
+      finish("Black marble", "383A39", 1171, 124, 336, 319),
+      finish("Olive glaze", "81856A", 72, 497, 336, 319, surfaced("glaze", 1.01, -0.005, -0.005)),
+      finish(
+        "Petrol glaze",
+        "335D64",
+        437,
+        497,
+        336,
+        319,
+        surfaced("glaze", 0.995, -0.001, -0.004),
+      ),
+      finish("Terracotta", "A66E52", 803, 498, 336, 319, surfaced("clay", 1.005, -0.006, -0.006)),
       // As photographed it is too close to Travertine; it carries the light catalogue colours.
-      finish("Fluted sand", "B4AA98", 1175, 497, 336, 319, {
-        surface: "fluted tile",
+      finish("Fluted sand", "B4AA98", 1171, 498, 336, 319, {
+        ...surfaced("fluted tile", 1.015, -0.007, -0.004),
         onlyTinted: true,
       }),
     ]),
@@ -358,8 +366,15 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
       }),
       chromaScale: 0.45,
       surfaceFirst: false,
-      // The tile without the dark backdrop at its sides and top.
-      outline: [[0.03, 0.03, 0.97, 0.03, 0.97, 1, 0.03, 1]],
+      // The tile without the dark wall around it.
+      outline: [
+        [
+          0.063, 0.037, 0.937, 0.037, 0.943, 0.044, 0.94, 0.94, 0.925, 0.956, 0.91, 0.953, 0.876,
+          0.96, 0.846, 0.96, 0.836, 0.953, 0.506, 0.953, 0.479, 0.96, 0.424, 0.953, 0.31, 0.953,
+          0.298, 0.96, 0.231, 0.953, 0.164, 0.96, 0.075, 0.956, 0.06, 0.963, 0.054, 0.956, 0.054,
+          0.063, 0.057, 0.044,
+        ],
+      ],
     },
   },
   switch: {
@@ -371,27 +386,27 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
       finish(
         "Brushed brass",
         "B8A078",
-        82,
-        141,
+        73,
+        138,
         320,
         303,
-        surfaced("brushed", 1.005, -0.006, -0.002),
+        surfaced("brushed", 1.005, 0.001, 0.001),
       ),
       finish(
         "Brushed silver",
         "AAA9A0",
-        454,
-        141,
+        447,
+        137,
         320,
         303,
-        surfaced("brushed", 0.985, 0.013, 0.014),
+        surfaced("brushed", 0.985, 0.014, 0.021),
       ),
-      finish("Graphite", "414548", 827, 141, 320, 303, surfaced("matte", 1.01, -0.005, -0.012)),
-      finish("Porcelain", "E5E3DC", 1199, 141, 320, 303, surfaced("matte", 1, -0.003, -0.01)),
-      finish("Aged bronze", "6B5940", 82, 506, 320, 303, surfaced("brushed", 1, 0, 0.003)),
-      finish("Ocean blue", "315969", 454, 506, 320, 303, surfaced("matte", 1, 0, 0)),
-      finish("Sage green", "798267", 827, 506, 320, 303, surfaced("matte", 1.01, -0.005, -0.005)),
-      finish("Copper", "B68161", 1199, 506, 320, 303, surfaced("brushed", 1.01, -0.014, -0.005)),
+      finish("Graphite", "414548", 820, 139, 320, 303, surfaced("matte", 1.01, -0.008, -0.012)),
+      finish("Porcelain", "E5E3DC", 1187, 137, 320, 303, surfaced("matte", 1, 0.01, -0.003)),
+      finish("Aged bronze", "6B5940", 76, 504, 320, 303, surfaced("brushed", 1, -0.003, 0.003)),
+      finish("Ocean blue", "315969", 447, 504, 320, 303, surfaced("matte", 1, 0, 0)),
+      finish("Sage green", "798267", 820, 503, 320, 303, surfaced("matte", 1.01, -0.008, -0.002)),
+      finish("Copper", "B68161", 1189, 503, 320, 303, surfaced("brushed", 1.01, -0.008, -0.002)),
     ]),
     // Colours of designer switch ranges, in brushed metal or matte lacquer.
     catalogue: {
@@ -429,9 +444,9 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
       surfaceFirst: true,
       outline: [
         [
-          0.098, 0.046, 0.838, 0.046, 0.86, 0.053, 0.886, 0.076, 0.889, 0.497, 0.883, 0.585, 0.889,
-          0.615, 0.889, 0.825, 0.883, 0.903, 0.873, 0.914, 0.857, 0.927, 0.844, 0.931, 0.191, 0.934,
-          0.076, 0.927, 0.053, 0.907, 0.05, 0.093, 0.053, 0.073, 0.072, 0.053,
+          0.121, 0.053, 0.86, 0.053, 0.883, 0.059, 0.908, 0.083, 0.912, 0.503, 0.905, 0.592, 0.912,
+          0.622, 0.912, 0.832, 0.905, 0.91, 0.895, 0.92, 0.879, 0.934, 0.867, 0.937, 0.214, 0.941,
+          0.098, 0.934, 0.076, 0.914, 0.072, 0.1, 0.076, 0.08, 0.095, 0.059,
         ],
       ],
     },
@@ -525,7 +540,7 @@ export function materialSamples(style: MaterialStyle): MaterialSample[] {
  * never look alike while each keeps the direction of its colour as far as the catalogue allows.
  * The same references get the same samples in any order and letter case, and a repeated reference
  * keeps its sample. Its neighbours take part in the choice, so in another collection a reference
- * may get another sample; an individual fragment therefore takes its sample from the whole card.
+ * may get another sample.
  */
 export function chooseMaterialSamples(
   style: MaterialStyle,

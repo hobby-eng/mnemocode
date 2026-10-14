@@ -1,3 +1,4 @@
+import { MENU_ENTRY_NAMES } from "../src/cli/menu-entries.js";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -59,15 +60,16 @@ describe("instructions for heirs", () => {
     });
     expect(text.needs[0]).toContain("Any 3 of the 5 Shamir shares");
     expect(text.needs[0]).toContain("tuna next keep gyro");
-    // Shares written as ur:sskr are printed on cards as their words, and named both ways
-    // (AUD-010-DOC004).
+    // The current card policy offers Unicode and color forms only. A UR stays a UR and the
+    // guide must not promise the older Bytewords card conversion (AUD-010-DOC004).
     const ur = heirSheetText({
       backup: { kind: "shares", format: "ur", threshold: 3, count: 5 },
       mode: "direct",
       dates: 0,
     });
     expect(ur.needs[0]).toContain("codes that start with ur:sskr/");
-    expect(ur.needs[0]).toContain("words such as tuna next keep gyro on printed cards");
+    expect(ur.needs[0]).not.toContain("printed cards");
+    expect(ur.needs[0]).not.toContain("words such as");
     expect(text.needs[1]).toContain("The owner's 2 secret dates (see the back)");
     expect(text.steps).toContain(
       'Type any 3 shares, separated by ";", then the secret dates as day-month-year (23-09-2026). MnemoCode shows the seed phrase.',
@@ -166,7 +168,9 @@ describe("instructions for heirs", () => {
     expect(text.basics).toEqual(heirSheetText(facts).basics);
     // Without a search for a date digit, the advice offers none.
     expect(text.trouble).not.toContain("digit");
-    expect(heirSheetText(facts).trouble).toContain("menu entry 5 tries every possibility");
+    expect(heirSheetText(facts).trouble).toContain(
+      `menu entry ${MENU_ENTRY_NAMES.recover.digit} tries every possibility`,
+    );
     // A route that prints another address as well makes no sheet.
     const elsewhere = new HeirInstructions({
       ...route,

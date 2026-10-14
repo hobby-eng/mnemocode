@@ -83,6 +83,20 @@ export function checkCandidateListStartup(): void {
     "An oversized candidate list",
   );
   const records = THREE_PHRASES_ENTROPY.map((entropy) => ({ entropy: bytesOfHex(entropy) }));
+  // One above the unsigned byte range: neither a wide value nor its changed prototype may
+  // silently become all-zero entropy through Uint8Array's copy constructor.
+  const wider = new Uint16Array(records[0]!.entropy.length).fill(256);
+  for (const [prototype, label] of [
+    [Uint16Array.prototype, "Non-byte candidate entropy"],
+    [Uint8Array.prototype, "Non-byte candidate entropy with a byte-array prototype"],
+  ] as const) {
+    Object.setPrototypeOf(wider, prototype);
+    expectRefused(
+      () => encodeCandidateList({ records: [{ entropy: wider as unknown as Uint8Array }] }),
+      /one length/u,
+      label,
+    );
+  }
   expectSame(hexOfBytes(encodeCandidateList({ records })), THREE_PHRASES_LIST, "Candidate list");
   const list = decodeCandidateList(bytesOfHex(THREE_PHRASES_LIST));
   expectSame(list.passphrase, undefined, "Candidate list passphrase");

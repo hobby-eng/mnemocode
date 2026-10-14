@@ -2,6 +2,8 @@ import { materialSheetShape, renderMaterialCard } from "./material-cards.js";
 import type { CardKind } from "../core/types.js";
 import type { BusinessStyle } from "./card-settings.js";
 import {
+  assertSeparateCards,
+  drawsSeparateCards,
   resolveTemplateId,
   TEMPLATE_CATALOG,
   type CardFamily,
@@ -79,30 +81,25 @@ const businessNames: Record<BusinessStyle, string> = {
 
 /**
  * Draws `content` in the design `entry` of the catalog with its family's renderer: the whole
- * document, or the separate card `fragment`, counted from 0. `businessOffset` starts the mixed
- * business style at another of its designs, as the QR cards of shares do by member; the other
- * families have no such choice. The templates below and the share cards (sskr-render.ts) both
- * draw through it, so that a design is drawn the same way from either.
+ * document, or the separate card `fragment`, counted from 0, where the design has separate cards
+ * (assertSeparateCards). `businessOffset` starts the mixed business style at another of its
+ * designs, as the QR cards of shares do by member; the other families have no such choice. The
+ * templates below and the share cards (sskr-render.ts) both draw through it, so that a design is
+ * drawn the same way from either.
  */
-export function renderCatalogDesign(
+export async function renderCatalogDesign(
   entry: CatalogEntry,
   drawing: CardDrawing,
   content: ColorCards,
   fragment?: number,
   businessOffset = 0,
 ): Promise<Uint8Array> {
+  if (fragment !== undefined) assertSeparateCards(entry);
   switch (entry.family) {
     case "business":
       return renderBusinessCards(drawing, entry.style, content, fragment, businessOffset);
     case "material":
-      // The key is left out for a whole document: a host compiled with
-      // exactOptionalPropertyTypes refuses an optional property given as undefined.
-      return renderMaterialCard(
-        drawing,
-        entry.style,
-        content,
-        fragment === undefined ? {} : { individualIndex: fragment },
-      );
+      return renderMaterialCard(drawing, entry.style, content);
   }
 }
 
@@ -137,8 +134,7 @@ function wordsOf(entry: CatalogEntry): Pick<CardTemplate, "name" | "description"
     case "material":
       return {
         name: `${capitalized(entry.style)} finish selection`,
-        description:
-          "Photographic material samples with finish names and exact references; optional collection QR. All page sizes and individual fragments.",
+        description: `Photographic material samples with finish names and exact references; optional collection QR. ${SHEET_SIZES_TEXT} sheets.`,
       };
   }
 }
@@ -153,8 +149,13 @@ function templateOf(entry: CatalogEntry): CardTemplate {
     family,
     ...wordsOf(entry),
     render: (drawing, content) => renderCatalogDesign(entry, drawing, content),
-    renderIndividual: (drawing, content, index) =>
-      renderCatalogDesign(entry, drawing, content, index),
+    // Only a design with separate cards has them (drawsSeparateCards).
+    ...(drawsSeparateCards(entry)
+      ? {
+          renderIndividual: (drawing: CardDrawing, content: CardContent, index: number) =>
+            renderCatalogDesign(entry, drawing, content, index),
+        }
+      : {}),
     sheetShape: (drawing, content, pageSize) =>
       catalogSheetShape(entry, drawing, content, pageSize),
   };

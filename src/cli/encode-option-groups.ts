@@ -42,3 +42,11 @@ export const ENCODE_SSKR_ONLY_OPTIONS = Object.freeze([
   "share-format",
   "card-layout",
 ] as const);
+
+/** Every option of Encode: the three groups, and --sskr, which chooses between its modes. */
+export const ENCODE_OPTIONS = Object.freeze([
+  ...ENCODE_SHARED_OPTIONS,
+  ...ENCODE_PLAIN_ONLY_OPTIONS,
+  ...ENCODE_SSKR_ONLY_OPTIONS,
+  "sskr",
+] as const);

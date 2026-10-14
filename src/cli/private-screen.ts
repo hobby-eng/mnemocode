@@ -5,9 +5,11 @@
 // the person can check them (input.ts, askSecretUntil). A script or a pipe on standard input gets
 // none of this, and output sent to a file or a pipe is written there as before.
 
-import { rowsOf, waitForEnter } from "./terminal-choice.js";
+import { ANSWER_LABEL_WIDTH, rowsOf, waitForEnter } from "./terminal-choice.js";
 import { terminalAvailable } from "./terminal-input.js";
 import { CLEAR_SCREEN, ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN } from "./terminal.js";
+import { factLine } from "./terminal-style.js";
+import { protectionSummary } from "./protection.js";
 import { CANCELLED_EXIT_CODE } from "./exit-codes.js";
 
 /** What the private screen asks before it is cleared, after a blank line. */
@@ -38,6 +40,17 @@ let active = false;
 /** Whether the private screen is shown now, so that a secret typed there may be shown too. */
 export function onPrivateScreen(): boolean {
   return active;
+}
+
+/**
+ * Shows on the private screen what protects this process now (protectionSummary): first when the
+ * screen opens, and again once a command has given up rights after its questions.
+ */
+export function showProtection(): void {
+  if (!active) return;
+  console.error(
+    `${factLine(process.stderr, "Protection", protectionSummary(), ANSWER_LABEL_WIDTH)}\n`,
+  );
 }
 
 /**

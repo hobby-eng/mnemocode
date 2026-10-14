@@ -40,53 +40,54 @@ const fixedIdentity = {
 };
 
 describe("export infrastructure", () => {
-  it("ships thirteen approved templates with individual export", () => {
+  it("ships thirteen approved templates, separate cards in the business card designs only", () => {
     expect(cardTemplates).toHaveLength(13);
     expect(new Set(cardTemplates.map((t) => t.id)).size).toBe(13);
-    for (const template of cardTemplates) expect(template.renderIndividual).toBeTypeOf("function");
+    // A material design is printed on sheets only (drawsSeparateCards).
+    for (const template of cardTemplates)
+      expect(typeof template.renderIndividual, template.id).toBe(
+        template.family === "business" ? "function" : "undefined",
+      );
   });
 
-  it.each([
-    "material-vehicle",
-    "material-enclosure",
-    "material-tile",
-    "material-switch",
-    "material-kitchen",
-  ])("keeps an enabled collection QR off the individual %s front", async (id) => {
-    const template = selectTemplate(id);
-    for (const pageSize of [undefined, "business"] as const) {
-      const withQr = await PDFDocument.load(
-        await template.renderIndividual!(
-          nodeCardRenderer,
-          {
-            kind: "colors",
-            colors: fragmentColors,
-            payload: fragmentColors.join(" "),
-            cardQr: true,
-            pageSize,
-            ...fixedIdentity,
-          },
-          0,
-        ),
-      );
-      const withoutQr = await PDFDocument.load(
-        await template.renderIndividual!(
-          nodeCardRenderer,
-          {
-            kind: "colors",
-            colors: fragmentColors,
-            payload: fragmentColors.join(" "),
-            cardQr: false,
-            pageSize,
-            ...fixedIdentity,
-          },
-          0,
-        ),
-      );
-      expect(withQr.getPageCount()).toBe(1);
-      expect(pageOperators(withQr, 0)).toBe(pageOperators(withoutQr, 0));
-    }
-  });
+  it.each(["business-it", "business-curves", "business-mixed"])(
+    "keeps an enabled collection QR off a separate %s card",
+    async (id) => {
+      const template = selectTemplate(id);
+      for (const pageSize of [undefined, "business"] as const) {
+        const withQr = await PDFDocument.load(
+          await template.renderIndividual!(
+            nodeCardRenderer,
+            {
+              kind: "colors",
+              colors: fragmentColors,
+              payload: fragmentColors.join(" "),
+              cardQr: true,
+              pageSize,
+              ...fixedIdentity,
+            },
+            0,
+          ),
+        );
+        const withoutQr = await PDFDocument.load(
+          await template.renderIndividual!(
+            nodeCardRenderer,
+            {
+              kind: "colors",
+              colors: fragmentColors,
+              payload: fragmentColors.join(" "),
+              cardQr: false,
+              pageSize,
+              ...fixedIdentity,
+            },
+            0,
+          ),
+        );
+        expect(withQr.getPageCount()).toBe(1);
+        expect(pageOperators(withQr, 0)).toBe(pageOperators(withoutQr, 0));
+      }
+    },
+  );
 
   it("preserves page content and removes private metadata in preview and saved PDFs", async () => {
     const bytes = await fixture();

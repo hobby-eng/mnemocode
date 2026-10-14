@@ -19,9 +19,10 @@
 //   answer error, such as no result or a file that could not be saved; Escape picks the last
 //   choice, which must be the one that stops or changes nothing.
 // - askWalletEvidence({ optional, explanation, place }): the wallet's master fingerprint, or one
-//   of its first receiving addresses, of Bitcoin or another coin, each checked at once as
-//   core/wallet-evidence.ts checks it, or "It cannot" where the mode can list candidates without
-//   the wallet. How many addresses it is compared with is asked after it (Enter: 20), unless
+//   of its first receiving addresses, of any coin, chosen from one list as mhfe asks it, each
+//   checked at once as core/wallet-evidence.ts checks it, or "It cannot" where the mode can list
+//   candidates without the wallet. How many addresses it is compared with is asked after it
+//   (Enter: 20), unless
 //   --scan-gap said it. `place` is walletPlaceOf(the evidence given with the options,
 //   --scan-gap): another wallet is looked for on its network and at its place. Without such
 //   evidence, assertWalletPlaceUsed(args, evidence) refuses --network, --account, --branch,
@@ -287,7 +288,7 @@ export async function askValueUntil<T>(
 export async function askAfterFailure<T>(
   question: string,
   choices: readonly Choice<T>[],
-  options: { readonly label?: string; readonly escape?: string } = {},
+  options: AfterFailureOptions & { readonly escape?: string } = {},
 ): Promise<T> {
   const last = choices.at(-1);
   if (last === undefined) throw new Error("A question after a failure needs a choice.");
@@ -295,8 +296,17 @@ export async function askAfterFailure<T>(
   const chosen = await choose(question, choices, {
     label: options.label ?? "Next",
     quit: options.escape ?? "stops",
+    ...(options.explanation === undefined ? {} : { explanation: options.explanation }),
   });
   return chosen === undefined ? last.value : chosen;
+}
+
+/** What a question after a failure may show besides its choices. */
+export interface AfterFailureOptions {
+  /** Its line in the record of answers; "Next" by default. */
+  readonly label?: string;
+  /** Text shown with the question, such as why the question is asked. */
+  readonly explanation?: Explanation;
 }
 
 /** The question after a failure, where nothing more particular is asked; others end with it. */
@@ -313,7 +323,7 @@ const STOPPED = "stop";
 export async function askOrCancel<T>(
   question: string,
   choices: readonly Choice<T>[],
-  options?: { readonly label?: string; readonly back?: false },
+  options?: AfterFailureOptions & { readonly back?: false },
 ): Promise<T>;
 export async function askOrCancel<T>(
   question: string,
@@ -323,7 +333,7 @@ export async function askOrCancel<T>(
 export async function askOrCancel<T>(
   question: string,
   choices: readonly Choice<T>[],
-  options: { readonly label?: string; readonly back?: boolean } = {},
+  options: AfterFailureOptions & { readonly back?: boolean } = {},
 ): Promise<T | undefined> {
   if (choices.some((choice) => choice.value === STOPPED))
     throw new Error(`An answer of a question with Stop has the value "${STOPPED}".`);
@@ -331,11 +341,10 @@ export async function askOrCancel<T>(
   const chosen =
     options.back === true
       ? await chooseOrBack(question, all, options.label)
-      : await askAfterFailure(
-          question,
-          all,
-          options.label === undefined ? {} : { label: options.label },
-        );
+      : await askAfterFailure(question, all, {
+          ...(options.label === undefined ? {} : { label: options.label }),
+          ...(options.explanation === undefined ? {} : { explanation: options.explanation }),
+        });
   if (chosen === STOPPED) throw new InputCancelled();
   return chosen as T | undefined;
 }
@@ -434,15 +443,8 @@ function addressWords(location: AddressLocation, addresses: number | undefined):
   };
 }
 
-/** How a Bitcoin address on `network` may begin. */
-function bitcoinAddressForms(network: DerivationLocation["network"]): string {
-  return network === "mainnet"
-    ? "1..., 3..., bc1q... or bc1p..."
-    : "m..., n..., 2..., tb1q... or tb1p...";
-}
-
 /** A way of recognising a wallet, as the wallet question offers it. */
-export type WalletWay = "fingerprint" | "address" | "coin" | "none";
+export type WalletWay = "fingerprint" | "address" | "none";
 
 /** What a value is asked with: its prompt, and what to type, said after an empty answer. */
 export interface AskedValue {
@@ -457,7 +459,8 @@ export interface AskedValue {
  */
 class WalletQuestionWords {
   static readonly QUESTION = "How can MnemoCode recognise the wallet?";
-  static readonly COIN_QUESTION = "Which coin?";
+  // As mhfe asks it (src/bin/mhfe/check.rs), every coin in the same list (owner, 2026-10-13).
+  static readonly COIN_QUESTION = "Which coin is the address for?";
   static readonly FINGERPRINT: AskedValue = Object.freeze({
     prompt: "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)",
     what: "the eight characters of the fingerprint",
@@ -482,13 +485,7 @@ class WalletQuestionWords {
         note: "Encode's Original, not the Encoded",
         value: "fingerprint",
       },
-      {
-        label: "Bitcoin address",
-        note: this.#words.note,
-        example: bitcoinAddressForms(this.#location.network),
-        value: "address",
-      },
-      { label: "Address of another coin", note: OTHER_COINS_NOTE, value: "coin" },
+      { label: "Address", note: this.#words.note, example: COINS_NOTE, value: "address" },
       ...(optional
         ? [{ label: "It cannot", note: "list every candidate instead", value: "none" } as const]
         : []),
@@ -499,9 +496,16 @@ class WalletQuestionWords {
     return { prompt: `Bitcoin address (${this.#words.prompt})`, what: this.#words.what };
   }
 
-  /** The coins besides Bitcoin, for "Which coin?". */
-  static coins(): Choice<Coin>[] {
-    return OTHER_COINS.map((coin) => ({ label: coin.name, note: coin.addressForms, value: coin }));
+  /**
+   * Every coin, for the question which coin the address is for, with the forms of its addresses
+   * on the network of the place.
+   */
+  coins(): Choice<Coin>[] {
+    return COINS.map((coin) => ({
+      label: coin.name,
+      note: coin.addressFormsOn(this.#location.network === "testnet"),
+      value: coin,
+    }));
   }
 
   coinAddress(coin: Coin): AskedValue {
@@ -582,8 +586,9 @@ const SCREEN_ASKER: WalletValueAsker = {
 };
 
 /**
- * Asks how the wallet can be recognised: by its BIP32 master fingerprint, by the first receiving
- * address of its Bitcoin account (or the address at `place`), or, when `optional`, not at all. A
+ * Asks how the wallet can be recognised: by its BIP32 master fingerprint, by one of its first
+ * receiving addresses (or the address at `place`) of any coin, which is asked next, or, when
+ * `optional`, not at all. A
  * value that no wallet can have is refused at once and asked again; going back from a value goes
  * back to the list, or leaves the question where `asker` says so. The private screen and the menu
  * both ask it, each with its own asker.
@@ -593,7 +598,7 @@ export async function askWalletEvidence(
   asker: WalletValueAsker = SCREEN_ASKER,
 ): Promise<WalletAnswer> {
   const place = question.place ?? FIRST_RECEIVING;
-  const { location, profiles } = place;
+  const { location } = place;
   const words = new WalletQuestionWords(place);
   for (;;) {
     const kind = await choose(WalletQuestionWords.QUESTION, words.ways(question.optional), {
@@ -612,46 +617,44 @@ export async function askWalletEvidence(
               network: location.network,
             }),
           )
-        : kind === "coin"
-          ? await askCoinAddress(location, words, asker)
-          : await asker.ask(
-              { ...words.bitcoinAddress, label: "Address" },
-              (answer): WalletEvidence => ({
-                kind: "address",
-                value: parseBitcoinAddress(answer, location.network),
-                profiles,
-                location,
-              }),
-            );
+        : await askAddress(place, words, asker);
     const evidence = await withAddressCount(typed, place, asker);
     if (evidence !== undefined) return { kind: "wallet", evidence };
     if (asker.backLeaves) return { kind: "back" };
   }
 }
 
-/** The coins besides Bitcoin, which has its own entry in the wallet question. */
-export const OTHER_COINS = COINS.filter((coin) => coin.id !== "bitcoin");
-/** How many coins a person can pick from, below "Address of another coin" in a list of ways. */
+/** How many coins the note of the way "Address" names before it counts the others. */
 const NAMED_COINS = 3;
-/** The note of "Address of another coin": the first coins by name, and how many more. */
-export const OTHER_COINS_NOTE = `${OTHER_COINS.slice(0, NAMED_COINS)
+/** The coins of the way "Address": the first by name, and how many more. */
+const COINS_NOTE = `${COINS.slice(0, NAMED_COINS)
   .map((coin) => coin.name)
-  .join(", ")} and ${OTHER_COINS.length - NAMED_COINS} more`;
+  .join(", ")} and ${COINS.length - NAMED_COINS} more coins`;
 
 /**
- * Asks which coin, then its address at `location` or in `range`, until it is one of that coin;
- * undefined when the person goes back (Escape), to the wallet question.
+ * Asks which coin the address is for, every coin in one list, then its address at the place:
+ * Bitcoin's in the profiles of the place, another coin's at its account, branch and index; each
+ * asked until it is one of that coin. Undefined when the person goes back (Escape), to the wallet
+ * question.
  */
-async function askCoinAddress(
-  location: DerivationLocation,
+async function askAddress(
+  place: WalletPlace,
   words: WalletQuestionWords,
   asker: WalletValueAsker,
 ): Promise<WalletEvidence | undefined> {
-  const coin = await choose(WalletQuestionWords.COIN_QUESTION, WalletQuestionWords.coins(), {
+  const coin = await choose(WalletQuestionWords.COIN_QUESTION, words.coins(), {
     label: "Coin",
     quit: "goes back",
   });
   if (coin === undefined) return undefined;
+  const { location, profiles } = place;
+  if (coin.id === "bitcoin")
+    return asker.ask({ ...words.bitcoinAddress, label: "Address" }, (answer): WalletEvidence => ({
+      kind: "address",
+      value: parseBitcoinAddress(answer, location.network),
+      profiles,
+      location,
+    }));
   const { account, branch, index } = location;
   return asker.ask({ ...words.coinAddress(coin), label: "Address" }, (answer): WalletEvidence => ({
     kind: "coin-address",

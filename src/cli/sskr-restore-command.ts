@@ -35,14 +35,8 @@ import {
   type ParsedArguments,
   assertAskedNotGiven,
 } from "./arguments.js";
-import {
-  encodedOutputLabel,
-  dates,
-  readBoundedTextFile,
-  textInput,
-  transformMode,
-  DATES_OPTION,
-} from "./input.js";
+import { encodedOutputLabel, dates, textInput, transformMode, DATES_OPTION } from "./input.js";
+import { readBoundedTextFile } from "./text-file.js";
 import { DatesAnswer, MAX_SHOWN_MATCHES } from "../core/date-search.js";
 import { DATE_COUNT_WORDS, Masking, PHRASE_WORDS, type SplitMode } from "../core/masking.js";
 import { masterFingerprint, walletCheckOf, type WalletEvidence } from "../bitcoin-evidence.js";

@@ -1,9 +1,10 @@
 // The known answers of SSKR that a self-test compares with: the official BCR-2020-011 grouped
-// vector, its shares written as colours, and the secret they restore. A host checks its own SSKR
-// library with them before it trusts it with a secret.
+// vector, its shares written as colours, and the secret they restore; and a set of the longest
+// secret, 32 bytes, that scripts/verify-sskr-known-answers.py restores without the library. A
+// host checks its own SSKR library with them before it trusts it with a secret.
 //
 // From the host it needs only its SharePlatform (share-platform.ts), whose combineShares restores
-// the vector and whose createShares reproduces a deterministic test set. All data is public.
+// the vectors and whose createShares reproduces a deterministic test set. All data is public.
 //
 // Host-neutral: it imports only other host-neutral sskr modules (test/portable-modules.test.ts).
 
@@ -81,6 +82,21 @@ export const sskrSetVector = {
   phrase: "abandon amount liar amount expire adjust cage candy arch gather drum buyer",
 } as const;
 
+/**
+ * The longest secret, 32 bytes for a 24-word phrase (AUD-020): the first two shares of the set of
+ * one group, two of three shares needed (vectors/sskr-v1.json, "bip39-256-2-of-3"), written by the
+ * pinned SSKR library from the entropy 000102…1f. That every two of its shares restore it was
+ * checked without that library by scripts/verify-sskr-known-answers.py, which first restores the
+ * official vector above.
+ */
+export const sskrLongVector = {
+  entropy: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  shares: [
+    "ur:sskr/hddaemjzaeadaebdfpwmtntkwlptsskispvwbkbwjnamsttssnpmhpfghdaonbcnfmjkrnltdnlarkmsrefllt",
+    "ur:sskr/hddaemjzaeadadtkaekkfmspcheycndschfhcmkelyvavefzfewezsvemdptaemestiazccybzjsveasreislp",
+  ],
+} as const;
+
 /** Transport and quorum refusals before every command; no engine, randomness or host is used. */
 export function checkSskrTransportStartup(): void {
   expectSame(
@@ -134,6 +150,22 @@ function changedShareValue(): string {
   }
 }
 
+/** The host's restoring of `shares` compared with `entropy`; `name` names the check. */
+async function expectRestored(
+  platform: SharePlatform,
+  shares: readonly string[],
+  entropy: string,
+  name: string,
+): Promise<void> {
+  const restored = await platform.combineShares(shares);
+  try {
+    if (hexOfBytes(restored) !== entropy)
+      throw new Error(`${name} self-test failed. No secret was processed.`);
+  } finally {
+    restored.fill(0);
+  }
+}
+
 /**
  * Compares the colour transport and the host's SSKR library with the known answers; throws, before
  * any secret is touched, at the first difference.
@@ -150,13 +182,13 @@ export async function checkSskrKnownAnswers(platform: SharePlatform): Promise<vo
     if (colorsToShare(shareToColors(share).join("")) !== normalizeShare(share))
       throw new Error("SSKR color self-test failed. No secret was processed.");
   }
-  const restored = await platform.combineShares(sskrVector.shares);
-  try {
-    if (hexOfBytes(restored) !== sskrVector.entropy)
-      throw new Error("SSKR recovery self-test failed. No secret was processed.");
-  } finally {
-    restored.fill(0);
-  }
+  await expectRestored(platform, sskrVector.shares, sskrVector.entropy, "SSKR recovery");
+  await expectRestored(
+    platform,
+    sskrLongVector.shares,
+    sskrLongVector.entropy,
+    "SSKR 32-byte recovery",
+  );
   const secret = bytesOfHex(sskrSetVector.entropy);
   const seed = bytesOfHex(sskrSetVector.testOnlySeed);
   try {

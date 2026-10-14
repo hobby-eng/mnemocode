@@ -35,7 +35,7 @@ const LAYOUTS: Readonly<Record<ShareCardPackaging, string>> = Object.freeze({
  * What the shares of a Seedshift split restore, in MnemoCode's words (PHRASE_WORDS): only the
  * decoy, so such shares are never called enough for recovery without the dates.
  */
-const MASKED_GOAL = `to restore ${PHRASE_WORDS.masked}, which only the same dates turn back into ${PHRASE_WORDS.original}`;
+const MASKED_GOAL = `to restore ${PHRASE_WORDS.masked}, which the owner's dates turn back into ${PHRASE_WORDS.original}`;
 
 /**
  * How many of `records`, UR records of one set, restore the phrase: read from the shares, whose

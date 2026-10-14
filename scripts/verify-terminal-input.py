@@ -25,6 +25,10 @@ It checks that
   it;
 - a seed phrase pasted one word per line is one answer (Encode with dates), and the backup typed
   again with its date passes the check that Encode offers;
+- Re-encode makes a backup made before again: typed with its date, its phrase is shown and
+  confirmed by the fingerprint of the wallet, and only then the new backup is asked; for a backup
+  of the Original Seedshift with a valid last word, a wrong date leaves no phrase that ends with
+  the last word, and the dates are typed again, keeping the codes;
 - Decode asks again after an empty answer and after a mistyped date, keeping the codes, and finds
   a date with ? by the fingerprint of the test phrase;
 - Restore from Shamir shares asks again after Ctrl+D on an empty line, takes two shares pasted
@@ -65,6 +69,14 @@ WRONG_LAST = " ".join(["1"] * 11 + ["5"])
 # The public date of the README examples, and the test phrase masked with it as word numbers.
 MASK_DATE = "23-09-2026"
 MASKED_WORD_NUMBERS = "2027 10 24 2027 10 24 2027 10 24 2027 10 377"
+# The test phrase masked with the same date by the Original Seedshift with a valid last word,
+# which keeps nothing of its last word, made with
+#   mnemocode encode --mode seedshift-legacy --legacy-valid-last-word \
+#     --mnemonic "abandon ... about" --dates 23-09-2026 --format 2
+# With the date one day later, no phrase that it gives ends with that last word.
+LEGACY_VALID_WORD_NUMBERS = "2027 10 24 2027 10 24 2027 10 24 2027 10 23"
+LAST_WORD = "about"
+NEXT_DAY = "24-09-2026"
 # The same date with a forgotten last digit of the year, and with a two-digit year.
 FORGOTTEN_DIGIT = "23-09-202?"
 MISTYPED_DATE = "23-09-26"
@@ -106,8 +118,14 @@ BACKSPACE, CTRL_U, CTRL_C, CTRL_D = "\x7f", "\x15", "\x03", "\x04"
 ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN = "\x1b[?1049h", "\x1b[?1049l"
 
 MENU_SHOWN = "Esc quits"
-ENCODE_ENTRY, DECODE_ENTRY, RESTORE_ENTRY = "1", "2", "4"
+# The entries of the menu, by the digits that choose them (src/cli/menu-entries.ts).
+ENCODE_ENTRY, RE_ENCODE_ENTRY, DECODE_ENTRY, RESTORE_ENTRY = "1", "2", "3", "5"
+RECOVER_ENTRY, TABLE_ENTRY = "6", "8"
+# The test phrase without Seedshift as Unicode codes, written joined.
+JOINED_UNICODE = "7684" * 11 + "5728"
 HIDDEN_RECORD = "Encoded seed phrase or record: "
+# The warning that comes with a fingerprint's match (FINGERPRINT_WARNING, src/core/wallet-check.ts).
+FINGERPRINT_FILTER = "A master fingerprint is only 32 bits and is a filter, not proof of recovery."
 # The questions below are looked for without the space after them: the pseudo-console of Windows
 # need not draw a space at the end of a line before something follows it.
 SEED_PHRASE = "Seed phrase (English BIP39 words):"
@@ -284,8 +302,8 @@ CONTROL_SEQUENCE = re.compile(r"\x1b\[([0-9;?]*)([@-~])")
 class Screen:
     """The rows that a terminal `columns` wide shows after `text`, for what the menu draws: text,
     which waits at the right edge before it wraps, carriage return, line feed, and the sequences
-    for cursor up, cursor down, cursor right and erase to the end of the screen. Rows never scroll away. Any
-    other escape sequence fails the check."""
+    for cursor up, cursor down, cursor right and erase to the end of the screen. Rows never scroll
+    away. Any other escape sequence fails the check."""
 
     def __init__(self, columns, text):
         self.columns = columns
@@ -391,8 +409,8 @@ def assert_kept_private(session, secrets):
 def at_hidden_record_prompt(session):
     """Chooses Decode with the arrow keys, typed input and no dates, up to the hidden prompt."""
     session.wait_for(MENU_SHOWN)
-    # Ctrl+Up must not count as the digit 5; Down, Up, Down, Enter end on entry 2, Decode.
-    session.type(CTRL_UP + DOWN + UP + DOWN + ENTER)
+    # Ctrl+Up must not count as the digit 5; Down, Up, Down, Down, Enter end on entry 3, Decode.
+    session.type(CTRL_UP + DOWN + UP + DOWN + DOWN + ENTER)
     session.wait_for("Where is the encoded seed phrase?")
     session.type("1")
     # All the codes typed: no decoys to leave out.
@@ -445,7 +463,7 @@ def check_back_from_entry():
     try:
         session.wait_for(MENU_SHOWN)
         # Look up, a word: a typed question, left with Escape after a few letters.
-        session.type("7")
+        session.type(TABLE_ENTRY)
         session.wait_for("What do you want to look up?")
         session.type("1")
         session.wait_for("Word: ")
@@ -483,7 +501,7 @@ def check_word_hints():
     session = Session()
     try:
         session.wait_for(MENU_SHOWN)
-        session.type("7")
+        session.type(TABLE_ENTRY)
         session.wait_for("What do you want to look up?")
         session.type("1")
         session.wait_for("Word: ")
@@ -542,7 +560,7 @@ def check_marked_codes_entry():
     session = Session()
     try:
         session.wait_for(MENU_SHOWN)
-        session.type("5")
+        session.type(RECOVER_ENTRY)
         session.wait_for("What is forgotten?")
         session.type("2")
         session.wait_for("How many words does the seed phrase have?")
@@ -559,7 +577,7 @@ def check_marked_codes_entry():
         assert code == 0, f"Escape after the codes gave exit code {code}"
     finally:
         session.close()
-    print("entry 5: a code of an encoded seed phrase, typed with ?, is searched by decode")
+    print("recover entry: a code of an encoded seed phrase, typed with ?, is searched by decode")
 
 
 def check_long_line():
@@ -620,6 +638,205 @@ def check_lines_pasted_as_one_answer():
     finally:
         session.close()
     print("encode in the menu: a phrase pasted one word per line is one answer, backup checked")
+
+
+def at_re_encode_confirmation(session):
+    """Chooses Re-encode in the menu shown and types the old backup, as Decode asks for it: typed,
+    every code read, MnemoCode Seedshift; then its dates, up to the question whether the phrase
+    shown is the one to re-encode."""
+    session.type(RE_ENCODE_ENTRY)
+    session.wait_for("Where is the encoded seed phrase?")
+    session.type("1")
+    session.wait_for("How many words does the seed phrase have?")
+    session.type("1")
+    session.wait_for("Was Seedshift used when it was encoded?")
+    session.type("2")
+    session.wait_for(HIDDEN_RECORD)
+    session.type(MASKED_WORD_NUMBERS + ENTER)
+    session.wait_for("Dates (")
+    session.type(MASK_DATE + ENTER)
+    session.wait_for(TEST_PHRASE)
+    session.wait_for("Is this the seed phrase to re-encode?")
+
+
+def check_re_encode_menu():
+    session = Session()
+    try:
+        session.wait_for(MENU_SHOWN)
+        # The old backup, then the phrase, re-encoded once the wallet confirms it.
+        at_re_encode_confirmation(session)
+        session.type("2")
+        answer_fingerprint(session)
+        # A fingerprint is only a filter: its warning comes with the match (AUD-020-SEC001).
+        session.wait_for(FINGERPRINT_FILTER)
+        session.wait_for("The fingerprint matches: the seed phrase is accepted, not proven.")
+        # Only then the new backup, with Encode's questions, under the lines of the confirmation:
+        # Unicode codes without Seedshift, on the screen.
+        session.wait_for("New backup")
+        session.wait_for(FINGERPRINT_FILTER)
+        session.wait_for("The fingerprint matches: the seed phrase is accepted, not proven.")
+        session.wait_for("Which form should the seed phrase take?")
+        session.type("2")
+        session.wait_for("Use Seedshift?")
+        session.type("2")
+        session.wait_for("Split it into Shamir shares?")
+        session.type("1")
+        session.wait_for("Where should the result go?")
+        session.type("1")
+        session.wait_for("Instructions for your heirs?")
+        session.type("1")
+        session.wait_for(JOINED_UNICODE)
+        session.wait_for("Check the backup now?")
+        session.type("2")
+        session.wait_for("The old backup still restores the same wallet")
+        session.wait_for(CLEAR_PROMPT)
+        assert "Error" not in session.output and "mnemocode:" not in session.output, session.output
+        session.type(ENTER)
+        session.wait_for(MENU_SHOWN)
+        session.type("q")
+        session.wait_for_exit()
+        assert_kept_private(session, (TEST_PHRASE, MASK_DATE, MASKED_WORD_NUMBERS, JOINED_UNICODE))
+    finally:
+        session.close()
+    print("re-encode in the menu: codes, dates, the phrase confirmed, then the new backup asked")
+
+
+# A company name that each answer takes (up to 100 characters) and that does not fit on share
+# cards of the IT design, which Encode refuses once every answer is given (AUD-022-UI001).
+LONG_COMPANY = "Northern Atlantic Consolidated Engineering and Logistics Holdings"
+
+
+def check_re_encode_answer_refused():
+    session = Session()
+    try:
+        session.wait_for(MENU_SHOWN)
+        at_re_encode_confirmation(session)
+        session.type("1")
+        # Shares in colors on A6 sheets of the IT design, with the long company name.
+        session.wait_for("Which form should the seed phrase take?")
+        session.type("3")
+        session.wait_for("Use Seedshift?")
+        session.type("2")
+        session.wait_for("Split it into Shamir shares?")
+        session.type("2")
+        session.wait_for("Where should the shares go?")
+        session.type("3")
+        session.wait_for("Which kind of file?")
+        session.type("1")
+        session.wait_for("How should the cards be laid out?")
+        session.type("1")
+        session.wait_for("How should the sheets be turned?")
+        session.type("1")
+        session.wait_for("PDF file name (Enter: mnemocode-share-cards.pdf):")
+        session.type(ENTER)
+        session.wait_for("Which card design?")
+        session.type("2")
+        session.wait_for("Add a QR code with the codes of the backup, without the extra cards?")
+        session.type("2")
+        session.wait_for("Type your own details for the cards?")
+        session.type("2")
+        session.wait_for("Name, in Latin letters (Enter: random):")
+        session.type(CARD_NAME + ENTER)
+        for detail in SHEET_DETAILS:
+            session.wait_for(f"{detail} (Enter: random):")
+            session.type((LONG_COMPANY if detail == "Company" else "") + ENTER)
+        session.wait_for("Also show the whole seed phrase?")
+        session.type("1")
+        session.wait_for("Instructions for your heirs?")
+        session.type("1")
+        # The refusal, then the same questions under the confirmed phrase: nothing is typed again.
+        session.wait_for("You recognised the seed phrase: it is confirmed.")
+        session.wait_for("Company is too long to fit legibly on the card")
+        session.wait_for("Which form should the seed phrase take?")
+        # Escape at the first question goes back to the phrase, and Stop to the menu.
+        session.type(ESCAPE)
+        session.wait_for("Is this the seed phrase to re-encode?")
+        session.type("5")
+        session.wait_for(MENU_SHOWN)
+        assert "mnemocode:" not in session.output, session.output
+        session.type("q")
+        session.wait_for_exit()
+        assert_kept_private(session, (TEST_PHRASE, MASK_DATE, MASKED_WORD_NUMBERS))
+    finally:
+        session.close()
+    print("re-encode in the menu: a refused new backup is asked again under the confirmed phrase")
+
+
+def check_re_encode_recognised():
+    # Typed as a command: --recognised answers the confirmation once the phrase was read.
+    session = Session(
+        ("re-encode", "--ask-secrets", "--recognised", "--mode", "direct", "--format", "3")
+    )
+    try:
+        session.wait_for(HIDDEN_RECORD)
+        session.type(MASKED_WORD_NUMBERS + ENTER)
+        # Without a header the codes do not say how they were made: MnemoCode Seedshift.
+        session.wait_for("Was Seedshift used when it was encoded?")
+        session.type("2")
+        session.wait_for("Dates (")
+        session.type(MASK_DATE + ENTER)
+        session.wait_for(TEST_PHRASE)
+        session.wait_for("Press Enter to make the new backup (Esc stops).")
+        session.type(ENTER)
+        session.wait_for(JOINED_UNICODE)
+        session.wait_for("Check the backup now?")
+        session.type("2")
+        session.wait_for(CLEAR_PROMPT)
+        session.type(ENTER)
+        code = session.wait_for_exit()
+        assert code == 0, f"re-encode --recognised gave exit code {code}"
+        assert_kept_private(session, (TEST_PHRASE, MASK_DATE, MASKED_WORD_NUMBERS, JOINED_UNICODE))
+    finally:
+        session.close()
+    print("re-encode --recognised: the phrase shown, Enter makes the new backup")
+
+
+def check_re_encode_last_word_after_wrong_date():
+    # Typed as a command, the new backup given by its options: Unicode codes without Seedshift.
+    session = Session(
+        (
+            "re-encode",
+            "--ask-secrets",
+            "--old-mode",
+            "seedshift-legacy-valid",
+            "--mode",
+            "direct",
+            "--format",
+            "3",
+        )
+    )
+    try:
+        session.wait_for(HIDDEN_RECORD)
+        session.type(LEGACY_VALID_WORD_NUMBERS + ENTER)
+        session.wait_for("Dates (")
+        session.type(NEXT_DAY + ENTER)
+        session.wait_for("Last word of the original seed phrase:")
+        session.type(LAST_WORD + ENTER)
+        # The wrong date gave other phrases: the dates are typed again, the codes kept.
+        session.wait_for("No seed phrase of this backup ends with that word")
+        asked = session.wait_for("What now?")
+        session.type("2")
+        session.wait_for("Dates (")
+        assert HIDDEN_RECORD not in session.output[asked : session.seen], "codes asked again"
+        session.type(MASK_DATE + ENTER)
+        session.wait_for("Last word of the original seed phrase:")
+        session.type(LAST_WORD + ENTER)
+        session.wait_for(TEST_PHRASE)
+        session.wait_for("Is this the seed phrase to re-encode?")
+        session.type("1")
+        session.wait_for(JOINED_UNICODE)
+        session.wait_for("Check the backup now?")
+        session.type("2")
+        session.wait_for(CLEAR_PROMPT)
+        session.type(ENTER)
+        code = session.wait_for_exit()
+        assert code == 0, f"re-encode after the dates typed again gave exit code {code}"
+        assert_kept_private(
+            session, (TEST_PHRASE, MASK_DATE, NEXT_DAY, LEGACY_VALID_WORD_NUMBERS, JOINED_UNICODE)
+        )
+    finally:
+        session.close()
+    print("re-encode with the last word: after a wrong date the dates are typed again, codes kept")
 
 
 def line_starting(session, start):
@@ -792,7 +1009,7 @@ def check_card_questions():
             session.wait_for("PDF file name (Enter: mnemocode-cards.pdf):")
             session.type(ENTER)
             design = first_design(session)
-            session.wait_for("Add a QR code with all the codes of the sheet?")
+            session.wait_for("Add a QR code with the codes of the backup, without the extra cards?")
             session.type("1")
             session.wait_for("Type your own details for the cards?")
             session.type("2")
@@ -912,6 +1129,10 @@ def main():
     check_share_word_hints()
     check_marked_codes_entry()
     check_lines_pasted_as_one_answer()
+    check_re_encode_menu()
+    check_re_encode_answer_refused()
+    check_re_encode_recognised()
+    check_re_encode_last_word_after_wrong_date()
     check_decode_dates_asked_again()
     check_restore_share_asked_again()
     check_ctrl_c()

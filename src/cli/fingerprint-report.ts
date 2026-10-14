@@ -7,7 +7,9 @@ import { PHRASE_WORDS } from "../core/masking.js";
 import { capitalized } from "../core/prose.js";
 import {
   FINGERPRINT_NOTE,
+  type Channel,
   terminalColor,
+  terminalLine,
   terminalFingerprint,
   terminalHint,
   terminalPart,
@@ -65,10 +67,14 @@ export function reportOriginalFingerprint(mnemonic: string): void {
  * fingerprint; where its BIP39 checksum fails, that instead (Decode and a restore from shares show
  * it so).
  */
-export function showOriginalPhrase(mnemonic: string, checksumValid = true): void {
-  terminalPart(capitalized(PHRASE_WORDS.original), true);
-  terminalPhrase(mnemonic);
-  console.log("");
+export function showOriginalPhrase(
+  mnemonic: string,
+  checksumValid = true,
+  channel: Channel = "stdout",
+): void {
+  terminalPart(capitalized(PHRASE_WORDS.original), true, channel);
+  terminalPhrase(mnemonic, channel);
+  terminalLine(channel, "");
   if (!checksumValid) {
     terminalStatus("BIP39 checksum", CHECKSUM_INVALID, false);
     return;
@@ -77,5 +83,6 @@ export function showOriginalPhrase(mnemonic: string, checksumValid = true): void
     PHRASE_WORDS.originalFingerprint,
     masterFingerprint(mnemonic),
     FINGERPRINT_NOTE,
+    channel,
   );
 }

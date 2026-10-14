@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import { PDFDocument, PDFPage } from "pdf-lib";
-import { collectionSheetLayout } from "../src/export/collection-sheet.js";
+import {
+  collectionSheetLayout,
+  MIN_SHEET_ROWS,
+  SHEET_PLAN_TEXT,
+} from "../src/export/collection-sheet.js";
 import { cardTemplates } from "../src/export/templates.js";
 import { indexesToColors } from "../src/core.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
@@ -39,6 +43,11 @@ function recordingQr(): { renderer: CardRenderer; payloads: string[]; matrices: 
 }
 
 describe("single-page design studies", () => {
+  it("tells a person the order of its preference in the words of its own rule", () => {
+    expect(MIN_SHEET_ROWS).toBe(3);
+    expect(SHEET_PLAN_TEXT).toBe("at least three rows, the largest cards");
+  });
+
   it.each(["business", "a6", "a4"] as const)(
     "reserves non-overlapping artwork, captions and a corner QR for every %s orientation and count",
     (pageSize) => {

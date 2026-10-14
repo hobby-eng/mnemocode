@@ -31,6 +31,16 @@ afterEach(() => {
 });
 
 describe("DatesAnswer", () => {
+  it("owns standalone recovery's incomplete-date rule without refusing complete decoding dates", () => {
+    const complete = dates("23-09-2026");
+    expect(complete.known).toEqual([parseDate("23-09-2026")]);
+    expect(complete.combinations).toBe(1);
+    expect(() => complete.assertIncomplete()).toThrow(
+      "At least one date must contain a forgotten digit represented by ?.",
+    );
+    for (const typed of ["2?-09-2026", "23-09-2026 2?-09-2026"])
+      expect(() => dates(typed).assertIncomplete()).not.toThrow();
+  });
   it("holds complete dates and dates with ?, and never changes", () => {
     const answer = dates("23-09-2026 ?3-09-2026");
     expect(answer.count).toBe(2);

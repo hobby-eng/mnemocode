@@ -63,6 +63,34 @@ export const TEMPLATE_CATALOG: readonly CatalogEntry[] = Object.freeze(
   ].map((entry) => Object.freeze(entry)),
 );
 
+/**
+ * Whether the designs of each family are drawn as separate cards as well as on sheets: a business
+ * card is a thing of its own, while a material design is a collection of samples that only its
+ * sheet shows, with its backdrop and its QR code (owner, 2026-10-13).
+ */
+const SEPARATE_CARDS: Readonly<Record<CardFamily, boolean>> = Object.freeze({
+  business: true,
+  material: false,
+});
+
+/** Whether `entry` is drawn as separate cards too, or on sheets only. */
+export function drawsSeparateCards(entry: CatalogEntry): boolean {
+  return SEPARATE_CARDS[entry.family];
+}
+
+/** Why `design`, a design named in a sentence, is not drawn as separate cards. */
+export function sheetsOnly(design: string): string {
+  return `${design} is printed on sheets only: separate cards are made in the business card designs.`;
+}
+
+/** Why a design is not drawn as separate cards. */
+export const SHEETS_ONLY = sheetsOnly("This design");
+
+/** Refuses separate cards of `entry` where it is drawn on sheets only (SHEETS_ONLY). */
+export function assertSeparateCards(entry: CatalogEntry): void {
+  if (!drawsSeparateCards(entry)) throw new Error(SHEETS_ONLY);
+}
+
 /** The design of colour cards when none is named: the first. */
 export const DEFAULT_TEMPLATE_ID = TEMPLATE_CATALOG[0]!.id;
 /** The design of share cards when none is named, chosen for shares on its own. */

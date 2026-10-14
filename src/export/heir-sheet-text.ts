@@ -93,8 +93,8 @@ const ENCODED_LOOKS: Readonly<Record<EncodedFormat, string>> = {
 /** How each share format looks. */
 const SHARE_LOOKS: Readonly<Record<ShareFormat, string>> = {
   words: "words such as tuna next keep gyro",
-  // Printed cards show such a share as its words; the text of it starts with ur:sskr/.
-  ur: "codes that start with ur:sskr/, or words such as tuna next keep gyro on printed cards",
+  // UR shares have no MnemoCode cards; do not promise the older Bytewords card conversion.
+  ur: "codes that start with ur:sskr/",
   indexes: `numbers from ${WORD_NUMBERS}`,
   unicode: "codes of four digits and letters A to F",
   colors: COLORS_LOOK,
@@ -169,6 +169,7 @@ function hintNote({ mode, dates }: HeirSheetFacts): string {
 
 /** The back: what someone who has never used a wallet needs to know first. */
 function basics({ mode }: HeirSheetFacts): HeirSheetSection[] {
+  const masking = Masking.of(mode);
   const sections: HeirSheetSection[] = [
     {
       heading: "Seed phrase",
@@ -177,12 +178,12 @@ function basics({ mode }: HeirSheetFacts): HeirSheetSection[] {
       ],
     },
   ];
-  if (Masking.of(mode).masked)
+  if (masking.masked)
     sections.push({
       heading: "Secret dates",
       paragraphs: [
         // The example is the one of the README (How checksum-valid Seedshift works).
-        'The owner masked the words with dates of their choosing, such as birthdays: the year, month and day of each date move the words along the BIP39 list of 2048 words, like a simple cipher (with 23-09-2026, "abandon" becomes "wool"). Only the same dates move them back; a wrong date gives no error, just another seed phrase with an empty wallet. The dates have nothing to do with today\'s date.',
+        `The owner masked the words with secret dates, such as birthdays: their year, month and day shift the words along the BIP39 list (with 23-09-2026, "abandon" becomes "wool"). Use the owner's dates to undo the shift. ${masking.wrongDateWarning!} The dates have nothing to do with today's date.`,
       ],
     });
   sections.push(

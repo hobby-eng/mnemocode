@@ -324,6 +324,15 @@ export class Masking {
     return this.#variant.keepsChecksum;
   }
 
+  /** Wrong-date guidance follows this mode's checksum rule, never a front end's mode switch. */
+  get wrongDateWarning(): string | undefined {
+    if (!this.masked) return undefined;
+    const result = this.keepsChecksum
+      ? "Wrong dates can still give a valid seed phrase."
+      : "Wrong dates may fail the checksum or give a valid seed phrase.";
+    return `${result} A valid checksum does not confirm the owner's wallet.`;
+  }
+
   /**
    * The mode that a backup of this mode names once its last word is replaced by one with a valid
    * checksum, or undefined where the mode offers no replacement.

@@ -119,13 +119,13 @@ export class CardPreview {
    * Refuses separate sample cards of every design: a folder of separate cards shows one. A host
    * asks before it checks the folder, since the sample cards need no secret.
    */
-  static assertSeparateCards(selection: DesignSelection): void {
+  static assertOneDesign(selection: DesignSelection): void {
     if (selection.every) throw new Error(ONE_DESIGN_FOR_SEPARATE_CARDS);
   }
 
-  /** The one design of separate sample cards with its content (assertSeparateCards). */
+  /** The one design of separate sample cards with its content (assertOneDesign). */
   separateCardsJob(selection: DesignSelection): CardJob {
-    CardPreview.assertSeparateCards(selection);
+    CardPreview.assertOneDesign(selection);
     return this.jobs(selection)[0]!;
   }
 

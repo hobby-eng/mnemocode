@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { flagOf } from "../src/cli/arguments.js";
 import { commandOptions, type CommandName } from "../src/cli/command-options.js";
 import { commandHelp, topicHelp } from "../src/cli/help-pages.js";
 import { QUESTION_HOURS } from "../src/core/search-turns.js";
@@ -12,6 +13,8 @@ import { MAX_SHOWN_MATCHES } from "../src/core/date-search.js";
 import { MIN_LIST_PASSPHRASE_LENGTH } from "../src/core/candidate-encryption.js";
 import { COINS } from "../src/core/coins.js";
 import { MASKING_MODES } from "../src/core/types.js";
+import { MAX_SEARCH_COMBINATIONS, MAX_SHOWN_CANDIDATES } from "../src/core/candidates.js";
+import { counting } from "../src/core/search-plan.js";
 import {
   bitcoinProfiles,
   BITCOIN_NETWORKS,
@@ -27,19 +30,15 @@ async function run(arguments_: readonly string[]) {
   });
 }
 
-/** The parser key of a documented option: "--dates" is stored as "date", "--events" as "event". */
-function parserKey(flag: string): string {
-  const name = flag.slice(2);
-  return name === "dates" ? "date" : name === "events" ? "event" : name;
-}
-
 describe("help", () => {
   it("documents exactly the options each command accepts", () => {
     for (const name of Object.keys(commandOptions) as CommandName[]) {
       const documented = commandHelp[name].groups.flatMap((group) =>
-        group.options.map((option) => parserKey(option.flag)),
+        group.options.map((option) => option.flag),
       );
-      expect([...new Set(documented)].sort(), name).toEqual([...commandOptions[name]].sort());
+      // Each parser key as it is typed, "--dates" for "date" (flagOf).
+      const accepted = commandOptions[name].map((key) => flagOf(key));
+      expect([...new Set(documented)].sort(), name).toEqual([...accepted].sort());
     }
   });
 
@@ -134,6 +133,8 @@ describe("S051: the numbers of the help come from the constants that own them", 
       `N to ${MAX_SHARES}`,
       `default ${MAX_SHOWN_MATCHES}`,
       `${MIN_LIST_PASSPHRASE_LENGTH} characters or more`,
+      `up to ${counting(MAX_SEARCH_COMBINATIONS)}`,
+      `More than ${counting(MAX_SHOWN_CANDIDATES)} candidates are not shown`,
     ])
       expect(text).toContain(value);
   });

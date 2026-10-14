@@ -81,6 +81,22 @@
       "types": "./dist/core/backup-reading-self-test.d.ts",
       "import": "./dist/core/backup-reading-self-test.js"
     },
+    "./core/re-encoding": {
+      "types": "./dist/core/re-encoding.d.ts",
+      "import": "./dist/core/re-encoding.js"
+    },
+    "./core/re-encoding-self-test": {
+      "types": "./dist/core/re-encoding-self-test.d.ts",
+      "import": "./dist/core/re-encoding-self-test.js"
+    },
+    "./core/png-admission": {
+      "types": "./dist/core/png-admission.d.ts",
+      "import": "./dist/core/png-admission.js"
+    },
+    "./core/png-admission-self-test": {
+      "types": "./dist/core/png-admission-self-test.d.ts",
+      "import": "./dist/core/png-admission-self-test.js"
+    },
     "./core/missing-codes": {
       "types": "./dist/core/missing-codes.d.ts",
       "import": "./dist/core/missing-codes.js"
@@ -189,6 +205,10 @@
       "types": "./dist/export/platform.d.ts",
       "import": "./dist/export/platform.js"
     },
+    "./export/card-renderer": {
+      "types": "./dist/export/card-renderer.d.ts",
+      "import": "./dist/export/card-renderer.js"
+    },
     "./export/card-copy": {
       "types": "./dist/export/card-copy.d.ts",
       "import": "./dist/export/card-copy.js"
@@ -238,6 +258,10 @@
     "sskr-wasm",
     "docs/*.md",
     "docs/audits/README.md",
+    "docs/audits/AUD-*.md",
+    "docs/audits/AUD-*.json",
+    "docs/audits/AUD-*-harnesses/*.{md,py,mjs,mts,ts,json,sh}",
+    "docs/audits/AUD-007-harnesses/docker-shim/docker",
     "CHANGELOG.md"
   ],
   "scripts": {
@@ -245,8 +269,10 @@
     "build": "pnpm clean && tsc -p tsconfig.json",
     "check:toolchain": "node scripts/verify-toolchain.mjs",
     "check:markdown": "node scripts/verify-markdown.mjs",
+    "check:audit-privacy": "node scripts/verify-audit-privacy.mjs",
+    "check:audit-package": "node scripts/verify-audit-package.mjs",
     "check:copies": "node scripts/verify-no-copies.mjs",
-    "check": "pnpm check:toolchain && pnpm check:markdown && pnpm check:copies && tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p tsconfig.cards.json && tsc -p tsconfig.strict-consumers.json",
+    "check": "pnpm check:toolchain && pnpm check:markdown && pnpm check:audit-privacy && pnpm check:audit-package && pnpm check:copies && tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p tsconfig.cards.json && tsc -p tsconfig.strict-consumers.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

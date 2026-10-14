@@ -136,6 +136,15 @@ function refusal(run: () => unknown): string {
   throw new Error("Nothing was refused.");
 }
 
+describe("the forms of a coin's addresses", () => {
+  it("are those of the test network where they differ there, and the main network's otherwise", () => {
+    const bitcoin = coinById("bitcoin");
+    expect(bitcoin.addressFormsOn(false)).toBe("1…, 3…, bc1q… or bc1p…");
+    expect(bitcoin.addressFormsOn(true)).toBe("m…, n…, 2…, tb1q… or tb1p…");
+    expect(coinById("litecoin").addressFormsOn(true)).toBe("L…, M…, 3… or ltc1q…");
+  });
+});
+
 describe("the coins that a host offers (a host of one coin family)", () => {
   const ethereum = ADDRESSES.find(([coin]) => coin === "ethereum")!;
   const evidence = coinAddress(ethereum[0], ethereum[3], locationOf(ethereum[2]));

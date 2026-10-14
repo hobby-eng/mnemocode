@@ -141,6 +141,7 @@ export const BITCOIN = new SegwitCoin({
   id: "bitcoin",
   name: "Bitcoin",
   addressForms: "1…, 3…, bc1q… or bc1p…",
+  testnetAddressForms: "m…, n…, 2…, tb1q… or tb1p…",
   coinTypes: [0],
   versions: [
     { prefix: [BITCOIN_P2PKH_VERSION], type: "p2pkh", testnet: false },

@@ -30,7 +30,7 @@ import { nodeSharePlatform } from "../sskr/share-platform-node.js";
 import { assertSskrSelfTest } from "../sskr/self-test.js";
 import { type ParsedArguments, choiceOption } from "./arguments.js";
 import { askAfterFailure, askSecretUntil, WHAT_NOW } from "./ask.js";
-import { askDates } from "./date-search.js";
+import { askDates, DATES_AGAIN_LABEL } from "./date-search.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { choose } from "./terminal-choice.js";
@@ -77,7 +77,7 @@ export async function checkShareBackup(
 /** The answer that types a part of the backup again. */
 const AGAIN: Readonly<Record<BackupPart, string>> = {
   codes: "Type the codes again",
-  dates: "Type the dates again",
+  dates: DATES_AGAIN_LABEL,
   shares: "Type the shares again",
 };
 

@@ -63,11 +63,11 @@ import {
   mostDates,
   encodedInput,
   givenInputFormat,
-  readBoundedTextFile,
   detectedFormat,
   phraseWords,
   SHARE_READER,
 } from "./input.js";
+import { readBoundedTextFile } from "./text-file.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import {
   SEEDSHIFT_CHOICES,
@@ -774,6 +774,14 @@ function dateMatchNoteLines(evidence: WalletEvidence | undefined): string[] {
     : noticeLines(
         `Each displayed candidate matched the requested ${evidenceLabel(evidence)} locally.`,
       );
+}
+
+/** The answer that types the dates again, after a phrase or a part that does not fit. */
+export const DATES_AGAIN_LABEL = "Type the dates again";
+
+/** The choice that asks for the dates again, after a phrase that cannot be the right one. */
+export function datesAgainChoice(): Choice<"dates"> {
+  return { label: DATES_AGAIN_LABEL, value: "dates" };
 }
 
 /** The choice that asks for the encoded seed phrase once more; after a file, it is typed. */

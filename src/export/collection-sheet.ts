@@ -2,6 +2,7 @@ import { rgb, type PDFDocument, type PDFFont, type PDFPage } from "pdf-lib";
 import { MM, centredRunStart, runCellSize, type CardBox, type MmRect } from "./business-layout.js";
 import { centredText, pdfPoint, pdfRect } from "./business-render-primitives.js";
 import { assertCardIndex } from "./card-codes.js";
+import { numberWord } from "../core/prose.js";
 import { drawCollectionQr, qrSizeForModuleMm } from "./card-qr.js";
 import type { QrModules, QrSource } from "./platform.js";
 import {
@@ -189,8 +190,26 @@ export const MAX_SHEET_CARDS = 64;
 /** The most cards in one row of a sheet. */
 const MAX_COLUMNS = 10;
 /**
+ * The fewest rows of a sheet where they fit, even where fewer rows would give larger cards: two
+ * long rows leave the page empty above and below them (owner, 2026-10-13). A card-sized page has
+ * no such rule (hasEnoughRows).
+ */
+export const MIN_SHEET_ROWS = 3;
+
+/** The order in which a sheet's plan prefers grids, as a person is told it (planCollectionSheet). */
+export const SHEET_PLAN_TEXT = `at least ${numberWord(MIN_SHEET_ROWS)} rows, the largest cards`;
+
+/**
+ * Whether a grid of `rows` rows has enough of them (MIN_SHEET_ROWS): always on a card-sized page
+ * (`compact`), which has no such rule.
+ */
+function hasEnoughRows(rows: number, compact: boolean): boolean {
+  return compact || rows >= MIN_SHEET_ROWS;
+}
+/**
  * How much larger, as a share of its area, a card of one plan must be to win over another: less
- * is a rounding error, and then fewer decoys and the page's own orientation win.
+ * is a rounding error, and then more cards, which fill more of the page, and the page's own
+ * orientation win.
  */
 const LARGER_CARD = 0.001;
 /** Why no layout fits the cards on a page. */
@@ -205,9 +224,11 @@ export type CaptionLines = number | ((width: number, size: number) => number);
 
 /**
  * A collection is a single design proposal, never a stack of duplex print cards. `code` is the QR
- * code that the sheet prints, if any, whose size the layout makes room for. Of the column counts
- * whose rows are all full, the one with the largest cards; a sheet whose last row is short looks
- * unfinished (owner, 2026-10-13), and only where no such count fits, the largest cards of any.
+ * code that the sheet prints, if any, whose size the layout makes room for. The grid with the
+ * largest cards, in this order of preference: of the column counts whose rows are all full and
+ * that have at least MIN_SHEET_ROWS rows (any number on a card-sized page, hasEnoughRows); else of
+ * those whose rows are all full, since a sheet whose last row is short looks unfinished (owner,
+ * 2026-10-13); and only where no such count fits, of any.
  */
 export function collectionSheetLayout(
   settings: CardSettings,
@@ -243,7 +264,11 @@ export function collectionSheetLayout(
       ? undefined
       : {
           x: width - margin - qrSize,
-          y: margin,
+          // Raised into the corner of the heading, so that the code and its caption end above the
+          // cards where they fit: below the full margin, they pushed the cards down by a few
+          // millimetres, and a low sheet, such as A6 in landscape, then showed two long rows with
+          // empty bands above and below (owner, 2026-10-13).
+          y: margin / 2,
           size: qrSize,
         };
   let availableWidth = width - margin * 2;
@@ -283,8 +308,9 @@ export function collectionSheetLayout(
       grids.push({ columns, rows, cellWidth, imageHeight, captionHeight });
   }
   const full = grids.filter((grid) => count % grid.columns === 0);
+  const tall = full.filter((grid) => hasEnoughRows(grid.rows, compact));
   // The largest card, the first such grid on a tie; every card has the same aspect.
-  const best = (full.length > 0 ? full : grids).reduce<Grid | undefined>(
+  const best = (tall.length > 0 ? tall : full.length > 0 ? full : grids).reduce<Grid | undefined>(
     (chosen, grid) =>
       chosen === undefined || grid.imageHeight > chosen.imageHeight ? grid : chosen,
     undefined,
@@ -292,7 +318,13 @@ export function collectionSheetLayout(
   if (!best) throw new Error(NO_ROOM);
   const { columns, rows, cellWidth, imageHeight, captionHeight } = best;
   const cellHeight = imageHeight + captionHeight;
-  const top = contentTop + centredRunStart(availableHeight, rows, cellHeight, gap);
+  // The columns share the width out in equal cells. The rows share the height out evenly: the room
+  // left beyond the rows and the least gap between them goes in equal parts above, between and
+  // below them, so that the cards fill the page symmetrically rather than stand as one block in
+  // its middle (owner, 2026-10-13).
+  const spare = Math.max(0, availableHeight - rows * cellHeight - (rows - 1) * gap);
+  const rowGap = gap + spare / (rows + 1);
+  const top = contentTop + spare / (rows + 1);
   const cards = Array.from({ length: count }, (_, index): StudyBox => {
     const row = Math.floor(index / columns);
     const rowCount = Math.min(columns, count - row * columns);
@@ -300,7 +332,7 @@ export function collectionSheetLayout(
       margin +
       centredRunStart(availableWidth, rowCount, cellWidth, gap) +
       (index % columns) * (cellWidth + gap);
-    const y = top + row * (cellHeight + gap);
+    const y = top + row * (cellHeight + rowGap);
     const cardWidth = imageHeight * aspect;
     return {
       index,
@@ -325,9 +357,9 @@ export function collectionSheetLayout(
     // The middle of the gap before the first full row's first card and above the first row.
     grid: {
       left: margin + centredRunStart(availableWidth, columns, cellWidth, gap) - gap / 2,
-      top: top - gap / 2,
+      top: top - rowGap / 2,
       columnPitch: cellWidth + gap,
-      rowPitch: cellHeight + gap,
+      rowPitch: cellHeight + rowGap,
     },
     ...(qr === undefined ? {} : { qr }),
   };
@@ -359,9 +391,11 @@ function ownOrientation(size: CardPageSize): CardOrientation {
 
 /**
  * The sheet for `own` codes of a backup in the design `shape`, on the page size of `settings`:
- * at least one decoy, at most as many as give `most` cards in all, all rows full, and the largest
- * cards (owner, 2026-10-13). The orientation is the one given, or the one with the larger cards,
- * the page's own on a tie; on a tie of sizes, fewer decoys. `code` is the QR code it prints.
+ * at least one decoy, at most as many as give `most` cards in all, all rows full, at least
+ * MIN_SHEET_ROWS rows where they fit, and the largest cards (owner, 2026-10-13). The orientation
+ * is the one given, or the one whose plan wins by the same rules: enough rows first, then the
+ * larger cards, the page's own on a tie; on a tie of sizes, more cards, which fill more of the
+ * page. `code` is the QR code it prints.
  */
 export function planCollectionSheet(
   settings: Pick<CardSettings, "pageSize" | "orientation">,
@@ -377,7 +411,7 @@ export function planCollectionSheet(
     given === undefined
       ? [first, ...CARD_ORIENTATIONS.filter((orientation) => orientation !== first)]
       : [given];
-  let best: (SheetPlan & { readonly area: number }) | undefined;
+  let best: (SheetPlan & { readonly area: number; readonly tall: boolean }) | undefined;
   let refusal: unknown;
   for (const orientation of orientations)
     for (let count = own + 1; count <= Math.min(most, MAX_SHEET_CARDS); count++) {
@@ -399,8 +433,18 @@ export function planCollectionSheet(
       }
       if (count % layout.columns !== 0) continue;
       const area = layout.cards[0]!.width * layout.cards[0]!.height;
-      if (best === undefined || area > best.area * (1 + LARGER_CARD))
-        best = { count, orientation, area };
+      // A sheet of enough rows wins over one of fewer whatever their cards (MIN_SHEET_ROWS).
+      const tall = hasEnoughRows(layout.rows, layout.compact);
+      // Of cards as large, the plan with more of them, which fills more of the page, also across
+      // its width (owner, 2026-10-13).
+      const larger = best !== undefined && area > best.area * (1 + LARGER_CARD);
+      const asLarge = best !== undefined && !larger && area >= best.area * (1 - LARGER_CARD);
+      if (
+        best === undefined ||
+        (tall && !best.tall) ||
+        (tall === best.tall && (larger || (asLarge && count > best.count)))
+      )
+        best = { count, orientation, area, tall };
     }
   if (best === undefined) throw refusal instanceof Error ? refusal : new Error(NO_ROOM);
   return { count: best.count, orientation: best.orientation };

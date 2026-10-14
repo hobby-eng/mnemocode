@@ -1,26 +1,11 @@
 import { closeSync, openSync, readSync } from "node:fs";
-
-/** Bytes in a mebibyte, the unit that every limit of input is named in. */
-export const MEBIBYTE = 1024 * 1024;
+import { InputTooLarge, MEBIBYTE } from "../core/byte-units.js";
 
 /**
  * The largest text that a command reads: a file, standard input or an answer typed or pasted at a
  * question. No valid input is nearly that long.
  */
 export const MAX_TEXT_INPUT_BYTES = MEBIBYTE;
-
-/** A limit of `bytes`, whole mebibytes, as the messages name it, such as "1 MiB". */
-export function limitName(bytes: number): string {
-  return `${bytes / MEBIBYTE} MiB`;
-}
-
-/** The refusal of an input larger than its limit: "`what` exceeds the 1 MiB safety limit." */
-export class InputTooLarge extends Error {
-  constructor(what: string, limit: number) {
-    super(`${what} exceeds the ${limitName(limit)} safety limit.`);
-    this.name = "InputTooLarge";
-  }
-}
 
 /**
  * Size of each read; small enough that a rejected input never occupies much more than its limit.

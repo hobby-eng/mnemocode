@@ -66,6 +66,11 @@ const PARTS: Readonly<Record<string, Part>> = {
   // Host services: the parts take them as parameters; none reads one configured beforehand.
   "src/sskr/share-platform.ts": { uses: [] },
   "src/export/platform.ts": { uses: [] },
+  // The card renderer that a host builds with its render platform and passes to every render.
+  "src/export/card-renderer.ts": {
+    uses: CARD_RENDERER_PARTS,
+    packages: PDF_PACKAGES,
+  },
   // The master fingerprint alone, with the host's PBKDF2: what a host for one coin takes without
   // the evidence of another, such as the Deriver's Dash edition.
   "src/core/master-fingerprint.ts": {
@@ -126,6 +131,10 @@ const PARTS: Readonly<Record<string, Part>> = {
     ],
   },
   "src/core/date-search.ts": { uses: ["src/core/masking.ts"] },
+  // A backup's phrase held back until it is confirmed, to be encoded again.
+  "src/core/re-encoding.ts": { uses: ["src/core/encoded-backup.ts"] },
+  // Structural PNG admission and exact inflation budgets, without loading any image decoder.
+  "src/core/png-admission.ts": { uses: [] },
   // Forgotten words, and the candidate list with its encryption.
   "src/core/candidates.ts": {
     uses: [],
@@ -198,6 +207,10 @@ const PARTS: Readonly<Record<string, Part>> = {
   // builds in or leaves out (wallet evidence, coins, the sheet for heirs, share cards) by the host.
   "src/core/master-fingerprint-self-test.ts": { uses: ["src/core/master-fingerprint.ts"] },
   "src/core/date-search-self-test.ts": { uses: ["src/core/date-search.ts"] },
+  "src/core/re-encoding-self-test.ts": {
+    uses: ["src/core/encoded-backup.ts", "src/core/re-encoding.ts"],
+  },
+  "src/core/png-admission-self-test.ts": { uses: ["src/core/png-admission.ts"] },
   "src/core/backup-reading-self-test.ts": {
     uses: [
       "src/core/backup-reading.ts",
@@ -260,7 +273,8 @@ const PARTS: Readonly<Record<string, Part>> = {
   // Cards of shares, the texts of a card design, and the sheet for heirs.
   "src/export/card-copy.ts": { uses: ["src/export/platform.ts"] },
   "src/export/sskr-render.ts": {
-    uses: CARD_RENDERER_PARTS,
+    // The longest public share set, which assertPrintable draws before any secret is asked.
+    uses: [...CARD_RENDERER_PARTS, "src/sskr/known-answers.ts"],
     packages: PDF_PACKAGES,
   },
   "src/export/heir-sheet.ts": { uses: ["src/export/platform.ts"], packages: PDF_PACKAGES },

@@ -115,10 +115,9 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<void>
   return recoverFromOptions(arguments_, settings);
 }
 
-/** recover-date's own rule: a date without a forgotten digit is no search. */
+/** The standalone search's refusal belongs to the date answer, shared with browser hosts. */
 function requireIncompleteDate(dates: DatesAnswer): void {
-  if (!dates.hasForgottenDigits)
-    throw new Error("At least one date must contain a forgotten digit represented by ?.");
+  dates.assertIncomplete();
 }
 
 /** Every input from the options, as before --ask-secrets existed; a problem ends the command. */

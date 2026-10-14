@@ -75,7 +75,9 @@ export function claimImageFolder(directory: string): Promise<NewFolder> {
 
 /**
  * Where the PDF for pdftocairo and its images wait: in memory on Linux (/dev/shm, a tmpfs), so
- * that these copies of a secret never reach a disk; the system's temporary folder elsewhere.
+ * that these copies of a secret are not written to a file on a disk, swap aside (SECURITY.md);
+ * where /dev/shm cannot be written, and on other systems, the system's temporary folder, which may
+ * be on a disk (SECURITY.md says so).
  */
 function rasterFolder(): string {
   const memory = "/dev/shm";

@@ -125,13 +125,24 @@ async function checkShareCards(drawing: CardDrawing): Promise<void> {
     `4BBF-1-1: ${sskrVector.firstShareUnicode}`,
     "Share card QR code without decoys",
   );
+  // Separate cards are drawn in the business card designs only (drawsSeparateCards).
   const separate = await ShareCardSet.create(
     drawing,
     SHARES,
-    { ...OPTIONS, layout: "individual", pageSize: "business" },
+    { ...OPTIONS, style: "it", layout: "individual", pageSize: "business" },
     FIXED_DECOYS,
   );
   expectSame(separate.qrCodes.length, 0, "QR codes of separate cards");
+  await expectRefusedLater(
+    () =>
+      ShareCardSet.create(drawing, SHARES, {
+        ...OPTIONS,
+        layout: "individual",
+        pageSize: "business",
+      }),
+    /printed on sheets only/u,
+    "Separate share cards of a material design",
+  );
   await expectRefusedLater(
     () => ShareCardSet.create(drawing, SHARES, { ...OPTIONS, shareFormat: "indexes" }),
     /have no cards/u,

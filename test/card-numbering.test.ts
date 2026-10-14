@@ -25,7 +25,8 @@ function printedText(bytes: Uint8Array): string {
 }
 
 describe.skipIf(!hasPoppler)("numbers on separate cards", () => {
-  for (const template of ["business-it", "material-tile"])
+  // Only the business card designs have separate cards (drawsSeparateCards).
+  for (const template of ["business-it", "business-mixed"])
     it(`prints the position of every reference on ${template} cards`, async () => {
       const cards = await renderIndividualCards(
         nodeCardRenderer,

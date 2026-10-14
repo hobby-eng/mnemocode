@@ -1,0 +1,988 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-020",
+  "auditNumber": 20,
+  "date": "2026-10-13",
+  "title": "Security diff review of menu, input and re-encoding changes",
+  "reviewer": {
+    "name": "Codex coordinator with four independent scoped reviewers",
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "ultra",
+    "workerModel": null,
+    "workerReasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "8de80e24c7e98b14a443cb9a0e3dc43aa73a7917",
+    "commitComplete": false,
+    "workingTree": " M CHANGELOG.md\n M README.md\n M docs/ARCHITECTURE.md\n M docs/SSKR.md\n M docs/releases/v0.1.0.md\n M package.json\n M scripts/verify-executable.mjs\n M scripts/verify-terminal-input.py\n M src/cli/arguments.ts\n M src/cli/ask.ts\n M src/cli/backup-check.ts\n M src/cli/cloud-folders.ts\n M src/cli/command-line.ts\n M src/cli/command-options.ts\n M src/cli/date-search.ts\n M src/cli/decode-command.ts\n M src/cli/encode-command.ts\n M src/cli/help-pages.ts\n M src/cli/input.ts\n M src/cli/menu-entries.ts\n M src/cli/menu.ts\n M src/cli/option-copy.ts\n M src/cli/protection.ts\n M src/cli/self-test.ts\n M src/cli/sskr-command.ts\n M src/cli/sskr-split-command.ts\n M src/cli/terminal-choice.ts\n M src/core/self-test.ts\n M test/ask.test.ts\n M test/date-search-questions.test.ts\n M test/encode-decode-questions.test.ts\n M test/heir-sheet.test.ts\n M test/help.test.ts\n M test/menu.test.ts\n M test/portable-modules.test.ts\n M test/scan-fixes.test.ts\n M test/terminal-choice-record.test.ts\n?? src/cli/encode-questions.ts\n?? src/cli/re-encode-command.ts\n?? src/cli/re-encode-options.ts\n?? src/core/re-encoding-self-test.ts\n?? src/core/re-encoding.ts\n?? test/re-encode.test.ts\n",
+    "sourceFingerprint": "72537600bec47c9f390e3cca811c50396b55ca8f654b1b8c1d51395a6c0f01dd",
+    "capturedAt": "2026-10-13T13:09:45.282524+00:00",
+    "changedFiles": [
+      "CHANGELOG.md",
+      "README.md",
+      "docs/ARCHITECTURE.md",
+      "docs/SSKR.md",
+      "docs/releases/v0.1.0.md",
+      "package.json",
+      "scripts/verify-executable.mjs",
+      "scripts/verify-terminal-input.py",
+      "src/cli/arguments.ts",
+      "src/cli/ask.ts",
+      "src/cli/backup-check.ts",
+      "src/cli/cloud-folders.ts",
+      "src/cli/command-line.ts",
+      "src/cli/command-options.ts",
+      "src/cli/date-search.ts",
+      "src/cli/decode-command.ts",
+      "src/cli/encode-command.ts",
+      "src/cli/encode-questions.ts",
+      "src/cli/help-pages.ts",
+      "src/cli/input.ts",
+      "src/cli/menu-entries.ts",
+      "src/cli/menu.ts",
+      "src/cli/option-copy.ts",
+      "src/cli/protection.ts",
+      "src/cli/re-encode-command.ts",
+      "src/cli/re-encode-options.ts",
+      "src/cli/self-test.ts",
+      "src/cli/sskr-command.ts",
+      "src/cli/sskr-split-command.ts",
+      "src/cli/terminal-choice.ts",
+      "src/core/re-encoding-self-test.ts",
+      "src/core/re-encoding.ts",
+      "src/core/self-test.ts",
+      "test/ask.test.ts",
+      "test/date-search-questions.test.ts",
+      "test/encode-decode-questions.test.ts",
+      "test/heir-sheet.test.ts",
+      "test/help.test.ts",
+      "test/menu.test.ts",
+      "test/portable-modules.test.ts",
+      "test/re-encode.test.ts",
+      "test/scan-fixes.test.ts",
+      "test/terminal-choice-record.test.ts"
+    ],
+    "changedFileHashes": [
+      {
+        "path": "CHANGELOG.md",
+        "sha256": "d94b3a4849d606de0abff1650f58d2b3ab115b99768200ff227dd2c539ba2c51"
+      },
+      {
+        "path": "README.md",
+        "sha256": "9699a67256003e177963331ed6285be7e2d5fdc100ceea22d9aa9873b40a51de"
+      },
+      {
+        "path": "docs/ARCHITECTURE.md",
+        "sha256": "e6cac76dfdd348d80bce9b5a9c30b308b61616ecae462624f6100c03bb7b9420"
+      },
+      {
+        "path": "docs/SSKR.md",
+        "sha256": "e9876add285a7e3d99c3b901938492667065224bcced0c850e624f5a92a4eb96"
+      },
+      {
+        "path": "docs/releases/v0.1.0.md",
+        "sha256": "3fd1eaaaa1246790838ddeaec74bca5a8ed6ce37a2a9e6b7a036a34872b63489"
+      },
+      {
+        "path": "package.json",
+        "sha256": "bc16ed587390ef132318a11ecf8d1d64261d58c80027c0006734f7189fa44915"
+      },
+      {
+        "path": "scripts/verify-executable.mjs",
+        "sha256": "1dff6705884680c4bc89cdb76fcc3949e5045996063f43217e083dddadd7c5d8"
+      },
+      {
+        "path": "scripts/verify-terminal-input.py",
+        "sha256": "a9c4d874268d6626aae29a092494cd962970ab89ef40cd40e68be89cfa0224ca"
+      },
+      {
+        "path": "src/cli/arguments.ts",
+        "sha256": "efe8e1f9ff41072021454f03f48def8e1d8db08ad957398a637595eaedc47ff0"
+      },
+      {
+        "path": "src/cli/ask.ts",
+        "sha256": "cda87981a992b1b139b2aed820ed9b3fe50692f83c12ec7d052b8c6362021a56"
+      },
+      {
+        "path": "src/cli/backup-check.ts",
+        "sha256": "3a233422037b0d7db50dc9519dcc5afaad8302f1d8a27c058f8436ef0b45e17f"
+      },
+      {
+        "path": "src/cli/cloud-folders.ts",
+        "sha256": "a208a644d14af32ecf0c30b1d6b69ea5c74bbc96b5a571f7afcfb469a44ec8d2"
+      },
+      {
+        "path": "src/cli/command-line.ts",
+        "sha256": "c0e9213477ea343abcd307fa15e7c684cd2837196083bc81a95ff9e6ee3ccfe7"
+      },
+      {
+        "path": "src/cli/command-options.ts",
+        "sha256": "b5cc85772d34cc4ca12faab28a284f1af64c03c2ef47c97f099eae947c308e20"
+      },
+      {
+        "path": "src/cli/date-search.ts",
+        "sha256": "95a9a8580d490f1538449511343cf0476123641efc7649dbee4aa10df2d0ebd0"
+      },
+      {
+        "path": "src/cli/decode-command.ts",
+        "sha256": "ef41b509f8bcdd1808c549c6784e9d75ce85753b1f63829c05da93e8af995ddc"
+      },
+      {
+        "path": "src/cli/encode-command.ts",
+        "sha256": "7bfe922f5e9c10d19bd0d55da0f4ff1eb8f8ac5d4049af4d07c29db345521e88"
+      },
+      {
+        "path": "src/cli/encode-questions.ts",
+        "sha256": "0e32eb7490a9d7017731faa5db16a6f2c16375c26348214d16b3ae579c12e6df"
+      },
+      {
+        "path": "src/cli/help-pages.ts",
+        "sha256": "23f559d5a80c215554a1518028e103bc56c0edf79ffbc687ab2961b509b9361d"
+      },
+      {
+        "path": "src/cli/input.ts",
+        "sha256": "f1bd39d7e0f662dee6b2602ce4cc45bc286dcb7b93112f20b14c27d4eb7f9952"
+      },
+      {
+        "path": "src/cli/menu-entries.ts",
+        "sha256": "95cbce78f0a9508d644fa45775319d40971dedbe901ca5606231c061e8f0f876"
+      },
+      {
+        "path": "src/cli/menu.ts",
+        "sha256": "c41e268c9a0eda94177306ef73638244edbaaa753882b40c87e7ea1fd7a40d38"
+      },
+      {
+        "path": "src/cli/option-copy.ts",
+        "sha256": "f8fa5823cf307933e3584ec73ae98834b4afe82745dcf53cd21ebfd5054e5f17"
+      },
+      {
+        "path": "src/cli/protection.ts",
+        "sha256": "986b2e8e8c4325744f49e8916d433e42dd57070154211a947fb100dc5d837ca3"
+      },
+      {
+        "path": "src/cli/re-encode-command.ts",
+        "sha256": "34189f020f0d0c3865beec4067aec3b9b8ff1d6437cc159aa889647356799883"
+      },
+      {
+        "path": "src/cli/re-encode-options.ts",
+        "sha256": "fc603d6802e486932af1eb68c303f1a14b7609df3f006918c3c2d4e94205365c"
+      },
+      {
+        "path": "src/cli/self-test.ts",
+        "sha256": "5d983fd14c3f6c169029ea15868d8d7e087155a5bd4362d31c71a5a7ad80e1fe"
+      },
+      {
+        "path": "src/cli/sskr-command.ts",
+        "sha256": "c85a00305fec39570f0a6d3e6286b3fa699ced67c04498e0ea5423d2efbbde1f"
+      },
+      {
+        "path": "src/cli/sskr-split-command.ts",
+        "sha256": "8726c96321e20e17adb9cd3855737a1ccf0c5c6a3b524dc8668bb8d0c2ac57fd"
+      },
+      {
+        "path": "src/cli/terminal-choice.ts",
+        "sha256": "58a2f622a9a21eb5b4fe7b92de74669c9d95934878cbaf0b0c57ade11ab2d940"
+      },
+      {
+        "path": "src/core/re-encoding-self-test.ts",
+        "sha256": "3f90f4c988af60cee2d39a63828481c62c09e48c355bc7273744d7ace0883eb6"
+      },
+      {
+        "path": "src/core/re-encoding.ts",
+        "sha256": "5f5fad8229e2d099ae0d3122a3377be37a54eec37e0e61c543588f43ea4e5d72"
+      },
+      {
+        "path": "src/core/self-test.ts",
+        "sha256": "128fea52f141872679f295615743a152fc6ac561c6eeaa1858701321c08f1dbd"
+      },
+      {
+        "path": "test/ask.test.ts",
+        "sha256": "643b97182f073d8ff1f0e1ff1042f47dfb76c90ce4bbd93d70dc0498e8af76d1"
+      },
+      {
+        "path": "test/date-search-questions.test.ts",
+        "sha256": "ca1ce1df6280dac2406e03416d627ad8333f14a588b0baab74723d44aa051897"
+      },
+      {
+        "path": "test/encode-decode-questions.test.ts",
+        "sha256": "b8720deade64a1c4a4a166b1e6069565c22841939853e0a55c362011f0448541"
+      },
+      {
+        "path": "test/heir-sheet.test.ts",
+        "sha256": "d502b95925681e4c5856922ccf4881b2dca7442797528656838a73273ef5d59a"
+      },
+      {
+        "path": "test/help.test.ts",
+        "sha256": "bb45a430d022eb24ea5cce3c6d89fdbecb96d18e4e4e2bc24b525afe927d7b15"
+      },
+      {
+        "path": "test/menu.test.ts",
+        "sha256": "35b25ef884cc48e4d0feac87d9fd9c8cbf6740b227d9d805954360f9c245b138"
+      },
+      {
+        "path": "test/portable-modules.test.ts",
+        "sha256": "a85ad7fe55546a1695520fdcf97fc842cc7e2ec66758b9f417a256f25e5aa4a1"
+      },
+      {
+        "path": "test/re-encode.test.ts",
+        "sha256": "455bc18887663725abf8a251db209292dff40888e0b7f37e96ead86d6df52e37"
+      },
+      {
+        "path": "test/scan-fixes.test.ts",
+        "sha256": "cbe7933b240b233ab2b7b7dc6335e095aaf78f2bf20dfcfbe313398781d104f0"
+      },
+      {
+        "path": "test/terminal-choice-record.test.ts",
+        "sha256": "fbd88a5424551d83e11ee69d7d18c8a48f5271d3e938f82ea2be0ed588165120"
+      }
+    ],
+    "fingerprintMethod": "SHA-256 of compact JSON sorted path/SHA-256 entries for Git tracked and untracked non-ignored files, excluding docs/audits/; absent files excluded.",
+    "postReviewDrift": {
+      "recordedAt": "2026-10-13T14:01:52.826344+00:00",
+      "changedSinceReviewedSnapshot": [
+        "CHANGELOG.md",
+        "README.md",
+        "docs/SSKR.md",
+        "docs/releases/v0.1.0.md",
+        "scripts/check-card-output.mjs",
+        "src/cli/encode-questions.ts",
+        "src/cli/sskr-output.ts",
+        "src/export/material-cards.ts",
+        "src/export/material-layout.ts",
+        "src/export/render.ts",
+        "src/export/sskr-render-self-test.ts",
+        "src/export/sskr-render.ts",
+        "src/export/template-catalog.ts",
+        "src/export/templates.ts",
+        "test/aud-012-remediation.test.ts",
+        "test/card-drawing.test.ts",
+        "test/card-numbering.test.ts",
+        "test/card-page-sizes.test.ts",
+        "test/export.test.ts",
+        "test/material-cards.test.ts",
+        "test/menu.test.ts",
+        "test/scan-fixes.test.ts"
+      ],
+      "assessment": "Later concurrent edits are excluded; checks remain bound to the original snapshot."
+    }
+  },
+  "scope": {
+    "mode": "working-tree security diff",
+    "changedFileCount": 43,
+    "inventoryEntries": 28,
+    "changedDocuments": 5,
+    "changedTests": 10,
+    "productionEditsByReviewer": false,
+    "method": "Independent architecture/source review, candidate discovery, validation and attack-path calibration; targeted sequential runtime controls.",
+    "procedureFiles": [
+      {
+        "path": "multi-chain-wallet-tools/docs/FULL_AUDIT_GUIDE.md",
+        "sha256": "e1b2fb641e4a25ebf292548fc1e2ef0c25dbd01faa5c2b580c6ba75df2afcab7"
+      },
+      {
+        "path": "multi-chain-wallet-tools/docs/audits/AUDIT_STANDARD.md",
+        "sha256": "9128a5e243ec5de86b58bde7b84f7d3bf6b9174346c056a34c5425957b27dc1f"
+      },
+      {
+        "path": "multi-chain-wallet-tools/docs/audits/AUDIT_TEMPLATE.md",
+        "sha256": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210"
+      },
+      {
+        "path": "multi-chain-wallet-tools/docs/audit-report.schema.json",
+        "sha256": "989bf3de974d581579c1d1c1e143d5ab9fa232dc70cc8c6f84ad00531ae698fb"
+      }
+    ]
+  },
+  "checks": {
+    "ledger": [
+      {
+        "id": "CHECK-SEC-001",
+        "category": "SEC",
+        "outcome": "reviewed",
+        "evidence": "Independent threat model and phrase/date/share ownership trace."
+      },
+      {
+        "id": "CHECK-SEC-002",
+        "category": "SEC",
+        "outcome": "reviewed",
+        "evidence": "Node and OS permission dispatch inspected; kernel guarantees not exercised."
+      },
+      {
+        "id": "CHECK-SEC-003",
+        "category": "SEC",
+        "outcome": "reviewed",
+        "evidence": "Offline command boundaries inspected; no network or provider execution."
+      },
+      {
+        "id": "CHECK-SEC-004",
+        "category": "SEC",
+        "outcome": "reviewed",
+        "evidence": "Changed adapters delegate to existing randomness/SSKR; full vectors excluded."
+      },
+      {
+        "id": "CHECK-SEC-005",
+        "category": "SEC",
+        "outcome": "reviewed",
+        "evidence": "Input snapshots, redaction and buffer lifetimes traced; V8 string erasure unproved."
+      },
+      {
+        "id": "CHECK-SEC-006",
+        "category": "SEC",
+        "outcome": "not-applicable",
+        "evidence": "This repository has no browser page; external host is outside this diff."
+      },
+      {
+        "id": "CHECK-SEC-007",
+        "category": "SEC",
+        "outcome": "reviewed",
+        "evidence": "Bounded reads and search controls inspected; maximum-load cases not run."
+      },
+      {
+        "id": "CHECK-FUN-001",
+        "category": "FUN",
+        "outcome": "passed",
+        "evidence": "Re-encoding tests cover checksum refusal, wrong dates and legacy last words."
+      },
+      {
+        "id": "CHECK-FUN-002",
+        "category": "FUN",
+        "outcome": "reviewed",
+        "evidence": "Fingerprint and first-address routes exercised; every coin/profile not replayed."
+      },
+      {
+        "id": "CHECK-FUN-003",
+        "category": "FUN",
+        "outcome": "not-applicable",
+        "evidence": "No BIP85/BIP38/message/Silent Payments change in the reviewed patch."
+      },
+      {
+        "id": "CHECK-FUN-004",
+        "category": "FUN",
+        "outcome": "not-applicable",
+        "evidence": "No script/descriptor/Miniscript/multisig change in this patch."
+      },
+      {
+        "id": "CHECK-FUN-005",
+        "category": "FUN",
+        "outcome": "not-applicable",
+        "evidence": "No transaction or PSBT feature in MnemoCode."
+      },
+      {
+        "id": "CHECK-FUN-006",
+        "category": "FUN",
+        "outcome": "passed",
+        "evidence": "Re-encoding, record import/export and SSKR split covered by selected tests."
+      },
+      {
+        "id": "CHECK-FUN-007",
+        "category": "FUN",
+        "outcome": "not-applicable",
+        "evidence": "MnemoCode has no connected discovery/provider/accounting service."
+      },
+      {
+        "id": "CHECK-API-001",
+        "category": "API",
+        "outcome": "reviewed",
+        "evidence": "WalletCheck and host contracts inspected; warning loss is SEC001."
+      },
+      {
+        "id": "CHECK-API-002",
+        "category": "API",
+        "outcome": "reviewed",
+        "evidence": "Confirmation and awaited host state inspected; no full cancellation suite replay."
+      },
+      {
+        "id": "CHECK-API-003",
+        "category": "API",
+        "outcome": "reviewed",
+        "evidence": "Re-encoding export surface inspected; monetary fidelity is not applicable."
+      },
+      {
+        "id": "CHECK-API-004",
+        "category": "API",
+        "outcome": "passed",
+        "evidence": "Selected record/format/SSKR cases and strict consumer composition passed."
+      },
+      {
+        "id": "CHECK-BLD-001",
+        "category": "BLD",
+        "outcome": "passed",
+        "evidence": "pnpm check, fresh build and portable module tests passed."
+      },
+      {
+        "id": "CHECK-BLD-002",
+        "category": "BLD",
+        "outcome": "not-run",
+        "evidence": "Only selected Linux Node tests and two PTY recipes; full matrix excluded."
+      },
+      {
+        "id": "CHECK-BLD-003",
+        "category": "BLD",
+        "outcome": "reviewed",
+        "evidence": "No dependency or SSKR source update in the reviewed patch; no advisory scan."
+      },
+      {
+        "id": "CHECK-BLD-004",
+        "category": "BLD",
+        "outcome": "not-run",
+        "evidence": "Canonical WASM/Docker byte replay is a release-level check and was excluded."
+      },
+      {
+        "id": "CHECK-BLD-005",
+        "category": "BLD",
+        "outcome": "reviewed",
+        "evidence": "Changed executable/terminal scripts inspected; no executable or paid CI run."
+      },
+      {
+        "id": "CHECK-UI-001",
+        "category": "UI",
+        "outcome": "not-run",
+        "evidence": "No PDF/card/QR rendering or full gallery; owner resource constraint."
+      },
+      {
+        "id": "CHECK-UI-002",
+        "category": "UI",
+        "outcome": "passed",
+        "evidence": "172 input/menu/help/composition tests and two focused PTY recipes passed."
+      },
+      {
+        "id": "CHECK-UI-003",
+        "category": "UI",
+        "outcome": "failed",
+        "evidence": "Fingerprint warning omitted by re-encode (SEC001); private-screen PTY passed."
+      },
+      {
+        "id": "CHECK-ARC-001",
+        "category": "ARC",
+        "outcome": "reviewed",
+        "evidence": "Core/front-end seams, ownership and browser-neutral imports inspected."
+      },
+      {
+        "id": "CHECK-ARC-002",
+        "category": "ARC",
+        "outcome": "passed",
+        "evidence": "Existing copy gate found zero copies of at least 50 tokens in 260 source files."
+      },
+      {
+        "id": "CHECK-ARC-003",
+        "category": "ARC",
+        "outcome": "reviewed",
+        "evidence": "Changed tests/comments traced; no independent full cryptographic oracle run."
+      },
+      {
+        "id": "CHECK-DOC-001",
+        "category": "DOC",
+        "outcome": "reviewed",
+        "evidence": "Five changed documents and SECURITY.md checked against actual runtime limits."
+      },
+      {
+        "id": "CHECK-DOC-002",
+        "category": "DOC",
+        "outcome": "reviewed",
+        "evidence": "Changed help/release/command descriptions inspected; no release acceptance."
+      },
+      {
+        "id": "CHECK-DOC-003",
+        "category": "DOC",
+        "outcome": "passed",
+        "evidence": "Sealed artifacts and workspace report bindings checked; historical audits untouched."
+      }
+    ],
+    "commands": [
+      {
+        "label": "input-composition-tests",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "test/ask.test.ts",
+          "test/help.test.ts",
+          "test/portable-modules.test.ts",
+          "test/menu.test.ts",
+          "--maxWorkers=1",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "logSha256": "55aa6d056d001f2dc02596475163bbec1bd457995150411b1a271d18a6394109",
+        "minimumAvailableGiB": 3.846,
+        "startedAt": "2026-10-13T13:22:35.075000+00:00",
+        "endedAt": "2026-10-13T13:23:05.625989+00:00"
+      },
+      {
+        "label": "re-encode-pty",
+        "command": [
+          "python3",
+          "/tmp/codex-security-artifacts-226b6e2e96f281d3dee77cc1c01fdd35f3c4825fcf40b4d108d37444da24aab8/artifacts/reencode-pty.py"
+        ],
+        "exitCode": 0,
+        "logSha256": "32c3620ed0f9240f82e3a2cca986cda79cb61bdb6d60dca77da16fb6cd44da89",
+        "minimumAvailableGiB": 5.002,
+        "startedAt": "2026-10-13T13:25:24.803089+00:00",
+        "endedAt": "2026-10-13T13:25:28.328521+00:00"
+      },
+      {
+        "label": "re-encode-tests-unsandboxed",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "test/re-encode.test.ts",
+          "--maxWorkers=1",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 0,
+        "logSha256": "2a0e59db46c1fe9cb051834296ed0c7487507551a20c62a4be0aea194ac50534",
+        "minimumAvailableGiB": 5.586,
+        "startedAt": "2026-10-13T13:17:45.541562+00:00",
+        "endedAt": "2026-10-13T13:18:00.329601+00:00"
+      },
+      {
+        "label": "re-encode-tests",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "test/re-encode.test.ts",
+          "--maxWorkers=1",
+          "--no-file-parallelism"
+        ],
+        "exitCode": 1,
+        "logSha256": "4512ebbd13af1baf3262bd2c32bc7f037d8652213980a86a2fd5915776ae19e9",
+        "minimumAvailableGiB": 5.573,
+        "startedAt": "2026-10-13T13:15:22.161451+00:00",
+        "endedAt": "2026-10-13T13:15:32.946275+00:00"
+      },
+      {
+        "label": "source-check-unsandboxed",
+        "command": [
+          "pnpm",
+          "check"
+        ],
+        "exitCode": 0,
+        "logSha256": "47ceed0d6e316a169cf95a94f4ae9b18a9e1837dcc5e1530f4a1d094c74b271c",
+        "minimumAvailableGiB": 5.93,
+        "startedAt": "2026-10-13T13:13:07.215796+00:00",
+        "endedAt": "2026-10-13T13:13:09.493489+00:00"
+      },
+      {
+        "label": "source-check",
+        "command": [
+          "pnpm",
+          "check"
+        ],
+        "exitCode": 1,
+        "logSha256": "900a6e86d535205fd5aa00a7671b5ef5757571ab49b92760280e1f7819f4327e",
+        "minimumAvailableGiB": 6.304,
+        "startedAt": "2026-10-13T13:12:41.027678+00:00",
+        "endedAt": "2026-10-13T13:12:41.554778+00:00"
+      },
+      {
+        "label": "targeted-build",
+        "command": [
+          "pnpm",
+          "build"
+        ],
+        "exitCode": 0,
+        "logSha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494",
+        "minimumAvailableGiB": 6.181,
+        "startedAt": "2026-10-13T13:14:12.627566+00:00",
+        "endedAt": "2026-10-13T13:14:13.149447+00:00"
+      },
+      {
+        "label": "warning-probe",
+        "command": [
+          "node",
+          "/tmp/codex-security-artifacts-226b6e2e96f281d3dee77cc1c01fdd35f3c4825fcf40b4d108d37444da24aab8/artifacts/02_discovery/validation_artifacts/candidate-32a21b807714cca1/warning.mjs"
+        ],
+        "exitCode": 0,
+        "logSha256": "a1c3b1b28af1d0f1c27091f5b08093b437c9706014d461e2c027f2a9dca3c7eb",
+        "minimumAvailableGiB": 6.181,
+        "startedAt": "2026-10-13T13:20:38.526285+00:00",
+        "endedAt": "2026-10-13T13:20:39.542680+00:00"
+      }
+    ],
+    "uniqueTestsPassed": 189,
+    "focusedPtyRecipesPassed": 2,
+    "artifacts": [
+      {
+        "path": "dist/core/re-encoding.js",
+        "sha256": "3c6dc504e52061646ccb9542a9a9b01edfb0b2b8ee5adfae769b4b9d2fed2705"
+      },
+      {
+        "path": "dist/cli/re-encode-command.js",
+        "sha256": "2709e77c7aa0733632ce15d650579416f59610e00c14d7ad723b115de1f34e3d"
+      },
+      {
+        "path": "dist/mnemocode.js",
+        "sha256": "1220395bbaa55b02af7e58f8aceafbda24ba73c0c927ff9b9b2eafde9c2051a1"
+      }
+    ],
+    "memory": {
+      "nodeHeapMiB": 768,
+      "startReserveGiB": 4,
+      "stopReserveGiB": 3,
+      "deadlineSeconds": 120,
+      "minimumAvailableGiB": 3.846
+    }
+  },
+  "findings": [
+    {
+      "id": "AUD-020-SEC001",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "Re-encode drops the fingerprint filter warning",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "evidence": {
+        "locations": [
+          {
+            "path": "src/cli/re-encode-command.ts",
+            "startLine": 168,
+            "endLine": 175,
+            "role": "entrypoint/wrapper"
+          },
+          {
+            "path": "src/cli/re-encode-command.ts",
+            "startLine": 333,
+            "endLine": 343,
+            "role": "root_control"
+          },
+          {
+            "path": "src/core/re-encoding.ts",
+            "startLine": 115,
+            "endLine": 117,
+            "role": "root_control"
+          },
+          {
+            "path": "src/cli/re-encode-command.ts",
+            "startLine": 155,
+            "endLine": 155,
+            "role": "sink"
+          }
+        ],
+        "codeEvidence": [
+          {
+            "id": "wallet-warning-dropped",
+            "label": "Matched result is reduced to a success message",
+            "path": "src/cli/re-encode-command.ts",
+            "startLine": 333,
+            "endLine": 343,
+            "language": "typescript",
+            "role": "root_control",
+            "code": "  const match = await reEncoding.confirmByWallet(walletCheckOf(evidence, passphrase)!);\n  if (!match.matched) {\n    terminalNotice(\n      \"The wallet of this seed phrase does not match: it is not confirmed.\",\n      \"warning\",\n    );\n    return undefined;\n  }\n  const line = walletLine(evidence, match.path);\n  terminalNotice(line, \"success\");\n  return line;",
+            "explanation": "The supplied match.warning is never rendered; success is followed by creation of the new backup."
+          }
+        ],
+        "log": "AUD-020-evidence/warning-probe.log",
+        "logSha256": "a1c3b1b28af1d0f1c27091f5b08093b437c9706014d461e2c027f2a9dca3c7eb"
+      },
+      "reproduction": "With the public BIP39 abandon x11 + about fixture and empty passphrase, run the warning.mjs harness against the fresh reviewed dist. The master fingerprint is 73c5da0a.",
+      "expected": "Retain the library's FINGERPRINT_WARNING when presenting fingerprint-only confirmation.",
+      "observed": "Library returns the warning; CLI exits 0, says the seed phrase is confirmed and omits the warning.",
+      "impact": "Misleading recovery assurance. No fingerprint collision, substituted backup, theft or secret disclosure was demonstrated.",
+      "recommendedFix": "Preserve match.warning through walletConfirms and render it before success. Qualify fingerprint-only confirmation so the output does not imply proof of the intended wallet. Keep supported fingerprint input; offer an address/public key or explicit human recognition when stronger assurance is wanted.",
+      "requiredVerification": [
+        "The public fixture still re-encodes correctly and prints FINGERPRINT_WARNING when the fingerprint matches.",
+        "Address/public-key confirmation remains unchanged and receives no fingerprint-specific warning.",
+        "Wrong dates or mismatched wallet evidence still refuse output; interactive private-screen behavior remains intact."
+      ],
+      "taxonomy": {
+        "category": "recovery assurance information",
+        "cwe": [
+          "CWE-345"
+        ]
+      },
+      "confidence": {
+        "level": "high",
+        "rationale": "Freshly built CLI and direct library control on the same public BIP39 fixture prove the warning is returned but omitted. Confidence is limited to the warning-loss defect; collision exploitation was not performed."
+      },
+      "counterEvidence": [
+        "Fingerprints are a documented supported filter, not a newly promised cryptographic authentication primitive. The published fixture is the correct phrase, not a collision. This validation narrows the reportable issue to discarded warning and overstated confirmation; no theft, direct disclosure or successful backup substitution is established."
+      ],
+      "attackPath": {
+        "summary": "Operator imports old backup -> ReEncoding.of decodes it -> MasterFingerprintEvidence supplies a 32-bit matched flag plus FINGERPRINT_WARNING -> walletConfirms drops warning and emits success -> runReEncode encodes confirmedPhrase. The verified impact is loss of a material assurance warning; the originally proposed chosen-collision substitution remains conditional and unproved.",
+        "dataFlow": "Operator imports old backup -> ReEncoding.of decodes it -> MasterFingerprintEvidence supplies a 32-bit matched flag plus FINGERPRINT_WARNING -> walletConfirms drops warning and emits success -> runReEncode encodes confirmedPhrase. The verified impact is loss of a material assurance warning; the originally proposed chosen-collision substitution remains conditional and unproved.",
+        "reachability": "Ordinary supported re-encode CLI and interactive confirmation routes with --master-fingerprint, against user-selected imported backup data. A malicious import needs operator interaction; there is no remote service.",
+        "impact": "Loss of a security-assurance warning. A targeted colliding replacement would be conditional on additional unproved work and user import.",
+        "likelihood": "low",
+        "preconditions": [
+          "User imports a backup and chooses master-fingerprint confirmation."
+        ],
+        "assumptions": [
+          "Fingerprint confirmation is a supported but documented weak filter; no attacker-controlled collision fixture was produced."
+        ],
+        "limitations": [
+          "No independently generated fixed-target fingerprint collision or cost measurement; full collision/KDF work was excluded by the owner's resource constraints."
+        ],
+        "controls": [
+          "README.md:550 already calls fingerprints filters and recommends an address/public key. src/cli/re-encode-command.ts:325-326 acknowledges chance matches. The public probe is a legitimate matching phrase, not a forged collision. Host callbacks and --recognised are explicit caller/operator assertions, not security boundaries; no private data was leaked or recovery substitution demonstrated."
+        ]
+      }
+    }
+  ],
+  "observations": [],
+  "remediation": [
+    {
+      "id": "AUD-020-SEC001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Original public fixture reproduces warning loss; no production fix in this review."
+    }
+  ],
+  "limitations": [
+    "Only the current working-tree diff and supporting paths were reviewed; no whole-repository or release acceptance.",
+    "PDF/card generation, full vectors, expensive KDF/collision work, Docker, browser suites, executable verification and Windows/macOS runtime were not run.",
+    "Native OS isolation, renderer resolution, filesystem ACLs, external browser integration and maximum-load behavior are not established by these checks.",
+    "The first source check and seven CLI cases failed only under the execution sandbox; unchanged bounded reruns passed. This does not prove every environment behaves the same.",
+    "No independent collision fixture, substitution or theft was demonstrated; the finding is the warning loss.",
+    "Later concurrent edits are excluded; checks remain bound to the original snapshot."
+  ],
+  "informationalRecommendations": [
+    "Interactive re-encode retains write/process capabilities while output is unknown and later narrows Node permissions. Qualify this mode in protection claims; no input-to-execution bypass was demonstrated.",
+    "Host callbacks and exposed result objects are trusted presentation APIs, not isolation boundaries. Immutable confirmation results may be considered separately; no cross-authority exploit established.",
+    "Linux raster temporary-memory claims remain conditional on /dev/shm availability; fallback uses tmpdir(). This unchanged export path was not rendered here.",
+    "Local remediation is preferred for this isolated warning defect. No architectural rewrite is justified by the validated finding alone.",
+    "Startup follow-up: direct representations have 12/24-word exact answers and refusals, while intermediate 15/18/21-word Seedshift answers currently live in the full suite. Fixed published intermediate answers could improve quick-start coverage without rendering or expensive KDF work.",
+    "SSKR is checked before feature use: exact creation, official grouped recovery, insufficient quorum and damaged-value refusal. Its feature-first-use known answer is 16-byte entropy; an independently verified fixed 32-byte answer would additionally cover the longest BIP39 phrase. All five entropy lengths are already exercised by ordinary SSKR tests. Existing deterministic 32-byte fixtures were generated by the pinned bridge and alone do not provide independent cryptographic validation."
+  ],
+  "codexSecurity": {
+    "scanId": "ead04f93-dd90-4fc2-9929-0439e91e4a8f",
+    "completedAt": "2026-10-13T13:38:52.506990Z",
+    "snapshotDigest": "codex-security-snapshot/v1:sha256:f17d7a663b1d62976125572732594213c052daf43fe3fde6c9bbd9bf406ce26b",
+    "findingId": "csf_3aaaaf0ff1051dd8a7bb4be4",
+    "occurrenceId": "occ_ccbb15e9ad72eb421a235d59",
+    "candidateId": "candidate-32a21b807714cca1",
+    "artifacts": [
+      {
+        "mediaType": "application/json",
+        "path": "findings.json",
+        "sha256": "faa21b65662681f36e151fc35ef57775cfe59e9beaccf0b9a9dd4cfeef73a01d"
+      },
+      {
+        "mediaType": "application/json",
+        "path": "coverage.json",
+        "sha256": "691179c915a9b85930478b08d2d0bbdc88a54af69befff8119363190a5ce77aa"
+      },
+      {
+        "mediaType": "application/octet-stream",
+        "path": "artifacts/02_discovery/validation_artifacts/candidate-32a21b807714cca1/warning-probe.log",
+        "sha256": "a1c3b1b28af1d0f1c27091f5b08093b437c9706014d461e2c027f2a9dca3c7eb"
+      },
+      {
+        "mediaType": "application/octet-stream",
+        "path": "artifacts/03_coverage/checks/input-composition-tests.log",
+        "sha256": "55aa6d056d001f2dc02596475163bbec1bd457995150411b1a271d18a6394109"
+      },
+      {
+        "mediaType": "application/octet-stream",
+        "path": "artifacts/03_coverage/checks/re-encode-pty.log",
+        "sha256": "32c3620ed0f9240f82e3a2cca986cda79cb61bdb6d60dca77da16fb6cd44da89"
+      },
+      {
+        "mediaType": "application/octet-stream",
+        "path": "artifacts/03_coverage/checks/re-encode-tests-unsandboxed.log",
+        "sha256": "2a0e59db46c1fe9cb051834296ed0c7487507551a20c62a4be0aea194ac50534"
+      },
+      {
+        "mediaType": "application/octet-stream",
+        "path": "artifacts/03_coverage/checks/source-check-unsandboxed.log",
+        "sha256": "47ceed0d6e316a169cf95a94f4ae9b18a9e1837dcc5e1530f4a1d094c74b271c"
+      },
+      {
+        "mediaType": "application/octet-stream",
+        "path": "artifacts/03_coverage/citation-validation.json",
+        "sha256": "940f385415da736c1a70398116c9df285d8fa01f6db352ca58875e6675257a0f"
+      }
+    ],
+    "coverageSurfaceCount": 48,
+    "targetWarnings": [
+      "Working-tree contents changed while the scan was running; results were saved for the original snapshot."
+    ],
+    "usage": {
+      "cacheWriteInputTokens": 0,
+      "cachedInputTokens": 19256576,
+      "coverage": "partial",
+      "inputTokens": 20098999,
+      "outputTokens": 97295,
+      "reasoningOutputTokens": 46451,
+      "source": "codex_rollout",
+      "threadCount": 6,
+      "totalTokens": 20196294,
+      "warnings": [
+        "rollout_record_invalid"
+      ]
+    }
+  },
+  "startupFollowup": {
+    "command": [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "test/startup-edges.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism"
+    ],
+    "testsPassed": 21,
+    "exitCode": 0,
+    "sourceBefore": "03c665c774f5f87bc6d17a4e19aaab2a3eeccd38f8172530efa79ed253e8ca4c",
+    "sourceAfter": "03c665c774f5f87bc6d17a4e19aaab2a3eeccd38f8172530efa79ed253e8ca4c",
+    "logSha256": "b2e503b984a6c0595974986551ed8fa1f6edd25131fe509271ce920b10d9e9e0",
+    "limitation": "Supplemental check after concurrent edits; separate from the sealed diff's 189 tests.",
+    "label": "startup-followup"
+  },
+  "portableProbeReplay": {
+    "command": [
+      "node",
+      "docs/audits/AUD-020-harnesses/warning.mjs"
+    ],
+    "exitCode": 0,
+    "sourceBefore": "03c665c774f5f87bc6d17a4e19aaab2a3eeccd38f8172530efa79ed253e8ca4c",
+    "sourceAfter": "03c665c774f5f87bc6d17a4e19aaab2a3eeccd38f8172530efa79ed253e8ca4c",
+    "logSha256": "a1c3b1b28af1d0f1c27091f5b08093b437c9706014d461e2c027f2a9dca3c7eb",
+    "label": "portable-warning",
+    "limitation": "Later portable-harness replay, separate from original sealed evidence; public fixture still reproduces warning loss."
+  },
+  "remediationAddendum": {
+    "date": "2026-10-13",
+    "fixSourceFingerprint": "9bdbbca420e64cbe2af7f750af2edf67d7ec9aba4b9061388b4fef6ffa1ea2b0",
+    "scope": "Remediation of the finding and the informational recommendations of this report, made in the same working tree by the repository's coding assistant on the owner's request.",
+    "fixSnapshot": {
+      "file": "AUD-020-evidence/remediation/snapshot.json",
+      "localOnly": true
+    },
+    "fingerprintMethod": "As the reviewed snapshot's: SHA-256 of compact JSON sorted path/SHA-256 entries for Git tracked and untracked non-ignored files, excluding docs/audits/; absent files excluded.",
+    "statusRule": "fixed, not verified: no fix or verification commit exists yet, and the full test suite, the PDF-generating tests and Windows and macOS runs were not run.",
+    "findings": [
+      {
+        "id": "AUD-020-SEC001",
+        "title": "Re-encode drops the fingerprint filter warning",
+        "originalSeverity": "low",
+        "status": "fixed",
+        "disposition": "source-fixed",
+        "fixCommit": null,
+        "verificationCommit": null,
+        "fixSourceFingerprint": "9bdbbca420e64cbe2af7f750af2edf67d7ec9aba4b9061388b4fef6ffa1ea2b0",
+        "date": "2026-10-13",
+        "evidence": {
+          "change": "walletConfirms (src/cli/re-encode-command.ts) gives back the notices of a match: the check's own warning first (match.warning, FINGERPRINT_WARNING for a fingerprint), then the confirmation line, shown under the phrase and again at the top of each screen of the new backup. A fingerprint's line says the seed phrase is accepted, not proven; an address or key keeps its confirmation without a warning. ReEncoding.confirmByWallet (src/core/re-encoding.ts) records the warning in its frozen confirmation, so that another host shows it too; its self-test checks the fingerprint's warning and its absence for an address.",
+          "files": [
+            "src/cli/re-encode-command.ts",
+            "src/core/re-encoding.ts",
+            "src/core/re-encoding-self-test.ts",
+            "README.md",
+            "CHANGELOG.md",
+            "docs/releases/v0.1.0.md",
+            "scripts/verify-terminal-input.py",
+            "test/re-encode.test.ts"
+          ],
+          "tests": [
+            "AUD-020-SEC001: a fingerprint's match is accepted with its warning (4 tests, test/aud-020.test.ts)",
+            "the terminal case check_re_encode_menu waits for the warning, then the line, on the phrase's screen and the new backup's"
+          ],
+          "reproduction": {
+            "label": "AUD-020-evidence/remediation/warning-probe",
+            "exitCode": 1,
+            "log": "AUD-020-evidence/remediation/warning-probe.log",
+            "logSha256": "998986663aa9895711ab51b4bc205b0f09c3a5c87b35df41e1d44b6e6ba72e7a",
+            "localOnly": true
+          },
+          "reproductionOutcome": "fails as expected: the baseline probe's assertion that the CLI says the seed phrase is confirmed no longer holds"
+        },
+        "remainingGap": "No commit exists; the full test suite and Windows and macOS runs were not run."
+      }
+    ],
+    "recommendations": [
+      {
+        "recommendation": "Qualify interactive re-encode in protection claims",
+        "disposition": "fixed",
+        "change": "README (Protection while it runs) and SECURITY.md say that re-encode with --ask-secrets and no option of the new backup keeps the rights to write files and start programs until the new backup is answered, that the permission model then gives up those the answers do not need, and that the system's limits keep what they allowed at the start."
+      },
+      {
+        "recommendation": "Immutable confirmation results",
+        "disposition": "fixed",
+        "change": "ReEncoding freezes the confirmation it records (by person, or by wallet with path and warning)."
+      },
+      {
+        "recommendation": "Linux raster temporary memory depends on /dev/shm",
+        "disposition": "fixed",
+        "change": "SECURITY.md and the comment of rasterFolder (src/export/image-export.ts) say that the system's temporary folder, usually on the disk, is used where /dev/shm cannot be written and on other systems."
+      },
+      {
+        "recommendation": "Startup answers for 15, 18 and 21 words",
+        "disposition": "fixed",
+        "change": "SEEDSHIFT_ANSWERS (src/core/representations-self-test.ts), a deliberate copy of vectors/mnemocode-v1.json checksum-valid-seedshift-15, -18 and -21, run before every command in all five forms, forward and back (about 13 ms); test/startup-edges.test.ts keeps them in step with the file and fails on a wrong forward or reverse answer."
+      },
+      {
+        "recommendation": "An independently verified 32-byte SSKR answer",
+        "disposition": "fixed",
+        "change": "sskrLongVector (src/sskr/known-answers.ts), two shares of vectors/sskr-v1.json bip39-256-2-of-3, restored by the engine before shares are split or combined. scripts/verify-sskr-known-answers.py, a standard-library Python implementation of Bytewords, CRC-32, the share metadata and bc-shamir's GF(2^8) interpolation and digest, first restores the official BCR-2020-011 vector from both valid quorums and refuses the three invalid ones, then restores every deterministic set from every pair of its shares; CI runs it. test/startup-edges.test.ts keeps the answer in step and fails on a wrong 32-byte recovery, wiping it."
+      }
+    ],
+    "checks": [
+      {
+        "label": "AUD-020-evidence/remediation/check",
+        "exitCode": 0,
+        "log": "AUD-020-evidence/remediation/check.log",
+        "logSha256": "5f65d61ba0c5bbed32ef1be55f0b37ed7462cf7e709431a3ccfb1749519739c7",
+        "localOnly": true
+      },
+      {
+        "label": "AUD-020-evidence/remediation/prettier",
+        "exitCode": 0,
+        "log": "AUD-020-evidence/remediation/prettier.log",
+        "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+        "localOnly": true
+      },
+      {
+        "label": "AUD-020-evidence/remediation/build",
+        "exitCode": 0,
+        "log": "AUD-020-evidence/remediation/build.log",
+        "logSha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494",
+        "localOnly": true
+      },
+      {
+        "label": "AUD-020-evidence/remediation/self-test",
+        "exitCode": 0,
+        "log": "AUD-020-evidence/remediation/self-test.log",
+        "logSha256": "27148c73074d513e80376ed9485fcba90196aaa79728b816af9c5a0f693733f3",
+        "localOnly": true
+      },
+      {
+        "label": "AUD-020-evidence/remediation/tests",
+        "exitCode": 0,
+        "log": "AUD-020-evidence/remediation/tests.log",
+        "logSha256": "9031562f8b503c8d7bb2d6c6d5b4a6d5b0e897fa7e89fa3ccc9025f17cdd8682",
+        "localOnly": true
+      },
+      {
+        "label": "AUD-020-evidence/remediation/terminal-re-encode",
+        "exitCode": 0,
+        "log": "AUD-020-evidence/remediation/terminal-re-encode.log",
+        "logSha256": "0e91687d8bd06f614ac47170444452d0b3de5bc4ac2995557450f950ed4ee9f5",
+        "localOnly": true
+      },
+      {
+        "label": "AUD-020-evidence/remediation/sskr-independent",
+        "exitCode": 0,
+        "log": "AUD-020-evidence/remediation/sskr-independent.log",
+        "logSha256": "5735ee7eb756a60aed4b573aa88b44d0e009a26f3a4101d87048b4f1845d664c",
+        "localOnly": true
+      }
+    ],
+    "checkCounts": {
+      "tests": "11 files, 266 tests passed",
+      "selfTest": "PASS, 7 public vectors, 75 representation round trips"
+    },
+    "notRun": [
+      "The full test suite (owner: targeted checks only)",
+      "The PDF-generating test files",
+      "Windows and macOS runs of the terminal checks"
+    ]
+  }
+}

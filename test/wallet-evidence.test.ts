@@ -8,6 +8,7 @@ import { HDKey, type Versions } from "@scure/bip32";
 import {
   DEFAULT_ADDRESS_COUNT,
   defaultAddressCount,
+  EVIDENCE_MATCHED_BY,
   MAX_ADDRESS_COUNT,
   WalletEvidenceCheck,
   bitcoinProfiles,
@@ -18,6 +19,7 @@ import {
   type DerivationLocation,
   type EvidenceMatch,
   type Pbkdf2HmacSha512,
+  type WalletEvidence,
 } from "../src/core/wallet-evidence.js";
 import {
   masterFingerprint,
@@ -437,6 +439,26 @@ describe("the validators, which need no phrase", () => {
         located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"], testnet),
       ),
     ).not.toThrow();
+  });
+});
+
+describe("what a line about a match names, for each kind of evidence", () => {
+  const named: readonly (readonly [WalletEvidence["kind"], string])[] = [
+    ["master-fingerprint", "fingerprint"],
+    ["master-xpub", "key"],
+    ["account-xpub", "key"],
+    ["address", "address"],
+    ["compressed-public-key", "key"],
+    ["wif", "key"],
+    ["coin-address", "address"],
+  ];
+
+  it.each(named)("a line about a match of %s evidence names the %s", (kind, subject) => {
+    expect(EVIDENCE_MATCHED_BY[kind]).toBe(subject);
+  });
+
+  it("names every kind of evidence, and nothing else", () => {
+    expect(Object.keys(EVIDENCE_MATCHED_BY).sort()).toEqual(named.map(([kind]) => kind).sort());
   });
 });
 

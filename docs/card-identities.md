@@ -16,7 +16,7 @@ The email and the website are decoration. They end in `.example`, a domain reser
 
 ## Studio on collection sheets
 
-The design studio named on a collection sheet is picked separately from the employer, also once per export. MnemoCode has 37 studio names, 30 slogans, five subtitles and six footers.
+The design studio named on a collection sheet is picked separately from the employer, also once per export. MnemoCode has 37 studio names, 29 slogans, five subtitles and six footers.
 
 ## Your own details
 

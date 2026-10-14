@@ -6,6 +6,8 @@ import { homedir } from "node:os";
 import { relative, resolve, sep } from "node:path";
 import { pathWithin } from "./path-within.js";
 import { terminalMore, terminalNotice } from "./terminal.js";
+import { value, type ParsedArguments } from "./arguments.js";
+import { SAVED_OPTIONS } from "./output-options.js";
 
 /** Folder names, compared without case, and the service they belong to. */
 const CLOUD_FOLDER_NAMES: readonly (readonly [RegExp, string])[] = [
@@ -61,4 +63,9 @@ export function warnOfCloudCopy(path: string | undefined): void {
   if (service === undefined) return;
   terminalNotice(`${service} keeps a copy of ${path!}`, "warning");
   terminalMore("cloud-folders");
+}
+
+/** warnOfCloudCopy for every result that `args` save. */
+export function warnOfCloudCopies(args: ParsedArguments): void {
+  for (const key of SAVED_OPTIONS) warnOfCloudCopy(value(args, key));
 }

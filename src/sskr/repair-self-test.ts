@@ -49,12 +49,19 @@ function checkRepair(text: string, ur: string, filled: string, name: string): vo
 }
 
 /**
- * The quick known answers: the official first share repaired from a whole color and two digits of
- * another unread, from a whole Unicode code and one digit of another, and from a digit in each of
- * two Color Unicode codes; and the shares refused,
- * with an unmarked error, too many marks, or a ? for a digit of a word number.
+ * The quick known answers: the first share of the set vector repaired from a whole color unread
+ * before a trailing decoy card; the official first share repaired from a whole color and two
+ * digits of another unread, from a whole Unicode code and one digit of another, and from a digit
+ * in each of two Color Unicode codes; and the shares refused, with an unmarked error, too many
+ * marks, or a ? for a digit of a word number.
  */
 export function checkShareRepairStartup(): void {
+  checkRepair(
+    `${marked(SET_COLORS[0]!, "#1F9121")} #000000`,
+    SET_SHARES[0]!,
+    "6:#1F9121",
+    "Marked share before a trailing decoy",
+  );
   const official = sskrVector.shares[0];
   checkRepair(
     marked(marked(OFFICIAL_COLORS, "#EE44D3"), "#E75FF8", "#E7?FF?"),

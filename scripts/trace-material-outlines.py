@@ -4,13 +4,14 @@
 
 The tint of a material sample (src/export/material-cards.ts) is clipped to the object, so that the
 backdrop, the shadow and the screw of the photograph keep their own colour. Every finish of a style
-shows the same kind of object, a cabinet front, a hood, a switch plate or a box corner,
+shows the same kind of object, a cabinet front, a hood, a switch plate, a box corner or a tile,
 photographed in another colour; so one outline per style is traced from the finish where the
 object stands out best, and every finish gets the scale and shift that lay that outline on its own
 object.
 
 In the reference finish the object is told from its backdrop by one plain rule per style (darker
-than the light card, bluer than it, more colourful than the dark floor, or inside a sharp rim),
+than the light card, bluer than it, more colourful than the dark floor, lighter than the dark
+wall, or inside a sharp rim),
 then cleaned: small gaps are closed, thin fringes opened, small holes filled. The outline runs
 INSET pixels inside the object's edge. The placement on another finish is the scale and shift that
 put the object's edge on the strongest edges of that photograph, or, where the rule finds the
@@ -19,8 +20,11 @@ object in every finish, on the object found there; the search takes about a minu
 The script prints, per style, the outline as rings of x, y pairs in fractions of the crop (the
 first ring is the object, any further ring a hole in it, such as a screw), and the placement of
 each finish as scale, x shift and y shift, ready to paste into src/export/material-artwork.ts.
-With --preview it also writes every crop with its outline drawn, to check the result by eye. It
-needs Python 3 with Pillow and NumPy.
+A sample shows its whole crop, so each crop holds its object in its middle: where an object lies
+off the middle of its crop by more than a pixel, the script says so and prints where the crop
+starts that centres it. Move such a crop and run the script again for the outline and the
+placements of the centred crops. With --preview it also writes every crop with its outline drawn,
+to check the result by eye. It needs Python 3 with Pillow and NumPy.
 """
 
 import re
@@ -67,7 +71,9 @@ def colourfulness(pixels):
 class Style:
     """How the object is found in the reference finish of a style."""
 
-    def __init__(self, reference, rule, closing, opening, keep_holes, fit_by_mask=False):
+    def __init__(
+        self, reference, rule, closing, opening, keep_holes, fit_by_mask=False, centring="sides"
+    ):
         # The finish whose object stands out best from its backdrop.
         self.reference = reference
         # True for the pixels of the object, from the blurred RGB pixels.
@@ -81,19 +87,30 @@ class Style:
         # Whether the rule finds the object in every finish, so that the outline is laid on the
         # object found there (mask_fit) rather than on the strongest edges (edge_fit).
         self.fit_by_mask = fit_by_mask
+        # How the object is found that each crop is moved to hold in its middle: "sides", the first
+        # sharp step from the backdrop on each side (sides_box); "outline", the outline as laid on
+        # the finish, for an object with a sharp shadow that the sides would take in; or None, for
+        # an object that runs off its photograph, such as the corner of a box.
+        self.centring = centring
 
 
 # The limits were read from the photographs: the black hood stays below 95 out of 255 while its
 # card and the shadow on it stay above; the blue plate has more blue than red by more than 6, while
 # the warm card and its shadow have more red; the teal box is more colourful than 10, while the
-# black floor, the frame around it and the steel screw are grey. Every kitchen front has a sharp
-# rim, bevel included, inside a soft shadow. The closing joins the bright facets of the hood and
-# the bevels of the plate and the box to the object.
+# black floor, the frame around it and the steel screw are grey; the limestone tile stays above 120
+# while the dark wall behind it and its shadow stay below. Every kitchen front has a sharp rim,
+# bevel included, inside a soft shadow. The closing joins the bright facets of the hood and the
+# bevels of the plate and the box to the object.
 STYLES = {
     "kitchen": Style("Graphite matte", inside_rim, 8, 3, False, fit_by_mask=True),
-    "vehicle": Style("Satin black", lambda pixels: lightness(pixels) < 95, 8, 3, False),
+    "vehicle": Style(
+        "Satin black", lambda pixels: lightness(pixels) < 95, 8, 3, False, centring="outline"
+    ),
     "switch": Style("Ocean blue", lambda pixels: pixels[..., 2] - pixels[..., 0] > 6, 8, 4, False),
-    "enclosure": Style("Petrol teal", lambda pixels: colourfulness(pixels) > 10, 8, 6, True),
+    "enclosure": Style(
+        "Petrol teal", lambda pixels: colourfulness(pixels) > 10, 8, 6, True, centring=None
+    ),
+    "tile": Style("Ivory limestone", lambda pixels: lightness(pixels) > 120, 8, 4, False),
 }
 # Largest colour step, per channel out of 255, between neighbouring backdrop pixels in inside_rim.
 GROW_STEP = 6
@@ -110,6 +127,14 @@ SIMPLIFY = 1.0
 MAX_SHIFT = 24
 SCALES = np.arange(0.95, 1.0501, 0.005)
 BAND = 2
+# A side of the object is the first step of lightness larger than this, out of 255, between the
+# pixels on either side of one, within the outer SIDE_REACH of the crop: a soft shadow stays below
+# it, while the edge of every tile, plate and front, the dark marble's bevel included, is above it.
+# The side is the SIDE_PERCENTILE of the lines across the crop, so that rounded corners and a few
+# noisy lines do not move it.
+SIDE_STEP = 12
+SIDE_REACH = 0.3
+SIDE_PERCENTILE = 5
 NEIGHBOURS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
@@ -313,6 +338,38 @@ def mask_fit(mask, crop, style):
     return max(placements(), key=score), centre
 
 
+def first_side(lines):
+    """Where the object starts on lines scanned from their first pixel inwards (see SIDE_STEP)."""
+    reach = int(lines.shape[1] * SIDE_REACH)
+    sharp = np.abs(lines[:, 2:] - lines[:, :-2])[:, :reach] > SIDE_STEP
+    crossing = sharp.any(axis=1)
+    return np.percentile(sharp.argmax(axis=1)[crossing] + 1, SIDE_PERCENTILE)
+
+
+def sides_box(crop):
+    """The object's box in the crop as (left, top, right, bottom), from its sides."""
+    gray = lightness(np.asarray(crop.filter(ImageFilter.GaussianBlur(BLUR)), dtype=float))
+    height, width = gray.shape
+    return (
+        first_side(gray),
+        first_side(gray.T),
+        width - first_side(gray[:, ::-1]),
+        height - first_side(gray.T[:, ::-1]),
+    )
+
+
+def outline_box(ring, scale, dx, dy):
+    """The box, as sides_box gives it, of the outline as laid on a crop at (scale, dx, dy)."""
+    points = np.array([((x + 0.5) * scale + dx, (y + 0.5) * scale + dy) for x, y in ring])
+    return (*points.min(axis=0), *points.max(axis=0))
+
+
+def off_centre(box, size):
+    """How far the middle of a box lies from the middle of a crop of `size`, as (x, y)."""
+    left, top, right, bottom = box
+    return np.array([(left + right) / 2, (top + bottom) / 2]) - np.array(size) / 2
+
+
 def placement(fit, mask, reference_fit, crop):
     """Where the outline lies on a photograph: (scale, dx, dy) such that the outline point (x, y)
     lies at (x * scale + dx, y * scale + dy), in pixels. The fit of the reference itself is taken
@@ -333,19 +390,40 @@ def main(arguments):
         width, height = reference.size
         mask, kept_holes = object_mask(reference, settings)
         outline = rings(mask, kept_holes)
-        flat = lambda ring: ", ".join(
-            "%.3f, %.3f" % ((x + 0.5) / width, (y + 0.5) / height) for x, y in ring
-        )
+        def flat(ring):
+            return ", ".join(
+                "%.3f, %.3f" % ((x + 0.5) / width, (y + 0.5) / height) for x, y in ring
+            )
+
         print(f"// {style}: {[len(ring) for ring in outline]} points")
         print("  outline: [" + ", ".join(f"[{flat(ring)}]" for ring in outline) + "],")
         if settings.fit_by_mask:
-            fit = lambda mask, crop: mask_fit(mask, crop, settings)
+            def fit(mask, crop):
+                return mask_fit(mask, crop, settings)
         else:
             fit = edge_fit
         reference_fit = fit(mask, reference)
+        rows = dict(finishes(style))
         for name, crop in crops.items():
             scale, dx, dy = placement(fit, mask, reference_fit, crop)
             print(f'  "{name}": [{scale:.3f}, {dx / width:.3f}, {dy / height:.3f}]')
+            if settings.centring is not None:
+                box = (
+                    sides_box(crop)
+                    if settings.centring == "sides"
+                    else outline_box(outline[0], scale, dx, dy)
+                )
+                x, y, _, _, source_width, _ = rows[name]
+                # In pixels of the photograph as the rows give them.
+                off_x, off_y = np.rint(
+                    off_centre(box, crop.size) * source_width / image.width
+                ).astype(int)
+                # A pixel is what rounding the crop to whole pixels leaves.
+                if max(abs(off_x), abs(off_y)) > 1:
+                    print(
+                        f"    off centre by {off_x}, {off_y}: centred, it starts at "
+                        f"{x + off_x}, {y + off_y}"
+                    )
             if preview:
                 preview.mkdir(parents=True, exist_ok=True)
                 drawn = crop.copy()

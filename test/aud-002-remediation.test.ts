@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
 import { integerOption } from "../src/cli/arguments.js";
 import { bip39Passphrase, walletEvidence } from "../src/cli/bitcoin-options.js";
-import { readBoundedTextFile } from "../src/cli/input.js";
+import { readBoundedTextFile } from "../src/cli/text-file.js";
 import { validateOutputPaths } from "../src/cli/output-paths.js";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";

@@ -12,6 +12,7 @@ import { CardPreview, type DesignSelection } from "../export/card-preview.js";
 import { value, type ParsedArguments, integerOption } from "./arguments.js";
 import { preflightOutputs } from "./output-saving.js";
 import { BIP39_WORD_COUNTS } from "../core/bip39-sizes.js";
+import { CARD_FORMAT_NUMBERS } from "./format-numbers.js";
 
 export async function runPreview(args: ParsedArguments): Promise<void> {
   const path = value(args, "pdf");
@@ -32,17 +33,22 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
     ) {
       throw new Error("Template listing cannot be combined with preview output settings.");
     }
-    terminalResultHeader("Card templates", [["Installed", String(cardTemplates.length)]]);
+    // Every design prints the codes of each form that has cards, so the forms are named once.
+    terminalResultHeader("Card templates", [
+      ["Installed", String(cardTemplates.length)],
+      ["Prints", `format ${CARD_FORMAT_NUMBERS}`],
+    ]);
     if (!cardTemplates.length)
       console.log(
         "No approved card templates are installed yet. Each design will be added after individual approval.",
       );
+    // Each with its number, which --template takes as well as the id (findTemplate).
+    const numberWidth = String(cardTemplates.length).length;
     const idWidth = Math.max(...cardTemplates.map((template) => template.id.length));
-    const kindWidth = Math.max(...cardTemplates.map((template) => template.kind.length));
     const nameWidth = Math.max(...cardTemplates.map((template) => template.name.length));
-    for (const template of cardTemplates) {
+    for (const [index, template] of cardTemplates.entries()) {
       console.log(
-        `${template.id.padEnd(idWidth)}   ${template.kind.padEnd(kindWidth)}   ${template.name.padEnd(nameWidth)}   ${template.description}`,
+        `${String(index + 1).padStart(numberWidth)}  ${template.id.padEnd(idWidth)}   ${template.name.padEnd(nameWidth)}   ${template.description}`,
       );
     }
     return;
@@ -55,7 +61,7 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
     throw new Error("Choose either all templates or one specific template, not both.");
   const selection: DesignSelection = args.all === true ? { every: true } : { template: id };
   if (directory !== undefined) {
-    CardPreview.assertSeparateCards(selection);
+    CardPreview.assertOneDesign(selection);
     validateCardOptions(args, "colors");
   }
   await preflightOutputs(args);

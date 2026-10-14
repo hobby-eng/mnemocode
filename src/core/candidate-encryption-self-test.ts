@@ -96,6 +96,25 @@ export async function checkCandidateEncryptionQuick(): Promise<void> {
     "An oversized encrypted candidate file",
   );
   const identity = { identity: TEST_IDENTITY };
+  const malformed = `${TEST_IDENTITY.slice(0, -1)}A`;
+  await expectFileRefused(
+    async () => {
+      try {
+        await decryptCandidates(bytesOfHex(TO_THE_SESSION_KEY), { identity: malformed });
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          error.message.includes(malformed) ||
+          error.cause !== undefined
+        )
+          throw new Error("A malformed identity reached diagnostics");
+        throw error;
+      }
+    },
+    "key",
+    /not a valid age identity/u,
+    "A malformed Scanner identity",
+  );
   expectSame(
     hexOfBytes(await decryptCandidates(bytesOfHex(TO_THE_SESSION_KEY), identity)),
     THREE_PHRASES_LIST,

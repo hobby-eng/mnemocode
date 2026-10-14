@@ -42,6 +42,19 @@ export function candidateListHolds(count: number): boolean {
 
 /** BIP39 entropy: 16 to 32 bytes for 12 to 24 words. */
 const ENTROPY_LENGTHS: ReadonlySet<number> = new Set(BIP39_ENTROPY_BYTES);
+// A genuine typed array may shadow byteLength with an own property. Its intrinsic getter reads
+// the actual storage, which the typed-array copy constructor copies too (ECMA-262 TypedArray).
+const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
+const intrinsicByteLength = Object.getOwnPropertyDescriptor(
+  typedArrayPrototype,
+  "byteLength",
+)!.get!;
+// instanceof trusts an object's replaceable prototype. The intrinsic tag getter reads the real
+// element kind, including byte arrays from another realm, without consulting a custom tag.
+const intrinsicArrayName = Object.getOwnPropertyDescriptor(
+  typedArrayPrototype,
+  Symbol.toStringTag,
+)!.get!;
 /** Magic, version, flags, entropy length and the 4-byte count. */
 const HEADER_BYTES = 11;
 const LENGTH_BYTES = 2;
@@ -63,6 +76,7 @@ export class TooManyForList extends Error {
 }
 
 export interface CandidateRecord {
+  /** Byte data, also at runtime: Uint8Array, including Buffer and subarray views. */
   readonly entropy: Uint8Array;
   /** The record's own BIP39 passphrase; without it, the list's. */
   readonly passphrase?: string;
@@ -147,11 +161,20 @@ export function encodeCandidateList(list: CandidateList): Uint8Array {
   const count = records.length;
   if (count < 1 || count > MAX_CANDIDATE_RECORDS)
     throw new Error(`A candidate list holds 1 to ${counting(MAX_CANDIDATE_RECORDS)} records.`);
-  const entropyLength = records[0]?.entropy?.length;
+  // Read each host field once: a getter must not supply bytes to validation and another value
+  // to serialization. Own the admitted bytes before passphrase getters can change their source.
+  const entropies = records.map((record) => record?.entropy);
+  const lengths = entropies.map((bytes) =>
+    ArrayBuffer.isView(bytes) && intrinsicArrayName.call(bytes) === "Uint8Array"
+      ? (intrinsicByteLength.call(bytes) as number)
+      : undefined,
+  );
+  const entropyLength = lengths[0];
   if (
     entropyLength === undefined ||
     !ENTROPY_LENGTHS.has(entropyLength) ||
-    records.some((r) => r?.entropy?.length !== entropyLength)
+    // TypedArray.set would silently narrow a wider array or coerce ordinary array elements.
+    lengths.some((length) => length !== entropyLength)
   )
     throw new Error("Every candidate must be BIP39 entropy of one length, 16 to 32 bytes.");
   // The passphrases as bytes are this function's own: copied into the list, then wiped, also when a
@@ -163,7 +186,12 @@ export function encodeCandidateList(list: CandidateList): Uint8Array {
     return bytes;
   };
   try {
-    return listBytes(records, entropyLength, count, {
+    const copies = entropies.map((bytes) => {
+      const copy = new Uint8Array(bytes);
+      owned.push(copy);
+      return copy;
+    });
+    return listBytes(copies, copies[0]!.byteLength, count, {
       global: bytesOf(list.passphrase, "passphrase for all candidates"),
       own: records.map((record, index) =>
         bytesOf(record.passphrase, `passphrase of candidate ${index + 1}`),
@@ -176,7 +204,7 @@ export function encodeCandidateList(list: CandidateList): Uint8Array {
 
 /** The bytes of a checked list: its header, passphrases and records, the CRC and the padding. */
 function listBytes(
-  records: readonly CandidateRecord[],
+  entropies: readonly Uint8Array[],
   entropyLength: number,
   count: number,
   passphrases: {
@@ -200,8 +228,8 @@ function listBytes(
     parts.push(length, bytes);
   };
   if (global) field(global);
-  records.forEach((record, index) => {
-    parts.push(record.entropy);
+  entropies.forEach((entropy, index) => {
+    parts.push(entropy);
     if (perRecord) field(own[index] ?? new Uint8Array());
   });
   const contentLength = parts.reduce((sum, part) => sum + part.length, 0);

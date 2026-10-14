@@ -37,6 +37,7 @@ import {
 import { factLine, STYLE_CODES } from "./terminal-style.js";
 import { isContinuation, validCharacters } from "./utf8.js";
 import type { WordHints } from "../core/word-hints.js";
+import { listInWords } from "../core/places.js";
 
 /** Marker, number and the gaps before a label: "› 1  ". */
 const LABEL_INDENT = 5;
@@ -47,8 +48,8 @@ export interface Choice<T> {
   readonly note?: string;
   /** A grey second line under the note, such as an example. */
   readonly example?: string;
-  /** The digit that chooses this entry at once; by default its place, 1 to 9. */
-  readonly digit?: number;
+  /** The digit that chooses this entry at once; by default its place, 1 to 9; null for none. */
+  readonly digit?: number | null;
   readonly value: T;
 }
 
@@ -103,6 +104,7 @@ export function shortened(text: string, room: number): string {
 }
 
 function digitOf<T>(choice: Choice<T>, index: number): number | undefined {
+  if (choice.digit === null) return undefined;
   return choice.digit ?? (index < 9 ? index + 1 : undefined);
 }
 
@@ -135,10 +137,22 @@ export function listLines<T>(choices: readonly Choice<T>[], selected: number): s
   return lines;
 }
 
+/**
+ * The digits that choose an entry at once, as the hint names them: a range where they are every
+ * digit from the lowest to the highest, such as "0 to 9"; otherwise each, in the order of the list,
+ * such as "7, 8, 9 or 0" where the entries that ask for a secret are left out.
+ */
+function digitsInWords(digits: readonly number[]): string {
+  const lowest = Math.min(...digits);
+  const highest = Math.max(...digits);
+  return new Set(digits).size === highest - lowest + 1
+    ? `${lowest} to ${highest}`
+    : listInWords(digits, "or");
+}
+
 function keyHint<T>(choices: readonly Choice<T>[], quit: string): string {
   const digits = choices.map(digitOf).filter((digit) => digit !== undefined);
-  const range =
-    digits.length > 1 ? ` · ${Math.min(...digits)} to ${Math.max(...digits)} at once` : "";
+  const range = digits.length > 1 ? ` · ${digitsInWords(digits)} at once` : "";
   return `↑ ↓ choose · Enter selects${range} · Esc ${quit}`;
 }
 

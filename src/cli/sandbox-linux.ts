@@ -25,6 +25,7 @@
 // io_uring, /dev/null opened for writing, a program started at a path where none can be.
 
 import { readFileSync } from "node:fs";
+import { MEBIBYTE } from "../core/byte-units.js";
 import {
   noLimit,
   RLIMIT_CORE,
@@ -168,7 +169,6 @@ const RLIM_INFINITY = 0xffff_ffff_ffff_ffffn;
 const CAP_IPC_LOCK = 14n;
 /** MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT: every page, also later ones, once it is used. */
 const LOCK_ALL_ON_FAULT = 1 | 2 | 4;
-const BYTES_PER_MIB = 1024 * 1024;
 
 // Probes.
 const AF_INET = 2;
@@ -309,7 +309,7 @@ export class LinuxSandbox implements SystemSandbox {
     const lockable = soft === RLIM_INFINITY || ((capabilities >> CAP_IPC_LOCK) & 1n) === 1n;
     if (!lockable)
       throw new Error(
-        `not locked, the system lets a program lock only ${Number(soft) / BYTES_PER_MIB} MiB`,
+        `not locked, the system lets a program lock only ${Number(soft) / MEBIBYTE} MiB`,
       );
     const failure = libc.failure(libc.call.mlockall(LOCK_ALL_ON_FAULT));
     if (failure !== undefined) throw new Error(`mlockall refused it (error ${failure})`);

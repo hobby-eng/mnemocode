@@ -1,13 +1,11 @@
 import { WALLET_EVIDENCE_OPTIONS } from "./bitcoin-options.js";
 import { businessOptionNames } from "./business-options.js";
-import {
-  ENCODE_PLAIN_ONLY_OPTIONS,
-  ENCODE_SHARED_OPTIONS,
-  ENCODE_SSKR_ONLY_OPTIONS,
-} from "./encode-option-groups.js";
+import { ENCODE_OPTIONS } from "./encode-option-groups.js";
 import { CANDIDATE_LIST_OPTIONS } from "./candidates-file.js";
 import { DRAWING_OPTIONS } from "./output-options.js";
 import { sskrExportOptions, sskrInputOptions } from "./sskr-command.js";
+import { asksNewBackup, RE_ENCODE_OPTIONS } from "./re-encode-options.js";
+import type { ParsedArguments } from "./arguments.js";
 
 // The options each command accepts, by their parser keys ("--dates" is stored as "date"). The
 // command line refuses any other option, and the help of a command documents exactly these; a test
@@ -32,12 +30,7 @@ export function isFlagOf(
 }
 
 export const commandOptions = {
-  encode: [
-    ...ENCODE_SHARED_OPTIONS,
-    ...ENCODE_PLAIN_ONLY_OPTIONS,
-    ...ENCODE_SSKR_ONLY_OPTIONS,
-    "sskr",
-  ],
+  encode: [...ENCODE_OPTIONS],
   decode: [
     "mode",
     "input",
@@ -55,6 +48,7 @@ export const commandOptions = {
     "max-candidates",
     "max-tries",
   ],
+  "re-encode": RE_ENCODE_OPTIONS,
   "recover-date": [
     "mode",
     "input",
@@ -145,6 +139,12 @@ export interface CommandFacts {
   readonly coreSelfTest: boolean;
   /** It is listed in the overview of the commands; sskr-split is an older name of encode --sskr. */
   readonly listed: boolean;
+  /**
+   * Whether it asks on its private screen where its results go, so that what it gives up before
+   * its first question (dropUnneeded) must leave what any answer may need, as re-encode does
+   * without options of its new backup.
+   */
+  readonly asksOutputs?: (args: ParsedArguments) => boolean;
 }
 
 /** A command that takes or shows a secret, as most do. */
@@ -161,6 +161,7 @@ const PUBLIC: CommandFacts = Object.freeze({ ...SECRET, secret: false });
 export const COMMAND_FACTS: Readonly<Record<CommandName, CommandFacts>> = Object.freeze({
   encode: SECRET,
   decode: SECRET,
+  "re-encode": Object.freeze({ ...SECRET, asksOutputs: asksNewBackup }),
   "recover-date": SECRET,
   "recover-word": SECRET,
   "sskr-combine": SECRET,

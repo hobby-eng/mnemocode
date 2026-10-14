@@ -115,8 +115,22 @@ describe("CLI records", () => {
     expect(listed.stdout).toContain("business-it");
     const rows = listed.stdout.trimEnd().split("\n");
     expect(rows).toHaveLength(13);
-    expect(rows.every((row) => /^(\S+) {3,}(\S+) {3,}(.+?) {3,}(.+)$/u.test(row))).toBe(true);
-    expect(new Set(rows.map((row) => row.indexOf("colors"))).size).toBe(1);
+    // Number, id, name and description; --template takes the number as well as the id.
+    expect(rows.every((row) => /^ ?\d+ {2}\S+ {3,}.+? {3,}.+$/u.test(row))).toBe(true);
+    expect(rows.map((row) => Number(row.trim().split(" ")[0]))).toEqual(
+      Array.from({ length: 13 }, (_, index) => index + 1),
+    );
+    // The names start in one column; the forms that every design prints are named once, above.
+    expect(new Set(rows.map((row) => row.search(/(?<=\S {3,})\S/u))).size).toBe(1);
+    // On a terminal only, as every result's facts (terminalResultHeader).
+    const colored = Object.entries(process.env).filter(
+      ([name]) => !["NO_COLOR", "FORCE_COLOR", "CLICOLOR"].includes(name),
+    );
+    const shown = await run(["preview", "--list"], {
+      ...Object.fromEntries(colored),
+      CLICOLOR_FORCE: "1",
+    });
+    expect(shown.stdout).toMatch(/Prints.*format 3, 4 or 5/u);
     await expect(
       run(["preview", "--all", "--template", "1", "--pdf", "unused.pdf"]),
     ).rejects.toMatchObject({
@@ -432,6 +446,33 @@ describe("CLI records", () => {
       const recovered = await run(["decode", "--input-file", path, "--dates", "23-09-2026"]);
       expect(recovered.stdout).toContain(mnemonic);
       expect(recovered.stderr).toContain("128 checksum-valid candidates");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("saves the QR code of a sheet beside its PDF in every form whose sheet prints one", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mnemocode-sheet-qr-"));
+    try {
+      // Unicode codes (3), Color Unicode (4) and colors (5), the forms of cards: each sheet prints
+      // the encoded text.
+      for (const format of ["3", "4", "5"]) {
+        const pdf = join(directory, `cards-${format}.pdf`);
+        const encoded = await run([
+          "encode",
+          "--mode",
+          "direct",
+          "--mnemonic",
+          mnemonic,
+          "--format",
+          format,
+          "--pdf",
+          pdf,
+          "--card-qr",
+        ]);
+        const raw = encoded.stdout.trim().split("\n").at(-1)!;
+        expect(await decodeQrPngFile(join(directory, `cards-${format}-qr.png`)), format).toBe(raw);
+      }
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

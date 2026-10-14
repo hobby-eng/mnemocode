@@ -146,8 +146,15 @@ export async function decryptCandidates(
   CandidateFileAdmission.assertLock(file, given);
   if (given === "key") requireWebCryptoX25519();
   const decrypter = new Decrypter();
-  if ("identity" in key) decrypter.addIdentity(key.identity);
-  else decrypter.addPassphrase(key.passphrase);
+  if ("identity" in key) {
+    try {
+      decrypter.addIdentity(key.identity);
+    } catch {
+      // The decoder includes a malformed private identity in its error. Neither that diagnostic
+      // nor its cause may reach a host's UI, inspection or logging.
+      throw new CandidateFileRefused("key", "This Scanner key is not a valid age identity.");
+    }
+  } else decrypter.addPassphrase(key.passphrase);
   // Given bytes, age reads its output through a fetch Response, and a browser replaces any error
   // inside it with its own ("Failed to fetch", "The operation was aborted"): given a stream, it
   // returns the stream unread, and its own error, such as "invalid tag", reaches every host.

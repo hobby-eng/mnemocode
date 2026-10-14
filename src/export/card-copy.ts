@@ -11,7 +11,6 @@
 // texts are independent of every seed phrase and share.
 
 import { pickWith, type UniformChoice } from "./platform.js";
-import { findTemplate } from "./template-catalog.js";
 import { type CardPresentation, cardText, COPY_FIELDS, type CopyField } from "./card-settings.js";
 
 export const studioNames = [
@@ -71,7 +70,6 @@ export const cardSlogans = [
   "Simple, sharp, memorable.",
   "First impressions, considered.",
   "Designed in-house, printed with care.",
-  "Your name, well set.",
   "Less noise. More paper.",
   "Built on good typography.",
   "From sketch to press.",
@@ -122,18 +120,14 @@ const COPY_TEXTS: Readonly<
 };
 
 /**
- * The texts that `design` (a template id) prints besides the person's details, in the order in
- * which a host asks for them: every sheet has the frame of a design study with the studio name,
- * slogan, subtitle and footer (drawStudyFrame, collection-sheet.ts); a separate business card
- * prints the label before its code (business-cards.ts), and a separate material card the studio
- * name and subtitle (material-cards.ts). `sheets`: the cards are printed on sheets, not as
- * separate cards.
+ * The texts that a design prints besides the person's details, in the order in which a host asks
+ * for them: every sheet has the frame of a design study with the studio name, slogan, subtitle and
+ * footer (drawStudyFrame, collection-sheet.ts); a separate card, which only a business design
+ * makes (assertIndividualTemplate, render.ts), prints the label before its code
+ * (business-cards.ts). `sheets`: the cards are printed on sheets, not as separate cards.
  */
-export function designTexts(design: string, sheets: boolean): readonly (keyof CardCopyOverrides)[] {
-  if (sheets) return ["studioName", "slogan", "subtitle", "footer"];
-  const family = findTemplate(design)?.family;
-  if (family === "material") return ["studioName", "subtitle"];
-  return ["referenceLabel"];
+export function designTexts(sheets: boolean): readonly (keyof CardCopyOverrides)[] {
+  return sheets ? ["studioName", "slogan", "subtitle", "footer"] : ["referenceLabel"];
 }
 
 export type { UniformChoice };

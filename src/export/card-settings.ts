@@ -80,11 +80,6 @@ export function parsePageSize(value: string | undefined): CardPageSize {
  * which the paper of the business size follows, never the other way.
  */
 export const BUSINESS_CARD_MM = Object.freeze({ width: 90, height: 50 } as const);
-/**
- * A card of ISO/IEC 7810 ID-1, the size of a bank card, in millimetres: the material layout is
- * drawn for it.
- */
-export const ID1_CARD_MM = Object.freeze({ width: 85.6, height: 54 } as const);
 
 /** Width and height in millimetres, in the natural orientation of each size (ISO 216 for A). */
 const PAGE_DIMENSIONS: Readonly<Record<CardPageSize, readonly [number, number]>> = {
@@ -143,6 +138,12 @@ export function assertSeparateCardSize(size: CardPageSize | undefined): void {
       "Separate cards have the business size. Choose the business size, or leave the size out.",
     );
 }
+
+/**
+ * What the QR code of a sheet holds, as the menu and the help name it: the backup alone, never the
+ * cards that end a set and belong to nothing (card-plan.ts).
+ */
+export const SHEET_QR_HOLDS = "the codes of the backup, without the extra cards";
 
 /**
  * Refuses a QR code on colour cards of the business size, which are separate cards: a QR code is

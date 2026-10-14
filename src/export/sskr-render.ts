@@ -18,6 +18,8 @@ import {
   assertShareFormatHasCards,
   shareFormatHasCards,
 } from "../sskr/transport.js";
+import { sskrLongVector } from "../sskr/known-answers.js";
+import { refusalMessage } from "../core/refusal.js";
 import { ExportDetails } from "./export-details.js";
 import type { CardSettings } from "./card-settings.js";
 import { printedCode, separateCardName } from "./card-codes.js";
@@ -30,7 +32,12 @@ import {
   parseSskrLayout,
 } from "./sskr-content.js";
 import { joinedDocuments, type NamedDocument } from "./pdf-documents.js";
-import { designOfStyle, type CardStyle, type CatalogEntry } from "./template-catalog.js";
+import {
+  assertSeparateCards,
+  designOfStyle,
+  type CardStyle,
+  type CatalogEntry,
+} from "./template-catalog.js";
 import { SHEET_PAGE_SIZE } from "./card-settings.js";
 import { codeColors } from "./card-palette.js";
 import { ownCards } from "./card-decoys.js";
@@ -132,6 +139,7 @@ export class ShareCardSet {
     };
     const design = designOfStyle(options.style);
     if (design === undefined) throw new Error("Unsupported SSKR card style.");
+    if (layout === "individual") assertSeparateCards(design);
     // The details first, then the shares: the order in which the random choices are made. Copies
     // of what the caller gave (ExportDetails), so that every card rendered later shows them as they
     // were.
@@ -218,6 +226,24 @@ export class ShareCardSet {
     for (let index = 0; index < member.share.documents; index++) {
       const bytes = await this.#render(member, index);
       yield { name: this.#documentName(member, index), bytes };
+    }
+  }
+
+  /**
+   * Refuses `requested` where the cards of a share of the longest secret, 32 bytes for a 24-word
+   * phrase (sskrLongVector, public), cannot be drawn: a typed detail too long for its card, or a
+   * material with fewer distinct samples than such a share has codes. A host asks it before any
+   * secret is asked, so that it refuses then, not after the shares are made (AUD-022-FUN004).
+   * Nothing is kept; the render takes about a second.
+   */
+  static async assertPrintable(drawing: CardDrawing, requested: SskrRenderOptions): Promise<void> {
+    try {
+      const set = await ShareCardSet.create(drawing, [...sskrLongVector.shares], requested);
+      (await set.renderShare(0)).fill(0);
+    } catch (error) {
+      throw new Error(
+        `These share cards cannot be printed for every seed phrase, the longest of 24 words included: ${refusalMessage(error)}`,
+      );
     }
   }
 

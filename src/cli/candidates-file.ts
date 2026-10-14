@@ -23,7 +23,7 @@ import {
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { askSecretUntil } from "./ask.js";
-import { readBoundedTextFile } from "./input.js";
+import { readBoundedTextFile } from "./text-file.js";
 import { discardRenamedOutput, preflightFileDestination } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { terminalNotice } from "./terminal.js";

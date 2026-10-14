@@ -151,12 +151,35 @@ export function neededPermissions(alwaysWrites: boolean, args: ParsedArguments):
 
 /**
  * Gives up what a command does not need (neededPermissions), with the system's sandbox while FFI
- * is still granted, then FFI; none of it can be taken back.
+ * is still granted, then FFI; none of it can be taken back. A command that `asksOutputs` on its
+ * private screen, as re-encode asks its new backup, keeps what any of them may need: the
+ * permission model gives up the rest once they are answered (dropUnneededAfterAnswers).
  */
-export function dropUnneeded(alwaysWrites: boolean, args: ParsedArguments): void {
+export function dropUnneeded(
+  alwaysWrites: boolean,
+  args: ParsedArguments,
+  asksOutputs = false,
+): void {
   if (!underProtection()) return;
-  const needed = neededPermissions(alwaysWrites, args);
+  const needed = asksOutputs
+    ? { writes: true, runsPrograms: true }
+    : neededPermissions(alwaysWrites, args);
   restrictThenDropFfi(needed);
+  dropPermissions(needed);
+}
+
+/**
+ * Gives up, with the permission model alone, what the outputs that a command asked for on its
+ * private screen do not need (dropUnneeded with `asksOutputs`): the system's sandbox was applied
+ * before the secret was read, and cannot be narrowed without FFI.
+ */
+export function dropUnneededAfterAnswers(args: ParsedArguments): void {
+  if (!underProtection()) return;
+  dropPermissions(neededPermissions(false, args));
+}
+
+/** Gives up the rights of the permission model that `needed` does not name. */
+function dropPermissions(needed: SandboxNeeds): void {
   if (!needed.runsPrograms) process.permission!.drop("child");
   if (!needed.writes) process.permission!.drop("fs.write");
 }

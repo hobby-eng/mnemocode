@@ -16,6 +16,10 @@ import { EncodedBackup } from "./encoded-backup.js";
 import { MissingCodes } from "./missing-codes.js";
 import { expectRefused, expectSame } from "./self-test-check.js";
 import type { PhraseFingerprint } from "./wallet-check.js";
+import { REPRESENTATION_ANSWERS } from "./representations-self-test.js";
+import { textPieces } from "./pieces.js";
+import { UNICODE_CODE_DIGITS } from "./code-text.js";
+import { assertWordCount } from "./bip39-sizes.js";
 
 /**
  * The public phrase masked with MnemoCode Seedshift and 23-09-2026 (vectors/mnemocode-v1.json,
@@ -106,6 +110,24 @@ function checkMarked(marked: MarkedCase): void {
  * does not narrow; the marks refused; and a share told from the codes of a phrase.
  */
 export function checkBackupReadingStartup(): void {
+  const answer = REPRESENTATION_ANSWERS[0]!;
+  const words = answer.words;
+  assertWordCount(words);
+  const codes = textPieces(answer.forms["colors-unicode"], UNICODE_CODE_DIGITS);
+  codes[codes.length - 1] = "?";
+  for (const text of [
+    codes.join(" "),
+    codes.map((code) => (code === "?" ? code : String.fromCodePoint(parseInt(code, 16)))).join(""),
+  ])
+    expectSame(
+      BackupReading.of(`MNC1:direct:colors-unicode:${text}`, {
+        words,
+        seedshiftOnly: false,
+        shareReader: SHARE_READER,
+      }).marked,
+      true,
+      "Color Unicode mark with a declared word count",
+    );
   checkMarked(MARKED_DIGITS);
   checkMarked(MARKED_UNICODE);
   expectSame(

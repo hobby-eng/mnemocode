@@ -45,17 +45,18 @@ const cases = [
   ],
   ["business-sskr", () => renderBusinessCards("it", share, 0), share.payload],
   ["material-full", () => selectTemplate("material-kitchen").render(drawing, base), base.payload],
-  [
-    "material-fragment",
-    () => selectTemplate("material-switch").renderIndividual(drawing, base, 1),
-    undefined,
-  ],
   ...cardTemplates.map((template) => [
     template.id + "-study",
     () => template.render(drawing, { ...base, pageSize: "business", orientation: "landscape" }),
     base.payload,
   ]),
 ];
+// A material design is printed on sheets only (template-catalog.ts, drawsSeparateCards).
+assert.equal(
+  selectTemplate("material-switch").renderIndividual,
+  undefined,
+  "material designs must have no separate cards",
+);
 const report = [];
 for (const [name, render, expected] of cases) {
   const bytes = await render();

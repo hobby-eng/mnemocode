@@ -1,15 +1,15 @@
 import { type DateShiftDate } from "../core.js";
 import { Masking } from "../core/masking.js";
 import { type ParsedArguments, value } from "./arguments.js";
-import { encodeFormat, transformMode, phraseAndDates } from "./input.js";
+import { dates, encodeFormat, transformMode, phraseAndDates } from "./input.js";
 import { validateCardOptions, cardOutputs } from "./card-options.js";
 import { businessOptions, TYPED_CARD_TEXT_OPTIONS } from "./business-options.js";
 import { type CardSettings, assertSheetQr } from "../export/card-settings.js";
 import { reportRenamedOutputs } from "./output-paths.js";
-import { runSskrSplit } from "./sskr-command.js";
+import { prepareSskrSplit } from "./sskr-command.js";
 import { printEncodeResult } from "./encode-report.js";
 import { backupCheckAnswer, offerEncodedCheck } from "./backup-check.js";
-import { saveEncodeResult } from "./encode-export.js";
+import { EncodeCardExport, saveEncodeResult } from "./encode-export.js";
 import { optionLabel } from "./option-copy.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
 import { terminalNotice } from "./terminal.js";
@@ -41,6 +41,8 @@ async function validateEncodeOptions(
   const mode = transformMode(args);
   const format = encodeFormat(value(args, "format"));
   EncodedBackup.assertEncodable(mode, { validLastWord: args["legacy-valid-last-word"] === true });
+  // Dates given as options fit the mode before any secret is read; asked ones are checked then.
+  if (args["ask-secrets"] !== true) Masking.of(mode).assertDateCount(dates(args).length);
   // The sheet leads through the menu, whose Decode does not offer a replaced last word.
   const replacement = Masking.of(mode).withValidLastWord;
   if (
@@ -63,8 +65,9 @@ async function createOutcome(
   args: ParsedArguments,
   mode: MaskingMode,
   format: EncodedFormat,
+  known: string | undefined,
 ): Promise<EncodeOutcome> {
-  const { mnemonic, dates: enteredDates } = await phraseAndDates(args, mode);
+  const { mnemonic, dates: enteredDates } = await phraseAndDates(args, mode, undefined, known);
   const encoding = EncodedBackup.encode(mnemonic, enteredDates, format, mode, {
     validLastWord: args["legacy-valid-last-word"] === true,
   });
@@ -130,8 +133,8 @@ async function assertCardsPrintable(saving: ParsedArguments, format: EncodedForm
 }
 
 /**
- * Saves every result of Encode that the options name, each on its own (saveOne), with `saving`,
- * the run's one object of options for saveEncodeResult (onlyResult).
+ * Saves every result of Encode that the options name, each on its own (saveOutput), with `saving`,
+ * the run's one object of options (onlyResult), and one retained library card plan.
  */
 async function saveResults(
   args: ParsedArguments,
@@ -139,36 +142,31 @@ async function saveResults(
   outcome: EncodeOutcome,
 ): Promise<void> {
   const saved = new Map<string, string>();
+  const cards = new EncodeCardExport(saving, outcome);
   for (const [key, what] of SAVED_RESULTS) {
     const path = await saveOutput(args, key, what, (path) =>
-      saveEncodeResult(onlyResult(saving, key, path), outcome),
+      saveEncodeResult(onlyResult(saving, key, path), outcome, cards),
     );
     if (path !== undefined) saved.set(key, path);
     // The colour cards on the terminal come after the record, as saveEncodeResult shows them.
     if (key === "output" && args.cards === true)
-      await saveEncodeResult(onlyResult(saving, "cards", true), outcome);
+      await saveEncodeResult(onlyResult(saving, "cards", true), outcome, cards);
   }
   await saveSheetQr(args, outcome, saved);
 }
 
 /**
- * The QR code that the sheets print with --card-qr, also saved as an image where they were saved:
- * beside the PDF, or else in the folder of their images. Decode reads it back (--qr-file). Not
- * when --qr names an image of its own, which holds the same codes.
+ * The QR code that the sheets print with --card-qr, in every form, also saved as an image where
+ * they were saved: beside the PDF, or else in the folder of their images. Decode reads it back
+ * (--qr-file). Not when --qr names an image of its own, which holds the same codes.
  */
 async function saveSheetQr(
   args: ParsedArguments,
   outcome: EncodeOutcome,
   saved: ReadonlyMap<string, string>,
 ): Promise<void> {
-  // Only the sheets of colours carry a QR code (exportColorPalette).
   const { backup } = outcome.encoding;
-  if (
-    args["card-qr"] !== true ||
-    value(args, "qr") !== undefined ||
-    !writtenInColors(backup.format)
-  )
-    return;
+  if (args["card-qr"] !== true || value(args, "qr") !== undefined) return;
   const pdf = saved.get("pdf");
   const images = saved.get("images-dir");
   if (pdf === undefined && images === undefined) return;
@@ -179,13 +177,46 @@ async function saveSheetQr(
   terminalNotice(`Saved the QR code of the sheet as an image: ${path}`, "success");
 }
 
+/**
+ * Encode once its options are checked: it asks for the phrase, or reads it, unless it is `known`,
+ * which Re-encode decoded and confirmed, then its dates, and makes and saves the backup.
+ */
+export type PreparedEncode = (known?: string) => Promise<void>;
+
 export async function runEncode(args: ParsedArguments): Promise<void> {
-  if (args.sskr === true) return runSskrSplit(args, true);
+  const encode = await prepareEncode(args);
+  await encode();
+}
+
+/**
+ * Checks every option of Encode, the destinations and the cards included, before any secret is
+ * asked or read, and gives what then encodes (PreparedEncode): a plain backup, or with --sskr its
+ * shares (prepareSskrSplit).
+ */
+export async function prepareEncode(args: ParsedArguments): Promise<PreparedEncode> {
+  if (args.sskr === true) return prepareSskrSplit(args, true);
   const { mode, format } = await validateEncodeOptions(args);
   const checkAnswer = backupCheckAnswer(args);
   const saving: ParsedArguments = { ...args };
   if (args["ask-secrets"] === true) await assertCardsPrintable(saving, format);
-  const outcome = await createOutcome(args, mode, format);
+  return (known) => encodeChecked(args, saving, { mode, format, checkAnswer }, known);
+}
+
+/** What prepareEncode checked: the mode, the form and the answer to the backup check. */
+interface CheckedEncode {
+  readonly mode: MaskingMode;
+  readonly format: EncodedFormat;
+  readonly checkAnswer: ReturnType<typeof backupCheckAnswer>;
+}
+
+/** Encodes the phrase, asked, read or `known`, and saves and shows what the options ask for. */
+async function encodeChecked(
+  args: ParsedArguments,
+  saving: ParsedArguments,
+  { mode, format, checkAnswer }: CheckedEncode,
+  known: string | undefined,
+): Promise<void> {
+  const outcome = await createOutcome(args, mode, format, known);
   printEncodeResult(outcome);
   await saveResults(args, saving, outcome);
   const { backup, result } = outcome.encoding;

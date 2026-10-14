@@ -14,7 +14,7 @@ import {
 } from "../bitcoin-evidence.js";
 import { NORMAL_INDEX_RANGE } from "../core/bip32-limits.js";
 import { integerOption, type ParsedArguments, value } from "./arguments.js";
-import { readBoundedTextFile } from "./input.js";
+import { readBoundedTextFile } from "./text-file.js";
 import { ADDRESS_COUNT_RANGE } from "../core/address-scan.js";
 import {
   BITCOIN_NETWORKS,

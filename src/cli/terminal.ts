@@ -66,32 +66,49 @@ export const ENTER_ALTERNATE_SCREEN = `\x1b[?1049h${CLEAR_SCREEN}`;
  */
 export const LEAVE_ALTERNATE_SCREEN = `${CLEAR_SCREEN}\x1b[?1049l`;
 
+/** A standard stream that a result is written to. */
+export type Channel = "stdout" | "stderr";
+
+/** Writes one line to `channel`. */
+export function terminalLine(channel: Channel, line: string): void {
+  if (channel === "stdout") console.log(line);
+  else console.error(line);
+}
+
 /** Whether `channel` gets colour (streamGetsColor, the rule of every bip_tools tool). */
-export function terminalColor(channel: "stdout" | "stderr"): boolean {
+export function terminalColor(channel: Channel): boolean {
   return streamGetsColor(process[channel]);
 }
 
-export function terminalPaint(channel: "stdout" | "stderr", code: string, text: string): string {
+export function terminalPaint(channel: Channel, code: string, text: string): string {
   return paint(process[channel], code, text);
 }
 
 /**
  * The heading of a result, "MnemoCode · <title>", and its facts as grey labels with their values,
- * like the summary of `mhfe`. Returns false without printing when stdout has no colour; the caller
- * then prints its plain form.
+ * like the summary of `mhfe`, on `channel`. Returns false without printing when it has no colour;
+ * the caller then prints its plain form.
  */
-export function terminalResultHeader(title: string, rows: readonly [string, string][]): boolean {
-  const lines = resultHeaderLines(title, rows);
-  for (const line of lines) console.log(line);
+export function terminalResultHeader(
+  title: string,
+  rows: readonly [string, string][],
+  channel: Channel = "stdout",
+): boolean {
+  const lines = resultHeaderLines(title, rows, channel);
+  for (const line of lines) terminalLine(channel, line);
   return lines.length > 0;
 }
 
 /**
- * The lines that terminalResultHeader prints, a blank line first, or none when stdout has no
+ * The lines that terminalResultHeader prints, a blank line first, or none when `channel` has no
  * colour: what a check of the room on the screen measures.
  */
-export function resultHeaderLines(title: string, rows: readonly [string, string][]): string[] {
-  return terminalColor("stdout") ? resultLines(process.stdout, title, rows) : [];
+export function resultHeaderLines(
+  title: string,
+  rows: readonly [string, string][],
+  channel: Channel = "stdout",
+): string[] {
+  return terminalColor(channel) ? resultLines(process[channel], title, rows) : [];
 }
 
 /**
@@ -156,8 +173,12 @@ export { capitalized };
  * The label of one part of a result, after a blank line: bold for the part that matters most, grey
  * for the others. Only where terminalResultHeader printed the heading of that result.
  */
-export function terminalPart(label: string, strong: boolean = false): void {
-  console.log(`\n${terminalPaint("stdout", strong ? STYLE.strong : STYLE.muted, label)}`);
+export function terminalPart(
+  label: string,
+  strong: boolean = false,
+  channel: Channel = "stdout",
+): void {
+  terminalLine(channel, `\n${terminalPaint(channel, strong ? STYLE.strong : STYLE.muted, label)}`);
 }
 
 /** The number before an item of a numbered row, such as " 12.", with the space after it. */
@@ -167,32 +188,33 @@ const ROW_INDENT = "  ";
 
 /**
  * `items` numbered from 1, `perRow` to a row, the numbers grey and the items bold, each padded to
- * `width` to line up the next; then `copy` on one plain line, for copying. Returns false without
- * printing when stdout has no colour; the caller then prints its plain form.
+ * `width` to line up the next; then `copy` on one plain line, for copying, on `channel`. Returns
+ * false without printing when it has no colour; the caller then prints its plain form.
  */
 function terminalNumbered(
   items: readonly string[],
   width: number,
   perRow: number,
   copy: string,
+  channel: Channel,
 ): boolean {
-  if (!terminalColor("stdout")) return false;
+  if (!terminalColor(channel)) return false;
   for (let start = 0; start < items.length; start += perRow) {
     const row = items.slice(start, start + perRow);
     const cells = row.map((item, column) => {
       const number = terminalPaint(
-        "stdout",
+        channel,
         STYLE.muted,
         `${String(start + column + 1).padStart(NUMBER_CELL - 2)}.`,
       );
       // The last item of a row needs no padding to line up the next one.
       const padded = column === row.length - 1 ? item : item.padEnd(width);
-      return `${number} ${terminalPaint("stdout", STYLE.strong, padded)}`;
+      return `${number} ${terminalPaint(channel, STYLE.strong, padded)}`;
     });
-    console.log(`${ROW_INDENT}${cells.join(" ".repeat(WORD_GAP))}`);
+    terminalLine(channel, `${ROW_INDENT}${cells.join(" ".repeat(WORD_GAP))}`);
   }
-  console.log(terminalPaint("stdout", STYLE.muted, "On one line, for copying:"));
-  console.log(copy);
+  terminalLine(channel, terminalPaint(channel, STYLE.muted, "On one line, for copying:"));
+  terminalLine(channel, copy);
   return true;
 }
 
@@ -200,8 +222,8 @@ function terminalNumbered(
  * A seed phrase for a person to write down, as `mhfe` shows one: numbered, four words to a row;
  * then on one plain line, for copying (terminalNumbered). False without colour.
  */
-export function terminalPhrase(phrase: string): boolean {
-  return terminalNumbered(phrase.split(" "), LONGEST_WORD, WORDS_PER_ROW, phrase);
+export function terminalPhrase(phrase: string, channel: Channel = "stdout"): boolean {
+  return terminalNumbered(phrase.split(" "), LONGEST_WORD, WORDS_PER_ROW, phrase, channel);
 }
 
 /**
@@ -233,9 +255,15 @@ export function printCodes(text: string, format: EncodedFormat): void {
  * A fingerprint under the phrase it belongs to, as `mhfe` shows one: the label grey, the value bold
  * and a grey note in brackets. Only where terminalResultHeader printed the heading of the result.
  */
-export function terminalFingerprint(label: string, value: string, note: string): void {
-  const paint = (code: string, text: string): string => terminalPaint("stdout", code, text);
-  console.log(
+export function terminalFingerprint(
+  label: string,
+  value: string,
+  note: string,
+  channel: Channel = "stdout",
+): void {
+  const paint = (code: string, text: string): string => terminalPaint(channel, code, text);
+  terminalLine(
+    channel,
     `${paint(STYLE.muted, label)}  ${paint(STYLE.strong, value)}  ${paint(STYLE.muted, `(${note})`)}`,
   );
 }

@@ -556,11 +556,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       await runDecode({ "ask-secrets": true, mode: "seedshift" });
       expect(terminal.questions).toEqual([WALLET_QUESTION]);
       // Every guessed date gives a valid phrase: only the wallet tells the right one.
-      expect(terminal.labels[0]).toEqual([
-        "Fingerprint",
-        "Bitcoin address",
-        "Address of another coin",
-      ]);
+      expect(terminal.labels[0]).toEqual(["Fingerprint", "Address"]);
       expect(out).toEqual([`${DATE}\t${TEST_PHRASE}\tmatched at m`]);
       expect(notices).toContain("Recovery search contains 10 date combinations.");
     });
@@ -572,12 +568,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
       // The checksum leaves only some dates: the wallet may be left out, as for recover-date.
       expect(terminal.questions).toEqual([WALLET_QUESTION]);
-      expect(terminal.labels[0]).toEqual([
-        "Fingerprint",
-        "Bitcoin address",
-        "Address of another coin",
-        "It cannot",
-      ]);
+      expect(terminal.labels[0]).toEqual(["Fingerprint", "Address", "It cannot"]);
       expect(out).toContain(`${DATE}\t${TEST_PHRASE}`);
 
       // With the wallet, only the phrase of the wallet is shown.

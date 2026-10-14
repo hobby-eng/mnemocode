@@ -46,6 +46,7 @@ import {
   maxResultsOf,
   askAfterDateSearch,
   backupChoice,
+  datesAgainChoice,
 } from "./date-search.js";
 import {
   assertAskedEncodedInput,
@@ -56,8 +57,15 @@ import {
   transformMode,
 } from "./input.js";
 import { clearPrivateScreen } from "./private-screen.js";
-import { terminalColor, terminalResultHeader, terminalNotice, terminalStatus } from "./terminal.js";
-import type { Explanation } from "./terminal-choice.js";
+import {
+  type Channel,
+  terminalColor,
+  terminalLine,
+  terminalResultHeader,
+  terminalNotice,
+  terminalStatus,
+} from "./terminal.js";
+import type { Choice, Explanation } from "./terminal-choice.js";
 import {
   CHECKSUM_INVALID,
   reportOriginalFingerprint,
@@ -91,19 +99,29 @@ async function decodeFromOptions(arguments_: ParsedArguments): Promise<void> {
     throw new Error(
       `--${unused} answers a question of decode --ask-secrets, where the dates or the codes may hold ?.`,
     );
-  let enteredDates: readonly DateShiftDate[] = [];
-  // The dates are counted as soon as the mode is known, so that a wrong count is refused before
-  // the form of the codes is asked about.
-  const { backup, mode } = await backupFromOptions(arguments_, false, (known) => {
-    enteredDates = dates(arguments_);
-    Masking.of(known).assertDateCount(enteredDates.length);
-  });
+  const { backup, dates: enteredDates } = await backupAndDatesFromOptions(arguments_);
   if (backup.givesSeveral) showLegacyValidCandidates(backup.candidates(enteredDates));
   else {
     const result = backup.decode(enteredDates);
-    showRecovered(result, mode, backup.format);
+    showRecovered(result, backup.mode, backup.format);
     if (!result.checksumValid) reportShorterPhrases(backup, enteredDates);
   }
+}
+
+/**
+ * The encoded seed phrase and its complete dates from the options, as Decode reads them; Re-encode
+ * reads an old backup so. The dates are counted as soon as the mode is known, so that a wrong count
+ * is refused before the form of the codes is asked about.
+ */
+export async function backupAndDatesFromOptions(
+  args: ParsedArguments,
+): Promise<{ readonly backup: EncodedBackup; readonly dates: readonly DateShiftDate[] }> {
+  let enteredDates: readonly DateShiftDate[] = [];
+  const { backup } = await backupFromOptions(args, false, (known) => {
+    enteredDates = dates(args);
+    Masking.of(known).assertDateCount(enteredDates.length);
+  });
+  return { backup, dates: enteredDates };
 }
 
 /**
@@ -139,27 +157,36 @@ function showLegacyValidCandidates(candidates: readonly DecodedResult[]): void {
 }
 
 /** The recovered seed phrase, its checksum and, when the checksum is valid, its fingerprint. */
-function showRecovered(result: DecodedResult, mode: MaskingMode, format: EncodedFormat): void {
-  const parts = terminalResultHeader("Recovered result", [
-    ["Mode", mode],
-    ["Input format", format],
-    ["Words", String(result.recoveredIndexes.length)],
-  ]);
-  if (parts) showRecoveredParts(result);
-  else showRecoveredPlain(result);
+export function showRecovered(
+  result: DecodedResult,
+  mode: MaskingMode,
+  format: EncodedFormat,
+  channel: Channel = "stdout",
+): void {
+  const parts = terminalResultHeader(
+    "Recovered result",
+    [
+      ["Mode", mode],
+      ["Input format", format],
+      ["Words", String(result.recoveredIndexes.length)],
+    ],
+    channel,
+  );
+  if (parts) showRecoveredParts(result, channel);
+  else showRecoveredPlain(result, channel);
 }
 
 /**
  * On a terminal: the phrase under its label, numbered for writing down, then its checksum and,
  * when the checksum is valid, its fingerprint, each apart, as a restore from shares shows them.
  */
-function showRecoveredParts(result: DecodedResult): void {
-  showOriginalPhrase(result.recoveredMnemonic, result.checksumValid);
+function showRecoveredParts(result: DecodedResult, channel: Channel): void {
+  showOriginalPhrase(result.recoveredMnemonic, result.checksumValid, channel);
 }
 
 /** The phrase on one line, then its checksum and fingerprint, for a file or a pipe. */
-function showRecoveredPlain(result: DecodedResult): void {
-  console.log(result.recoveredMnemonic);
+function showRecoveredPlain(result: DecodedResult, channel: Channel): void {
+  terminalLine(channel, result.recoveredMnemonic);
   if (terminalColor("stderr")) {
     console.error("");
     terminalStatus(
@@ -178,15 +205,54 @@ function showRecoveredPlain(result: DecodedResult): void {
  * only some dates, the wallet is optional, as the menu asks it for recover-date.
  */
 function decodeWalletExplanation(mode: MaskingMode, passphrase: string): Explanation {
-  return walletExplanation(mode, [
-    passphrase === ""
-      ? "Decode compares it without a BIP39 passphrase."
-      : "Decode compares it with the BIP39 passphrase of --bip39-passphrase-file.",
-  ]);
+  return walletExplanation(mode, [comparedPassphrase("Decode", passphrase)]);
+}
+
+/**
+ * The line of a wallet question that says which BIP39 passphrase `tool` compares the wallet with:
+ * none, or that of --bip39-passphrase-file, as `passphrase` is empty or not. A wallet made with
+ * another one does not match, whatever the dates.
+ */
+export function comparedPassphrase(tool: string, passphrase: string): string {
+  return passphrase === ""
+    ? `${tool} compares it without a BIP39 passphrase.`
+    : `${tool} compares it with the BIP39 passphrase of --bip39-passphrase-file.`;
 }
 
 /** What is asked or done next on the private screen. */
 type Step = "backup" | "dates" | "wallet" | "search" | "decode" | "done";
+
+/** What follows a phrase that the questions decoded: the end, or the dates or the codes again. */
+export type AfterDecoded = Extract<Step, "done" | "dates" | "backup">;
+
+/**
+ * What the questions of Decode are for: Decode shows the phrase they decode; Re-encode confirms it
+ * and encodes it again (re-encode-command.ts), from the whole backup.
+ */
+export interface DecodeUse {
+  /** Codes and dates with ?, and a Shamir share given for the codes, are taken and searched. */
+  readonly searches: boolean;
+  /** The choice that ends after a phrase whose checksum fails, beside typing again. */
+  readonly stop: Choice<"done">;
+  /** What follows a record that gives several phrases (EncodedBackup.givesSeveral). */
+  several(backup: EncodedBackup, dates: readonly DateShiftDate[]): Promise<AfterDecoded>;
+  /** What follows a phrase with a valid checksum, shown already. */
+  decoded(backup: EncodedBackup, dates: readonly DateShiftDate[]): Promise<AfterDecoded>;
+  /** Shows the decoded phrase: Decode's result on standard output, re-encode's on the terminal. */
+  show(result: DecodedResult, mode: MaskingMode, format: EncodedFormat): void;
+}
+
+/** Decode itself: the phrase shown, a record's several phrases listed, and done. */
+const DECODE: DecodeUse = {
+  searches: true,
+  stop: { label: "Done", note: "keep this result", value: "done" },
+  async several(backup, dates) {
+    showLegacyValidCandidates(backup.candidates(dates));
+    return "done";
+  },
+  decoded: async () => "done",
+  show: (result, mode, format) => showRecovered(result, mode, format),
+};
 
 /** The answers that decode's options give its questions on the private screen. */
 interface GivenAnswers extends MissingCodesAnswers {
@@ -235,9 +301,13 @@ function afterDates(dates: DatesAnswer): Step {
  * seed phrase and everything that can be checked before the dates (askEncodedBackup), the dates,
  * which may hold ?, then either the decoding or, for dates with ?, the wallet (optional where the
  * mode's checksum leaves only some dates) and the search. A result that cannot be right offers
- * what to type again; every other answer is kept.
+ * what to type again; every other answer is kept. `use` says what the decoded phrase is for, and
+ * whether codes and dates may hold ? (DecodeUse); Decode's own by default.
  */
-async function decodeWithQuestions(args: ParsedArguments): Promise<void> {
+export async function decodeWithQuestions(
+  args: ParsedArguments,
+  use: DecodeUse = DECODE,
+): Promise<void> {
   assertAskedEncodedInput(args);
   // The values of the options are checked before the first question, so that none is lost to them.
   assertOneEncodedSource(args);
@@ -266,8 +336,8 @@ async function decodeWithQuestions(args: ParsedArguments): Promise<void> {
         args: backupArgs,
         seedshiftOnly: false,
         recordMode,
-        marks: true,
-        shares: true,
+        marks: use.searches,
+        shares: use.searches,
         inputKind,
       });
       // A Shamir share typed here is restored from, with its mode if Decode was given one.
@@ -304,7 +374,7 @@ async function decodeWithQuestions(args: ParsedArguments): Promise<void> {
           typedDates?.fitsPhrase(backup.indexes.length) === true ? afterDates(typedDates) : "dates";
       }
     } else if (step === "dates") {
-      typedDates = await askDates({ wordCount: backup!.indexes.length, patterns: true });
+      typedDates = await askDates({ wordCount: backup!.indexes.length, patterns: use.searches });
       step = afterDates(typedDates);
     } else if (step === "wallet") {
       const needed = walletNeeded(backup!.mode);
@@ -334,6 +404,7 @@ async function decodeWithQuestions(args: ParsedArguments): Promise<void> {
         backup!,
         foundDates ?? typedDates?.known ?? [],
         backupArgs,
+        use,
         foundCodes,
       );
     }
@@ -344,34 +415,30 @@ async function decodeWithQuestions(args: ParsedArguments): Promise<void> {
 }
 
 /**
- * Decodes with complete dates and shows the result. A phrase without a valid checksum, which the
- * Original Seedshift gives for a wrong date or code, offers to type the dates or the codes again;
- * `backupArgs` are the options the codes were read with.
+ * Decodes with complete dates and shows the result, then does what `use` says with it. A phrase
+ * without a valid checksum, which the Original Seedshift gives for a wrong date or code, offers to
+ * type the dates or the codes again; `backupArgs` are the options the codes were read with.
  */
 async function decodeAndShow(
   backup: EncodedBackup,
   known: readonly DateShiftDate[],
   backupArgs: ParsedArguments,
+  use: DecodeUse,
   foundCodes?: () => void,
 ): Promise<Step> {
   const { mode, format } = backup;
-  if (backup.givesSeveral) {
-    showLegacyValidCandidates(backup.candidates(known));
-    return "done";
-  }
+  if (backup.givesSeveral) return use.several(backup, known);
   const result = backup.decode(known);
   // The result is a step of its own: the questions are cleared away.
   clearPrivateScreen();
   foundCodes?.();
-  showRecovered(result, mode, format);
-  if (result.checksumValid) return "done";
+  use.show(result, mode, format);
+  if (result.checksumValid) return use.decoded(backup, known);
   reportShorterPhrases(backup, known);
   return askAfterFailure<Step>(WHAT_NOW, [
-    ...(Masking.of(mode).masked
-      ? [{ label: "Type the dates again", value: "dates" } as const]
-      : []),
+    ...(Masking.of(mode).masked ? [datesAgainChoice()] : []),
     backupChoice(backupArgs),
-    { label: "Done", note: "keep this result", value: "done" },
+    use.stop,
   ]);
 }
 

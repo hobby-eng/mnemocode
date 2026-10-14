@@ -1,21 +1,17 @@
 import { assertAllowedArguments, parseArguments } from "./arguments.js";
 import { runDecode } from "./decode-command.js";
 import { runEncode } from "./encode-command.js";
+import { runReEncode } from "./re-encode-command.js";
 import { runRecoverDate } from "./recover-date-command.js";
 import { runRecoverWord } from "./recover-word-command.js";
 import { assertCoreSelfTest, runSelfTest } from "./self-test.js";
 import { runTable } from "./table-command.js";
-import { onPrivateScreen, withPrivateScreen } from "./private-screen.js";
-import {
-  assertProtected,
-  dropUnneeded,
-  memoryKeptFromSwap,
-  protectionSummary,
-} from "./protection.js";
+import { showProtection, withPrivateScreen } from "./private-screen.js";
+import { assertProtected, dropUnneeded, memoryKeptFromSwap } from "./protection.js";
 import { swapWarning } from "./swap-check.js";
-import { warnOfCloudCopy } from "./cloud-folders.js";
+import { warnOfCloudCopies } from "./cloud-folders.js";
 import { terminalMore, terminalNotice } from "./terminal.js";
-import { value, type ParsedArguments } from "./arguments.js";
+import { type ParsedArguments } from "./arguments.js";
 import { runPreview } from "./preview-command.js";
 import { helpNames, printCommandHelp, printNamedHelp, printUsage } from "./usage.js";
 import {
@@ -31,9 +27,6 @@ import {
 import { MNEMOCODE_VERSION } from "../version.js";
 import { runSskrSplit, runSskrCombine, runSskrExport } from "./sskr-command.js";
 import { reportRenamedOutputs, settleOutputPaths } from "./output-paths.js";
-import { SAVED_OPTIONS } from "./output-options.js";
-import { factLine } from "./terminal-style.js";
-import { ANSWER_LABEL_WIDTH } from "./terminal-choice.js";
 
 // Here too for the modules that take it with the command line (menu-runner.ts, menu.ts).
 export { PRIVATE_SCREEN_COMMANDS };
@@ -42,6 +35,7 @@ export { PRIVATE_SCREEN_COMMANDS };
 const HANDLERS: Readonly<Record<CommandName, (args: ParsedArguments) => void | Promise<void>>> = {
   encode: runEncode,
   decode: runDecode,
+  "re-encode": runReEncode,
   "recover-date": runRecoverDate,
   "recover-word": runRecoverWord,
   "sskr-split": (args) => runSskrSplit(args),
@@ -86,7 +80,7 @@ export async function runCommandLine(argv: readonly string[]): Promise<void> {
   const arguments_ = parseArguments(rest);
   const facts = COMMAND_FACTS[command];
   // Before anything is read: what this command does not need is given up for good.
-  dropUnneeded(facts.alwaysWrites, arguments_);
+  dropUnneeded(facts.alwaysWrites, arguments_, facts.asksOutputs?.(arguments_) === true);
   assertAllowedArguments(arguments_, command, commandOptions[command]);
   if (facts.coreSelfTest) assertCoreSelfTest();
   const run = async (): Promise<void> => HANDLERS[command](arguments_);
@@ -110,10 +104,7 @@ async function withOutputs(args: ParsedArguments, run: () => Promise<void>): Pro
 async function withSecrets(args: ParsedArguments, run: () => Promise<void>): Promise<void> {
   assertProtected();
   return withPrivateScreen(async () => {
-    if (onPrivateScreen())
-      console.error(
-        `${factLine(process.stderr, "Protection", protectionSummary(), ANSWER_LABEL_WIDTH)}\n`,
-      );
+    showProtection();
     // Swap cannot hold locked memory, the seed phrase included.
     const swap = memoryKeptFromSwap() ? undefined : swapWarning();
     if (swap !== undefined) {
@@ -124,7 +115,7 @@ async function withSecrets(args: ParsedArguments, run: () => Promise<void>): Pro
     // as they will be saved; a command reports its own renamed names, and any left are reported
     // still on the private screen.
     await withOutputs(args, async () => {
-      for (const key of SAVED_OPTIONS) warnOfCloudCopy(value(args, key));
+      warnOfCloudCopies(args);
       await run();
     });
   });

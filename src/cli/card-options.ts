@@ -7,6 +7,7 @@ import { value, type ParsedArguments } from "./arguments.js";
 import { CARD_FORMAT_NUMBERS, noCardTemplateMessage } from "./format-numbers.js";
 import { cardKindOf } from "../core/backup-options.js";
 import { assertIndividualTemplate } from "../export/render.js";
+import { isCardPageSize, parsePageSize } from "../export/card-settings.js";
 
 /** The card outputs that the options name: sheets (a PDF or page images), and separate cards. */
 export interface CardOutputs {
@@ -48,7 +49,10 @@ export function validateCardOptions(args: ParsedArguments, format: EncodedFormat
   if (!sheets && !cards) return;
   const kind = cardKindOf(format);
   if (kind === undefined) throw new Error(`Card export requires format ${CARD_FORMAT_NUMBERS}.`);
-  if (cards) assertIndividualTemplate(selectTemplate(value(args, "template"), kind));
+  // A card page size makes a PDF or page images of separate cards too, which only some designs
+  // draw (AUD-022-FUN004).
+  const separate = cards || isCardPageSize(parsePageSize(value(args, "page-size")));
+  if (separate) assertIndividualTemplate(selectTemplate(value(args, "template"), kind));
   businessOptions(args);
   cardTemplate(args, kind);
 }

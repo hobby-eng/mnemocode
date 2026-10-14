@@ -181,7 +181,6 @@ import {
   pageSizeLabel,
   pageDimensions,
   BUSINESS_CARD_MM,
-  ID1_CARD_MM,
   COPY_FIELDS,
   validateProfile,
   CARD_PAGE_SIZES,
@@ -193,6 +192,7 @@ import {
 import { indexesOfWords } from "../src/core/english-words.js";
 import {
   markedColorSymbols,
+  colorSymbolsOf,
   isColorUnicodeSymbol,
   isRgbReference,
   rgbReferenceDigits,
@@ -200,7 +200,7 @@ import {
 import { hexCodePoint } from "../src/core/code-text.js";
 import { parseRecord } from "../src/record.js";
 import { invalidAddress, DAMAGED, AddressRefusal, CoinList } from "../src/core/coins/coin.js";
-import { InputTooLarge } from "../src/cli/bounded-read.js";
+import { InputTooLarge } from "../src/core/byte-units.js";
 import { RESTORED_FORM } from "../src/sskr/share-set.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import { SearchPlan, TELL_SECONDS } from "../src/core/search-plan.js";
@@ -1170,6 +1170,7 @@ describe("S022: every class that holds a secret shows only its kind", () => {
         "MissingCodes",
         "OpenedCandidateList",
         "PassphraseProtection",
+        "ReEncoding",
         "RestoredShares",
         "Share",
         "ShareSet",
@@ -1314,6 +1315,8 @@ describe("S031: one check and one conversion of a phrase's indexes", () => {
 describe("S032: one range of the Color Unicode characters", () => {
   it("takes U+E000 to U+F8FF everywhere, and nothing past it", () => {
     expect(markedColorSymbols("\u{E000}\u{F8FF}")).toEqual(["E000", "F8FF"]);
+    expect(colorSymbolsOf("\u{E000} ?\u{F8FF}")).toEqual(["\u{E000}", "?", "\u{F8FF}"]);
+    expect(colorSymbolsOf("E000 F8FF")).toBeUndefined();
     expect(markedColorSymbols("\u{F900}")).toBeUndefined();
     expect(isColorUnicodeSymbol("\u{F0000}")).toBe(false);
     // A supplementary Private Use character is no colour code, so the reason is not about colors.
@@ -1856,9 +1859,8 @@ describe("S079: one catalog of designs and one reader of their numbers", () => {
 describe("S080: one list of the styles of the designs", () => {
   it("derives the business styles, the texts of a design and the share card styles from it", async () => {
     expect(businessStyles).toEqual(BUSINESS_STYLES.filter((style) => style !== "mixed"));
-    expect(designTexts("material-tile", false)).toEqual(["studioName", "subtitle"]);
-    expect(designTexts("business-it", false)).toEqual(["referenceLabel"]);
-    expect(designTexts("11", false)).toEqual(["studioName", "subtitle"]);
+    expect(designTexts(false)).toEqual(["referenceLabel"]);
+    expect(designTexts(true)).toEqual(["studioName", "slogan", "subtitle", "footer"]);
     for (const entry of TEMPLATE_CATALOG) expect(designOfStyle(entry.style)).toBe(entry);
     expect(designOfStyle("business-it")).toBeUndefined();
     await expect(
@@ -2027,6 +2029,7 @@ describe("S091: the facts of each command in one table", () => {
       [
         "decode",
         "encode",
+        "re-encode",
         "recover-date",
         "recover-word",
         "sskr-combine",
@@ -2100,7 +2103,6 @@ describe("S101: the sizes of cards and paper are named once", () => {
       "90 x 50 mm",
     ]);
     expect(pageDimensions("business")).toEqual([BUSINESS_CARD_MM.width, BUSINESS_CARD_MM.height]);
-    expect(ID1_CARD_MM).toEqual({ width: 85.6, height: 54 });
     expect([heirSheetSizeLabel("a5"), heirSheetSizeLabel("a6")]).toEqual([
       "148 x 210 mm",
       "105 x 148 mm",
@@ -2167,7 +2169,7 @@ describe("S111: the invented details of an export have one owner", () => {
     const choose = vi.fn((_limit: number) => 0);
     const details = ExportDetails.drawn(choose, {}, {}, "it");
     // Studio, slogan, subtitle and footer; then company, name and role, the sector given by "it".
-    expect(choose.mock.calls).toEqual([[37], [30], [5], [6], [5], [60], [16]]);
+    expect(choose.mock.calls).toEqual([[37], [29], [5], [6], [5], [60], [16]]);
     expect(details.profile.company).toBe("Norvale Systems");
     expect(Object.isFrozen(details.profile) && Object.isFrozen(details.presentation)).toBe(true);
     choose.mockClear();
@@ -2207,11 +2209,11 @@ describe("S111: the invented details of an export have one owner", () => {
       return 0;
     };
     ExportDetails.of(choose, {}, "it");
-    expect(limits).toEqual([37, 30, 5, 6, 5, 60, 16]);
+    expect(limits).toEqual([37, 29, 5, 6, 5, 60, 16]);
     limits.length = 0;
     // The business designs choose the person first (ExportDetails.ofPersonFirst).
     ExportDetails.ofPersonFirst(choose, {}, "it");
-    expect(limits).toEqual([5, 60, 16, 37, 30, 5, 6]);
+    expect(limits).toEqual([5, 60, 16, 37, 29, 5, 6]);
   });
 });
 
@@ -2296,7 +2298,7 @@ describe("S118: one note on how saved shares are kept", () => {
       "These shares are fewer than the 2 needed for recovery; each file is one share. Store the shares apart.",
     );
     expect(shareKeepingNote(set, "pages", true)).toBe(
-      `Any 2 of the 3 shares are enough to restore ${PHRASE_WORDS.masked}, which only the same dates turn back into ${PHRASE_WORDS.original}; the numbered pages of each share belong together. Store the shares apart.`,
+      `Any 2 of the 3 shares are enough to restore ${PHRASE_WORDS.masked}, which the owner's dates turn back into ${PHRASE_WORDS.original}; the numbered pages of each share belong together. Store the shares apart.`,
     );
     expect(() => shareKeepingNote([], "folder", false)).toThrow("There are no shares to keep.");
   });
@@ -2678,13 +2680,13 @@ describe("G1-019, G1-023 and G1-025: the names and the designs of exports have o
   });
 
   it("refuses separate sample cards of every design in the library", () => {
-    expect(() => CardPreviewClass.assertSeparateCards({ every: true })).toThrow(
+    expect(() => CardPreviewClass.assertOneDesign({ every: true })).toThrow(
       ONE_DESIGN_FOR_SEPARATE_CARDS,
     );
     expect(ONE_DESIGN_FOR_SEPARATE_CARDS.startsWith("Separate sample cards show one design")).toBe(
       true,
     );
-    expect(() => CardPreviewClass.assertSeparateCards({ template: "1" })).not.toThrow();
+    expect(() => CardPreviewClass.assertOneDesign({ template: "1" })).not.toThrow();
   });
 });
 
@@ -3095,9 +3097,6 @@ describe("S096: one rule decides between a separate card and a sheet", () => {
     await expect(renderBusinessCards(nodeCardRenderer, "it", share, 99)).rejects.toThrow(
       "There is no card 100",
     );
-    await expect(
-      renderMaterialCard(nodeCardRenderer, "tile", share, { individualIndex: 99 }),
-    ).rejects.toThrow("There is no card 100");
   });
 
   it("draws the whole-share QR sheet in every family, also when a card is asked for", async () => {
@@ -3113,8 +3112,8 @@ describe("S096: one rule decides between a separate card and a sheet", () => {
     });
     const sheets = [
       await renderBusinessCards(renderer, "it", share, 0),
-      // Before the rule was shared, the material family drew a separate card here.
-      await renderMaterialCard(renderer, "tile", share, { individualIndex: 0 }),
+      // A material design draws its sheet only (drawsSeparateCards).
+      await renderMaterialCard(renderer, "tile", share),
     ];
     expect(qr).toHaveBeenCalledTimes(2);
     expect(payloads).toEqual(Array(2).fill(share.payload));
@@ -3239,12 +3238,12 @@ describe("S098, S099: a separate card is one card centred on its page", () => {
 describe("S146 follow-up: finish rows state their photograph once; one new-folder rule", () => {
   it("measures each crop on its material's photograph", () => {
     const [ivory] = materialArtwork.kitchen.finishes;
-    expect(ivory!.crop).toEqual([52 / 1580, 187 / 996, 346 / 1580, 250 / 996]);
+    expect(ivory!.crop).toEqual([49 / 1580, 186 / 996, 346 / 1580, 250 / 996]);
+    expect(ivory!.outlineFit).toBeUndefined();
     const [charcoal] = materialArtwork.vehicle.finishes;
-    expect(charcoal).toMatchObject({ surface: "matte", outlineFit: [1.005, 0.001, 0.006] });
-    const glaze = materialArtwork.tile.finishes.find((finish) => finish.name === "Olive glaze");
-    expect(glaze).toMatchObject({ surface: "glaze" });
-    expect(glaze!.outlineFit).toBeUndefined();
+    expect(charcoal).toMatchObject({ surface: "matte", outlineFit: [1.005, -0.002, -0.002] });
+    const sand = materialArtwork.tile.finishes.find((finish) => finish.name === "Fluted sand");
+    expect(sand).toMatchObject({ surface: "fluted tile", onlyTinted: true });
   });
 
   it("refuses a card folder that exists, before anything is rendered", async () => {

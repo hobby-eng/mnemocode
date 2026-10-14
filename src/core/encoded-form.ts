@@ -22,6 +22,7 @@ import {
   colorsToUnicode,
   indexesToColors,
   isColorUnicodeSymbol,
+  colorSymbolsOf,
   parseColors,
   unicodeToColors,
 } from "./colors.js";
@@ -142,8 +143,8 @@ const VARIANTS = Object.freeze({
     // Each colour is two code points, written as symbols run together or as four-digit codes.
     leading: (text, count) => {
       const points = count * COLOR_UNICODE_POINTS_PER_COLOR;
-      const symbols = Array.from(text).filter(isColorUnicodeSymbol);
-      if (symbols.length > 0) return symbols.slice(0, points).join("");
+      const symbols = colorSymbolsOf(text);
+      if (symbols !== undefined) return symbols.slice(0, points).join("");
       return leadingHexUnits(text, UNICODE_CODE_DIGITS, points)?.join(" ");
     },
     cardKind: "colors",
