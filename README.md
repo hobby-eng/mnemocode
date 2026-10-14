@@ -190,7 +190,7 @@ Answers are checked at once. An invalid word, date or share is explained in one 
 
 `--mnemonic-file PATH` and `--input-file PATH` read the secret from a local file instead; the path `-` reads standard input. With `--ask-secrets`, `decode` and `recover-date` can take the record from `--input-file` or `--qr-file` and then ask only for the dates; when that file cannot be used, they offer another file, typing the record, or Stop.
 
-Text input, from a prompt, a pipe or a file, may be up to 1 MiB. A QR image may be up to 16 MiB and 4096 pixels on a side. MnemoCode stops reading at the limit and refuses larger input.
+Text input, from a prompt, a pipe or a file, may be up to 1 MiB. A QR image may be up to 16 MiB, 4096 pixels on a side and 8 megapixels (a 3840 x 2160 screen), with up to 8 bits per sample. MnemoCode stops reading at the limit and refuses larger input.
 
 ## Commands
 

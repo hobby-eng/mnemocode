@@ -15,8 +15,16 @@ export const MAX_PNG_BYTES = 16 * MEBIBYTE;
 export const MAX_PNG_DIMENSION = 4096;
 /** A megapixel as the limit names it: 2^20 pixels, counted as a mebibyte is. */
 export const MEGAPIXEL = MEBIBYTE;
-/** The most pixels of a QR code image that a host reads. */
-export const MAX_PNG_PIXELS = 16 * MEGAPIXEL;
+/**
+ * The most pixels of a QR code image that a host reads: a whole 3840 x 2160 screen fits. It bounds
+ * what a decoder holds for a small file of the largest admitted image (AUD-022).
+ */
+export const MAX_PNG_PIXELS = 8 * MEGAPIXEL;
+/**
+ * The most bits of a sample that a host reads. A QR code has two levels, and 16-bit samples would
+ * only double the buffers of the decoder.
+ */
+export const MAX_PNG_SAMPLE_BITS = 8;
 
 // PNG signature, chunk framing and IHDR fields: W3C PNG Third Edition, sections 5 and 11.2.1.
 const SIGNATURE = Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10);
@@ -47,6 +55,7 @@ const INCOMPLETE_PNG = "The QR input is not a complete PNG file.";
 const NOT_PNG = "The QR input is not a PNG file.";
 const INVALID_IHDR_LENGTH = "The QR PNG has an invalid IHDR chunk length.";
 const NO_LEADING_IHDR = "The QR PNG does not begin with an IHDR chunk.";
+const WIDE_SAMPLES = `The QR PNG has samples of more than ${MAX_PNG_SAMPLE_BITS} bits; save it with ${MAX_PNG_SAMPLE_BITS} bits per sample.`;
 /** Where the first chunk starts, after the signature. */
 const FIRST_CHUNK_AT = SIGNATURE.length;
 /** Where each field starts in the data of IHDR. */
@@ -173,6 +182,7 @@ export class PngAdmission {
           ? COLOR_LAYOUTS[colorType]
           : undefined;
         if (!layout || !layout.depths.includes(depth)) refused();
+        if (depth > MAX_PNG_SAMPLE_BITS) throw new Error(WIDE_SAMPLES);
         // Compression and filter method 0 are the only ones defined (PNG section 11.2.1).
         if (
           view.getUint8(start + HEADER_FIELDS.compression) !== 0 ||

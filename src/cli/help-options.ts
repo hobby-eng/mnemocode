@@ -12,7 +12,13 @@ import {
 } from "../core/wallet-evidence.js";
 import { MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
 import { limitName } from "../core/byte-units.js";
-import { MAX_PNG_BYTES, MAX_PNG_DIMENSION } from "../core/png-admission.js";
+import {
+  MAX_PNG_BYTES,
+  MAX_PNG_DIMENSION,
+  MAX_PNG_PIXELS,
+  MAX_PNG_SAMPLE_BITS,
+  MEGAPIXEL,
+} from "../core/png-admission.js";
 import { ENCODED_FORMATS, type EncodedFormat, MASKING_MODES } from "../core/types.js";
 import {
   COLOR_FORMAT_NUMBERS,
@@ -156,7 +162,7 @@ export function encodedQrOf(modeFlag: string): HelpOption {
     value: "PNG",
     summary: "Read the encoded record from a QR code in a PNG image",
     details: [
-      `The image is read on this computer. It may be up to ${limitName(MAX_PNG_BYTES)} and ${MAX_PNG_DIMENSION} pixels on a side. A QR code holds no header, so give ${modeFlag} for a masked record; without it, --ask-secrets asks how it was masked.`,
+      `The image is read on this computer. It may be up to ${limitName(MAX_PNG_BYTES)}, ${MAX_PNG_DIMENSION} pixels on a side and ${MAX_PNG_PIXELS / MEGAPIXEL} megapixels, with up to ${MAX_PNG_SAMPLE_BITS} bits per sample. A QR code holds no header, so give ${modeFlag} for a masked record; without it, --ask-secrets asks how it was masked.`,
     ],
   };
 }

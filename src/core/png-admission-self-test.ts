@@ -1,6 +1,6 @@
 // The self-test of PNG admission (png-admission.ts): the exact budget of filtered scanline bytes of
 // small images, without and with Adam7 interlacing, and the refusals of a second IHDR, data after
-// IEND and a palette image without its palette (AUD-022-ARC002). The budgets follow the W3C PNG
+// IEND, a palette image without its palette (AUD-022-ARC002) and 16-bit samples. The budgets follow the W3C PNG
 // specification (sections 7.2 and 8.1: one filter byte per row, the seven Adam7 passes, no rows
 // for an empty pass) and were computed independently, by that formula in Python. The images come
 // from synthetic-png.ts: admission inflates nothing, so their data need not be compressed. Public
@@ -58,12 +58,17 @@ function checkPngAdmissionStartup(): void {
     REFUSED,
     "PNG palette image without a palette",
   );
+  expectRefused(
+    () => PngAdmission.read(pngImage(pngHeader(1, 1, 16, 0), DATA)),
+    /bits per sample/u,
+    "PNG 16-bit samples",
+  );
 }
 
 /** The checks of PNG admission, for a host that reads QR code images. */
 export const PNG_ADMISSION_SELF_TEST: SelfTestFeature = selfTestFeature({
   name: "PNG admission",
-  detail: "scanline budgets with and without Adam7, a second IHDR, data after IEND",
+  detail: "scanline budgets with and without Adam7, a second IHDR, data after IEND, 16-bit samples",
   startup: checkPngAdmissionStartup,
   run: checkPngAdmissionStartup,
 });

@@ -7,7 +7,12 @@ import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { INVALID_PNG_INPUT, PngAdmission, MAX_PNG_DIMENSION } from "../src/core/png-admission.js";
+import {
+  INVALID_PNG_INPUT,
+  MAX_PNG_DIMENSION,
+  MAX_PNG_PIXELS,
+  PngAdmission,
+} from "../src/core/png-admission.js";
 import { PNG_SIGNATURE, pngChunk, pngHeader, pngImage } from "../src/core/synthetic-png.js";
 import {
   decryptCandidates,
@@ -159,13 +164,13 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
       ],
     ],
     [
-      "RGBA16",
+      "gray and alpha",
       8,
       8,
-      16,
-      6,
       8,
-      527,
+      4,
+      2,
+      143,
       [
         [1, 1],
         [1, 1],
@@ -202,12 +207,12 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
 
   it.each([
     [
-      pngHeader(MAX_PNG_DIMENSION, MAX_PNG_DIMENSION, 8, 6),
-      (4 * MAX_PNG_DIMENSION + 1) * MAX_PNG_DIMENSION,
+      pngHeader(MAX_PNG_DIMENSION, MAX_PNG_PIXELS / MAX_PNG_DIMENSION, 8, 6),
+      ((4 * MAX_PNG_DIMENSION + 1) * MAX_PNG_PIXELS) / MAX_PNG_DIMENSION,
     ],
     [pngHeader(8, 8, 8, 6, 1), 271],
     [pngHeader(9, 9, 8, 6, 1), 343],
-    [pngHeader(8, 8, 16, 6, 1), 527],
+    [pngHeader(8, 8, 8, 4, 1), 143],
     [pngHeader(8, 8, 1, 0, 1), 30],
     [pngHeader(8, 8, 2, 0, 1), 34],
   ] as const)("uses the independently calculated PNG scanline budget %#", (ihdr, length) => {
@@ -224,6 +229,20 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
   it("refuses dimensions above the supported side limit before inflation", () => {
     expect(() => PngAdmission.read(image(pngHeader(MAX_PNG_DIMENSION + 1, 1, 8, 6)))).toThrow(
       "dimensions exceed",
+    );
+  });
+
+  it("refuses more pixels than a 3840 x 2160 screen holds before inflation", () => {
+    expect(3840 * 2160).toBeLessThanOrEqual(MAX_PNG_PIXELS);
+    const over = MAX_PNG_PIXELS / MAX_PNG_DIMENSION + 1;
+    expect(() => PngAdmission.read(image(pngHeader(MAX_PNG_DIMENSION, over, 8, 6)))).toThrow(
+      "4096 px / 8-megapixel safety limit",
+    );
+  });
+
+  it.each([0, 2, 4, 6])("refuses 16-bit samples of color type %i before inflation", (color) => {
+    expect(() => PngAdmission.read(image(pngHeader(1, 1, 16, color)))).toThrow(
+      "samples of more than 8 bits",
     );
   });
 

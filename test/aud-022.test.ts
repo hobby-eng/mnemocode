@@ -101,6 +101,20 @@ describe("AUD-022-ARC002: PNG admission has quick known answers that can fail", 
     });
     expect(() => PNG_ADMISSION_SELF_TEST.startup()).toThrow("PNG data after IEND");
   });
+
+  it("fails on a reader that takes 16-bit samples", () => {
+    const read = PngAdmission.read.bind(PngAdmission);
+    const valid = read(pngImage(pngHeader(1, 1, 8, 0), pngChunk("IDAT", [0])));
+    vi.spyOn(PngAdmission, "read").mockImplementation((bytes) => {
+      try {
+        return read(bytes);
+      } catch (error) {
+        if (String(error).includes("bits per sample")) return valid;
+        throw error;
+      }
+    });
+    expect(() => PNG_ADMISSION_SELF_TEST.startup()).toThrow("PNG 16-bit samples");
+  });
 });
 
 describe("AUD-022-API001: a damaged PNG start is refused with its own reason", () => {
