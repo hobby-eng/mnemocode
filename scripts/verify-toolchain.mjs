@@ -73,6 +73,23 @@ const lockedBindgen = cargoLock.match(/^name = "wasm-bindgen"\nversion = "([^"]+
 if (lockedBindgen !== cargoBindgen) {
   throw new Error("sskr-wasm/rust/Cargo.lock must resolve wasm-bindgen to the pin of Cargo.toml");
 }
+// The checks of the crate run with the Rust that the container builds with, in CI too.
+const rustVersion = dockerArgument("RUST_VERSION");
+const crateToolchain = readFileSync(
+  new URL("../sskr-wasm/rust/rust-toolchain.toml", import.meta.url),
+  "utf8",
+).match(/^channel = "([^"]+)"$/mu)?.[1];
+if (crateToolchain !== rustVersion) {
+  throw new Error(
+    "sskr-wasm/rust/rust-toolchain.toml channel must equal Dockerfile.sskr RUST_VERSION",
+  );
+}
+const ciRust = workflows
+  .find(({ name }) => name === "ci.yml")
+  ?.text.match(/rustup toolchain install (\S+)/u)?.[1];
+if (ciRust !== rustVersion) {
+  throw new Error("ci.yml must install the Rust of Dockerfile.sskr RUST_VERSION for pnpm check");
+}
 if (dockerArgument("NODE_VERSION") !== nodeVersion) {
   throw new Error("Dockerfile.sskr NODE_VERSION must equal .node-version");
 }

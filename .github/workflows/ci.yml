@@ -27,6 +27,9 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       # Poppler before the tests: without it the card tests that rasterize PDFs are skipped.
       - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends poppler-utils
+      # Clippy and rustfmt for the SSKR engine's crate in pnpm check (RUST-02), at the version of its
+      # rust-toolchain.toml and its container (scripts/verify-toolchain.mjs).
+      - run: rustup toolchain install 1.99.0 --profile minimal --component clippy,rustfmt
       # The same checks as a release's (package.json verify), so that a check added there runs here.
       - run: pnpm verify
       - name: Drive the menu and the hidden prompts in a pseudo-terminal

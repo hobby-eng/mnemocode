@@ -13,6 +13,8 @@ export-*/
 exports/
 # Cards written by scripts/check-card-output.mjs and scripts/business-goldens.mjs.
 goldens/
+# A Cargo build of the SSKR engine's crate run by hand; pnpm check:rust builds in node_modules/.cache.
+sskr-wasm/rust/target/
 # Bytecode that Python writes beside the scripts and audit harnesses it imports.
 __pycache__/
 

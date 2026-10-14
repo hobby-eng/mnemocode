@@ -1,3 +1,8 @@
+//! The SSKR engine of MnemoCode, built into WebAssembly: Blockchain Commons' SSKR, which splits a
+//! secret into Shamir shares and restores it, with the shares written as compact URs or standard
+//! Bytewords. The host gives the fresh randomness of a split and reads the shares one per line;
+//! the copies of a secret, a seed or a share that the engine keeps are wiped once it is done.
+
 use bc_rand::RandomNumberGenerator;
 use bc_ur::{bytewords, prelude::*};
 use rand_chacha::ChaCha20Rng;
@@ -109,7 +114,9 @@ fn thrown(text: Refusal) -> JsValue {
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShareEncoding {
+    /// The compact UR of a share (ur:sskr/...), its minimal Bytewords.
     CompactUr = 0,
+    /// The standard Bytewords of a share's tagged CBOR.
     Bytewords = 1,
 }
 
@@ -220,6 +227,7 @@ fn combine(records: &str, encoding: u8) -> Result<Vec<u8>, Refusal> {
         .map_err(refusal)
 }
 
+/// The shares of `secret` as compact URs, one per line (create_sskr_shares_formatted).
 #[wasm_bindgen]
 pub fn create_sskr_shares(
     secret: Vec<u8>,
@@ -236,6 +244,10 @@ pub fn create_sskr_shares(
     )
 }
 
+/// The shares of `secret` in the encoding numbered `encoding` (ShareEncoding), one per line: of
+/// the groups `group_specs`, a threshold and a count for each, of which `group_threshold` restore
+/// it, made with a generator seeded with the host's fresh `random_seed`. The secret and the seed
+/// are wiped, also when the split is refused.
 #[wasm_bindgen]
 pub fn create_sskr_shares_formatted(
     mut secret: Vec<u8>,
@@ -257,11 +269,14 @@ pub fn create_sskr_shares_formatted(
     result.map_err(thrown)
 }
 
+/// The secret of the compact UR shares `records`, one per line (recover_sskr_shares_formatted).
 #[wasm_bindgen]
 pub fn recover_sskr_shares(records: String) -> Result<Vec<u8>, JsValue> {
     recover_sskr_shares_formatted(records, ShareEncoding::CompactUr as u8)
 }
 
+/// The secret of the shares `records`, one per line, in the encoding numbered `encoding`
+/// (ShareEncoding). The records are wiped, also when they are refused.
 #[wasm_bindgen]
 pub fn recover_sskr_shares_formatted(
     mut records: String,

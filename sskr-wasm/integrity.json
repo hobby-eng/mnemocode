@@ -1,9 +1,11 @@
 {
   "rust/Cargo.lock": "2ab7d0d519146c41eac131374600331c412fd37270e5e03379482b8399dbe0a4",
-  "rust/Cargo.toml": "055f51b84aab3e077ad7a49628b80de12e21f5f3ea54d0f53909b505b6e688dd",
+  "rust/Cargo.toml": "9ceea9d55a17cea1e7850690e4d1a5a5e8187f047301b9bba8b012c3ca7215c0",
+  "rust/clippy.toml": "42205e005acff1dd5d36837c3c1a93000bd677f84b81f7722fec94c75e609c46",
+  "rust/rust-toolchain.toml": "58036485dea1e5bb8ccb7ca06d881ac7ea052a17e3c5b879a70259292c036797",
   "generated/recovery_sskr_wasm_bg.wasm.d.ts": "1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04",
-  "generated/recovery_sskr_wasm.d.ts": "e3302bd8917bca083a869ae36a0ef7940a115499c9a39a620fc8e7a1f142574b",
-  "generated/recovery_sskr_wasm_bg.wasm": "3b8fb85d16d6e9911b7a7a69a8f713f3aa1ee9385449f42f0216eed78c5a3e1d",
-  "generated/recovery_sskr_wasm.js": "94944cacc63e1b0dec029ad83f3c4af261437a3bd85244362190dc843c8db36c",
-  "rust/src/lib.rs": "69b017ec3e2cfbfe31422d96c9244f64e31f4967af97ee21442d4cfeaf9b8e04"
+  "generated/recovery_sskr_wasm.d.ts": "4fe377e3834fbd460e5aeaa668cd16c343c50bd50606cf9390a2491797bdb2ac",
+  "generated/recovery_sskr_wasm_bg.wasm": "0865beeedb81f6ad0b0af357cdebf380e27ebdca53dd62f1d1223457b2fb6f4e",
+  "generated/recovery_sskr_wasm.js": "bc4555cc3cbfef9dd3c29045fd6179632b1e1c665d0a8c980c37794340e2a35e",
+  "rust/src/lib.rs": "27618d8b3583712f0517ed31202ac02d5a604fcbce7505567a500a9be39e03c5"
 }
