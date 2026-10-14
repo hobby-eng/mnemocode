@@ -72,6 +72,7 @@ import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
 import { InputCancelledError } from "../src/cli/terminal-input.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
+import { matching } from "./helpers/matchers.js";
 
 const FINGERPRINT = "73c5da0a";
 const ELEVEN = "abandon ".repeat(11);
@@ -240,7 +241,7 @@ describe("recover-word on the private screen", () => {
     expect(terminal.questions).toEqual(["What now?", "How can MnemoCode recognise the wallet?"]);
     // Then only the candidate of the wallet is shown, with its number among all of them.
     expect(out.filter((line) => !line.startsWith("candidate\t"))).toEqual([
-      expect.stringMatching(/^\d+\t\d+\tabandon\t1\tmatched at m\t(abandon ){11}about$/u),
+      matching(/^\d+\t\d+\tabandon\t1\tmatched at m\t(abandon ){11}about$/u),
     ]);
   });
 

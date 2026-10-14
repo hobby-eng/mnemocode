@@ -22,6 +22,7 @@ import { ShareSplit } from "../src/sskr/split.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { pageOperators } from "./helpers/pdf-content.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
+import { holes, withHoles } from "./helpers/holes.js";
 
 // Public data only: the all-zero entropy's phrase, synthetic dates, and the public SSKR vectors.
 const PHRASE = `${"abandon ".repeat(11)}about`;
@@ -123,9 +124,9 @@ describe("AUD-009-API002: EncodedBackup.of refuses index arrays with holes", () 
   it("refuses sparse, partly sparse, undefined and out-of-range indexes", () => {
     const dense = Array.from({ length: 12 }, () => 0);
     const partly = [...dense];
-    delete partly[5];
+    withHoles(partly, 5);
     for (const indexes of [
-      new Array<number>(12),
+      holes<number>(12),
       partly,
       [...dense.slice(0, 11), undefined as unknown as number],
       [...dense.slice(0, 11), 2048],
@@ -187,7 +188,7 @@ describe("AUD-009 follow-up: every DatesAnswer holds the limits it was checked a
   });
 
   it("refuses a hole in the dates, which was counted as a date", () => {
-    expect(() => DatesAnswer.of(new Array<typeof DATE>(2))).toThrow(
+    expect(() => DatesAnswer.of(holes<typeof DATE>(2))).toThrow(
       /^Date 1: a date must have a year, a month and a day\.$/u,
     );
   });
@@ -223,8 +224,8 @@ describe("AUD-009 follow-up: codes are checked before an object holds them", () 
   it("refuses holes and codes outside the list when a date search is built", () => {
     const dates = DatesAnswer.parse("2?-09-2026", { patterns: true, wordCount: 12 });
     const partly = zeros();
-    delete partly[3];
-    for (const indexes of [new Array<number>(12), partly, [...zeros().slice(1), 2048]])
+    withHoles(partly, 3);
+    for (const indexes of [holes<number>(12), partly, [...zeros().slice(1), 2048]])
       expect(() => new DateSearch({ indexes, dates, mode: "seedshift" })).toThrow(
         "Every BIP39 index must be an integer from 0 through 2047.",
       );
@@ -232,20 +233,20 @@ describe("AUD-009 follow-up: codes are checked before an object holds them", () 
 
   it("checks the codes in EncodedBackup's constructor, which JavaScript can call", () => {
     const Raw = EncodedBackup as unknown as Constructible<EncodedBackup>;
-    expect(() => new Raw(new Array<number>(12), "indexes", "direct")).toThrow(/integer from 0/u);
+    expect(() => new Raw(holes<number>(12), "indexes", "direct")).toThrow(/integer from 0/u);
     expect(() => new Raw(zeros(), "indexes", "seedshift")).toThrow(/lack the BIP39 checksum/u);
     expect(() => new Raw(zeros(), "bad", "direct")).toThrow("Unsupported encoded format: bad.");
   });
 
   it("writes no colors for indexes with holes, which were left out without a word", () => {
     const partly = zeros();
-    delete partly[3];
+    withHoles(partly, 3);
     // Before: no colors at all, and 7 colors of wrong digits.
-    expect(() => indexesToColors(new Array<number>(12))).toThrow(/integer from 0/u);
+    expect(() => indexesToColors(holes<number>(12))).toThrow(/integer from 0/u);
     expect(() => indexesToColors(partly)).toThrow(/integer from 0/u);
     const colors = indexesToColors(zeros());
     const holed = [...colors];
-    delete holed[2];
+    withHoles(holed, 2);
     expect(() => colorsToUnicode(holed)).toThrow(/#RRGGBB/u);
     expect(() => colorsToIndexes(holed)).toThrow(/#RRGGBB/u);
     expect(colorsToIndexes(colors)).toEqual(zeros());
@@ -261,7 +262,7 @@ describe("AUD-009 follow-up: codes are checked before an object holds them", () 
   it("refuses a candidate list with a hole, whose header counted a record it lacked", () => {
     const entropy = new Uint8Array(16);
     const records = [{ entropy }, { entropy }, { entropy }];
-    delete (records as unknown[])[1];
+    withHoles(records, 1);
     expect(() => encodeCandidateList({ records })).toThrow(
       /Every candidate must be BIP39 entropy/u,
     );
@@ -291,7 +292,7 @@ describe("AUD-009 follow-up: a backup check says restores only after a real reco
 
   it("refuses a hole among the dates of the result", () => {
     const encoded = Masking.of("seedshift").encode(PHRASE, [DATE]);
-    const dates = new Array<typeof DATE>(1);
+    const dates = holes<typeof DATE>(1);
     expect(
       () =>
         new EncodedBackupCheck({
@@ -342,7 +343,7 @@ describe("AUD-009 follow-up: nothing a library object hands out changes it", () 
     expect(written.saved.map((share) => share.number)).toEqual([1, 2]);
     expect(written.leftOutMessages()).toEqual([]);
     const partly = [1, 2];
-    delete partly[1];
+    withHoles(partly, 1);
     for (const places of [partly, [1], [1, 0]])
       expect(() => ShareExport.of(set, places)).toThrow(
         "Each share needs its place among those typed, a whole number from 1.",

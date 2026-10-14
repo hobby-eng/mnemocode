@@ -9,6 +9,7 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import { createSessionIdentity, decryptCandidates } from "../src/core/candidate-encryption.js";
+import { containing } from "./helpers/matchers.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -32,7 +33,7 @@ describe("recover-word CLI", () => {
       .apartCodes(EncodedForm.of("unicode").codes([...Array<number>(11).fill(0), 3]))!
       .map((code, place) => (place === 2 ? "?" : code));
     await expect(run(["recover-word", "--mnemonic", codes.join(" ")])).rejects.toMatchObject({
-      stderr: expect.stringContaining(
+      stderr: containing(
         "These are the codes of an encoded seed phrase, not its words: Decode numbers",
       ),
     });
@@ -72,7 +73,7 @@ describe("recover-word CLI", () => {
       );
       // Without a protection the list is refused, and a list in the open needs its own flag.
       await expect(save(join(dir, "open.mncl"))).rejects.toMatchObject({
-        stderr: expect.stringContaining("--candidates-key"),
+        stderr: containing("--candidates-key"),
       });
       const open = await save(join(dir, "open.mncl"), "--plaintext-candidates");
       expect(open.stderr).toContain("NOT encrypted");
@@ -134,7 +135,7 @@ describe("recover-word CLI", () => {
           join(dir, "legacy.age"),
           "--plaintext-candidates",
         ]),
-      ).rejects.toMatchObject({ stderr: expect.stringContaining("no candidate list") });
+      ).rejects.toMatchObject({ stderr: containing("no candidate list") });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -193,9 +194,9 @@ describe("recover-word CLI", () => {
   it("rejects input without a placeholder, and searches that are too large", async () => {
     await expect(
       run(["recover-word", "--mnemonic", incomplete.replace("?", "about")]),
-    ).rejects.toMatchObject({ stderr: expect.stringContaining("Mark each forgotten word") });
+    ).rejects.toMatchObject({ stderr: containing("Mark each forgotten word") });
     await expect(
       run(["recover-word", "--mnemonic", `? ? ${"abandon ".repeat(9)}?`]),
-    ).rejects.toMatchObject({ stderr: expect.stringContaining("combinations") });
+    ).rejects.toMatchObject({ stderr: containing("combinations") });
   });
 });

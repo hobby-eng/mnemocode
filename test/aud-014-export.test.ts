@@ -18,7 +18,7 @@ import { cardTemplates, type CardTemplate } from "../src/export/templates.js";
 import type { CardContent } from "../src/export/backup-cards.js";
 
 /** The public phrase of BIP39's first vector as colors: eleven zeros and a checksum word. */
-const colors = indexesToColors([...Array(11).fill(0), 3]);
+const colors = indexesToColors([...Array.from({ length: 11 }, () => 0), 3]);
 const content: CardContent = {
   kind: "colors",
   title: "Public fixture",

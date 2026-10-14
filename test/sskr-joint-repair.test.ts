@@ -273,7 +273,7 @@ describe("Joint repair with digits read in part", () => {
     for (const place of places) {
       const part = parts[place]!;
       const prefix = part.startsWith("#") ? "#" : "";
-      const symbols = [...part.slice(prefix.length)];
+      const symbols = Array.from(part.slice(prefix.length));
       for (const digit of digits) symbols[digit] = "?";
       parts[place] = prefix + symbols.join("");
     }

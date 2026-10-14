@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { Decrypter, Encrypter } from "age-encryption";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CandidateFileAdmission } from "../src/core/candidate-file-admission.js";
@@ -17,9 +16,11 @@ import {
 } from "../src/core/candidate-list.js";
 import { checkCandidateListStartup } from "../src/core/candidate-list-self-test.js";
 import { checkCandidateEncryptionQuick } from "../src/core/candidate-encryption-self-test.js";
+import { candidateVectors } from "./helpers/vectors.js";
+import { containing } from "./helpers/matchers.js";
 
 // Public fixtures independently opened with Python (vectors/candidates-v1.json).
-const vectors = JSON.parse(readFileSync("vectors/candidates-v1.json", "utf8"));
+const vectors = candidateVectors();
 const bytesOf = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
 const ageFiles = vectors.age.open as { name: string; file: string }[];
 const keyFile = () => bytesOf(ageFiles.find((file) => !file.name.includes("passphrase"))!.file);
@@ -276,7 +277,7 @@ describe("Candidate file admission", () => {
     });
     await expect(CandidateFileAdmission.readPlaintext(stream)).rejects.toMatchObject({
       code: "unsupported",
-      message: expect.stringContaining(`limit of ${parameters.plaintextBytes} bytes`),
+      message: containing(`limit of ${parameters.plaintextBytes} bytes`),
     });
     expect(cancel).toHaveBeenCalledOnce();
     expect(wipedAtCancellation).toBe(true);

@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -8,6 +7,7 @@ import { writeShare } from "../src/sskr/transport.js";
 import { wrongValue } from "./helpers/shares.js";
 import { checkShareBackup } from "../src/cli/backup-check.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 const PHRASE = "abandon ".repeat(11) + "about";
 
@@ -41,7 +41,7 @@ describe("AUD-008-FUN001: incomplete-group disclosure", () => {
   });
 
   it("keeps ordinary published vectors checked through both package APIs", async () => {
-    const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8"));
+    const vectors = sskrVectors();
     for (const vector of vectors.deterministic) {
       const expected = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
       const result = await combineSskrShareSet(vector.shares);
@@ -53,13 +53,13 @@ describe("AUD-008-FUN001: incomplete-group disclosure", () => {
   });
 
   it("discloses unsettled repair elements instead of silently confirming a wholly unreadable share", async () => {
-    const vector = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")).deterministic[1];
+    const vector = sskrVectors().deterministic[1]!;
     const expected = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
-    const missing = writeShare(vector.shares[2], "indexes")
+    const missing = writeShare(vector.shares[2]!, "indexes")
       .split(" ")
       .map(() => "?")
       .join(" ");
-    const given = [vector.shares[0], vector.shares[1], missing];
+    const given = [vector.shares[0]!, vector.shares[1]!, missing];
     const restored = await combineSskrShareSet(given);
     expect(restored.mnemonic).toBe(expected);
     expect(restored.unsettled.length).toBeGreaterThan(0);

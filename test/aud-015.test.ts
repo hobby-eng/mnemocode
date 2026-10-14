@@ -2,7 +2,6 @@
 // and the checks of the consolidated rules. Public test data only: the all-zero-entropy phrase, a
 // published BIP39 phrase, a synthetic date and the published SSKR vector.
 
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { allWiped, madeArrays } from "./helpers/made-arrays.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
@@ -37,13 +36,14 @@ import {
   urToBytewords,
   urToTransport,
 } from "../src/sskr/transport.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 const PHRASE = zeroEntropyPhrase(12);
 /** A published BIP39 test phrase (the 0x7f… vector), another phrase than PHRASE. */
 const OTHER_PHRASE = "legal winner thank year wave sausage worth useful legal winner thank yellow";
 const DATE = parseDate("23-09-2026");
-const VECTOR = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")).deterministic[0];
-const SHARE: string = VECTOR.shares[0];
+const VECTOR = sskrVectors().deterministic[0]!;
+const SHARE: string = VECTOR.shares[0]!;
 
 describe("AUD-015-API001: nothing found after a stop is published", () => {
   /** A wallet check that matches, and stops the search two microtasks after it answered. */

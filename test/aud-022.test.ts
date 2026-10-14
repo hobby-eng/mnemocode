@@ -68,7 +68,10 @@ describe("AUD-022-ARC002: PNG admission has quick known answers that can fail", 
     const read = PngAdmission.read.bind(PngAdmission);
     vi.spyOn(PngAdmission, "read").mockImplementation((bytes) => {
       const admitted = read(bytes);
-      return Object.create(admitted, { filteredBytes: { value: admitted.filteredBytes + 1 } });
+      // An object made on the admitted result, which it differs from in one field.
+      return Object.create(admitted, {
+        filteredBytes: { value: admitted.filteredBytes + 1 },
+      }) as typeof admitted;
     });
     expect(() => PNG_ADMISSION_SELF_TEST.startup()).toThrow("PNG budget");
   });
@@ -108,8 +111,8 @@ describe("AUD-022-API001: a damaged PNG start is refused with its own reason", (
       Uint8Array.from([
         ...PNG_SIGNATURE,
         ...pngUint32(length),
-        ...[...type].map((letter) => letter.charCodeAt(0)),
-        ...new Array<number>(17).fill(0),
+        ...Array.from(type, (letter) => letter.charCodeAt(0)),
+        ...Array.from({ length: 17 }, () => 0),
       ]);
     expect(() => PngAdmission.read(start(1, "IDAT"))).toThrow("does not begin with an IHDR chunk");
     expect(() => PngAdmission.read(start(13, "IDAT"))).toThrow("does not begin with an IHDR chunk");

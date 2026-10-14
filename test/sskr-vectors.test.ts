@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -17,9 +16,8 @@ import {
 import { MAX_SHARES } from "../src/sskr/split.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { recheck } from "./helpers/share-transport.js";
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-);
+import { sskrVectors } from "./helpers/vectors.js";
+const vectors = sskrVectors();
 const bytes = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
 /** A deterministic regression fixture of vectors/sskr-v1.json. */
 interface DeterministicVector {
@@ -34,10 +32,10 @@ const original = entropyToMnemonic(bytes(vectors.official.entropy), wordlist);
 describe("Published SSKR v1 vectors", () => {
   it("matches independently computed transport bytes and RGB codes in both directions", () => {
     const v = vectors.official;
-    expect(Buffer.from(urToTransport(v.shares[0])).toString("hex")).toBe(v.firstShareTransportHex);
-    expect(shareToColors(v.shares[0])).toEqual(v.firstShareColors);
-    expect(colorsToShare(v.firstShareColors.join(""))).toBe(v.shares[0]);
-    expect(normalizeShare(v.shares[0].toUpperCase())).toBe(v.shares[0]);
+    expect(Buffer.from(urToTransport(v.shares[0]!)).toString("hex")).toBe(v.firstShareTransportHex);
+    expect(shareToColors(v.shares[0]!)).toEqual(v.firstShareColors);
+    expect(colorsToShare(v.firstShareColors.join(""))).toBe(v.shares[0]!);
+    expect(normalizeShare(v.shares[0]!.toUpperCase())).toBe(v.shares[0]!);
   });
   it("recovers all 30 minimal official grouped quorums and tagged Bytewords", async () => {
     const s = vectors.official.shares as string[];
@@ -53,7 +51,7 @@ describe("Published SSKR v1 vectors", () => {
     "rejects an invalid official quorum %j",
     async (...indices: number[]) => {
       await expect(
-        combineSskrShares(indices.map((i) => vectors.official.shares[i])),
+        combineSskrShares(indices.map((i) => vectors.official.shares[i]!)),
       ).rejects.toThrow();
     },
   );
@@ -82,7 +80,7 @@ describe("Published SSKR v1 vectors", () => {
     },
   );
   it("rejects bad CBOR metadata even with an intact CRC", () => {
-    const body = urToTransport(vectors.official.shares[0]).slice(0, -CHECKSUM_BYTES);
+    const body = urToTransport(vectors.official.shares[0]!).slice(0, -CHECKSUM_BYTES);
     for (const [offset, value] of [
       [0, 0x80],
       [3, 0xf0],
@@ -106,8 +104,8 @@ describe("Published SSKR v1 vectors", () => {
       expect(() => normalizeShare(input)).toThrow();
   });
   it("rejects tampered share data after transport checksum is recomputed", async () => {
-    const selected = [0, 2, 3, 5, 7].map((i) => vectors.official.shares[i]);
-    const body = urToTransport(selected[0]).slice(0, -CHECKSUM_BYTES);
+    const selected = [0, 2, 3, 5, 7].map((i) => vectors.official.shares[i]!);
+    const body = urToTransport(selected[0]!).slice(0, -CHECKSUM_BYTES);
     body[8]! ^= 1;
     selected[0] = transportToUr(recheck(body));
     await expect(combineSskrShares(selected)).rejects.toThrow();
@@ -155,8 +153,8 @@ describe("Published SSKR v1 vectors", () => {
     expect(() => split(SEED_BYTES + 1)).toThrow(/32 bytes/u);
   });
   it("rejects metadata conflicts before native reconstruction", () => {
-    const first = vectors.official.shares[0];
-    const body = urToTransport(vectors.official.shares[1]).slice(0, -CHECKSUM_BYTES);
+    const first = vectors.official.shares[0]!;
+    const body = urToTransport(vectors.official.shares[1]!).slice(0, -CHECKSUM_BYTES);
     for (const [offset, value] of [
       [1, 0],
       [3, 0],

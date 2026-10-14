@@ -433,13 +433,13 @@ describe("recover-date on the private screen", () => {
     const shownAt = vi
       .mocked(console.error)
       .mock.calls.findIndex((line) => line.join(" ") === encoded);
-    const askedAt = vi.mocked(process.stderr.write).mock.calls.findIndex(([chunk]) =>
+    const askedAt = vi.mocked(process.stderr).write.mock.calls.findIndex(([chunk]) =>
       Buffer.from(chunk as Uint8Array)
         .toString("utf8")
         .includes(DATES_PROMPT),
     );
     expect(vi.mocked(console.error).mock.invocationCallOrder[shownAt]).toBeLessThan(
-      vi.mocked(process.stderr.write).mock.invocationCallOrder[askedAt]!,
+      vi.mocked(process.stderr).write.mock.invocationCallOrder[askedAt]!,
     );
     // Codes of the Original Seedshift, which usually lack the checksum, show none.
     notices = [];

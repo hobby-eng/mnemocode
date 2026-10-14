@@ -12,6 +12,7 @@ import {
   type DateSearchProgress,
   type WalletCheck,
 } from "../src/core/date-search.js";
+import { anyOf } from "./helpers/matchers.js";
 
 // The host-neutral date search on its own, as another host such as the Deriver uses it: no
 // terminal, no Node.js service, the wallet check and the event loop's turns passed in.
@@ -323,7 +324,7 @@ describe("DateSearch", () => {
     expect(result.shown[0]).toStrictEqual({
       dates: "01-09-2026",
       allDates: [{ year: 2026, month: 9, day: 1 }],
-      mnemonic: expect.any(String),
+      mnemonic: anyOf(String),
     });
     // The Original Seedshift with a valid last word tries every last word whose checksum fits: 128
     // for 12 words. One combination only, as each of them takes a while to decode.

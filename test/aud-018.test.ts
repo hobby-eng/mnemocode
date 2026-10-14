@@ -27,7 +27,10 @@ vi.mock("pngjs", async (original) => {
     captured.pixels.push(image.data);
     return image;
   };
-  const PNG = Object.assign(Object.create(actual.PNG), { sync: { ...actual.PNG.sync, read } });
+  // An object made on pngjs's PNG, which it differs from in its reader.
+  const PNG = Object.assign(Object.create(actual.PNG) as typeof actual.PNG, {
+    sync: { ...actual.PNG.sync, read },
+  });
   return { ...actual, PNG, default: { ...actual, PNG } };
 });
 

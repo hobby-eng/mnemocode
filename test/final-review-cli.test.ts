@@ -44,6 +44,7 @@ afterEach(async () => {
 
 describe("CC-01: a saved candidate list leaves no copy of the entropies", () => {
   it("wipes the bytes of a list without encryption once they are written", async () => {
+    // oxlint-disable-next-line typescript/unbound-method -- the spy calls it on its own instance
     const write = CandidateListWriter.prototype.write;
     let made: CandidateListFile | undefined;
     vi.spyOn(CandidateListWriter.prototype, "write").mockImplementation(async function (

@@ -24,6 +24,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
+import { sskrVectors } from "./helpers/vectors.js";
 
 const publicMnemonic = "abandon ".repeat(11) + "about";
 
@@ -281,9 +282,9 @@ describe("AUD-005 regression contracts", () => {
     async () => {
       const directory = await mkdtemp(join(tmpdir(), "mnemocode-share-folder-"));
       try {
-        const vectors = JSON.parse(await readFile("vectors/sskr-v1.json", "utf8"));
+        const vectors = sskrVectors();
         const target = join(directory, "cards");
-        const cards = await ShareCardSet.create(nodeCardRenderer, [vectors.official.shares[0]], {
+        const cards = await ShareCardSet.create(nodeCardRenderer, [vectors.official.shares[0]!], {
           style: "it",
           pageSize: "business",
         });

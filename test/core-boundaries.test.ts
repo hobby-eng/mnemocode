@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { wordlist as chinese } from "@scure/bip39/wordlists/traditional-chinese.js";
@@ -14,6 +13,7 @@ import {
   type DateShiftDate,
 } from "../src/core.js";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
+import { mnemocodeVectors } from "./helpers/vectors.js";
 // Independent BIP39 construction: integer entropy + SHA256 checksum, no library encoder.
 function phrase(entropy: bigint, bits: number): string {
   const hex = entropy.toString(16).padStart(bits / 4, "0");
@@ -43,9 +43,7 @@ function shifted(entropy: bigint, bits: number, dates: readonly DateShiftDate[])
     ((entropy + BigInt(steps[chunks % steps.length]!)) & ((1n << BigInt(tail)) - 1n))
   );
 }
-const vector = JSON.parse(
-  readFileSync(new URL("../vectors/mnemocode-v1.json", import.meta.url), "utf8"),
-);
+const vector = mnemocodeVectors();
 describe("Core independent entropy and calendar boundaries", () => {
   it.each([128, 160, 192, 224, 256])(
     "exhausts every entropy tail for %i bits against independent modular arithmetic and SHA256",
@@ -121,7 +119,7 @@ describe("Core independent entropy and calendar boundaries", () => {
         metadata.sha256_newline_joined,
       );
     }
-    expect(masterFingerprint(phrase(0n, 128))).toBe(vector.vectors[0].sourceFingerprint);
-    expect(vector.vectors[0].sourceFingerprint).toBe("73c5da0a");
+    expect(masterFingerprint(phrase(0n, 128))).toBe(vector.vectors[0]!.sourceFingerprint);
+    expect(vector.vectors[0]!.sourceFingerprint).toBe("73c5da0a");
   });
 });

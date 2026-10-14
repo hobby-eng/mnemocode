@@ -93,11 +93,9 @@ function protectedRun(argv: readonly string[], reads?: readonly string[]) {
 
 /** The case-swapped name of the current folder, which tsx looks at to learn the file system. */
 function swappedCase(path: string): string {
-  return [...path]
-    .map((character) =>
-      character === character.toUpperCase() ? character.toLowerCase() : character.toUpperCase(),
-    )
-    .join("");
+  return Array.from(path, (character) =>
+    character === character.toUpperCase() ? character.toLowerCase() : character.toUpperCase(),
+  ).join("");
 }
 
 /** The heading of /proc/swaps; the areas follow, one per line. */

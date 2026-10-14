@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
+import { containing, matching } from "./helpers/matchers.js";
 
 /** The limit of the one test that starts the command line fifteen times. */
 const FIFTEEN_STARTS_TIME_LIMIT_MS = 300_000;
@@ -30,7 +31,7 @@ describe("CLI records", () => {
       expect(result.stderr).toBe("");
     }
     await expect(run(["--version", "extra"])).rejects.toMatchObject({
-      stderr: expect.stringContaining("The version command does not accept additional arguments."),
+      stderr: containing("The version command does not accept additional arguments."),
     });
   });
 
@@ -102,7 +103,7 @@ describe("CLI records", () => {
       await expect(
         run(["encode", "--mnemonic", mnemonic, "--format", "1", "--output"]),
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining("output record file setting requires a value"),
+        stderr: containing("output record file setting requires a value"),
       });
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -134,10 +135,10 @@ describe("CLI records", () => {
     await expect(
       run(["preview", "--all", "--template", "1", "--pdf", "unused.pdf"]),
     ).rejects.toMatchObject({
-      stderr: expect.stringContaining("either all templates or one specific template"),
+      stderr: containing("either all templates or one specific template"),
     });
     await expect(run(["preview", "--template", "1"])).rejects.toMatchObject({
-      stderr: expect.stringContaining("To save a preview, provide"),
+      stderr: containing("To save a preview, provide"),
     });
   });
 
@@ -183,7 +184,7 @@ describe("CLI records", () => {
       ]) {
         await expect(run(args)).rejects.toMatchObject({
           // Unicode codes (format 3) have no cards: refused before any file is made.
-          stderr: expect.stringMatching(
+          stderr: matching(
             /No installed card template|unknown or incompatible|Card export requires format/iu,
           ),
         });
@@ -292,7 +293,7 @@ describe("CLI records", () => {
       await expect(
         run(["encode", "--mode", "direct", "--mnemonic", mnemonic, "--format", "6"]),
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining("The representation format must be one of"),
+        stderr: containing("The representation format must be one of"),
       });
     },
     FIFTEEN_STARTS_TIME_LIMIT_MS,
@@ -327,14 +328,14 @@ describe("CLI records", () => {
       run(["decode", "--mode", "direct", "--input", "not a recorded representation"]),
     ).rejects.toMatchObject({
       // The library's reason, as the screen gives it for typed codes (S003: BackupReading).
-      stderr: expect.stringContaining("Enter 12, 15, 18, 21 or 24 English BIP39 words."),
+      stderr: containing("Enter 12, 15, 18, 21 or 24 English BIP39 words."),
     });
   });
 
   it("does not guess between multiple valid raw representations in a non-interactive process", async () => {
     const ambiguous = "76 84 57 28 90 19 59 27 62 11 89 81 66 42 75 28 50 11 52 30 57 30 62 10";
     await expect(run(["decode", "--mode", "direct", "--input", ambiguous])).rejects.toMatchObject({
-      stderr: expect.stringContaining("matches several formats (indexes, unicode)"),
+      stderr: containing("matches several formats (indexes, unicode)"),
     });
   });
 
@@ -356,14 +357,12 @@ describe("CLI records", () => {
       await expect(
         run(["decode", "--input-file", path, "--format", "colors"]),
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining("The record holds unicode codes, not colors."),
+        stderr: containing("The record holds unicode codes, not colors."),
       });
       await expect(
         run(["decode", "--input-file", path, "--mode", "seedshift", "--dates", "23-09-2026"]),
       ).rejects.toMatchObject({
-        stderr: expect.stringContaining(
-          "The record was made with no Seedshift, not with MnemoCode Seedshift.",
-        ),
+        stderr: containing("The record was made with no Seedshift, not with MnemoCode Seedshift."),
       });
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -375,10 +374,10 @@ describe("CLI records", () => {
       run(["decode", "--input", `MNC1:direct:unicode:${mnemonic}`]),
     ).rejects.toMatchObject({
       // The one message of the Unicode reader (S011).
-      stderr: expect.stringContaining("Unicode codes have four hexadecimal digits each"),
+      stderr: containing("Unicode codes have four hexadecimal digits each"),
     });
     await expect(run(["decode", "--input", "MNC1:direct:unicode:"])).rejects.toMatchObject({
-      stderr: expect.stringContaining("Malformed MnemoCode record header"),
+      stderr: containing("Malformed MnemoCode record header"),
     });
   });
 

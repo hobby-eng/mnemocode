@@ -2,7 +2,6 @@
 // test data only: the all-zero-entropy phrase, a published BIP39 phrase, a synthetic date and the
 // published SSKR vector.
 
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { allWiped, madeArrays } from "./helpers/made-arrays.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
@@ -15,12 +14,12 @@ import { MALFORMED_WALLET_ANSWER, type WalletMatch } from "../src/core/wallet-ch
 import { nodeFillRandom, nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { bytewordsToUr, urToBytewords, urToTransport } from "../src/sskr/transport.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 const PHRASE = zeroEntropyPhrase(12);
 const OTHER_PHRASE = "legal winner thank year wave sausage worth useful legal winner thank yellow";
 const DATE = parseDate("23-09-2026");
-const SHARE: string = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")).deterministic[0]
-  .shares[0];
+const SHARE: string = sskrVectors().deterministic[0]!.shares[0]!;
 
 /** The date search of PHRASE masked with DATE, asking `walletCheck`. */
 function dateSearch(walletCheck: WalletCheck): DateSearch {

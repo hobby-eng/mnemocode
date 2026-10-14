@@ -228,7 +228,7 @@ describe("Unreadable digits inside a color or a Unicode code", () => {
     for (const [place, digits] of Object.entries(marks)) {
       const part = parts[Number(place)]!;
       const prefix = part.startsWith("#") ? "#" : "";
-      const symbols = [...part.slice(prefix.length)];
+      const symbols = Array.from(part.slice(prefix.length));
       for (const digit of digits) symbols[digit] = "?";
       parts[Number(place)] = prefix + symbols.join("");
     }

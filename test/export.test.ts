@@ -13,6 +13,7 @@ import { indexesToColors } from "../src/core.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
 import { createCardIdentity } from "../src/export/card-identities.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { anyOf } from "./helpers/matchers.js";
 
 // Blank PDF fixture tests the export transport only. It is never a registered design.
 async function fixture(pageCount = 1) {
@@ -148,8 +149,8 @@ describe("export infrastructure", () => {
       expect.objectContaining({
         ...content,
         cardQr: false,
-        profile: expect.any(Object),
-        presentation: expect.any(Object),
+        profile: anyOf(Object),
+        presentation: anyOf(Object),
       }),
     );
     expect(

@@ -45,7 +45,7 @@ const COLOR_VIEWS = ["joined hex", "apart hex", "joined symbols", "apart symbols
 type ColorView = (typeof COLOR_VIEWS)[number];
 const MIXED_FORMATS = Share.FORMATS.filter((format) => SHARE_UNITS[format].mixed !== undefined);
 const COLOR_DECOY = hexUnits(colorsToUnicode(["#000000"]), UNICODE_CODE_DIGITS)!;
-const MARKED_DECOY = new Array<string>(COLOR_UNICODE_POINTS_PER_COLOR).fill("?");
+const MARKED_DECOY = Array.from({ length: COLOR_UNICODE_POINTS_PER_COLOR }, () => "?");
 
 /** Color Unicode points in each supported spelling; ? always keeps its place. */
 function colorText(points: readonly string[], view: ColorView): string {

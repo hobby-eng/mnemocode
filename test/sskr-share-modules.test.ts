@@ -20,6 +20,7 @@ import { ShareSplit } from "../src/sskr/split.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { counted, duration } from "../src/core/search-plan.js";
 import { markUnits, wrongValue } from "./helpers/shares.js";
+import { matching } from "./helpers/matchers.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const vectors = JSON.parse(
@@ -532,7 +533,7 @@ describe("RepairReport", () => {
     expect(repairs).toEqual([
       {
         share: 3,
-        elements: [{ position: 6, value: expect.stringMatching(/^#[0-9A-F]{6}$/u), guess: false }],
+        elements: [{ position: 6, value: matching(/^#[0-9A-F]{6}$/u), guess: false }],
       },
     ]);
     expect(lines.at(-1)).toEqual({ kind: "notice", text: REPAIR_NOTES.correct });

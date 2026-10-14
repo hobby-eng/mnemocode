@@ -26,6 +26,7 @@ import {
   OLD_BACKUP_OPTIONS,
   RECOGNISED_OPTION,
 } from "../src/cli/re-encode-options.js";
+import { containing } from "./helpers/matchers.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -317,22 +318,22 @@ describe("re-encode CLI", () => {
         FINGERPRINT,
       ]),
     ).rejects.toMatchObject({
-      stderr: expect.stringContaining("Nothing was re-encoded."),
+      stderr: containing("Nothing was re-encoded."),
     });
   });
 
   it("needs a confirmation on the command line, one way, and the secrets one way", async () => {
     await expect(run([...OLD, "--format", "3"])).rejects.toMatchObject({
-      stderr: expect.stringContaining("its checksum confirms nothing"),
+      stderr: containing("its checksum confirms nothing"),
     });
     await expect(
       run([...OLD, "--recognised", "--master-fingerprint", FINGERPRINT]),
-    ).rejects.toMatchObject({ stderr: expect.stringContaining("give one") });
+    ).rejects.toMatchObject({ stderr: containing("give one") });
     await expect(run(["--ask-secrets", "--old-dates", "23-09-2026"])).rejects.toMatchObject({
-      stderr: expect.stringContaining("--ask-secrets cannot be combined with --old-dates"),
+      stderr: containing("--ask-secrets cannot be combined with --old-dates"),
     });
     await expect(run(["--mnemonic", PHRASE, "--recognised"])).rejects.toMatchObject({
-      stderr: expect.stringContaining("does not support the mnemonic text setting"),
+      stderr: containing("does not support the mnemonic text setting"),
     });
   });
 
@@ -342,7 +343,7 @@ describe("re-encode CLI", () => {
     }).backup;
     const old = ["--input", several.record(), "--old-dates", "23-09-2026", "--format", "3"];
     await expect(run([...old, "--recognised"])).rejects.toMatchObject({
-      stderr: expect.stringContaining("give the last word of the original seed phrase"),
+      stderr: containing("give the last word of the original seed phrase"),
     });
     const result = await run([...old, "--last-word", "about", "--recognised"]);
     expect(result.stdout).toContain(UNICODE);
@@ -353,7 +354,7 @@ describe("re-encode CLI", () => {
     await expect(
       run(["--input", "not a backup", "--format", "1", "--cards", "--recognised"]),
     ).rejects.toMatchObject({
-      stderr: expect.stringContaining("Terminal color cards are available only"),
+      stderr: containing("Terminal color cards are available only"),
     });
     // Dates that the new backup's mode takes none of, before the old backup is decoded.
     const refused = await run([
@@ -376,17 +377,17 @@ describe("re-encode CLI", () => {
     await expect(
       run([...backup, "--old-mode", "direct", "--old-dates", "23-09-2026"]),
     ).rejects.toMatchObject({
-      stderr: expect.stringContaining(`${OLD_BACKUP_REFUSAL}Dates cannot be used in direct mode.`),
+      stderr: containing(`${OLD_BACKUP_REFUSAL}Dates cannot be used in direct mode.`),
     });
     await expect(run([...backup, "--old-mode", "seedshift"])).rejects.toMatchObject({
-      stderr: expect.stringContaining(`${OLD_BACKUP_REFUSAL}seedshift requires at least one date.`),
+      stderr: containing(`${OLD_BACKUP_REFUSAL}seedshift requires at least one date.`),
     });
     await expect(run([...backup, "--old-mode", "bogus"])).rejects.toMatchObject({
-      stderr: expect.stringContaining(`${OLD_BACKUP_REFUSAL}The transformation mode must be`),
+      stderr: containing(`${OLD_BACKUP_REFUSAL}The transformation mode must be`),
     });
     // The old backup's options asked on the private screen are checked before its first question.
     await expect(run(["--ask-secrets", "--old-format", "9"])).rejects.toMatchObject({
-      stderr: expect.stringContaining(`${OLD_BACKUP_REFUSAL}The representation format must be`),
+      stderr: containing(`${OLD_BACKUP_REFUSAL}The representation format must be`),
     });
   });
 });

@@ -5,12 +5,16 @@ import { cp, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
+import { sskrVectors } from "./helpers/vectors.js";
 
 const execute = promisify(execFile);
 const bridge = resolve("sskr-wasm");
 
 async function manifest(): Promise<Record<string, string>> {
-  return JSON.parse(await readFile(join(bridge, "integrity.json"), "utf8"));
+  return JSON.parse(await readFile(join(bridge, "integrity.json"), "utf8")) as Record<
+    string,
+    string
+  >;
 }
 
 async function filesBelow(folder: string): Promise<string[]> {
@@ -61,9 +65,9 @@ describe("SSKR integrity (AUD-005-BLD005)", () => {
   it.each(["generated/recovery_sskr_wasm_bg.wasm", "generated/recovery_sskr_wasm.js"])(
     "refuses Shamir work when %s differs by one byte",
     async (damaged) => {
-      const vectors = JSON.parse(await readFile("vectors/sskr-v1.json", "utf8"));
-      const quorum: string[] = vectors.official.validQuorums[0].map(
-        (index: number) => vectors.official.shares[index],
+      const vectors = sskrVectors();
+      const quorum: string[] = vectors.official.validQuorums[0]!.map(
+        (index: number) => vectors.official.shares[index]!,
       );
       await withDamagedInstallation(damaged, async (directory) => {
         const result = await execute(

@@ -302,6 +302,7 @@ describe("AUD-012-SEC004: a plan that ShareRestore.read hands out to none is wip
   /** Runs `body` with every ReadingSpace that a plan solves recorded, and its arrays. */
   async function withSpaces<T>(body: (arrays: Uint8Array[]) => Promise<T>): Promise<T> {
     const arrays: Uint8Array[] = [];
+    // oxlint-disable-next-line typescript/unbound-method -- kept to be called on ReadingSpace and put back
     const solve = ReadingSpace.solve;
     ReadingSpace.solve = (reading) => {
       const space = solve.call(ReadingSpace, reading);

@@ -97,6 +97,7 @@ import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
 import { markUnits, VALUE_BYTE, wrongValue } from "./helpers/shares.js";
+import { STYLE_CODES } from "../src/cli/terminal-style.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const FINGERPRINT = "73c5da0a";
@@ -122,7 +123,7 @@ function misread(share: string): string {
 
 /** `line` without its colour codes. */
 function withoutColour(line: string): string {
-  return line.replace(/\x1b\[[0-9;]*m/gu, "");
+  return line.replace(STYLE_CODES, "");
 }
 
 /** The second share in colours with the elements at `marks` unreadable. */
@@ -408,6 +409,7 @@ describe("shares on the private screen", () => {
 
   it("wipes the plan of a search not made before the shares are typed again", async () => {
     // Each wipe of a plan of marked shares is told among the questions and answers.
+    // oxlint-disable-next-line typescript/unbound-method -- the spy calls it on its own instance
     const plan = JointRepair.prototype.plan;
     vi.spyOn(JointRepair.prototype, "plan").mockImplementation(async function (
       this: JointRepair,
@@ -546,7 +548,7 @@ describe("shares on the private screen", () => {
       vi.stubEnv("CLICOLOR_FORCE", "1");
       terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
       await combine({ mode: "seedshift" });
-      const plain = notices.map((line) => line.replace(/\x1b\[[0-9;]*m/gu, ""));
+      const plain = notices.map((line) => line.replace(STYLE_CODES, ""));
       expect(plain).toContain(
         `✓ Encoded fingerprint (of the masked phrase) ${masterFingerprint(masked)}`,
       );
@@ -750,9 +752,9 @@ describe("shares on the private screen", () => {
       // sets of real shares pass both the CRC-32 and the digest, so the step is given a second.
       const others = (await splitSskrMnemonic(TEST_PHRASE, 2, 3)).slice(0, 2);
       const other = { mnemonic: TEST_PHRASE, shares: others.map(unrepairedShare), unsettled: [] };
-      const phrases = ShareRestore.phrases;
+      const phrases = ShareRestore.phrases.bind(ShareRestore);
       vi.spyOn(ShareRestore, "phrases").mockImplementation(async (...args) => {
-        const found = await phrases.apply(ShareRestore, args);
+        const found = await phrases(...args);
         if (found.kind !== "phrases") return found;
         const extra = { set: other, mnemonic: TEST_PHRASE, held: TEST_PHRASE, repairs: [] };
         return { ...found, phrases: [...found.phrases, extra], sets: [...found.sets, other] };

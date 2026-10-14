@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { printableText, printCodes, ProgressLine, terminalPhrase } from "../src/cli/terminal.js";
+import { STYLE_CODES } from "../src/cli/terminal-style.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 
@@ -84,7 +85,7 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
     vi.stubEnv("NO_COLOR", "");
     vi.stubEnv("CLICOLOR_FORCE", "1");
     expect(terminalPhrase(TEST_PHRASE)).toBe(true);
-    expect(out.map((line) => line.replace(/\x1b\[[0-9;]*m/gu, ""))).toEqual([
+    expect(out.map((line) => line.replace(STYLE_CODES, ""))).toEqual([
       "    1. abandon      2. abandon      3. abandon      4. abandon",
       "    5. abandon      6. abandon      7. abandon      8. abandon",
       "    9. abandon     10. abandon     11. abandon     12. about",
@@ -102,7 +103,7 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
     vi.stubEnv("NO_COLOR", "");
     vi.stubEnv("CLICOLOR_FORCE", "1");
     printCodes(unicode, "unicode");
-    expect(out.map((line) => line.replace(/\x1b\[[0-9;]*m/gu, ""))).toEqual([
+    expect(out.map((line) => line.replace(STYLE_CODES, ""))).toEqual([
       `${"7684 ".repeat(11)}5728`,
       "Joined, for copying:",
       unicode,
@@ -114,7 +115,7 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
     out.length = 0;
     printCodes("E000E064E13AE191", "colors-unicode");
     // Code by code, as a ? stands for one code in every reader.
-    expect(out[0]!.replace(/\x1b\[[0-9;]*m/gu, "")).toBe("E000 E064 E13A E191");
+    expect(out[0]!.replace(STYLE_CODES, "")).toBe("E000 E064 E13A E191");
     // Forms written apart already are shown as they are.
     out.length = 0;
     printCodes(TEST_PHRASE, "english");

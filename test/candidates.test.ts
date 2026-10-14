@@ -171,7 +171,7 @@ describe("WordCandidateSearch", () => {
   it("tells the places it searched, and each candidate's entropy and checksum bits", () => {
     const last = WordCandidateSearch.parse(`${ELEVEN}?`, "unknown-words");
     expect(last.unknownPlaces).toEqual([11]);
-    const first = last.candidates().next().value!;
+    const first = last.candidates().next().value as WordCandidate;
     expect(first.phrase).toBe(`${ELEVEN}about`);
     expect(first.checksumBits).toBe("0011");
     expect(last.placesOf(first)).toEqual([11]);
@@ -182,7 +182,7 @@ describe("WordCandidateSearch", () => {
     const missing = WordCandidateSearch.parse(`${"abandon ".repeat(10)}about`, "missing-word");
     expect(missing.wordCount).toBe(12);
     expect(missing.unknownPlaces).toEqual([]);
-    const inserted = missing.candidates().next().value!;
+    const inserted = missing.candidates().next().value as WordCandidate;
     expect(inserted.phrase).toBe(`${ELEVEN}about`);
     expect(missing.placesOf(inserted)).toEqual([0]);
   });
@@ -218,7 +218,7 @@ describe("WordCandidateSearch", () => {
       `legal winner thank year ? sausage worth useful legal winner thank yellow`,
       "unknown-words",
     );
-    const candidate = search.candidates().next().value!;
+    const candidate = search.candidates().next().value as WordCandidate;
     for (const [value, marker] of [
       [search, "[WordCandidateSearch: redacted]"],
       [candidate, "[WordCandidate: redacted]"],

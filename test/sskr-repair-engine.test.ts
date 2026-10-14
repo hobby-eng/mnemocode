@@ -44,6 +44,7 @@ import {
   type ShareFormat,
 } from "../src/sskr/transport.js";
 import { markUnits, shareUnits } from "./helpers/shares.js";
+import { anyOf } from "./helpers/matchers.js";
 
 const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
   deterministic: { entropy: string; shares: string[] }[];
@@ -335,7 +336,7 @@ describe("S048: one progress and one way to turn for every search", () => {
       turn,
     });
     expect(restored.kind).toBe("phrases");
-    expect(read).toHaveBeenCalledWith(input, expect.any(Function), turn);
+    expect(read).toHaveBeenCalledWith(input, anyOf(Function), turn);
   });
 });
 

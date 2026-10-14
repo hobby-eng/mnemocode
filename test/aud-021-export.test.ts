@@ -48,7 +48,8 @@ vi.mock("../src/export/platform-node.js", async (original) => {
     },
     // The production renderer is frozen: replace the service rather than mutating it.
     nodeCardRenderer: {
-      ...actual.nodeCardRenderer,
+      qrModules: actual.nodeCardRenderer.qrModules,
+      businessArtwork: actual.nodeCardRenderer.businessArtwork,
       randomInt: (upper: number) => observed.randomChoices++ % upper,
       // The font, which only a sheet's plan reads here, since the exporters are passive.
       readAsset: async (path: Parameters<typeof actual.nodeCardRenderer.readAsset>[0]) => {

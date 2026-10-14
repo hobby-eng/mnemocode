@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import { pbkdf2Sync } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { COIN_ADDRESS_SELF_TEST } from "../src/core/coins-self-test.js";
 import { MasterFingerprintCheck, type Pbkdf2HmacSha512 } from "../src/core/master-fingerprint.js";
@@ -10,14 +9,13 @@ import { heirSheetSelfTest } from "../src/export/heir-sheet-self-test.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { shareCardsSelfTest } from "../src/export/sskr-render-self-test.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
+import { mnemocodeVectors } from "./helpers/vectors.js";
 
 // The host services a page would give, here from Node.js, and the published vectors file.
 const pbkdf2: Pbkdf2HmacSha512 = (password, salt, rounds, bytes) =>
   new Uint8Array(pbkdf2Sync(password, salt, rounds, bytes, "sha512"));
 const fingerprints = new MasterFingerprintCheck(pbkdf2);
-const publicVectors: unknown = JSON.parse(
-  readFileSync(new URL("../vectors/mnemocode-v1.json", import.meta.url), "utf8"),
-);
+const publicVectors: unknown = mnemocodeVectors();
 /** The rows of the library's own checks, in order, with a share platform. */
 const LIBRARY_ROWS = [
   "Core integrity",

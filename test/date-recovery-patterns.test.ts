@@ -16,6 +16,7 @@ import {
   parseDate,
   parseDatePattern,
 } from "../src/core.js";
+import { containing } from "./helpers/matchers.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -193,7 +194,7 @@ describe("date recovery patterns", () => {
         "1000",
       ]),
     ).rejects.toMatchObject({
-      stderr: expect.stringContaining("Increase the candidate search limit to at least 3,652,059"),
+      stderr: containing("Increase the candidate search limit to at least 3,652,059"),
     });
   });
 });

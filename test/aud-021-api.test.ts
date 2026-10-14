@@ -15,6 +15,7 @@ import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { NOT_CONFIRMED, ReEncoding } from "../src/core/re-encoding.js";
 import type { DecodedResult } from "../src/core/types.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
+import { holes } from "./helpers/holes.js";
 
 const vectors = JSON.parse(
   readFileSync(new URL("../vectors/candidates-v1.json", import.meta.url), "utf8"),
@@ -161,13 +162,13 @@ describe("AUD-021-API001: candidate entropy is byte data", () => {
       "clamped bytes with a byte-array prototype",
       Object.setPrototypeOf(new Uint8ClampedArray(ENTROPY_BYTES), Uint8Array.prototype),
     ],
-    ["ordinary byte array", new Array(ENTROPY_BYTES).fill(0)],
-    ["negative array elements", new Array(ENTROPY_BYTES).fill(-1)],
-    ["overflowing array elements", new Array(ENTROPY_BYTES).fill(256)],
-    ["fractional array elements", new Array(ENTROPY_BYTES).fill(0.5)],
-    ["non-finite array elements", new Array(ENTROPY_BYTES).fill(NaN)],
-    ["text array elements", new Array(ENTROPY_BYTES).fill("0")],
-    ["sparse entropy", new Array(ENTROPY_BYTES)],
+    ["ordinary byte array", Array.from({ length: ENTROPY_BYTES }, () => 0)],
+    ["negative array elements", Array.from({ length: ENTROPY_BYTES }, () => -1)],
+    ["overflowing array elements", Array.from({ length: ENTROPY_BYTES }, () => 256)],
+    ["fractional array elements", Array.from({ length: ENTROPY_BYTES }, () => 0.5)],
+    ["non-finite array elements", Array.from({ length: ENTROPY_BYTES }, () => NaN)],
+    ["text array elements", Array.from({ length: ENTROPY_BYTES }, () => "0")],
+    ["sparse entropy", holes(ENTROPY_BYTES)],
     ["null entropy", null],
     ["missing entropy", undefined],
     ["an object imitating bytes", { length: ENTROPY_BYTES, byteLength: ENTROPY_BYTES }],
@@ -178,7 +179,7 @@ describe("AUD-021-API001: candidate entropy is byte data", () => {
         byteLength: { value: ENTROPY_BYTES },
       }),
     ],
-  ] as const)("refuses %s alone and after valid records", (_, entropy) => {
+  ] as const)("refuses %s alone and after valid records", (_, entropy: unknown) => {
     const valid = new Uint8Array(ENTROPY_BYTES).fill(1);
     for (const records of [[{ entropy }], [{ entropy: valid }, { entropy }]]) {
       const list = {
@@ -190,11 +191,11 @@ describe("AUD-021-API001: candidate entropy is byte data", () => {
       // A JavaScript caller is not restricted by the CandidateList TypeScript contract.
       expect(() => encodeCandidateList(list as unknown as CandidateList)).toThrow(/one length/u);
     }
-    expect([...valid]).toEqual(new Array(ENTROPY_BYTES).fill(1));
+    expect([...valid]).toEqual(Array.from({ length: ENTROPY_BYTES }, () => 1));
   });
 
   it.each([
-    ["a record hole", new Array(1)],
+    ["a record hole", holes(1)],
     ["a null record", [null]],
     ["a missing entropy field", [{}]],
     ["mixed null records", [{ entropy: new Uint8Array(ENTROPY_BYTES) }, null]],

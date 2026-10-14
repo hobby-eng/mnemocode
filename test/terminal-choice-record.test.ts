@@ -153,7 +153,7 @@ class Screen {
   }
 
   write(text: string): void {
-    const characters = [...text];
+    const characters = Array.from(text);
     for (let index = 0; index < characters.length; index += 1) {
       const character = characters[index]!;
       if (character === ESCAPE) index = this.#control(characters, index);
@@ -260,6 +260,7 @@ function watchScreen(columns: number, reported: Reported = { columns }): Screen 
 }
 
 /** The writers that watchScreen replaces. */
+// oxlint-disable-next-line typescript/unbound-method -- kept to be put back on process.stderr
 const originalWrite = process.stderr.write;
 const originalError = console.error;
 
@@ -501,10 +502,10 @@ describe("a typed answer leaves only its line in the record of answers", () => {
     screen.write(BEFORE);
     // Everything written, decoded: a byte that is no UTF-8 would show as U+FFFD.
     const written: string[] = [];
-    const toScreen = process.stderr.write;
+    const toScreen = process.stderr.write.bind(process.stderr);
     process.stderr.write = ((chunk: string | Uint8Array) => {
       written.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
-      return toScreen.call(process.stderr, chunk);
+      return toScreen(chunk);
     }) as typeof process.stderr.write;
     const shown: string[][] = [];
     terminal.onFirstKey = () => shown.push(screen.lines());

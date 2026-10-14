@@ -401,7 +401,7 @@ describe("addresses out of reach", () => {
 
   it("are refused for Dash Orchard and other Platform types, and need the one encoding", () => {
     const encoded = (payload: Uint8Array) => bech32m.encode("dash", bech32m.toWords(payload));
-    const payment = Uint8Array.of(0xb0, ...new Array<number>(20).fill(0x11));
+    const payment = Uint8Array.of(0xb0, ...Array.from({ length: 20 }, () => 0x11));
     expect(refusal(() => parseCoinAddress("dash", encoded(payment.subarray(0, 20))))).toContain(
       "it has the wrong length",
     );
@@ -467,14 +467,14 @@ describe("addresses out of reach", () => {
   });
 
   it("are refused as damaged past Bech32's limits: 1023 characters, a prefix of 83", () => {
-    const payment = Uint8Array.of(0xb0, ...new Array<number>(20).fill(0x11));
+    const payment = Uint8Array.of(0xb0, ...Array.from({ length: 20 }, () => 0x11));
     for (const [coin, checksum, prefix, words, name] of [
       ["cosmos", bech32, "cosmos", bech32.toWords(new Uint8Array(20).fill(7)), "Cosmos"],
       ["dash", bech32m, "dash", bech32m.toWords(payment), "Dash"],
     ] as const) {
       // Zero groups after the data, to `length` with the prefix, its separator and the checksum.
       const atLength = (length: number) => {
-        const zeros = new Array<number>(length - prefix.length - 7 - words.length).fill(0);
+        const zeros = Array.from({ length: length - prefix.length - 7 - words.length }, () => 0);
         return checksum.encode(prefix, [...words, ...zeros], false);
       };
       expect(atLength(1023)).toHaveLength(1023);

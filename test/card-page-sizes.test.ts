@@ -37,7 +37,10 @@ describe("page size decides between a sheet and separate cards", () => {
     for (const template of ["business-it", "material-tile"]) {
       const [page, ...more] = await pages(template, {});
       expect(more, template).toEqual([]);
-      expect([...page!].sort(), template).toEqual([105, 148]);
+      expect(
+        [...page!].sort((a, b) => a - b),
+        template,
+      ).toEqual([105, 148]);
       expect(await pages(template, { orientation: "landscape" }), template).toEqual([[148, 105]]);
       expect(await pages(template, { orientation: "portrait" }), template).toEqual([[105, 148]]);
     }

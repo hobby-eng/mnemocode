@@ -11,7 +11,7 @@ export function recordCutNotes(
   const room = notesRoom(choices as never);
   for (const choice of choices)
     for (const text of [choice.note, choice.example])
-      if (text !== undefined && [...text].length > room)
+      if (text !== undefined && Array.from(text).length > room)
         cut.push(`${question} ${choice.label}: ${text}`);
 }
 

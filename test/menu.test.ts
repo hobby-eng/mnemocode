@@ -52,7 +52,7 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => {
       const room = actual.notesRoom(choices as never);
       for (const choice of choices as readonly { label: string; note?: string; example?: string }[])
         for (const text of [choice.note, choice.example])
-          if (text !== undefined && [...text].length > room)
+          if (text !== undefined && Array.from(text).length > room)
             script.cutNotes.push(`${question} ${choice.label}: ${text}`);
       return choices[place]!.value;
     },
@@ -105,6 +105,8 @@ import { MENU_ENTRY_NAMES as ENTRY, type MenuEntryName } from "../src/cli/menu-e
 import { resolveSskrLayout } from "../src/export/sskr-content.js";
 import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
 import { formatNumber } from "../src/cli/format-numbers.js";
+import { anyOf, containing } from "./helpers/matchers.js";
+import { STYLE_CODES } from "../src/cli/terminal-style.js";
 
 /** Questions whose answers all lead to command lines of the same shape; only the first is taken. */
 const SAME_SHAPE = new Set(["Which card design?"]);
@@ -273,7 +275,7 @@ describe("start menu", () => {
       // Lists and explanations fit a terminal of 80 columns unwrapped (TEXT_WIDTH), and no note of a
       // list is cut to fit.
       for (const line of [...script.lists.flat(), ...script.explanations.flat()])
-        expect([...line].length, line).toBeLessThanOrEqual(TEXT_WIDTH);
+        expect(Array.from(line).length, line).toBeLessThanOrEqual(TEXT_WIDTH);
       expect([...new Set(script.cutNotes)]).toEqual([]);
       // Every question names its line in the record of answers, within the label column.
       for (const label of script.labels)
@@ -387,7 +389,7 @@ describe("start menu", () => {
     expect(run[run.indexOf("--format") + 1]).toBe(String(formatNumber("english")));
     const forms = script.digits["Which form should the seed phrase take?"]!;
     expect(forms.map(({ digit }) => digit)).toEqual(forms.map(() => undefined));
-    const list = script.lists[0]!.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ""));
+    const list = script.lists[0]!.map((line) => line.replace(STYLE_CODES, ""));
     const places = list.map((line) => line.match(/^[›\s]\s(\d)\s/u)?.[1]).filter(Boolean);
     expect(places).toEqual(["1", "2", "3", "4", "5"]);
     expect(forms.at(-1)).toEqual({ value: "english", digit: undefined });
@@ -493,9 +495,9 @@ describe("start menu", () => {
       "--mode",
       "seedshift",
       "--output",
-      expect.any(String),
+      anyOf(String),
       "--qr",
-      expect.any(String),
+      anyOf(String),
     ]);
     const all = script.asked.find((asked) => asked.question === "Where should the result go?")!;
     expect(all.labels.at(-1)).toBe("All of these");
@@ -504,14 +506,14 @@ describe("start menu", () => {
     const run = (await runOf(ENTRY.encode, [2, 1, 0, 4, 0, 0, 0, 0, 0, 0, 0]))!;
     expect(run.slice(run.indexOf("--output"), run.indexOf("--qr") + 2)).toEqual([
       "--output",
-      expect.any(String),
+      anyOf(String),
       "--qr",
-      expect.any(String),
+      anyOf(String),
     ]);
     expect(run).toContain("--pdf");
     // Shares of colors: a text file and their cards.
     const shares = (await runOf(ENTRY.encode, [2, 1, 1, 3, 0, 0, 0, 0, 0, 0, 0]))!;
-    expect(shares[shares.indexOf("--output") + 1]).toEqual(expect.any(String));
+    expect(shares[shares.indexOf("--output") + 1]).toEqual(anyOf(String));
     expect(shares).toContain("--template");
   });
 
@@ -651,10 +653,7 @@ describe("start menu", () => {
         "--card-qr",
       ]);
       const kinds = script.asked.filter((asked) => asked.question === "Which kind of file?");
-      expect(kinds.map((asked) => asked.warning)).toEqual([
-        undefined,
-        expect.stringContaining("pdftocairo"),
-      ]);
+      expect(kinds.map((asked) => asked.warning)).toEqual([undefined, containing("pdftocairo")]);
     });
 
     it("takes typed details, keeps the others random, and refuses what the command refuses", async () => {

@@ -10,6 +10,7 @@ import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { type ShareFormat } from "../src/sskr/transport.js";
 import { markUnits } from "./helpers/shares.js";
+import { sskrVectors } from "./helpers/vectors.js";
 const mnemonic = `${"abandon ".repeat(11)}about`;
 function cli(args: string[]) {
   const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...args], {
@@ -21,7 +22,7 @@ function cli(args: string[]) {
 }
 describe("integrated SSKR CLI", () => {
   it("repairs marked shares in every form before CLI recovery, without exposing the damaged text", () => {
-    const vector = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")).deterministic[0];
+    const vector = sskrVectors().deterministic[0]!;
     const formats: ShareFormat[] = [
       "ur",
       "words",
@@ -31,8 +32,8 @@ describe("integrated SSKR CLI", () => {
       "colors-unicode",
     ];
     for (const format of formats) {
-      const damaged = markUnits(vector.shares[0], format, [3]);
-      const result = cli(["sskr-combine", "--share", damaged, "--share", vector.shares[1]]);
+      const damaged = markUnits(vector.shares[0]!, format, [3]);
+      const result = cli(["sskr-combine", "--share", damaged, "--share", vector.shares[1]!]);
       expect(result.status, result.stderr).toBe(0);
       expect(result.stderr).toMatch(/Share 1: element \d+ is \S+\./u);
       expect(result.stderr).not.toContain(damaged);
@@ -41,13 +42,13 @@ describe("integrated SSKR CLI", () => {
   });
 
   it("exports a repaired share without changing the other shares", () => {
-    const vector = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")).deterministic[0];
-    const damaged = markUnits(vector.shares[0], "colors", [4]);
+    const vector = sskrVectors().deterministic[0]!;
+    const damaged = markUnits(vector.shares[0]!, "colors", [4]);
     const result = cli(["sskr-export", "--share", damaged, "--format", "indexes"]);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toMatch(/Share 1: element \d+ is \S+\./u);
     const line = result.stdout.split("\n").find((line) => /^\d+(?: \d+)+$/u.test(line))!;
-    expect(readRepairableShare(line).ur).toBe(vector.shares[0]);
+    expect(readRepairableShare(line).ur).toBe(vector.shares[0]!);
   });
 
   it("shares transformed entropy once and reverses the dates with a quorum", () => {
@@ -286,7 +287,7 @@ describe("integrated SSKR CLI", () => {
   });
 
   it("repairs shares that each miss two elements together, and keeps the phrase hidden on export", () => {
-    const vector = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")).deterministic[0];
+    const vector = sskrVectors().deterministic[0]!;
     const expected = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
     const typed = vector.shares.map((share: string, index: number) =>
       markUnits(share, "indexes", [2 + index, 9 + index]),
@@ -320,10 +321,10 @@ describe("integrated SSKR CLI", () => {
   });
 
   it("asks for --max-tries before a long search and says what would help", () => {
-    const shares = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")).deterministic[0].shares;
+    const shares = sskrVectors().deterministic[0]!.shares;
     // Two colors of the secret: 48 bits, 32 of them settled by the checksum.
-    const damaged = markUnits(shares[1], "colors", [5, 7]);
-    const typed = ["--share", shares[0], "--share", damaged];
+    const damaged = markUnits(shares[1]!, "colors", [5, 7]);
+    const typed = ["--share", shares[0]!, "--share", damaged];
     const refused = cli(["sskr-combine", ...typed, "--max-tries", "1000"]);
     expect(refused.status).toBe(1);
     expect(refused.stderr).toMatch(/Open combinations: 65,536 \(2\^16\)/u);

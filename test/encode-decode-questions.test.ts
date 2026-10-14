@@ -102,6 +102,8 @@ import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
+import { matching } from "./helpers/matchers.js";
+import { STYLE_CODES } from "../src/cli/terminal-style.js";
 
 const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const FINGERPRINT = "73c5da0a";
@@ -755,13 +757,13 @@ describe("encode, decode and the backup check on the private screen", () => {
       const shownAt = vi
         .mocked(console.error)
         .mock.calls.findIndex((line) => line.join(" ") === fingerprintLine);
-      const askedAt = vi.mocked(process.stderr.write).mock.calls.findIndex(([chunk]) =>
+      const askedAt = vi.mocked(process.stderr).write.mock.calls.findIndex(([chunk]) =>
         Buffer.from(chunk as Uint8Array)
           .toString("utf8")
           .includes(DECODE_DATES_PROMPT),
       );
       expect(vi.mocked(console.error).mock.invocationCallOrder[shownAt]).toBeLessThan(
-        vi.mocked(process.stderr.write).mock.invocationCallOrder[askedAt]!,
+        vi.mocked(process.stderr).write.mock.invocationCallOrder[askedAt]!,
       );
 
       // Not for codes without the BIP39 checksum, as the Original Seedshift's usually are, and not
@@ -782,7 +784,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       vi.stubEnv("CLICOLOR_FORCE", "1");
       terminal.answers = [`${MASKED}\r`, `${DATE}\r`];
       await runDecode({ "ask-secrets": true, mode: "seedshift" });
-      const plain = notices.map((line) => line.replace(/\x1b\[[0-9;]*m/gu, ""));
+      const plain = notices.map((line) => line.replace(STYLE_CODES, ""));
       expect(plain).toEqual(
         expect.arrayContaining([
           `✓ Encoded fingerprint (of the masked phrase) ${ENCODED_FINGERPRINT}`,
@@ -796,7 +798,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       vi.stubEnv("CLICOLOR_FORCE", "1");
       terminal.answers = [`${MASKED}\r`, `${DATE}\r`];
       await runDecode({ "ask-secrets": true, mode: "seedshift" });
-      const shown = out.map((line) => line.replace(/\x1b\[[0-9;]*m/gu, ""));
+      const shown = out.map((line) => line.replace(STYLE_CODES, ""));
       const parts = [
         "\nMnemoCode · Recovered result",
         "\nThe original seed phrase, the wallet's",
@@ -982,8 +984,8 @@ describe("encode, decode and the backup check on the private screen", () => {
       ]);
       expect(notices.filter((line) => line !== "")).toEqual([
         "This is one share; type 2, separated by ;.",
-        expect.stringMatching(/^Share 2 cannot be read: /u),
-        expect.stringMatching(/^Share 2 cannot be read: /u),
+        matching(/^Share 2 cannot be read: /u),
+        matching(/^Share 2 cannot be read: /u),
         "Date 1 is not one of the dates of this backup.",
         "The backup restores this seed phrase.",
       ]);

@@ -1,6 +1,5 @@
 // Quick startup assertions must detect wrong answers and lost refusals, not merely round-trip.
 // Public fixtures only; no card/PDF renderer or full vector replay is used in this file.
-import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const fault = vi.hoisted(() => ({
@@ -63,6 +62,7 @@ import {
   sskrVector,
 } from "../src/sskr/known-answers.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
+import { mnemocodeVectors, sskrVectors, type MnemocodeVector } from "./helpers/vectors.js";
 
 afterEach(() => {
   fault.write = undefined;
@@ -73,10 +73,8 @@ afterEach(() => {
 });
 
 /** The public vectors of vectors/mnemocode-v1.json by name. */
-function publicVector(name: string) {
-  return JSON.parse(readFileSync("vectors/mnemocode-v1.json", "utf8")).vectors.find(
-    (item: { readonly name: string }) => item.name === name,
-  );
+function publicVector(name: string): MnemocodeVector {
+  return mnemocodeVectors().vectors.find((item) => item.name === name)!;
 }
 
 describe("representation startup checks", () => {
@@ -172,9 +170,7 @@ describe("SSKR quick and feature-first-use checks", () => {
   });
 
   it("keeps its 32-byte answer equal to the published 24-word set", () => {
-    const vector = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")).deterministic.find(
-      (item: { readonly name: string }) => item.name === "bip39-256-2-of-3",
-    );
+    const vector = sskrVectors().deterministic.find((item) => item.name === "bip39-256-2-of-3")!;
     expect(sskrLongVector.entropy).toBe(vector.entropy);
     expect(sskrLongVector.shares).toEqual(vector.shares.slice(0, 2));
   });

@@ -111,7 +111,7 @@ class Screen {
   }
 
   write(text: string): void {
-    const characters = [...text];
+    const characters = Array.from(text);
     for (let index = 0; index < characters.length; index += 1) {
       const character = characters[index]!;
       if (character === "\x1b") {
@@ -475,7 +475,10 @@ describe("hints below a visible answer, as in mhfe", () => {
   });
 
   it("completes a word with Tab as far as the words agree, and ends it with a space", async () => {
-    const { answer, after } = await typeWithHints([..."abou", "\t", ..."abs", "\t"], 80);
+    const { answer, after } = await typeWithHints(
+      [...Array.from("abou"), "\t", ...Array.from("abs"), "\t"],
+      80,
+    );
     expect(after[4]!.rows).toEqual(["PPPPPPabout"]);
     expect(after[4]!.cursor).toEqual([0, 12]);
     // The words that begin with "abs" differ at once: Tab adds nothing, and the hint stays.
@@ -505,7 +508,7 @@ describe("hints below a visible answer, as in mhfe", () => {
 
   it("hints the word before the cursor inside a long answer, below its last row", async () => {
     const { after } = await typeWithHints(
-      [..."abandon abandon abandon ab", HOME, ...Array<string>(8).fill("\x1b[C"), LEFT],
+      [...Array.from("abandon abandon abandon ab"), HOME, ...Array<string>(8).fill("\x1b[C"), LEFT],
       30,
     );
     // 6 + 26 columns: two rows, the hint below the second, two words to a row.

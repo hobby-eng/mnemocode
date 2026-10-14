@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readFile } from "node:fs/promises";
 import { PDFDocument, PDFPage } from "pdf-lib";
 import {
   collectionSheetLayout,
@@ -17,6 +16,7 @@ import { pageOperators } from "./helpers/pdf-content.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { CardRenderer } from "../src/export/card-renderer.js";
 import type { QrModules } from "../src/export/platform.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 const colors = indexesToColors(Array.from({ length: 24 }, (_, index) => index * 73 + 1));
 const payload = colors.join(" ");
@@ -126,10 +126,8 @@ describe("single-page design studies", () => {
   );
 
   it("keeps the same studio on three SSKR study pages, with one own-member QR per page", async () => {
-    const vector = JSON.parse(
-      await readFile(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-    );
-    const shares = vector.deterministic[0].shares as string[];
+    const vector = sskrVectors();
+    const shares = vector.deterministic[0]!.shares as string[];
     const qrSpy = vi.spyOn(qr, "drawCollectionQr");
     const textSpy = vi.spyOn(PDFPage.prototype, "drawText");
     const { renderer, payloads, matrices } = recordingQr();

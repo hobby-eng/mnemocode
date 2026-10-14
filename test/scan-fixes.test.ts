@@ -385,6 +385,7 @@ import { SSKR_ENGINE_FOLDER, SSKR_BRIDGE } from "../src/bundled-file-paths.js";
 import { CardRenderer } from "../src/export/card-renderer.js";
 import { A6, renderHeirSheet } from "../src/export/heir-sheet.js";
 import type { RenderAsset, RenderPlatform } from "../src/export/platform.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 // The BIP39 library as it is, with the turning of a phrase into entropy watched: S005's case keeps
 // the entropy of each phrase to see that it is wiped. Every other call works as without the spy.
@@ -394,8 +395,7 @@ vi.mock("@scure/bip39", async (importOriginal) => {
 });
 
 /** The first share of the public SSKR vectors (vectors/sskr-v1.json). */
-const PUBLIC_SHARE: string = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8"))
-  .deterministic[0].shares[0];
+const PUBLIC_SHARE: string = sskrVectors().deterministic[0]!.shares[0]!;
 
 describe("S001, S019: the modes of shares, sheets for heirs and replaced last words are Masking's", () => {
   it("derives which modes split and which take a sheet from the variants", () => {
@@ -466,7 +466,9 @@ describe("S005: the candidate list is written by one library writer", () => {
     expect(decodeCandidateList(made.list.bytes)).toMatchObject({ passphrase: "TREZOR" });
     expect(made.list.records).toBe(1);
     expect((await writer.writePhrases([])).kind).toBe("empty");
-    expect((await writer.writePhrases(new Array(LIST_KEEP).fill(PHRASE))).kind).toBe("full");
+    expect((await writer.writePhrases(Array.from({ length: LIST_KEEP }, () => PHRASE))).kind).toBe(
+      "full",
+    );
     expect(candidateListHolds(MAX_CANDIDATE_RECORDS)).toBe(true);
     expect(candidateListHolds(LIST_KEEP)).toBe(false);
     const entropy = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
@@ -746,6 +748,7 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
   async function countWipes() {
     const { JointRepair } = await import("../src/sskr/joint-repair.js");
     const wipes: number[] = [];
+    // oxlint-disable-next-line typescript/unbound-method -- the spy calls it on its own instance
     const plan = JointRepair.prototype.plan;
     const spy = vi.spyOn(JointRepair.prototype, "plan").mockImplementation(async function (
       this: InstanceType<typeof JointRepair>,
@@ -2348,11 +2351,11 @@ describe("S126: one module names the files of a release", () => {
   /** The part of scripts/executable-files.mjs that this test uses; the script has no types. */
   interface ExecutableFiles {
     readonly CHECKSUM_LINE: RegExp;
-    checksumLine(sha256: string, file: string): string;
-    checksumsName(executable: string): string;
-    executableName(version: string): string;
-    noticesName(executable: string): string;
-    releaseFilePrefix(version: string): string;
+    readonly checksumLine: (sha256: string, file: string) => string;
+    readonly checksumsName: (executable: string) => string;
+    readonly executableName: (version: string) => string;
+    readonly noticesName: (executable: string) => string;
+    readonly releaseFilePrefix: (version: string) => string;
   }
 
   it("writes the checksum lines that the signing script reads, under one prefix", async () => {

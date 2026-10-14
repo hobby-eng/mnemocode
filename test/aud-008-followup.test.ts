@@ -13,6 +13,7 @@ import { writeShare } from "../src/sskr/transport.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { markUnits, wrongValue } from "./helpers/shares.js";
+import { holes, withHoles } from "./helpers/holes.js";
 
 /** Synthetic entropy and engine randomness, as the task of this follow-up names them. */
 const SECRET_BYTE = 0x42;
@@ -276,11 +277,6 @@ describe("AUD-008 follow-up: the reference is checked by a digest, and restores"
 
 describe("AUD-008 follow-up: a sparse word search is refused", () => {
   const known = (count: number) => Array.from({ length: count }, () => [0] as number[]);
-  /** `values` with the elements at `holes` deleted, so that the array keeps its length. */
-  function withHoles<T>(values: T[], ...holes: number[]): T[] {
-    for (const hole of holes) delete values[hole];
-    return values;
-  }
   /** A place of one word whose length counts a hole after its last element. */
   const trailingHole = () => {
     const place = [5];
@@ -293,7 +289,7 @@ describe("AUD-008 follow-up: a sparse word search is refused", () => {
       "written words with a hole",
       { kind: "missing-word", written: withHoles(Array(11).fill(0), 4) },
     ],
-    ["written words that are all holes", { kind: "missing-word", written: new Array(11) }],
+    ["written words that are all holes", { kind: "missing-word", written: holes(11) }],
     [
       "a place with a hole after its last index",
       { kind: "unknown-words", places: [...known(11), trailingHole()] },

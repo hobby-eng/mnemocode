@@ -18,6 +18,7 @@ import { MissingCodes } from "../src/core/missing-codes.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import type { MaskingMode } from "../src/core/types.js";
 import { MALFORMED_WALLET_ANSWER, type WalletMatch } from "../src/core/wallet-check.js";
+import { withHoles } from "./helpers/holes.js";
 
 // AUD-014 remediation of the core: the public reproductions of the audit's findings, each with
 // its well-formed controls, and the checks of the consolidated rules (recommendations 1 to 9).
@@ -195,7 +196,7 @@ describe("AUD-014 recommendations 1 and 2: one rule for index lists and counts",
     expect(areWordIndexes([0, 2048])).toBe(false);
     expect(areWordIndexes([0, -1])).toBe(false);
     expect(areWordIndexes([0, 1.5])).toBe(false);
-    expect(areWordIndexes([0, , 1])).toBe(false);
+    expect(areWordIndexes(withHoles([0, 0, 1], 1))).toBe(false);
   });
 
   it("keeps the refusals of a candidate and of a missing-word search in their own words", () => {
@@ -206,7 +207,7 @@ describe("AUD-014 recommendations 1 and 2: one rule for index lists and counts",
     );
     expect(() => new WordCandidate(1.5, words)).toThrow(RangeError);
     const sparse = [...words];
-    delete sparse[4];
+    withHoles(sparse, 4);
     expect(() => new WordCandidate(1, sparse)).toThrow(
       "A candidate needs 12, 15, 18, 21 or 24 BIP39 indexes.",
     );

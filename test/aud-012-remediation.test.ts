@@ -63,6 +63,8 @@ import {
 } from "../src/sskr/transport.js";
 import { indexesToColors } from "../src/core/colors.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { sskrVectors } from "./helpers/vectors.js";
+import { holes } from "./helpers/holes.js";
 
 /** BIP39's public test phrase, "abandon" eleven times and "about". */
 const PUBLIC_PHRASE = "abandon ".repeat(11) + "about";
@@ -130,9 +132,7 @@ describe("AUD-012-FUN002: the plan of codes with complete dates counts the check
 });
 
 /** The first share of the first deterministic vector (vectors/sskr-v1.json), as a UR. */
-const VECTOR_SHARE: string = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-).deterministic[0].shares[0];
+const VECTOR_SHARE: string = sskrVectors().deterministic[0]!.shares[0]!;
 
 /** `share` as a UR whose CBOR carries `tag`, with its checksum written again. */
 function taggedUr(share: string, tag: readonly number[]): string {
@@ -164,7 +164,7 @@ describe("AUD-012-FUN003: a tagged UR becomes Bytewords with one tag", () => {
 
 describe("AUD-012-API001: the places of a search are checked before they are counted", () => {
   it("refuses an empty, sparse or foreign place, and counts valid ones in order", () => {
-    for (const places of [[[]], [[1], []], [new Array(1)], [[2048]], [[-1]], [[0.5]]])
+    for (const places of [[[]], [[1], []], [holes(1)], [[2048]], [[-1]], [[0.5]]])
       expect(() => placeCombinations(places as number[][])).toThrow();
     const seen: number[][] = [];
     for (const words of placeCombinations([
@@ -187,12 +187,15 @@ describe("AUD-012-API002: a repair bounds its shares before it reads any", () =>
       "Provide between 1 and 256 SSKR shares.",
     );
     const read: number[] = [];
-    const many = new Proxy(new Array<string>(257).fill(VECTOR_SHARE), {
-      get(target, key, receiver) {
-        if (typeof key === "string" && /^\d+$/u.test(key)) read.push(Number(key));
-        return Reflect.get(target, key, receiver);
+    const many = new Proxy(
+      Array.from({ length: 257 }, () => VECTOR_SHARE),
+      {
+        get(target, key, receiver) {
+          if (typeof key === "string" && /^\d+$/u.test(key)) read.push(Number(key));
+          return Reflect.get(target, key, receiver) as unknown;
+        },
       },
-    });
+    );
     await expect(planJointRepair(many, { platform: nodeSharePlatform })).rejects.toThrow(
       "Provide between 1 and 256 SSKR shares.",
     );
@@ -202,7 +205,7 @@ describe("AUD-012-API002: a repair bounds its shares before it reads any", () =>
 
 describe("AUD-012-SEC001: a refused encoding leaves no share in the engine's memory", () => {
   it("refuses the code before any share is made", () => {
-    const vector = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")).deterministic[0];
+    const vector = sskrVectors().deterministic[0]!;
     // A fresh instance of the bundled engine, so that no earlier call left anything in it.
     const wasm = engine.initSync({
       module: readFileSync("sskr-wasm/generated/recovery_sskr_wasm_bg.wasm"),
@@ -319,8 +322,7 @@ describe("AUD-012-ARC013, ARC015: the copy check reads its threshold and its mar
 });
 
 /** The first share of the public SSKR vectors (vectors/sskr-v1.json). */
-const PUBLIC_SHARE: string = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8"))
-  .deterministic[0].shares[0];
+const PUBLIC_SHARE: string = sskrVectors().deterministic[0]!.shares[0]!;
 
 describe("AUD-012-FUN004: the labels of color cards are one per color", () => {
   // One Unicode code to a card (owner, 2026-10-13).
@@ -480,7 +482,7 @@ describe("AUD-012-API006, API007: shared lists cannot be changed or holed", () =
 
   it("refuses an empty or sparse list of Bitcoin profiles", () => {
     expect(() => checkedBitcoinProfiles([])).toThrow("At least one Bitcoin address profile");
-    expect(() => checkedBitcoinProfiles(new Array(1))).toThrow("Unknown Bitcoin address profile.");
+    expect(() => checkedBitcoinProfiles(holes(1))).toThrow("Unknown Bitcoin address profile.");
     const checked = checkedBitcoinProfiles(["taproot", "legacy"]);
     expect(checked).toEqual(["taproot", "legacy"]);
     expect(Object.isFrozen(checked)).toBe(true);

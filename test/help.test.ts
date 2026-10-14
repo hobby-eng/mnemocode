@@ -20,6 +20,7 @@ import {
   BITCOIN_NETWORKS,
   extendedPublicKeyPrefixes,
 } from "../src/core/wallet-evidence.js";
+import { containing } from "./helpers/matchers.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -86,11 +87,11 @@ describe("help", () => {
   it("refuses an unknown command or topic and names it", async () => {
     await expect(run(["frobnicate"])).rejects.toMatchObject({
       code: 1,
-      stderr: expect.stringContaining("There is no command “frobnicate”"),
+      stderr: containing("There is no command “frobnicate”"),
     });
     await expect(run(["help", "frobnicate"])).rejects.toMatchObject({
       code: 1,
-      stderr: expect.stringContaining("There is no command or topic “frobnicate”"),
+      stderr: containing("There is no command or topic “frobnicate”"),
     });
   });
 });
