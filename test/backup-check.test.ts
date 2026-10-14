@@ -5,7 +5,7 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The check on the private screen runs with the terminal replaced, as in
-// encode-decode-questions.test.ts: each question that reads a line takes the next of
+// test/helpers/question-terminal.ts: each question that reads a line takes the next of
 // `terminal.answers`, and each list question the next of `terminal.choices`.
 const terminal = vi.hoisted(() => ({ answers: [] as string[], choices: [] as unknown[] }));
 vi.mock("node:tty", async (importOriginal) => ({
@@ -170,7 +170,9 @@ describe("checking a written-down encoded seed phrase", () => {
       "Dates 1 and 2 are not dates of this backup.",
     );
   });
+});
 
+describe("checking a written-down encoded seed phrase", () => {
   it("reads a record in its own form, and names a record of another mode", async () => {
     const original = encoded([DATE], "indexes");
     const check = new EncodedBackupCheck(original);
@@ -213,10 +215,10 @@ describe("checking a written-down encoded seed phrase", () => {
   });
 });
 
-describe("checking written-down Shamir shares", () => {
-  const masked = encodeMnemonic(PHRASE, [parseDate(DATE)]).shiftedEnglish.join(" ");
-  const dates: readonly DateShiftDate[] = [parseDate(DATE)];
+const masked = encodeMnemonic(PHRASE, [parseDate(DATE)]).shiftedEnglish.join(" ");
+const dates: readonly DateShiftDate[] = [parseDate(DATE)];
 
+describe("checking written-down Shamir shares", () => {
   it("accepts enough shares, in any written form, with the dates", async () => {
     const shares = await splitSskrMnemonic(PHRASE, 2, 3);
     expect(await checkShareBackup(PHRASE, `${shares[0]};${shares[2]}`, "direct", "")).toBe(
@@ -296,7 +298,9 @@ describe("checking written-down Shamir shares", () => {
       "Share 2: mark at most 64 unreadable elements with ?.",
     );
   });
+});
 
+describe("checking written-down Shamir shares", () => {
   it("tells shares of another phrase from a wrong date", async () => {
     const check = new ShareBackupCheck(
       { mnemonic: PHRASE, mode: "seedshift", threshold: 2, dates },

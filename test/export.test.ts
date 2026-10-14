@@ -89,7 +89,9 @@ describe("export infrastructure", () => {
       }
     },
   );
+});
 
+describe("export infrastructure", () => {
   it("preserves page content and removes private metadata in preview and saved PDFs", async () => {
     const bytes = await fixture();
     const template: CardTemplate = {
@@ -176,7 +178,9 @@ describe("export infrastructure", () => {
     for (const page of output.getPages())
       expect(page.getSize()).toEqual({ width: 100, height: 60 });
   });
+});
 
+describe("export infrastructure", () => {
   it("rejects empty jobs and wrong card types, and preserves multi-page collections", async () => {
     const template: CardTemplate = {
       id: "test-only",

@@ -82,25 +82,25 @@ function expectTerminalGivenBack(): void {
   expect(keys.listenerCount("data")).toBe(0);
 }
 
-describe("Ctrl+C during a long search", () => {
-  beforeEach(() => {
-    keys = new Keyboard();
-    terminal.present = true;
-    terminal.privateScreen = false;
-    terminal.refusesRawMode = false;
-    terminal.rawModes = [];
-    terminal.modesAtQuestions = [];
-    vi.spyOn(process, "stdin", "get").mockReturnValue(keys as unknown as typeof process.stdin);
-    vi.stubEnv("TERM", "xterm");
-    // Progress and notices are not looked at here.
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    vi.spyOn(console, "log").mockImplementation(() => undefined);
-  });
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-  });
+beforeEach(() => {
+  keys = new Keyboard();
+  terminal.present = true;
+  terminal.privateScreen = false;
+  terminal.refusesRawMode = false;
+  terminal.rawModes = [];
+  terminal.modesAtQuestions = [];
+  vi.spyOn(process, "stdin", "get").mockReturnValue(keys as unknown as typeof process.stdin);
+  vi.stubEnv("TERM", "xterm");
+  // Progress and notices are not looked at here.
+  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  vi.spyOn(console, "log").mockImplementation(() => undefined);
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
+describe("Ctrl+C during a long search", () => {
   it("is read as a key in raw mode; other keys are dropped unseen and wiped", () => {
     const watch = watchForCtrlC();
     expect(terminal.rawModes).toEqual([true]);
@@ -188,7 +188,9 @@ describe("Ctrl+C during a long search", () => {
     expectTerminalGivenBack();
     expect(terminal.rawModes).toEqual([true, false, true, false]);
   });
+});
 
+describe("Ctrl+C during a long search", () => {
   it.each([
     ["no terminal", () => (terminal.present = false)],
     ["a dumb terminal", () => vi.stubEnv("TERM", "dumb")],

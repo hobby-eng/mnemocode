@@ -133,7 +133,9 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
       message: MISSING_CODES_TEXTS.noneByWallet,
     });
   });
+});
 
+describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
   it("lists every candidate with its phrase and fingerprint where they are few", async () => {
     const search = new MissingCodesSearch(
       MissingCodes.read(FEW, "indexes", "seedshift"),

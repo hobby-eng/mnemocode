@@ -110,7 +110,9 @@ describe("the code rules of the coding guide", () => {
     expect(rulesBroken({ "package-lock.json": "{}" })).toEqual(["TOOL-05"]);
     expect(rulesBroken({ "pnpm-lock.yaml": null })).toEqual(["TOOL-05"]);
   });
+});
 
+describe("the code rules of the coding guide", () => {
   it("refuse an error class without the Error suffix or a readonly code", () => {
     expect(rulesBroken({ "src/a.ts": "class Refused extends Error {}\n" })).toEqual(["TS-06"]);
     const coded = [

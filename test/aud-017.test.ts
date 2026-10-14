@@ -85,7 +85,9 @@ describe("AUD-016-API001 (AUD-017): host result operations retain their original
     expect(answer.derived).toBe(`child ${DERIVED}`);
     expect(answer.describe()).toBe(DERIVED);
   });
+});
 
+describe("AUD-016-API001 (AUD-017): host result operations retain their original receiver", () => {
   it("captures common getters once and makes them immutable even if the host later changes", async () => {
     const reads = { matched: 0, path: 0, warning: 0 };
     const given = {

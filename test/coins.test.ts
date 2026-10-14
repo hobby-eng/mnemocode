@@ -254,7 +254,9 @@ describe("addresses of every coin, where the wallets of the public phrase put th
       assertWalletEvidence({ ...coinAddress("bitcoin", deep, account2), addresses: 0 }, COINS),
     ).toThrow("The number of addresses compared must be an integer");
   });
+});
 
+describe("addresses of every coin, where the wallets of the public phrase put them", () => {
   it("are not found elsewhere, with another passphrase or in another wallet", () => {
     const address = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
     const notFound = { matched: false, kind: "coin-address" };
@@ -433,7 +435,9 @@ describe("addresses out of reach", () => {
     );
     expect(refusal(() => parseCoinAddress("dash", "dash1qqqqqq"))).toContain("checksum or format");
   });
+});
 
+describe("addresses out of reach", () => {
   it("are refused for Cosmos SDK accounts with a Bech32m checksum or the wrong length", () => {
     // The public Cosmos and Injective vectors re-encoded with a Bech32m checksum.
     for (const [coin, text] of [

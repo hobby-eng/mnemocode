@@ -121,7 +121,9 @@ describe("AUD-008 follow-up: the reference is checked by a digest, and restores"
       "These shares do not restore a secret: check them, and that all belong to one set.",
     );
   });
+});
 
+describe("AUD-008 follow-up: the reference is checked by a digest, and restores", () => {
   it.each([
     [
       1,
@@ -198,7 +200,9 @@ describe("AUD-008 follow-up: the reference is checked by a digest, and restores"
     );
     expect(await followAdvice(given)).toEqual({ phrase: PHRASE, followed: 1 });
   });
+});
 
+describe("AUD-008 follow-up: the reference is checked by a digest, and restores", () => {
   it("stops after a bounded number of combinations of groups", async () => {
     // Group threshold 7 of 14 groups of one share: 3432 combinations, of which only the last one,
     // the right groups 8 to 14, restores.

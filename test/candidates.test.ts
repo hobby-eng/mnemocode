@@ -135,13 +135,13 @@ describe("Candidate searches", () => {
   });
 });
 
-describe("WordCandidateSearch", () => {
-  /**
-   * Combinations above which a search is not run again here, only its size checked: the test
-   * above runs it, and the class takes its candidates from searchCandidates.
-   */
-  const LONG_SEARCH = 100_000;
+/**
+ * Combinations above which a search is not run again here, only its size checked: the test
+ * above runs it, and the class takes its candidates from searchCandidates.
+ */
+const LONG_SEARCH = 100_000;
 
+describe("WordCandidateSearch", () => {
   it.each(vectors.searches.map((search) => [search.name, search] as const))(
     "%s: tells the count before the search, and numbers the candidates of the vectors",
     (_, search) => {
@@ -212,7 +212,9 @@ describe("WordCandidateSearch", () => {
       `${ELEVEN}about`,
     ]);
   });
+});
 
+describe("WordCandidateSearch", () => {
   it("never shows its words through toString, toJSON or inspect", () => {
     const search = WordCandidateSearch.parse(
       `legal winner thank year ? sausage worth useful legal winner thank yellow`,
@@ -289,11 +291,17 @@ describe("Candidate lists", () => {
   });
 });
 
-describe("Candidate file encryption", () => {
-  const plain = fromHex(vectors.age.plaintext);
+const plain = fromHex(vectors.age.plaintext);
+
+/** Puts back the globals that a test of file encryption stubs. */
+function unstubGlobalsAfterEach(): void {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+}
+
+describe("Candidate file encryption", () => {
+  unstubGlobalsAfterEach();
 
   it.each(vectors.age.open.map((file) => [file.name, file.file] as const))(
     "opens the file %s",
@@ -363,6 +371,10 @@ describe("Candidate file encryption", () => {
     const typo = session.recipient.slice(0, -1) + (session.recipient.endsWith("q") ? "p" : "q");
     expect(() => parseRecipient(typo)).toThrow(/62/u);
   });
+});
+
+describe("Candidate file encryption", () => {
+  unstubGlobalsAfterEach();
 
   it("reads a list passphrase without white space at its ends or a byte order mark", () => {
     expect(parseListPassphrase(`\uFEFF  ${LIST_PASSPHRASE} \n`)).toBe(LIST_PASSPHRASE);

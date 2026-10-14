@@ -63,8 +63,10 @@ describe("dates of one answer", () => {
   });
 });
 
-describe("the date search", () => {
-  let lines: string[];
+let lines: string[];
+
+/** Records what each test writes, without colour, and puts the writers back after it. */
+function recordLinesOfEachTest(): void {
   beforeEach(() => {
     lines = [];
     vi.stubEnv("NO_COLOR", "1");
@@ -79,6 +81,10 @@ describe("the date search", () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
+}
+
+describe("the date search", () => {
+  recordLinesOfEachTest();
 
   it("returns the matches, the checksum-valid candidates and every match for a list", async () => {
     const encoded = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]);
@@ -163,6 +169,10 @@ describe("the date search", () => {
       "out No candidate with a valid BIP39 checksum was found.",
     ]);
   });
+});
+
+describe("the date search", () => {
+  recordLinesOfEachTest();
 
   // What recover-date printed before its search moved to date-search.ts (dist built 2026-10-06
   // 11:06 from 2c3ec5b and the earlier uncommitted work), standard output and standard error.
@@ -242,6 +252,10 @@ describe("the date search", () => {
     await runRecoverDate(parseArguments(argv));
     expect(lines).toEqual(expected);
   });
+});
+
+describe("the date search", () => {
+  recordLinesOfEachTest();
 
   it("finds the dates by an address of another coin, at its path", async () => {
     const { parseArguments } = await import("../src/cli/arguments.js");
@@ -300,6 +314,10 @@ describe("the date search", () => {
       ),
     ).rejects.toThrow("--network is for Bitcoin evidence");
   });
+});
+
+describe("the date search", () => {
+  recordLinesOfEachTest();
 
   it("compares an address with the first 20 from --index, or as many as --scan-gap says", async () => {
     const { parseArguments } = await import("../src/cli/arguments.js");
@@ -394,6 +412,10 @@ describe("the date search", () => {
       "out None of the 10 checksum-valid candidates matched the requested address.",
     ]);
   });
+});
+
+describe("the date search", () => {
+  recordLinesOfEachTest();
 
   it("says that no list was written when nothing matched", async () => {
     const { parseArguments } = await import("../src/cli/arguments.js");

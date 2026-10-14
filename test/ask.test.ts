@@ -105,42 +105,42 @@ function at(prompt: string, typed: string | Buffer): void {
 /** Bitcoin, as the question which coin an address is for gives it. */
 const BITCOIN = coinById("bitcoin");
 
-describe("questions asked again until the answer can be used", () => {
-  beforeEach(() => {
-    keys = new Keyboard();
-    screen = "";
-    seen = 0;
-    prompts = [];
-    notices = [];
-    terminal.privateScreen = false;
-    terminal.choices = [];
-    terminal.questions = [];
-    terminal.lists = [];
-    vi.spyOn(process, "stdin", "get").mockReturnValue(keys as unknown as typeof process.stdin);
-    vi.stubEnv("TERM", "xterm");
-    vi.stubEnv("NO_COLOR", "1");
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      screen += Buffer.from(chunk as Uint8Array).toString("utf8");
-      const next = prompts[0];
-      const found = next === undefined ? -1 : screen.indexOf(`${next.prompt} `, seen);
-      if (next !== undefined && found >= 0) {
-        seen = found + next.prompt.length + 1;
-        prompts.shift();
-        // Typed once the prompt shows, as a person would.
-        setImmediate(() => keys.type(next.keys));
-      }
-      return true;
-    });
-    vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
-      notices.push(line.join(" "));
-    });
+beforeEach(() => {
+  keys = new Keyboard();
+  screen = "";
+  seen = 0;
+  prompts = [];
+  notices = [];
+  terminal.privateScreen = false;
+  terminal.choices = [];
+  terminal.questions = [];
+  terminal.lists = [];
+  vi.spyOn(process, "stdin", "get").mockReturnValue(keys as unknown as typeof process.stdin);
+  vi.stubEnv("TERM", "xterm");
+  vi.stubEnv("NO_COLOR", "1");
+  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    screen += Buffer.from(chunk as Uint8Array).toString("utf8");
+    const next = prompts[0];
+    const found = next === undefined ? -1 : screen.indexOf(`${next.prompt} `, seen);
+    if (next !== undefined && found >= 0) {
+      seen = found + next.prompt.length + 1;
+      prompts.shift();
+      // Typed once the prompt shows, as a person would.
+      setImmediate(() => keys.type(next.keys));
+    }
+    return true;
   });
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-    expect(takeCutNotes(), "a note cut to fit its list").toEqual([]);
+  vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
+    notices.push(line.join(" "));
   });
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  expect(takeCutNotes(), "a note cut to fit its list").toEqual([]);
+});
 
+describe("questions asked again until the answer can be used", () => {
   it("asks again after an empty answer and after Ctrl+D, with one line", async () => {
     at("Dates:", "   \r");
     at("Dates:", CTRL_D);
@@ -211,7 +211,9 @@ describe("questions asked again until the answer can be used", () => {
       "tuna acid;yurt able",
     );
   });
+});
 
+describe("questions asked again until the answer can be used", () => {
   it("asks again after a paste longer than any answer, whose rest answers nothing", async () => {
     at("Phrase:", Buffer.alloc(1024 * 1024 + 4096, 0x61));
     at("Phrase:", "abandon\r");
@@ -261,7 +263,9 @@ describe("questions asked again until the answer can be used", () => {
       { question: "What now?", quit: "stops here" },
     ]);
   });
+});
 
+describe("questions asked again until the answer can be used", () => {
   it("asks for the wallet and checks each value at once, as bitcoin-evidence.ts does", async () => {
     terminal.choices = ["fingerprint"];
     at("Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):", "zz\r");
@@ -339,7 +343,9 @@ describe("questions asked again until the answer can be used", () => {
     ).toMatchObject({ evidence: { kind: "address", location, addresses: 1 } });
     expect(notices).toEqual([]);
   });
+});
 
+describe("questions asked again until the answer can be used", () => {
   it("looks for another wallet where the one given was, and refuses such options without it", async () => {
     const given: BitcoinEvidence = {
       kind: "address",
@@ -410,6 +416,9 @@ describe("questions asked again until the answer can be used", () => {
     expect(droppedPath("~/record.txt", "linux")).toBe(join(homedir(), "record.txt"));
     expect(droppedPath("record.txt", "linux")).toBe("record.txt");
   });
+});
+
+describe("questions asked again until the answer can be used", () => {
   // Last: the end of the input stays for every later question of this file.
   it("ends as a cancel when the input ends, without asking again and again", async () => {
     const asked = askSecretUntil("Phrase:", (answer) => answer);

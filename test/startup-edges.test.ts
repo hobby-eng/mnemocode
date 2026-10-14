@@ -202,7 +202,9 @@ describe("SSKR quick and feature-first-use checks", () => {
     expect(owned).toHaveLength(2);
     expect(owned.every((array) => array.every((byte) => byte === 0))).toBe(true);
   });
+});
 
+describe("SSKR quick and feature-first-use checks", () => {
   it("fails on an engine that accepts an insufficient grouped quorum", async () => {
     const accepted: Uint8Array[] = [];
     await expect(

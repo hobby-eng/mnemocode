@@ -134,7 +134,9 @@ describe("instructions for heirs", () => {
       }),
     ).toThrow("a whole number of codes");
   });
+});
 
+describe("instructions for heirs", () => {
   it("leads through the route of any program, which prints its own address once", () => {
     // A stand-in for another program, such as a page with tabs.
     const address = "https://example.com/wallet-tool";
@@ -232,7 +234,9 @@ describe("instructions for heirs", () => {
       }),
     ).toThrow("A sheet for heirs cannot be made");
   });
+});
 
+describe("instructions for heirs", () => {
   it("fits every kind of backup on one sheet, both sides, in A5 and in A6", async () => {
     // Rendering refuses a front without room for the hint and a back the basics overflow.
     for (const format of [A5, A6])
@@ -306,7 +310,9 @@ describe("instructions for heirs", () => {
     expect(wrong.status).not.toBe(0);
     expect(wrong.stderr).toContain("must be a5 or a6");
   });
+});
 
+describe("instructions for heirs", () => {
   it("is refused with a replaced last word, which the menu cannot decode", () => {
     const refused = cli([
       "encode",

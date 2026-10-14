@@ -68,59 +68,60 @@ const LEGACY = formatEncoded(
 const DATES_PROMPT =
   "Dates with ? for what is forgotten (up to 4, one to three of them incomplete):";
 
+let screen: string;
+let out: string[];
+let notices: string[];
+/** The window's size before a test, given back after it. */
+let window: { rows: number; columns: number };
+
+function windowOf(rows: number, columns: number): void {
+  Object.assign(process.stderr, { rows, columns });
+}
+
+/** Runs recover-date --ask-secrets with `options`, answering as the terminal says. */
+function recover(options: Record<string, string>): Promise<void> {
+  return runRecoverDate({ "ask-secrets": true, ...options });
+}
+
+/** Where each prompt appears on the screen, in order. */
+function promptsShown(): string[] {
+  return [
+    ...screen.matchAll(
+      /(Encoded seed phrase or record:|Dates with \?[^:]*:|Original fingerprint of the wallet[^:]*:)/gu,
+    ),
+  ].map((match) => match[1]!);
+}
+
+beforeEach(() => {
+  terminal.answers = [];
+  terminal.choices = [];
+  terminal.questions = [];
+  terminal.labels = [];
+  terminal.stdoutTerminal = false;
+  window = { rows: process.stderr.rows, columns: process.stderr.columns };
+  screen = "";
+  out = [];
+  notices = [];
+  vi.stubEnv("NO_COLOR", "1");
+  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    screen += Buffer.from(chunk as Uint8Array).toString("utf8");
+    return true;
+  });
+  vi.spyOn(console, "log").mockImplementation((...line: unknown[]) => {
+    out.push(line.join(" "));
+  });
+  vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
+    notices.push(line.join(" "));
+  });
+});
+afterEach(() => {
+  Object.assign(process.stderr, window);
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  expect(takeCutNotes(), "a note cut to fit its list").toEqual([]);
+});
+
 describe("recover-date on the private screen", () => {
-  let screen: string;
-  let out: string[];
-  let notices: string[];
-  /** The window's size before a test, given back after it. */
-  let window: { rows: number; columns: number };
-  beforeEach(() => {
-    terminal.answers = [];
-    terminal.choices = [];
-    terminal.questions = [];
-    terminal.labels = [];
-    terminal.stdoutTerminal = false;
-    window = { rows: process.stderr.rows, columns: process.stderr.columns };
-    screen = "";
-    out = [];
-    notices = [];
-    vi.stubEnv("NO_COLOR", "1");
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      screen += Buffer.from(chunk as Uint8Array).toString("utf8");
-      return true;
-    });
-    vi.spyOn(console, "log").mockImplementation((...line: unknown[]) => {
-      out.push(line.join(" "));
-    });
-    vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
-      notices.push(line.join(" "));
-    });
-  });
-  afterEach(() => {
-    Object.assign(process.stderr, window);
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-    expect(takeCutNotes(), "a note cut to fit its list").toEqual([]);
-  });
-
-  function windowOf(rows: number, columns: number): void {
-    Object.assign(process.stderr, { rows, columns });
-  }
-
-  /** Runs recover-date --ask-secrets with `options`, answering as the terminal says. */
-  function recover(options: Record<string, string>): Promise<void> {
-    return runRecoverDate({ "ask-secrets": true, ...options });
-  }
-
-  /** Where each prompt appears on the screen, in order. */
-  function promptsShown(): string[] {
-    return [
-      ...screen.matchAll(
-        /(Encoded seed phrase or record:|Dates with \?[^:]*:|Original fingerprint of the wallet[^:]*:)/gu,
-      ),
-    ].map((match) => match[1]!);
-  }
-
   it("asks again for each answer that cannot be used, keeping the others, and the wallet last", async () => {
     terminal.answers = [
       `${MASKED}\r`,
@@ -216,7 +217,9 @@ describe("recover-date on the private screen", () => {
     );
     expect(out).toEqual([FOUND]);
   });
+});
 
+describe("recover-date on the private screen", () => {
   it("offers the Original Seedshift when the codes lack MnemoCode Seedshift's checksum", async () => {
     terminal.answers = [`${MASKED.replace(/377$/u, "378")}\r`, "2?-09-2026\r"];
     // The original Seedshift then; nothing fits, and Escape at "What now?" stops.
@@ -306,7 +309,9 @@ describe("recover-date on the private screen", () => {
       expect(terminal.questions).toEqual([]);
     }
   });
+});
 
+describe("recover-date on the private screen", () => {
   it("keeps the dates and the wallet when the encoded phrase is typed again", async () => {
     const other = formatEncoded(encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2025")]), "indexes");
     terminal.answers = [`${other}\r`, "2?-09-2026\r", `${MASKED}\r`];
@@ -371,7 +376,9 @@ describe("recover-date on the private screen", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+});
 
+describe("recover-date on the private screen", () => {
   it("asks whether Seedshift was used for codes in a record file without its header", async () => {
     // As decode reads them: the codes do not say how they were made, and taken as not masked a
     // masked phrase would be shown as the seed phrase.
@@ -467,7 +474,9 @@ describe("recover-date on the private screen", () => {
     );
     expect(screen).toBe("");
   });
+});
 
+describe("recover-date on the private screen", () => {
   it("cancels when the input ends", async () => {
     terminal.answers = [`${MASKED}\r`];
     await expect(

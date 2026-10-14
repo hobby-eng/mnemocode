@@ -94,7 +94,9 @@ describe("recover-word CLI", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+});
 
+describe("recover-word CLI", () => {
   it("keeps record N as candidate N with a wallet check, and reads a passphrase file as typed", async () => {
     const dir = mkdtempSync(join(tmpdir(), "mnc-candidates-"));
     try {
@@ -190,7 +192,9 @@ describe("recover-word CLI", () => {
     expect(lines.filter((line) => line.includes("\tpreserved\t"))).toHaveLength(1);
     expect(result.stderr).toContain("All checksum-valid last words");
   });
+});
 
+describe("recover-word CLI", () => {
   it("rejects input without a placeholder, and searches that are too large", async () => {
     await expect(
       run(["recover-word", "--mnemonic", incomplete.replace("?", "about")]),

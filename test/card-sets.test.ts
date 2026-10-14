@@ -174,7 +174,9 @@ describe("a sheet of cards", () => {
       studyCaptionWidth(font, ["Unbreakablelongname", "Racing green", "01  016451"]),
     );
   });
+});
 
+describe("a sheet of cards", () => {
   it("lays out a sheet with the room that its split names take", () => {
     const fixed = collectionSheetLayout({ pageSize: "a4", orientation: "portrait" }, 20, 1.2, 2);
     const split = collectionSheetLayout(

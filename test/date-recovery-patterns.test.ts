@@ -84,7 +84,9 @@ describe("date recovery patterns", () => {
     const phrases = steps.flat().map((candidate) => candidate.mnemonic);
     expect(new Set(phrases).size).toBe(phrases.length);
   });
+});
 
+describe("date recovery patterns", () => {
   it("finds no phrase twice and the right one once, in every mode, length and forgotten part", () => {
     const phrases = {
       12: publicMnemonic,
@@ -167,7 +169,9 @@ describe("date recovery patterns", () => {
     expect(recovered.stderr).toContain("Recovery search contains 30 date combinations.");
     expect(recovered.stdout).toContain(`10-07-1963 23-09-2026\t${publicMnemonic}`);
   });
+});
 
+describe("date recovery patterns", () => {
   it("refuses a search of more dates than --max-candidates allows", async () => {
     const encoded = await run([
       "encode",

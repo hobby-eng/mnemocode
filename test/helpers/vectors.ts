@@ -112,3 +112,8 @@ export function candidateVectors(): CandidateVectors {
   // The repository's own file: a field it lacks fails the test that reads it.
   return vectorFile("candidates-v1.json") as CandidateVectors;
 }
+
+/** The first share of the first deterministic split: a public share for a test that needs one. */
+export function publicShare(): string {
+  return sskrVectors().deterministic[0]!.shares[0]!;
+}

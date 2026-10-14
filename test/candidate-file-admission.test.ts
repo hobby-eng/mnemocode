@@ -110,7 +110,9 @@ describe("Candidate file admission", () => {
     expect(read).toHaveBeenCalledExactlyOnceWith(parameters.headerBytes);
     expect(prefix.every((byte) => byte === 0)).toBe(true);
   });
+});
 
+describe("Candidate file admission", () => {
   it.each([-1, 1])("refuses and wipes a prefix with a changed length (%s)", async (difference) => {
     const file = keyFile();
     const prefix = new Uint8Array(file.byteLength + difference).fill(1);
@@ -182,7 +184,9 @@ describe("Candidate file admission", () => {
       });
     },
   );
+});
 
+describe("Candidate file admission", () => {
   it("checks oversized encryption inputs before either key or scrypt work", async () => {
     const bytes = announcedBytes(Uint8Array.of(1), parameters.plaintextBytes + 1);
     const encrypt = vi.spyOn(Encrypter.prototype, "encrypt");
@@ -260,7 +264,9 @@ describe("Candidate file admission", () => {
     expect(cancel).not.toHaveBeenCalled();
     expect(stream.locked).toBe(false);
   });
+});
 
+describe("Candidate file admission", () => {
   it("checks cumulative decrypted bytes before copying and cancels on overflow", async () => {
     const chunks = [announcedBytes(Uint8Array.of(1), parameters.plaintextBytes), Uint8Array.of(2)];
     let wipedAtCancellation = false;

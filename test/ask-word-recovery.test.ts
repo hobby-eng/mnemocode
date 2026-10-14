@@ -82,62 +82,63 @@ const PHRASE_PROMPT = "Seed phrase, ? for each forgotten word:";
 const LIST_PROMPT = "Passphrase for the candidates list:";
 const LIST_PASSPHRASE = "public candidate test passphrase";
 
+let screen: string;
+let out: string[];
+let notices: string[];
+let directory: string;
+/** The window's size before a test, given back after it. */
+let window: { rows: number; columns: number };
+
+function windowOf(rows: number, columns: number): void {
+  Object.assign(process.stderr, { rows, columns });
+}
+
+function recover(options: Record<string, string | boolean>): Promise<void> {
+  return runRecoverWord({ "ask-secrets": true, ...options });
+}
+
+/** The prompts shown, in order. */
+function promptsShown(): string[] {
+  return [
+    ...screen.matchAll(
+      /(Seed phrase, \? for each forgotten word:|Passphrase for the candidates list:|The same passphrase again:)/gu,
+    ),
+  ].map((match) => match[1]!);
+}
+
+beforeEach(async () => {
+  terminal.answers = [];
+  terminal.choices = [];
+  terminal.questions = [];
+  terminal.privateScreen = true;
+  terminal.stdoutTerminal = false;
+  terminal.saveFailures = 0;
+  window = { rows: process.stderr.rows, columns: process.stderr.columns };
+  screen = "";
+  out = [];
+  notices = [];
+  directory = await mkdtemp(join(tmpdir(), "mnemocode-word-questions-"));
+  vi.stubEnv("NO_COLOR", "1");
+  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    screen += Buffer.from(chunk as Uint8Array).toString("utf8");
+    return true;
+  });
+  vi.spyOn(console, "log").mockImplementation((...line: unknown[]) => {
+    out.push(line.join(" "));
+  });
+  vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
+    notices.push(line.join(" "));
+  });
+});
+afterEach(async () => {
+  Object.assign(process.stderr, window);
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  await rm(directory, { recursive: true, force: true });
+  expect(takeCutNotes(), "a note cut to fit its list").toEqual([]);
+});
+
 describe("recover-word on the private screen", () => {
-  let screen: string;
-  let out: string[];
-  let notices: string[];
-  let directory: string;
-  /** The window's size before a test, given back after it. */
-  let window: { rows: number; columns: number };
-  beforeEach(async () => {
-    terminal.answers = [];
-    terminal.choices = [];
-    terminal.questions = [];
-    terminal.privateScreen = true;
-    terminal.stdoutTerminal = false;
-    terminal.saveFailures = 0;
-    window = { rows: process.stderr.rows, columns: process.stderr.columns };
-    screen = "";
-    out = [];
-    notices = [];
-    directory = await mkdtemp(join(tmpdir(), "mnemocode-word-questions-"));
-    vi.stubEnv("NO_COLOR", "1");
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      screen += Buffer.from(chunk as Uint8Array).toString("utf8");
-      return true;
-    });
-    vi.spyOn(console, "log").mockImplementation((...line: unknown[]) => {
-      out.push(line.join(" "));
-    });
-    vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
-      notices.push(line.join(" "));
-    });
-  });
-  afterEach(async () => {
-    Object.assign(process.stderr, window);
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-    await rm(directory, { recursive: true, force: true });
-    expect(takeCutNotes(), "a note cut to fit its list").toEqual([]);
-  });
-
-  function windowOf(rows: number, columns: number): void {
-    Object.assign(process.stderr, { rows, columns });
-  }
-
-  function recover(options: Record<string, string | boolean>): Promise<void> {
-    return runRecoverWord({ "ask-secrets": true, ...options });
-  }
-
-  /** The prompts shown, in order. */
-  function promptsShown(): string[] {
-    return [
-      ...screen.matchAll(
-        /(Seed phrase, \? for each forgotten word:|Passphrase for the candidates list:|The same passphrase again:)/gu,
-      ),
-    ].map((match) => match[1]!);
-  }
-
   it("checks the phrase before the list's passphrase, which is asked again without a limit", async () => {
     const path = join(directory, "candidates.age");
     terminal.answers = [
@@ -217,7 +218,9 @@ describe("recover-word on the private screen", () => {
     );
     expect(out).toHaveLength(129);
   });
+});
 
+describe("recover-word on the private screen", () => {
   it("offers a wallet check when the candidates are too many to show", async () => {
     terminal.answers = [`a* ${"abandon ".repeat(10)}?\r`];
     terminal.choices = ["Done"];
@@ -312,7 +315,9 @@ describe("recover-word on the private screen", () => {
     expect(decodeCandidateList(await readFile(other)).records).toHaveLength(1);
     expect(terminal.questions).toEqual(["What now?", "What now?"]);
   });
+});
 
+describe("recover-word on the private screen", () => {
   it("keeps the candidates when the list cannot be saved: try again, another name, or skip", async () => {
     const path = join(directory, "first.mncl");
     const other = join(directory, "other.mncl");

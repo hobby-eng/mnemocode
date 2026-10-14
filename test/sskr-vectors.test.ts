@@ -103,6 +103,9 @@ describe("Published SSKR v1 vectors", () => {
     for (const input of ["ur:sskr/1-2/abcd", "ur:sskr/zz", "tuna unknown", "", "#A11A5"])
       expect(() => normalizeShare(input)).toThrow();
   });
+});
+
+describe("Published SSKR v1 vectors", () => {
   it("rejects tampered share data after transport checksum is recomputed", async () => {
     const selected = [0, 2, 3, 5, 7].map((i) => vectors.official.shares[i]!);
     const body = urToTransport(selected[0]!).slice(0, -CHECKSUM_BYTES);

@@ -136,7 +136,9 @@ describe("AUD-021-API001: candidate entropy is byte data", () => {
     const encoded = encodeCandidateList({ records: [{ entropy }] });
     expect(decodeCandidateList(encoded).records[0]!.entropy).toEqual(entropy);
   });
+});
 
+describe("AUD-021-API001: candidate entropy is byte data", () => {
   it.each([ENTROPY_BYTES - 1, Math.max(...BIP39_ENTROPY_BYTES) + 1])(
     "refuses byte entropy of unsupported length %i",
     (length) => {
@@ -285,7 +287,9 @@ describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
     const encoded = EncodedBackup.encode(reEncoding.confirmedPhrase(), [], "unicode", "direct");
     expect(encoded.backup.text()).toBe(PUBLIC_UNICODE);
   });
+});
 
+describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
   it("never confirms a different wallet after mutation attempts", async () => {
     const reEncoding = ReEncoding.of(maskedBackup(), [parseDate("23-09-2026")]);
     const match = await reEncoding.confirmByWallet(async (phrase) => {

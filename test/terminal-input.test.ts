@@ -131,8 +131,13 @@ describe("terminal keys", () => {
   });
 });
 
-describe("hidden line", () => {
+/** Puts back the mocks after each test. */
+function restoreMocksAfterEach(): void {
   afterEach(() => vi.restoreAllMocks());
+}
+
+describe("hidden line", () => {
+  restoreMocksAfterEach();
 
   it("keeps every byte as typed and shows nothing", async () => {
     const shown = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -211,6 +216,10 @@ describe("hidden line", () => {
     // A character of several bytes moves and deletes as one.
     expect(await readLine(typed(`a€b${LEFT}${LEFT}\x7f\r`), { echo: true })).toBe("€b");
   });
+});
+
+describe("hidden line", () => {
+  restoreMocksAfterEach();
 
   it("ignores Escape alone in a secret prompt and goes back with it in the menu", async () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);

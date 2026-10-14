@@ -46,21 +46,22 @@ import { InputCancelledError } from "../src/cli/terminal-input.js";
 const TEST_PHRASE =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
-describe("secret input", () => {
-  let written: string[];
-  beforeEach(() => {
-    terminal.available = true;
-    terminal.answers = "";
-    terminal.switched = 0;
-    terminal.privateScreen = false;
-    written = [];
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-  });
-  afterEach(() => vi.restoreAllMocks());
+let written: string[];
 
+beforeEach(() => {
+  terminal.available = true;
+  terminal.answers = "";
+  terminal.switched = 0;
+  terminal.privateScreen = false;
+  written = [];
+  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    written.push(String(chunk));
+    return true;
+  });
+});
+afterEach(() => vi.restoreAllMocks());
+
+describe("secret input", () => {
   it("reads the answer at a hidden prompt and shows only the question", async () => {
     terminal.answers = "  test only  \r";
     expect(await askSecretUntil("Seed phrase (English BIP39 words):", typed)).toBe("test only");

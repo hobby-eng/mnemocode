@@ -219,7 +219,9 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys", () => {
       expect(Share.read(colorText(complete, view)).ur, view).toBe(ur);
     }
   });
+});
 
+describe("AUD-021-FUN002: marked SSKR prefixes with card decoys", () => {
   it("keeps partial digit constraints when cropping a share prefix", () => {
     const ur = sskrSetVector.shares[0];
     for (const format of ["colors", "unicode", "colors-unicode"] as const) {
@@ -289,7 +291,9 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys", () => {
     );
     expect(() => MarkedReading.of(`${"??E000".repeat(8)}E000E000`)).toThrow(AmbiguousMarksError);
   });
+});
 
+describe("AUD-021-FUN002: marked SSKR prefixes with card decoys", () => {
   it("lists multiple valid shares instead of silently choosing a prefix repair", () => {
     const ur = sskrSetVector.shares[0];
     // One whole color and three hex digits: 36 unknown bits leave four beyond the CRC-32.

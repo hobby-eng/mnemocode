@@ -369,7 +369,9 @@ describe("AUD-009 follow-up: nothing a library object hands out changes it", () 
     expect(Object.isFrozen(report.assessment)).toBe(true);
     expect(Object.isFrozen(report.assessment.shares[0]!.forms)).toBe(true);
   });
+});
 
+describe("AUD-009 follow-up: nothing a library object hands out changes it", () => {
   it("renders every card of a share set with the texts it was given at first", async () => {
     const presentation = {
       studioName: "Synthetic Studio",

@@ -256,13 +256,19 @@ async function typeOnScreen(keys: readonly string[], columns: number, promptWidt
   return { answer, screen, text: edited.characters.join("") };
 }
 
-describe("visible answer on the terminal", () => {
-  const originalColumns = process.stderr.columns;
+const originalColumns = process.stderr.columns;
+
+/** Puts back the mocks and the width of the terminal around each test. */
+function restoreTerminalAroundEach(): void {
   beforeEach(() => vi.restoreAllMocks());
   afterEach(() => {
     vi.restoreAllMocks();
     process.stderr.columns = originalColumns;
   });
+}
+
+describe("visible answer on the terminal", () => {
+  restoreTerminalAroundEach();
 
   it.each([
     [7, 0],
@@ -357,6 +363,10 @@ describe("visible answer on the terminal", () => {
       expect(answer).toBe(text);
     },
   );
+});
+
+describe("visible answer on the terminal", () => {
+  restoreTerminalAroundEach();
 
   it("counts the rows of a line and the row after an answer as terminals wrap them", () => {
     // At 5 columns "abcd的" leaves the fifth cell of the first row empty: two rows.
@@ -442,12 +452,7 @@ async function typeWithHints(keys: readonly string[], columns: number, promptWid
 }
 
 describe("hints below a visible answer, as in mhfe", () => {
-  const originalColumns = process.stderr.columns;
-  beforeEach(() => vi.restoreAllMocks());
-  afterEach(() => {
-    vi.restoreAllMocks();
-    process.stderr.columns = originalColumns;
-  });
+  restoreTerminalAroundEach();
 
   it("shows how many words begin with a letter, then the words, and a word no word begins like", async () => {
     const { answer, after, end } = await typeWithHints(["a", "b", "x", BACKSPACE, " "], 80);
@@ -528,6 +533,10 @@ describe("hints below a visible answer, as in mhfe", () => {
     expect(after[35]!.rows).toEqual(answer);
     expect(after[35]!.cursor).toEqual([0, 13]);
   });
+});
+
+describe("hints below a visible answer, as in mhfe", () => {
+  restoreTerminalAroundEach();
 
   it("gives a hint the last words typed only, never the phrase typed so far (AUD-019-SEC001)", async () => {
     process.stderr.columns = 80;

@@ -85,7 +85,9 @@ describe("business card collections", () => {
       expect((pageOperators(pdf, 0).match(/\nf\n/gu) ?? []).length).toBeGreaterThan(100);
     }
   }, 180_000);
+});
 
+describe("business card collections", () => {
   it("fails on mismatched QR data and unprintable personal fields before returning a PDF", async () => {
     const template = selectTemplate("business-it");
     const content = { kind: "colors" as const, colors, payload: colors.join(" ") };

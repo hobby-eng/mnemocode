@@ -110,7 +110,9 @@ describe("platform-neutral card rendering", () => {
         path,
       ).toBe(true);
   });
+});
 
+describe("platform-neutral card rendering", () => {
   it("renders through the platform supplied by the host", async () => {
     const calls = { assets: new Set<string>(), random: 0, decode: 0, encode: 0, qr: 0 };
     const host: RenderPlatform = {

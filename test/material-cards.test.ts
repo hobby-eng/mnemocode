@@ -143,7 +143,9 @@ describe("material selection cards", () => {
       }
     }
   });
+});
 
+describe("material selection cards", () => {
   it("holds the object of every tinted finish in the middle of its crop", () => {
     // A sample shows its whole crop: an object off its middle stood off the middle of its dark
     // square (owner, 2026-10-13). The crops were centred on the objects' sides; an outline runs a
@@ -213,7 +215,9 @@ describe("material selection cards", () => {
       }
     },
   );
+});
 
+describe("material selection cards", () => {
   it("prints exact ordered references and finish names on the same study page as the QR", async () => {
     const texts = textSpy();
     const pdf = await PDFDocument.load(

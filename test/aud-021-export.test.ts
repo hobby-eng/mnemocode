@@ -296,7 +296,9 @@ describe("AUD-021-FUN003: one card plan through the production Encode dispatcher
     expect(observed.notices.some((line) => line.startsWith("Saved PDF:"))).toBe(false);
     expect(observed.questions).toEqual(["What now?", "Check the backup now?"]);
   });
+});
 
+describe("AUD-021-FUN003: one card plan through the production Encode dispatcher", () => {
   it("keeps the card plan when a failed PDF is saved under another checked name", async () => {
     observed.privateScreen = true;
     observed.failures.pdf = 1;

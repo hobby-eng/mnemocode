@@ -90,7 +90,9 @@ describe("cards of a share set, for any host", () => {
       expect((await set.renderShare(0)).length, style).toBeGreaterThan(0);
     }
   });
+});
 
+describe("cards of a share set, for any host", () => {
   it("refuses cards of shares in word numbers, Bytewords or a UR, which have none", async () => {
     for (const shareFormat of ["indexes", "words", "ur"] as const) {
       await expect(

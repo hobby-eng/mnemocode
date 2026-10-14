@@ -368,7 +368,9 @@ describe("ShareInput", () => {
       },
     });
   });
+});
 
+describe("ShareInput", () => {
   it("names the set troubles by place, before anything is restored", async () => {
     const platform = countingPlatform();
     const input = new ShareInput(TEXTS);
@@ -515,7 +517,9 @@ describe("RepairReport", () => {
       "A repair report needs a positive pace.",
     );
   });
+});
 
+describe("RepairReport", () => {
   it("says what a repair filled in, by the place of each share", async () => {
     const plan = await planJointRepair([SHARES[0], marked([5])], { platform: nodeSharePlatform });
     const [set] = await plan.search();

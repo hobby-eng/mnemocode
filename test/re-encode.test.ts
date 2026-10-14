@@ -289,7 +289,9 @@ describe("re-encode CLI", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+});
 
+describe("re-encode CLI", () => {
   it("splits the phrase of a backup into Shamir shares", async () => {
     const result = await run([
       ...OLD,
@@ -371,7 +373,9 @@ describe("re-encode CLI", () => {
     expect(refused.stderr).not.toContain(OLD_BACKUP_REFUSAL);
     expect(refused.stderr).not.toContain(FINGERPRINT);
   });
+});
 
+describe("re-encode CLI", () => {
   it("says which refusals are of the old backup's options", async () => {
     const backup = ["--input", MASKED_WORDS, "--format", "3", "--recognised"];
     await expect(

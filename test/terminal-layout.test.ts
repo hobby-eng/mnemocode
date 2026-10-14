@@ -10,11 +10,13 @@ function stderrAs(tty: boolean, columns = 80): void {
   vi.spyOn(process.stderr, "columns", "get").mockReturnValue(columns);
 }
 
-describe("the layout of results on a terminal (terminal.ts)", () => {
-  let written: string;
-  let out: string[];
-  let errors: string[];
-  const saved = new Map<string, PropertyDescriptor | undefined>();
+let written: string;
+let out: string[];
+let errors: string[];
+const saved = new Map<string, PropertyDescriptor | undefined>();
+
+/** Gives each test a terminal of its own whose writes it records, and puts it back after. */
+function watchTerminalOfEachTest(): void {
   beforeEach(() => {
     written = "";
     out = [];
@@ -47,6 +49,10 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
     }
     saved.clear();
   });
+}
+
+describe("the layout of results on a terminal (terminal.ts)", () => {
+  watchTerminalOfEachTest();
 
   it("rewrites the progress of a search in place on a terminal, and closes its line", () => {
     stderrAs(true);

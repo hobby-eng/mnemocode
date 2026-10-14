@@ -98,7 +98,9 @@ describe("One explicit unreadable SSKR element", () => {
       repaired: true,
     });
   });
+});
 
+describe("One explicit unreadable SSKR element", () => {
   it("repairs a whole eight-digit color Unicode pair or both of its symbols", () => {
     for (const vector of vectors.deterministic) {
       const share = vector.shares[0]!;
@@ -211,30 +213,30 @@ describe("Several unreadable SSKR elements", () => {
   }, 120_000);
 });
 
+const vector = vectors.deterministic[0]!;
+const share = vector.shares[0]!;
+
+/** The share in `format` with the elements at `places` marked whole. */
+function wholeMarks(format: ShareFormat, places: readonly number[]): string {
+  const parts = shareUnits(share, format);
+  for (const place of places) parts[place] = "?";
+  return joinUnits(parts, format);
+}
+
+/** The share in `format` with the digits at `digits` (from 0, after any #) of each element unreadable. */
+function markDigits(format: ShareFormat, marks: Record<number, readonly number[]>): string {
+  const parts = shareUnits(share, format);
+  for (const [place, digits] of Object.entries(marks)) {
+    const part = parts[Number(place)]!;
+    const prefix = part.startsWith("#") ? "#" : "";
+    const symbols = Array.from(part.slice(prefix.length));
+    for (const digit of digits) symbols[digit] = "?";
+    parts[Number(place)] = prefix + symbols.join("");
+  }
+  return joinUnits(parts, format);
+}
+
 describe("Unreadable digits inside a color or a Unicode code", () => {
-  const vector = vectors.deterministic[0]!;
-  const share = vector.shares[0]!;
-
-  /** The share in `format` with the elements at `places` marked whole. */
-  function wholeMarks(format: ShareFormat, places: readonly number[]): string {
-    const parts = shareUnits(share, format);
-    for (const place of places) parts[place] = "?";
-    return joinUnits(parts, format);
-  }
-
-  /** The share in `format` with the digits at `digits` (from 0, after any #) of each element unreadable. */
-  function markDigits(format: ShareFormat, marks: Record<number, readonly number[]>): string {
-    const parts = shareUnits(share, format);
-    for (const [place, digits] of Object.entries(marks)) {
-      const part = parts[Number(place)]!;
-      const prefix = part.startsWith("#") ? "#" : "";
-      const symbols = Array.from(part.slice(prefix.length));
-      for (const digit of digits) symbols[digit] = "?";
-      parts[Number(place)] = prefix + symbols.join("");
-    }
-    return joinUnits(parts, format);
-  }
-
   it("uses the digits read of colors: three colors missing two digits each are settled", () => {
     const colors = shareUnits(share, "colors");
     // Places 4 to 6 hold only the secret, which nothing but the checksum settles.
@@ -312,7 +314,9 @@ describe("Unreadable digits inside a color or a Unicode code", () => {
       ).ur,
     ).toBe(share);
   });
+});
 
+describe("Unreadable digits inside a color or a Unicode code", () => {
   it("reads a ? for a digit of a Color Unicode code written apart, and its color's candidates", () => {
     const codes = shareUnits(share, "colors-unicode").flatMap((color) => color.match(/.{4}/gu)!);
     const digit = (code: string, at: number) => `${code.slice(0, at)}?${code.slice(at + 1)}`;

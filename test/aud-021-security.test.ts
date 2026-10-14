@@ -118,7 +118,9 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
     expect(await decodeQrPngFile(path)).toBe(payload);
     expect(captured.limits[0]).toBeGreaterThan(WHITE_PIXEL.length);
   });
+});
 
+describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () => {
   it.each([
     [
       "odd RGBA8",
@@ -216,7 +218,9 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
     expect(() => admission.assertInflatedSize(length - 1)).toThrow(INVALID_PNG_INPUT);
     expect(() => admission.assertInflatedSize(length + 1)).toThrow(INVALID_PNG_INPUT);
   });
+});
 
+describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () => {
   it("refuses dimensions above the supported side limit before inflation", () => {
     expect(() => PngAdmission.read(image(pngHeader(MAX_PNG_DIMENSION + 1, 1, 8, 6)))).toThrow(
       "dimensions exceed",

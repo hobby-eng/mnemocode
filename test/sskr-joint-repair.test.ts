@@ -18,6 +18,14 @@ function mnemonicOf(vector: { entropy: string }): string {
   return entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
 }
 
+// Two phrases split with the same random bytes give shares of one set identifier: a share of the
+// other phrase passes every check but the restore itself (S013).
+async function twinSets(): Promise<[string[], string[]]> {
+  const split = new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7));
+  const other = "zoo ".repeat(11) + "wrong";
+  return [await split.split(publicMnemonic, 2, 3), await split.split(other, 2, 3)];
+}
+
 describe("Joint repair of the shares of one set", () => {
   it("restores 2-of-3 shares that each miss two elements, in every form", async () => {
     for (const vector of vectors.deterministic) {
@@ -107,7 +115,9 @@ describe("Joint repair of the shares of one set", () => {
     expect(found[0]!.unsettled.length).toBeGreaterThan(0);
     expect(found[0]!.unsettled.every((element) => element.share === 3)).toBe(true);
   });
+});
 
+describe("Joint repair of the shares of one set", () => {
   it("combines two damaged copies of one share", async () => {
     const vector = vectors.deterministic[0]!;
     const typed = [
@@ -120,14 +130,6 @@ describe("Joint repair of the shares of one set", () => {
     expect(found[0]!.shares[0]!.ur).toBe(vector.shares[0]);
     expect(found[0]!.shares[1]!.ur).toBe(vector.shares[0]);
   });
-
-  // Two phrases split with the same random bytes give shares of one set identifier: a share of the
-  // other phrase passes every check but the restore itself (S013).
-  async function twinSets(): Promise<[string[], string[]]> {
-    const split = new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7));
-    const other = "zoo ".repeat(11) + "wrong";
-    return [await split.split(publicMnemonic, 2, 3), await split.split(other, 2, 3)];
-  }
 
   it("refuses a repaired set whose surplus share is of another phrase (S013)", async () => {
     const [mine, other] = await twinSets();
@@ -196,7 +198,9 @@ describe("Joint repair of the shares of one set", () => {
     expect(found).toEqual([]);
     expect(plan.assessment.verdict).toMatch(/no-fit|determined|search/u);
   });
+});
 
+describe("Joint repair of the shares of one set", () => {
   it("says when shares are missing or repeated", async () => {
     const vector = vectors.deterministic[0]!;
     const one = await planJointRepair([markUnits(vector.shares[0]!, "indexes", [4])], {
@@ -259,27 +263,27 @@ describe("Joint repair of the shares of one set", () => {
   });
 });
 
-describe("Joint repair with digits read in part", () => {
-  const vector = vectors.deterministic[0]!;
+const vector = vectors.deterministic[0]!;
 
-  /** `share` in `format` with ? at the digits `digits` of each element at `places`. */
-  function markDigits(
-    share: string,
-    format: ShareFormat,
-    places: readonly number[],
-    digits: readonly number[],
-  ): string {
-    const parts = shareUnits(share, format);
-    for (const place of places) {
-      const part = parts[place]!;
-      const prefix = part.startsWith("#") ? "#" : "";
-      const symbols = Array.from(part.slice(prefix.length));
-      for (const digit of digits) symbols[digit] = "?";
-      parts[place] = prefix + symbols.join("");
-    }
-    return joinUnits(parts, format);
+/** `share` in `format` with ? at the digits `digits` of each element at `places`. */
+function markDigits(
+  share: string,
+  format: ShareFormat,
+  places: readonly number[],
+  digits: readonly number[],
+): string {
+  const parts = shareUnits(share, format);
+  for (const place of places) {
+    const part = parts[place]!;
+    const prefix = part.startsWith("#") ? "#" : "";
+    const symbols = Array.from(part.slice(prefix.length));
+    for (const digit of digits) symbols[digit] = "?";
+    parts[place] = prefix + symbols.join("");
   }
+  return joinUnits(parts, format);
+}
 
+describe("Joint repair with digits read in part", () => {
   it("settles colors missing digits on both shares, where whole colors need a long search", async () => {
     const typed = [
       markDigits(vector.shares[0]!, "colors", [4, 5, 6], [4, 5]),

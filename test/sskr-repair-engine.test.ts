@@ -136,7 +136,9 @@ describe("S038: one codec of units for every share form", () => {
         });
       }
   });
+});
 
+describe("S038: one codec of units for every share form", () => {
   it("reads a code apart all of whose digits are ? as the whole code, and counts it once", () => {
     // Final review R2 and R8: the repair reads codes through code-text's hexUnits, which gives
     // such a code as a lone ?, and markCount counts it as the one element it is.

@@ -113,116 +113,116 @@ function recordingHost() {
   return { check: new WalletEvidenceCheck(host, [BITCOIN]), calls, seeds };
 }
 
-describe("every kind of wallet evidence, with a page's PBKDF2", () => {
-  const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
-    [
-      "a master fingerprint",
-      { kind: "master-fingerprint", value: "73C5DA0A", network: "mainnet" },
-      {
-        matched: true,
-        kind: "master-fingerprint",
-        derived: "73c5da0a",
-        path: "m",
-        warning: "A master fingerprint is only 32 bits and is a filter, not proof of recovery.",
-      },
-    ],
-    [
-      "a master zpub",
-      { kind: "master-xpub", value: BIP84.rootZpub, network: "mainnet" },
-      {
-        matched: true,
-        kind: "master-xpub",
-        derived: inForm(HDKey.fromExtendedKey(BIP84.rootZpub, VERSIONS.zpub), "xpub"),
-        path: "m",
-      },
-    ],
-    [
-      "an account zpub",
-      located("account-xpub", BIP84.accountZpub, ["legacy", "native-segwit"]),
-      {
-        matched: true,
-        kind: "account-xpub",
-        derived: inForm(HDKey.fromExtendedKey(BIP84.accountZpub, VERSIONS.zpub), "xpub"),
-        path: "m/84'/0'/0'",
-      },
-    ],
-    [
-      "a Taproot account xpub",
-      located("account-xpub", BIP86.accountXpub, ["taproot"]),
-      { matched: true, kind: "account-xpub", derived: BIP86.accountXpub, path: "m/86'/0'/0'" },
-    ],
-    [
-      "a native SegWit address among all four profiles",
-      located("address", BIP84.firstReceiving, [
-        "legacy",
-        "nested-segwit",
-        "native-segwit",
-        "taproot",
-      ]),
-      { matched: true, kind: "address", derived: BIP84.firstReceiving, path: "m/84'/0'/0'/0/0" },
-    ],
-    [
-      "a change address on branch 1",
-      located("address", BIP84.firstChange, ["native-segwit"], { ...mainnet, branch: 1 }),
-      { matched: true, kind: "address", derived: BIP84.firstChange, path: "m/84'/0'/0'/1/0" },
-    ],
-    [
-      "a Taproot address in upper case",
-      located("address", BIP86.firstReceiving.toUpperCase(), ["taproot"]),
-      { matched: true, kind: "address", derived: BIP86.firstReceiving, path: "m/86'/0'/0'/0/0" },
-    ],
-    [
-      "a compressed public key",
-      located("compressed-public-key", BIP84.firstReceivingPublicKey.toUpperCase(), [
-        "native-segwit",
-      ]),
-      {
-        matched: true,
-        kind: "compressed-public-key",
-        derived: BIP84.firstReceivingPublicKey,
-        path: "m/84'/0'/0'/0/0",
-      },
-    ],
-    [
-      "a WIF given as its value",
-      located("wif", ` ${BIP84.firstReceivingWif}\n`, ["native-segwit"]),
-      { matched: true, kind: "wif", derived: BIP84.firstReceivingWif, path: "m/84'/0'/0'/0/0" },
-    ],
-    [
-      "a nested SegWit address on testnet",
-      located("address", BIP49_TESTNET.firstReceiving, ["nested-segwit"], testnet),
-      {
-        matched: true,
-        kind: "address",
-        derived: BIP49_TESTNET.firstReceiving,
-        path: "m/49'/1'/0'/0/0",
-      },
-    ],
-    [
-      "a testnet account upub",
-      located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"], testnet),
-      {
-        matched: true,
-        kind: "account-xpub",
-        derived: inForm(HDKey.fromExtendedKey(BIP49_TESTNET.accountUpub, VERSIONS.upub), "tpub"),
-        path: "m/49'/1'/0'",
-      },
-    ],
-    [
-      "an address of another index",
-      located("address", BIP84.firstReceiving, ["native-segwit"], { ...mainnet, index: 1 }),
-      { matched: false, kind: "address" },
-    ],
-    [
-      "a key at another account",
-      located("compressed-public-key", BIP84.firstReceivingPublicKey, ["native-segwit"], {
-        ...mainnet,
-        account: 1,
-      }),
-      { matched: false, kind: "compressed-public-key" },
-    ],
-  ];
+const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
+  [
+    "a master fingerprint",
+    { kind: "master-fingerprint", value: "73C5DA0A", network: "mainnet" },
+    {
+      matched: true,
+      kind: "master-fingerprint",
+      derived: "73c5da0a",
+      path: "m",
+      warning: "A master fingerprint is only 32 bits and is a filter, not proof of recovery.",
+    },
+  ],
+  [
+    "a master zpub",
+    { kind: "master-xpub", value: BIP84.rootZpub, network: "mainnet" },
+    {
+      matched: true,
+      kind: "master-xpub",
+      derived: inForm(HDKey.fromExtendedKey(BIP84.rootZpub, VERSIONS.zpub), "xpub"),
+      path: "m",
+    },
+  ],
+  [
+    "an account zpub",
+    located("account-xpub", BIP84.accountZpub, ["legacy", "native-segwit"]),
+    {
+      matched: true,
+      kind: "account-xpub",
+      derived: inForm(HDKey.fromExtendedKey(BIP84.accountZpub, VERSIONS.zpub), "xpub"),
+      path: "m/84'/0'/0'",
+    },
+  ],
+  [
+    "a Taproot account xpub",
+    located("account-xpub", BIP86.accountXpub, ["taproot"]),
+    { matched: true, kind: "account-xpub", derived: BIP86.accountXpub, path: "m/86'/0'/0'" },
+  ],
+  [
+    "a native SegWit address among all four profiles",
+    located("address", BIP84.firstReceiving, [
+      "legacy",
+      "nested-segwit",
+      "native-segwit",
+      "taproot",
+    ]),
+    { matched: true, kind: "address", derived: BIP84.firstReceiving, path: "m/84'/0'/0'/0/0" },
+  ],
+  [
+    "a change address on branch 1",
+    located("address", BIP84.firstChange, ["native-segwit"], { ...mainnet, branch: 1 }),
+    { matched: true, kind: "address", derived: BIP84.firstChange, path: "m/84'/0'/0'/1/0" },
+  ],
+  [
+    "a Taproot address in upper case",
+    located("address", BIP86.firstReceiving.toUpperCase(), ["taproot"]),
+    { matched: true, kind: "address", derived: BIP86.firstReceiving, path: "m/86'/0'/0'/0/0" },
+  ],
+  [
+    "a compressed public key",
+    located("compressed-public-key", BIP84.firstReceivingPublicKey.toUpperCase(), [
+      "native-segwit",
+    ]),
+    {
+      matched: true,
+      kind: "compressed-public-key",
+      derived: BIP84.firstReceivingPublicKey,
+      path: "m/84'/0'/0'/0/0",
+    },
+  ],
+  [
+    "a WIF given as its value",
+    located("wif", ` ${BIP84.firstReceivingWif}\n`, ["native-segwit"]),
+    { matched: true, kind: "wif", derived: BIP84.firstReceivingWif, path: "m/84'/0'/0'/0/0" },
+  ],
+  [
+    "a nested SegWit address on testnet",
+    located("address", BIP49_TESTNET.firstReceiving, ["nested-segwit"], testnet),
+    {
+      matched: true,
+      kind: "address",
+      derived: BIP49_TESTNET.firstReceiving,
+      path: "m/49'/1'/0'/0/0",
+    },
+  ],
+  [
+    "a testnet account upub",
+    located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"], testnet),
+    {
+      matched: true,
+      kind: "account-xpub",
+      derived: inForm(HDKey.fromExtendedKey(BIP49_TESTNET.accountUpub, VERSIONS.upub), "tpub"),
+      path: "m/49'/1'/0'",
+    },
+  ],
+  [
+    "an address of another index",
+    located("address", BIP84.firstReceiving, ["native-segwit"], { ...mainnet, index: 1 }),
+    { matched: false, kind: "address" },
+  ],
+  [
+    "a key at another account",
+    located("compressed-public-key", BIP84.firstReceivingPublicKey, ["native-segwit"], {
+      ...mainnet,
+      account: 1,
+    }),
+    { matched: false, kind: "compressed-public-key" },
+  ],
+];
 
+describe("every kind of wallet evidence, with a page's PBKDF2", () => {
   it.each(cases)("%s", (_, evidence, expected) => {
     expect(browserCheck.match(publicMnemonic, evidence)).toEqual(expected);
     // The Node.js module gives the same result from node:crypto.

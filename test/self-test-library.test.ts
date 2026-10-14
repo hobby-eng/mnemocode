@@ -105,7 +105,9 @@ describe("The self-test as a library (core/self-test.ts)", () => {
     });
     await expect(wrongSeeds.run()).rejects.toThrow(/BIP39 seed vector mismatch/u);
   });
+});
 
+describe("The self-test as a library (core/self-test.ts)", () => {
   it("has a quick core check that needs nothing from the host", () => {
     expect(() => MnemoCodeSelfTest.core()).not.toThrow();
     expect(() => MnemoCodeSelfTest.core(FEATURES)).not.toThrow();

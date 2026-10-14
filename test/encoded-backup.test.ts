@@ -118,7 +118,9 @@ describe("EncodedBackup", () => {
     ).toBeUndefined();
     expect(unseen).not.toHaveBeenCalled();
   });
+});
 
+describe("EncodedBackup", () => {
   it("decodes with complete dates in every mode, and gives the candidates of a valid last word", () => {
     const decoded = (indexes: readonly number[], mode: "seedshift" | "seedshift-legacy") =>
       EncodedBackup.of(indexes, "indexes", mode).decode([DATE]);

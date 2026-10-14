@@ -171,7 +171,9 @@ describe("AUD-004 regression contracts", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+});
 
+describe("AUD-004 regression contracts", () => {
   it("AUD-004-DOC001: a publication killed at any moment leaves no partial file under the final name", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-killed-"));
     // Thirty-two publications of 1 MiB last long enough for every kill to land inside one, and each

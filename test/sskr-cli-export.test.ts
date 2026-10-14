@@ -116,6 +116,9 @@ describe("integrated SSKR CLI", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+
+describe("integrated SSKR CLI", () => {
   it("saves the QR code of the sheets as images beside the PDF, which restore and decode read", () => {
     const directory = mkdtempSync(join(tmpdir(), "mnemocode-sheet-qr-"));
     try {
@@ -205,6 +208,9 @@ describe("integrated SSKR CLI", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("not available in SSKR mode");
   });
+});
+
+describe("integrated SSKR CLI", () => {
   it("keeps terminal color swatches plain when redirected", () => {
     const result = cli(["encode", "--mnemonic", mnemonic, "--format", "5", "--cards"]);
     expect(result.status, result.stderr).toBe(0);
@@ -285,7 +291,9 @@ describe("integrated SSKR CLI", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+});
 
+describe("integrated SSKR CLI", () => {
   it("repairs shares that each miss two elements together, and keeps the phrase hidden on export", () => {
     const vector = sskrVectors().deterministic[0]!;
     const expected = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);

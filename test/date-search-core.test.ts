@@ -219,7 +219,9 @@ describe("DateSearch", () => {
     );
     expect(DateSearch.secondsPerCombination("seedshift", eight, 24)).toBeGreaterThan(0);
   });
+});
 
+describe("DateSearch", () => {
   it("times the decoding with a phrase of the search's own length (AUD-010-UI005)", () => {
     // With a valid last word the Original Seedshift decodes 128 phrases a combination for 12
     // words and 8 for 24: a 24-word probe made 12-word searches look about 14 times shorter.
@@ -307,7 +309,9 @@ describe("DateSearch", () => {
       },
     ]);
   });
+});
 
+describe("DateSearch", () => {
   it("without a wallet keeps every checksum-valid phrase, shown up to its limit", async () => {
     const matches: DateMatch[] = [];
     const answer = dates("??-09-2026");

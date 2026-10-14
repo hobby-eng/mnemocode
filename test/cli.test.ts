@@ -109,7 +109,9 @@ describe("CLI records", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+});
 
+describe("CLI records", () => {
   it("lists approved collections and validates preview arguments", async () => {
     const listed = await run(["preview", "--list"]);
     expect(listed.stdout).toContain("business-architect");
@@ -195,7 +197,9 @@ describe("CLI records", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+});
 
+describe("CLI records", () => {
   it("stores only the raw encoded representation in a generated QR", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-raw-qr-"));
     const path = join(directory, "palette.png");
@@ -252,7 +256,9 @@ describe("CLI records", () => {
     ]);
     expect(decoded.stdout.trim()).toBe(mnemonic);
   });
+});
 
+describe("CLI records", () => {
   // It starts the command line once per representation; process start-up is slow on Windows
   // and on a busy or hot machine. Fifteen starts take minutes there, so it has a limit of its own.
   it(
@@ -331,7 +337,9 @@ describe("CLI records", () => {
       stderr: containing("Enter 12, 15, 18, 21 or 24 English BIP39 words."),
     });
   });
+});
 
+describe("CLI records", () => {
   it("does not guess between multiple valid raw representations in a non-interactive process", async () => {
     const ambiguous = "76 84 57 28 90 19 59 27 62 11 89 81 66 42 75 28 50 11 52 30 57 30 62 10";
     await expect(run(["decode", "--mode", "direct", "--input", ambiguous])).rejects.toMatchObject({
@@ -410,7 +418,9 @@ describe("CLI records", () => {
     expect(recovered.stderr).toContain("Detected input format: colors.");
     expect(recovered.stdout).toContain(`10-07-1963\t${mnemonic}`);
   });
+});
 
+describe("CLI records", () => {
   it("shows a legacy checksum-word suggestion and self-describes an applied replacement", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-legacy-valid-"));
     const path = join(directory, "record.txt");

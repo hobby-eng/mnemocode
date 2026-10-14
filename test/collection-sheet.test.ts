@@ -124,7 +124,9 @@ describe("single-page design studies", () => {
       expect(pdf.getTitle() ?? "").toBe("");
     },
   );
+});
 
+describe("single-page design studies", () => {
   it("keeps the same studio on three SSKR study pages, with one own-member QR per page", async () => {
     const vector = sskrVectors();
     const shares = vector.deterministic[0]!.shares as string[];
