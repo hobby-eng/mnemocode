@@ -19,6 +19,15 @@ import {
 } from "./card-settings.js";
 import { type CardGrid, type MaterialBackdrop } from "./study-backdrops.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.collection-layout", {
+  "qr-cannot-fit-on-design-study-choose-larger": () =>
+    "The QR cannot fit on the design study; choose a larger page size.",
+  "no-room": () => NO_ROOM,
+  "sheet-holds-at-most-cards": (value0: string) => `A sheet holds at most ${value0} cards.`,
+  "invalid-design-study-layout": () => "Invalid design study layout.",
+});
 
 /** Where one card of a sheet goes, and where its caption goes below it, in millimetres. */
 export interface StudyBox extends CardBox {
@@ -289,7 +298,7 @@ function roomForCards(
   let contentTop = headingHeight;
   if (qr) {
     if (qr.x < margin || qr.y + qr.size + lineHeight >= height - footer)
-      throw new Error("The QR cannot fit on the design study; choose a larger page size.");
+      throw ERRORS.create("qr-cannot-fit-on-design-study-choose-larger", []);
     if (compact && width >= height) {
       // A card-sized page is too low to place the cards below the QR code; they sit beside it.
       availableWidth -= qrSize + gap * 2;
@@ -343,7 +352,7 @@ function largestGrid(
       chosen === undefined || grid.imageHeight > chosen.imageHeight ? grid : chosen,
     undefined,
   );
-  if (!best) throw new Error(NO_ROOM);
+  if (!best) throw ERRORS.create("no-room", []);
   return best;
 }
 
@@ -364,7 +373,7 @@ export function collectionSheetLayout(
   minimumCaptionWidth = 0,
 ): StudyLayout {
   if (Number.isInteger(count) && count > MAX_SHEET_CARDS)
-    throw new Error(`A sheet holds at most ${MAX_SHEET_CARDS} cards.`);
+    throw ERRORS.create("sheet-holds-at-most-cards", [`${MAX_SHEET_CARDS}`]);
   const linesIn = typeof captionLines === "number" ? () => captionLines : captionLines;
   if (
     !Number.isInteger(count) ||
@@ -372,7 +381,7 @@ export function collectionSheetLayout(
     aspect <= 0 ||
     (typeof captionLines === "number" && captionLines < 1)
   )
-    throw new Error("Invalid design study layout.");
+    throw ERRORS.create("invalid-design-study-layout", []);
   const size = parsePageSize(settings.pageSize);
   const [width, height] = pageDimensions(size, settings.orientation);
   // Ordinary cards of the business size are separate cards and never come here. The compact
@@ -522,7 +531,7 @@ export function planCollectionSheet(
       )
         best = { count, orientation, area, tall };
     }
-  if (best === undefined) throw refusal instanceof Error ? refusal : new Error(NO_ROOM);
+  if (best === undefined) throw refusal instanceof Error ? refusal : ERRORS.create("no-room", []);
   return { count: best.count, orientation: best.orientation };
 }
 

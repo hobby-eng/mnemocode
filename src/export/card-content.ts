@@ -10,6 +10,15 @@ import { ownCards } from "./card-decoys.js";
 // Types only, which leave no import behind: the card families import this module.
 import type { SskrCardContent } from "./sskr-content.js";
 import type { CardContent } from "./backup-cards.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.card-content", {
+  "cards-draw-color-references": () => "These cards draw color references.",
+  "cards-print-codes-print-one-code-each-color": () =>
+    "Cards that print codes print one code for each color, in order.",
+  "collection-qr-does-not-match-printed-references": () =>
+    "Collection QR does not match the printed references.",
+});
 
 /** The refusal of cards without any reference, which every family that checks gives. */
 export const EMPTY_CARD_COLLECTION = "The card collection is empty.";
@@ -26,7 +35,7 @@ export function assertColorCards(
   content: CardContent | SskrCardContent,
 ): asserts content is ColorCards {
   if (content.kind !== "colors" && content.kind !== "sskr")
-    throw new Error("These cards draw color references.");
+    throw ERRORS.create("cards-draw-color-references", []);
   assertColorCardContent(content);
 }
 
@@ -66,7 +75,7 @@ function assertLabelsPerColor(content: ColorCardContent): void {
     owned.length !== content.colors.length ||
     !owned.every((label) => typeof label === "string" && label.trim() !== "")
   )
-    throw new Error("Cards that print codes print one code for each color, in order.");
+    throw ERRORS.create("cards-print-codes-print-one-code-each-color", []);
 }
 
 /** The form whose codes a seed phrase's cards print in place of its colors. */
@@ -80,7 +89,7 @@ function assertPhraseCodes(codes: readonly string[], payload: string): void {
   const indexes = PRINTED_PHRASE_FORM.read(codes.join(" "));
   assertPhraseIndexes(indexes);
   if (PRINTED_PHRASE_FORM.read(payload).join(" ") !== indexes.join(" "))
-    throw new Error("Collection QR does not match the printed references.");
+    throw ERRORS.create("collection-qr-does-not-match-printed-references", []);
 }
 
 /**
@@ -104,5 +113,5 @@ export function assertColorCardContent(content: ColorCardContent): void {
   }
   colorsToIndexes(colors);
   if (!payloadHoldsColors(colors, content.payload))
-    throw new Error("Collection QR does not match the printed references.");
+    throw ERRORS.create("collection-qr-does-not-match-printed-references", []);
 }

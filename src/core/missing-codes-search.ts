@@ -31,6 +31,19 @@ import { phraseOfIndexes } from "./words.js";
 import { ownedDates } from "./dates.js";
 import { CORRECT_WRITTEN_COPY, SearchPlan, counted } from "./search-plan.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.missing-codes-search", {
+  "search-host-s-fingerprint-function": {
+    kind: "type",
+    text: () => "The search needs the host's fingerprint function.",
+  },
+  "codes-were-not-masked-no-dates-search": () =>
+    "Codes that were not masked have no dates to search.",
+  "dates-found-do-not-decode-codes-wallet-matched": () =>
+    "The dates found do not decode the codes to the wallet that matched.",
+  "operation-refused": suppliedMessage,
+});
 
 /** How the right codes are told. */
 export type MissingCodesWay = "encoded" | "wallet" | "list";
@@ -170,7 +183,7 @@ export class MissingCodesSearch {
 
   constructor(codes: MissingCodes, fingerprint: PhraseFingerprint) {
     if (typeof fingerprint !== "function")
-      throw new TypeError("The search needs the host's fingerprint function.");
+      throw ERRORS.create("search-host-s-fingerprint-function", []);
     this.#codes = codes;
     this.#fingerprint = fingerprint;
   }
@@ -396,7 +409,7 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
   constructor(codes: MissingCodes, walletCheck: WalletCheck, dates: DatesAnswer) {
     const { mode } = codes;
     if (!Masking.isMaskedMode(mode))
-      throw new Error("Codes that were not masked have no dates to search.");
+      throw ERRORS.create("codes-were-not-masked-no-dates-search", []);
     this.#codes = codes;
     this.#mode = mode;
     this.#walletCheck = walletCheck;
@@ -454,7 +467,7 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
     // another phrase (AUD-012-FUN001). Checked here, so that no host decodes another wallet.
     const phrases = result.backup.candidates(match.allDates);
     if (!phrases.some((phrase) => phrase.recoveredMnemonic === match.mnemonic))
-      throw new Error("The dates found do not decode the codes to the wallet that matched.");
+      throw ERRORS.create("dates-found-do-not-decode-codes-wallet-matched", []);
     return { ...result, dates: match.allDates, foundDates: match.dates };
   }
 }
@@ -470,7 +483,8 @@ class ListWay implements MissingCodesWaySearch {
     fingerprintOf: PhraseFingerprint,
     dates: readonly DateShiftDate[],
   ) {
-    if (codes.expected > MAX_LISTED) throw new Error(tooManyToList(codes.expected));
+    if (codes.expected > MAX_LISTED)
+      throw ERRORS.create("operation-refused", [tooManyToList(codes.expected)]);
     this.#codes = codes;
     this.#fingerprintOf = fingerprintOf;
     // Copied and checked, so that a date the host changes later reaches no candidate.

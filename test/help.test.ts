@@ -84,14 +84,14 @@ describe("help", () => {
     expect(stdout).toContain("colors-unicode");
   });
 
-  it("refuses an unknown command or topic and names it", async () => {
+  it("refuses an unknown command or topic without repeating it", async () => {
     await expect(run(["frobnicate"])).rejects.toMatchObject({
       code: 1,
-      stderr: containing("There is no command “frobnicate”"),
+      stderr: containing("There is no such command."),
     });
     await expect(run(["help", "frobnicate"])).rejects.toMatchObject({
       code: 1,
-      stderr: containing("There is no command or topic “frobnicate”"),
+      stderr: containing("There is no such command or topic."),
     });
   });
 });

@@ -60,8 +60,18 @@ import {
 } from "./re-encode-options.js";
 import { readmeLink, terminalNotice, terminalPart, type NoticeKind } from "./terminal.js";
 import { waitForEnter, type Choice, type Explanation } from "./terminal-choice.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.re-encode-command", {
+  refused: (value0: string, value1: string) => `${value0}${value1}`,
+  "recognised-wallet-option-two-ways-confirm-seed-phrase": () =>
+    "--recognised and a wallet option are two ways to confirm the seed phrase: give one.",
+  "say-how-seed-phrase-old-backup-confirmed-since": () =>
+    "Say how the seed phrase of the old backup is confirmed, since its checksum confirms nothing: a wallet option, such as --master-fingerprint or --bitcoin-address, or --recognised if you check it yourself.",
+  "nothing-was-re-encoded": () => "Nothing was re-encoded.",
+});
 
 /** The options of the old backup by Decode's names, and those of the new one by Encode's. */
 interface SplitOptions {
@@ -95,14 +105,14 @@ export const OLD_BACKUP_REFUSAL = "The old backup: ";
  * Runs `read`, which reads or checks the old backup from its options, and names the old backup in
  * a refusal it raises, keeping the refusal as its cause: the old backup's options are Decode's
  * under other names, and the new backup's, Encode's, are refused in the same words (--old-dates
- * and --dates, --old-mode and --mode). Stopping and faults that are no Error pass through.
+ * and --dates, --old-mode and --mode). Faults that are no Error pass through.
  */
 async function ofOldBackup<T>(read: () => T | Promise<T>): Promise<T> {
   try {
     return await read();
   } catch (error) {
-    if (!(error instanceof Error) || error instanceof InputCancelledError) throw error;
-    throw new Error(`${OLD_BACKUP_REFUSAL}${error.message}`, { cause: error });
+    if (!(error instanceof Error)) throw error;
+    throw ERRORS.create("refused", [`${OLD_BACKUP_REFUSAL}`, `${error.message}`], { cause: error });
   }
 }
 
@@ -117,15 +127,11 @@ type GivenConfirmation = "recognised" | "wallet" | undefined;
 function givenConfirmation(args: ParsedArguments, given: GivenWallet): GivenConfirmation {
   const recognised = args[RECOGNISED_OPTION] === true;
   if (recognised && given.evidence !== undefined)
-    throw new Error(
-      "--recognised and a wallet option are two ways to confirm the seed phrase: give one.",
-    );
+    throw ERRORS.create("recognised-wallet-option-two-ways-confirm-seed-phrase", []);
   if (recognised) return "recognised";
   if (given.evidence !== undefined) return "wallet";
   if (args["ask-secrets"] !== true)
-    throw new Error(
-      "Say how the seed phrase of the old backup is confirmed, since its checksum confirms nothing: a wallet option, such as --master-fingerprint or --bitcoin-address, or --recognised if you check it yourself.",
-    );
+    throw ERRORS.create("say-how-seed-phrase-old-backup-confirmed-since", []);
   return undefined;
 }
 
@@ -186,7 +192,8 @@ function newBackupScreen(notices: Notices): void {
   showNotices(notices);
 }
 
-export async function runReEncode(args: ParsedArguments): Promise<void> {
+/** Makes a new backup of an old one's phrase; CANCELLED when the person cancelled or stopped. */
+export async function runReEncode(args: ParsedArguments): Promise<Cancelled | undefined> {
   // The secrets of both backups are asked on the private screen; none may be given beside it.
   assertAskedNotGiven(args, [
     ...ENCODED_SECRET_OPTIONS,
@@ -203,35 +210,51 @@ export async function runReEncode(args: ParsedArguments): Promise<void> {
   const confirmed =
     args["ask-secrets"] === true
       ? await askedReEncoding(old, given, confirmedBy, encode)
-      : { ...(await reEncodingFromOptions(old, given)), encode: defined(encode) };
+      : await confirmedFromOptions(old, given, defined(encode));
+  if (confirmed === CANCELLED) return CANCELLED;
   newBackupScreen(confirmed.notices);
   // The rights that the answers do not need were given up after the questions: what holds now.
   if (encode === undefined) showProtection();
-  await confirmed.encode(confirmed.reEncoding.confirmedPhrase());
+  if ((await confirmed.encode(confirmed.reEncoding.confirmedPhrase())) === CANCELLED)
+    return CANCELLED;
   terminalNotice(RE_ENCODING_WORDS.oldBackupStillOpens, "warning");
+  return undefined;
 }
 
 /**
  * The old backup from the options, decoded, its fingerprint shown but never its phrase, and
  * confirmed by the wallet that an option gives, or by --recognised (givenConfirmation). A wallet
- * that does not match ends the command.
+ * that does not match ends the command. CANCELLED when the person left the question about the
+ * form of the codes (backupFromOptions).
  */
 async function reEncodingFromOptions(
   old: ParsedArguments,
   given: GivenWallet,
-): Promise<{ readonly reEncoding: ReEncoding; readonly notices: Notices }> {
+): Promise<{ readonly reEncoding: ReEncoding; readonly notices: Notices } | Cancelled> {
   const reEncoding = await ofOldBackup(async () => {
-    const { backup, dates } = await backupAndDatesFromOptions(old);
-    return ReEncoding.of(backup, dates, value(old, LAST_WORD_OPTION));
+    const read = await backupAndDatesFromOptions(old);
+    if (read === CANCELLED) return CANCELLED;
+    return ReEncoding.of(read.backup, read.dates, value(old, LAST_WORD_OPTION));
   });
+  if (reEncoding === CANCELLED) return CANCELLED;
   showOldFingerprint(reEncoding.result);
   if (given.evidence === undefined) {
     reEncoding.confirmByPerson();
     return { reEncoding, notices: RECOGNISED };
   }
   const notices = await walletConfirms(reEncoding, given.evidence, given.passphrase);
-  if (notices === undefined) throw new Error("Nothing was re-encoded.");
+  if (notices === undefined) throw ERRORS.create("nothing-was-re-encoded", []);
   return { reEncoding, notices };
+}
+
+/** The old backup confirmed from the options (reEncodingFromOptions), made new by `encode`. */
+async function confirmedFromOptions(
+  old: ParsedArguments,
+  given: GivenWallet,
+  encode: PreparedEncode,
+): Promise<Confirmed | Cancelled> {
+  const confirmed = await reEncodingFromOptions(old, given);
+  return confirmed === CANCELLED ? CANCELLED : { ...confirmed, encode };
 }
 
 /** The choice that ends re-encode before the new backup, beside typing again. */
@@ -241,14 +264,14 @@ const STOP: Choice<"done"> = { label: "Stop", note: "nothing is re-encoded", val
  * The old backup asked on the private screen with Decode's questions, every code and date
  * complete, and for a backup that gives several phrases the last word of the original one; its
  * phrase is confirmed below it (confirmation), and then the new backup asked where no option gives
- * it (`encode`). Stop cancels.
+ * it (`encode`). Stop cancels (CANCELLED), as Ctrl+C does.
  */
 async function askedReEncoding(
   old: ParsedArguments,
   given: GivenWallet,
   confirmedBy: GivenConfirmation,
   encode: PreparedEncode | undefined,
-): Promise<Confirmed> {
+): Promise<Confirmed | Cancelled> {
   // Decode checks these before its first question too, in its own words.
   await ofOldBackup(() => {
     transformMode(old);
@@ -259,11 +282,15 @@ async function askedReEncoding(
    * Confirms the phrase, then takes the new backup; Escape at its first question goes back. A new
    * backup that Encode refuses is asked again, with the reason (AUD-022-UI001).
    */
-  const confirmAndAsk = async (reEncoding: ReEncoding, backup: EncodedBackup) => {
+  const confirmAndAsk = async (
+    reEncoding: ReEncoding,
+    backup: EncodedBackup,
+  ): Promise<AfterDecoded | Cancelled> => {
     for (;;) {
       const next = await confirmation(reEncoding, backup, old, given, confirmedBy);
-      if (typeof next === "string") return next;
+      if (next === CANCELLED || typeof next === "string") return next;
       const chosen = encode ?? (await newBackupAskedUntilTaken(next.notices));
+      if (chosen === CANCELLED) return CANCELLED;
       if (chosen !== undefined) {
         confirmed = { reEncoding, notices: next.notices, encode: chosen };
         return "done";
@@ -272,12 +299,12 @@ async function askedReEncoding(
       showOldPhrase(reEncoding.result, backup.mode, backup.format);
     }
   };
-  await decodeWithQuestions(old, {
+  const decoded = await decodeWithQuestions(old, {
     searches: false,
     stop: STOP,
     async several(backup, dates) {
       const reEncoding = await askLastWord(backup, dates, old);
-      if (typeof reEncoding === "string") return reEncoding;
+      if (reEncoding === CANCELLED || typeof reEncoding === "string") return reEncoding;
       clearPrivateScreen();
       showOldPhrase(reEncoding.result, backup.mode, backup.format);
       return confirmAndAsk(reEncoding, backup);
@@ -285,8 +312,8 @@ async function askedReEncoding(
     decoded: (backup, dates) => confirmAndAsk(ReEncoding.of(backup, dates), backup),
     show: showOldPhrase,
   });
-  if (confirmed === undefined) throw new InputCancelledError();
-  return confirmed;
+  // Stop, before the phrase was confirmed or a new backup was given, cancels as Ctrl+C does.
+  return decoded === CANCELLED ? CANCELLED : (confirmed ?? CANCELLED);
 }
 
 /** What is typed again after a last word that no phrase of the backup ends with, or Stop. */
@@ -297,19 +324,20 @@ type AfterLastWord = "word" | AfterDecoded;
  * last word, which keeps nothing of it, picking the phrase of the backup that ends with it. Where
  * none does, the word may be mistyped, or a wrong date gave other phrases: the person chooses what
  * to type again, or stops (Escape too); the dates and the codes are given back to Decode's
- * questions, which keep the other answers.
+ * questions, which keep the other answers. CANCELLED when the person cancelled.
  */
 async function askLastWord(
   backup: EncodedBackup,
   dates: readonly DateShiftDate[],
   old: ParsedArguments,
-): Promise<ReEncoding | AfterDecoded> {
+): Promise<ReEncoding | AfterDecoded | Cancelled> {
   for (;;) {
     const reEncoding = await askSecretUntil(
       "Last word of the original seed phrase:",
       (answer) => phraseEndingWith(backup, dates, answer),
       { what: "the last word of the original seed phrase", hints: WordList.BIP39 },
     );
+    if (reEncoding === CANCELLED) return CANCELLED;
     if (reEncoding !== undefined) return reEncoding;
     terminalNotice(NO_SUCH_LAST_WORD, "warning");
     const next = await askAfterFailure<AfterLastWord>(WHAT_NOW, [
@@ -343,15 +371,18 @@ function phraseEndingWith(
 
 /**
  * The new backup, asked until Encode takes it (askedNewBackup): a refusal, such as text that does
- * not fit the cards, is shown at the top of the questions asked again; undefined at Escape.
+ * not fit the cards, is shown at the top of the questions asked again; undefined at Escape,
+ * CANCELLED at Ctrl+C.
  */
-async function newBackupAskedUntilTaken(notices: Notices): Promise<PreparedEncode | undefined> {
+async function newBackupAskedUntilTaken(
+  notices: Notices,
+): Promise<PreparedEncode | undefined | Cancelled> {
   let refusal: string | undefined;
   for (;;) {
     try {
       return await askedNewBackup(notices, refusal);
     } catch (error) {
-      if (error instanceof InputCancelledError || !(error instanceof Error)) throw error;
+      if (!(error instanceof Error)) throw error;
       refusal = error.message;
     }
   }
@@ -368,13 +399,13 @@ async function newBackupAskedUntilTaken(notices: Notices): Promise<PreparedEncod
 async function askedNewBackup(
   notices: Notices,
   refusal: string | undefined,
-): Promise<PreparedEncode | undefined> {
+): Promise<PreparedEncode | undefined | Cancelled> {
   newBackupScreen(notices);
   if (refusal !== undefined) terminalNotice(refusal, "warning");
   forgetClaimedOutputs();
   // Encode's command line: its name, then the options.
   const encoding = await askEncoding();
-  if (encoding === undefined) return undefined;
+  if (encoding === undefined || encoding === CANCELLED) return encoding;
   const fresh = parseArguments(encoding.slice(1));
   await settleOutputPaths(fresh);
   warnOfCloudCopies(fresh);
@@ -401,7 +432,7 @@ type Confirmation = { readonly notices: Notices } | Exclude<AfterDecoded, "done"
  * once the person has read it and pressed Enter, a wallet option at once; otherwise, or when that
  * wallet does not match, as the person chooses: by recognising it, or by an address or fingerprint
  * compared with the wallet, which may be tried again. They may also type the dates or the backup
- * again.
+ * again. CANCELLED when the person cancelled, or stopped with Escape after --recognised.
  */
 async function confirmation(
   reEncoding: ReEncoding,
@@ -409,10 +440,10 @@ async function confirmation(
   old: ParsedArguments,
   given: GivenWallet,
   confirmed: GivenConfirmation,
-): Promise<Confirmation> {
+): Promise<Confirmation | Cancelled> {
   if (confirmed === "recognised") {
-    if (!(await waitForEnter("Press Enter to make the new backup (Esc stops).")))
-      throw new InputCancelledError();
+    if ((await waitForEnter("Press Enter to make the new backup (Esc stops).")) !== "enter")
+      return CANCELLED;
     reEncoding.confirmByPerson();
     return { notices: RECOGNISED };
   }
@@ -439,6 +470,7 @@ async function confirmation(
       label: "Confirm",
       explanation: CONFIRM_EXPLANATION,
     });
+    if (way === CANCELLED) return CANCELLED;
     if (way === "person") {
       reEncoding.confirmByPerson();
       return { notices: RECOGNISED };
@@ -449,6 +481,7 @@ async function confirmation(
       place: given.place,
       explanation: { lines: [comparedPassphrase("Re-encode", given.passphrase)] },
     });
+    if (answer === CANCELLED) return CANCELLED;
     if (answer.kind !== "wallet") continue;
     const notices = await walletConfirms(reEncoding, answer.evidence, given.passphrase);
     if (notices !== undefined) return { notices };

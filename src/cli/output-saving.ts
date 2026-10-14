@@ -16,6 +16,7 @@ import {
   validateOutputPaths,
 } from "./output-paths.js";
 import { saveWithRetry } from "./save-retry.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 
 type FolderOutput = (typeof FOLDER_OUTPUTS)[number];
 type SavedOutput = (typeof FILE_OUTPUTS)[number] | FolderOutput;
@@ -87,7 +88,7 @@ export async function saveOutput(
   key: SavedOutput,
   what: string,
   write: (path: string) => Promise<void>,
-): Promise<string | undefined> {
+): Promise<string | undefined | Cancelled> {
   const path = value(args, key);
   if (path === undefined) return undefined;
   const saved = await saveWithRetry({
@@ -97,16 +98,17 @@ export async function saveOutput(
     write,
     checkName: (name) => checkOutputName(args, key, name),
   });
-  if (saved !== undefined) args[key] = saved;
+  if (saved !== undefined && saved !== CANCELLED) args[key] = saved;
   return saved;
 }
 
-/** Saves the sheet for heirs when --heir-sheet names a file, as saveOutput saves. */
+/** Saves the sheet for heirs when --heir-sheet names a file, as saveOutput saves; CANCELLED at Ctrl+C. */
 export async function saveHeirSheetOutput(
   args: ParsedArguments,
   facts: HeirSheetFacts,
-): Promise<void> {
-  await saveOutput(args, "heir-sheet", "The sheet for heirs", (path) =>
+): Promise<Cancelled | undefined> {
+  const saved = await saveOutput(args, "heir-sheet", "The sheet for heirs", (path) =>
     saveHeirSheet({ ...args, "heir-sheet": path }, facts),
   );
+  return saved === CANCELLED ? CANCELLED : undefined;
 }

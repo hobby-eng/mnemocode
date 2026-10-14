@@ -319,6 +319,8 @@ const PARTS: Readonly<Record<string, Part>> = {
 const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   "src/core.ts": [],
   "src/record.ts": [],
+  "src/core/error-catalog.ts": [],
+  "src/core/wallet-evidence-errors.ts": [],
   "src/core/date-recovery.ts": [],
   "src/core/wallet-check.ts": [],
   "src/core/search-turns.ts": [],

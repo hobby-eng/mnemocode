@@ -81,7 +81,12 @@ export {
   walletNeeded,
   walletReason,
 } from "../core/date-search.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.date-search", {
+  "search-dates-refused": suppliedMessage,
+});
 
 /**
  * Why the wallet is asked for before a date search in `mode`, shown with the question: the
@@ -136,8 +141,11 @@ export interface DatesQuestion extends DatesRules {
   readonly check?: (answer: DatesAnswer) => void;
 }
 
-/** Asks for the dates on the private screen until they can be used (DatesAnswer.parse). */
-export async function askDates(question: DatesQuestion): Promise<DatesAnswer> {
+/**
+ * Asks for the dates on the private screen until they can be used (DatesAnswer.parse); CANCELLED
+ * when the command is cancelled.
+ */
+export async function askDates(question: DatesQuestion): Promise<DatesAnswer | Cancelled> {
   return askSecretUntil(
     question.prompt ?? datesQuestion(question),
     (line) => {
@@ -214,11 +222,12 @@ export async function withDateProgress<T>(
  * `limits.maxCandidates`, or without that limit one longer than twelve hours on this computer
  * (DateSearch.plan, SearchPlan.ask), is asked for first on the private screen and needs
  * --max-candidates elsewhere. Ctrl+C is read as a key during the search's turns and stops it at
- * the next one (InputCancelledError). Undefined when the person chose not to search.
+ * the next one, which cancels the command (CANCELLED). Undefined when the person chose not to
+ * search.
  */
 export async function searchDates(
   request: DateSearchRequest,
-): Promise<DateSearchResult | undefined> {
+): Promise<DateSearchResult | undefined | Cancelled> {
   const walletCheck = walletCheckOf(request.evidence, request.passphrase);
   const search = new DateSearch({
     indexes: request.indexes,
@@ -231,9 +240,12 @@ export async function searchDates(
   const plan = search.plan(await search.pace(), request.limits.maxCandidates);
   if (plan.ask) {
     if (!onPrivateScreen())
-      throw new Error(allowedBy(plan.extent(), [["max-candidates", plan.count]]));
+      throw ERRORS.create("search-dates-refused", [
+        allowedBy(plan.extent(), [["max-candidates", plan.count]]),
+      ]);
     // Keys typed while the wallet check was timed do not answer this (askToSearch).
-    if (!(await askToSearch(plan.question(), DATES_AGAIN))) return undefined;
+    const start = await askToSearch(plan.question(), DATES_AGAIN);
+    if (start !== "yes") return start === "no" ? undefined : start;
   }
   // The size is said once, and then the time where it is told (SearchPlan.tell).
   terminalNotice(`Recovery search contains ${plan.size}.`);
@@ -244,7 +256,7 @@ export async function searchDates(
     ),
   );
   // The person stopped the search with Ctrl+C.
-  if (result.stopped) throw new InputCancelledError();
+  if (result.stopped) return CANCELLED;
   return result;
 }
 
@@ -383,15 +395,15 @@ type AfterSearchChoice = "dates" | "backup" | "done" | "wallet" | "change-wallet
  * Asks what to change after a date search whose result cannot be used: none matched, more than a
  * list holds, or, without a wallet, more than are shown or than fit on the screen; "done" when the
  * result is complete. A wallet asked for here is asked at once, and Escape there asks this again.
- * Decode and recover-date ask it so.
+ * CANCELLED when the command is cancelled. Decode and recover-date ask it so.
  */
 export async function askAfterDateSearch(
   result: DateSearchResult,
   question: AfterDateSearchQuestion,
-): Promise<AfterDateSearch> {
+): Promise<AfterDateSearch | Cancelled> {
   for (;;) {
     const next = await afterSearchChoice(result, question);
-    if (next !== "wallet" && next !== "change-wallet") return next;
+    if (next === CANCELLED || (next !== "wallet" && next !== "change-wallet")) return next;
     // "It cannot" only where it changes the search: in place of a wallet that matched none, where
     // the mode can list the candidates without one. Asked for a wallet that was missing, it would
     // run the same search again.
@@ -399,6 +411,7 @@ export async function askAfterDateSearch(
       optional: next === "change-wallet" && !walletNeeded(question.mode),
       ...question.wallet,
     });
+    if (answer === CANCELLED) return CANCELLED;
     if (answer.kind === "back") continue;
     return { kind: "search", evidence: answer.kind === "wallet" ? answer.evidence : undefined };
   }
@@ -408,7 +421,7 @@ export async function askAfterDateSearch(
 async function afterSearchChoice(
   result: DateSearchResult,
   question: AfterDateSearchQuestion,
-): Promise<AfterSearchChoice> {
+): Promise<AfterSearchChoice | Cancelled> {
   const done: Choice<AfterSearchChoice> = { label: "Stop", value: "done" };
   const dates: Choice<AfterSearchChoice> = { label: "Change the dates", value: "dates" };
   const checkWallet = checkWalletAnswer<AfterSearchChoice>("wallet");

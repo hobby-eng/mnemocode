@@ -38,6 +38,11 @@ import {
 } from "./seedshift-choices.js";
 import { SHARE_SEPARATOR } from "../sskr/share-input.js";
 import type { Bip39WordCount } from "../core/bip39-sizes.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.heir-sheet", {
+  "heir-sheet-size-heir-sheet": () => "--heir-sheet-size needs --heir-sheet.",
+});
 
 export type { HeirBackup, HeirSheetFacts } from "../export/heir-sheet-text.js";
 
@@ -121,7 +126,7 @@ function sheetFormat(args: ParsedArguments): HeirSheetFormat {
 /** Refuses a size without a sheet, or a size that does not exist. */
 export function validateHeirSheetOptions(args: ParsedArguments): void {
   if (args["heir-sheet-size"] !== undefined && args["heir-sheet"] === undefined)
-    throw new Error("--heir-sheet-size needs --heir-sheet.");
+    throw ERRORS.create("heir-sheet-size-heir-sheet", []);
   sheetFormat(args);
 }
 

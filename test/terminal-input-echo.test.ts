@@ -3,6 +3,7 @@ import { readLine, type LineOptions } from "../src/cli/terminal-input.js";
 import { WordList } from "../src/core/word-hints.js";
 import { answerEndRow, rowsOfText, terminalColumns } from "../src/cli/terminal-geometry.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import type { Cancelled } from "../src/cli/terminal-keys.js";
 
 const LEFT = "\x1b[D";
 const HOME = "\x1b[H";
@@ -31,7 +32,7 @@ async function showTyping(
   text: string,
   columns: number,
   options: Omit<LineOptions, "echo"> = {},
-): Promise<{ readonly answer: string | undefined; readonly screen: string }> {
+): Promise<{ readonly answer: string | undefined | Cancelled; readonly screen: string }> {
   process.stderr.columns = columns;
   const written: Buffer[] = [];
   vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {

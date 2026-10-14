@@ -20,6 +20,11 @@ import { textPieces } from "../core/pieces.js";
 import { ShareSet } from "./share-set.js";
 import type { SharePlatform } from "./share-platform.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.repair-self-test", {
+  "share-self-test-marks-element-lacks": () => "A share self-test marks an element it lacks.",
+});
 
 /** The first share of the official vector in colors, Unicode codes and word numbers. */
 const OFFICIAL_COLORS = sskrVector.firstShareColors.join(" ");
@@ -34,7 +39,7 @@ const { shares: SET_SHARES, colors: SET_COLORS, phrase: SET_PHRASE } = sskrSetVe
 
 /** `text` with the element written `element` marked as `mark`. */
 function marked(text: string, element: string, mark = "?"): string {
-  if (!text.includes(element)) throw new Error("A share self-test marks an element it lacks.");
+  if (!text.includes(element)) throw ERRORS.create("share-self-test-marks-element-lacks", []);
   return text.replace(element, mark);
 }
 

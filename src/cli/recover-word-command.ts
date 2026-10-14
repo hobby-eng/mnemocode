@@ -57,7 +57,16 @@ import { counting } from "../core/search-plan.js";
 import { rowsOf, listQuestionRows } from "./terminal-choice.js";
 import { closingRows } from "./private-screen.js";
 import { defined } from "../core/defined.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.recover-word-command", {
+  "codes-not-words": () => CODES_NOT_WORDS,
+  "legacy-valid-last-word-missing-word-cannot-combined": () =>
+    "--legacy-valid-last-word and --missing-word cannot be combined.",
+  "legacy-valid-last-word-lists-replacements-not-wallets": () =>
+    "--legacy-valid-last-word lists replacements, not wallets: no candidate list.",
+});
 
 /** The table's columns for the candidates of `search`, and a row maker. */
 function tableOf(search: WordCandidateSearch): {
@@ -114,7 +123,7 @@ function parsePhrase(text: string, rules: PhraseRules): PhraseSearch {
     return phraseOf(text, rules);
   } catch (error) {
     // Codes typed here are read by Decode, which finds those marked with ? (owner, 2026-10-13).
-    if (BackupReading.isCodes(text)) throw new Error(CODES_NOT_WORDS);
+    if (BackupReading.isCodes(text)) throw ERRORS.create("codes-not-words", []);
     throw error;
   }
 }
@@ -203,10 +212,11 @@ interface Found {
  * counted and compared with the wallet, the first MAX_SHOWN_CANDIDATES and every one that matched
  * are kept for the screen, and a list keeps the entropy of every candidate, so that record N is
  * candidate N; past the most that a list holds the search stops (TooManyForListError). Ctrl+C is
- * read as a key during the turns and stops it at the next one. The replacements of a legacy last
- * word are a short fixed list, each compared with the wallet.
+ * read as a key during the turns and stops it at the next one, which cancels the command
+ * (CANCELLED). The replacements of a legacy last word are a short fixed list, each compared with
+ * the wallet.
  */
-async function collect(phrase: PhraseSearch, context: SearchContext): Promise<Found> {
+async function collect(phrase: PhraseSearch, context: SearchContext): Promise<Found | Cancelled> {
   const walletCheck = walletCheckOf(context.evidence, context.passphrase);
   if (phrase.kind === "legacy") {
     const rows = phrase.replacements.map((candidate, index): Row => {
@@ -251,7 +261,7 @@ async function collect(phrase: PhraseSearch, context: SearchContext): Promise<Fo
     }),
   ).finally(() => progress.end());
   // The person stopped the search with Ctrl+C.
-  if (result.stopped) throw new InputCancelledError();
+  if (result.stopped) return CANCELLED;
   const rows = result.shown.map(({ candidate, match }): Row => ({
     columns: table.row(candidate),
     mnemonic: candidate.phrase,
@@ -282,15 +292,16 @@ type Next =
 const DONE: Next = { kind: "done" };
 const PHRASE: Next = { kind: "phrase" };
 
-export async function runRecoverWord(arguments_: ParsedArguments): Promise<void> {
+/** Searches the forgotten words; CANCELLED when the person cancelled. */
+export async function runRecoverWord(arguments_: ParsedArguments): Promise<Cancelled | undefined> {
   const legacy = arguments_["legacy-valid-last-word"] === true;
   const missing = arguments_["missing-word"] === true;
   if (legacy && missing)
-    throw new Error("--legacy-valid-last-word and --missing-word cannot be combined.");
+    throw ERRORS.create("legacy-valid-last-word-missing-word-cannot-combined", []);
   let target = await CandidatesFile.of(arguments_);
   // The replacements are stored phrases, not wallets: the Scanner would search the wrong ones.
   if (legacy && target !== undefined)
-    throw new Error("--legacy-valid-last-word lists replacements, not wallets: no candidate list.");
+    throw ERRORS.create("legacy-valid-last-word-lists-replacements-not-wallets", []);
   // A wallet asked later replaces the one given.
   const { evidence: given, place, passphrase } = givenWallet(arguments_);
   let evidence = given;
@@ -302,7 +313,7 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<void>
     : missing
       ? "The words you have, in their order:"
       : "Seed phrase, ? for each forgotten word:";
-  const read = async (): Promise<PhraseSearch> => {
+  const read = async (): Promise<PhraseSearch | Cancelled> => {
     const rules = { legacy, missing, listed: target !== undefined };
     if (!asked) return parsePhrase(textInput(arguments_, "mnemonic"), rules);
     return askSecretUntil(prompt, (text) => parsePhrase(text, rules), {
@@ -311,27 +322,35 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<void>
     });
   };
   let phrase = await read();
+  if (phrase === CANCELLED) return CANCELLED;
   // Only once the phrase can be searched: a list passphrase typed for nothing is lost work.
-  await target?.prepare(passphrase);
+  if ((await target?.prepare(passphrase)) === CANCELLED) return CANCELLED;
   for (;;) {
     const next = await searchAndShow(phrase, { target, evidence, passphrase, place }, asked);
-    if (next.kind === "done") return;
-    if (next.kind === "phrase") phrase = await read();
-    else {
+    if (next === CANCELLED) return CANCELLED;
+    if (next.kind === "done") return undefined;
+    if (next.kind === "phrase") {
+      const typed = await read();
+      if (typed === CANCELLED) return CANCELLED;
+      phrase = typed;
+    } else {
       evidence = next.evidence;
       if (!next.listed) target = undefined;
     }
   }
 }
 
-/** Searches the candidates of `phrase`, shows them, saves the list, and asks what comes next. */
+/**
+ * Searches the candidates of `phrase`, shows them, saves the list, and asks what comes next;
+ * CANCELLED when the person cancelled.
+ */
 async function searchAndShow(
   phrase: PhraseSearch,
   context: SearchContext,
   asked: boolean,
-): Promise<Next> {
+): Promise<Next | Cancelled> {
   const table = tableFor(phrase);
-  let found: Found;
+  let found: Found | Cancelled;
   try {
     found = await collect(phrase, context);
   } catch (error) {
@@ -348,9 +367,11 @@ async function searchAndShow(
       ],
       { optional: false, place: context.place },
     );
+    if (next === CANCELLED) return CANCELLED;
     if (context.target !== undefined && next.kind !== "phrase") context.target.discard();
     return next;
   }
+  if (found === CANCELLED) return CANCELLED;
   try {
     return await show(phrase, table, found, context, asked);
   } finally {
@@ -361,16 +382,17 @@ async function searchAndShow(
 /**
  * Asks what comes next after a search; a choice of the wallet asks for it at once
  * (askWalletEvidence: at `place`, with "It cannot" only when `optional`), and Escape there asks
- * the first question again.
+ * the first question again. CANCELLED when the person cancelled.
  */
 async function askNext(
   choices: readonly Choice<Next>[],
   wallet: { readonly optional: boolean; readonly place: WalletPlace },
-): Promise<Next> {
+): Promise<Next | Cancelled> {
   for (;;) {
     const next = await askAfterFailure(WHAT_NOW, choices);
-    if (next.kind !== "wallet") return next;
+    if (next === CANCELLED || next.kind !== "wallet") return next;
     const answer = await askWalletEvidence(wallet);
+    if (answer === CANCELLED) return CANCELLED;
     if (answer.kind === "back") continue;
     return { ...next, evidence: answer.kind === "wallet" ? answer.evidence : undefined };
   }
@@ -448,14 +470,17 @@ function noteLines(note: Note): string[] {
   return "more" in note ? [moreLine(note.more)] : noticeLines(note.text, note.kind);
 }
 
-/** Shows what a search found, as from the command line, then asks what comes next if anything. */
+/**
+ * Shows what a search found, as from the command line, then asks what comes next if anything;
+ * CANCELLED when the person cancelled.
+ */
 async function show(
   phrase: PhraseSearch,
   table: Table,
   found: Found,
   context: SearchContext,
   asked: boolean,
-): Promise<Next> {
+): Promise<Next | Cancelled> {
   const { target, evidence, passphrase } = context;
   const { rows, entropies, count, matched } = found;
   const headerRows = [...table.headerRows];
@@ -475,8 +500,8 @@ async function show(
           { optional: false, place: context.place },
         )
       : DONE;
-    if (next.kind === "done" && target !== undefined) await target.saveEntropies([]);
-    return next;
+    if (next === CANCELLED || next.kind !== "done" || target === undefined) return next;
+    return (await target.saveEntropies([])) ?? next;
   }
   if (evidence !== undefined) headerRows.push(["Evidence matches", String(matched)]);
   const headerLines = resultHeaderLines("Missing word recovery", headerRows);
@@ -516,7 +541,8 @@ async function show(
   }
   const tooManyToShow = !everyRow && evidence === undefined && target === undefined;
   if (target !== undefined) {
-    if (!savedLater) await target.saveEntropies(entropies, passphrase);
+    if (!savedLater && (await target.saveEntropies(entropies, passphrase)) === CANCELLED)
+      return CANCELLED;
   } else if (tooManyToShow) terminalNotice(tooManyNotice(count), "warning");
   for (const note of notes) printNote(note);
   if (!asked) return DONE;
@@ -536,9 +562,8 @@ async function show(
     );
   if (savedLater) {
     const next = await askNext(laterChoices, { optional: true, place: context.place });
-    if (next.kind === "done" && target !== undefined)
-      await target.saveEntropies(entropies, passphrase);
-    return next;
+    if (next === CANCELLED || next.kind !== "done" || target === undefined) return next;
+    return (await target.saveEntropies(entropies, passphrase)) ?? next;
   }
   return DONE;
 }

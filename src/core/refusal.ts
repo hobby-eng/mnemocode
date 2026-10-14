@@ -17,3 +17,10 @@ export function refusalMessage(error: unknown): string {
 export function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+/** An Error's string code, read once; undefined for other thrown values or a non-string code. */
+export function errorCode(error: unknown): string | undefined {
+  if (!(error instanceof Error) || !("code" in error)) return undefined;
+  const code: unknown = error.code;
+  return typeof code === "string" ? code : undefined;
+}

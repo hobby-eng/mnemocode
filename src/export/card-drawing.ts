@@ -27,6 +27,12 @@ import {
   type PDFPage,
   type PDFRef,
 } from "pdf-lib";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.card-drawing", {
+  "save-cards-as-pdf": (value0: string, value1: string) =>
+    `${value0}: ${value1}. Save the cards as PDF.`,
+});
 
 /** The six numbers of a PDF transformation: x' = a·x + c·y + e, y' = b·x + d·y + f. */
 export type Matrix = readonly [a: number, b: number, c: number, d: number, e: number, f: number];
@@ -129,7 +135,7 @@ export interface CardPageDrawing {
 export const CARD_DRAWING_REFUSAL = "Image export cannot draw this card";
 
 function unsupported(what: string): Error {
-  return new Error(`${CARD_DRAWING_REFUSAL}: ${what}. Save the cards as PDF.`);
+  return ERRORS.create("save-cards-as-pdf", [`${CARD_DRAWING_REFUSAL}`, `${what}`]);
 }
 
 // How many values each command takes (ISO 32000-1, 8.4.4 and 8.5.2): a point, a rectangle, a

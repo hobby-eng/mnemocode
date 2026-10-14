@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, vi } from "vitest";
 import { askLine, startRecord } from "../../src/cli/terminal-choice.js";
 import { displayWidth } from "../../src/cli/terminal-geometry.js";
 import { terminal } from "./keyed-terminal.js";
+import type { Cancelled } from "../../src/cli/terminal-keys.js";
 
 /** The keys that the tests type. */
 export const ESCAPE = "\x1b";
@@ -219,7 +220,7 @@ export async function answer(
   columns: number,
   options: Parameters<typeof askLine>[2] = {},
   reported: Reported = { columns },
-): Promise<{ screen: Screen; answer: string | undefined }> {
+): Promise<{ screen: Screen; answer: string | undefined | Cancelled }> {
   const screen = watchScreen(columns, reported);
   screen.write(BEFORE);
   // The keys for each time the question is asked.

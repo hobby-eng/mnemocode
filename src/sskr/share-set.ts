@@ -37,6 +37,19 @@ import { placeOf } from "../core/places.js";
 import { unrepairedShare } from "./repair.js";
 import { isMarked } from "./repair-units.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.share-set", {
+  "share-set-at-least-one-share": () => "A share set has at least one share.",
+  "combine-refused": suppliedMessage,
+  "no-phrase-fits": () => NO_PHRASE_FITS,
+  "more-than-one-phrase-fits-shares-read-more": () =>
+    "More than one phrase fits these shares: read more of the marked elements, or add a share.",
+  "share-s-secret-no-bip39-length": () => "A share's secret has no BIP39 length.",
+  "each-share-place-among-typed-whole-number-from": () =>
+    "Each share needs its place among those typed, a whole number from 1.",
+});
+
 // The copy rule belongs to set-topology.ts; here too for the modules that take it with a set.
 export { copiesAmong, type PlacedShare };
 
@@ -84,7 +97,7 @@ export class ShareSet extends Redacted {
 
   private constructor(set: RepairedSet) {
     super("ShareSet");
-    if (set.shares.length === 0) throw new Error("A share set has at least one share.");
+    if (set.shares.length === 0) throw ERRORS.create("share-set-at-least-one-share", []);
     // A copy that nothing can change: the set is handed out (toRepairedSet, shares) and must stay
     // what was restored and checked.
     this.#set = frozenSet(set);
@@ -136,18 +149,15 @@ export class ShareSet extends Redacted {
     if (assessment.reason !== undefined || assessment.combinations > MAX_LIBRARY_TRIES) {
       // A plan that is not searched is wiped here; searchOnce wipes the one that is.
       plan.wipe();
-      throw new Error(
+      throw ERRORS.create("combine-refused", [
         assessment.reason ??
           "Too many combinations are open: read more of the marked elements, or add a share.",
-      );
+      ]);
     }
     // Searched without a signal: nothing stops it.
     const { sets: found } = await searchOnce(plan);
-    if (found.length === 0) throw new Error(NO_PHRASE_FITS);
-    if (found.length > 1)
-      throw new Error(
-        "More than one phrase fits these shares: read more of the marked elements, or add a share.",
-      );
+    if (found.length === 0) throw ERRORS.create("no-phrase-fits", []);
+    if (found.length > 1) throw ERRORS.create("more-than-one-phrase-fits-shares-read-more", []);
     return new ShareSet(defined(found[0]));
   }
 
@@ -159,7 +169,7 @@ export class ShareSet extends Redacted {
   /** Words of the phrase whose secret has `secretBytes`, as the shares and an assessment tell. */
   static wordCountOf(secretBytes: number): number {
     const words = wordCountOfEntropy(secretBytes);
-    if (words === undefined) throw new Error("A share's secret has no BIP39 length.");
+    if (words === undefined) throw ERRORS.create("share-s-secret-no-bip39-length", []);
     return words;
   }
 
@@ -340,7 +350,7 @@ export class ShareExport {
       named.length < set.shares.length ||
       !named.every((place) => Number.isSafeInteger(place) && place >= 1)
     )
-      throw new Error("Each share needs its place among those typed, a whole number from 1.");
+      throw ERRORS.create("each-share-place-among-typed-whole-number-from", []);
     const leftOut = [...new Set(set.unsettled.map((element) => placeOf(named, element.share)))];
     const shown = set.shares.flatMap((share, index) =>
       leftOut.includes(defined(named[index]))

@@ -1,6 +1,22 @@
 import type { BusinessStyle, MaterialStyle } from "./template-catalog.js";
 import { listInWords } from "../core/places.js";
 import { capitalized } from "../core/prose.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.card-settings", {
+  "page-size": (value0: string) => `Page size must be ${value0}.`,
+  "separate-cards-business-size-choose-business-size-leave": () =>
+    "Separate cards have the business size. Choose the business size, or leave the size out.",
+  "qr-code-printed-on-sheet-only-choose-size": (value0: string) =>
+    `A QR code is printed on a sheet only. Choose the ${value0} size for a QR code; separate cards never carry one.`,
+  orientation: (value0: string) => `Orientation must be ${value0}.`,
+  "card-non-empty-text-on-one-line": (value0: string, value1: string) =>
+    `Card ${value0} must be non-empty text on one line${value1}`,
+  "card-too-long-maximum-characters": (value0: string, value1: string) =>
+    `Card ${value0} is too long (maximum ${value1} characters).`,
+  "card-name-use-latin-letters-only-spaces-apostrophes": () =>
+    "Card name must use Latin letters only (spaces, apostrophes and hyphens are allowed).",
+});
 
 /** Print layout is independent of the visual template and the encoded format. */
 export const CARD_PAGE_SIZES = Object.freeze(["a6", "a5", "a4", "business"] as const);
@@ -85,7 +101,7 @@ export function parsePageSize(value: string | undefined): CardPageSize {
   if (value === undefined) return SHEET_PAGE_SIZE;
   const size = CARD_PAGE_SIZES.find((known) => known === value);
   if (size === undefined)
-    throw new Error(`Page size must be ${listInWords(CARD_PAGE_SIZES, "or")}.`);
+    throw ERRORS.create("page-size", [`${listInWords(CARD_PAGE_SIZES, "or")}`]);
   return size;
 }
 
@@ -148,9 +164,7 @@ export function resolvePageSize(value: string | undefined, separate: boolean): C
 /** Refuses a size given for separate cards other than theirs: they have the business size. */
 export function assertSeparateCardSize(size: CardPageSize | undefined): void {
   if (size !== undefined && !isCardPageSize(size))
-    throw new Error(
-      "Separate cards have the business size. Choose the business size, or leave the size out.",
-    );
+    throw ERRORS.create("separate-cards-business-size-choose-business-size-leave", []);
 }
 
 /**
@@ -166,9 +180,7 @@ export const SHEET_QR_HOLDS = "the codes of the backup, without the extra cards"
  */
 export function assertSheetQr(card: { readonly kind: string } & CardSettings): void {
   if (card.kind === "colors" && isCardPageSize(card.pageSize) && card.cardQr === true)
-    throw new Error(
-      `A QR code is printed on a sheet only. Choose the ${SHEET_SIZES_TEXT} size for a QR code; separate cards never carry one.`,
-    );
+    throw ERRORS.create("qr-code-printed-on-sheet-only-choose-size", [`${SHEET_SIZES_TEXT}`]);
 }
 
 /** The orientation that `value` names, or none; every export reads an orientation through it. */
@@ -176,7 +188,7 @@ export function parseOrientation(value: string | undefined): CardOrientation | u
   if (value === undefined) return undefined;
   const orientation = CARD_ORIENTATIONS.find((known) => known === value);
   if (orientation === undefined)
-    throw new Error(`Orientation must be ${listInWords(CARD_ORIENTATIONS, "or")}.`);
+    throw ERRORS.create("orientation", [`${listInWords(CARD_ORIENTATIONS, "or")}`]);
   return orientation;
 }
 
@@ -190,9 +202,12 @@ export const MAX_CARD_TEXT_LENGTH = 100;
  */
 export function cardText(text: unknown, label: string, blankEnding: string): string {
   if (typeof text !== "string" || !text.trim() || /[\p{Cc}\p{Cf}]/u.test(text))
-    throw new Error(`Card ${label} must be non-empty text on one line${blankEnding}`);
+    throw ERRORS.create("card-non-empty-text-on-one-line", [`${label}`, `${blankEnding}`]);
   if (Array.from(text).length > MAX_CARD_TEXT_LENGTH)
-    throw new Error(`Card ${label} is too long (maximum ${MAX_CARD_TEXT_LENGTH} characters).`);
+    throw ERRORS.create("card-too-long-maximum-characters", [
+      `${label}`,
+      `${MAX_CARD_TEXT_LENGTH}`,
+    ]);
   return text.trim().normalize("NFC");
 }
 
@@ -211,9 +226,7 @@ export function validateProfile(profile: CardProfile = {}): CardProfile {
       (!/\p{Script=Latin}/u.test(normalized) ||
         !/^[\p{Script=Latin}\p{M} .’'‐-]+$/u.test(normalized))
     ) {
-      throw new Error(
-        "Card name must use Latin letters only (spaces, apostrophes and hyphens are allowed).",
-      );
+      throw ERRORS.create("card-name-use-latin-letters-only-spaces-apostrophes", []);
     }
     result[field] = normalized;
   }

@@ -3,6 +3,14 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { robinson, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from "../dist/export/world-map.js";
+import { ErrorCatalog } from "../src/core/error-catalog.ts";
+
+const ERRORS = new ErrorCatalog("scripts.build-world-map", {
+  /**
+   * @param {string} value0
+   */
+  "unexpected-map-source": (value0) => `Unexpected map source: ${value0}`,
+});
 
 const sourcePath = new URL("../assets/maps/ne_110m_land.geojson", import.meta.url);
 const targetPath = new URL("../src/export/world-map-data.ts", import.meta.url);
@@ -14,7 +22,7 @@ const MINIMUM_EXTENT = 6;
 
 const bytes = readFileSync(sourcePath);
 const digest = createHash("sha256").update(bytes).digest("hex");
-if (digest !== EXPECTED_SHA256) throw new Error(`Unexpected map source: ${digest}`);
+if (digest !== EXPECTED_SHA256) throw ERRORS.create("unexpected-map-source", [`${digest}`]);
 
 const paths = [];
 for (const feature of JSON.parse(bytes.toString("utf8")).features) {

@@ -22,6 +22,21 @@ import {
   type SystemAccess,
   type SystemSandbox,
 } from "./sandbox-record.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.sandbox-windows", {
+  "wer-set-flags-refused": () => "WerSetFlags refused",
+  "wer-get-flags-refused": () => "WerGetFlags refused",
+  "heap-still-reported": () => "the heap is still reported",
+  "refused-error": (value0: string) => `refused (error ${value0})`,
+  "not-readable-error": (value0: string) => `not readable (error ${value0})`,
+  "not-force": () => "not in force",
+  "not-created-error": (value0: string) => `not created (error ${value0})`,
+  "limit-was-refused-error": (value0: string) => `its limit was refused (error ${value0})`,
+  "process-could-not-join-error": (value0: string) =>
+    `this process could not join it (error ${value0})`,
+  "limit-could-not-read-back": () => "its limit could not be read back",
+});
 
 const KERNEL32 = "kernel32.dll";
 
@@ -81,12 +96,12 @@ export class WindowsSandbox implements SystemSandbox {
     const kernel32 = this.#kernel32;
     if (kernel32 === undefined) return;
     this.#record.attempt("crash reports", () => {
-      if (kernel32.WerSetFlags(WER_NO_HEAP) !== 0) throw new Error("WerSetFlags refused");
+      if (kernel32.WerSetFlags(WER_NO_HEAP) !== 0) throw ERRORS.create("wer-set-flags-refused", []);
       const flags = Buffer.alloc(4);
       if (kernel32.WerGetFlags(kernel32.GetCurrentProcess(), flags) !== 0)
-        throw new Error("WerGetFlags refused");
+        throw ERRORS.create("wer-get-flags-refused", []);
       if ((flags.readUInt32LE(0) & WER_NO_HEAP) === 0)
-        throw new Error("the heap is still reported");
+        throw ERRORS.create("heap-still-reported", []);
       this.#record.hold("no heap in crash reports");
     });
     this.#policy(
@@ -130,12 +145,12 @@ export class WindowsSandbox implements SystemSandbox {
       const wanted = Buffer.alloc(POLICY_BYTES);
       wanted.writeUInt32LE(flags, 0);
       if (kernel32.SetProcessMitigationPolicy(policy, wanted, BigInt(POLICY_BYTES)) === 0)
-        throw new Error(`refused (error ${kernel32.GetLastError()})`);
+        throw ERRORS.create("refused-error", [`${kernel32.GetLastError()}`]);
       const read = Buffer.alloc(POLICY_BYTES);
       const current = kernel32.GetCurrentProcess();
       if (kernel32.GetProcessMitigationPolicy(current, policy, read, BigInt(POLICY_BYTES)) === 0)
-        throw new Error(`not readable (error ${kernel32.GetLastError()})`);
-      if ((read.readUInt32LE(0) & flags) !== flags) throw new Error("not in force");
+        throw ERRORS.create("not-readable-error", [`${kernel32.GetLastError()}`]);
+      if ((read.readUInt32LE(0) & flags) !== flags) throw ERRORS.create("not-force", []);
       this.#record.hold(boundary);
     });
   }
@@ -143,18 +158,18 @@ export class WindowsSandbox implements SystemSandbox {
   /** Puts this process alone into a job that holds one process, and reads the job back. */
   #forbidPrograms(kernel32: Kernel32): void {
     const job = kernel32.CreateJobObjectW(null, null);
-    if (job === 0n) throw new Error(`not created (error ${kernel32.GetLastError()})`);
+    if (job === 0n) throw ERRORS.create("not-created-error", [`${kernel32.GetLastError()}`]);
     const limit = Buffer.alloc(BASIC_LIMIT_BYTES);
     limit.writeUInt32LE(JOB_OBJECT_LIMIT_ACTIVE_PROCESS, LIMIT_FLAGS_OFFSET);
     limit.writeUInt32LE(1, ACTIVE_PROCESS_LIMIT_OFFSET);
     if (
       kernel32.SetInformationJobObject(job, BASIC_LIMIT_INFORMATION, limit, BASIC_LIMIT_BYTES) === 0
     )
-      throw new Error(`its limit was refused (error ${kernel32.GetLastError()})`);
+      throw ERRORS.create("limit-was-refused-error", [`${kernel32.GetLastError()}`]);
     // The job's handle stays open for the life of the process; the job ends with it.
     const current = kernel32.GetCurrentProcess();
     if (kernel32.AssignProcessToJobObject(job, current) === 0)
-      throw new Error(`this process could not join it (error ${kernel32.GetLastError()})`);
+      throw ERRORS.create("process-could-not-join-error", [`${kernel32.GetLastError()}`]);
     const inJob = Buffer.alloc(4);
     const read = Buffer.alloc(BASIC_LIMIT_BYTES);
     const joined =
@@ -170,7 +185,7 @@ export class WindowsSandbox implements SystemSandbox {
     const limited =
       (read.readUInt32LE(LIMIT_FLAGS_OFFSET) & JOB_OBJECT_LIMIT_ACTIVE_PROCESS) !== 0 &&
       read.readUInt32LE(ACTIVE_PROCESS_LIMIT_OFFSET) === 1;
-    if (!joined || !limited) throw new Error("its limit could not be read back");
+    if (!joined || !limited) throw ERRORS.create("limit-could-not-read-back", []);
     this.#record.hold("Windows: no other programs");
   }
 }

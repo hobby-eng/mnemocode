@@ -70,6 +70,16 @@ import {
   withWays,
   type WorkBudget,
 } from "./joint-solve.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.joint-repair", {
+  "readings-refused": suppliedMessage,
+  "plan-joint-repair-refused": suppliedMessage,
+  "share-repair-host-s-share-platform": {
+    kind: "type",
+    text: () => "A share repair needs the host's SharePlatform.",
+  },
+});
 
 // This part's entry gives what its plans and repairs hold, and the digest width, as it did before
 // the CORE-15 split moved them into joint-results.ts and joint-solve.ts, which have no entry of
@@ -175,7 +185,7 @@ function readingsOf(place: number, text: string): MarkedReading[] {
     return MarkedReading.of(text);
   } catch (error) {
     if (error instanceof AmbiguousMarksError)
-      throw new Error(afterPlace("Share", place, AMBIGUOUS_MARK_WIDTHS));
+      throw ERRORS.create("readings-refused", [afterPlace("Share", place, AMBIGUOUS_MARK_WIDTHS)]);
     throw error;
   }
 }
@@ -399,7 +409,7 @@ export async function planJointRepair(
   const texts = Array.from(records, (record) => record.trim());
   for (const [index, text] of texts.entries()) {
     const problem = jointMarkLimitProblem(placeOf(places, index + 1), text);
-    if (problem !== undefined) throw new Error(problem);
+    if (problem !== undefined) throw ERRORS.create("plan-joint-repair-refused", [problem]);
   }
   // A plan that can search keeps the arrays of its branches for its searches; every other array
   // made for the assessment is wiped, all of them when it is stopped (AUD-012-SEC004).
@@ -624,7 +634,7 @@ function merged(first: RepairedSet, other: RepairedSet): RepairedSet {
  */
 function checkedPlatform(platform: SharePlatform | undefined): SharePlatform {
   if (typeof platform?.hmacSha256 !== "function" || typeof platform.combineShares !== "function")
-    throw new TypeError("A share repair needs the host's SharePlatform.");
+    throw ERRORS.create("share-repair-host-s-share-platform", []);
   return platform;
 }
 

@@ -5,6 +5,12 @@ import { exportCards } from "./export/pdf.js";
 import { nodeRenderPlatform } from "./export/platform-node.js";
 import { selectTemplate, templatesOfKind } from "./export/templates.js";
 import { assertColorCardContent } from "./export/card-content.js";
+import { ErrorCatalog } from "./core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("color-export", {
+  "select-one-template-template-collection-not-both": () =>
+    "Select one template or a template collection, not both.",
+});
 
 /** The id of a design of color cards, as the catalog names it (templates.ts). */
 export type ColorCardTemplateId = string;
@@ -35,7 +41,7 @@ export async function exportColorPalette(options: ColorExportOptions): Promise<v
   // Checked here too: the palette may write only its QR code, and draw no card.
   assertColorCardContent({ kind: "colors", colors: options.colors, payload });
   if (options.template !== undefined && options.templates !== undefined)
-    throw new Error("Select one template or a template collection, not both.");
+    throw ERRORS.create("select-one-template-template-collection-not-both", []);
   if (options.pdfPath !== undefined) {
     const ids = options.templates ?? [options.template];
     const templates = ids.map((id) => selectTemplate(id, "colors"));

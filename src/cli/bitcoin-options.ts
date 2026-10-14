@@ -24,6 +24,30 @@ import {
 } from "../core/wallet-evidence.js";
 import { withoutByteOrderMark } from "../core/white-space.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.bitcoin-options", {
+  "bitcoin-address-profile-auto-comma-separated-list": (value0: string) =>
+    `The Bitcoin address profile must be auto or a comma-separated list of: ${value0}.`,
+  "bitcoin-network": (value0: string) => `The Bitcoin network must be ${value0}.`,
+  "wif-given-file-never-on-command-line": () =>
+    "A WIF is given in a file, never on a command line.",
+  "coin-names-coin-coin-address": () => "--coin names the coin of --coin-address.",
+  "select-exactly-one-recovery-evidence-option": () =>
+    "Select exactly one recovery-evidence option.",
+  "scan-gap-applies-address-compressed-public-key-wif": () =>
+    "--scan-gap applies to an address, a compressed public key or a WIF, one of several in a row.",
+  "coin-address-coin-such-as-coin-ethereum": () =>
+    "--coin-address needs --coin, such as --coin ethereum.",
+  "bitcoin-evidence-coin-s-address-tells-own": (value0: string) =>
+    `--${value0} is for Bitcoin evidence; the coin's address tells its own.`,
+  "places-address-key-wif-master-key-no-place": (value0: string) =>
+    `--${value0} places an address, a key or a WIF; a master key has no place.`,
+  "scan-gap-applies-address-given-option-asked-on": () =>
+    "--scan-gap applies to an address given with an option, or asked on the screen with --ask-secrets.",
+  "applies-wallet-given-as-option-such-as-bitcoin": (value0: string, value1: string) =>
+    `--${value0} applies to a wallet given as an option, such as --bitcoin-address${value1}.`,
+});
 
 /** The option that gives each kind of evidence; a WIF is read from the file it names. */
 const EVIDENCE_OPTIONS = Object.freeze({
@@ -67,16 +91,16 @@ function bitcoinProfilesFrom(arguments_: ParsedArguments): readonly BitcoinProfi
   try {
     return checkedBitcoinProfiles(requested.split(",").map((item) => item.trim()));
   } catch {
-    throw new Error(
-      `The Bitcoin address profile must be auto or a comma-separated list of: ${bitcoinProfiles.join(", ")}.`,
-    );
+    throw ERRORS.create("bitcoin-address-profile-auto-comma-separated-list", [
+      `${bitcoinProfiles.join(", ")}`,
+    ]);
   }
 }
 
 function bitcoinNetwork(arguments_: ParsedArguments): BitcoinNetworkName {
   const network = value(arguments_, "network") ?? BITCOIN_NETWORKS[0];
   if (!isBitcoinNetwork(network))
-    throw new Error(`The Bitcoin network must be ${BITCOIN_NETWORKS_TEXT}.`);
+    throw ERRORS.create("bitcoin-network", [`${BITCOIN_NETWORKS_TEXT}`]);
   return network;
 }
 
@@ -111,8 +135,7 @@ export function scanGapOf(arguments_: ParsedArguments): number | undefined {
  * differ from the defaults. A WIF has no such options: it is read from a file.
  */
 export function walletEvidenceArguments(evidence: WalletEvidence): string[] {
-  if (evidence.kind === "wif")
-    throw new Error("A WIF is given in a file, never on a command line.");
+  if (evidence.kind === "wif") throw ERRORS.create("wif-given-file-never-on-command-line", []);
   const coin = evidence.kind === "coin-address" ? ["--coin", evidence.coin] : [];
   const options = [...coin, `--${EVIDENCE_OPTIONS[evidence.kind]}`, evidence.value];
   if ("network" in evidence && evidence.network !== FIRST_RECEIVING_LOCATION.network)
@@ -145,25 +168,20 @@ export function walletEvidence(arguments_: ParsedArguments): WalletEvidence | un
   const supplied = items.filter(([, item]) => item !== undefined);
   const coin = value(arguments_, "coin");
   if (coin !== undefined && value(arguments_, "coin-address") === undefined)
-    throw new Error("--coin names the coin of --coin-address.");
+    throw ERRORS.create("coin-names-coin-coin-address", []);
   if (supplied.length === 0) return undefined;
-  if (supplied.length !== 1) throw new Error("Select exactly one recovery-evidence option.");
+  if (supplied.length !== 1) throw ERRORS.create("select-exactly-one-recovery-evidence-option", []);
   const [kind, rawValue] = defined(supplied[0]);
   const counted = scanGapOf(arguments_);
   if (counted !== undefined && !isScannedKind(kind))
-    throw new Error(
-      "--scan-gap applies to an address, a compressed public key or a WIF, one of several in a row.",
-    );
+    throw ERRORS.create("scan-gap-applies-address-compressed-public-key-wif", []);
   const place = placeOf(arguments_);
   const addresses = counted ?? defaultAddressCount(place.index);
   if (kind === "coin-address") {
-    if (coin === undefined)
-      throw new Error("--coin-address needs --coin, such as --coin ethereum.");
+    if (coin === undefined) throw ERRORS.create("coin-address-coin-such-as-coin-ethereum", []);
     for (const bitcoinOnly of BITCOIN_ONLY_OPTIONS)
       if (value(arguments_, bitcoinOnly) !== undefined)
-        throw new Error(
-          `--${bitcoinOnly} is for Bitcoin evidence; the coin's address tells its own.`,
-        );
+        throw ERRORS.create("bitcoin-evidence-coin-s-address-tells-own", [`${bitcoinOnly}`]);
     return {
       kind,
       coin: coinById(coin).id,
@@ -184,7 +202,7 @@ export function walletEvidence(arguments_: ParsedArguments): WalletEvidence | un
     // The master key has no place in an account: these would be ignored, so they are refused.
     const placing = ACCOUNT_PLACE_OPTIONS.find((key) => value(arguments_, key) !== undefined);
     if (placing !== undefined)
-      throw new Error(`--${placing} places an address, a key or a WIF; a master key has no place.`);
+      throw ERRORS.create("places-address-key-wif-master-key-no-place", [`${placing}`]);
     return { kind, value: value_, network } as WalletEvidence;
   }
   const location: DerivationLocation = { network, ...place };
@@ -237,9 +255,7 @@ export function walletPlaceOf(
 ): WalletPlace {
   const addresses = scanGapOf(args);
   if (addresses !== undefined && given === undefined && args["ask-secrets"] !== true)
-    throw new Error(
-      "--scan-gap applies to an address given with an option, or asked on the screen with --ask-secrets.",
-    );
+    throw ERRORS.create("scan-gap-applies-address-given-option-asked-on", []);
   const counted = (place: WalletPlace, count: number | undefined): WalletPlace =>
     count === undefined ? place : { ...place, addresses: count };
   if (given === undefined) return counted(FIRST_RECEIVING, addresses);
@@ -277,9 +293,7 @@ export function assertWalletPlaceUsed(
     args["ask-secrets"] === true
       ? "; the wallet asked on the screen is looked for on mainnet among its first receiving addresses"
       : "";
-  throw new Error(
-    `--${placing} applies to a wallet given as an option, such as --bitcoin-address${asked}.`,
-  );
+  throw ERRORS.create("applies-wallet-given-as-option-such-as-bitcoin", [`${placing}`, `${asked}`]);
 }
 
 /** The wallet that the options give, where a wallet is looked for, and its BIP39 passphrase. */

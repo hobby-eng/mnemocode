@@ -21,6 +21,19 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { RELEASE_FOLDER, executableName, noticesName } from "./executable-files.mjs";
+import { ErrorCatalog } from "../src/core/error-catalog.ts";
+
+const ERRORS = new ErrorCatalog("scripts.verify-executable", {
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "there-no": (value0, value1) => `There is no ${value0} in ${value1}.`,
+  /**
+   * @param {string} value0
+   */
+  "executable-failed": (value0) => `The executable failed: ${value0}.`,
+});
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
@@ -32,7 +45,7 @@ const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).ver
 function findExecutable(path) {
   if (!statSync(path).isDirectory()) return path;
   const name = executableName(version);
-  if (!readdirSync(path).includes(name)) throw new Error(`There is no ${name} in ${path}.`);
+  if (!readdirSync(path).includes(name)) throw ERRORS.create("there-no", [`${name}`, `${path}`]);
   return join(path, name);
 }
 
@@ -60,7 +73,7 @@ const run = (...arguments_) =>
     stdio: ["ignore", "pipe", "pipe"],
   });
 const check = (condition, what) => {
-  if (!condition) throw new Error(`The executable failed: ${what}.`);
+  if (!condition) throw ERRORS.create("executable-failed", [`${what}`]);
   console.log(`ok  ${what}`);
 };
 

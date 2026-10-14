@@ -3,7 +3,13 @@
 // non-null assertion). A missing one is a fault of MnemoCode, never of its input, and stops the
 // operation with an error instead of going on with undefined.
 //
-// Host-neutral: it imports nothing, so that every module can take it.
+// Host-neutral: it takes only the shared error catalog, which imports nothing.
+
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.defined", {
+  "missing-value": () => MISSING_VALUE,
+});
 
 /** What a value that the code holds to be there but is not says: a fault of MnemoCode. */
 export const MISSING_VALUE =
@@ -13,6 +19,6 @@ export const MISSING_VALUE =
  * `value`, which the code holds to be there; throws MISSING_VALUE where it is undefined or null.
  */
 export function defined<T>(value: T | undefined | null): T {
-  if (value === undefined || value === null) throw new Error(MISSING_VALUE);
+  if (value === undefined || value === null) throw ERRORS.create("missing-value", []);
   return value;
 }

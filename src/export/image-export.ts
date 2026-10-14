@@ -21,6 +21,15 @@ import {
   type ImageFormat,
 } from "./document-formats.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.image-export", {
+  "png-jpeg-export-requires-local-poppler-pdftocairo-program": () =>
+    "PNG/JPEG export requires the local Poppler pdftocairo program. Install Poppler before using image export, or export PDF instead.",
+  "local-pdf-renderer-produced-no-images": () => "The local PDF renderer produced no images.",
+  "image-destination-already-exists-nothing-will-overwritten": () =>
+    "An image destination already exists; nothing will be overwritten.",
+});
 
 // The formats and the drawing rules are document-formats.ts's, which a page takes too; here too
 // for the modules of the command line that take them from here.
@@ -56,9 +65,7 @@ export function assertImageRenderer(): Promise<void> {
     .then(() => undefined)
     .catch(() => {
       renderer = undefined;
-      throw new Error(
-        "PNG/JPEG export requires the local Poppler pdftocairo program. Install Poppler before using image export, or export PDF instead.",
-      );
+      throw ERRORS.create("png-jpeg-export-requires-local-poppler-pdftocairo-program", []);
     }));
 }
 
@@ -144,7 +151,7 @@ export async function writeRenderedDocument(
     const files = (await readdir(temporary))
       .filter((file) => PAGE_FILE.test(file))
       .sort((a, b) => Number(defined(a.match(/\d+/u))[0]) - Number(defined(b.match(/\d+/u))[0]));
-    if (!files.length) throw new Error("The local PDF renderer produced no images.");
+    if (!files.length) throw ERRORS.create("local-pdf-renderer-produced-no-images", []);
     for (const [index, file] of files.entries()) {
       // The page shows what the document shows: its bytes are wiped once written.
       await wipedAfterAsync(await readFile(join(temporary, file)), (page) =>
@@ -154,7 +161,7 @@ export async function writeRenderedDocument(
     return files.length;
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "EEXIST")
-      throw new Error("An image destination already exists; nothing will be overwritten.");
+      throw ERRORS.create("image-destination-already-exists-nothing-will-overwritten", []);
     throw error;
   } finally {
     await rm(temporary, { recursive: true, force: true });

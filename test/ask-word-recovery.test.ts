@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { decryptCandidates } from "../src/core/candidate-encryption.js";
 import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
+import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { matching } from "./helpers/matchers.js";
 import {
   byLabel,
@@ -51,7 +51,7 @@ const LIST_PASSPHRASE = "public candidate test passphrase";
 
 let directory: string;
 
-function recover(options: Record<string, string | boolean>): Promise<void> {
+function recover(options: Record<string, string | boolean>): Promise<Cancelled | undefined> {
   return runRecoverWord({ "ask-secrets": true, ...options });
 }
 
@@ -125,9 +125,7 @@ describe("recover-word on the private screen", () => {
 
   it("lets Ctrl+C at the list's passphrase cancel at once", async () => {
     terminal.answers = [`${LAST_FORGOTTEN}\r`, "public\x03"];
-    await expect(recover({ "candidates-file": join(directory, "c.age") })).rejects.toBeInstanceOf(
-      InputCancelledError,
-    );
+    expect(await recover({ "candidates-file": join(directory, "c.age") })).toBe(CANCELLED);
     expect(seen.notices.join("\n")).not.toContain("Try again");
   });
 

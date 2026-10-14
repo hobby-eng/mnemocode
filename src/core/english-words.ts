@@ -11,6 +11,11 @@ import { entropyToMnemonic, validateMnemonic } from "@scure/bip39";
 import { wordlist as englishWordlist } from "@scure/bip39/wordlists/english.js";
 import { entropyBytes, type Bip39WordCount } from "./bip39-sizes.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.english-words", {
+  "word-not-english-bip39-list": () => "A word is not in the English BIP39 list.",
+});
 
 export { englishWordlist };
 
@@ -58,7 +63,7 @@ export function wordsOfIndexes(indexes: readonly number[]): string[] {
 export function indexesOfWords(words: readonly string[]): number[] {
   return words.map((word) => {
     const index = ENGLISH_INDEX.get(word);
-    if (index === undefined) throw new Error("A word is not in the English BIP39 list.");
+    if (index === undefined) throw ERRORS.create("word-not-english-bip39-list", []);
     return index;
   });
 }

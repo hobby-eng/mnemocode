@@ -16,6 +16,15 @@ import {
 import { MM, type MmRect } from "./business-layout.js";
 import { rgbChannels } from "./color-math.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.business-render-primitives", {
+  "contains-character-not-supported-by-card-font": (value0: string, value1: string) =>
+    `${value0} contains a character not supported by the card font: ${value1}`,
+  "too-long-fit-legibly-on-card-shorten": (value0: string) =>
+    `${value0} is too long to fit legibly on the card; shorten it.`,
+});
+
 /** The dark ink of the business designs' text. */
 export const ink = rgb(0.12, 0.13, 0.14);
 const CORNER_RADIUS_HEIGHT_RATIO = 0.055;
@@ -42,13 +51,15 @@ export function fit(
     (c) => !font.getCharacterSet().includes(defined(c.codePointAt(0))),
   );
   if (unsupported !== undefined)
-    throw new Error(`${label} contains a character not supported by the card font: ${unsupported}`);
+    throw ERRORS.create("contains-character-not-supported-by-card-font", [
+      `${label}`,
+      `${unsupported}`,
+    ]);
   const size = Math.min(
     preferred,
     width / Math.max(font.widthOfTextAtSize(text, 1), MIN_MEASURED_WIDTH),
   );
-  if (size < minimum)
-    throw new Error(`${label} is too long to fit legibly on the card; shorten it.`);
+  if (size < minimum) throw ERRORS.create("too-long-fit-legibly-on-card-shorten", [`${label}`]);
   return size;
 }
 

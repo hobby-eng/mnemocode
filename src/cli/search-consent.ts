@@ -3,6 +3,7 @@
 // with (terminal-choice.ts), so that a test can answer them.
 
 import { choose } from "./terminal-choice.js";
+import type { Cancelled } from "./terminal-keys.js";
 
 /** An option that allows a longer search, such as "max-tries", and the count it needs. */
 export type SearchAllowance = readonly [option: string, count: number];
@@ -24,18 +25,22 @@ export interface SearchRefusal {
 }
 
 /**
- * Asks whether a search longer than its limit starts: Yes, which Ctrl+C stops, or No, which does
- * what `no` says. Keys typed before, such as while the search was timed, never answer it. Every
- * search of the command line asks it so.
+ * Asks whether a search longer than its limit starts: "yes", which Ctrl+C stops, or "no", which
+ * does what `no` says and which Escape also answers; CANCELLED when the command is cancelled. Keys
+ * typed before, such as while the search was timed, never answer it. Every search of the command
+ * line asks it so.
  */
-export async function askToSearch(question: string, no: SearchRefusal): Promise<boolean> {
+export async function askToSearch(
+  question: string,
+  no: SearchRefusal,
+): Promise<"yes" | "no" | Cancelled> {
   const start = await choose(
     question,
     [
-      { label: "Yes", note: "Ctrl+C stops it", value: true },
-      { label: "No", note: no.note, value: false },
+      { label: "Yes", note: "Ctrl+C stops it", value: "yes" as const },
+      { label: "No", note: no.note, value: "no" as const },
     ],
     { label: "Search", quit: no.quit },
   );
-  return start === true;
+  return start ?? "no";
 }

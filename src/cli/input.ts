@@ -2,7 +2,7 @@ import { terminalNotice } from "./terminal.js";
 import { askSecretUntil } from "./ask.js";
 import { choose } from "./terminal-choice.js";
 import { terminalAvailable } from "./terminal-input.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import {
   ENCODED_FORMATS,
   MASKING_MODES,
@@ -41,6 +41,24 @@ import { listInWords } from "../core/places.js";
 import { DATE_FORMAT_TEXT } from "../core/dates.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.input", {
+  "mnemonic-word-count": (value0: string) => `The mnemonic word count must be ${value0}.`,
+  "provide-either-as-direct-text-file-but-not": (value0: string) =>
+    `Provide ${value0} either as direct text or in a file, but not both.`,
+  "provide-as-direct-text-file-through-ask-secrets": (value0: string) =>
+    `Provide ${value0} as direct text, in a file, or through --ask-secrets.`,
+  "choose-one-encoded-input-source-qr-image-direct": () =>
+    "Choose one encoded input source: a QR image, direct text, or a text file.",
+  "representation-format-one-use-number-name": (value0: string) =>
+    `The representation format must be one of: ${value0}. Use the number or the name.`,
+  "backup-from-options-refused": suppliedMessage,
+  "input-matches-several-formats-choose-recorded-format-explicitly": (value0: string) =>
+    `The input matches several formats (${value0}). Choose the recorded format explicitly.`,
+  "transformation-mode": (value0: string) => `The transformation mode must be ${value0}.`,
+  "transform-mode-refused": suppliedMessage,
+});
 
 /**
  * The words of the seed phrase that --words gives, or undefined: of codes from printed cards, which
@@ -53,8 +71,7 @@ export function phraseWords(args: ParsedArguments): Bip39WordCount | undefined {
     max: defined(BIP39_WORD_COUNTS.at(-1)),
     label: "mnemonic word count",
   });
-  if (!isBip39WordCount(words))
-    throw new Error(`The mnemonic word count must be ${WORD_COUNTS_TEXT}.`);
+  if (!isBip39WordCount(words)) throw ERRORS.create("mnemonic-word-count", [`${WORD_COUNTS_TEXT}`]);
   return words;
 }
 
@@ -75,9 +92,9 @@ export function textInput(arguments_: ParsedArguments, key: "input" | "mnemonic"
   const path = value(arguments_, `${key}-file`);
   const subject = key === "mnemonic" ? "the mnemonic" : "the encoded input";
   if (direct !== undefined && path !== undefined)
-    throw new Error(`Provide ${subject} either as direct text or in a file, but not both.`);
+    throw ERRORS.create("provide-either-as-direct-text-file-but-not", [`${subject}`]);
   if (direct === undefined && path === undefined)
-    throw new Error(`Provide ${subject} as direct text, in a file, or through --ask-secrets.`);
+    throw ERRORS.create("provide-as-direct-text-file-through-ask-secrets", [`${subject}`]);
   return (
     direct ??
     (path === "-"
@@ -113,7 +130,7 @@ export function assertOneEncodedSource(arguments_: ParsedArguments): void {
     value(arguments_, "qr-file") !== undefined &&
     (value(arguments_, "input") !== undefined || value(arguments_, "input-file") !== undefined)
   )
-    throw new Error("Choose one encoded input source: a QR image, direct text, or a text file.");
+    throw ERRORS.create("choose-one-encoded-input-source-qr-image-direct", []);
 }
 
 export async function encodedInput(arguments_: ParsedArguments): Promise<string> {
@@ -131,9 +148,7 @@ export function inputFormat(value_: string): EncodedFormat {
     (name) => value_ === name || value_ === String(formatNumber(name)),
   );
   if (format === undefined) {
-    throw new Error(
-      `The representation format must be one of: ${formatLegend()}. Use the number or the name.`,
-    );
+    throw ERRORS.create("representation-format-one-use-number-name", [`${formatLegend()}`]);
   }
   return format;
 }
@@ -155,12 +170,13 @@ const WHICH_FORMAT = "The input fits more than one format. Which format was reco
 
 /**
  * The form of codes that `fitting` forms read, as detected: the one, or the one the person picks,
- * each said in one line. Undefined when the person leaves with Escape, which `quit` names.
+ * each said in one line. Undefined when the person leaves with Escape, which `quit` names,
+ * CANCELLED at Ctrl+C.
  */
 export async function detectedFormat(
   fitting: readonly EncodedFormat[],
   quit: string,
-): Promise<EncodedFormat | undefined> {
+): Promise<EncodedFormat | undefined | Cancelled> {
   const format =
     fitting.length === 1
       ? fitting[0]
@@ -169,7 +185,8 @@ export async function detectedFormat(
           fitting.map((form) => ({ label: form, value: form })),
           { label: "Format", quit },
         );
-  if (format !== undefined) terminalNotice(`Detected input format: ${format}.`);
+  if (format !== undefined && format !== CANCELLED)
+    terminalNotice(`Detected input format: ${format}.`);
   return format;
 }
 
@@ -179,13 +196,14 @@ export async function detectedFormat(
  * are refused with the library's reason, and a mode or form that the record contradicts too. Codes
  * that fit several forms are asked about on a terminal; anywhere else they end the command.
  * `modeKnown` is called with the mode as soon as it is settled, before the form is: a refusal by
- * the mode, such as a wrong number of dates, comes before any question about the form.
+ * the mode, such as a wrong number of dates, comes before any question about the form. CANCELLED
+ * when the person leaves the question about the form.
  */
 export async function backupFromOptions(
   arguments_: ParsedArguments,
   seedshiftOnly: boolean,
   modeKnown?: (mode: MaskingMode) => void,
-): Promise<{ readonly backup: EncodedBackup; readonly mode: MaskingMode }> {
+): Promise<{ readonly backup: EncodedBackup; readonly mode: MaskingMode } | Cancelled> {
   const reading = BackupReading.of(await encodedInput(arguments_), {
     seedshiftOnly,
     shareReader: SHARE_READER,
@@ -195,18 +213,18 @@ export async function backupFromOptions(
   modeKnown?.(mode);
   const given = givenInputFormat(arguments_);
   const conflict = reading.formatConflict(given);
-  if (conflict !== undefined) throw new Error(conflict);
+  if (conflict !== undefined) throw ERRORS.create("backup-from-options-refused", [conflict]);
   const fitting = reading.formats(given);
   let format = defined(fitting[0]);
   // A record or --format names the form; only a detected one is announced.
   if (!reading.hasRecord && given === undefined) {
     if (fitting.length > 1 && !terminalAvailable())
-      throw new Error(
-        `The input matches several formats (${fitting.join(", ")}). Choose the recorded format explicitly.`,
-      );
+      throw ERRORS.create("input-matches-several-formats-choose-recorded-format-explicitly", [
+        `${fitting.join(", ")}`,
+      ]);
     const chosen = await detectedFormat(fitting, "cancels");
     // Escape is the person leaving, as the hint says, not an error of MnemoCode.
-    if (chosen === undefined) throw new InputCancelledError();
+    if (chosen === undefined || chosen === CANCELLED) return CANCELLED;
     format = chosen;
   }
   return { backup: reading.codes(format).withMode(mode), mode };
@@ -219,10 +237,10 @@ export function encodeFormat(value_: string | undefined): EncodedFormat {
 export function transformMode(arguments_: ParsedArguments, embedded?: MaskingMode): MaskingMode {
   const explicit = value(arguments_, "mode");
   if (explicit !== undefined && !Masking.isMode(explicit)) {
-    throw new Error(`The transformation mode must be ${listInWords(MASKING_MODES, "or")}.`);
+    throw ERRORS.create("transformation-mode", [`${listInWords(MASKING_MODES, "or")}`]);
   }
   const conflict = modeConflictOf(embedded, explicit as MaskingMode | undefined);
-  if (conflict !== undefined) throw new Error(conflict);
+  if (conflict !== undefined) throw ERRORS.create("transform-mode-refused", [conflict]);
   if (explicit !== undefined) return explicit as MaskingMode;
   if (embedded !== undefined) return embedded;
   return values(arguments_, "date").length > 0 ? "seedshift" : "direct";
@@ -285,15 +303,16 @@ function typedDates(line: string, wordCount: number | undefined): DateShiftDate[
  * private screen with --ask-secrets, or read from the options. The dates are counted for the mode
  * before the phrase is read: the library's rule (Masking.assertDateCount), refused early in the
  * command's `words`. A `known` phrase, which Re-encode decoded and confirmed, is neither asked nor
- * read: only its dates are.
+ * read: only its dates are. CANCELLED when the person cancels a question.
  */
 export async function phraseAndDates(
   args: ParsedArguments,
   mode: MaskingMode,
   words: DateCountWords = DATE_COUNT_WORDS.codes,
   known?: string,
-): Promise<{ readonly mnemonic: string; readonly dates: readonly DateShiftDate[] }> {
+): Promise<{ readonly mnemonic: string; readonly dates: readonly DateShiftDate[] } | Cancelled> {
   const prompted = await promptedEncodeInputs(args, mode, known);
+  if (prompted === CANCELLED) return CANCELLED;
   const dateValues = prompted?.dates ?? dates(args);
   Masking.of(mode).assertDateCount(dateValues.length, false, words);
   return {
@@ -305,13 +324,13 @@ export async function phraseAndDates(
 /**
  * The seed phrase and the dates of Encode with --ask-secrets, each asked again until it can be
  * used (askSecretUntil): the phrase first, checked at once, unless it is `known`, then the dates
- * alone, which a second try asks without the phrase.
+ * alone, which a second try asks without the phrase. CANCELLED when the person cancels.
  */
 export async function promptedEncodeInputs(
   arguments_: ParsedArguments,
   mode: MaskingMode,
   known?: string,
-): Promise<{ readonly mnemonic: string; readonly dates: DateShiftDate[] } | undefined> {
+): Promise<{ readonly mnemonic: string; readonly dates: DateShiftDate[] } | undefined | Cancelled> {
   if (arguments_["ask-secrets"] !== true) return undefined;
   assertAskedNotGiven(arguments_, [...PHRASE_SECRET_OPTIONS, DATES_OPTION]);
   const mnemonic =
@@ -320,6 +339,7 @@ export async function promptedEncodeInputs(
       what: "the words of the seed phrase",
       hints: WordList.BIP39,
     }));
+  if (mnemonic === CANCELLED) return CANCELLED;
   if (!Masking.of(mode).masked) return { mnemonic, dates: [] };
   const wordCount = englishTokens(mnemonic).length;
   const dates = await askSecretUntil(
@@ -329,5 +349,6 @@ export async function promptedEncodeInputs(
       what: "the dates",
     },
   );
+  if (dates === CANCELLED) return CANCELLED;
   return { mnemonic, dates };
 }

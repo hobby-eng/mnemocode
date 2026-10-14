@@ -22,6 +22,11 @@ import {
   type StudyLayout,
   type StudyTheme,
 } from "./collection-layout.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.collection-sheet", {
+  "missing-design-study-qr-area": () => "Missing design study QR area.",
+});
 
 type Color = ReturnType<typeof rgb>;
 
@@ -267,7 +272,7 @@ function drawSheetQr(
   code: QrModules,
   palette: SheetPalette,
 ): void {
-  if (!layout.qr) throw new Error("Missing design study QR area.");
+  if (!layout.qr) throw ERRORS.create("missing-design-study-qr-area", []);
   const { x, y, size } = layout.qr;
   page.drawRectangle({
     ...pdfRect(page, {

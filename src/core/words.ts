@@ -28,6 +28,30 @@ import { bitsOf, bitsOfIndexes, bitsToBytes, lastWordChecksumBits } from "./bits
 import type { MappingRow, MissingWordCandidate } from "./types.js";
 import { inWholeRange, wholeNumberOf } from "./typed-number.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.words", {
+  "words-fail-bip39-checksum-check-each-word-their": () =>
+    "These words fail the BIP39 checksum: check each word and their order.",
+  "enter-english-bip39-words": (value0: string) => `Enter ${value0} English BIP39 words.`,
+  "unknown-english-bip39-word-at-position": (value0: string) =>
+    `Unknown English BIP39 word at position ${value0}.`,
+  "word-numbers-run-together": () => WORD_NUMBERS_RUN_TOGETHER,
+  "indexes-decimal-integers-from": (value0: string) =>
+    `Indexes must be decimal integers from ${value0}.`,
+  "indexes-use-seedshift-compatible-numbering-from": (value0: string) =>
+    `Indexes use Seedshift-compatible numbering from ${value0}.`,
+  "unicode-codes-four-hexadecimal-digits-each-separated-by": () =>
+    "Unicode codes have four hexadecimal digits each, separated by spaces or joined.",
+  "unicode-code-not-bip39-word": (value0: string) => `Unicode code ${value0} is not a BIP39 word.`,
+  "selected-mapped-bip39-character-not-one-unicode-scalar": () =>
+    "The selected mapped BIP39 character is not one Unicode scalar value.",
+  "wordlist-index-from": (value0: string) => `A wordlist index must be from ${value0}.`,
+  "word-table-row-refused": suppliedMessage,
+  "mode-exact-old-final-word-stands-no-word": () =>
+    "This mode needs the exact old final word: ? stands for no word here.",
+});
+
 export { englishWordlist, traditionalChineseWordlist };
 // The English words alone belong to english-words.ts; here too for the modules that take both.
 export {
@@ -51,7 +75,7 @@ export function validatedEnglishWords(mnemonic: string): string[] {
   const words = canonicalEnglishWords(mnemonic);
   assertWordCount(words.length);
   if (!phraseChecksumValid(words.join(" "))) {
-    throw new Error("These words fail the BIP39 checksum: check each word and their order.");
+    throw ERRORS.create("words-fail-bip39-checksum-check-each-word-their", []);
   }
   return words;
 }
@@ -83,11 +107,11 @@ export function unicodeCodesOfIndexes(indexes: readonly number[]): string[] {
 export function canonicalEnglishWords(mnemonic: string): string[] {
   const words = englishTokens(mnemonic);
   if (!isBip39WordCount(words.length)) {
-    throw new Error(`Enter ${WORD_COUNTS_TEXT} English BIP39 words.`);
+    throw ERRORS.create("enter-english-bip39-words", [`${WORD_COUNTS_TEXT}`]);
   }
   for (const [position, word] of words.entries()) {
     if (!ENGLISH_INDEX.has(word)) {
-      throw new Error(`Unknown English BIP39 word at position ${position + 1}.`);
+      throw ERRORS.create("unknown-english-bip39-word-at-position", [`${position + 1}`]);
     }
   }
   return words;
@@ -128,12 +152,14 @@ export function runTogetherNumbers(token: string): boolean {
 
 /** wordIndexOf for a word number of a phrase; throws why it is none, its digits or its range. */
 export function wordIndexOfNumber(token: string): number {
-  if (runTogetherNumbers(token)) throw new Error(WORD_NUMBERS_RUN_TOGETHER);
+  if (runTogetherNumbers(token)) throw ERRORS.create("word-numbers-run-together", []);
   if (!WORD_NUMBER.test(token))
-    throw new Error(`Indexes must be decimal integers from ${WORD_NUMBERS_THROUGH}.`);
+    throw ERRORS.create("indexes-decimal-integers-from", [`${WORD_NUMBERS_THROUGH}`]);
   const index = wordIndexOf(token);
   if (index === undefined)
-    throw new Error(`Indexes use Seedshift-compatible numbering from ${WORD_NUMBERS_THROUGH}.`);
+    throw ERRORS.create("indexes-use-seedshift-compatible-numbering-from", [
+      `${WORD_NUMBERS_THROUGH}`,
+    ]);
   return index;
 }
 
@@ -144,12 +170,10 @@ export function wordIndexOfNumber(token: string): number {
 export function unicodeIndexesOf(text: string): number[] {
   const codes = completeHexUnits(text, UNICODE_CODE_DIGITS);
   if (codes === undefined)
-    throw new Error(
-      "Unicode codes have four hexadecimal digits each, separated by spaces or joined.",
-    );
+    throw ERRORS.create("unicode-codes-four-hexadecimal-digits-each-separated-by", []);
   return codes.map((code, place) => {
     const index = UNICODE_INDEX.get(code);
-    if (index === undefined) throw new Error(`Unicode code ${place + 1} is not a BIP39 word.`);
+    if (index === undefined) throw ERRORS.create("unicode-code-not-bip39-word", [`${place + 1}`]);
     return index;
   });
 }
@@ -164,14 +188,14 @@ export { assertWordCount };
 export function unicodeHex(symbol: string): string {
   const points = Array.from(symbol);
   if (points.length !== 1)
-    throw new Error("The selected mapped BIP39 character is not one Unicode scalar value.");
+    throw ERRORS.create("selected-mapped-bip39-character-not-one-unicode-scalar", []);
   return hexCodePoint(defined(defined(points[0]).codePointAt(0)));
 }
 
 /** The row of the word table for word number `index`, from 1 through 2,048. */
 export function mappingRow(index: number): MappingRow {
   if (!inWholeRange(index, WORD_NUMBER_RANGE))
-    throw new Error(`A wordlist index must be from ${WORD_NUMBERS_THROUGH}.`);
+    throw ERRORS.create("wordlist-index-from", [`${WORD_NUMBERS_THROUGH}`]);
   const zeroBased = index - 1;
   return {
     index,
@@ -220,7 +244,7 @@ const WORD_TABLE_LOOKUPS: Readonly<
 export function wordTableRow(lookup: WordTableLookup, text: string): MappingRow {
   const { find, refusal } = WORD_TABLE_LOOKUPS[lookup];
   const index = find(text.trim());
-  if (index === undefined) throw new Error(refusal);
+  if (index === undefined) throw ERRORS.create("word-table-row-refused", [refusal]);
   return mappingRow(index + 1);
 }
 
@@ -284,7 +308,7 @@ export function validLastWordIndexes(prefix: readonly number[]): number[] {
 export function recoverLegacyValidLastWords(value: string): MissingWordCandidate[] {
   // A ? typed out of habit would otherwise be refused as a word that is no BIP39 word.
   if (englishTokens(value).includes("?"))
-    throw new Error("This mode needs the exact old final word: ? stands for no word here.");
+    throw ERRORS.create("mode-exact-old-final-word-stands-no-word", []);
   const words = canonicalEnglishWords(value);
   const finalPosition = words.length - 1;
   const checksumLength = checksumBits(words.length);

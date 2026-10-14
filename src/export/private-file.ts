@@ -1,5 +1,11 @@
 import { chmod, link, lstat, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.private-file", {
+  "new-folder-path-empty-one-refused": () => "A new folder needs a path; an empty one is refused.",
+  "absent-path-refused": suppliedMessage,
+});
 
 /** Owner-only access to a file of a backup: read and write for its owner, nothing for others. */
 const PRIVATE_FILE_MODE = 0o600;
@@ -118,9 +124,9 @@ export async function entryAt(path: string): Promise<"none" | "folder" | "other"
  * folder of an export is checked so, before the secrets are read and again when it is published.
  */
 export async function absentPath(path: string, taken: string): Promise<string> {
-  if (path.trim() === "") throw new Error("A new folder needs a path; an empty one is refused.");
+  if (path.trim() === "") throw ERRORS.create("new-folder-path-empty-one-refused", []);
   const target = resolve(path);
-  if ((await entryAt(target)) !== "none") throw new Error(taken);
+  if ((await entryAt(target)) !== "none") throw ERRORS.create("absent-path-refused", [taken]);
   return target;
 }
 

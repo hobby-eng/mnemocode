@@ -2,8 +2,8 @@
 // (private-screen.ts). Nowhere may a command end abruptly and lose what the person typed: a wrong
 // or unusable answer is explained in one warning line, which never repeats what was typed (a
 // position such as "date 2" or "place 11" is fine), and the same question is asked again, while the
-// caller keeps every earlier answer. Only the person leaves: Ctrl+C (InputCancelledError, exit code
-// CANCELLED_EXIT_CODE), or the last choice of askAfterFailure. Inside a secret question Escape does
+// caller keeps every earlier answer. Only the person leaves: Ctrl+C (CANCELLED, returned up to the
+// command, which ends with CANCELLED_EXIT_CODE), or the last choice of askAfterFailure. Inside a secret question Escape does
 // nothing, so that a slip of the finger loses nothing. Every question first drops what was typed
 // before it showed (dropTypedAhead), so that only keys pressed for it answer it.
 //
@@ -69,13 +69,24 @@ import {
   dumbTerminalReason,
   SECRET_SOURCE_ADVICE,
 } from "./terminal-input.js";
-import { InputCancelledError, UnusableAnswerError, type NextByte } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled, UnusableAnswerError, type NextByte } from "./terminal-keys.js";
 import { displayWidth } from "./terminal-geometry.js";
 import { trimWhiteSpace } from "../core/white-space.js";
 import { isFirstReceiving } from "../core/wallet-evidence.js";
 import { validCharacters } from "./utf8.js";
 import type { WordHints } from "../core/word-hints.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.ask", {
+  "run-command-another-terminal-set-term-such-as": (value0: string, value1: string) =>
+    `${value0} Run the command in another terminal, set TERM (such as TERM=xterm-256color), or ${value1}.`,
+  "ask-secrets-terminal-on-standard-input-standard-error": (value0: string) =>
+    `--ask-secrets needs a terminal on standard input and standard error. Run the command in a terminal, or ${value0}.`,
+  "question-after-failure-choice": () => "A question after a failure needs a choice.",
+  "answer-question-stop-value": (value0: string) =>
+    `An answer of a question with Stop has the value "${value0}".`,
+});
 
 /** How a question is asked again. */
 export interface AskOptions {
@@ -116,19 +127,22 @@ type Reading =
   /** An answer longer than any valid one, or not UTF-8: the reason, without the answer. */
   | { readonly kind: "unusable"; readonly reason: string }
   /** The input ended (standard input closed): nothing more can be asked. */
-  | { readonly kind: "ended" };
+  | { readonly kind: "ended" }
+  /** Ctrl+C: the command is cancelled. */
+  | { readonly kind: "cancelled" };
 
 /** Refuses a question without a terminal, before the terminal is touched. */
 function assertTerminal(): void {
   if (terminalAvailable()) return;
   // A terminal of the type "dumb", as in some editors, cannot draw the private screen.
   if (terminalTooDumb())
-    throw new Error(
-      `${dumbTerminalReason("--ask-secrets")} Run the command in another terminal, set TERM (such as TERM=xterm-256color), or ${SECRET_SOURCE_ADVICE}.`,
-    );
-  throw new Error(
-    `--ask-secrets needs a terminal on standard input and standard error. Run the command in a terminal, or ${SECRET_SOURCE_ADVICE}.`,
-  );
+    throw ERRORS.create("run-command-another-terminal-set-term-such-as", [
+      `${dumbTerminalReason("--ask-secrets")}`,
+      `${SECRET_SOURCE_ADVICE}`,
+    ]);
+  throw ERRORS.create("ask-secrets-terminal-on-standard-input-standard-error", [
+    `${SECRET_SOURCE_ADVICE}`,
+  ]);
 }
 
 /**
@@ -145,7 +159,7 @@ async function readAnswer(
   },
 ): Promise<Reading> {
   return withRawTerminal(async (next, moreWithin) => {
-    await dropTypedAhead();
+    if ((await dropTypedAhead()) === CANCELLED) return { kind: "cancelled" };
     // The end of the input is told from Ctrl+D by the reader: readLine returns nothing for both.
     let ended = false;
     let wentBack = false;
@@ -169,6 +183,7 @@ async function readAnswer(
         ...(how.pastedLineBreak === undefined ? {} : { pastedLineBreak: how.pastedLineBreak }),
         ...(how.hints === undefined ? {} : { hints: how.hints }),
       });
+      if (text === CANCELLED) return { kind: "cancelled" };
       // An answer given with Enter that held a byte of no character is refused; Escape still goes
       // back.
       if (text !== undefined && valid.leftOut()) return { kind: "unusable", reason: NOT_UTF8 };
@@ -179,7 +194,7 @@ async function readAnswer(
     } catch (error) {
       if (!(error instanceof UnusableAnswerError)) throw error;
       // The rest of a paste would otherwise answer the question when it is asked again.
-      await dropRestOfPaste(next, moreWithin);
+      if ((await dropRestOfPaste(next, moreWithin)) === CANCELLED) return { kind: "cancelled" };
       return { kind: "unusable", reason: error.message };
     } finally {
       // The terminal did not show the Enter key either.
@@ -190,13 +205,14 @@ async function readAnswer(
 
 /**
  * Asks for a secret until `parse` accepts the answer, as described at the top, and returns what
- * `parse` made of it. The answer is trimmed. On the private screen it shows as it is typed.
+ * `parse` made of it, or CANCELLED at Ctrl+C or the end of the input. The answer is trimmed. On
+ * the private screen it shows as it is typed.
  */
 export async function askSecretUntil<T>(
   prompt: string,
   parse: AnswerParser<T>,
   options: SecretAskOptions = {},
-): Promise<T> {
+): Promise<T | Cancelled> {
   const answer = await askUntil(parse, async () => {
     const reading = await readAnswer(prompt, {
       echo: onPrivateScreen(),
@@ -207,11 +223,14 @@ export async function askSecretUntil<T>(
     return turnOfReading(reading, { ...options, leave: "stop" });
   });
   // A secret is never left with Escape: Ctrl+C stops instead.
-  return answer as T;
+  return answer as T | Cancelled;
 }
 
-/** One answer to a question that asks until it can be used: its text, back, or a warning. */
-type Turn = { readonly text: string } | { readonly warning: string } | "back";
+/**
+ * One answer to a question that asks until it can be used: its text, back, a warning, or the
+ * person's cancel.
+ */
+type Turn = { readonly text: string } | { readonly warning: string } | "back" | Cancelled;
 
 /** How a typed question treats an answer not given, and how it is left (enteredAnswer). */
 type TurnRules = Parameters<typeof enteredAnswer>[1];
@@ -231,7 +250,8 @@ function turnOf(typed: string, rules: TurnRules): Turn {
  * says so. Where it does not, as in a secret, an answer not given is empty.
  */
 function turnOfReading(reading: Reading, rules: TurnRules): Turn {
-  if (reading.kind === "ended") throw new InputCancelledError();
+  // Nothing can answer once the input has ended: the command is cancelled.
+  if (reading.kind === "ended" || reading.kind === "cancelled") return CANCELLED;
   if (reading.kind === "unusable") return { warning: reading.reason };
   if (reading.kind === "back" && rules.leave === "back") return "back";
   return turnOf(reading.kind === "answer" ? reading.text : "", rules);
@@ -239,18 +259,19 @@ function turnOfReading(reading: Reading, rules: TurnRules): Turn {
 
 /**
  * Asks, by `turn`, until `parse` accepts an answer, each warning shown before the question comes
- * again: why the answer was refused, or why it was empty. Undefined when the person went back.
- * The questions for a secret and for a visible value ask through it.
+ * again: why the answer was refused, or why it was empty. Undefined when the person went back,
+ * CANCELLED when they cancelled. The questions for a secret and for a visible value ask through it.
  */
 async function askUntil<T>(
   parse: AnswerParser<T>,
   turn: () => Promise<Turn>,
-): Promise<T | undefined> {
+): Promise<T | undefined | Cancelled> {
   assertTerminal();
   for (let warning: string | undefined; ;) {
     if (warning !== undefined) terminalNotice(warning, "warning");
     const answer = await turn();
     if (answer === "back") return undefined;
+    if (answer === CANCELLED) return CANCELLED;
     if ("warning" in answer) warning = answer.warning;
     else
       try {
@@ -263,14 +284,14 @@ async function askUntil<T>(
 
 /**
  * Asks for a visible value that is no secret, such as a fingerprint or a file name, until `parse`
- * accepts it; undefined when the person goes back with Escape. Enter alone answers the
- * `fallback` where there is one, which the prompt names.
+ * accepts it; undefined when the person goes back with Escape, CANCELLED at Ctrl+C. Enter alone
+ * answers the `fallback` where there is one, which the prompt names.
  */
 export async function askValueUntil<T>(
   prompt: string,
   parse: AnswerParser<T>,
   options: ValueAskOptions = {},
-): Promise<T | undefined> {
+): Promise<T | undefined | Cancelled> {
   return askUntil(parse, async () => {
     const reading = await readAnswer(prompt, { echo: true, back: true });
     return turnOfReading(reading, { ...options, leave: "back" });
@@ -281,16 +302,16 @@ export async function askValueUntil<T>(
  * Asks what to do after a failure that no answer caused and that no new answer to the same
  * question mends: no result, a wallet that matched nothing, a file that could not be saved. The
  * choices are listed with the arrow keys and digits (choose); Escape, q and the end of the input
- * pick the last one, which must therefore stop or change nothing ("Stop", "Done", "Skip").
- * `escape` says what Escape does in the key hint ("stops" by default).
+ * pick the last one, which must therefore stop or change nothing ("Stop", "Done", "Skip"). Ctrl+C
+ * gives CANCELLED. `escape` says what Escape does in the key hint ("stops" by default).
  */
 export async function askAfterFailure<T>(
   question: string,
   choices: readonly Choice<T>[],
   options: AfterFailureOptions & { readonly escape?: string } = {},
-): Promise<T> {
+): Promise<T | Cancelled> {
   const last = choices.at(-1);
-  if (last === undefined) throw new Error("A question after a failure needs a choice.");
+  if (last === undefined) throw ERRORS.create("question-after-failure-choice", []);
   assertTerminal();
   const chosen = await choose(question, choices, {
     label: options.label ?? "Next",
@@ -316,26 +337,26 @@ const STOPPED = "stop";
 
 /**
  * Asks what to do after a failure (askAfterFailure), with a Stop of its own as the last choice,
- * which cancels the command (InputCancelledError): so Escape, q and the end of the input stop. With
- * `back`, for a question reached from another, Escape goes back instead and gives undefined.
+ * which cancels the command (CANCELLED): so Escape, q and the end of the input stop. With `back`,
+ * for a question reached from another, Escape goes back instead and gives undefined.
  */
 export async function askOrCancel<T>(
   question: string,
   choices: readonly Choice<T>[],
   options?: AfterFailureOptions & { readonly back?: false },
-): Promise<T>;
+): Promise<T | Cancelled>;
 export async function askOrCancel<T>(
   question: string,
   choices: readonly Choice<T>[],
   options: { readonly label?: string; readonly back: boolean },
-): Promise<T | undefined>;
+): Promise<T | undefined | Cancelled>;
 export async function askOrCancel<T>(
   question: string,
   choices: readonly Choice<T>[],
   options: AfterFailureOptions & { readonly back?: boolean } = {},
-): Promise<T | undefined> {
+): Promise<T | undefined | Cancelled> {
   if (choices.some((choice) => choice.value === STOPPED))
-    throw new Error(`An answer of a question with Stop has the value "${STOPPED}".`);
+    throw ERRORS.create("answer-question-stop-value", [`${STOPPED}`]);
   const all: Choice<T | typeof STOPPED>[] = [...choices, { label: "Stop", value: STOPPED }];
   const chosen =
     options.back === true
@@ -344,8 +365,8 @@ export async function askOrCancel<T>(
           ...(options.label === undefined ? {} : { label: options.label }),
           ...(options.explanation === undefined ? {} : { explanation: options.explanation }),
         });
-  if (chosen === STOPPED) throw new InputCancelledError();
-  return chosen as T | undefined;
+  if (chosen === STOPPED) return CANCELLED;
+  return chosen as T | undefined | Cancelled;
 }
 
 /**
@@ -357,7 +378,7 @@ async function chooseOrBack<T>(
   question: string,
   choices: readonly Choice<T>[],
   label = "Next",
-): Promise<T | undefined> {
+): Promise<T | undefined | Cancelled> {
   assertTerminal();
   return choose(question, choices, { label, quit: "goes back" });
 }
@@ -523,12 +544,13 @@ class WalletQuestionWords {
 
 /**
  * Asks among how many addresses from `place` the address typed is, Enter for the count that fits
- * from there (defaultAddressCount); undefined when the person goes back with Escape.
+ * from there (defaultAddressCount); undefined when the person goes back with Escape, CANCELLED at
+ * Ctrl+C.
  */
 async function askAddressCount(
   place: WalletPlace,
   asker: WalletValueAsker,
-): Promise<number | undefined> {
+): Promise<number | undefined | Cancelled> {
   const asked = new WalletQuestionWords(place).addressCount;
   const first = place.location.index;
   // Enter takes the count that fits from this index on, one at the last index (AUD-012-UI001).
@@ -540,15 +562,16 @@ async function askAddressCount(
 
 /**
  * `evidence`, an address of a wallet, compared with as many addresses as `place` says, or as the
- * person says after it; undefined when they go back from that question.
+ * person says after it; undefined when they go back from that question, CANCELLED at Ctrl+C.
  */
 async function withAddressCount(
   evidence: WalletEvidence | undefined,
   place: WalletPlace,
   asker: WalletValueAsker,
-): Promise<WalletEvidence | undefined> {
+): Promise<WalletEvidence | undefined | Cancelled> {
   if (evidence === undefined || !isScannedEvidence(evidence)) return evidence;
   const addresses = place.addresses ?? (await askAddressCount(place, asker));
+  if (addresses === CANCELLED) return CANCELLED;
   return addresses === undefined ? undefined : { ...evidence, addresses };
 }
 
@@ -565,8 +588,8 @@ export interface WalletValue extends AskedValue {
  * menu, which records each answer and builds the command line from them.
  */
 export interface WalletValueAsker {
-  /** Asks `value` until `parse` takes it; undefined when the person goes back. */
-  ask<T>(value: WalletValue, parse: (answer: string) => T): Promise<T | undefined>;
+  /** Asks `value` until `parse` takes it; undefined when the person goes back, CANCELLED at Ctrl+C. */
+  ask<T>(value: WalletValue, parse: (answer: string) => T): Promise<T | undefined | Cancelled>;
   /** Whether going back from a value leaves the question, as in the menu, not back to its list. */
   readonly backLeaves: boolean;
 }
@@ -589,13 +612,13 @@ const SCREEN_ASKER: WalletValueAsker = {
  * receiving addresses (or the address at `place`) of any coin, which is asked next, or, when
  * `optional`, not at all. A
  * value that no wallet can have is refused at once and asked again; going back from a value goes
- * back to the list, or leaves the question where `asker` says so. The private screen and the menu
- * both ask it, each with its own asker.
+ * back to the list, or leaves the question where `asker` says so. CANCELLED at Ctrl+C. The private
+ * screen and the menu both ask it, each with its own asker.
  */
 export async function askWalletEvidence(
   question: WalletQuestion,
   asker: WalletValueAsker = SCREEN_ASKER,
-): Promise<WalletAnswer> {
+): Promise<WalletAnswer | Cancelled> {
   const place = question.place ?? FIRST_RECEIVING;
   const { location } = place;
   const words = new WalletQuestionWords(place);
@@ -604,6 +627,7 @@ export async function askWalletEvidence(
       label: "Wallet",
       ...(question.explanation === undefined ? {} : { explanation: question.explanation }),
     });
+    if (kind === CANCELLED) return CANCELLED;
     if (kind === undefined) return { kind: "back" };
     if (kind === "none") return { kind: "none" };
     const typed =
@@ -617,7 +641,9 @@ export async function askWalletEvidence(
             }),
           )
         : await askAddress(place, words, asker);
+    if (typed === CANCELLED) return CANCELLED;
     const evidence = await withAddressCount(typed, place, asker);
+    if (evidence === CANCELLED) return CANCELLED;
     if (evidence !== undefined) return { kind: "wallet", evidence };
     if (asker.backLeaves) return { kind: "back" };
   }
@@ -634,18 +660,18 @@ const COINS_NOTE = `${COINS.slice(0, NAMED_COINS)
  * Asks which coin the address is for, every coin in one list, then its address at the place:
  * Bitcoin's in the profiles of the place, another coin's at its account, branch and index; each
  * asked until it is one of that coin. Undefined when the person goes back (Escape), to the wallet
- * question.
+ * question; CANCELLED at Ctrl+C.
  */
 async function askAddress(
   place: WalletPlace,
   words: WalletQuestionWords,
   asker: WalletValueAsker,
-): Promise<WalletEvidence | undefined> {
+): Promise<WalletEvidence | undefined | Cancelled> {
   const coin = await choose(WalletQuestionWords.COIN_QUESTION, words.coins(), {
     label: "Coin",
     quit: "goes back",
   });
-  if (coin === undefined) return undefined;
+  if (coin === undefined || coin === CANCELLED) return coin;
   const { location, profiles } = place;
   if (coin.id === "bitcoin")
     return asker.ask({ ...words.bitcoinAddress, label: "Address" }, (answer): WalletEvidence => ({

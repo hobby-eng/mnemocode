@@ -3,6 +3,28 @@ import { optionLabel, optionSubject, optionValue } from "./option-copy.js";
 import { listInWords } from "../core/places.js";
 import { SHARE_SOURCE_OPTIONS } from "./share-options.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.arguments", {
+  "command-does-not-accept-unnamed-value-use-appropriate": () =>
+    "This command does not accept an unnamed value. Use the appropriate named option.",
+  "at-least-one-value": (value0: string) => `${value0} needs at least one value.`,
+  "requires-value": (value0: string) => `${value0} requires a value.`,
+  "ask-secrets-cannot-combined": (value0: string) =>
+    `--ask-secrets cannot be combined with ${value0}.`,
+  refused: (value0: string, value1: string) => `--${value0} must be ${value1}.`,
+  required: (value0: string) => `${value0} is required.`,
+  "base-10-integer-from": (value0: string, value1: string) =>
+    `${value0} must be a base-10 integer from ${value1}.`,
+  "provide-only-one-value-setting": (value0: string) =>
+    `Provide only one value for the ${value0} setting.`,
+  "provide-exactly-one-value-setting": (value0: string) =>
+    `Provide exactly one value for the ${value0} setting.`,
+  "command-does-not-support-setting": (value0: string, value1: string) =>
+    `The ${value0} command does not support the ${value1} setting.`,
+  "on-off-choice-does-not-accept-separate-value": (value0: string) =>
+    `${value0} is an on-or-off choice and does not accept a separate value.`,
+});
 
 export type ParsedArguments = Record<string, string | boolean | string[]>;
 
@@ -27,9 +49,7 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
   for (let index = 0; index < items.length; index += 1) {
     const item = defined(items[index]);
     if (!item.startsWith("--"))
-      throw new Error(
-        "This command does not accept an unnamed value. Use the appropriate named option.",
-      );
+      throw ERRORS.create("command-does-not-accept-unnamed-value-use-appropriate", []);
     const key = item.slice(2);
     // Own names only: a typed "--constructor" must not find a name that every object inherits.
     const listKey = Object.hasOwn(LIST_OPTIONS, key) ? LIST_OPTIONS[key] : undefined;
@@ -40,7 +60,7 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
         index += 1;
       }
       if (dateValues.length === 0)
-        throw new Error(`${optionSubject(key)} needs at least one value.`);
+        throw ERRORS.create("at-least-one-value", [`${optionSubject(key)}`]);
       const existing = parsed[listKey];
       parsed[listKey] =
         existing === undefined
@@ -50,7 +70,8 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
     }
     const next = items[index + 1];
     if (next === undefined || next.startsWith("--")) {
-      if (!booleanOptions.has(key)) throw new Error(`${optionSubject(key)} requires a value.`);
+      if (!booleanOptions.has(key))
+        throw ERRORS.create("requires-value", [`${optionSubject(key)}`]);
       parsed[key] = true;
       continue;
     }
@@ -90,9 +111,7 @@ export function assertAskedNotGiven(arguments_: ParsedArguments, options: readon
   if (arguments_["ask-secrets"] !== true) return;
   const given = options.filter((key) => arguments_[key] !== undefined);
   if (given.length > 0)
-    throw new Error(
-      `--ask-secrets cannot be combined with ${listInWords(given.map(flagOf), "or")}.`,
-    );
+    throw ERRORS.create("ask-secrets-cannot-combined", [`${listInWords(given.map(flagOf), "or")}`]);
 }
 
 export function value(arguments_: ParsedArguments, key: string): string | undefined {
@@ -112,7 +131,7 @@ export function choiceOption<Choice extends string>(
   const given = value(arguments_, key);
   if (given === undefined) return undefined;
   if (!(choices as readonly string[]).includes(given))
-    throw new Error(`--${key} must be ${listInWords(choices, "or")}.`);
+    throw ERRORS.create("refused", [`${key}`, `${listInWords(choices, "or")}`]);
   return given as Choice;
 }
 
@@ -142,11 +161,11 @@ export function integerOption(
   const named = bounds.label === undefined ? optionValue(key) : `The ${bounds.label} value`;
   if (raw === undefined) {
     if (bounds.defaultValue !== undefined) return bounds.defaultValue;
-    throw new Error(`${named} is required.`);
+    throw ERRORS.create("required", [`${named}`]);
   }
   const parsed = wholeNumberOf(raw, CANONICAL_INTEGER, bounds);
   if (parsed === undefined)
-    throw new Error(`${named} must be a base-10 integer from ${rangeText(bounds)}.`);
+    throw ERRORS.create("base-10-integer-from", [`${named}`, `${rangeText(bounds)}`]);
   return parsed;
 }
 
@@ -163,7 +182,7 @@ export function assertSingleValues(
 ): void {
   for (const [key, entry] of Object.entries(arguments_)) {
     if (Array.isArray(entry) && !repeatable.includes(key))
-      throw new Error(`Provide only one value for the ${optionLabel(key)} setting.`);
+      throw ERRORS.create("provide-only-one-value-setting", [`${optionLabel(key)}`]);
   }
 }
 
@@ -171,7 +190,7 @@ export function assertSingleValues(
 export function assertTextValues(arguments_: ParsedArguments, names: readonly string[]): void {
   for (const name of names) {
     if (arguments_[name] !== undefined && typeof arguments_[name] !== "string")
-      throw new Error(`Provide exactly one value for the ${optionLabel(name)} setting.`);
+      throw ERRORS.create("provide-exactly-one-value-setting", [`${optionLabel(name)}`]);
   }
 }
 
@@ -184,14 +203,13 @@ export function assertAllowedArguments(
   const allowedSet = new Set(allowed);
   const unknown = Object.keys(arguments_).filter((key) => !allowedSet.has(key));
   if (unknown.length > 0)
-    throw new Error(
-      `The ${command} command does not support the ${optionLabel(defined(unknown[0]))} setting.`,
-    );
+    throw ERRORS.create("command-does-not-support-setting", [
+      `${command}`,
+      `${optionLabel(defined(unknown[0]))}`,
+    ]);
 }
 
 export function assertFlag(arguments_: ParsedArguments, key: string): void {
   if (arguments_[key] !== undefined && arguments_[key] !== true)
-    throw new Error(
-      `${optionSubject(key)} is an on-or-off choice and does not accept a separate value.`,
-    );
+    throw ERRORS.create("on-off-choice-does-not-accept-separate-value", [`${optionSubject(key)}`]);
 }

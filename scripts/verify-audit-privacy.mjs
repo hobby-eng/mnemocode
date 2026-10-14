@@ -8,6 +8,14 @@ import { homedir, userInfo } from "node:os";
 import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
 import { publishedAuditFiles } from "./audit-files.mjs";
+import { ErrorCatalog } from "../src/core/error-catalog.ts";
+
+const ERRORS = new ErrorCatalog("scripts.verify-audit-privacy", {
+  /**
+   * @param {string} value0
+   */
+  "audit-privacy": (value0) => `Audit privacy:\n${value0}`,
+});
 
 /** A date with a time of day, then an offset or a zone name if any is written after it. */
 const DATE_TIME =
@@ -65,7 +73,7 @@ async function main() {
   const problems = [];
   for (const path of files)
     problems.push(...auditTextProblems(await readFile(path, "utf8"), path, owners));
-  if (problems.length > 0) throw new Error(`Audit privacy:\n${problems.join("\n")}`);
+  if (problems.length > 0) throw ERRORS.create("audit-privacy", [`${problems.join("\n")}`]);
   console.log(`Audit privacy: ${files.length} published files; no owner name, times in UTC.`);
 }
 

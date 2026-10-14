@@ -32,6 +32,20 @@ import {
   type SystemSandbox,
 } from "./system-sandbox.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.protection", {
+  "executable-was-built-without-protection-settings": () =>
+    "This executable was built without its protection settings.",
+  "mnemo-code-could-not-find-own-program-file": () =>
+    "MnemoCode could not find its own program file.",
+  "mnemo-code-runs-without-protection-settings-asks-no": () =>
+    "MnemoCode runs without its protection settings; it asks for no secret so.",
+  "mnemo-code-could-not-switch-off-core-dumps": (value0: string) =>
+    `MnemoCode could not switch off core dumps (${value0}); it asks for no secret without that.`,
+  "mnemo-code-could-still-call-native-code-asks": () =>
+    "MnemoCode could still call native code; it asks for no secret so.",
+});
 
 /**
  * The Node.js options that a start outside the permission model runs again with
@@ -77,9 +91,9 @@ async function exitCodeOf(child: ReturnType<typeof spawn>): Promise<number> {
  * built in, so for it this is an error.
  */
 export async function relaunchProtected(argv: readonly string[]): Promise<number> {
-  if (isSea()) throw new Error("This executable was built without its protection settings.");
+  if (isSea()) throw ERRORS.create("executable-was-built-without-protection-settings", []);
   const script = process.argv[1];
-  if (script === undefined) throw new Error("MnemoCode could not find its own program file.");
+  if (script === undefined) throw ERRORS.create("mnemo-code-could-not-find-own-program-file", []);
   const child = spawn(
     process.execPath,
     [...PROTECTION_FLAGS, ...process.execArgv, script, ...argv],
@@ -129,14 +143,14 @@ export async function hardenProcess(): Promise<void> {
  */
 export function assertProtected(): void {
   if (!underProtection())
-    throw new Error("MnemoCode runs without its protection settings; it asks for no secret so.");
+    throw ERRORS.create("mnemo-code-runs-without-protection-settings-asks-no", []);
   const dumps = sandbox.coreDumps();
   if (dumps.state === "failed")
-    throw new Error(
-      `MnemoCode could not switch off core dumps (${dumps.reason ?? "unknown reason"}); it asks for no secret without that.`,
-    );
+    throw ERRORS.create("mnemo-code-could-not-switch-off-core-dumps", [
+      `${dumps.reason ?? "unknown reason"}`,
+    ]);
   if (defined(process.permission).has("ffi"))
-    throw new Error("MnemoCode could still call native code; it asks for no secret so.");
+    throw ERRORS.create("mnemo-code-could-still-call-native-code-asks", []);
 }
 
 /**

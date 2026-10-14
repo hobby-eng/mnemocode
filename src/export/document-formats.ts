@@ -9,6 +9,13 @@
 import { listInWords } from "../core/places.js";
 import { POINTS_PER_INCH } from "./page-units.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.document-formats", {
+  "image-format-one-accepted-as-alias": (value0: string, value1: string) =>
+    `The image format must be one of: ${value0}; ${value1} is accepted as an alias.`,
+  "select-as-file-format": (value0: string) => `Select ${value0} as the file format.`,
+});
 
 /** The formats of the files of cards: the PDF first, the default, then the image formats. */
 export const DOCUMENT_FORMATS = Object.freeze(["pdf", "png", "jpg"] as const);
@@ -86,9 +93,10 @@ export function parseImageFormat(value: string | undefined): ImageFormat {
   if (value === undefined) return DEFAULT_IMAGE_FORMAT;
   if (value === JPEG_ALIAS) return "jpg";
   if (!isImageFormat(value))
-    throw new Error(
-      `The image format must be one of: ${IMAGE_FORMATS.join(", ")}; ${JPEG_ALIAS} is accepted as an alias.`,
-    );
+    throw ERRORS.create("image-format-one-accepted-as-alias", [
+      `${IMAGE_FORMATS.join(", ")}`,
+      `${JPEG_ALIAS}`,
+    ]);
   return value;
 }
 
@@ -97,7 +105,7 @@ export function parseDocumentFormat(value: string | undefined): DocumentFormat {
   if (value === undefined || value === "" || value === "pdf") return DEFAULT_DOCUMENT_FORMAT;
   if (value === JPEG_ALIAS || isImageFormat(value)) return parseImageFormat(value);
   const names = DOCUMENT_FORMATS.map((format) => DOCUMENT_FORMAT_FACTS[format].name);
-  throw new Error(`Select ${listInWords(names, "or")} as the file format.`);
+  throw ERRORS.create("select-as-file-format", [`${listInWords(names, "or")}`]);
 }
 
 // The points of an inch (page-units.ts), here too for the hosts that take it with the formats.

@@ -65,7 +65,7 @@ describe("Masking", () => {
     for (const mode of Masking.MODES)
       expect(parseRecord(serializeRecord(mode, "indexes", "1 2"))?.mode).toBe(mode);
     expect(() => serializeRecord("shifted" as never, "indexes", "1 2")).toThrow(
-      "Unsupported MnemoCode record mode: shifted.",
+      "Unsupported MnemoCode record mode.",
     );
   });
 

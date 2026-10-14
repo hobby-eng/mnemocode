@@ -45,10 +45,24 @@ import {
   transformMode,
 } from "./input.js";
 import { terminalNotice } from "./terminal.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { counting } from "../core/search-plan.js";
 import type { MaskingMode } from "../core/types.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.recover-date-command", {
+  "recovery-mode-can-produce-checksum-valid-candidates-every": () =>
+    "This recovery mode can produce checksum-valid candidates for every date. Provide a master fingerprint, address, public key, extended public key, or WIF to identify the intended wallet.",
+  "seedshift-mode-only": () => SEEDSHIFT_MODE_ONLY,
+  "provide-dates-including-at-least-one-pattern-containing": () =>
+    "Provide dates, including at least one pattern containing ? digits.",
+  "date-patterns-produce-combinations-increase-candidate-search-limit": (
+    value0: string,
+    value1: string,
+  ) =>
+    `The date patterns produce ${value0} combinations. Increase the candidate search limit to at least ${value1} to continue.`,
+});
 
 /**
  * Checksum-valid Seedshift gives a valid phrase for every date, so only the wallet can tell the
@@ -56,9 +70,7 @@ import { defined } from "../core/defined.js";
  */
 function assertEvidenceGiven(mode: MaskingMode, evidence: unknown): void {
   if (walletNeeded(mode) && evidence === undefined)
-    throw new Error(
-      "This recovery mode can produce checksum-valid candidates for every date. Provide a master fingerprint, address, public key, extended public key, or WIF to identify the intended wallet.",
-    );
+    throw ERRORS.create("recovery-mode-can-produce-checksum-valid-candidates-every", []);
 }
 
 /** The options of recover-date, read and checked before any question. */
@@ -90,7 +102,7 @@ async function settingsOf(args: ParsedArguments): Promise<Settings> {
   const target = await CandidatesFile.of(args);
   // A record may name another mode or format; askEncodedCodes and backupFromOptions settle that.
   if (value(args, "mode") !== undefined && !Masking.isMaskedMode(transformMode(args)))
-    throw new Error(SEEDSHIFT_MODE_ONLY);
+    throw ERRORS.create("seedshift-mode-only", []);
   givenInputFormat(args);
   const { evidence, place, passphrase } = givenWallet(args);
   if (args["ask-secrets"] !== true && value(args, "mode") !== undefined) {
@@ -112,7 +124,8 @@ async function settingsOf(args: ParsedArguments): Promise<Settings> {
 /** Why recover-date refuses a mode given or chosen: only a masked phrase has dates to search. */
 const SEEDSHIFT_MODE_ONLY = "Date recovery is available only when a Seedshift mode is selected.";
 
-export async function runRecoverDate(arguments_: ParsedArguments): Promise<void> {
+/** Searches the forgotten digits of the dates; CANCELLED when the person cancelled. */
+export async function runRecoverDate(arguments_: ParsedArguments): Promise<Cancelled | undefined> {
   const settings = await settingsOf(arguments_);
   if (arguments_["ask-secrets"] === true) return recoverWithQuestions(arguments_, settings);
   return recoverFromOptions(arguments_, settings);
@@ -123,15 +136,24 @@ function requireIncompleteDate(dates: DatesAnswer): void {
   dates.assertIncomplete();
 }
 
-/** Every input from the options, as before --ask-secrets existed; a problem ends the command. */
-async function recoverFromOptions(args: ParsedArguments, settings: Settings): Promise<void> {
-  const { backup, mode } = await backupFromOptions(args, true);
-  if (!Masking.isMaskedMode(mode)) throw new Error(SEEDSHIFT_MODE_ONLY);
+/**
+ * Every input from the options, as before --ask-secrets existed; a problem ends the command.
+ * CANCELLED when the person left a question of the private screen: the form of the codes, the
+ * passphrase of the list, or a search longer than allowed, which ends it too.
+ */
+async function recoverFromOptions(
+  args: ParsedArguments,
+  settings: Settings,
+): Promise<Cancelled | undefined> {
+  const read = await backupFromOptions(args, true);
+  if (read === CANCELLED) return CANCELLED;
+  const { backup, mode } = read;
+  if (!Masking.isMaskedMode(mode)) throw ERRORS.create("seedshift-mode-only", []);
   assertEvidenceGiven(mode, settings.evidence);
   const indexes = backup.indexes;
   const dateValues = values(args, "date");
   if (dateValues.length === 0)
-    throw new Error("Provide dates, including at least one pattern containing ? digits.");
+    throw ERRORS.create("provide-dates-including-at-least-one-pattern-containing", []);
   const dates = DatesAnswer.parse(dateValues.join(" "), {
     wordCount: indexes.length,
     patterns: true,
@@ -140,32 +162,32 @@ async function recoverFromOptions(args: ParsedArguments, settings: Settings): Pr
   const { combinations } = dates;
   if (settings.maxCandidates !== undefined && combinations > settings.maxCandidates) {
     const formatted = counting(combinations);
-    throw new Error(
-      `The date patterns produce ${formatted} combinations. Increase the candidate search limit to at least ${formatted} to continue.`,
-    );
+    throw ERRORS.create("date-patterns-produce-combinations-increase-candidate-search-limit", [
+      `${formatted}`,
+      `${formatted}`,
+    ]);
   }
-  await settings.target?.prepare(settings.passphrase);
+  if ((await settings.target?.prepare(settings.passphrase)) === CANCELLED) return CANCELLED;
   const result = await search(indexes, dates, mode, settings.evidence, settings);
+  if (result === CANCELLED) return CANCELLED;
   // Asked on the private screen whether to make a search longer than allowed, the person said no.
   if (result === undefined) {
     if (settings.target !== undefined) settings.target.discard();
-    throw new InputCancelledError();
+    return CANCELLED;
   }
   reportDateMatches(result, { mode, evidence: settings.evidence, maxResults: settings.maxResults });
-  if (result.matchCount === 0) {
-    if (settings.target !== undefined) await settings.target.saveEntropies([]);
-    return;
-  }
+  if (result.matchCount === 0) return settings.target?.saveEntropies([]);
   if (settings.target !== undefined) {
     if (!candidateListHolds(result.matchCount)) throw new TooManyForListError(NARROW_DATE_SEARCH);
-    await saveList(settings, result);
+    if ((await saveList(settings, result)) === CANCELLED) return CANCELLED;
   }
   dateMatchNotes(settings.evidence);
+  return undefined;
 }
 
 /**
  * The search of recover-date with its settings; undefined when the person chose not to make a
- * search longer than allowed (searchDates).
+ * search longer than allowed, CANCELLED when they stopped it (searchDates).
  */
 function search(
   indexes: readonly number[],
@@ -173,7 +195,7 @@ function search(
   mode: SeedshiftMode,
   evidence: WalletEvidence | undefined,
   settings: Settings,
-): Promise<DateSearchResult | undefined> {
+): Promise<DateSearchResult | undefined | Cancelled> {
   return searchDates({
     indexes,
     dates,
@@ -186,9 +208,9 @@ function search(
   });
 }
 
-/** Saves every match as a candidate list. */
-async function saveList(settings: Settings, result: DateSearchResult): Promise<void> {
-  await defined(settings.target).savePhrases(result.kept, settings.passphrase);
+/** Saves every match as a candidate list; CANCELLED when the person cancelled the save. */
+function saveList(settings: Settings, result: DateSearchResult): Promise<Cancelled | undefined> {
+  return defined(settings.target).savePhrases(result.kept, settings.passphrase);
 }
 
 /** What is asked next on the private screen. */
@@ -200,9 +222,12 @@ type Step = "backup" | "dates" | "wallet" | "search" | "done";
  * encoded fingerprint is shown, as decode shows it, so that a mistyped code shows before a long
  * search; the dates, the wallet when the mode needs it and no option gave it, then the search.
  * After a search without a usable result the person chooses what to change; every other answer is
- * kept.
+ * kept. CANCELLED when the person cancelled, at a question or by stopping the search.
  */
-async function recoverWithQuestions(args: ParsedArguments, settings: Settings): Promise<void> {
+async function recoverWithQuestions(
+  args: ParsedArguments,
+  settings: Settings,
+): Promise<Cancelled | undefined> {
   assertAskedEncodedInput(args);
   let backupArgs = args;
   let backup: EncodedBackup | undefined;
@@ -216,13 +241,16 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
   for (let step: Step = "backup"; step !== "done";) {
     if (step === "backup") {
       const read = await askEncodedCodes({ args: backupArgs, seedshiftOnly: true, recordMode });
+      if (read === CANCELLED) return CANCELLED;
       backup = read.backup;
       recordMode = read.recordMode ?? recordMode;
       showEncodedFingerprint(encodedFingerprintOf(backup));
       // Dates kept from before still count if the new phrase takes as many.
       step = dates?.fitsPhrase(backup.indexes.length) === true ? "wallet" : "dates";
     } else if (step === "dates") {
-      dates = await askRecoveryDates(defined(backup));
+      const asked = await askRecoveryDates(defined(backup));
+      if (asked === CANCELLED) return CANCELLED;
+      dates = asked;
       step = "wallet";
     } else if (step === "wallet") {
       if (evidence !== undefined || !walletNeeded(defined(backup).mode)) step = "search";
@@ -232,13 +260,14 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
           explanation: walletExplanation(defined(backup).mode),
           place: settings.place,
         });
+        if (answer === CANCELLED) return CANCELLED;
         if (answer.kind === "wallet") evidence = answer.evidence;
         step = answer.kind === "back" ? "dates" : "search";
       }
     } else {
       const { mode } = defined(backup);
       Masking.assertMaskedMode(mode);
-      await settings.target?.prepare(settings.passphrase);
+      if ((await settings.target?.prepare(settings.passphrase)) === CANCELLED) return CANCELLED;
       const result = await search(
         defined(backup).indexes,
         defined(dates),
@@ -246,6 +275,7 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
         evidence,
         settings,
       );
+      if (result === CANCELLED) return CANCELLED;
       // A search longer than allowed that the person did not want: the dates are typed again.
       if (result === undefined) {
         step = "dates";
@@ -255,7 +285,8 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
       const listable = settings.target === undefined || candidateListHolds(result.matchCount);
       lastMatches = result.matchCount;
       if (result.matchCount > 0 && listable) {
-        if (settings.target !== undefined) await saveList(settings, result);
+        if (settings.target !== undefined && (await saveList(settings, result)) === CANCELLED)
+          return CANCELLED;
         listed = true;
         dateMatchNotes(evidence);
       } else if (!listable)
@@ -268,6 +299,7 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
         wallet: { explanation: walletExplanation(mode), place: settings.place },
         listing: settings.target !== undefined,
       });
+      if (next === CANCELLED) return CANCELLED;
       if (typeof next === "string") step = next;
       else {
         evidence = next.evidence;
@@ -278,13 +310,14 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
       if (step === "backup") backupArgs = typedAfterFile(args);
     }
   }
-  if (settings.target === undefined || listed) return;
-  if (lastMatches === 0) await settings.target.saveEntropies([]);
-  else settings.target.discard();
+  if (settings.target === undefined || listed) return undefined;
+  if (lastMatches === 0) return settings.target.saveEntropies([]);
+  settings.target.discard();
+  return undefined;
 }
 
-/** Asks for the dates with ? until they can be used. */
-async function askRecoveryDates(backup: EncodedBackup): Promise<DatesAnswer> {
+/** Asks for the dates with ? until they can be used; CANCELLED when the person cancelled. */
+async function askRecoveryDates(backup: EncodedBackup): Promise<DatesAnswer | Cancelled> {
   const wordCount = backup.indexes.length;
   return askDates({
     wordCount,

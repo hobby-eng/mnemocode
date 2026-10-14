@@ -31,10 +31,20 @@ import type { EncodedFormat } from "../core/types.js";
 // cycle.
 import type { PreparedEncode } from "./encode-command.js";
 import { defined } from "../core/defined.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
 
-export async function runSskrSplit(args: ParsedArguments, integrated = false): Promise<void> {
+const ERRORS = new ErrorCatalog("cli.sskr-split-command", {
+  "setting-not-available-sskr-mode-export-shares-pdf": (value0: string) =>
+    `The ${value0} setting is not available in SSKR mode. Export shares to a PDF file or an individual-card output folder instead.`,
+});
+
+export async function runSskrSplit(
+  args: ParsedArguments,
+  integrated = false,
+): Promise<Cancelled | undefined> {
   const split = await prepareSskrSplit(args, integrated);
-  await split();
+  return split();
 }
 
 /**
@@ -56,9 +66,9 @@ export async function prepareSskrSplit(
   if (integrated) {
     for (const key of ENCODE_PLAIN_ONLY_OPTIONS)
       if (args[key] !== undefined)
-        throw new Error(
-          `The ${optionLabel(key)} setting is not available in SSKR mode. Export shares to a PDF file or an individual-card output folder instead.`,
-        );
+        throw ERRORS.create("setting-not-available-sskr-mode-export-shares-pdf", [
+          `${optionLabel(key)}`,
+        ]);
   }
   // With --format the whole seed phrase is shown beside the shares, in that form; without it, only
   // the shares, which is what splitting is for.
@@ -98,19 +108,19 @@ interface CheckedSplit {
   readonly checkAnswer: ReturnType<typeof backupCheckAnswer>;
 }
 
-/** Splits the phrase, asked, read or `known`, and saves and shows the shares. */
+/**
+ * Splits the phrase, asked, read or `known`, and saves and shows the shares; CANCELLED when the
+ * person cancelled.
+ */
 async function splitChecked(
   args: ParsedArguments,
   checked: CheckedSplit,
   known: string | undefined,
-): Promise<void> {
+): Promise<Cancelled | undefined> {
   const { mode, threshold, count, format, options, representation, checkAnswer } = checked;
-  const { mnemonic, dates: dateValues } = await phraseAndDates(
-    args,
-    mode,
-    DATE_COUNT_WORDS.split,
-    known,
-  );
+  const asked = await phraseAndDates(args, mode, DATE_COUNT_WORDS.split, known);
+  if (asked === CANCELLED) return CANCELLED;
+  const { mnemonic, dates: dateValues } = asked;
   const {
     records: shares,
     original,
@@ -124,13 +134,17 @@ async function splitChecked(
   });
   // A save that fails is offered again or skipped (saveWithRetry): the shares are shown below
   // either way, and only once every save is settled, so that none is lost to a failure.
-  await saveShares(inForm(shares, format), args, options, Masking.of(mode).masked);
+  if (
+    (await saveShares(inForm(shares, format), args, options, Masking.of(mode).masked)) === CANCELLED
+  )
+    return CANCELLED;
   const codes = ownShareCards(defined(shares[0]), format);
-  await saveHeirSheetOutput(args, {
+  const sheet = await saveHeirSheetOutput(args, {
     backup: { kind: "shares", format, threshold, count, ...(codes === undefined ? {} : { codes }) },
     mode,
     dates: dateValues.length,
   });
+  if (sheet === CANCELLED) return CANCELLED;
   reportRenamedOutputs();
   if (
     !terminalResultHeader("SSKR export", [
@@ -155,7 +169,7 @@ async function splitChecked(
   }
   printShares(inForm(shares, format), undefined, Masking.of(mode).holds);
   printFingerprints(mode, masterFingerprint(original), masterFingerprint(held));
-  await offerShareCheck(
+  return offerShareCheck(
     original,
     mode,
     threshold,

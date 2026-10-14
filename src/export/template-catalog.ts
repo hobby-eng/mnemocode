@@ -9,6 +9,13 @@
 
 import type { CardKind } from "../core/types.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.template-catalog", {
+  "sheets-only": () => SHEETS_ONLY,
+  "card-template-unknown-incompatible-list-available-preview-templates": (value0: string) =>
+    `The card template “${value0}” is unknown or incompatible. List the available preview templates and choose one of them.`,
+});
 
 /** The business designs, in their order; "mixed" draws the others in turn. */
 export const BUSINESS_STYLES = Object.freeze([
@@ -91,7 +98,7 @@ export const SHEETS_ONLY = sheetsOnly("This design");
 
 /** Refuses separate cards of `entry` where it is drawn on sheets only (SHEETS_ONLY). */
 export function assertSeparateCards(entry: CatalogEntry): void {
-  if (!drawsSeparateCards(entry)) throw new Error(SHEETS_ONLY);
+  if (!drawsSeparateCards(entry)) throw ERRORS.create("sheets-only", []);
 }
 
 /** The design of colour cards when none is named: the first. */
@@ -147,9 +154,9 @@ export function resolveTemplateId(idOrNumber?: string, kind?: CardKind): Catalog
   if (findTemplate(undefined, kind) === undefined) throw new NoCardTemplateError(kind);
   const found = findTemplate(idOrNumber, kind);
   if (found === undefined)
-    throw new Error(
-      `The card template “${idOrNumber}” is unknown or incompatible. List the available preview templates and choose one of them.`,
-    );
+    throw ERRORS.create("card-template-unknown-incompatible-list-available-preview-templates", [
+      `${idOrNumber}`,
+    ]);
   return found;
 }
 

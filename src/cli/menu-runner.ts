@@ -8,23 +8,11 @@ import { CANCELLED_EXIT_CODE, signalNameOf, stoppedBySignal } from "./exit-codes
 import { runInOwnProcess } from "./protection.js";
 import { choose } from "./terminal-choice.js";
 import { dropTypedAhead, terminalAvailable } from "./terminal-input.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { LEAVE_ALTERNATE_SCREEN } from "./terminal.js";
 import { WHAT_NOW } from "./ask.js";
 import { defined } from "../core/defined.js";
-
-/**
- * Wipes what was typed while a command ran but not read by it, such as the rest of a paste after
- * it had failed, so that it answers no question of the menu. A Ctrl+C among it was meant for the
- * command, which has ended.
- */
-async function dropAfterCommand(): Promise<void> {
-  try {
-    await dropTypedAhead();
-  } catch (error) {
-    if (!(error instanceof InputCancelledError)) throw error;
-  }
-}
+import { describeError, errorCode } from "../core/refusal.js";
 
 /** stty, run by its own path, as Linux and macOS have it, rather than looked up. */
 const STTY = "/bin/stty";
@@ -59,35 +47,46 @@ async function withEchoOff<T>(body: () => Promise<T>): Promise<T> {
  * Runs `run` in a process of its own and returns its exit code, or undefined when the person went
  * back to the menu instead. A command that could not be started, or that a signal stopped, such as
  * the out-of-memory killer, is said so in one line and offered again with the same answers.
+ * CANCELLED when Ctrl+C typed with the last answer, before the command started, cancels it, or
+ * when the person cancels the question after a failure.
  */
-export async function runCommand(run: readonly string[]): Promise<number | undefined> {
+export async function runCommand(run: readonly string[]): Promise<number | undefined | Cancelled> {
   for (;;) {
     let failure: string;
     try {
       const code = await withEchoOff(async () => {
         // What was typed or pasted with the last answer goes to no process: a command reads only
         // the keys pressed for its own questions.
-        await dropTypedAhead();
+        if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
         const exit = await runInOwnProcess(run);
-        await dropAfterCommand();
+        // What was typed while the command ran but not read by it, such as the rest of a paste
+        // after it had failed, answers no question of the menu. A Ctrl+C among it was meant for
+        // the command, which has ended: it cancels nothing here.
+        await dropTypedAhead();
         return exit;
       });
+      if (code === CANCELLED) return CANCELLED;
       if (!stoppedBySignal(code) || code === CANCELLED_EXIT_CODE) return code;
       if (PRIVATE_SCREEN_COMMANDS.has(defined(run[0])) && privateScreenAvailable())
         process.stderr.write(LEAVE_ALTERNATE_SCREEN);
       failure = `The command stopped unexpectedly (${signalNameOf(code)}).`;
     } catch (error) {
-      const reason = (error as NodeJS.ErrnoException).code ?? (error as Error).message;
+      const code = errorCode(error);
+      // Native system failures such as EAGAIN keep their familiar code. A library refusal has
+      // its own qualified code for hosts, but the person reads its existing default message.
+      const reason =
+        code !== undefined && /^[A-Z][A-Z0-9_]*$/u.test(code) ? code : describeError(error);
       failure = `The command could not be started (${reason}).`;
     }
     const again = await choose(
       WHAT_NOW,
       [
-        { label: "Start it again", note: "with the same answers", value: true },
-        { label: "Back to the menu", value: false },
-      ],
+        { label: "Start it again", note: "with the same answers", value: "again" },
+        { label: "Back to the menu", value: "back" },
+      ] as const,
       { label: "Next", warning: failure },
     );
-    if (again !== true) return undefined;
+    if (again === CANCELLED) return CANCELLED;
+    if (again !== "again") return undefined;
   }
 }

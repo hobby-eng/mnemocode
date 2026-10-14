@@ -4,6 +4,14 @@ import { isRgbReference, rgbReferenceDigits } from "../core/colors.js";
 import type { MaterialStyle } from "./card-settings.js";
 import { capitalized } from "../core/prose.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.material-artwork", {
+  "material-reference-contain-exactly-six-hexadecimal-digits": () =>
+    "Material reference must contain exactly six hexadecimal digits.",
+  "material-offers-only-distinct-samples": (value0: string, value1: string) =>
+    `The ${value0} material offers only ${value1} distinct samples.`,
+});
 
 // The styles are named with the other card settings, which the template catalog reads without
 // this artwork.
@@ -565,12 +573,12 @@ export function chooseMaterialSamples(
   references: readonly string[],
 ): MaterialSample[] {
   if (!references.every(isRgbReference))
-    throw new Error("Material reference must contain exactly six hexadecimal digits.");
+    throw ERRORS.create("material-reference-contain-exactly-six-hexadecimal-digits", []);
   const { chromaScale } = materialArtwork[style].catalogue;
   const samples = materialSamples(style);
   const codes = [...new Set(references.map(rgbReferenceDigits))];
   if (codes.length > samples.length)
-    throw new Error(`The ${style} material offers only ${samples.length} distinct samples.`);
+    throw ERRORS.create("material-offers-only-distinct-samples", [`${style}`, `${samples.length}`]);
   const point = ([l, a, b]: readonly number[]) => [
     defined(l) * MATCH_LIGHTNESS_WEIGHT,
     defined(a),

@@ -23,6 +23,17 @@ import {
   type ListFileLock,
 } from "./candidate-file-admission.js";
 import { CandidateFileRefusedError } from "./candidate-file-refusal.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.candidate-encryption", {
+  "no-webcrypto": () => NO_WEBCRYPTO,
+  "key-one-age-key-62-characters-starts-age1": () =>
+    "The key must be one age key of 62 characters that starts with age1, as the Scanner shows it.",
+  "use-at-least-characters-passphrase-all-protects-seed": (value0: string) =>
+    `Use at least ${value0} characters for the passphrase: it is all that protects these seed phrases.`,
+  "passphrase-candidates-empty": () => "The passphrase for the candidates is empty.",
+  "not-protection-choice": { kind: "type", text: () => NOT_A_PROTECTION_CHOICE },
+});
 
 // Keep the existing import paths valid for hosts that already use this module.
 export { CandidateFileRefusedError, type CandidateFileProblem } from "./candidate-file-refusal.js";
@@ -44,7 +55,8 @@ const ENCRYPTED_READ_CHUNK_BYTES = 64 * 1024;
  * TypeError ("Cannot read properties of undefined") that tells a person nothing.
  */
 function requireWebCryptoX25519(): void {
-  if (typeof globalThis.crypto?.subtle?.importKey !== "function") throw new Error(NO_WEBCRYPTO);
+  if (typeof globalThis.crypto?.subtle?.importKey !== "function")
+    throw ERRORS.create("no-webcrypto", []);
 }
 
 /** A one-time key: the identity that opens the file, and the recipient a writer encrypts to. */
@@ -68,9 +80,7 @@ export async function createSessionIdentity(): Promise<SessionIdentity> {
  */
 export function parseRecipient(text: string): string {
   const recipient = text.trim().toLowerCase();
-  const refused = new Error(
-    "The key must be one age key of 62 characters that starts with age1, as the Scanner shows it.",
-  );
+  const refused = ERRORS.create("key-one-age-key-62-characters-starts-age1", []);
   if (!X25519_RECIPIENT.test(recipient)) throw refused;
   try {
     // Decodes the Bech32 text and checks its checksum and length, without encrypting anything.
@@ -98,9 +108,9 @@ export function parseListPassphrase(text: string): string {
   const passphrase = withoutByteOrderMark(text).trim();
   // Characters as a person counts them: code points, not UTF-16 units.
   if (Array.from(passphrase).length < MIN_LIST_PASSPHRASE_LENGTH)
-    throw new Error(
-      `Use at least ${MIN_LIST_PASSPHRASE_LENGTH} characters for the passphrase: it is all that protects these seed phrases.`,
-    );
+    throw ERRORS.create("use-at-least-characters-passphrase-all-protects-seed", [
+      `${MIN_LIST_PASSPHRASE_LENGTH}`,
+    ]);
   return passphrase;
 }
 
@@ -113,7 +123,7 @@ export async function encryptCandidatesWithPassphrase(
   passphrase: string,
 ): Promise<Uint8Array> {
   CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
-  if (passphrase === "") throw new Error("The passphrase for the candidates is empty.");
+  if (passphrase === "") throw ERRORS.create("passphrase-candidates-empty", []);
   const encrypter = new Encrypter();
   encrypter.setPassphrase(passphrase);
   encrypter.setScryptWorkFactor(SCRYPT_LOG_N);
@@ -313,12 +323,12 @@ const NOT_A_PROTECTION_CHOICE =
  * returned: a host's object may answer differently when it is read again (AUD-015).
  */
 function checkedChoice(given: unknown): ListProtectionChoice {
-  if (typeof given !== "object" || given === null) throw new TypeError(NOT_A_PROTECTION_CHOICE);
+  if (typeof given !== "object" || given === null) throw ERRORS.create("not-protection-choice", []);
   const choice: object = { ...given };
   const fields = choice as Readonly<Record<string, unknown>>;
   const kind = Object.hasOwn(choice, "kind") ? fields["kind"] : undefined;
   if (typeof kind !== "string" || !Object.hasOwn(CHOICE_FIELDS, kind))
-    throw new TypeError(NOT_A_PROTECTION_CHOICE);
+    throw ERRORS.create("not-protection-choice", []);
   const wanted: readonly string[] = CHOICE_FIELDS[kind as ListProtectionChoice["kind"]];
   // Own enumerable names, as many as the kind has and each one of them: no field is missing, and
   // none of another kind, such as a passphrase beside "none", comes along unread.
@@ -328,7 +338,7 @@ function checkedChoice(given: unknown): ListProtectionChoice {
     !names.every((name) => name === "kind" || wanted.includes(name)) ||
     !wanted.every((name) => typeof fields[name] === "string")
   )
-    throw new TypeError(NOT_A_PROTECTION_CHOICE);
+    throw ERRORS.create("not-protection-choice", []);
   return choice as ListProtectionChoice;
 }
 

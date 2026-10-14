@@ -6,6 +6,12 @@ import { inflateSync } from "node:zlib";
 // that the cards are drawn with (export/platform-node.ts), which a command that draws loads anyway.
 import type { PNG } from "pngjs";
 import { wipedAfter } from "../core/bits.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.qr-input", {
+  "invalid-png-input": () => INVALID_PNG_INPUT,
+  "no-readable-qr-code-was-found-png-file": () => "No readable QR code was found in the PNG file.",
+});
 
 /**
  * Reads a QR code from a PNG file saved by the local palette exporter. The image holds an encoded
@@ -50,7 +56,7 @@ export async function decodeQrPngFile(path: string): Promise<string> {
       });
       image = reader.sync.read(bytes);
     } catch {
-      throw new Error(INVALID_PNG_INPUT);
+      throw ERRORS.create("invalid-png-input", []);
     }
     return wipedAfter(image.data, (pixels) => {
       const decoded = scan(
@@ -59,7 +65,7 @@ export async function decodeQrPngFile(path: string): Promise<string> {
         image.height,
         { inversionAttempts: "attemptBoth" },
       );
-      if (decoded === null) throw new Error("No readable QR code was found in the PNG file.");
+      if (decoded === null) throw ERRORS.create("no-readable-qr-code-was-found-png-file", []);
       return decoded.data;
     });
   });

@@ -6,6 +6,13 @@
 // which every search and wallet check takes without any package.
 
 import { trimWhiteSpace } from "./white-space.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.wallet-check", {
+  "malformed-wallet-answer": { kind: "type", text: () => MALFORMED_WALLET_ANSWER },
+  "master-fingerprint-eight-hexadecimal-characters": () =>
+    "A master fingerprint must be eight hexadecimal characters.",
+});
 
 /** What the host's wallet check says of one phrase. */
 export interface WalletMatch {
@@ -92,7 +99,7 @@ export async function askWallet<M extends WalletMatch>(
   // The fields a search reads are read once and kept as checked (AUD-015). Extra data remains
   // owned data, while getters/methods keep the host's receiver and private brand (AUD-016-API001).
   const read = readOnce(given);
-  if (typeof read?.matched !== "boolean") throw new TypeError(MALFORMED_WALLET_ANSWER);
+  if (typeof read?.matched !== "boolean") throw ERRORS.create("malformed-wallet-answer", []);
   return ownedAnswer(given as object, read) as M;
 }
 
@@ -131,7 +138,7 @@ export const FINGERPRINT_WARNING =
 export function parseMasterFingerprint(value: string): string {
   const fingerprint = trimWhiteSpace(value).toLowerCase();
   if (!isFingerprintText(fingerprint))
-    throw new Error("A master fingerprint must be eight hexadecimal characters.");
+    throw ERRORS.create("master-fingerprint-eight-hexadecimal-characters", []);
   return fingerprint;
 }
 

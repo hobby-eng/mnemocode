@@ -16,6 +16,26 @@ import { inWholeRange } from "./typed-number.js";
 import { listInWords } from "./places.js";
 import { listPieces, textPieces } from "./pieces.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.colors", {
+  "each-color-use-uppercase-rrggbb-form": () => "Each color must use uppercase #RRGGBB form.",
+  "invalid-rgb-reference": () => "Invalid RGB reference.",
+  "enter-colors-standard-bip39-word-count": (value0: string) =>
+    `Enter ${value0} colors for a standard BIP39 word count.`,
+  "parse-colors-refused": suppliedMessage,
+  "invalid-color-set": () => INVALID_COLOR_SET,
+  "color-codes-do-not-contain-valid-bip39-word": () =>
+    "The color codes do not contain valid BIP39 word positions.",
+  "colors-can-read-do-not-tell-where-others": () =>
+    "The colors that can be read do not tell where the others belong.",
+  "color-unicode-uses-only-mnemo-code-private-use": () =>
+    "Color Unicode uses only MnemoCode Private Use Area code points.",
+  "color-unicode-contains-value-outside-rrggbb-range": () =>
+    "Color Unicode contains a value outside the #RRGGBB range.",
+  "color-unicode-pairs": () => COLOR_UNICODE_PAIRS,
+  "codes-all": (value0: string, value1: string) => `${value0}: ${value1} codes in all.`,
+});
 
 const RGB_PAYLOAD_DIGITS = 6;
 const ORDER_TAG_DIGITS = 2;
@@ -53,7 +73,7 @@ const RGB_REFERENCE = new RegExp(`^#?[0-9A-F]{${RGB_HEX_DIGITS}}$`, "iu");
 
 /** Refuses a color that is not a #RRGGBB code in capitals (COLOR_CODE). */
 function assertColorCode(color: string): void {
-  if (!COLOR_CODE.test(color)) throw new Error("Each color must use uppercase #RRGGBB form.");
+  if (!COLOR_CODE.test(color)) throw ERRORS.create("each-color-use-uppercase-rrggbb-form", []);
 }
 
 /** Whether `reference` is a color as the card exports take it (RGB_REFERENCE). */
@@ -63,16 +83,16 @@ export function isRgbReference(reference: string): boolean {
 
 /** The six hexadecimal digits of a color in capitals, without #; refuses another text. */
 export function rgbReferenceDigits(reference: string): string {
-  if (!isRgbReference(reference)) throw new Error("Invalid RGB reference.");
+  if (!isRgbReference(reference)) throw ERRORS.create("invalid-rgb-reference", []);
   return reference.replace(/^#/u, "").toUpperCase();
 }
 
 /** Refuses a number of colors that no BIP39 phrase has. */
 function assertColorCount(count: number): void {
   if (!RGB_REFERENCE_COUNTS.includes(count))
-    throw new Error(
-      `Enter ${listInWords(RGB_REFERENCE_COUNTS, "or")} colors for a standard BIP39 word count.`,
-    );
+    throw ERRORS.create("enter-colors-standard-bip39-word-count", [
+      `${listInWords(RGB_REFERENCE_COUNTS, "or")}`,
+    ]);
 }
 
 /**
@@ -125,11 +145,11 @@ export function parseColors(value: string): string[] {
       ? undefined
       : completeHexUnits(value, RGB_HEX_DIGITS);
   if (codes === undefined)
-    throw new Error(
+    throw ERRORS.create("parse-colors-refused", [
       hashed
         ? "Colors must use #RRGGBB codes, separated or concatenated."
         : "A continuous RGB stream must contain complete six-digit RRGGBB values.",
-    );
+    ]);
   const colors = codes.map((code) => `#${code}`);
   assertColorCount(colors.length);
   return colors;
@@ -149,12 +169,12 @@ export function colorsToIndexes(given: readonly string[]): number[] {
   const expectedDifference = orderTagStep(colors.length);
   for (let index = 1; index < encoded.length; index += 1) {
     if (defined(encoded[index]).tag - defined(encoded[index - 1]).tag !== expectedDifference) {
-      throw new Error(INVALID_COLOR_SET);
+      throw ERRORS.create("invalid-color-set", []);
     }
   }
   const positions = wordPositionsOf(encoded.map((color) => color.payload).join("")).map(Number);
   if (!positions.every((position) => inWholeRange(position, WORD_NUMBER_RANGE)))
-    throw new Error("The color codes do not contain valid BIP39 word positions.");
+    throw ERRORS.create("color-codes-do-not-contain-valid-bip39-word", []);
   return positions.map((position) => position - WORD_NUMBER_RANGE.min);
 }
 
@@ -173,7 +193,7 @@ export function wordPositionPatterns(colors: readonly (string | undefined)[]): s
   for (const color of given) {
     if (color === undefined) continue;
     const { tag, payload } = tagAndPayload(color);
-    if (payloads.has(tag)) throw new Error(INVALID_COLOR_SET);
+    if (payloads.has(tag)) throw ERRORS.create("invalid-color-set", []);
     payloads.set(tag, payload);
   }
   const tags = [...payloads.keys()];
@@ -186,8 +206,7 @@ export function wordPositionPatterns(colors: readonly (string | undefined)[]): s
   ).filter((offset) => offset <= lowest && fits(offset));
   // The tags of MnemoCode start at 0; another start is taken only when it is the one that fits.
   const offset = offsets.includes(0) ? 0 : offsets.length === 1 ? offsets[0] : undefined;
-  if (offset === undefined)
-    throw new Error("The colors that can be read do not tell where the others belong.");
+  if (offset === undefined) throw ERRORS.create("colors-can-read-do-not-tell-where-others", []);
   return wordPositionsOf(
     given
       .map((_, slot) => payloads.get(offset + slot * step) ?? "?".repeat(RGB_PAYLOAD_DIGITS))
@@ -229,7 +248,7 @@ export function isColorUnicodePoint(point: number): boolean {
 /** Refuses code points of which any is not one of the Private Use code points of Color Unicode. */
 function assertColorUnicodePoints(points: readonly number[]): void {
   if (!points.every(isColorUnicodePoint))
-    throw new Error("Color Unicode uses only MnemoCode Private Use Area code points.");
+    throw ERRORS.create("color-unicode-uses-only-mnemo-code-private-use", []);
 }
 
 /** Whether `symbol` is one character of the Color Unicode codes. */
@@ -251,7 +270,7 @@ export function colorOfUnicodePair(high: number, low: number): string {
   assertColorUnicodePoints([high, low]);
   const color = (high - COLOR_UNICODE_BASE) * COLOR_UNICODE_WIDTH + low - COLOR_UNICODE_BASE;
   if (color > RGB_MAX_VALUE)
-    throw new Error("Color Unicode contains a value outside the #RRGGBB range.");
+    throw ERRORS.create("color-unicode-contains-value-outside-rrggbb-range", []);
   return rgbHex(color);
 }
 
@@ -287,7 +306,7 @@ function colorUnicodePoints(value: string): number[] {
 /** Two code points per color back to #RRGGBB codes, for any number of colors. */
 function colorsFromUnicodePoints(points: readonly number[]): string[] {
   if (points.length === 0 || points.length % COLOR_UNICODE_POINTS_PER_COLOR !== 0)
-    throw new Error(COLOR_UNICODE_PAIRS);
+    throw ERRORS.create("color-unicode-pairs", []);
   // Every point is checked before any color is made, so that the message names the points.
   assertColorUnicodePoints(points);
   return listPieces(points, COLOR_UNICODE_POINTS_PER_COLOR).map(([high, low]) =>
@@ -299,12 +318,13 @@ function colorsFromUnicodePoints(points: readonly number[]): string[] {
 export function unicodeToColors(value: string): string[] {
   const points = colorUnicodePoints(value);
   if (!RGB_REFERENCE_COUNTS.includes(points.length / COLOR_UNICODE_POINTS_PER_COLOR))
-    throw new Error(
-      `${COLOR_UNICODE_PAIRS.slice(0, -1)}: ${listInWords(
+    throw ERRORS.create("codes-all", [
+      `${COLOR_UNICODE_PAIRS.slice(0, -1)}`,
+      `${listInWords(
         RGB_REFERENCE_COUNTS.map((count) => count * COLOR_UNICODE_POINTS_PER_COLOR),
         "or",
-      )} codes in all.`,
-    );
+      )}`,
+    ]);
   return colorsFromUnicodePoints(points);
 }
 

@@ -17,6 +17,32 @@ import { Redacted } from "./redacted.js";
 import { equalBytes } from "./bits.js";
 import { assertCandidateFileSize } from "./candidate-file-refusal.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.candidate-list", {
+  "padm-length-2-more": () => "Padmé needs a length of 2 or more.",
+  "not-valid-unicode-text": (value0: string) => `The ${value0} is not valid Unicode text.`,
+  "longer-than-bytes": (value0: string, value1: string) =>
+    `The ${value0} is longer than ${value1} bytes.`,
+  "candidate-list-holds-1-records": (value0: string) =>
+    `A candidate list holds 1 to ${value0} records.`,
+  "every-candidate-bip39-entropy-one-length-16-32": () =>
+    "Every candidate must be BIP39 entropy of one length, 16 to 32 bytes.",
+  "candidate-list-cut-short": () => "The candidate list is cut short.",
+  "passphrase-candidate-list-wrong-length": () =>
+    "A passphrase in the candidate list has a wrong length.",
+  "passphrase-candidate-list-not-valid-utf-8-text": () =>
+    "A passphrase in the candidate list is not valid UTF-8 text.",
+  "not-mnemo-code-candidate-list": () => "This is not a MnemoCode candidate list.",
+  "candidate-list-version-not-supported": (value0: string) =>
+    `Candidate list version ${value0} is not supported.`,
+  "candidate-list-unknown-flags": () => "The candidate list has unknown flags.",
+  "candidate-list-wrong-entropy-length": () => "The candidate list has a wrong entropy length.",
+  "candidate-list-wrong-record-count": () => "The candidate list has a wrong record count.",
+  "candidate-list-damaged-crc-32-does-not-match": () =>
+    "The candidate list is damaged: its CRC-32 does not match.",
+  "candidate-list-wrong-padding": () => "The candidate list has wrong padding.",
+});
 
 /** "MNCL": MnemoCode candidate list. */
 const MAGIC = [0x4d, 0x4e, 0x43, 0x4c] as const;
@@ -109,8 +135,7 @@ export interface CandidateList {
  * the length less one and S that of E, the low E − S bits are rounded up; at most about 12 % more.
  */
 export function padmeLength(length: number): number {
-  if (!Number.isSafeInteger(length) || length < 2)
-    throw new Error("Padmé needs a length of 2 or more.");
+  if (!Number.isSafeInteger(length) || length < 2) throw ERRORS.create("padm-length-2-more", []);
   const floorLog2 = (value: number) => {
     let bits = 0;
     while (2 ** (bits + 1) <= value) bits += 1;
@@ -138,9 +163,9 @@ const encoder = new TextEncoder();
  * or one longer than MAX_PASSPHRASE_BYTES. Callers check a BIP39 passphrase before a long search.
  */
 export function assertListPassphrase(passphrase: string, what = "BIP39 passphrase"): void {
-  if (/\p{Cs}/u.test(passphrase)) throw new Error(`The ${what} is not valid Unicode text.`);
+  if (/\p{Cs}/u.test(passphrase)) throw ERRORS.create("not-valid-unicode-text", [`${what}`]);
   if (utf8Length(passphrase) > MAX_PASSPHRASE_BYTES)
-    throw new Error(`The ${what} is longer than ${MAX_PASSPHRASE_BYTES} bytes.`);
+    throw ERRORS.create("longer-than-bytes", [`${what}`, `${MAX_PASSPHRASE_BYTES}`]);
 }
 
 /** The highest code points written in UTF-8 with one, two and three bytes (RFC 3629). */
@@ -173,7 +198,7 @@ export function encodeCandidateList(list: CandidateList): Uint8Array {
   const records = Array.from(list.records);
   const count = records.length;
   if (count < 1 || count > MAX_CANDIDATE_RECORDS)
-    throw new Error(`A candidate list holds 1 to ${counting(MAX_CANDIDATE_RECORDS)} records.`);
+    throw ERRORS.create("candidate-list-holds-1-records", [`${counting(MAX_CANDIDATE_RECORDS)}`]);
   // Read each host field once: a getter must not supply bytes to validation and another value
   // to serialization. Own the admitted bytes before passphrase getters can change their source.
   const entropies = records.map((record) => record?.entropy);
@@ -189,7 +214,7 @@ export function encodeCandidateList(list: CandidateList): Uint8Array {
     // TypedArray.set would silently narrow a wider array or coerce ordinary array elements.
     lengths.some((length) => length !== entropyLength)
   )
-    throw new Error("Every candidate must be BIP39 entropy of one length, 16 to 32 bytes.");
+    throw ERRORS.create("every-candidate-bip39-entropy-one-length-16-32", []);
   // The passphrases as bytes are this function's own: copied into the list, then wiped, also when a
   // later one is refused.
   const owned: Uint8Array[] = [];
@@ -264,7 +289,7 @@ export function decodeCandidateList(bytes: Uint8Array): CandidateList {
   const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   let offset = 0;
   const take = (length: number): Uint8Array => {
-    if (offset + length > bytes.length) throw new Error("The candidate list is cut short.");
+    if (offset + length > bytes.length) throw ERRORS.create("candidate-list-cut-short", []);
     offset += length;
     return bytes.subarray(offset - length, offset);
   };
@@ -280,25 +305,26 @@ export function decodeCandidateList(bytes: Uint8Array): CandidateList {
   const passphrase = (minimum: number): string | undefined => {
     const length = uint16();
     if (length < minimum || length > MAX_PASSPHRASE_BYTES)
-      throw new Error("A passphrase in the candidate list has a wrong length.");
+      throw ERRORS.create("passphrase-candidate-list-wrong-length", []);
     if (length === 0) return undefined;
     try {
       return decoder.decode(take(length));
     } catch {
-      throw new Error("A passphrase in the candidate list is not valid UTF-8 text.");
+      throw ERRORS.create("passphrase-candidate-list-not-valid-utf-8-text", []);
     }
   };
   const magic = take(MAGIC.length);
-  if (!equalBytes(magic, MAGIC)) throw new Error("This is not a MnemoCode candidate list.");
+  if (!equalBytes(magic, MAGIC)) throw ERRORS.create("not-mnemo-code-candidate-list", []);
   const [version, flags, entropyLength] = take(3);
-  if (version !== VERSION) throw new Error(`Candidate list version ${version} is not supported.`);
+  if (version !== VERSION)
+    throw ERRORS.create("candidate-list-version-not-supported", [`${version}`]);
   if ((defined(flags) & ~(GLOBAL_PASSPHRASE_FLAG | RECORD_PASSPHRASE_FLAG)) !== 0)
-    throw new Error("The candidate list has unknown flags.");
+    throw ERRORS.create("candidate-list-unknown-flags", []);
   if (!ENTROPY_LENGTHS.has(defined(entropyLength)))
-    throw new Error("The candidate list has a wrong entropy length.");
+    throw ERRORS.create("candidate-list-wrong-entropy-length", []);
   const count = uint32();
   if (count < 1 || count > MAX_CANDIDATE_RECORDS)
-    throw new Error("The candidate list has a wrong record count.");
+    throw ERRORS.create("candidate-list-wrong-record-count", []);
   const global = defined(flags) & GLOBAL_PASSPHRASE_FLAG ? passphrase(1) : undefined;
   const records: CandidateRecord[] = [];
   try {
@@ -310,9 +336,9 @@ export function decodeCandidateList(bytes: Uint8Array): CandidateList {
     }
     const contentLength = offset;
     if (uint32() !== crc32(bytes.subarray(0, contentLength)))
-      throw new Error("The candidate list is damaged: its CRC-32 does not match.");
+      throw ERRORS.create("candidate-list-damaged-crc-32-does-not-match", []);
     if (bytes.length !== padmeLength(offset) || bytes.subarray(offset).some((byte) => byte !== 0))
-      throw new Error("The candidate list has wrong padding.");
+      throw ERRORS.create("candidate-list-wrong-padding", []);
   } catch (error) {
     // A list refused as a whole gives nothing back: the entropy copied so far is wiped.
     for (const record of records) record.entropy.fill(0);

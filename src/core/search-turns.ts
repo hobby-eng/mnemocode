@@ -8,6 +8,15 @@
 // Needs from the host: nothing; setTimeout, which every host has, is the default turn.
 
 import { inWholeRange, wholeNumbersFrom } from "./typed-number.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.search-turns", {
+  "whole-number-more": {
+    kind: "range",
+    text: (value0: string, value1: string) =>
+      `${value0} must be a whole number of ${value1} or more.`,
+  },
+});
 
 /**
  * A search expected to take longer than this on the host's computer is asked for first: twelve
@@ -164,6 +173,6 @@ export function keptCount(
 ): number {
   if (count === undefined) return fallback;
   if (!inWholeRange(count, wholeNumbersFrom(minimum)))
-    throw new RangeError(`${name} must be a whole number of ${minimum} or more.`);
+    throw ERRORS.create("whole-number-more", [`${name}`, `${minimum}`]);
   return count;
 }

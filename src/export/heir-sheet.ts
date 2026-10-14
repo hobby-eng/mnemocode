@@ -15,6 +15,16 @@ import { documentWithFont } from "./pdf-documents.js";
 import type { AssetSource } from "./platform.js";
 import { pageDimensions } from "./card-settings.js";
 import { listInWords } from "../core/places.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.heir-sheet", {
+  "instructions-heirs-leave-no-room-hint-on-front": () =>
+    "The instructions for heirs leave no room for a hint on the front.",
+  "steps-basics-heirs-do-not-fit-on-back": () =>
+    "The steps and the basics for heirs do not fit on the back.",
+  "size-instructions-heirs": (value0: string) =>
+    `The size of the instructions for heirs must be ${value0}.`,
+});
 
 /** A part of the back: a heading and its paragraphs. */
 export interface HeirSheetSection {
@@ -234,7 +244,7 @@ function hintLinesFor(font: PDFFont, text: HeirSheetText, format: HeirSheetForma
   writeFront(trial, text, format, 0);
   const lines = Math.floor(trial.room / format.ruling);
   if (lines < MIN_HINT_LINES)
-    throw new Error("The instructions for heirs leave no room for a hint on the front.");
+    throw ERRORS.create("instructions-heirs-leave-no-room-hint-on-front", []);
   return lines;
 }
 
@@ -266,8 +276,7 @@ function writeBack(writer: Writer, text: HeirSheetText, format: HeirSheetFormat)
   writer.gap();
   writeBasics(writer, text, format);
   // The words are fixed by the program, so a back they overflow is a bug in them.
-  if (writer.room < 0)
-    throw new Error("The steps and the basics for heirs do not fit on the back.");
+  if (writer.room < 0) throw ERRORS.create("steps-basics-heirs-do-not-fit-on-back", []);
 }
 
 /** The layout of each size of the sheet. */
@@ -280,9 +289,7 @@ export const HEIR_SHEET_FORMATS: Readonly<Record<HeirSheetSize, HeirSheetFormat>
 export function parseHeirSheetSize(value: string | undefined): HeirSheetFormat {
   const size = HEIR_SHEET_SIZES.find((known) => known === (value ?? DEFAULT_HEIR_SHEET_SIZE));
   if (size === undefined)
-    throw new Error(
-      `The size of the instructions for heirs must be ${listInWords(HEIR_SHEET_SIZES, "or")}.`,
-    );
+    throw ERRORS.create("size-instructions-heirs", [`${listInWords(HEIR_SHEET_SIZES, "or")}`]);
   return HEIR_SHEET_FORMATS[size];
 }
 

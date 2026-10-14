@@ -1,6 +1,29 @@
 import type { DateShiftDate, DatePattern, Bip39WordCount } from "./types.js";
 import { inWholeRange, integerRefusal, type WholeRange } from "./typed-number.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.dates", {
+  "there-no-month": () => "There is no such calendar month.",
+  "assert-calendar-date-refused": suppliedMessage,
+  "assert-calendar-date-refused-2": suppliedMessage,
+  "day-outside-selected-calendar-month": () => "The day is outside the selected calendar month.",
+  "use-four-digit-year-example-23-09-2026": (value0: string) =>
+    `Use ${value0} with a four-digit year, for example 23-09-2026.`,
+  "date-year-month-day": () => "A date must have a year, a month and a day.",
+  "date-pattern-cannot-match-valid": (value0: string) =>
+    `The date pattern cannot match a valid ${value0}.`,
+  "date-pattern-years-months-days": () => "A date pattern must have its years, months and days.",
+  "date-pattern-cannot-match-real-calendar-date": () =>
+    "The date pattern cannot match a real calendar date.",
+  "key-conflict": () => KEY_CONFLICT,
+  "no-date": () => NO_DATE,
+  "derive-shifts-refused": suppliedMessage,
+  "use-each-forgotten-digit-values-joined-by-such": (value0: string) =>
+    `Use ${value0} with ? for each forgotten digit, values joined by | such as 05|15, or a lone ? for a whole date.`,
+  "recovery-pattern-contain-digit-values-joined-by": () =>
+    "A recovery pattern must contain a ? digit, or values joined by |.",
+});
 
 /** Seedshift shifts three words with each date: by its year, its month and its day. */
 const WORDS_PER_DATE = 3;
@@ -79,8 +102,7 @@ export function isLeapYear(year: number): boolean {
 
 /** The days of `month` of `year`; refused for a month that is not 1 to 12. */
 export function daysInMonth(year: number, month: number): number {
-  if (!inWholeRange(month, DATE_PARTS.month))
-    throw new Error(`There is no month ${String(month)}.`);
+  if (!inWholeRange(month, DATE_PARTS.month)) throw ERRORS.create("there-no-month", []);
   if (month === 2) return isLeapYear(year) ? 29 : 28;
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
@@ -93,13 +115,17 @@ function yearRangeText(): string {
 
 function assertCalendarDate(date: DateShiftDate): void {
   if (!inWholeRange(date.year, DATE_PARTS.year)) {
-    throw new Error(integerRefusal("A date year", DATE_PARTS.year, yearRangeText()));
+    throw ERRORS.create("assert-calendar-date-refused", [
+      integerRefusal("A date year", DATE_PARTS.year, yearRangeText()),
+    ]);
   }
   if (!inWholeRange(date.month, DATE_PARTS.month)) {
-    throw new Error(integerRefusal("A date month", DATE_PARTS.month));
+    throw ERRORS.create("assert-calendar-date-refused-2", [
+      integerRefusal("A date month", DATE_PARTS.month),
+    ]);
   }
   if (!inWholeRange(date.day, DATE_PARTS.day) || date.day > daysInMonth(date.year, date.month)) {
-    throw new Error("The day is outside the selected calendar month.");
+    throw ERRORS.create("day-outside-selected-calendar-month", []);
   }
 }
 
@@ -112,7 +138,7 @@ export function parseDate(value: string): DateShiftDate {
     new RegExp(`^\\d{${width}}$`, "u").test(part) ? Number(part) : undefined,
   );
   if (date === undefined)
-    throw new Error(`Use ${DATE_FORMAT_TEXT} with a four-digit year, for example 23-09-2026.`);
+    throw ERRORS.create("use-four-digit-year-example-23-09-2026", [`${DATE_FORMAT_TEXT}`]);
   assertCalendarDate(date);
   return { year: date.year, month: date.month, day: date.day };
 }
@@ -130,8 +156,7 @@ export function ownedDates(dates: readonly DateShiftDate[]): readonly DateShiftD
 /** A date held to the rules of a date, copied (ownedDate's rule for each of `dates` above). */
 export function ownedDate(date: DateShiftDate): DateShiftDate {
   // A hole of a sparse list reaches here as undefined.
-  if (typeof date !== "object" || date === null)
-    throw new Error("A date must have a year, a month and a day.");
+  if (typeof date !== "object" || date === null) throw ERRORS.create("date-year-month-day", []);
   // Copied first and the copy checked: a getter could give one value to a check and another later.
   const copy = { year: date.year, month: date.month, day: date.day };
   assertCalendarDate(copy);
@@ -143,7 +168,7 @@ function ownedPart(values: readonly number[], part: WholeRange, name: string) {
   // Array.from turns holes into undefined, which the check below refuses; some() would skip them.
   const copy = Array.from(values ?? []);
   if (copy.length === 0 || !copy.every((value) => inWholeRange(value, part)))
-    throw new Error(`The date pattern cannot match a valid ${name}.`);
+    throw ERRORS.create("date-pattern-cannot-match-valid", [`${name}`]);
   // Each value once, in ascending order, as parseDatePattern gives them:
   // datePatternCombinationCount counts distinct dates, a value given twice would be tried twice,
   // and the search keeps the earliest dates of each shift, which it meets first only in this order.
@@ -157,14 +182,14 @@ function ownedPart(values: readonly number[], part: WholeRange, name: string) {
 export function ownedPattern(pattern: DatePattern): DatePattern {
   // A hole of a sparse list reaches here as undefined, as for ownedDate.
   if (typeof pattern !== "object" || pattern === null)
-    throw new Error("A date pattern must have its years, months and days.");
+    throw ERRORS.create("date-pattern-years-months-days", []);
   const owned: DatePattern = Object.freeze({
     key: String(pattern.key),
     years: ownedPart(pattern.years, DATE_PARTS.year, "year"),
     months: ownedPart(pattern.months, DATE_PARTS.month, "month"),
     days: ownedPart(pattern.days, DATE_PARTS.day, "day"),
   });
-  if (countOf(owned) === 0) throw new Error("The date pattern cannot match a real calendar date.");
+  if (countOf(owned) === 0) throw ERRORS.create("date-pattern-cannot-match-real-calendar-date", []);
   return owned;
 }
 
@@ -206,7 +231,7 @@ export const NO_DATE = "Type at least one date.";
  */
 export function ownedPatterns(patterns: readonly DatePattern[]): readonly DatePattern[] {
   const owned = Array.from(patterns, ownedPattern);
-  if (conflictingPatternKey(owned) >= 0) throw new Error(KEY_CONFLICT);
+  if (conflictingPatternKey(owned) >= 0) throw ERRORS.create("key-conflict", []);
   return Object.freeze(owned);
 }
 
@@ -228,8 +253,9 @@ export function sortDates(dates: readonly DateShiftDate[]): DateShiftDate[] {
  * the dates; refuses no date and more than the phrase takes.
  */
 export function deriveShifts(dates: readonly DateShiftDate[], wordCount: Bip39WordCount): number[] {
-  if (dates.length === 0) throw new Error(NO_DATE);
-  if (dates.length > maximumDates(wordCount)) throw new Error(tooManyDatesMessage(wordCount));
+  if (dates.length === 0) throw ERRORS.create("no-date", []);
+  if (dates.length > maximumDates(wordCount))
+    throw ERRORS.create("derive-shifts-refused", [tooManyDatesMessage(wordCount)]);
   const sorted = sortDates(dates);
   sorted.forEach(assertCalendarDate);
   // Sorting makes the input date order irrelevant; years, months and days
@@ -279,11 +305,9 @@ export function parseDatePattern(value: string): DatePattern {
   // Each part with its values joined by |, in an order of DATE_ORDERS.
   const read = readDateParts(typed === WHOLE_DATE ? WHOLE_DATE_PATTERN : typed, partMasks);
   if (read === undefined)
-    throw new Error(
-      `Use ${DATE_FORMAT_TEXT} with ? for each forgotten digit, values joined by | such as 05|15, or a lone ? for a whole date.`,
-    );
+    throw ERRORS.create("use-each-forgotten-digit-values-joined-by-such", [`${DATE_FORMAT_TEXT}`]);
   if (!isDatePattern(typed))
-    throw new Error("A recovery pattern must contain a ? digit, or values joined by |.");
+    throw ERRORS.create("recovery-pattern-contain-digit-values-joined-by", []);
   // The same values in another order are the same pattern: one key, so that it is searched once.
   const keyOf = (masks: readonly string[]) => [...new Set(masks)].sort().join("|");
   // Held to the rules of every pattern there, a valid value in each part and a real date.

@@ -41,7 +41,7 @@ import { datesPrompt } from "../src/cli/input.js";
 
 /** The answer as typed: the secret questions take a reading of it, here none. */
 const typed = (answer: string) => answer;
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
+import { CANCELLED } from "../src/cli/terminal-keys.js";
 
 const TEST_PHRASE =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -101,13 +101,13 @@ describe("secret input", () => {
 
   it("cancels at the end of the input instead of asking again", async () => {
     terminal.answers = "";
-    await expect(askSecretUntil("Seed phrase:", typed)).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await askSecretUntil("Seed phrase:", typed)).toBe(CANCELLED);
     expect(written.join("").match(/Seed phrase: /gu)).toHaveLength(1);
   });
 
   it("stops at Ctrl+C", async () => {
     terminal.answers = "test\x03";
-    await expect(askSecretUntil("Seed phrase:", typed)).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await askSecretUntil("Seed phrase:", typed)).toBe(CANCELLED);
   });
 
   it("asks only for the dates when a record file gives the encoded seed phrase", async () => {

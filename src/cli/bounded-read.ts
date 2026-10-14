@@ -1,5 +1,10 @@
 import { closeSync, openSync, readSync } from "node:fs";
 import { InputTooLargeError, MEBIBYTE } from "../core/byte-units.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.bounded-read", {
+  "read-file-refuse-refused": suppliedMessage,
+});
 
 /**
  * The largest text that a command reads: a file, standard input or an answer typed or pasted at a
@@ -64,6 +69,6 @@ export function readFileOrRefuse(
     return readBoundedFile(path, limit, what);
   } catch (error) {
     if (error instanceof InputTooLargeError) throw error;
-    throw new Error(unreadable, { cause: error });
+    throw ERRORS.create("read-file-refuse-refused", [unreadable], { cause: error });
   }
 }

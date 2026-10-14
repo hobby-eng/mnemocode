@@ -11,6 +11,11 @@ import {
   type CopyField,
 } from "./card-settings.js";
 import type { UniformChoice } from "./platform.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.card-session", {
+  "card-session-no-name": () => "The card session has no name.",
+});
 
 /**
  * Remembers the random choices of one working session.
@@ -73,7 +78,7 @@ export function createCardSession(choose: UniformChoice): CardSession {
       presentation ??= resolveCardPresentation(choose);
       const own = validateProfile(supplied);
       // The name was chosen together with the first employment.
-      if (name === undefined) throw new Error("The card session has no name.");
+      if (name === undefined) throw ERRORS.create("card-session-no-name", []);
       // Email and website follow the company that is finally printed.
       const details = ExportDetails.drawn(
         choose,

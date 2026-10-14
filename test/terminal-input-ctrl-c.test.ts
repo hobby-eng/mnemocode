@@ -28,7 +28,7 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/cli/terminal-choice.js")>()),
   choose: async () => {
     terminal.modesAtQuestions.push([...terminal.rawModes]);
-    return true;
+    return "yes";
   },
 }));
 
@@ -36,7 +36,7 @@ import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
 import { searchShareRepair } from "../src/cli/share-repair.js";
 import { watchForCtrlC, withCtrlCWatch } from "../src/cli/terminal-input.js";
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
+import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { writeShare } from "../src/sskr/transport.js";
 
 const TEST_PHRASE =
@@ -111,7 +111,7 @@ describe("Ctrl+C during a long search", () => {
     expect(typed.every((byte) => byte === 0)).toBe(true);
     keys.type(`x${CTRL_C}`);
     expect(watch.signal.aborted).toBe(true);
-    expect(() => watch.signal.throwIfAborted()).toThrow(InputCancelledError);
+    expect(watch.signal.reason).toBe(CANCELLED);
     await watch.stop();
     expectTerminalGivenBack();
     // A second stop changes nothing.
@@ -122,7 +122,7 @@ describe("Ctrl+C during a long search", () => {
   it("takes Ctrl+\\ for Ctrl+C, so that no SIGQUIT ends the tool on the private screen", async () => {
     const watch = watchForCtrlC();
     keys.type(CTRL_BACKSLASH);
-    expect(() => watch.signal.throwIfAborted()).toThrow(InputCancelledError);
+    expect(watch.signal.reason).toBe(CANCELLED);
     await watch.stop();
     expectTerminalGivenBack();
   });
@@ -143,7 +143,7 @@ describe("Ctrl+C during a long search", () => {
       expect(terminal.rawModes).toEqual([true, false, true]);
       expect(watch.signal.aborted).toBe(false);
       keys.type(CTRL_C);
-      expect(() => watch.signal.throwIfAborted()).toThrow(InputCancelledError);
+      expect(watch.signal.reason).toBe(CANCELLED);
       await watch.stop();
       expectTerminalGivenBack();
     },
@@ -218,7 +218,7 @@ describe("Ctrl+C during a long search", () => {
       "max-candidates": "10000",
     });
     setTimeout(() => keys.type(CTRL_C), 10);
-    await expect(search).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await search).toBe(CANCELLED);
     expect(terminal.rawModes).toEqual([true, false]);
     expectTerminalGivenBack();
   });
@@ -227,7 +227,7 @@ describe("Ctrl+C during a long search", () => {
     // Two forgotten words: 4,194,304 combinations, some seconds of search.
     const search = runRecoverWord({ mnemonic: `? ? ${TEST_PHRASE.split(" ").slice(2).join(" ")}` });
     setTimeout(() => keys.type(CTRL_C), 10);
-    await expect(search).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await search).toBe(CANCELLED);
     expect(terminal.rawModes).toEqual([true, false]);
     expectTerminalGivenBack();
   });
@@ -256,7 +256,7 @@ describe("Ctrl+C during a long search", () => {
       else setTimeout(() => keys.type(CTRL_C), 0);
     };
     typeAfterQuestion();
-    await expect(search).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await search).toBe(CANCELLED);
     // The question drops the keys typed ahead itself (choose, replaced here); the watch takes raw
     // mode only after it.
     expect(terminal.modesAtQuestions).toEqual([[]]);

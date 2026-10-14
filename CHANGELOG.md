@@ -4,6 +4,9 @@
 
 ### Distribution
 
+- Terminal questions return cancellation as a value. Ctrl+C ends the command with one cancellation line and exit code 130; a share assessment cancelled at its final callback gives no live repair plan.
+- Refusals carry stable module codes while retaining their existing messages, native error kinds and causes. The shared error catalog and a gate against uncoded native constructors keep terminal and browser hosts on the same contract.
+- A seed phrase pasted into a record mode, format, month, command, help topic or unknown option is not repeated in the refusal. Known options keep their usual labels.
 - Each release has one executable file for Linux, Windows and macOS, with Node.js, the card artwork and the SSKR engine built in; `pnpm build:executable` builds it for the current computer.
 - Started without a command in a terminal, for example by a double-click on the executable file, MnemoCode shows a menu. It asks step by step, with examples, and shows in grey the command that does the same before it runs it.
 - Encode in the menu offers the usual sets of Shamir shares, such as 2 of 3 or 3 of 5, and any other up to 16 shares, and writes them in the form chosen: restoring them gives that form back. Entry 4 splits the seed phrase itself into standard SSKR shares in Bytewords or as a `ur:sskr` code.

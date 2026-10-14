@@ -30,6 +30,12 @@ import {
 } from "./self-test-check.js";
 import { CandidateFileAdmission } from "./candidate-file-admission.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.candidate-encryption-self-test", {
+  "refused-another-reason": () => "refused for another reason",
+  "malformed-identity-reached-diagnostics": () => "A malformed identity reached diagnostics",
+});
 
 /**
  * `open` refused as a CandidateFileRefusedError with `problem` and a message that `because`
@@ -47,7 +53,7 @@ function expectFileRefused(
         await open();
       } catch (error) {
         if (error instanceof CandidateFileRefusedError && error.code === problem) throw error;
-        throw new Error("refused for another reason");
+        throw ERRORS.create("refused-another-reason", []);
       }
     },
     because,
@@ -110,7 +116,7 @@ export async function checkCandidateEncryptionQuick(): Promise<void> {
           error.message.includes(malformed) ||
           error.cause !== undefined
         )
-          throw new Error("A malformed identity reached diagnostics");
+          throw ERRORS.create("malformed-identity-reached-diagnostics", []);
         throw error;
       }
     },

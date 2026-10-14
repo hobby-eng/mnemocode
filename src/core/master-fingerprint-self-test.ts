@@ -16,6 +16,12 @@ import {
   expectSame,
   hexOfBytes,
 } from "./self-test-check.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.master-fingerprint-self-test", {
+  "bip39-seed-was-asked-other-parameters": () =>
+    "The BIP39 seed was asked for with other parameters.",
+});
 
 /** The public test phrase of all-zero entropy, the first BIP39 vector. */
 export const PUBLIC_MNEMONIC =
@@ -176,7 +182,7 @@ function publishedSeeds(
   return (password, salt, rounds, bytes) => {
     const known = expected.find((entry) => entry.phrase === password && entry.salt === salt);
     if (known === undefined || rounds !== SEED_ROUNDS || bytes !== SEED_BYTES)
-      throw new Error("The BIP39 seed was asked for with other parameters.");
+      throw ERRORS.create("bip39-seed-was-asked-other-parameters", []);
     return bytesOfHex(known.seed);
   };
 }

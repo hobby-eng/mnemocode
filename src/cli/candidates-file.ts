@@ -23,12 +23,25 @@ import {
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { askSecretUntil } from "./ask.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { wipeAll } from "../core/bits.js";
 import { readBoundedTextFile } from "./text-file.js";
 import { discardRenamedOutput, preflightFileDestination } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { terminalNotice } from "./terminal.js";
 import { saveOutput } from "./output-saving.js";
 import { counted } from "../core/search-plan.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.candidates-file", {
+  "choose-one-protection-candidates-scanner-s-key-passphrase": () =>
+    "Choose one protection for the candidates: the Scanner's key, a passphrase, or none.",
+  "protect-candidates-candidates-key-scanner-s-age1-key": () =>
+    "Protect the candidates with --candidates-key (the Scanner's age1 key), --candidates-key-file or --candidates-passphrase-file; --plaintext-candidates writes them without encryption.",
+  "give-candidates-file-save-candidates": () => "Give --candidates-file to save candidates.",
+  "give-passphrase-candidates-candidates-passphrase-file": () =>
+    "Give the passphrase for the candidates with --candidates-passphrase-file.",
+});
 
 /**
  * The protection chosen with the options; none when, on the private screen, a passphrase is asked
@@ -41,9 +54,7 @@ function protectionOf(args: ParsedArguments): ListProtection | undefined {
   const plaintext = args["plaintext-candidates"] === true;
   const given = [key, keyFile, passphraseFile].filter((item) => item !== undefined).length;
   if (given + (plaintext ? 1 : 0) > 1)
-    throw new Error(
-      "Choose one protection for the candidates: the Scanner's key, a passphrase, or none.",
-    );
+    throw ERRORS.create("choose-one-protection-candidates-scanner-s-key-passphrase", []);
   if (key !== undefined) return new ScannerKeyProtection(key);
   if (keyFile !== undefined)
     return new ScannerKeyProtection(readBoundedTextFile(keyFile, "The Scanner's key file"));
@@ -51,9 +62,7 @@ function protectionOf(args: ParsedArguments): ListProtection | undefined {
     return new PassphraseProtection(readBoundedTextFile(passphraseFile, "The passphrase file"));
   if (plaintext) return new NoProtection();
   if (args["ask-secrets"] === true) return undefined;
-  throw new Error(
-    "Protect the candidates with --candidates-key (the Scanner's age1 key), --candidates-key-file or --candidates-passphrase-file; --plaintext-candidates writes them without encryption.",
-  );
+  throw ERRORS.create("protect-candidates-candidates-key-scanner-s-age1-key", []);
 }
 
 /** How a candidate list is protected; each needs --candidates-file. */
@@ -91,7 +100,8 @@ export class CandidatesFile {
     const path = value(args, "candidates-file");
     if (path === undefined) {
       for (const key of CANDIDATE_PROTECTION_OPTIONS)
-        if (args[key] !== undefined) throw new Error("Give --candidates-file to save candidates.");
+        if (args[key] !== undefined)
+          throw ERRORS.create("give-candidates-file-save-candidates", []);
       return undefined;
     }
     await preflightFileDestination(path, false);
@@ -110,13 +120,15 @@ export class CandidatesFile {
    * Settles what the list needs before a search can take long: the passphrase, asked twice on the
    * private screen when no file gave it, and the BIP39 passphrase that the list would hold. A short
    * passphrase, or two that differ, is asked again without a limit, so that it does not lose a
-   * finished search; only Ctrl+C leaves.
+   * finished search; only Ctrl+C leaves, which gives CANCELLED.
    */
-  async prepare(bip39Passphrase: string): Promise<CandidateListWriter> {
+  async prepare(bip39Passphrase: string): Promise<CandidateListWriter | Cancelled> {
     if (this.#writer?.passphrase === bip39Passphrase) return this.#writer.writer;
     assertListPassphrase(bip39Passphrase);
-    this.#protection ??= await askListPassphrase();
-    const writer = new CandidateListWriter(this.#protection, bip39Passphrase);
+    const protection = this.#protection ?? (await askListPassphrase());
+    if (protection === CANCELLED) return CANCELLED;
+    this.#protection = protection;
+    const writer = new CandidateListWriter(protection, bip39Passphrase);
     this.#writer = { passphrase: bip39Passphrase, writer };
     return writer;
   }
@@ -130,29 +142,48 @@ export class CandidatesFile {
     terminalNotice("No list was saved; no file was written.", "warning");
   }
 
-  /** Saves `phrases`, English BIP39 phrases in their order, with `bip39Passphrase` for all. */
-  async savePhrases(phrases: readonly string[], bip39Passphrase = ""): Promise<void> {
-    await this.#save((await this.prepare(bip39Passphrase)).writePhrases(phrases));
+  /**
+   * Saves `phrases`, English BIP39 phrases in their order, with `bip39Passphrase` for all;
+   * CANCELLED at Ctrl+C.
+   */
+  async savePhrases(
+    phrases: readonly string[],
+    bip39Passphrase = "",
+  ): Promise<Cancelled | undefined> {
+    const writer = await this.prepare(bip39Passphrase);
+    if (writer === CANCELLED) return CANCELLED;
+    return this.#save(writer.writePhrases(phrases));
   }
 
-  /** Saves the BIP39 `entropies` of the candidates; they are wiped once the list is made. */
-  async saveEntropies(entropies: Uint8Array[], bip39Passphrase = ""): Promise<void> {
-    await this.#save((await this.prepare(bip39Passphrase)).write(entropies));
+  /**
+   * Saves the BIP39 `entropies` of the candidates; they are wiped once the list is made, or at once
+   * when the person cancels (CANCELLED).
+   */
+  async saveEntropies(
+    entropies: Uint8Array[],
+    bip39Passphrase = "",
+  ): Promise<Cancelled | undefined> {
+    const writer = await this.prepare(bip39Passphrase);
+    if (writer === CANCELLED) {
+      wipeAll(entropies);
+      return CANCELLED;
+    }
+    return this.#save(writer.write(entropies));
   }
 
-  async #save(made: Promise<ListOutcome>): Promise<void> {
+  async #save(made: Promise<ListOutcome>): Promise<Cancelled | undefined> {
     const outcome = await made;
     if (outcome.kind === "empty") {
       discardRenamedOutput(this.#path);
       terminalNotice(NO_CANDIDATE_TO_SAVE, "warning");
-      return;
+      return undefined;
     }
     // The searches refuse a list before this; here only a fault of MnemoCode would be refused.
     if (outcome.kind === "full") throw new TooManyForListError(NARROW_ANY_SEARCH);
     const { list } = outcome;
     // A save that fails on the private screen is offered again, under another name, or skipped,
     // and the candidates stay on the screen (save-retry.ts).
-    let saved: string | undefined;
+    let saved: string | undefined | Cancelled;
     try {
       saved = await saveOutput(this.#args, "candidates-file", "The candidate list", (path) =>
         publishNewPrivateFile(path, list.bytes),
@@ -162,7 +193,7 @@ export class CandidatesFile {
       // written, skipped or refused (CandidateListFile.bytes).
       list.bytes.fill(0);
     }
-    if (saved === undefined) return;
+    if (saved === undefined || saved === CANCELLED) return saved;
     terminalNotice(
       `Saved ${counted(list.records, "candidate phrase")}, ${list.description}: ${saved} (record N is candidate N).`,
       "success",
@@ -173,20 +204,23 @@ export class CandidatesFile {
         : "This file holds real seed phrases in the open: keep it offline, and delete it once the wallet is found.",
       "warning",
     );
+    return undefined;
   }
 }
 
 /** The passphrase for a list, asked twice on the private screen until both agree. */
-async function askListPassphrase(): Promise<ListProtection> {
+async function askListPassphrase(): Promise<ListProtection | Cancelled> {
   if (!onPrivateScreen())
-    throw new Error("Give the passphrase for the candidates with --candidates-passphrase-file.");
+    throw ERRORS.create("give-passphrase-candidates-candidates-passphrase-file", []);
   for (;;) {
     const first = await askSecretUntil("Passphrase for the candidates list:", parseListPassphrase, {
       what: `a passphrase of at least ${MIN_LIST_PASSPHRASE_LENGTH} characters`,
     });
+    if (first === CANCELLED) return CANCELLED;
     const again = await askSecretUntil("The same passphrase again:", (answer) => answer, {
       what: "the same passphrase again",
     });
+    if (again === CANCELLED) return CANCELLED;
     if (again === first) return new PassphraseProtection(first);
     // Either of the two may be the mistyped one, so both are asked again.
     terminalNotice("The two passphrases differ: type both again.", "warning");

@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { formatEncoded, parseDate, representMnemonic } from "../src/core.js";
 import { backupCheckAnswer, offerEncodedCheck, offerShareCheck } from "../src/cli/backup-check.js";
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
+import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { matching } from "./helpers/matchers.js";
@@ -42,7 +42,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         "24-09-2026\r",
         `${DATE}\r`,
       ];
-      terminal.choices = [true, "again", "again"];
+      terminal.choices = ["yes", "again", "again"];
       await offerEncodedCheck(original, () => undefined, undefined);
       expect(seen.notices).toEqual([
         "",
@@ -117,7 +117,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const wrong = direct.replace(/^\d+/u, "2");
       const show = vi.fn();
       terminal.answers = [`${wrong}\r`, `${direct}\r`];
-      terminal.choices = [true, "show", true];
+      terminal.choices = ["yes", "show", "yes"];
       await offerEncodedCheck(
         {
           mnemonic: TEST_PHRASE,
@@ -148,7 +148,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         "24-09-2026\r",
         `${DATE}\r`,
       ];
-      terminal.choices = [true, "again"];
+      terminal.choices = ["yes", "again"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
         parseDate(DATE),
       ]);
@@ -172,7 +172,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const other = MINIMAL_BYTEWORDS.find((word) => word !== pair)!;
       const changed = `${SSKR_UR_PREFIX}${body.slice(0, at)}${other}${body.slice(at + 2)}`;
       terminal.answers = [`${shares[0]};${changed}\r`, `${shares[1]}\r`, `${DATE}\r`];
-      terminal.choices = [true];
+      terminal.choices = ["yes"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
         parseDate(DATE),
       ]);
@@ -185,7 +185,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("tells shares of another phrase from wrong dates without the dates of the result", async () => {
       const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
       terminal.answers = [`${shares[0]};${shares[1]}\r`, "24-09-2026\r", `${DATE}\r`];
-      terminal.choices = [true, "again"];
+      terminal.choices = ["yes", "again"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined);
       expect(seen.notices.filter((line) => line !== "")).toEqual([
         "The shares with these dates give another seed phrase: check the dates and the shares.",
@@ -195,7 +195,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const others = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
       seen.notices = [];
       terminal.answers = [`${others[0]};${others[1]}\r`];
-      terminal.choices = [true];
+      terminal.choices = ["yes"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
         parseDate(DATE),
       ]);
@@ -210,10 +210,8 @@ describe("encode, decode and the backup check on the private screen", () => {
   describe("the backup check", () => {
     it("stops at Ctrl+C inside the check", async () => {
       terminal.answers = ["12\x03"];
-      terminal.choices = [true];
-      await expect(offerEncodedCheck(original, () => undefined, undefined)).rejects.toBeInstanceOf(
-        InputCancelledError,
-      );
+      terminal.choices = ["yes"];
+      expect(await offerEncodedCheck(original, () => undefined, undefined)).toBe(CANCELLED);
     });
   });
 });

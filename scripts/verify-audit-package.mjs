@@ -4,6 +4,15 @@
 // pnpm check.
 import { execFileSync } from "node:child_process";
 import { publishedAuditFiles } from "./audit-files.mjs";
+import { ErrorCatalog } from "../src/core/error-catalog.ts";
+
+const ERRORS = new ErrorCatalog("scripts.verify-audit-package", {
+  /**
+   * @param {string} value0
+   */
+  "audit-files-left-out-npm-package-files": (value0) =>
+    `Audit files left out of the npm package ("files"):\n${value0}`,
+});
 
 const [listing] = JSON.parse(
   execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
@@ -15,5 +24,5 @@ const packed = new Set(listing.files.map((file) => file.path));
 const audits = publishedAuditFiles();
 const missing = audits.filter((path) => !packed.has(path));
 if (missing.length > 0)
-  throw new Error(`Audit files left out of the npm package ("files"):\n${missing.join("\n")}`);
+  throw ERRORS.create("audit-files-left-out-npm-package-files", [`${missing.join("\n")}`]);
 console.log(`Audit package: all ${audits.length} published audit files are packed.`);

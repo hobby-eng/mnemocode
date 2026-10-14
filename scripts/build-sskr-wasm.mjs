@@ -12,6 +12,20 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { format } from "prettier";
+import { ErrorCatalog } from "../src/core/error-catalog.ts";
+
+const ERRORS = new ErrorCatalog("scripts.build-sskr-wasm", {
+  /**
+   * @param {string} value0
+   */
+  "sskr-glue-missing": (value0) => `The SSKR glue is missing ${value0}.`,
+  "sskr-glue-still-network-loader-async-start": () =>
+    "The SSKR glue still has a network loader or an async start.",
+  "sskr-declarations-missing-documented-async-start": () =>
+    "The SSKR declarations are missing the documented async start.",
+  "sskr-declarations-more-after-async-start": () =>
+    "The SSKR declarations have more after the async start.",
+});
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const bridge = join(root, "sskr-wasm");
@@ -33,7 +47,7 @@ const declarationStyle = {
 function removeSection(source, startMarker, endMarker) {
   const start = source.indexOf(startMarker);
   const end = source.indexOf(endMarker, start + startMarker.length);
-  if (start < 0 || end < 0) throw new Error(`The SSKR glue is missing ${startMarker.trim()}.`);
+  if (start < 0 || end < 0) throw ERRORS.create("sskr-glue-missing", [`${startMarker.trim()}`]);
   return source.slice(0, start) + source.slice(end);
 }
 
@@ -54,7 +68,7 @@ function offlineGlue(glue) {
     "initSync.__wbindgen_wasm_module = module;",
   );
   if (/\bfetch\s*\(|import\.meta|__wbg_load|\b__wbg_init\b/u.test(result)) {
-    throw new Error("The SSKR glue still has a network loader or an async start.");
+    throw ERRORS.create("sskr-glue-still-network-loader-async-start", []);
   }
   return result;
 }
@@ -64,10 +78,10 @@ function offlineDeclarations(declarations) {
   const start = declarations.lastIndexOf("export default function __wbg_init");
   const documentation = declarations.lastIndexOf("\n/**", start);
   if (start < 0 || documentation < 0) {
-    throw new Error("The SSKR declarations are missing the documented async start.");
+    throw ERRORS.create("sskr-declarations-missing-documented-async-start", []);
   }
   if (!/^export default function __wbg_init[^\n]*;\s*$/u.test(declarations.slice(start))) {
-    throw new Error("The SSKR declarations have more after the async start.");
+    throw ERRORS.create("sskr-declarations-more-after-async-start", []);
   }
   return `${declarations.slice(0, documentation).trimEnd()}\n`;
 }

@@ -33,6 +33,13 @@ import { readBundledFile } from "../bundled-files.js";
 import { headingLine } from "./terminal-style.js";
 import { PUBLIC_VECTORS_FILE } from "../bundled-file-paths.js";
 import { describeError } from "../core/refusal.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.self-test", {
+  "critical-mnemo-code-core-self-test-failed-no": (value0: string) =>
+    `CRITICAL: MnemoCode core self-test failed.\nNo mnemonic data was processed.\n${value0}`,
+  "qr-write-read-round-trip-mismatch": () => "QR write/read round trip mismatch.",
+});
 
 const PUBLIC_MNEMONIC =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -61,9 +68,7 @@ export function assertCoreSelfTest(): void {
     MnemoCodeSelfTest.core(FEATURES);
   } catch (error) {
     const detail = describeError(error);
-    throw new Error(
-      `CRITICAL: MnemoCode core self-test failed.\nNo mnemonic data was processed.\n${detail}`,
-    );
+    throw ERRORS.create("critical-mnemo-code-core-self-test-failed-no", [`${detail}`]);
   }
 }
 
@@ -86,7 +91,7 @@ async function checkQrRoundTrip(): Promise<void> {
     const path = join(directory, "vector.png");
     await exportQrPayload(payload, path);
     if ((await decodeQrPngFile(path)) !== payload)
-      throw new Error("QR write/read round trip mismatch.");
+      throw ERRORS.create("qr-write-read-round-trip-mismatch", []);
   });
 }
 

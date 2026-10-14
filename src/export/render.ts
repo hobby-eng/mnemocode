@@ -16,6 +16,18 @@ import { assertColorCardContent, EMPTY_CARD_COLLECTION } from "./card-content.js
 import { withPlannedDecoys } from "./card-plan.js";
 import { SHEETS_ONLY, sheetsOnly } from "./template-catalog.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.render", {
+  "no-approved-card-templates-installed-yet": () => "No approved card templates are installed yet.",
+  "template-does-not-support": (value0: string, value1: string) =>
+    `Template ${value0} does not support ${value1}.`,
+  "template-rendered-empty-document": (value0: string) =>
+    `Template ${value0} rendered an empty document.`,
+  "assert-individual-template-refused": suppliedMessage,
+  "no-individual-cards": () => NO_INDIVIDUAL_CARDS,
+  "empty-card-collection": () => EMPTY_CARD_COLLECTION,
+});
 
 /** One card output: the design that draws it and the content it draws. */
 export interface CardJob {
@@ -71,7 +83,7 @@ export async function renderCards(
   drawing: CardDrawing,
   jobs: readonly CardJob[],
 ): Promise<Uint8Array> {
-  if (jobs.length === 0) throw new Error("No approved card templates are installed yet.");
+  if (jobs.length === 0) throw ERRORS.create("no-approved-card-templates-installed-yet", []);
   // Every page setting is checked before any choice is made or any template draws
   // (AUD-012-FUN006), and so is every design that a card page size draws as separate cards.
   for (const { template, content } of jobs) {
@@ -88,7 +100,10 @@ export async function renderCards(
   const pages: Uint8Array[] = [];
   for (const { template, content } of jobs) {
     if (template.kind !== content.kind)
-      throw new Error(`Template ${template.id} does not support ${String(content.kind)}.`);
+      throw ERRORS.create("template-does-not-support", [
+        `${template.id}`,
+        `${String(content.kind)}`,
+      ]);
     // A design's own texts and details print over those of the export.
     const resolved: CardContent = {
       ...content,
@@ -110,7 +125,7 @@ export async function renderCards(
     });
     const source = await PDFDocument.load(bytes);
     if (source.getPageCount() === 0)
-      throw new Error(`Template ${template.id} rendered an empty document.`);
+      throw ERRORS.create("template-rendered-empty-document", [`${template.id}`]);
     pages.push(bytes);
   }
   if (pages.length === 1) {
@@ -129,7 +144,9 @@ const NO_INDIVIDUAL_CARDS = "Only color codes are drawn as individual business c
  */
 export function assertIndividualTemplate(template: CardTemplate, named = false): void {
   if (!template.renderIndividual)
-    throw new Error(named ? sheetsOnly(`The design "${template.name}"`) : SHEETS_ONLY);
+    throw ERRORS.create("assert-individual-template-refused", [
+      named ? sheetsOnly(`The design "${template.name}"`) : SHEETS_ONLY,
+    ]);
 }
 
 /**
@@ -141,8 +158,8 @@ export function assertIndividualTemplate(template: CardTemplate, named = false):
  */
 export function assertIndividualCards(template: CardTemplate, content: CardContent): void {
   assertIndividualTemplate(template);
-  if (content.kind !== "colors") throw new Error(NO_INDIVIDUAL_CARDS);
-  if (!content.colors.length) throw new Error(EMPTY_CARD_COLLECTION);
+  if (content.kind !== "colors") throw ERRORS.create("no-individual-cards", []);
+  if (!content.colors.length) throw ERRORS.create("empty-card-collection", []);
   assertColorCardContent(content);
   assertPageSettings(content);
   assertSeparateCardSize(content.pageSize);

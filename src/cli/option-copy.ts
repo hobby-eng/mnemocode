@@ -1,7 +1,34 @@
 import { coinById, type WalletEvidence } from "../bitcoin-evidence.js";
 import { defined } from "../core/defined.js";
+import {
+  COPY_FIELDS,
+  profileFields,
+  type CopyField,
+  type ProfileField,
+} from "../export/card-settings.js";
 
-const labels: Readonly<Record<string, string>> = {
+/** The option of each text of a card design; studio-name has no card- before it. */
+export const COPY_OPTIONS: Readonly<Record<CopyField, string>> = Object.freeze({
+  studioName: "studio-name",
+  slogan: "card-slogan",
+  subtitle: "card-subtitle",
+  footer: "card-footer",
+  referenceLabel: "card-reference-label",
+});
+
+/** The option of a detail of the person on the cards, such as --card-name. */
+export function profileOption(field: ProfileField): string {
+  return `card-${field}`;
+}
+
+const OPTION_LABELS: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(profileFields.map((field) => [profileOption(field), `card ${field}`])),
+  ...Object.fromEntries(
+    COPY_FIELDS.map((field) => {
+      const key = COPY_OPTIONS[field];
+      return [key, key.replaceAll("-", " ")];
+    }),
+  ),
   all: "all templates selection",
   "ask-secrets": "secret prompt mode",
   "backup-check": "written-backup check",
@@ -75,12 +102,11 @@ const labels: Readonly<Record<string, string>> = {
 };
 
 /**
- * Human-facing CLI copy must not expose internal parser keys. The key may be any name typed, such
- * as --constructor, so only the table's own entries are labels, never what an object inherits
- * (AUD-015-UI001).
+ * Human-facing CLI copy uses only the table's own labels (AUD-015-UI001). An unknown key is
+ * untrusted text: it could be a seed phrase pasted into the wrong field and is never repeated.
  */
 export function optionLabel(key: string): string {
-  return Object.hasOwn(labels, key) ? defined(labels[key]) : key.replaceAll("-", " ");
+  return Object.hasOwn(OPTION_LABELS, key) ? defined(OPTION_LABELS[key]) : "unknown option";
 }
 
 export function optionSubject(key: string): string {

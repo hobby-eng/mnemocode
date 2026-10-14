@@ -52,6 +52,36 @@ import { Redacted } from "./redacted.js";
 import { counting } from "./search-plan.js";
 import { inWholeRange, wholeNumbersFrom } from "./typed-number.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.candidates", {
+  "no-bip39-word-starts-letters-at": (value0: string) =>
+    `No BIP39 word starts with the letters at ${value0}.`,
+  "unknown-english-bip39-word-at": (value0: string) => `Unknown English BIP39 word at ${value0}.`,
+  "enter-places-words-prefix-b": (value0: string) =>
+    `Enter ${value0} places: words, ?, a prefix with *, or a|b.`,
+  "mark-each-forgotten-word-prefix-b": () =>
+    "Mark each forgotten word with ?, a prefix with *, or a|b.",
+  "enter-words-you-their-order": (value0: string) =>
+    `Enter the ${value0} words you have, in their order.`,
+  "unknown-english-bip39-word-at-place": (value0: string) =>
+    `Unknown English BIP39 word at place ${value0}.`,
+  "missing-word-search-one-word-fewer-than-valid": () =>
+    "A missing-word search needs one word fewer than a valid phrase length.",
+  "written-word-not-bip39-index": () => "A written word is not a BIP39 index.",
+  "unknown-search-kind": () => UNKNOWN_SEARCH_KIND,
+  "word-search-places": (value0: string) => `A word search needs ${value0} places.`,
+  "every-place-one-more-bip39-indexes-ascending-order": () =>
+    "Every place needs one or more BIP39 indexes in ascending order.",
+  "search-more-than-combinations": (value0: string, value1: string) =>
+    `This search has more than ${value0} combinations: ${value1}.`,
+  "every-place-search-at-least-one-word": () => "Every place of a search needs at least one word.",
+  "candidate-s-number-counts-from-1": {
+    kind: "range",
+    text: () => "A candidate's number counts from 1.",
+  },
+  "candidate-bip39-indexes": (value0: string) => `A candidate needs ${value0} BIP39 indexes.`,
+});
 
 /** Combinations that one search may check; at a few microseconds each, about a minute. */
 export const MAX_SEARCH_COMBINATIONS = 2 ** 24;
@@ -126,13 +156,13 @@ export function wordPlaceOf(written: string, position: number): WordPlace {
     );
     // The letters are part of a secret word: the message names only their place.
     if (prefix === "" || /[*?|]/u.test(prefix) || indexes.length === 0)
-      throw new Error(`No BIP39 word starts with the letters at ${where}.`);
+      throw ERRORS.create("no-bip39-word-starts-letters-at", [`${where}`]);
     return indexes;
   }
   const words = written.split("|");
   const indexes = words.map((word) => ENGLISH_INDEX.get(word));
   if (indexes.some((index) => index === undefined))
-    throw new Error(`Unknown English BIP39 word at ${where}.`);
+    throw ERRORS.create("unknown-english-bip39-word-at", [`${where}`]);
   return [...new Set(indexes as number[])].sort((a, b) => a - b);
 }
 
@@ -140,10 +170,10 @@ export function wordPlaceOf(written: string, position: number): WordPlace {
 export function parseUnknownWords(text: string): WordSearch {
   const written = englishTokens(text);
   if (!isBip39WordCount(written.length))
-    throw new Error(`Enter ${WORD_COUNTS_TEXT} places: words, ?, a prefix with *, or a|b.`);
+    throw ERRORS.create("enter-places-words-prefix-b", [`${WORD_COUNTS_TEXT}`]);
   const places = written.map((word, index) => wordPlaceOf(word, index + 1));
   if (places.every((place) => place.length === 1))
-    throw new Error("Mark each forgotten word with ?, a prefix with *, or a|b.");
+    throw ERRORS.create("mark-each-forgotten-word-prefix-b", []);
   return { kind: "unknown-words", places };
 }
 
@@ -151,10 +181,11 @@ export function parseUnknownWords(text: string): WordSearch {
 export function parseMissingWord(text: string): WordSearch {
   const written = englishTokens(text);
   if (!isBip39WordCount(written.length + 1))
-    throw new Error(`Enter the ${WORD_COUNTS_LESS_ONE_TEXT} words you have, in their order.`);
+    throw ERRORS.create("enter-words-you-their-order", [`${WORD_COUNTS_LESS_ONE_TEXT}`]);
   const indexes = written.map((word, index) => {
     const found = ENGLISH_INDEX.get(word);
-    if (found === undefined) throw new Error(`Unknown English BIP39 word at place ${index + 1}.`);
+    if (found === undefined)
+      throw ERRORS.create("unknown-english-bip39-word-at-place", [`${index + 1}`]);
     return found;
   });
   return { kind: "missing-word", written: indexes };
@@ -195,15 +226,15 @@ const UNKNOWN_SEARCH_KIND = "Unknown kind of word search.";
 function assertSearch(search: WordSearch): void {
   if (search.kind === "missing-word") {
     if (!Array.isArray(search.written) || !isBip39WordCount(search.written.length + 1))
-      throw new Error("A missing-word search needs one word fewer than a valid phrase length.");
-    if (!areWordIndexes(search.written)) throw new Error("A written word is not a BIP39 index.");
+      throw ERRORS.create("missing-word-search-one-word-fewer-than-valid", []);
+    if (!areWordIndexes(search.written)) throw ERRORS.create("written-word-not-bip39-index", []);
     return;
   }
-  if (search.kind !== "unknown-words") throw new Error(UNKNOWN_SEARCH_KIND);
+  if (search.kind !== "unknown-words") throw ERRORS.create("unknown-search-kind", []);
   if (!Array.isArray(search.places) || !isBip39WordCount(search.places.length))
-    throw new Error(`A word search needs ${WORD_COUNTS_TEXT} places.`);
+    throw ERRORS.create("word-search-places", [`${WORD_COUNTS_TEXT}`]);
   if (!everyElement(search.places, isPlace))
-    throw new Error("Every place needs one or more BIP39 indexes in ascending order.");
+    throw ERRORS.create("every-place-one-more-bip39-indexes-ascending-order", []);
 }
 
 /** The combinations a search checks: the work it takes, which MAX_SEARCH_COMBINATIONS bounds. */
@@ -219,9 +250,10 @@ export function searchCombinations(search: WordSearch): number {
  */
 export function assertSearchable(combinations: number, narrow: string = NARROW_WORD_SEARCH): void {
   if (combinations > MAX_SEARCH_COMBINATIONS)
-    throw new Error(
-      `This search has more than ${counting(MAX_SEARCH_COMBINATIONS)} combinations: ${narrow}.`,
-    );
+    throw ERRORS.create("search-more-than-combinations", [
+      `${counting(MAX_SEARCH_COMBINATIONS)}`,
+      `${narrow}`,
+    ]);
 }
 
 /** The places, counted from 0, that a search tries several words in. */
@@ -308,7 +340,7 @@ export function placeCombinations(places: readonly WordPlace[]): Generator<reado
   // Copied first, then checked: Array.from turns holes into undefined, which is refused.
   const owned = Array.from(places, (place) => {
     if (!Array.isArray(place) || place.length === 0)
-      throw new Error("Every place of a search needs at least one word.");
+      throw ERRORS.create("every-place-search-at-least-one-word", []);
     const words = Array.from<unknown>(place);
     assertWordIndexes(words);
     return Object.freeze(words);
@@ -459,14 +491,14 @@ export class WordCandidate extends Redacted {
   constructor(number: number, words: CandidateWords) {
     super("WordCandidate");
     if (!inWholeRange(number, CANDIDATE_NUMBERS))
-      throw new RangeError("A candidate's number counts from 1.");
+      throw ERRORS.create("candidate-s-number-counts-from-1", []);
     if (!Array.isArray(words))
-      throw new Error(`A candidate needs ${WORD_COUNTS_TEXT} BIP39 indexes.`);
+      throw ERRORS.create("candidate-bip39-indexes", [`${WORD_COUNTS_TEXT}`]);
     // A copy, checked itself: a search reuses its array for the next combination, and a getter
     // cannot give the check one value and the copy another.
     const copy = Array.from<unknown>(words);
     if (!isBip39WordCount(copy.length) || !areWordIndexes(copy))
-      throw new Error(`A candidate needs ${WORD_COUNTS_TEXT} BIP39 indexes.`);
+      throw ERRORS.create("candidate-bip39-indexes", [`${WORD_COUNTS_TEXT}`]);
     this.#number = number;
     this.#words = Object.freeze(copy);
   }
@@ -532,7 +564,7 @@ export class WordCandidateSearch extends Redacted {
   static parse(text: string, kind: WordSearch["kind"]): WordCandidateSearch {
     if (kind === "unknown-words") return new WordCandidateSearch(parseUnknownWords(text));
     if (kind === "missing-word") return new WordCandidateSearch(parseMissingWord(text));
-    throw new Error(UNKNOWN_SEARCH_KIND);
+    throw ERRORS.create("unknown-search-kind", []);
   }
 
   /** Takes a search that a host made itself, after the same checks as a parsed one. */

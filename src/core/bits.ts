@@ -3,6 +3,13 @@
 import { BIP39_INDEX_BITS, BITS_PER_BYTE, checksumBits } from "./bip39-sizes.js";
 import { textPieces } from "./pieces.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.bits", {
+  "entropy-contain-whole-number-bytes": () => "Entropy must contain a whole number of bytes.",
+  "hexadecimal-text-two-digits-0-9-f-each": () =>
+    "Hexadecimal text has two digits, 0-9 or a-f, for each byte.",
+});
 
 // Defined in bip39-sizes.ts, which this module imports and which may not import it back.
 export { BITS_PER_BYTE };
@@ -87,7 +94,7 @@ export function bytesToBits(bytes: Uint8Array): string {
  */
 export function bitsToBytes(bits: string): Uint8Array {
   if (bits.length % BITS_PER_BYTE !== 0 || !/^[01]+$/u.test(bits))
-    throw new Error("Entropy must contain a whole number of bytes.");
+    throw ERRORS.create("entropy-contain-whole-number-bytes", []);
   return Uint8Array.from(textPieces(bits, BITS_PER_BYTE, (byte) => Number.parseInt(byte, 2)));
 }
 
@@ -109,7 +116,7 @@ export const HEX_DIGITS_PER_BYTE = 2;
  */
 export function bytesOfHex(text: string): Uint8Array {
   if (text.length % HEX_DIGITS_PER_BYTE !== 0 || !/^[0-9a-f]*$/iu.test(text))
-    throw new Error("Hexadecimal text has two digits, 0-9 or a-f, for each byte.");
+    throw ERRORS.create("hexadecimal-text-two-digits-0-9-f-each", []);
   return Uint8Array.from(
     textPieces(text, HEX_DIGITS_PER_BYTE, (byte) => Number.parseInt(byte, 16)),
   );

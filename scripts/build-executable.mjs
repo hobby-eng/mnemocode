@@ -43,6 +43,7 @@ import {
   SSKR_ENGINE_FOLDER,
   SSKR_MANIFEST,
 } from "../src/bundled-file-paths.ts";
+import { ERRORS, PublicationRollbackError } from "./executable-build-errors.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const output = resolve(process.argv[2] ?? join(root, RELEASE_FOLDER));
@@ -53,7 +54,10 @@ const name = executableName(version);
 
 // The executable carries the running Node.js, so it must be the version the project is tested on.
 if (process.version !== `v${nodeVersion}`)
-  throw new Error(`Build with Node.js ${nodeVersion} from .node-version, not ${process.version}.`);
+  throw ERRORS.create("build-node-js-from-node-version-not", [
+    `${nodeVersion}`,
+    `${process.version}`,
+  ]);
 
 /**
  * Every file the program reads at run time, by its path from the package root
@@ -181,10 +185,7 @@ try {
     if (failures.length > 1) {
       // Never discard the last recoverable copies when the filesystem also refuses rollback.
       keepStaging = true;
-      throw new AggregateError(
-        failures,
-        `Publication and rollback failed; backups remain in ${staging}.`,
-      );
+      throw new PublicationRollbackError(failures, `${staging}`);
     }
     throw error;
   }

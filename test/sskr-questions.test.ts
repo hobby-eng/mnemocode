@@ -8,7 +8,7 @@ import type { ParsedArguments } from "../src/cli/arguments.js";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
 import { runSskrCombine } from "../src/cli/sskr-command.js";
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
+import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { JointRepair } from "../src/sskr/joint-repair.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
@@ -54,7 +54,7 @@ function withoutColour(line: string): string {
 }
 
 /** Restores with --ask-secrets and `options`, answering as the terminal says. */
-function combine(options: ParsedArguments = {}): Promise<void> {
+function combine(options: ParsedArguments = {}): Promise<Cancelled | undefined> {
   return runSskrCombine({ "ask-secrets": true, ...options });
 }
 
@@ -303,7 +303,7 @@ describe("shares on the private screen", () => {
   it("goes back to the shares when the search is not wanted", async () => {
     // Two unreadable colours leave 65,536 combinations, more than --max-tries 1 allows.
     terminal.answers = [`${SHARES[0]};${marked([5, 7])}\r`, `${SHARES[1]}\r`];
-    terminal.choices = [false, "one", 2];
+    terminal.choices = ["no", "one", 2];
     await combine({ "max-tries": "1" });
     expect(terminal.questions[0]).toMatch(/^Search 65,536 combinations, .+\?$/u);
     // Keys typed during the assessment do not answer it: choose drops them
@@ -333,7 +333,7 @@ describe("shares on the private screen", () => {
     });
     terminal.answers = [`${SHARES[0]};${marked([5, 7])}\r`, `${SHARES[0]};${SHARES[1]}\r`];
     // No to the search, then "Type every share again".
-    terminal.choices = [false, "all"];
+    terminal.choices = ["no", "all"];
     await combine({ "max-tries": "1" });
     expect(seen.out).toContain(PHRASE);
     const wipes = terminal.events.flatMap((event, at) => (event === "wipe" ? [at] : []));
@@ -385,8 +385,8 @@ describe("shares on the private screen", () => {
 
   it("stops when the person chooses Stop", async () => {
     terminal.answers = [`${SHARES[0]};${marked([5, 7])}\r`];
-    terminal.choices = [false, "stop"];
-    await expect(combine({ "max-tries": "1" })).rejects.toBeInstanceOf(InputCancelledError);
+    terminal.choices = ["no", "stop"];
+    expect(await combine({ "max-tries": "1" })).toBe(CANCELLED);
     expect(seen.out).toEqual([]);
   });
 });
@@ -485,15 +485,15 @@ describe("shares on the private screen", () => {
 
     it("asks for a date search beyond --max-candidates, and starts one within it", async () => {
       terminal.answers = [`${shares[0]};${shares[2]}\r`, "23-09-202?\r"];
-      terminal.choices = [false];
+      terminal.choices = ["no"];
       // The answers of the menu's wallet question are given as options: only the search is asked.
-      await expect(
-        combine({
+      expect(
+        await combine({
           mode: "seedshift",
           "master-fingerprint": TEST_FINGERPRINT,
           "max-candidates": "9",
         }),
-      ).rejects.toThrow();
+      ).toBe(CANCELLED);
       expect(terminal.questions[0]).toMatch(/^Search 10 date combinations, /u);
       terminal.questions = [];
       terminal.answers = [`${shares[0]};${shares[2]}\r`, "23-09-202?\r"];

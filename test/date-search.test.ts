@@ -5,7 +5,14 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeMnemonic, encodeMnemonicLegacy, parseDate } from "../src/core.js";
 import { HARD_MAX_COMBINATIONS, reportDateMatches, searchDates } from "../src/cli/date-search.js";
-import { DatesAnswer, DateSearch } from "../src/core/date-search.js";
+import { DatesAnswer, DateSearch, type DateSearchResult } from "../src/core/date-search.js";
+import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
+
+/** The result of a search that was made and not stopped. */
+function made(result: DateSearchResult | undefined | Cancelled): DateSearchResult {
+  if (result === undefined || result === CANCELLED) throw new Error("No search was made.");
+  return result;
+}
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
@@ -96,18 +103,20 @@ describe("the date search", () => {
       limits: { maxResults: 100 },
       report: { progressEvery: 1000 },
     };
-    const all = (await searchDates(search))!;
+    const all = made(await searchDates(search));
     // MnemoCode Seedshift gives a valid phrase for every date.
     expect(all).toMatchObject({ combinations: 10, checksumValid: 10, matchCount: 10 });
     expect(all.kept).toEqual([]);
-    const matched = (await searchDates({
-      ...search,
-      evidence: { kind: "master-fingerprint", value: TEST_FINGERPRINT, network: "mainnet" },
-      target: await CandidatesFile.of({
-        "candidates-file": "unused.age",
-        "plaintext-candidates": true,
+    const matched = made(
+      await searchDates({
+        ...search,
+        evidence: { kind: "master-fingerprint", value: TEST_FINGERPRINT, network: "mainnet" },
+        target: await CandidatesFile.of({
+          "candidates-file": "unused.age",
+          "plaintext-candidates": true,
+        }),
       }),
-    }))!;
+    );
     expect(matched).toMatchObject({ checksumValid: 10, matchCount: 1, kept: [TEST_PHRASE] });
     expect(matched.shown).toEqual([
       {

@@ -42,6 +42,14 @@ import { SHEET_PAGE_SIZE } from "./card-settings.js";
 import { codeColors } from "./card-palette.js";
 import { ownCards } from "./card-decoys.js";
 import { withPlannedDecoys, type SheetShaper } from "./card-plan.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.sskr-render", {
+  "unsupported-sskr-card-style": () => "Unsupported SSKR card style.",
+  "share-cards-cannot-printed-every-seed-phrase-longest": (value0: string) =>
+    `These share cards cannot be printed for every seed phrase, the longest of 24 words included: ${value0}`,
+  "there-no-share-at-place-set": () => "There is no share at that place in the set.",
+});
 
 /**
  * How the cards of shares are drawn: the design, the layout, unless the page size decides it, and
@@ -142,7 +150,7 @@ export class ShareCardSet {
         : {}),
     };
     const design = designOfStyle(options.style);
-    if (design === undefined) throw new Error("Unsupported SSKR card style.");
+    if (design === undefined) throw ERRORS.create("unsupported-sskr-card-style", []);
     if (layout === "individual") assertSeparateCards(design);
     // The details first, then the shares: the order in which the random choices are made. Copies
     // of what the caller gave (ExportDetails), so that every card rendered later shows them as they
@@ -245,9 +253,9 @@ export class ShareCardSet {
       const set = await ShareCardSet.create(drawing, [...sskrLongVector.shares], requested);
       (await set.renderShare(0)).fill(0);
     } catch (error) {
-      throw new Error(
-        `These share cards cannot be printed for every seed phrase, the longest of 24 words included: ${refusalMessage(error)}`,
-      );
+      throw ERRORS.create("share-cards-cannot-printed-every-seed-phrase-longest", [
+        `${refusalMessage(error)}`,
+      ]);
     }
   }
 
@@ -263,7 +271,7 @@ export class ShareCardSet {
 
   #member(place: number): Member {
     const member = Number.isSafeInteger(place) ? this.#members[place] : undefined;
-    if (member === undefined) throw new Error("There is no share at that place in the set.");
+    if (member === undefined) throw ERRORS.create("there-no-share-at-place-set", []);
     return member;
   }
 

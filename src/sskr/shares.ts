@@ -11,6 +11,12 @@ import { ShareSet } from "./share-set.js";
 import { nodeFillRandom, nodeSharePlatform } from "./share-platform-node.js";
 import { type BackupSplit, type BackupSplitRequest, MAX_SHARES, ShareSplit } from "./split.js";
 import { assertShareCount, normalizeShare } from "./transport.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.shares", {
+  "some-shares-repaired-elements-could-not-checked-use": () =>
+    "Some shares or repaired elements could not be checked. Use combineSskrShareSet to inspect them, or restore on the command line.",
+});
 
 export { MAX_SHARES };
 
@@ -89,9 +95,7 @@ export async function combineSskrShares(records: readonly string[]): Promise<str
   await assertCheckedRecords(records);
   const restored = await ShareSet.combine(records, nodeSharePlatform);
   if (!restored.checked)
-    throw new Error(
-      "Some shares or repaired elements could not be checked. Use combineSskrShareSet to inspect them, or restore on the command line.",
-    );
+    throw ERRORS.create("some-shares-repaired-elements-could-not-checked-use", []);
   return restored.mnemonic;
 }
 

@@ -7,6 +7,12 @@ import {
 } from "../export/image-export.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { terminalNotice } from "./terminal.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.image-options", {
+  "image-format-can-selected-only-when-image-output": () =>
+    "An image format can be selected only when an image output folder or individual-card output folder is provided.",
+});
 
 export function imageFormat(args: ParsedArguments): ImageFormat {
   return parseImageFormat(value(args, "image-format"));
@@ -33,9 +39,7 @@ export async function validateImageOptions(
   const cards = value(args, "cards-dir");
   await validateOutputPaths(args);
   if (args["image-format"] !== undefined && directory === undefined && cards === undefined)
-    throw new Error(
-      "An image format can be selected only when an image output folder or individual-card output folder is provided.",
-    );
+    throw ERRORS.create("image-format-can-selected-only-when-image-output", []);
   if (directory === undefined && args["image-format"] === undefined)
     return { needsRenderer: false };
   imageFormat(args);

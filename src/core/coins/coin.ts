@@ -17,6 +17,19 @@ import { hash160, type AddressType } from "./address-types.js";
 import { writtenAsAnAddress } from "./other-forms.js";
 import { trimWhiteSpace, asciiLowercase } from "../white-space.js";
 import { equalBytes } from "../bits.js";
+import { ErrorCatalog, suppliedMessage } from "../error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.coins.coin", {
+  "assert-address-location-refused": suppliedMessage,
+  "coins-wallet-check-coins-core-coins": {
+    kind: "type",
+    text: () => "The coins of a wallet check must be coins of core/coins/.",
+  },
+  "coins-wallet-check-each-given-once": () =>
+    "The coins of a wallet check must each be given once.",
+  "unknown-coin-coins": (value0: string, value1: string) =>
+    `Unknown coin "${value0}"; the coins are ${value1}.`,
+});
 
 /** The identifier of each coin, as a host names it, such as "bitcoin-cash". */
 export type CoinId =
@@ -342,7 +355,9 @@ export function assertAddressLocation(location: AddressLocation): void {
   for (const name of ["account", "branch", "index"] as const) {
     const value = location[name];
     if (!inWholeRange(value, NORMAL_INDEX_RANGE))
-      throw new Error(integerRefusal(name, NORMAL_INDEX_RANGE));
+      throw ERRORS.create("assert-address-location-refused", [
+        integerRefusal(name, NORMAL_INDEX_RANGE),
+      ]);
   }
 }
 
@@ -362,9 +377,9 @@ export class CoinList {
   constructor(coins: readonly Coin[]) {
     const owned = Array.from(coins);
     if (!owned.every((coin) => coin instanceof Coin))
-      throw new TypeError("The coins of a wallet check must be coins of core/coins/.");
+      throw ERRORS.create("coins-wallet-check-coins-core-coins", []);
     if (new Set(owned.map((coin) => coin.id)).size !== owned.length)
-      throw new Error("The coins of a wallet check must each be given once.");
+      throw ERRORS.create("coins-wallet-check-each-given-once", []);
     this.#coins = Object.freeze(owned);
   }
 
@@ -381,9 +396,10 @@ export class CoinList {
     const wanted = asciiLowercase(trimWhiteSpace(String(id)));
     const coin = this.#coins.find((candidate) => candidate.id === wanted);
     if (coin === undefined)
-      throw new Error(
-        `Unknown coin "${id}"; the coins are ${this.#coins.map((known) => known.id).join(", ")}.`,
-      );
+      throw ERRORS.create("unknown-coin-coins", [
+        `${id}`,
+        `${this.#coins.map((known) => known.id).join(", ")}`,
+      ]);
     return coin;
   }
 }

@@ -50,6 +50,19 @@ function rulesBroken(files: Readonly<Record<string, string | null>>): string[] {
 }
 
 describe("the code rules of the coding guide", () => {
+  it("refuse native errors in source and tooling, while allowing simulated test faults", () => {
+    for (const path of ["src/cli/a.ts", "scripts/check.mjs"])
+      for (const constructor of ["Error", "TypeError", "RangeError", "SyntaxError"])
+        for (const prefix of ["new ", "", "new globalThis."])
+          expect(rulesBroken({ [path]: `throw ${prefix}${constructor}("Refused.");\n` })).toEqual([
+            "CORE-23",
+          ]);
+    expect(rulesBroken({ "test/a.test.ts": 'throw new Error("Synthetic fault.");\n' })).toEqual([]);
+    expect(rulesBroken({ "src/cli/a.ts": '// new Error("A comment.")\n' })).toEqual([]);
+    expect(rulesBroken({ "src/cli/a.ts": 'const hint = "new Error()";\n' })).toEqual([]);
+    expect(rulesBroken({ "src/cli/a.ts": 'throw ERRORS.create("refused", []);\n' })).toEqual([]);
+  });
+
   it("pass a tree that keeps every rule", () => {
     expect(codeRules({})).toEqual({ status: 0, problems: "" });
   });

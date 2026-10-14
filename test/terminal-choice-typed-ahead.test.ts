@@ -12,7 +12,7 @@ vi.mock("node:tty", async (importOriginal) => ({
 
 import { clearPrivateScreen, withPrivateScreen } from "../src/cli/private-screen.js";
 import { waitForEnter } from "../src/cli/terminal-choice.js";
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
+import { CANCELLED } from "../src/cli/terminal-keys.js";
 
 const ENTER = "\r";
 const ESCAPE = "\x1b";
@@ -104,11 +104,11 @@ describe("waitForEnter takes only keys pressed after its message", () => {
   it("does not take an Enter pressed before the message showed", async () => {
     keys.type(ENTER);
     after("Press Enter.", ESCAPE);
-    // The Enter typed ahead would have answered true.
-    expect(await waitForEnter("Press Enter.")).toBe(false);
+    // The Enter typed ahead would have accepted the message instead of leaving.
+    expect(await waitForEnter("Press Enter.")).toBe("escape");
     keys.type(`${ENTER}${ENTER}`);
     after("Press Enter.", ENTER);
-    expect(await waitForEnter("Press Enter.")).toBe(true);
+    expect(await waitForEnter("Press Enter.")).toBe("enter");
   });
 
   it("does not take an Escape typed ahead where only Escape leaves", async () => {
@@ -118,12 +118,12 @@ describe("waitForEnter takes only keys pressed after its message", () => {
       await waitForEnter("Press Enter to return to the menu (Esc quits).", {
         onlyEscapeLeaves: true,
       }),
-    ).toBe(true);
+    ).toBe("enter");
   });
 
   it("still cancels at a Ctrl+C typed ahead", async () => {
     keys.type(`left over${CTRL_C}`);
-    await expect(waitForEnter("Press Enter.")).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await waitForEnter("Press Enter.")).toBe(CANCELLED);
     expect(screen).not.toContain("Press Enter.");
   });
 

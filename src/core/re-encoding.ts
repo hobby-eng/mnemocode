@@ -25,6 +25,15 @@ import {
   type WalletMatch,
 } from "./wallet-check.js";
 import { capitalized } from "./prose.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.re-encoding", {
+  "last-word-not-taken": () => LAST_WORD_NOT_TAKEN,
+  "checksum-fails": () => CHECKSUM_FAILS,
+  "last-word-needed": () => LAST_WORD_NEEDED,
+  "no-such-last-word": () => NO_SUCH_LAST_WORD,
+  "not-confirmed": () => NOT_CONFIRMED,
+});
 
 // What confirmationLine takes, for a host that names it; wallet evidence names it for each of its
 // kinds (EVIDENCE_MATCHED_BY).
@@ -104,9 +113,9 @@ export class ReEncoding extends Redacted {
    */
   static of(backup: EncodedBackup, dates: readonly DateShiftDate[], lastWord?: string): ReEncoding {
     if (backup.givesSeveral) return ReEncoding.#withLastWord(backup.candidates(dates), lastWord);
-    if (lastWord !== undefined) throw new Error(LAST_WORD_NOT_TAKEN);
+    if (lastWord !== undefined) throw ERRORS.create("last-word-not-taken", []);
     const result = backup.decode(dates);
-    if (!result.checksumValid) throw new Error(CHECKSUM_FAILS);
+    if (!result.checksumValid) throw ERRORS.create("checksum-fails", []);
     return new ReEncoding(result);
   }
 
@@ -119,7 +128,7 @@ export class ReEncoding extends Redacted {
     candidates: readonly DecodedResult[],
     lastWord: string | undefined,
   ): ReEncoding {
-    if (lastWord === undefined) throw new Error(LAST_WORD_NEEDED);
+    if (lastWord === undefined) throw ERRORS.create("last-word-needed", []);
     const typed = englishTokens(lastWord);
     const found =
       typed.length === 1
@@ -127,7 +136,7 @@ export class ReEncoding extends Redacted {
             (candidate) => englishTokens(candidate.recoveredMnemonic).at(-1) === typed[0],
           )
         : undefined;
-    if (found === undefined) throw new Error(NO_SUCH_LAST_WORD);
+    if (found === undefined) throw ERRORS.create("no-such-last-word", []);
     return new ReEncoding(found);
   }
 
@@ -184,7 +193,7 @@ export class ReEncoding extends Redacted {
    */
   confirmationLine(by: MatchedBy): string {
     const confirmation = this.#confirmation;
-    if (confirmation === undefined) throw new Error(NOT_CONFIRMED);
+    if (confirmation === undefined) throw ERRORS.create("not-confirmed", []);
     if (confirmation.by === "person") return RE_ENCODING_WORDS.recognised;
     if (confirmation.warning !== undefined)
       return `The ${by} matches: the seed phrase is accepted, not proven.`;
@@ -195,7 +204,7 @@ export class ReEncoding extends Redacted {
 
   /** The phrase to encode again; refused until it is confirmed (NOT_CONFIRMED). */
   confirmedPhrase(): string {
-    if (this.#confirmedPhrase === undefined) throw new Error(NOT_CONFIRMED);
+    if (this.#confirmedPhrase === undefined) throw ERRORS.create("not-confirmed", []);
     return this.#confirmedPhrase;
   }
 }

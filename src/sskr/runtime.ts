@@ -8,6 +8,12 @@ import {
 } from "../bundled-file-paths.js";
 import type * as Engine from "../../sskr-wasm/generated/recovery_sskr_wasm.js";
 import { CheckedSskrBridge, type SskrBridge } from "./bridge.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.runtime", {
+  "sskr-dependency-integrity-check-failed-no-secret-was": () =>
+    "SSKR dependency integrity check failed. No secret was processed.",
+});
 
 let pending: Promise<SskrBridge> | undefined;
 
@@ -33,7 +39,7 @@ export function sskrEngine(): Promise<SskrBridge> {
       [binaryPath, binary],
     ] as const) {
       if (createHash("sha256").update(bytes).digest("hex") !== manifest[path]) {
-        throw new Error("SSKR dependency integrity check failed. No secret was processed.");
+        throw ERRORS.create("sskr-dependency-integrity-check-failed-no-secret-was", []);
       }
     }
     // A literal, which TypeScript and the bundler need: the bridge of SSKR_BRIDGE, which a test

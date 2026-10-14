@@ -32,6 +32,7 @@ import {
 } from "../export/heir-sheet.js";
 import { askOutputFile } from "./output-questions.js";
 import { askCards } from "./card-questions.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 
 /**
  * The phrase of the examples: a public BIP39 test vector (entropy 0x80 repeated). The usual test
@@ -159,7 +160,7 @@ const ALWAYS_MASKED_EXPLANATION: Explanation = {
 export async function askSeedshift(
   question: string,
   options: { readonly required?: boolean; readonly shares?: boolean } = {},
-): Promise<Mode | undefined> {
+): Promise<Mode | undefined | Cancelled> {
   if (options.required !== true) {
     const unmasked = options.shares === true ? "the shares alone restore it" : UNMASKED_NOTE;
     const used = await choose(
@@ -170,7 +171,7 @@ export async function askSeedshift(
       ],
       { label: "Seedshift", explanation: SEEDSHIFT_EXPLANATION },
     );
-    if (used === undefined) return undefined;
+    if (used === undefined || used === CANCELLED) return used;
     if (!used) return "direct";
   }
   if (options.shares === true) return "seedshift";
@@ -193,27 +194,29 @@ function everyPlace(places: readonly string[]): Choice<"all"> {
  * back from one of them.
  */
 async function eachAsked(
-  asks: readonly (() => Promise<string[] | undefined>)[],
-): Promise<string[] | undefined> {
+  asks: readonly (() => Promise<string[] | undefined | Cancelled>)[],
+): Promise<string[] | undefined | Cancelled> {
   const options: string[] = [];
   for (const ask of asks) {
     const asked = await ask();
-    if (asked === undefined) return undefined;
+    if (asked === undefined || asked === CANCELLED) return asked;
     options.push(...asked);
   }
   return options;
 }
 
 /** The record file of a result: --output and its name. */
-async function askRecordFile(): Promise<string[] | undefined> {
+async function askRecordFile(): Promise<string[] | undefined | Cancelled> {
   const path = await askOutputFile("Record file name", RECORD_FILE);
-  return path === undefined ? undefined : ["--output", path];
+  if (path === undefined || path === CANCELLED) return path;
+  return ["--output", path];
 }
 
 /** The QR code image of a result: --qr and its name. */
-async function askQrFile(): Promise<string[] | undefined> {
+async function askQrFile(): Promise<string[] | undefined | Cancelled> {
   const path = await askOutputFile("QR code file name", QR_FILE);
-  return path === undefined ? undefined : ["--qr", path];
+  if (path === undefined || path === CANCELLED) return path;
+  return ["--qr", path];
 }
 
 /**
@@ -221,7 +224,9 @@ async function askQrFile(): Promise<string[] | undefined> {
  * or Unicode codes, so they are offered only for a result written in a form with cards
  * (cardKindOf).
  */
-async function askResultDestination(form: EncodedFormat): Promise<string[] | undefined> {
+async function askResultDestination(
+  form: EncodedFormat,
+): Promise<string[] | undefined | Cancelled> {
   const withCards = cardKindOf(form) !== undefined;
   const choices: Choice<"screen" | "record" | "qr" | "cards" | "all">[] = [
     { label: "Only on this screen", value: "screen" },
@@ -236,7 +241,7 @@ async function askResultDestination(form: EncodedFormat): Promise<string[] | und
     });
   choices.push(everyPlace(["a record file", "a QR code", ...(withCards ? ["cards"] : [])]));
   const destination = await choose("Where should the result go?", choices, { label: "Output" });
-  if (destination === undefined) return undefined;
+  if (destination === undefined || destination === CANCELLED) return destination;
   const cards = () => askCards("mnemocode-cards", false);
   // The questions of each answer: none for the screen, all of them for All of these.
   const asks = {
@@ -260,29 +265,33 @@ export const QR_FILE = "mnemocode-qr.png";
  * it goes and the sheet for heirs; Encode's command line, or undefined for back. The shares are
  * written in the same form, so that whatever is chosen looks alike.
  */
-export async function askEncoding(): Promise<string[] | undefined> {
+export async function askEncoding(): Promise<string[] | undefined | Cancelled> {
   const form = await choose("Which form should the seed phrase take?", formChoices(), {
     label: "Form",
   });
-  if (form === undefined) return undefined;
+  if (form === undefined || form === CANCELLED) return form;
   const mode = await askSeedshift("Use Seedshift?", { required: alwaysMasked(form) });
-  if (mode === undefined) return undefined;
+  if (mode === undefined || mode === CANCELLED) return mode;
   // The Original Seedshift cannot be split into shares (mnemocode encode --help).
   const set = capabilities(mode).split
     ? await askShareSet("Split it into Shamir shares?", SHARES_EXPLANATION, true)
     : null;
-  if (set === undefined) return undefined;
+  if (set === undefined || set === CANCELLED) return set;
   const run =
     set === null ? await askCopyDestination(form, mode) : await askSharesRun(set, form, mode);
-  if (run === undefined) return undefined;
+  if (run === undefined || run === CANCELLED) return run;
   const heirs = await askHeirSheet(mode);
-  return heirs === undefined ? undefined : [...run, ...heirs];
+  if (heirs === undefined || heirs === CANCELLED) return heirs;
+  return [...run, ...heirs];
 }
 
 /** One copy in the chosen form, and where it goes. */
-async function askCopyDestination(form: EncodedFormat, mode: Mode): Promise<string[] | undefined> {
+async function askCopyDestination(
+  form: EncodedFormat,
+  mode: Mode,
+): Promise<string[] | undefined | Cancelled> {
   const destination = await askResultDestination(form);
-  if (destination === undefined) return undefined;
+  if (destination === undefined || destination === CANCELLED) return destination;
   return [
     "encode",
     "--ask-secrets",
@@ -302,9 +311,9 @@ async function askSharesRun(
   set: ShareSetChoice,
   form: EncodedFormat,
   mode: Mode,
-): Promise<string[] | undefined> {
+): Promise<string[] | undefined | Cancelled> {
   const shares = await askShares(set, shareFormatOf(form));
-  if (shares === undefined) return undefined;
+  if (shares === undefined || shares === CANCELLED) return shares;
   const copy = await choose(
     "Also show the whole seed phrase?",
     [
@@ -313,7 +322,7 @@ async function askSharesRun(
     ],
     { label: "Copy", explanation: COPY_EXPLANATION },
   );
-  if (copy === undefined) return undefined;
+  if (copy === undefined || copy === CANCELLED) return copy;
   return [
     "encode",
     "--sskr",
@@ -335,7 +344,7 @@ const HEIR_SHEET_NOTES: Readonly<Record<HeirSheetSize, string>> = {
  * The optional sheet that tells heirs how to restore the backup (README, Instructions for heirs),
  * where a backup made in `mode` can have one.
  */
-export async function askHeirSheet(mode: Mode): Promise<string[] | undefined> {
+export async function askHeirSheet(mode: Mode): Promise<string[] | undefined | Cancelled> {
   if (!capabilities(mode).heirSheet) return [];
   const size = await choose(
     "Instructions for your heirs?",
@@ -349,10 +358,11 @@ export async function askHeirSheet(mode: Mode): Promise<string[] | undefined> {
     ],
     { label: "Heirs", explanation: HEIRS_EXPLANATION },
   );
-  if (size === undefined) return undefined;
+  if (size === undefined || size === CANCELLED) return size;
   if (size === "") return [];
   const path = await askOutputFile("PDF file name", HEIR_SHEET_FILE);
-  return path === undefined ? undefined : ["--heir-sheet", path, "--heir-sheet-size", size];
+  if (path === undefined || path === CANCELLED) return path;
+  return ["--heir-sheet", path, "--heir-sheet-size", size];
 }
 
 /**
@@ -364,7 +374,7 @@ export async function askShareSet(
   question: string,
   explanation: Explanation,
   withNo: boolean,
-): Promise<ShareSetChoice | null | undefined> {
+): Promise<ShareSetChoice | null | undefined | Cancelled> {
   const set = await choose<ShareSetChoice | "other" | null>(
     question,
     [
@@ -387,7 +397,7 @@ export async function askShareSet(
  * used, so that a good first number stays. Each is recorded as the command line takes it, without
  * leading zeros.
  */
-async function askOtherShareSet(): Promise<ShareSetChoice | undefined> {
+async function askOtherShareSet(): Promise<ShareSetChoice | undefined | Cancelled> {
   const { MIN_SHARES, MAX_SHARES } = ShareSetChoice;
   const count = await askLine(
     `How many shares in all? (${MIN_SHARES} to ${MAX_SHARES})`,
@@ -397,12 +407,12 @@ async function askOtherShareSet(): Promise<ShareSetChoice | undefined> {
       check: (answer) => String(ShareSetChoice.typedCount(answer)),
     },
   );
-  if (count === undefined) return undefined;
+  if (count === undefined || count === CANCELLED) return count;
   const threshold = await askLine("How many of them restore the seed phrase?", "Restore", {
     what: `a number from ${MIN_SHARES} to ${count}`,
     check: (answer) => String(ShareSetChoice.typedThreshold(answer, Number(count))),
   });
-  if (threshold === undefined) return undefined;
+  if (threshold === undefined || threshold === CANCELLED) return threshold;
   return ShareSetChoice.of(Number(threshold), Number(count));
 }
 
@@ -413,7 +423,7 @@ async function askOtherShareSet(): Promise<ShareSetChoice | undefined> {
 export async function askShares(
   set: ShareSetChoice,
   shareFormat: ShareFormat,
-): Promise<string[] | undefined> {
+): Promise<string[] | undefined | Cancelled> {
   const options = ["--threshold", String(set.threshold), "--shares", String(set.count)];
   options.push("--share-format", shareFormat);
   const destinations: Choice<"screen" | "file" | "cards" | "all">[] = [
@@ -437,14 +447,16 @@ export async function askShares(
   const destination = await choose("Where should the shares go?", destinations, {
     label: "Output",
   });
-  if (destination === undefined) return undefined;
-  const file = async (): Promise<string[] | undefined> => {
+  if (destination === undefined || destination === CANCELLED) return destination;
+  const file = async (): Promise<string[] | undefined | Cancelled> => {
     const path = await askOutputFile("Text file name", "mnemocode-shares.txt");
-    return path === undefined ? undefined : ["--output", path];
+    if (path === undefined || path === CANCELLED) return path;
+    return ["--output", path];
   };
   const cards = () => askCards("mnemocode-share-cards", true);
   // The questions of each answer: none for the screen, all of them for All of these.
   const asks = { screen: [], file: [file], cards: [cards], all: [file, cards] }[destination];
   const outputs = await eachAsked(asks);
-  return outputs === undefined ? undefined : [...options, ...outputs];
+  if (outputs === undefined || outputs === CANCELLED) return outputs;
+  return [...options, ...outputs];
 }

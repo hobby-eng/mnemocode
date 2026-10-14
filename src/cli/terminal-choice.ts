@@ -16,7 +16,7 @@ import {
   ESCAPE_ALIASES,
   NOT_UTF8,
 } from "./terminal-input.js";
-import { UnusableAnswerError, type NextByte } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled, UnusableAnswerError, type NextByte } from "./terminal-keys.js";
 import {
   answerEndRow,
   displayWidth,
@@ -304,8 +304,8 @@ export interface ChooseOptions {
 
 /**
  * Asks `question` and lets the person choose an entry with the arrow keys and Enter, or at once
- * with its digit. Returns the value of the entry, or undefined for Escape, which `quit` describes
- * ("goes back", "quits"). The question stands apart, after a blank line, with a `warning` above it,
+ * with its digit. Returns the value of the entry, undefined for Escape, which `quit` describes
+ * ("goes back", "quits"), or CANCELLED for Ctrl+C, also when it was typed ahead. The question stands apart, after a blank line, with a `warning` above it,
  * such as why it is asked again, and its `explanation` below; once it is answered, the question and
  * its list are replaced by one line of the record of answers, its `label` and the chosen entry, so
  * that the questions asked so far read as a short summary.
@@ -314,10 +314,10 @@ export async function choose<T>(
   question: string,
   choices: readonly Choice<T>[],
   options: ChooseOptions,
-): Promise<T | undefined> {
+): Promise<T | undefined | Cancelled> {
   // Keys pressed before the question showed, such as the rest of a paste, are dropped and wiped:
   // only keys pressed for it answer it.
-  await dropTypedAhead();
+  if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
   let selected = options.initial ?? 0;
   const hint = paint(STYLE.muted, keyHint(choices, options.quit ?? "goes back"));
   const explanation = explanationLines(options.explanation);
@@ -342,6 +342,7 @@ export async function choose<T>(
     let drawn = draw();
     for (;;) {
       const key = await readKey(next, moreWithin);
+      if (key.kind === "cancel") return CANCELLED;
       if (key.kind === "back") {
         erase();
         return undefined;
@@ -430,6 +431,8 @@ export function enteredAnswer(
 type LineOutcome =
   | { readonly kind: "answer"; readonly answer: string }
   | { readonly kind: "back" }
+  /** Ctrl+C: the command is cancelled. */
+  | { readonly kind: "cancelled" }
   /** The answer could not be used: why, shown above the question when it is asked again. */
   | { readonly kind: "refused"; readonly reason: string };
 
@@ -444,7 +447,7 @@ function startsCharacter(byte: number): boolean {
  * `fallback`, or leaves out an `optional` answer (""), and asks again with a hint where there is
  * neither; an answer that is not UTF-8 (validCharacters) or that readLine refuses as too long, or
  * that `check` refuses, is explained in one warning line above the same question. Returns
- * undefined at Escape or when the input ends (Ctrl+D), which goes back. Only keys pressed after the
+ * undefined at Escape or when the input ends (Ctrl+D), which goes back, and CANCELLED at Ctrl+C. Only keys pressed after the
  * question shows answer it (dropTypedAhead). As with choose, the question goes once it is answered
  * or left, and the answer becomes a line of the record of answers under `label`.
  */
@@ -452,7 +455,7 @@ export async function askLine(
   question: string,
   label: string,
   options: LineQuestion = {},
-): Promise<string | undefined> {
+): Promise<string | undefined | Cancelled> {
   // The end of the input goes back here, as Escape does: the menu then leaves at its own question,
   // whose last answer the end of the input picks. A command's question cancels instead
   // (askValueUntil), since nothing can answer it any more.
@@ -462,6 +465,7 @@ export async function askLine(
   for (;;) {
     const outcome = await askLineOnce(shown, label, options, warning);
     if (outcome.kind === "back") return undefined;
+    if (outcome.kind === "cancelled") return CANCELLED;
     if (outcome.kind === "answer") return outcome.answer;
     warning = outcome.reason;
   }
@@ -477,7 +481,7 @@ async function askLineOnce(
   const promptWidth = displayWidth(shown);
   const warned = warningLines(warning);
   return withRawTerminal(async (next, moreWithin) => {
-    await dropTypedAhead();
+    if ((await dropTypedAhead()) === CANCELLED) return { kind: "cancelled" };
     process.stderr.write(`\n${warned.map((line) => `${line}\n`).join("")}`);
     writePrompt(shown);
     // The row of the cursor below the first row of the prompt: after the prompt, where Ctrl+D
@@ -496,7 +500,7 @@ async function askLineOnce(
       if (byte !== undefined && startsCharacter(byte)) characters += 1;
       return byte;
     };
-    let typed: string | undefined;
+    let typed: string | undefined | Cancelled;
     try {
       typed = await readLine(counted, {
         echo: true,
@@ -511,12 +515,13 @@ async function askLineOnce(
     } catch (error) {
       if (!(error instanceof UnusableAnswerError)) throw error;
       // The rest of a paste would otherwise answer the question when it is asked again.
-      await dropRestOfPaste(next, moreWithin);
+      if ((await dropRestOfPaste(next, moreWithin)) === CANCELLED) return { kind: "cancelled" };
       endRow = Math.floor((promptWidth + characters) / terminalColumns());
       reachDown();
       erase();
       return { kind: "refused", reason: error.message };
     }
+    if (typed === CANCELLED) return { kind: "cancelled" };
     if (typed !== undefined) endRow = answerEndRow(promptWidth, typed);
     reachDown();
     erase();
@@ -573,21 +578,29 @@ export interface EnterOptions {
 }
 
 /**
- * Waits for Enter after `message`; false when the person presses Escape instead. Only keys pressed
- * after the message shows count (dropTypedAhead): a second Enter, pressed while a result was being
- * worked out, would otherwise clear the screen with the result before it was read.
+ * Waits for Enter after `message`: "enter", "escape" when the person presses Escape instead, or
+ * CANCELLED at Ctrl+C. Only keys pressed after the message shows count (dropTypedAhead): a second
+ * Enter, pressed while a result was being worked out, would otherwise clear the screen with the
+ * result before it was read.
  */
-export async function waitForEnter(message: string, options: EnterOptions = {}): Promise<boolean> {
+export async function waitForEnter(
+  message: string,
+  options: EnterOptions = {},
+): Promise<"enter" | "escape" | Cancelled> {
   return withRawTerminal(async (next, moreWithin) => {
-    await dropTypedAhead();
+    if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
     writePrompt(message);
     for (;;) {
       const keyBytes = options.onlyEscapeLeaves === true ? withoutEscapeAliases(next) : next;
       const key = await readKey(keyBytes, moreWithin);
+      if (key.kind === "cancel") {
+        process.stderr.write("\n");
+        return CANCELLED;
+      }
       if (key.kind === "enter" || key.kind === "back") {
         // The key itself was not shown.
         process.stderr.write("\n");
-        return key.kind === "enter";
+        return key.kind === "enter" ? "enter" : "escape";
       }
     }
   });

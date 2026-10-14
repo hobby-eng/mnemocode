@@ -38,6 +38,13 @@ import {
   type ShareStructure,
 } from "./repair-units.js";
 import { CODE_FORMS, type CodeForm, DIGIT_MARKED_WIDTHS, unitModels } from "./repair-models.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.repair", {
+  "each-at-place": (value0: string) => `${value0}, each at its place.`,
+  "repair-candidates-refused": suppliedMessage,
+  "shares-readings-refused": suppliedMessage,
+});
 
 /** More marked elements than this leave too few checksum bits to find them. */
 export const MAX_MARKED_ELEMENTS = 6;
@@ -625,9 +632,10 @@ export function repairCandidates(
   if (!isMarked(value)) return [unrepairedShare(value)];
   const text = value.trim();
   if (exceedsMarks(text, MAX_MARKED_ELEMENTS))
-    throw new Error(`${capitalized(markLimit(MAX_MARKED_ELEMENTS))}, each at its place.`);
+    throw ERRORS.create("each-at-place", [`${capitalized(markLimit(MAX_MARKED_ELEMENTS))}`]);
   const problem = markProblem(text);
-  if (problem !== undefined) throw new Error(capitalized(problem));
+  if (problem !== undefined)
+    throw ERRORS.create("repair-candidates-refused", [capitalized(problem)]);
   const outcomes = MarkedReading.of(text)
     .flatMap((reading) => triedReadings(reading, freeBits))
     .map((model) => {
@@ -671,14 +679,14 @@ export function sharesOfReadings(
     for (const share of outcome.shares) found.set(share.ur, share);
   }
   if (tooMany || found.size === 0)
-    throw new Error(
+    throw ERRORS.create("shares-readings-refused", [
       tooMany || cappedDecoys
         ? "Too many elements are marked for this form: the checksum cannot tell them. Mark fewer, or use another share."
         : withJoinedMarksHint(
             "No valid share fits the marked elements. Check their places and the other elements.",
             text,
           ),
-    );
+    ]);
   return [...found.values()];
 }
 

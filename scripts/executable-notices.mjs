@@ -7,6 +7,15 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ASSETS_FOLDER, SSKR_ENGINE_FOLDER } from "../src/bundled-file-paths.ts";
+import { ErrorCatalog } from "../src/core/error-catalog.ts";
+
+const ERRORS = new ErrorCatalog("scripts.executable-notices", {
+  /**
+   * @param {string} value0
+   */
+  "license-running-node-js-was-not-found-next": (value0) =>
+    `The LICENSE of the running Node.js was not found next to ${value0}. Build with an official Node.js download.`,
+});
 
 /** File names that hold a package's license or notice text. */
 const LICENSE_FILE = /^(licen[cs]e|copying|notice)(\.(md|txt))?$/iu;
@@ -71,9 +80,7 @@ function nodeLicense() {
   const candidates = [join(folder, "LICENSE"), join(folder, "..", "LICENSE")];
   const found = candidates.find((path) => existsSync(path));
   if (found === undefined)
-    throw new Error(
-      `The LICENSE of the running Node.js was not found next to ${process.execPath}. Build with an official Node.js download.`,
-    );
+    throw ERRORS.create("license-running-node-js-was-not-found-next", [`${process.execPath}`]);
   return readFileSync(found, "utf8");
 }
 

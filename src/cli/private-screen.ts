@@ -11,6 +11,7 @@ import { CLEAR_SCREEN, ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN } from "./
 import { factLine } from "./terminal-style.js";
 import { protectionSummary } from "./protection.js";
 import { CANCELLED_EXIT_CODE } from "./exit-codes.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 
 /** What the private screen asks before it is cleared, after a blank line. */
 const CLEAR_PROMPT = "Press Enter to clear this screen.";
@@ -68,10 +69,13 @@ export function clearPrivateScreen(): boolean {
  * Runs `body` on the alternate screen when privateScreenAvailable(), waits for Enter after it
  * succeeds and then leaves the screen. When `body` fails, the screen is left at once, so that the
  * error is shown on the main screen. Ctrl+C also leaves it first: at a question and during a long
- * search it is read as a key (watchForCtrlC), and `body` fails with InputCancelledError; SIGINT,
- * from Ctrl+C while `body` computes something else or sent by other means, is handled here.
+ * search it is read as a key (watchForCtrlC), and `body` gives CANCELLED, as the question after
+ * the result does at Ctrl+C; SIGINT, from Ctrl+C while `body` computes something else or sent by
+ * other means, is handled here.
  */
-export async function withPrivateScreen<T>(body: () => Promise<T>): Promise<T> {
+export async function withPrivateScreen<T>(
+  body: () => Promise<T | Cancelled>,
+): Promise<T | Cancelled> {
   if (!privateScreenAvailable()) return body();
   // Written raw: NO_COLOR removes colours, not the screen switch.
   process.stderr.write(ENTER_ALTERNATE_SCREEN);
@@ -83,10 +87,10 @@ export async function withPrivateScreen<T>(body: () => Promise<T>): Promise<T> {
   process.once("SIGINT", interrupted);
   try {
     const result = await body();
+    if (result === CANCELLED) return CANCELLED;
     await flushed(process.stdout);
     process.stderr.write("\n");
-    await waitForEnter(CLEAR_PROMPT);
-    return result;
+    return (await waitForEnter(CLEAR_PROMPT)) === CANCELLED ? CANCELLED : result;
   } finally {
     active = false;
     process.off("SIGINT", interrupted);

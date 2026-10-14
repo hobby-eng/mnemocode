@@ -3,6 +3,12 @@ import { mappingRow, wordTableRow, wordTableText } from "../core/words.js";
 import { WORD_NUMBER_RANGE } from "../core/bip39-sizes.js";
 import { integerOption, type ParsedArguments, value } from "./arguments.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.table-command", {
+  "choose-exactly-one-lookup-value-word-index-bip39": () =>
+    "Choose exactly one lookup value: a word index, a BIP39 word, or a Unicode value. Request the full table instead when no lookup is needed.",
+});
 
 function printRow(row: ReturnType<typeof mappingRow>): void {
   terminalResultHeader("Word mapping", []);
@@ -20,9 +26,7 @@ export function runTable(arguments_: ParsedArguments): void {
   const word = value(arguments_, "word");
   const unicode = value(arguments_, "unicode");
   if ([indexValue, word, unicode].filter((item) => item !== undefined).length !== 1) {
-    throw new Error(
-      "Choose exactly one lookup value: a word index, a BIP39 word, or a Unicode value. Request the full table instead when no lookup is needed.",
-    );
+    throw ERRORS.create("choose-exactly-one-lookup-value-word-index-bip39", []);
   }
   // A number is read as every whole-number option is (arguments.ts); the row from the table.
   if (indexValue !== undefined)

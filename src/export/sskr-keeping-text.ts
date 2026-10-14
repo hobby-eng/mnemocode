@@ -9,6 +9,11 @@ import { PHRASE_WORDS } from "../core/masking.js";
 import { Share } from "../sskr/transport.js";
 import { counted } from "../core/search-plan.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.sskr-keeping-text", {
+  "there-no-shares-keep": () => "There are no shares to keep.",
+});
 
 /** How the cards or records of the shares were saved. */
 export type ShareCardPackaging =
@@ -65,6 +70,6 @@ export function shareKeepingNote(
   packaging: ShareCardPackaging,
   masked: boolean,
 ): string {
-  if (records.length === 0) throw new Error("There are no shares to keep.");
+  if (records.length === 0) throw ERRORS.create("there-no-shares-keep", []);
   return `${quorum(records, masked)}; ${LAYOUTS[packaging]}. Store the shares apart.`;
 }

@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { MENU_ENTRIES, runMenu } from "../src/cli/menu.js";
 import { askLine, choose, waitForEnter } from "../src/cli/terminal-choice.js";
+import { ErrorCatalog } from "../src/core/error-catalog.js";
 import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
 import { terminal, type Question } from "./helpers/keyed-terminal.js";
 import {
@@ -73,11 +74,11 @@ describe("a typed answer leaves only its line in the record of answers", () => {
   });
 
   it.each([
-    ["q, Q and Ctrl+D, then Enter", `qQ${CTRL_D}word${ENTER}`, {}, false],
-    ["q, Q and Ctrl+D, then Enter", `qQ${CTRL_D}word${ENTER}`, { onlyEscapeLeaves: true }, true],
-    ["a word, then Escape", `query${ESCAPE}`, { onlyEscapeLeaves: true }, false],
+    ["q, Q and Ctrl+D, then Enter", `qQ${CTRL_D}word${ENTER}`, {}, "escape"],
+    ["q, Q and Ctrl+D, then Enter", `qQ${CTRL_D}word${ENTER}`, { onlyEscapeLeaves: true }, "enter"],
+    ["a word, then Escape", `query${ESCAPE}`, { onlyEscapeLeaves: true }, "escape"],
     // A function key whose sequence ends in a letter that alone would leave.
-    ["F2 (ESC O Q), then Enter", `\x1bOQ${ENTER}`, { onlyEscapeLeaves: true }, true],
+    ["F2 (ESC O Q), then Enter", `\x1bOQ${ENTER}`, { onlyEscapeLeaves: true }, "enter"],
   ])("waits for Enter after %s with %j", async (_, keys, options, entered) => {
     watchScreen(80);
     terminal.keysFor = () => keys;
@@ -442,6 +443,18 @@ describe("what the menu does when a command cannot run or stops", () => {
       warning: "The command could not be started (EAGAIN).",
     });
     expect(asked.at(-1)!.question).toBe("What do you want to do?");
+  });
+
+  it("shows the default message of a coded library refusal when a command cannot start", async () => {
+    const errors = new ErrorCatalog("fixture", { failed: () => "The reader could not start." });
+    terminal.exit = async () => {
+      throw errors.create("failed", []);
+    };
+    const { asked } = await menuWith([...LOOK_UP, `${DOWN}${ENTER}`, ESCAPE]);
+    expect(asked[3]).toMatchObject({
+      question: "What now?",
+      warning: "The command could not be started (The reader could not start.).",
+    });
   });
 
   it("offers no entry that asks for a secret when the self-test fails", async () => {

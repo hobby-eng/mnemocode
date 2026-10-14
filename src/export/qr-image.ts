@@ -5,6 +5,11 @@ import QRCode from "qrcode";
 import { publishNewPrivateFile } from "./private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import { QR_ERROR_CORRECTION_LEVEL } from "./platform.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.qr-image", {
+  "qr-payload-not-empty": () => "QR payload must not be empty.",
+});
 
 /** Pixels of the image's side: a QR code of a whole share still reads at a glance. */
 const QR_IMAGE_PIXELS = 720;
@@ -14,7 +19,7 @@ const QR_IMAGE_PIXELS = 720;
  * image shows the payload, so its bytes are wiped once saved or refused.
  */
 export async function exportQrPayload(payload: string, path: string): Promise<void> {
-  if (payload.length === 0) throw new Error("QR payload must not be empty.");
+  if (payload.length === 0) throw ERRORS.create("qr-payload-not-empty", []);
   const png = await QRCode.toBuffer(payload, {
     errorCorrectionLevel: QR_ERROR_CORRECTION_LEVEL,
     margin: 1,

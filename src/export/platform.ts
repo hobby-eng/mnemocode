@@ -1,4 +1,14 @@
 import { defined } from "../core/defined.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.platform", {
+  "unknown-card-asset": (value0: string) => `Unknown card asset: ${value0}`,
+  "cannot-load-card-artwork": (value0: string, value1: string) =>
+    `Cannot load card artwork ${value0}: ${value1}`,
+  "image-dimensions-positive-integers": () => "Image dimensions must be positive integers.",
+  "checked-choice-refused": suppliedMessage,
+});
+
 /**
  * Host services used by the card renderers.
  *
@@ -96,7 +106,7 @@ export function isRenderAsset(path: string): path is RenderAsset {
 
 /** The bundled file `path` from `source`, refused when it is none of renderAssets. */
 export function readRenderAsset(source: AssetSource, path: string): Promise<Uint8Array> {
-  if (!isRenderAsset(path)) throw new Error(`Unknown card asset: ${path}`);
+  if (!isRenderAsset(path)) throw ERRORS.create("unknown-card-asset", [`${path}`]);
   return source.readAsset(path);
 }
 
@@ -126,7 +136,7 @@ export class BundledAssetCache<T> {
         .then((bytes) => this.#prepare(bytes))
         .catch((error: unknown) => {
           this.#entries.delete(path);
-          throw new Error(`Cannot load card artwork ${path}: ${String(error)}`);
+          throw ERRORS.create("cannot-load-card-artwork", [`${path}`, `${String(error)}`]);
         });
       this.#entries.set(path, entry);
     }
@@ -148,7 +158,7 @@ export function pixelOffset(image: RasterImage, x: number, y: number): number {
  */
 export function createRasterImage(width: number, height: number): RasterImage {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1)
-    throw new Error("Image dimensions must be positive integers.");
+    throw ERRORS.create("image-dimensions-positive-integers", []);
   return { width, height, data: new Uint8Array(width * height * RGBA_CHANNELS) };
 }
 
@@ -159,7 +169,8 @@ export function createRasterImage(width: number, height: number): RasterImage {
  */
 export function checkedChoice(choose: UniformChoice, limit: number, refusal: string): number {
   const index = choose(limit);
-  if (!Number.isInteger(index) || index < 0 || index >= limit) throw new Error(refusal);
+  if (!Number.isInteger(index) || index < 0 || index >= limit)
+    throw ERRORS.create("checked-choice-refused", [refusal]);
   return index;
 }
 

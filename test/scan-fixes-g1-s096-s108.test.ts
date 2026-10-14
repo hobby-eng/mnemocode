@@ -287,7 +287,7 @@ describe("G1-031: the public entries of date patterns hold a pattern to its rule
     expect(() => [...datePatternCandidates(pattern)]).toThrow("cannot match a valid month");
     expect(() => datePatternCandidateCount(pattern)).toThrow("cannot match a valid month");
     expect(() => expandDatePattern(pattern)).toThrow("cannot match a valid month");
-    expect(() => daysInMonth(2026, 13)).toThrow("There is no month 13.");
+    expect(() => daysInMonth(2026, 13)).toThrow("There is no such calendar month.");
     expect(
       datePatternCandidateCount({ key: "k", years: [2024], months: [2], days: [29, 30] }),
     ).toBe(1);

@@ -74,6 +74,35 @@ import { EncodedForm } from "../core/encoded-form.js";
 import { WordList } from "../core/word-hints.js";
 import { bytewords } from "./bytewords-list.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.transport", {
+  "invalid-sskr-transport-length": () => "Invalid SSKR transport length.",
+  "sskr-transport-checksum-does-not-match": () => "SSKR transport checksum does not match.",
+  "not-sskr-cbor-tag": () => "Not an SSKR CBOR tag.",
+  "invalid-sskr-share-byte-string": () => "Invalid SSKR share byte string.",
+  "invalid-sskr-share-metadata": () => "Invalid SSKR share metadata.",
+  "decoded-bytes-refused": suppliedMessage,
+  "expected-single-part-ur-sskr-record": () => "Expected a single-part ur:sskr record.",
+  "sskr-record-too-long": () => "SSKR record is too long.",
+  "mixed-share-refused": suppliedMessage,
+  "invalid-sskr-rgb-codes-preserve-their-printed-order": () =>
+    "Invalid SSKR RGB codes. Preserve their printed order.",
+  "share-format-one": (value0: string) => `The share format must be one of: ${value0}.`,
+  "shares-written-as-no-cards-cards-print-shares": (value0: string) =>
+    `Shares written as ${value0} have no cards: cards print shares in colors or in Unicode codes.`,
+  "word-numbers-run-together": () => WORD_NUMBERS_RUN_TOGETHER,
+  "word-numbers-share-whole-numbers-from": (value0: string) =>
+    `Word numbers of a share are whole numbers from ${value0}.`,
+  "unicode-codes-share-too-long": () => "The Unicode codes of a share are too long.",
+  "not-sskr-share": () => "This is not an SSKR share.",
+  "share-qr-does-not-match-printed-references": () =>
+    "Share QR does not match the printed references.",
+  "assert-share-count-refused": suppliedMessage,
+  "read-set-refused": suppliedMessage,
+  "not-enough-sskr-shares-meet-recorded-threshold": () =>
+    "Not enough SSKR shares to meet the recorded threshold.",
+});
 
 /** The bytes of the CRC32 checksum at the end of a share's bytes. */
 export const CHECKSUM_BYTES = CRC32_BYTES;
@@ -98,11 +127,11 @@ const MAX_SET_SHARES = MAX_GROUPS * MAX_GROUP_MEMBERS;
 
 function validateTransportChecksum(bytes: Uint8Array): void {
   if (bytes.length < CHECKSUM_BYTES + 1 || bytes.length > MAX_TRANSPORT_BYTES) {
-    throw new Error("Invalid SSKR transport length.");
+    throw ERRORS.create("invalid-sskr-transport-length", []);
   }
   const checksumOffset = bytes.length - CHECKSUM_BYTES;
   if (crc32(bytes.subarray(0, checksumOffset)) !== checksumAt(bytes, checksumOffset)) {
-    throw new Error("SSKR transport checksum does not match.");
+    throw ERRORS.create("sskr-transport-checksum-does-not-match", []);
   }
 }
 
@@ -126,7 +155,7 @@ function sharePayload(transport: Uint8Array): Uint8Array {
     const high = cbor[1];
     const low = cbor[2];
     if (high === undefined || low === undefined || !SSKR_CBOR_TAGS.includes((high << 8) | low)) {
-      throw new Error("Not an SSKR CBOR tag.");
+      throw ERRORS.create("not-sskr-cbor-tag", []);
     }
     offset = CBOR_TAG_BYTES;
   }
@@ -142,7 +171,7 @@ function sharePayload(transport: Uint8Array): Uint8Array {
     payloadLength = cbor[offset++] ?? -1;
   }
   if (payloadLength !== cbor.length - offset || !SHARE_LENGTHS.has(payloadLength)) {
-    throw new Error("Invalid SSKR share byte string.");
+    throw ERRORS.create("invalid-sskr-share-byte-string", []);
   }
   return cbor.subarray(offset);
 }
@@ -179,7 +208,7 @@ export function shareInfo(transport: Uint8Array): ShareInfo {
     info.groupThreshold > info.groupCount ||
     info.groupIndex >= info.groupCount
   ) {
-    throw new Error("Invalid SSKR share metadata.");
+    throw ERRORS.create("invalid-sskr-share-metadata", []);
   }
   return info;
 }
@@ -195,7 +224,7 @@ function decodedBytes(tokens: readonly string[], units: ShareUnits, unknown: str
     const byte = units.valueOf(token);
     if (byte === undefined) {
       bytes.fill(0);
-      throw new Error(unknown);
+      throw ERRORS.create("decoded-bytes-refused", [unknown]);
     }
     bytes[index] = byte;
   }
@@ -210,7 +239,7 @@ export function urToTransport(value: string): Uint8Array {
   const match = UR_SSKR.exec(value.trim());
   const body = match?.[1];
   if (!body || body.length % 2 !== 0 || body.length > MAX_TRANSPORT_BYTES * 2) {
-    throw new Error("Expected a single-part ur:sskr record.");
+    throw ERRORS.create("expected-single-part-ur-sskr-record", []);
   }
   const pairs = defined(body.toLowerCase().match(/../gu));
   const bytes = decodedBytes(pairs, SHARE_UNITS.ur, "Unknown Bytewords pair in SSKR record.");
@@ -282,7 +311,7 @@ export function urToBytewords(ur: string): string {
  */
 export function bytewordsToUr(value: string): string {
   const words = bytewordUnits(value);
-  if (words.length > MAX_TRANSPORT_BYTES) throw new Error("SSKR record is too long.");
+  if (words.length > MAX_TRANSPORT_BYTES) throw ERRORS.create("sskr-record-too-long", []);
   return wipedAfter(
     decodedBytes(words, SHARE_UNITS.words, "Unknown SSKR Byteword."),
     transportToUr,
@@ -314,7 +343,7 @@ function mixedUnits(ur: string, form: MixedForm): number[] {
 function mixedToShare(form: MixedForm, values: readonly number[]): string {
   const own = values.slice(0, ownUnitCount(form, values) ?? values.length);
   const transport = mixedTransport(form, form.pack(own), own.length);
-  if (transport === undefined) throw new Error(form.refusal);
+  if (transport === undefined) throw ERRORS.create("mixed-share-refused", [form.refusal]);
   return wipedAfter(transport, transportToUr);
 }
 
@@ -327,7 +356,8 @@ export function shareToColors(ur: string): string[] {
 function parseColorValues(value: string): number[] {
   const codes =
     value.length > MAX_COLOR_TEXT_LENGTH ? undefined : completeHexUnits(value, RGB_HEX_DIGITS);
-  if (codes === undefined) throw new Error("Invalid SSKR RGB codes. Preserve their printed order.");
+  if (codes === undefined)
+    throw ERRORS.create("invalid-sskr-rgb-codes-preserve-their-printed-order", []);
   return codes.map((code) => defined(SHARE_UNITS.colors.valueOf(code)));
 }
 
@@ -350,7 +380,7 @@ export function isShareFormat(value: unknown): value is ShareFormat {
  */
 export function assertShareFormat(value: unknown): asserts value is ShareFormat {
   if (!isShareFormat(value))
-    throw new Error(`The share format must be one of: ${SHARE_FORMATS.join(", ")}.`);
+    throw ERRORS.create("share-format-one", [`${SHARE_FORMATS.join(", ")}`]);
 }
 
 /** `value` as a form of shares; refused with the list of them (assertShareFormat). */
@@ -407,23 +437,20 @@ export function shareFormatHasCards(format: ShareFormat): boolean {
 /** Refuses cards of shares written in `format` where it has none (shareFormatHasCards). */
 export function assertShareFormatHasCards(format: ShareFormat): void {
   if (!shareFormatHasCards(format))
-    throw new Error(
-      `Shares written as ${format} have no cards: cards print shares in colors or in Unicode codes.`,
-    );
+    throw ERRORS.create("shares-written-as-no-cards-cards-print-shares", [`${format}`]);
 }
 
 function indexesToShare(value: string): string {
   const numbers = codeTokens(value);
-  if (numbers.some(runTogetherNumbers)) throw new Error(WORD_NUMBERS_RUN_TOGETHER);
+  if (numbers.some(runTogetherNumbers)) throw ERRORS.create("word-numbers-run-together", []);
   const indexes = numbers.map(shareWordIndex);
   if (numbers.length > MAX_COLOR_TEXT_LENGTH || indexes.some((index) => index === undefined))
-    throw new Error(`Word numbers of a share are whole numbers from ${WORD_NUMBERS_THROUGH}.`);
+    throw ERRORS.create("word-numbers-share-whole-numbers-from", [`${WORD_NUMBERS_THROUGH}`]);
   return mixedToShare(WORD_FORM, indexes as number[]);
 }
 
 function unicodeToShare(value: string): string {
-  if (value.length > MAX_COLOR_TEXT_LENGTH)
-    throw new Error("The Unicode codes of a share are too long.");
+  if (value.length > MAX_COLOR_TEXT_LENGTH) throw ERRORS.create("unicode-codes-share-too-long", []);
   return mixedToShare(WORD_FORM, unicodeIndexesOf(value));
 }
 
@@ -515,7 +542,7 @@ export function readShare(value: string): { readonly ur: string; readonly format
       firstError ??= error;
     }
   }
-  throw firstError instanceof Error ? firstError : new Error("This is not an SSKR share.");
+  throw firstError instanceof Error ? firstError : ERRORS.create("not-sskr-share", []);
 }
 
 /** The share of `value`, in any form, as a UR; refuses a text that is no share. */
@@ -536,7 +563,7 @@ export function assertShareQr(
   const printed =
     labels === undefined ? colorsToShare(colors.join(" ")) : readShare(labels.join(" ")).ur;
   if (readShare(payload).ur !== printed)
-    throw new Error("Share QR does not match the printed references.");
+    throw ERRORS.create("share-qr-does-not-match-printed-references", []);
 }
 
 /**
@@ -553,7 +580,7 @@ export function shareCountProblem(count: number): string | undefined {
 /** Bound the input before parsing or searching for any missing elements (shareCountProblem). */
 export function assertShareCount(count: number): void {
   const problem = shareCountProblem(count);
-  if (problem !== undefined) throw new Error(problem);
+  if (problem !== undefined) throw ERRORS.create("assert-share-count-refused", [problem]);
 }
 
 /**
@@ -602,9 +629,10 @@ export class Share extends Redacted {
     const shares = records.map((record) => Share.read(record));
     const infos = shares.map((share) => share.info);
     const conflict = SetTopology.firstConflict(infos);
-    if (conflict !== undefined) throw new Error(SET_CONFLICT_TEXTS[conflict.kind].refusal);
+    if (conflict !== undefined)
+      throw ERRORS.create("read-set-refused", [SET_CONFLICT_TEXTS[conflict.kind].refusal]);
     if (requireQuorum && !new SetTopology(infos).enough) {
-      throw new Error("Not enough SSKR shares to meet the recorded threshold.");
+      throw ERRORS.create("not-enough-sskr-shares-meet-recorded-threshold", []);
     }
     return shares;
   }

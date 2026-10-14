@@ -16,6 +16,15 @@ import { unicodeCodesOfIndexes } from "../core/words.js";
 import { codeColors } from "./card-palette.js";
 import { checkedChoice, type UniformChoice } from "./platform.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.card-decoys", {
+  "decoy-cards-whole-number-fewer-than-cards": () =>
+    "The decoy cards must be a whole number, fewer than the cards.",
+  "decoys-added-colors-whole-phrase": () => "Decoys are added to the colors of a whole phrase.",
+  "cards-their-decoys-already": () => "These cards have their decoys already.",
+  "cards-kept-hold-every-code-backup": () => "The cards kept must hold every code of the backup.",
+});
 
 /** The most decoys that a set of cards takes: more than any sheet needs to fill its last row. */
 export const MAX_DECOYS = 16;
@@ -47,7 +56,7 @@ export function assertDecoys(cards: DecoyCards): void {
   const { decoys } = cards;
   if (decoys === undefined) return;
   if (!Number.isSafeInteger(decoys) || decoys < 0 || decoys >= cards.colors.length)
-    throw new Error("The decoy cards must be a whole number, fewer than the cards.");
+    throw ERRORS.create("decoy-cards-whole-number-fewer-than-cards", []);
 }
 
 /** How many of the cards print the backup's own codes: all but the decoys after them. */
@@ -69,7 +78,7 @@ function wordCode(random: UniformChoice): string {
  */
 function phraseColor(random: UniformChoice, colorCount: number): string {
   const words = BIP39_WORD_COUNTS[RGB_REFERENCE_COUNTS.indexOf(colorCount)];
-  if (words === undefined) throw new Error("Decoys are added to the colors of a whole phrase.");
+  if (words === undefined) throw ERRORS.create("decoys-added-colors-whole-phrase", []);
   const colors = indexesToColors(
     Array.from({ length: words }, () =>
       checkedChoice(random, BIP39_DICTIONARY_SIZE, RANDOM_REFUSAL),
@@ -92,7 +101,7 @@ export function withDecoyPool<T extends DecoyCards>(
   cards: T,
   random: UniformChoice,
 ): WithDecoys<T> {
-  if ((cards.decoys ?? 0) !== 0) throw new Error("These cards have their decoys already.");
+  if ((cards.decoys ?? 0) !== 0) throw ERRORS.create("cards-their-decoys-already", []);
   const own = cards.colors.length;
   const decoys = Array.from({ length: MAX_DECOYS }, () =>
     cards.labels !== undefined
@@ -111,7 +120,7 @@ export function withDecoyPool<T extends DecoyCards>(
 export function keptCards<T extends DecoyCards>(cards: T, count: number): WithDecoys<T> {
   const own = ownCards(cards);
   if (!Number.isSafeInteger(count) || count < own || count > cards.colors.length)
-    throw new Error("The cards kept must hold every code of the backup.");
+    throw ERRORS.create("cards-kept-hold-every-code-backup", []);
   return {
     ...cards,
     colors: cards.colors.slice(0, count),

@@ -66,6 +66,7 @@ import { MASTER_KEY_PATH, type MatchedBy } from "./wallet-check.js";
 import { hexOfBytes, bytesOfHex, equalBytes, HEX_DIGITS_PER_BYTE } from "./bits.js";
 import { listInWords } from "./places.js";
 import { defined } from "./defined.js";
+import { ERRORS } from "./wallet-evidence-errors.js";
 
 // What every caller of this module used here before the split keeps working.
 export { parseMasterFingerprint, type Pbkdf2HmacSha512 };
@@ -350,11 +351,11 @@ function bitcoinAddressOn(value: string, network: BitcoinNetworkName): CoinAddre
   } catch (error) {
     // An address of a script is Bitcoin's, only of no single key: said as the coin says it.
     if (error instanceof AddressRefusalError && error.code === "not-single-key") throw error;
-    throw new Error(`The address is not valid for Bitcoin ${network}.`);
+    throw ERRORS.create("address-not-valid-bitcoin", [`${network}`]);
   }
   const on = networkNamed(address.testnet);
   if (on !== network)
-    throw new Error(`The address is not valid for Bitcoin ${network}; it is a ${on} address.`);
+    throw ERRORS.create("address-not-valid-bitcoin-address", [`${network}`, `${on}`]);
   return address;
 }
 
@@ -442,9 +443,7 @@ function evidenceOf(evidence: WalletEvidence, coins: CoinList): Evidence {
     !isScannedKind(evidence.kind) &&
     (evidence as { addresses?: unknown }).addresses !== undefined
   )
-    throw new Error(
-      "Only an address, an address of another coin, a compressed public key or a WIF is compared with several addresses.",
-    );
+    throw ERRORS.create("only-address-address-another-coin-compressed-public-key", []);
   switch (evidence.kind) {
     case "master-fingerprint":
       return new MasterFingerprintEvidence(evidence.value, evidence.network);
@@ -461,7 +460,7 @@ function evidenceOf(evidence: WalletEvidence, coins: CoinList): Evidence {
     case "coin-address":
       return new CoinEvidence(evidence, coins);
     default:
-      throw new Error("Unsupported Bitcoin evidence kind.");
+      throw ERRORS.create("unsupported-bitcoin-evidence-kind", []);
   }
 }
 
@@ -640,8 +639,7 @@ class WifEvidence extends LocatedEvidence {
   protected derivedFrom(node: HDKey) {
     // A copy of the node's key, which node.wipePrivateData() does not reach.
     const derivedKey = node.privateKey;
-    if (derivedKey === null)
-      throw new Error("Unable to derive the private key for WIF comparison.");
+    if (derivedKey === null) throw ERRORS.create("unable-derive-private-key-wif-comparison", []);
     try {
       return equalBytes(derivedKey, this.#key)
         ? WIF(networkParameters(this.network)).encode(derivedKey)
@@ -702,7 +700,7 @@ class CoinEvidence implements Evidence {
 
 function assertNetwork(network: BitcoinNetworkName): void {
   if (!isBitcoinNetwork(network))
-    throw new Error(`Bitcoin network must be ${BITCOIN_NETWORKS_TEXT}.`);
+    throw ERRORS.create("bitcoin-network", [`${BITCOIN_NETWORKS_TEXT}`]);
 }
 
 function assertLocation(location: DerivationLocation): void {
@@ -717,8 +715,8 @@ function assertLocation(location: DerivationLocation): void {
  */
 export function checkedBitcoinProfiles(profiles: readonly unknown[]): readonly BitcoinProfile[] {
   const owned = Array.from(profiles);
-  if (owned.length === 0) throw new Error("At least one Bitcoin address profile must be selected.");
-  if (!owned.every(isBitcoinProfile)) throw new Error("Unknown Bitcoin address profile.");
+  if (owned.length === 0) throw ERRORS.create("at-least-one-bitcoin-address-profile-selected", []);
+  if (!owned.every(isBitcoinProfile)) throw ERRORS.create("unknown-bitcoin-address-profile", []);
   return Object.freeze(owned);
 }
 
@@ -735,15 +733,16 @@ function parseCompressedPublicKey(value: string): Uint8Array {
   const normalized = trimWhiteSpace(value).toLowerCase();
   const digits = COMPRESSED_KEY_BYTES * HEX_DIGITS_PER_BYTE;
   if (!new RegExp(`^[0-9a-f]{${digits}}$`, "u").test(normalized))
-    throw new Error(
-      `A compressed public key must be exactly ${COMPRESSED_KEY_BYTES} bytes encoded as ${digits} hexadecimal characters.`,
-    );
+    throw ERRORS.create("compressed-public-key-exactly-bytes-encoded-as-hexadecimal", [
+      `${COMPRESSED_KEY_BYTES}`,
+      `${digits}`,
+    ]);
   const bytes = bytesOfHex(normalized);
   if (bytes[0] !== 0x02 && bytes[0] !== 0x03)
-    throw new Error("A compressed public key must start with 02 or 03.");
+    throw ERRORS.create("compressed-public-key-start-02-03", []);
   // Without this, a key that no wallet can have would only fail to match (AUD-008-API002).
   if (!secp256k1.utils.isValidPublicKey(bytes, true))
-    throw new Error("The compressed public key is not a point of the secp256k1 curve.");
+    throw ERRORS.create("compressed-public-key-not-point-secp256k1-curve", []);
   return bytes;
 }
 
@@ -753,11 +752,11 @@ function wifKey(value: string, network: BitcoinNetworkName): Uint8Array {
   try {
     key = WIF(networkParameters(network)).decode(trimWhiteSpace(value));
   } catch {
-    throw new Error(`The WIF is not valid for Bitcoin ${network}.`);
+    throw ERRORS.create("wif-not-valid-bitcoin", [`${network}`]);
   }
   if (!secp256k1.utils.isValidSecretKey(key)) {
     key.fill(0);
-    throw new Error("The WIF holds no valid secp256k1 private key.");
+    throw ERRORS.create("wif-holds-no-valid-secp256k1-private-key", []);
   }
   return key;
 }
@@ -770,17 +769,15 @@ function extendedPublicKeyOn(value: string, network: BitcoinNetworkName): HDKey 
   const prefix = trimWhiteSpace(value).slice(0, 4);
   const metadata = extendedKeyVersions[prefix];
   if (metadata === undefined)
-    throw new Error(
-      `Unsupported extended-key prefix. Supported public forms include ${listInWords(
-        BITCOIN_NETWORKS.flatMap(extendedPublicKeyPrefixes),
-      )}.`,
-    );
+    throw ERRORS.create("unsupported-extended-key-prefix-supported-public-forms-include", [
+      `${listInWords(BITCOIN_NETWORKS.flatMap(extendedPublicKeyPrefixes))}`,
+    ]);
   if (metadata.network !== network)
-    throw new Error("The extended-key prefix does not match the selected Bitcoin network.");
+    throw ERRORS.create("extended-key-prefix-does-not-match-selected-bitcoin", []);
   try {
     return HDKey.fromExtendedKey(trimWhiteSpace(value), metadata.versions);
   } catch {
-    throw new Error("The extended public key is not valid.");
+    throw ERRORS.create("extended-public-key-not-valid", []);
   }
 }
 

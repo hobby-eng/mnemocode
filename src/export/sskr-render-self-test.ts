@@ -35,6 +35,13 @@ import {
   WIDTH_TOLERANCE_POINTS,
 } from "./self-test-cards.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.sskr-render-self-test", {
+  "share-cards-no-decoy": () => "Share cards have no decoy.",
+  "share-card-pdf-no-page": () => "Share card PDF has no page.",
+  "share-card-a6-dimensions-mismatch": () => "Share card A6 dimensions mismatch.",
+});
 
 /** The first two shares of the official vector: members 1 and 2 of its first group. */
 const SHARES = [
@@ -112,7 +119,7 @@ async function checkShareCards(drawing: CardDrawing): Promise<void> {
   const own = sskrVector.firstShareColors.map((color) => color.slice(1));
   expectSame(cards.ownCodes(0), own.length, "Own codes of a share's cards");
   expectSame(printed.slice(0, own.length).join(" "), own.join(" "), "Codes of a share's cards");
-  if (printed.length <= own.length) throw new Error("Share cards have no decoy.");
+  if (printed.length <= own.length) throw ERRORS.create("share-cards-no-decoy", []);
   expectSame(printed.at(-1), "000000", "Decoy of a share's colors");
   const unicode = await ShareCardSet.create(
     drawing,
@@ -150,10 +157,10 @@ async function checkShareCards(drawing: CardDrawing): Promise<void> {
     "Share cards in word numbers",
   );
   const pdf = await PDFDocument.load(await cards.renderShare(0));
-  if (pdf.getPageCount() < 1) throw new Error("Share card PDF has no page.");
+  if (pdf.getPageCount() < 1) throw ERRORS.create("share-card-pdf-no-page", []);
   for (const page of pdf.getPages())
     if (Math.abs(page.getWidth() - A6_WIDTH_POINTS) > WIDTH_TOLERANCE_POINTS)
-      throw new Error("Share card A6 dimensions mismatch.");
+      throw ERRORS.create("share-card-a6-dimensions-mismatch", []);
   const [first] = cards.qrCodes;
   assertShareQr(sskrVector.firstShareColors, defined(first).payload);
   expectRefused(

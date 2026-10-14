@@ -14,6 +14,17 @@ import { preflightOutputs } from "./output-saving.js";
 import { BIP39_WORD_COUNTS } from "../core/bip39-sizes.js";
 import { CARD_FORMAT_NUMBERS } from "./format-numbers.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.preview-command", {
+  "template-listing-cannot-combined-preview-output-settings": () =>
+    "Template listing cannot be combined with preview output settings.",
+  "save-preview-provide-pdf-file-image-output-folder": () =>
+    "To save a preview, provide a PDF file, an image output folder, or an individual-card output folder. To inspect the available designs, request the template list.",
+  "choose-either-all-templates-one-specific-template-not": () =>
+    "Choose either all templates or one specific template, not both.",
+  "provide-mnemonic-word-count-only-once": () => "Provide the mnemonic word count only once.",
+});
 
 export async function runPreview(args: ParsedArguments): Promise<void> {
   const path = value(args, "pdf");
@@ -32,7 +43,7 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
       args.words !== undefined ||
       businessOptionNames.some((key) => args[key] !== undefined)
     ) {
-      throw new Error("Template listing cannot be combined with preview output settings.");
+      throw ERRORS.create("template-listing-cannot-combined-preview-output-settings", []);
     }
     // Every design prints the codes of each form that has cards, so the forms are named once.
     terminalResultHeader("Card templates", [
@@ -55,11 +66,9 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
     return;
   }
   if (!path && !directory && !images)
-    throw new Error(
-      "To save a preview, provide a PDF file, an image output folder, or an individual-card output folder. To inspect the available designs, request the template list.",
-    );
+    throw ERRORS.create("save-preview-provide-pdf-file-image-output-folder", []);
   if (args.all === true && id !== undefined)
-    throw new Error("Choose either all templates or one specific template, not both.");
+    throw ERRORS.create("choose-either-all-templates-one-specific-template-not", []);
   const selection: DesignSelection = args.all === true ? { every: true } : { template: id };
   if (directory !== undefined) {
     CardPreview.assertOneDesign(selection);
@@ -68,7 +77,7 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
   await preflightOutputs(args);
   const settings = businessOptions(args);
   if (args.words !== undefined && typeof args.words !== "string")
-    throw new Error("Provide the mnemonic word count only once.");
+    throw ERRORS.create("provide-mnemonic-word-count-only-once", []);
   // Read only as a whole number here; which lengths a sample may have, and its default, are the
   // library's (CardPreview).
   const words =

@@ -402,12 +402,13 @@ export class ShareRestore {
     if (unreadable !== undefined) return { kind: "trouble", trouble: unreadable, lines: [] };
     const places = input.places();
     const texts = input.texts();
-    // A watch may reject after the plan was made, such as a Ctrl+C read just after the assessment's
-    // last turn: the plan, which keeps the shares' secret for its search, is then wiped here.
+    // A host failure after the plan was made still releases what the assessment owns.
     let made: JointPlan | undefined;
     let plan: JointPlan;
+    let assessmentSignal: AbortSignal | undefined;
     try {
       plan = await watch(async (signal) => {
+        assessmentSignal = signal;
         made = await this.#repair.plan(texts, { signal, places, turn });
         return made;
       });
@@ -420,7 +421,9 @@ export class ShareRestore {
     // here (AUD-012-SEC004). A plan handed out is wiped by its search or by releaseRead.
     let handedOut = false;
     try {
-      if (plan.assessment.verdict === "stopped") return { kind: "stopped", lines: [] };
+      // The host can cancel after the assessment's last turn, while its watch returns the plan.
+      if (assessmentSignal?.aborted === true || plan.assessment.verdict === "stopped")
+        return { kind: "stopped", lines: [] };
       const report = new RepairReport(plan.assessment, this.#repair.triesPerSecond(), places);
       const lines = report.lines();
       const trouble = input.assessmentTrouble(plan.assessment, places);

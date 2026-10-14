@@ -142,21 +142,23 @@ describe("AUD-015-API002: a split is made of one request", () => {
   );
 });
 
-describe("AUD-015-UI001: an option named like an object's own field is labelled as typed", () => {
+describe("AUD-015-UI001: option labels never resolve inherited fields", () => {
   it.each(["__proto__", "constructor", "toString", "hasOwnProperty"])("labels %s", (key) => {
-    expect(optionLabel(key)).toBe(key);
+    expect(optionLabel(key)).toBe("unknown option");
   });
 
-  it("keeps the labels of the table and of other unknown names", () => {
+  it("keeps known labels and conceals unknown names", () => {
     expect(optionLabel("word")).toBe("BIP39 word");
-    expect(optionLabel("made-up-option")).toBe("made up option");
+    expect(optionLabel("made-up-option")).toBe("unknown option");
+    expect(optionLabel("card-name")).toBe("card name");
+    expect(optionLabel("studio-name")).toBe("studio name");
   });
 
-  it("names --__proto__ and --constructor as typed in the command line's refusal", () => {
+  it("refuses --__proto__ and --constructor without resolving them as labels", () => {
     for (const name of ["__proto__", "constructor"])
       expect(() =>
         assertAllowedArguments(parseArguments([`--${name}`, "x"]), "table", ["word"]),
-      ).toThrow(`The table command does not support the ${name} setting.`);
+      ).toThrow("The table command does not support the unknown option setting.");
   });
 });
 

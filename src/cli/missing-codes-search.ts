@@ -31,7 +31,7 @@ import { counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
 import { defined } from "../core/defined.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 
 /** Seconds between two progress updates of a long search. */
 const PROGRESS_SECONDS = 2;
@@ -92,18 +92,27 @@ export function reportFound(codes: MissingCodes, backup: EncodedBackup, foundDat
 
 /**
  * Whether `way` is searched: at once, its time said from a minute, or, when the plan asks for it,
- * only when the person chooses it.
+ * only when the person chooses it (askToSearch).
  */
-async function started(way: MissingCodesWaySearch, limit: number | undefined): Promise<boolean> {
+async function started(
+  way: MissingCodesWaySearch,
+  limit: number | undefined,
+): Promise<"yes" | "no" | Cancelled> {
   const plan = await way.plan(limit);
   if (plan.ask)
     return askToSearch(plan.question(), { note: "choose another way", quit: "goes back" });
   if (plan.tell) terminalNotice(plan.notice());
-  return true;
+  return "yes";
 }
 
-/** Runs `way` while Ctrl+C is read as a key, with its progress on one line. */
-async function ran(way: MissingCodesWaySearch): Promise<MissingCodesResult> {
+/** What a way that ran gave: its result, or CANCELLED when Ctrl+C stopped it. */
+type RanResult = Exclude<MissingCodesResult, { readonly kind: "stopped" }> | Cancelled;
+
+/**
+ * Runs `way` while Ctrl+C is read as a key, with its progress on one line; a search that Ctrl+C
+ * stopped cancels the command.
+ */
+async function ran(way: MissingCodesWaySearch): Promise<RanResult> {
   const progress = new ProgressLine(PROGRESS_SECONDS);
   try {
     const result = await withCtrlCWatch((signal) =>
@@ -117,7 +126,7 @@ async function ran(way: MissingCodesWaySearch): Promise<MissingCodesResult> {
       }),
     );
     // The person stopped the search with Ctrl+C.
-    if (result.kind === "stopped") throw new InputCancelledError();
+    if (result.kind === "stopped") return CANCELLED;
     return result;
   } finally {
     progress.end();
@@ -126,19 +135,21 @@ async function ran(way: MissingCodesWaySearch): Promise<MissingCodesResult> {
 
 /**
  * Asks how the right codes are told and searches them, until one set is found, the candidates are
- * listed, or the person types the codes again. The options in `answers` answer the first way and
- * its value; once that way finds nothing, the person chooses.
+ * listed, or the person types the codes again; CANCELLED when the command is cancelled. The
+ * options in `answers` answer the first way and its value; once that way finds nothing, the
+ * person chooses.
  */
 export async function searchMissingCodes(
   codes: MissingCodes,
   answers: MissingCodesAnswers,
-): Promise<MissingOutcome> {
+): Promise<MissingOutcome | Cancelled> {
   const search = new MissingCodesSearch(codes, masterFingerprint);
   terminalNotice(search.unreadable, "warning");
   if (search.many) terminalHint(MISSING_CODES_TEXTS.many);
   for (let given = givenWay(search, answers); ; given = undefined) {
     const way = given ?? (await askWay(search));
     if (way === undefined) return { kind: "again" };
+    if (way === CANCELLED) return CANCELLED;
     const outcome =
       way === "encoded"
         ? await byEncodedFingerprint(search, answers, given === "encoded")
@@ -150,7 +161,9 @@ export async function searchMissingCodes(
 }
 
 /** Asks how the right codes are told; undefined types the codes again. */
-async function askWay(search: MissingCodesSearch): Promise<MissingCodesWay | undefined> {
+async function askWay(
+  search: MissingCodesSearch,
+): Promise<MissingCodesWay | undefined | Cancelled> {
   return choose(
     MISSING_CODES_TEXTS.question,
     search.ways.map(({ way, label, note }) => ({ label, note, value: way })),
@@ -166,7 +179,7 @@ async function byEncodedFingerprint(
   search: MissingCodesSearch,
   answers: MissingCodesAnswers,
   given: boolean,
-): Promise<MissingOutcome | undefined> {
+): Promise<MissingOutcome | undefined | Cancelled> {
   const fingerprint = given
     ? answers.encodedFingerprint
     : await askValueUntil(
@@ -174,10 +187,8 @@ async function byEncodedFingerprint(
         parseMasterFingerprint,
         { what: "the eight characters of the fingerprint" },
       );
-  if (fingerprint === undefined) return undefined;
-  const way = search.byEncodedFingerprint(fingerprint);
-  if (!(await started(way, answers.maxCandidates))) return undefined;
-  return outcomeOf(search, await ran(way));
+  if (fingerprint === undefined || fingerprint === CANCELLED) return fingerprint;
+  return searched(search, search.byEncodedFingerprint(fingerprint), answers.maxCandidates);
 }
 
 /**
@@ -188,33 +199,59 @@ async function byWallet(
   search: MissingCodesSearch,
   answers: MissingCodesAnswers,
   given: boolean,
-): Promise<MissingOutcome | undefined> {
+): Promise<MissingOutcome | undefined | Cancelled> {
   const dates = search.needsDates ? await askCodeDates(search, true) : undefined;
+  if (dates === CANCELLED) return CANCELLED;
   const evidence = given ? answers.evidence : await askWallet(answers.place);
-  if (evidence === undefined) return undefined;
+  if (evidence === undefined || evidence === CANCELLED) return evidence;
   const way = search.byWallet(defined(walletCheckOf(evidence, answers.passphrase)), dates);
-  if (!(await started(way, answers.maxCandidates))) return undefined;
-  return outcomeOf(search, await ran(way));
+  return searched(search, way, answers.maxCandidates);
 }
 
-/** The dates of the masked codes, with ? for a forgotten digit where `patterns`. */
-function askCodeDates(search: MissingCodesSearch, patterns: boolean): Promise<DatesAnswer> {
+/**
+ * Searches `way` once the person allows it (started) and tells its outcome; undefined, after the
+ * answer No, asks for another way.
+ */
+async function searched(
+  search: MissingCodesSearch,
+  way: MissingCodesWaySearch,
+  limit: number | undefined,
+): Promise<MissingOutcome | undefined | Cancelled> {
+  const start = await started(way, limit);
+  if (start !== "yes") return start === "no" ? undefined : start;
+  const result = await ran(way);
+  return result === CANCELLED ? CANCELLED : outcomeOf(search, result);
+}
+
+/**
+ * The dates of the masked codes, with ? for a forgotten digit where `patterns`; CANCELLED when
+ * the command is cancelled.
+ */
+function askCodeDates(
+  search: MissingCodesSearch,
+  patterns: boolean,
+): Promise<DatesAnswer | Cancelled> {
   return askDates({ wordCount: search.codes.wordCount, patterns });
 }
 
 /** The wallet asked on the screen; undefined when the person goes back. */
-async function askWallet(place: WalletPlace | undefined): Promise<WalletEvidence | undefined> {
+async function askWallet(
+  place: WalletPlace | undefined,
+): Promise<WalletEvidence | undefined | Cancelled> {
   const answer = await askWalletEvidence({
     optional: false,
     ...(place === undefined ? {} : { place }),
   });
+  if (answer === CANCELLED) return CANCELLED;
   return answer.kind === "wallet" ? answer.evidence : undefined;
 }
 
 /** Every candidate with its phrase and fingerprint, for the person to compare. */
-async function listed(search: MissingCodesSearch): Promise<MissingOutcome> {
-  const dates = search.needsDates ? (await askCodeDates(search, false)).known : [];
-  const result = await ran(search.listed(dates));
+async function listed(search: MissingCodesSearch): Promise<MissingOutcome | Cancelled> {
+  const dates = search.needsDates ? await askCodeDates(search, false) : undefined;
+  if (dates === CANCELLED) return CANCELLED;
+  const result = await ran(search.listed(dates?.known ?? []));
+  if (result === CANCELLED) return CANCELLED;
   if (result.kind === "list")
     result.rows.forEach(({ codes, phrase, fingerprint }, index) =>
       console.log(`${index + 1}\t${codes}\t${phrase}\t${fingerprint}`),
@@ -229,8 +266,8 @@ async function listed(search: MissingCodesSearch): Promise<MissingOutcome> {
  */
 async function outcomeOf(
   search: MissingCodesSearch,
-  result: MissingCodesResult,
-): Promise<MissingOutcome | undefined> {
+  result: Exclude<RanResult, Cancelled>,
+): Promise<MissingOutcome | undefined | Cancelled> {
   if (result.kind === "found") {
     reportFound(search.codes, result.backup, result.foundDates);
     return result;
@@ -249,5 +286,6 @@ async function outcomeOf(
     ] as const,
     { escape: "types the codes again" },
   );
+  if (next === CANCELLED) return CANCELLED;
   return next === "again" ? { kind: "again" } : undefined;
 }

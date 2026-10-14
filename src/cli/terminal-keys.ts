@@ -1,8 +1,6 @@
 // The raw keys of the terminal that the questions act on, the readers of the bytes typed, how long
-// the rest of a key's sequence or of a paste may take, and the refusals of a question: cancelled
-// with Ctrl+C, or an answer that it cannot use.
-
-import { CANCELLED_MESSAGE } from "./exit-codes.js";
+// the rest of a key's sequence or of a paste may take, the person's cancel, and the refusal of an
+// answer that a question cannot use.
 
 /** Raw terminal bytes that this module acts on. */
 export const KEY = {
@@ -31,21 +29,19 @@ export const KEY = {
   DELETE: 0x7f,
 } as const;
 
-/** The codes of the errors of terminal input: a question cancelled, an answer it cannot use. */
-export type TerminalInputErrorCode = "cancelled" | "unusable-answer";
-
 /**
- * Thrown when Ctrl+C cancels a question; the tool then stops with CANCELLED_EXIT_CODE, as for
- * SIGINT.
+ * The person leaving: Ctrl+C at a question or during a search, or Stop where a question offers it.
+ * A question returns it and every step returns it in turn, up to the command, which then ends with
+ * CANCELLED_EXIT_CODE, as for SIGINT. A value, not an error: a person cancelling is control flow
+ * (CORE-22).
  */
-export class InputCancelledError extends Error {
-  readonly code: TerminalInputErrorCode = "cancelled";
+export const CANCELLED: unique symbol = Symbol("cancelled");
 
-  constructor() {
-    super(CANCELLED_MESSAGE);
-    this.name = "InputCancelledError";
-  }
-}
+/** The type of CANCELLED, which a step that the person may cancel returns besides its answer. */
+export type Cancelled = typeof CANCELLED;
+
+/** The codes of the errors of terminal input: an answer that a question cannot use. */
+export type TerminalInputErrorCode = "unusable-answer";
 
 /**
  * Thrown by readLine for an answer that no question can use: longer than its limit, or not UTF-8

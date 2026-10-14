@@ -13,7 +13,7 @@ import { type RepairedSet } from "../src/sskr/joint-results.js";
 import { REPAIR_NOTES, RepairReport } from "../src/sskr/repair-report.js";
 import { QUESTION_SECONDS } from "../src/core/search-turns.js";
 import { ShareInput, type TypedShare } from "../src/sskr/share-input.js";
-import { ShareRestore, signalWatch } from "../src/sskr/share-restore.js";
+import { releaseRead, ShareRestore, signalWatch } from "../src/sskr/share-restore.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import type { SharePlatform } from "../src/sskr/share-platform.js";
 import { SHARE_FORMAT_NAMES, ShareExport, ShareSet } from "../src/sskr/share-set.js";
@@ -214,6 +214,39 @@ describe("ShareSet", () => {
 });
 
 describe("ShareRestore", () => {
+  it.each([
+    ["a cancelled final callback", true, "stopped"],
+    ["a running final callback", false, "marked"],
+  ] as const)("respects %s before handing out the assessment", async (_, cancel, kind) => {
+    const controller = new AbortController();
+    let afterAssessment = false;
+    let subsequentChecks = 0;
+    const platform: SharePlatform = {
+      ...nodeSharePlatform,
+      hmacSha256: (...args) => {
+        if (afterAssessment) subsequentChecks += 1;
+        return nodeSharePlatform.hmacSha256(...args);
+      },
+    };
+    const input = new ShareInput(TEXTS);
+    input.add([SHARES[0], marked([5])]);
+    const result = await new ShareRestore(platform).read(input, async (step) => {
+      const plan = await step(controller.signal);
+      afterAssessment = true;
+      if (cancel) controller.abort();
+      return plan;
+    });
+    try {
+      expect(result.kind).toBe(kind);
+      if (cancel) {
+        expect(result.lines).toEqual([]);
+        expect(subsequentChecks).toBe(0);
+      } else expect(subsequentChecks).toBeGreaterThan(0);
+    } finally {
+      releaseRead(result);
+    }
+  });
+
   function markedInput(): ShareInput {
     const input = new ShareInput(TEXTS);
     input.add([SHARES[0], marked([5])]);

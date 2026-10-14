@@ -48,6 +48,7 @@ import {
   type Explanation,
 } from "./terminal-choice.js";
 import { terminalAvailable } from "./terminal-input.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import {
   readmeLink,
   STYLE,
@@ -92,9 +93,10 @@ export function menuAvailable(): boolean {
 }
 
 /**
- * What an entry does once its questions are answered; undefined means that the person went back.
+ * What an entry does once its questions are answered; undefined means that the person went back,
+ * CANCELLED that they cancelled with Ctrl+C, which ends the menu as it ends a command.
  */
-type Action = { readonly run: readonly string[] } | "help" | "quit" | undefined;
+type Action = { readonly run: readonly string[] } | "help" | "quit" | undefined | Cancelled;
 
 /** What standard shares are, shown with the question how many to make in entry 4. */
 const STANDARD_SHARES_EXPLANATION: Explanation = {
@@ -116,7 +118,7 @@ function askedAfresh(action: () => Promise<Action>): () => Promise<Action> {
  */
 async function encodeAction(): Promise<Action> {
   const run = await askEncoding();
-  return run === undefined ? undefined : { run };
+  return run === undefined || run === CANCELLED ? run : { run };
 }
 
 /**
@@ -126,14 +128,15 @@ async function encodeAction(): Promise<Action> {
  */
 async function reEncodeAction(): Promise<Action> {
   const old = await askBackupSource("--old-mode");
-  return old === undefined ? undefined : { run: ["re-encode", "--ask-secrets", ...old] };
+  if (old === undefined || old === CANCELLED) return old;
+  return { run: ["re-encode", "--ask-secrets", ...old] };
 }
 
 /**
  * How many words the seed phrase has, for codes typed from printed cards, which end with codes
  * that belong to nothing (--words): null where all the codes typed are read, undefined for back.
  */
-function askPhraseWords(): Promise<Bip39WordCount | null | undefined> {
+function askPhraseWords(): Promise<Bip39WordCount | null | undefined | Cancelled> {
   return choose<Bip39WordCount | null>(
     PHRASE_WORDS_QUESTION,
     [
@@ -155,7 +158,7 @@ const SAMPLES_APART = " · ";
  * Where an encoded seed phrase is read from: typed on the private screen, with how many words the
  * phrase has, or a file encode saved.
  */
-async function askSource(): Promise<{ readonly options: string[] } | undefined> {
+async function askSource(): Promise<{ readonly options: string[] } | undefined | Cancelled> {
   const files = [
     { label: "In a record file", note: "the text file that Encode saved", value: "record" },
     { label: "In a QR code image", note: "the PNG file that Encode saved", value: "qr" },
@@ -169,10 +172,10 @@ async function askSource(): Promise<{ readonly options: string[] } | undefined> 
     [{ ...typed, example: samples.join(SAMPLES_APART) }, ...files] as const,
     { label: "Source" },
   );
-  if (source === undefined) return undefined;
+  if (source === undefined || source === CANCELLED) return source;
   if (source === "typed") {
     const words = await askPhraseWords();
-    if (words === undefined) return undefined;
+    if (words === undefined || words === CANCELLED) return words;
     return { options: words === null ? [] : ["--words", String(words)] };
   }
   const path =
@@ -185,14 +188,15 @@ async function askSource(): Promise<{ readonly options: string[] } | undefined> 
           fallback: QR_FILE,
           check: (answer) => inputFile(answer, MAX_PNG_BYTES),
         });
-  if (path === undefined) return undefined;
+  if (path === undefined || path === CANCELLED) return path;
   return { options: [source === "record" ? "--input-file" : "--qr-file", path] };
 }
 
 /** Entry 3: an encoded seed phrase turned back into the words. */
 async function decodeAction(): Promise<Action> {
   const source = await askBackupSource("--mode");
-  return source === undefined ? undefined : { run: ["decode", "--ask-secrets", ...source] };
+  if (source === undefined || source === CANCELLED) return source;
+  return { run: ["decode", "--ask-secrets", ...source] };
 }
 
 /**
@@ -202,12 +206,13 @@ async function decodeAction(): Promise<Action> {
  * the command asks itself for codes that name no mode, and a typed record that names another mode
  * is questioned there, before any date is asked.
  */
-async function askBackupSource(modeFlag: string): Promise<string[] | undefined> {
+async function askBackupSource(modeFlag: string): Promise<string[] | undefined | Cancelled> {
   const source = await askSource();
-  if (source === undefined) return undefined;
+  if (source === undefined || source === CANCELLED) return source;
   if (source.options[0] === "--input-file") return source.options;
   const mode = await askEncodedMode();
-  return mode === undefined ? undefined : [...source.options, modeFlag, mode];
+  if (mode === undefined || mode === CANCELLED) return mode;
+  return [...source.options, modeFlag, mode];
 }
 
 /**
@@ -215,7 +220,7 @@ async function askBackupSource(modeFlag: string): Promise<string[] | undefined> 
  * follows rather than what each variant does: the variants are told apart where the codes are
  * read (decode), and the explanation here says what Seedshift is.
  */
-function askEncodedMode(): Promise<Mode | undefined> {
+function askEncodedMode(): Promise<Mode | undefined | Cancelled> {
   return choose(
     ENCODED_SEEDSHIFT_QUESTION,
     ENCODED_SEEDSHIFT_CHOICES.map((choice) =>
@@ -231,9 +236,9 @@ function askEncodedMode(): Promise<Mode | undefined> {
  */
 async function markedCodesAction(): Promise<Action> {
   const words = await askPhraseWords();
-  if (words === undefined) return undefined;
+  if (words === undefined || words === CANCELLED) return words;
   const mode = await askEncodedMode();
-  if (mode === undefined) return undefined;
+  if (mode === undefined || mode === CANCELLED) return mode;
   return {
     run: [
       "decode",
@@ -251,12 +256,13 @@ async function markedCodesAction(): Promise<Action> {
  */
 async function splitAction(): Promise<Action> {
   const mode = await askSeedshift("Use Seedshift before splitting?", { shares: true });
-  if (mode === undefined) return undefined;
+  if (mode === undefined || mode === CANCELLED) return mode;
   const set = await askShareSet(
     "How many shares, and how many of them restore the seed phrase?",
     STANDARD_SHARES_EXPLANATION,
     false,
   );
+  if (set === CANCELLED) return CANCELLED;
   if (set === undefined || set === null) return undefined;
   const shareFormat = await choose(
     "How should each share be written?",
@@ -266,11 +272,11 @@ async function splitAction(): Promise<Action> {
     ] as const,
     { label: "Shares as" },
   );
-  if (shareFormat === undefined) return undefined;
+  if (shareFormat === undefined || shareFormat === CANCELLED) return shareFormat;
   const shares = await askShares(set, shareFormat);
-  if (shares === undefined) return undefined;
+  if (shares === undefined || shares === CANCELLED) return shares;
   const heirs = await askHeirSheet(mode);
-  if (heirs === undefined) return undefined;
+  if (heirs === undefined || heirs === CANCELLED) return heirs;
   return { run: ["encode", "--sskr", "--ask-secrets", "--mode", mode, ...shares, ...heirs] };
 }
 
@@ -278,7 +284,7 @@ async function splitAction(): Promise<Action> {
  * Whether the phrase of shares was masked before it was split, as the sheet for heirs and the
  * commands of shares ask it; undefined means back. Entries 5 and 6 ask it so.
  */
-function askSharesMasked(): Promise<SplitMode | undefined> {
+function askSharesMasked(): Promise<SplitMode | undefined | Cancelled> {
   return choose(SHARE_SEEDSHIFT_QUESTION, SHARE_SEEDSHIFT_CHOICES, {
     label: "Seedshift",
     explanation: SEEDSHIFT_EXPLANATION,
@@ -288,7 +294,7 @@ function askSharesMasked(): Promise<SplitMode | undefined> {
 /** Entry 5: the seed phrase rebuilt from typed Shamir shares. */
 async function restoreAction(): Promise<Action> {
   const mode = await askSharesMasked();
-  if (mode === undefined) return undefined;
+  if (mode === undefined || mode === CANCELLED) return mode;
   return {
     run: ["sskr-combine", "--ask-secrets", ...(mode === "seedshift" ? ["--mode", mode] : [])],
   };
@@ -318,13 +324,13 @@ async function recoverAction(): Promise<Action> {
     ] as const,
     { label: "Forgotten" },
   );
-  if (forgotten === undefined) return undefined;
+  if (forgotten === undefined || forgotten === CANCELLED) return forgotten;
   if (forgotten === "word") return wordRecoveryAction();
   if (forgotten === "code") return markedCodesAction();
   // The shares come back whole, in their own form, without the seed phrase being shown.
   if (forgotten === "share") return shareRepairAction();
   const source = await askSource();
-  if (source === undefined) return undefined;
+  if (source === undefined || source === CANCELLED) return source;
   // A record file names its mode; otherwise the person says which Seedshift was used.
   const mode =
     source.options[0] === "--input-file"
@@ -333,12 +339,13 @@ async function recoverAction(): Promise<Action> {
           label: "Seedshift",
           explanation: VARIANT_EXPLANATION,
         });
+  if (mode === CANCELLED) return CANCELLED;
   if (mode === undefined && source.options[0] !== "--input-file") return undefined;
   // Every date gives MnemoCode Seedshift a valid phrase, so only the wallet can tell the right one;
   // the original Seedshift's checksum sorts out most dates by itself. A record file names its own
   // mode, and recover-date asks for the wallet after reading it only when that mode needs one.
   const wallet = await askWallet(mode !== undefined && walletNeeded(mode), walletExplanation(mode));
-  if (wallet === undefined) return undefined;
+  if (wallet === undefined || wallet === CANCELLED) return wallet;
   return {
     run: [
       "recover-date",
@@ -369,7 +376,7 @@ async function wordRecoveryAction(): Promise<Action> {
     ] as const,
     { label: "Places" },
   );
-  if (where === undefined) return undefined;
+  if (where === undefined || where === CANCELLED) return where;
   const search = [
     "recover-word",
     "--ask-secrets",
@@ -378,15 +385,15 @@ async function wordRecoveryAction(): Promise<Action> {
   const save = await choose(
     "Save the candidates for the Discovery Scanner?",
     [
-      { label: "No", value: false },
-      { label: "Yes", note: "an encrypted list that the Scanner checks online", value: true },
-    ],
+      { label: "No", value: "no" },
+      { label: "Yes", note: "an encrypted list that the Scanner checks online", value: "yes" },
+    ] as const,
     { label: "List", explanation: CANDIDATES_EXPLANATION },
   );
-  if (save === undefined) return undefined;
-  if (!save) return { run: search };
+  if (save === undefined || save === CANCELLED) return save;
+  if (save === "no") return { run: search };
   const path = await askOutputFile("File name", "candidates.age");
-  if (path === undefined) return undefined;
+  if (path === undefined || path === CANCELLED) return path;
   const protection = await choose(
     "How should the list be encrypted?",
     [
@@ -399,7 +406,7 @@ async function wordRecoveryAction(): Promise<Action> {
     ] as const,
     { label: "Protect" },
   );
-  if (protection === undefined) return undefined;
+  if (protection === undefined || protection === CANCELLED) return protection;
   const key =
     protection === "key"
       ? await askLine("Scanner key", "Key", {
@@ -407,7 +414,7 @@ async function wordRecoveryAction(): Promise<Action> {
           check: parseRecipient,
         })
       : "";
-  if (key === undefined) return undefined;
+  if (key === undefined || key === CANCELLED) return key;
   return {
     run: [...search, "--candidates-file", path, ...(key === "" ? [] : ["--candidates-key", key])],
   };
@@ -425,10 +432,10 @@ const CANDIDATES_EXPLANATION: Explanation = {
  */
 async function shareRepairAction(): Promise<Action> {
   const wallet = await askWallet(false, SHARE_WALLET_EXPLANATION);
-  if (wallet === undefined) return undefined;
+  if (wallet === undefined || wallet === CANCELLED) return wallet;
   if (wallet.length === 0) return { run: ["sskr-export", "--ask-secrets"] };
   const mode = await askSharesMasked();
-  if (mode === undefined) return undefined;
+  if (mode === undefined || mode === CANCELLED) return mode;
   return {
     run: [
       "sskr-export",
@@ -449,8 +456,9 @@ async function shareRepairAction(): Promise<Action> {
 async function askWallet(
   required: boolean,
   explanation: Explanation,
-): Promise<string[] | undefined> {
+): Promise<string[] | undefined | Cancelled> {
   const answer = await askWalletEvidence({ optional: !required, explanation }, MENU_ASKER);
+  if (answer === CANCELLED) return CANCELLED;
   if (answer.kind === "back") return undefined;
   if (answer.kind === "none") return [];
   return walletEvidenceArguments(answer.evidence);
@@ -471,7 +479,8 @@ const MENU_ASKER: WalletValueAsker = {
         return text;
       },
     });
-    return answer === undefined ? undefined : parsed;
+    if (answer === undefined || answer === CANCELLED) return answer;
+    return parsed;
   },
   backLeaves: true,
 };
@@ -479,9 +488,9 @@ const MENU_ASKER: WalletValueAsker = {
 /** Entry 7: card designs drawn with the public test phrase. */
 async function previewAction(): Promise<Action> {
   const design = await askDesign(true);
-  if (design === undefined) return undefined;
+  if (design === undefined || design === CANCELLED) return design;
   const path = await askOutputFile("PDF file name", `${SAMPLE_FILE_BASE}.pdf`);
-  if (path === undefined) return undefined;
+  if (path === undefined || path === CANCELLED) return path;
   return {
     run: ["preview", ...(design === "" ? ["--all"] : ["--template", design]), "--pdf", path],
   };
@@ -538,7 +547,7 @@ async function tableAction(): Promise<Action> {
     ] as const,
     { label: "Look up" },
   );
-  if (lookup === undefined) return undefined;
+  if (lookup === undefined || lookup === CANCELLED) return lookup;
   if (lookup === "all") return { run: ["table", "--all"] };
   const { question, label, what, check, hints } = LOOKUPS[lookup];
   const answer = await askLine(question, label, {
@@ -546,7 +555,7 @@ async function tableAction(): Promise<Action> {
     check,
     ...(hints === undefined ? {} : { hints }),
   });
-  if (answer === undefined) return undefined;
+  if (answer === undefined || answer === CANCELLED) return answer;
   return { run: ["table", `--${lookup}`, answer] };
 }
 
@@ -614,7 +623,11 @@ function writeHeading(refusal: string | undefined): void {
   console.error("");
 }
 
-export async function runMenu(): Promise<void> {
+/**
+ * Runs the menu until the person quits, with Escape, q or the entry Quit; CANCELLED when they
+ * cancelled at one of its questions with Ctrl+C, which the program then says as a command does.
+ */
+export async function runMenu(): Promise<Cancelled | undefined> {
   // Each command runs in a process of its own, which gives up what it does not need; the menu
   // itself saves nothing.
   dropForMenu();
@@ -632,10 +645,11 @@ export async function runMenu(): Promise<void> {
       entries.map((item) => ({ label: item.label, digit: item.digit, value: item })),
       { label: "Task", initial: Math.max(0, entries.indexOf(selected)), quit: "quits" },
     );
-    if (entry === undefined) return;
+    if (entry === undefined || entry === CANCELLED) return entry;
     selected = entry;
     const action = await entry.action();
-    if (action === "quit") return;
+    if (action === CANCELLED) return CANCELLED;
+    if (action === "quit") return undefined;
     if (action === undefined) {
       // Back: the task and the answers given for it leave the record before the list returns.
       eraseAnswersSince(before);
@@ -651,6 +665,7 @@ export async function runMenu(): Promise<void> {
       console.error(paint(STYLE.accent, commandDisplay(action.run)));
       // The command reports its own result, error or cancellation (Ctrl+C), then the menu goes on.
       const code = await runCommand(action.run);
+      if (code === CANCELLED) return CANCELLED;
       if (code === undefined || code === CANCELLED_EXIT_CODE) continue;
       // A copy that fails its own check is not trusted with a secret either.
       if (action.run[0] === "self-test" && code !== 0 && refusal === undefined) {
@@ -672,6 +687,6 @@ export async function runMenu(): Promise<void> {
     const back = await waitForEnter("Press Enter to return to the menu (Esc quits).", {
       onlyEscapeLeaves: true,
     });
-    if (!back) return;
+    if (back !== "enter") return back === "escape" ? undefined : back;
   }
 }

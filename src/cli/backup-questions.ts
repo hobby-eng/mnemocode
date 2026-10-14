@@ -42,6 +42,12 @@ import { reportFingerprint, plainFingerprintLine } from "./fingerprint-report.js
 import type { EncodedFormat } from "../core/types.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { defined } from "../core/defined.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.backup-questions", {
+  "only-complete-codes-read-here": () => "Only complete codes are read here.",
+});
 
 // The encoded seed phrase, before its dates.
 
@@ -170,8 +176,9 @@ class BackupSource {
 
   /**
    * The text of the next attempt; `problem`, shown first, is why the last one could not be used.
+   * CANCELLED when the person cancels.
    */
-  async next(problem: string | undefined): Promise<string> {
+  async next(problem: string | undefined): Promise<string | Cancelled> {
     if (this.#typed) {
       if (problem !== undefined) terminalNotice(problem, "warning");
       return askSecretUntil("Encoded seed phrase or record:", recordText, {
@@ -190,8 +197,8 @@ class BackupSource {
     return this.#otherSource(problem);
   }
 
-  /** After a file could not be used: another file, the phrase typed instead, or Stop. */
-  async #otherSource(problem: string | undefined): Promise<string> {
+  /** After a file could not be used: another file, the phrase typed instead, or Stop (CANCELLED). */
+  async #otherSource(problem: string | undefined): Promise<string | Cancelled> {
     for (;;) {
       if (problem !== undefined) terminalNotice(problem, "warning");
       problem = undefined;
@@ -199,6 +206,7 @@ class BackupSource {
         { label: "Read another file", value: "file" },
         { label: "Type the encoded seed phrase", note: "or paste it", value: "typed" },
       ] as const);
+      if (next === CANCELLED) return CANCELLED;
       if (next === "typed") {
         this.#typed = true;
         return this.next(undefined);
@@ -211,6 +219,7 @@ class BackupSource {
         },
         { what: "the name of the file" },
       );
+      if (text === CANCELLED) return CANCELLED;
       if (text !== undefined) return text;
     }
   }
@@ -232,12 +241,16 @@ interface Again {
 
 /**
  * Asks for the encoded seed phrase on the private screen, or reads the file given, and checks it as
- * described at the top, until it passes; the caller asks for the dates then.
+ * described at the top, until it passes; the caller asks for the dates then. CANCELLED when the
+ * person cancels.
  */
-export async function askEncodedBackup(question: BackupQuestion): Promise<ReadBackup> {
+export async function askEncodedBackup(question: BackupQuestion): Promise<ReadBackup | Cancelled> {
   const source = new BackupSource(question.args);
   for (let problem: string | undefined; ;) {
-    const checked = await checkedBackup(await source.next(problem), question, source);
+    const text = await source.next(problem);
+    if (text === CANCELLED) return CANCELLED;
+    const checked = await checkedBackup(text, question, source);
+    if (checked === CANCELLED) return CANCELLED;
     if (!("again" in checked)) return checked;
     problem = checked.again;
   }
@@ -246,9 +259,10 @@ export async function askEncodedBackup(question: BackupQuestion): Promise<ReadBa
 /** The codes alone, for a command that takes neither marks nor shares (askEncodedBackup). */
 export async function askEncodedCodes(
   question: Omit<BackupQuestion, "marks" | "shares">,
-): Promise<ReadCodes> {
+): Promise<ReadCodes | Cancelled> {
   const read = await askEncodedBackup(question);
-  if (read.kind !== "codes") throw new Error("Only complete codes are read here.");
+  if (read === CANCELLED) return CANCELLED;
+  if (read.kind !== "codes") throw ERRORS.create("only-complete-codes-read-here", []);
   return read;
 }
 
@@ -263,7 +277,7 @@ async function offeredRestore(
   text: string,
   source: BackupSource,
   inputKind: InputKind | undefined,
-): Promise<"share" | "codes" | "again" | undefined> {
+): Promise<"share" | "codes" | "again" | undefined | Cancelled> {
   const kind = BackupReading.shareKind(text);
   if (kind === undefined) return undefined;
   if (inputKind === "share") return "share";
@@ -292,10 +306,11 @@ async function checkedBackup(
   text: string,
   question: BackupQuestion,
   source: BackupSource,
-): Promise<ReadBackup | Again> {
+): Promise<ReadBackup | Again | Cancelled> {
   // --input-kind codes reads every text as codes, a share among them.
   if (question.shares === true && question.inputKind !== "codes") {
     const offered = await offeredRestore(text, source, question.inputKind);
+    if (offered === CANCELLED) return CANCELLED;
     if (offered === "share") return { kind: "share", text, fromQr: source.readsQr };
     if (offered === "again") return { again: undefined };
   }
@@ -310,6 +325,7 @@ async function checkedBackup(
     return { again: refusal(error) };
   }
   const settled = await settledMode(reading, question, source);
+  if (settled === CANCELLED) return CANCELLED;
   if (settled === undefined) return { again: undefined };
   if (reading.marked) return markedBackup(reading, settled, question, source);
   // Read first as not masked, which has no rule beyond the codes and their count: codes that name
@@ -317,7 +333,7 @@ async function checkedBackup(
   const read = await codesAndMode(reading, settled, question, source, false, (format) =>
     reading.codes(format),
   );
-  if ("again" in read) return read;
+  if (read === CANCELLED || "again" in read) return read;
   const { codes, mode } = read;
   const recordMode = reading.mode();
   try {
@@ -329,6 +345,7 @@ async function checkedBackup(
       [{ label: "It was the Original Seedshift", value: "legacy" }, source.againChoice()] as const,
       { escape: "asks again" },
     );
+    if (choice === CANCELLED) return CANCELLED;
     return choice === "again"
       ? { again: undefined }
       : { kind: "codes", backup: codes.withMode("seedshift-legacy"), recordMode };
@@ -344,13 +361,13 @@ async function markedBackup(
   settled: MaskingMode | "ask",
   question: BackupQuestion,
   source: BackupSource,
-): Promise<ReadBackup | Again> {
+): Promise<ReadBackup | Again | Cancelled> {
   if (question.marks !== true)
     return { again: "Every code is needed here: Decode searches codes marked with ?." };
   const read = await codesAndMode(reading, settled, question, source, true, (format) =>
     reading.missingCodes(format),
   );
-  if ("again" in read) return read;
+  if (read === CANCELLED || "again" in read) return read;
   return { kind: "missing", codes: read.codes.withMode(read.mode), recordMode: reading.mode() };
 }
 
@@ -366,8 +383,9 @@ async function codesAndMode<Codes>(
   source: BackupSource,
   marked: boolean,
   read: (format: EncodedFormat) => Codes,
-): Promise<{ readonly codes: Codes; readonly mode: MaskingMode } | Again> {
+): Promise<{ readonly codes: Codes; readonly mode: MaskingMode } | Again | Cancelled> {
   const format = await settledFormat(reading, question.args, source, marked);
+  if (format === CANCELLED) return CANCELLED;
   if (typeof format !== "string") return format;
   let codes: Codes;
   try {
@@ -376,6 +394,7 @@ async function codesAndMode<Codes>(
     return { again: refusal(error) };
   }
   const mode = settled === "ask" ? await askedMode(question.seedshiftOnly) : settled;
+  if (mode === CANCELLED) return CANCELLED;
   if (mode === undefined) return { again: undefined };
   return { codes, mode };
 }
@@ -389,7 +408,7 @@ async function settledMode(
   reading: BackupReading,
   question: BackupQuestion,
   source: BackupSource,
-): Promise<MaskingMode | "ask" | undefined> {
+): Promise<MaskingMode | "ask" | undefined | Cancelled> {
   const given = value(question.args, "mode") as MaskingMode | undefined;
   const conflict = reading.modeConflict(given);
   if (conflict !== undefined) {
@@ -402,6 +421,7 @@ async function settledMode(
       ] as const,
       { escape: "asks again" },
     );
+    if (choice === CANCELLED) return CANCELLED;
     return choice === "record" ? named : undefined;
   }
   // Nothing names how these codes were made, whether typed, in a QR code or in a file without
@@ -416,7 +436,7 @@ async function settledMode(
  * one was used at all, after saying that no record header names it. Undefined (Escape) asks for
  * the codes again.
  */
-async function askedMode(seedshiftOnly: boolean): Promise<MaskingMode | undefined> {
+async function askedMode(seedshiftOnly: boolean): Promise<MaskingMode | undefined | Cancelled> {
   if (!seedshiftOnly)
     terminalNotice(
       "These codes have no MNC1 record header, so they do not say how they were made.",
@@ -437,7 +457,7 @@ async function settledFormat(
   args: ParsedArguments,
   source: BackupSource,
   marked = false,
-): Promise<EncodedFormat | Again> {
+): Promise<EncodedFormat | Again | Cancelled> {
   const given = givenInputFormat(args);
   const conflict = reading.formatConflict(given);
   if (conflict !== undefined) {
@@ -450,6 +470,7 @@ async function settledFormat(
       ] as const,
       { escape: "asks again" },
     );
+    if (choice === CANCELLED) return CANCELLED;
     return choice === "record" ? defined(recorded) : { again: undefined };
   }
   let fitting: EncodedFormat[];

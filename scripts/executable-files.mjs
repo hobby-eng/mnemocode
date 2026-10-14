@@ -1,3 +1,11 @@
+import { ErrorCatalog } from "../src/core/error-catalog.ts";
+
+const ERRORS = new ErrorCatalog("scripts.executable-files", {
+  /**
+   * @param {string} value0
+   */
+  "no-executable-built": (value0) => `No executable is built for ${value0}.`,
+});
 // The names of the files of a release: a single executable, its license notices and its checksums,
 // the folder they are built into and the checksum line. build-executable.mjs writes them,
 // verify-executable.mjs checks them and sign-release.mjs reads them back from the draft release,
@@ -17,7 +25,7 @@ export function releaseFilePrefix(version) {
 /** mnemocode-<version>-<system>-<processor>[.exe] for the computer this runs on. */
 export function executableName(version) {
   const system = SYSTEM_NAMES[process.platform];
-  if (system === undefined) throw new Error(`No executable is built for ${process.platform}.`);
+  if (system === undefined) throw ERRORS.create("no-executable-built", [`${process.platform}`]);
   return `${releaseFilePrefix(version)}${system}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`;
 }
 

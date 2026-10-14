@@ -9,6 +9,12 @@
 // Does not: load or verify the WASM (runtime.ts), or change what the bridge returns.
 
 import type * as Engine from "../../sskr-wasm/generated/recovery_sskr_wasm.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.bridge", {
+  "unsupported-encoding": () => UNSUPPORTED_ENCODING,
+  "unsupported-group-threshold": () => UNSUPPORTED_GROUP_THRESHOLD,
+});
 
 /** The generated bridge, as its glue exports it. */
 type Bridge = typeof Engine;
@@ -96,12 +102,12 @@ export class CheckedSskrBridge implements SskrBridge {
   /** Refuses anything but the code of one of the bridge's encodings, a whole number as it is. */
   #assertEncoding(encoding: unknown): void {
     if (typeof encoding !== "number" || !this.#encodings.includes(encoding))
-      throw new Error(UNSUPPORTED_ENCODING);
+      throw ERRORS.create("unsupported-encoding", []);
   }
 
   /** Refuses a group threshold that the glue's u8 would not hold as it is. */
   static #assertGroupThreshold(threshold: unknown): void {
     if (!Number.isInteger(threshold) || (threshold as number) < 0 || (threshold as number) > U8_MAX)
-      throw new Error(UNSUPPORTED_GROUP_THRESHOLD);
+      throw ERRORS.create("unsupported-group-threshold", []);
   }
 }

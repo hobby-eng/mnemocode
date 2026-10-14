@@ -7,6 +7,11 @@ import { wipeAll } from "./bits.js";
 import { MAX_CANDIDATE_LIST_BYTES, OpenedCandidateList } from "./candidate-list.js";
 import { assertCandidateFileSize, CandidateFileRefusedError } from "./candidate-file-refusal.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.candidate-file-admission", {
+  "invalid-supported-header": () => "invalid supported header",
+});
 
 /** More than any supported single-stanza binary age header needs. */
 const MAX_HEADER_BYTES = 64 * 1024;
@@ -174,7 +179,7 @@ export class CandidateFileAdmission {
         base64nopad.decode(defined(lines[end]).slice(MAC_LINE_START.length)).length !==
           HEADER_MAC_BYTES
       )
-        throw new Error("invalid supported header");
+        throw ERRORS.create("invalid-supported-header", []);
     } catch {
       throw new CandidateFileRefusedError("unsupported", "The age header is malformed.");
     }

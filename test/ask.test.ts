@@ -43,7 +43,7 @@ import {
 } from "../src/cli/ask.js";
 import { assertWalletPlaceUsed, walletPlaceOf } from "../src/cli/bitcoin-options.js";
 import { LAST_NORMAL_INDEX } from "../src/core/address-scan.js";
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
+import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
@@ -168,17 +168,9 @@ describe("questions asked again until the answer can be used", () => {
     expect(screen.match(/Phrase: /gu)).toHaveLength(2);
   });
 
-  it("lets Ctrl+C through, typed or thrown by the check, and anything not an Error", async () => {
+  it("gives CANCELLED at Ctrl+C, and lets through anything thrown that is not an Error", async () => {
     at("Phrase:", `abc${CTRL_C}`);
-    await expect(askSecretUntil("Phrase:", (answer) => answer)).rejects.toBeInstanceOf(
-      InputCancelledError,
-    );
-    at("Phrase:", "abc\r");
-    await expect(
-      askSecretUntil("Phrase:", () => {
-        throw new InputCancelledError();
-      }),
-    ).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await askSecretUntil("Phrase:", (answer) => answer)).toBe(CANCELLED);
     at("Phrase:", "abc\r");
     await expect(
       askSecretUntil("Phrase:", () => {
@@ -194,9 +186,7 @@ describe("questions asked again until the answer can be used", () => {
     expect(await askSecretUntil("Dates:", (answer) => answer)).toBe("23-09-2026");
     expect(notices).toEqual([]);
     keys.type(`typed ahead${CTRL_C}`);
-    await expect(askSecretUntil("Dates:", (answer) => answer)).rejects.toBeInstanceOf(
-      InputCancelledError,
-    );
+    expect(await askSecretUntil("Dates:", (answer) => answer)).toBe(CANCELLED);
   });
 
   it("takes a paste of several lines as one answer, with ; between shares where asked", async () => {
@@ -423,11 +413,9 @@ describe("questions asked again until the answer can be used", () => {
   it("ends as a cancel when the input ends, without asking again and again", async () => {
     const asked = askSecretUntil("Phrase:", (answer) => answer);
     setTimeout(() => keys.emit("end"), 30);
-    await expect(asked).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await asked).toBe(CANCELLED);
     expect(screen.match(/Phrase: /gu)).toHaveLength(1);
     // The end stays: a later question cancels at once.
-    await expect(askSecretUntil("Again:", (answer) => answer)).rejects.toBeInstanceOf(
-      InputCancelledError,
-    );
+    expect(await askSecretUntil("Again:", (answer) => answer)).toBe(CANCELLED);
   });
 });

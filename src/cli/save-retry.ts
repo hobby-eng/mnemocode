@@ -11,9 +11,9 @@ import { warnOfCloudCopy } from "./cloud-folders.js";
 import { discardRenamedOutput } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { terminalNotice } from "./terminal.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { lowerFirst } from "../core/prose.js";
-import { describeError } from "../core/refusal.js";
+import { describeError, errorCode } from "../core/refusal.js";
 import { LeftStagingCopyError } from "../export/private-file.js";
 
 /** Plain words for the errors of a file system that a save may meet (errno names). */
@@ -45,8 +45,9 @@ export interface Saving {
 
 /** Why a save failed, in one line that names the file but nothing it holds. */
 function saveFailure(what: string, path: string, error: unknown): string {
-  const code = (error as NodeJS.ErrnoException | undefined)?.code;
-  const known = code === undefined ? undefined : SAVE_FAILURES[code];
+  const code = errorCode(error);
+  const known =
+    code !== undefined && Object.hasOwn(SAVE_FAILURES, code) ? SAVE_FAILURES[code] : undefined;
   return `${what} could not be saved as ${path}: ${known ?? otherFailure(error)}.`;
 }
 
@@ -61,10 +62,10 @@ function otherFailure(error: unknown): string {
 
 /**
  * Another name for a result that could not be saved, checked before it is used; undefined when
- * the person goes back with Escape. A name in a folder that a cloud service copies is warned of,
- * as the names given with the options are (command-line.ts).
+ * the person goes back with Escape, CANCELLED at Ctrl+C. A name in a folder that a cloud service
+ * copies is warned of, as the names given with the options are (command-line.ts).
  */
-async function askOtherName(saving: Saving): Promise<string | undefined> {
+async function askOtherName(saving: Saving): Promise<string | undefined | Cancelled> {
   const path = await askValueUntil(
     `New name for ${lowerFirst(saving.what)}:`,
     async (answer) => {
@@ -74,6 +75,7 @@ async function askOtherName(saving: Saving): Promise<string | undefined> {
     },
     { what: saving.kind === "file" ? "the name of a new file" : "the name of a new folder" },
   );
+  if (path === CANCELLED) return CANCELLED;
   warnOfCloudCopy(path);
   return path;
 }
@@ -93,11 +95,11 @@ export async function writeSaved(write: () => Promise<unknown>): Promise<void> {
 }
 
 /**
- * Saves a result as described at the top. Resolves with the path it was saved at, or undefined
- * when the person skipped it. Escape at "What now?" skips; Escape at the new name brings the
- * choice back without saving.
+ * Saves a result as described at the top. Resolves with the path it was saved at, undefined when
+ * the person skipped it, or CANCELLED at Ctrl+C. Escape at "What now?" skips; Escape at the new
+ * name brings the choice back without saving.
  */
-export async function saveWithRetry(saving: Saving): Promise<string | undefined> {
+export async function saveWithRetry(saving: Saving): Promise<string | undefined | Cancelled> {
   let path = saving.path;
   for (let write = true; ;) {
     if (write)
@@ -107,7 +109,7 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined>
         if (path !== saving.path) discardRenamedOutput(saving.path);
         return path;
       } catch (error) {
-        if (!onPrivateScreen() || error instanceof InputCancelledError) throw error;
+        if (!onPrivateScreen()) throw error;
         terminalNotice(saveFailure(saving.what, path, error), "warning");
       }
     const next = await askAfterFailure(
@@ -119,6 +121,7 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined>
       ] as const,
       { escape: "skips it" },
     );
+    if (next === CANCELLED) return CANCELLED;
     if (next === "skip") {
       discardRenamedOutput(saving.path);
       terminalNotice(`${saving.what} was not saved.`, "warning");
@@ -127,6 +130,7 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined>
     write = true;
     if (next === "other") {
       const other = await askOtherName(saving);
+      if (other === CANCELLED) return CANCELLED;
       if (other === undefined) write = false;
       else path = other;
     }

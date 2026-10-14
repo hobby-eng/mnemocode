@@ -79,7 +79,19 @@ import { SHARE_SOURCE_OPTIONS } from "./share-options.js";
 import { reportOriginalFingerprint, showOriginalPhrase } from "./fingerprint-report.js";
 import { isMasterKeyPath } from "../core/wallet-check.js";
 import { defined } from "../core/defined.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.sskr-restore-command", {
+  "standard-input-can-only-read-once": () => "Standard input can only be read once.",
+  "provide-at-least-one-complete-share-as-text": () =>
+    "Provide at least one complete share as text, in a text file, in a QR image, or through --ask-secrets. Additional share sources may be repeated.",
+  "ask-share-dates-refused": suppliedMessage,
+  "after-refused-refused": suppliedMessage,
+  "restore-phrases-refused": suppliedMessage,
+  "after-mismatch-refused": suppliedMessage,
+  "too-few-shares-restore-phrase": () => "Too few shares to restore the phrase.",
+});
 
 export const sskrInputOptions = [...SHARE_SOURCE_OPTIONS, "ask-secrets"] as const;
 
@@ -92,7 +104,7 @@ export const sskrInputOptions = [...SHARE_SOURCE_OPTIONS, "ask-secrets"] as cons
  */
 export async function givenShares(args: ParsedArguments): Promise<TypedShares> {
   if (values(args, "share-file").filter((path) => path === "-").length > 1)
-    throw new Error("Standard input can only be read once.");
+    throw ERRORS.create("standard-input-can-only-read-once", []);
   const shares = new TypedShares();
   const { input } = shares;
   input.add(values(args, "share"));
@@ -105,19 +117,19 @@ export async function givenShares(args: ParsedArguments): Promise<TypedShares> {
   }
   for (const path of values(args, "share-qr")) input.add([await decodeQrPngFile(path)]);
   if (input.list.length === 0)
-    throw new Error(
-      "Provide at least one complete share as text, in a text file, in a QR image, or through --ask-secrets. Additional share sources may be repeated.",
-    );
+    throw ERRORS.create("provide-at-least-one-complete-share-as-text", []);
   return shares;
 }
 
-/** The shares: asked on the private screen with --ask-secrets, or read from the options. */
-export async function typedShares(args: ParsedArguments): Promise<TypedShares> {
+/**
+ * The shares: asked on the private screen with --ask-secrets, or read from the options; CANCELLED
+ * when the person cancelled.
+ */
+export async function typedShares(args: ParsedArguments): Promise<TypedShares | Cancelled> {
   if (args["ask-secrets"] !== true) return givenShares(args);
   assertAskedNotGiven(args, SHARE_SOURCE_OPTIONS);
   const shares = new TypedShares();
-  await shares.askAll();
-  return shares;
+  return (await shares.askAll()) ?? shares;
 }
 
 // Restoring the phrase from the shares, with the dates and the wallet.
@@ -205,9 +217,9 @@ type Restoring =
 interface RestoreRules {
   /**
    * After too few shares, explained by `message`: "again" when more shares were added, "few" to
-   * stop restoring and give the shares back to the caller.
+   * stop restoring and give the shares back to the caller, CANCELLED when the person cancelled.
    */
-  readonly few: (message: string) => Promise<"again" | "few">;
+  readonly few: (message: string) => Promise<"again" | "few" | Cancelled>;
   /** Whether several phrases, without a wallet, ask for one to tell the right set (sskr-export). */
   readonly one: boolean;
 }
@@ -216,27 +228,31 @@ interface RestoreRules {
  * Asks for the dates of a Seedshift phrase of `words` words, ? standing for a forgotten digit,
  * until they can be used. Without a private screen the dates must have been given.
  */
-async function askShareDates(r: Recovery, words: number | undefined): Promise<DatesAnswer> {
+async function askShareDates(
+  r: Recovery,
+  words: number | undefined,
+): Promise<DatesAnswer | Cancelled> {
   // Off the private screen recoverySettings has refused a masked mode without dates, so the dates
   // given can only be too many for the phrase.
-  if (!r.interactive) throw new Error(defined(r.dates).tooManyFor(words));
+  if (!r.interactive)
+    throw ERRORS.create("ask-share-dates-refused", [defined(defined(r.dates).tooManyFor(words))]);
   return askDates({ wordCount: words, patterns: true });
 }
 
 /**
  * Whether the date search of `phrases` phrases is made (dateSearchDecision): at once, with its
- * notice, or when the person chooses it; false types the dates again. Dates with ? are typed on
- * the private screen only.
+ * notice, or when the person chooses it (askToSearch); "no" types the dates again. Dates with ?
+ * are typed on the private screen only.
  */
 async function askDateSearch(
   work: DateWork,
   phrases: number,
   limits: SearchLimits,
-): Promise<boolean> {
+): Promise<"yes" | "no" | Cancelled> {
   const decision = dateSearchDecision(work, phrases, limits);
   if (decision.question === undefined) {
     if (decision.notice !== undefined) terminalNotice(decision.notice);
-    return true;
+    return "yes";
   }
   return askToSearch(decision.question, DATES_AGAIN);
 }
@@ -317,13 +333,14 @@ function stepAfterShares(r: Recovery, words: number | undefined): Step {
  * The wallet, asked when the date search needs it and none was given: the step after it, the
  * search, or the dates at Escape.
  */
-async function walletForSearch(r: Recovery): Promise<Step> {
+async function walletForSearch(r: Recovery): Promise<Step | Cancelled> {
   if (!unmaskingOf(r).needsWallet || r.evidence !== undefined) return "search";
   const answer = await askWalletEvidence({
     optional: false,
     explanation: walletExplanation(r.mode),
     place: r.place,
   });
+  if (answer === CANCELLED) return CANCELLED;
   if (answer.kind === "back") return "dates";
   if (answer.kind === "wallet") r.evidence = answer.evidence;
   return "search";
@@ -337,26 +354,27 @@ async function walletForSearch(r: Recovery): Promise<Step> {
 async function afterRefused(
   r: Recovery,
   result: Extract<RestoredPhrases, { readonly kind: "dates" | "mismatch" }>,
-): Promise<Step> {
+): Promise<Step | Cancelled> {
   if (result.kind === "mismatch") return afterMismatch(r, result.message);
-  if (!r.interactive) throw new Error(result.message);
+  if (!r.interactive) throw ERRORS.create("after-refused-refused", [result.message]);
   terminalNotice(result.message, "warning");
   return "dates";
 }
 
 /**
  * Several sets fit, and nothing tells the right one: the wallet does, without a new search.
- * Whether a wallet was given.
+ * "given" when a wallet was given, "none" when not.
  */
-async function walletForSeveral(r: Recovery, sets: number): Promise<boolean> {
+async function walletForSeveral(r: Recovery, sets: number): Promise<"given" | "none" | Cancelled> {
   const answer = await askWalletEvidence({
     optional: true,
     explanation: { lines: [severalSetsNote(sets)] },
     place: r.place,
   });
-  if (answer.kind !== "wallet") return false;
+  if (answer === CANCELLED) return CANCELLED;
+  if (answer.kind !== "wallet") return "none";
   r.evidence = answer.evidence;
-  return true;
+  return "given";
 }
 
 /**
@@ -365,9 +383,13 @@ async function walletForSeveral(r: Recovery, sets: number): Promise<boolean> {
  * a Seedshift phrase, with ? for forgotten digits, the wallet when a date search needs it, then the
  * search of marked shares and of the dates, and the wallet check. A result that cannot be used
  * offers what to change; the other answers, and the phrases already found, are kept. Without a
- * private screen the first problem ends the command.
+ * private screen the first problem ends the command. CANCELLED when the person cancelled, at a
+ * question or by stopping a search.
  */
-export async function restorePhrases(r: Recovery, rules: RestoreRules): Promise<Restoring> {
+export async function restorePhrases(
+  r: Recovery,
+  rules: RestoreRules,
+): Promise<Restoring | Cancelled> {
   let repair: MarkedShares | undefined;
   let sets: readonly RepairedSet[] | undefined;
   let places: number[] = [];
@@ -395,13 +417,18 @@ export async function restorePhrases(r: Recovery, rules: RestoreRules): Promise<
     repair = marked;
   };
   try {
-    for (let step: Step = "shares"; ;) {
+    for (let step: Step | Cancelled = "shares"; ;) {
+      if (step === CANCELLED) return CANCELLED;
       if (step === "shares") {
         const outcome = await assessShares(r.shares);
+        if (outcome === CANCELLED) return CANCELLED;
         if (outcome.kind === "trouble") {
-          if (outcome.trouble.kind !== "few")
-            await mendShares(r.shares, outcome.trouble, r.interactive);
-          else if ((await rules.few(outcome.trouble.message)) === "few") return { kind: "few" };
+          const mended =
+            outcome.trouble.kind === "few"
+              ? await rules.few(outcome.trouble.message)
+              : await mendShares(r.shares, outcome.trouble, r.interactive);
+          if (mended === CANCELLED) return CANCELLED;
+          if (mended === "few") return { kind: "few" };
           continue;
         }
         places = r.shares.places();
@@ -420,39 +447,44 @@ export async function restorePhrases(r: Recovery, rules: RestoreRules): Promise<
       } else if (step === "dates") {
         // Also after "It was masked with Seedshift" (otherMode), which comes here.
         showEncoded();
-        r.dates = await askShareDates(r, words);
+        const dates = await askShareDates(r, words);
+        if (dates === CANCELLED) return CANCELLED;
+        r.dates = dates;
         step = "wallet";
       } else if (step === "wallet") {
         step = await walletForSearch(r);
       } else {
         if (sets === undefined) {
           const found = await searchShareRepair(defined(repair), r.limits, await dateWork(r));
+          if (found === CANCELLED) return CANCELLED;
           if (found === undefined || found.length === 0) {
             // A search not made leaves the plan, which the shares typed next do not use: it is
             // wiped now, before they are asked. A search wiped it already, which is no harm.
             assessed(undefined);
             // Shares given with the options cannot be typed again here.
             const problem = found === undefined ? "The search was not started." : NO_PHRASE_FITS;
-            if (!r.interactive) throw new Error(problem);
+            if (!r.interactive) throw ERRORS.create("restore-phrases-refused", [problem]);
             if (found !== undefined) terminalNotice(problem, "warning");
             // Escape here is Stop (askAfterFailure): a search that found nothing has no question
             // to go back to, and the search question, whose own Escape leads here, would be asked
             // without end once the input has ended.
-            await askShareFix(r.shares, { question: "Which shares to change?" });
-            step = "shares";
+            const change = await askShareFix(r.shares, { question: "Which shares to change?" });
+            step = change === CANCELLED ? CANCELLED : "shares";
             continue;
           }
           sets = found;
         } else {
           const work = await dateWork(r);
-          if (work !== undefined && !(await askDateSearch(work, sets.length, r.limits))) {
-            step = "dates";
+          const start =
+            work === undefined ? "yes" : await askDateSearch(work, sets.length, r.limits);
+          if (start !== "yes") {
+            step = start === "no" ? "dates" : start;
             continue;
           }
         }
         const result = await unmasked(r, sets, places);
         // The person stopped the date search with Ctrl+C.
-        if (result.kind === "stopped") throw new InputCancelledError();
+        if (result.kind === "stopped") return CANCELLED;
         if (result.kind === "dates" || result.kind === "mismatch") {
           step = await afterRefused(r, result);
           continue;
@@ -460,7 +492,8 @@ export async function restorePhrases(r: Recovery, rules: RestoreRules): Promise<
         const restored = { ...result, kind: "restored", places } as const;
         if (!(rules.one && result.sets.length > 1 && r.evidence === undefined && r.interactive))
           return restored;
-        if (!(await walletForSeveral(r, result.sets.length))) return restored;
+        const wallet = await walletForSeveral(r, result.sets.length);
+        if (wallet !== "given") return wallet === "none" ? restored : wallet;
       }
     }
   } finally {
@@ -487,11 +520,11 @@ function otherMode(r: Recovery): Step {
 /**
  * After phrases of which none matches the wallet given: says so, in the library's `message`
  * (ShareRestore.phrases), and asks what to change, the dates, the wallet, the shares or whether
- * Seedshift was used; Stop cancels. Escape at the wallet or share question that follows comes back
- * here. Without a private screen the mismatch ends the command.
+ * Seedshift was used; Stop cancels (CANCELLED). Escape at the wallet or share question that
+ * follows comes back here. Without a private screen the mismatch ends the command.
  */
-async function afterMismatch(r: Recovery, message: string): Promise<Step> {
-  if (!r.interactive) throw new Error(message);
+async function afterMismatch(r: Recovery, message: string): Promise<Step | Cancelled> {
+  if (!r.interactive) throw ERRORS.create("after-mismatch-refused", [message]);
   terminalNotice(message, "warning");
   for (;;) {
     const next = await askOrCancel(WHAT_NOW, [
@@ -504,14 +537,19 @@ async function afterMismatch(r: Recovery, message: string): Promise<Step> {
         ? { label: "It was masked with Seedshift", note: "type its dates", value: "mode" as const }
         : { label: "It was not masked with Seedshift", note: "no dates", value: "mode" as const },
     ]);
+    if (next === CANCELLED) return CANCELLED;
     if (next === "dates") return "dates";
     if (next === "mode") return otherMode(r);
     if (next === "shares") {
-      if (await askShareFix(r.shares, { question: "Which shares to change?", back: true }))
-        return "shares";
+      const change = await askShareFix(r.shares, {
+        question: "Which shares to change?",
+        back: true,
+      });
+      if (change !== "back") return change === "changed" ? "shares" : change;
       continue;
     }
     const answer = await askWalletEvidence({ optional: false, place: r.place });
+    if (answer === CANCELLED) return CANCELLED;
     if (answer.kind === "wallet") {
       r.evidence = answer.evidence;
       return "search";
@@ -524,24 +562,24 @@ async function afterMismatch(r: Recovery, message: string): Promise<Step> {
  * for the codes: that share is kept as the first, and the others are asked for. Shares are made
  * with Seedshift or without; Decode's mode tells which where it is one of the two, or it is asked
  * as the menu's entry asks it. `handed` are Decode's options that a restore takes too, such as
- * the mode, the wallet and the search limits.
+ * the mode, the wallet and the search limits. CANCELLED when the person cancelled.
  */
 export async function restoreFromShare(
   handed: ParsedArguments,
   share: FirstShare,
-): Promise<"done" | "back"> {
+): Promise<"done" | "back" | Cancelled> {
   const given = value(handed, "mode");
   const mode = Masking.isSplitMode(given) ? given : await askShareSeedshift();
   if (mode === undefined) return "back";
+  if (mode === CANCELLED) return CANCELLED;
   const options: ParsedArguments = { ...handed, "ask-secrets": true };
   delete options.mode;
   if (Masking.of(mode).masked) options.mode = mode;
-  await runSskrCombine(options, share);
-  return "done";
+  return (await runSskrCombine(options, share)) ?? "done";
 }
 
 /** Whether Seedshift was used before the shares were made; undefined goes back (Escape). */
-async function askShareSeedshift(): Promise<SplitMode | undefined> {
+async function askShareSeedshift(): Promise<SplitMode | undefined | Cancelled> {
   return choose(SHARE_SEEDSHIFT_QUESTION, SHARE_SEEDSHIFT_CHOICES, {
     label: "Seedshift",
     quit: "goes back",
@@ -550,12 +588,13 @@ async function askShareSeedshift(): Promise<SplitMode | undefined> {
 
 /**
  * Restores the phrase from the shares given, or typed on the private screen, after `firstShare`
- * when another command's question took it (restoreFromShare).
+ * when another command's question took it (restoreFromShare). CANCELLED when the person
+ * cancelled.
  */
 export async function runSskrCombine(
   args: ParsedArguments,
   firstShare?: FirstShare,
-): Promise<void> {
+): Promise<Cancelled | undefined> {
   // Again for the menu, which runs the command without the command line's checks.
   assertSingleValues(args);
   const settings = await recoverySettings(args);
@@ -563,16 +602,16 @@ export async function runSskrCombine(
   target?.assertListable(settings.passphrase);
   const shares =
     firstShare === undefined ? await typedShares(args) : await TypedShares.startingWith(firstShare);
+  if (shares === CANCELLED) return CANCELLED;
   const r: Recovery = { ...settings, target, shares };
-  await target?.prepare(r.passphrase);
+  if ((await target?.prepare(r.passphrase)) === CANCELLED) return CANCELLED;
   const restored = await restorePhrases(r, {
-    few: async (message) => {
-      await mendShares(r.shares, { kind: "few", message }, r.interactive);
-      return "again";
-    },
+    few: async (message) =>
+      (await mendShares(r.shares, { kind: "few", message }, r.interactive)) ?? "again",
     one: false,
   });
-  if (restored.kind === "few") throw new Error("Too few shares to restore the phrase.");
+  if (restored === CANCELLED) return CANCELLED;
+  if (restored.kind === "few") throw ERRORS.create("too-few-shares-restore-phrase", []);
   const { phrases } = restored;
   // The result is a step of its own: the questions and the search are cleared away.
   const cleared = clearPrivateScreen();
@@ -586,10 +625,11 @@ export async function runSskrCombine(
     // The private screen keeps no scrollback: there each phrase has a screen of its own, the next
     // shown on Enter, so that none scrolls out of reach.
     if (index > 0 && cleared) {
-      if (
-        !(await waitForEnter(`Press Enter for phrase ${index + 1} of ${phrases.length}; Esc ends.`))
-      )
-        break;
+      const next = await waitForEnter(
+        `Press Enter for phrase ${index + 1} of ${phrases.length}; Esc ends.`,
+      );
+      if (next === CANCELLED) return CANCELLED;
+      if (next === "escape") break;
       clearPrivateScreen();
     }
     showRestored(phrase, r.mode, {
@@ -602,7 +642,7 @@ export async function runSskrCombine(
     });
     reported.add(phrase.set);
   }
-  if (target !== undefined) await target.savePhrases(restored.listed, r.passphrase);
+  return target?.savePhrases(restored.listed, r.passphrase);
 }
 
 /** Where a restored phrase stands among those shown, and what was already said of its set. */

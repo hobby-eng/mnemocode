@@ -46,6 +46,17 @@ import { misfitMessage } from "./complete-shares.js";
 import { refusalMessage } from "../core/refusal.js";
 import { afterPlace } from "../core/prose.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.share-input", {
+  "share-input-name-host-s-reader-seed-phrase": {
+    kind: "type",
+    text: () => "ShareInput needs the name of the host's reader of a seed phrase.",
+  },
+  "shares-text-refused": suppliedMessage,
+  "type-at-least-one-share": () => "Type at least one share.",
+  "no-share-was-typed-at-place": (value0: string) => `No share was typed at place ${value0}.`,
+});
 
 /** Lines that one share may take in a paste, as a narrow column of a PDF wraps it. */
 const MAX_WRAPPED_LINES = 8;
@@ -295,7 +306,7 @@ export class ShareInput {
    */
   constructor(options: { readonly decodeEntry: string }) {
     if (typeof options?.decodeEntry !== "string" || options.decodeEntry.trim() === "")
-      throw new TypeError("ShareInput needs the name of the host's reader of a seed phrase.");
+      throw ERRORS.create("share-input-name-host-s-reader-seed-phrase", []);
     this.#decodeEntry = options.decodeEntry;
   }
 
@@ -384,7 +395,8 @@ export class ShareInput {
     // have as many numbers as a phrase has words.
     if (!shares.some(shareOrMarked)) {
       const kind = phraseKind(parts.join(" "));
-      if (kind !== undefined) throw new Error(this.#notShareMessage(kind, subject));
+      if (kind !== undefined)
+        throw ERRORS.create("shares-text-refused", [this.#notShareMessage(kind, subject)]);
     }
     return shares;
   }
@@ -395,7 +407,7 @@ export class ShareInput {
    */
   sharesOfAnswer(answer: string, adding = false): string[] {
     const shares = this.sharesOfText(answer);
-    if (shares.length === 0) throw new Error("Type at least one share.");
+    if (shares.length === 0) throw ERRORS.create("type-at-least-one-share", []);
     assertShareCount((adding ? this.#shares.length : 0) + shares.length);
     return shares;
   }
@@ -418,7 +430,7 @@ export class ShareInput {
 
   /** Takes `text` for the share at `place`, which keeps its place. */
   replace(place: number, text: string): void {
-    if (!this.has(place)) throw new Error(`No share was typed at place ${place}.`);
+    if (!this.has(place)) throw ERRORS.create("no-share-was-typed-at-place", [`${place}`]);
     this.#shares = this.#shares.map((share) =>
       share.place === place ? Object.freeze({ place, text }) : share,
     );

@@ -25,6 +25,14 @@ import type { DateWork } from "./repair-report.js";
 import { Redacted } from "../core/redacted.js";
 import { BIP39_WORD_COUNTS } from "../core/bip39-sizes.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.share-unmasking", {
+  "seedshift-phrase-unmasked-dates-dates-answer": {
+    kind: "type",
+    text: () => "A Seedshift phrase is unmasked with its dates, a DatesAnswer.",
+  },
+});
 
 /** The two modes in which shares are made: SSKR splits the entropy of a valid BIP39 phrase. */
 export type ShareMode = SplitMode;
@@ -90,7 +98,7 @@ export class ShareUnmasking extends Redacted {
     Masking.assertSplitMode(options.mode);
     const masked = Masking.isMaskedMode(options.mode);
     if (masked && !(options.dates instanceof DatesAnswer))
-      throw new TypeError("A Seedshift phrase is unmasked with its dates, a DatesAnswer.");
+      throw ERRORS.create("seedshift-phrase-unmasked-dates-dates-answer", []);
     this.#mode = options.mode;
     this.#dates = masked ? options.dates : undefined;
     this.#walletCheck = options.walletCheck;

@@ -92,7 +92,6 @@ import {
   cursorRight,
 } from "../src/cli/terminal.js";
 import { NOT_UTF8 } from "../src/cli/terminal-input.js";
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import {
   isUnusableOutputPath,
   validateOutputPaths,
@@ -490,9 +489,7 @@ describe("S085: one Stop that cancels, one question and one answer for more shar
     const stops = readdirSync("src", { recursive: true, encoding: "utf8" })
       .filter((file) => file.endsWith(".ts"))
       .filter((file) =>
-        /=== "stop"\) throw new InputCancelledError\(\)/u.test(
-          readFileSync(join("src", file), "utf8"),
-        ),
+        /=== "stop"\) return CANCELLED/u.test(readFileSync(join("src", file), "utf8")),
       );
     expect(stops).toEqual([]);
     expect(WHAT_NOW).toBe("What now?");
@@ -624,7 +621,7 @@ describe("S092: the shapes of terminal lines in the style leaf", () => {
     expect(factLine(plain, "Protection", "no network", 11)).toBe("  Protection  no network");
     expect(styledMarkedLinesForTest(plain, "Careful.", "warning")).toEqual(["! Careful."]);
     expect(styledNoticeLines(plain, "Careful.", "warning")).toEqual(["Careful."]);
-    expect(new InputCancelledError().message).toBe(CANCELLED_MESSAGE);
+    expect(CANCELLED_MESSAGE).toBe("Cancelled.");
     expect(CANCELLED_EXIT_CODE).toBe(130);
   });
 });

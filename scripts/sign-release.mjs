@@ -28,6 +28,116 @@ import { describeError } from "../src/core/refusal.ts";
 // here.
 import { CHECKSUM_LINE, releaseFilePrefix } from "./executable-files.mjs";
 import { SIGNING_KEY } from "./release-key.mjs";
+import { ErrorCatalog, suppliedMessage } from "../src/core/error-catalog.ts";
+
+const ERRORS = new ErrorCatalog("scripts.sign-release", {
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "not-installed": (value0, value1) => `${value0} is not installed; ${value1}.`,
+  "failure-refused": suppliedMessage,
+  /**
+   * @param {string} value0
+   */
+  "unknown-option-see-help": (value0) => `Unknown option ${value0}; see --help.`,
+  /**
+   * @param {string} value0
+   */
+  "give-one-release-tag-not-too": (value0) => `Give one release tag, not ${value0} too.`,
+  "give-release-tag-example-node-scripts-sign-release": () =>
+    "Give the release tag, for example: node scripts/sign-release.mjs v0.1.0",
+  /**
+   * @param {string} value0
+   */
+  "not-release-tag-looks-like-v0-1-0": (value0) =>
+    `${value0} is not a release tag; it looks like v0.1.0.`,
+  "git-hub-cli-no-gh-attestation-command-install": () =>
+    "This GitHub CLI has no gh attestation command; install a newer one.",
+  /**
+   * @param {string} value0
+   */
+  "gnu-pg-on-computer-no-secret-key": (value0) =>
+    `GnuPG on this computer has no secret key ${value0}.`,
+  "sha256sum-version-failed": () => "sha256sum --version failed.",
+  /**
+   * @param {string} value0
+   */
+  "git-hub-no-release-tag-s-workflow-creates": (value0) =>
+    `GitHub has no release ${value0}; the tag's workflow creates its draft.`,
+  /**
+   * @param {string} value0
+   */
+  "published-already-only-draft-signed": (value0) =>
+    `${value0} is published already; only a draft is signed.`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "drafts-on-git-hub-delete-all-but-one": (value0, value1) =>
+    `${value0} has ${value1} drafts on GitHub; delete all but the one to sign, then retry.`,
+  /**
+   * @param {string} value0
+   */
+  "exists-already-move-away-remove-then-run-again": (value0) =>
+    `${value0}/ exists already; move it away or remove it, then run again.`,
+  /**
+   * @param {string} value0
+   */
+  "draft-no": (value0) => `The draft has no ${value0}.`,
+  /**
+   * @param {string} value0
+   */
+  "lists-no-file": (value0) => `${value0} lists no file.`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "line-not-sha-256-file": (value0, value1) =>
+    `${value0} line ${value1} is not "<sha-256>  <file>".`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   * @param {string} value2
+   */
+  "lists-which-no-file-version": (value0, value1, value2) =>
+    `${value0} lists ${value1}, which is no file of version ${value2}.`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "draft-holds-which-does-not-list": (value0, value1) =>
+    `The draft holds ${value0}, which ${value1} does not list.`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "draft-lacks-which-lists": (value0, value1) =>
+    `The draft lacks ${value0}, which ${value1} lists.`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "checking-files-against-failed": (value0, value1) =>
+    `Checking the files against ${value0} failed: ${value1}`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "download-differs-from": (value0, value1) => `${value0}: the download differs from ${value1}.`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "gnu-pg-did-not-confirm-as-signature-by": (value0, value1) =>
+    `GnuPG did not confirm ${value0} as a signature by ${value1}.`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "gnu-pg-exported-no-public-key": (value0, value1) =>
+    `GnuPG exported no public key ${value0} to ${value1}.`,
+});
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
@@ -173,7 +283,7 @@ async function run(step, { cwd = root, terminal = false } = {}) {
   // A program that catches Ctrl+C may end before Node's listener has run.
   await nextTurn();
   if (result.error?.code === "ENOENT") {
-    throw new Error(`${command} is not installed; ${INSTALL_HINTS[command]}.`);
+    throw ERRORS.create("not-installed", [`${command}`, `${INSTALL_HINTS[command]}`]);
   }
   if (result.error !== undefined) throw result.error;
   if (interrupted || result.signal === "SIGINT") throw new Cancelled();
@@ -182,7 +292,9 @@ async function run(step, { cwd = root, terminal = false } = {}) {
 
 function failure(what, result) {
   const said = lastLine(result.stderr) || lastLine(result.stdout);
-  return new Error(said === "" ? `${what} failed.` : `${what} failed: ${said}`);
+  return ERRORS.create("failure-refused", [
+    said === "" ? `${what} failed.` : `${what} failed: ${said}`,
+  ]);
 }
 
 /** Whether a checking command succeeds. */
@@ -210,16 +322,17 @@ function parseArguments(argv) {
     if (argument === "--publish") options.publish = true;
     else if (argument === "--dry-run") options.dryRun = true;
     else if (argument === "-h" || argument === "--help") options.help = true;
-    else if (argument.startsWith("-")) throw new Error(`Unknown option ${argument}; see --help.`);
+    else if (argument.startsWith("-"))
+      throw ERRORS.create("unknown-option-see-help", [`${argument}`]);
     else if (options.tag === undefined) options.tag = argument;
-    else throw new Error(`Give one release tag, not ${argument} too.`);
+    else throw ERRORS.create("give-one-release-tag-not-too", [`${argument}`]);
   }
   if (options.help) return options;
   if (options.tag === undefined) {
-    throw new Error("Give the release tag, for example: node scripts/sign-release.mjs v0.1.0");
+    throw ERRORS.create("give-release-tag-example-node-scripts-sign-release", []);
   }
   if (!TAG.test(options.tag)) {
-    throw new Error(`${options.tag} is not a release tag; it looks like v0.1.0.`);
+    throw ERRORS.create("not-release-tag-looks-like-v0-1-0", [`${options.tag}`]);
   }
   return options;
 }
@@ -294,12 +407,13 @@ function printPlan({ tag, publish }, folder) {
 /** Checks before anything is downloaded that the tools and the signing key are there. */
 async function checkTools() {
   if (!(await succeeds(COMMANDS.attestationTool()))) {
-    throw new Error("This GitHub CLI has no gh attestation command; install a newer one.");
+    throw ERRORS.create("git-hub-cli-no-gh-attestation-command-install", []);
   }
   if (!(await succeeds(COMMANDS.secretKey()))) {
-    throw new Error(`GnuPG on this computer has no secret key ${SIGNING_KEY}.`);
+    throw ERRORS.create("gnu-pg-on-computer-no-secret-key", [`${SIGNING_KEY}`]);
   }
-  if (!(await succeeds(COMMANDS.checksumTool()))) throw new Error("sha256sum --version failed.");
+  if (!(await succeeds(COMMANDS.checksumTool())))
+    throw ERRORS.create("sha256sum-version-failed", []);
 }
 
 /**
@@ -313,22 +427,20 @@ async function checkDraft(tag) {
     .filter((line) => line !== "")
     .map((line) => line.split(" "));
   if (releases.length === 0) {
-    throw new Error(`GitHub has no release ${tag}; the tag's workflow creates its draft.`);
+    throw ERRORS.create("git-hub-no-release-tag-s-workflow-creates", [`${tag}`]);
   }
   if (releases.some(([draft]) => draft !== "true")) {
-    throw new Error(`${tag} is published already; only a draft is signed.`);
+    throw ERRORS.create("published-already-only-draft-signed", [`${tag}`]);
   }
   if (releases.length > 1) {
-    throw new Error(
-      `${tag} has ${releases.length} drafts on GitHub; delete all but the one to sign, then retry.`,
-    );
+    throw ERRORS.create("drafts-on-git-hub-delete-all-but-one", [`${tag}`, `${releases.length}`]);
   }
   return releases[0][1];
 }
 
 /** The download goes into a new folder, so that no file of an earlier run is signed by mistake. */
 function folderExistsError(folder) {
-  return new Error(`${folder}/ exists already; move it away or remove it, then run again.`);
+  return ERRORS.create("exists-already-move-away-remove-then-run-again", [`${folder}`]);
 }
 
 function makeFolder(folder) {
@@ -346,17 +458,17 @@ function makeFolder(folder) {
  */
 function listedFiles(folderPath, version) {
   const present = readdirSync(folderPath);
-  if (!present.includes(CHECKSUMS)) throw new Error(`The draft has no ${CHECKSUMS}.`);
+  if (!present.includes(CHECKSUMS)) throw ERRORS.create("draft-no", [`${CHECKSUMS}`]);
   const lines = readFileSync(join(folderPath, CHECKSUMS), "utf8").split("\n");
   if (lines.at(-1) === "") lines.pop();
-  if (lines.length === 0) throw new Error(`${CHECKSUMS} lists no file.`);
+  if (lines.length === 0) throw ERRORS.create("lists-no-file", [`${CHECKSUMS}`]);
   const files = lines.map((line, index) => {
     const name = CHECKSUM_LINE.exec(line)?.[1];
     if (name === undefined) {
-      throw new Error(`${CHECKSUMS} line ${index + 1} is not "<sha-256>  <file>".`);
+      throw ERRORS.create("line-not-sha-256-file", [`${CHECKSUMS}`, `${index + 1}`]);
     }
     if (!name.startsWith(releaseFilePrefix(version))) {
-      throw new Error(`${CHECKSUMS} lists ${name}, which is no file of version ${version}.`);
+      throw ERRORS.create("lists-which-no-file-version", [`${CHECKSUMS}`, `${name}`, `${version}`]);
     }
     return name;
   });
@@ -366,11 +478,11 @@ function listedFiles(folderPath, version) {
       warn(`The draft holds an earlier ${name}; this run replaces it.`);
       continue;
     }
-    throw new Error(`The draft holds ${name}, which ${CHECKSUMS} does not list.`);
+    throw ERRORS.create("draft-holds-which-does-not-list", [`${name}`, `${CHECKSUMS}`]);
   }
   for (const name of files) {
     if (!present.includes(name)) {
-      throw new Error(`The draft lacks ${name}, which ${CHECKSUMS} lists.`);
+      throw ERRORS.create("draft-lacks-which-lists", [`${name}`, `${CHECKSUMS}`]);
     }
   }
   return files;
@@ -385,9 +497,12 @@ async function checkChecksums(folderPath) {
     .filter((line) => line.endsWith(": FAILED"))
     .map((line) => line.slice(0, -": FAILED".length));
   if (differing.length === 0) {
-    throw new Error(`Checking the files against ${CHECKSUMS} failed: ${lastLine(result.stderr)}`);
+    throw ERRORS.create("checking-files-against-failed", [
+      `${CHECKSUMS}`,
+      `${lastLine(result.stderr)}`,
+    ]);
   }
-  throw new Error(`${differing.join(", ")}: the download differs from ${CHECKSUMS}.`);
+  throw ERRORS.create("download-differs-from", [`${differing.join(", ")}`, `${CHECKSUMS}`]);
 }
 
 /**
@@ -404,14 +519,17 @@ async function checkSignature(folderPath) {
       return fields[0] === SIGNING_KEY || fields.at(-1) === SIGNING_KEY;
     });
   if (!valid) {
-    throw new Error(`GnuPG did not confirm ${SIGNATURE} as a signature by ${SIGNING_KEY}.`);
+    throw ERRORS.create("gnu-pg-did-not-confirm-as-signature-by", [
+      `${SIGNATURE}`,
+      `${SIGNING_KEY}`,
+    ]);
   }
 }
 
 function checkPublicKey(folderPath) {
   const text = readFileSync(join(folderPath, PUBLIC_KEY), "utf8");
   if (!text.startsWith("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
-    throw new Error(`GnuPG exported no public key ${SIGNING_KEY} to ${PUBLIC_KEY}.`);
+    throw ERRORS.create("gnu-pg-exported-no-public-key", [`${SIGNING_KEY}`, `${PUBLIC_KEY}`]);
   }
 }
 

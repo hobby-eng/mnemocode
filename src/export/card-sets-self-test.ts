@@ -30,6 +30,11 @@ import { oklab } from "./color-math.js";
 import { plannedCardJob, renderCards } from "./render.js";
 import { selectTemplate, type CardDrawing } from "./templates.js";
 import { SELF_TEST_CARD_DETAILS } from "./self-test-cards.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.card-sets-self-test", {
+  "set-cards-no-decoy": () => "A set of cards has no decoy.",
+});
 
 /**
  * The first colours of every set of cards that print codes, as the independent reference
@@ -115,7 +120,7 @@ async function checkCardSets(drawing: CardDrawing): Promise<void> {
     },
   });
   const { content } = job;
-  if ((content.decoys ?? 0) < 1) throw new Error("A set of cards has no decoy.");
+  if ((content.decoys ?? 0) < 1) throw ERRORS.create("set-cards-no-decoy", []);
   expectSame(content.labels?.slice(0, 12).join(" "), PHRASE_CODES.join(" "), "Codes of a set");
   expectSame(content.payload, PHRASE_CODES.join(""), "QR code of a set");
   const pdf = await PDFDocument.load(await renderCards(drawing, [job]), {

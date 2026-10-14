@@ -8,25 +8,11 @@ import {
   validateProfile,
   type CardSettings,
   COPY_FIELDS,
-  type CopyField,
-  type ProfileField,
 } from "../export/card-settings.js";
 import { assertTextValues, value, type ParsedArguments } from "./arguments.js";
-
-/** The option of each text of a card design; studio-name has no card- before it. */
-export const COPY_OPTIONS: Readonly<Record<CopyField, string>> = Object.freeze({
-  studioName: "studio-name",
-  slogan: "card-slogan",
-  subtitle: "card-subtitle",
-  footer: "card-footer",
-  referenceLabel: "card-reference-label",
-});
+import { COPY_OPTIONS, profileOption } from "./option-copy.js";
+export { COPY_OPTIONS, profileOption } from "./option-copy.js";
 export const cardCopyOptions = COPY_FIELDS.map((field) => COPY_OPTIONS[field]);
-
-/** The option of a detail of the person on the cards, such as --card-name. */
-export function profileOption(field: ProfileField): string {
-  return `card-${field}`;
-}
 
 /** The card options whose text the person writes: the person's details and the design's texts. */
 export const TYPED_CARD_TEXT_OPTIONS = Object.freeze([

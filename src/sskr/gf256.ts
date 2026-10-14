@@ -1,4 +1,11 @@
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("sskr.gf256", {
+  "zero-no-inverse-gf-256": () => "Zero has no inverse in GF(256).",
+  "shamir-points-distinct": () => "Shamir points must be distinct.",
+});
+
 // Arithmetic in GF(2^8) with the AES polynomial x^8 + x^4 + x^3 + x + 1 (0x11B), the field in
 // which bc-shamir splits a secret (bc-shamir 0.13.0, hazmat.rs). A share is the value of one
 // polynomial per byte at x = its member index; the secret sits at x = 255 and the digest at 254.
@@ -35,7 +42,7 @@ export function gfMultiply(a: number, b: number): number {
 }
 
 function gfInverse(a: number): number {
-  if (a === 0) throw new Error("Zero has no inverse in GF(256).");
+  if (a === 0) throw ERRORS.create("zero-no-inverse-gf-256", []);
   return defined(EXP[ORDER - defined(LOG[a])]);
 }
 
@@ -45,7 +52,7 @@ function gfInverse(a: number): number {
  * make bc-shamir divide by zero silently; here they are refused.
  */
 export function lagrangeCoefficients(xs: readonly number[], at: number): number[] {
-  if (new Set(xs).size !== xs.length) throw new Error("Shamir points must be distinct.");
+  if (new Set(xs).size !== xs.length) throw ERRORS.create("shamir-points-distinct", []);
   return xs.map((xi, i) =>
     xs.reduce(
       (product, xj, j) =>

@@ -41,6 +41,14 @@ import { rgbChannels } from "./color-math.js";
 import { documentWithFont } from "./pdf-documents.js";
 import { type CardPageSize, isCardPageSize, parsePageSize } from "./card-settings.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.material-cards", {
+  "empty-card-collection": () => EMPTY_CARD_COLLECTION,
+  "material-cards-support-at-most-references": (value0: string) =>
+    `Material cards support at most ${value0} references.`,
+});
+
 /** The sizes of a material card's page: those of every card (CardPageSize). */
 export type MaterialPageSize = CardPageSize;
 // The tint layer keeps the photograph's light, texture and highlights ("Color" blend) and takes
@@ -158,9 +166,9 @@ async function createRenderContext(
   content: CardContent | SskrCardContent,
 ) {
   assertColorCards(content);
-  if (content.colors.length === 0) throw new Error(EMPTY_CARD_COLLECTION);
+  if (content.colors.length === 0) throw ERRORS.create("empty-card-collection", []);
   if (content.colors.length > MAX_SHEET_CARDS)
-    throw new Error(`Material cards support at most ${MAX_SHEET_CARDS} references.`);
+    throw ERRORS.create("material-cards-support-at-most-references", [`${MAX_SHEET_CARDS}`]);
   // A material design is printed on sheets only: A6 unless another size is asked for.
   const size = parsePageSize(content.pageSize);
   const artwork = materialArtwork[style];

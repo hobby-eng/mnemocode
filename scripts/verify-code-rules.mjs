@@ -14,6 +14,7 @@
 // - CORE-25: every dependency is pinned to an exact version.
 // - TOOL-05: pnpm-lock.yaml is the only lockfile.
 // - TS-06: an error class's name ends in "Error", and it carries a `readonly code`.
+// - CORE-23: source and tooling use coded errors, not direct native Error construction.
 // - TS-08: no `enum`.
 // - TS-05: no `private` keyword; private fields and methods are `#name`.
 // - TS-11: every exported declaration of a library module (src/ outside the command line) has a
@@ -463,6 +464,19 @@ function checkErrorClasses(classes) {
   }
 }
 
+/** CORE-23: native constructors carry no module code. Test fixtures may simulate such faults. */
+function checkUncodedErrors(path, tokens) {
+  if (!path.startsWith("src/") && !path.startsWith("scripts/")) return;
+  tokens.forEach((token, at) => {
+    if (!BUILT_IN_ERRORS.has(token.key) || tokens[at + 1]?.key !== "(") return;
+    // A named property or method is no call of a native constructor.
+    const before = tokens[at - 1]?.key;
+    if (before === "." && !["globalThis", "global", "window"].includes(tokens[at - 2]?.key)) return;
+    if (before === "function") return;
+    report(path, token.line, "CORE-23", "use the module's coded error, not a native constructor");
+  });
+}
+
 /** TS-05 and TS-08: no `private` keyword, no `enum`. */
 function checkKeywords(path, tokens) {
   tokens.forEach((token, at) => {
@@ -551,6 +565,7 @@ function checkMarkup(path, text) {
 function checkScriptSource(path, text, classes) {
   const { tokens, comments } = tokensOf(text);
   checkLintExceptions(path, comments);
+  checkUncodedErrors(path, tokens);
   if (!path.endsWith(".ts")) return;
   checkKeywords(path, tokens);
   for (const known of classesOf(tokens)) classes.push({ ...known, path });

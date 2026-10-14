@@ -8,6 +8,16 @@ import { CARD_FORMAT_NUMBERS, noCardTemplateMessage } from "./format-numbers.js"
 import { cardKindOf } from "../core/backup-options.js";
 import { assertIndividualTemplate } from "../export/render.js";
 import { isCardPageSize, parsePageSize } from "../export/card-settings.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.card-options", {
+  "provide-individual-card-output-folder-once-using-non": () =>
+    "Provide the individual-card output folder once, using a non-empty path.",
+  "card-settings-require-pdf-file-image-output-folder": () =>
+    "Card settings require a PDF file, an image output folder or an individual-card output folder.",
+  "card-export-requires-format": (value0: string) => `Card export requires format ${value0}.`,
+  "card-template-refused": suppliedMessage,
+});
 
 /** The card outputs that the options name: sheets (a PDF or page images), and separate cards. */
 export interface CardOutputs {
@@ -31,12 +41,10 @@ export function cardOutputs(args: ParsedArguments): CardOutputs {
  */
 export function assertCardOutput(args: ParsedArguments, settings: readonly string[]): CardOutputs {
   if (args["cards-dir"] !== undefined && typeof args["cards-dir"] !== "string")
-    throw new Error("Provide the individual-card output folder once, using a non-empty path.");
+    throw ERRORS.create("provide-individual-card-output-folder-once-using-non", []);
   const outputs = cardOutputs(args);
   if (!outputs.sheets && !outputs.cards && settings.some((name) => args[name] !== undefined))
-    throw new Error(
-      "Card settings require a PDF file, an image output folder or an individual-card output folder.",
-    );
+    throw ERRORS.create("card-settings-require-pdf-file-image-output-folder", []);
   return outputs;
 }
 
@@ -48,7 +56,8 @@ export function validateCardOptions(args: ParsedArguments, format: EncodedFormat
   const { sheets, cards } = assertCardOutput(args, ENCODE_CARD_SETTINGS);
   if (!sheets && !cards) return;
   const kind = cardKindOf(format);
-  if (kind === undefined) throw new Error(`Card export requires format ${CARD_FORMAT_NUMBERS}.`);
+  if (kind === undefined)
+    throw ERRORS.create("card-export-requires-format", [`${CARD_FORMAT_NUMBERS}`]);
   // A card page size makes a PDF or page images of separate cards too, which only some designs
   // draw (AUD-022-FUN004).
   const separate = cards || isCardPageSize(parsePageSize(value(args, "page-size")));
@@ -65,7 +74,8 @@ export function cardTemplate(args: ParsedArguments, kind: CardKind): CardTemplat
   try {
     return selectTemplate(value(args, "template"), kind);
   } catch (error) {
-    if (error instanceof NoCardTemplateError) throw new Error(noCardTemplateMessage(error));
+    if (error instanceof NoCardTemplateError)
+      throw ERRORS.create("card-template-refused", [noCardTemplateMessage(error)]);
     throw error;
   }
 }

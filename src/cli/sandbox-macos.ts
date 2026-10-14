@@ -26,6 +26,13 @@ import {
   type SystemAccess,
   type SystemSandbox,
 } from "./sandbox-record.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.sandbox-macos", {
+  "setrlimit-refused-rlimit-core-0": () => "setrlimit refused RLIMIT_CORE 0",
+  "not-refused": () => "not refused",
+  refused: (value0: string) => `refused (${value0})`,
+});
 
 /** The system library, which holds every call below. */
 const LIBSYSTEM = "/usr/lib/libSystem.B.dylib";
@@ -96,10 +103,10 @@ export class MacSandbox implements SystemSandbox {
     if (system === undefined) return;
     this.#coreDumps = switchOffCoreDumps(() => {
       if (system.setrlimit(RLIMIT_CORE, noLimit()) !== 0)
-        throw new Error("setrlimit refused RLIMIT_CORE 0");
+        throw ERRORS.create("setrlimit-refused-rlimit-core-0", []);
     });
     this.#record.attempt("debugger attach", () => {
-      if (system.ptrace(PT_DENY_ATTACH, 0, null, 0) !== 0) throw new Error("not refused");
+      if (system.ptrace(PT_DENY_ATTACH, 0, null, 0) !== 0) throw ERRORS.create("not-refused", []);
       this.#attachDenied = true;
     });
   }
@@ -114,7 +121,7 @@ export class MacSandbox implements SystemSandbox {
         const message = error.readBigUInt64LE(0);
         const text = message === 0n ? "unknown reason" : ffi.toString(message);
         if (message !== 0n) system.sandbox_free_error(message);
-        throw new Error(`refused (${text ?? "unknown reason"})`);
+        throw ERRORS.create("refused", [`${text ?? "unknown reason"}`]);
       }
       this.#record.claim("no network", network(reach), "a connection was not refused");
       if (!needs.runsPrograms)

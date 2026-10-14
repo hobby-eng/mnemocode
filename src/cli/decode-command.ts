@@ -75,8 +75,18 @@ import {
 } from "./fingerprint-report.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
 import { defined } from "../core/defined.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
 
-export async function runDecode(arguments_: ParsedArguments): Promise<void> {
+const ERRORS = new ErrorCatalog("cli.decode-command", {
+  "answers-question-decode-ask-secrets-where-dates-codes": (value0: string) =>
+    `--${value0} answers a question of decode --ask-secrets, where the dates or the codes may hold ?.`,
+  "list-candidates-lists-candidates-instead-wallet-check": () =>
+    "--list-candidates lists the candidates instead of a wallet check.",
+});
+
+/** Decodes an encoded seed phrase; CANCELLED when the person cancelled. */
+export async function runDecode(arguments_: ParsedArguments): Promise<Cancelled | undefined> {
   if (arguments_["ask-secrets"] === true) return decodeWithQuestions(arguments_);
   return decodeFromOptions(arguments_);
 }
@@ -95,36 +105,44 @@ const SCREEN_ANSWERS = [
   "input-kind",
 ] as const;
 
-/** Every input from the options; a problem ends the command. */
-async function decodeFromOptions(arguments_: ParsedArguments): Promise<void> {
+/**
+ * Every input from the options; a problem ends the command. CANCELLED when the person left the
+ * question about the form of the codes (backupFromOptions).
+ */
+async function decodeFromOptions(arguments_: ParsedArguments): Promise<Cancelled | undefined> {
   const unused = SCREEN_ANSWERS.find((key) => arguments_[key] !== undefined);
   if (unused !== undefined)
-    throw new Error(
-      `--${unused} answers a question of decode --ask-secrets, where the dates or the codes may hold ?.`,
-    );
-  const { backup, dates: enteredDates } = await backupAndDatesFromOptions(arguments_);
+    throw ERRORS.create("answers-question-decode-ask-secrets-where-dates-codes", [`${unused}`]);
+  const read = await backupAndDatesFromOptions(arguments_);
+  if (read === CANCELLED) return CANCELLED;
+  const { backup, dates: enteredDates } = read;
   if (backup.givesSeveral) showLegacyValidCandidates(backup.candidates(enteredDates));
   else {
     const result = backup.decode(enteredDates);
     showRecovered(result, backup.mode, backup.format);
     if (!result.checksumValid) reportShorterPhrases(backup, enteredDates);
   }
+  return undefined;
 }
 
 /**
  * The encoded seed phrase and its complete dates from the options, as Decode reads them; Re-encode
  * reads an old backup so. The dates are counted as soon as the mode is known, so that a wrong count
- * is refused before the form of the codes is asked about.
+ * is refused before the form of the codes is asked about. CANCELLED when the person left the
+ * question about the form.
  */
 export async function backupAndDatesFromOptions(
   args: ParsedArguments,
-): Promise<{ readonly backup: EncodedBackup; readonly dates: readonly DateShiftDate[] }> {
+): Promise<
+  { readonly backup: EncodedBackup; readonly dates: readonly DateShiftDate[] } | Cancelled
+> {
   let enteredDates: readonly DateShiftDate[] = [];
-  const { backup } = await backupFromOptions(args, false, (known) => {
+  const read = await backupFromOptions(args, false, (known) => {
     enteredDates = dates(args);
     Masking.of(known).assertDateCount(enteredDates.length);
   });
-  return { backup, dates: enteredDates };
+  if (read === CANCELLED) return CANCELLED;
+  return { backup: read.backup, dates: enteredDates };
 }
 
 /**
@@ -238,9 +256,15 @@ export interface DecodeUse {
   /** The choice that ends after a phrase whose checksum fails, beside typing again. */
   readonly stop: Choice<"done">;
   /** What follows a record that gives several phrases (EncodedBackup.givesSeveral). */
-  several(backup: EncodedBackup, dates: readonly DateShiftDate[]): Promise<AfterDecoded>;
-  /** What follows a phrase with a valid checksum, shown already. */
-  decoded(backup: EncodedBackup, dates: readonly DateShiftDate[]): Promise<AfterDecoded>;
+  several(
+    backup: EncodedBackup,
+    dates: readonly DateShiftDate[],
+  ): Promise<AfterDecoded | Cancelled>;
+  /** What follows a phrase with a valid checksum, shown already; CANCELLED ends the command. */
+  decoded(
+    backup: EncodedBackup,
+    dates: readonly DateShiftDate[],
+  ): Promise<AfterDecoded | Cancelled>;
   /** Shows the decoded phrase: Decode's result on standard output, re-encode's on the terminal. */
   show(result: DecodedResult, mode: MaskingMode, format: EncodedFormat): void;
 }
@@ -275,7 +299,7 @@ function givenAnswers(args: ParsedArguments): GivenAnswers {
   searchLimit(args);
   const list = args["list-candidates"] === true;
   if (list && evidence !== undefined)
-    throw new Error("--list-candidates lists the candidates instead of a wallet check.");
+    throw ERRORS.create("list-candidates-lists-candidates-instead-wallet-check", []);
   const fingerprint = value(args, "encoded-fingerprint");
   return {
     evidence,
@@ -316,12 +340,13 @@ function stepAfterCodes(backup: EncodedBackup, typedDates: DatesAnswer | undefin
  * which may hold ?, then either the decoding or, for dates with ?, the wallet (optional where the
  * mode's checksum leaves only some dates) and the search. A result that cannot be right offers
  * what to type again; every other answer is kept. `use` says what the decoded phrase is for, and
- * whether codes and dates may hold ? (DecodeUse); Decode's own by default.
+ * whether codes and dates may hold ? (DecodeUse); Decode's own by default. CANCELLED when the
+ * person cancelled, at a question or by stopping a search.
  */
 export async function decodeWithQuestions(
   args: ParsedArguments,
   use: DecodeUse = DECODE,
-): Promise<void> {
+): Promise<Cancelled | undefined> {
   assertAskedEncodedInput(args);
   // The values of the options are checked before the first question, so that none is lost to them.
   assertOneEncodedSource(args);
@@ -342,7 +367,8 @@ export async function decodeWithQuestions(
   // and the line that names the codes found, shown again with the result.
   let foundDates: readonly DateShiftDate[] | undefined;
   let foundCodes: (() => void) | undefined;
-  for (let step: Step = "backup"; step !== "done";) {
+  for (let step: Step | Cancelled = "backup"; step !== "done";) {
+    if (step === CANCELLED) return CANCELLED;
     if (step === "backup") {
       foundDates = undefined;
       foundCodes = undefined;
@@ -354,10 +380,12 @@ export async function decodeWithQuestions(
         shares: use.searches,
         inputKind,
       });
+      if (read === CANCELLED) return CANCELLED;
       // A Shamir share typed here is restored from, with its mode if Decode was given one.
       if (read.kind === "share") {
         const restore = { text: read.text, fromQr: read.fromQr };
-        if ((await restoreFromShare(handedToRestore(args), restore)) === "done") return;
+        const restored = await restoreFromShare(handedToRestore(args), restore);
+        if (restored !== "back") return restored === "done" ? undefined : restored;
         // Escape at the question whether Seedshift was used: the codes are given again.
         backupArgs = typedAfterFile(args);
         continue;
@@ -365,6 +393,7 @@ export async function decodeWithQuestions(
       recordMode = read.recordMode ?? recordMode;
       if (read.kind === "missing") {
         const outcome = await searchMissingCodes(read.codes, given);
+        if (outcome === CANCELLED) return CANCELLED;
         if (outcome.kind !== "found") {
           step = outcome.kind === "shown" ? "done" : "backup";
           if (step === "backup") backupArgs = typedAfterFile(args);
@@ -382,24 +411,27 @@ export async function decodeWithQuestions(
       } else backup = read.backup;
       step = stepAfterCodes(backup, typedDates);
     } else if (step === "dates") {
-      typedDates = await askDates({
+      const asked = await askDates({
         wordCount: defined(backup).indexes.length,
         patterns: use.searches,
       });
+      if (asked === CANCELLED) return CANCELLED;
+      typedDates = asked;
       step = afterDates(typedDates);
     } else if (step === "wallet") {
-      ({ step, evidence, withoutWallet } = await askedWallet(defined(backup), given, {
-        evidence,
-        withoutWallet,
-      }));
+      const wallet = await askedWallet(defined(backup), given, { evidence, withoutWallet });
+      if (wallet === CANCELLED) return CANCELLED;
+      ({ step, evidence, withoutWallet } = wallet);
     } else if (step === "search") {
-      ({ step, evidence } = await searchAndShow(
+      const searched = await searchAndShow(
         defined(backup),
         defined(typedDates),
         evidence,
         backupArgs,
         given,
-      ));
+      );
+      if (searched === CANCELLED) return CANCELLED;
+      ({ step, evidence } = searched);
       withoutWallet = evidence === undefined;
     } else {
       step = await decodeAndShow(
@@ -414,18 +446,21 @@ export async function decodeWithQuestions(
     // unless --mode or a record named it.
     if (step === "backup") backupArgs = typedAfterFile(args);
   }
+  return undefined;
 }
 
 /**
  * The wallet before a search of dates with ?: asked unless it was given, or unless it was left out
  * before ("It cannot", or --list-candidates) and the mode needs none. The step after it, with the
- * wallet and whether it is left out.
+ * wallet and whether it is left out; CANCELLED when the person cancelled.
  */
 async function askedWallet(
   backup: EncodedBackup,
   given: GivenAnswers,
   known: { readonly evidence: WalletEvidence | undefined; readonly withoutWallet: boolean },
-): Promise<{ step: Step; evidence: WalletEvidence | undefined; withoutWallet: boolean }> {
+): Promise<
+  { step: Step; evidence: WalletEvidence | undefined; withoutWallet: boolean } | Cancelled
+> {
   const needed = walletNeeded(backup.mode);
   if (needed && given.list && known.evidence === undefined)
     terminalNotice(
@@ -439,6 +474,7 @@ async function askedWallet(
     explanation: decodeWalletExplanation(backup.mode, given.passphrase),
     place: given.place,
   });
+  if (answer === CANCELLED) return CANCELLED;
   return {
     step: answer.kind === "back" ? "dates" : "search",
     evidence: answer.kind === "wallet" ? answer.evidence : known.evidence,
@@ -457,7 +493,7 @@ async function decodeAndShow(
   backupArgs: ParsedArguments,
   use: DecodeUse,
   foundCodes?: () => void,
-): Promise<Step> {
+): Promise<Step | Cancelled> {
   const { mode, format } = backup;
   if (backup.givesSeveral) return use.several(backup, known);
   const result = backup.decode(known);
@@ -483,7 +519,8 @@ interface Searched {
 /**
  * Searches the dates with ?, shows the matches as recover-date shows them, and asks what to change
  * when no match was found, or, without a wallet, when not every match is shown or the matches are
- * taller than the window. `backupArgs` are the options the codes were read with.
+ * taller than the window. `backupArgs` are the options the codes were read with. CANCELLED when
+ * the person cancelled, at a question or by stopping the search.
  */
 async function searchAndShow(
   backup: EncodedBackup,
@@ -491,7 +528,7 @@ async function searchAndShow(
   evidence: WalletEvidence | undefined,
   backupArgs: ParsedArguments,
   given: GivenAnswers,
-): Promise<Searched> {
+): Promise<Searched | Cancelled> {
   const { mode } = backup;
   Masking.assertMaskedMode(mode);
   const { maxResults } = given;
@@ -509,6 +546,7 @@ async function searchAndShow(
   });
   // A search longer than twelve hours that the person did not want: the dates are typed again.
   if (result === undefined) return { step: "dates", evidence };
+  if (result === CANCELLED) return CANCELLED;
   reportDateMatches(result, { mode, evidence, maxResults });
   if (result.matchCount > 0) dateMatchNotes(evidence);
   const next = await askAfterDateSearch(result, {
@@ -518,6 +556,7 @@ async function searchAndShow(
     again: backupChoice(backupArgs),
     wallet: { explanation: decodeWalletExplanation(mode, given.passphrase), place: given.place },
   });
+  if (next === CANCELLED) return CANCELLED;
   return typeof next === "string"
     ? { step: next, evidence }
     : { step: "search", evidence: next.evidence };

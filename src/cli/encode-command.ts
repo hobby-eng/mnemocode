@@ -22,6 +22,15 @@ import { nodeCardRenderer } from "../export/platform-node.js";
 import { ENCODE_SSKR_ONLY_OPTIONS } from "./encode-option-groups.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
 import { defined } from "../core/defined.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.encode-command", {
+  "setting-available-only-sskr-mode": (value0: string) =>
+    `The ${value0} setting is available only in SSKR mode.`,
+  "terminal-color-cards-available-only-rgb-color-formats": (value0: string) =>
+    `Terminal color cards are available only for RGB color formats ${value0}.`,
+});
 
 /** What Encode made: the library's encoding, with the mode as asked and the dates as typed. */
 export interface EncodeOutcome {
@@ -37,7 +46,7 @@ async function validateEncodeOptions(
 ): Promise<{ mode: MaskingMode; format: EncodedFormat }> {
   for (const key of ENCODE_SSKR_ONLY_OPTIONS) {
     if (args[key] !== undefined)
-      throw new Error(`The ${optionLabel(key)} setting is available only in SSKR mode.`);
+      throw ERRORS.create("setting-available-only-sskr-mode", [`${optionLabel(key)}`]);
   }
   const mode = transformMode(args);
   const format = encodeFormat(value(args, "format"));
@@ -53,9 +62,9 @@ async function validateEncodeOptions(
   )
     Masking.assertHeirSheetMode(replacement.mode);
   if (args.cards === true && !writtenInColors(format))
-    throw new Error(
-      `Terminal color cards are available only for RGB color formats ${COLOR_FORMAT_NUMBERS}.`,
-    );
+    throw ERRORS.create("terminal-color-cards-available-only-rgb-color-formats", [
+      `${COLOR_FORMAT_NUMBERS}`,
+    ]);
   validateCardOptions(args, format);
   // Validate all destinations before prompting or reading a mnemonic.
   await preflightOutputs(args);
@@ -67,8 +76,10 @@ async function createOutcome(
   mode: MaskingMode,
   format: EncodedFormat,
   known: string | undefined,
-): Promise<EncodeOutcome> {
-  const { mnemonic, dates: enteredDates } = await phraseAndDates(args, mode, undefined, known);
+): Promise<EncodeOutcome | Cancelled> {
+  const asked = await phraseAndDates(args, mode, undefined, known);
+  if (asked === CANCELLED) return CANCELLED;
+  const { mnemonic, dates: enteredDates } = asked;
   const encoding = EncodedBackup.encode(mnemonic, enteredDates, format, mode, {
     validLastWord: args["legacy-valid-last-word"] === true,
   });
@@ -135,25 +146,28 @@ async function assertCardsPrintable(saving: ParsedArguments, format: EncodedForm
 
 /**
  * Saves every result of Encode that the options name, each on its own (saveOutput), with `saving`,
- * the run's one object of options (onlyResult), and one retained library card plan.
+ * the run's one object of options (onlyResult), and one retained library card plan. CANCELLED when
+ * the command was cancelled at the question after a failed save; what was saved before stays.
  */
 async function saveResults(
   args: ParsedArguments,
   saving: ParsedArguments,
   outcome: EncodeOutcome,
-): Promise<void> {
+): Promise<Cancelled | undefined> {
   const saved = new Map<string, string>();
   const cards = new EncodeCardExport(saving, outcome);
   for (const [key, what] of SAVED_RESULTS) {
     const path = await saveOutput(args, key, what, (path) =>
       saveEncodeResult(onlyResult(saving, key, path), outcome, cards),
     );
+    if (path === CANCELLED) return CANCELLED;
     if (path !== undefined) saved.set(key, path);
     // The colour cards on the terminal come after the record, as saveEncodeResult shows them.
     if (key === "output" && args.cards === true)
       await saveEncodeResult(onlyResult(saving, "cards", true), outcome, cards);
   }
   await saveSheetQr(args, outcome, saved);
+  return undefined;
 }
 
 /**
@@ -181,12 +195,13 @@ async function saveSheetQr(
 /**
  * Encode once its options are checked: it asks for the phrase, or reads it, unless it is `known`,
  * which Re-encode decoded and confirmed, then its dates, and makes and saves the backup.
+ * CANCELLED when the person cancelled it.
  */
-export type PreparedEncode = (known?: string) => Promise<void>;
+export type PreparedEncode = (known?: string) => Promise<Cancelled | undefined>;
 
-export async function runEncode(args: ParsedArguments): Promise<void> {
+export async function runEncode(args: ParsedArguments): Promise<Cancelled | undefined> {
   const encode = await prepareEncode(args);
-  await encode();
+  return encode();
 }
 
 /**
@@ -216,20 +231,23 @@ async function encodeChecked(
   saving: ParsedArguments,
   { mode, format, checkAnswer }: CheckedEncode,
   known: string | undefined,
-): Promise<void> {
+): Promise<Cancelled | undefined> {
   const outcome = await createOutcome(args, mode, format, known);
+  if (outcome === CANCELLED) return CANCELLED;
   printEncodeResult(outcome);
-  await saveResults(args, saving, outcome);
+  if ((await saveResults(args, saving, outcome)) === CANCELLED) return CANCELLED;
   const { backup, result } = outcome.encoding;
   // A record with a replaced last word never gets a sheet (validateEncodeOptions).
-  if (Masking.isHeirSheetMode(backup.mode))
-    await saveHeirSheetOutput(args, {
-      backup: { kind: "encoded", format: backup.format, words: backup.words },
-      mode: backup.mode,
-      dates: outcome.enteredDates.length,
-    });
+  const sheet = Masking.isHeirSheetMode(backup.mode)
+    ? await saveHeirSheetOutput(args, {
+        backup: { kind: "encoded", format: backup.format, words: backup.words },
+        mode: backup.mode,
+        dates: outcome.enteredDates.length,
+      })
+    : undefined;
+  if (sheet === CANCELLED) return CANCELLED;
   reportRenamedOutputs();
-  await offerEncodedCheck(
+  return offerEncodedCheck(
     {
       mnemonic: result.sourceMnemonic,
       format: backup.format,

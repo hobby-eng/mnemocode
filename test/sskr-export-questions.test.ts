@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { runSskrExport, runSskrSplit } from "../src/cli/sskr-command.js";
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
+import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { unrepairedShare } from "../src/sskr/repair.js";
 import { ShareRestore, variantsMessage } from "../src/sskr/share-restore.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
@@ -80,13 +80,13 @@ describe("shares on the private screen", () => {
       terminal.answers = [`${SHARES[0]}\r`];
       // Escape at "What now?".
       terminal.choices = [undefined];
-      await expect(
-        runSskrExport({
+      expect(
+        await runSskrExport({
           "ask-secrets": true,
           "master-fingerprint": TEST_FINGERPRINT,
           format: "indexes",
         }),
-      ).rejects.toBeInstanceOf(InputCancelledError);
+      ).toBe(CANCELLED);
       expect(terminal.questions).toEqual(["What now?"]);
       expect(seen.out).toEqual([]);
     });
@@ -147,9 +147,7 @@ describe("shares on the private screen", () => {
         const pdf = join(folder, "shares.pdf");
         terminal.answers = [`${SHARES[0]};${writeShare(SHARES[2], "colors")}\r`];
         terminal.choices = ["stop"];
-        await expect(runSskrExport({ "ask-secrets": true, pdf })).rejects.toBeInstanceOf(
-          InputCancelledError,
-        );
+        expect(await runSskrExport({ "ask-secrets": true, pdf })).toBe(CANCELLED);
         expect(terminal.questions).toEqual([
           "The shares are written in different forms. Which form should the cards show?",
         ]);
@@ -191,7 +189,7 @@ describe("shares on the private screen", () => {
     });
 
     /** Splits the test phrase into 2 of 3 shares saved at `output`; the backup check is skipped. */
-    function split(output: string): Promise<void> {
+    function split(output: string): Promise<Cancelled | undefined> {
       return runSskrSplit({ mnemonic: TEST_PHRASE, threshold: "2", shares: "3", output });
     }
 

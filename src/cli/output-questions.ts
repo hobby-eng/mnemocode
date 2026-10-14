@@ -14,6 +14,23 @@ import {
   preflightFolderDestination,
 } from "./output-paths.js";
 import { askLine } from "./terminal-choice.js";
+import type { Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.output-questions", {
+  "another-file-task-name-folder-choose-another-one": () =>
+    "Another file of this task has this name or this folder; choose another one.",
+  "typed-path-refused": suppliedMessage,
+  "name-starts-would-read-as-option-type-before": () =>
+    "A name that starts with - would be read as an option; type ./ before it.",
+  "there-no-such-file-check-name-folder": () =>
+    "There is no such file; check its name and its folder.",
+  "folder-type-name-file": () => "That is a folder; type the name of a file in it.",
+  "no-ordinary-file-type-name-file": () => "That is no ordinary file; type the name of the file.",
+  "mnemo-code-may-not-read-file": () => "MnemoCode may not read that file.",
+  "file-larger-than-cannot-one": (value0: string) =>
+    `That file is larger than ${value0}; it cannot be the one.`,
+});
 
 /**
  * The files and folders that the answers of the entry being asked name for saving, as absolute
@@ -37,9 +54,7 @@ class ClaimedOutputs {
   assertFree(path: string): void {
     const absolute = resolve(path);
     if (this.#paths.some((earlier) => pathsOverlap(earlier, absolute)))
-      throw new Error(
-        "Another file of this task has this name or this folder; choose another one.",
-      );
+      throw ERRORS.create("another-file-task-name-folder-choose-another-one", []);
   }
 
   claim(path: string): void {
@@ -66,13 +81,12 @@ function typedPath(answer: string): string {
   const path = droppedPath(answer);
   // The command's rule for a name that is no path (isUnusableOutputPath), in the menu's words.
   if (isUnusableOutputPath(path))
-    throw new Error(
+    throw ERRORS.create("typed-path-refused", [
       path === "-"
         ? "- is no file name here; type the name of a file."
         : "That name is blank; type a name, or press Enter alone for the one shown.",
-    );
-  if (path.startsWith("-"))
-    throw new Error("A name that starts with - would be read as an option; type ./ before it.");
+    ]);
+  if (path.startsWith("-")) throw ERRORS.create("name-starts-would-read-as-option-type-before", []);
   return path;
 }
 
@@ -113,26 +127,29 @@ export async function inputFile(answer: string, limit: number): Promise<string> 
   try {
     info = await stat(path);
   } catch {
-    throw new Error("There is no such file; check its name and its folder.");
+    throw ERRORS.create("there-no-such-file-check-name-folder", []);
   }
-  if (info.isDirectory()) throw new Error("That is a folder; type the name of a file in it.");
-  if (!info.isFile()) throw new Error("That is no ordinary file; type the name of the file.");
+  if (info.isDirectory()) throw ERRORS.create("folder-type-name-file", []);
+  if (!info.isFile()) throw ERRORS.create("no-ordinary-file-type-name-file", []);
   try {
     await access(path, fileAccess.R_OK);
   } catch {
-    throw new Error("MnemoCode may not read that file.");
+    throw ERRORS.create("mnemo-code-may-not-read-file", []);
   }
   if (info.size > limit)
-    throw new Error(`That file is larger than ${limitName(limit)}; it cannot be the one.`);
+    throw ERRORS.create("file-larger-than-cannot-one", [`${limitName(limit)}`]);
   return path;
 }
 
 /** Asks for the name of a file to save, `fallback` by default. */
-export function askOutputFile(question: string, fallback: string): Promise<string | undefined> {
+export function askOutputFile(
+  question: string,
+  fallback: string,
+): Promise<string | undefined | Cancelled> {
   return askLine(question, "File", { fallback, check: outputFile });
 }
 
 /** Asks for the name of a new folder to save into, `fallback` by default. */
-export function askNewFolder(fallback: string): Promise<string | undefined> {
+export function askNewFolder(fallback: string): Promise<string | undefined | Cancelled> {
   return askLine("Name of the new folder", "Folder", { fallback, check: newFolder });
 }

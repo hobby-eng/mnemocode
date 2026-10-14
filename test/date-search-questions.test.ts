@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import { encodeMnemonic, encodeMnemonicLegacy, formatEncoded, parseDate } from "../src/core.js";
 import { askEncodedBackup } from "../src/cli/backup-questions.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
-import { InputCancelledError } from "../src/cli/terminal-keys.js";
+import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { MASKED } from "./helpers/phrase-questions.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
@@ -38,7 +38,7 @@ const DATES_PROMPT =
   "Dates with ? for what is forgotten (up to 4, one to three of them incomplete):";
 
 /** Runs recover-date --ask-secrets with `options`, answering as the terminal says. */
-function recover(options: Record<string, string>): Promise<void> {
+function recover(options: Record<string, string>): Promise<Cancelled | undefined> {
   return runRecoverDate({ "ask-secrets": true, ...options });
 }
 
@@ -263,7 +263,7 @@ describe("recover-date on the private screen", () => {
   it("searches more than --max-candidates only when the person chooses it", async () => {
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r", "2?-09-2026\r"];
     // No types the dates again; the same search is then asked for once more, and made.
-    terminal.choices = [false, true];
+    terminal.choices = ["no", "yes"];
     await recover({
       mode: "seedshift",
       "master-fingerprint": TEST_FINGERPRINT,
@@ -309,9 +309,13 @@ describe("recover-date on the private screen", () => {
 
       // Stop at "What now?" cancels.
       terminal.choices = ["stop"];
-      await expect(
-        recover({ "input-file": bad, mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT }),
-      ).rejects.toBeInstanceOf(InputCancelledError);
+      expect(
+        await recover({
+          "input-file": bad,
+          mode: "seedshift",
+          "master-fingerprint": TEST_FINGERPRINT,
+        }),
+      ).toBe(CANCELLED);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -328,6 +332,7 @@ describe("recover-date on the private screen", () => {
         args: { "ask-secrets": true, ...args },
         seedshiftOnly: false,
       });
+      if (read === CANCELLED) throw new Error("Cancelled, not the codes.");
       if (read.kind !== "codes") throw new Error(`Read ${read.kind}, not the codes.`);
       return read;
     };
@@ -419,8 +424,8 @@ describe("recover-date on the private screen", () => {
 describe("recover-date on the private screen", () => {
   it("cancels when the input ends", async () => {
     terminal.answers = [`${MASKED}\r`];
-    await expect(
-      recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT }),
-    ).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT })).toBe(
+      CANCELLED,
+    );
   });
 });

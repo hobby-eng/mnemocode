@@ -1,3 +1,8 @@
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.utf8", {
+  "strict-utf8text-refused": suppliedMessage,
+});
 // The rules of UTF-8 (RFC 3629) that reading text needs: how many bytes a character has, which
 // bytes continue one, a reader that passes on valid characters only, and the strict decoding of a
 // file or of standard input. One owner for the terminal modules (terminal-input.ts,
@@ -50,7 +55,8 @@ export function strictUtf8Text(bytes: Uint8Array, what: string): string {
     return STRICT_UTF8_WITH_BOM.decode(bytes);
   } catch (error) {
     // TextDecoder refuses with a TypeError, whose message names no byte of the text.
-    if (error instanceof TypeError) throw new Error(notUtf8Text(what));
+    if (error instanceof TypeError)
+      throw ERRORS.create("strict-utf8text-refused", [notUtf8Text(what)]);
     throw error;
   }
 }

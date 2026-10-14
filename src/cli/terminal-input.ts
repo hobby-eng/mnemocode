@@ -34,8 +34,9 @@ import { dumbTerminal } from "./terminal-style.js";
 import { refusalMessage } from "../core/refusal.js";
 import { defined } from "../core/defined.js";
 import {
+  CANCELLED,
+  type Cancelled,
   ESCAPE_DELAY_MS,
-  InputCancelledError,
   KEY,
   type MoreWithin,
   type NextByte,
@@ -49,6 +50,12 @@ import {
   readLateSequence,
 } from "./key-sequences.js";
 import { TypedAnswer } from "./typed-answer.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.terminal-input", {
+  "terminal-on-standard-input-run-command-terminal": (value0: string) =>
+    `This needs a terminal on standard input. Run the command in a terminal, or ${value0}.`,
+});
 
 /**
  * The longest answer: the limit of every text input (bounded-read.ts); no valid one is that long.
@@ -64,19 +71,19 @@ export const ESCAPE_ALIASES: ReadonlySet<number> = new Set([KEY.LOWER_Q, KEY.UPP
 
 /**
  * The warning for an answer, a file or codes that were refused, to be asked again with it: the
- * message of the Error. InputCancelledError, which is the person leaving, and anything thrown that
- * is no Error pass through. Every question that asks again classifies a refusal with it.
+ * message of the Error; anything thrown that is no Error passes through. Every question that asks
+ * again classifies a refusal with it.
  */
 export function refusal(error: unknown): string {
-  if (error instanceof InputCancelledError) throw error;
   return refusalMessage(error);
 }
 
 /** Why an answer is refused that holds bytes of no UTF-8 character. */
 export const NOT_UTF8 = notUtf8Text("The answer");
 
+/** A key as the questions read it; "cancel" is Ctrl+C, which cancels the command. */
 export type Key =
-  | { readonly kind: "up" | "down" | "enter" | "back" | "other" }
+  | { readonly kind: "up" | "down" | "enter" | "back" | "cancel" | "other" }
   | { readonly kind: "digit"; readonly digit: number };
 
 /**
@@ -197,14 +204,14 @@ function wipeTypedAhead(): boolean {
 /**
  * Drops and wipes what was typed or pasted before the next question is drawn: the rest of a
  * paste, a second Enter, keys pressed while a step ran that read no keys. Ctrl+C among them still
- * cancels the tool (InputCancelledError). A question calls it inside withRawTerminal, before it
- * draws anything, as askLine and waitForEnter do; called outside, before choose, it reads the
+ * cancels the command: CANCELLED is returned. A question calls it inside withRawTerminal, before
+ * it draws anything, as askLine and waitForEnter do; called outside, before choose, it reads the
  * terminal briefly itself.
  */
-export async function dropTypedAhead(): Promise<void> {
+export async function dropTypedAhead(): Promise<Cancelled | undefined> {
   if (rawSessions > 0) await settle();
   else if (terminalAvailable() && process.stdin.isTTY === true) await withRawTerminal(settle);
-  if (wipeTypedAhead()) throw new InputCancelledError();
+  return wipeTypedAhead() ? CANCELLED : undefined;
 }
 
 export function settle(): Promise<void> {
@@ -214,19 +221,19 @@ export function settle(): Promise<void> {
 /**
  * Drops the rest of an answer that was refused while it still arrived, such as a paste longer
  * than any answer: everything until no byte has come for PASTE_GAP_MS, wiped. Ctrl+C among it
- * cancels the tool. Without `moreWithin` only what has arrived is dropped. Bytes that `next`
- * holds elsewhere, as a test's keyboard does, are read through it.
+ * cancels the command: CANCELLED is returned. Without `moreWithin` only what has arrived is
+ * dropped. Bytes that `next` holds elsewhere, as a test's keyboard does, are read through it.
  */
 export async function dropRestOfPaste(
   next: NextByte,
   moreWithin: MoreWithin | undefined,
-): Promise<void> {
+): Promise<Cancelled | undefined> {
   let cancelled = wipeTypedAhead();
   while (moreWithin !== undefined && (await moreWithin(PASTE_GAP_MS))) {
     if (typedAhead.length > 0) cancelled = wipeTypedAhead() || cancelled;
     else if ((await next()) === KEY.CTRL_C) cancelled = true;
   }
-  if (cancelled) throw new InputCancelledError();
+  return cancelled ? CANCELLED : undefined;
 }
 
 /**
@@ -239,9 +246,9 @@ export async function withRawTerminal<T>(
 ): Promise<T> {
   const input = process.stdin;
   if (input.isTTY !== true) {
-    throw new Error(
-      `This needs a terminal on standard input. Run the command in a terminal, or ${SECRET_SOURCE_ADVICE}.`,
-    );
+    throw ERRORS.create("terminal-on-standard-input-run-command-terminal", [
+      `${SECRET_SOURCE_ADVICE}`,
+    ]);
   }
   let wake: (() => void) | undefined;
   const receive = (chunk: Buffer): void => {
@@ -345,8 +352,8 @@ async function leaveRawMode(input: typeof process.stdin): Promise<void> {
 /** A stop for a long search, which Ctrl+C sets off. */
 export interface CtrlCWatch {
   /**
-   * Aborted with InputCancelledError as its reason at Ctrl+C or Ctrl+\, and with the error when the
-   * terminal fails after Ctrl+Z: `signal.throwIfAborted()` throws it.
+   * Aborted with CANCELLED as its reason at Ctrl+C or Ctrl+\, and with the error when the terminal
+   * fails after Ctrl+Z (withCtrlCWatch throws that one).
    */
   readonly signal: AbortSignal;
   /** Gives the terminal back as it was, once it resolves; a second call does nothing. */
@@ -371,8 +378,7 @@ export function watchForCtrlC(): CtrlCWatch {
   const receive = (chunk: Buffer): void => {
     for (const byte of chunk) {
       if (controller.signal.aborted) break;
-      if (byte === KEY.CTRL_C || byte === KEY.CTRL_BACKSLASH)
-        controller.abort(new InputCancelledError());
+      if (byte === KEY.CTRL_C || byte === KEY.CTRL_BACKSLASH) controller.abort(CANCELLED);
       else if (byte === KEY.CTRL_Z) suspendJob(controller);
     }
     // The chunk may hold a secret typed by mistake; it is not used.
@@ -425,14 +431,22 @@ export function nodeTurn(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
-/** Runs `search` with the signal of watchForCtrlC and stops watching when it ends or fails. */
+/**
+ * Runs `search` with the signal of watchForCtrlC and stops watching when it ends or fails. A
+ * Ctrl+C stops the search, which then says so in what it returns; a terminal that failed after
+ * Ctrl+Z is an error, thrown here once the search has ended.
+ */
 export async function withCtrlCWatch<T>(search: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const watch = watchForCtrlC();
+  let result: T;
   try {
-    return await search(watch.signal);
+    result = await search(watch.signal);
   } finally {
     await watch.stop();
   }
+  const { signal } = watch;
+  if (signal.aborted && signal.reason !== CANCELLED) throw signal.reason;
+  return result;
 }
 
 /**
@@ -451,7 +465,7 @@ export async function readKey(next: NextByte, moreWithin?: MoreWithin): Promise<
     moreWithin && (async (milliseconds) => keyBytesAgain.length > 0 || moreWithin(milliseconds));
   const byte = await take();
   if (byte === undefined) return { kind: "back" };
-  if (byte === KEY.CTRL_C) throw new InputCancelledError();
+  if (byte === KEY.CTRL_C) return { kind: "cancel" };
   if (byte === KEY.CARRIAGE_RETURN || byte === KEY.LINE_FEED) return { kind: "enter" };
   if (byte >= KEY.DIGIT_0 && byte <= KEY.DIGIT_9)
     return { kind: "digit", digit: byte - KEY.DIGIT_0 };
@@ -513,11 +527,14 @@ export type PastedLineBreak = " " | ";";
 
 /**
  * Reads one line from raw bytes as described at the top. Returns undefined when the input ends
- * before anything was typed, or at Escape where it goes back. A visible answer leaves the cursor
+ * before anything was typed, or at Escape where it goes back, and CANCELLED at Ctrl+C. A visible answer leaves the cursor
  * just after its end, wherever it was moved before, so that a caller can count the rows of the
  * question and the answer up from there.
  */
-export async function readLine(next: NextByte, options: LineOptions): Promise<string | undefined> {
+export async function readLine(
+  next: NextByte,
+  options: LineOptions,
+): Promise<string | undefined | Cancelled> {
   const { echo, moreWithin } = options;
   const answer = new TypedAnswer(
     options.limit ?? MAX_ANSWER_BYTES,
@@ -561,7 +578,7 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
         if (answer.cursor > 0 && answer.before !== lineBreak) answer.insert(lineBreak);
         continue;
       }
-      if (byte === KEY.CTRL_C) throw new InputCancelledError();
+      if (byte === KEY.CTRL_C) return CANCELLED;
       if (byte === KEY.CTRL_D && answer.length === 0) return undefined;
       if (byte === KEY.BACKSPACE || byte === KEY.DELETE || byte === KEY.CTRL_U)
         answer.control(byte);

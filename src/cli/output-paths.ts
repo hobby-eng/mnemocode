@@ -8,6 +8,34 @@ import { optionLabel } from "./option-copy.js";
 import { terminalNotice } from "./terminal.js";
 import { FILE_INPUTS, FILE_OUTPUTS, FOLDER_OUTPUTS, SAVED_OPTIONS } from "./output-options.js";
 import { DOCUMENT_EXTENSIONS } from "../export/document-formats.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.output-paths", {
+  "path-empty-paths-not-accepted-results-always-appear": (value0: string) =>
+    `The ${value0} needs a path; - and empty paths are not accepted. Results always appear in the terminal.`,
+  "too-many-numbered-copies-already-choose-another-name": (value0: string) =>
+    `${value0} has too many numbered copies already. Choose another name.`,
+  "output-path-could-not-resolved-safely": () => "The output path could not be resolved safely.",
+  "new-folder-name-without-which-ending-file-choose": (value0: string) =>
+    `A new folder needs a name without .${value0}, which is the ending of a file; choose another name.`,
+  "folder-unwritable": () => FOLDER_UNWRITABLE,
+  "file-stands-where-folder-name-should-choose-another": () =>
+    "A file stands where a folder of this name should be; choose another name.",
+  "could-not-read-check-file-exists-readable": (value0: string) =>
+    `The ${value0} could not be read. Check that the file exists and is readable.`,
+  "use-separate-non-overlapping-paths": (value0: string, value1: string) =>
+    `The ${value0} and ${value1} must use separate, non-overlapping paths.`,
+  "not-overlap": (value0: string, value1: string) =>
+    `The ${value0} must not overlap the ${value1}.`,
+  "file-export-requires-file-path-empty-paths-not": () =>
+    "File export requires a file path; - and empty paths are not accepted. Results always appear in the terminal.",
+  "folder-file": () => FOLDER_IS_A_FILE,
+  "folder-unwritable-file": () => FOLDER_UNWRITABLE_FOR_FILE,
+  "output-file-already-exists-choose-new-path": () =>
+    "The output file already exists. Choose a new path.",
+  "folder-name-give-file-another-name-name-inside": () =>
+    "A folder has this name; give the file another name, or a name inside that folder.",
+});
 
 /** More numbered copies of one name than this are surely a mistake. */
 const MAX_COPY_NUMBER = 999;
@@ -26,9 +54,9 @@ export function isUnusableOutputPath(path: string): boolean {
 /** Refuses the output `key` given as no path (isUnusableOutputPath). */
 export function assertUsableOutputPath(key: string, path: string): void {
   if (isUnusableOutputPath(path))
-    throw new Error(
-      `The ${optionLabel(key)} needs a path; - and empty paths are not accepted. Results always appear in the terminal.`,
-    );
+    throw ERRORS.create("path-empty-paths-not-accepted-results-always-appear", [
+      `${optionLabel(key)}`,
+    ]);
 }
 
 /**
@@ -68,7 +96,7 @@ async function firstFreeNumberedName(path: string, folder: boolean): Promise<str
     const free = numberedName(path, number, folder);
     if ((await entryAt(free)) === "none") return free;
   }
-  throw new Error(`${path} has too many numbered copies already. Choose another name.`);
+  throw ERRORS.create("too-many-numbered-copies-already-choose-another-name", [`${path}`]);
 }
 
 /**
@@ -117,7 +145,7 @@ export function reportRenamedOutputs(): void {
 async function effectiveOutputPath(path: string): Promise<string> {
   const absolute = resolve(path);
   const found = await nearestExisting(dirname(absolute));
-  if (found === undefined) throw new Error("The output path could not be resolved safely.");
+  if (found === undefined) throw ERRORS.create("output-path-could-not-resolved-safely", []);
   return resolve(found.real, ...found.missing, basename(absolute));
 }
 
@@ -155,9 +183,7 @@ const FOLDER_UNWRITABLE =
 function assertFolderName(path: string): void {
   const ending = extname(path.replace(TRAILING_SEPARATORS, "")).slice(1).toLowerCase();
   if (DOCUMENT_EXTENSIONS.includes(ending))
-    throw new Error(
-      `A new folder needs a name without .${ending}, which is the ending of a file; choose another name.`,
-    );
+    throw ERRORS.create("new-folder-name-without-which-ending-file-choose", [`${ending}`]);
 }
 
 /**
@@ -169,13 +195,13 @@ function assertFolderName(path: string): void {
 export async function preflightFolderDestination(path: string): Promise<void> {
   assertFolderName(path);
   const found = await nearestExisting(dirname(resolve(path)));
-  if (found === undefined) throw new Error(FOLDER_UNWRITABLE);
+  if (found === undefined) throw ERRORS.create("folder-unwritable", []);
   if (!(await stat(found.real)).isDirectory())
-    throw new Error("A file stands where a folder of this name should be; choose another name.");
+    throw ERRORS.create("file-stands-where-folder-name-should-choose-another", []);
   try {
     await access(found.real, constants.W_OK);
   } catch (error) {
-    throw new Error(FOLDER_UNWRITABLE, { cause: error });
+    throw ERRORS.create("folder-unwritable", [], { cause: error });
   }
 }
 
@@ -183,9 +209,7 @@ async function effectiveSourcePath(path: string, key: string): Promise<string> {
   try {
     return await realpath(resolve(path));
   } catch {
-    throw new Error(
-      `The ${optionLabel(key)} could not be read. Check that the file exists and is readable.`,
-    );
+    throw ERRORS.create("could-not-read-check-file-exists-readable", [`${optionLabel(key)}`]);
   }
 }
 
@@ -202,16 +226,17 @@ export async function validateOutputPaths(args: ParsedArguments): Promise<void> 
   for (const [index, left] of effectiveOutputs.entries()) {
     for (const right of effectiveOutputs.slice(index + 1)) {
       if (pathsOverlap(left.path, right.path))
-        throw new Error(
-          `The ${optionLabel(left.key)} and ${optionLabel(right.key)} must use separate, non-overlapping paths.`,
-        );
+        throw ERRORS.create("use-separate-non-overlapping-paths", [
+          `${optionLabel(left.key)}`,
+          `${optionLabel(right.key)}`,
+        ]);
     }
     for (const key of FILE_INPUTS) {
       for (const source of values(args, key)) {
         if (source === "-") continue;
         const effectiveSource = await effectiveSourcePath(source, key);
         if (pathsOverlap(left.path, effectiveSource))
-          throw new Error(`The ${optionLabel(left.key)} must not overlap the ${optionLabel(key)}.`);
+          throw ERRORS.create("not-overlap", [`${optionLabel(left.key)}`, `${optionLabel(key)}`]);
       }
     }
   }
@@ -232,24 +257,20 @@ export async function preflightFileDestination(
   allowOverwrite: boolean,
 ): Promise<void> {
   if (isUnusableOutputPath(path))
-    throw new Error(
-      "File export requires a file path; - and empty paths are not accepted. Results always appear in the terminal.",
-    );
+    throw ERRORS.create("file-export-requires-file-path-empty-paths-not", []);
   let existing: Stats | undefined;
   try {
     existing = await lstat(path);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     // A name under a file, or a folder that cannot be looked into.
-    if (code === "ENOTDIR") throw new Error(FOLDER_IS_A_FILE, { cause: error });
-    if (code !== "ENOENT") throw new Error(FOLDER_UNWRITABLE_FOR_FILE, { cause: error });
+    if (code === "ENOTDIR") throw ERRORS.create("folder-file", [], { cause: error });
+    if (code !== "ENOENT") throw ERRORS.create("folder-unwritable-file", [], { cause: error });
   }
   if (existing !== undefined) {
-    if (!allowOverwrite) throw new Error("The output file already exists. Choose a new path.");
+    if (!allowOverwrite) throw ERRORS.create("output-file-already-exists-choose-new-path", []);
     if (existing.isDirectory())
-      throw new Error(
-        "A folder has this name; give the file another name, or a name inside that folder.",
-      );
+      throw ERRORS.create("folder-name-give-file-another-name-name-inside", []);
   }
   const parent = dirname(resolve(path));
   let isDirectory: boolean;
@@ -257,7 +278,7 @@ export async function preflightFileDestination(
     isDirectory = (await stat(parent)).isDirectory();
     if (isDirectory) await access(parent, constants.W_OK);
   } catch (error) {
-    throw new Error(FOLDER_UNWRITABLE_FOR_FILE, { cause: error });
+    throw ERRORS.create("folder-unwritable-file", [], { cause: error });
   }
-  if (!isDirectory) throw new Error(FOLDER_IS_A_FILE);
+  if (!isDirectory) throw ERRORS.create("folder-file", []);
 }

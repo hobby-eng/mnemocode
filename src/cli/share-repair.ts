@@ -61,7 +61,14 @@ import {
 import { counting } from "../core/search-plan.js";
 import { isMarked } from "../sskr/repair-units.js";
 import { defined } from "../core/defined.js";
-import { InputCancelledError } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.share-repair", {
+  "no-share-was-typed-at-place": (value0: string) => `No share was typed at place ${value0}.`,
+  "mend-shares-refused": suppliedMessage,
+  "search-share-repair-refused": suppliedMessage,
+});
 
 /** The restore of shares with Node's SSKR library: it keeps nothing of a restore. */
 const SHARE_RESTORE = new ShareRestore(nodeSharePlatform);
@@ -121,12 +128,11 @@ export class TypedShares {
    * typed share is, shown when it came from a QR code image, and the others are asked for when the
    * restore finds it too few.
    */
-  static async startingWith(first: FirstShare): Promise<TypedShares> {
+  static async startingWith(first: FirstShare): Promise<TypedShares | Cancelled> {
     const shares = new TypedShares();
     shares.input.add([first.text]);
     if (first.fromQr) shares.#readFromQr();
-    await shares.#retypeUnreadable();
-    return shares;
+    return (await shares.#retypeUnreadable()) ?? shares;
   }
 
   get list(): readonly TypedShare[] {
@@ -148,31 +154,36 @@ export class TypedShares {
     return this.input.marked;
   }
 
-  /** Asks for every share in one answer, in place of any typed before. */
-  async askAll(): Promise<void> {
+  /**
+   * Asks for every share in one answer, in place of any typed before; CANCELLED, as every question
+   * of the shares gives it, when the command is cancelled.
+   */
+  async askAll(): Promise<Cancelled | undefined> {
     const texts = await askSecretUntil(
       SHARES_PROMPT,
       (answer) => this.input.sharesOfAnswer(answer),
       { what: "the shares", pastedLineBreak: SHARE_SEPARATOR, hints: SHARE_WORD_HINTS },
     );
+    if (texts === CANCELLED) return CANCELLED;
     this.#fromQr = false;
     this.input.replaceAll(texts);
-    await this.#retypeUnreadable();
+    return this.#retypeUnreadable();
   }
 
   /**
    * Asks for more shares, which are added after those given. After a share read from a QR code
    * image, such as the one Decode read, the next may be read from one too, or typed.
    */
-  async askMore(): Promise<void> {
+  async askMore(): Promise<Cancelled | undefined> {
     const texts = this.#fromQr ? await this.#askNextShare() : await this.#typeMore();
+    if (texts === CANCELLED) return CANCELLED;
     this.input.add(texts);
     this.#showRead();
-    await this.#retypeUnreadable();
+    return this.#retypeUnreadable();
   }
 
   /** More shares, typed in one answer. */
-  async #typeMore(): Promise<string[]> {
+  async #typeMore(): Promise<string[] | Cancelled> {
     this.#fromQr = false;
     return askSecretUntil(MORE_SHARES_PROMPT, (answer) => this.input.sharesOfAnswer(answer, true), {
       what: "the shares to add",
@@ -185,9 +196,11 @@ export class TypedShares {
    * The next share read from a QR code image, or more shares typed, as the person chooses; Escape
    * at the file name chooses again.
    */
-  async #askNextShare(): Promise<string[]> {
+  async #askNextShare(): Promise<string[] | Cancelled> {
     for (;;) {
-      if ((await this.#askSource()) === "typed") return this.#typeMore();
+      const source = await this.#askSource();
+      if (source === CANCELLED) return CANCELLED;
+      if (source === "typed") return this.#typeMore();
       const texts = await askValueUntil(
         "QR code file name:",
         async (answer) =>
@@ -199,7 +212,7 @@ export class TypedShares {
   }
 
   /** How the next share is given: from another QR code image, or typed. Escape types it. */
-  async #askSource(): Promise<ShareSource> {
+  async #askSource(): Promise<ShareSource | Cancelled> {
     const source = await choose(
       "The next share?",
       [
@@ -213,7 +226,7 @@ export class TypedShares {
       ] as const,
       { label: "Shares", quit: "types them" },
     );
-    return source === "qr" ? "qr" : "typed";
+    return source ?? "typed";
   }
 
   /** Marks the last share as read from a QR code image, and shows it. */
@@ -235,30 +248,32 @@ export class TypedShares {
    * that still cannot be read, the share may be left out instead while others remain, so that a
    * part that is no share, such as a heading pasted with the shares, does not have to be replaced.
    */
-  async retype(place: number, warning?: string): Promise<void> {
-    if (!this.input.has(place)) throw new Error(`No share was typed at place ${place}.`);
+  async retype(place: number, warning?: string): Promise<Cancelled | undefined> {
+    if (!this.input.has(place)) throw ERRORS.create("no-share-was-typed-at-place", [`${place}`]);
     for (let problem = warning; ;) {
       if (problem !== undefined) {
         terminalNotice(problem, "warning");
-        if (this.list.length > 1 && (await this.leftOut(place))) return;
+        const kept = this.list.length > 1 ? await this.askLeaveOut(place) : "again";
+        if (kept !== "again") return kept === "out" ? undefined : kept;
       }
       const text = await askSecretUntil(`Share ${place} again:`, (answer) => answer, {
         what: `share ${place}`,
         hints: SHARE_WORD_HINTS,
       });
+      if (text === CANCELLED) return CANCELLED;
       problem = this.input.readProblem(place, text);
       if (problem === undefined) {
         this.input.replace(place, text);
-        return;
+        return undefined;
       }
     }
   }
 
   /**
-   * Asks whether the share at `place` is left out or typed again, after a warning about it; true
-   * when it was left out. Escape types it again, which loses nothing.
+   * Asks whether the share at `place` is left out or typed again, after a warning about it, and
+   * leaves it out at "out". Escape types it again ("again"), which loses nothing.
    */
-  async leftOut(place: number): Promise<boolean> {
+  async askLeaveOut(place: number): Promise<"out" | "again" | Cancelled> {
     const choice = await askAfterFailure(
       WHAT_NOW,
       [
@@ -268,7 +283,7 @@ export class TypedShares {
       { escape: "types it again" },
     );
     if (choice === "out") this.leaveOut(place);
-    return choice === "out";
+    return choice;
   }
 
   /** Leaves out the share at `place`; the others keep their places. */
@@ -277,7 +292,7 @@ export class TypedShares {
   }
 
   /** Asks which share, unless only one was typed; undefined when the person goes back (Escape). */
-  async #chosenPlace(): Promise<number | undefined> {
+  async #chosenPlace(): Promise<number | undefined | Cancelled> {
     if (this.list.length === 1) return defined(this.list[0]).place;
     return choose(
       "Which share?",
@@ -290,61 +305,56 @@ export class TypedShares {
     );
   }
 
-  /** Asks which share to type again, then for it; false when the person goes back (Escape). */
-  async retypeChosen(): Promise<boolean> {
+  /** Asks which share to type again, then for it; "back" when the person goes back (Escape). */
+  async retypeChosen(): Promise<SharesChange> {
     const place = await this.#chosenPlace();
-    if (place === undefined) return false;
-    await this.retype(place);
-    return true;
+    if (place === undefined) return "back";
+    if (place === CANCELLED) return CANCELLED;
+    return (await this.retype(place)) ?? "changed";
   }
 
-  /** Asks which share to leave out, and leaves it out; false when the person goes back (Escape). */
-  async leaveOutChosen(): Promise<boolean> {
+  /** Asks which share to leave out, and leaves it out; "back" when the person goes back (Escape). */
+  async leaveOutChosen(): Promise<SharesChange> {
     const place = await this.#chosenPlace();
-    if (place === undefined) return false;
+    if (place === undefined) return "back";
+    if (place === CANCELLED) return CANCELLED;
     this.leaveOut(place);
-    return true;
+    return "changed";
   }
 
   /**
    * Each share that cannot be read is typed again, with why, until it can be, or left out; over
    * the list as it was, which `list` gives as a copy.
    */
-  async #retypeUnreadable(): Promise<void> {
+  async #retypeUnreadable(): Promise<Cancelled | undefined> {
     for (const share of this.list) {
       const problem = this.input.readProblem(share.place, share.text);
-      if (problem !== undefined) await this.retype(share.place, problem);
+      if (problem !== undefined && (await this.retype(share.place, problem)) === CANCELLED)
+        return CANCELLED;
     }
+    return undefined;
   }
 }
+
+/** What a question that changes the shares did: changed them, or went back with Escape. */
+export type SharesChange = "changed" | "back" | Cancelled;
 
 // What the shares give together.
 
 /**
  * What the shares as typed give, or their first problem (ShareRestore.read): complete shares are
  * read and checked as a set, copies left out with a note, and restored; shares with ? are assessed
- * together, during which Ctrl+C is read as a key, and the assessment is shown. No combination is
- * searched yet.
+ * together, during which Ctrl+C is read as a key, and the assessment is shown; an assessment that
+ * Ctrl+C stopped cancels the command (CANCELLED). No combination is searched yet.
  */
 export async function assessShares(
   shares: TypedShares,
-): Promise<Exclude<SharesRead, { kind: "stopped" }>> {
+): Promise<Exclude<SharesRead, { kind: "stopped" }> | Cancelled> {
   const { input } = shares;
-  const read = await SHARE_RESTORE.read(
-    input,
-    (step) =>
-      withCtrlCWatch(async (signal) => {
-        const result = await step(signal);
-        // The assessment hears the signal at each of its turns (SearchTurns); a step that ends
-        // without hearing it, such as one that does not take it, is stopped here.
-        signal.throwIfAborted();
-        return result;
-      }),
-    nodeTurn,
-  );
+  const read = await SHARE_RESTORE.read(input, withCtrlCWatch, nodeTurn);
   printLines(read.lines);
   // The person stopped the assessment with Ctrl+C.
-  if (read.kind === "stopped") throw new InputCancelledError();
+  if (read.kind === "stopped") return CANCELLED;
   return read;
 }
 
@@ -370,14 +380,14 @@ export interface ShareFixQuestion {
 /**
  * Asks which share to change after a refusal that names none or several, or a search without a
  * result: one share typed again, one left out (while others remain), every share typed again,
- * more shares, or Stop, which cancels (InputCancelledError). A refusal may name shares to leave
- * out, possibly more than one; each is left out by a choice of its own. Escape at the list of
- * shares asks again. True once the shares were changed; false when the person went back (`back`).
+ * more shares, or Stop, which cancels (CANCELLED). A refusal may name shares to leave out,
+ * possibly more than one; each is left out by a choice of its own. Escape at the list of shares
+ * asks again. "changed" once the shares were changed; "back" when the person went back (`back`).
  */
 export async function askShareFix(
   shares: TypedShares,
   how: ShareFixQuestion = {},
-): Promise<boolean> {
+): Promise<SharesChange> {
   const question = how.question ?? WHAT_NOW;
   for (;;) {
     const several = shares.list.length > 1;
@@ -390,39 +400,35 @@ export async function askShareFix(
       addMoreShares("more"),
     ];
     const fix = await askOrCancel(question, choices, { back: how.back === true });
-    if (fix === undefined) return false;
-    if (fix === "all") {
-      await shares.askAll();
-      return true;
-    }
-    if (fix === "more") {
-      await shares.askMore();
-      return true;
-    }
+    if (fix === undefined) return "back";
+    if (fix === CANCELLED) return CANCELLED;
+    if (fix === "all") return (await shares.askAll()) ?? "changed";
+    if (fix === "more") return (await shares.askMore()) ?? "changed";
     // Escape at the list of shares asks this question again.
     const changed = fix === "out" ? await shares.leaveOutChosen() : await shares.retypeChosen();
-    if (changed) return true;
+    if (changed !== "back") return changed;
   }
 }
 
 /**
  * Mends a problem of the shares on the private screen, as ShareTrouble describes, after one
- * warning line; elsewhere the problem ends the command. "few" asks for more shares.
+ * warning line; elsewhere the problem ends the command. "few" asks for more shares. CANCELLED
+ * when the command is cancelled.
  */
 export async function mendShares(
   shares: TypedShares,
   trouble: ShareTrouble,
   interactive: boolean,
-): Promise<void> {
-  if (!interactive) throw new Error(trouble.message);
+): Promise<Cancelled | undefined> {
+  if (!interactive) throw ERRORS.create("mend-shares-refused", [trouble.message]);
   if (trouble.kind === "unreadable") return shares.retype(trouble.place, trouble.message);
   terminalNotice(trouble.message, "warning");
   if (trouble.kind === "few") return shares.askMore();
-  if (trouble.kind === "refused") {
-    await askShareFix(shares);
-    return;
-  }
-  if (!(await shares.leftOut(trouble.place))) await shares.retype(trouble.place);
+  if (trouble.kind === "refused")
+    return (await askShareFix(shares)) === CANCELLED ? CANCELLED : undefined;
+  const kept = await shares.askLeaveOut(trouble.place);
+  if (kept === "again") return shares.retype(trouble.place);
+  return kept === CANCELLED ? CANCELLED : undefined;
 }
 
 // Shares with unreadable elements.
@@ -440,28 +446,31 @@ export function searchLimit(args: ParsedArguments): number | undefined {
  * Runs the search of marked shares, after asking on the private screen when it is longer than
  * `limits` allow (searchDecision); elsewhere a longer search needs --max-tries. With `dates`, the
  * date search that follows for each phrase found is counted in the time, and named in the
- * question. Resolves with every phrase found, possibly none, or undefined when the person chose not
- * to search; the caller then releases the read (releaseRead).
+ * question. Resolves with every phrase found, possibly none, undefined when the person chose not
+ * to search, or CANCELLED when Ctrl+C stopped the search; the caller then releases the read
+ * (releaseRead).
  */
 export async function searchShareRepair(
   marked: MarkedShares,
   limits: SearchLimits,
   dates?: DateWork,
-): Promise<RepairedSet[] | undefined> {
+): Promise<RepairedSet[] | undefined | Cancelled> {
   const { report } = marked;
   const decision = searchDecision(marked, dates, limits);
   if (decision.question !== undefined) {
     if (!onPrivateScreen()) {
       const allowances: SearchAllowance[] = [["max-tries", report.combinations]];
       if (dates !== undefined) allowances.push(["max-candidates", dates.combinations]);
-      throw new Error(allowedBy(report.searchExtent(dates), allowances));
+      throw ERRORS.create("search-share-repair-refused", [
+        allowedBy(report.searchExtent(dates), allowances),
+      ]);
     }
     // Keys typed during the assessment, which reads none after its watch, do not answer this.
     const start = await askToSearch(decision.question, {
       note: "change the shares",
       quit: "changes the shares",
     });
-    if (!start) return undefined;
+    if (start !== "yes") return start === "no" ? undefined : start;
   } else if (decision.notice !== undefined) terminalNotice(decision.notice);
   const progress = new ProgressLine(SEARCH_PROGRESS_SECONDS);
   // Watched only now, after the question, which reads its own keys: Ctrl+C stops the search at
@@ -482,7 +491,7 @@ export async function searchShareRepair(
       }),
     );
     // The person stopped the search with Ctrl+C.
-    if (found.kind === "stopped") throw new InputCancelledError();
+    if (found.kind === "stopped") return CANCELLED;
     return found.kind === "sets" ? found.sets : [];
   } finally {
     progress.end();

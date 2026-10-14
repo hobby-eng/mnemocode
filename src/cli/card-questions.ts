@@ -31,6 +31,13 @@ import { readmeLink } from "./terminal.js";
 import { COPY_OPTIONS, profileOption } from "./business-options.js";
 import { defined } from "../core/defined.js";
 import { askNewFolder, askOutputFile } from "./output-questions.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.card-questions", {
+  "detail-starts-would-read-as-option-leave-out": () =>
+    "A detail that starts with - would be read as an option; leave out the -.",
+});
 
 /**
  * Which design, with Every design first where `withEveryDesign`; for separate cards
@@ -39,7 +46,7 @@ import { askNewFolder, askOutputFile } from "./output-questions.js";
 export async function askDesign(
   withEveryDesign: boolean,
   separateCards = false,
-): Promise<string | undefined> {
+): Promise<string | undefined | Cancelled> {
   const designs: Choice<string>[] = cardTemplates
     .filter((template) => !separateCards || template.renderIndividual !== undefined)
     .map((template) => ({ label: template.name, note: template.id, value: template.id }));
@@ -77,11 +84,11 @@ const SHEET_TURNS: readonly Choice<SheetTurn>[] = [
 ];
 
 /** The options of how the sheets are turned (--orientation); none where their size decides. */
-async function askSheetTurn(): Promise<string[] | undefined> {
+async function askSheetTurn(): Promise<string[] | undefined | Cancelled> {
   const turn = await choose("How should the sheets be turned?", SHEET_TURNS, {
     label: "Orientation",
   });
-  if (turn === undefined) return undefined;
+  if (turn === undefined || turn === CANCELLED) return turn;
   return turn === "best" ? [] : ["--orientation", turn];
 }
 
@@ -111,20 +118,23 @@ async function missingImageRenderer(): Promise<string | undefined> {
  * new folder (--cards-dir, --images-dir). Images need pdftocairo, which is checked as soon as one
  * is chosen.
  */
-async function askCardFiles(base: string, shares: boolean): Promise<CardFiles | undefined> {
+async function askCardFiles(
+  base: string,
+  shares: boolean,
+): Promise<CardFiles | undefined | Cancelled> {
   const kind = await askCardFileKind();
-  if (kind === undefined) return undefined;
+  if (kind === undefined || kind === CANCELLED) return kind;
   const layout = await choose("How should the cards be laid out?", CARD_LAYOUTS, {
     label: "Layout",
   });
-  if (layout === undefined) return undefined;
+  if (layout === undefined || layout === CANCELLED) return layout;
   // The page size that the commands take when none is given is left out of the command.
   const pageSize =
     layout === "separate" || layout === SHEET_PAGE_SIZE ? [] : ["--page-size", layout];
   const image = kind === "pdf" ? [] : ["--image-format", kind];
   if (layout === "separate") {
     const folder = await askNewFolder(base);
-    if (folder === undefined) return undefined;
+    if (folder === undefined || folder === CANCELLED) return folder;
     return {
       sheets: false,
       options: [
@@ -137,21 +147,22 @@ async function askCardFiles(base: string, shares: boolean): Promise<CardFiles | 
   }
   // Sheets only: a separate card has the shape of a business card.
   const turn = await askSheetTurn();
-  if (turn === undefined) return undefined;
+  if (turn === undefined || turn === CANCELLED) return turn;
   const size = [...pageSize, ...turn];
   if (kind === "pdf") {
     const path = await askOutputFile("PDF file name", `${base}.pdf`);
-    return path === undefined ? undefined : { sheets: true, options: ["--pdf", path, ...size] };
+    if (path === undefined || path === CANCELLED) return path;
+    return { sheets: true, options: ["--pdf", path, ...size] };
   }
   const folder = await askNewFolder(`${base}-images`);
-  if (folder === undefined) return undefined;
+  if (folder === undefined || folder === CANCELLED) return folder;
   return { sheets: true, options: ["--images-dir", folder, ...image, ...size] };
 }
 
 /**
  * The kind of file that printable cards are saved in: a PDF, or an image, which needs pdftocairo.
  */
-async function askCardFileKind(): Promise<DocumentFormat | undefined> {
+async function askCardFileKind(): Promise<DocumentFormat | undefined | Cancelled> {
   let warning: string | undefined;
   for (;;) {
     const kind = await choose(
@@ -167,7 +178,7 @@ async function askCardFileKind(): Promise<DocumentFormat | undefined> {
       }),
       { label: "Files", warning },
     );
-    if (kind === undefined || kind === "pdf") return kind;
+    if (kind === undefined || kind === CANCELLED || kind === "pdf") return kind;
     warning = await missingImageRenderer();
     if (warning === undefined) return kind;
   }
@@ -190,7 +201,7 @@ interface CardDetail {
 /** A detail's answer that the command line would read as an option: -h, --help or --name. */
 function refuseOptionLike(answer: string): void {
   if (answer.startsWith("-"))
-    throw new Error("A detail that starts with - would be read as an option; leave out the -.");
+    throw ERRORS.create("detail-starts-would-read-as-option-leave-out", []);
 }
 
 /** The question for each detail of the person on the cards (--card-<field>). */
@@ -244,7 +255,7 @@ const TEXT_DETAILS: Readonly<Record<CopyField, CardDetail>> = {
  * The details on the cards: random, as the commands invent them, or typed one by one, where Enter
  * keeps a detail random. They are a decoy, no secret, and go on the command line.
  */
-async function askCardDetails(sheets: boolean): Promise<string[] | undefined> {
+async function askCardDetails(sheets: boolean): Promise<string[] | undefined | Cancelled> {
   const own = await choose(
     "Type your own details for the cards?",
     [
@@ -253,7 +264,7 @@ async function askCardDetails(sheets: boolean): Promise<string[] | undefined> {
     ],
     { label: "Details", explanation: DETAILS_EXPLANATION },
   );
-  if (own === undefined) return undefined;
+  if (own === undefined || own === CANCELLED) return own;
   if (!own) return [];
   const options: string[] = [];
   const texts = designTexts(sheets).map((key) => TEXT_DETAILS[key]);
@@ -262,7 +273,7 @@ async function askCardDetails(sheets: boolean): Promise<string[] | undefined> {
       optional: "random",
       check: detail.check,
     });
-    if (answer === undefined) return undefined;
+    if (answer === undefined || answer === CANCELLED) return answer;
     if (answer !== "") options.push(`--${detail.option}`, answer);
   }
   return options;
@@ -274,12 +285,15 @@ async function askCardDetails(sheets: boolean): Promise<string[] | undefined> {
  * on them. Separate business cards
  * never carry a QR code. `shares`: the cards of Shamir shares, one set per share.
  */
-export async function askCards(base: string, shares: boolean): Promise<string[] | undefined> {
+export async function askCards(
+  base: string,
+  shares: boolean,
+): Promise<string[] | undefined | Cancelled> {
   // How the cards are saved comes first, then their design.
   const files = await askCardFiles(base, shares);
-  if (files === undefined) return undefined;
+  if (files === undefined || files === CANCELLED) return files;
   const design = await askDesign(false, !files.sheets);
-  if (design === undefined) return undefined;
+  if (design === undefined || design === CANCELLED) return design;
   const qr = files.sheets
     ? await choose(
         `Add a QR code with ${SHEET_QR_HOLDS}?`,
@@ -294,8 +308,8 @@ export async function askCards(base: string, shares: boolean): Promise<string[] 
         { label: "QR code" },
       )
     : false;
-  if (qr === undefined) return undefined;
+  if (qr === undefined || qr === CANCELLED) return qr;
   const details = await askCardDetails(files.sheets);
-  if (details === undefined) return undefined;
+  if (details === undefined || details === CANCELLED) return details;
   return ["--template", design, ...files.options, ...(qr ? ["--card-qr"] : []), ...details];
 }

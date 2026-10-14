@@ -37,6 +37,18 @@ import {
 import { EncodedForm } from "./encoded-form.js";
 import { refusalMessage } from "./refusal.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.encoded-backup", {
+  "encoded-seed-phrase": (value0: string, value1: string, value2: string) =>
+    `These are ${value0} ${value1}; an encoded seed phrase has ${value2}.`,
+  "create-legacy-checksum-valid-record-select-legacy-seedshift": () =>
+    "To create a legacy checksum-valid record, select legacy Seedshift and enable the checksum-word replacement.",
+  "legacy-checksum-word-replacement-available-only-legacy-seedshift": () =>
+    "The legacy checksum-word replacement is available only in legacy Seedshift mode.",
+  "original-seedshift-valid-last-word-gives-several-phrases": () =>
+    "The Original Seedshift with a valid last word gives several phrases: take its candidates.",
+});
 
 /**
  * How the codes were made: not masked, or one of the Seedshift variants (core/masking.ts).
@@ -113,9 +125,11 @@ export class EncodedBackup extends Redacted {
     // copy another.
     const codes = Array.from(indexes);
     if (!isBip39WordCount(codes.length))
-      throw new Error(
-        `These are ${codes.length} ${form.unit}; an encoded seed phrase has ${WORD_COUNTS_TEXT}.`,
-      );
+      throw ERRORS.create("encoded-seed-phrase", [
+        `${codes.length}`,
+        `${form.unit}`,
+        `${WORD_COUNTS_TEXT}`,
+      ]);
     masking.assertCodes(codes);
     this.#indexes = Object.freeze(codes);
     this.#format = format;
@@ -139,13 +153,9 @@ export class EncodedBackup extends Redacted {
   static assertEncodable(mode: MaskingMode, options: EncodeOptions = {}): void {
     const masking = Masking.of(mode);
     if (!masking.encodable)
-      throw new Error(
-        "To create a legacy checksum-valid record, select legacy Seedshift and enable the checksum-word replacement.",
-      );
+      throw ERRORS.create("create-legacy-checksum-valid-record-select-legacy-seedshift", []);
     if (options.validLastWord === true && masking.withValidLastWord === undefined)
-      throw new Error(
-        "The legacy checksum-word replacement is available only in legacy Seedshift mode.",
-      );
+      throw ERRORS.create("legacy-checksum-word-replacement-available-only-legacy-seedshift", []);
   }
 
   /**
@@ -261,9 +271,7 @@ export class EncodedBackup extends Redacted {
    */
   decode(dates: readonly DateShiftDate[]): DecodedResult {
     if (this.givesSeveral)
-      throw new Error(
-        "The Original Seedshift with a valid last word gives several phrases: take its candidates.",
-      );
+      throw ERRORS.create("original-seedshift-valid-last-word-gives-several-phrases", []);
     return defined(Masking.of(this.#mode).undo(this.#indexes, dates)[0]);
   }
 

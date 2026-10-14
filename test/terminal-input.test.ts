@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dropTypedAhead, readKey, readLine, type Key } from "../src/cli/terminal-input.js";
-import { InputCancelledError, type MoreWithin, type NextByte } from "../src/cli/terminal-keys.js";
+import {
+  CANCELLED,
+  type Cancelled,
+  type MoreWithin,
+  type NextByte,
+} from "../src/cli/terminal-keys.js";
 import { rowsOfOutputLine } from "../src/cli/terminal-geometry.js";
 
 /** The bytes of `text` as a terminal in raw mode delivers them, then the end of the input. */
@@ -30,7 +35,7 @@ async function keys(text: string): Promise<string[]> {
   for (;;) {
     const key = await readKey(next);
     read.push(key.kind === "digit" ? `digit ${key.digit}` : key.kind);
-    if (key.kind === "back") return read;
+    if (key.kind === "back" || key.kind === "cancel") return read;
   }
 }
 
@@ -57,8 +62,8 @@ describe("terminal keys", () => {
     expect(await readKey(next, moreWithin)).toEqual({ kind: "up" });
   });
 
-  it("cancels the tool at Ctrl+C", async () => {
-    await expect(readKey(typed("\x03"))).rejects.toBeInstanceOf(InputCancelledError);
+  it("reads Ctrl+C as a cancellation key", async () => {
+    expect(await readKey(typed("\x03"))).toEqual({ kind: "cancel" });
   });
 
   it("reads an escape sequence with parameters to its end, so that Ctrl+Up is no digit 5", async () => {
@@ -84,7 +89,7 @@ describe("terminal keys", () => {
       "up",
       "back",
     ]);
-    await expect(keys("\x1b[1;\x03")).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await keys("\x1b[1;\x03")).toEqual(["other", "digit 1", "other", "cancel"]);
     // No key's sequence is longer than eight bytes after the [.
     expect(await keys(`\x1b[${"1".repeat(9)}A`)).toEqual([
       "other",
@@ -119,7 +124,7 @@ describe("terminal keys", () => {
     await dropTypedAhead();
     expect(await readKey(typed(""))).toEqual({ kind: "back" });
     expect(await readKey(typed("\x1b[1\x03"))).toEqual({ kind: "other" });
-    await expect(dropTypedAhead()).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await dropTypedAhead()).toBe(CANCELLED);
     expect(await readKey(typed(""))).toEqual({ kind: "back" });
   });
 });
@@ -152,9 +157,7 @@ describe("hidden line", () => {
   });
 
   it("is cancelled by Ctrl+C", async () => {
-    await expect(readLine(typed("secret\x03"), { echo: false })).rejects.toBeInstanceOf(
-      InputCancelledError,
-    );
+    expect(await readLine(typed("secret\x03"), { echo: false })).toBe(CANCELLED);
   });
 
   it("refuses an answer longer than its limit and text that is not UTF-8", async () => {
@@ -264,7 +267,7 @@ describe("hidden line", () => {
 
   it("keeps text that starts with [ or O after an ignored Escape, typed or pasted", async () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const answers: string[] = [];
+    const answers: (string | undefined | Cancelled)[] = [];
     for (const chunks of [
       // Typed key by key: no key's sequence comes this slowly.
       ["\x1b", "O", "x", "f", "o", "r", "d", "\r"],
@@ -275,14 +278,14 @@ describe("hidden line", () => {
       ["\x1b", "[1;5Dx\r"],
     ]) {
       const input = arriving(...chunks);
-      answers.push((await readLine(input.next, { echo: true, moreWithin: input.moreWithin }))!);
+      answers.push(await readLine(input.next, { echo: true, moreWithin: input.moreWithin }));
     }
     expect(answers).toEqual(["Oxford", "[A", "Oxford passphrase", "OBrien", "[1;5Dx"]);
     // Ctrl+C right after the [ still cancels.
     const cancelled = arriving("\x1b", "[\x03");
-    await expect(
-      readLine(cancelled.next, { echo: true, moreWithin: cancelled.moreWithin }),
-    ).rejects.toBeInstanceOf(InputCancelledError);
+    expect(await readLine(cancelled.next, { echo: true, moreWithin: cancelled.moreWithin })).toBe(
+      CANCELLED,
+    );
   });
 
   it("keeps what is typed after an ESC [ that is no key's sequence", async () => {
@@ -297,9 +300,7 @@ describe("hidden line", () => {
     // Backspace deletes, Alt+Enter ends the answer, Ctrl+C cancels.
     expect(await readLine(typed("ab\x1b[1\x7f\r"), { echo: true })).toBe("ab");
     expect(await readLine(typed("abc\x1b\r"), { echo: true })).toBe("abc");
-    await expect(readLine(typed("ab\x1b[1;\x03"), { echo: true })).rejects.toBeInstanceOf(
-      InputCancelledError,
-    );
+    expect(await readLine(typed("ab\x1b[1;\x03"), { echo: true })).toBe(CANCELLED);
     // A whole sequence of a key that edits nothing, such as F9 (ESC [ 2 0 ~), is still left out.
     expect(await readLine(typed("ab\x1b[20~c\r"), { echo: true })).toBe("abc");
   });

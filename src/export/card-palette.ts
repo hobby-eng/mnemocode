@@ -15,6 +15,12 @@
 import { ReferenceTint } from "./business-tint.js";
 import { channelsHex, oklab, rgbChannels, rgbOfHsv } from "./color-math.js";
 import { defined } from "../core/defined.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.card-palette", {
+  "cards-print-codes-at-most-colours": (value0: string) =>
+    `Cards that print codes have at most ${value0} colours.`,
+});
 
 /** The candidate colours: a hue every HUE_STEP_DEGREES, each with these saturations and values. */
 const HUE_STEP_DEGREES = 3;
@@ -96,7 +102,7 @@ class FarthestColours {
   /** The first `count` colours of the order. */
   first(count: number): readonly string[] {
     if (count > this.#candidates.length)
-      throw new Error(`Cards that print codes have at most ${this.#candidates.length} colours.`);
+      throw ERRORS.create("cards-print-codes-at-most-colours", [`${this.#candidates.length}`]);
     while (this.#order.length < count) this.#take();
     return this.#order.slice(0, count);
   }

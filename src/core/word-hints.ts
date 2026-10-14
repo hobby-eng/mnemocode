@@ -12,6 +12,15 @@
 
 import { englishWordlist } from "./english-words.js";
 import { defined } from "./defined.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.word-hints", {
+  "word-list-holds-lower-case-letters-hyphens-only": () =>
+    "A word list holds lower-case letters and hyphens only.",
+  "word-list-alphabetical-order-without-repeats": () =>
+    "A word list must be in alphabetical order without repeats.",
+  "words-run-together-all-same-length": () => "Words run together must all have the same length.",
+});
 
 /**
  * Letters typed before the words that begin with them are listed; fewer give how many there are.
@@ -94,9 +103,9 @@ export class WordList implements WordHints {
   constructor(names: WordNames, words: readonly string[], spacing: WordSpacing = {}) {
     words.forEach((word, index) => {
       if (!WORD_CHARACTERS.test(word) || word !== word.toLowerCase())
-        throw new Error("A word list holds lower-case letters and hyphens only.");
+        throw ERRORS.create("word-list-holds-lower-case-letters-hyphens-only", []);
       if (index > 0 && defined(words[index - 1]) >= word)
-        throw new Error("A word list must be in alphabetical order without repeats.");
+        throw ERRORS.create("word-list-alphabetical-order-without-repeats", []);
     });
     this.#names = Object.freeze({ ...names });
     this.#words = Object.freeze([...words]);
@@ -104,7 +113,7 @@ export class WordList implements WordHints {
     this.#separators = spacing.separators ?? WHITE_SPACE;
     this.#runTogether = spacing.runTogether;
     if (this.#runTogether !== undefined && words.some((word) => word.length !== this.#runTogether))
-      throw new Error("Words run together must all have the same length.");
+      throw ERRORS.create("words-run-together-all-same-length", []);
   }
 
   /** The hint for the last word of `line`, the text typed so far. */

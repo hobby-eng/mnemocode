@@ -38,6 +38,21 @@ import {
   type SystemAccess,
   type SystemSandbox,
 } from "./sandbox-record.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.sandbox-linux", {
+  "setrlimit-refused-rlimit-core-0": () => "setrlimit refused RLIMIT_CORE 0",
+  "prctl-refused": () => "prctl refused",
+  "process-still-dumpable": () => "the process is still dumpable",
+  "refused-so-neither-seccomp-nor-landlock-can-used": () =>
+    "refused, so neither seccomp nor Landlock can be used",
+  "no-filter": (value0: string) => `no filter for ${value0}`,
+  "refused-every-thread": (value0: string) => `refused for every thread (${value0})`,
+  "switched-off-missing-kernel": () => "switched off or missing in this kernel",
+  "ruleset-was-refused-error": (value0: string) => `the ruleset was refused (error ${value0})`,
+  "kernel-cannot-restrict-every-thread-at-once-error": (value0: string) =>
+    `this kernel cannot restrict every thread at once (error ${value0})`,
+});
 
 /** The C library, which holds every call below. */
 const LIBC = "libc.so.6";
@@ -246,10 +261,11 @@ export class LinuxSandbox implements SystemSandbox {
     if (libc === undefined) return;
     this.#coreDumps = switchOffCoreDumps(() => {
       if (libc.call.setrlimit(RLIMIT_CORE, noLimit()) !== 0)
-        throw new Error("setrlimit refused RLIMIT_CORE 0");
-      if (libc.call.prctl(PR_SET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0) throw new Error("prctl refused");
+        throw ERRORS.create("setrlimit-refused-rlimit-core-0", []);
+      if (libc.call.prctl(PR_SET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0)
+        throw ERRORS.create("prctl-refused", []);
       if (libc.call.prctl(PR_GET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0)
-        throw new Error("the process is still dumpable");
+        throw ERRORS.create("process-still-dumpable", []);
     });
   }
 
@@ -259,7 +275,7 @@ export class LinuxSandbox implements SystemSandbox {
     this.#record.attempt("no_new_privs", () => {
       const set = libc.call.prctl(PR_SET_NO_NEW_PRIVS, 1n, 0n, 0n, 0n);
       if (set !== 0 || libc.call.prctl(PR_GET_NO_NEW_PRIVS, 0n, 0n, 0n, 0n) !== 1)
-        throw new Error("refused, so neither seccomp nor Landlock can be used");
+        throw ERRORS.create("refused-so-neither-seccomp-nor-landlock-can-used", []);
     });
     if (libc.call.prctl(PR_GET_NO_NEW_PRIVS, 0n, 0n, 0n, 0n) !== 1) return;
     this.#record.attempt("seccomp", () => this.#filter(libc, !needs.runsPrograms));
@@ -282,7 +298,7 @@ export class LinuxSandbox implements SystemSandbox {
   /** Installs the seccomp filter on every thread, then probes it. */
   #filter(libc: Libc, refuseExec: boolean): void {
     const architecture = seccompArchitecture();
-    if (architecture === undefined) throw new Error(`no filter for ${process.arch}`);
+    if (architecture === undefined) throw ERRORS.create("no-filter", [`${process.arch}`]);
     const filter = seccompFilter(architecture, refuseExec);
     const program = Buffer.alloc(FILTER_PROGRAM_BYTES);
     program.writeUInt16LE(filter.length / INSTRUCTION_BYTES, 0);
@@ -295,7 +311,9 @@ export class LinuxSandbox implements SystemSandbox {
     );
     // A positive result names a thread that could not take the filter; nothing was installed.
     if (result !== 0n)
-      throw new Error(`refused for every thread (${libc.failure(result) ?? `thread ${result}`})`);
+      throw ERRORS.create("refused-every-thread", [
+        `${libc.failure(result) ?? `thread ${result}`}`,
+      ]);
     this.#record.claim("no sockets", sockets(libc), "a socket or an io_uring was not refused");
     if (refuseExec)
       this.#record.claim("no other programs", programs(libc), "starting a program was not refused");
@@ -304,18 +322,20 @@ export class LinuxSandbox implements SystemSandbox {
   /** Refuses every change to the file system on every thread, then probes it. */
   #forbidWrites(libc: Libc): void {
     const abi = libc.syscall(LANDLOCK_CREATE_RULESET, null, 0n, BigInt(CREATE_RULESET_VERSION));
-    if (abi < 1n) throw new Error("switched off or missing in this kernel");
+    if (abi < 1n) throw ERRORS.create("switched-off-missing-kernel", []);
     const withNetwork = abi >= BigInt(NETWORK_ABI);
     const attribute = Buffer.alloc(withNetwork ? RULESET_ATTR_BYTES : RULESET_ATTR_BYTES / 2);
     attribute.writeBigUInt64LE(landlockWriteRights(Number(abi)), 0);
     if (withNetwork) attribute.writeBigUInt64LE(TCP_RIGHTS, 8);
     const ruleset = libc.syscall(LANDLOCK_CREATE_RULESET, attribute, BigInt(attribute.length), 0n);
-    if (ruleset < 0n) throw new Error(`the ruleset was refused (error ${libc.errno()})`);
+    if (ruleset < 0n) throw ERRORS.create("ruleset-was-refused-error", [`${libc.errno()}`]);
     try {
       // No rule grants any of the handled rights: they are refused everywhere.
       const result = libc.syscall(LANDLOCK_RESTRICT_SELF, ruleset, BigInt(RESTRICT_SELF_TSYNC));
       if (result !== 0n)
-        throw new Error(`this kernel cannot restrict every thread at once (error ${libc.errno()})`);
+        throw ERRORS.create("kernel-cannot-restrict-every-thread-at-once-error", [
+          `${libc.errno()}`,
+        ]);
     } finally {
       libc.call.close(Number(ruleset));
     }

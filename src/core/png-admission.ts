@@ -5,6 +5,19 @@
 import { BITS_PER_BYTE, equalBytes } from "./bits.js";
 import { InputTooLargeError, MEBIBYTE } from "./byte-units.js";
 import { CRC32_BYTES, crc32 } from "../sskr/checksum.js";
+import { ErrorCatalog } from "./error-catalog.js";
+
+const ERRORS = new ErrorCatalog("core.png-admission", {
+  "invalid-png-input": () => INVALID_PNG_INPUT,
+  "qr-png-dimensions-non-zero": () => "QR PNG dimensions must be non-zero.",
+  "qr-png-dimensions-exceed-px-megapixel-safety-limit": (value0: string, value1: string) =>
+    `QR PNG dimensions exceed the ${value0} px / ${value1}-megapixel safety limit.`,
+  "incomplete-png": () => INCOMPLETE_PNG,
+  "not-png": () => NOT_PNG,
+  "no-leading-ihdr": () => NO_LEADING_IHDR,
+  "invalid-ihdr-length": () => INVALID_IHDR_LENGTH,
+  "wide-samples": () => WIDE_SAMPLES,
+});
 
 /** The largest QR code image that a host reads; the menu checks a file's size against it. */
 export const MAX_PNG_BYTES = 16 * MEBIBYTE;
@@ -94,15 +107,16 @@ const ADAM7 = [
 ] as const;
 
 function refused(): never {
-  throw new Error(INVALID_PNG_INPUT);
+  throw ERRORS.create("invalid-png-input", []);
 }
 
 function assertDimensions(width: number, height: number): void {
-  if (width === 0 || height === 0) throw new Error("QR PNG dimensions must be non-zero.");
+  if (width === 0 || height === 0) throw ERRORS.create("qr-png-dimensions-non-zero", []);
   if (width > MAX_PNG_DIMENSION || height > MAX_PNG_DIMENSION || width * height > MAX_PNG_PIXELS)
-    throw new Error(
-      `QR PNG dimensions exceed the ${MAX_PNG_DIMENSION} px / ${MAX_PNG_PIXELS / MEGAPIXEL}-megapixel safety limit.`,
-    );
+    throw ERRORS.create("qr-png-dimensions-exceed-px-megapixel-safety-limit", [
+      `${MAX_PNG_DIMENSION}`,
+      `${MAX_PNG_PIXELS / MEGAPIXEL}`,
+    ]);
 }
 
 function rowBytes(width: number, bitsPerPixel: number): number {
@@ -139,16 +153,17 @@ export class PngAdmission {
   static read(bytes: Uint8Array): PngAdmission {
     if (bytes.byteLength > MAX_PNG_BYTES)
       throw new InputTooLargeError("QR PNG input", MAX_PNG_BYTES);
-    if (bytes.length < SIGNATURE.length) throw new Error(INCOMPLETE_PNG);
-    if (!PngAdmission.hasSignature(bytes)) throw new Error(NOT_PNG);
-    if (bytes.length < DIMENSIONS_END) throw new Error(INCOMPLETE_PNG);
+    if (bytes.length < SIGNATURE.length) throw ERRORS.create("incomplete-png", []);
+    if (!PngAdmission.hasSignature(bytes)) throw ERRORS.create("not-png", []);
+    if (bytes.length < DIMENSIONS_END) throw ERRORS.create("incomplete-png", []);
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     // The start is read before the chunk stream, so that a damaged one is refused with its reason
     // and no larger dimensions reach any later check. The type first: a first chunk of another
     // type is no IHDR, whatever its length.
     if (view.getUint32(FIRST_CHUNK_AT + CHUNK_LENGTH_BYTES) !== IHDR)
-      throw new Error(NO_LEADING_IHDR);
-    if (view.getUint32(FIRST_CHUNK_AT) !== IHDR_BYTES) throw new Error(INVALID_IHDR_LENGTH);
+      throw ERRORS.create("no-leading-ihdr", []);
+    if (view.getUint32(FIRST_CHUNK_AT) !== IHDR_BYTES)
+      throw ERRORS.create("invalid-ihdr-length", []);
     assertDimensions(
       view.getUint32(FIRST_CHUNK_AT + CHUNK_HEADER_BYTES + HEADER_FIELDS.width),
       view.getUint32(FIRST_CHUNK_AT + CHUNK_HEADER_BYTES + HEADER_FIELDS.height),
@@ -182,7 +197,7 @@ export class PngAdmission {
           ? COLOR_LAYOUTS[colorType]
           : undefined;
         if (!layout || !layout.depths.includes(depth)) refused();
-        if (depth > MAX_PNG_SAMPLE_BITS) throw new Error(WIDE_SAMPLES);
+        if (depth > MAX_PNG_SAMPLE_BITS) throw ERRORS.create("wide-samples", []);
         // Compression and filter method 0 are the only ones defined (PNG section 11.2.1).
         if (
           view.getUint8(start + HEADER_FIELDS.compression) !== 0 ||
