@@ -155,10 +155,14 @@ describe("Ctrl+C during a long search", () => {
     const watch = watchForCtrlC();
     keys.type(CTRL_Z);
     expect(kill).not.toHaveBeenCalled();
-    expect(terminal.rawModes).toEqual([true]);
+    // Raw mode is taken again at once (takeRawMode), as another process may have left it.
+    expect(terminal.rawModes).toEqual([false, true]);
     expect(watch.signal.aborted).toBe(false);
     await watch.stop();
-    expectTerminalGivenBack();
+    // Windows keeps raw mode until the process ends, so that a Ctrl+C is never lost (AUD-024).
+    expect(terminal.rawModes.at(-1)).toBe(true);
+    expect(keys.flowing).toBe(false);
+    expect(keys.listenerCount("data")).toBe(0);
   });
 
   // Windows has no job control: Ctrl+Z is dropped there, as a test of this file shows, never sent.

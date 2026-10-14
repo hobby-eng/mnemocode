@@ -274,7 +274,7 @@ export async function withRawTerminal<T>(
     wake = undefined;
     return typedAhead.length > 0;
   };
-  input.setRawMode(true);
+  takeRawMode(input);
   input.on("data", receive);
   input.on("end", end);
   input.resume();
@@ -295,16 +295,51 @@ export async function withRawTerminal<T>(
 }
 
 /**
- * Stops reading the terminal, then leaves raw mode. Node.js stops reading a paused terminal only
- * at its next tick, and libuv, asked to change the mode of a terminal it still reads, reads it
- * again in the new mode: on Windows a line-mode read (ReadConsoleW), which libuv then cancels with
- * an Enter of its own, dropping the keys that read took, such as the one pressed for the next
- * question. Raw mode is therefore left a turn of the event loop after the pause.
+ * Whether raw mode stays on between questions: on Windows, where a pseudo-console need not turn a
+ * Ctrl+C into SIGINT (watchForCtrlC), and a Ctrl+C pressed while the console is in line mode,
+ * between two questions, was lost (AUD-024). There raw mode stays on until the process ends, so
+ * that every key, Ctrl+C included, waits for the next question or watch. Elsewhere it is left
+ * after each question, so that Ctrl+C sends SIGINT while the tool computes.
+ */
+function keepsRawMode(): boolean {
+  return process.platform === "win32";
+}
+
+/** Whether this process gives the console its line mode back when it ends (keepsRawMode). */
+let restoresAtExit = false;
+
+/**
+ * Puts the terminal on standard input in raw mode. Where raw mode is kept, it is set again: libuv
+ * skips a mode it believes set, and a command of the menu, another process at the same console,
+ * gives the console its line mode back when it ends. The terminal is not read at this point, so
+ * the moment in line mode starts no read of a line.
+ */
+function takeRawMode(input: typeof process.stdin): void {
+  if (keepsRawMode()) input.setRawMode(false);
+  input.setRawMode(true);
+}
+
+/**
+ * Stops reading the terminal, then leaves raw mode, except where it is kept (keepsRawMode), which
+ * gives the console its line mode back when the process ends. Node.js stops reading a paused
+ * terminal only at its next tick, and libuv, asked to change the mode of a terminal it still reads,
+ * reads it again in the new mode: on Windows a line-mode read (ReadConsoleW), which libuv then
+ * cancels with an Enter of its own, dropping the keys that read took, such as the one pressed for
+ * the next question. Raw mode is therefore left a turn of the event loop after the pause.
  */
 async function leaveRawMode(input: typeof process.stdin): Promise<void> {
   input.pause();
   await nodeTurn();
-  input.setRawMode(false);
+  if (!keepsRawMode()) {
+    input.setRawMode(false);
+    return;
+  }
+  if (restoresAtExit) return;
+  restoresAtExit = true;
+  process.once("exit", () => {
+    // The shell that started the tool reads its next line in line mode.
+    if (process.stdin.isTTY === true) process.stdin.setRawMode(false);
+  });
 }
 
 /** A stop for a long search, which Ctrl+C sets off. */
@@ -343,7 +378,7 @@ export function watchForCtrlC(): CtrlCWatch {
     // The chunk may hold a secret typed by mistake; it is not used.
     chunk.fill(0);
   };
-  input.setRawMode(true);
+  takeRawMode(input);
   input.on("data", receive);
   input.resume();
   let watching = true;
