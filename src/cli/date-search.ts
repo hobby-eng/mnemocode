@@ -81,6 +81,7 @@ export {
   walletNeeded,
   walletReason,
 } from "../core/date-search.js";
+import { InputCancelledError } from "./terminal-keys.js";
 
 /**
  * Why the wallet is asked for before a date search in `mode`, shown with the question: the
@@ -237,11 +238,14 @@ export async function searchDates(
   // The size is said once, and then the time where it is told (SearchPlan.tell).
   terminalNotice(`Recovery search contains ${plan.size}.`);
   if (plan.tell) terminalNotice(plan.timeNotice());
-  return withDateProgress((progress) =>
+  const result = await withDateProgress((progress) =>
     withCtrlCWatch((signal) =>
       search.run(dateSearchRun(signal, request.report.progressEvery, progress)),
     ),
   );
+  // The person stopped the search with Ctrl+C.
+  if (result.stopped) throw new InputCancelledError();
+  return result;
 }
 
 /**

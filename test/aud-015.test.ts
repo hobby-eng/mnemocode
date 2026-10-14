@@ -54,7 +54,7 @@ describe("AUD-015-API001: nothing found after a stop is published", () => {
     };
   }
 
-  it("the date search rejects with the reason and calls onMatch for nothing", async () => {
+  it("the date search ends as stopped and calls onMatch for nothing", async () => {
     const controller = new AbortController();
     const published: string[] = [];
     const search = new DateSearch({
@@ -64,29 +64,29 @@ describe("AUD-015-API001: nothing found after a stop is published", () => {
       keep: 1,
       walletCheck: lateStop(controller),
     });
-    await expect(
-      search.run({ signal: controller.signal, onMatch: (match) => published.push(match.mnemonic) }),
-    ).rejects.toThrow("stopped late");
+    // A stop is a result, not an error (CORE-22): stopped, with nothing published or kept.
+    const result = await search.run({
+      signal: controller.signal,
+      onMatch: (match) => published.push(match.mnemonic),
+    });
+    expect(result).toMatchObject({ stopped: true, matchCount: 0, shown: [], kept: [] });
     expect(published).toEqual([]);
   });
 
   it("the word search and the search of marked codes return nothing after it either", async () => {
     const words = new AbortController();
-    await expect(
-      WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words").run({
-        walletCheck: lateStop(words),
-        signal: words.signal,
-      }),
-    ).rejects.toThrow("stopped late");
+    const found = await WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words").run(
+      { walletCheck: lateStop(words), signal: words.signal },
+    );
+    expect(found).toMatchObject({ stopped: true, count: 0, matched: 0, shown: [], entropies: [] });
     const codes = new AbortController();
-    await expect(
-      new MissingCodesSearch(
-        MissingCodes.read(`${"abandon ".repeat(11)}?`, "english", "direct"),
-        () => "00000000",
-      )
-        .byWallet(lateStop(codes))
-        .run({ signal: codes.signal }),
-    ).rejects.toThrow("stopped late");
+    const result = await new MissingCodesSearch(
+      MissingCodes.read(`${"abandon ".repeat(11)}?`, "english", "direct"),
+      () => "00000000",
+    )
+      .byWallet(lateStop(codes))
+      .run({ signal: codes.signal });
+    expect(result).toEqual({ kind: "stopped" });
   });
 
   it("keeps the matches of a search that nothing stops", async () => {

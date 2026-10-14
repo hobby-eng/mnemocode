@@ -79,9 +79,14 @@ describe("WordCandidateSearch.run", () => {
     const turn = vi.fn(async () => {
       stop.abort(new Error("Stopped."));
     });
-    await expect(
-      FIRST_AND_LAST.run({ signal: stop.signal, turn, onProgress: () => undefined }),
-    ).rejects.toThrow("Stopped.");
+    // A stop is a result, not an error (CORE-22): only what was checked before it counts.
+    const found = await FIRST_AND_LAST.run({
+      signal: stop.signal,
+      turn,
+      onProgress: () => undefined,
+    });
+    expect(found.stopped).toBe(true);
+    expect(found.entropies).toEqual([]);
     expect(turn).toHaveBeenCalledTimes(1);
     await expect(LAST.run({ keep: -1 })).rejects.toThrow(
       "keep must be a whole number of 0 or more.",

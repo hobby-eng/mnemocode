@@ -17,12 +17,7 @@ import { EncodedBackup } from "./encoded-backup.js";
 import { EncodedForm } from "./encoded-form.js";
 import { Masking } from "./masking.js";
 import type { MissingCodes } from "./missing-codes.js";
-import {
-  assertStillRunning,
-  startTimer,
-  type SearchProgress,
-  type SearchRun,
-} from "./search-turns.js";
+import { stillRunning, startTimer, type SearchProgress, type SearchRun } from "./search-turns.js";
 import type { DateShiftDate } from "./types.js";
 import {
   askWallet,
@@ -84,7 +79,12 @@ export type MissingCodesResult =
   /** No codes fit: `message` says what to check. */
   | { readonly kind: "none"; readonly message: string }
   /** Several sets fit, which a fingerprint leaves only by chance: the wallet tells them apart. */
-  | { readonly kind: "several"; readonly count: number; readonly message: string };
+  | { readonly kind: "several"; readonly count: number; readonly message: string }
+  /** The host stopped the search (SearchRun.signal): nothing found is told (CORE-22). */
+  | { readonly kind: "stopped" };
+
+/** The result of a way that the host stopped. */
+const STOPPED: MissingCodesResult = { kind: "stopped" };
 
 /**
  * A search of one way before it starts: what is searched, such as "128 candidates" or "128
@@ -139,12 +139,13 @@ function secondsToDecode(backup: EncodedBackup, dates: readonly DateShiftDate[])
   return elapsed();
 }
 
-/** The one set found, none, or several, as a result. */
+/** The one set found, none, or several, as a result; or that the host stopped the search. */
 function foundOne(
-  { found, passed }: SearchedCodes,
+  { found, passed, stopped }: SearchedCodes,
   nothing: string,
   dates: readonly DateShiftDate[] | undefined,
 ): MissingCodesResult {
+  if (stopped) return STOPPED;
   if (passed === 0) return { kind: "none", message: nothing };
   if (passed === 1) return { kind: "found", backup: defined(found[0]), dates };
   // Counted by every set that passed, as the progress counts them, not by those kept.
@@ -267,10 +268,11 @@ export class MissingCodesSearch {
   }
 }
 
-/** What a search of the codes kept, and how many sets of codes passed in all. */
+/** What a search of the codes kept, how many sets of codes passed in all, and whether it stopped. */
 interface SearchedCodes {
   readonly found: readonly EncodedBackup[];
   readonly passed: number;
+  readonly stopped: boolean;
 }
 
 /** The search of `codes` with `check`, with the host's progress and signal. */
@@ -289,8 +291,11 @@ async function searched(
         : ({ checked, found }) =>
             defined(run.onProgress)({ checked, total: codes.expected, found }),
   });
-  assertStillRunning(run);
-  return { found: result.found, passed: result.passed };
+  return {
+    found: result.found,
+    passed: result.passed,
+    stopped: result.stopped || !stillRunning(run),
+  };
 }
 
 /** The way of the encoded fingerprint, which needs no dates. */
@@ -432,6 +437,8 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
       this.#codes,
       async (indexes) => {
         const result = await this.#searchOf(indexes).run({ signal: run.signal, turn: run.turn });
+        // A stop is heard by the search of the codes too, at its next turn.
+        if (result.stopped) return false;
         const match = result.shown[0];
         if (match === undefined) return false;
         matched += 1;
@@ -476,12 +483,13 @@ class ListWay implements MissingCodesWaySearch {
   }
 
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
-    const { found } = await searched(this.#codes, () => true, run);
+    const { found, stopped } = await searched(this.#codes, () => true, run);
+    if (stopped) return STOPPED;
     const rows: MissingCodesRow[] = [];
     for (const backup of found)
       for (const phrase of phrasesOf(backup, this.#dates)) {
         const fingerprint = await this.#fingerprintOf(phrase);
-        assertStillRunning(run);
+        if (!stillRunning(run)) return STOPPED;
         rows.push({
           codes: backup.text(),
           phrase,
@@ -489,7 +497,6 @@ class ListWay implements MissingCodesWaySearch {
         });
       }
     // The host's fingerprints are waited for after the search: a stop meanwhile lists nothing.
-    assertStillRunning(run);
-    return { kind: "list", rows };
+    return stillRunning(run) ? { kind: "list", rows } : STOPPED;
   }
 }

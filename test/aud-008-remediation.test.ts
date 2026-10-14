@@ -254,7 +254,8 @@ describe("AUD-008-API006: every share layout that is read whole is also repaired
       [untaggedWords, marked],
       [marked, untaggedWords],
     ]) {
-      const found = await (await planJointRepair(typed, { platform: nodeSharePlatform })).search();
+      const found = (await (await planJointRepair(typed, { platform: nodeSharePlatform })).search())
+        .sets;
       expect(found.map((set) => set.mnemonic)).toEqual([expected]);
     }
   });

@@ -72,7 +72,7 @@ describe("the share parts with the host's platform", () => {
     );
     const platform = hostPlatform();
     const plan = await planJointRepair([FIRST, marked(5)], { platform });
-    expect((await plan.search()).map((one) => one.mnemonic)).toEqual([PHRASE]);
+    expect((await plan.search()).sets.map((one) => one.mnemonic)).toEqual([PHRASE]);
     expect(platform.calls.hmac).toBeGreaterThan(0);
   });
 
@@ -100,7 +100,7 @@ describe("the share parts with the host's platform", () => {
     const repair = new JointRepair(platform);
     const plan = await repair.plan([FIRST, marked(5), marked(9)]);
     expect(plan.assessment.verdict).not.toBe("no-fit");
-    const found = await plan.search();
+    const found = (await plan.search()).sets;
     expect(found.map((one) => one.mnemonic)).toEqual([PHRASE]);
     const searched = platform.calls.hmac;
     expect(searched).toBeGreaterThan(0);

@@ -180,8 +180,9 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     );
     const stop = new AbortController();
     stop.abort();
-    await expect(
-      search.byEncodedFingerprint("00000000").run({ signal: stop.signal }),
-    ).rejects.toThrow();
+    // A stop is a result, not an error (CORE-22).
+    expect(await search.byEncodedFingerprint("00000000").run({ signal: stop.signal })).toEqual({
+      kind: "stopped",
+    });
   });
 });

@@ -57,6 +57,7 @@ import { counting } from "../core/search-plan.js";
 import { rowsOf, listQuestionRows } from "./terminal-choice.js";
 import { closingRows } from "./private-screen.js";
 import { defined } from "../core/defined.js";
+import { InputCancelledError } from "./terminal-keys.js";
 
 /** The table's columns for the candidates of `search`, and a row maker. */
 function tableOf(search: WordCandidateSearch): {
@@ -249,6 +250,8 @@ async function collect(phrase: PhraseSearch, context: SearchContext): Promise<Fo
       turn: nodeTurn,
     }),
   ).finally(() => progress.end());
+  // The person stopped the search with Ctrl+C.
+  if (result.stopped) throw new InputCancelledError();
   const rows = result.shown.map(({ candidate, match }): Row => ({
     columns: table.row(candidate),
     mnemonic: candidate.phrase,

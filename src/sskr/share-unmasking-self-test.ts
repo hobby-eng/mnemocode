@@ -57,8 +57,10 @@ async function unmasked(
   unmasking: ShareUnmasking,
   sets: readonly RepairedSet[] = [MASKED_SET],
 ): Promise<string> {
+  // Unmasked without a signal: nothing stops it.
   const result = await unmasking.unmask(sets);
   if (result.kind === "dates") return result.message;
+  if (result.kind === "stopped") return "stopped";
   return result.phrases
     .map((phrase) => [phrase.mnemonic, phrase.dates].filter(Boolean).join(" at "))
     .join("; ");
@@ -127,5 +129,6 @@ async function repairedMaskedShares(platform: SharePlatform): Promise<RepairedSe
     return colors.join(" ");
   });
   const plan = await new JointRepair(platform).plan(marked);
-  return searchOnce(plan);
+  // Searched without a signal: nothing stops it.
+  return (await searchOnce(plan)).sets;
 }

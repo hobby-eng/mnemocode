@@ -125,7 +125,8 @@ export async function checkShareRepair(platform: SharePlatform): Promise<void> {
     marked(SET_COLORS[1], "#E8135A", "#E81?5A"),
   ];
   const plan = await repair.plan(records);
-  const found = await searchOnce(plan);
+  // Searched without a signal: nothing stops it.
+  const { sets: found } = await searchOnce(plan);
   expectSame(found.length, 1, "Shares repaired together: phrases");
   expectSame(defined(found[0]).mnemonic, SET_PHRASE, "Shares repaired together: phrase");
   expectSame(

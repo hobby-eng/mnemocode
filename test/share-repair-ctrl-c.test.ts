@@ -18,6 +18,7 @@ const terminal = vi.hoisted(() => ({
   modesAtAssessments: [] as boolean[][],
   signals: [] as (AbortSignal | undefined)[],
   assessmentErrors: [] as unknown[],
+  assessmentVerdicts: [] as string[],
   atAssessment: undefined as (() => void) | undefined,
   passSignal: true,
 }));
@@ -43,7 +44,10 @@ vi.mock("../src/sskr/joint-repair.js", async (importOriginal) => {
       terminal.modesAtAssessments.push([...terminal.rawModes]);
       terminal.atAssessment?.();
       const plan = super.plan(records, terminal.passSignal ? options : {});
-      plan.catch((error: unknown) => terminal.assessmentErrors.push(error));
+      plan.then(
+        (made) => terminal.assessmentVerdicts.push(made.assessment.verdict),
+        (error: unknown) => terminal.assessmentErrors.push(error),
+      );
       return plan;
     }
   }
@@ -120,6 +124,7 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     terminal.modesAtAssessments = [];
     terminal.signals = [];
     terminal.assessmentErrors = [];
+    terminal.assessmentVerdicts = [];
     terminal.atAssessment = undefined;
     terminal.passSignal = true;
     vi.spyOn(process, "stdin", "get").mockReturnValue(keys as unknown as typeof process.stdin);
@@ -147,8 +152,9 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     expect(terminal.modesAtAssessments).toEqual([[true]]);
     expect(terminal.signals).toHaveLength(1);
     expect(terminal.signals[0]?.aborted).toBe(true);
-    expect(terminal.assessmentErrors).toHaveLength(1);
-    expect(terminal.assessmentErrors[0]).toBeInstanceOf(InputCancelledError);
+    // A stop is no failure of the assessment (CORE-22): it ends with the verdict "stopped".
+    expect(terminal.assessmentErrors).toEqual([]);
+    expect(terminal.assessmentVerdicts).toEqual(["stopped"]);
     expect(terminal.rawModes).toEqual([true, false]);
     expectTerminalGivenBack();
     // Nothing is shown or saved.

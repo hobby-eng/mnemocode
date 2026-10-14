@@ -35,7 +35,7 @@ describe("Joint repair of the shares of one set", () => {
         );
         const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
         expect(plan.assessment.verdict, `${vector.name} ${format}`).toBe("determined");
-        const found = await plan.search();
+        const found = (await plan.search()).sets;
         expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
         expect(found[0]!.shares.map((share) => share.ur)).toEqual(vector.shares);
         expect(found[0]!.shares.every((share) => share.format === format)).toBe(true);
@@ -56,7 +56,7 @@ describe("Joint repair of the shares of one set", () => {
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
     expect(plan.assessment.shares.every((share) => share.openAlone > 0)).toBe(true);
     expect(plan.assessment.openBits).toBe(0);
-    const [set] = await plan.search();
+    const [set] = (await plan.search()).sets;
     expect(set!.mnemonic).toBe(mnemonicOf(vector));
     expect(set!.shares.map((share) => share.ur)).toEqual(vector.shares);
   });
@@ -70,12 +70,14 @@ describe("Joint repair of the shares of one set", () => {
       [1, 2, 0],
       [2, 1, 0],
     ]) {
-      const found = await (
-        await planJointRepair(
-          order.map((index) => typed[index]!),
-          { platform: nodeSharePlatform },
-        )
-      ).search();
+      const found = (
+        await (
+          await planJointRepair(
+            order.map((index) => typed[index]!),
+            { platform: nodeSharePlatform },
+          )
+        ).search()
+      ).sets;
       expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
     }
   });
@@ -92,7 +94,7 @@ describe("Joint repair of the shares of one set", () => {
     ];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
     expect(plan.assessment.verdict).toBe("determined");
-    const [set] = await plan.search();
+    const [set] = (await plan.search()).sets;
     expect(set!.shares[2]!.ur).toBe(vector.shares[2]);
     expect(set!.unsettled).toEqual([]);
   });
@@ -109,7 +111,8 @@ describe("Joint repair of the shares of one set", () => {
         parts.map((_, place) => place),
       ),
     ];
-    const found = await (await planJointRepair(typed, { platform: nodeSharePlatform })).search();
+    const found = (await (await planJointRepair(typed, { platform: nodeSharePlatform })).search())
+      .sets;
     expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
     // Its member number cannot be read, so the share itself is not settled.
     expect(found[0]!.unsettled.length).toBeGreaterThan(0);
@@ -125,7 +128,8 @@ describe("Joint repair of the shares of one set", () => {
       markUnits(vector.shares[0]!, "colors", [5, 6, 7]),
       markUnits(vector.shares[1]!, "colors", [8]),
     ];
-    const found = await (await planJointRepair(typed, { platform: nodeSharePlatform })).search();
+    const found = (await (await planJointRepair(typed, { platform: nodeSharePlatform })).search())
+      .sets;
     expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
     expect(found[0]!.shares[0]!.ur).toBe(vector.shares[0]);
     expect(found[0]!.shares[1]!.ur).toBe(vector.shares[0]);
@@ -139,11 +143,11 @@ describe("Joint repair of the shares of one set", () => {
       other[2]!,
     ];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
-    expect(await searchOnce(plan)).toEqual([]);
+    expect((await searchOnce(plan)).sets).toEqual([]);
     // Without that share the same marks restore the phrase.
-    const kept = await searchOnce(
-      await planJointRepair(typed.slice(0, 2), { platform: nodeSharePlatform }),
-    );
+    const kept = (
+      await searchOnce(await planJointRepair(typed.slice(0, 2), { platform: nodeSharePlatform }))
+    ).sets;
     expect(kept.map((set) => set.mnemonic)).toEqual([publicMnemonic]);
   });
 
@@ -155,7 +159,7 @@ describe("Joint repair of the shares of one set", () => {
       markUnits(mine[1]!, "colors", [5]),
     ];
     expect(await searchOnce(await planJointRepair(typed, { platform: nodeSharePlatform }))).toEqual(
-      [],
+      { sets: [], stopped: false },
     );
   });
 
@@ -165,7 +169,7 @@ describe("Joint repair of the shares of one set", () => {
     const plan = await planJointRepair(all, { platform: nodeSharePlatform });
     expect(plan.assessment.threshold).toBe(3);
     expect(plan.assessment.verdict).toBe("determined");
-    expect((await plan.search()).map((set) => set.mnemonic)).toEqual([publicMnemonic]);
+    expect((await plan.search()).sets.map((set) => set.mnemonic)).toEqual([publicMnemonic]);
     // Three shares, one of them with many marks: the digest has to decide, and help is named.
     const three = [
       shares[0]!,
@@ -178,7 +182,7 @@ describe("Joint repair of the shares of one set", () => {
     expect(open.assessment.verdict).toBe("search");
     expect(open.assessment.moreShares).toBe(1);
     expect(open.assessment.helps.length).toBeGreaterThan(0);
-    const found = await open.search();
+    const found = (await open.search()).sets;
     expect(found.map((set) => set.mnemonic)).toContain(publicMnemonic);
   });
 
@@ -194,7 +198,7 @@ describe("Joint repair of the shares of one set", () => {
       markUnits(vector.shares[2]!, "indexes", [8]),
     ];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
-    const found = await plan.search();
+    const found = (await plan.search()).sets;
     expect(found).toEqual([]);
     expect(plan.assessment.verdict).toMatch(/no-fit|determined|search/u);
   });
@@ -244,7 +248,7 @@ describe("Joint repair of the shares of one set", () => {
     );
     expect(plan.assessment.combinations).toBeGreaterThan(2 ** 40);
     expect(plan.assessment.verdict).toBe("too-uncertain");
-    expect(await plan.search()).toEqual([]);
+    expect((await plan.search()).sets).toEqual([]);
   });
 
   it("stops when the host asks", async () => {
@@ -255,11 +259,12 @@ describe("Joint repair of the shares of one set", () => {
     );
     expect(plan.assessment.verdict).toBe("search");
     const stop = new AbortController();
-    const search = plan.search({
+    const found = await plan.search({
       onProgress: () => stop.abort(new Error("stopped")),
       signal: stop.signal,
     });
-    await expect(search).rejects.toThrow("stopped");
+    // A stop is a result, not an error (CORE-22).
+    expect(found.stopped).toBe(true);
   });
 });
 
@@ -291,7 +296,7 @@ describe("Joint repair with digits read in part", () => {
     ];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
     expect(plan.assessment.openBits).toBe(0);
-    const found = await plan.search();
+    const found = (await plan.search()).sets;
     expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
     expect(found[0]!.shares.map((share) => share.ur)).toEqual(vector.shares.slice(0, 2));
     const whole = await planJointRepair(
@@ -311,7 +316,7 @@ describe("Joint repair with digits read in part", () => {
     ];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
     expect(plan.assessment.verdict).toBe("determined");
-    const found = await plan.search();
+    const found = (await plan.search()).sets;
     expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
     expect(found[0]!.shares[0]!.filled.map((element) => element.position)).toEqual([
       5, 8, 10, 13, 16,
@@ -368,6 +373,7 @@ describe("Joint repair with digits read in part", () => {
     );
     const planned = planJointRepair(typed, { platform: nodeSharePlatform, signal: stop.signal });
     stop.abort(new Error("stopped"));
-    await expect(planned).rejects.toThrow("stopped");
+    // A stop is a result, not an error (CORE-22): the assessment plans nothing.
+    expect((await planned).assessment.verdict).toBe("stopped");
   });
 });

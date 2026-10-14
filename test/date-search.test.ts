@@ -160,7 +160,15 @@ describe("the date search", () => {
 
   it("says that no candidate matched the wallet when there were checksum-valid ones", () => {
     const evidence = { kind: "master-fingerprint", value: "00000000", network: "mainnet" } as const;
-    const empty = { combinations: 10, checksumValid: 10, matchCount: 0, shown: [], kept: [] };
+    const empty = {
+      combinations: 10,
+      checksumValid: 10,
+      matchCount: 0,
+      shown: [],
+      kept: [],
+      checked: 10,
+      stopped: false,
+    };
     reportDateMatches(empty, { mode: "seedshift", evidence, maxResults: 100 });
     reportDateMatches({ ...empty, checksumValid: 0 }, { mode: "seedshift-legacy", maxResults: 1 });
     expect(lines).toEqual([

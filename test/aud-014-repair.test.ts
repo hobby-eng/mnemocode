@@ -35,7 +35,7 @@ function marked(codes: readonly number[], colors: readonly number[]): string {
 async function jointPhrases(damaged: string): Promise<string[]> {
   const plan = await planJointRepair([first, second, damaged], { platform: nodeSharePlatform });
   expect(plan.assessment.verdict).not.toBe("no-fit");
-  return (await searchOnce(plan)).map((set) => set.mnemonic);
+  return (await searchOnce(plan)).sets.map((set) => set.mnemonic);
 }
 
 describe("AUD-014-FUN002: Color Unicode marks of one code and of a whole color together", () => {

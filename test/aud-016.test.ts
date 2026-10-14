@@ -96,7 +96,7 @@ describe("AUD-015-API001 (AUD-016): a list of codes is not handed out after a st
   /** The codes of a 24-word phrase without its last word: a few candidates, which a list holds. */
   const codes = () => MissingCodes.read(`${"abandon ".repeat(23)}?`, "english", "direct");
 
-  it("rejects with the reason when the host stops while it fingerprints", async () => {
+  it("ends as stopped, listing nothing, when the host stops while it fingerprints", async () => {
     const controller = new AbortController();
     let calls = 0;
     const search = new MissingCodesSearch(codes(), async () => {
@@ -104,9 +104,7 @@ describe("AUD-015-API001 (AUD-016): a list of codes is not handed out after a st
       controller.abort(new Error("stopped while fingerprinting"));
       return "00000000";
     });
-    await expect(search.listed([]).run({ signal: controller.signal })).rejects.toThrow(
-      "stopped while fingerprinting",
-    );
+    expect(await search.listed([]).run({ signal: controller.signal })).toEqual({ kind: "stopped" });
     expect(calls).toBe(1);
   });
 

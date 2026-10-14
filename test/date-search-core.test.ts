@@ -286,6 +286,8 @@ describe("DateSearch", () => {
         },
       ],
       kept: [TEST_PHRASE],
+      checked: 10,
+      stopped: false,
     });
     expect(matches).toEqual(result.shown);
     expect(progress.map((step) => step.checked)).toEqual([4, 8, 10]);
@@ -351,7 +353,13 @@ describe("DateSearch", () => {
     });
     const stopped = new AbortController();
     stopped.abort(new Error("stopped before"));
-    await expect(search.run({ signal: stopped.signal })).rejects.toThrow("stopped before");
+    // A stop is a result, not an error (CORE-22): nothing checked before it.
+    expect(await search.run({ signal: stopped.signal })).toMatchObject({
+      stopped: true,
+      checked: 0,
+      matchCount: 0,
+      shown: [],
+    });
 
     // Every combination takes longer than a turn's time here, so the search turns before each.
     let now = 0;
@@ -359,17 +367,16 @@ describe("DateSearch", () => {
     const controller = new AbortController();
     let turns = 0;
     const checked: number[] = [];
-    await expect(
-      search.run({
-        signal: controller.signal,
-        progressEvery: 1,
-        onProgress: (step) => checked.push(step.checked),
-        turn: async () => {
-          turns += 1;
-          if (turns === 3) controller.abort(new Error("stopped by the host"));
-        },
-      }),
-    ).rejects.toThrow("stopped by the host");
+    const result = await search.run({
+      signal: controller.signal,
+      progressEvery: 1,
+      onProgress: (step) => checked.push(step.checked),
+      turn: async () => {
+        turns += 1;
+        if (turns === 3) controller.abort(new Error("stopped by the host"));
+      },
+    });
+    expect(result).toMatchObject({ stopped: true, checked: 2 });
     expect(checked).toEqual([1, 2]);
   });
 });

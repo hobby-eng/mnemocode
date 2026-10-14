@@ -196,6 +196,8 @@ export interface CodesCheckResult {
   readonly passed: number;
   /** How many candidates were checked. */
   readonly count: number;
+  /** Whether the host stopped the search: then only the candidates checked before it count. */
+  readonly stopped: boolean;
 }
 
 /**
@@ -318,13 +320,19 @@ export class MissingCodes extends Redacted {
     let passed = 0;
     const turns = SearchTurns.of(run);
     for (const codes of this.candidates()) {
+      if (turns.stopped) return { found, passed, count, stopped: true };
+      const passes = await run.check(codes);
+      // An answer that came after a stop is not counted (AUD-015-API001).
+      if (turns.stopped) return { found, passed, count, stopped: true };
       count += 1;
-      if (await run.check(codes)) {
+      if (passes) {
         passed += 1;
         if (found.length < maxFound) found.push(EncodedBackup.of(codes, this.#format, this.mode));
       }
-      if (await turns.due()) run.onProgress?.({ checked: count, found: passed });
+      const turn = await turns.due();
+      if (turn === "stopped") return { found, passed, count, stopped: true };
+      if (turn === "turned") run.onProgress?.({ checked: count, found: passed });
     }
-    return { found, passed, count };
+    return { found, passed, count, stopped: false };
   }
 }

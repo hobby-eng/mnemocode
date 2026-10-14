@@ -60,7 +60,9 @@ export type Unmasked =
       /** Every phrase for a candidate list, also the matches of a search beyond those shown. */
       readonly listed: readonly string[];
     }
-  | { readonly kind: "dates"; readonly message: string };
+  | { readonly kind: "dates"; readonly message: string }
+  /** The host stopped the date search (DateSearchRun.signal): no phrase is told (CORE-22). */
+  | { readonly kind: "stopped" };
 
 /**
  * A phrase length for the wallet checks of one date combination: MnemoCode Seedshift gives one
@@ -167,6 +169,7 @@ export class ShareUnmasking extends Redacted {
         maxShown: this.#maxShown,
         keep,
       }).run(run);
+      if (result.stopped) return { kind: "stopped" };
       for (const match of result.shown)
         phrases.push({
           set,

@@ -352,29 +352,29 @@ describe("AUD-014 observations: a stop during the host's answer, and the checksu
       keep: 1,
       walletCheck: stoppingCheck(controller),
     });
-    await expect(
-      search.run({ signal: controller.signal, onMatch: (match) => published.push(match.mnemonic) }),
-    ).rejects.toThrow("stopped while answering");
+    // A stop is a result, not an error (CORE-22): stopped, with nothing published or kept.
+    const result = await search.run({
+      signal: controller.signal,
+      onMatch: (match) => published.push(match.mnemonic),
+    });
+    expect(result).toMatchObject({ stopped: true, matchCount: 0, shown: [], kept: [] });
     expect(published).toEqual([]);
   });
 
   it("stops the word search and the search of marked codes the same way", async () => {
     const words = new AbortController();
-    await expect(
-      WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words").run({
-        walletCheck: stoppingCheck(words),
-        signal: words.signal,
-      }),
-    ).rejects.toThrow("stopped while answering");
+    const found = await WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words").run(
+      { walletCheck: stoppingCheck(words), signal: words.signal },
+    );
+    expect(found).toMatchObject({ stopped: true, count: 0, matched: 0, shown: [], entropies: [] });
     const codes = new AbortController();
-    await expect(
-      new MissingCodesSearch(
-        MissingCodes.read(`${"abandon ".repeat(11)}?`, "english", "direct"),
-        () => "00000000",
-      )
-        .byWallet(stoppingCheck(codes))
-        .run({ signal: codes.signal }),
-    ).rejects.toThrow("stopped while answering");
+    const result = await new MissingCodesSearch(
+      MissingCodes.read(`${"abandon ".repeat(11)}?`, "english", "direct"),
+      () => "00000000",
+    )
+      .byWallet(stoppingCheck(codes))
+      .run({ signal: codes.signal });
+    expect(result).toEqual({ kind: "stopped" });
   });
 
   it("refuses an index that names no word instead of answering for its checksum", () => {

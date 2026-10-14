@@ -112,7 +112,9 @@ export type SharesRead =
       /** The warning that a share took no part in the check of the set, if one did not. */
       readonly unchecked?: string | undefined;
     }
-  | MarkedShares;
+  | MarkedShares
+  /** The host stopped the assessment of marked shares (CORE-22): nothing is planned. */
+  | { readonly kind: "stopped"; readonly lines: readonly ReportLine[] };
 
 /** Complete shares, restored. */
 export type CompleteShares = Extract<SharesRead, { kind: "complete" }>;
@@ -136,7 +138,9 @@ export function releaseRead(read: SharesRead): void {
 }
 
 /** The words of the phrase that `read` holds, or undefined while an assessment does not tell. */
-export function wordCountOf(read: Exclude<SharesRead, { kind: "trouble" }>): number | undefined {
+export function wordCountOf(
+  read: Extract<SharesRead, { kind: "complete" | "marked" }>,
+): number | undefined {
   const secretBytes =
     read.kind === "complete" ? read.secretBytes : read.plan.assessment.secretBytes;
   return secretBytes === undefined ? undefined : ShareSet.wordCountOf(secretBytes);
@@ -184,7 +188,7 @@ const COMPLETE_READ_PHRASES = 1;
  * such as after another wallet, is asked anew with their count (dateSearchDecision).
  */
 export function searchDecision(
-  read: Exclude<SharesRead, { kind: "trouble" }>,
+  read: Extract<SharesRead, { kind: "complete" | "marked" }>,
   work: DateWork | undefined,
   limits: SearchLimits = {},
 ): SearchDecision {
@@ -238,7 +242,9 @@ export type RestoredPhrases =
   /** The dates are more than a set's phrase takes. */
   | { readonly kind: "dates"; readonly message: string }
   /** No phrase is the wallet's (ShareSet.walletMismatch). */
-  | { readonly kind: "mismatch"; readonly message: string };
+  | { readonly kind: "mismatch"; readonly message: string }
+  /** The host stopped the date search: no phrase is told (CORE-22). */
+  | { readonly kind: "stopped" };
 
 /** A restore or a repair that ends without a result: a trouble to say, or a question first. */
 export type ShareStop =
@@ -251,7 +257,9 @@ export type ShareStop =
       readonly kind: "question";
       readonly question: string;
       readonly lines: readonly ReportLine[];
-    };
+    }
+  /** The host stopped the assessment or a search (CORE-22): nothing is told. */
+  | { readonly kind: "stopped"; readonly lines: readonly ReportLine[] };
 
 /** Too few shares to restore a phrase: a repair then writes each share again on its own. */
 export interface FewShares {
@@ -272,7 +280,9 @@ interface FoundSets {
 /** What a search of marked shares finds (ShareRestore.search): its sets, or why there are none. */
 export type SearchedSets =
   | { readonly kind: "sets"; readonly sets: RepairedSet[]; readonly notes: readonly string[] }
-  | { readonly kind: "none"; readonly message: string };
+  | { readonly kind: "none"; readonly message: string }
+  /** The host stopped the search (RestoreRun.signal): no set is told (CORE-22). */
+  | { readonly kind: "stopped" };
 
 /**
  * What a restore of shares ends with: stopped, too few shares, or the phrases found, each with its
@@ -410,6 +420,7 @@ export class ShareRestore {
     // here (AUD-012-SEC004). A plan handed out is wiped by its search or by releaseRead.
     let handedOut = false;
     try {
+      if (plan.assessment.verdict === "stopped") return { kind: "stopped", lines: [] };
       const report = new RepairReport(plan.assessment, this.#repair.triesPerSecond(), places);
       const lines = report.lines();
       const trouble = input.assessmentTrouble(plan.assessment, places);
@@ -426,12 +437,13 @@ export class ShareRestore {
    * check; none fits when they are empty.
    */
   async search(marked: MarkedShares, run: RestoreRun = {}): Promise<SearchedSets> {
-    const sets = await searchOnce(marked.plan, {
+    const { sets, stopped } = await searchOnce(marked.plan, {
       signal: run.signal,
       turn: run.turn,
       // Without a wallet yet, every phrase found is one that matched.
       onProgress: (progress) => run.onProgress?.({ ...progress, matched: progress.found }),
     });
+    if (stopped) return { kind: "stopped" };
     if (sets.length === 0) return { kind: "none", message: NO_PHRASE_FITS };
     const notes = sets.flatMap((set) => ShareSet.of(set).uncheckedNote(marked.places) ?? []);
     return { kind: "sets", sets, notes };
@@ -462,6 +474,7 @@ export class ShareRestore {
       signal: request.signal,
       turn: request.turn,
     });
+    if (restored.kind === "stopped") return { kind: "stopped", lines: found.lines };
     if (restored.kind !== "phrases")
       return { kind: "trouble", message: restored.message, lines: found.lines };
     const { sets } = restored;
@@ -488,7 +501,7 @@ export class ShareRestore {
     run?: DateSearchRun,
   ): Promise<RestoredPhrases> {
     const unmasked = await unmasking.unmask(sets, run);
-    if (unmasked.kind === "dates") return unmasked;
+    if (unmasked.kind === "dates" || unmasked.kind === "stopped") return unmasked;
     if (unmasked.phrases.length === 0)
       return {
         kind: "mismatch",
@@ -597,6 +610,7 @@ export class ShareRestore {
   ): Promise<ShareStop | FewShares | FoundSets> {
     const { dates, confirmed } = request;
     const read = await this.read(request.input, signalWatch(request.signal), request.turn);
+    if (read.kind === "stopped") return read;
     if (read.kind === "trouble")
       return {
         kind: read.trouble.kind === "few" ? "few" : "trouble",
@@ -626,6 +640,7 @@ export class ShareRestore {
         notes: [...(read.unchecked === undefined ? [] : [read.unchecked]), ...notice],
       };
     const found = await this.search(read, request);
+    if (found.kind === "stopped") return { kind: "stopped", lines: read.lines };
     if (found.kind === "none")
       return { kind: "trouble", message: found.message, lines: read.lines };
     return {

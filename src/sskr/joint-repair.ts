@@ -31,6 +31,7 @@ import {
   startTimer,
   type SearchProgress,
   type SearchRun,
+  type TurnState,
 } from "../core/search-turns.js";
 import {
   everyPick,
@@ -49,7 +50,12 @@ import { SHARE_METADATA_BYTES } from "./share-layout.js";
 import { afterPlace } from "../core/prose.js";
 import { placeOf } from "../core/places.js";
 import { defined } from "../core/defined.js";
-import { type JointAssessment, type RepairedSet, type ShareAssessment } from "./joint-results.js";
+import {
+  type JointAssessment,
+  type RepairedSet,
+  type RepairSearch,
+  type ShareAssessment,
+} from "./joint-results.js";
 import {
   AssessmentSecrets,
   Branch,
@@ -74,6 +80,7 @@ export type {
   MarkedElement,
   RepairedSet,
   RepairedShares,
+  RepairSearch,
   ShareAssessment,
 } from "./joint-results.js";
 export { DIGEST_BITS } from "./joint-solve.js";
@@ -115,14 +122,17 @@ export interface SearchOptions extends SearchRun {
  */
 export interface JointPlan {
   readonly assessment: JointAssessment;
-  /** Tries every open combination; resolves with every phrase that passes, possibly none. */
-  readonly search: (options?: SearchOptions) => Promise<RepairedSet[]>;
+  /**
+   * Tries every open combination; resolves with every phrase that passes, possibly none, and
+   * whether the host stopped the search.
+   */
+  readonly search: (options?: SearchOptions) => Promise<RepairSearch>;
   /** Wipes what the search keeps of the shares' secret; the plan searches no more after it. */
   readonly wipe: () => void;
 }
 
 /** The phrases of `plan`'s one search; what the plan kept of the secret is wiped after it. */
-export async function searchOnce(plan: JointPlan, options?: SearchOptions): Promise<RepairedSet[]> {
+export async function searchOnce(plan: JointPlan, options?: SearchOptions): Promise<RepairSearch> {
   try {
     return await plan.search(options);
   } finally {
@@ -189,10 +199,16 @@ function refusal(
       reason,
       ...(unfit === undefined ? {} : { unfit }),
     },
-    search: async () => [],
+    search: async () => NOTHING_SEARCHED,
     wipe: () => undefined,
   };
 }
+
+/** The search of a plan that refuses: nothing to try. */
+const NOTHING_SEARCHED: RepairSearch = { sets: [], stopped: false };
+
+/** Why an assessment that the host stopped plans nothing (verdict "stopped"). */
+const STOPPED_REASON = "The assessment was stopped.";
 
 /** The value of a field when every branch agrees on it. */
 function agreed<T>(branches: readonly Branch[], field: (branch: Branch) => T): T | undefined {
@@ -334,7 +350,8 @@ async function refined(
   if (chosen.length === 0) return undefined;
   const expanded: ReadingSpace[][] = [];
   for (const [share, spaces] of spacesOf.entries()) {
-    await turns.take();
+    // The caller sees a stop in `turns`.
+    if ((await turns.take()) === "stopped") return undefined;
     const places = chosen.filter((unit) => unit.share === share).map((unit) => unit.place);
     const tried = spaces.flatMap((space) =>
       space.reading
@@ -374,7 +391,7 @@ export async function planJointRepair(
 ): Promise<JointPlan> {
   // A host's platform is checked before its signal: without it no search could follow.
   checkedPlatform(options?.platform);
-  // Refuses a signal that is already aborted before anything else.
+  // A signal that is already aborted is heard at the first turn, before any share is read.
   const turns = SearchTurns.of(options);
   // The bound of every set of shares, before any record is read (AUD-012-API002).
   assertShareCount(records.length);
@@ -392,8 +409,8 @@ export async function planJointRepair(
     const spacesOf: ReadingSpace[][] = [];
     for (const [index, text] of texts.entries()) {
       // A turn between the shares, however quick: reading one is quick, but many add up, and a
-      // stop typed meanwhile is heard (SearchTurns.take).
-      await turns.take();
+      // stop typed meanwhile is heard (SearchTurns.take): the assessment then plans nothing.
+      if ((await turns.take()) === "stopped") return refusal([], "stopped", STOPPED_REASON);
       const spaces = readingsOf(placeOf(places, index + 1), text)
         .map((reading) => reading.space())
         .filter((space): space is ReadingSpace => space !== undefined);
@@ -443,10 +460,10 @@ async function assessReadings(
     plan: refusal(shares, verdict, reason, unfit),
     kept: [],
   });
-  const plan = async (branches: readonly Branch[]): Promise<Assessed> => ({
-    plan: await planOf(shares, branches, platform, turns),
-    kept: branches,
-  });
+  const plan = async (branches: readonly Branch[]): Promise<Assessed> => {
+    const made = await planOf(shares, branches, platform, turns);
+    return turns.stopped ? refuse("stopped", STOPPED_REASON) : { plan: made, kept: branches };
+  };
   const unfit = spacesOf.findIndex((spaces) => spaces.length === 0);
   if (unfit >= 0) {
     const message = unreadableShareMessage(
@@ -462,12 +479,15 @@ async function assessReadings(
       "These shares belong to a set of several groups; only sets of one group are repaired.",
     );
   const solved = await solveReadings(spacesOf, turns, secrets);
+  // A stop of the host while the readings were solved: what was solved is not planned.
+  if (turns.stopped) return refuse("stopped", STOPPED_REASON);
   if (solved.refused !== undefined) {
     // The digits read of partly read codes may tell what the codes unknown as a whole cannot.
     const tried =
       solved.refused.verdict === "too-uncertain"
         ? await refined(spacesOf, Number.POSITIVE_INFINITY, turns, secrets)
         : undefined;
+    if (turns.stopped) return refuse("stopped", STOPPED_REASON);
     if (tried === undefined) return refuse(solved.refused.verdict, solved.refused.reason);
     return plan(tried);
   }
@@ -492,6 +512,7 @@ async function assessReadings(
   // above come from the codes unknown as a whole, which a wrong word cannot mislead.
   const branches =
     (await refined(spacesOf, combinationsOf(solved.branches), turns, secrets)) ?? solved.branches;
+  if (turns.stopped) return refuse("stopped", STOPPED_REASON);
   return plan(branches);
 }
 
@@ -524,7 +545,7 @@ async function planOf(
         }
       : {}),
   };
-  if (tooOpen) return { assessment, search: async () => [], wipe: () => undefined };
+  if (tooOpen) return { assessment, search: async () => NOTHING_SEARCHED, wipe: () => undefined };
   return {
     assessment,
     search: (options) => searchBranches(branches, platform, options),
@@ -542,26 +563,31 @@ async function searchBranches(
   branches: readonly Branch[],
   platform: SharePlatform,
   options: SearchOptions = {},
-): Promise<RepairedSet[]> {
-  // Refuses a signal that is already aborted before any check.
+): Promise<RepairSearch> {
+  // A signal that is already aborted stops the search before any check.
   const turns = SearchTurns.of(options);
+  if (turns.stopped) return { sets: [], stopped: true };
   const total = combinationsOf(branches);
   const found = new Map<string, RepairedSet>();
   const progress = (checked: number): RepairProgress => ({ checked, total, found: found.size });
   let done = 0;
-  const tried = (): Promise<void> | undefined => {
+  const tried = (): Promise<TurnState> | undefined => {
     done += 1;
     if (done % TRIES_PER_PROGRESS !== 0) return undefined;
     options.onProgress?.(progress(done));
-    return turns.due().then(() => undefined);
+    return turns.due();
   };
   const add = (repaired: RepairedSet): void => {
     const known = found.get(repaired.mnemonic);
     found.set(repaired.mnemonic, known === undefined ? repaired : merged(known, repaired));
   };
-  for (const branch of branches) await branch.searchDigest(platform, add, tried);
+  for (const branch of branches) {
+    await branch.searchDigest(platform, add, tried);
+    // The sets found before a stop are given as such: only those (CORE-22).
+    if (turns.stopped) return { sets: [...found.values()], stopped: true };
+  }
   options.onProgress?.(progress(total));
-  return [...found.values()];
+  return { sets: [...found.values()], stopped: false };
 }
 
 /**

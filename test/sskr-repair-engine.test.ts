@@ -271,9 +271,11 @@ describe("S048: one progress and one way to turn for every search", () => {
   it("hears a stop between two turns, before a turn is due", async () => {
     const stop = new AbortController();
     const turns = new SearchTurns(stop.signal);
-    expect(await turns.due()).toBe(false);
+    expect(await turns.due()).toBe("running");
     stop.abort(new Error("Stopped between turns."));
-    await expect(turns.due()).rejects.toThrow("Stopped between turns.");
+    // A stop is a state that the search returns, not an error (CORE-22).
+    expect(await turns.due()).toBe("stopped");
+    expect(turns.stopped).toBe(true);
   });
 
   it("takes a turn when asked, however soon, and hears a stop typed during it", async () => {
@@ -283,7 +285,7 @@ describe("S048: one progress and one way to turn for every search", () => {
       turns += 1;
       stop.abort(new Error("Stopped during the turn."));
     });
-    await expect(searchTurns.take()).rejects.toThrow("Stopped during the turn.");
+    expect(await searchTurns.take()).toBe("stopped");
     expect(turns).toBe(1);
   });
 
@@ -292,7 +294,7 @@ describe("S048: one progress and one way to turn for every search", () => {
       platform: nodeSharePlatform,
     });
     const progress: RepairProgress[] = [];
-    const found = await searchOnce(plan, { onProgress: (step) => progress.push(step) });
+    const found = (await searchOnce(plan, { onProgress: (step) => progress.push(step) })).sets;
     expect(found.map((set) => set.mnemonic)).toEqual([
       entropyToMnemonic(Buffer.from(VECTOR.entropy, "hex"), wordlist),
     ]);
@@ -386,7 +388,7 @@ describe("S120: one wording for each refusal, and shares named by their places",
     const typed = [markUnits(mine[0]!, "colors", [3]), other[1]!];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
     expect(plan.assessment.reason).toBeUndefined();
-    expect(await searchOnce(plan)).toEqual([]);
+    expect((await searchOnce(plan)).sets).toEqual([]);
     await expect(ShareSet.combine(typed, nodeSharePlatform)).rejects.toThrow(NO_PHRASE_FITS);
   });
 

@@ -61,6 +61,7 @@ import {
 import { counting } from "../core/search-plan.js";
 import { isMarked } from "../sskr/repair-units.js";
 import { defined } from "../core/defined.js";
+import { InputCancelledError } from "./terminal-keys.js";
 
 /** The restore of shares with Node's SSKR library: it keeps nothing of a restore. */
 const SHARE_RESTORE = new ShareRestore(nodeSharePlatform);
@@ -325,7 +326,9 @@ export class TypedShares {
  * together, during which Ctrl+C is read as a key, and the assessment is shown. No combination is
  * searched yet.
  */
-export async function assessShares(shares: TypedShares): Promise<SharesRead> {
+export async function assessShares(
+  shares: TypedShares,
+): Promise<Exclude<SharesRead, { kind: "stopped" }>> {
   const { input } = shares;
   const read = await SHARE_RESTORE.read(
     input,
@@ -340,6 +343,8 @@ export async function assessShares(shares: TypedShares): Promise<SharesRead> {
     nodeTurn,
   );
   printLines(read.lines);
+  // The person stopped the assessment with Ctrl+C.
+  if (read.kind === "stopped") throw new InputCancelledError();
   return read;
 }
 
@@ -460,7 +465,7 @@ export async function searchShareRepair(
   } else if (decision.notice !== undefined) terminalNotice(decision.notice);
   const progress = new ProgressLine(SEARCH_PROGRESS_SECONDS);
   // Watched only now, after the question, which reads its own keys: Ctrl+C stops the search at
-  // its next turn, which then rejects with InputCancelledError.
+  // its next turn, which then ends as stopped.
   try {
     const found = await withCtrlCWatch((signal) =>
       SHARE_RESTORE.search(marked, {
@@ -476,6 +481,8 @@ export async function searchShareRepair(
         },
       }),
     );
+    // The person stopped the search with Ctrl+C.
+    if (found.kind === "stopped") throw new InputCancelledError();
     return found.kind === "sets" ? found.sets : [];
   } finally {
     progress.end();

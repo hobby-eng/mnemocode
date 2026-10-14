@@ -79,6 +79,7 @@ import { SHARE_SOURCE_OPTIONS } from "./share-options.js";
 import { reportOriginalFingerprint, showOriginalPhrase } from "./fingerprint-report.js";
 import { isMasterKeyPath } from "../core/wallet-check.js";
 import { defined } from "../core/defined.js";
+import { InputCancelledError } from "./terminal-keys.js";
 
 export const sskrInputOptions = [...SHARE_SOURCE_OPTIONS, "ask-secrets"] as const;
 
@@ -450,6 +451,8 @@ export async function restorePhrases(r: Recovery, rules: RestoreRules): Promise<
           }
         }
         const result = await unmasked(r, sets, places);
+        // The person stopped the date search with Ctrl+C.
+        if (result.kind === "stopped") throw new InputCancelledError();
         if (result.kind === "dates" || result.kind === "mismatch") {
           step = await afterRefused(r, result);
           continue;

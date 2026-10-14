@@ -4,7 +4,7 @@
 // computes and the arrays of the secret that it holds, and wipes them.
 
 import { BITS_PER_BYTE, xorInto } from "../core/bits.js";
-import { SearchTurns } from "../core/search-turns.js";
+import { SearchTurns, type TurnState } from "../core/search-turns.js";
 import {
   BitFields,
   bytesToBits,
@@ -225,7 +225,7 @@ export class Branch {
   async searchDigest(
     platform: SharePlatform,
     found: (set: RepairedSet) => void,
-    tried: () => Promise<void> | undefined,
+    tried: () => Promise<TurnState> | undefined,
   ): Promise<void> {
     const { particular, visible, visibleDeltas } = this.#parts;
     const current = Uint8Array.from(this.#parts.secretAndDigest);
@@ -240,7 +240,8 @@ export class Branch {
           if (repaired !== undefined) found(repaired);
         }
         const turn = tried();
-        if (turn !== undefined) await turn;
+        // A stop of the host ends this branch's search; the caller tells it (searchBranches).
+        if (turn !== undefined && (await turn) === "stopped") return;
       }
     } finally {
       current.fill(0);
@@ -569,8 +570,9 @@ export async function solveJoint(
   let enoughMembers = false;
   let { duplicates } = solution;
   for (let choice = 0; choice < 2 ** labelBasis.length; choice += 1) {
-    // A turn now and then, not for each choice: a turn costs about a millisecond.
-    await turns.due();
+    // A turn now and then, not for each choice: a turn costs about a millisecond. A stop of the
+    // host ends the solving; the caller sees it in `turns` and drops what was solved.
+    if ((await turns.due()) === "stopped") break;
     const label = labels.value ^ combination(labelBasis, BigInt(choice));
     const threshold = storedCount(Number(label & BigInt(LOW_NIBBLE)));
     const members = Array.from({ length: shares }, (_, share) =>
@@ -636,8 +638,9 @@ export async function helpfulElements(
   if (openBits === 0) return [];
   const helps: ElementHelp[] = [];
   for (const [share, space] of widest.spaces.entries()) {
-    // A turn for each share: they are few, and each takes a while for many marks.
-    await turns.take();
+    // A turn for each share: they are few, and each takes a while for many marks. The caller sees
+    // a stop in `turns`.
+    if ((await turns.take()) === "stopped") return [];
     for (const [hole, place] of space.holes.entries())
       helps.push({
         share: share + 1,

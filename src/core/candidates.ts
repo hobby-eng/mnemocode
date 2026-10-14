@@ -41,7 +41,7 @@ import {
 } from "./bip39-sizes.js";
 import { BITS_PER_BYTE, lastWordChecksumBits, wipeAll } from "./bits.js";
 import {
-  assertStillRunning,
+  stillRunning,
   keptCount,
   SearchTurns,
   type SearchProgress,
@@ -438,6 +438,12 @@ export interface WordSearchResult<M extends WalletMatch = WalletMatch> {
   readonly warning: string | undefined;
   /** Whether the candidates were more than `keep`, so that no list holds them. */
   readonly listFull: boolean;
+  /**
+   * Whether the host stopped the search (SearchRun.signal): then the counts and candidates cover
+   * only those checked before the stop, and no entropy is kept, since no list of a part is
+   * complete (CORE-22).
+   */
+  readonly stopped: boolean;
 }
 
 /**
@@ -603,9 +609,23 @@ export class WordCandidateSearch extends Redacted {
     let count = 0;
     const tally = new MatchTally();
     let listFull = false;
+    let stopped = false;
     try {
       const turns = SearchTurns.of(run);
       for (const candidate of this.candidates()) {
+        if (turns.stopped) {
+          stopped = true;
+          break;
+        }
+        const match =
+          run.walletCheck === undefined
+            ? undefined
+            : await askWallet(run.walletCheck, candidate.phrase);
+        // An answer that came after a stop is neither counted nor shown (AUD-015-API001).
+        if (!stillRunning(run)) {
+          stopped = true;
+          break;
+        }
         count += 1;
         if (keep > 0 && !listFull && count > keep) {
           listFull = true;
@@ -613,24 +633,27 @@ export class WordCandidateSearch extends Redacted {
           entropies = [];
           run.onListFull?.();
         }
-        const match =
-          run.walletCheck === undefined
-            ? undefined
-            : await askWallet(run.walletCheck, candidate.phrase);
         tally.add(match);
         if (keep > 0 && !listFull) entropies.push(candidate.entropy());
         if (count <= maxShown || match?.matched === true)
           shown.push(match === undefined ? { candidate } : { candidate, match });
         // Every candidate is a phrase whose checksum holds: each one checked is one found.
-        if (await turns.due())
+        const turn = await turns.due();
+        if (turn === "turned")
           run.onProgress?.({ checked: count, found: count, matched: tally.matched });
       }
-      assertStillRunning(run);
     } catch (error) {
       wipeAll(entropies);
       throw error;
     }
+    // A stop heard only after the last candidate still tells the search as stopped, as every
+    // search tells it.
+    if (!stillRunning(run)) stopped = true;
+    if (stopped) {
+      wipeAll(entropies);
+      entropies = [];
+    }
     const { matched, warning } = tally;
-    return { shown, entropies, count, matched, warning, listFull };
+    return { shown, entropies, count, matched, warning, listFull, stopped };
   }
 }

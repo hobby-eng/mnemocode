@@ -11,6 +11,7 @@ import {
   type MarkedElement,
   type RepairedSet,
   type RepairedShares,
+  type RepairSearch,
   type ShareAssessment,
 } from "../src/sskr/joint-repair.js";
 
@@ -23,7 +24,8 @@ describe("the joint repair's entry", () => {
     expectTypeOf<JointPlan["assessment"]>().toEqualTypeOf<JointAssessment>();
     expectTypeOf<JointAssessment["shares"][number]>().toEqualTypeOf<ShareAssessment>();
     expectTypeOf<JointAssessment["helps"][number]>().toEqualTypeOf<ElementHelp>();
-    expectTypeOf<Awaited<ReturnType<JointPlan["search"]>>[number]>().toEqualTypeOf<RepairedSet>();
+    expectTypeOf<Awaited<ReturnType<JointPlan["search"]>>>().toEqualTypeOf<RepairSearch>();
+    expectTypeOf<RepairSearch["sets"][number]>().toEqualTypeOf<RepairedSet>();
     expectTypeOf<RepairedSet>().toExtend<RepairedShares>();
     expectTypeOf<RepairedShares["unsettled"][number]>().toEqualTypeOf<MarkedElement>();
   });

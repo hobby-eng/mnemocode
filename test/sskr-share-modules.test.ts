@@ -200,7 +200,7 @@ describe("ShareSet", () => {
     expect(set.shares[1]!.repaired).toBe(true);
     expect(set.backupForm).toBe("english");
     const plan = await planJointRepair([SHARES[0], marked([5])], { platform: nodeSharePlatform });
-    const [found] = await plan.search();
+    const [found] = (await plan.search()).sets;
     const taken = ShareSet.of(found!);
     expect(taken.toRepairedSet()).toEqual(found);
     // What the set hands out cannot change it: it is a frozen copy.
@@ -236,9 +236,10 @@ describe("ShareRestore", () => {
   it("passes the host's stop to the assessment", async () => {
     const stop = new AbortController();
     stop.abort(new Error("Assessment stopped."));
-    await expect(
-      new ShareRestore(nodeSharePlatform).read(markedInput(), signalWatch(stop.signal)),
-    ).rejects.toThrow("Assessment stopped.");
+    // A stop is a result, not an error (CORE-22).
+    expect(
+      await new ShareRestore(nodeSharePlatform).read(markedInput(), signalWatch(stop.signal)),
+    ).toEqual({ kind: "stopped", lines: [] });
   });
 
   it("passes the host's stop to the search", async () => {
@@ -248,7 +249,7 @@ describe("ShareRestore", () => {
     if (read.kind !== "marked") throw new Error("Expected marked shares.");
     const stop = new AbortController();
     stop.abort(new Error("Search stopped."));
-    await expect(restore.search(read, { signal: stop.signal })).rejects.toThrow("Search stopped.");
+    expect(await restore.search(read, { signal: stop.signal })).toEqual({ kind: "stopped" });
   });
 });
 
@@ -523,7 +524,7 @@ describe("RepairReport", () => {
 describe("RepairReport", () => {
   it("says what a repair filled in, by the place of each share", async () => {
     const plan = await planJointRepair([SHARES[0], marked([5])], { platform: nodeSharePlatform });
-    const [set] = await plan.search();
+    const [set] = (await plan.search()).sets;
     const lines = RepairReport.repairLines(set!, [1, 3]);
     expect(lines[0]).toMatchObject({ kind: "warning" });
     expect(lines[0]!.kind === "warning" && lines[0]!.text).toMatch(

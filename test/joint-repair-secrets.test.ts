@@ -61,7 +61,7 @@ describe("AUD-012-SEC004: an assessment keeps only what its search needs", () =>
     expect(allWiped()).toBe(false);
     const mnemonic = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
     for (let time = 0; time < 2; time += 1)
-      expect((await plan.search()).map((set) => set.mnemonic)).toEqual([mnemonic]);
+      expect((await plan.search()).sets.map((set) => set.mnemonic)).toEqual([mnemonic]);
   });
 
   it("wipes what the plan kept once its one search is over (S008)", async () => {
@@ -70,7 +70,7 @@ describe("AUD-012-SEC004: an assessment keeps only what its search needs", () =>
       { platform: nodeSharePlatform },
     );
     const mnemonic = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
-    expect((await searchOnce(plan)).map((set) => set.mnemonic)).toEqual([mnemonic]);
+    expect((await searchOnce(plan)).sets.map((set) => set.mnemonic)).toEqual([mnemonic]);
     expect(allWiped()).toBe(true);
   });
 
@@ -86,12 +86,12 @@ describe("AUD-012-SEC004: an assessment keeps only what its search needs", () =>
   it("wipes what it read when it is stopped between two shares", async () => {
     const stop = new AbortController();
     solved.after = () => stop.abort();
-    await expect(
-      planJointRepair(
-        vector.shares.map((share) => marked(share, [4])),
-        { platform: nodeSharePlatform, signal: stop.signal },
-      ),
-    ).rejects.toThrow();
+    // A stop is a result, not an error (CORE-22): the plan says "stopped" and keeps nothing.
+    const plan = await planJointRepair(
+      vector.shares.map((share) => marked(share, [4])),
+      { platform: nodeSharePlatform, signal: stop.signal },
+    );
+    expect(plan.assessment.verdict).toBe("stopped");
     expect(solved.spaces.length).toBeGreaterThan(0);
     expect(allWiped()).toBe(true);
   });

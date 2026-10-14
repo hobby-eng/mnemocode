@@ -141,7 +141,8 @@ export class ShareSet extends Redacted {
           "Too many combinations are open: read more of the marked elements, or add a share.",
       );
     }
-    const found = await searchOnce(plan);
+    // Searched without a signal: nothing stops it.
+    const { sets: found } = await searchOnce(plan);
     if (found.length === 0) throw new Error(NO_PHRASE_FITS);
     if (found.length > 1)
       throw new Error(

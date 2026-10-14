@@ -44,9 +44,10 @@ export interface JointAssessment {
   readonly unfit?: number;
   /**
    * "determined": no bit is open, and the search checks one candidate per way to read the shares;
-   * "search": the digest decides among `combinations`; the others refuse, with `reason`.
+   * "search": the digest decides among `combinations`; "stopped": the host stopped the assessment,
+   * and nothing is planned (CORE-22); the others refuse, with `reason`.
    */
-  readonly verdict: "determined" | "search" | "too-uncertain" | "no-fit" | "not-enough";
+  readonly verdict: "determined" | "search" | "too-uncertain" | "no-fit" | "not-enough" | "stopped";
   readonly reason?: string;
 }
 
@@ -65,4 +66,13 @@ export interface RepairedSet extends RepairedShares {
    * than its threshold, in a set of several groups.
    */
   readonly unchecked?: readonly number[];
+}
+
+/**
+ * What a search of marked shares gives: every distinct set that passed, possibly none, and whether
+ * the host stopped it (SearchRun.signal), when the sets are only those found before the stop.
+ */
+export interface RepairSearch {
+  readonly sets: RepairedSet[];
+  readonly stopped: boolean;
 }

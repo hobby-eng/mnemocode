@@ -245,7 +245,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, digits known in
       );
       try {
         expect(plan.assessment.verdict).toBe("determined");
-        const found = await plan.search();
+        const found = (await plan.search()).sets;
         expect(found.map((set) => set.mnemonic)).toEqual([sskrSetVector.phrase]);
         expect(found[0]!.shares.map((share) => share.ur)).toEqual(sskrSetVector.shares.slice(0, 2));
         expect(found[0]!.shares[0]!.filled).toHaveLength(1);
@@ -343,7 +343,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, several valid s
     );
     try {
       const expected = entropyToMnemonic(bytesOfHex(vector.entropy), wordlist);
-      expect((await plan.search()).map((set) => set.mnemonic)).toEqual([expected]);
+      expect((await plan.search()).sets.map((set) => set.mnemonic)).toEqual([expected]);
     } finally {
       plan.wipe();
     }

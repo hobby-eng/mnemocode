@@ -31,6 +31,7 @@ import { counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
 import { defined } from "../core/defined.js";
+import { InputCancelledError } from "./terminal-keys.js";
 
 /** Seconds between two progress updates of a long search. */
 const PROGRESS_SECONDS = 2;
@@ -105,7 +106,7 @@ async function started(way: MissingCodesWaySearch, limit: number | undefined): P
 async function ran(way: MissingCodesWaySearch): Promise<MissingCodesResult> {
   const progress = new ProgressLine(PROGRESS_SECONDS);
   try {
-    return await withCtrlCWatch((signal) =>
+    const result = await withCtrlCWatch((signal) =>
       way.run({
         signal,
         turn: nodeTurn,
@@ -115,6 +116,9 @@ async function ran(way: MissingCodesWaySearch): Promise<MissingCodesResult> {
           ),
       }),
     );
+    // The person stopped the search with Ctrl+C.
+    if (result.kind === "stopped") throw new InputCancelledError();
+    return result;
   } finally {
     progress.end();
   }

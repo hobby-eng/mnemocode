@@ -171,7 +171,7 @@ describe("shares, apart or run together", () => {
       platform: nodeSharePlatform,
     });
     expect(plan.assessment.verdict).toBe("determined");
-    const [set] = await plan.search();
+    const [set] = (await plan.search()).sets;
     expect(set!.shares.map((share) => share.ur)).toContain(FIRST);
   });
 

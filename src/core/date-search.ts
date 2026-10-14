@@ -34,7 +34,7 @@ import { dateRecoveryCandidates, type SeedshiftMode } from "./date-recovery.js";
 import { Masking, type MaskingMode } from "./masking.js";
 import { placesNamed } from "./places.js";
 import {
-  assertStillRunning,
+  stillRunning,
   keptCount,
   SearchTurns,
   startTimer,
@@ -343,6 +343,13 @@ export interface DateSearchResult {
   readonly shown: readonly DateMatch[];
   /** The phrase of every match, kept only when `keep` is above 0, at most `keep` of them. */
   readonly kept: readonly string[];
+  /** The date combinations checked: all of them, unless the search was stopped. */
+  readonly checked: number;
+  /**
+   * Whether the host stopped the search (SearchRun.signal): then the counts and matches cover only
+   * the combinations checked before the stop, and nothing found after it (CORE-22).
+   */
+  readonly stopped: boolean;
 }
 
 /** How fast a search goes in a host, in seconds, as DateSearch.pace measures it. */
@@ -528,20 +535,34 @@ export class DateSearch extends Redacted {
     let checksumValid = 0;
     let matchCount = 0;
     const turns = SearchTurns.of(run);
+    const result = (stopped: boolean): DateSearchResult => ({
+      combinations,
+      checksumValid,
+      matchCount,
+      shown,
+      kept,
+      checked,
+      stopped,
+    });
+    if (turns.stopped) return result(true);
     for (const candidates of dateRecoveryCandidates(
       this.#indexes,
       this.#dates.known,
       this.#dates.patterns,
       this.#mode,
     )) {
+      const turn = await turns.due();
+      if (turn === "stopped") return result(true);
       checked += 1;
-      const turned = await turns.due();
+      const turned = turn === "turned";
       for (const candidate of candidates) {
         checksumValid += 1;
         const match =
           this.#walletCheck === undefined
             ? undefined
             : await askWallet(this.#walletCheck, candidate.mnemonic);
+        // An answer that came after a stop is neither counted nor published (AUD-015-API001).
+        if (!stillRunning(run)) return result(true);
         if (match !== undefined && !match.matched) continue;
         matchCount += 1;
         if (kept.length < this.#keep) kept.push(candidate.mnemonic);
@@ -553,7 +574,6 @@ export class DateSearch extends Redacted {
           // Only a match of the wallet at a path names one; without a check there is no key.
           ...(match?.path === undefined ? {} : { evidence: match.path }),
         };
-        assertStillRunning(run);
         if (shown.length < this.#maxShown) shown.push(found);
         run.onMatch?.(found);
       }
@@ -566,7 +586,6 @@ export class DateSearch extends Redacted {
           matched: matchCount,
         });
     }
-    assertStillRunning(run);
-    return { combinations, checksumValid, matchCount, shown, kept };
+    return result(!stillRunning(run));
   }
 }

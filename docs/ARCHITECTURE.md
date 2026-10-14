@@ -216,6 +216,7 @@ The Node.js hosts sit beside the parts: `bitcoin-evidence.ts` builds a `WalletEv
 - X25519 is in WebCrypto only on a secure page, served over https or from localhost. Elsewhere a list for the Scanner's key is refused with one line, and a list under a passphrase still works.
 - The command line makes images of pages with Poppler's `pdftocairo`, which a page lacks: the parts give PDF bytes, `export/card-drawing.ts` (`CardPdfReader`) reads them back as drawing steps, and the page paints those on its canvas. The reader accepts only the PDF commands the renderers write, and `test/card-drawing.test.ts` reads the cards of every renderer through it. The command line also reads QR codes from PNG images itself; a page reads them its own way.
 - Files, the private screen, Ctrl+C and the [protection while it runs](../README.md#protection-while-it-runs), with its warnings about swap and cloud folders, belong to the command line.
+- A host stops a long search, the assessment of marked shares among them, with the `AbortSignal` it passes. A stop is no failure: the search ends at its next turn and gives what it found before the stop, marked as stopped (`stopped: true`, the kind `"stopped"` or the verdict `"stopped"`), and nothing found after it.
 - The parts wipe the byte arrays they own once they are done with them, also when they refuse or are stopped. A plan of a share repair keeps the arrays it searches with for as long as the host keeps the plan. Neither host can wipe a JavaScript string.
 
 ## Single executable
