@@ -24,6 +24,7 @@ import type { RepairedSet } from "./joint-repair.js";
 import type { DateWork } from "./repair-report.js";
 import { Redacted } from "../core/redacted.js";
 import { BIP39_WORD_COUNTS } from "../core/bip39-sizes.js";
+import { defined } from "../core/defined.js";
 
 /** The two modes in which shares are made: SSKR splits the entropy of a valid BIP39 phrase. */
 export type ShareMode = SplitMode;
@@ -68,7 +69,7 @@ export type Unmasked =
  */
 const ANY_WORD_COUNT = BIP39_WORD_COUNTS[0];
 /** The longest phrase, which the decoding of the dates is timed with (secondsPerCombination). */
-const LONGEST_PHRASE = BIP39_WORD_COUNTS.at(-1)!;
+const LONGEST_PHRASE = defined(BIP39_WORD_COUNTS.at(-1));
 
 /**
  * How the sets of one restore are turned into seed phrases. A class, so that a host builds it once
@@ -105,7 +106,7 @@ export class ShareUnmasking extends Redacted {
    * is said against (ShareSet.walletMismatch); undefined without a search.
    */
   get searchedCombinations(): number | undefined {
-    return this.searches ? this.#dates!.combinations : undefined;
+    return this.searches ? defined(this.#dates).combinations : undefined;
   }
 
   /** Whether the search needs the wallet to tell the right dates (walletNeeded). */
@@ -124,7 +125,7 @@ export class ShareUnmasking extends Redacted {
     // Only a masked phrase has dates to search.
     const mode = this.#mode;
     if (!this.searches || !Masking.isMaskedMode(mode)) return undefined;
-    const dates = this.#dates!;
+    const dates = defined(this.#dates);
     // The shares do not say yet how long their phrase is; every count of dates fits 24 words.
     const perCombination = DateSearch.secondsPerCombination(mode, dates, LONGEST_PHRASE);
     if (this.#walletCheck === undefined)

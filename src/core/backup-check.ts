@@ -36,6 +36,7 @@ import { modeConflictOf } from "./backup-reading.js";
 import { englishTokens } from "./english-words.js";
 import { isMarked } from "../sskr/repair.js";
 import { refusalMessage } from "./refusal.js";
+import { defined } from "./defined.js";
 
 /** The part of a backup that a finding is about. */
 export type BackupPart = "codes" | "shares" | "dates";
@@ -509,7 +510,7 @@ export class RestoredShares extends Redacted {
   static of(set: ShareSet, kept: KeptShares): RestoredShares {
     const places = kept.places;
     const shares = [...set.unchecked, ...set.unsettled.map((element) => element.share)];
-    const unchecked = [...new Set(shares.map((share) => places[share - 1]!))];
+    const unchecked = [...new Set(shares.map((share) => defined(places[share - 1])))];
     unchecked.sort((a, b) => a - b);
     return new RestoredShares(set, unchecked);
   }

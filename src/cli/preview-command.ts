@@ -13,6 +13,7 @@ import { value, type ParsedArguments, integerOption } from "./arguments.js";
 import { preflightOutputs } from "./output-saving.js";
 import { BIP39_WORD_COUNTS } from "../core/bip39-sizes.js";
 import { CARD_FORMAT_NUMBERS } from "./format-numbers.js";
+import { defined } from "../core/defined.js";
 
 export async function runPreview(args: ParsedArguments): Promise<void> {
   const path = value(args, "pdf");
@@ -75,7 +76,7 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
       ? undefined
       : integerOption(args, "words", {
           min: BIP39_WORD_COUNTS[0],
-          max: BIP39_WORD_COUNTS.at(-1)!,
+          max: defined(BIP39_WORD_COUNTS.at(-1)),
           label: "mnemonic word count",
         });
   // The sample cards themselves come from the library (export/card-preview.ts), which a page

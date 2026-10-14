@@ -4,6 +4,7 @@ import {
   type EncodedFormat,
   type MaskingMode,
 } from "./core/types.js";
+import { defined } from "./core/defined.js";
 
 /** The version of the MNC1 record that this program writes, and the only one it reads. */
 export const MNEMOCODE_RECORD_VERSION = 1 as const;
@@ -61,6 +62,6 @@ export function parseRecord(value: string): MnemoCodeRecord | undefined {
     version: MNEMOCODE_RECORD_VERSION,
     mode: match[2],
     format,
-    payload: match[4]!,
+    payload: defined(match[4]),
   };
 }

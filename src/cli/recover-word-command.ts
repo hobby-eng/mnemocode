@@ -56,31 +56,37 @@ import { wordNumberOf } from "../core/bip39-sizes.js";
 import { counting } from "../core/search-plan.js";
 import { rowsOf, listQuestionRows } from "./terminal-choice.js";
 import { closingRows } from "./private-screen.js";
+import { defined } from "../core/defined.js";
 
 /** The table's columns for the candidates of `search`, and a row maker. */
 function tableOf(search: WordCandidateSearch): {
   readonly heading: readonly string[];
   readonly row: (candidate: WordCandidate) => readonly string[];
 } {
-  const word = (index: number) => [englishWordlist[index]!, String(wordNumberOf(index))];
+  const word = (index: number) => [defined(englishWordlist[index]), String(wordNumberOf(index))];
   if (search.kind === "missing-word")
     return {
       heading: ["position", "word", "word-index"],
       row: (candidate) => {
-        const place = search.placesOf(candidate)[0]!;
-        return [String(place + 1), ...word(candidate.words[place]!)];
+        const place = defined(search.placesOf(candidate)[0]);
+        return [String(place + 1), ...word(defined(candidate.words[place]))];
       },
     };
   const unknown = search.unknownPlaces;
   if (unknown.length === 1)
     return {
       heading: ["word", "word-index", "checksum-bits"],
-      row: (candidate) => [...word(candidate.words[unknown[0]!]!), candidate.checksumBits],
+      row: (candidate) => [
+        ...word(defined(candidate.words[defined(unknown[0])])),
+        candidate.checksumBits,
+      ],
     };
   return {
     heading: ["words"],
     row: (candidate) => [
-      unknown.map((place) => `${place + 1}:${englishWordlist[candidate.words[place]!]}`).join(" "),
+      unknown
+        .map((place) => `${place + 1}:${englishWordlist[defined(candidate.words[place])]}`)
+        .join(" "),
     ],
   };
 }

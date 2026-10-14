@@ -72,6 +72,7 @@ import {
   showOriginalPhrase,
 } from "./fingerprint-report.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
+import { defined } from "../core/defined.js";
 
 export async function runDecode(arguments_: ParsedArguments): Promise<void> {
   if (arguments_["ask-secrets"] === true) return decodeWithQuestions(arguments_);
@@ -139,7 +140,7 @@ function reportShorterPhrases(backup: EncodedBackup, dates: readonly DateShiftDa
     )
     .join("; ");
   terminalNotice(
-    `The first codes give a phrase with a valid checksum: ${listed}. Printed cards end with codes that belong to nothing; give the number of words of the phrase (--words ${shorter[0]!.words}).`,
+    `The first codes give a phrase with a valid checksum: ${listed}. Printed cards end with codes that belong to nothing; give the number of words of the phrase (--words ${defined(shorter[0]).words}).`,
     "warning",
   );
 }
@@ -374,20 +375,23 @@ export async function decodeWithQuestions(
           typedDates?.fitsPhrase(backup.indexes.length) === true ? afterDates(typedDates) : "dates";
       }
     } else if (step === "dates") {
-      typedDates = await askDates({ wordCount: backup!.indexes.length, patterns: use.searches });
+      typedDates = await askDates({
+        wordCount: defined(backup).indexes.length,
+        patterns: use.searches,
+      });
       step = afterDates(typedDates);
     } else if (step === "wallet") {
-      const needed = walletNeeded(backup!.mode);
+      const needed = walletNeeded(defined(backup).mode);
       if (needed && given.list && evidence === undefined)
         terminalNotice(
-          `--list-candidates does not apply here. ${walletReason(backup!.mode)}`,
+          `--list-candidates does not apply here. ${walletReason(defined(backup).mode)}`,
           "warning",
         );
       if (evidence !== undefined || (withoutWallet && !needed)) step = "search";
       else {
         const answer = await askWalletEvidence({
           optional: !needed,
-          explanation: decodeWalletExplanation(backup!.mode, given.passphrase),
+          explanation: decodeWalletExplanation(defined(backup).mode, given.passphrase),
           place: given.place,
         });
         if (answer.kind === "wallet") evidence = answer.evidence;
@@ -395,13 +399,19 @@ export async function decodeWithQuestions(
         step = answer.kind === "back" ? "dates" : "search";
       }
     } else if (step === "search") {
-      const searched = await searchAndShow(backup!, typedDates!, evidence, backupArgs, given);
+      const searched = await searchAndShow(
+        defined(backup),
+        defined(typedDates),
+        evidence,
+        backupArgs,
+        given,
+      );
       step = searched.step;
       evidence = searched.evidence;
       withoutWallet = evidence === undefined;
     } else {
       step = await decodeAndShow(
-        backup!,
+        defined(backup),
         foundDates ?? typedDates?.known ?? [],
         backupArgs,
         use,

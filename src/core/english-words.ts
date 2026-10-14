@@ -10,6 +10,7 @@
 import { entropyToMnemonic, validateMnemonic } from "@scure/bip39";
 import { wordlist as englishWordlist } from "@scure/bip39/wordlists/english.js";
 import { entropyBytes, type Bip39WordCount } from "./bip39-sizes.js";
+import { defined } from "./defined.js";
 
 export { englishWordlist };
 
@@ -50,7 +51,7 @@ export function fingerprintOfValidPhrase<T>(
 
 /** The English words of BIP39 indexes, counted from 0. */
 export function wordsOfIndexes(indexes: readonly number[]): string[] {
-  return indexes.map((index) => englishWordlist[index]!);
+  return indexes.map((index) => defined(englishWordlist[index]));
 }
 
 /** The BIP39 indexes, counted from 0, of English words; refuses a word that is not in the list. */

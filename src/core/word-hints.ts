@@ -11,6 +11,7 @@
 // Host-neutral: it imports only the English BIP39 list.
 
 import { englishWordlist } from "./english-words.js";
+import { defined } from "./defined.js";
 
 /** Letters typed before the words that begin with them are listed; fewer give how many there are. */
 export const LIST_FROM_LETTERS = 2;
@@ -90,7 +91,7 @@ export class WordList implements WordHints {
     words.forEach((word, index) => {
       if (!WORD_CHARACTERS.test(word) || word !== word.toLowerCase())
         throw new Error("A word list holds lower-case letters and hyphens only.");
-      if (index > 0 && words[index - 1]! >= word)
+      if (index > 0 && defined(words[index - 1]) >= word)
         throw new Error("A word list must be in alphabetical order without repeats.");
     });
     this.#names = Object.freeze({ ...names });
@@ -159,7 +160,7 @@ export class WordList implements WordHints {
   #startingWith(letters: string): readonly string[] {
     const start = firstAtLeast(this.#words, letters);
     let end = start;
-    while (end < this.#words.length && this.#words[end]!.startsWith(letters)) end += 1;
+    while (end < this.#words.length && defined(this.#words[end]).startsWith(letters)) end += 1;
     return this.#words.slice(start, end);
   }
 }
@@ -170,7 +171,7 @@ function firstAtLeast(words: readonly string[], letters: string): number {
   let high = words.length;
   while (low < high) {
     const middle = (low + high) >>> 1;
-    if (words[middle]! < letters) low = middle + 1;
+    if (defined(words[middle]) < letters) low = middle + 1;
     else high = middle;
   }
   return low;

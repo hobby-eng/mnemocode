@@ -63,6 +63,7 @@ import {
 } from "./terminal.js";
 import { counting } from "../core/search-plan.js";
 import { isMarked } from "../sskr/repair.js";
+import { defined } from "../core/defined.js";
 
 /** The restore of shares with Node's SSKR library: it keeps nothing of a restore. */
 const SHARE_RESTORE = new ShareRestore(nodeSharePlatform);
@@ -226,7 +227,7 @@ export class TypedShares {
   /** Shows the share just read from a QR code image as text, under its place. */
   #showRead(): void {
     if (!this.#fromQr) return;
-    const share = this.list.at(-1)!;
+    const share = defined(this.list.at(-1));
     // An image may hold any text: it is shown without its control characters.
     terminalStatus(`Share ${share.place}, from its QR code:`, printableText(share.text));
   }
@@ -279,7 +280,7 @@ export class TypedShares {
 
   /** Asks which share, unless only one was typed; undefined when the person goes back (Escape). */
   async #chosenPlace(): Promise<number | undefined> {
-    if (this.list.length === 1) return this.list[0]!.place;
+    if (this.list.length === 1) return defined(this.list[0]).place;
     return choose(
       "Which share?",
       this.list.map((share) => ({

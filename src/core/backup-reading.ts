@@ -30,6 +30,7 @@ import { Redacted } from "./redacted.js";
 import { CRC32_BYTES } from "../sskr/checksum.js";
 import { BITS_PER_BYTE } from "./bits.js";
 import type { MaskingMode } from "./types.js";
+import { defined } from "./defined.js";
 
 /** What a host reads a backup for. */
 export interface ReadingRules {
@@ -285,7 +286,7 @@ export function modeConflictOf(
   given: MaskingMode | undefined,
 ): string | undefined {
   if (!metadataDiffers(recorded, given)) return undefined;
-  return `The record was made with ${Masking.of(recorded!).name}, not with ${Masking.of(given!).name}.`;
+  return `The record was made with ${Masking.of(defined(recorded)).name}, not with ${Masking.of(defined(given)).name}.`;
 }
 
 /** The same for the form of the codes: the record's, `recorded`, and `given`. */

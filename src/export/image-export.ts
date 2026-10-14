@@ -20,6 +20,7 @@ import {
   type DocumentFormat,
   type ImageFormat,
 } from "./document-formats.js";
+import { defined } from "../core/defined.js";
 
 // The formats and the drawing rules are document-formats.ts's, which a page takes too; here too
 // for the modules of the command line that take them from here.
@@ -133,7 +134,7 @@ export async function writeRenderedDocument(
     }
     const files = (await readdir(temporary))
       .filter((file) => PAGE_FILE.test(file))
-      .sort((a, b) => Number(a.match(/\d+/u)![0]) - Number(b.match(/\d+/u)![0]));
+      .sort((a, b) => Number(defined(a.match(/\d+/u))[0]) - Number(defined(b.match(/\d+/u))[0]));
     if (!files.length) throw new Error("The local PDF renderer produced no images.");
     for (const [index, file] of files.entries()) {
       // The page shows what the document shows: its bytes are wiped once written.

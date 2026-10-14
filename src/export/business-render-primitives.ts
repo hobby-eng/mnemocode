@@ -15,6 +15,7 @@ import {
 } from "pdf-lib";
 import { MM, type MmRect } from "./business-layout.js";
 import { rgbChannels } from "./color-math.js";
+import { defined } from "../core/defined.js";
 /** The dark ink of the business designs' text. */
 export const ink = rgb(0.12, 0.13, 0.14);
 const CORNER_RADIUS_HEIGHT_RATIO = 0.055;
@@ -37,7 +38,9 @@ export function fit(
   width: number,
   label: string,
 ): number {
-  const unsupported = [...text].find((c) => !font.getCharacterSet().includes(c.codePointAt(0)!));
+  const unsupported = [...text].find(
+    (c) => !font.getCharacterSet().includes(defined(c.codePointAt(0))),
+  );
   if (unsupported !== undefined)
     throw new Error(`${label} contains a character not supported by the card font: ${unsupported}`);
   const size = Math.min(

@@ -2,6 +2,7 @@ import { wholeNumberOf, type WholeRange, rangeText } from "../core/typed-number.
 import { optionLabel, optionSubject, optionValue } from "./option-copy.js";
 import { listInWords } from "../core/places.js";
 import { SHARE_SOURCE_OPTIONS } from "./share-options.js";
+import { defined } from "../core/defined.js";
 
 export type ParsedArguments = Record<string, string | boolean | string[]>;
 
@@ -24,7 +25,7 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
     "recognised",
   ]);
   for (let index = 0; index < items.length; index += 1) {
-    const item = items[index]!;
+    const item = defined(items[index]);
     if (!item.startsWith("--"))
       throw new Error(
         "This command does not accept an unnamed value. Use the appropriate named option.",
@@ -34,8 +35,8 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
     const listKey = Object.hasOwn(LIST_OPTIONS, key) ? LIST_OPTIONS[key] : undefined;
     if (listKey !== undefined) {
       const dateValues: string[] = [];
-      while (items[index + 1] !== undefined && !items[index + 1]!.startsWith("--")) {
-        dateValues.push(items[index + 1]!);
+      while (items[index + 1] !== undefined && !defined(items[index + 1]).startsWith("--")) {
+        dateValues.push(defined(items[index + 1]));
         index += 1;
       }
       if (dateValues.length === 0)
@@ -184,7 +185,7 @@ export function assertAllowedArguments(
   const unknown = Object.keys(arguments_).filter((key) => !allowedSet.has(key));
   if (unknown.length > 0)
     throw new Error(
-      `The ${command} command does not support the ${optionLabel(unknown[0]!)} setting.`,
+      `The ${command} command does not support the ${optionLabel(defined(unknown[0]))} setting.`,
     );
 }
 

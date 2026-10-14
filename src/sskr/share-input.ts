@@ -49,6 +49,7 @@ import {
 import { misfitMessage } from "./complete-shares.js";
 import { refusalMessage } from "../core/refusal.js";
 import { afterPlace } from "../core/prose.js";
+import { defined } from "../core/defined.js";
 
 /** Lines that one share may take in a paste, as a narrow column of a PDF wraps it. */
 const MAX_WRAPPED_LINES = 8;
@@ -184,7 +185,7 @@ function wrappedShare(
 ): { readonly text: string; readonly end: number } | undefined {
   const lines: string[] = [];
   for (let end = start; end < parts.length && lines.length < MAX_WRAPPED_LINES; end += 1) {
-    const part = parts[end]!;
+    const part = defined(parts[end]);
     if (shareOrMarked(part)) return undefined;
     lines.push(part);
     if (lines.length < 2) continue;
@@ -206,7 +207,7 @@ function joinWrapped(parts: readonly string[]): string[] {
   const shares: string[] = [];
   for (let start = 0; start < parts.length;) {
     const wrapped = wrappedShare(parts, start);
-    shares.push(wrapped?.text ?? parts[start]!);
+    shares.push(wrapped?.text ?? defined(parts[start]));
     start = wrapped?.end ?? start + 1;
   }
   return shares;
@@ -240,13 +241,13 @@ function setTrouble(shares: readonly ReadShare[]): ShareTrouble | undefined {
   });
   const largest = Math.max(...[...sets.values()].map((indexes) => indexes.length));
   const main = [...sets.values()].filter((indexes) => indexes.length === largest);
-  const placeOf = (index: number) => shares[index]!.place;
+  const placeOf = (index: number) => defined(shares[index]).place;
   if (main.length > 1)
     return undecided(
-      main.map((indexes) => placeOf(indexes[0]!)),
+      main.map((indexes) => placeOf(defined(indexes[0]))),
       SET_CONFLICT_TEXTS.set.between,
     );
-  const reference = main[0]![0]!;
+  const reference = defined(defined(main[0])[0]);
   const conflict = SetTopology.firstConflict(
     shares.map((share) => share.info),
     reference,
@@ -264,10 +265,10 @@ function setTrouble(shares: readonly ReadShare[]): ShareTrouble | undefined {
 
 /** Why complete shares of one set are too few to restore it, or undefined when they are enough. */
 function fewTrouble(shares: readonly ReadShare[]): ShareTrouble | undefined {
-  const { groupThreshold, groupCount } = shares[0]!.info;
+  const { groupThreshold, groupCount } = defined(shares[0]).info;
   if (new SetTopology(shares.map((share) => share.info)).enough) return undefined;
   if (groupCount === 1) {
-    const needed = shares[0]!.info.memberThreshold;
+    const needed = defined(shares[0]).info.memberThreshold;
     const typed = shares.length === 1 ? "One share is" : `These ${shares.length} shares are`;
     return { kind: "few", message: `${typed} not enough: this set needs ${needed}.` };
   }
@@ -570,7 +571,7 @@ export class ShareInput {
     if (assessment.unfit !== undefined)
       return {
         kind: "unreadable",
-        place: places[assessment.unfit - 1]!,
+        place: defined(places[assessment.unfit - 1]),
         message: assessment.reason,
       };
     return {
@@ -624,7 +625,7 @@ export class ShareInput {
     const places = read.map((share) => share.place);
     try {
       const set = (await ShareSet.restore(texts, platform, places)).toRepairedSet();
-      return { kind: "complete", set, secretBytes: read[0]!.info.secretLength, places };
+      return { kind: "complete", set, secretBytes: defined(read[0]).info.secretLength, places };
     } catch (error) {
       const message = refusalMessage(error);
       const fits: number[] = [];
@@ -642,7 +643,11 @@ export class ShareInput {
       if (fits.length === 1)
         return {
           kind: "trouble",
-          trouble: { kind: "odd", place: fits[0]!, message: misfitMessage(fits[0]!) },
+          trouble: {
+            kind: "odd",
+            place: defined(fits[0]),
+            message: misfitMessage(defined(fits[0])),
+          },
         };
       // The share set names each share by the place it was typed at.
       return { kind: "trouble", trouble: { kind: "refused", message } };

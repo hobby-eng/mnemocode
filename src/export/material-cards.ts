@@ -39,6 +39,7 @@ import { pdfRect } from "./business-render-primitives.js";
 import { rgbChannels } from "./color-math.js";
 import { documentWithFont } from "./pdf-documents.js";
 import { type CardPageSize, isCardPageSize, parsePageSize } from "./card-settings.js";
+import { defined } from "../core/defined.js";
 /** The sizes of a material card's page: those of every card (CardPageSize). */
 export type MaterialPageSize = CardPageSize;
 // The tint layer keeps the photograph's light, texture and highlights ("Color" blend) and takes
@@ -108,22 +109,22 @@ function drawSample(
     // Outline points are fractions of the crop with y downwards; the page's y runs upwards.
     const at = (ring: readonly number[], i: number) =>
       [
-        left + (ring[i]! * scale + dx) * dw * MM,
-        bottom + (1 - ring[i + 1]! * scale - dy) * dh * MM,
+        left + (defined(ring[i]) * scale + dx) * dw * MM,
+        bottom + (1 - defined(ring[i + 1]) * scale - dy) * dh * MM,
       ] as const;
     const outline = artwork.catalogue.outline.flatMap((ring) => [
       moveTo(...at(ring, 0)),
       ...Array.from({ length: ring.length / 2 - 1 }, (_, i) => lineTo(...at(ring, 2 * i + 2))),
       closePath(),
     ]);
-    const [r, g, b] = rgbChannels(sample.tint!);
+    const [r, g, b] = rgbChannels(defined(sample.tint));
     page.pushOperators(
       ...outline,
       // Even-odd, so that a hole in the outline, such as a screw, stays untinted.
       clipEvenOdd(),
       endPath(),
       setGraphicsState(useTintState(page)),
-      setFillingRgbColor(r!, g!, b!),
+      setFillingRgbColor(defined(r), defined(g), defined(b)),
       rectangle(left, bottom, placed.width, placed.height),
       fill(),
     );
@@ -197,7 +198,7 @@ function studyCaptions(
 ): string[][] {
   return Array.from({ length: count }, (_, index) => [
     numberedCode(content, index),
-    ...(compact ? [] : [samples[index]!.label]),
+    ...(compact ? [] : [defined(samples[index]).label]),
   ]);
 }
 
@@ -227,7 +228,7 @@ export async function materialSheetShape(
   const compact = isCardPageSize(pageSize);
   return {
     font,
-    aspect: cropAspect(image, materialArtwork[style].finishes[0]!),
+    aspect: cropAspect(image, defined(materialArtwork[style].finishes[0])),
     captions: (count) => {
       const samples = chooseMaterialSamples(style, content.colors.slice(0, count));
       return studyCaptions(content, samples, compact, count);
@@ -248,10 +249,19 @@ async function drawMaterialStudy(context: MaterialRenderContext): Promise<void> 
     preparedFor: profile.name,
     theme: artwork.studyTheme,
     // The finishes of one material are cropped alike, so every box takes the shape of a sample.
-    aspect: cropAspect(image, artwork.finishes[0]!),
+    aspect: cropAspect(image, defined(artwork.finishes[0])),
     captions: studyCaptions(content, samples, compact, content.colors.length),
     paint: (page, box) =>
-      drawSample(page, image, artwork, samples[box.index]!, box.x, box.y, box.width, box.height),
-    pictureArea: (box) => sampleArea(image, samples[box.index]!.finish, box),
+      drawSample(
+        page,
+        image,
+        artwork,
+        defined(samples[box.index]),
+        box.x,
+        box.y,
+        box.width,
+        box.height,
+      ),
+    pictureArea: (box) => sampleArea(image, defined(samples[box.index]).finish, box),
   });
 }

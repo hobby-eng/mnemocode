@@ -8,6 +8,7 @@
 import { PHRASE_WORDS } from "../core/masking.js";
 import { Share } from "../sskr/transport.js";
 import { counted } from "../core/search-plan.js";
+import { defined } from "../core/defined.js";
 
 /** How the cards or records of the shares were saved. */
 export type ShareCardPackaging =
@@ -44,7 +45,7 @@ const MASKED_GOAL = `to restore ${PHRASE_WORDS.masked}, which the owner's dates 
  */
 function quorum(records: readonly string[], masked: boolean): string {
   const goal = masked ? MASKED_GOAL : "for recovery";
-  const { info } = Share.read(records[0]!);
+  const { info } = Share.read(defined(records[0]));
   if (info.groupCount > 1)
     return `These shares belong to ${info.groupCount} groups, each needing enough of its own ${goal}`;
   const threshold = info.memberThreshold;

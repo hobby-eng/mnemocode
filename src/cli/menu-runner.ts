@@ -10,6 +10,7 @@ import { choose } from "./terminal-choice.js";
 import { dropTypedAhead, InputCancelledError, terminalAvailable } from "./terminal-input.js";
 import { LEAVE_ALTERNATE_SCREEN } from "./terminal.js";
 import { WHAT_NOW } from "./ask.js";
+import { defined } from "../core/defined.js";
 
 /**
  * Wipes what was typed while a command ran but not read by it, such as the rest of a paste after
@@ -71,7 +72,7 @@ export async function runCommand(run: readonly string[]): Promise<number | undef
         return exit;
       });
       if (!stoppedBySignal(code) || code === CANCELLED_EXIT_CODE) return code;
-      if (PRIVATE_SCREEN_COMMANDS.has(run[0]!) && privateScreenAvailable())
+      if (PRIVATE_SCREEN_COMMANDS.has(defined(run[0])) && privateScreenAvailable())
         process.stderr.write(LEAVE_ALTERNATE_SCREEN);
       failure = `The command stopped unexpectedly (${signalNameOf(code)}).`;
     } catch (error) {

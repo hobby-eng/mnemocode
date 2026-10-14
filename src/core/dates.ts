@@ -1,5 +1,6 @@
 import type { DateShiftDate, DatePattern, Bip39WordCount } from "./types.js";
 import { inWholeRange, integerRefusal, type WholeRange } from "./typed-number.js";
+import { defined } from "./defined.js";
 
 /** Seedshift shifts three words with each date: by its year, its month and its day. */
 const WORDS_PER_DATE = 3;
@@ -56,9 +57,9 @@ function readDateParts<T>(
   const parts = text.split(PART_SEPARATOR);
   if (parts.length !== WRITTEN_ORDER.length) return undefined;
   for (const order of DATE_ORDERS) {
-    const read = order.map((name, index) => readPart(parts[index]!, widthOf(name)));
+    const read = order.map((name, index) => readPart(defined(parts[index]), widthOf(name)));
     if (read.every((value) => value !== undefined))
-      return Object.fromEntries(order.map((name, index) => [name, read[index]!])) as Record<
+      return Object.fromEntries(order.map((name, index) => [name, defined(read[index])])) as Record<
         DatePartName,
         T
       >;
@@ -233,7 +234,9 @@ export function deriveShifts(dates: readonly DateShiftDate[], wordCount: Bip39Wo
   // Sorting makes the input date order irrelevant; years, months and days
   // remain in that fixed order when the shift sequence repeats.
   const sequence = sorted.flatMap((date) => [date.year, date.month, date.day]);
-  return Array.from({ length: wordCount }, (_, index) => sequence[index % sequence.length]!);
+  return Array.from({ length: wordCount }, (_, index) =>
+    defined(sequence[index % sequence.length]),
+  );
 }
 
 /**
@@ -416,7 +419,7 @@ function* combinationsFrom(
   }
   const predecessor = predecessors[index];
   const earlier = predecessor === undefined ? undefined : selected[predecessor];
-  for (const date of candidatesOf(patterns[index]!)) {
+  for (const date of candidatesOf(defined(patterns[index]))) {
     if (earlier !== undefined && compareDates(date, earlier) < 0) continue;
     yield* combinationsFrom(patterns, predecessors, index + 1, [...selected, date]);
   }

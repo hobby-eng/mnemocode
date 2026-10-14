@@ -10,6 +10,7 @@ import { hex, utf8 } from "@scure/base";
 import { Coin, invalidAddress, type CoinAddress } from "./coin.js";
 import { KECCAK_RULES } from "./keccak-account.js";
 import { hexAccountDigits, isHexAccount, HEX_ACCOUNT_DIGITS } from "./other-forms.js";
+import { defined } from "../defined.js";
 
 /** EIP-55: a letter is a capital where the matching digit of the hash is 8 or more. */
 const EIP55_CAPITAL_FROM = 8;
@@ -36,7 +37,7 @@ function eip55(account: Uint8Array): string {
   const hash = keccak_256(utf8.decode(lowercase));
   return [...lowercase]
     .map((character, position) => {
-      const byte = hash[position >> 1]!;
+      const byte = defined(hash[position >> 1]);
       const digit = position % 2 === 0 ? byte >> 4 : byte & 0x0f;
       return digit >= EIP55_CAPITAL_FROM ? character.toUpperCase() : character;
     })

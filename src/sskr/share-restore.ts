@@ -49,6 +49,7 @@ import { ShareSet, type SetBackup } from "./share-set.js";
 import { ShareUnmasking, type ShareMode, type UnmaskedPhrase } from "./share-unmasking.js";
 import { writeShare, type ShareFormat } from "./transport.js";
 import { type SearchRun } from "../core/search-turns.js";
+import { defined } from "../core/defined.js";
 
 /** Why a wallet check of shares needs a whole set: no phrase is restored from fewer. */
 export const WALLET_CHECK_NEEDS_THRESHOLD =
@@ -563,7 +564,7 @@ export class ShareRestore {
         lines: restored.lines,
       };
     return ShareRestore.#exportOutcome(
-      sets[0]!,
+      defined(sets[0]),
       restored.places,
       form,
       restored.lines,
@@ -585,7 +586,7 @@ export class ShareRestore {
       fingerprint: fingerprintOf(
         phrases.find((phrase) => phrase.set === set)?.mnemonic ?? set.mnemonic,
       ),
-      shares: set.shares.map((share, index) => repairedShare(share, places[index]!, form)),
+      shares: set.shares.map((share, index) => repairedShare(share, defined(places[index]), form)),
       repairs: RepairReport.repairs(set, places),
     }));
   }

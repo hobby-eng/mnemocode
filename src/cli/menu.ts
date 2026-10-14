@@ -86,6 +86,7 @@ import {
   sampleOf,
   type Mode,
 } from "./encode-questions.js";
+import { defined } from "../core/defined.js";
 
 /** The menu reads keys from a terminal and draws on one; anything else gets the help instead. */
 export function menuAvailable(): boolean {
@@ -623,7 +624,7 @@ export async function runMenu(): Promise<void> {
   writeHeading(refusal);
   // Drawn again, as it is then, where going back draws the whole screen anew.
   startRecord(() => writeHeading(refusal));
-  let selected: Entry = MENU_ENTRIES[0]!;
+  let selected: Entry = defined(MENU_ENTRIES[0]);
   for (;;) {
     const entries =
       refusal === undefined ? MENU_ENTRIES : MENU_ENTRIES.filter((item) => !item.asksSecrets);
@@ -659,7 +660,11 @@ export async function runMenu(): Promise<void> {
         terminalNotice(`${refusal} ${SECRET_ENTRIES_LEFT_OUT}`, "warning");
       }
       // After the private screen the person has already read the result and pressed Enter.
-      if (code === 0 && PRIVATE_SCREEN_COMMANDS.has(action.run[0]!) && privateScreenAvailable()) {
+      if (
+        code === 0 &&
+        PRIVATE_SCREEN_COMMANDS.has(defined(action.run[0])) &&
+        privateScreenAvailable()
+      ) {
         console.error(paint(STYLE.muted, "The screen with the result was cleared."));
         continue;
       }

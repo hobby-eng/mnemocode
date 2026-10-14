@@ -30,6 +30,7 @@ import { ProgressLine, terminalHint, terminalNotice, terminalStatus } from "./te
 import { counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
+import { defined } from "../core/defined.js";
 
 /** Seconds between two progress updates of a long search. */
 const PROGRESS_SECONDS = 2;
@@ -187,7 +188,7 @@ async function byWallet(
   const dates = search.needsDates ? await askCodeDates(search, true) : undefined;
   const evidence = given ? answers.evidence : await askWallet(answers.place);
   if (evidence === undefined) return undefined;
-  const way = search.byWallet(walletCheckOf(evidence, answers.passphrase)!, dates);
+  const way = search.byWallet(defined(walletCheckOf(evidence, answers.passphrase)), dates);
   if (!(await started(way, answers.maxCandidates))) return undefined;
   return outcomeOf(search, await ran(way));
 }

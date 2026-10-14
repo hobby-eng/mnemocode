@@ -77,6 +77,7 @@ import { trimWhiteSpace } from "../core/white-space.js";
 import { isFirstReceiving } from "../core/wallet-evidence.js";
 import { validCharacters } from "./utf8.js";
 import type { WordHints } from "../core/word-hints.js";
+import { defined } from "../core/defined.js";
 
 /** How a question is asked again. */
 export interface AskOptions {
@@ -678,7 +679,11 @@ export function droppedPath(answer: string, platform: NodeJS.Platform = process.
   const text = answer.trim();
   const quoted = DROPPED_QUOTES.exec(text);
   const path =
-    quoted !== null ? quoted[2]! : platform === "win32" ? text : text.replace(/\\(.)/gsu, "$1");
+    quoted !== null
+      ? defined(quoted[2])
+      : platform === "win32"
+        ? text
+        : text.replace(/\\(.)/gsu, "$1");
   if (path === "~") return homedir();
   return path.startsWith("~/") || (platform === "win32" && path.startsWith("~\\"))
     ? join(homedir(), path.slice(2))

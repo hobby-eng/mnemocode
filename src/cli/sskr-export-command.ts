@@ -36,6 +36,7 @@ import {
   typedShares,
 } from "./sskr-restore-command.js";
 import type { RepairedSet, RepairedShares } from "../sskr/joint-repair.js";
+import { defined } from "../core/defined.js";
 
 /**
  * Asks in which form cards show shares written in different forms; Stop cancels. Without a
@@ -82,7 +83,8 @@ async function exportSet(
   if (checked !== undefined && written.forms.length > 1)
     written = written.inForm(await cardForm(written.forms, r.interactive));
   const saved = written.saved;
-  const options = checked === undefined ? undefined : { ...checked, shareFormat: saved[0]!.format };
+  const options =
+    checked === undefined ? undefined : { ...checked, shareFormat: defined(saved[0]).format };
   await saveShares(saved, args, options, Masking.of(r.mode).masked);
   reportRenamedOutputs();
   if (written.copiesNote !== undefined) terminalNotice(written.copiesNote);
@@ -154,10 +156,10 @@ function showVariants(
   terminalNotice(variantsMessage(variants.length), "warning");
   for (const [index, variant] of variants.entries()) {
     const title = `Variant ${index + 1} of ${variants.length}`;
-    const fingerprint = variant.fingerprint!;
+    const fingerprint = defined(variant.fingerprint);
     if (!terminalResultHeader(title, [[PHRASE_WORDS.originalFingerprint, fingerprint]]))
       console.log(`${title}, original fingerprint ${fingerprint}:`);
-    reportRepairs(sets[index]!, places);
+    reportRepairs(defined(sets[index]), places);
     printShares(
       variant.shares.map((share) => ({
         ur: share.record,
@@ -236,6 +238,6 @@ export async function runSskrExport(args: ParsedArguments): Promise<void> {
     }
     const { sets, places } = restored;
     if (sets.length > 1) return showVariants(restored.phrases, sets, places, given);
-    if (await exportSet(r, sets[0]!, places, given, checked, args)) return;
+    if (await exportSet(r, defined(sets[0]), places, given, checked, args)) return;
   }
 }

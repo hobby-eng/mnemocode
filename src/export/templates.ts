@@ -23,6 +23,7 @@ import type { BusinessArtwork } from "./business-artwork.js";
 import type { AssetSource, QrSource, RandomSource } from "./platform.js";
 import type { CardContent } from "./backup-cards.js";
 import type { ColorCards } from "./card-content.js";
+import { defined } from "../core/defined.js";
 
 // The kinds of cards are the core's (core/types.ts).
 export type { CardKind };
@@ -183,5 +184,5 @@ export function templateNumber(template: CardTemplate): number {
 /** The design that `id`, its id or its number, names among those of `kind` (resolveTemplateId). */
 export function selectTemplate(id?: string, kind?: CardKind): CardTemplate {
   const { id: found } = resolveTemplateId(id, kind);
-  return cardTemplates.find((template) => template.id === found)!;
+  return defined(cardTemplates.find((template) => template.id === found));
 }

@@ -41,6 +41,7 @@ import {
   unicodeIndexesOf,
   wordIndexOfNumber,
 } from "./words.js";
+import { defined } from "./defined.js";
 
 /** How the elements of a form are counted for a phrase: one per word, or one per colour. */
 type ElementUnit = "word" | "color";
@@ -217,7 +218,7 @@ export class EncodedForm {
 
   /** The form that typed text most likely is, judged by its characters. */
   static likely(text: string): EncodedFormat {
-    return LIKELY_ORDER.find((format) => VARIANTS[format].looks(text))!;
+    return defined(LIKELY_ORDER.find((format) => VARIANTS[format].looks(text)));
   }
 
   get format(): EncodedFormat {
@@ -253,7 +254,7 @@ export class EncodedForm {
   /** How many elements of this form a seed phrase of `words` words has: one a word, or a colour. */
   elementCount(words: Bip39WordCount): number {
     if (this.#variant.elementUnit === "word") return words;
-    return RGB_REFERENCE_COUNTS[BIP39_WORD_COUNTS.indexOf(words)]!;
+    return defined(RGB_REFERENCE_COUNTS[BIP39_WORD_COUNTS.indexOf(words)]);
   }
 
   /**

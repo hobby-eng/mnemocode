@@ -73,6 +73,7 @@ import {
   HEIR_SHEET_SIZES,
   DEFAULT_HEIR_SHEET_SIZE,
 } from "../export/heir-sheet.js";
+import { defined } from "../core/defined.js";
 
 /** The dates of a lone ?, every supported date: the attempts of one such date. */
 const EVERY_DATE_COMBINATIONS = datePatternCandidateCount(parseDatePattern(WHOLE_DATE));
@@ -104,7 +105,7 @@ const FORMAT_DESCRIPTIONS: Readonly<Record<EncodedFormat, string>> = {
   unicode:
     "Four-digit Unicode codes of the words of the Traditional Chinese BIP39 list; only the codes are written, spaced or joined",
   "colors-unicode": `The color codes of format ${formatNumber("colors")}, each written as two four-digit Private Use codes; all five lengths; plain text that needs no special font`,
-  colors: `Color codes such as #01AB63: ${COLOR_COUNTS_TEXT} codes for ${BIP39_WORD_COUNTS[0]} to ${BIP39_WORD_COUNTS.at(-1)!} words, BIP39Colors-compatible for 12 and 24 words; MnemoCode also supports 15, 18 and 21. Separated or joined, in any order, but every code is needed`,
+  colors: `Color codes such as #01AB63: ${COLOR_COUNTS_TEXT} codes for ${BIP39_WORD_COUNTS[0]} to ${defined(BIP39_WORD_COUNTS.at(-1))} words, BIP39Colors-compatible for 12 and 24 words; MnemoCode also supports 15, 18 and 21. Separated or joined, in any order, but every code is needed`,
 };
 
 export interface HelpOption {
@@ -260,7 +261,7 @@ const phraseWords: HelpOption = {
   value: BIP39_WORD_COUNTS.join("|"),
   summary: "The words of the seed phrase: read only the codes of so many words",
   details: [
-    `Printed cards end with a few random codes that belong to nothing. The sheet for heirs states the number of words; with it, only the codes of so many words from the start are read, and the cards after them may be typed or left out. In colors, ${BIP39_WORD_COUNTS[0]} words are ${RGB_REFERENCE_COUNTS[0]} codes and ${BIP39_WORD_COUNTS.at(-1)!} words ${RGB_REFERENCE_COUNTS.at(-1)!}.`,
+    `Printed cards end with a few random codes that belong to nothing. The sheet for heirs states the number of words; with it, only the codes of so many words from the start are read, and the cards after them may be typed or left out. In colors, ${BIP39_WORD_COUNTS[0]} words are ${RGB_REFERENCE_COUNTS[0]} codes and ${defined(BIP39_WORD_COUNTS.at(-1))} words ${defined(RGB_REFERENCE_COUNTS.at(-1))}.`,
   ],
 };
 
@@ -800,7 +801,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   decode: {
     summary: "Turn an encoded record back into the phrase",
     about: [
-      `Reads a record in any of the ${numberWord(ENCODED_FORMATS.length)} formats, from text, a file or a QR code, and prints the phrase with its fingerprint. A masked record needs the same dates. A seedshift-legacy-valid record gives every possible last word, each with its fingerprint: ${legacyValidCandidates(BIP39_WORD_COUNTS[0])} candidates for ${BIP39_WORD_COUNTS[0]} words, ${legacyValidCandidates(BIP39_WORD_COUNTS.at(-1)!)} for ${BIP39_WORD_COUNTS.at(-1)!}.`,
+      `Reads a record in any of the ${numberWord(ENCODED_FORMATS.length)} formats, from text, a file or a QR code, and prints the phrase with its fingerprint. A masked record needs the same dates. A seedshift-legacy-valid record gives every possible last word, each with its fingerprint: ${legacyValidCandidates(BIP39_WORD_COUNTS[0])} candidates for ${BIP39_WORD_COUNTS[0]} words, ${legacyValidCandidates(defined(BIP39_WORD_COUNTS.at(-1)))} for ${defined(BIP39_WORD_COUNTS.at(-1))}.`,
       "With --ask-secrets the record is checked before the dates are asked for. Codes without an MNC1 header do not say how they were made: without --mode, MnemoCode asks whether Seedshift was used, and which. Where the codes of a masked record form a valid BIP39 phrase, their encoded fingerprint is shown before the dates, to compare with the one encode showed.",
       "A date may then hold ? for each forgotten digit, as in recover-date: the dates are searched, and the matches listed as recover-date lists them. Before the search the wallet's fingerprint or one of its first receiving addresses, of Bitcoin or another coin, is asked for. It is needed where every date gives a valid phrase, as in seedshift mode; with seedshift-legacy, whose checksum sorts out most dates, it may be left out.",
       "On the private screen the codes may hold ? where one cannot be read: a word number, a word, a Unicode code or a whole color, narrowed by a few letters (ab*), words joined by |, or a ? for one digit. The right codes are told by the encoded fingerprint that encode showed, by the wallet with the dates, which may hold ? too, or by a list where they are few. A Shamir share typed in place of the codes, or read from a QR code, leads to the restore from shares, the share kept as the first; after a share from a QR code the next can be read from another.",
@@ -1023,7 +1024,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     summary: "Find a forgotten digit of a date",
     about: [
       `Tries every date that fits one to ${numberWord(MAX_INCOMPLETE_DATES)} incomplete dates, where each forgotten digit is written as ?, and lists the candidates that pass a recovery check. Every check is local and offline.`,
-      `In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of ${checksumBits(BIP39_WORD_COUNTS[0])} to ${checksumBits(BIP39_WORD_COUNTS.at(-1)!)} bits.`,
+      `In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of ${checksumBits(BIP39_WORD_COUNTS[0])} to ${checksumBits(defined(BIP39_WORD_COUNTS.at(-1)))} bits.`,
       "With --ask-secrets the encoded fingerprint of the codes is shown once they are read, before the dates, as decode shows it, so that a code typed wrongly shows before a long search.",
     ],
     usage: "[OPTIONS] (--ask-secrets | --dates <PATTERN ...>) [<RECOVERY CHECK>]",

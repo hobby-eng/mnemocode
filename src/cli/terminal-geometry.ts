@@ -3,6 +3,7 @@
 // must fit its rows count them here.
 
 import { characterLength } from "./utf8.js";
+import { defined } from "../core/defined.js";
 
 /** Terminal width when the terminal does not say. */
 const DEFAULT_COLUMNS = 80;
@@ -58,7 +59,7 @@ export function placedAfter(
 ): number {
   let end = offset;
   for (let index = from; index < to;) {
-    const size = characterSize(line[index]!);
+    const size = characterSize(defined(line[index]));
     if (index + size > to) break;
     const width = codePointWidth(codePointAt(line, index, size));
     const column = end % columns;
@@ -132,9 +133,10 @@ function codePointWidth(point: number): number {
 
 /** The code point of the UTF-8 character of `size` bytes at `index` (RFC 3629, section 3). */
 function codePointAt(line: Buffer, index: number, size: number): number {
-  const first = line[index]!;
+  const first = defined(line[index]);
   let point = size === 1 ? first : first & (0xff >> (size + 1));
-  for (let part = 1; part < size; part += 1) point = (point << 6) | (line[index + part]! & 0x3f);
+  for (let part = 1; part < size; part += 1)
+    point = (point << 6) | (defined(line[index + part]) & 0x3f);
   return point;
 }
 
@@ -142,7 +144,7 @@ function codePointAt(line: Buffer, index: number, size: number): number {
 export function displayWidthOf(line: Buffer, from: number, to: number): number {
   let width = 0;
   for (let index = from; index < to;) {
-    const size = characterSize(line[index]!);
+    const size = characterSize(defined(line[index]));
     width += codePointWidth(codePointAt(line, index, size));
     index += size;
   }

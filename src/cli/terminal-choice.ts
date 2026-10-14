@@ -38,6 +38,7 @@ import { factLine, STYLE_CODES } from "./terminal-style.js";
 import { isContinuation, validCharacters } from "./utf8.js";
 import type { WordHints } from "../core/word-hints.js";
 import { listInWords } from "../core/places.js";
+import { defined } from "../core/defined.js";
 
 /** Marker, number and the gaps before a label: "› 1  ". */
 const LABEL_INDENT = 5;
@@ -336,8 +337,8 @@ export async function choose<T>(
     const erase = (): void => redrawFrom(rowsOf(drawn) + rowsOf(warning) + questionRows(question));
     const answer = (index: number): T => {
       erase();
-      writeAnswer(options.label, choices[index]!.label);
-      return choices[index]!.value;
+      writeAnswer(options.label, defined(choices[index]).label);
+      return defined(choices[index]).value;
     };
     let drawn = draw();
     for (;;) {
@@ -534,7 +535,7 @@ async function settledAnswer(
 ): Promise<LineOutcome> {
   const entered = enteredAnswer(typed, { ...options, leave: "back" });
   if (entered.kind === "left-out") {
-    writeAnswer(label, options.optional!);
+    writeAnswer(label, defined(options.optional));
     return { kind: "answer", answer: "" };
   }
   if (entered.kind === "refused") return entered;

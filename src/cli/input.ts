@@ -39,6 +39,7 @@ import { englishTokens } from "../core/english-words.js";
 import { listInWords } from "../core/places.js";
 import { DATE_FORMAT_TEXT } from "../core/dates.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
+import { defined } from "../core/defined.js";
 
 /**
  * The words of the seed phrase that --words gives, or undefined: of codes from printed cards, which
@@ -48,7 +49,7 @@ export function phraseWords(args: ParsedArguments): Bip39WordCount | undefined {
   if (value(args, "words") === undefined) return undefined;
   const words = integerOption(args, "words", {
     min: BIP39_WORD_COUNTS[0],
-    max: BIP39_WORD_COUNTS.at(-1)!,
+    max: defined(BIP39_WORD_COUNTS.at(-1)),
     label: "mnemonic word count",
   });
   if (!isBip39WordCount(words))
@@ -81,7 +82,7 @@ export function textInput(arguments_: ParsedArguments, key: "input" | "mnemonic"
     (path === "-"
       ? readBoundedStdin()
       : readBoundedTextFile(
-          path!,
+          defined(path),
           key === "mnemonic" ? "The mnemonic file" : "The encoded input file",
         ))
   );
@@ -195,7 +196,7 @@ export async function backupFromOptions(
   const conflict = reading.formatConflict(given);
   if (conflict !== undefined) throw new Error(conflict);
   const fitting = reading.formats(given);
-  let format = fitting[0]!;
+  let format = defined(fitting[0]);
   // A record or --format names the form; only a detected one is announced.
   if (!reading.hasRecord && given === undefined) {
     if (fitting.length > 1 && !terminalAvailable())

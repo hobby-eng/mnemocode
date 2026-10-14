@@ -1,3 +1,4 @@
+import { defined } from "../core/defined.js";
 // What a card prints for each element of a backup: the hex code of its color, which is the element
 // itself in the color forms; or, for a Shamir share written in another form, the share's own code
 // in that form (a word number, a Unicode code, a Bytewords word), when the colors only decorate the
@@ -15,7 +16,7 @@ export interface PrintedCodes {
 
 /** The code that the card of the element at `index` prints, without a #. */
 export function printedCode(content: PrintedCodes, index: number): string {
-  return content.labels?.[index] ?? content.colors[index]!.slice(1).toUpperCase();
+  return content.labels?.[index] ?? defined(content.colors[index]).slice(1).toUpperCase();
 }
 
 /**

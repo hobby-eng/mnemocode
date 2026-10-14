@@ -15,6 +15,7 @@ import { indexesToColors, RGB_MAX_VALUE, RGB_REFERENCE_COUNTS, rgbHex } from "..
 import { unicodeCodesOfIndexes } from "../core/words.js";
 import { codeColors } from "./card-palette.js";
 import { checkedChoice, type UniformChoice } from "./platform.js";
+import { defined } from "../core/defined.js";
 
 /** The most decoys that a set of cards takes: more than any sheet needs to fill its last row. */
 export const MAX_DECOYS = 16;
@@ -55,7 +56,9 @@ export function ownCards(cards: DecoyCards): number {
 
 /** The Unicode code of a random word: a decoy beside the Unicode codes of a phrase or a share. */
 function wordCode(random: UniformChoice): string {
-  return unicodeCodesOfIndexes([checkedChoice(random, BIP39_DICTIONARY_SIZE, RANDOM_REFUSAL)])[0]!;
+  return defined(
+    unicodeCodesOfIndexes([checkedChoice(random, BIP39_DICTIONARY_SIZE, RANDOM_REFUSAL)])[0],
+  );
 }
 
 /**
@@ -70,7 +73,7 @@ function phraseColor(random: UniformChoice, colorCount: number): string {
       checkedChoice(random, BIP39_DICTIONARY_SIZE, RANDOM_REFUSAL),
     ),
   );
-  return colors[checkedChoice(random, colors.length, RANDOM_REFUSAL)]!;
+  return defined(colors[checkedChoice(random, colors.length, RANDOM_REFUSAL)]);
 }
 
 /** A random colour: a decoy beside a share's colours, which look random themselves. */

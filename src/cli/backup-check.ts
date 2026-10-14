@@ -39,6 +39,7 @@ import { SHARE_SEPARATOR, SHARE_WORD_HINTS } from "../sskr/share-input.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { SHARE_ANSWER_HINT } from "./share-repair.js";
 import { refusalMessage } from "../core/refusal.js";
+import { defined } from "../core/defined.js";
 
 /** A seed phrase typed in place of the shares is sent to the menu's entry that decodes it. */
 const SHARE_CHECK_TEXTS = { decodeEntry: MENU_ENTRY_NAMES.decode.label };
@@ -248,7 +249,7 @@ async function askShares(check: ShareBackupCheck, problem: string | undefined): 
       (share, index) => check.shareProblem(index + 1, share) !== undefined,
     );
     if (place < 0) return shares;
-    terminalNotice(check.shareProblem(place + 1, shares[place]!)!, "warning");
+    terminalNotice(defined(check.shareProblem(place + 1, defined(shares[place]))), "warning");
     shares[place] = await askSecretUntil(
       `Share ${place + 1} as written down:`,
       (answer) => {

@@ -3,6 +3,7 @@ import { channelsHex, rgbChannels } from "./color-math.js";
 import { isRgbReference, rgbReferenceDigits } from "../core/colors.js";
 import type { MaterialStyle } from "./card-settings.js";
 import { capitalized } from "../core/prose.js";
+import { defined } from "../core/defined.js";
 
 // The styles are named with the other card settings, which the template catalog reads without
 // this artwork.
@@ -504,7 +505,8 @@ const MATCH_LIGHTNESS_WEIGHT = 0.5;
  * with the photograph by TINT_OPACITY.
  */
 export function tintedLook(base: string, tint: string): string {
-  const luminosity = ([r, g, b]: number[]) => 0.3 * r! + 0.59 * g! + 0.11 * b!;
+  const luminosity = ([r, g, b]: number[]) =>
+    0.3 * defined(r) + 0.59 * defined(g) + 0.11 * defined(b);
   const backdrop: number[] = rgbChannels(base);
   const light = luminosity(backdrop);
   const shifted = rgbChannels(tint).map((v, _, all) => v + light - luminosity(all));
@@ -516,7 +518,9 @@ export function tintedLook(base: string, tint: string): string {
     if (high > 1) v = light + ((v - light) * (1 - light)) / (high - light);
     return v;
   });
-  return channelsHex(backdrop.map((v, i) => (1 - TINT_OPACITY) * v + TINT_OPACITY * clipped[i]!));
+  return channelsHex(
+    backdrop.map((v, i) => (1 - TINT_OPACITY) * v + TINT_OPACITY * defined(clipped[i])),
+  );
 }
 
 /**
@@ -537,7 +541,7 @@ export function materialSamples(style: MaterialStyle): MaterialSample[] {
         ? candidate
         : best,
     );
-    const surface = finish.surface!;
+    const surface = defined(finish.surface);
     const label = catalogue.surfaceFirst
       ? `${capitalized(surface)} ${name.toLowerCase()}`
       : `${name} ${surface}`;
@@ -565,7 +569,11 @@ export function chooseMaterialSamples(
   const codes = [...new Set(references.map(rgbReferenceDigits))];
   if (codes.length > samples.length)
     throw new Error(`The ${style} material offers only ${samples.length} distinct samples.`);
-  const point = ([l, a, b]: readonly number[]) => [l! * MATCH_LIGHTNESS_WEIGHT, a!, b!];
+  const point = ([l, a, b]: readonly number[]) => [
+    defined(l) * MATCH_LIGHTNESS_WEIGHT,
+    defined(a),
+    defined(b),
+  ];
   const looks = samples.map((sample) => point(lab(sample.look)));
   const pairs = codes.flatMap((code, c) => {
     const [l, a, b] = lab(code);
@@ -579,11 +587,13 @@ export function chooseMaterialSamples(
   const taken = new Set<number>();
   for (const { c, s } of pairs) {
     if (chosen[c] !== undefined || taken.has(s)) continue;
-    chosen[c] = samples[s]!;
+    chosen[c] = defined(samples[s]);
     taken.add(s);
   }
-  return references.map((reference) => chosen[codes.indexOf(rgbReferenceDigits(reference))]!);
+  return references.map((reference) =>
+    defined(chosen[codes.indexOf(rgbReferenceDigits(reference))]),
+  );
 }
 
 const labDistance = (a: readonly number[], b: readonly number[]) =>
-  a.reduce((sum, v, i) => sum + (v - b[i]!) ** 2, 0);
+  a.reduce((sum, v, i) => sum + (v - defined(b[i])) ** 2, 0);

@@ -15,6 +15,7 @@ import { joinedDocuments, savedWithoutMetadata, type NamedDocument } from "./pdf
 import { assertColorCardContent, EMPTY_CARD_COLLECTION } from "./card-content.js";
 import { withPlannedDecoys } from "./card-plan.js";
 import { SHEETS_ONLY, sheetsOnly } from "./template-catalog.js";
+import { defined } from "../core/defined.js";
 
 /** One card output: the design that draws it and the content it draws. */
 export interface CardJob {
@@ -79,7 +80,11 @@ export async function renderCards(
       assertIndividualTemplate(template, jobs.length > 1);
   }
   // One person and one set of texts for every design; the employer suits the first.
-  const details = ExportDetails.of(drawing.randomInt, jobs[0]!.content, jobs[0]!.template.style);
+  const details = ExportDetails.of(
+    drawing.randomInt,
+    defined(jobs[0]).content,
+    defined(jobs[0]).template.style,
+  );
   const pages: Uint8Array[] = [];
   for (const { template, content } of jobs) {
     if (template.kind !== content.kind)
@@ -109,7 +114,7 @@ export async function renderCards(
     pages.push(bytes);
   }
   if (pages.length === 1) {
-    return savedWithoutMetadata(await PDFDocument.load(pages[0]!));
+    return savedWithoutMetadata(await PDFDocument.load(defined(pages[0])));
   }
   return joinedDocuments(pages);
 }
@@ -151,7 +156,7 @@ export async function renderIndividualCards(
 ): Promise<RenderedCard[]> {
   assertIndividualCards(template, content);
   // Checked by assertIndividualCards.
-  const renderIndividual = template.renderIndividual!;
+  const renderIndividual = defined(template.renderIndividual);
   const { profile, presentation } = ExportDetails.of(drawing.randomInt, content, template.style);
   const resolvedContent = await plannedContent(
     drawing,

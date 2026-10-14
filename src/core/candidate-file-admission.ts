@@ -6,6 +6,7 @@ import { base64nopad } from "@scure/base";
 import { wipeAll } from "./bits.js";
 import { MAX_CANDIDATE_LIST_BYTES, OpenedCandidateList } from "./candidate-list.js";
 import { assertCandidateFileSize, CandidateFileRefusedError } from "./candidate-file-refusal.js";
+import { defined } from "./defined.js";
 
 /** More than any supported single-stanza binary age header needs. */
 const MAX_HEADER_BYTES = 64 * 1024;
@@ -151,7 +152,7 @@ export class CandidateFileAdmission {
     );
     if (lock === undefined) throw this.#recipientRefusal();
     if (stanzas.length !== 1) throw this.#recipientRefusal(type);
-    if (lock === "passphrase" && stanzas[0]![2] !== String(SCRYPT_LOG_N))
+    if (lock === "passphrase" && defined(stanzas[0])[2] !== String(SCRYPT_LOG_N))
       throw new CandidateFileRefusedError(
         "unsupported",
         `The candidate file must use the scrypt work factor ${SCRYPT_LOG_N}.`,
@@ -159,16 +160,17 @@ export class CandidateFileAdmission {
     // These recipients wrap a 16-byte file key with a 16-byte tag: one 32-byte body line.
     // Checking that shape also keeps a false MAC marker from hiding a later, unbounded header.
     try {
-      const stanza = stanzas[0]!;
+      const stanza = defined(stanzas[0]);
       const passphrase = lock === "passphrase";
       if (
         end !== MAC_LINE_INDEX ||
-        !lines[1]!.startsWith(STANZA_LINE_START) ||
+        !defined(lines[1]).startsWith(STANZA_LINE_START) ||
         stanza.length !== (passphrase ? 3 : 2) ||
-        base64nopad.decode(stanza[1]!).length !==
+        base64nopad.decode(defined(stanza[1])).length !==
           (passphrase ? SCRYPT_SALT_BYTES : X25519_KEY_BYTES) ||
-        base64nopad.decode(lines[2]!).length !== WRAPPED_KEY_BYTES ||
-        base64nopad.decode(lines[end]!.slice(MAC_LINE_START.length)).length !== HEADER_MAC_BYTES
+        base64nopad.decode(defined(lines[2])).length !== WRAPPED_KEY_BYTES ||
+        base64nopad.decode(defined(lines[end]).slice(MAC_LINE_START.length)).length !==
+          HEADER_MAC_BYTES
       )
         throw new Error("invalid supported header");
     } catch {

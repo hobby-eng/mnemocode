@@ -25,6 +25,7 @@ import { backupCardContent, type CardBackup, type CardContent } from "./backup-c
 import type { CardSettings } from "./card-settings.js";
 import { renderCards, renderIndividualCards, type CardJob } from "./render.js";
 import { cardTemplates, selectTemplate, type CardDrawing, type CardTemplate } from "./templates.js";
+import { defined } from "../core/defined.js";
 
 /** The lengths of a sample phrase, as BIP39 has them. */
 export const SAMPLE_WORD_COUNTS = BIP39_WORD_COUNTS;
@@ -41,7 +42,7 @@ export const ONE_DESIGN_FOR_SEPARATE_CARDS =
 /** The length of the sample phrase when none is chosen: the shortest. */
 export const DEFAULT_SAMPLE_WORDS: SampleWordCount = BIP39_WORD_COUNTS[0];
 /** The longest sample phrase: the most codes, and the most cards, that a backup prints. */
-export const LONGEST_SAMPLE_WORDS: SampleWordCount = BIP39_WORD_COUNTS.at(-1)!;
+export const LONGEST_SAMPLE_WORDS: SampleWordCount = defined(BIP39_WORD_COUNTS.at(-1));
 /** The length of a sample phrase, in words: one of BIP39's. */
 export type SampleWordCount = Bip39WordCount;
 
@@ -127,7 +128,7 @@ export class CardPreview {
   /** The one design of separate sample cards with its content (assertOneDesign). */
   separateCardsJob(selection: DesignSelection): CardJob {
     CardPreview.assertOneDesign(selection);
-    return this.jobs(selection)[0]!;
+    return defined(this.jobs(selection)[0]);
   }
 
   /** One design, by its name or number, or the first one; as one PDF. */

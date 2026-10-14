@@ -22,6 +22,7 @@ import {
   type TopicHelp,
 } from "./help-pages.js";
 import { STYLE, terminalPaint, wrapText } from "./terminal.js";
+import { defined } from "../core/defined.js";
 
 /** Width of the help texts, as in `mhfe --help`: an 80-column terminal, also in a wider one. */
 const HELP_WIDTH = 80;
@@ -299,7 +300,7 @@ function templateRows(): string[] {
 
 /** `mnemocode help <topic>`. */
 export function printTopicHelp(name: string): void {
-  const topic: TopicHelp = topicHelp[name]!;
+  const topic: TopicHelp = defined(topicHelp[name]);
   const blocks: string[] = [topic.summary];
   for (const part of topic.sections) {
     const lines: string[] = [];

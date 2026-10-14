@@ -34,6 +34,7 @@ import {
   SELF_TEST_CARD_DETAILS,
   WIDTH_TOLERANCE_POINTS,
 } from "./self-test-cards.js";
+import { defined } from "../core/defined.js";
 
 /** The first two shares of the official vector: members 1 and 2 of its first group. */
 const SHARES = [
@@ -78,10 +79,10 @@ function qrCodesOf(set: ShareCardSet): string {
 function checkShareCardsStartup(): void {
   const shares = Share.readSet(SHARES, false);
   expectSame(shares.map(shareReference).join(" "), REFERENCES, "Share card references");
-  const colors = shareCardFace(shares[0]!, "colors");
+  const colors = shareCardFace(defined(shares[0]), "colors");
   expectSame(colors.payload, sskrVector.firstShareColors.join(" "), "Share card QR code in colors");
   expectSame(colors.labels, undefined, "Share cards in colors print their colors");
-  const codes = shareCardFace(shares[0]!, "unicode");
+  const codes = shareCardFace(defined(shares[0]), "unicode");
   expectSame(codes.payload, sskrVector.firstShareUnicode, "Share card QR code in Unicode codes");
   expectSame(codes.labels?.join(" "), sskrVector.firstShareUnicode, "Share card Unicode codes");
   // One color for each distinct code, and the same color for the same code.
@@ -93,7 +94,7 @@ function checkShareCardsStartup(): void {
     "Share forms with cards",
   );
   expectRefused(
-    () => Share.readSet([SHARES[0]!.replace(/w$/u, "y"), SHARES[1]!], false),
+    () => Share.readSet([defined(SHARES[0]).replace(/w$/u, "y"), defined(SHARES[1])], false),
     /checksum|Bytewords/u,
     "Share cards of a damaged share",
   );
@@ -154,15 +155,20 @@ async function checkShareCards(drawing: CardDrawing): Promise<void> {
     if (Math.abs(page.getWidth() - A6_WIDTH_POINTS) > WIDTH_TOLERANCE_POINTS)
       throw new Error("Share card A6 dimensions mismatch.");
   const [first] = cards.qrCodes;
-  assertShareQr(sskrVector.firstShareColors, first!.payload);
+  assertShareQr(sskrVector.firstShareColors, defined(first).payload);
   expectRefused(
-    () => assertShareQr(sskrVector.firstShareColors, cards.qrCodes[1]!.payload),
+    () => assertShareQr(sskrVector.firstShareColors, defined(cards.qrCodes[1]).payload),
     /does not match/u,
     "A QR code of another share",
   );
   // Cards that print Unicode codes: the QR code must hold the share those spell.
   expectRefused(
-    () => assertShareQr([], unicode.qrCodes[1]!.payload, sskrVector.firstShareUnicode.split(" ")),
+    () =>
+      assertShareQr(
+        [],
+        defined(unicode.qrCodes[1]).payload,
+        sskrVector.firstShareUnicode.split(" "),
+      ),
     /does not match/u,
     "A QR code of another share beside Unicode codes",
   );

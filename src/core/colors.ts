@@ -15,6 +15,7 @@ import {
 import { inWholeRange } from "./typed-number.js";
 import { listInWords } from "./places.js";
 import { listPieces, textPieces } from "./pieces.js";
+import { defined } from "./defined.js";
 
 const RGB_PAYLOAD_DIGITS = 6;
 const ORDER_TAG_DIGITS = 2;
@@ -36,7 +37,7 @@ export const RGB_REFERENCE_COUNTS: readonly number[] = BIP39_WORD_COUNTS.map(
   (words) => (words * WORD_NUMBER_DIGITS) / RGB_PAYLOAD_DIGITS,
 );
 /** The colors of a phrase as the help and the questions name them: "8 to 16". */
-export const COLOR_COUNTS_TEXT = `${RGB_REFERENCE_COUNTS[0]} to ${RGB_REFERENCE_COUNTS.at(-1)!}`;
+export const COLOR_COUNTS_TEXT = `${RGB_REFERENCE_COUNTS[0]} to ${defined(RGB_REFERENCE_COUNTS.at(-1))}`;
 /** A #RRGGBB color code, upper case. */
 const COLOR_CODE = new RegExp(`^#[0-9A-F]{${RGB_HEX_DIGITS}}$`, "u");
 /** Why colors are refused whose order tags are not those of one BIP39Colors set. */
@@ -147,7 +148,7 @@ export function colorsToIndexes(given: readonly string[]): number[] {
   // behavior here; enforcing a zero first tag would reject existing records.
   const expectedDifference = orderTagStep(colors.length);
   for (let index = 1; index < encoded.length; index += 1) {
-    if (encoded[index]!.tag - encoded[index - 1]!.tag !== expectedDifference) {
+    if (defined(encoded[index]).tag - defined(encoded[index - 1]).tag !== expectedDifference) {
       throw new Error(INVALID_COLOR_SET);
     }
   }
@@ -278,7 +279,7 @@ function colorUnicodePoints(value: string): number[] {
     ? textPieces(compact, COLOR_UNICODE_CODE_POINT_DIGITS, (code) => Number.parseInt(code, 16))
     : Array.from(value)
         .filter((point) => !/\s/u.test(point))
-        .map((point) => point.codePointAt(0)!);
+        .map((point) => defined(point.codePointAt(0)));
 }
 
 /** Two code points per color back to #RRGGBB codes, for any number of colors. */
@@ -288,7 +289,7 @@ function colorsFromUnicodePoints(points: readonly number[]): string[] {
   // Every point is checked before any color is made, so that the message names the points.
   assertColorUnicodePoints(points);
   return listPieces(points, COLOR_UNICODE_POINTS_PER_COLOR).map(([high, low]) =>
-    colorOfUnicodePair(high!, low!),
+    colorOfUnicodePair(defined(high), defined(low)),
   );
 }
 
@@ -331,6 +332,6 @@ export function colorSymbolsOf(text: string): string[] | undefined {
  */
 export function markedColorSymbols(text: string): string[] | undefined {
   return colorSymbolsOf(text)?.map((symbol) =>
-    symbol === "?" ? "?" : hexCodePoint(symbol.codePointAt(0)!),
+    symbol === "?" ? "?" : hexCodePoint(defined(symbol.codePointAt(0))),
   );
 }

@@ -31,6 +31,7 @@ import {
   type SystemAccess,
   type SystemSandbox,
 } from "./system-sandbox.js";
+import { defined } from "../core/defined.js";
 
 /**
  * The Node.js options that a start outside the permission model runs again with
@@ -96,7 +97,7 @@ export async function relaunchProtected(argv: readonly string[]): Promise<number
 export async function runInOwnProcess(run: readonly string[]): Promise<number> {
   const script = process.argv[1];
   // The executable carries its options; a script names them again, with itself.
-  const args = isSea() ? [...run] : [...process.execArgv, script!, ...run];
+  const args = isSea() ? [...run] : [...process.execArgv, defined(script), ...run];
   return exitCodeOf(spawn(process.execPath, args, { stdio: "inherit" }));
 }
 
@@ -134,7 +135,7 @@ export function assertProtected(): void {
     throw new Error(
       `MnemoCode could not switch off core dumps (${dumps.reason ?? "unknown reason"}); it asks for no secret without that.`,
     );
-  if (process.permission!.has("ffi"))
+  if (defined(process.permission).has("ffi"))
     throw new Error("MnemoCode could still call native code; it asks for no secret so.");
 }
 
@@ -180,8 +181,8 @@ export function dropUnneededAfterAnswers(args: ParsedArguments): void {
 
 /** Gives up the rights of the permission model that `needed` does not name. */
 function dropPermissions(needed: SandboxNeeds): void {
-  if (!needed.runsPrograms) process.permission!.drop("child");
-  if (!needed.writes) process.permission!.drop("fs.write");
+  if (!needed.runsPrograms) defined(process.permission).drop("child");
+  if (!needed.writes) defined(process.permission).drop("fs.write");
 }
 
 /**
@@ -191,13 +192,13 @@ function dropPermissions(needed: SandboxNeeds): void {
  */
 export function dropForMenu(): void {
   if (!underProtection()) return;
-  process.permission!.drop("ffi");
-  process.permission!.drop("fs.write");
+  defined(process.permission).drop("ffi");
+  defined(process.permission).drop("fs.write");
 }
 
 function restrictThenDropFfi(needs: SandboxNeeds): void {
   sandbox.restrict(needs);
-  process.permission!.drop("ffi");
+  defined(process.permission).drop("ffi");
 }
 
 /** What protects this process now, for the private screen: all of it. */
@@ -215,7 +216,7 @@ function permissionParts(): string[] {
   const parts: string[] = [];
   if (sandbox.coreDumps().state === "off") parts.push("no core dumps");
   if (underProtection()) {
-    const permission = process.permission!;
+    const permission = defined(process.permission);
     if (!permission.has("net")) parts.push("no network");
     if (!permission.has("child")) parts.push("no other programs");
     if (!permission.has("fs.write")) parts.push("no file writes");

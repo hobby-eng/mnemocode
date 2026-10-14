@@ -78,6 +78,7 @@ import { withCtrlCWatch } from "./terminal-input.js";
 import { SHARE_SOURCE_OPTIONS } from "./share-options.js";
 import { reportOriginalFingerprint, showOriginalPhrase } from "./fingerprint-report.js";
 import { isMasterKeyPath } from "../core/wallet-check.js";
+import { defined } from "../core/defined.js";
 
 export const sskrInputOptions = [...SHARE_SOURCE_OPTIONS, "ask-secrets"] as const;
 
@@ -217,7 +218,7 @@ interface RestoreRules {
 async function askShareDates(r: Recovery, words: number | undefined): Promise<DatesAnswer> {
   // Off the private screen recoverySettings has refused a masked mode without dates, so the dates
   // given can only be too many for the phrase.
-  if (!r.interactive) throw new Error(r.dates!.tooManyFor(words));
+  if (!r.interactive) throw new Error(defined(r.dates).tooManyFor(words));
   return askDates({ wordCount: words, patterns: true });
 }
 
@@ -321,7 +322,7 @@ export async function restorePhrases(r: Recovery, rules: RestoreRules): Promise<
     if (!r.interactive || !Masking.of(r.mode).masked || encodedShown) return;
     // Marked shares restore their phrases only in the search, after the dates.
     if (repair !== undefined || sets === undefined) return;
-    showSetFingerprint(sets[0]!);
+    showSetFingerprint(defined(sets[0]));
     encodedShown = true;
   };
   /**
@@ -380,7 +381,7 @@ export async function restorePhrases(r: Recovery, rules: RestoreRules): Promise<
         }
       } else {
         if (sets === undefined) {
-          const found = await searchShareRepair(repair!, r.limits, await dateWork(r));
+          const found = await searchShareRepair(defined(repair), r.limits, await dateWork(r));
           if (found === undefined || found.length === 0) {
             // A search not made leaves the plan, which the shares typed next do not use: it is
             // wiped now, before they are asked. A search wiped it already, which is no harm.

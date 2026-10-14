@@ -73,6 +73,7 @@ import { type EncodedFormat } from "../core/types.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { WordList } from "../core/word-hints.js";
 import { bytewords } from "./bytewords-list.js";
+import { defined } from "../core/defined.js";
 
 /** The bytes of the CRC32 checksum at the end of a share's bytes. */
 export const CHECKSUM_BYTES = CRC32_BYTES;
@@ -118,16 +119,16 @@ function sharePayload(transport: Uint8Array): Uint8Array {
   const cbor = transport.subarray(0, -CHECKSUM_BYTES);
   let offset = 0;
   if (cbor[0] === CBOR_UINT16_TAG) {
-    const tag = (cbor[1]! << 8) | cbor[2]!;
+    const tag = (defined(cbor[1]) << 8) | defined(cbor[2]);
     if (!SSKR_CBOR_TAGS.includes(tag)) throw new Error("Not an SSKR CBOR tag.");
     offset = CBOR_TAG_BYTES;
   }
-  const header = cbor[offset++]!;
+  const header = defined(cbor[offset++]);
   let payloadLength = -1;
   if (header >= CBOR_BYTE_STRING && header < CBOR_BYTE_STRING + CBOR_SHORT_LENGTH_LIMIT) {
     payloadLength = header - CBOR_BYTE_STRING;
   } else if (header === CBOR_BYTE_STRING_ONE_BYTE_LENGTH) {
-    payloadLength = cbor[offset++]!;
+    payloadLength = defined(cbor[offset++]);
   }
   if (payloadLength !== cbor.length - offset || !SHARE_LENGTHS.has(payloadLength)) {
     throw new Error("Invalid SSKR share byte string.");
@@ -153,15 +154,15 @@ export interface ShareInfo {
 export function shareInfo(transport: Uint8Array): ShareInfo {
   const payload = sharePayload(transport);
   const info: ShareInfo = {
-    identifier: (payload[0]! << 8) | payload[1]!,
-    groupThreshold: storedCount(payload[GROUP_BYTE]! >>> NIBBLE_BITS),
-    groupCount: storedCount(payload[GROUP_BYTE]! & LOW_NIBBLE),
-    groupIndex: payload[MEMBER_THRESHOLD_BYTE]! >>> NIBBLE_BITS,
-    memberThreshold: storedCount(payload[MEMBER_THRESHOLD_BYTE]! & LOW_NIBBLE),
-    memberIndex: payload[MEMBER_BYTE]! & LOW_NIBBLE,
+    identifier: (defined(payload[0]) << 8) | defined(payload[1]),
+    groupThreshold: storedCount(defined(payload[GROUP_BYTE]) >>> NIBBLE_BITS),
+    groupCount: storedCount(defined(payload[GROUP_BYTE]) & LOW_NIBBLE),
+    groupIndex: defined(payload[MEMBER_THRESHOLD_BYTE]) >>> NIBBLE_BITS,
+    memberThreshold: storedCount(defined(payload[MEMBER_THRESHOLD_BYTE]) & LOW_NIBBLE),
+    memberIndex: defined(payload[MEMBER_BYTE]) & LOW_NIBBLE,
     secretLength: payload.length - SHARE_METADATA_BYTES,
   };
-  const reservedBits = payload[MEMBER_BYTE]! >>> NIBBLE_BITS;
+  const reservedBits = defined(payload[MEMBER_BYTE]) >>> NIBBLE_BITS;
   if (
     reservedBits !== 0 ||
     info.groupThreshold > info.groupCount ||
@@ -200,7 +201,7 @@ export function urToTransport(value: string): Uint8Array {
   if (!body || body.length % 2 !== 0 || body.length > MAX_TRANSPORT_BYTES * 2) {
     throw new Error("Expected a single-part ur:sskr record.");
   }
-  const pairs = body.toLowerCase().match(/../gu)!;
+  const pairs = defined(body.toLowerCase().match(/../gu));
   const bytes = decodedBytes(pairs, SHARE_UNITS.ur, "Unknown Bytewords pair in SSKR record.");
   // The bytes are the caller's once they are checked; a share refused here is wiped first.
   try {
@@ -221,7 +222,7 @@ export function urToTransport(value: string): Uint8Array {
  */
 function canonicalCbor(transport: Uint8Array): Uint8Array {
   const payload = sharePayload(transport);
-  const head = byteStringHeads(payload.length)[0]!;
+  const head = defined(byteStringHeads(payload.length)[0]);
   const cbor = new Uint8Array(head.length + payload.length);
   cbor.set(head);
   cbor.set(payload, head.length);
@@ -316,7 +317,7 @@ function parseColorValues(value: string): number[] {
   const codes =
     value.length > MAX_COLOR_TEXT_LENGTH ? undefined : completeHexUnits(value, RGB_HEX_DIGITS);
   if (codes === undefined) throw new Error("Invalid SSKR RGB codes. Preserve their printed order.");
-  return codes.map((code) => SHARE_UNITS.colors.valueOf(code)!);
+  return codes.map((code) => defined(SHARE_UNITS.colors.valueOf(code)));
 }
 
 /** The share of `value` written in colors, as a UR; refuses colors that are no share. */
@@ -369,7 +370,7 @@ export const MIRRORED_FORM = Object.freeze({
  */
 export function shareFormatMirroring(form: EncodedFormat): ShareFormat {
   EncodedForm.of(form);
-  return SHARE_FORMATS.find((format) => format !== "ur" && MIRRORED_FORM[format] === form)!;
+  return defined(SHARE_FORMATS.find((format) => format !== "ur" && MIRRORED_FORM[format] === form));
 }
 
 /** The share forms written in colors, as --format writes a seed phrase in colors. */
@@ -432,7 +433,7 @@ export function writeShare(share: string, format: ShareFormat): string {
     case "colors-unicode": {
       // MnemoCode's own forms: the units of the mixed layout that the form holds.
       const { mixed, text } = SHARE_UNITS[format];
-      return text(mixedUnits(share, mixed!));
+      return text(mixedUnits(share, defined(mixed)));
     }
   }
 }

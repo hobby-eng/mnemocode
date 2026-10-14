@@ -8,6 +8,7 @@
 // commands, which name a design by its id or its number (a test pins them).
 
 import type { CardKind } from "../core/types.js";
+import { defined } from "../core/defined.js";
 
 /** The business designs, in their order; "mixed" draws the others in turn. */
 export const BUSINESS_STYLES = Object.freeze([
@@ -94,7 +95,7 @@ export function assertSeparateCards(entry: CatalogEntry): void {
 }
 
 /** The design of colour cards when none is named: the first. */
-export const DEFAULT_TEMPLATE_ID = TEMPLATE_CATALOG[0]!.id;
+export const DEFAULT_TEMPLATE_ID = defined(TEMPLATE_CATALOG[0]).id;
 /** The design of share cards when none is named, chosen for shares on its own. */
 export const DEFAULT_SHARE_TEMPLATE_ID = "business-it";
 

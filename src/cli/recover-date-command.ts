@@ -46,6 +46,7 @@ import { terminalNotice } from "./terminal.js";
 import { InputCancelledError } from "./terminal-input.js";
 import { counting } from "../core/search-plan.js";
 import type { MaskingMode } from "../core/types.js";
+import { defined } from "../core/defined.js";
 
 /**
  * Checksum-valid Seedshift gives a valid phrase for every date, so only the wallet can tell the
@@ -185,7 +186,7 @@ function search(
 
 /** Saves every match as a candidate list. */
 async function saveList(settings: Settings, result: DateSearchResult): Promise<void> {
-  await settings.target!.savePhrases(result.kept, settings.passphrase);
+  await defined(settings.target).savePhrases(result.kept, settings.passphrase);
 }
 
 /** What is asked next on the private screen. */
@@ -219,24 +220,30 @@ async function recoverWithQuestions(args: ParsedArguments, settings: Settings): 
       // Dates kept from before still count if the new phrase takes as many.
       step = dates?.fitsPhrase(backup.indexes.length) === true ? "wallet" : "dates";
     } else if (step === "dates") {
-      dates = await askRecoveryDates(backup!);
+      dates = await askRecoveryDates(defined(backup));
       step = "wallet";
     } else if (step === "wallet") {
-      if (evidence !== undefined || !walletNeeded(backup!.mode)) step = "search";
+      if (evidence !== undefined || !walletNeeded(defined(backup).mode)) step = "search";
       else {
         const answer = await askWalletEvidence({
           optional: false,
-          explanation: walletExplanation(backup!.mode),
+          explanation: walletExplanation(defined(backup).mode),
           place: settings.place,
         });
         if (answer.kind === "wallet") evidence = answer.evidence;
         step = answer.kind === "back" ? "dates" : "search";
       }
     } else {
-      const { mode } = backup!;
+      const { mode } = defined(backup);
       Masking.assertMaskedMode(mode);
       await settings.target?.prepare(settings.passphrase);
-      const result = await search(backup!.indexes, dates!, mode, evidence, settings);
+      const result = await search(
+        defined(backup).indexes,
+        defined(dates),
+        mode,
+        evidence,
+        settings,
+      );
       // A search longer than allowed that the person did not want: the dates are typed again.
       if (result === undefined) {
         step = "dates";

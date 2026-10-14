@@ -106,6 +106,7 @@ export {
 } from "../core/date-search.js";
 import type { EncodedFormat } from "../core/types.js";
 import { EncodedForm } from "../core/encoded-form.js";
+import { defined } from "../core/defined.js";
 
 /**
  * Why the wallet is asked for before a date search in `mode`, shown with the question: the
@@ -486,7 +487,7 @@ async function settledMode(
   const given = value(question.args, "mode") as MaskingMode | undefined;
   const conflict = reading.modeConflict(given);
   if (conflict !== undefined) {
-    const named = reading.mode()!;
+    const named = defined(reading.mode());
     const choice = await askAfterFailure(
       conflict,
       [
@@ -537,10 +538,13 @@ async function settledFormat(
     const [recorded] = reading.formats();
     const choice = await askAfterFailure(
       conflict,
-      [{ label: `Read them as ${recorded!}`, value: "record" }, source.againChoice()] as const,
+      [
+        { label: `Read them as ${defined(recorded)}`, value: "record" },
+        source.againChoice(),
+      ] as const,
       { escape: "asks again" },
     );
-    return choice === "record" ? recorded! : { again: undefined };
+    return choice === "record" ? defined(recorded) : { again: undefined };
   }
   let fitting: EncodedFormat[];
   try {
@@ -549,7 +553,7 @@ async function settledFormat(
     return { again: refusal(error) };
   }
   // A record or --format names the format; only a detected one is announced.
-  if (reading.hasRecord || given !== undefined) return fitting[0]!;
+  if (reading.hasRecord || given !== undefined) return defined(fitting[0]);
   const format = await detectedFormat(fitting, "asks for the codes again");
   return format ?? { again: undefined };
 }

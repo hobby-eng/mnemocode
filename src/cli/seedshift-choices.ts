@@ -5,6 +5,7 @@
 
 import type { SplitMode } from "../core/masking.js";
 import type { Choice } from "./terminal-choice.js";
+import { defined } from "../core/defined.js";
 
 /** The variants that a question offers. */
 export type OfferedSeedshift = "seedshift" | "seedshift-legacy";
@@ -52,5 +53,5 @@ export const SHARE_SEEDSHIFT_CHOICES: readonly Choice<SplitMode>[] = Object.free
 
 /** The label of the answer of `value` among `choices`, as the sheet for heirs names it. */
 export function answerLabel<T>(choices: readonly Choice<T>[], value: T): string {
-  return choices.find((choice) => choice.value === value)!.label;
+  return defined(choices.find((choice) => choice.value === value)).label;
 }

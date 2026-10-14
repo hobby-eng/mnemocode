@@ -14,6 +14,7 @@
 
 import { ReferenceTint } from "./business-tint.js";
 import { channelsHex, oklab, rgbChannels, rgbOfHsv } from "./color-math.js";
+import { defined } from "../core/defined.js";
 
 /** The candidate colours: a hue every HUE_STEP_DEGREES, each with these saturations and values. */
 const HUE_STEP_DEGREES = 3;
@@ -73,7 +74,7 @@ const DISTANCE_STEPS = 1_000_000;
 function distance(left: Candidate, right: Candidate): number {
   return Math.min(
     ...left.views.map((view, index) => {
-      const other = right.views[index]!;
+      const other = defined(right.views[index]);
       const [l, a, b] = [view[0] - other[0], view[1] - other[1], view[2] - other[2]];
       return Math.round(Math.sqrt(l * l + a * a + b * b) * DISTANCE_STEPS);
     }),
@@ -106,14 +107,14 @@ class FarthestColours {
     if (this.#order.length > 0) {
       next = 0;
       for (let index = 1; index < all.length; index++)
-        if (this.#nearest[index]! > this.#nearest[next]!) next = index;
+        if (defined(this.#nearest[index]) > defined(this.#nearest[next])) next = index;
     }
-    const chosen = all[next]!;
+    const chosen = defined(all[next]);
     this.#order.push(chosen.hex);
     for (let index = 0; index < all.length; index++)
       this.#nearest[index] = Math.min(
         this.#nearest[index] ?? Number.POSITIVE_INFINITY,
-        distance(all[index]!, chosen),
+        distance(defined(all[index]), chosen),
       );
   }
 }
@@ -130,8 +131,8 @@ export function codeColors(codes: readonly string[]): string[] {
   const distinct = [...new Set(codes)];
   farthest ??= new FarthestColours();
   const colours = farthest.first(distinct.length);
-  const colourOf = new Map(distinct.map((code, rank) => [code, colours[rank]!]));
-  return codes.map((code) => colourOf.get(code)!);
+  const colourOf = new Map(distinct.map((code, rank) => [code, defined(colours[rank])]));
+  return codes.map((code) => defined(colourOf.get(code)));
 }
 
 /**
@@ -144,6 +145,6 @@ export function closestPair(colours: readonly string[]): number {
   let closest = Number.POSITIVE_INFINITY;
   for (let left = 0; left < looks.length; left++)
     for (let right = left + 1; right < looks.length; right++)
-      closest = Math.min(closest, distance(looks[left]!, looks[right]!));
+      closest = Math.min(closest, distance(defined(looks[left]), defined(looks[right])));
   return closest;
 }

@@ -40,6 +40,7 @@ import {
 import { assertWordCount } from "./words.js";
 import { phraseChecksumValid, phraseOfIndexes } from "./english-words.js";
 import { parseInput } from "./representations.js";
+import { defined } from "./defined.js";
 
 /**
  * How a seed phrase was written: not masked, or one of the Seedshift variants. The names are
@@ -497,7 +498,7 @@ export function decodeIndexes(
   indexes: readonly number[],
   dates: readonly DateShiftDate[],
 ): DecodedResult {
-  return Masking.of("seedshift").undo(indexes, dates)[0]!;
+  return defined(Masking.of("seedshift").undo(indexes, dates)[0]);
 }
 
 /** The Original Seedshift with a valid last word undone: every phrase it may have been. */

@@ -65,6 +65,7 @@ import { trimWhiteSpace } from "./white-space.js";
 import { MASTER_KEY_PATH, type MatchedBy } from "./wallet-check.js";
 import { hexOfBytes, bytesOfHex, equalBytes, HEX_DIGITS_PER_BYTE } from "./bits.js";
 import { listInWords } from "./places.js";
+import { defined } from "./defined.js";
 
 // What every caller of this module used here before the split keeps working.
 export { parseMasterFingerprint, type Pbkdf2HmacSha512 };
@@ -188,7 +189,7 @@ const NETWORK_FACTS = Object.freeze({
 
 /** The network that a coin's test-network flag names. */
 function networkNamed(testnet: boolean): BitcoinNetworkName {
-  return BITCOIN_NETWORKS.find((network) => NETWORK_FACTS[network].testnet === testnet)!;
+  return defined(BITCOIN_NETWORKS.find((network) => NETWORK_FACTS[network].testnet === testnet));
 }
 
 /** The SLIP-132 forms of an extended public key, by their four-character prefix. */

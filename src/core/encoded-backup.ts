@@ -36,6 +36,7 @@ import {
 } from "./bip39-sizes.js";
 import { EncodedForm } from "./encoded-form.js";
 import { refusalMessage } from "./refusal.js";
+import { defined } from "./defined.js";
 
 /**
  * How the codes were made: not masked, or one of the Seedshift variants (core/masking.ts).
@@ -168,8 +169,8 @@ export class EncodedBackup extends Redacted {
       validLastWord !== undefined &&
       validLastWord.shiftedIndexes.at(-1) !== base.shiftedIndexes.at(-1);
     const replaced = options.validLastWord === true && lastWordChanged;
-    const result = replaced ? validLastWord! : base;
-    const recordMode: MaskingMode = replaced ? replacement!.mode : mode;
+    const result = replaced ? defined(validLastWord) : base;
+    const recordMode: MaskingMode = replaced ? defined(replacement).mode : mode;
     return {
       backup: EncodedBackup.of(result.shiftedIndexes, format, recordMode),
       result,
@@ -257,7 +258,7 @@ export class EncodedBackup extends Redacted {
       throw new Error(
         "The Original Seedshift with a valid last word gives several phrases: take its candidates.",
       );
-    return Masking.of(this.#mode).undo(this.#indexes, dates)[0]!;
+    return defined(Masking.of(this.#mode).undo(this.#indexes, dates)[0]);
   }
 
   /** Every phrase that the codes and the complete `dates` may give: one unless givesSeveral. */

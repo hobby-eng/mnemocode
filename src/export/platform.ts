@@ -1,3 +1,4 @@
+import { defined } from "../core/defined.js";
 /**
  * Host services used by the card renderers.
  *
@@ -168,5 +169,7 @@ export function checkedChoice(choose: UniformChoice, limit: number, refusal: str
  * copy of a card are picked through it, one choice each, in the order they are made.
  */
 export function pickWith<T>(values: readonly T[], choose: UniformChoice): T {
-  return values[checkedChoice(choose, values.length, "Invalid random selection for a card.")]!;
+  return defined(
+    values[checkedChoice(choose, values.length, "Invalid random selection for a card.")],
+  );
 }

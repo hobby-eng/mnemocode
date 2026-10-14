@@ -39,6 +39,7 @@ import type { WordHint, WordHints } from "../core/word-hints.js";
 import { hintRows } from "./typed-hints.js";
 import { dumbTerminal } from "./terminal-style.js";
 import { refusalMessage } from "../core/refusal.js";
+import { defined } from "../core/defined.js";
 
 /**
  * The longest answer: the limit of every text input (bounded-read.ts); no valid one is that long.
@@ -188,7 +189,7 @@ class ByteQueue {
 
   shift(): number | undefined {
     if (this.#head === this.#bytes.length) return undefined;
-    const byte = this.#bytes[this.#head]!;
+    const byte = defined(this.#bytes[this.#head]);
     // The byte may be part of a secret; its place is not needed any more.
     this.#bytes[this.#head++] = 0;
     // Once most of the array is taken, the rest moves to its start, once for many bytes.
@@ -775,7 +776,7 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
     for (;;) {
       // Drawn once no key follows at once, so that a paste is hinted once, at its end.
       if (hintDue && (more === undefined || !(await more(PASTE_GAP_MS)))) {
-        shown!.showHint(hints!.hint(typedBefore()), length, cursor);
+        defined(shown).showHint(defined(hints).hint(typedBefore()), length, cursor);
         hintDue = false;
       }
       const byte = await take();
@@ -804,7 +805,7 @@ export async function readLine(next: NextByte, options: LineOptions): Promise<st
       } else if (!echo) {
         insert(byte);
       } else if (late) {
-        const sequence = await readLateSequence(byte, take, more!);
+        const sequence = await readLateSequence(byte, take, defined(more));
         if ("key" in sequence) edit(sequence.key);
         else {
           insert(byte);
@@ -978,7 +979,7 @@ class ShownLine {
    */
   #endOf(length: number): number {
     while (this.#countedBytes < length) {
-      const size = characterSize(this.#line[this.#countedBytes]!);
+      const size = characterSize(defined(this.#line[this.#countedBytes]));
       if (this.#countedBytes + size > length) break;
       this.#countedEnd = placedAfter(
         this.#line,
@@ -1005,14 +1006,14 @@ class ShownLine {
 /** Where the UTF-8 character before `position` starts: its continuation bytes, then its first. */
 function previousCharacter(line: Buffer, position: number): number {
   let start = position;
-  while (start > 0 && isContinuation(line[start - 1]!)) start -= 1;
+  while (start > 0 && isContinuation(defined(line[start - 1]))) start -= 1;
   return Math.max(0, start - 1);
 }
 
 /** Where the UTF-8 character at `position` ends. */
 function nextCharacter(line: Buffer, position: number, length: number): number {
   let end = position + 1;
-  while (end < length && isContinuation(line[end]!)) end += 1;
+  while (end < length && isContinuation(defined(line[end]))) end += 1;
   return Math.min(end, length);
 }
 
@@ -1035,6 +1036,6 @@ function nextWord(line: Buffer, position: number, length: number): number {
 /** Whether the bytes up to `length` end with a complete UTF-8 character. */
 function isCharacterEnd(line: Buffer, length: number): boolean {
   let start = length - 1;
-  while (start > 0 && isContinuation(line[start]!)) start -= 1;
-  return length - start === characterSize(line[start]!);
+  while (start > 0 && isContinuation(defined(line[start]))) start -= 1;
+  return length - start === characterSize(defined(line[start]));
 }

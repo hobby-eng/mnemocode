@@ -19,6 +19,7 @@ import { UNICODE_CODE_DIGITS } from "../core/code-text.js";
 import { textPieces } from "../core/pieces.js";
 import { ShareSet } from "./share-set.js";
 import type { SharePlatform } from "./share-platform.js";
+import { defined } from "../core/defined.js";
 
 /** The first share of the official vector in colors, Unicode codes and word numbers. */
 const OFFICIAL_COLORS = sskrVector.firstShareColors.join(" ");
@@ -57,8 +58,8 @@ function checkRepair(text: string, ur: string, filled: string, name: string): vo
  */
 export function checkShareRepairStartup(): void {
   checkRepair(
-    `${marked(SET_COLORS[0]!, "#1F9121")} #000000`,
-    SET_SHARES[0]!,
+    `${marked(defined(SET_COLORS[0]), "#1F9121")} #000000`,
+    defined(SET_SHARES[0]),
     "6:#1F9121",
     "Marked share before a trailing decoy",
   );
@@ -126,9 +127,11 @@ export async function checkShareRepair(platform: SharePlatform): Promise<void> {
   const plan = await repair.plan(records);
   const found = await searchOnce(plan);
   expectSame(found.length, 1, "Shares repaired together: phrases");
-  expectSame(found[0]!.mnemonic, SET_PHRASE, "Shares repaired together: phrase");
+  expectSame(defined(found[0]).mnemonic, SET_PHRASE, "Shares repaired together: phrase");
   expectSame(
-    found[0]!.shares.map((share) => share.ur).join(" "),
+    defined(found[0])
+      .shares.map((share) => share.ur)
+      .join(" "),
     `${SET_SHARES[0]} ${SET_SHARES[1]}`,
     "Shares repaired together: shares",
   );

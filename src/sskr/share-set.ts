@@ -40,6 +40,7 @@ import { Redacted } from "../core/redacted.js";
 import { counted } from "../core/search-plan.js";
 import { placeOf } from "../core/places.js";
 import { unrepairedShare, isMarked } from "./repair.js";
+import { defined } from "../core/defined.js";
 // The copy rule belongs to set-topology.ts; here too for the modules that take it with a set.
 export { copiesAmong, type PlacedShare };
 
@@ -150,7 +151,7 @@ export class ShareSet extends Redacted {
       throw new Error(
         "More than one phrase fits these shares: read more of the marked elements, or add a share.",
       );
-    return new ShareSet(found[0]!);
+    return new ShareSet(defined(found[0]));
   }
 
   /** A phrase that a search of marked shares found (JointPlan.search), as a share set. */
@@ -217,19 +218,19 @@ export class ShareSet extends Redacted {
 
   /** Groups of the set that restore the phrase. */
   get groupThreshold(): number {
-    return this.#infos[0]!.groupThreshold;
+    return defined(this.#infos[0]).groupThreshold;
   }
 
   /** Groups of the set, given or not. */
   get groupCount(): number {
-    return this.#infos[0]!.groupCount;
+    return defined(this.#infos[0]).groupCount;
   }
 
   /** The groups of the shares given, in the order they first come. */
   get groups(): readonly ShareGroup[] {
     const topology = new SetTopology(this.#infos);
     return topology.groups.map((members) => ({
-      index: this.#infos[members[0]!]!.groupIndex,
+      index: defined(this.#infos[defined(members[0])]).groupIndex,
       threshold: topology.thresholdOf(members),
       members: members.map((member) => member + 1),
     }));
@@ -237,7 +238,7 @@ export class ShareSet extends Redacted {
 
   /** Bytes of the secret that the shares hold. */
   get secretBytes(): number {
-    return this.#infos[0]!.secretLength;
+    return defined(this.#infos[0]).secretLength;
   }
 
   /** Words of the phrase that the shares hold. */
@@ -247,7 +248,7 @@ export class ShareSet extends Redacted {
 
   /** The form in which the backup that was split is shown again: that of its first share. */
   get backupForm(): EncodedFormat {
-    return RESTORED_FORM[this.shares[0]!.format];
+    return RESTORED_FORM[defined(this.shares[0]).format];
   }
 
   /**
@@ -343,9 +344,9 @@ export class ShareExport {
       throw new Error("Each share needs its place among those typed, a whole number from 1.");
     const leftOut = [...new Set(set.unsettled.map((element) => placeOf(named, element.share)))];
     const shown = set.shares.flatMap((share, index) =>
-      leftOut.includes(named[index]!)
+      leftOut.includes(defined(named[index]))
         ? []
-        : [{ ur: share.ur, format: format ?? share.format, number: named[index]! }],
+        : [{ ur: share.ur, format: format ?? share.format, number: defined(named[index]) }],
     );
     return new ShareExport(shown, leftOut, Math.max(...named));
   }

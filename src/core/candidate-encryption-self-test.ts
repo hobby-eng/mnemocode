@@ -29,6 +29,7 @@ import {
   hexOfBytes,
 } from "./self-test-check.js";
 import { CandidateFileAdmission } from "./candidate-file-admission.js";
+import { defined } from "./defined.js";
 
 /**
  * `open` refused as a CandidateFileRefusedError with `problem` and a message that `because` matches;
@@ -74,7 +75,7 @@ const SCRYPT_WORK_FACTOR_16 =
 /** The file with its last byte changed: a byte of the encrypted list, which age authenticates. */
 function changedLastByte(hex: string): Uint8Array {
   const bytes = bytesOfHex(hex);
-  bytes[bytes.length - 1]! ^= 1;
+  bytes[bytes.length - 1] = defined(bytes[bytes.length - 1]) ^ 1;
   return bytes;
 }
 

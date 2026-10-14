@@ -61,6 +61,7 @@ import {
   WORD_NUMBERS_RUN_TOGETHER,
 } from "./words.js";
 import { Redacted } from "./redacted.js";
+import { defined } from "./defined.js";
 
 /** What makes a search of marked codes smaller, in the words of its refusal (assertSearchable). */
 const NARROW_MARKED_CODES = "read a few letters or digits of the codes, or mark fewer";
@@ -130,7 +131,7 @@ function unicodeColors(text: string): (string | undefined)[] {
     // A code with ? among its digits leaves its color unknown: its digits are no digits of it.
     if (pair.some((code) => code.includes("?"))) return undefined;
     const [high, low] = pair.map((code) => Number.parseInt(code, 16));
-    return colorOfUnicodePair(high!, low!);
+    return colorOfUnicodePair(defined(high), defined(low));
   });
 }
 

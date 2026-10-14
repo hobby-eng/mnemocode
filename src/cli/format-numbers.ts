@@ -6,6 +6,7 @@ import { cardKindOf, writtenInColors } from "../core/backup-options.js";
 import { ENCODED_FORMATS, type EncodedFormat } from "../core/types.js";
 import { listInWords } from "../core/places.js";
 import { findTemplate, type NoCardTemplateError } from "../export/template-catalog.js";
+import { defined } from "../core/defined.js";
 
 /** The number of a form, as --format and every question of a form take it. */
 export function formatNumber(format: EncodedFormat): number {
@@ -21,7 +22,7 @@ function numbersOf(formats: readonly EncodedFormat[], last: string): string {
 }
 
 /** The numbers of the forms, as --format takes them: "1 to 5". */
-export const FORMAT_NUMBER_RANGE = `${formatNumber(ENCODED_FORMATS[0])} to ${formatNumber(ENCODED_FORMATS.at(-1)!)}`;
+export const FORMAT_NUMBER_RANGE = `${formatNumber(ENCODED_FORMATS[0])} to ${formatNumber(defined(ENCODED_FORMATS.at(-1)))}`;
 
 /** The forms written in colors, by their numbers, as the help and the messages name them. */
 export const COLOR_FORMAT_NUMBERS = numbersOf(ENCODED_FORMATS.filter(writtenInColors), "and");

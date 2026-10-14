@@ -15,6 +15,7 @@ import { englishWordlist } from "./english-words.js";
 import { Redacted } from "./redacted.js";
 import { equalBytes } from "./bits.js";
 import { assertCandidateFileSize } from "./candidate-file-refusal.js";
+import { defined } from "./defined.js";
 
 /** "MNCL": MnemoCode candidate list. */
 const MAGIC = [0x4d, 0x4e, 0x43, 0x4c] as const;
@@ -46,16 +47,14 @@ const ENTROPY_LENGTHS: ReadonlySet<number> = new Set(BIP39_ENTROPY_BYTES);
 // A genuine typed array may shadow byteLength with an own property. Its intrinsic getter reads
 // the actual storage, which the typed-array copy constructor copies too (ECMA-262 TypedArray).
 const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
-const intrinsicByteLength = Object.getOwnPropertyDescriptor(
-  typedArrayPrototype,
-  "byteLength",
-)!.get!;
+const intrinsicByteLength = defined(
+  defined(Object.getOwnPropertyDescriptor(typedArrayPrototype, "byteLength")).get,
+);
 // instanceof trusts an object's replaceable prototype. The intrinsic tag getter reads the real
 // element kind, including byte arrays from another realm, without consulting a custom tag.
-const intrinsicArrayName = Object.getOwnPropertyDescriptor(
-  typedArrayPrototype,
-  Symbol.toStringTag,
-)!.get!;
+const intrinsicArrayName = defined(
+  defined(Object.getOwnPropertyDescriptor(typedArrayPrototype, Symbol.toStringTag)).get,
+);
 /** Magic, version, flags, entropy length and the 4-byte count. */
 const HEADER_BYTES = 11;
 const LENGTH_BYTES = 2;
@@ -152,7 +151,7 @@ const UTF8_LIMITS = [0x7f, 0x7ff, 0xffff] as const;
 function utf8Length(text: string): number {
   let length = 0;
   for (const character of text) {
-    const point = character.codePointAt(0)!;
+    const point = defined(character.codePointAt(0));
     length += 1 + UTF8_LIMITS.filter((limit) => point > limit).length;
   }
   return length;
@@ -203,7 +202,7 @@ export function encodeCandidateList(list: CandidateList): Uint8Array {
       owned.push(copy);
       return copy;
     });
-    return listBytes(copies, copies[0]!.byteLength, count, {
+    return listBytes(copies, defined(copies[0]).byteLength, count, {
       global: bytesOf(list.passphrase, "passphrase for all candidates"),
       own: records.map((record, index) =>
         bytesOf(record.passphrase, `passphrase of candidate ${index + 1}`),
@@ -291,20 +290,20 @@ export function decodeCandidateList(bytes: Uint8Array): CandidateList {
   if (!equalBytes(magic, MAGIC)) throw new Error("This is not a MnemoCode candidate list.");
   const [version, flags, entropyLength] = take(3);
   if (version !== VERSION) throw new Error(`Candidate list version ${version} is not supported.`);
-  if ((flags! & ~(GLOBAL_PASSPHRASE_FLAG | RECORD_PASSPHRASE_FLAG)) !== 0)
+  if ((defined(flags) & ~(GLOBAL_PASSPHRASE_FLAG | RECORD_PASSPHRASE_FLAG)) !== 0)
     throw new Error("The candidate list has unknown flags.");
-  if (!ENTROPY_LENGTHS.has(entropyLength!))
+  if (!ENTROPY_LENGTHS.has(defined(entropyLength)))
     throw new Error("The candidate list has a wrong entropy length.");
   const count = uint32();
   if (count < 1 || count > MAX_CANDIDATE_RECORDS)
     throw new Error("The candidate list has a wrong record count.");
-  const global = flags! & GLOBAL_PASSPHRASE_FLAG ? passphrase(1) : undefined;
+  const global = defined(flags) & GLOBAL_PASSPHRASE_FLAG ? passphrase(1) : undefined;
   const records: CandidateRecord[] = [];
   try {
     for (let index = 0; index < count; index += 1) {
-      const entropy = Uint8Array.from(take(entropyLength!));
+      const entropy = Uint8Array.from(take(defined(entropyLength)));
       records.push({ entropy });
-      const own = flags! & RECORD_PASSPHRASE_FLAG ? passphrase(0) : undefined;
+      const own = defined(flags) & RECORD_PASSPHRASE_FLAG ? passphrase(0) : undefined;
       if (own !== undefined) records[index] = { entropy, passphrase: own };
     }
     const contentLength = offset;

@@ -14,6 +14,7 @@ import {
   type ProfileField,
 } from "./card-settings.js";
 import { BUSINESS_STYLES, type PhysicalBusinessStyle } from "./template-catalog.js";
+import { defined } from "../core/defined.js";
 
 export type { PhysicalBusinessStyle };
 /** The business designs with artwork of their own, in the catalog's order: "mixed" draws them. */
@@ -248,7 +249,7 @@ export const businessDesigns: Readonly<Record<PhysicalBusinessStyle, BusinessDes
 
 /** The design that card `index` of `style` shows: "mixed" takes the designs in turn. */
 export function physicalStyle(style: BusinessStyle, index: number): PhysicalBusinessStyle {
-  return style === "mixed" ? businessStyles[index % businessStyles.length]! : style;
+  return style === "mixed" ? defined(businessStyles[index % businessStyles.length]) : style;
 }
 
 /** The theme of a sheet of `style`: the design's own, or the mixed sheet's. */

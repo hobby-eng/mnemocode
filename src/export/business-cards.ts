@@ -28,6 +28,7 @@ import { assertColorCards, type ColorCards } from "./card-content.js";
 import { peakRelativeLuma } from "./color-math.js";
 import { artworkBrightness } from "./business-tint.js";
 import { documentWithFont } from "./pdf-documents.js";
+import { defined } from "../core/defined.js";
 
 /** The top of the reference line's box on a separate card, in millimetres. */
 const REFERENCE_TOP = 46;
@@ -95,7 +96,7 @@ export async function renderBusinessCards(
   const fieldColor = (dark: boolean | undefined, index: number) => {
     if (!dark) return white;
     if (businessDesigns[designOf(index)].darkFieldInk === "fixed") return ink;
-    const color = content.colors[index]!;
+    const color = defined(content.colors[index]);
     const lightness = peakRelativeLuma(color) * artworkBrightness(color);
     return lightness > LIGHT_REFERENCE_LUMA ? ink : white;
   };
@@ -249,7 +250,7 @@ async function renderCollection(context: RenderContext): Promise<void> {
  */
 async function drawCardFace(context: RenderContext, page: PDFPage, box: CardBox): Promise<void> {
   const { font, content, fieldsFor, fieldColor } = context;
-  const code = content.colors[box.index]!.toUpperCase();
+  const code = defined(content.colors[box.index]).toUpperCase();
   drawClippedArtwork(page, await context.artwork(box.index, code), box);
   const scale = box.width / CARD.width;
   for (const field of fieldsFor(box.index))

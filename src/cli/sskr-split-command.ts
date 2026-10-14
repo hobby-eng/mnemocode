@@ -29,6 +29,7 @@ import { ENCODE_PLAIN_ONLY_OPTIONS } from "./encode-option-groups.js";
 import type { EncodedFormat } from "../core/types.js";
 // The type alone: encode-command.ts runs this module for --sskr, and a value import would be a cycle.
 import type { PreparedEncode } from "./encode-command.js";
+import { defined } from "../core/defined.js";
 
 export async function runSskrSplit(args: ParsedArguments, integrated = false): Promise<void> {
   const split = await prepareSskrSplit(args, integrated);
@@ -123,7 +124,7 @@ async function splitChecked(
   // A save that fails is offered again or skipped (saveWithRetry): the shares are shown below
   // either way, and only once every save is settled, so that none is lost to a failure.
   await saveShares(inForm(shares, format), args, options, Masking.of(mode).masked);
-  const codes = ownShareCards(shares[0]!, format);
+  const codes = ownShareCards(defined(shares[0]), format);
   await saveHeirSheetOutput(args, {
     backup: { kind: "shares", format, threshold, count, ...(codes === undefined ? {} : { codes }) },
     mode,

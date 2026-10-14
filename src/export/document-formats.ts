@@ -8,6 +8,7 @@
 
 import { listInWords } from "../core/places.js";
 import { POINTS_PER_INCH } from "./page-units.js";
+import { defined } from "../core/defined.js";
 
 /** The formats of the files of cards: the PDF first, the default, then the image formats. */
 export const DOCUMENT_FORMATS = Object.freeze(["pdf", "png", "jpg"] as const);
@@ -22,7 +23,7 @@ export type ImageFormat = (typeof IMAGE_FORMATS)[number];
 /** The format of the files of cards when none is chosen. */
 export const DEFAULT_DOCUMENT_FORMAT: DocumentFormat = DOCUMENT_FORMATS[0];
 /** The image format when an image is asked for without one. */
-export const DEFAULT_IMAGE_FORMAT: ImageFormat = IMAGE_FORMATS[0]!;
+export const DEFAULT_IMAGE_FORMAT: ImageFormat = defined(IMAGE_FORMATS[0]);
 
 /** What each format is, as hosts name and save it. */
 export interface DocumentFormatFacts {
@@ -62,7 +63,7 @@ export const DOCUMENT_FORMAT_FACTS: Readonly<Record<DocumentFormat, DocumentForm
   });
 
 /** The quality of a JPEG page, of 100. */
-export const JPEG_QUALITY = DOCUMENT_FORMAT_FACTS.jpg.qualityPercent!;
+export const JPEG_QUALITY = defined(DOCUMENT_FORMAT_FACTS.jpg.qualityPercent);
 /** Another name of jpg that a person may type. */
 const JPEG_ALIAS = "jpeg";
 

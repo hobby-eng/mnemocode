@@ -23,6 +23,7 @@ import {
   isScannedEvidence,
 } from "../core/wallet-evidence.js";
 import { withoutByteOrderMark } from "../core/white-space.js";
+import { defined } from "../core/defined.js";
 
 /** The option that gives each kind of evidence; a WIF is read from the file it names. */
 const EVIDENCE_OPTIONS = Object.freeze({
@@ -147,7 +148,7 @@ export function walletEvidence(arguments_: ParsedArguments): WalletEvidence | un
     throw new Error("--coin names the coin of --coin-address.");
   if (supplied.length === 0) return undefined;
   if (supplied.length !== 1) throw new Error("Select exactly one recovery-evidence option.");
-  const [kind, rawValue] = supplied[0]!;
+  const [kind, rawValue] = defined(supplied[0]);
   const counted = scanGapOf(arguments_);
   if (counted !== undefined && !isScannedKind(kind))
     throw new Error(
@@ -167,7 +168,7 @@ export function walletEvidence(arguments_: ParsedArguments): WalletEvidence | un
       kind,
       coin: coinById(coin).id,
       // Read as the coin reads it, white space at its ends left out (trimWhiteSpace).
-      value: rawValue!,
+      value: defined(rawValue),
       location: place,
       addresses,
     };
@@ -176,8 +177,8 @@ export function walletEvidence(arguments_: ParsedArguments): WalletEvidence | un
   // a file may begin with a byte order mark besides.
   const value_ =
     kind === "wif"
-      ? withoutByteOrderMark(readBoundedTextFile(rawValue!, "The WIF file"))
-      : rawValue!;
+      ? withoutByteOrderMark(readBoundedTextFile(defined(rawValue), "The WIF file"))
+      : defined(rawValue);
   const network = bitcoinNetwork(arguments_);
   if (!isPlacedKind(kind)) {
     // The master key has no place in an account: these would be ignored, so they are refused.

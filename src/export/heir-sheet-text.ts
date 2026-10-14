@@ -23,6 +23,7 @@ import {
 import { parseShareFormat, shareFormatHasCards, type ShareFormat } from "../sskr/transport.js";
 import type { HeirSheetSection, HeirSheetText } from "./heir-sheet.js";
 import type { EncodedFormat } from "../core/types.js";
+import { defined } from "../core/defined.js";
 
 /** How the seed phrase was masked: a mode for which a sheet can be made (Masking). */
 export type HeirMode = HeirSheetMode;
@@ -186,7 +187,7 @@ function basics({ mode }: HeirSheetFacts): HeirSheetSection[] {
       heading: "Secret dates",
       paragraphs: [
         // The example is the one of the README (How checksum-valid Seedshift works).
-        `The owner masked the words with secret dates, such as birthdays: their year, month and day shift the words along the BIP39 list (with 23-09-2026, "abandon" becomes "wool"). Use the owner's dates to undo the shift. ${masking.wrongDateWarning!} The dates have nothing to do with today's date.`,
+        `The owner masked the words with secret dates, such as birthdays: their year, month and day shift the words along the BIP39 list (with 23-09-2026, "abandon" becomes "wool"). Use the owner's dates to undo the shift. ${defined(masking.wrongDateWarning)} The dates have nothing to do with today's date.`,
       ],
     });
   sections.push(

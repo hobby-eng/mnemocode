@@ -19,6 +19,7 @@ import {
 import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from "./world-map.js";
 import { WORLD_MAP_LAND } from "./world-map-data.js";
 import { drawMaterialBackdrop, type CardGrid, type MaterialBackdrop } from "./study-backdrops.js";
+import { defined } from "../core/defined.js";
 
 /** Where one card of a sheet goes, and where its caption goes below it, in millimetres. */
 export interface StudyBox extends CardBox {
@@ -438,7 +439,7 @@ export function planCollectionSheet(
         continue;
       }
       if (count % layout.columns !== 0) continue;
-      const area = layout.cards[0]!.width * layout.cards[0]!.height;
+      const area = defined(layout.cards[0]).width * defined(layout.cards[0]).height;
       // A sheet of enough rows wins over one of fewer whatever their cards (MIN_SHEET_ROWS).
       const tall = hasEnoughRows(layout.rows, layout.compact);
       // Of cards as large, the plan with more of them, which fills more of the page, also across
@@ -876,7 +877,7 @@ const PHRASE_SERIES = "01";
 export function collectionSeries(
   content: Pick<CollectionContent, "kind" | "collectionReference">,
 ): string {
-  return content.kind === "sskr" ? content.collectionReference! : PHRASE_SERIES;
+  return content.kind === "sskr" ? defined(content.collectionReference) : PHRASE_SERIES;
 }
 
 /** The line that names the person a set of cards is prepared for. */

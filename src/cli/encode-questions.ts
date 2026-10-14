@@ -65,6 +65,7 @@ import {
   type HeirSheetSize,
 } from "../export/heir-sheet.js";
 import { COPY_OPTIONS, profileOption } from "./business-options.js";
+import { defined } from "../core/defined.js";
 
 /**
  * The phrase of the examples: a public BIP39 test vector (entropy 0x80 repeated). The usual test
@@ -516,7 +517,7 @@ const PERSON_DETAILS: readonly CardDetail[] = profileFields.map((field) => ({
   label: profileFieldLabel(field),
   check: (answer) => {
     refuseOptionLike(answer);
-    return validateProfile({ [field]: answer })[field]!;
+    return defined(validateProfile({ [field]: answer })[field]);
   },
 }));
 

@@ -70,6 +70,7 @@ import {
 import { restoreCompleteShares, uncheckedField } from "./complete-shares.js";
 import { afterPlace } from "../core/prose.js";
 import { placeOf } from "../core/places.js";
+import { defined } from "../core/defined.js";
 
 /** Marked elements on one share. The other shares settle most of them; see the assessment. */
 export const MAX_JOINT_MARKED_ELEMENTS = 64;
@@ -222,12 +223,12 @@ class Joint {
 
   /** The joint coordinates: every basis vector of every share. */
   get dimensions(): number {
-    return this.#offsets.at(-1)! + this.#spaces.at(-1)!.basis.length;
+    return defined(this.#offsets.at(-1)) + defined(this.#spaces.at(-1)).basis.length;
   }
 
   /** The change that joint direction `z` makes to the marked bits of share `share`. */
   holeChange(share: number, z: bigint): bigint {
-    return combination(this.#spaces[share]!.basis, this.#own(share, z));
+    return combination(defined(this.#spaces[share]).basis, this.#own(share, z));
   }
 
   /**
@@ -250,7 +251,7 @@ class Joint {
 
   /** The bits of joint point `z` that pick share `share`'s basis vectors. */
   #own(share: number, z: bigint): bigint {
-    return z >> BigInt(this.#offsets[share]!);
+    return z >> BigInt(defined(this.#offsets[share]));
   }
 }
 
@@ -321,13 +322,13 @@ class Branch {
   /** Open bits of this branch if marked element `hole` of share `share` were read. */
   openBitsIfRead(share: number, hole: number): number {
     const { joint, visible, visibleDeltas, hidden } = this.#parts;
-    const mask = joint.spaces[share]!.unitMask(hole);
+    const mask = defined(joint.spaces[share]).unitMask(hole);
     // Each direction with the change it makes in (S, D): a pair, typed as one so that a host that
     // compiles with noUncheckedIndexedAccess reads both of its parts as present.
     const directions: (readonly [bigint, bigint])[] = [
       ...visible.map((direction, i): readonly [bigint, bigint] => [
         direction,
-        bytesToBits(visibleDeltas[i]!),
+        bytesToBits(defined(visibleDeltas[i])),
       ]),
       ...hidden.map((direction): readonly [bigint, bigint] => [direction, 0n]),
     ];
@@ -352,7 +353,7 @@ class Branch {
   sharesToSettle(shares: readonly ShareAssessment[]): number {
     const { threshold, members } = this.#parts;
     if (this.openBits === 0) return 0;
-    const clean = new Set(members.filter((_, share) => shares[share]!.marks === 0)).size;
+    const clean = new Set(members.filter((_, share) => defined(shares[share]).marks === 0)).size;
     const byEquations = Math.ceil(this.openBits / (BITS_PER_BYTE * this.secretBytes));
     return Math.max(1, Math.min(threshold - clean, byEquations));
   }
@@ -373,7 +374,7 @@ class Branch {
     try {
       for (let step = 0; step < this.combinations; step += 1) {
         if (step > 0) {
-          xorInto(current, visibleDeltas[lowestBit(step)]!);
+          xorInto(current, defined(visibleDeltas[lowestBit(step)]));
         }
         if (digestFits(current, this.secretBytes, platform.hmacSha256)) {
           const gray = BigInt(step) ^ (BigInt(step) >> 1n);
@@ -473,21 +474,22 @@ class AssessmentSecrets {
 /** Rows that hold for every reading of a set of one group: one group, and the same metadata. */
 function sharedResidual(payloads: readonly Uint8Array[]): bigint {
   const fields = new BitFields();
-  const first = payloads[0]!;
+  const first = defined(payloads[0]);
   // One group of one: group threshold and count 1, group index 0.
-  fields.add(first[GROUP_BYTE]!, BITS_PER_BYTE);
-  fields.add(first[MEMBER_THRESHOLD_BYTE]! >>> NIBBLE_BITS, NIBBLE_BITS);
+  fields.add(defined(first[GROUP_BYTE]), BITS_PER_BYTE);
+  fields.add(defined(first[MEMBER_THRESHOLD_BYTE]) >>> NIBBLE_BITS, NIBBLE_BITS);
   for (const payload of payloads.slice(1))
     for (let byte = 0; byte < MEMBER_BYTE; byte += 1)
-      fields.add(payload[byte]! ^ first[byte]!, BITS_PER_BYTE);
+      fields.add(defined(payload[byte]) ^ defined(first[byte]), BITS_PER_BYTE);
   return fields.vector;
 }
 
 /** The member threshold, less one, then the member number of every share, 4 bits each. */
 function labelsOf(payloads: readonly Uint8Array[]): bigint {
   const fields = new BitFields();
-  fields.add(payloads[0]![MEMBER_THRESHOLD_BYTE]! & LOW_NIBBLE, NIBBLE_BITS);
-  for (const payload of payloads) fields.add(payload[MEMBER_BYTE]! & LOW_NIBBLE, NIBBLE_BITS);
+  fields.add(defined(defined(payloads[0])[MEMBER_THRESHOLD_BYTE]) & LOW_NIBBLE, NIBBLE_BITS);
+  for (const payload of payloads)
+    fields.add(defined(payload[MEMBER_BYTE]) & LOW_NIBBLE, NIBBLE_BITS);
   return fields.vector;
 }
 
@@ -499,17 +501,17 @@ function polynomialResidual(
   secretBytes: number,
 ): bigint {
   const fields = new BitFields();
-  const xs = base.map((share) => members[share]!);
+  const xs = base.map((share) => defined(members[share]));
   payloads.forEach((payload, share) => {
     if (base.includes(share)) return;
     const copyOf = base.find((other) => members[other] === members[share]);
-    const lambdas = copyOf === undefined ? lagrangeCoefficients(xs, members[share]!) : [];
+    const lambdas = copyOf === undefined ? lagrangeCoefficients(xs, defined(members[share])) : [];
     for (let k = SHARE_METADATA_BYTES; k < SHARE_METADATA_BYTES + secretBytes; k += 1) {
-      let value = payload[k]!;
-      if (copyOf !== undefined) value ^= payloads[copyOf]![k]!;
+      let value = defined(payload[k]);
+      if (copyOf !== undefined) value ^= defined(defined(payloads[copyOf])[k]);
       else
         base.forEach((other, i) => {
-          value ^= gfMultiply(lambdas[i]!, payloads[other]![k]!);
+          value ^= gfMultiply(defined(lambdas[i]), defined(defined(payloads[other])[k]));
         });
       fields.add(value, BITS_PER_BYTE);
     }
@@ -524,15 +526,15 @@ function secretAndDigest(
   base: readonly number[],
   secretBytes: number,
 ): Uint8Array {
-  const xs = base.map((share) => members[share]!);
+  const xs = base.map((share) => defined(members[share]));
   const toSecret = lagrangeCoefficients(xs, SECRET_X);
   const toDigest = lagrangeCoefficients(xs, DIGEST_X);
   const out = new Uint8Array(2 * secretBytes);
   for (let k = 0; k < secretBytes; k += 1)
     base.forEach((share, i) => {
-      const y = payloads[share]![SHARE_METADATA_BYTES + k]!;
-      out[k]! ^= gfMultiply(toSecret[i]!, y);
-      out[secretBytes + k]! ^= gfMultiply(toDigest[i]!, y);
+      const y = defined(defined(payloads[share])[SHARE_METADATA_BYTES + k]);
+      out[k] = defined(out[k]) ^ gfMultiply(defined(toSecret[i]), y);
+      out[secretBytes + k] = defined(out[secretBytes + k]) ^ gfMultiply(defined(toDigest[i]), y);
     });
   return out;
 }
@@ -891,7 +893,9 @@ async function solveReadings(
     sameLength,
     ...(refused === undefined ? {} : { refused }),
   });
-  const lengths = new Set(spacesOf[0]!.map((space) => space.reading.structure.payloadLength));
+  const lengths = new Set(
+    defined(spacesOf[0]).map((space) => space.reading.structure.payloadLength),
+  );
   for (const payloadLength of lengths) {
     const secretBytes = payloadLength - SHARE_METADATA_BYTES;
     if (!BIP39_ENTROPY_BYTES.includes(secretBytes)) continue;
@@ -1048,7 +1052,7 @@ export async function planJointRepair(
   } finally {
     const verdict = assessed?.plan.assessment.verdict;
     const searched = verdict === "search" || verdict === "determined";
-    secrets.wipeAllBut(searched ? assessed!.kept : []);
+    secrets.wipeAllBut(searched ? defined(assessed).kept : []);
   }
 }
 
@@ -1074,7 +1078,7 @@ async function assessReadings(
 ): Promise<Assessed> {
   const { platform, places, turns, secrets } = run;
   const shares: ShareAssessment[] = spacesOf.map((spaces, index) => ({
-    marks: markCount(texts[index]!),
+    marks: markCount(defined(texts[index])),
     forms: [...new Set(spaces.map((space) => space.reading.format))],
     openAlone: spaces.length === 0 ? 0 : Math.min(...spaces.map((space) => space.basis.length)),
   }));
@@ -1094,8 +1098,8 @@ async function assessReadings(
   if (unfit >= 0) {
     const message = unreadableShareMessage(
       placeOf(places, unfit + 1),
-      shares[unfit]!.marks,
-      texts[unfit]!,
+      defined(shares[unfit]).marks,
+      defined(texts[unfit]),
     );
     return refuse("no-fit", message, unfit + 1);
   }
@@ -1220,7 +1224,7 @@ async function searchBranches(
  */
 function merged(first: RepairedSet, other: RepairedSet): RepairedSet {
   const differing = first.shares.flatMap((share, index) => {
-    const second = other.shares[index]!;
+    const second = defined(other.shares[index]);
     if (share.ur === second.ur) return [];
     const values = new Map(second.filled.map((element) => [element.position, element.value]));
     return share.filled
@@ -1257,11 +1261,11 @@ async function restore(
   );
   try {
     const { mnemonic, unchecked } = await restoreCompleteShares(
-      kept.map((place) => shares[place]!.ur),
+      kept.map((place) => defined(shares[place]).ur),
       platform,
     );
     // The places among the shares read, counted from 0, of the shares kept that took no part.
-    return { mnemonic, unchecked: unchecked.map((index) => kept[index]!) };
+    return { mnemonic, unchecked: unchecked.map((index) => defined(kept[index])) };
   } catch {
     // A refusal of the set: this reading of the shares is not one of it.
     return undefined;

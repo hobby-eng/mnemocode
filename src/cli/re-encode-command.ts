@@ -60,6 +60,7 @@ import {
 import { readmeLink, terminalNotice, terminalPart, type NoticeKind } from "./terminal.js";
 import { waitForEnter, type Choice, type Explanation } from "./terminal-choice.js";
 import { InputCancelledError } from "./terminal-input.js";
+import { defined } from "../core/defined.js";
 
 /** The options of the old backup by Decode's names, and those of the new one by Encode's. */
 interface SplitOptions {
@@ -79,7 +80,8 @@ export function splitOptions(args: ParsedArguments): SplitOptions {
     if (key === "ask-secrets") {
       old[key] = entry;
       fresh[key] = entry;
-    } else if (Object.hasOwn(OLD_BACKUP_OPTIONS, key)) old[OLD_BACKUP_OPTIONS[key]!] = entry;
+    } else if (Object.hasOwn(OLD_BACKUP_OPTIONS, key))
+      old[defined(OLD_BACKUP_OPTIONS[key])] = entry;
     else fresh[key] = entry;
   }
   return { old, fresh };
@@ -200,7 +202,7 @@ export async function runReEncode(args: ParsedArguments): Promise<void> {
   const confirmed =
     args["ask-secrets"] === true
       ? await askedReEncoding(old, given, confirmedBy, encode)
-      : { ...(await reEncodingFromOptions(old, given)), encode: encode! };
+      : { ...(await reEncodingFromOptions(old, given)), encode: defined(encode) };
   newBackupScreen(confirmed.notices);
   // The rights that the answers do not need were given up after the questions: what holds now.
   if (encode === undefined) showProtection();
@@ -414,7 +416,7 @@ async function confirmation(
     return { notices: RECOGNISED };
   }
   if (confirmed === "wallet") {
-    const notices = await walletConfirms(reEncoding, given.evidence!, given.passphrase);
+    const notices = await walletConfirms(reEncoding, defined(given.evidence), given.passphrase);
     if (notices !== undefined) return { notices };
   }
   const ways: Choice<Way>[] = [

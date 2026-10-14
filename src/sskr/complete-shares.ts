@@ -14,6 +14,7 @@ import type { SharePlatform } from "./share-platform.js";
 import { Share } from "./transport.js";
 import { equalBytes } from "../core/bits.js";
 import { placeOf } from "../core/places.js";
+import { defined } from "../core/defined.js";
 
 /**
  * Choices of groups tried as the reference: about a second of recoveries for the largest sets.
@@ -44,7 +45,7 @@ function* choicesOf<T>(items: readonly T[], count: number, from = 0): Generator<
     return;
   }
   for (let at = from; at <= items.length - count; at += 1)
-    for (const rest of choicesOf(items, count - 1, at + 1)) yield [items[at]!, ...rest];
+    for (const rest of choicesOf(items, count - 1, at + 1)) yield [defined(items[at]), ...rest];
 }
 
 /**
@@ -141,13 +142,16 @@ export async function restoreCompleteShares(
   /** The entropy that the SSKR library restores from `members`, or undefined when it refuses. */
   const recoverWith = async (members: readonly number[]): Promise<Uint8Array | undefined> => {
     try {
-      return await platform.combineShares(members.map((member) => normalized[member]!));
+      return await platform.combineShares(members.map((member) => defined(normalized[member])));
     } catch {
       return undefined;
     }
   };
-  const reference = await referenceOf(complete, infos[0]!.groupThreshold, threshold, (choice) =>
-    recoverWith(choice.flatMap(firstMembers)),
+  const reference = await referenceOf(
+    complete,
+    defined(infos[0]).groupThreshold,
+    threshold,
+    (choice) => recoverWith(choice.flatMap(firstMembers)),
   );
   const { groups: used, entropy } = reference;
   try {

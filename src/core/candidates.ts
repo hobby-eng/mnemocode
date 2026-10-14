@@ -51,6 +51,7 @@ import { askWallet, type WalletCheck, type WalletMatch } from "./wallet-check.js
 import { Redacted } from "./redacted.js";
 import { counting } from "./search-plan.js";
 import { inWholeRange, wholeNumbersFrom } from "./typed-number.js";
+import { defined } from "./defined.js";
 
 /** Combinations that one search may check; at a few microseconds each, about a minute. */
 export const MAX_SEARCH_COMBINATIONS = 2 ** 24;
@@ -120,7 +121,9 @@ export function wordPlaceOf(written: string, position: number): WordPlace {
   if (written === "?") return EVERY_WORD;
   if (written.endsWith("*")) {
     const prefix = written.slice(0, -1);
-    const indexes = EVERY_WORD.filter((index) => englishWordlist[index]!.startsWith(prefix));
+    const indexes = EVERY_WORD.filter((index) =>
+      defined(englishWordlist[index]).startsWith(prefix),
+    );
     // The letters are part of a secret word: the message names only their place.
     if (prefix === "" || /[*?|]/u.test(prefix) || indexes.length === 0)
       throw new Error(`No BIP39 word starts with the letters at ${where}.`);
@@ -237,7 +240,8 @@ export function expectedCandidates(search: WordSearch): ExpectedCandidates {
     search.kind === "unknown-words" ? search.places.length : search.written.length + 1;
   const passing = combinations * checksumPassShare(wordCount);
   const exact =
-    search.kind === "unknown-words" && search.places.at(-1)!.length === BIP39_DICTIONARY_SIZE;
+    search.kind === "unknown-words" &&
+    defined(search.places.at(-1)).length === BIP39_DICTIONARY_SIZE;
   // At least one: the right phrase is always among the candidates, and the time of a search is
   // planned by this count.
   return { count: exact ? passing : Math.max(1, Math.round(passing)), exact };
@@ -285,9 +289,9 @@ export function checksumValid(words: CandidateWords): boolean {
 function checksumFits(words: CandidateWords): boolean {
   const checksumLength = checksumBits(words.length);
   const entropy = entropyOfWords(words);
-  const expected = sha256(entropy)[0]! >>> (BITS_PER_BYTE - checksumLength);
+  const expected = defined(sha256(entropy)[0]) >>> (BITS_PER_BYTE - checksumLength);
   entropy.fill(0);
-  return (words.at(-1)! & ((1 << checksumLength) - 1)) === expected;
+  return (defined(words.at(-1)) & ((1 << checksumLength) - 1)) === expected;
 }
 
 /** The English phrase of word indexes (words.ts). */
@@ -315,18 +319,18 @@ export function placeCombinations(places: readonly WordPlace[]): Generator<reado
 /** The counter of placeCombinations, on places already checked. */
 function* combinationsOf(places: readonly WordPlace[]): Generator<readonly number[]> {
   const counters = places.map(() => 0);
-  const words = places.map((place) => place[0]!);
+  const words = places.map((place) => defined(place[0]));
   for (;;) {
     yield words;
     let place = places.length - 1;
-    while (place >= 0 && counters[place] === places[place]!.length - 1) {
+    while (place >= 0 && counters[place] === defined(places[place]).length - 1) {
       counters[place] = 0;
-      words[place] = places[place]![0]!;
+      words[place] = defined(defined(places[place])[0]);
       place -= 1;
     }
     if (place < 0) return;
-    counters[place]! += 1;
-    words[place] = places[place]![counters[place]!]!;
+    counters[place] = defined(counters[place]) + 1;
+    words[place] = defined(defined(places[place])[defined(counters[place])]);
   }
 }
 
@@ -483,7 +487,7 @@ export class WordCandidate extends Redacted {
 
   /** The checksum bits at the end of its last word, as a candidate table shows them. */
   get checksumBits(): string {
-    return lastWordChecksumBits(this.#words.at(-1)!, this.#words.length);
+    return lastWordChecksumBits(defined(this.#words.at(-1)), this.#words.length);
   }
 }
 

@@ -21,6 +21,7 @@ import { CardPreview, LONGEST_SAMPLE_WORDS } from "../export/card-preview.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
 import { ENCODE_SSKR_ONLY_OPTIONS } from "./encode-option-groups.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
+import { defined } from "../core/defined.js";
 
 /** What Encode made: the library's encoding, with the mode as asked and the dates as typed. */
 export interface EncodeOutcome {
@@ -172,7 +173,7 @@ async function saveSheetQr(
   if (pdf === undefined && images === undefined) return;
   const path =
     pdf === undefined
-      ? await saveQrInside(backup.text(), images!)
+      ? await saveQrInside(backup.text(), defined(images))
       : await saveQrBeside(backup.text(), pdf);
   terminalNotice(`Saved the QR code of the sheet as an image: ${path}`, "success");
 }

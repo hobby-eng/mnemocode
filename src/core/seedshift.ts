@@ -20,6 +20,7 @@ import { sortDates, deriveShifts } from "./dates.js";
 import { resultFromIndexes, parseInput } from "./representations.js";
 import type { EncodedResult, DecodedResult, DateShiftDate, EncodedFormat } from "./types.js";
 import { textPieces } from "./pieces.js";
+import { defined } from "./defined.js";
 
 /** BIP39 words for owned entropy bits; the temporary byte buffer is cleared afterwards. */
 function mnemonicFromEntropyBits(bits: string): string {
@@ -54,7 +55,7 @@ function shiftedIndexes(
   direction: Direction,
 ): number[] {
   return indexes.map((index, position) =>
-    modulo(index + direction * shifts[position]!, BIP39_DICTIONARY_SIZE),
+    modulo(index + direction * defined(shifts[position]), BIP39_DICTIONARY_SIZE),
   );
 }
 
@@ -77,7 +78,10 @@ function shiftedEntropyBits(
     (bits) => Number.parseInt(bits, 2),
   );
   const tail = Number.parseInt(entropy.slice(-tailWidth), 2);
-  const movedTail = modulo(tail + direction * shifts.at(-1)!, lastWordEntropyValues(wordCount));
+  const movedTail = modulo(
+    tail + direction * defined(shifts.at(-1)),
+    lastWordEntropyValues(wordCount),
+  );
   return bitsOfIndexes(shiftedIndexes(chunks, shifts, direction)) + bitsOf(movedTail, tailWidth);
 }
 

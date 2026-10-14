@@ -8,6 +8,7 @@ import { pathWithin } from "./path-within.js";
 import { terminalMore, terminalNotice } from "./terminal.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { SAVED_OPTIONS } from "./output-options.js";
+import { defined } from "../core/defined.js";
 
 /** Folder names, compared without case, and the service they belong to. */
 const CLOUD_FOLDER_NAMES: readonly (readonly [RegExp, string])[] = [
@@ -40,7 +41,7 @@ export function cloudServiceOf(
   // Every folder below macOS's ~/Library/CloudStorage belongs to a service, named in its own name.
   const cloudStorage = resolve(home, "Library", "CloudStorage");
   if (pathWithin(cloudStorage, absolute) && absolute !== cloudStorage) {
-    const provider = relative(cloudStorage, absolute).split(sep)[0]!;
+    const provider = defined(relative(cloudStorage, absolute).split(sep)[0]);
     const known = CLOUD_FOLDER_NAMES.find(([pattern]) => pattern.test(provider))?.[1];
     return known ?? provider.split("-")[0];
   }
@@ -61,7 +62,7 @@ export function cloudServiceOf(
 export function warnOfCloudCopy(path: string | undefined): void {
   const service = path === undefined ? undefined : cloudServiceOf(path);
   if (service === undefined) return;
-  terminalNotice(`${service} keeps a copy of ${path!}`, "warning");
+  terminalNotice(`${service} keeps a copy of ${defined(path)}`, "warning");
   terminalMore("cloud-folders");
 }
 

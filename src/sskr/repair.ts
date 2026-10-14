@@ -65,6 +65,7 @@ import {
 import { BITS_PER_BYTE, xorInto } from "../core/bits.js";
 import { capitalized } from "../core/prose.js";
 import { listPieces } from "../core/pieces.js";
+import { defined } from "../core/defined.js";
 
 /** More marked elements than this leave too few checksum bits to find them. */
 export const MAX_MARKED_ELEMENTS = 6;
@@ -135,7 +136,9 @@ export class ShareVariantsError extends Error {
   readonly code: ShareRepairErrorCode = "share-variants";
 
   constructor(readonly variants: readonly ReadRepairableShare[]) {
-    const places = variants[0]!.filled.map((element) => element.position).join(", ");
+    const places = defined(variants[0])
+      .filled.map((element) => element.position)
+      .join(", ");
     super(
       `${variants.length} shares fit the marked elements ${places}. Use another copy of this share, or another share.`,
     );
@@ -219,19 +222,22 @@ function cborLayouts(tags: readonly (readonly number[])[]): CborLayout[] {
 function cborRows(cbor: ArrayLike<number>, layout: CborLayout): ZeroField[] {
   const { payloadLength, header, tagBytes } = layout;
   const tag = tagBytes.length;
-  const headerBytes = byteStringHeads(payloadLength).find((head) => head.length === header)!;
+  const headerBytes = defined(
+    byteStringHeads(payloadLength).find((head) => head.length === header),
+  );
   return [
-    ...tagBytes.map((byte, index) => [cbor[index]! ^ byte, BITS_PER_BYTE] as const),
-    ...headerBytes.map((byte, index) => [cbor[tag + index]! ^ byte, BITS_PER_BYTE] as const),
+    ...tagBytes.map((byte, index) => [defined(cbor[index]) ^ byte, BITS_PER_BYTE] as const),
+    ...headerBytes.map(
+      (byte, index) => [defined(cbor[tag + index]) ^ byte, BITS_PER_BYTE] as const,
+    ),
     // The reserved high nibble of the member's byte (sskr encoding.rs).
-    [cbor[tag + header + MEMBER_BYTE]! >>> NIBBLE_BITS, BITS_PER_BYTE - NIBBLE_BITS],
+    [defined(cbor[tag + header + MEMBER_BYTE]) >>> NIBBLE_BITS, BITS_PER_BYTE - NIBBLE_BITS],
   ];
 }
 
 function payloadOf(cbor: ArrayLike<number>, layout: CborLayout): Uint8Array {
-  return Uint8Array.from(
-    { length: layout.payloadLength },
-    (_, index) => cbor[layout.tagBytes.length + layout.header + index]!,
+  return Uint8Array.from({ length: layout.payloadLength }, (_, index) =>
+    defined(cbor[layout.tagBytes.length + layout.header + index]),
   );
 }
 
@@ -407,7 +413,7 @@ function unitValues(
 ): (number | undefined)[] | undefined {
   const { valueOf } = SHARE_UNITS[format];
   const values = units.map((unit) => (marked(unit) ? undefined : valueOf(unit)));
-  return values.some((value, index) => value === undefined && !marked(units[index]!))
+  return values.some((value, index) => value === undefined && !marked(defined(units[index])))
     ? undefined
     : values;
 }
@@ -518,7 +524,7 @@ function addUnicodeModel(models: UnitModel[], text: string): void {
             fits: (filled: readonly number[]) =>
               fitting
                 .slice(0, filled.length)
-                .every((words, place) => words?.has(filled[place]!) ?? true),
+                .every((words, place) => words?.has(defined(filled[place])) ?? true),
           }
         : {}),
     },
@@ -536,7 +542,7 @@ function addColorModel(models: UnitModel[], text: string): void {
   if (colors === undefined) return;
   const partly = colors.some(readInPart);
   // Every color not marked has six digits (markedCodes), so it has a value.
-  const values = unitValues("colors", colors, isMarked)!;
+  const values = defined(unitValues("colors", colors, isMarked));
   addUnitModel(
     models,
     {
@@ -650,12 +656,12 @@ function colorUnicodePairings(
   const firstMark = scalars.indexOf("?");
   const leading = firstMark < 0 ? scalars : scalars.slice(0, firstMark);
   const own = ownCountRead(
-    mixed!,
+    defined(mixed),
     listPieces(leading.slice(0, leading.length - (leading.length % per)), per).map((pair) =>
       valueOf(pair.join("")),
     ),
   );
-  const colorCounts = [...mixedUnitCounts(mixed!)].filter(
+  const colorCounts = [...mixedUnitCounts(defined(mixed))].filter(
     (count) => own === undefined || count === own,
   );
   // The fewest and the most codes that the pieces from each one on stand for: a mark one code,
@@ -663,10 +669,10 @@ function colorUnicodePairings(
   const fewest = new Array<number>(pieces.length + 1).fill(0);
   const most = new Array<number>(pieces.length + 1).fill(0);
   for (let piece = pieces.length - 1; piece >= 0; piece -= 1) {
-    const current = pieces[piece]!;
+    const current = defined(pieces[piece]);
     const marks = typeof current === "string" ? 0 : current.marks;
-    fewest[piece] = fewest[piece + 1]! + (marks === 0 ? 1 : marks);
-    most[piece] = most[piece + 1]! + (marks === 0 ? 1 : marks * per);
+    fewest[piece] = defined(fewest[piece + 1]) + (marks === 0 ? 1 : marks);
+    most[piece] = defined(most[piece + 1]) + (marks === 0 ? 1 : marks * per);
   }
   // Whether the codes from each one on are decoys: valid colors only, complete ones unless the
   // share's own length is known, when a ? may stand for a code or a whole color of a decoy. A
@@ -676,16 +682,16 @@ function colorUnicodePairings(
   for (let at = scalars.length - 1; at >= 0; at -= 1) {
     const pair = scalars.slice(at, at + per);
     decoysFrom[at] =
-      (own !== undefined && scalars[at] === "?" && decoysFrom[at + 1]!) ||
+      (own !== undefined && scalars[at] === "?" && defined(decoysFrom[at + 1])) ||
       (pair.length === per &&
         (own !== undefined || !pair.includes("?")) &&
         someColorFits(pair) &&
-        decoysFrom[at + per]!);
+        defined(decoysFrom[at + per]));
   }
   // Where each piece begins among the codes as written.
   const scalarAt = [0];
   for (const piece of pieces)
-    scalarAt.push(scalarAt.at(-1)! + (typeof piece === "string" ? 1 : piece.marks));
+    scalarAt.push(defined(scalarAt.at(-1)) + (typeof piece === "string" ? 1 : piece.marks));
   let lastMark = -1;
   for (let piece = 0; piece < pieces.length; piece += 1)
     if (typeof pieces[piece] === "object") lastMark = piece;
@@ -717,16 +723,18 @@ function colorUnicodePairings(
     if (steps > MAX_MARK_WIDTH_STEPS) throw new AmbiguousMarksError();
     // Marks after a share of known length are decoys and need no place in it.
     const required =
-      own === undefined && piece <= lastMark ? fewest[piece]! - fewest[lastMark + 1]! : 0;
+      own === undefined && piece <= lastMark
+        ? defined(fewest[piece]) - defined(fewest[lastMark + 1])
+        : 0;
     const least = codes.length + required;
-    const greatest = codes.length + most[piece]!;
+    const greatest = codes.length + defined(most[piece]);
     if (!colorCounts.some((count) => least <= count * per && count * per <= greatest)) return;
-    if (colorCounts.includes(codes.length / per) && decoysFrom[scalarAt[piece]!]) {
+    if (colorCounts.includes(codes.length / per) && decoysFrom[defined(scalarAt[piece])]) {
       read(piece < pieces.length);
       if (own !== undefined) return;
     }
     if (piece === pieces.length) return;
-    const current = pieces[piece]!;
+    const current = defined(pieces[piece]);
     if (typeof current === "string") {
       withPlaced([current], () => place(piece + 1));
       return;
@@ -738,7 +746,7 @@ function colorUnicodePairings(
     if (own !== undefined)
       for (let taken = 1; taken < current.marks; taken += 1)
         for (const length of runLengths(taken, codes.length))
-          if (codes.length + length === own * per && decoysFrom[scalarAt[piece]! + taken])
+          if (codes.length + length === own * per && decoysFrom[defined(scalarAt[piece]) + taken])
             withPlaced(marksOf(length), () => read(true));
   };
   place(0);
@@ -759,11 +767,13 @@ function addColorUnicodeModels(models: UnitModel[], text: string): void {
   for (const { pairs, decoys } of colorUnicodePairings(scalars)) {
     // Every color whose codes are all read is one (colorUnicodePairings); one with a mark in
     // either of its codes is unknown as a whole.
-    const values = unitValues(
-      "colors-unicode",
-      pairs.map((pair) => pair.join("")),
-      isMarked,
-    )!;
+    const values = defined(
+      unitValues(
+        "colors-unicode",
+        pairs.map((pair) => pair.join("")),
+        isMarked,
+      ),
+    );
     models.push({
       format: "colors-unicode",
       values,
@@ -771,7 +781,7 @@ function addColorUnicodeModels(models: UnitModel[], text: string): void {
       structures: structuresOf("colors-unicode", pairs.length),
       fits: (filled) =>
         pairs.every((pair, index) => {
-          const written = unitText(filled[index]!).match(CODE_POINT_TEXT)!;
+          const written = defined(unitText(defined(filled[index])).match(CODE_POINT_TEXT));
           return pair.every((code, half) => code === "?" || code === written[half]);
         }),
     });
@@ -793,7 +803,9 @@ function colorsFitting(pair: readonly string[]): number[] {
     COLOR_CODE_POINTS.filter((point) => fitsPattern(code, point)),
   );
   const { valueOf } = SHARE_UNITS["colors-unicode"];
-  return high!.flatMap((first) => low!.flatMap((second) => valueOf(first + second) ?? []));
+  return defined(high).flatMap((first) =>
+    defined(low).flatMap((second) => valueOf(first + second) ?? []),
+  );
 }
 
 /**
@@ -836,9 +848,12 @@ function addColorUnicodeDigitModel(models: UnitModel[], text: string): void {
     // A solution keeps every digit read, also beside a code that cannot be read.
     fits: (filled) =>
       pairs.slice(0, filled.length).every((pair, index) => {
-        if (fitting[index] !== undefined) return fitting[index]!.has(filled[index]!);
-        const written = unitText(filled[index]!).match(CODE_POINT_TEXT)!;
-        return pair.every((code, half) => wholeMark(code) || fitsPattern(code, written[half]!));
+        if (fitting[index] !== undefined)
+          return defined(fitting[index]).has(defined(filled[index]));
+        const written = defined(unitText(defined(filled[index])).match(CODE_POINT_TEXT));
+        return pair.every(
+          (code, half) => wholeMark(code) || fitsPattern(code, defined(written[half])),
+        );
       }),
   });
 }
@@ -1011,7 +1026,7 @@ export class MarkedReading {
     try {
       for (let bit = 0; bit < this.unitBits; bit += 1) {
         const flipped = [...values];
-        flipped[place] = values[place]! ^ (1 << bit);
+        flipped[place] = defined(values[place]) ^ (1 << bit);
         const after = this.#structure.evaluate(flipped).payload;
         try {
           for (let byte = 0; byte < SHARE_METADATA_BYTES; byte += 1)
@@ -1036,8 +1051,9 @@ export class MarkedReading {
     // Another reading of the share, such as another form, may have no candidates at these places.
     const tried = places.filter((place) => candidates?.[place] !== undefined);
     if (tried.length === 0) return [this];
-    return everyPick(tried.map((place) => candidates![place]!))!.map((values) =>
-      this.withValues(new Map(tried.map((place, index) => [place, values[index]!]))),
+    return defined(everyPick(tried.map((place) => defined(defined(candidates)[place])))).map(
+      (values) =>
+        this.withValues(new Map(tried.map((place, index) => [place, defined(values[index])]))),
     );
   }
 
@@ -1067,7 +1083,7 @@ export class MarkedReading {
     if (read.format !== this.format) return undefined;
     const filled = this.#holes.map((index) => ({
       position: index + 1,
-      value: units.unitText(values[index]!),
+      value: units.unitText(defined(values[index])),
     }));
     return { ur: read.ur, format: read.format, repaired: filled.length > 0, filled };
   }
@@ -1130,7 +1146,7 @@ export class ReadingSpace {
         holes.map((hole) => {
           const bitsRead = readBits[hole];
           const change =
-            bitsRead === undefined ? 0 : (values[hole]! ^ bitsRead.value) & bitsRead.mask;
+            bitsRead === undefined ? 0 : (defined(values[hole]) ^ bitsRead.value) & bitsRead.mask;
           return [change, unitBits] as const;
         }),
       );
@@ -1472,5 +1488,5 @@ export function sharesOfReadings(
 export function readRepairableShare(value: string): ReadRepairableShare {
   const candidates = repairCandidates(value);
   if (candidates.length > 1) throw new ShareVariantsError(candidates);
-  return candidates[0]!;
+  return defined(candidates[0]);
 }

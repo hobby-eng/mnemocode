@@ -12,6 +12,7 @@ import { encodedOutputLabel } from "./input.js";
 import type { EncodeOutcome } from "./encode-command.js";
 import { Masking, PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
 import { FINGERPRINTS_HINT, plainFingerprintLine } from "./fingerprint-report.js";
+import { defined } from "../core/defined.js";
 
 /** Why codes of the Original Seedshift may have no fingerprint of their own. */
 const NO_ENCODED_FINGERPRINT =
@@ -83,9 +84,11 @@ export function printEncodeResult(outcome: EncodeOutcome): void {
         "Legacy shifted phrase already has a valid BIP39 checksum; no final-word replacement is needed.",
       );
     } else if (!encoding.replaced) {
-      console.error(`Optional checksum-valid final word: ${validLastWord!.shiftedEnglish.at(-1)}`);
       console.error(
-        `Optional checksum-valid legacy phrase: ${validLastWord!.shiftedEnglish.join(" ")}`,
+        `Optional checksum-valid final word: ${defined(validLastWord).shiftedEnglish.at(-1)}`,
+      );
+      console.error(
+        `Optional checksum-valid legacy phrase: ${defined(validLastWord).shiftedEnglish.join(" ")}`,
       );
       console.error(
         "That word replaces the shifted last word; --legacy-valid-last-word records it.",

@@ -35,6 +35,7 @@ import { placesNamed } from "./places.js";
 import { phraseOfIndexes } from "./words.js";
 import { ownedDates } from "./dates.js";
 import { CORRECT_WRITTEN_COPY, SearchPlan, counted } from "./search-plan.js";
+import { defined } from "./defined.js";
 
 /** How the right codes are told. */
 export type MissingCodesWay = "encoded" | "wallet" | "list";
@@ -145,7 +146,7 @@ function foundOne(
   dates: readonly DateShiftDate[] | undefined,
 ): MissingCodesResult {
   if (passed === 0) return { kind: "none", message: nothing };
-  if (passed === 1) return { kind: "found", backup: found[0]!, dates };
+  if (passed === 1) return { kind: "found", backup: defined(found[0]), dates };
   // Counted by every set that passed, as the progress counts them, not by those kept.
   return {
     kind: "several",
@@ -285,7 +286,8 @@ async function searched(
     onProgress:
       run.onProgress === undefined
         ? undefined
-        : ({ checked, found }) => run.onProgress!({ checked, total: codes.expected, found }),
+        : ({ checked, found }) =>
+            defined(run.onProgress)({ checked, total: codes.expected, found }),
   });
   assertStillRunning(run);
   return { found: result.found, passed: result.passed };
@@ -440,7 +442,7 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
     );
     const result = foundOne(found, MISSING_CODES_TEXTS.noneByWallet, []);
     if (result.kind !== "found") return result;
-    const match = first!;
+    const match = defined(first);
     // The codes are decoded with every date, the known ones too: the guessed ones alone give
     // another phrase (AUD-012-FUN001). Checked here, so that no host decodes another wallet.
     const phrases = result.backup.candidates(match.allDates);

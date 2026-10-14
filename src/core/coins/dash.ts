@@ -19,6 +19,7 @@ import {
   type CoinAddress,
   unreadableAddress,
 } from "./coin.js";
+import { defined } from "../defined.js";
 
 /** DIP18's human-readable parts on the main and the test network. */
 const PLATFORM = new Bech32Prefixes("dash", "tdash");
@@ -73,7 +74,7 @@ class DashCoin extends Base58Coin {
     const [type, ...hash] = bytesOf(decoded.words);
     if (type === PLATFORM_P2PKH) {
       if (hash.length !== HASH160_BYTES) throw invalidAddress(WRONG_LENGTH);
-      const last = decoded.words[decoded.words.length - 1]!;
+      const last = defined(decoded.words[decoded.words.length - 1]);
       if (decoded.words.length !== PAYMENT_GROUPS || (last & PADDING_MASK) !== 0)
         throw unreadableAddress();
       return this.address("dash-platform", Uint8Array.from(hash), asciiLowercase(text), testnet);

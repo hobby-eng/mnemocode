@@ -15,6 +15,7 @@ import {
   type EncodedFormat,
   type EncodedResult,
 } from "./types.js";
+import { defined } from "./defined.js";
 
 /** A known answer of the forms of codes: a phrase of `words` words written in every form. */
 export interface Answer {
@@ -180,14 +181,14 @@ export function checkRepresentationStartup(): void {
   expectRefused(
     () =>
       parseInput(
-        `F8FFF8FF${REPRESENTATION_ANSWERS[0]!.forms["colors-unicode"].slice(8)}`,
+        `F8FFF8FF${defined(REPRESENTATION_ANSWERS[0]).forms["colors-unicode"].slice(8)}`,
         "colors-unicode",
       ),
     /outside the #RRGGBB range/u,
     "Color Unicode beyond RGB",
   );
   expectRefused(
-    () => parseInput(REPRESENTATION_ANSWERS[0]!.forms.english, "unknown" as EncodedFormat),
+    () => parseInput(defined(REPRESENTATION_ANSWERS[0]).forms.english, "unknown" as EncodedFormat),
     /Unsupported encoded format/u,
     "Unknown representation",
   );

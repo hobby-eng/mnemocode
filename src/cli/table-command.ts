@@ -2,6 +2,7 @@ import { terminalResultHeader } from "./terminal.js";
 import { mappingRow, wordTableRow, wordTableText } from "../core/words.js";
 import { WORD_NUMBER_RANGE } from "../core/bip39-sizes.js";
 import { integerOption, type ParsedArguments, value } from "./arguments.js";
+import { defined } from "../core/defined.js";
 
 function printRow(row: ReturnType<typeof mappingRow>): void {
   terminalResultHeader("Word mapping", []);
@@ -26,5 +27,7 @@ export function runTable(arguments_: ParsedArguments): void {
   // A number is read as every whole-number option is (arguments.ts); the row from the table.
   if (indexValue !== undefined)
     return printRow(mappingRow(integerOption(arguments_, "index", WORD_NUMBER_RANGE)));
-  printRow(word !== undefined ? wordTableRow("word", word) : wordTableRow("unicode", unicode!));
+  printRow(
+    word !== undefined ? wordTableRow("word", word) : wordTableRow("unicode", defined(unicode)),
+  );
 }

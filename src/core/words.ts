@@ -27,6 +27,7 @@ import {
 import { bitsOf, bitsOfIndexes, bitsToBytes, lastWordChecksumBits } from "./bits.js";
 import type { MappingRow, MissingWordCandidate } from "./types.js";
 import { inWholeRange, wholeNumberOf } from "./typed-number.js";
+import { defined } from "./defined.js";
 export { englishWordlist, traditionalChineseWordlist };
 // The English words alone belong to english-words.ts; here too for the modules that take both.
 export {
@@ -72,7 +73,7 @@ export function unicodeCodesFitting(pattern: string): number[] {
 
 /** The Unicode codes of BIP39 indexes, counted from 0. */
 export function unicodeCodesOfIndexes(indexes: readonly number[]): string[] {
-  return indexes.map((index) => UNICODE_CODES[index]!);
+  return indexes.map((index) => defined(UNICODE_CODES[index]));
 }
 
 /**
@@ -164,7 +165,7 @@ export function unicodeHex(symbol: string): string {
   const points = Array.from(symbol);
   if (points.length !== 1)
     throw new Error("The selected mapped BIP39 character is not one Unicode scalar value.");
-  return hexCodePoint(points[0]!.codePointAt(0)!);
+  return hexCodePoint(defined(defined(points[0]).codePointAt(0)));
 }
 
 /** The row of the word table for word number `index`, from 1 through 2,048. */
@@ -174,8 +175,8 @@ export function mappingRow(index: number): MappingRow {
   const zeroBased = index - 1;
   return {
     index,
-    english: englishWordlist[zeroBased]!,
-    unicodeHex: UNICODE_CODES[zeroBased]!,
+    english: defined(englishWordlist[zeroBased]),
+    unicodeHex: defined(UNICODE_CODES[zeroBased]),
   };
 }
 
@@ -201,7 +202,7 @@ const WORD_TABLE_LOOKUPS: Readonly<
     // As a phrase reads its words: one word, in any case.
     find: (typed) => {
       const words = englishTokens(typed);
-      return words.length === 1 ? ENGLISH_INDEX.get(words[0]!) : undefined;
+      return words.length === 1 ? ENGLISH_INDEX.get(defined(words[0])) : undefined;
     },
     refusal: "That word is not in the English BIP39 list.",
   },
@@ -242,7 +243,7 @@ export function wordTableText(): string {
 function finalWordCandidates(words: readonly string[]): MissingWordCandidate[] {
   const prefix = indexesOfWords(words.slice(0, -1));
   return validLastWordIndexes(prefix).map((index) => {
-    const word = englishWordlist[index]!;
+    const word = defined(englishWordlist[index]);
     return {
       position: words.length,
       word,
@@ -269,7 +270,7 @@ export function validLastWordIndexes(prefix: readonly number[]): number[] {
     const mnemonic = entropyToMnemonic(entropy, englishWordlist);
     // One of the candidates is the wallet's.
     entropy.fill(0);
-    indexes.push(ENGLISH_INDEX.get(mnemonic.slice(mnemonic.lastIndexOf(" ") + 1))!);
+    indexes.push(defined(ENGLISH_INDEX.get(mnemonic.slice(mnemonic.lastIndexOf(" ") + 1))));
   }
   return indexes;
 }
@@ -287,7 +288,7 @@ export function recoverLegacyValidLastWords(value: string): MissingWordCandidate
   const words = canonicalEnglishWords(value);
   const finalPosition = words.length - 1;
   const checksumLength = checksumBits(words.length);
-  const finalIndex = ENGLISH_INDEX.get(words[finalPosition]!)!;
+  const finalIndex = defined(ENGLISH_INDEX.get(defined(words[finalPosition])));
   const legacyEntropyTail = finalIndex >> checksumLength;
   const incomplete = [...words];
   incomplete[finalPosition] = "?";

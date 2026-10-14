@@ -1,4 +1,5 @@
 import { coinById, type WalletEvidence } from "../bitcoin-evidence.js";
+import { defined } from "../core/defined.js";
 
 const labels: Readonly<Record<string, string>> = {
   all: "all templates selection",
@@ -79,7 +80,7 @@ const labels: Readonly<Record<string, string>> = {
  * (AUD-015-UI001).
  */
 export function optionLabel(key: string): string {
-  return Object.hasOwn(labels, key) ? labels[key]! : key.replaceAll("-", " ");
+  return Object.hasOwn(labels, key) ? defined(labels[key]) : key.replaceAll("-", " ");
 }
 
 export function optionSubject(key: string): string {

@@ -2,6 +2,7 @@
 
 import { BIP39_INDEX_BITS, BITS_PER_BYTE, checksumBits } from "./bip39-sizes.js";
 import { textPieces } from "./pieces.js";
+import { defined } from "./defined.js";
 
 // Defined in bip39-sizes.ts, which this module imports and which may not import it back.
 export { BITS_PER_BYTE };
@@ -14,7 +15,8 @@ export { BITS_PER_BYTE };
 export function equalBytes(left: ArrayLike<number>, right: ArrayLike<number>): boolean {
   if (left.length !== right.length) return false;
   let different = 0;
-  for (let index = 0; index < left.length; index += 1) different |= left[index]! ^ right[index]!;
+  for (let index = 0; index < left.length; index += 1)
+    different |= defined(left[index]) ^ defined(right[index]);
   return different === 0;
 }
 
@@ -118,5 +120,6 @@ export function bytesOfHex(text: string): Uint8Array {
  * to a share's payload, or to a secret and its digest. The caller owns both and wipes them.
  */
 export function xorInto(target: Uint8Array, delta: ArrayLike<number>): void {
-  for (let index = 0; index < target.length; index += 1) target[index]! ^= delta[index]!;
+  for (let index = 0; index < target.length; index += 1)
+    target[index] = defined(target[index]) ^ defined(delta[index]);
 }
