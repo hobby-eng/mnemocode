@@ -125,7 +125,7 @@ describe("legacy checksum-word replacement", () => {
       const candidates = decodeIndexesLegacyValid(corrected.shiftedIndexes, [
         parseDate("23-09-2026"),
       ]);
-      expect(candidates).toHaveLength(expectedCandidates[position]);
+      expect(candidates).toHaveLength(expectedCandidates[position]!);
       expect(candidates.some((candidate) => candidate.recoveredMnemonic === mnemonic)).toBe(true);
     });
   }

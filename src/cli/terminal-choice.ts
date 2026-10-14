@@ -175,7 +175,7 @@ const LINK_INDENT = "    ";
  */
 export interface Explanation {
   readonly lines: readonly string[];
-  readonly more?: readonly string[];
+  readonly more?: readonly string[] | undefined;
 }
 
 export function explanationLines(explanation: Explanation | undefined): string[] {
@@ -299,7 +299,7 @@ export interface ChooseOptions {
   readonly quit?: string;
   readonly explanation?: Explanation;
   /** Why the question is asked, such as why it is asked again, shown above it. */
-  readonly warning?: string;
+  readonly warning?: string | undefined;
 }
 
 /**

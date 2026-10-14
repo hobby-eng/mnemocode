@@ -38,8 +38,8 @@ export const COPY_FIELDS = Object.freeze([
 export type CopyField = (typeof COPY_FIELDS)[number];
 export type CardPresentation = Readonly<Record<CopyField, string>>;
 export interface CardSettings {
-  readonly pageSize?: CardPageSize;
-  readonly orientation?: CardOrientation;
+  readonly pageSize?: CardPageSize | undefined;
+  readonly orientation?: CardOrientation | undefined;
   readonly profile?: CardProfile;
   readonly presentation?: CardPresentation;
   readonly cardQr?: boolean;

@@ -14,7 +14,7 @@ const BACKSPACE = "\x7f";
  * index: shifting a long array takes time of its own, which would hide the time readLine takes.
  * `moreWithin` says whether bytes are left, so that a final Escape is Escape alone.
  */
-function keyboard(text: string): Pick<LineOptions, "moreWithin"> & {
+function keyboard(text: string): Required<Pick<LineOptions, "moreWithin">> & {
   readonly next: () => Promise<number | undefined>;
 } {
   const bytes = Buffer.from(text, "utf8");
@@ -396,7 +396,7 @@ describe("visible answer on the terminal", () => {
     expect(terminalColumns()).toBe(33);
     process.stderr.columns = 0;
     expect(terminalColumns()).toBe(80);
-    (process.stderr as { columns?: number }).columns = undefined;
+    (process.stderr as { columns?: number | undefined }).columns = undefined;
     expect(terminalColumns()).toBe(80);
   });
 });

@@ -41,7 +41,7 @@ export type CardContent = CardSettings & {
   readonly colors: readonly string[];
   readonly labels?: readonly string[];
   readonly payload: string;
-  readonly title?: string;
+  readonly title?: string | undefined;
   /** How many of the last cards are decoys; undefined until a plan adds them (card-plan.ts). */
   readonly decoys?: number;
 };

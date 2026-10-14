@@ -162,7 +162,7 @@ describe("AUD-008-FUN001: every share given must agree with the restored secret"
   const expected = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
   // Byte 8 of the CBOR is in the share value: the share keeps a valid checksum but lies off the
   // polynomial of the others.
-  const wrong = altered(vector.shares[2]!, (body) => void (body[8] ^= 1));
+  const wrong = altered(vector.shares[2]!, (body) => void (body[8]! ^= 1));
 
   it("refuses a wrong surplus share in every order, and names it", async () => {
     const [a, b] = vector.shares as [string, string];
@@ -186,7 +186,7 @@ describe("AUD-008-FUN001: every share given must agree with the restored secret"
       [0, 1],
       [0, 2],
       [1, 2],
-    ])
+    ] as const)
       expect(await combineSskrShares([s[i]!, s[j]!])).toBe(expected);
     expect(await combineSskrShares([...s].reverse())).toBe(expected);
   });
@@ -197,7 +197,7 @@ describe("AUD-008-FUN001: every share given must agree with the restored secret"
     // All eight shares: group 1 (2 of 3) and group 2 (3 of 5) both with surplus members.
     expect(await combineSskrShares(official.shares)).toBe(original);
     // A wrong surplus member of the second group.
-    const bad = altered(official.shares[7]!, (body) => void (body[9] ^= 1));
+    const bad = altered(official.shares[7]!, (body) => void (body[9]! ^= 1));
     await expect(combineSskrShares([...official.shares.slice(0, 7), bad])).rejects.toThrow(
       /Share 8 does not fit/u,
     );
@@ -211,7 +211,7 @@ describe("AUD-008-FUN001: every share given must agree with the restored secret"
       .split("\n");
     const phrase = entropyToMnemonic(secret, wordlist);
     expect(await combineSskrShares(shares)).toBe(phrase);
-    const badGroup = altered(shares[3]!, (body) => void (body[9] ^= 1));
+    const badGroup = altered(shares[3]!, (body) => void (body[9]! ^= 1));
     await expect(combineSskrShares([...shares.slice(0, 3), badGroup, shares[4]!])).rejects.toThrow(
       /do not fit/u,
     );

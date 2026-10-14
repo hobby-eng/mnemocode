@@ -12,19 +12,24 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 // warning, and Enter alone takes the fallback or leaves an optional answer out.
 const script = vi.hoisted(() => ({
   answers: [] as number[],
-  asked: [] as { question: string; count: number; labels: string[]; warning?: string }[],
+  asked: [] as {
+    question: string;
+    count: number;
+    labels: string[];
+    warning?: string | undefined;
+  }[],
   lists: [] as string[][],
   explanations: [] as string[][],
   labels: [] as string[],
   typed: {} as Record<string, string[]>,
   usual: {} as Record<string, string>,
-  lines: [] as { question: string; warning?: string }[],
+  lines: [] as { question: string; warning?: string | undefined }[],
   /** Notes and examples longer than their list's room, which the list would cut. */
   cutNotes: [] as string[],
   /** Whether pdftocairo, which images need, is missing. */
   noImages: false,
   /** The value and the key of each answer, by the question last asked with them. */
-  digits: {} as Record<string, { value: unknown; digit?: number }[]>,
+  digits: {} as Record<string, { value: unknown; digit?: number | undefined }[]>,
 }));
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/cli/terminal-choice.js")>();

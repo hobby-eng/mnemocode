@@ -31,9 +31,9 @@ interface Question {
   readonly question: string;
   /** The labels of the entries of a list. */
   readonly labels?: readonly string[];
-  readonly fallback?: string;
-  readonly optional?: string;
-  readonly warning?: string;
+  readonly fallback?: string | undefined;
+  readonly optional?: string | undefined;
+  readonly warning?: string | undefined;
 }
 
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
@@ -240,7 +240,7 @@ const UNLIMITED_ROWS = 100_000;
  */
 function watchScreen(columns: number, reported: Reported = { columns }): Screen {
   stopWatching();
-  (process.stderr as { columns?: number }).columns = reported.columns;
+  (process.stderr as { columns?: number | undefined }).columns = reported.columns;
   (process.stderr as { rows?: number }).rows = reported.height ?? UNLIMITED_ROWS;
   const screen = new Screen(columns, reported.height);
   // Replaced by hand, not with vi.spyOn: a spy keeps every call it sees, and the walk through every

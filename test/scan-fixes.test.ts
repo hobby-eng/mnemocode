@@ -2828,7 +2828,7 @@ describe("G1-027: one owner of an opened candidate list", () => {
 
   it("wipes the bytes of a list that it refuses", () => {
     const damaged = bytesOfHex(lists[0]!.bytes);
-    damaged[damaged.length - 1] ^= 1;
+    damaged[damaged.length - 1]! ^= 1;
     expect(() => OpenedCandidateList.fromBytes(damaged)).toThrow();
     expect(damaged.every((byte) => byte === 0)).toBe(true);
   });

@@ -21,7 +21,7 @@ describe("Standalone SSKR", () => {
         [0, 1],
         [0, 2],
         [1, 2],
-      ]) {
+      ] as const) {
         expect(await combineSskrShares([shares[a]!, shares[b]!])).toBe(source);
       }
       for (const share of shares) {

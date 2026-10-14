@@ -183,7 +183,7 @@ describe("material selection cards", () => {
       await renderMaterialCard(nodeCardRenderer, "enclosure", { ...content, pageSize: "a4" }),
     );
     const tints = chooseMaterialSamples("enclosure", colors).filter((s) => s.tint).length;
-    expect((operators(pdf)[0].match(/\nW\*\nn\n/gu) ?? []).length).toBe(tints);
+    expect((operators(pdf)[0]!.match(/\nW\*\nn\n/gu) ?? []).length).toBe(tints);
   });
 
   it.each(["business", "a6", "a5", "a4"] as const)(
@@ -207,8 +207,8 @@ describe("material selection cards", () => {
           orientation === "portrait" ? [...expected[size]].reverse() : expected[size];
         expect(pdf.getPageCount()).toBe(1);
         for (const page of pdf.getPages()) {
-          expect((page.getWidth() * 25.4) / 72).toBeCloseTo(dimensions[0], 3);
-          expect((page.getHeight() * 25.4) / 72).toBeCloseTo(dimensions[1], 3);
+          expect((page.getWidth() * 25.4) / 72).toBeCloseTo(dimensions[0]!, 3);
+          expect((page.getHeight() * 25.4) / 72).toBeCloseTo(dimensions[1]!, 3);
         }
       }
     },
@@ -235,7 +235,7 @@ describe("material selection cards", () => {
     }
     const streams = operators(pdf);
     expect(streams).toHaveLength(1);
-    expect((streams[0].match(/\nf\n/gu) ?? []).length).toBeGreaterThan(100);
+    expect((streams[0]!.match(/\nf\n/gu) ?? []).length).toBeGreaterThan(100);
   });
 
   it("prints a sheet of A6 where no page size is given, as every other design does", async () => {

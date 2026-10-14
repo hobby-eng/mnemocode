@@ -1,6 +1,7 @@
 {
-  "extends": "./tsconfig.strict-consumers.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
+    "noEmit": true,
     "declaration": false,
     "module": "ESNext",
     "moduleResolution": "Bundler",
