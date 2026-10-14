@@ -15,7 +15,8 @@ import type { CardContent } from "./backup-cards.js";
 import type { CardDrawing } from "./templates.js";
 import type { SskrCardContent } from "./sskr-content.js";
 import { MM, separateCardPage, type CardBox } from "./business-layout.js";
-import { drawCollectionStudy, separateCardIndex, type SheetShape } from "./collection-sheet.js";
+import { drawCollectionStudy, separateCardIndex } from "./collection-sheet.js";
+import { type SheetShape } from "./collection-layout.js";
 import {
   parsePageSize,
   type BusinessStyle,

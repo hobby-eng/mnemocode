@@ -30,7 +30,7 @@ import {
   planCollectionSheet,
   StudyCaptions,
   studyCaptionWidth,
-} from "../src/export/collection-sheet.js";
+} from "../src/export/collection-layout.js";
 import { MM } from "../src/export/business-layout.js";
 import { drawMaterialBackdrop } from "../src/export/study-backdrops.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";

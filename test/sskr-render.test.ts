@@ -196,7 +196,7 @@ describe("share cards after AUD-010", () => {
       expect(["90x50", "50x90"], shareFormat).toContain(page);
     }
     // More cards than any layout holds on the page are refused with the page named.
-    const { planCollectionSheet } = await import("../src/export/collection-sheet.js");
+    const { planCollectionSheet } = await import("../src/export/collection-layout.js");
     const { businessSheetShape } = await import("../src/export/business-cards.js");
     const content = {
       kind: "colors",

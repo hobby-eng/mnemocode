@@ -23,7 +23,8 @@ import type { CardDrawing } from "./templates.js";
 import type { SskrCardContent } from "./sskr-content.js";
 import { ExportDetails } from "./export-details.js";
 import { clearDocumentMetadata } from "./document-metadata.js";
-import { drawCollectionStudy, MAX_SHEET_CARDS, type SheetShape } from "./collection-sheet.js";
+import { drawCollectionStudy } from "./collection-sheet.js";
+import { MAX_SHEET_CARDS, type SheetShape } from "./collection-layout.js";
 import {
   chooseMaterialSamples,
   materialArtwork,

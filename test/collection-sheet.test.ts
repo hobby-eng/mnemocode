@@ -4,7 +4,7 @@ import {
   collectionSheetLayout,
   MIN_SHEET_ROWS,
   SHEET_PLAN_TEXT,
-} from "../src/export/collection-sheet.js";
+} from "../src/export/collection-layout.js";
 import { cardTemplates } from "../src/export/templates.js";
 import { indexesToColors } from "../src/core.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";

@@ -107,7 +107,8 @@ import {
   HEIR_SHEET_FORMATS,
   DEFAULT_HEIR_SHEET_SIZE,
 } from "../src/export/heir-sheet.js";
-import { MAX_SHEET_CARDS, preparedForLine } from "../src/export/collection-sheet.js";
+import { preparedForLine } from "../src/export/collection-sheet.js";
+import { MAX_SHEET_CARDS } from "../src/export/collection-layout.js";
 import { cardCopyOptions } from "../src/cli/business-options.js";
 import { heirSheetText } from "../src/cli/heir-sheet.js";
 import { shareKeepingNote } from "../src/export/sskr-keeping-text.js";

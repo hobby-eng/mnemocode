@@ -34,7 +34,7 @@ import {
   type ProfileField,
   SHEET_QR_HOLDS,
 } from "../export/card-settings.js";
-import { SHEET_PLAN_TEXT } from "../export/collection-sheet.js";
+import { SHEET_PLAN_TEXT } from "../export/collection-layout.js";
 import { assertImageRenderer } from "../export/image-export.js";
 import {
   DOCUMENT_FORMAT_FACTS,

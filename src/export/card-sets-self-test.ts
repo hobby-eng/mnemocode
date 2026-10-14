@@ -1,6 +1,6 @@
 // The self-test of how a set of cards is made (owner, 2026-10-13): the colours of cards that print
 // codes, as far apart as the designs show them (card-palette.ts), the brightness that the business
-// designs take from a colour (business-tint.ts), the sheets in full rows (collection-sheet.ts),
+// designs take from a colour (business-tint.ts), the sheets in full rows (collection-layout.ts),
 // the decoys after a backup's codes that keep its codes and its QR code (card-decoys.ts), and a
 // phrase read back from the codes before its decoys (EncodedForm.leadingCodes); in the full
 // self-test, a sheet of a phrase in Unicode codes drawn with its decoys, in a PDF that carries no
@@ -25,7 +25,7 @@ import { artworkBrightness } from "./business-tint.js";
 import { codeColors } from "./card-palette.js";
 import { assertColorCardContent, type ColorCardContent } from "./card-content.js";
 import { keptCards, MAX_DECOYS, ownCards, withDecoyPool } from "./card-decoys.js";
-import { collectionSheetLayout } from "./collection-sheet.js";
+import { collectionSheetLayout } from "./collection-layout.js";
 import { oklab } from "./color-math.js";
 import { plannedCardJob, renderCards } from "./render.js";
 import { selectTemplate, type CardDrawing } from "./templates.js";

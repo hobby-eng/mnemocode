@@ -1,7 +1,7 @@
 // Decoys: random codes after a backup's own codes on its cards (owner, 2026-10-13). A sheet of
 // cards ends in full rows, which a backup's own codes seldom fill, and with a few more codes its
 // cards may be larger: a set of cards has at least one decoy, then as many as give the largest
-// cards in full rows on one sheet (planCollectionSheet, collection-sheet.ts). Separate cards have
+// cards in full rows on one sheet (planCollectionSheet, collection-layout.ts). Separate cards have
 // as many as the sheet of their design. A decoy looks like the backup's codes: the Unicode code of
 // a random word, a colour of a random phrase of the same length, or a random colour beside the
 // colours of a share. The QR code of the cards holds the backup alone; the sheet for heirs says how

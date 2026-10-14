@@ -83,7 +83,7 @@ export interface BusinessDesign {
   readonly fields: readonly FieldPlace[];
 }
 
-/** The themes of a sheet of business cards (collection-sheet.ts StudyTheme). */
+/** The themes of a sheet of business cards (collection-layout.ts StudyTheme). */
 export type BusinessStudyTheme = "cool" | "noir";
 /** The theme of a sheet of mixed designs. */
 const MIXED_STUDY_THEME: BusinessStudyTheme = "cool";

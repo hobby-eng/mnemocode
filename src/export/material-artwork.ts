@@ -1,4 +1,4 @@
-import type { StudyTheme } from "./collection-sheet.js";
+import type { StudyTheme } from "./collection-layout.js";
 import { channelsHex, rgbChannels } from "./color-math.js";
 import { isRgbReference, rgbReferenceDigits } from "../core/colors.js";
 import type { MaterialStyle } from "./card-settings.js";

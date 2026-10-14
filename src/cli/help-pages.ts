@@ -22,7 +22,7 @@ import {
   SHEET_QR_HOLDS,
   SHEET_SIZES_TEXT,
 } from "../export/card-settings.js";
-import { SHEET_PLAN_TEXT } from "../export/collection-sheet.js";
+import { SHEET_PLAN_TEXT } from "../export/collection-layout.js";
 import { PROGRESS_EVERY } from "./date-search.js";
 import { counting } from "../core/search-plan.js";
 import { MAX_SEARCH_COMBINATIONS, MAX_SHOWN_CANDIDATES } from "../core/candidates.js";

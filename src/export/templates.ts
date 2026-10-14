@@ -17,7 +17,7 @@ import {
   SHEET_SIZES_TEXT,
   type CardPageSize,
 } from "./card-settings.js";
-import type { SheetShape } from "./collection-sheet.js";
+import type { SheetShape } from "./collection-layout.js";
 import { capitalized } from "../core/prose.js";
 import type { BusinessArtwork } from "./business-artwork.js";
 import type { AssetSource, QrSource, RandomSource } from "./platform.js";

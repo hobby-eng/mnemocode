@@ -70,14 +70,16 @@ import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-nod
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import { NewFolder } from "../src/export/private-file.js";
 import {
-  collectionSheetLayout,
   drawCollectionStudy,
   drawStudyCaption,
   separateCardIndex,
+} from "../src/export/collection-sheet.js";
+import {
+  collectionSheetLayout,
   studyCaptionWidth,
   type StudyBox,
   type StudyLayout,
-} from "../src/export/collection-sheet.js";
+} from "../src/export/collection-layout.js";
 import * as cardQrModule from "../src/export/card-qr.js";
 import { renderBusinessCards } from "../src/export/business-cards.js";
 import { MAX_DECOYS } from "../src/export/card-decoys.js";

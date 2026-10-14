@@ -154,7 +154,7 @@ describe("page size decides the layout of Shamir share cards", () => {
   it("prints the QR card of a share as a compact sheet of the business size", async () => {
     const { splitSskrMnemonic } = await import("../src/sskr/shares.js");
     const { renderSskrPdf } = await import("../src/export/sskr-cards.js");
-    const { collectionSheetLayout } = await import("../src/export/collection-sheet.js");
+    const { collectionSheetLayout } = await import("../src/export/collection-layout.js");
     // Public BIP39 test vector; never a real wallet.
     const shares = await splitSskrMnemonic(`${"abandon ".repeat(11)}about`, 2, 3);
     const document = await PDFDocument.load(
