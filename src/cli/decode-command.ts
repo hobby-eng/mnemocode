@@ -300,6 +300,17 @@ function afterDates(dates: DatesAnswer): Step {
 }
 
 /**
+ * The step after the codes of `backup`: the decoding of an unmasked phrase; for a masked one, once
+ * its encoded fingerprint is shown, the dates, or the step after `typedDates`, which still count
+ * when the new phrase takes them.
+ */
+function stepAfterCodes(backup: EncodedBackup, typedDates: DatesAnswer | undefined): Step {
+  if (!Masking.of(backup.mode).masked) return "decode";
+  showEncodedFingerprint(encodedFingerprintOf(backup));
+  return typedDates?.fitsPhrase(backup.indexes.length) === true ? afterDates(typedDates) : "dates";
+}
+
+/**
  * The answers of decode on the private screen, in this order, each checked at once: the encoded
  * seed phrase and everything that can be checked before the dates (askEncodedBackup), the dates,
  * which may hold ?, then either the decoding or, for dates with ?, the wallet (optional where the
@@ -369,13 +380,7 @@ export async function decodeWithQuestions(
           continue;
         }
       } else backup = read.backup;
-      if (!Masking.of(backup.mode).masked) step = "decode";
-      else {
-        showEncodedFingerprint(encodedFingerprintOf(backup));
-        // Dates kept from before still count if the new phrase takes them.
-        step =
-          typedDates?.fitsPhrase(backup.indexes.length) === true ? afterDates(typedDates) : "dates";
-      }
+      step = stepAfterCodes(backup, typedDates);
     } else if (step === "dates") {
       typedDates = await askDates({
         wordCount: defined(backup).indexes.length,
@@ -383,33 +388,18 @@ export async function decodeWithQuestions(
       });
       step = afterDates(typedDates);
     } else if (step === "wallet") {
-      const needed = walletNeeded(defined(backup).mode);
-      if (needed && given.list && evidence === undefined)
-        terminalNotice(
-          `--list-candidates does not apply here. ${walletReason(defined(backup).mode)}`,
-          "warning",
-        );
-      if (evidence !== undefined || (withoutWallet && !needed)) step = "search";
-      else {
-        const answer = await askWalletEvidence({
-          optional: !needed,
-          explanation: decodeWalletExplanation(defined(backup).mode, given.passphrase),
-          place: given.place,
-        });
-        if (answer.kind === "wallet") evidence = answer.evidence;
-        withoutWallet = answer.kind === "none";
-        step = answer.kind === "back" ? "dates" : "search";
-      }
+      ({ step, evidence, withoutWallet } = await askedWallet(defined(backup), given, {
+        evidence,
+        withoutWallet,
+      }));
     } else if (step === "search") {
-      const searched = await searchAndShow(
+      ({ step, evidence } = await searchAndShow(
         defined(backup),
         defined(typedDates),
         evidence,
         backupArgs,
         given,
-      );
-      step = searched.step;
-      evidence = searched.evidence;
+      ));
       withoutWallet = evidence === undefined;
     } else {
       step = await decodeAndShow(
@@ -424,6 +414,36 @@ export async function decodeWithQuestions(
     // unless --mode or a record named it.
     if (step === "backup") backupArgs = typedAfterFile(args);
   }
+}
+
+/**
+ * The wallet before a search of dates with ?: asked unless it was given, or unless it was left out
+ * before ("It cannot", or --list-candidates) and the mode needs none. The step after it, with the
+ * wallet and whether it is left out.
+ */
+async function askedWallet(
+  backup: EncodedBackup,
+  given: GivenAnswers,
+  known: { readonly evidence: WalletEvidence | undefined; readonly withoutWallet: boolean },
+): Promise<{ step: Step; evidence: WalletEvidence | undefined; withoutWallet: boolean }> {
+  const needed = walletNeeded(backup.mode);
+  if (needed && given.list && known.evidence === undefined)
+    terminalNotice(
+      `--list-candidates does not apply here. ${walletReason(backup.mode)}`,
+      "warning",
+    );
+  if (known.evidence !== undefined || (known.withoutWallet && !needed))
+    return { ...known, step: "search" };
+  const answer = await askWalletEvidence({
+    optional: !needed,
+    explanation: decodeWalletExplanation(backup.mode, given.passphrase),
+    place: given.place,
+  });
+  return {
+    step: answer.kind === "back" ? "dates" : "search",
+    evidence: answer.kind === "wallet" ? answer.evidence : known.evidence,
+    withoutWallet: answer.kind === "none",
+  };
 }
 
 /**

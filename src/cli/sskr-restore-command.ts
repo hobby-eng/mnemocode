@@ -300,6 +300,65 @@ function showSetFingerprint(set: RepairedSet): void {
 }
 
 /**
+ * The step after the shares of a phrase of `words` words: its dates where none were given or more
+ * than the phrase takes, which the person is told; otherwise the wallet.
+ */
+function stepAfterShares(r: Recovery, words: number | undefined): Step {
+  // Dates typed or given before the word count was known may be more than the phrase takes.
+  const tooMany = r.dates?.tooManyFor(words);
+  if (tooMany !== undefined && r.interactive) terminalNotice(tooMany, "warning");
+  return Masking.of(r.mode).masked && (r.dates === undefined || tooMany !== undefined)
+    ? "dates"
+    : "wallet";
+}
+
+/**
+ * The wallet, asked when the date search needs it and none was given: the step after it, the
+ * search, or the dates at Escape.
+ */
+async function walletForSearch(r: Recovery): Promise<Step> {
+  if (!unmaskingOf(r).needsWallet || r.evidence !== undefined) return "search";
+  const answer = await askWalletEvidence({
+    optional: false,
+    explanation: walletExplanation(r.mode),
+    place: r.place,
+  });
+  if (answer.kind === "back") return "dates";
+  if (answer.kind === "wallet") r.evidence = answer.evidence;
+  return "search";
+}
+
+/**
+ * The step after the phrases of the shares were refused: the dates again when they do not fit,
+ * or what afterMismatch asks when no phrase is the wallet's. Without a private screen the refusal
+ * ends the command.
+ */
+async function afterRefused(
+  r: Recovery,
+  result: Extract<RestoredPhrases, { readonly kind: "dates" | "mismatch" }>,
+): Promise<Step> {
+  if (result.kind === "mismatch") return afterMismatch(r, result.message);
+  if (!r.interactive) throw new Error(result.message);
+  terminalNotice(result.message, "warning");
+  return "dates";
+}
+
+/**
+ * Several sets fit, and nothing tells the right one: the wallet does, without a new search.
+ * Whether a wallet was given.
+ */
+async function walletForSeveral(r: Recovery, sets: number): Promise<boolean> {
+  const answer = await askWalletEvidence({
+    optional: true,
+    explanation: { lines: [severalSetsNote(sets)] },
+    place: r.place,
+  });
+  if (answer.kind !== "wallet") return false;
+  r.evidence = answer.evidence;
+  return true;
+}
+
+/**
  * Restores the phrases that the shares hold, asked in this order on the private screen, each
  * answer checked at once: the shares (each read, then the set; see share-repair.ts), the dates of
  * a Seedshift phrase, with ? for forgotten digits, the wallet when a date search needs it, then the
@@ -356,29 +415,14 @@ export async function restorePhrases(r: Recovery, rules: RestoreRules): Promise<
           sets = undefined;
         }
         words = wordsOfRead(outcome);
-        // Dates typed or given before the word count was known may be more than the phrase takes.
-        const tooMany = r.dates?.tooManyFor(words);
-        if (tooMany !== undefined && r.interactive) terminalNotice(tooMany, "warning");
-        step =
-          Masking.of(r.mode).masked && (r.dates === undefined || tooMany !== undefined)
-            ? "dates"
-            : "wallet";
+        step = stepAfterShares(r, words);
       } else if (step === "dates") {
         // Also after "It was masked with Seedshift" (otherMode), which comes here.
         showEncoded();
         r.dates = await askShareDates(r, words);
         step = "wallet";
       } else if (step === "wallet") {
-        step = "search";
-        if (unmaskingOf(r).needsWallet && r.evidence === undefined) {
-          const answer = await askWalletEvidence({
-            optional: false,
-            explanation: walletExplanation(r.mode),
-            place: r.place,
-          });
-          if (answer.kind === "back") step = "dates";
-          else if (answer.kind === "wallet") r.evidence = answer.evidence;
-        }
+        step = await walletForSearch(r);
       } else {
         if (sets === undefined) {
           const found = await searchShareRepair(defined(repair), r.limits, await dateWork(r));
@@ -406,27 +450,14 @@ export async function restorePhrases(r: Recovery, rules: RestoreRules): Promise<
           }
         }
         const result = await unmasked(r, sets, places);
-        if (result.kind === "dates") {
-          if (!r.interactive) throw new Error(result.message);
-          terminalNotice(result.message, "warning");
-          step = "dates";
-          continue;
-        }
-        if (result.kind === "mismatch") {
-          step = await afterMismatch(r, result.message);
+        if (result.kind === "dates" || result.kind === "mismatch") {
+          step = await afterRefused(r, result);
           continue;
         }
         const restored = { ...result, kind: "restored", places } as const;
         if (!(rules.one && result.sets.length > 1 && r.evidence === undefined && r.interactive))
           return restored;
-        // Several sets fit, and nothing tells the right one: the wallet does, without a new search.
-        const answer = await askWalletEvidence({
-          optional: true,
-          explanation: { lines: [severalSetsNote(result.sets.length)] },
-          place: r.place,
-        });
-        if (answer.kind !== "wallet") return restored;
-        r.evidence = answer.evidence;
+        if (!(await walletForSeveral(r, result.sets.length))) return restored;
       }
     }
   } finally {
