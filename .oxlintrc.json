@@ -1,0 +1,66 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import", "oxc", "eslint"],
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": ["docs/audits/**", "dist/**", "sskr-wasm/generated/**", "coverage/**"],
+  "rules": {
+    "max-lines": [
+      "error",
+      {
+        "max": 800,
+        "skipBlankLines": false,
+        "skipComments": false
+      }
+    ],
+    "max-lines-per-function": [
+      "error",
+      {
+        "max": 150,
+        "skipBlankLines": false,
+        "skipComments": false
+      }
+    ],
+    "import/no-cycle": "error",
+    "import/no-default-export": "error",
+    "unicorn/filename-case": [
+      "error",
+      {
+        "case": "kebabCase"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.mts"],
+      "rules": {
+        "typescript/no-explicit-any": "error",
+        "typescript/no-non-null-assertion": "error",
+        "typescript/no-unsafe-argument": "error",
+        "typescript/no-unsafe-assignment": "error",
+        "typescript/no-unsafe-call": "error",
+        "typescript/no-unsafe-member-access": "error",
+        "typescript/no-unsafe-return": "error"
+      }
+    },
+    {
+      "files": ["src/**"],
+      "rules": {
+        "no-console": "error"
+      }
+    },
+    {
+      "files": ["src/cli/**", "src/mnemocode.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["test/**"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off"
+      }
+    }
+  ]
+}
