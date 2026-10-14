@@ -1,6 +1,7 @@
-// sskr-combine on the private screen, with the terminal replaced (test/helpers/question-terminal.ts).
-// Public test data only: the "abandon … about" phrase, its fingerprint 73c5da0a, and
-// vectors/sskr-v1.json. test/sskr-export-questions.test.ts has sskr-export and sskr-split.
+// sskr-combine on the private screen, with the terminal replaced
+// (test/helpers/question-terminal.ts). Public test data only: the "abandon … about" phrase, its
+// fingerprint 73c5da0a, and vectors/sskr-v1.json. test/sskr-export-questions.test.ts has
+// sskr-export and sskr-split.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParsedArguments } from "../src/cli/arguments.js";
@@ -305,7 +306,8 @@ describe("shares on the private screen", () => {
     terminal.choices = [false, "one", 2];
     await combine({ "max-tries": "1" });
     expect(terminal.questions[0]).toMatch(/^Search 65,536 combinations, .+\?$/u);
-    // Keys typed during the assessment do not answer it: choose drops them (test/scan-fixes.test.ts, S015).
+    // Keys typed during the assessment do not answer it: choose drops them
+    // (test/scan-fixes.test.ts, S015).
     expect(terminal.questions.slice(1)).toEqual(["Which shares to change?", "Which share?"]);
     expect(terminal.labels[2]).toEqual(["Share 1", "Share 2"]);
     expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again:"]);

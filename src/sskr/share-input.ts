@@ -51,7 +51,10 @@ import { defined } from "../core/defined.js";
 const MAX_WRAPPED_LINES = 8;
 /** What a person types between the shares of one answer; prompts and messages name it. */
 export const SHARE_SEPARATOR = ";";
-/** What separates the shares of one answer: SHARE_SEPARATOR (no regular-expression character), or a line break. */
+/**
+ * What separates the shares of one answer: SHARE_SEPARATOR (no regular-expression character), or a
+ * line break.
+ */
 const SHARE_SEPARATORS = new RegExp(`${SHARE_SEPARATOR}|\\r?\\n`, "u");
 
 /**

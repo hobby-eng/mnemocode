@@ -110,7 +110,9 @@ export class SearchTurns {
     return new SearchTurns(run.signal, run.turn);
   }
 
-  /** Lets the host run if a turn is due; true when it did, so that the search tells its progress. */
+  /**
+   * Lets the host run if a turn is due; true when it did, so that the search tells its progress.
+   */
   async due(): Promise<boolean> {
     // Heard at once: a host may stop a search from its progress, between two turns.
     this.#signal?.throwIfAborted();

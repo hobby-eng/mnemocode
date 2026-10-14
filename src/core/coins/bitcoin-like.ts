@@ -1,6 +1,6 @@
-// Coins that write addresses as Bitcoin does: Base58Check with a version prefix, and for Bitcoin and
-// Litecoin also SegWit in Bech32 or Bech32m (BIP173, BIP350). Bitcoin, Litecoin, Dogecoin and the
-// transparent addresses of Zcash.
+// Coins that write addresses as Bitcoin does: Base58Check with a version prefix, and for Bitcoin
+// and Litecoin also SegWit in Bech32 or Bech32m (BIP173, BIP350). Bitcoin, Litecoin, Dogecoin and
+// the transparent addresses of Zcash.
 //
 // Host-neutral, with @scure/base (test/portable-modules.test.ts).
 
@@ -41,7 +41,9 @@ const SEGWIT_RULES: CoinRules = {
   commitments: { "p2sh-p2wpkh": nestedSegwitHash, p2tr: taprootOutputKey },
   purposes: { "p2sh-p2wpkh": 49, p2wpkh: 84, p2tr: 86 },
 };
-/** The characters of a P2WPKH address besides its prefix: separator, version, key hash, checksum. */
+/**
+ * The characters of a P2WPKH address besides its prefix: separator, version, key hash, checksum.
+ */
 const P2WPKH_CHARACTERS_AFTER_PREFIX = 40;
 const TYPE_NAMES: Readonly<Partial<Record<AddressType, string>>> = {
   p2pkh: "legacy",
@@ -97,7 +99,9 @@ class SegwitCoin extends Base58Coin {
   }
 }
 
-/** A SegWit address's lower-case prefix, witness version and program, or undefined (BIP173, BIP350). */
+/**
+ * A SegWit address's lower-case prefix, witness version and program, or undefined (BIP173, BIP350).
+ */
 function decodeSegwit(
   text: string,
 ): { readonly prefix: string; readonly version: number; readonly program: Uint8Array } | undefined {

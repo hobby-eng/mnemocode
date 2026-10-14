@@ -1,7 +1,8 @@
 // The tokens of TypeScript and JavaScript source, read with a small tokenizer of its own, so that
 // the checks that read code need no package: the copy check (verify-no-copies.mjs) and the code
-// rules (verify-code-rules.mjs). Not a full parser of TypeScript, but the same code always gives the
-// same tokens, and strings, templates, regular expressions and comments are told apart from code.
+// rules (verify-code-rules.mjs). Not a full parser of TypeScript, but the same code always gives
+// the same tokens, and strings, templates, regular expressions and comments are told apart from
+// code.
 
 /** After these tokens a slash starts a regular expression, not a division. */
 const BEFORE_REGEX = new Set([

@@ -201,9 +201,9 @@ interface Found {
  * Runs the search of `phrase` with the core's rules (WordCandidateSearch.run): every candidate is
  * counted and compared with the wallet, the first MAX_SHOWN_CANDIDATES and every one that matched
  * are kept for the screen, and a list keeps the entropy of every candidate, so that record N is
- * candidate N; past the most that a list holds the search stops (TooManyForListError). Ctrl+C is read as
- * a key during the turns and stops it at the next one. The replacements of a legacy last word are
- * a short fixed list, each compared with the wallet.
+ * candidate N; past the most that a list holds the search stops (TooManyForListError). Ctrl+C is
+ * read as a key during the turns and stops it at the next one. The replacements of a legacy last
+ * word are a short fixed list, each compared with the wallet.
  */
 async function collect(phrase: PhraseSearch, context: SearchContext): Promise<Found> {
   const walletCheck = walletCheckOf(context.evidence, context.passphrase);

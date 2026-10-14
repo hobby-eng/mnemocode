@@ -184,7 +184,9 @@ export async function decryptCandidates(
   }
 }
 
-/** Borrowed ciphertext views: age never needs a temporary copy of the entire file to read a nonce. */
+/**
+ * Borrowed ciphertext views: age never needs a temporary copy of the entire file to read a nonce.
+ */
 function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
   let offset = 0;
   return new ReadableStream({

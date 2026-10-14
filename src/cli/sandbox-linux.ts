@@ -1,8 +1,9 @@
 // The Linux kernel's own boundaries for a MnemoCode process, as mhfe sets them
-// (src/bin/mhfe/protect.rs and its core dump check), with one difference that Node.js imposes: it has started its threads,
-// the pool of libuv that runs file operations among them, before any script runs. Each boundary is
-// therefore applied to every thread at once (SECCOMP_FILTER_FLAG_TSYNC, LANDLOCK_RESTRICT_SELF_TSYNC),
-// and a kernel that cannot do so gets none of it, rather than one that holds for one thread only.
+// (src/bin/mhfe/protect.rs and its core dump check), with one difference that Node.js imposes: it
+// has started its threads, the pool of libuv that runs file operations among them, before any
+// script runs. Each boundary is therefore applied to every thread at once
+// (SECCOMP_FILTER_FLAG_TSYNC, LANDLOCK_RESTRICT_SELF_TSYNC), and a kernel that cannot do so gets
+// none of it, rather than one that holds for one thread only.
 //
 // - No core dumps, at start: setrlimit(RLIMIT_CORE, 0) and prctl(PR_SET_DUMPABLE, 0), read back.
 //   A crash cannot write the memory, the seed phrase included, to the disk, as systemd-coredump or
@@ -322,7 +323,9 @@ export class LinuxSandbox implements SystemSandbox {
   }
 }
 
-/** Both a socket and an io_uring, which could open a socket without the socket call, are refused. */
+/**
+ * Both a socket and an io_uring, which could open a socket without the socket call, are refused.
+ */
 function sockets(libc: Libc): Found {
   const socket = libc.call.socket(AF_INET, SOCK_DGRAM | CLOEXEC, 0);
   const socketRefused = socket < 0 && libc.errno() === REFUSED;
@@ -342,7 +345,9 @@ function programs(libc: Libc): Found {
   return failure === NOT_A_DIRECTORY ? "broken" : "unknown";
 }
 
-/** /dev/null opened for writing is refused; a system without it, or another refusal, cannot tell. */
+/**
+ * /dev/null opened for writing is refused; a system without it, or another refusal, cannot tell.
+ */
 function writes(libc: Libc): Found {
   const file = libc.call.open("/dev/null", O_WRONLY | CLOEXEC);
   if (file >= 0) {

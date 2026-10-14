@@ -1,7 +1,8 @@
 // The candidate list (docs/CANDIDATES.md, "The list"): BIP39 entropies with optional passphrases,
 // in the order of the search, padded with Padmé so that its size tells little, and the limit of
-// records one list holds (TooManyForListError). Any search can fill one: it knows nothing of dates or
-// shares, and of words only that a record's entropy is an English BIP39 phrase (OpenedCandidateList).
+// records one list holds (TooManyForListError). Any search can fill one: it knows nothing of dates
+// or shares, and of words only that a record's entropy is an English BIP39 phrase
+// (OpenedCandidateList).
 //
 // It needs nothing from the host. It does not encrypt, which is a separate layer
 // (candidate-encryption.ts): a reader decrypts first and opens the plain bytes here. It reads or
@@ -323,7 +324,9 @@ export function decodeCandidateList(bytes: Uint8Array): CandidateList {
 /** Where the BIP39 passphrases of an opened list come from: none, one for all, or the records. */
 export type ListPassphrases = "none" | "list" | "records";
 
-/** One candidate of an opened list: its seed phrase, and the BIP39 passphrase it is checked with. */
+/**
+ * One candidate of an opened list: its seed phrase, and the BIP39 passphrase it is checked with.
+ */
 export interface ListCandidate {
   readonly phrase: string;
   readonly passphrase: string;

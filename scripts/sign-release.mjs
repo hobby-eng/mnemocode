@@ -24,7 +24,8 @@ import {
 import { CANCELLED_EXIT_CODE, CANCELLED_MESSAGE } from "../src/cli/exit-codes.ts";
 import { typedLine } from "../src/cli/shell-command.ts";
 import { describeError } from "../src/core/refusal.ts";
-// SHA256SUMS joins the checksum files of build-executable.mjs; their lines and names come from here.
+// SHA256SUMS joins the checksum files of build-executable.mjs; their lines and names come from
+// here.
 import { CHECKSUM_LINE, releaseFilePrefix } from "./executable-files.mjs";
 import { SIGNING_KEY } from "./release-key.mjs";
 

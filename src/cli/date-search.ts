@@ -245,9 +245,9 @@ export async function searchDates(
 }
 
 /**
- * The answer that changes the wallet (changeWalletAnswer), with `value`, after a search that matched
- * no phrase with the wallet given; nothing where none was given. Decode and recover-date offer it
- * so (AUD-012-ARC001).
+ * The answer that changes the wallet (changeWalletAnswer), with `value`, after a search that
+ * matched no phrase with the wallet given; nothing where none was given. Decode and recover-date
+ * offer it so (AUD-012-ARC001).
  */
 function changeWalletChoice<T>(evidence: WalletEvidence | undefined, value: T): Choice<T>[] {
   return evidence === undefined ? [] : [changeWalletAnswer(value)];

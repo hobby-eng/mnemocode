@@ -248,7 +248,8 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
 
   it.each([
     image(PIXEL_HEADER).subarray(0, -1),
-    // After IEND: a byte, too short for a chunk, and a whole chunk, which only IEND's place refuses.
+    // After IEND: a byte, too short for a chunk, and a whole chunk, which only IEND's place
+    // refuses.
     Buffer.concat([image(PIXEL_HEADER), Buffer.of(0)]),
     Buffer.concat([image(PIXEL_HEADER), pngChunk("tEXt", [65])]),
     image(PIXEL_HEADER, WHITE_PIXEL, [pngChunk("IHDR", new Uint8Array(12))]),

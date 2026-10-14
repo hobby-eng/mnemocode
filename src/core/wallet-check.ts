@@ -41,7 +41,9 @@ function readOnce(answer: unknown): Readonly<Record<keyof WalletMatch, unknown>>
   return { matched, path, warning };
 }
 
-/** Checked fields are fixed data; the host's extra accessors/methods keep their original receiver. */
+/**
+ * Checked fields are fixed data; the host's extra accessors/methods keep their original receiver.
+ */
 function ownedAnswer(given: object, read: Readonly<Record<keyof WalletMatch, unknown>>): object {
   const fields = new Map<PropertyKey, PropertyDescriptor>();
   for (const [key, value] of Object.entries(read)) fields.set(key, { value, enumerable: true });

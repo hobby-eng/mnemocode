@@ -1,8 +1,8 @@
 // The share parts with a platform of the host's own, as a browser page passes it, in a module graph
 // that never loads the Node.js platform (share-platform-node.ts): every repair, search and measure
-// must use the platform it was given (JointRepair, planJointRepair), none keeps one of its own (scan
-// finding S108), and the restore of a masked phrase from shares runs with the host's wallet check
-// (ShareUnmasking).
+// must use the platform it was given (JointRepair, planJointRepair), none keeps one of its own
+// (scan finding S108), and the restore of a masked phrase from shares runs with the host's wallet
+// check (ShareUnmasking).
 // Published SSKR vectors and the public test phrase only.
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";

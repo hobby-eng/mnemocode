@@ -223,7 +223,10 @@ function wholeMarks(format: ShareFormat, places: readonly number[]): string {
   return joinUnits(parts, format);
 }
 
-/** The share in `format` with the digits at `digits` (from 0, after any #) of each element unreadable. */
+/**
+ * The share in `format` with the digits at `digits` (from 0, after any #) of each element
+ * unreadable.
+ */
 function markDigits(format: ShareFormat, marks: Record<number, readonly number[]>): string {
   const parts = shareUnits(share, format);
   for (const [place, digits] of Object.entries(marks)) {

@@ -37,7 +37,10 @@ export const OLD_BACKUP_OPTIONS: Readonly<Record<string, string>> = Object.freez
   ...Object.fromEntries(WALLET_EVIDENCE_OPTIONS.map((key) => [key, key])),
 });
 
-/** Every option of Re-encode: the old backup's, its confirmation, then Encode's but the phrase's own. */
+/**
+ * Every option of Re-encode: the old backup's, its confirmation, then Encode's but the phrase's
+ * own.
+ */
 export const RE_ENCODE_OPTIONS = Object.freeze([
   ...Object.keys(OLD_BACKUP_OPTIONS),
   RECOGNISED_OPTION,

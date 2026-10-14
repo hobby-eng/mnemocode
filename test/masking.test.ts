@@ -27,7 +27,9 @@ import { TEST_PHRASE } from "./helpers/test-phrase.js";
 const DATE = parseDate("23-09-2026");
 const MASKED = encodeMnemonic(TEST_PHRASE, [DATE]);
 const LEGACY = encodeMnemonicLegacy(TEST_PHRASE, [DATE]);
-/** The first share of the first published SSKR vector, 2 of 3 in one group (vectors/sskr-v1.json). */
+/**
+ * The first share of the first published SSKR vector, 2 of 3 in one group (vectors/sskr-v1.json).
+ */
 const SHARE = (
   JSON.parse(readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8")) as {
     deterministic: { shares: string[] }[];

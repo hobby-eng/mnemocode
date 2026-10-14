@@ -205,7 +205,8 @@ describe("start menu", () => {
 describe("start menu", () => {
   describe("typed answers are checked at once and asked again", () => {
     it("takes a new folder where the nearest folder that exists may be written", async () => {
-      // Printing sample cards has no folder; Encode's separate cards do. Missing folders are made by the command.
+      // Printing sample cards has no folder; Encode's separate cards do. Missing folders are made
+      // by the command.
       const deep = join(files, "a", "b", "cards");
       const run = await runOf(ENTRY.encode, [2, 1, 0, 3, 0, 3, 0, 0], {
         "Name of the new folder": [

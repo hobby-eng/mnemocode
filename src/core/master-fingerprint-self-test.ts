@@ -22,7 +22,9 @@ export const PUBLIC_MNEMONIC =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 /** The passphrase of every BIP39 vector (trezor/python-mnemonic, vectors.json). */
 export const VECTOR_PASSPHRASE = "TREZOR";
-/** BIP39 "From mnemonic to seed": the salt is "mnemonic" and the passphrase, 2048 rounds, 64 bytes. */
+/**
+ * BIP39 "From mnemonic to seed": the salt is "mnemonic" and the passphrase, 2048 rounds, 64 bytes.
+ */
 const SEED_ROUNDS = 2048;
 const SEED_BYTES = 64;
 const SALT_PREFIX = "mnemonic";

@@ -138,7 +138,10 @@ export function encodeMnemonicLegacy(
   );
 }
 
-/** Replaces only the derived checksum bits of a legacy result, preserving its visible entropy prefix. */
+/**
+ * Replaces only the derived checksum bits of a legacy result, preserving its visible entropy
+ * prefix.
+ */
 export function legacyChecksumValidResult(result: EncodedResult): EncodedResult {
   const indexes = result.shiftedIndexes;
   // An index above 2047 would write more than 11 bits and shift every later bit of the entropy.

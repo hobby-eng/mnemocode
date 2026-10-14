@@ -37,7 +37,9 @@ function marked(codes: string, places: readonly number[]): string {
  * 1? and 2?, a hundred combinations of which a few keep the checksum, few enough to list.
  */
 const FEW = "2027 1? 2? 2027 10 24 2027 10 24 2027 10 377";
-/** The masked codes with the last digit of the third forgotten: one candidate keeps the checksum. */
+/**
+ * The masked codes with the last digit of the third forgotten: one candidate keeps the checksum.
+ */
 const ONE = "2027 10 2? 2027 10 24 2027 10 24 2027 10 377";
 
 const MASKED_TEXT = formatEncoded(ENCODED, "indexes");

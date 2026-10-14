@@ -365,9 +365,9 @@ export interface ShareFixQuestion {
 /**
  * Asks which share to change after a refusal that names none or several, or a search without a
  * result: one share typed again, one left out (while others remain), every share typed again,
- * more shares, or Stop, which cancels (InputCancelledError). A refusal may name shares to leave out,
- * possibly more than one; each is left out by a choice of its own. Escape at the list of shares
- * asks again. True once the shares were changed; false when the person went back (`back`).
+ * more shares, or Stop, which cancels (InputCancelledError). A refusal may name shares to leave
+ * out, possibly more than one; each is left out by a choice of its own. Escape at the list of
+ * shares asks again. True once the shares were changed; false when the person went back (`back`).
  */
 export async function askShareFix(
   shares: TypedShares,

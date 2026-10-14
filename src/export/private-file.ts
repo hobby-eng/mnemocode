@@ -77,11 +77,11 @@ const NO_HARD_LINKS = new Set(["EPERM", "ENOTSUP", "EOPNOTSUPP", "ENOSYS"]);
 
 /**
  * Create a new export only after its complete contents have been written privately, and never
- * replace an existing file. The final name is made a hard link to the finished temporary file, which
- * fails if the name exists. On a file system without hard links, the name is first reserved with an
- * empty private file, which also fails if it exists, and the finished file then replaces that
- * reservation in one rename. If that rename fails, the reservation is removed again; only a crash
- * between the two steps can leave it, empty, never with part of the contents.
+ * replace an existing file. The final name is made a hard link to the finished temporary file,
+ * which fails if the name exists. On a file system without hard links, the name is first reserved
+ * with an empty private file, which also fails if it exists, and the finished file then replaces
+ * that reservation in one rename. If that rename fails, the reservation is removed again; only a
+ * crash between the two steps can leave it, empty, never with part of the contents.
  */
 export async function publishNewPrivateFile(path: string, bytes: Uint8Array): Promise<void> {
   const destination = resolve(path);

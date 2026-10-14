@@ -1,10 +1,10 @@
 // The self-test of PNG admission (png-admission.ts): the exact budget of filtered scanline bytes of
 // small images, without and with Adam7 interlacing, and the refusals of a second IHDR, data after
-// IEND, a palette image without its palette (AUD-022-ARC002) and 16-bit samples. The budgets follow the W3C PNG
-// specification (sections 7.2 and 8.1: one filter byte per row, the seven Adam7 passes, no rows
-// for an empty pass) and were computed independently, by that formula in Python. The images come
-// from synthetic-png.ts: admission inflates nothing, so their data need not be compressed. Public
-// synthetic bytes only.
+// IEND, a palette image without its palette (AUD-022-ARC002) and 16-bit samples. The budgets follow
+// the W3C PNG specification (sections 7.2 and 8.1: one filter byte per row, the seven Adam7 passes,
+// no rows for an empty pass) and were computed independently, by that formula in Python. The images
+// come from synthetic-png.ts: admission inflates nothing, so their data need not be compressed.
+// Public synthetic bytes only.
 //
 // Host-neutral: it imports only core and sskr modules.
 

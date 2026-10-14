@@ -1,8 +1,8 @@
 // The published audit records and harness files name no machine owner and give every time in UTC
 // (workspace .github/instructions/audits.instructions.md, Report privacy). The owner's names are
 // read from the account that runs the check, so that the check itself holds none of them; any
-// other home path, such as synthetic test data or a CI runner's, is not an owner's. Local command evidence (*-evidence/) is never published and
-// never checked (audit-files.mjs). Run by pnpm check.
+// other home path, such as synthetic test data or a CI runner's, is not an owner's. Local command
+// evidence (*-evidence/) is never published and never checked (audit-files.mjs). Run by pnpm check.
 import { readFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { basename } from "node:path";

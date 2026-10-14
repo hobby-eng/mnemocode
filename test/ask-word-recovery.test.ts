@@ -1,7 +1,8 @@
 // recover-word --ask-secrets and its candidate list on the private screen, with the terminal
-// replaced (test/helpers/question-terminal.ts). `terminal.saveFailures` makes that many saves of the
-// list fail as a full disk would. Standard output is a terminal only with `terminal.stdoutTerminal`;
-// the private screen then shows what fits in the window, which windowOf sets.
+// replaced (test/helpers/question-terminal.ts). `terminal.saveFailures` makes that many saves of
+// the list fail as a full disk would. Standard output is a terminal only with
+// `terminal.stdoutTerminal`; the private screen then shows what fits in the window, which windowOf
+// sets.
 
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";

@@ -210,7 +210,9 @@ const MAX_COLUMNS = 10;
  */
 export const MIN_SHEET_ROWS = 3;
 
-/** The order in which a sheet's plan prefers grids, as a person is told it (planCollectionSheet). */
+/**
+ * The order in which a sheet's plan prefers grids, as a person is told it (planCollectionSheet).
+ */
 export const SHEET_PLAN_TEXT = `at least ${numberWord(MIN_SHEET_ROWS)} rows, the largest cards`;
 
 /**
@@ -238,7 +240,10 @@ const NO_ROOM =
  */
 export type CaptionLines = number | ((width: number, size: number) => number);
 
-/** A grid of a sheet: its columns and rows, the width of a cell, and its card's and caption's height. */
+/**
+ * A grid of a sheet: its columns and rows, the width of a cell, and its card's and caption's
+ * height.
+ */
 interface SheetGrid {
   readonly columns: number;
   readonly rows: number;
@@ -534,7 +539,10 @@ export function studyCaptionWidth(font: PDFFont, lines: readonly string[]): numb
 interface MeasuredLine {
   readonly text: string;
   readonly width: number;
-  /** The two halves that balance best, split at a space, and the wider half's width; none if one word. */
+  /**
+   * The two halves that balance best, split at a space, and the wider half's width; none if one
+   * word.
+   */
   readonly halves?: { readonly texts: readonly [string, string]; readonly width: number };
 }
 

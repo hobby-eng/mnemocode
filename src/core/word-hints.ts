@@ -13,12 +13,16 @@
 import { englishWordlist } from "./english-words.js";
 import { defined } from "./defined.js";
 
-/** Letters typed before the words that begin with them are listed; fewer give how many there are. */
+/**
+ * Letters typed before the words that begin with them are listed; fewer give how many there are.
+ */
 export const LIST_FROM_LETTERS = 2;
 
 /** What a front end shows below a word being typed. */
 export type WordHint =
-  /** Nothing: no word is being typed, or the list has it whole and no longer word begins with it. */
+  /**
+   * Nothing: no word is being typed, or the list has it whole and no longer word begins with it.
+   */
   | { readonly kind: "nothing" }
   /** One letter typed: how many words of the list begin with it, as `text` says. */
   | { readonly kind: "count"; readonly count: number; readonly text: string }

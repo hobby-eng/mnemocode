@@ -9,7 +9,9 @@
 export const MISSING_VALUE =
   "MnemoCode expected a value that is not there: this is a fault of MnemoCode.";
 
-/** `value`, which the code holds to be there; throws MISSING_VALUE where it is undefined or null. */
+/**
+ * `value`, which the code holds to be there; throws MISSING_VALUE where it is undefined or null.
+ */
 export function defined<T>(value: T | undefined | null): T {
   if (value === undefined || value === null) throw new Error(MISSING_VALUE);
   return value;

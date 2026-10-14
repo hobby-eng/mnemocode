@@ -1,7 +1,8 @@
 // The forms that the codes of an encoded seed phrase are written in, each with what it is: how its
 // codes are read and written, what they are called, how text in it looks, how it prints on cards,
-// which list its words are typed from, and whether a seed phrase in it is always masked. A new form is one more variant here, and the
-// compiler asks for each of its facts; every reader, writer and question asks the form.
+// which list its words are typed from, and whether a seed phrase in it is always masked. A new form
+// is one more variant here, and the compiler asks for each of its facts; every reader, writer and
+// question asks the form.
 //
 // Host-neutral: it reaches only the core's words and colors.
 

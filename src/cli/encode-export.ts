@@ -48,7 +48,9 @@ export class EncodeCardExport {
     ));
   }
 
-  /** The same cards as separate card files draw them: turned as the person asked, not as a sheet. */
+  /**
+   * The same cards as separate card files draw them: turned as the person asked, not as a sheet.
+   */
   async separateJob(): Promise<CardJob> {
     return separateCardJob(
       await this.job(),

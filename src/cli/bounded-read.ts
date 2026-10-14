@@ -14,10 +14,10 @@ const CHUNK_BYTES = 64 * 1024;
 
 /**
  * Reads a file descriptor to its end, but never more than `limit` bytes: one byte more is refused
- * as InputTooLargeError, naming `what`. The bound applies to what is actually read, so it also holds
- * for pipes, devices and files that grow while they are read, whose reported size says nothing.
- * The input may be a secret: every chunk read is wiped before this returns or throws, and the one
- * copy returned is the caller's to wipe.
+ * as InputTooLargeError, naming `what`. The bound applies to what is actually read, so it also
+ * holds for pipes, devices and files that grow while they are read, whose reported size says
+ * nothing. The input may be a secret: every chunk read is wiped before this returns or throws, and
+ * the one copy returned is the caller's to wipe.
  */
 export function readBoundedDescriptor(descriptor: number, limit: number, what: string): Buffer {
   const chunks: Buffer[] = [];

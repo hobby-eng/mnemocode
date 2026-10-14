@@ -28,7 +28,9 @@ const DATE = parseDate("23-09-2026");
 const MASKED = encodeMnemonic(TEST_PHRASE, [DATE]);
 const LEGACY = encodeMnemonicLegacy(TEST_PHRASE, [DATE]);
 const LEGACY_VALID = legacyChecksumValidResult(LEGACY);
-/** The fingerprint of MASKED's codes read as a phrase, as encode shows it ("Encoded fingerprint"). */
+/**
+ * The fingerprint of MASKED's codes read as a phrase, as encode shows it ("Encoded fingerprint").
+ */
 const ENCODED_FINGERPRINT = "0d05289e";
 const FORMATS: readonly EncodedFormat[] = [
   "english",

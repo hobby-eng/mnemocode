@@ -61,7 +61,9 @@ export class PivotBasis {
     return this.#pivots.size;
   }
 
-  /** The pivots' vectors, in the order they were added: a basis of the span of the vectors added. */
+  /**
+   * The pivots' vectors, in the order they were added: a basis of the span of the vectors added.
+   */
   get vectors(): bigint[] {
     return [...this.#pivots.values()].map((pivot) => pivot.vector);
   }

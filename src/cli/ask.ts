@@ -382,8 +382,8 @@ export interface WalletQuestion {
   /** Text shown with the question, such as why the wallet is needed. */
   readonly explanation?: Explanation;
   /**
-   * Where the wallet is looked for (walletPlaceOf); by default among its first receiving addresses on
-   * mainnet.
+   * Where the wallet is looked for (walletPlaceOf); by default among its first receiving addresses
+   * on mainnet.
    */
   readonly place?: WalletPlace;
 }

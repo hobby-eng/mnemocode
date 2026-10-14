@@ -115,7 +115,8 @@ describe("ReEncoding", () => {
     const absent = ["zoo", "zone", "zero", "wrong"].find((word) => !lastWords.includes(word))!;
     expect(() => ReEncoding.of(several, [RIGHT], absent)).toThrow(NO_SUCH_LAST_WORD);
     expect(() => ReEncoding.of(several, [RIGHT], "about about")).toThrow(NO_SUCH_LAST_WORD);
-    // A backup of one phrase takes no last word: one given is refused, not ignored (AUD-022-API002).
+    // A backup of one phrase takes no last word: one given is refused, not ignored
+    // (AUD-022-API002).
     expect(() => ReEncoding.of(legacy, [RIGHT], "zoo")).toThrow(LAST_WORD_NOT_TAKEN);
   });
 

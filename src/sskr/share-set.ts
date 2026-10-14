@@ -267,7 +267,9 @@ export class ShareSet extends Redacted {
     return fingerprintOfValidPhrase(this.mnemonic, fingerprintOf);
   }
 
-  /** The set as plain data, as combineSskrShareSet and the searches give it; it cannot be changed. */
+  /**
+   * The set as plain data, as combineSskrShareSet and the searches give it; it cannot be changed.
+   */
   toRepairedSet(): RepairedSet {
     return this.#set;
   }

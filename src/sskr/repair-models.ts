@@ -75,7 +75,9 @@ function readInPart(code: string): boolean {
   return code !== "?" && code.includes("?");
 }
 
-/** The digits of `code` that can be read, as ReadBits; each digit is four bits, the first highest. */
+/**
+ * The digits of `code` that can be read, as ReadBits; each digit is four bits, the first highest.
+ */
 function digitBits(code: string): ReadBits {
   let value = 0;
   let mask = 0;
@@ -149,7 +151,9 @@ function addUnitModel(models: UnitModel[], units: ReadingUnits, prefixes = true)
   }
 }
 
-/** A unit marked as a whole, by a lone ?: the only mark of a Byteword, a UR pair or a word number. */
+/**
+ * A unit marked as a whole, by a lone ?: the only mark of a Byteword, a UR pair or a word number.
+ */
 const loneMark = (unit: string): boolean => unit === "?";
 
 /** Adds the model of `units` in `format` when every unit that is not a lone ? has a value. */

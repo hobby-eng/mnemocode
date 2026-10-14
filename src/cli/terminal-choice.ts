@@ -303,12 +303,12 @@ export interface ChooseOptions {
 }
 
 /**
- * Asks `question` and lets the person choose an entry with the arrow keys and Enter, or at once with
- * its digit. Returns the value of the entry, or undefined for Escape, which `quit` describes ("goes
- * back", "quits"). The question stands apart, after a blank line, with a `warning` above it, such
- * as why it is asked again, and its `explanation` below; once it is answered, the question and its
- * list are replaced by one line of the record of answers, its `label` and the chosen entry, so that
- * the questions asked so far read as a short summary.
+ * Asks `question` and lets the person choose an entry with the arrow keys and Enter, or at once
+ * with its digit. Returns the value of the entry, or undefined for Escape, which `quit` describes
+ * ("goes back", "quits"). The question stands apart, after a blank line, with a `warning` above it,
+ * such as why it is asked again, and its `explanation` below; once it is answered, the question and
+ * its list are replaced by one line of the record of answers, its `label` and the chosen entry, so
+ * that the questions asked so far read as a short summary.
  */
 export async function choose<T>(
   question: string,

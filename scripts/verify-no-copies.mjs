@@ -51,7 +51,9 @@ function option(name, fallback) {
   return value;
 }
 
-/** Every file under `directory` that ends with `extension`, by its path from the repository root. */
+/**
+ * Every file under `directory` that ends with `extension`, by its path from the repository root.
+ */
 function sourceFiles(directory, extension) {
   return readdirSync(join(root, directory), { withFileTypes: true }).flatMap((entry) => {
     const path = `${directory}/${entry.name}`;

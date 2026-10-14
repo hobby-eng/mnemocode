@@ -188,7 +188,8 @@ describe("AUD-014-API002: a file or standard input is valid UTF-8 or refused", (
     expect(bip39Passphrase({ "bip39-passphrase-file": fileWith("synthetic-�\r\n") })).toBe(
       "synthetic-�",
     );
-    // The BIP39 passphrase file keeps a byte order mark, as it did before; only one line break goes.
+    // The BIP39 passphrase file keeps a byte order mark, as it did before; only one line break
+    // goes.
     expect(bip39Passphrase({ "bip39-passphrase-file": fileWith("﻿synthetic\n\n") })).toBe(
       "﻿synthetic\n",
     );

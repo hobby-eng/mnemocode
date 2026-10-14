@@ -82,7 +82,8 @@ export async function combineSskrShareSet(records: readonly string[]): Promise<R
 
 /**
  * The phrase only, when every supplied share was checked. A string cannot disclose unchecked data:
- * callers that need partial recovery use combineSskrShareSet and report its metadata (AUD-008-FUN001).
+ * callers that need partial recovery use combineSskrShareSet and report its metadata
+ * (AUD-008-FUN001).
  */
 export async function combineSskrShares(records: readonly string[]): Promise<string> {
   await assertCheckedRecords(records);

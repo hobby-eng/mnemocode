@@ -272,7 +272,9 @@ export function colorsToUnicode(colors: readonly string[]): string {
     .join("");
 }
 
-/** The code points of color Unicode text: four hexadecimal digits each, or the symbols themselves. */
+/**
+ * The code points of color Unicode text: four hexadecimal digits each, or the symbols themselves.
+ */
 function colorUnicodePoints(value: string): number[] {
   const compact = compactCode(value);
   return /^[0-9A-F]+$/iu.test(compact) && compact.length % COLOR_UNICODE_CODE_POINT_DIGITS === 0

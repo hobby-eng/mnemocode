@@ -33,7 +33,10 @@ export const CBOR_BYTE_STRING_ONE_BYTE_LENGTH = 0x58;
 /** The first length that the head of a byte string cannot hold itself. */
 export const CBOR_SHORT_LENGTH_LIMIT = 24;
 
-/** The heads that a byte string of `length` bytes may be written with: one byte where it fits, and two. */
+/**
+ * The heads that a byte string of `length` bytes may be written with: one byte where it fits, and
+ * two.
+ */
 export function byteStringHeads(length: number): number[][] {
   return [
     ...(length < CBOR_SHORT_LENGTH_LIMIT ? [[CBOR_BYTE_STRING + length]] : []),

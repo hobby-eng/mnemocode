@@ -69,7 +69,10 @@ export interface Encoding {
   readonly validLastWord?: EncodedResult | undefined;
   /** Whether that last word differs from the shifted one: only then is anything replaced. */
   readonly lastWordChanged: boolean;
-  /** Whether the last word was replaced: asked for, and changed; the record then names the mode that keeps it. */
+  /**
+   * Whether the last word was replaced: asked for, and changed; the record then names the mode that
+   * keeps it.
+   */
   readonly replaced: boolean;
 }
 
@@ -86,9 +89,9 @@ export { MissingChecksumError };
 /**
  * The codes of one encoded seed phrase with their format and mode. A class pays off here: it is
  * built only by `read` or `of`, and its constructor refuses codes that no seed phrase has or that
- * their mode cannot have written, so every EncodedBackup can be decoded; it never changes afterwards
- * (`withMode` gives another); and it keeps the codes, which without Seedshift are the seed phrase
- * itself, out of toString, toJSON and Node.js's inspect.
+ * their mode cannot have written, so every EncodedBackup can be decoded; it never changes
+ * afterwards (`withMode` gives another); and it keeps the codes, which without Seedshift are the
+ * seed phrase itself, out of toString, toJSON and Node.js's inspect.
  */
 export class EncodedBackup extends Redacted {
   readonly #indexes: readonly number[];
@@ -121,7 +124,8 @@ export class EncodedBackup extends Redacted {
 
   /**
    * Reads codes written in `format` as the codes of a seed phrase made with `mode`. Throws why
-   * they cannot be, naming places and counts only; MissingChecksumError for a checksum-keeping mode.
+   * they cannot be, naming places and counts only; MissingChecksumError for a checksum-keeping
+   * mode.
    */
   static read(text: string, format: EncodedFormat, mode: MaskingMode): EncodedBackup {
     return EncodedBackup.of(parseInput(text, format), format, mode);
@@ -223,7 +227,9 @@ export class EncodedBackup extends Redacted {
     return this.#indexes.length as Bip39WordCount;
   }
 
-  /** Whether complete dates still leave several phrases: the Original Seedshift's valid last word. */
+  /**
+   * Whether complete dates still leave several phrases: the Original Seedshift's valid last word.
+   */
   get givesSeveral(): boolean {
     return Masking.of(this.#mode).givesSeveral;
   }

@@ -72,8 +72,8 @@ describe("secret input", () => {
     terminal.privateScreen = true;
     terminal.answers = "test onlz\x7fy\r";
     expect(await askSecretUntil("Seed phrase:", typed)).toBe("test only");
-    // Backspace redraws the answer after the prompt (13 columns): back to its start, cleared, written
-    // again; then y is added.
+    // Backspace redraws the answer after the prompt (13 columns): back to its start, cleared,
+    // written again; then y is added.
     expect(written.join("")).toBe("Seed phrase: test onlz\r\x1b[13C\x1b[Jtest onl\r\x1b[21Cy\n");
   });
 

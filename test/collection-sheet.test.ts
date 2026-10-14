@@ -195,7 +195,8 @@ describe("single-page design studies", () => {
     };
     for (const id of ["business-it", "business-architect", "material-enclosure"])
       expect(await background(id), id).toBe("0.043 0.047 0.059");
-    // A showroom, a concrete wall, a tiled wall and an oak floor, each painted over its base colour.
+    // A showroom, a concrete wall, a tiled wall and an oak floor, each painted over its base
+    // colour.
     const backdrops = {
       "material-vehicle": "0.86 0.87 0.88",
       "material-switch": "0.8 0.79 0.765",

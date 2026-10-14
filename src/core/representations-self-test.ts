@@ -134,7 +134,9 @@ function checkForms(
   }
 }
 
-/** Exact forward/reverse answers and refusals, without PBKDF2, files, renderers or a share engine. */
+/**
+ * Exact forward/reverse answers and refusals, without PBKDF2, files, renderers or a share engine.
+ */
 export function checkRepresentationStartup(): void {
   for (const { words, forms } of REPRESENTATION_ANSWERS)
     checkForms(

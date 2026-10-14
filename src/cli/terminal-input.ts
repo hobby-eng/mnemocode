@@ -64,8 +64,8 @@ export const ESCAPE_ALIASES: ReadonlySet<number> = new Set([KEY.LOWER_Q, KEY.UPP
 
 /**
  * The warning for an answer, a file or codes that were refused, to be asked again with it: the
- * message of the Error. InputCancelledError, which is the person leaving, and anything thrown that is
- * no Error pass through. Every question that asks again classifies a refusal with it.
+ * message of the Error. InputCancelledError, which is the person leaving, and anything thrown that
+ * is no Error pass through. Every question that asks again classifies a refusal with it.
  */
 export function refusal(error: unknown): string {
   if (error instanceof InputCancelledError) throw error;
@@ -193,9 +193,9 @@ function wipeTypedAhead(): boolean {
 /**
  * Drops and wipes what was typed or pasted before the next question is drawn: the rest of a
  * paste, a second Enter, keys pressed while a step ran that read no keys. Ctrl+C among them still
- * cancels the tool (InputCancelledError). A question calls it inside withRawTerminal, before it draws
- * anything, as askLine and waitForEnter do; called outside, before choose, it reads the terminal
- * briefly itself.
+ * cancels the tool (InputCancelledError). A question calls it inside withRawTerminal, before it
+ * draws anything, as askLine and waitForEnter do; called outside, before choose, it reads the
+ * terminal briefly itself.
  */
 export async function dropTypedAhead(): Promise<void> {
   if (rawSessions > 0) await settle();

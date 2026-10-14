@@ -1,6 +1,7 @@
 // Checks the rules of the workspace coding guide that the compiler, the linter and the copy check
-// cannot see: the gate `code-rules` of the guide (code-core.instructions.md, "Gates by name"). Every
-// problem is printed with the ID of its rule, which names the rule and its reason in the guide:
+// cannot see: the gate `code-rules` of the guide (code-core.instructions.md, "Gates by name").
+// Every problem is printed with the ID of its rule, which names the rule and its reason in the
+// guide:
 //
 // - CORE-15: a file that the linter does not measure (anything but TypeScript and JavaScript) has
 //   at most 800 lines. A Rust file's #[cfg(test)] module and the generated files listed below are
@@ -21,8 +22,8 @@
 // - WEB-01: no `on…=` handler in markup.
 //
 // The audit records and their harnesses in docs/audits/ are frozen evidence, and the files that the
-// SSKR engine's build writes (sskr-wasm/generated/) are its output: neither is read, as the formatter
-// leaves them out.
+// SSKR engine's build writes (sskr-wasm/generated/) are its output: neither is read, as the
+// formatter leaves them out.
 //
 //   node scripts/verify-code-rules.mjs
 
@@ -35,11 +36,16 @@ import { tokensOf } from "./source-tokens.mjs";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 /** CORE-15: the most lines a file may have. */
 const MAX_FILE_LINES = 800;
-/** Frozen evidence, never changed after its audit, and a build's output: left out of every check. */
+/**
+ * Frozen evidence, never changed after its audit, and a build's output: left out of every check.
+ */
 const LEFT_OUT = ["docs/audits/", "sskr-wasm/generated/"];
 /** Files that a tool writes, left out of the file length (CORE-15). */
 const GENERATED = new Set(["pnpm-lock.yaml"]);
-/** The kinds of file whose length this check measures; the linter measures TypeScript and JavaScript. */
+/**
+ * The kinds of file whose length this check measures; the linter measures TypeScript and
+ * JavaScript.
+ */
 const MEASURED = new Set([".md", ".py", ".rs", ".sh", ".toml", ".txt", ".yaml", ".yml"]);
 /** Lockfiles of the package managers other than pnpm (TOOL-05). */
 const OTHER_LOCKFILES = new Set([
@@ -88,7 +94,10 @@ function report(path, line, rule, message) {
   problems.push({ path, line, rule, message });
 }
 
-/** Every file of the repository that Git does not ignore, by its path from the root (LEFT_OUT aside). */
+/**
+ * Every file of the repository that Git does not ignore, by its path from the root (LEFT_OUT
+ * aside).
+ */
 function repositoryFiles() {
   return listFiles()
     .map((path) => path.split("\\").join("/"))

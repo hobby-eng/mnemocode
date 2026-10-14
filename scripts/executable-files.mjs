@@ -21,7 +21,9 @@ export function executableName(version) {
   return `${releaseFilePrefix(version)}${system}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`;
 }
 
-/** The license notices that travel with an executable: its name without .exe, then -licenses.txt. */
+/**
+ * The license notices that travel with an executable: its name without .exe, then -licenses.txt.
+ */
 export function noticesName(executable) {
   return `${executable.replace(/\.exe$/u, "")}-licenses.txt`;
 }

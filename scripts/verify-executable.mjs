@@ -4,7 +4,8 @@
 // license notices next to it. Public test data only.
 //
 //   node scripts/verify-executable.mjs [executable or its folder]   (default release)
-//   node scripts/verify-executable.mjs --print-path   (only prints release/<this system's executable>)
+//   node scripts/verify-executable.mjs --print-path   (only prints release/<this system's
+// executable>)
 
 import { execFileSync } from "node:child_process";
 import {

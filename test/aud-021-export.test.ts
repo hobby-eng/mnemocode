@@ -186,8 +186,9 @@ function expectSameCollection(attempts: readonly Attempt[], format: EncodedForma
   expect(content.payload).toBe(own.payload);
   assertColorCardContent(content);
   for (const attempt of attempts) {
-    // Compare the full collection, including the trailing decoys, labels, profile and copy. Separate
-    // cards keep the person's page turn, not the one the plan chose for its sheets (AUD-022-FUN002).
+    // Compare the full collection, including the trailing decoys, labels, profile and copy.
+    // Separate cards keep the person's page turn, not the one the plan chose for its sheets
+    // (AUD-022-FUN002).
     if (attempt.destination === "cards") {
       expect(attempt.job.content).toEqual(separateCardJob(first.job, undefined).content);
     } else {

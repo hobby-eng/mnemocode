@@ -168,7 +168,9 @@ export async function cardOptions(start: number[], answers: number[]): Promise<r
   return run.slice(run.indexOf("--template") + 2, end < 0 ? undefined : end);
 }
 
-/** The Find entry, a digit of a date, typed, all the codes typed, MnemoCode Seedshift, the wallet. */
+/**
+ * The Find entry, a digit of a date, typed, all the codes typed, MnemoCode Seedshift, the wallet.
+ */
 export const DATE_WALLET = [2, 0, 0, 0];
 
 /** The POSIX shells to paste into: sh, and bash and zsh where they are installed. */

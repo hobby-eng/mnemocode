@@ -9,7 +9,9 @@ import { hash160 } from "./address-types.js";
 
 /** BIP340: a Taproot key is written as its x coordinate alone, 32 bytes. */
 export const X_ONLY_KEY_BYTES = 32;
-/** BIP141: the redeem script of nested SegWit is OP_0, a push of 20 bytes, and the key's HASH160. */
+/**
+ * BIP141: the redeem script of nested SegWit is OP_0, a push of 20 bytes, and the key's HASH160.
+ */
 const WITNESS_KEY_HASH_PREFIX = [0x00, 0x14];
 /** BIP341: the tag of the hash that tweaks a Taproot internal key. */
 const TAP_TWEAK_TAG = "TapTweak";

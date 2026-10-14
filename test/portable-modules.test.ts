@@ -507,7 +507,9 @@ function packagesAllowed(part: string): Set<string> {
   return new Set([...BIP39_PACKAGES, ...parts.flatMap((name) => PARTS[name]!.packages ?? [])]);
 }
 
-/** Refuses a module that no other host could compile: Node.js globals, or a module never reached. */
+/**
+ * Refuses a module that no other host could compile: Node.js globals, or a module never reached.
+ */
 function expectHostNeutral(entry: string, modules: Map<string, Module>): void {
   for (const [name, module] of modules) {
     expect(module.nodeGlobals, `${entry} reaches ${name}, which uses Node.js`).toEqual([]);

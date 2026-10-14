@@ -5,9 +5,9 @@
 // profiles, an account extended public key at an account, or an address, a compressed public key
 // or a WIF private key at an account, branch and index; on mainnet or testnet. Or it is a
 // receiving address of one of the coins that the host offers, which it always names (every coin
-// of core/coins.ts on the command line) at an account, branch and index, compared on the paths where
-// that coin's wallets put it. The host passes its coins, so that a build of a few coins carries no
-// other coin's code. An address, a public key or a WIF may also be
+// of core/coins.ts on the command line) at an account, branch and index, compared on the paths
+// where that coin's wallets put it. The host passes its coins, so that a build of a few coins
+// carries no other coin's code. An address, a public key or a WIF may also be
 // compared with several addresses in a row, from its index on, such as the first 20 of a wallet,
 // when the person does not know which one it is. A program that checks wallets takes this module
 // alone: it needs nothing about Seedshift, shares or cards.
@@ -558,7 +558,9 @@ abstract class LocatedEvidence implements Evidence {
     return BITCOIN.accountPathsOf(PROFILE_TYPES[profile], NETWORK_FACTS[network].testnet, account);
   }
 
-  /** The paths of the branch at the evidence's place in `profile`, as Bitcoin's coin writes them. */
+  /**
+   * The paths of the branch at the evidence's place in `profile`, as Bitcoin's coin writes them.
+   */
   #branchPaths(profile: BitcoinProfile): string[] {
     const location = this.#location;
     return BITCOIN.branchPathsOf(

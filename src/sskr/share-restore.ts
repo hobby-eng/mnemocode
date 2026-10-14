@@ -49,7 +49,9 @@ import { defined } from "../core/defined.js";
 /** Why a wallet check of shares needs a whole set: no phrase is restored from fewer. */
 export const WALLET_CHECK_NEEDS_THRESHOLD =
   "The wallet can be checked only with as many shares as the threshold.";
-/** Why a repair of shares of a Seedshift phrase needs the wallet: the dates serve only its check. */
+/**
+ * Why a repair of shares of a Seedshift phrase needs the wallet: the dates serve only its check.
+ */
 export const SEEDSHIFT_REPAIR_NEEDS_WALLET =
   "Seedshift mode here serves only the wallet check: give the wallet too.";
 /** Why no share is written again: every one has an element that nothing settles. */
@@ -306,7 +308,9 @@ export interface ShareVariant {
 export interface ShareRepairRequest extends Omit<ShareRestoreRequest, "keep"> {
   /** The form every share is written in; without it each keeps its own. */
   readonly form?: ShareFormat | undefined;
-  /** The master fingerprint of a phrase with an empty passphrase, for sets that fit several ways. */
+  /**
+   * The master fingerprint of a phrase with an empty passphrase, for sets that fit several ways.
+   */
   readonly fingerprintOf: (mnemonic: string) => string;
 }
 
@@ -504,8 +508,8 @@ export class ShareRestore {
 
   /**
    * Why a repair of shares in `mode` cannot start, before any share is read; none when it can. A
-   * wallet tells sets of repaired shares apart, and for a Seedshift phrase it needs the dates, which
-   * serve only its check.
+   * wallet tells sets of repaired shares apart, and for a Seedshift phrase it needs the dates,
+   * which serve only its check.
    */
   static repairRefusal(mode: ShareMode, walletGiven: boolean): string | undefined {
     return Masking.of(mode).masked && !walletGiven ? SEEDSHIFT_REPAIR_NEEDS_WALLET : undefined;

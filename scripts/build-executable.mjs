@@ -55,7 +55,10 @@ const name = executableName(version);
 if (process.version !== `v${nodeVersion}`)
   throw new Error(`Build with Node.js ${nodeVersion} from .node-version, not ${process.version}.`);
 
-/** Every file the program reads at run time, by its path from the package root (bundled-file-paths.ts). */
+/**
+ * Every file the program reads at run time, by its path from the package root
+ * (bundled-file-paths.ts).
+ */
 function bundledFiles() {
   const files = [
     ...[SSKR_MANIFEST, SSKR_BRIDGE, SSKR_BINARY].map((file) => `${SSKR_ENGINE_FOLDER}${file}`),

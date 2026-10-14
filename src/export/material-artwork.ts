@@ -59,7 +59,9 @@ export interface MaterialArtwork {
   readonly finishes: readonly MaterialFinish[];
   readonly catalogue: MaterialCatalogue;
 }
-/** The optional details of a finish row: those of MaterialFinish beyond its name, colour and crop. */
+/**
+ * The optional details of a finish row: those of MaterialFinish beyond its name, colour and crop.
+ */
 type FinishDetails = Pick<MaterialFinish, "surface" | "outlineFit" | "onlyTinted">;
 /** A finish photographed for its material: its name, colour, crop in pixels and details. */
 type FinishRow = (

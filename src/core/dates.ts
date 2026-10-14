@@ -144,9 +144,9 @@ function ownedPart(values: readonly number[], part: WholeRange, name: string) {
   const copy = Array.from(values ?? []);
   if (copy.length === 0 || !copy.every((value) => inWholeRange(value, part)))
     throw new Error(`The date pattern cannot match a valid ${name}.`);
-  // Each value once, in ascending order, as parseDatePattern gives them: datePatternCombinationCount
-  // counts distinct dates, a value given twice would be tried twice, and the search keeps the
-  // earliest dates of each shift, which it meets first only in this order.
+  // Each value once, in ascending order, as parseDatePattern gives them:
+  // datePatternCombinationCount counts distinct dates, a value given twice would be tried twice,
+  // and the search keeps the earliest dates of each shift, which it meets first only in this order.
   return Object.freeze([...new Set(copy)].sort((left, right) => left - right));
 }
 

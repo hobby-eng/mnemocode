@@ -241,7 +241,9 @@ const COPIED_FUNCTION = `export function spread(values: readonly number[], limit
 /** The tokens of COPIED_FUNCTION, as the copy check counts them: a copy of all of them or none. */
 const COPIED_FUNCTION_TOKENS = ["--tokens", "92"];
 
-/** The copy check run over `sources`, each one file of src/, with `args`: its exit code and errors. */
+/**
+ * The copy check run over `sources`, each one file of src/, with `args`: its exit code and errors.
+ */
 function copyRun(
   sources: readonly string[],
   args: readonly string[] = [],

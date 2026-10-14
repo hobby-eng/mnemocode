@@ -81,8 +81,8 @@ describe("start menu", () => {
         ];
         if (secret.includes(command!)) expect(parsed["ask-secrets"], typedCommand(run)).toBe(true);
       }
-      // Lists and explanations fit a terminal of 80 columns unwrapped (TEXT_WIDTH), and no note of a
-      // list is cut to fit.
+      // Lists and explanations fit a terminal of 80 columns unwrapped (TEXT_WIDTH), and no note of
+      // a list is cut to fit.
       for (const line of [...script.lists.flat(), ...script.explanations.flat()])
         expect(Array.from(line).length, line).toBeLessThanOrEqual(TEXT_WIDTH);
       expect([...new Set(script.cutNotes)]).toEqual([]);

@@ -79,8 +79,8 @@ function thenDates(dates: string | undefined): string {
 
 /**
  * The way through MnemoCode's start menu, as a double-click opens it. What is typed follows the
- * prompts: the backup or the shares separated by SHARE_SEPARATOR (the share prompt of share-repair.ts), then
- * the dates (datesPrompt).
+ * prompts: the backup or the shares separated by SHARE_SEPARATOR (the share prompt of
+ * share-repair.ts), then the dates (datesPrompt).
  */
 const MENU_ROUTE: HeirRoute = {
   subtitle: `Made with MnemoCode ${MNEMOCODE_VERSION}, free and offline.`,

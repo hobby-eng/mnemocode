@@ -26,7 +26,9 @@ const COLOR_CODES = RGB_MAX_VALUE + 1;
 /** Why a random source is refused that gave a number out of range. */
 const RANDOM_REFUSAL = "The random source of the decoy cards gave a number out of range.";
 
-/** The cards that decoys are added to: colours, the codes printed in their place, and the decoys. */
+/**
+ * The cards that decoys are added to: colours, the codes printed in their place, and the decoys.
+ */
 export interface DecoyCards {
   /** A seed phrase's cards ("colors") or a share's ("sskr"). */
   readonly kind: "colors" | "sskr";

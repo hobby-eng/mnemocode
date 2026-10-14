@@ -108,7 +108,9 @@ const SHEET_PAGES = 2;
 /** Steps enough to overflow the back of any size. */
 const OVERFLOWING_STEPS = 200;
 
-/** The lines of a sheet that its facts decide: what is needed, the steps, the advice, the warning. */
+/**
+ * The lines of a sheet that its facts decide: what is needed, the steps, the advice, the warning.
+ */
 function factLines(text: HeirSheetText): string[] {
   return [...text.needs, ...text.steps, text.trouble, text.warning];
 }

@@ -5,7 +5,9 @@
 //
 // Imports nothing, so that every module can take it, the self-tests included.
 
-/** The message of a refusal: the Error's message; anything thrown that is no Error passes through. */
+/**
+ * The message of a refusal: the Error's message; anything thrown that is no Error passes through.
+ */
 export function refusalMessage(error: unknown): string {
   if (!(error instanceof Error)) throw error;
   return error.message;

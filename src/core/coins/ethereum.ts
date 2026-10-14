@@ -1,6 +1,6 @@
 // Ethereum and every EVM network: the account is the last 20 bytes of the Keccak-256 of the public
-// key, written "0x" and 40 hexadecimal digits with the EIP-55 checksum. A module of its own, so that
-// a host of Ethereum alone takes no other coin of these accounts (evm.ts reuses its reader).
+// key, written "0x" and 40 hexadecimal digits with the EIP-55 checksum. A module of its own, so
+// that a host of Ethereum alone takes no other coin of these accounts (evm.ts reuses its reader).
 //
 // Host-neutral: it imports only coin.ts, keccak-account.ts, other-forms.ts, @scure/base and
 // @noble/hashes (test/portable-modules.test.ts).
@@ -17,7 +17,9 @@ const EIP55_CAPITAL_FROM = 8;
 
 /** A coin of Ethereum-style addresses. */
 export class HexCoin extends Coin {
-  /** In mixed case the capitals are the EIP-55 checksum, which must hold; in one case there is none. */
+  /**
+   * In mixed case the capitals are the EIP-55 checksum, which must hold; in one case there is none.
+   */
   protected read(text: string): CoinAddress {
     const digits = hexAccountDigits(text);
     if (digits === undefined) throw this.notOurs();

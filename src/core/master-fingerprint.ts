@@ -130,9 +130,9 @@ export class Bip39Seed {
     return checkedSeed(await this.#pbkdf2(phrase, salt, SEED_ROUNDS, SEED_BYTES));
   }
   /**
-   * What `use` makes of the master key of the wallet of `mnemonic`, from a PBKDF2 that answers at once:
-   * the seed and the key are wiped once `use` returns, so `use` must not keep the key or answer
-   * later. `versions` are the root's version bytes; BIP32's default ones by default.
+   * What `use` makes of the master key of the wallet of `mnemonic`, from a PBKDF2 that answers at
+   * once: the seed and the key are wiped once `use` returns, so `use` must not keep the key or
+   * answer later. `versions` are the root's version bytes; BIP32's default ones by default.
    */
   withRoot<T>(
     mnemonic: string,
@@ -154,7 +154,9 @@ export class Bip39Seed {
   }
 }
 
-/** What `use` makes of the master key of `seed`; the seed and the key are wiped, whatever happens. */
+/**
+ * What `use` makes of the master key of `seed`; the seed and the key are wiped, whatever happens.
+ */
 function useRoot<T>(seed: Uint8Array, use: (root: HDKey) => T, versions?: Versions): T {
   let root: HDKey;
   try {

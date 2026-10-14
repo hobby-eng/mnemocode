@@ -52,7 +52,9 @@ export class CandidateFileAdmission {
     return PARAMETERS;
   }
 
-  /** An announced file size checked before a host reads any bytes. Zero is not format validation. */
+  /**
+   * An announced file size checked before a host reads any bytes. Zero is not format validation.
+   */
   static assertSize(size: number, form: CandidateFileForm): void {
     if (form === "plaintext") OpenedCandidateList.assertSize(size);
     else if (form === "age")

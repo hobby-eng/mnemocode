@@ -174,7 +174,9 @@ export class TypedAnswer {
     else this.insert(KEY.SPACE);
   }
 
-  /** Draws the hint below the answer when it is behind, once `quiet` says no key follows at once. */
+  /**
+   * Draws the hint below the answer when it is behind, once `quiet` says no key follows at once.
+   */
   async hintWhen(quiet: () => Promise<boolean>): Promise<void> {
     if (!this.#hintDue || !(await quiet())) return;
     defined(this.#shown).showHint(

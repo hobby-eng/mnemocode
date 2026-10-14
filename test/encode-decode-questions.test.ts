@@ -47,7 +47,9 @@ vi.mock("../src/cli/encode-export.js", async (importOriginal) => {
   };
 });
 
-/** The fingerprint of MASKED read as a phrase itself, as encode shows it ("Encoded fingerprint"). */
+/**
+ * The fingerprint of MASKED read as a phrase itself, as encode shows it ("Encoded fingerprint").
+ */
 const ENCODED_FINGERPRINT = "0d05289e";
 /** The test phrase masked with the Original Seedshift and 23-09-2026, as word numbers. */
 const LEGACY = formatEncoded(encodeMnemonicLegacy(TEST_PHRASE, [parseDate(DATE)]), "indexes");

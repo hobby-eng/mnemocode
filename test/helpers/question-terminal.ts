@@ -3,8 +3,9 @@
 // goes back), and each list question (choose) the next of `terminal.choices`, or Escape when none
 // is left; byLabel answers with the entry of that label. Standard output is a terminal only with
 // `terminal.stdoutTerminal`, and the private screen is on unless `terminal.privateScreen` is
-// false. Nothing reads the real terminal. A test file loads this module in vi.hoisted, and its vi.mock factories replace
-// each module with what is here; so this module imports no module that a test replaces.
+// false. Nothing reads the real terminal. A test file loads this module in vi.hoisted, and its
+// vi.mock factories replace each module with what is here; so this module imports no module that a
+// test replaces.
 
 import type * as Tty from "node:tty";
 import { afterEach, beforeEach, expect, vi } from "vitest";
