@@ -545,6 +545,8 @@ describe("S138: one rule for the case of a first letter", () => {
   it("keeps an abbreviation and puts a message after its place", () => {
     expect(lowerFirst("Invalid share.")).toBe("invalid share.");
     expect(lowerFirst("SSKR shares differ.")).toBe("SSKR shares differ.");
+    // A name with a capital inside it keeps its case as an abbreviation does (AUD-024).
+    expect(lowerFirst("MnemoCode expected a value.")).toBe("MnemoCode expected a value.");
     expect(capitalized("glass")).toBe("Glass");
     expect(afterPlace("Date", 2, "The day is wrong.")).toBe("Date 2: the day is wrong.");
     // Before, a date's message lost the case of an abbreviation: "bIP39".

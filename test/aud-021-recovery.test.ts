@@ -144,7 +144,7 @@ function shareText(ur: string, format: ShareFormat, marks: readonly number[]): s
   return joinUnits([...marked, SHARE_UNITS[format].unitText(0)], format);
 }
 
-describe("AUD-021-FUN002: marked SSKR prefixes with card decoys", () => {
+describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, readings that do not fit", () => {
   it("refuses an unresolved capped reading beside a solved reading in either order", () => {
     const marked = `${sskrSetVector.colors[0].replace("#1F9121", "?")} #000000`;
     const share = readRepairableShare(marked);
@@ -221,7 +221,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys", () => {
   });
 });
 
-describe("AUD-021-FUN002: marked SSKR prefixes with card decoys", () => {
+describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, digits known in part", () => {
   it("keeps partial digit constraints when cropping a share prefix", () => {
     const ur = sskrSetVector.shares[0];
     for (const format of ["colors", "unicode", "colors-unicode"] as const) {
@@ -293,7 +293,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys", () => {
   });
 });
 
-describe("AUD-021-FUN002: marked SSKR prefixes with card decoys", () => {
+describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, several valid shares", () => {
   it("lists multiple valid shares instead of silently choosing a prefix repair", () => {
     const ur = sskrSetVector.shares[0];
     // One whole color and three hex digits: 36 unknown bits leave four beyond the CRC-32.
