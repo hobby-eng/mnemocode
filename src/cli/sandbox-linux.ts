@@ -17,15 +17,14 @@
 //   up once this is applied (protection.ts).
 // - Landlock refuses every change to the file system where the command saves nothing, and TCP
 //   bind and connect where the kernel knows them (Landlock ABI 4).
-// - The memory is locked out of swap where the system lets a program lock all of it: without a
-//   limit, or with CAP_IPC_LOCK. Under the usual limit of a few MiB locking would make later
-//   allocations fail, so it is not tried.
+// - The memory is not locked out of swap, unlike mhfe's: V8 returns freed pages to the system with
+//   madvise(MADV_DONTNEED), which Linux refuses on locked pages (EINVAL), and V8 then stops the
+//   process at once. mlockall would crash every run that the system lets lock memory, such as one
+//   as root; the warning about unencrypted swap covers swap instead (swap-check.ts).
 //
 // Every boundary is read back by a probe that tries what it forbids, as mhfe's are: a socket, an
 // io_uring, /dev/null opened for writing, a program started at a path where none can be.
 
-import { readFileSync } from "node:fs";
-import { MEBIBYTE } from "../core/byte-units.js";
 import {
   noLimit,
   RLIMIT_CORE,
@@ -162,14 +161,6 @@ export function landlockWriteRights(abi: number): bigint {
   return WRITE_RIGHTS_ABI_1 | (abi >= 2 ? REFER : 0n) | (abi >= 3 ? TRUNCATE : 0n);
 }
 
-// Locked memory.
-const RLIMIT_MEMLOCK = 8;
-const RLIM_INFINITY = 0xffff_ffff_ffff_ffffn;
-/** CAP_IPC_LOCK, bit 14 of CapEff in /proc/self/status. */
-const CAP_IPC_LOCK = 14n;
-/** MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT: every page, also later ones, once it is used. */
-const LOCK_ALL_ON_FAULT = 1 | 2 | 4;
-
 // Probes.
 const AF_INET = 2;
 const SOCK_DGRAM = 2;
@@ -187,8 +178,6 @@ const LIBC_FUNCTIONS = {
   syscall: { arguments: ["i64", "pointer", "pointer", "pointer"], return: "i64" },
   prctl: { arguments: ["i32", "u64", "u64", "u64", "u64"], return: "i32" },
   setrlimit: { arguments: ["i32", "buffer"], return: "i32" },
-  getrlimit: { arguments: ["i32", "buffer"], return: "i32" },
-  mlockall: { arguments: ["i32"], return: "i32" },
   socket: { arguments: ["i32", "i32", "i32"], return: "i32" },
   open: { arguments: ["string", "i32"], return: "i32" },
   close: { arguments: ["i32"], return: "i32" },
@@ -245,7 +234,6 @@ export class LinuxSandbox implements SystemSandbox {
   readonly #record = new SandboxRecord();
   readonly #libc: Libc | undefined;
   #coreDumps: CoreDumps;
-  #memoryLocked = false;
 
   constructor(access: SystemAccess) {
     this.#libc = this.#record.reach("the C library", access, (ffi) => new Libc(ffi));
@@ -262,7 +250,6 @@ export class LinuxSandbox implements SystemSandbox {
       if (libc.call.prctl(PR_GET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0)
         throw new Error("the process is still dumpable");
     });
-    this.#record.attempt("memory", () => this.#lockMemory(libc));
   }
 
   restrict(needs: SandboxNeeds): void {
@@ -280,42 +267,15 @@ export class LinuxSandbox implements SystemSandbox {
 
   held(): readonly string[] {
     const kernel = this.#record.held;
-    return [
-      ...(kernel.length > 0 ? [`kernel: ${kernel.join(", ")}`] : []),
-      ...(this.#memoryLocked ? ["memory locked"] : []),
-    ];
+    return kernel.length > 0 ? [`kernel: ${kernel.join(", ")}`] : [];
   }
 
   missing(): readonly string[] {
     return this.#record.reasons;
   }
 
-  keepsMemoryFromSwap(): boolean {
-    return this.#memoryLocked;
-  }
-
   coreDumps(): CoreDumps {
     return this.#coreDumps;
-  }
-
-  /** Locks every page where nothing limits it, and reads the locked size back. */
-  #lockMemory(libc: Libc): void {
-    const limit = Buffer.alloc(16);
-    if (libc.call.getrlimit(RLIMIT_MEMLOCK, limit) !== 0)
-      throw new Error("its lock limit is unknown");
-    const soft = limit.readBigUInt64LE(0);
-    const status = readFileSync("/proc/self/status", "utf8");
-    const capabilities = BigInt(`0x${/^CapEff:\s*([0-9a-f]+)/mu.exec(status)?.[1] ?? "0"}`);
-    const lockable = soft === RLIM_INFINITY || ((capabilities >> CAP_IPC_LOCK) & 1n) === 1n;
-    if (!lockable)
-      throw new Error(
-        `not locked, the system lets a program lock only ${Number(soft) / MEBIBYTE} MiB`,
-      );
-    const failure = libc.failure(libc.call.mlockall(LOCK_ALL_ON_FAULT));
-    if (failure !== undefined) throw new Error(`mlockall refused it (error ${failure})`);
-    const locked = /^VmLck:\s*(\d+)/mu.exec(readFileSync("/proc/self/status", "utf8"))?.[1];
-    if (Number(locked ?? "0") === 0) throw new Error("mlockall locked nothing");
-    this.#memoryLocked = true;
   }
 
   /** Installs the seccomp filter on every thread, then probes it. */

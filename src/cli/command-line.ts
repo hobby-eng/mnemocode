@@ -7,7 +7,7 @@ import { runRecoverWord } from "./recover-word-command.js";
 import { assertCoreSelfTest, runSelfTest } from "./self-test.js";
 import { runTable } from "./table-command.js";
 import { showProtection, withPrivateScreen } from "./private-screen.js";
-import { assertProtected, dropUnneeded, memoryKeptFromSwap } from "./protection.js";
+import { assertProtected, dropUnneeded } from "./protection.js";
 import { swapWarning } from "./swap-check.js";
 import { warnOfCloudCopies } from "./cloud-folders.js";
 import { terminalMore, terminalNotice } from "./terminal.js";
@@ -105,8 +105,7 @@ async function withSecrets(args: ParsedArguments, run: () => Promise<void>): Pro
   assertProtected();
   return withPrivateScreen(async () => {
     showProtection();
-    // Swap cannot hold locked memory, the seed phrase included.
-    const swap = memoryKeptFromSwap() ? undefined : swapWarning();
+    const swap = swapWarning();
     if (swap !== undefined) {
       terminalNotice(swap, "warning");
       terminalMore("unencrypted-swap");

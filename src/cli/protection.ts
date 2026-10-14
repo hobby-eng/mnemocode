@@ -231,8 +231,3 @@ export function sandboxReport(): string {
   if (missing.length > 0) parts.push(`not available: ${missing.join("; ")}`);
   return parts.join("; ");
 }
-
-/** Whether the memory of this process is locked, so that swap cannot hold any of it. */
-export function memoryKeptFromSwap(): boolean {
-  return sandbox.keepsMemoryFromSwap();
-}

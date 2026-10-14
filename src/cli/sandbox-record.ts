@@ -40,8 +40,6 @@ export interface SystemSandbox {
   held(): readonly string[];
   /** What this system did not enforce for this run, and why, as the self-test names it. */
   missing(): readonly string[];
-  /** Whether all the memory of the process is locked, so that swap holds none of it. */
-  keepsMemoryFromSwap(): boolean;
   /**
    * Core dumps, where the system can switch them off: no secret is asked while they failed
    * (protection.ts, assertProtected).

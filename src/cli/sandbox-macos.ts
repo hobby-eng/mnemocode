@@ -138,11 +138,6 @@ export class MacSandbox implements SystemSandbox {
   coreDumps(): CoreDumps {
     return this.#coreDumps;
   }
-
-  /** The memory is not locked here: swap may hold some of it. */
-  keepsMemoryFromSwap(): boolean {
-    return false;
-  }
 }
 
 /** errno of the call just made. */

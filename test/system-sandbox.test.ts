@@ -108,8 +108,11 @@ describe("the record of a sandbox", () => {
       throw new Error("refused");
     });
     record.attempt("Landlock", () => undefined);
-    record.lack("memory: not locked");
-    expect(record.reasons).toEqual(["seccomp: refused", "memory: not locked"]);
+    record.lack("file writes are refused by the permission model only");
+    expect(record.reasons).toEqual([
+      "seccomp: refused",
+      "file writes are refused by the permission model only",
+    ]);
   });
 
   it("holds a boundary only where its probe found it to hold", () => {
@@ -182,6 +185,29 @@ describe("the sandbox of this system, in a protected process", () => {
       const landlock = /kernel: [^·]*no file writes/u.test(run.summary);
       expect(landlock || run.report.includes("Landlock: ")).toBe(true);
     }
+  });
+
+  it("leaves the memory of a protected process unlocked, which V8 needs to exit", async () => {
+    // Linux refuses madvise(MADV_DONTNEED) on locked pages, and V8 stops the process when it
+    // frees pages, at the latest when it disposes of the isolate at exit: a run with locked memory
+    // ends in a crash where mlockall succeeds (as root, or with CAP_IPC_LOCK). The child reports
+    // its locked memory, which states the property on every machine, and has to exit cleanly.
+    const script = `
+      import("./dist/cli/protection.js").then(async (protection) => {
+        await protection.hardenProcess();
+        if (process.platform === "linux") {
+          const { readFileSync } = await import("node:fs");
+          console.log(readFileSync("/proc/self/status", "utf8").match(/^VmLck:.*$/mu)?.[0]);
+        }
+      });`;
+    const { stdout } = await execute(process.execPath, [
+      ...PROTECTION_FLAGS,
+      "--allow-fs-read=/proc/self/status",
+      "--input-type=module",
+      "-e",
+      script,
+    ]);
+    if (process.platform === "linux") expect(stdout).toMatch(/^VmLck:\s+0 kB$/mu);
   });
 
   it("keeps what a command needs: other programs where it draws images", async () => {

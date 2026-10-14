@@ -119,11 +119,6 @@ export class WindowsSandbox implements SystemSandbox {
     return this.#record.reasons;
   }
 
-  /** The memory is not locked here: swap may hold some of it. */
-  keepsMemoryFromSwap(): boolean {
-    return false;
-  }
-
   /** Left as Windows has them: it writes no dump unless an administrator set one up. */
   coreDumps(): CoreDumps {
     return { state: "untouched" };

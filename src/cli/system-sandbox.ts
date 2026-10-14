@@ -1,9 +1,9 @@
 // The protections that the operating system itself enforces for a MnemoCode process, beyond the
-// Node.js permission model (protection.ts): on Linux core dumps off, seccomp, Landlock and locked
-// memory (sandbox-linux.ts), on macOS core dumps off, no debugger and its sandbox
-// (sandbox-macos.ts), on Windows crash reports without the heap, a job object and process
-// mitigation policies (sandbox-windows.ts). Node.js reaches them through node:ffi, which
-// protection.ts gives up once they are applied, before any secret is asked.
+// Node.js permission model (protection.ts): on Linux core dumps off, seccomp and Landlock
+// (sandbox-linux.ts), on macOS core dumps off, no debugger and its sandbox (sandbox-macos.ts), on
+// Windows crash reports without the heap, a job object and process mitigation policies
+// (sandbox-windows.ts). Node.js reaches them through node:ffi, which protection.ts gives up once
+// they are applied, before any secret is asked.
 //
 // Each is applied where the system offers it and read back before the summary names it. A system
 // without one runs as before, without it (owner, 2026-10-13): nothing is refused for its lack, and
@@ -37,10 +37,6 @@ class NoSandbox implements SystemSandbox {
 
   missing(): readonly string[] {
     return [this.reason];
-  }
-
-  keepsMemoryFromSwap(): boolean {
-    return false;
   }
 
   coreDumps(): CoreDumps {
