@@ -12,15 +12,9 @@ import {
   HELP_FLAGS,
   VERSION_FLAGS,
 } from "./command-options.js";
-import {
-  commandHelp,
-  TEST_PHRASE,
-  TEST_PHRASE_VARIABLE,
-  topicHelp,
-  type HelpOption,
-  type HelpRow,
-  type TopicHelp,
-} from "./help-pages.js";
+import { TEST_PHRASE, TEST_PHRASE_VARIABLE } from "./help-options.js";
+import { commandHelp, topicHelp } from "./help-pages.js";
+import type { HelpOption, HelpRow, TopicHelp } from "./help-types.js";
 import { STYLE, terminalPaint, wrapText } from "./terminal.js";
 import { defined } from "../core/defined.js";
 
