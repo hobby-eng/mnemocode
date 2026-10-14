@@ -29,8 +29,10 @@ export const terminal = {
    * after each answer read.
    */
   events: [] as string[],
-  /** Saves that fail with ENOSPC, as on a full disk, before one succeeds (failingSave). */
+  /** Saves that fail, as on a full disk, before one succeeds (failingSave). */
   saveFailures: 0,
+  /** The errno code of those failures: ENOSPC, a full disk, unless a test names another. */
+  saveFailureCode: "ENOSPC",
   stdoutTerminal: false,
   privateScreen: true,
 };
@@ -129,11 +131,15 @@ export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
   };
 }
 
-/** `save`, unless `terminal.saveFailures` says that it fails first, as on a full disk. */
+/**
+ * `save`, unless `terminal.saveFailures` says that it fails first, with the errno code
+ * `terminal.saveFailureCode`, as the file system reports it.
+ */
 export async function failingSave<T>(save: () => Promise<T>): Promise<T> {
   if (terminal.saveFailures > 0) {
     terminal.saveFailures -= 1;
-    throw Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" });
+    const code = terminal.saveFailureCode;
+    throw Object.assign(new Error(`${code}: the save failed, write`), { code });
   }
   return save();
 }
@@ -158,6 +164,7 @@ export function questionsOnPrivateScreen(): void {
       escapes: [],
       events: [],
       saveFailures: 0,
+      saveFailureCode: "ENOSPC",
       stdoutTerminal: false,
       privateScreen: true,
     });

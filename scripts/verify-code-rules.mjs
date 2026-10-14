@@ -235,9 +235,31 @@ function requirementsFilesOf(path, pythonFiles) {
   return [...owners].map((owner) => join(folder, `${basename(owner, ".py")}-requirements.txt`));
 }
 
+/** Modules that Python imports under another name than the package that pip installs. */
+const PYTHON_PACKAGES = new Map([
+  ["PIL", "pillow"],
+  ["fontTools", "fonttools"],
+  ["winpty", "pywinpty"],
+]);
+
+/** A package name as pip compares names (PEP 503): lower case, runs of - _ . as one -. */
+function packageKey(name) {
+  return name.toLowerCase().replace(/[-_.]+/gu, "-");
+}
+
+/** The requirements of a requirements file, one per entry, without comments. */
+function requirementEntries(text) {
+  // A requirement continues over the lines that end in a backslash.
+  return text
+    .replace(/\\\r?\n/gu, " ")
+    .split(/\r?\n/u)
+    .map((line) => line.replace(/(^|\s)#.*$/u, "").trim())
+    .filter((line) => line !== "");
+}
+
 /**
  * TOOL-03: a Python script's packages come with their hashes, in its requirements file or, for a
- * module that scripts import, in theirs.
+ * module that scripts import, in theirs; every package imported is pinned there.
  */
 function checkPythonPackages(path, imports, standardLibrary, pythonFiles) {
   const folder = dirname(path);
@@ -246,25 +268,27 @@ function checkPythonPackages(path, imports, standardLibrary, pythonFiles) {
   );
   if (packages.length === 0) return;
   const candidates = requirementsFilesOf(path, pythonFiles);
-  if (candidates.some((requirements) => existsSync(join(root, requirements)))) return;
-  for (const [name, line] of packages)
-    report(
-      path,
-      line,
-      "TOOL-03",
-      `imports ${name}, which needs its pin with hashes in ${candidates[0]}`,
-    );
+  const present = candidates.filter((requirements) => existsSync(join(root, requirements)));
+  const pinned = new Set(
+    present.flatMap((requirements) =>
+      requirementEntries(readFileSync(join(root, requirements), "utf8")).map((entry) =>
+        packageKey(entry.split(/[\s=<>!~[;]/u)[0]),
+      ),
+    ),
+  );
+  for (const [name, line] of packages) {
+    if (pinned.has(packageKey(PYTHON_PACKAGES.get(name) ?? name))) continue;
+    const where =
+      present.length === 0
+        ? `needs its pin with hashes in ${candidates[0]}`
+        : `is not pinned in ${present.join(" or ")}`;
+    report(path, line, "TOOL-03", `imports ${name}, which ${where}`);
+  }
 }
 
 /** TOOL-03, CORE-25: every requirement of a requirements file is exact and hashed. */
 function checkRequirements(path, text) {
-  // A requirement continues over the lines that end in a backslash.
-  const entries = text
-    .replace(/\\\r?\n/gu, " ")
-    .split(/\r?\n/u)
-    .map((line, index) => ({ line: line.replace(/(^|\s)#.*$/u, "").trim(), index }))
-    .filter(({ line }) => line !== "");
-  for (const { line } of entries) {
+  for (const line of requirementEntries(text)) {
     const name = line.split(/\s/u)[0];
     if (!/^[A-Za-z0-9._-]+(?:\[[^\]]*\])?==[^\s=]+$/u.test(name))
       report(path, 1, "CORE-25", `${name} is not pinned to one version with ==`);
@@ -292,22 +316,51 @@ function checkManifest(path, text) {
   if (basename(path) === "Cargo.toml") checkCargoManifest(path, text);
 }
 
-/** CORE-25: every dependency of a Cargo manifest is pinned with "=". */
+/** A section of dependencies, `[dependencies]` or a target's, also dev- and build-. */
+const CARGO_DEPENDENCIES = /(?:^|\.)(?:dev-|build-)?dependencies$/u;
+/** A section of one dependency, `[dependencies.<name>]` and the like. */
+const CARGO_DEPENDENCY_TABLE = /(?:^|\.)(?:dev-|build-)?dependencies\.([\w-]+)$/u;
+
+/**
+ * CORE-25: every dependency of a Cargo manifest is pinned with "=", in each form TOML allows: a
+ * string, an inline table, dotted keys (`name.version = …`) or a table of its own
+ * (`[dependencies.name]`). Each dependency is checked once its section ends.
+ */
 function checkCargoManifest(path, text) {
-  let inDependencies = false;
+  // The dependencies of the current section: the line that names each and its version.
+  let dependencies;
+  // The dependency whose own table the current section is.
+  let table;
+  const checkSection = () => {
+    for (const [name, { line, version }] of dependencies ?? [])
+      if (version === undefined || !/^=\d+\.\d+\.\d+/u.test(version))
+        report(path, line, "CORE-25", `${name} is not pinned with "=x.y.z"`);
+  };
   linesOf(text).forEach((line, index) => {
     const section = /^\s*\[([^\]]+)\]/u.exec(line);
     if (section !== null) {
-      inDependencies = /(?:^|\.)(?:dev-|build-)?dependencies$/u.test(section[1].trim());
+      checkSection();
+      const name = section[1].trim();
+      table = CARGO_DEPENDENCY_TABLE.exec(name)?.[1];
+      dependencies = table !== undefined || CARGO_DEPENDENCIES.test(name) ? new Map() : undefined;
+      if (table !== undefined) dependencies.set(table, { line: index + 1, version: undefined });
       return;
     }
-    const entry = /^\s*([\w-]+)\s*=\s*(.+)$/u.exec(line);
-    if (!inDependencies || entry === null) return;
-    const version =
-      /^"([^"]*)"/u.exec(entry[2])?.[1] ?? /\bversion\s*=\s*"([^"]*)"/u.exec(entry[2])?.[1];
-    if (version === undefined || !/^=\d+\.\d+\.\d+/u.test(version))
-      report(path, index + 1, "CORE-25", `${entry[1]} is not pinned with "=x.y.z"`);
+    const entry = /^\s*([\w-]+)(?:\.([\w-]+))?\s*=\s*(.+)$/u.exec(line);
+    if (dependencies === undefined || entry === null) return;
+    const [, key, field, value] = entry;
+    const quoted = /^"([^"]*)"/u.exec(value)?.[1];
+    if (table !== undefined) {
+      if (key === "version" && field === undefined) dependencies.get(table).version = quoted;
+      return;
+    }
+    const dependency = dependencies.get(key) ?? { line: index + 1, version: undefined };
+    if (field === undefined)
+      dependency.version = quoted ?? /\bversion\s*=\s*"([^"]*)"/u.exec(value)?.[1];
+    else if (field === "version") dependency.version = quoted;
+    dependencies.set(key, dependency);
   });
+  checkSection();
 }
 
 /** TOOL-05: pnpm's lockfile and no other. */

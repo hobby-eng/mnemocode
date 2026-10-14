@@ -113,22 +113,33 @@ function addTransportChecksum(payload: Uint8Array): Uint8Array {
   return bytes;
 }
 
-/** Only the definite byte-string CBOR form used by SSKR is accepted. */
+/**
+ * Only the definite byte-string CBOR form used by SSKR is accepted. The checksum bounds the CBOR
+ * to one byte at least, so every later byte is read as input that may be missing: a record cut
+ * short is an invalid share, not a fault of MnemoCode (AUD-024-FUN001).
+ */
 function sharePayload(transport: Uint8Array): Uint8Array {
   validateTransportChecksum(transport);
   const cbor = transport.subarray(0, -CHECKSUM_BYTES);
   let offset = 0;
   if (cbor[0] === CBOR_UINT16_TAG) {
-    const tag = (defined(cbor[1]) << 8) | defined(cbor[2]);
-    if (!SSKR_CBOR_TAGS.includes(tag)) throw new Error("Not an SSKR CBOR tag.");
+    const high = cbor[1];
+    const low = cbor[2];
+    if (high === undefined || low === undefined || !SSKR_CBOR_TAGS.includes((high << 8) | low)) {
+      throw new Error("Not an SSKR CBOR tag.");
+    }
     offset = CBOR_TAG_BYTES;
   }
-  const header = defined(cbor[offset++]);
+  const header = cbor[offset++];
   let payloadLength = -1;
-  if (header >= CBOR_BYTE_STRING && header < CBOR_BYTE_STRING + CBOR_SHORT_LENGTH_LIMIT) {
+  if (
+    header !== undefined &&
+    header >= CBOR_BYTE_STRING &&
+    header < CBOR_BYTE_STRING + CBOR_SHORT_LENGTH_LIMIT
+  ) {
     payloadLength = header - CBOR_BYTE_STRING;
   } else if (header === CBOR_BYTE_STRING_ONE_BYTE_LENGTH) {
-    payloadLength = defined(cbor[offset++]);
+    payloadLength = cbor[offset++] ?? -1;
   }
   if (payloadLength !== cbor.length - offset || !SHARE_LENGTHS.has(payloadLength)) {
     throw new Error("Invalid SSKR share byte string.");

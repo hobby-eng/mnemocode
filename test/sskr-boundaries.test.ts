@@ -50,6 +50,23 @@ describe("SSKR's BIP39 entropy-width boundary", () => {
   );
 });
 
+describe("a CRC-valid share whose CBOR is cut short (AUD-024-FUN001)", () => {
+  // 0xd9 starts a two-byte tag, 0xd9 0x9d 0x75 is the SSKR tag 40309; every record ends early.
+  it.each([
+    ["the tag byte alone", [0xd9], "Not an SSKR CBOR tag."],
+    ["a tag with one of its two bytes", [0xd9, 0x01], "Not an SSKR CBOR tag."],
+    ["a one-byte-length header alone", [CBOR_ONE_BYTE_LENGTH], "Invalid SSKR share byte string."],
+    ["the SSKR tag without a byte string", [0xd9, 0x9d, 0x75], "Invalid SSKR share byte string."],
+    [
+      "the SSKR tag and a header without its length",
+      [0xd9, 0x9d, 0x75, CBOR_ONE_BYTE_LENGTH],
+      "Invalid SSKR share byte string.",
+    ],
+  ])("is refused as an invalid share: %s", (_, cbor, message) => {
+    expect(() => shareInfo(recheck(Uint8Array.from(cbor)))).toThrow(message);
+  });
+});
+
 describe("the raw SSKR engine refuses malformed group policies", () => {
   it.each([{ pairs: [] }, { pairs: [2] }, { pairs: [2, 3, 2] }])(
     "refuses incomplete threshold/count pairs $pairs",

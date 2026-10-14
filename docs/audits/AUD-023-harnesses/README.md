@@ -1,6 +1,6 @@
 # AUD-023 harnesses
 
-The scripts of AUD-023, the full audit of MnemoCode at HEAD `8de80e24c7e98b14a443cb9a0e3dc43aa73a7917` with its uncommitted changes, source fingerprint `89c0cf323e39545dcbb37b5f37027314cc3b39f57cf6cbfd9004bc2a7f34c68d` (the source that the AUD-022 remediation left). The audit is in progress: its report is not written yet. Command evidence stays in the ignored `docs/audits/AUD-023-evidence/`.
+The scripts of AUD-023, the full audit of MnemoCode at HEAD `8de80e24c7e98b14a443cb9a0e3dc43aa73a7917` with its uncommitted changes, source fingerprint `89c0cf323e39545dcbb37b5f37027314cc3b39f57cf6cbfd9004bc2a7f34c68d` (the source that the AUD-022 remediation left). The audit was not completed and has no report: AUD-024 superseded it at a new snapshot, after the coding-guide restructuring, and reuses `record.py`, `snapshot.py` and `cap.sh` from this folder. Command evidence stays in the ignored `docs/audits/AUD-023-evidence/`.
 
 Run every script from the repository root after `pnpm build`, with the pinned Node.js and pnpm and Python 3. `baseline.sh` also needs the Python package `jsonschema` and a `multi-chain-wallet-tools` checkout beside this repository, whose `docs/audit-report.schema.json` the record schema check reads (through `../AUD-022-harnesses/validate-records.py`); `cap.sh` needs `flock` and a systemd user session (`systemd-run --user`). Public test data only.
 

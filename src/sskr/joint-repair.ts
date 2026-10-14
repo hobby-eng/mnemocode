@@ -65,6 +65,19 @@ import {
   type WorkBudget,
 } from "./joint-solve.js";
 
+// This part's entry gives what its plans and repairs hold, and the digest width, as it did before
+// the CORE-15 split moved them into joint-results.ts and joint-solve.ts, which have no entry of
+// their own (AUD-024-API001).
+export type {
+  ElementHelp,
+  JointAssessment,
+  MarkedElement,
+  RepairedSet,
+  RepairedShares,
+  ShareAssessment,
+} from "./joint-results.js";
+export { DIGEST_BITS } from "./joint-solve.js";
+
 /** Marked elements on one share. The other shares settle most of them; see the assessment. */
 export const MAX_JOINT_MARKED_ELEMENTS = 64;
 

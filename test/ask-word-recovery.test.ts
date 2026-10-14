@@ -256,13 +256,15 @@ describe("recover-word on the private screen", () => {
   it("keeps the candidates when the list cannot be saved: try again, another name, or skip", async () => {
     const path = join(directory, "first.mncl");
     const other = join(directory, "other.mncl");
+    // A folder without the right to write, the usual failure (AUD-024-ARC002).
     terminal.saveFailures = 1;
+    terminal.saveFailureCode = "EACCES";
     terminal.answers = [`${LAST_FORGOTTEN}\r`, `${other}\r`];
     terminal.choices = [byLabel("Another file name")];
     await recover({ "candidates-file": path, "plaintext-candidates": true });
     expect(seen.notices).toEqual(
       expect.arrayContaining([
-        `The candidate list could not be saved as ${path}: the disk is full.`,
+        `The candidate list could not be saved as ${path}: there is no permission to write there.`,
         `Saved 128 candidate phrases, NOT encrypted: ${other} (record N is candidate N).`,
       ]),
     );
@@ -270,6 +272,7 @@ describe("recover-word on the private screen", () => {
 
     seen.notices = [];
     terminal.saveFailures = 2;
+    terminal.saveFailureCode = "ENOSPC";
     terminal.answers = [`${LAST_FORGOTTEN}\r`];
     terminal.choices = [byLabel("Try again"), byLabel("Skip")];
     await recover({
@@ -282,12 +285,13 @@ describe("recover-word on the private screen", () => {
     // Off the private screen the failure ends the command, as before.
     terminal.privateScreen = false;
     terminal.saveFailures = 1;
+    terminal.saveFailureCode = "EPERM";
     await expect(
       runRecoverWord({
         mnemonic: LAST_FORGOTTEN,
         "candidates-file": join(directory, "plain.mncl"),
         "plaintext-candidates": true,
       }),
-    ).rejects.toThrow("ENOSPC");
+    ).rejects.toThrow("EPERM");
   });
 });

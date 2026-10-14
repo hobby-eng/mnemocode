@@ -29,6 +29,8 @@ const WRONG_DATE = "24-09-2026";
 /** The last word of the test phrase, and a BIP39 word that ends no phrase of the backup. */
 const LAST_WORD = "about";
 const NOT_A_LAST_WORD = "zoo";
+/** A word of the old phrase that neither the codes nor the last word typed hold. */
+const OLD_WORD = "abandon";
 /** The test phrase without Seedshift as Unicode codes, from the BIP39 Chinese list. */
 const UNICODE = `${"7684".repeat(11)}5728`;
 const CODES_PROMPT = "Encoded seed phrase or record:";
@@ -111,6 +113,30 @@ describe("re-encode on the private screen, for a backup with a valid last word",
     expect(timesShown(DATES_PROMPT)).toBe(2);
     expect(timesShown(LAST_WORD_PROMPT)).toBe(3);
   });
+
+  // Standard output is a file here, as in `mnemocode re-encode --ask-secrets … > new.txt`: the old
+  // phrase is shown only on standard error when it is a terminal, else only its fingerprint
+  // (AUD-022-SEC001, AUD-024-ARC001).
+  it.each([
+    ["a terminal", true],
+    ["no terminal", false],
+  ])(
+    "keeps the old phrase off standard output, with standard error %s",
+    async (_, stderrTerminal) => {
+      const wasTerminal = process.stderr.isTTY;
+      process.stderr.isTTY = stderrTerminal;
+      try {
+        terminal.answers = [`${LEGACY_VALID}\r`, `${DATE}\r`, `${LAST_WORD}\r`];
+        terminal.choices = ["person"];
+        await runReEncode({ ...ARGS });
+      } finally {
+        process.stderr.isTTY = wasTerminal;
+      }
+      expect(seen.out).toContain(UNICODE);
+      expect(seen.out.join("\n")).not.toContain(OLD_WORD);
+      expect(seen.notices.join("\n").includes(OLD_WORD)).toBe(stderrTerminal);
+    },
+  );
 
   it("stops at Escape after a last word that ends no phrase, and re-encodes nothing", async () => {
     terminal.answers = [`${LEGACY_VALID}\r`, `${WRONG_DATE}\r`, `${LAST_WORD}\r`];

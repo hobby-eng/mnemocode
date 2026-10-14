@@ -90,6 +90,11 @@ describe("the code rules of the coding guide", () => {
         "scripts/trace-requirements.txt": hashed,
       }),
     ).toEqual([]);
+    // The requirements file pins every package imported, under its published name (AUD-024-BLD001).
+    const two = { "scripts/trace.py": "import numpy\nfrom PIL import Image\n" };
+    expect(rulesBroken({ ...two, "scripts/trace-requirements.txt": hashed })).toEqual(["TOOL-03"]);
+    const pillow = `Pillow==12.3.0 \\\n    --hash=sha256:${"0".repeat(64)}\n`;
+    expect(rulesBroken({ ...two, "scripts/trace-requirements.txt": hashed + pillow })).toEqual([]);
   });
 
   it("refuse file names that are not kebab-case where the code lives", () => {
@@ -107,6 +112,20 @@ describe("the code rules of the coding guide", () => {
       "CORE-25",
     ]);
     expect(rulesBroken({ "crate/Cargo.toml": '[dependencies]\nsskr = "=0.12.0"\n' })).toEqual([]);
+    // A dependency written as a table or with dotted keys is checked too (AUD-024-BLD002).
+    for (const manifest of [
+      '[dependencies.sskr]\nversion = "0.12.0"\n',
+      '[dev-dependencies.sskr]\nversion = "~0.12"\n',
+      "[target.'cfg(unix)'.dependencies.sskr]\nversion = \"0.12.0\"\n",
+      '[dependencies.sskr]\nfeatures = ["std"]\n',
+      '[dependencies]\nsskr.version = "0.12.0"\n',
+    ])
+      expect(rulesBroken({ "crate/Cargo.toml": manifest })).toEqual(["CORE-25"]);
+    for (const manifest of [
+      '[dependencies.sskr]\nversion = "=0.12.0"\nfeatures = ["std"]\n',
+      '[dependencies]\nsskr.version = "=0.12.0"\nsskr.features = ["std"]\n',
+    ])
+      expect(rulesBroken({ "crate/Cargo.toml": manifest })).toEqual([]);
     expect(rulesBroken({ "package-lock.json": "{}" })).toEqual(["TOOL-05"]);
     expect(rulesBroken({ "pnpm-lock.yaml": null })).toEqual(["TOOL-05"]);
   });

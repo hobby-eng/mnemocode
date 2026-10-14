@@ -1,0 +1,1282 @@
+{
+ "schemaVersion": 1,
+ "auditId": "AUD-024",
+ "auditNumber": 24,
+ "date": "2026-10-14",
+ "title": "Compact audit of main after the coding-guide restructuring, with the AUD-022 fixes verified",
+ "reviewer": {
+  "name": "Claude Code coordinator with five scoped reviewer agents and one skeptic agent per candidate finding",
+  "model": "claude-opus-5-5",
+  "reasoningEffort": null
+ },
+ "snapshot": {
+  "commit": "ee4499e891754158b4e6bcf0c919dc360ffc8b4e",
+  "commitComplete": true,
+  "workingTree": "clean",
+  "sourceFingerprint": "522419b9a2e40a76f641a3c51fe0319122709c92c2c2d66e462a37ca3a0fe018",
+  "fileCount": 518,
+  "capturedAt": "2026-10-14T12:23:13.795112+00:00",
+  "aud022Source": {
+   "commit": "870effe",
+   "fingerprint": "89c0cf323e39545dcbb37b5f37027314cc3b39f57cf6cbfd9004bc2a7f34c68d",
+   "note": "The tree of 870effe (a local object, not on any published branch) has the fingerprint that AUD-023 recorded for the source the AUD-022 remediation left. main's 8aa9b25 is 870effe with fixup commits of a cloud session folded in."
+  }
+ },
+ "scope": {
+  "summary": "A compact ordinary audit at the owner's request for a short one. The review covered what changed since the source that the AUD-022 remediation left (`git diff 870effe ee4499e`: 335 files outside docs/audits, 182 of them in src): the coding-guide restructuring (TS-01 compiler flags, TS-03 checks instead of non-null assertions, the lint and code-rules gates, CORE-15 module splits), the SSKR crate's lints with its rebuilt WASM, a cloud session's changes (QR image limits, shared test helpers), the Windows raw-mode fix and oxlint 1.88.0; and it verified the fixes of all 20 AUD-022 findings. Code unchanged since AUD-022 was not reviewed again.  The coordinator ran every command once, one at a time, and challenged each candidate finding through a skeptic agent told to refute it. It then reproduced four findings with harnesses of its own (FUN001, API001, BLD001, BLD002) and ran the reproduction commands of ARC002, DOC001 and DOC002 itself; ARC001 rests on the reviewer's mutant run, repeated by its skeptic. Five reviewer agents had distinct scopes, made no change in the checkout and ran only single test files and small probes. Public fixtures only: the BIP39 test phrase, the README examples and vectors/.  Earlier findings are treated as a regression checklist through the verification of AUD-022; AUD-023 was started at 8de80e2 with the uncommitted remediation and never completed; this audit supersedes it at a new snapshot.",
+  "procedureSha256": {
+   "multi-chain-wallet-tools/docs/FULL_AUDIT_GUIDE.md": "e1b2fb641e4a25ebf292548fc1e2ef0c25dbd01faa5c2b580c6ba75df2afcab7",
+   "multi-chain-wallet-tools/docs/audits/AUDIT_STANDARD.md": "0c80621acaf5d210f85af76de28a994e545f89f3f660a129026ac0931bb38593",
+   "multi-chain-wallet-tools/docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+   "multi-chain-wallet-tools/docs/audit-report.schema.json": "989bf3de974d581579c1d1c1e143d5ab9fa232dc70cc8c6f84ad00531ae698fb"
+  }
+ },
+ "checks": {
+  "commands": [
+   {
+    "label": "aud022-source",
+    "command": "python3 docs/audits/AUD-024-harnesses/source-at-commit.py 870effe 89c0cf32…",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:23:13.851757+00:00",
+    "endUtc": "2026-10-14T12:23:14.961288+00:00",
+    "logSha256": "399d1451170db8a005aca0b592f188c44b878ea818f0b8060c4edf739a95aa91",
+    "summary": "The tree of 870effe has the fingerprint of the AUD-022 remediated source (469 files).",
+    "evidence": "AUD-024-evidence/aud022-source.log (local only)"
+   },
+   {
+    "label": "lockfile-frozen",
+    "command": "pnpm install --frozen-lockfile --offline --ignore-scripts --lockfile-only",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:23:15.036092+00:00",
+    "endUtc": "2026-10-14T12:23:15.153831+00:00",
+    "logSha256": "c877c9c8e5bf14f509252b6c3a826b6871fd019bb853b6b8063422b8884a6f04",
+    "summary": "Lockfile agrees with package.json.",
+    "evidence": "AUD-024-evidence/lockfile-frozen.log (local only)"
+   },
+   {
+    "label": "build",
+    "command": "pnpm build",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:23:15.213987+00:00",
+    "endUtc": "2026-10-14T12:23:15.696435+00:00",
+    "logSha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494",
+    "summary": "Fresh dist/ from the snapshot.",
+    "evidence": "AUD-024-evidence/build.log (local only)"
+   },
+   {
+    "label": "source",
+    "command": "pnpm check",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:23:15.765346+00:00",
+    "endUtc": "2026-10-14T12:23:20.953389+00:00",
+    "logSha256": "760e74c957868918057c3d6a75a91d3fdb5837e2efc043a18ede76116f5507af",
+    "summary": "Toolchain pins, Markdown lists, release key, audit privacy and package listing, copies, code rules (514 files), oxlint 1.88.0, clippy and rustfmt of the SSKR crate, three tsc projects.",
+    "evidence": "AUD-024-evidence/source.log (local only)"
+   },
+   {
+    "label": "format",
+    "command": "pnpm format:check",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:23:21.015389+00:00",
+    "endUtc": "2026-10-14T12:23:26.039975+00:00",
+    "logSha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2",
+    "summary": "Prettier over the repository.",
+    "evidence": "AUD-024-evidence/format.log (local only)"
+   },
+   {
+    "label": "tests-other",
+    "command": "pnpm exec vitest run <96 test files without PDF generation, 4 workers>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:23:26.129367+00:00",
+    "endUtc": "2026-10-14T12:24:57.093986+00:00",
+    "logSha256": "b22487096a040c0919ed718a195aaae60076bd81744ac6f17edb9d46e099da92",
+    "summary": "96 files: 1,728 passed, 4 skipped.",
+    "evidence": "AUD-024-evidence/tests-other.log (local only)"
+   },
+   {
+    "label": "tests-pdf-01",
+    "command": "pnpm exec vitest run <3 PDF-generating test files, batch 1>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:24:57.189859+00:00",
+    "endUtc": "2026-10-14T12:25:10.735704+00:00",
+    "logSha256": "5fd58d07e15b5c3b4e8751b95c00a08a910e1abb8e33d5bf0bdcb9e59cc24ab5",
+    "summary": "72 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-01.log (local only)"
+   },
+   {
+    "label": "tests-pdf-02",
+    "command": "pnpm exec vitest run <batch 2>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:25:10.805060+00:00",
+    "endUtc": "2026-10-14T12:25:39.970823+00:00",
+    "logSha256": "1736b11c9938f0bd853e75e117830c11fe88dc5d27ee4a16617bafa0e27bd0e7",
+    "summary": "45 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-02.log (local only)"
+   },
+   {
+    "label": "tests-pdf-03",
+    "command": "pnpm exec vitest run <batch 3>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:25:40.070148+00:00",
+    "endUtc": "2026-10-14T12:26:39.811387+00:00",
+    "logSha256": "d31999c74ef3260f4bbcad1a2bf873bcf5f173f22cc396d16d3640aee1ccafd0",
+    "summary": "28 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-03.log (local only)"
+   },
+   {
+    "label": "tests-pdf-04",
+    "command": "pnpm exec vitest run <batch 4>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:26:39.888327+00:00",
+    "endUtc": "2026-10-14T12:27:42.974960+00:00",
+    "logSha256": "360ab36df9bdbbad04b487a98dc67dd995ae3a206f48ee92a4e95af7de023abe",
+    "summary": "16 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-04.log (local only)"
+   },
+   {
+    "label": "tests-pdf-05",
+    "command": "pnpm exec vitest run <batch 5>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:27:43.041814+00:00",
+    "endUtc": "2026-10-14T12:29:49.439038+00:00",
+    "logSha256": "fe22909712cbd3aca365e969471b44640102f84d264e215cde608702247799f6",
+    "summary": "59 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-05.log (local only)"
+   },
+   {
+    "label": "tests-pdf-06",
+    "command": "pnpm exec vitest run <batch 6>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:29:49.522159+00:00",
+    "endUtc": "2026-10-14T12:30:04.996573+00:00",
+    "logSha256": "a685f395c3eaa5b0ac690778dbb94104a19cca074fd95e8420ae16f77e2cd4f7",
+    "summary": "17 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-06.log (local only)"
+   },
+   {
+    "label": "tests-pdf-07",
+    "command": "pnpm exec vitest run <batch 7>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:30:05.075395+00:00",
+    "endUtc": "2026-10-14T12:30:23.830011+00:00",
+    "logSha256": "518906f07f65f21c318ecf4d59174621f57b44bf0c39977bb06dd074f1323ef0",
+    "summary": "59 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-07.log (local only)"
+   },
+   {
+    "label": "tests-pdf-08",
+    "command": "pnpm exec vitest run <batch 8>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:30:23.913049+00:00",
+    "endUtc": "2026-10-14T12:30:50.939804+00:00",
+    "logSha256": "e17ad30ed79fa42325478bd48d18e89291c666f05f810c22d0bfb5e94b6c7d30",
+    "summary": "52 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-08.log (local only)"
+   },
+   {
+    "label": "tests-pdf-09",
+    "command": "pnpm exec vitest run <batch 9>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:30:51.045351+00:00",
+    "endUtc": "2026-10-14T12:31:00.781960+00:00",
+    "logSha256": "3c02a81e2e8fb55026f3e64877dd7536732c43dd523e92e10abcdbeee0ff3bdc",
+    "summary": "80 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-09.log (local only)"
+   },
+   {
+    "label": "tests-pdf-10",
+    "command": "pnpm exec vitest run <batch 10>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:31:00.858128+00:00",
+    "endUtc": "2026-10-14T12:31:04.003646+00:00",
+    "logSha256": "e0c4841e0e1ec28c94b39db26ace1cfb1e03e95f309dd0e9dadee54e32bb3681",
+    "summary": "98 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-10.log (local only)"
+   },
+   {
+    "label": "tests-pdf-11",
+    "command": "pnpm exec vitest run <batch 11>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:31:04.108080+00:00",
+    "endUtc": "2026-10-14T12:32:17.947220+00:00",
+    "logSha256": "d63031acc631d7a7f40dea22354a7d721c76f73ff754ebe2ffd4ef285850dfc7",
+    "summary": "49 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-11.log (local only)"
+   },
+   {
+    "label": "tests-pdf-12",
+    "command": "pnpm exec vitest run <batch 12, one file>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:32:18.084904+00:00",
+    "endUtc": "2026-10-14T12:33:41.494184+00:00",
+    "logSha256": "90d790b473d5737869758bc2510c8219210d982c661ad66859ef9d64a8c71cc0",
+    "summary": "11 passed.",
+    "evidence": "AUD-024-evidence/tests-pdf-12.log (local only)"
+   },
+   {
+    "label": "cli-self-test",
+    "command": "node dist/mnemocode.js self-test",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:33:41.565152+00:00",
+    "endUtc": "2026-10-14T12:34:03.846280+00:00",
+    "logSha256": "4c2debe8738db06d8ae45516fcaa0e2731e59f1697dee2ab8f2510f55630fe18",
+    "summary": "PASS: 7 public vectors, 75 representation round trips.",
+    "evidence": "AUD-024-evidence/cli-self-test.log (local only)"
+   },
+   {
+    "label": "terminal-input",
+    "command": "python3 scripts/verify-terminal-input.py",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:34:03.923007+00:00",
+    "endUtc": "2026-10-14T12:34:54.469302+00:00",
+    "logSha256": "b941c1de0d32c052b3858a267851083fd18df82846a6552eac5a5bfdf9cd9880",
+    "summary": "Every pseudo-terminal case of the menu and the private screen passed.",
+    "evidence": "AUD-024-evidence/terminal-input.log (local only)"
+   },
+   {
+    "label": "card-output",
+    "command": "node scripts/check-card-output.mjs docs/audits/AUD-024-evidence/card-output",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:34:54.549736+00:00",
+    "endUtc": "2026-10-14T12:38:11.177581+00:00",
+    "logSha256": "729dcfd3539bac1a4bbc3afc281cd94ff6596cfdc16c2153592ab247d9341a13",
+    "summary": "Card, material and SSKR PDFs rendered, QR codes read back exactly.",
+    "evidence": "AUD-024-evidence/card-output.log (local only)"
+   },
+   {
+    "label": "repair-leading-marks",
+    "command": "node docs/audits/AUD-022-harnesses/repair-leading-marks.mjs",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:38:11.273779+00:00",
+    "endUtc": "2026-10-14T12:39:40.716987+00:00",
+    "logSha256": "a3d4be02e3e502fc70997c6dd276ed45799dd0129c4cb8e7a923a9f4ac640e98",
+    "summary": "45 cases: none ends in \"do not fit\"; 18 keep a list of variants with the share among them or the refusal of 128-bit colors, the result the AUD-022 remediation recorded.",
+    "evidence": "AUD-024-evidence/repair-leading-marks.log (local only)"
+   },
+   {
+    "label": "reencode-stdout",
+    "command": "python3 docs/audits/AUD-022-harnesses/reencode-stdout.py",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:39:40.800871+00:00",
+    "endUtc": "2026-10-14T12:40:02.123609+00:00",
+    "logSha256": "e04e89ed89b58eed3b9eeaee8e4519e949056eb8fedf0ddcce62f80b7509f886",
+    "summary": "Confirmation asked, phrase on the private screen, absent from the redirected file.",
+    "evidence": "AUD-024-evidence/reencode-stdout.log (local only)"
+   },
+   {
+    "label": "aud021-fixed",
+    "command": "node docs/audits/AUD-022-harnesses/aud021-fixed.mjs",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:40:02.205812+00:00",
+    "endUtc": "2026-10-14T12:40:03.744558+00:00",
+    "logSha256": "219a7efff156cad16ff8e79356a13eb71e3f9870e90ffbd161b238ce138310cf",
+    "summary": "Every check of the fixed state of AUD-021 passed.",
+    "evidence": "AUD-024-evidence/aud021-fixed.log (local only)"
+   },
+   {
+    "label": "sskr-independent",
+    "command": "python3 scripts/verify-sskr-known-answers.py",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:40:03.807250+00:00",
+    "endUtc": "2026-10-14T12:40:03.856389+00:00",
+    "logSha256": "5735ee7eb756a60aed4b573aa88b44d0e009a26f3a4101d87048b4f1845d664c",
+    "summary": "Official BCR-2020-011 vector from every valid quorum, every deterministic set restored from every quorum.",
+    "evidence": "AUD-024-evidence/sskr-independent.log (local only)"
+   },
+   {
+    "label": "seedshift-oracle",
+    "command": "python3 docs/audits/AUD-005-harnesses/seedshift-oracle.py",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:40:03.933716+00:00",
+    "endUtc": "2026-10-14T12:40:06.832857+00:00",
+    "logSha256": "0a553a0fcf02514e0e8a491d77e232478c3d1ede1f6dfd8a3aba6ab3b7d9109c",
+    "summary": "6,000 library comparisons, 0 failures.",
+    "evidence": "AUD-024-evidence/seedshift-oracle.log (local only)"
+   },
+   {
+    "label": "sskr-reproducible",
+    "command": "pnpm verify:sskr",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:40:06.920360+00:00",
+    "endUtc": "2026-10-14T12:40:15.050168+00:00",
+    "logSha256": "8d389b4a4f9b23fe0dce030c7d9ee76f893f4e87ea6e71dd0041f3473841c1cc",
+    "summary": "Docker rebuild of the SSKR engine equals sskr-wasm/generated byte for byte.",
+    "evidence": "AUD-024-evidence/sskr-reproducible.log (local only)"
+   },
+   {
+    "label": "dependency-advisories",
+    "command": "pnpm audit --audit-level high",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:40:15.111683+00:00",
+    "endUtc": "2026-10-14T12:40:16.363723+00:00",
+    "logSha256": "15950a68a7ed99c59779717acefdceb3f69cfd31bde67d2c954f2a3cea4d7955",
+    "summary": "No known vulnerabilities.",
+    "evidence": "AUD-024-evidence/dependency-advisories.log (local only)"
+   },
+   {
+    "label": "package-manifest",
+    "command": "npm pack --dry-run --json --ignore-scripts",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:40:16.435141+00:00",
+    "endUtc": "2026-10-14T12:40:18.584437+00:00",
+    "logSha256": "78e7bdc8f75944c304f7adbc73cbe1f34e004d4f7f43f230463953d8b758a231",
+    "summary": "924 files, 5,007,914 bytes; no evidence folder, output or release file.",
+    "evidence": "AUD-024-evidence/package-manifest.log (local only)"
+   },
+   {
+    "label": "records-schema",
+    "command": "python3 docs/audits/AUD-022-harnesses/validate-records.py",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:59:44.315293+00:00",
+    "endUtc": "2026-10-14T12:59:44.470139+00:00",
+    "logSha256": "8b4324f3586b46b957601fbe26f836d1e615b20fbeba54b209ae1261d68d1175",
+    "summary": "Every docs/audits/AUD-*.json record valid against the workspace schema, no duplicate keys, finding IDs in both twins, this report included.",
+    "evidence": "AUD-024-evidence/records-schema.log (local only)"
+   },
+   {
+    "label": "probe-truncated-share",
+    "command": "node docs/audits/AUD-024-harnesses/truncated-share.mjs",
+    "exitCode": 1,
+    "outcome": "failed (expected)",
+    "startUtc": "2026-10-14T12:41:31.740861+00:00",
+    "endUtc": "2026-10-14T12:41:31.890510+00:00",
+    "logSha256": "bb5841b5711b4fdfa09291f66de73025ea8b1d1030795e90a89176683a0ccf36",
+    "summary": "Exit 1 as the finding expects: five CRC-valid truncated records blamed on MnemoCode (AUD-024-FUN001).",
+    "evidence": "AUD-024-evidence/probe-truncated-share.log (local only)"
+   },
+   {
+    "label": "probe-entry-types",
+    "command": "bash docs/audits/AUD-024-harnesses/entry-types.sh",
+    "exitCode": 1,
+    "outcome": "failed (expected)",
+    "startUtc": "2026-10-14T12:41:32.200862+00:00",
+    "endUtc": "2026-10-14T12:41:32.674571+00:00",
+    "logSha256": "fbb7dc96b938f049e17b39db3129ec4a49b7e87c10945886d881f1671770fdbc",
+    "summary": "Exit 1 as the finding expects: seven names missing from mnemocode/sskr/joint-repair (AUD-024-API001).",
+    "evidence": "AUD-024-evidence/probe-entry-types.log (local only)"
+   },
+   {
+    "label": "probe-code-rules-gaps",
+    "command": "bash docs/audits/AUD-024-harnesses/code-rules-gaps.sh",
+    "exitCode": 1,
+    "outcome": "failed (expected)",
+    "startUtc": "2026-10-14T12:41:32.998667+00:00",
+    "endUtc": "2026-10-14T12:41:34.683556+00:00",
+    "logSha256": "e7e3e81f75e4817d1b908aedcb483613b011020a6f748bd1f4a303fa36ebdc5c",
+    "summary": "Exit 1 as the findings expect: four violating cases pass the gate, both controls pass (AUD-024-BLD001, BLD002).",
+    "evidence": "AUD-024-evidence/probe-code-rules-gaps.log (local only)"
+   }
+  ],
+  "ledger": [
+   {
+    "checkId": "CHECK-SEC-001",
+    "group": "SEC / secret ownership",
+    "outcome": "passed",
+    "evidence": "No wipe, fill(0) or finally line removed in core; every removed wipe in src/sskr reappears in the split modules; terminal chunks still zeroed; owner types print nothing of the phrase (core and sskr-export reviewers)."
+   },
+   {
+    "checkId": "CHECK-SEC-002",
+    "group": "SEC / vault, CSP, sandbox",
+    "outcome": "not-applicable",
+    "evidence": "A command-line program without an iframe vault or CSP; its browser host is the multi-chain Deriver, outside this repository."
+   },
+   {
+    "checkId": "CHECK-SEC-003",
+    "group": "SEC / network and permission boundary",
+    "outcome": "passed",
+    "evidence": "protection-flags.json unchanged; neededPermissions, dropUnneeded and dropForMenu changed only by TS-03; no new network path. The Linux memory-locking removal (45c9f86) is documented."
+   },
+   {
+    "checkId": "CHECK-SEC-004",
+    "group": "SEC / randomness and encryption",
+    "outcome": "passed",
+    "evidence": "Age encryption of candidate lists: fresh identities, X25519 and passphrase round trips, wrong key and tampering refused with their codes (probe, all-zero entropy)."
+   },
+   {
+    "checkId": "CHECK-SEC-005",
+    "group": "SEC / lifecycle and exceptional paths",
+    "outcome": "passed",
+    "evidence": "Wipes kept through the splits and the TS-03 edits; planJointRepair still wipes in finally; the raw-mode fix keeps typed-ahead bytes wiped."
+   },
+   {
+    "checkId": "CHECK-SEC-006",
+    "group": "SEC / messages, logs, file names",
+    "outcome": "passed",
+    "evidence": "No new or changed message repeats typed text; defined() throws a fixed text."
+   },
+   {
+    "checkId": "CHECK-SEC-007",
+    "group": "SEC / input bounds",
+    "outcome": "passed",
+    "evidence": "PNG admission: 4096 px per side, 8 megapixels, 8-bit samples and the other refusals probed with independently built chunks; search bounds unchanged."
+   },
+   {
+    "checkId": "CHECK-FUN-001",
+    "group": "FUN / BIP39",
+    "outcome": "passed",
+    "evidence": "NFKD, case, spaces, 12 to 24 words, checksum and prefix refusals; checksum-valid Seedshift vectors 15 to 24 words."
+   },
+   {
+    "checkId": "CHECK-FUN-002",
+    "group": "FUN / fingerprint and wallet checks",
+    "outcome": "passed",
+    "evidence": "Master fingerprint 73c5da0a and the first BIP44/49/84/86 receiving addresses of the test phrase matched against literal published values."
+   },
+   {
+    "checkId": "CHECK-FUN-003",
+    "group": "FUN / BIP85, BIP38, messages, Silent Payments",
+    "outcome": "not-applicable",
+    "evidence": "Not implemented by MnemoCode."
+   },
+   {
+    "checkId": "CHECK-FUN-004",
+    "group": "FUN / scripts and descriptors",
+    "outcome": "not-applicable",
+    "evidence": "Not implemented by MnemoCode."
+   },
+   {
+    "checkId": "CHECK-FUN-005",
+    "group": "FUN / transactions and PSBT",
+    "outcome": "not-applicable",
+    "evidence": "Not implemented by MnemoCode."
+   },
+   {
+    "checkId": "CHECK-FUN-006",
+    "group": "FUN / recovery and backup formats",
+    "outcome": "failed",
+    "evidence": "All vectors in five forms, README examples, dates, MNC1, legacy; SSKR known answers and every quorum; the splits of repair and joint repair are moves. AUD-024-FUN001: truncated share CBOR blamed on MnemoCode."
+   },
+   {
+    "checkId": "CHECK-FUN-007",
+    "group": "FUN / discovery and providers",
+    "outcome": "not-applicable",
+    "evidence": "No provider or discovery code; candidate lists for the Scanner are covered by SEC-004 and API-003."
+   },
+   {
+    "checkId": "CHECK-API-001",
+    "group": "API / runtime contracts",
+    "outcome": "failed",
+    "evidence": "Error classes renamed to *Error with code (TS-06), consistent at run time and in the synced host copy; AUD-024-DOC001 (the host document names the removed field) and AUD-024-API001 (entry exports)."
+   },
+   {
+    "checkId": "CHECK-API-002",
+    "group": "API / async state and cancellation",
+    "outcome": "passed",
+    "evidence": "Raw mode left only after the read stops (32ae899); every withCtrlCWatch caller awaits; typed-ahead and Ctrl+C semantics unchanged; 13 terminal tests."
+   },
+   {
+    "checkId": "CHECK-API-003",
+    "group": "API / exports",
+    "outcome": "passed",
+    "evidence": "No expected value of an export test changed after 8aa9b25; card output check reads every QR back exactly."
+   },
+   {
+    "checkId": "CHECK-API-004",
+    "group": "API / encodings",
+    "outcome": "passed",
+    "evidence": "Colors, Color Unicode, Unicode codes, indexes and English read back to the vector; Array.from replaces string spreads with the same code points."
+   },
+   {
+    "checkId": "CHECK-BLD-001",
+    "group": "BLD / composition and entry points",
+    "outcome": "passed",
+    "evidence": "exports and files unchanged since 870effe; no new library module imports node:* or a new package; portable-modules test walks the split modules."
+   },
+   {
+    "checkId": "CHECK-BLD-002",
+    "group": "BLD / build matrix",
+    "outcome": "not-applicable",
+    "evidence": "One package and one executable per system; no feature matrix."
+   },
+   {
+    "checkId": "CHECK-BLD-003",
+    "group": "BLD / lockfile, pins, licenses, gates",
+    "outcome": "failed",
+    "evidence": "Frozen lockfile, exact versions and no advisories; .oxlintrc.json agrees with the guide; AUD-024-BLD001 and BLD002 (code-rules gaps)."
+   },
+   {
+    "checkId": "CHECK-BLD-004",
+    "group": "BLD / canonical WASM",
+    "outcome": "passed",
+    "evidence": "verify:sskr rebuilds the engine byte for byte; lib.rs changed only in doc comments; the WASM differs from 870effe's in two bytes (see observations)."
+   },
+   {
+    "checkId": "CHECK-BLD-005",
+    "group": "BLD / CI and release workflows",
+    "outcome": "passed",
+    "evidence": "Rust 1.99.0 pinned in three places and cross-checked; action pins match the table; permissions and concurrency set; CI at a03862c green on three systems. Release workflow not exercised (no tag)."
+   },
+   {
+    "checkId": "CHECK-UI-001",
+    "group": "UI / real files and viewports",
+    "outcome": "not-applicable",
+    "evidence": "No browser page in this repository; the terminal is covered under UI-002 and UI-003."
+   },
+   {
+    "checkId": "CHECK-UI-002",
+    "group": "UI / terminal navigation and questions",
+    "outcome": "passed",
+    "evidence": "Help pages identical apart from intended content changes; moved question code unchanged; pseudo-terminal checks on Linux here and on three systems in CI."
+   },
+   {
+    "checkId": "CHECK-UI-003",
+    "group": "UI / secret visibility",
+    "outcome": "passed",
+    "evidence": "Private screen, hidden input and the re-encode confirmation in the pseudo-terminal checks; the shortened re-encode notes fit their 37 columns."
+   },
+   {
+    "checkId": "CHECK-ARC-001",
+    "group": "ARC / ownership and imports",
+    "outcome": "failed",
+    "evidence": "No import cycle among the split modules; AUD-024-API001 (an entry lost the names of its results)."
+   },
+   {
+    "checkId": "CHECK-ARC-002",
+    "group": "ARC / duplication and dead code",
+    "outcome": "passed",
+    "evidence": "No duplicate bodies; no declaration defined twice; every split file under 800 lines."
+   },
+   {
+    "checkId": "CHECK-ARC-003",
+    "group": "ARC / tests and production-path fidelity",
+    "outcome": "failed",
+    "evidence": "Cases 1,449 to 1,478 and expect() calls 4,855 to 4,941 since 870effe; AUD-024-ARC001 and ARC002 (two regressions not guarded by the suite)."
+   },
+   {
+    "checkId": "CHECK-DOC-001",
+    "group": "DOC / capabilities and safety",
+    "outcome": "passed",
+    "evidence": "PNG limits agree across README, CHANGELOG, release notes and help; no overstated claim found in the changed documents."
+   },
+   {
+    "checkId": "CHECK-DOC-002",
+    "group": "DOC / commands, links, legal",
+    "outcome": "passed",
+    "evidence": "0 broken relative links or anchors; every absolute v0.1.0 link in the release notes has a local target; examples use current options."
+   },
+   {
+    "checkId": "CHECK-DOC-003",
+    "group": "DOC / audit records",
+    "outcome": "failed",
+    "evidence": "Index counts agree with the AUD-020 to AUD-022 records; AUD-024-DOC002 (the harness paragraph lists 4 of 22 folders)."
+   }
+  ],
+  "ci": [
+   {
+    "workflow": "CI",
+    "runId": 38560572717,
+    "commit": "a03862c2d3f161b1b150498e3b69784f53e198ee",
+    "conclusion": "success",
+    "jobs": [
+     "verify",
+     "portable (macos-15)",
+     "portable (windows-2025)"
+    ]
+   },
+   {
+    "workflow": "Executable",
+    "runId": 38560572551,
+    "commit": "a03862c2d3f161b1b150498e3b69784f53e198ee",
+    "conclusion": "success",
+    "jobs": [
+     "build (ubuntu-24.04)",
+     "build (macos-15)",
+     "build (windows-2025)"
+    ]
+   }
+  ]
+ },
+ "findings": [
+  {
+   "kind": "finding",
+   "id": "AUD-024-FUN001",
+   "category": "FUN",
+   "severity": "low",
+   "status": "fixed",
+   "releaseBlocking": false,
+   "title": "Truncated share CBOR is refused as a fault of MnemoCode instead of an invalid share",
+   "affectedFiles": [
+    "src/sskr/transport.ts:122",
+    "src/sskr/transport.ts:126",
+    "src/sskr/transport.ts:131",
+    "src/core/defined.ts:1-16"
+   ],
+   "reproduction": "`node docs/audits/AUD-024-harnesses/truncated-share.mjs` (five ur:sskr records whose CBOR is cut short and whose CRC32 is valid), or `node dist/mnemocode.js sskr-combine --share ur:sskr/hdrlprengr`.",
+   "expected": "An input refusal, as at 870effe: \"Not an SSKR CBOR tag.\" or \"Invalid SSKR share byte string.\". src/core/defined.ts says a missing value is a fault of MnemoCode, never of its input.",
+   "observed": "Every record throws \"MnemoCode expected a value that is not there: this is a fault of MnemoCode.\"; the CLI prints \"Share 1 cannot be read: mnemoCode expected a value that is not there…\" and exits 1. Commit bd4c948 (TS-03) replaced `cbor[1]!` and `cbor[offset++]!` by defined() on indexes that depend on the input.",
+   "impact": "The share is still refused with the same exit code and nothing is accepted; the message blames the program instead of the share. Reachable only with a crafted or badly encoded record, since a typo fails the CRC32 first.",
+   "evidence": "probe-truncated-share (exit 1, local log); sskr-export reviewer and skeptic probes against 870effe and HEAD (local only).",
+   "recommendedFix": "In sharePayload check the length before each read and refuse with the existing messages; keep defined() for indexes the code guarantees.",
+   "requiredVerification": "truncated-share.mjs exits 0; a test in test/sskr-boundaries.test.ts with these records fails before the fix and passes after it.",
+   "tags": [
+    "sskr",
+    "ts-03",
+    "regression"
+   ]
+  },
+  {
+   "kind": "finding",
+   "id": "AUD-024-API001",
+   "category": "API",
+   "severity": "low",
+   "status": "fixed",
+   "releaseBlocking": false,
+   "title": "The joint-repair entry no longer exports the types of its results after the CORE-15 split",
+   "affectedFiles": [
+    "src/sskr/joint-repair.ts:52-57",
+    "src/sskr/joint-results.ts",
+    "src/sskr/joint-solve.ts:41",
+    "package.json (exports)"
+   ],
+   "reproduction": "`bash docs/audits/AUD-024-harnesses/entry-types.sh`: a host project imports ElementHelp, JointAssessment, MarkedElement, RepairedSet, RepairedShares, ShareAssessment and DIGEST_BITS from mnemocode/sskr/joint-repair.",
+   "expected": "The part's entry gives the same names as at 870effe; ARCHITECTURE.md and README say each part has an entry of its own that a host takes alone. A CORE-15 split is a move.",
+   "observed": "tsc fails with TS2305/TS2459 for all seven names. Commit b0cf85e moved them into joint-results.ts and joint-solve.ts, which have no package entry, and only imported them back. Public declarations such as RepairReport.repairs(set: RepairedShares) and ShareSet.unsettled: MarkedElement[] now use types no entry exports.",
+   "impact": "Compilation only: a host of the package cannot name these types (five can be derived from other exports); run-time behaviour is unchanged. The package is private and 0.1.0 unreleased; the multi-chain host compiles the synced sources and is not affected. A skeptic re-rated the reviewer's medium to low.",
+   "evidence": "probe-entry-types (exit 1, local log); sskr-export reviewer's export comparison of every entry at 870effe and HEAD (local only).",
+   "recommendedFix": "Re-export the six types from src/sskr/joint-repair.ts, and DIGEST_BITS or a recorded reason why it became internal; add a test that compares each entry's export names with a snapshot.",
+   "requiredVerification": "entry-types.sh exits 0; the snapshot test fails on the current entry and passes after the fix.",
+   "tags": [
+    "sskr",
+    "exports",
+    "core-15"
+   ]
+  },
+  {
+   "kind": "finding",
+   "id": "AUD-024-BLD001",
+   "category": "BLD",
+   "severity": "low",
+   "status": "fixed",
+   "releaseBlocking": false,
+   "title": "code-rules passes a Python import that the script's existing requirements file does not pin",
+   "affectedFiles": [
+    "scripts/verify-code-rules.mjs:242-256",
+    "test/code-rules.test.ts:77-93"
+   ],
+   "reproduction": "`bash docs/audits/AUD-024-harnesses/code-rules-gaps.sh`, case python-import-not-in-requirements: a script imports PIL and requests, and its requirements file pins only pillow with a hash.",
+   "expected": "TOOL-03 (Check: code-rules): every non-standard package of a Python script is pinned with its hashes in the requirements file next to it.",
+   "observed": "Exit 0. checkPythonPackages returns as soon as any candidate requirements file exists (line 249) and never compares its entries with the imports.",
+   "impact": "A script can import an unpinned package and pass pnpm check while it has a requirements file. No current script does: the four requirements files cover their imports.",
+   "evidence": "probe-code-rules-gaps (exit 1, local log); cli-build reviewer and skeptic probes (local only).",
+   "recommendedFix": "Read the requirement names (normalised) and report each imported module none of them lists, with a small map for names that differ (PIL to pillow, fontTools to fonttools, winpty to pywinpty); add the case to test/code-rules.test.ts.",
+   "requiredVerification": "code-rules-gaps.sh refuses the case; node scripts/verify-code-rules.mjs still exits 0 on the repository.",
+   "tags": [
+    "gates",
+    "tool-03"
+   ]
+  },
+  {
+   "kind": "finding",
+   "id": "AUD-024-BLD002",
+   "category": "BLD",
+   "severity": "low",
+   "status": "fixed",
+   "releaseBlocking": false,
+   "title": "code-rules misses Cargo dependencies written as tables or dotted keys",
+   "affectedFiles": [
+    "scripts/verify-code-rules.mjs:296-312",
+    "test/code-rules.test.ts:100-111"
+   ],
+   "reproduction": "`bash docs/audits/AUD-024-harnesses/code-rules-gaps.sh`, cases cargo-dependency-table (`[dependencies.serde]` with `version = \"1\"`), cargo-dev-dependency-table and cargo-dotted-key (`serde.version = \"1\"`).",
+   "expected": "CORE-25 (Check: code-rules): every Cargo dependency is pinned with \"=x.y.z\".",
+   "observed": "Exit 0 for all three. The section regex matches only names ending in dependencies, and the key regex does not take a dotted key, so the version inside is never read; the inline form is refused as it should be.",
+   "impact": "A crate dependency added in table or dotted form with a range passes pnpm check. sskr-wasm/rust/Cargo.toml uses only pinned inline entries today.",
+   "evidence": "probe-code-rules-gaps (exit 1, local log); cli-build reviewer and skeptic probes (local only).",
+   "recommendedFix": "Treat a section `<dependencies>.<name>` (also dev-, build- and target-specific) and a dotted `<name>.version` key as one dependency and check its version; add the cases to test/code-rules.test.ts.",
+   "requiredVerification": "code-rules-gaps.sh exits 0; the gate still passes the repository.",
+   "tags": [
+    "gates",
+    "core-25"
+   ]
+  },
+  {
+   "kind": "finding",
+   "id": "AUD-024-ARC001",
+   "category": "ARC",
+   "severity": "low",
+   "status": "fixed",
+   "releaseBlocking": false,
+   "title": "The --ask-secrets path of the AUD-022-SEC001 fix has no regression in the suite or CI",
+   "affectedFiles": [
+    "src/cli/re-encode-command.ts:163-172",
+    "test/re-encode-questions.test.ts",
+    "test/re-encode.test.ts:217-218",
+    "scripts/terminal_secret_checks.py:55-185"
+   ],
+   "relatedFindings": [
+    "AUD-022-SEC001"
+   ],
+   "reproduction": "Change showOldPhrase in a copy of dist/cli/re-encode-command.js to write the phrase to standard output; the repository's three re-encode pseudo-terminal checks still pass (standard output and error are the same terminal there), and no test of re-encode-questions asserts that the old phrase is absent from standard output. Only docs/audits/AUD-022-harnesses/reencode-stdout.py fails, and no pnpm script or workflow runs it.",
+   "expected": "AUD-022-SEC001's required verification asks for redirected-stdout regressions on the options path and the --ask-secrets path; CORE-33 asks for a test that fails before the fix and after it is undone.",
+   "observed": "The options path has one (test/re-encode.test.ts:217-218); the --ask-secrets path is guarded only by the audit harness.",
+   "impact": "The fix is intact today (the harness passes in this baseline); a later change could send the old phrase to a redirected file again without failing pnpm verify or CI.",
+   "evidence": "aud022-fixes reviewer's mutant run and the skeptic's rerun (local only); reencode-stdout passes in this baseline.",
+   "recommendedFix": "Add a case with standard error a terminal and standard output not, asserting that the old phrase stays off standard output, to test/re-encode-questions.test.ts or to the pseudo-terminal checks with output sent to a file.",
+   "requiredVerification": "The new check fails with showOldPhrase writing to standard output and passes at the fix; it runs in pnpm verify or the CI terminal action.",
+   "tags": [
+    "tests",
+    "re-encode"
+   ]
+  },
+  {
+   "kind": "finding",
+   "id": "AUD-024-ARC002",
+   "category": "ARC",
+   "severity": "low",
+   "status": "fixed",
+   "releaseBlocking": false,
+   "title": "The permission-denied save message lost its only test when recover-word moved to the shared terminal",
+   "affectedFiles": [
+    "test/ask-word-recovery.test.ts:256-291",
+    "test/helpers/question-terminal.ts:133-137",
+    "src/cli/save-retry.ts:24-25"
+   ],
+   "reproduction": "`git grep -n 'no permission to write' 870effe -- test` finds test/ask-word-recovery.test.ts:324; the same at HEAD finds nothing; `git log -S'no permission to write there' 870effe..HEAD -- test` names 1d4f97b.",
+   "expected": "A save that fails with EACCES keeps a test of its exact line, \"… could not be saved as <path>: there is no permission to write there.\", as at 870effe.",
+   "observed": "The shared failingSave helper throws only ENOSPC; no test at HEAD sends EACCES or EPERM through saveWithRetry.",
+   "impact": "A change to the permission reason, the usual one for a protected folder, would pass the suite; the behaviour at HEAD is unchanged.",
+   "evidence": "docs-tests reviewer's removed_expects.py and the skeptic's rerun (local only).",
+   "recommendedFix": "Let failingSave take an errno code (ENOSPC by default) and assert the EACCES line again; optionally one table-driven test over every SAVE_FAILURES entry.",
+   "requiredVerification": "A test asserts the EACCES line and fails when SAVE_FAILURES.EACCES changes.",
+   "tags": [
+    "tests"
+   ]
+  },
+  {
+   "kind": "finding",
+   "id": "AUD-024-DOC001",
+   "category": "DOC",
+   "severity": "low",
+   "status": "fixed",
+   "releaseBlocking": false,
+   "title": "docs/CANDIDATES.md names the removed problem field of CandidateFileRefusedError",
+   "affectedFiles": [
+    "docs/CANDIDATES.md:103",
+    "src/core/candidate-file-refusal.ts:18-27"
+   ],
+   "reproduction": "Read docs/CANDIDATES.md:103; refuse a candidate file through dist/core/candidate-file-refusal.js and read the error: code is \"unsupported\", problem is undefined.",
+   "expected": "DOC-06: the host contract names the field a host branches on, `code`, since commit 7c5ece9 renamed the class and the field (TS-06).",
+   "observed": "The sentence was updated for the class name only and still says `problem: \"unsupported\"`.",
+   "impact": "A host written from the document never matches the refusal and may give the wrong next step; the in-workspace host already uses code.",
+   "evidence": "core reviewer's runtime probe and the skeptic's rerun (local only).",
+   "recommendedFix": "Write `code: \"unsupported\"` and `code: \"damaged\"` in docs/CANDIDATES.md:103.",
+   "requiredVerification": "docs/CANDIDATES.md names only fields that CandidateFileRefusedError has.",
+   "tags": [
+    "docs",
+    "host-contract"
+   ]
+  },
+  {
+   "kind": "finding",
+   "id": "AUD-024-DOC002",
+   "category": "DOC",
+   "severity": "low",
+   "status": "fixed",
+   "releaseBlocking": false,
+   "title": "The audit index lists 4 of the 22 published harness folders",
+   "affectedFiles": [
+    "docs/audits/README.md:45-48"
+   ],
+   "reproduction": "Read docs/audits/README.md:45-48; `git ls-files docs/audits | grep -oE 'AUD-0[0-9]+-harnesses' | sort -u | wc -l` gives 22.",
+   "expected": "The paragraph names every published harness folder or points to the table, whose rows link them.",
+   "observed": "It says the scripts are published one folder per audit and lists only AUD-001, AUD-002, AUD-004 and AUD-005; it dates from 2026-10-01.",
+   "impact": "An incomplete list for a reader of the index; the table rows link the folders.",
+   "evidence": "docs-tests reviewer and the skeptic's rerun (local only).",
+   "recommendedFix": "Replace the list by a pointer to the Records column of the table.",
+   "requiredVerification": "The paragraph is current; pnpm check passes.",
+   "tags": [
+    "docs",
+    "audit-records"
+   ]
+  }
+ ],
+ "observations": [],
+ "remediation": [
+  {
+   "id": "AUD-022-SEC001",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "Phrase only on standard error when it is a terminal, else its fingerprint (src/cli/re-encode-command.ts:163-172); re-encode.test.ts 19 passed; reencode-stdout passes in this baseline. See AUD-024-ARC001 for the missing suite regression of the --ask-secrets path."
+  },
+  {
+   "id": "AUD-022-SEC002",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "verify-audit-privacy.mjs reads the account at run time and refuses non-UTC times in every published file type; audit-privacy.test.ts 6 passed; the gate passes over 345 files."
+  },
+  {
+   "id": "AUD-022-FUN001",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "Fix intact through the CORE-15 split (repair-models.ts, joint-solve.ts); aud-022.test.ts 22 passed; repair-leading-marks: 0 of 45 cases \"do not fit\", as recorded at the remediation."
+  },
+  {
+   "id": "AUD-022-FUN002",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "separateCardJob keeps the person's orientation; 90 × 50 mm card pages for 12, 18 and 24 words with --cards-dir alone and with --pdf (reviewer probe); card-output passes."
+  },
+  {
+   "id": "AUD-022-FUN003",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "A read header leaves marks after the share's own length out (repair-models.ts); its aud-022 test passes."
+  },
+  {
+   "id": "AUD-022-FUN004",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "validateCardOptions counts a card page size as separate cards, and share cards are checked printable before any secret (card-options.ts, sskr-output.ts); aud-022 tests pass."
+  },
+  {
+   "id": "AUD-022-API001",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "PngAdmission keeps the distinct IHDR refusals; aud-002-remediation.test.ts 18 and aud-021-security.test.ts 34 passed."
+  },
+  {
+   "id": "AUD-022-API002",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "ReEncoding.of refuses a last word for a backup that gives one phrase, and --last-word with --ask-secrets is refused (src/core/re-encoding.ts); its tests pass."
+  },
+  {
+   "id": "AUD-022-UI001",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "newBackupAskedUntilTaken asks again after a refused answer for the new backup; the pseudo-terminal case check_re_encode_answer_refused passes."
+  },
+  {
+   "id": "AUD-022-BLD001",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "S118, now in test/scan-fixes-s100-s148.test.ts, matches the keeping note of src/export/sskr-keeping-text.ts and passes."
+  },
+  {
+   "id": "AUD-022-ARC001",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "The fingerprint rule and notices of re-encode live in the library; its tests pass."
+  },
+  {
+   "id": "AUD-022-ARC002",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "PNG_ADMISSION_SELF_TEST runs at start and in self-test, now also with 16-bit samples; self-test passes."
+  },
+  {
+   "id": "AUD-022-DOC001",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "AUD-012 keeps its committed bytes and its quoted anchor equals the test line; the records no longer describe edits of other records (AUD-021 update, the privacy section of docs/audits/README.md)."
+  },
+  {
+   "id": "AUD-022-DOC002",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "docs/card-identities.md says 29 slogans; test/card-copy.test.ts counts them against the program."
+  },
+  {
+   "id": "AUD-022-DOC003",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "The help names only current card kinds."
+  },
+  {
+   "id": "AUD-022-DOC004",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "docs/SSKR.md and the help example use share forms that have cards (read, not run: they draw cards)."
+  },
+  {
+   "id": "AUD-022-DOC005",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "One source, SHEET_PLAN_TEXT, for the menu note and the help; README, CHANGELOG and the release notes agree with it."
+  },
+  {
+   "id": "AUD-022-DOC006",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "AUD-021's remediation table shows BLD001 fixed."
+  },
+  {
+   "id": "AUD-022-DOC007",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "The re-encode help names --old-mode and --old-format."
+  },
+  {
+   "id": "AUD-022-DOC008",
+   "status": "verified",
+   "fixCommit": "8aa9b25",
+   "verificationCommit": "ee4499e",
+   "evidence": "One source, SHEET_QR_HOLDS, for the question and the help: the codes of the backup, without the extra cards."
+  },
+  {
+   "id": "AUD-024-FUN001",
+   "status": "fixed",
+   "fixCommit": null,
+   "verificationCommit": null,
+   "evidence": "Fixed with this record, not verified; see the remediation addendum."
+  },
+  {
+   "id": "AUD-024-API001",
+   "status": "fixed",
+   "fixCommit": null,
+   "verificationCommit": null,
+   "evidence": "Fixed with this record, not verified; see the remediation addendum."
+  },
+  {
+   "id": "AUD-024-BLD001",
+   "status": "fixed",
+   "fixCommit": null,
+   "verificationCommit": null,
+   "evidence": "Fixed with this record, not verified; see the remediation addendum."
+  },
+  {
+   "id": "AUD-024-BLD002",
+   "status": "fixed",
+   "fixCommit": null,
+   "verificationCommit": null,
+   "evidence": "Fixed with this record, not verified; see the remediation addendum."
+  },
+  {
+   "id": "AUD-024-ARC001",
+   "status": "fixed",
+   "fixCommit": null,
+   "verificationCommit": null,
+   "evidence": "Fixed with this record, not verified; see the remediation addendum."
+  },
+  {
+   "id": "AUD-024-ARC002",
+   "status": "fixed",
+   "fixCommit": null,
+   "verificationCommit": null,
+   "evidence": "Fixed with this record, not verified; see the remediation addendum."
+  },
+  {
+   "id": "AUD-024-DOC001",
+   "status": "fixed",
+   "fixCommit": null,
+   "verificationCommit": null,
+   "evidence": "Fixed with this record, not verified; see the remediation addendum."
+  },
+  {
+   "id": "AUD-024-DOC002",
+   "status": "fixed",
+   "fixCommit": null,
+   "verificationCommit": null,
+   "evidence": "Fixed with this record, not verified; see the remediation addendum."
+  }
+ ],
+ "limitations": [
+  "A compact audit of about one hour: the review covered the changes since 870effe and the AUD-022 fixes; code unchanged since AUD-022 was not reviewed again.",
+  "No local Windows or macOS run; CI at a03862c covers their tests, pseudo-terminal checks and executables.",
+  "No local executable build or check; CI built and checked the three executables at a03862c.",
+  "No browser parity check of the multi-chain Deriver, which lives in another repository.",
+  "The pnpm verify:sskr rebuild ran with the Docker cache; no uncached canonical rebuild.",
+  "Reviewer probes and logs are kept locally (docs/audits/AUD-024-evidence/, ignored by Git); the three probes that reproduce findings are published in AUD-024-harnesses/.",
+  "The reasoning effort of the coordinator and the agents is not retained by the client."
+ ],
+ "informationalObservations": [
+  "The rebuilt SSKR WASM differs from 870effe's in two bytes (offsets 228177 and 228193, 0xb0 to 0xb7), panic-location line numbers that the doc comments added to lib.rs moved; lib.rs changed only in comments, and verify:sskr reproduces the committed bytes.",
+  "withRawTerminal lowers its session count before the awaited turn of leaveRawMode: a later caller that started a raw session without awaiting the previous one could see raw mode left under it. No caller does so; lowering the count after leaveRawMode would remove the fragility.",
+  "docs/audits/AUD-015-harnesses/staging-probes.ts imports LeftStagingCopy, now LeftStagingCopyError (TS-06); it is frozen evidence but ships in the package and no longer compiles.",
+  "The TS-06 renames of public names (…Error classes, .problem and .kind to .code) are not in CHANGELOG.md; with 0.1.0 unreleased nobody depends on the old names, but a line would help hosts.",
+  "History before the release: main's 8aa9b25 is a work-in-progress commit to regroup, 45c9f86's message still says it is temporary and unsigned, and ee4499e is a fixup commit to fold (workspace Commits rules).",
+  "The AUD-022 records say the remediation is not committed; it is in 8aa9b25, and this report records the fix and verification commits. The AUD-022 records stay unchanged.",
+  "The multi-chain Deriver does not yet use RE_ENCODING_WORDS, confirmationLine or PNG_ADMISSION_SELF_TEST in its own host code, although its synced copy has them; the synced copies of the split files are byte-identical to HEAD.",
+  "ci.yml runs the full pnpm verify, the pseudo-terminal check, the card round trip, the SSKR replay and pnpm audit on every push, and executable.yml builds three executables on push to main; CI-04 asks for fast checks only on push. Unchanged since AUD-022.",
+  "Smaller gaps of code-rules that need no fix today: a second module after `import a as b, c`, `#!/usr/bin/env -S bash`, `long:` anywhere on a first line, and WEB-01 checked per line.",
+  "The CLI lowercases the first letter of a library message, which reads \"mnemoCode expected …\" for the message of AUD-024-FUN001.",
+  "test/aud-021-recovery.test.ts has three describe blocks with the same name; two header comments exceed 100 columns (scripts/verify-audit-privacy.mjs:4, src/core/png-admission-self-test.ts:3).",
+  "The CHANGELOG's bound of about 200 MiB for the PNG decoder was not measured again; the cloud session measured about 170 MiB."
+ ],
+ "reviewPhases": [
+  {
+   "phase": "coordinator",
+   "model": "claude-opus-5-5",
+   "reasoningEffort": null,
+   "scope": "Snapshot, baseline commands, challenge of every candidate, report."
+  },
+  {
+   "phase": "review: aud022-fixes",
+   "model": "claude-opus-5-5",
+   "reasoningEffort": null,
+   "scope": "Fixes of AUD-022-SEC001, SEC002, FUN001-004, API001-002, UI001, BLD001, ARC001-002."
+  },
+  {
+   "phase": "review: docs-tests",
+   "model": "claude-opus-5-5",
+   "reasoningEffort": null,
+   "scope": "Fixes of AUD-022-DOC001-008; documents against code; audit records; test fidelity."
+  },
+  {
+   "phase": "review: core",
+   "model": "claude-opus-5-5",
+   "reasoningEffort": null,
+   "scope": "src/core and top-level modules since 870effe; BIP39, formats, wallet checks, encodings, candidate encryption, PNG bounds."
+  },
+  {
+   "phase": "review: sskr-export",
+   "model": "claude-opus-5-5",
+   "reasoningEffort": null,
+   "scope": "src/sskr, sskr-wasm and src/export since 870effe; the CORE-15 splits; wipes; exports; the rebuilt WASM."
+  },
+  {
+   "phase": "review: cli-build",
+   "model": "claude-opus-5-5",
+   "reasoningEffort": null,
+   "scope": "src/cli, scripts, workflows, package manifest and the guide's gates since 870effe; the Windows raw-mode fix."
+  },
+  {
+   "phase": "challenge",
+   "model": "claude-opus-5-5",
+   "reasoningEffort": null,
+   "scope": "Eight skeptic agents, one per candidate finding, each told to refute it; all eight confirmed, one re-rated from medium to low."
+  }
+ ],
+ "remediationAddendum": {
+  "date": "2026-10-14",
+  "commit": "ee4499e891754158b4e6bcf0c919dc360ffc8b4e",
+  "statusRule": "Fixed, not verified: the fixes are committed together with this record, and no later commit has verified them yet. Each test below was seen failing before its fix and passing after it.",
+  "fixes": [
+   {
+    "id": "AUD-024-FUN001",
+    "files": [
+     "src/sskr/transport.ts",
+     "test/sskr-boundaries.test.ts"
+    ],
+    "change": "sharePayload reads the tag bytes, the header and the one-byte length as input that may be missing and refuses a record cut short with \"Not an SSKR CBOR tag.\" or \"Invalid SSKR share byte string.\"; five CRC-valid truncated records are tested."
+   },
+   {
+    "id": "AUD-024-API001",
+    "files": [
+     "src/sskr/joint-repair.ts",
+     "test/joint-repair-entry.test.ts"
+    ],
+    "change": "The entry re-exports ElementHelp, JointAssessment, MarkedElement, RepairedSet, RepairedShares, ShareAssessment and DIGEST_BITS; a type-level test of the test tsconfig fails when one goes missing (seven errors without the fix)."
+   },
+   {
+    "id": "AUD-024-BLD001",
+    "files": [
+     "scripts/verify-code-rules.mjs",
+     "test/code-rules.test.ts"
+    ],
+    "change": "checkPythonPackages reads the existing requirements files and reports each imported package that none pins, by its published name (PIL, fontTools and winpty mapped) compared as pip compares names; one parser of requirement entries serves both checks."
+   },
+   {
+    "id": "AUD-024-BLD002",
+    "files": [
+     "scripts/verify-code-rules.mjs",
+     "test/code-rules.test.ts"
+    ],
+    "change": "checkCargoManifest collects each dependency of a section in any TOML form (string, inline table, dotted keys, its own table, dev-, build- and target-specific) and checks its version when the section ends."
+   },
+   {
+    "id": "AUD-024-ARC001",
+    "files": [
+     "test/re-encode-questions.test.ts"
+    ],
+    "change": "re-encode --ask-secrets with standard output not a terminal: the new backup on standard output, no word of the old phrase there, the phrase on standard error only when it is a terminal; both cases fail with showOldPhrase writing to standard output."
+   },
+   {
+    "id": "AUD-024-ARC002",
+    "files": [
+     "test/helpers/question-terminal.ts",
+     "test/ask-word-recovery.test.ts"
+    ],
+    "change": "failingSave takes the errno code of its failures (ENOSPC unless a test names another); recover-word asserts the exact EACCES line again and the off-screen EPERM rejection; a changed EACCES text fails the test."
+   },
+   {
+    "id": "AUD-024-DOC001",
+    "files": [
+     "docs/CANDIDATES.md"
+    ],
+    "change": "The host contract names code: \"unsupported\" and code: \"damaged\"."
+   },
+   {
+    "id": "AUD-024-DOC002",
+    "files": [
+     "docs/audits/README.md"
+    ],
+    "change": "The paragraph points to the table, whose rows link every harness folder."
+   }
+  ],
+  "sourceFingerprint": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+  "fileCount": 519,
+  "capturedAt": "2026-10-14T12:56:06.504235+00:00",
+  "checks": [
+   {
+    "label": "remediation-build",
+    "command": "pnpm build",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:56:06.550905+00:00",
+    "endUtc": "2026-10-14T12:56:07.074102+00:00",
+    "logSha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "Fresh dist/.",
+    "evidence": "AUD-024-evidence/remediation-build.log (local only)"
+   },
+   {
+    "label": "remediation-source",
+    "command": "pnpm check",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:56:07.143644+00:00",
+    "endUtc": "2026-10-14T12:56:12.459310+00:00",
+    "logSha256": "f63a1f2b9b347e21932bd61528acb62390edd033dadb2118affdb69fdbd7f5d5",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "Every gate, the code rules with the fixed checks included.",
+    "evidence": "AUD-024-evidence/remediation-source.log (local only)"
+   },
+   {
+    "label": "remediation-format",
+    "command": "pnpm format:check",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:56:12.526699+00:00",
+    "endUtc": "2026-10-14T12:56:17.793413+00:00",
+    "logSha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "Prettier over the repository.",
+    "evidence": "AUD-024-evidence/remediation-format.log (local only)"
+   },
+   {
+    "label": "remediation-tests",
+    "command": "pnpm exec vitest run <17 test files of the fixes and the code they touch>",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:56:17.862085+00:00",
+    "endUtc": "2026-10-14T12:57:33.455153+00:00",
+    "logSha256": "96ae008d7fd7c29df7999079e91ef759b58df21ca6227a37bbc20754643f6166",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "17 files: 415 passed.",
+    "evidence": "AUD-024-evidence/remediation-tests.log (local only)"
+   },
+   {
+    "label": "remediation-cli-self-test",
+    "command": "node dist/mnemocode.js self-test",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:57:33.532367+00:00",
+    "endUtc": "2026-10-14T12:57:49.926980+00:00",
+    "logSha256": "17707107ffb4df0f41a22bd8bbb51cfd5d8e68ee1204fc331560058754ddaa10",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "PASS.",
+    "evidence": "AUD-024-evidence/remediation-cli-self-test.log (local only)"
+   },
+   {
+    "label": "remediation-terminal-input",
+    "command": "python3 scripts/verify-terminal-input.py",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:57:50.014750+00:00",
+    "endUtc": "2026-10-14T12:58:34.235375+00:00",
+    "logSha256": "b941c1de0d32c052b3858a267851083fd18df82846a6552eac5a5bfdf9cd9880",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "Every pseudo-terminal case passed.",
+    "evidence": "AUD-024-evidence/remediation-terminal-input.log (local only)"
+   },
+   {
+    "label": "remediation-sskr-independent",
+    "command": "python3 scripts/verify-sskr-known-answers.py",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:58:34.308759+00:00",
+    "endUtc": "2026-10-14T12:58:44.311231+00:00",
+    "logSha256": "5735ee7eb756a60aed4b573aa88b44d0e009a26f3a4101d87048b4f1845d664c",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "Official vector and every quorum restored.",
+    "evidence": "AUD-024-evidence/remediation-sskr-independent.log (local only)"
+   },
+   {
+    "label": "remediation-probe-truncated-share",
+    "command": "node docs/audits/AUD-024-harnesses/truncated-share.mjs",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:58:44.373835+00:00",
+    "endUtc": "2026-10-14T12:58:44.433239+00:00",
+    "logSha256": "a9e2f3ad43f3cd38a9203379e43dc2a510df6b7ef85fb7a0de44beeb8fc6b81f",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "Exit 0: every truncated record refused as input.",
+    "evidence": "AUD-024-evidence/remediation-probe-truncated-share.log (local only)"
+   },
+   {
+    "label": "remediation-probe-entry-types",
+    "command": "bash docs/audits/AUD-024-harnesses/entry-types.sh",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:58:44.503277+00:00",
+    "endUtc": "2026-10-14T12:58:44.618893+00:00",
+    "logSha256": "1b24b7d77c5c4d2f4c223e777031364027320691a3f34308754a5f5ba39a9110",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "Exit 0: the host compiles.",
+    "evidence": "AUD-024-evidence/remediation-probe-entry-types.log (local only)"
+   },
+   {
+    "label": "remediation-probe-code-rules-gaps",
+    "command": "bash docs/audits/AUD-024-harnesses/code-rules-gaps.sh",
+    "exitCode": 0,
+    "outcome": "passed",
+    "startUtc": "2026-10-14T12:58:44.687634+00:00",
+    "endUtc": "2026-10-14T12:58:45.101145+00:00",
+    "logSha256": "cccd1343b466bbb1742ba8232d9e0eb9890a8d789ce2e545fb21ff5748d5d30b",
+    "sourceBefore": "462787d844039d639f06a2476473dfe6e3291ff989fc059c46fb0bd91eea3232",
+    "summary": "Exit 0: every violating case refused, both controls pass.",
+    "evidence": "AUD-024-evidence/remediation-probe-code-rules-gaps.log (local only)"
+   }
+  ]
+ }
+}
