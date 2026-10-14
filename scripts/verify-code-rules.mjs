@@ -158,7 +158,8 @@ function checkLength(path, text) {
   if (!MEASURED.has(extname(name)) && !name.startsWith("Dockerfile")) return;
   const lines = linesOf(text);
   const exemption = lines[0]?.startsWith("#!") ? lines[1] : lines[0];
-  if (exemption !== undefined && /\blong:\s*\S/u.test(exemption)) return;
+  // The exemption is a comment that starts the line, not "long:" anywhere in it.
+  if (exemption !== undefined && /^\s*(?:#|\/\/|\/\*|<!--)\s*long:\s*\S/u.test(exemption)) return;
   // A Rust file's unit tests sit at its end (RUST-08) and do not count.
   const tests = path.endsWith(".rs")
     ? lines.findIndex((line) => line.trim() === "#[cfg(test)]")
@@ -175,7 +176,10 @@ function checkLength(path, text) {
 
 /** Whether `text` is a shell script: by its name or by its first line. */
 function isShellScript(path, text) {
-  return path.endsWith(".sh") || /^#!\s*\/(?:usr\/)?bin\/(?:env\s+)?(?:ba|da|z)?sh\b/u.test(text);
+  return (
+    path.endsWith(".sh") ||
+    /^#!\s*\/(?:usr\/)?bin\/(?:env\s+(?:-S\s+)?)?(?:ba|da|z)?sh\b/u.test(text)
+  );
 }
 
 /** TOOL-02: a shell script stops on its first error. */
@@ -207,11 +211,18 @@ function pythonImports(text) {
   const imports = new Map();
   linesOf(text).forEach((line, index) => {
     const match =
-      /^\s*(?:from\s+([A-Za-z_][\w.]*)\s+import\b|import\s+([A-Za-z_][\w.]*(?:\s*,\s*[A-Za-z_][\w.]*)*))/u.exec(
+      /^\s*(?:from\s+([A-Za-z_][\w.]*)\s+import\b|import\s+([A-Za-z_][\w.]*(?:\s+as\s+\w+)?(?:\s*,\s*[A-Za-z_][\w.]*(?:\s+as\s+\w+)?)*))/u.exec(
         line,
       );
     if (match === null) return;
-    const names = (match[1] ?? match[2]).split(",").map((name) => name.trim().split(".")[0]);
+    // A module renamed with "as" keeps its own name.
+    const names = (match[1] ?? match[2]).split(",").map(
+      (name) =>
+        name
+          .trim()
+          .split(/\s+as\s+/u)[0]
+          .split(".")[0],
+    );
     for (const name of names) if (!imports.has(name)) imports.set(name, index + 1);
   });
   return imports;
@@ -525,17 +536,15 @@ function checkLintExceptions(path, comments) {
   }
 }
 
-/** WEB-01: markup has no inline handler. */
+/** WEB-01: markup has no inline handler, also in a tag written over several lines. */
 function checkMarkup(path, text) {
-  linesOf(text).forEach((line, index) => {
-    if (/<[^>]*\son[a-z]+\s*=/iu.test(line))
-      report(
-        path,
-        index + 1,
-        "WEB-01",
-        "no on…= handler in markup: the page's script adds its listeners",
-      );
-  });
+  for (const handler of text.matchAll(/<[^>]*\son[a-z]+\s*=/giu))
+    report(
+      path,
+      text.slice(0, handler.index).split("\n").length,
+      "WEB-01",
+      "no on…= handler in markup: the page's script adds its listeners",
+    );
 }
 
 /** Every check of one TypeScript or JavaScript file that the linter does not cover. */

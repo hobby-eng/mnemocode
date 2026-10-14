@@ -60,6 +60,10 @@ describe("the code rules of the coding guide", () => {
     expect(
       rulesBroken({ "docs/long.md": `<!-- long: one table of every code -->\n${long}` }),
     ).toEqual([]);
+    // Only a comment that starts the line exempts a file, not "long:" anywhere in it.
+    expect(rulesBroken({ "docs/long.md": `A table too long: every code\n${long}` })).toEqual([
+      "CORE-15",
+    ]);
     // A Rust file's unit tests at its end do not count.
     const rust = `${"fn f() {}\n".repeat(700)}#[cfg(test)]\nmod tests {\n${"//\n".repeat(200)}}\n`;
     expect(rulesBroken({ "crate/src/lib.rs": rust })).toEqual([]);
@@ -72,6 +76,10 @@ describe("the code rules of the coding guide", () => {
     expect(
       rulesBroken({ "scripts/run.sh": "#!/usr/bin/env bash\n# Runs it.\nset -euo pipefail\n" }),
     ).toEqual([]);
+    // A script without the .sh ending, started through env -S, is a shell script too.
+    expect(rulesBroken({ "tools/run": "#!/usr/bin/env -S bash -e\nset -u\necho\n" })).toEqual([
+      "TOOL-02",
+    ]);
   });
 
   it.skipIf(!PYTHON)("refuse a Python package without its pin and hashes", () => {
@@ -95,6 +103,9 @@ describe("the code rules of the coding guide", () => {
     expect(rulesBroken({ ...two, "scripts/trace-requirements.txt": hashed })).toEqual(["TOOL-03"]);
     const pillow = `Pillow==12.3.0 \\\n    --hash=sha256:${"0".repeat(64)}\n`;
     expect(rulesBroken({ ...two, "scripts/trace-requirements.txt": hashed + pillow })).toEqual([]);
+    // Every module of one import line counts, renamed or not.
+    const renamed = { "scripts/trace.py": "import json as j, numpy\n" };
+    expect(rulesBroken(renamed)).toEqual(["TOOL-03"]);
   });
 
   it("refuse file names that are not kebab-case where the code lives", () => {
@@ -183,5 +194,9 @@ describe("the code rules of the coding guide", () => {
     expect(rulesBroken({ "page.html": '<button onclick="go()">Go</button>\n' })).toEqual([
       "WEB-01",
     ]);
+    // A tag written over several lines.
+    expect(
+      rulesBroken({ "page.html": '<button\n  type="button"\n  onclick="go()">Go</button>\n' }),
+    ).toEqual(["WEB-01"]);
   });
 });
