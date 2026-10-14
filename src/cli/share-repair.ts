@@ -62,7 +62,7 @@ import {
   terminalStatus,
 } from "./terminal.js";
 import { counting } from "../core/search-plan.js";
-import { isMarked } from "../sskr/repair.js";
+import { isMarked } from "../sskr/repair-units.js";
 import { defined } from "../core/defined.js";
 
 /** The restore of shares with Node's SSKR library: it keeps nothing of a restore. */

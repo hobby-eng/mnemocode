@@ -42,8 +42,6 @@ import {
 } from "./gf2.js";
 import { DIGEST_X, gfMultiply, lagrangeCoefficients, SECRET_X } from "./gf256.js";
 import {
-  AMBIGUOUS_MARK_WIDTHS,
-  AmbiguousMarksError,
   everyPick,
   markCount,
   MarkedReading,
@@ -54,6 +52,7 @@ import {
   exceedsMarks,
   markLimit,
 } from "./repair.js";
+import { AMBIGUOUS_MARK_WIDTHS, AmbiguousMarksError } from "./repair-models.js";
 import type { SharePlatform } from "./share-platform.js";
 import { type ShareFormat, assertShareCount } from "./transport.js";
 import { withoutCopies } from "./set-topology.js";

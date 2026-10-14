@@ -6,13 +6,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import {
-  AMBIGUOUS_MARK_WIDTHS,
-  AmbiguousMarksError,
-  everyPick,
-  MarkedReading,
-  readRepairableShare,
-} from "../src/sskr/repair.js";
+import { everyPick, MarkedReading, readRepairableShare } from "../src/sskr/repair.js";
+import { AMBIGUOUS_MARK_WIDTHS, AmbiguousMarksError } from "../src/sskr/repair-models.js";
 import { planJointRepair, searchOnce } from "../src/sskr/joint-repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { shareUnits } from "./helpers/shares.js";

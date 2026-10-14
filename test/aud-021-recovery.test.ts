@@ -17,7 +17,6 @@ import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { sskrSetVector } from "../src/sskr/known-answers.js";
 import { mixShare, SHARE_HEADER_BYTES } from "../src/sskr/mixed-layout.js";
 import {
-  AmbiguousMarksError,
   MarkedReading,
   MAX_MARKED_ELEMENTS,
   readRepairableShare,
@@ -25,6 +24,7 @@ import {
   ShareVariantsError,
   sharesOfReadings,
 } from "../src/sskr/repair.js";
+import { AmbiguousMarksError } from "../src/sskr/repair-models.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { GROUP_BYTE, NIBBLE_BITS, SHARE_METADATA_BYTES } from "../src/sskr/share-layout.js";
 import { SHARE_UNITS } from "../src/sskr/share-units.js";

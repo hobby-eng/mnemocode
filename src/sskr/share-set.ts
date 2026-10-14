@@ -39,7 +39,8 @@ import { restoreCompleteShares, uncheckedField } from "./complete-shares.js";
 import { Redacted } from "../core/redacted.js";
 import { counted } from "../core/search-plan.js";
 import { placeOf } from "../core/places.js";
-import { unrepairedShare, isMarked } from "./repair.js";
+import { unrepairedShare } from "./repair.js";
+import { isMarked } from "./repair-units.js";
 import { defined } from "../core/defined.js";
 // The copy rule belongs to set-topology.ts; here too for the modules that take it with a set.
 export { copiesAmong, type PlacedShare };

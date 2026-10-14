@@ -26,8 +26,8 @@ import {
   ShareVariantsError,
   type ReadRepairableShare,
   unrepairedShare,
-  isMarked,
 } from "./repair.js";
+import { isMarked } from "./repair-units.js";
 import type { SharePlatform } from "./share-platform.js";
 import { copiesAmong, ShareExport, ShareSet } from "./share-set.js";
 import { LineWordHints, type WordHints } from "../core/word-hints.js";
