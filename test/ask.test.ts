@@ -45,8 +45,8 @@ import { assertWalletPlaceUsed, walletPlaceOf } from "../src/cli/bitcoin-options
 import { LAST_NORMAL_INDEX } from "../src/core/address-scan.js";
 import { InputCancelledError } from "../src/cli/terminal-keys.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 /** The public test phrase's first native SegWit receiving address, m/84'/0'/0'/0/0. */
 const FIRST_ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 /** A valid testnet address (BIP173's example), which mainnet refuses by name. */

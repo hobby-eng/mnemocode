@@ -5,6 +5,7 @@ import { indexesToColors } from "../src/core.js";
 import { MM } from "../src/export/business-layout.js";
 import { pageOperators } from "./helpers/pdf-content.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const colors = indexesToColors(Array.from({ length: 12 }, (_, index) => index * 7));
 const content: CardContent = { kind: "colors", colors, payload: colors.join(" ") };
@@ -130,7 +131,7 @@ describe("page size decides the layout of Shamir share cards", () => {
       const { ShareCardSet } = await import("../src/export/sskr-render.js");
       const { renderSskrPdf } = await import("../src/export/sskr-cards.js");
       // Public BIP39 test vector; never a real wallet.
-      const shares = await splitSskrMnemonic(`${"abandon ".repeat(11)}about`, 2, 3);
+      const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
       const sheets = await PDFDocument.load(
         await renderSskrPdf(nodeCardRenderer, shares, { style: "it" }),
       );
@@ -156,7 +157,7 @@ describe("page size decides the layout of Shamir share cards", () => {
     const { renderSskrPdf } = await import("../src/export/sskr-cards.js");
     const { collectionSheetLayout } = await import("../src/export/collection-layout.js");
     // Public BIP39 test vector; never a real wallet.
-    const shares = await splitSskrMnemonic(`${"abandon ".repeat(11)}about`, 2, 3);
+    const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
     const document = await PDFDocument.load(
       await renderSskrPdf(nodeCardRenderer, shares, {
         style: "it",

@@ -4,6 +4,7 @@ import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { parseDate } from "../src/core/dates.js";
 import { Masking } from "../src/core/masking.js";
 import { HeirInstructions, type HeirRoute } from "../src/export/heir-sheet-text.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const route: HeirRoute = {
   subtitle: "Public audit fixture",
@@ -14,7 +15,6 @@ const route: HeirRoute = {
   dateDigitHelp: undefined,
 };
 const instructions = new HeirInstructions(route);
-const PHRASE = `${"abandon ".repeat(11)}about`;
 
 describe("AUD-021-DOC001: heir advice follows masking semantics", () => {
   it.each(["direct", "seedshift", "seedshift-legacy"] as const)(
@@ -52,9 +52,9 @@ describe("AUD-021-DOC001: heir advice follows masking semantics", () => {
     );
     const wrong = modern.decode([parseDate("24-09-2026")]);
     expect(wrong.checksumValid).toBe(true);
-    expect(wrong.recoveredMnemonic).not.toBe(PHRASE);
+    expect(wrong.recoveredMnemonic).not.toBe(TEST_PHRASE);
     // A date key is not unique: the published modulo-2048 shift also accepts this later year.
-    expect(modern.decode([parseDate("23-09-4074")]).recoveredMnemonic).toBe(PHRASE);
+    expect(modern.decode([parseDate("23-09-4074")]).recoveredMnemonic).toBe(TEST_PHRASE);
   });
 
   it("does not guarantee that wrong-date wallets are empty in the public guide", () => {

@@ -45,9 +45,7 @@ import { swapWarning, unencryptedSwap } from "../src/cli/swap-check.js";
 import { assertImageRenderer, IMAGE_FOLDER_TAKEN } from "../src/export/image-export.js";
 import { exportCards } from "../src/export/pdf.js";
 import { NewFolder } from "../src/export/private-file.js";
-
-/** The public BIP39 test phrase of the vectors. */
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const folders: string[] = [];
 

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readLine, type LineOptions } from "../src/cli/terminal-input.js";
 import { WordList } from "../src/core/word-hints.js";
 import { answerEndRow, rowsOfText, terminalColumns } from "../src/cli/terminal-geometry.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const LEFT = "\x1b[D";
 const HOME = "\x1b[H";
@@ -542,7 +543,7 @@ describe("hints below a visible answer, as in mhfe", () => {
     process.stderr.columns = 80;
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const seen: string[] = [];
-    const phrase = `${"abandon ".repeat(11)}about`;
+    const phrase = TEST_PHRASE;
     const keys = [...Buffer.from(`${phrase}\r`)];
     let read = 0;
     const answer = await readLine(async () => keys[read++], {

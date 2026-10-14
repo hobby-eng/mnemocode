@@ -10,6 +10,7 @@ import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { Masking, SPLIT_MODES_ONLY } from "../src/core/masking.js";
 import { publicShare } from "./helpers/vectors.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // The BIP39 library as it is, with the turning of a phrase into entropy watched: S005's case keeps
 // the entropy of each phrase to see that it is wiped. Every other call works as without the spy.
@@ -244,7 +245,6 @@ const MASKED_SHARES = [
   "ur:sskr/gomuttaeadaojytnhyvtpaqdmobwreoyykutjtkofedicanladwm",
 ];
 const MASKED = `${"wool abuse actual ".repeat(3)}wool abuse congress`;
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const noWallet = () => ({ matched: false });
 
 // Imported here, as the block above does: other blocks reset the modules, and a class checked

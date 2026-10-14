@@ -8,9 +8,9 @@ import { MissingCodes } from "../src/core/missing-codes.js";
 import { englishWordlist } from "../src/core/words.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // Public test data only: the phrase "abandon ... about", masked with one public date.
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const DATE = parseDate("23-09-2026");
 const ENCODED = encodeMnemonic(TEST_PHRASE, [DATE]);
 const fingerprints = new MasterFingerprintCheck(

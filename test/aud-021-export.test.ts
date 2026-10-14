@@ -138,9 +138,8 @@ import { runEncode } from "../src/cli/encode-command.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { backupCardContent } from "../src/export/backup-cards.js";
 import { assertColorCardContent } from "../src/export/card-content.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-// The published BIP39 zero-entropy phrase, never private wallet data.
-const PHRASE = `${"abandon ".repeat(11)}about`;
 let folder: string;
 
 function observe(destination: Destination, job: CardJob): void {
@@ -163,7 +162,7 @@ function save(destination: Destination, path: string): void {
 
 function argumentsFor(format: EncodedFormat = "colors-unicode"): ParsedArguments {
   return {
-    mnemonic: PHRASE,
+    mnemonic: TEST_PHRASE,
     mode: "direct",
     format,
     template: "business-it",
@@ -179,7 +178,7 @@ function expectSameCollection(attempts: readonly Attempt[], format: EncodedForma
   // The plan as the sheets and page images take it; separate cards take it without its page turn.
   const first = attempts.find((attempt) => attempt.destination !== "cards")!;
   const content = first.job.content;
-  const own = backupCardContent(EncodedBackup.encode(PHRASE, [], format, "direct").backup);
+  const own = backupCardContent(EncodedBackup.encode(TEST_PHRASE, [], format, "direct").backup);
   expect(content.decoys).toBeGreaterThan(0);
   expect(content.colors.length).toBe(own.colors.length + content.decoys!);
   expect(content.colors.slice(0, own.colors.length)).toEqual(own.colors);
@@ -344,7 +343,13 @@ describe("AUD-021-FUN003: one card plan through the production Encode dispatcher
   it("does not plan cards for a record and standalone QR output", async () => {
     const record = join(folder, "public.txt");
     const qr = join(folder, "public.png");
-    await runEncode({ mnemonic: PHRASE, mode: "direct", format: "indexes", output: record, qr });
+    await runEncode({
+      mnemonic: TEST_PHRASE,
+      mode: "direct",
+      format: "indexes",
+      output: record,
+      qr,
+    });
     expect(observed.plainSaves).toEqual([record, qr]);
     expect(observed.fontReads).toBe(0);
     expect(observed.randomChoices).toBe(0);

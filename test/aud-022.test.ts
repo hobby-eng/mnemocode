@@ -28,8 +28,8 @@ import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { repairCandidates } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { writeShare, type ShareFormat } from "../src/sskr/transport.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const PHRASE = `${"abandon ".repeat(11)}about`;
 const SHARE_SETS = (
   JSON.parse(readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8")) as {
     deterministic: { name: string; shares: string[] }[];
@@ -136,18 +136,23 @@ describe("AUD-022-API001: a damaged PNG start is refused with its own reason", (
 
 describe("AUD-022-API002: a last word is refused where the backup gives one phrase", () => {
   it("refuses it for a backup without Seedshift and one of MnemoCode Seedshift", () => {
-    const direct = EncodedBackup.read(PHRASE, "english", "direct");
+    const direct = EncodedBackup.read(TEST_PHRASE, "english", "direct");
     expect(() => ReEncoding.of(direct, [], "zoo")).toThrow(LAST_WORD_NOT_TAKEN);
-    const masked = EncodedBackup.encode(PHRASE, [parseDate("23-09-2026")], "indexes", "seedshift");
+    const masked = EncodedBackup.encode(
+      TEST_PHRASE,
+      [parseDate("23-09-2026")],
+      "indexes",
+      "seedshift",
+    );
     expect(() => ReEncoding.of(masked.backup, [parseDate("23-09-2026")], "about")).toThrow(
       LAST_WORD_NOT_TAKEN,
     );
-    expect(ReEncoding.of(direct, []).phrase).toBe(PHRASE);
+    expect(ReEncoding.of(direct, []).phrase).toBe(TEST_PHRASE);
   });
 });
 
 describe("AUD-022-ARC001: the library words how a phrase was confirmed", () => {
-  const backup = () => EncodedBackup.read(PHRASE, "english", "direct");
+  const backup = () => EncodedBackup.read(TEST_PHRASE, "english", "direct");
 
   it("says accepted, not proven, for any match that came with a warning", async () => {
     const reEncoding = ReEncoding.of(backup(), []);

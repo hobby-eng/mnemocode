@@ -10,6 +10,7 @@ import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import { createSessionIdentity, decryptCandidates } from "../src/core/candidate-encryption.js";
 import { containing } from "./helpers/matchers.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -123,9 +124,7 @@ describe("recover-word CLI", () => {
         }),
       );
       expect(list.records).toHaveLength(128);
-      expect(entropyToMnemonic(list.records[number - 1]!.entropy, wordlist)).toBe(
-        `${"abandon ".repeat(11)}about`,
-      );
+      expect(entropyToMnemonic(list.records[number - 1]!.entropy, wordlist)).toBe(TEST_PHRASE);
       // Replacements of a legacy phrase are no wallets: they are not saved as candidates.
       await expect(
         run([
@@ -147,7 +146,7 @@ describe("recover-word CLI", () => {
     const two = await run(["recover-word", "--mnemonic", `ab* ${"abandon ".repeat(10)}abo*`]);
     const lines = two.stdout.trim().split("\n");
     expect(lines[0]).toBe("candidate\twords\tmnemonic");
-    expect(lines).toContain(`1\t1:abandon 12:about\t${"abandon ".repeat(11)}about`);
+    expect(lines).toContain(`1\t1:abandon 12:about\t${TEST_PHRASE}`);
     const missing = await run([
       "recover-word",
       "--missing-word",
@@ -156,7 +155,7 @@ describe("recover-word CLI", () => {
     ]);
     const rows = missing.stdout.trim().split("\n");
     expect(rows[0]).toBe("candidate\tposition\tword\tword-index\tmnemonic");
-    expect(rows[1]).toBe(`1\t1\tabandon\t1\t${"abandon ".repeat(11)}about`);
+    expect(rows[1]).toBe(`1\t1\tabandon\t1\t${TEST_PHRASE}`);
     // Two forgotten words in 12: 262,144 candidates, too many to show without a list or a wallet.
     const many = await run(["recover-word", "--mnemonic", `? ${"abandon ".repeat(10)}?`]);
     expect(many.stdout.trim()).toBe("");

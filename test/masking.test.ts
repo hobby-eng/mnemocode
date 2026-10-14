@@ -18,12 +18,12 @@ import { EncodedBackup, MissingChecksumError } from "../src/core/encoded-backup.
 import { Masking } from "../src/core/masking.js";
 import { parseRecord, serializeRecord } from "../src/record.js";
 import { Share, writeShare } from "../src/sskr/transport.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // The parts that read and write an encoded seed phrase, each on its own, as another host such as
 // the Deriver uses them: the Seedshift modes (Masking), the codes in every form with their record
 // (EncodedBackup), and how a backup as given is read (BackupReading). Public test data only.
 
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const DATE = parseDate("23-09-2026");
 const MASKED = encodeMnemonic(TEST_PHRASE, [DATE]);
 const LEGACY = encodeMnemonicLegacy(TEST_PHRASE, [DATE]);

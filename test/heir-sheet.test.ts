@@ -9,9 +9,9 @@ import { heirSheetText, type HeirSheetFacts } from "../src/cli/heir-sheet.js";
 import { A5, A6, renderHeirSheet } from "../src/export/heir-sheet.js";
 import { HeirInstructions, type HeirRoute } from "../src/export/heir-sheet-text.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-// The public BIP39 test phrase and public dates of the examples.
-const PHRASE = `${"abandon ".repeat(11)}about`;
+// The public dates of the examples.
 const DATES = ["23-09-2026", "08-08-1988"];
 
 function cli(args: string[]) {
@@ -257,7 +257,7 @@ describe("instructions for heirs", () => {
         "encode",
         "--sskr",
         "--mnemonic",
-        PHRASE,
+        TEST_PHRASE,
         "--dates",
         ...DATES,
         "--threshold",
@@ -296,7 +296,7 @@ describe("instructions for heirs", () => {
   });
 
   it("refuses a size without a sheet and a size that does not exist", () => {
-    const base = ["encode", "--mnemonic", PHRASE, "--dates", DATES[0]!];
+    const base = ["encode", "--mnemonic", TEST_PHRASE, "--dates", DATES[0]!];
     const alone = cli([...base, "--heir-sheet-size", "a6"]);
     expect(alone.status).not.toBe(0);
     expect(alone.stderr).toContain("--heir-sheet-size needs --heir-sheet");
@@ -320,7 +320,7 @@ describe("instructions for heirs", () => {
       "seedshift-legacy",
       "--legacy-valid-last-word",
       "--mnemonic",
-      PHRASE,
+      TEST_PHRASE,
       "--dates",
       DATES[0]!,
       "--heir-sheet",

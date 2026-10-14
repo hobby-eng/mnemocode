@@ -45,6 +45,7 @@ import {
 } from "../src/sskr/transport.js";
 import { markUnits, shareUnits } from "./helpers/shares.js";
 import { anyOf } from "./helpers/matchers.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
   deterministic: { entropy: string; shares: string[] }[];
@@ -52,7 +53,6 @@ const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
 const VECTOR = vectors.deterministic[0]!;
 const SHARES = VECTOR.shares;
 const SHARE = SHARES[0]!;
-const PUBLIC_PHRASE = `${"abandon ".repeat(11)}about`;
 const OTHER_PHRASE = `${"zoo ".repeat(11)}wrong`;
 
 afterEach(() => {
@@ -67,7 +67,7 @@ function unitValues(share: string, format: ShareFormat): number[] {
 /** Two sets of 2 of `count` shares of different phrases with the same identifier (S013). */
 async function twinSets(count: number): Promise<[string[], string[]]> {
   const split = new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7));
-  return [await split.split(PUBLIC_PHRASE, 2, count), await split.split(OTHER_PHRASE, 2, count)];
+  return [await split.split(TEST_PHRASE, 2, count), await split.split(OTHER_PHRASE, 2, count)];
 }
 
 describe("S038: one codec of units for every share form", () => {
@@ -302,7 +302,7 @@ describe("S048: one progress and one way to turn for every search", () => {
 
   it("tells a date search's progress at its turns when no step is given", async () => {
     const search = new DateSearch({
-      indexes: encodeMnemonic(PUBLIC_PHRASE, [parseDate("23-09-2026")]).shiftedIndexes,
+      indexes: encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]).shiftedIndexes,
       dates: DatesAnswer.parse("2?-09-2026", { wordCount: 12, patterns: true }),
       mode: "seedshift",
     });

@@ -103,6 +103,7 @@ import { entryAt, absentPath } from "../src/export/private-file.js";
 import { validCharacters, characterLength, isContinuation } from "../src/cli/utf8.js";
 import { characterSize } from "../src/cli/terminal-geometry.js";
 import { assertColorCards } from "../src/export/card-content.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("S059: the menu's wallet answer is the command line that gives the same evidence", () => {
   it("reads back every way of the wallet question, and a place that is not the first", () => {
@@ -294,7 +295,7 @@ describe("S073: the share separator is one constant", () => {
 });
 
 describe("S075: one library split of a backup", () => {
-  const phrase = `${"abandon ".repeat(11)}about`;
+  const phrase = TEST_PHRASE;
   const dated = [parseDate("23-09-2026")];
 
   it("splits the phrase that the mode holds, and refuses a mode without shares", async () => {
@@ -332,7 +333,7 @@ describe("S075: one library split of a backup", () => {
 
 describe("S076: Encode keeps the library's encoding", () => {
   it("says whether the last word was replaced", () => {
-    const phrase = `${"abandon ".repeat(11)}about`;
+    const phrase = TEST_PHRASE;
     const dated = [parseDate("23-09-2026")];
     const kept = EncodedBackup.encode(phrase, dated, "indexes", "seedshift-legacy");
     const asked = EncodedBackup.encode(phrase, dated, "indexes", "seedshift-legacy", {

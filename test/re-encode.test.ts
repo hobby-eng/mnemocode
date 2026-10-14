@@ -27,15 +27,14 @@ import {
   RECOGNISED_OPTION,
 } from "../src/cli/re-encode-options.js";
 import { containing } from "./helpers/matchers.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
 
 // Public test data only: the BIP39 test phrase, masked with MnemoCode Seedshift and 23-09-2026
 // (vectors/mnemocode-v1.json), and its fingerprint and first native SegWit address.
-const PHRASE = `${"abandon ".repeat(11)}about`;
 const MASKED_WORDS = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
-const FINGERPRINT = "73c5da0a";
 const ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 /** The test phrase without Seedshift as Unicode codes, from the BIP39 Chinese list. */
 const UNICODE = `${"7684".repeat(11)}5728`;
@@ -60,12 +59,12 @@ const OLD = ["--input", MASKED_WORDS, "--old-mode", "seedshift", "--old-dates", 
 describe("ReEncoding", () => {
   it("decodes the old backup and holds its phrase back until it is confirmed", () => {
     const reEncoding = ReEncoding.of(masked(), [RIGHT]);
-    expect(reEncoding.phrase).toBe(PHRASE);
+    expect(reEncoding.phrase).toBe(TEST_PHRASE);
     expect(reEncoding.confirmation).toBeUndefined();
     expect(() => reEncoding.confirmedPhrase()).toThrow(NOT_CONFIRMED);
     reEncoding.confirmByPerson();
     expect(reEncoding.confirmation).toEqual({ by: "person" });
-    expect(reEncoding.confirmedPhrase()).toBe(PHRASE);
+    expect(reEncoding.confirmedPhrase()).toBe(TEST_PHRASE);
   });
 
   it("is confirmed by a wallet that matches, and by nothing else", async () => {
@@ -78,18 +77,18 @@ describe("ReEncoding", () => {
     );
     expect(() => reEncoding.confirmedPhrase()).toThrow(NOT_CONFIRMED);
     const match = await reEncoding.confirmByWallet(async (mnemonic) => ({
-      matched: mnemonic === PHRASE,
+      matched: mnemonic === TEST_PHRASE,
       path: "m/84'/0'/0'/0/0",
     }));
     expect(match.matched).toBe(true);
     expect(reEncoding.confirmation).toEqual({ by: "wallet", path: "m/84'/0'/0'/0/0" });
-    expect(reEncoding.confirmedPhrase()).toBe(PHRASE);
+    expect(reEncoding.confirmedPhrase()).toBe(TEST_PHRASE);
   });
 
   it("gives a wrong date's valid phrase, which only the wallet tells apart", async () => {
     const wrong = ReEncoding.of(masked(), [WRONG]);
-    expect(wrong.phrase).not.toBe(PHRASE);
-    const check = (mnemonic: string) => ({ matched: mnemonic === PHRASE });
+    expect(wrong.phrase).not.toBe(TEST_PHRASE);
+    const check = (mnemonic: string) => ({ matched: mnemonic === TEST_PHRASE });
     expect((await wrong.confirmByWallet(check)).matched).toBe(false);
   });
 
@@ -99,16 +98,16 @@ describe("ReEncoding", () => {
       "unicode",
       "seedshift-legacy",
     );
-    expect(ReEncoding.of(legacy, [RIGHT]).phrase).toBe(PHRASE);
+    expect(ReEncoding.of(legacy, [RIGHT]).phrase).toBe(TEST_PHRASE);
     expect(() => ReEncoding.of(legacy, [WRONG])).toThrow(CHECKSUM_FAILS);
     // The Original Seedshift with a valid last word, as Encode makes it: every last word may be it.
-    const several = EncodedBackup.encode(PHRASE, [RIGHT], "indexes", "seedshift-legacy", {
+    const several = EncodedBackup.encode(TEST_PHRASE, [RIGHT], "indexes", "seedshift-legacy", {
       validLastWord: true,
     }).backup;
     expect(several.mode).toBe("seedshift-legacy-valid");
     expect(() => ReEncoding.of(several, [RIGHT])).toThrow(LAST_WORD_NEEDED);
     // The last word the person remembers picks the phrase, as typed, in any case.
-    expect(ReEncoding.of(several, [RIGHT], " About ").phrase).toBe(PHRASE);
+    expect(ReEncoding.of(several, [RIGHT], " About ").phrase).toBe(TEST_PHRASE);
     // One that no candidate ends with, or that is no single word, is refused.
     const lastWords = several
       .candidates([RIGHT])
@@ -174,7 +173,9 @@ describe("re-encode options", () => {
   it("asks the new backup on the private screen only without options of it", () => {
     const asked = (...items: string[]) => asksNewBackup(parseArguments(items));
     expect(asked("--ask-secrets", "--qr-file", "old.png", "--old-mode", "seedshift")).toBe(true);
-    expect(asked("--ask-secrets", "--recognised", "--master-fingerprint", FINGERPRINT)).toBe(true);
+    expect(asked("--ask-secrets", "--recognised", "--master-fingerprint", TEST_FINGERPRINT)).toBe(
+      true,
+    );
     expect(asked("--ask-secrets", "--format", "3")).toBe(false);
     expect(asked("--ask-secrets", "--sskr")).toBe(false);
     // Without --ask-secrets the options give every answer.
@@ -211,7 +212,7 @@ describe("re-encode CLI", () => {
       "--format",
       "3",
       "--master-fingerprint",
-      FINGERPRINT,
+      TEST_FINGERPRINT,
     ]);
     // Standard output carries only the new backup, never the old phrase (AUD-022-SEC001).
     expect(result.stdout).not.toContain("abandon");
@@ -251,7 +252,7 @@ describe("re-encode CLI", () => {
       "--dates",
       "01-01-2030",
     ]);
-    expect(back.stdout).toContain(PHRASE);
+    expect(back.stdout).toContain(TEST_PHRASE);
   });
 
   it("re-encodes a record file, confirmed by --recognised, into a new record file", async () => {
@@ -263,7 +264,7 @@ describe("re-encode CLI", () => {
         cli,
         "encode",
         "--mnemonic",
-        PHRASE,
+        TEST_PHRASE,
         "--dates",
         "23-09-2026",
         "--format",
@@ -317,7 +318,7 @@ describe("re-encode CLI", () => {
         "--format",
         "3",
         "--master-fingerprint",
-        FINGERPRINT,
+        TEST_FINGERPRINT,
       ]),
     ).rejects.toMatchObject({
       stderr: containing("Nothing was re-encoded."),
@@ -329,18 +330,18 @@ describe("re-encode CLI", () => {
       stderr: containing("its checksum confirms nothing"),
     });
     await expect(
-      run([...OLD, "--recognised", "--master-fingerprint", FINGERPRINT]),
+      run([...OLD, "--recognised", "--master-fingerprint", TEST_FINGERPRINT]),
     ).rejects.toMatchObject({ stderr: containing("give one") });
     await expect(run(["--ask-secrets", "--old-dates", "23-09-2026"])).rejects.toMatchObject({
       stderr: containing("--ask-secrets cannot be combined with --old-dates"),
     });
-    await expect(run(["--mnemonic", PHRASE, "--recognised"])).rejects.toMatchObject({
+    await expect(run(["--mnemonic", TEST_PHRASE, "--recognised"])).rejects.toMatchObject({
       stderr: containing("does not support the mnemonic text setting"),
     });
   });
 
   it("takes the last word of a backup of the Original Seedshift with a valid last word", async () => {
-    const several = EncodedBackup.encode(PHRASE, [RIGHT], "indexes", "seedshift-legacy", {
+    const several = EncodedBackup.encode(TEST_PHRASE, [RIGHT], "indexes", "seedshift-legacy", {
       validLastWord: true,
     }).backup;
     const old = ["--input", several.record(), "--old-dates", "23-09-2026", "--format", "3"];
@@ -371,7 +372,7 @@ describe("re-encode CLI", () => {
     ]).catch((error: { stderr: string }) => error);
     expect(refused.stderr).toContain("Dates cannot be used in direct mode.");
     expect(refused.stderr).not.toContain(OLD_BACKUP_REFUSAL);
-    expect(refused.stderr).not.toContain(FINGERPRINT);
+    expect(refused.stderr).not.toContain(TEST_FINGERPRINT);
   });
 });
 

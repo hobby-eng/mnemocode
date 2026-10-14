@@ -23,6 +23,7 @@ import type { SharePlatform } from "../src/sskr/share-platform.js";
 import { ShareSet } from "../src/sskr/share-set.js";
 import { ShareUnmasking } from "../src/sskr/share-unmasking.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const vectors = JSON.parse(
   readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
@@ -30,7 +31,6 @@ const vectors = JSON.parse(
 const VECTOR = vectors.deterministic[0]!;
 const PHRASE = entropyToMnemonic(Uint8Array.from(Buffer.from(VECTOR.entropy, "hex")), wordlist);
 const [FIRST, SECOND] = VECTOR.shares as [string, string, string];
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const DATE = parseDate("23-09-2026");
 
 /** The host's own platform, which counts its calls: node:crypto's HMAC and the bundled SSKR. */

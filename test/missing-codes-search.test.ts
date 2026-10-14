@@ -12,9 +12,9 @@ import {
 } from "../src/core/missing-codes-search.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import type { WalletCheck } from "../src/core/wallet-check.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // Public test data only: the phrase "abandon ... about", masked with one public date.
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const DATE = "23-09-2026";
 const ENCODED = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
 const ENCODED_PHRASE = ENCODED.shiftedEnglish.join(" ");

@@ -20,6 +20,7 @@ import { searchDates } from "../src/cli/date-search.js";
 import { DatesAnswer } from "../src/core/date-search.js";
 import { DATE_COUNT_WORDS, Masking, PHRASE_WORDS } from "../src/core/masking.js";
 import { SearchPlan } from "../src/core/search-plan.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/cli/terminal-input.js")>()),
@@ -27,7 +28,6 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
   terminalAvailable: () => false,
 }));
 
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 /** Codes that are both word numbers and Unicode text (test/cli.test.ts). */
 const AMBIGUOUS = "76 84 57 28 90 19 59 27 62 11 89 81 66 42 75 28 50 11 52 30 57 30 62 10";
 

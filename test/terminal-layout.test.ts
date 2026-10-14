@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { printableText, printCodes, ProgressLine, terminalPhrase } from "../src/cli/terminal.js";
 import { STYLE_CODES } from "../src/cli/terminal-style.js";
-
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** Standard error as a terminal of `columns` columns, or as a pipe, for the length of a test. */
 function stderrAs(tty: boolean, columns = 80): void {

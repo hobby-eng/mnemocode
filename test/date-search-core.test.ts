@@ -13,11 +13,11 @@ import {
   type WalletCheck,
 } from "../src/core/date-search.js";
 import { anyOf } from "./helpers/matchers.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // The host-neutral date search on its own, as another host such as the Deriver uses it: no
 // terminal, no Node.js service, the wallet check and the event loop's turns passed in.
 
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 /** The test phrase masked with MnemoCode Seedshift and 23-09-2026, as BIP39 indexes. */
 const MASKED = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]).shiftedIndexes;
 /** A wallet check that knows the test phrase, as a fingerprint check would, at the master key. */

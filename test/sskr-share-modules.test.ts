@@ -22,8 +22,8 @@ import { writeShare } from "../src/sskr/transport.js";
 import { counted, duration } from "../src/core/search-plan.js";
 import { markUnits, wrongValue } from "./helpers/shares.js";
 import { matching } from "./helpers/matchers.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const vectors = JSON.parse(
   readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
 ) as {

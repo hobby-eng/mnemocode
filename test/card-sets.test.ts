@@ -44,8 +44,8 @@ import {
   shareFormatHasCards,
   writeShare,
 } from "../src/sskr/transport.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const PUBLIC_PHRASE = `${"abandon ".repeat(11)}about`;
 /** The Unicode codes of "abandon" and "about" (core/words.ts). */
 const ABANDON = UNICODE_CODES[0]!;
 const ABOUT = UNICODE_CODES[3]!;
@@ -301,7 +301,7 @@ describe("decoys after a backup's codes", () => {
 });
 
 describe("the codes before the decoys, read back", () => {
-  const backup = EncodedBackup.read(PUBLIC_PHRASE, "english", "direct");
+  const backup = EncodedBackup.read(TEST_PHRASE, "english", "direct");
 
   it("are taken from the start in every form, marks kept", () => {
     for (const format of ["indexes", "unicode", "colors", "colors-unicode", "english"] as const) {
@@ -334,7 +334,7 @@ describe("the codes before the decoys, read back", () => {
     const longer = EncodedBackup.of(codes, "unicode", "direct");
     expect(longer.decode([]).checksumValid).toBe(false);
     expect(longer.shorterPhrases([]).map(({ words }) => words)).toEqual([12]);
-    expect(longer.shorterPhrases([])[0]!.result.recoveredMnemonic).toBe(PUBLIC_PHRASE);
+    expect(longer.shorterPhrases([])[0]!.result.recoveredMnemonic).toBe(TEST_PHRASE);
     expect(backup.shorterPhrases([])).toEqual([]);
   });
 });

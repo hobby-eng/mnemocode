@@ -8,10 +8,9 @@ import {
 } from "../src/core/master-fingerprint.js";
 import { WalletEvidenceCheck } from "../src/core/wallet-evidence.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // Public data only: the all-zero entropy's phrase, whose master fingerprint is 73c5da0a.
-const PHRASE = `${"abandon ".repeat(11)}about`;
-const FINGERPRINT = "73c5da0a";
 
 /** BIP39's PBKDF2 as the command line passes it, and the same answering later, as WebCrypto. */
 const now = (password: string, salt: string, rounds: number, bytes: number) =>
@@ -21,42 +20,48 @@ const later = async (password: string, salt: string, rounds: number, bytes: numb
 
 describe("The master fingerprint on its own (core/master-fingerprint.ts)", () => {
   it("gives the published fingerprint, at once and later", async () => {
-    expect(new MasterFingerprintCheck(now).fingerprint(PHRASE)).toBe(FINGERPRINT);
-    expect(await new MasterFingerprintCheck(later).fingerprintAsync(PHRASE)).toBe(FINGERPRINT);
+    expect(new MasterFingerprintCheck(now).fingerprint(TEST_PHRASE)).toBe(TEST_FINGERPRINT);
+    expect(await new MasterFingerprintCheck(later).fingerprintAsync(TEST_PHRASE)).toBe(
+      TEST_FINGERPRINT,
+    );
     // Another BIP39 passphrase is another wallet.
-    expect(new MasterFingerprintCheck(now).fingerprint(PHRASE, "TREZOR")).not.toBe(FINGERPRINT);
+    expect(new MasterFingerprintCheck(now).fingerprint(TEST_PHRASE, "TREZOR")).not.toBe(
+      TEST_FINGERPRINT,
+    );
   });
 
   it("matches an expected fingerprint, with its warning, and refuses one that cannot be", async () => {
     const check = new MasterFingerprintCheck(now);
-    expect(check.match(PHRASE, " 73C5DA0A ")).toEqual({
+    expect(check.match(TEST_PHRASE, " 73C5DA0A ")).toEqual({
       matched: true,
       path: "m",
       warning: FINGERPRINT_WARNING,
     });
-    expect(check.match(PHRASE, "deadbeef").matched).toBe(false);
-    expect(await new MasterFingerprintCheck(later).matchAsync(PHRASE, FINGERPRINT)).toMatchObject({
+    expect(check.match(TEST_PHRASE, "deadbeef").matched).toBe(false);
+    expect(
+      await new MasterFingerprintCheck(later).matchAsync(TEST_PHRASE, TEST_FINGERPRINT),
+    ).toMatchObject({
       matched: true,
     });
-    expect(() => check.match(PHRASE, "73c5da0")).toThrow(/eight hexadecimal/u);
+    expect(() => check.match(TEST_PHRASE, "73c5da0")).toThrow(/eight hexadecimal/u);
     expect(() => parseMasterFingerprint("xyz")).toThrow(/eight hexadecimal/u);
     // A PBKDF2 that answers later needs the Async forms, as before the split.
-    expect(() => new MasterFingerprintCheck(later).fingerprint(PHRASE)).toThrow(/matchAsync/u);
+    expect(() => new MasterFingerprintCheck(later).fingerprint(TEST_PHRASE)).toThrow(/matchAsync/u);
   });
 
   it("gives what the wallet evidence check gives, which is built on it", () => {
     const evidence = new WalletEvidenceCheck(now, [BITCOIN]);
-    expect(evidence.fingerprint(PHRASE)).toBe(FINGERPRINT);
+    expect(evidence.fingerprint(TEST_PHRASE)).toBe(TEST_FINGERPRINT);
     expect(
-      evidence.match(PHRASE, {
+      evidence.match(TEST_PHRASE, {
         kind: "master-fingerprint",
-        value: FINGERPRINT,
+        value: TEST_FINGERPRINT,
         network: "mainnet",
       }),
     ).toEqual({
       matched: true,
       kind: "master-fingerprint",
-      derived: FINGERPRINT,
+      derived: TEST_FINGERPRINT,
       path: "m",
       warning: FINGERPRINT_WARNING,
     });

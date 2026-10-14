@@ -9,12 +9,11 @@ import { describe, expect, it } from "vitest";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { ReEncoding } from "../src/core/re-encoding.js";
 import { FINGERPRINT_WARNING, fingerprintMatch } from "../src/core/wallet-check.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
 
-const PHRASE = `${"abandon ".repeat(11)}about`;
-const FINGERPRINT = "73c5da0a";
 const ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 /** The test phrase without Seedshift as Unicode codes, from the BIP39 Chinese list. */
 const UNICODE = `${"7684".repeat(11)}5728`;
@@ -28,7 +27,7 @@ function reEncode(...wallet: readonly string[]) {
       cli,
       "re-encode",
       "--input",
-      PHRASE,
+      TEST_PHRASE,
       "--old-mode",
       "direct",
       "--old-format",
@@ -43,7 +42,7 @@ function reEncode(...wallet: readonly string[]) {
 
 describe("AUD-020-SEC001: a fingerprint's match is accepted with its warning", () => {
   it("shows the warning before the match, and claims no proof", async () => {
-    const { stdout, stderr } = await reEncode("--master-fingerprint", FINGERPRINT);
+    const { stdout, stderr } = await reEncode("--master-fingerprint", TEST_FINGERPRINT);
     // The new backup is made as before.
     expect(stdout).toContain(UNICODE);
     const warning = stderr.indexOf(FINGERPRINT_WARNING);
@@ -70,10 +69,10 @@ describe("AUD-020-SEC001: a fingerprint's match is accepted with its warning", (
   });
 
   it("keeps the check's warning in the library's record of the confirmation", async () => {
-    const backup = EncodedBackup.read(PHRASE, "english", "direct");
+    const backup = EncodedBackup.read(TEST_PHRASE, "english", "direct");
     const byFingerprint = ReEncoding.of(backup, []);
     await byFingerprint.confirmByWallet((mnemonic) =>
-      fingerprintMatch(mnemonic === PHRASE ? FINGERPRINT : "00000000", FINGERPRINT),
+      fingerprintMatch(mnemonic === TEST_PHRASE ? TEST_FINGERPRINT : "00000000", TEST_FINGERPRINT),
     );
     expect(byFingerprint.confirmation).toEqual({
       by: "wallet",

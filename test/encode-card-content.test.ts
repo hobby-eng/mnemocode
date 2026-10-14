@@ -5,6 +5,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CardJob } from "../src/export/render.js";
 import type { CardDrawing } from "../src/export/templates.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const drawn: { readonly output: string; readonly job: CardJob }[] = [];
 
@@ -37,7 +38,6 @@ const { parseDate } = await import("../src/core/dates.js");
 const { EncodedForm } = await import("../src/core/encoded-form.js");
 const { codeColors } = await import("../src/export/card-palette.js");
 
-const PHRASE = `${"abandon ".repeat(11)}about`;
 const DATES = [parseDate("23-09-2026")];
 
 afterEach(() => {
@@ -46,7 +46,7 @@ afterEach(() => {
 
 describe("the cards of Encode", () => {
   it("draws its PDF, its page images and its separate cards from one content", async () => {
-    const encoding = EncodedBackup.encode(PHRASE, DATES, "colors", "seedshift");
+    const encoding = EncodedBackup.encode(TEST_PHRASE, DATES, "colors", "seedshift");
     const outcome = { encoding, mode: "seedshift" as const, enteredDates: DATES };
     // One object of options for the run, as Encode keeps it (onlyResult), so that the random card
     // details are drawn once.
@@ -78,14 +78,14 @@ describe("the cards of Encode", () => {
 
   it("prints Unicode codes in colors that decorate them, and refuses a form without cards", () => {
     const dates = [parseDate("23-09-2026")];
-    const unicode = EncodedBackup.encode(PHRASE, dates, "unicode", "seedshift").backup;
+    const unicode = EncodedBackup.encode(TEST_PHRASE, dates, "unicode", "seedshift").backup;
     const content = backupCardContent(unicode);
     expect(content.labels).toEqual(EncodedForm.of("unicode").cardCodes(unicode.indexes));
     expect(content.colors).toEqual(codeColors(content.labels!));
     expect(content.payload).toBe(unicode.text());
-    const words = EncodedBackup.encode(PHRASE, [], "english", "direct").backup;
+    const words = EncodedBackup.encode(TEST_PHRASE, [], "english", "direct").backup;
     expect(() => backupCardContent(words)).toThrow("No card prints codes written as english.");
-    const numbers = EncodedBackup.encode(PHRASE, dates, "indexes", "seedshift").backup;
+    const numbers = EncodedBackup.encode(TEST_PHRASE, dates, "indexes", "seedshift").backup;
     expect(() => backupCardContent(numbers)).toThrow("No card prints codes written as indexes.");
   });
 });

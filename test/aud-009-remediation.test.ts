@@ -23,9 +23,9 @@ import { writeShare } from "../src/sskr/transport.js";
 import { pageOperators } from "./helpers/pdf-content.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { holes, withHoles } from "./helpers/holes.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // Public data only: the all-zero entropy's phrase, synthetic dates, and the public SSKR vectors.
-const PHRASE = `${"abandon ".repeat(11)}about`;
 const TEXTS = { decodeEntry: "Decode" };
 const DATE = { year: 2026, month: 9, day: 23 };
 const SHARES = (
@@ -67,14 +67,14 @@ describe("AUD-009-FUN001: objects own the dates they were given", () => {
 
   it("approves a share backup only when its dates really give the phrase back", async () => {
     const date = { year: 2026, month: 9, day: 23 };
-    const masked = Masking.of("seedshift").encode(PHRASE, [date]).shiftedEnglish.join(" ");
+    const masked = Masking.of("seedshift").encode(TEST_PHRASE, [date]).shiftedEnglish.join(" ");
     const shares = await new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7)).split(
       masked,
       2,
       3,
     );
     const check = new ShareBackupCheck(
-      { mnemonic: PHRASE, mode: "seedshift", threshold: 2, dates: [date] },
+      { mnemonic: TEST_PHRASE, mode: "seedshift", threshold: 2, dates: [date] },
       nodeSharePlatform,
       TEXTS,
     );
@@ -135,7 +135,9 @@ describe("AUD-009-API002: EncodedBackup.of refuses index arrays with holes", () 
   });
 
   it("still reads dense codes in every mode", () => {
-    const encoded = Masking.of("seedshift").encode(PHRASE, [{ year: 2026, month: 9, day: 23 }]);
+    const encoded = Masking.of("seedshift").encode(TEST_PHRASE, [
+      { year: 2026, month: 9, day: 23 },
+    ]);
     expect(EncodedBackup.of(encoded.shiftedIndexes, "indexes", "seedshift").indexes).toEqual(
       encoded.shiftedIndexes,
     );
@@ -253,7 +255,7 @@ describe("AUD-009 follow-up: codes are checked before an object holds them", () 
   });
 
   it("refuses an index above 2047 in a legacy result, which shifted every later bit", () => {
-    const result = encodeMnemonicLegacy(PHRASE, [DATE]);
+    const result = encodeMnemonicLegacy(TEST_PHRASE, [DATE]);
     const wide = { ...result, shiftedIndexes: [...result.shiftedIndexes.slice(0, 11), 4096] };
     expect(() => legacyChecksumValidResult(wide)).toThrow(/integer from 0/u);
     expect(legacyChecksumValidResult(result).shiftedIndexes).toHaveLength(12);
@@ -274,7 +276,7 @@ describe("AUD-009 follow-up: a backup check says restores only after a real reco
     // Before: without the dates of the result, these modes compared nothing, and any shares
     // that restore passed, here as the backup of a phrase they do not hold.
     const shares = await new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7)).split(
-      PHRASE,
+      TEST_PHRASE,
       2,
       3,
     );
@@ -291,12 +293,12 @@ describe("AUD-009 follow-up: a backup check says restores only after a real reco
   });
 
   it("refuses a hole among the dates of the result", () => {
-    const encoded = Masking.of("seedshift").encode(PHRASE, [DATE]);
+    const encoded = Masking.of("seedshift").encode(TEST_PHRASE, [DATE]);
     const dates = holes<typeof DATE>(1);
     expect(
       () =>
         new EncodedBackupCheck({
-          mnemonic: PHRASE,
+          mnemonic: TEST_PHRASE,
           format: "indexes",
           mode: "seedshift",
           codes: encoded.shiftedIndexes,
@@ -306,7 +308,7 @@ describe("AUD-009 follow-up: a backup check says restores only after a real reco
     expect(
       () =>
         new ShareBackupCheck(
-          { mnemonic: PHRASE, mode: "seedshift", threshold: 2, dates },
+          { mnemonic: TEST_PHRASE, mode: "seedshift", threshold: 2, dates },
           nodeSharePlatform,
           TEXTS,
         ),

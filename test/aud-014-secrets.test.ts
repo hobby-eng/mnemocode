@@ -22,6 +22,7 @@ import { CandidatesFile } from "../src/cli/candidates-file.js";
 import { givenInputFormat, textInput } from "../src/cli/input.js";
 import { readBoundedTextFile } from "../src/cli/text-file.js";
 import { strictUtf8Text } from "../src/cli/utf8.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** What the readers of bounded-read.ts returned, so that a test can see they were wiped. */
 const returned: Buffer[] = [];
@@ -47,7 +48,6 @@ vi.mock("../src/cli/bounded-read.js", async (importOriginal) => {
   };
 });
 
-const PHRASE = `${"abandon ".repeat(11)}about`;
 const LIST_PASSPHRASE = "synthetic public password";
 /** The bytes of the audit's probe: a passphrase file ending in byte FF and a line feed. */
 const MALFORMED = Buffer.concat([Buffer.from("synthetic-passphrase-"), Buffer.from([0xff, 0x0a])]);
@@ -111,7 +111,7 @@ describe("AUD-014-SEC001: only the three known protections, none only when chose
   it("still takes the three well-formed choices, and writes in the open only for none", async () => {
     const none = protectionFor({ kind: "none" });
     expect(none).toBeInstanceOf(NoProtection);
-    const open = await new CandidateListWriter(none).writePhrases([PHRASE]);
+    const open = await new CandidateListWriter(none).writePhrases([TEST_PHRASE]);
     if (open.kind !== "list") throw new Error("expected a list");
     expect(open.list.encrypted).toBe(false);
     expect(new TextDecoder().decode(open.list.bytes.subarray(0, 4))).toBe("MNCL");
@@ -125,7 +125,7 @@ describe("AUD-014-SEC001: only the three known protections, none only when chose
     const { recipient } = await createSessionIdentity();
     const key = protectionFor({ kind: "key", recipient });
     expect(key).toBeInstanceOf(ScannerKeyProtection);
-    const sealed = await new CandidateListWriter(key).writePhrases([PHRASE]);
+    const sealed = await new CandidateListWriter(key).writePhrases([TEST_PHRASE]);
     if (sealed.kind !== "list") throw new Error("expected a list");
     expect(sealed.list.encrypted).toBe(true);
     expect(listFileLock(sealed.list.bytes)).toBe("key");
@@ -199,8 +199,8 @@ describe("AUD-014-API002: a file or standard input is valid UTF-8 or refused", (
       "candidates-passphrase-file": fileWith(`﻿${LIST_PASSPHRASE}\n`),
     });
     expect(target).toBeInstanceOf(CandidatesFile);
-    standardInput = Buffer.from(`${PHRASE}\n`);
-    expect(textInput({ "mnemonic-file": "-" }, "mnemonic")).toBe(`${PHRASE}\n`);
+    standardInput = Buffer.from(`${TEST_PHRASE}\n`);
+    expect(textInput({ "mnemonic-file": "-" }, "mnemonic")).toBe(`${TEST_PHRASE}\n`);
     expect(allWiped()).toBe(true);
   });
 });

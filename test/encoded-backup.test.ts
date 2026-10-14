@@ -18,12 +18,12 @@ import {
 import { WalletEvidenceCheck } from "../src/core/wallet-evidence.js";
 import { Masking } from "../src/core/masking.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // The host-neutral encoded backup on its own, as another host such as the Deriver uses it: the
 // codes of an encoded seed phrase checked before its dates, the encoded fingerprint with the
 // host's PBKDF2, and the decoding with complete dates. Public test phrase only.
 
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
 const DATE = parseDate("23-09-2026");
 const MASKED = encodeMnemonic(TEST_PHRASE, [DATE]);
 const LEGACY = encodeMnemonicLegacy(TEST_PHRASE, [DATE]);

@@ -7,9 +7,8 @@ import { encodeMnemonic, encodeMnemonicLegacy, parseDate } from "../src/core.js"
 import { HARD_MAX_COMBINATIONS, reportDateMatches, searchDates } from "../src/cli/date-search.js";
 import { DatesAnswer, DateSearch } from "../src/core/date-search.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const TEST_PHRASE = `${"abandon ".repeat(11)}about`;
-const FINGERPRINT = "73c5da0a";
 /** The test phrase masked with MnemoCode Seedshift and 23-09-2026, as word numbers. */
 const MASKED = "2027 10 24 2027 10 24 2027 10 24 2027 10 377";
 /** The test phrase masked with the original Seedshift and 10-07-1963 and 23-09-2026. */
@@ -103,7 +102,7 @@ describe("the date search", () => {
     expect(all.kept).toEqual([]);
     const matched = (await searchDates({
       ...search,
-      evidence: { kind: "master-fingerprint", value: FINGERPRINT, network: "mainnet" },
+      evidence: { kind: "master-fingerprint", value: TEST_FINGERPRINT, network: "mainnet" },
       target: await CandidatesFile.of({
         "candidates-file": "unused.age",
         "plaintext-candidates": true,
@@ -135,7 +134,7 @@ describe("the date search", () => {
       mode: "seedshift" as const,
       evidence: {
         kind: "master-fingerprint" as const,
-        value: FINGERPRINT,
+        value: TEST_FINGERPRINT,
         network: "mainnet" as const,
       },
       passphrase: "",
@@ -210,7 +209,7 @@ describe("the date search", () => {
         "--dates",
         "2?-09-2026",
         "--master-fingerprint",
-        FINGERPRINT,
+        TEST_FINGERPRINT,
         "--progress-every",
         "4",
       ],

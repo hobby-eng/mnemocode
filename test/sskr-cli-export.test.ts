@@ -11,7 +11,8 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { type ShareFormat } from "../src/sskr/transport.js";
 import { markUnits } from "./helpers/shares.js";
 import { sskrVectors } from "./helpers/vectors.js";
-const mnemonic = `${"abandon ".repeat(11)}about`;
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
+
 function cli(args: string[]) {
   const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...args], {
     encoding: "utf8",
@@ -59,7 +60,7 @@ describe("integrated SSKR CLI", () => {
         "encode",
         "--sskr",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--dates",
         "23-09-2026",
         "--format",
@@ -93,13 +94,13 @@ describe("integrated SSKR CLI", () => {
         "23-09-2026",
       ]);
       expect(restored.status, restored.stderr).toBe(0);
-      expect(restored.stdout).toContain(mnemonic);
+      expect(restored.stdout).toContain(TEST_PHRASE);
       // A taken name is numbered, shares-1.txt, without spaces; the old file stays as it was.
       const again = cli([
         "encode",
         "--sskr",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--threshold",
         "2",
         "--shares",
@@ -126,7 +127,7 @@ describe("integrated SSKR CLI", () => {
       const single = cli([
         "encode",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--format",
         "colors",
         "--pdf",
@@ -144,14 +145,14 @@ describe("integrated SSKR CLI", () => {
         "--qr-file",
         join(directory, "cards-qr.png"),
       ]);
-      expect(decoded.stdout.trim()).toBe(mnemonic);
+      expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
       // The shares: one image for each, named after its reference.
       const shares = join(directory, "shares.pdf");
       const split = cli([
         "encode",
         "--sskr",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--threshold",
         "2",
         "--shares",
@@ -178,7 +179,7 @@ describe("integrated SSKR CLI", () => {
         join(directory, images[2]!),
       ]);
       // The backup in the form of the shares comes first, then the seed phrase.
-      expect(restored.stdout.trim().split("\n").at(-1)).toBe(mnemonic);
+      expect(restored.stdout.trim().split("\n").at(-1)).toBe(TEST_PHRASE);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
@@ -212,7 +213,7 @@ describe("integrated SSKR CLI", () => {
 
 describe("integrated SSKR CLI", () => {
   it("keeps terminal color swatches plain when redirected", () => {
-    const result = cli(["encode", "--mnemonic", mnemonic, "--format", "5", "--cards"]);
+    const result = cli(["encode", "--mnemonic", TEST_PHRASE, "--format", "5", "--cards"]);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout + result.stderr).not.toContain("\x1b");
   });
@@ -224,7 +225,7 @@ describe("integrated SSKR CLI", () => {
       const split = cli([
         "sskr-split",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--threshold",
         "2",
         "--shares",
@@ -242,7 +243,7 @@ describe("integrated SSKR CLI", () => {
       expect(split.stdout).toContain(records[0]!);
       const restored = cli(["sskr-combine", "--share", records[1]!, "--share", records[2]!]);
       expect(restored.status, restored.stderr).toBe(0);
-      expect(restored.stdout).toContain(mnemonic);
+      expect(restored.stdout).toContain(TEST_PHRASE);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -257,7 +258,7 @@ describe("integrated SSKR CLI", () => {
         "encode",
         "--sskr",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--dates",
         date,
         "--threshold",
@@ -274,7 +275,7 @@ describe("integrated SSKR CLI", () => {
       expect(split.stdout).not.toContain("Unicode code points of");
       const records = readFileSync(path, "utf8").trim().split("\n");
       for (const record of records) expect(record).toMatch(/^[0-9A-F]{4}( [0-9A-F]{4})+$/u);
-      const masked = formatEncoded(encodeMnemonic(mnemonic, [parseDate(date)]), "unicode");
+      const masked = formatEncoded(encodeMnemonic(TEST_PHRASE, [parseDate(date)]), "unicode");
       const restored = cli([
         "sskr-combine",
         "--share",
@@ -286,7 +287,7 @@ describe("integrated SSKR CLI", () => {
       ]);
       expect(restored.status, restored.stderr).toBe(0);
       expect(restored.stdout).toContain(masked);
-      expect(restored.stdout).toContain(mnemonic);
+      expect(restored.stdout).toContain(TEST_PHRASE);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
