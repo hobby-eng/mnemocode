@@ -103,7 +103,10 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       ["Backup check", "whether to type the backup again from paper, unless --backup-check"],
     ],
     examples: [
-      ["mnemocode encode --ask-secrets --format 3", "A real phrase, dates asked for, as Unicode"],
+      [
+        "mnemocode encode --mode seedshift --ask-secrets --format 3",
+        "A real phrase, dates asked for, as Unicode",
+      ],
       [
         `mnemocode encode --mode direct --mnemonic ${TEST_PHRASE_VARIABLE} --format 5 --cards`,
         "The test phrase as colors, shown as cards in the terminal",
@@ -576,7 +579,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     about: [
       `Prints the row of the BIP39 table that links an English word, its number from ${WORD_NUMBERS} and the four-digit Unicode code of format ${formatNumber("unicode")}, or the whole table.`,
     ],
-    usage: "(--word <WORD> | --index <N> | --unicode <HEX> | --all)",
+    usage:
+      "(--word <WORD> | --index <N> | --unicode <HEX> | --all | --recovery-guide | --word-lists-dir <PATH>) [--table-format <NAME>] [--output <PATH>]",
     groups: [
       {
         heading: "Options (exactly one):",
@@ -585,6 +589,31 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           { flag: "--index", value: "N", summary: `A word number, ${WORD_NUMBERS}` },
           { flag: "--unicode", value: "HEX", summary: "A four-digit Unicode code, such as 5BF6" },
           { flag: "--all", summary: "The whole table: number, word and code, tab-separated" },
+          {
+            flag: "--recovery-guide",
+            summary: "Standalone English instructions for manual recovery",
+          },
+          {
+            flag: "--word-lists-dir",
+            value: "PATH",
+            summary: "Full set in a new folder: numbered lists, full mapping and guide",
+          },
+        ],
+      },
+      {
+        heading: "Export:",
+        options: [
+          {
+            flag: "--table-format",
+            value: "NAME",
+            summary:
+              "With --all: english, chinese (Traditional), unicode or mapping; numbered from 1",
+          },
+          {
+            flag: "--output",
+            value: "PATH",
+            summary: "Save the full word list or recovery guide as a UTF-8 text file",
+          },
         ],
       },
     ],
@@ -593,6 +622,18 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       ["mnemocode table --index 1", "The first word"],
       ["mnemocode table --unicode 5BF6", "The word with this code"],
       ["mnemocode table --all", `All ${counting(BIP39_DICTIONARY_SIZE)} rows`],
+      [
+        "mnemocode table --all --table-format mapping --output bip39-mapping.txt",
+        "Save the complete English/Chinese/Unicode mapping",
+      ],
+      [
+        "mnemocode table --recovery-guide --output manual-recovery.md",
+        "Save the printable English recovery guide",
+      ],
+      [
+        "mnemocode table --word-lists-dir ./recovery-pack",
+        "Save all dictionaries and the guide in one folder",
+      ],
     ],
   },
 
@@ -734,7 +775,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
     examples: [
       ["mnemocode preview --list", "The installed designs"],
       [
-        "mnemocode encode --ask-secrets --format 5 --template business-it --pdf cards.pdf",
+        "mnemocode encode --mode seedshift --ask-secrets --format 5 --template business-it --pdf cards.pdf",
         "A real export; the phrase and the dates are asked on the private screen",
       ],
       ["mnemocode encode --help", "Every card option explained"],

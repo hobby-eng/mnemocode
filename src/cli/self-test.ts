@@ -6,13 +6,13 @@
 
 import { masterFingerprint, nodePbkdf2HmacSha512 } from "../bitcoin-evidence.js";
 import { STYLE, terminalColor, terminalPaint } from "./terminal.js";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { encodeMnemonic, formatEncoded, parseDate } from "../core.js";
 import { COIN_ADDRESS_SELF_TEST } from "../core/coins-self-test.js";
 import { MnemoCodeSelfTest, type SelfTestCheck, type SelfTestFeature } from "../core/self-test.js";
-import { expectRefusedLater, expectSame } from "../core/self-test-check.js";
+import { expectRefused, expectRefusedLater, expectSame } from "../core/self-test-check.js";
 import { WALLET_EVIDENCE_SELF_TEST } from "../core/wallet-evidence-self-test.js";
 import { WORD_HINTS_SELF_TEST } from "../core/word-hints-self-test.js";
 import { RE_ENCODING_SELF_TEST } from "../core/re-encoding-self-test.js";
@@ -34,8 +34,10 @@ import { headingLine } from "./terminal-style.js";
 import { PUBLIC_VECTORS_FILE } from "../bundled-file-paths.js";
 import { describeError } from "../core/refusal.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { TextFileInput } from "./text-file.js";
 
 const ERRORS = new ErrorCatalog("cli.self-test", {
+  "qr-image-not-saved": () => "QR image was not saved.",
   "critical-mnemo-code-core-self-test-failed-no": (value0: string) =>
     `CRITICAL: MnemoCode core self-test failed.\nNo mnemonic data was processed.\n${value0}`,
   "qr-write-read-round-trip-mismatch": () => "QR write/read round trip mismatch.",
@@ -66,11 +68,49 @@ const FEATURES: readonly SelfTestFeature[] = [
 export function assertCoreSelfTest(): void {
   try {
     MnemoCodeSelfTest.core(FEATURES);
+    checkTextFileInputStartup();
   } catch (error) {
     const detail = describeError(error);
     throw ERRORS.create("critical-mnemo-code-core-self-test-failed-no", [`${detail}`]);
   }
 }
+
+/** Inline input stays inline and remote file links fail before any user text is read. */
+function checkTextFileInputStartup(): void {
+  expectSame(
+    TextFileInput.read(sskrVector.shares[0], "The test file"),
+    sskrVector.shares[0],
+    "An inline UR is no file path",
+  );
+  expectRefused(
+    () => TextFileInput.read("file://example.invalid/backup.txt", "The test file"),
+    /local text file/u,
+    "A remote file link",
+  );
+}
+
+/** The full CLI self-test reads one synthetic share file without changing its line boundaries. */
+export const TEXT_FILE_INPUT_CHECK: SelfTestCheck = {
+  name: "Text file input",
+  detail: "local UTF-8 file, share lines retained, missing file refused",
+  run: async () => {
+    checkTextFileInputStartup();
+    const directory = await mkdtemp(join(tmpdir(), "mnemocode-file-check-"));
+    try {
+      const path = join(directory, "public shares.txt");
+      const text = `${sskrVector.shares[0]}\n${sskrVector.shares[2]}\n`;
+      await writeFile(path, text, { mode: 0o600 });
+      expectSame(TextFileInput.read(`"${path}"`, "The test file"), text, "All share file lines");
+      expectRefused(
+        () => TextFileInput.read(join(directory, "missing.txt"), "The test file"),
+        /could not be read/u,
+        "A missing text file",
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+};
 
 /** Runs `check` in a new temporary folder, which is removed afterwards whatever happens. */
 async function withTemporaryFolder(check: (directory: string) => Promise<void>): Promise<void> {
@@ -112,6 +152,7 @@ async function checkQrBesideSheets(): Promise<void> {
     const sheet = join(directory, "cards.pdf");
     const beside = await saveQrBeside(payload, sheet);
     expectSame(beside, join(directory, "cards-qr.png"), "QR image beside a PDF");
+    if (typeof beside !== "string") throw ERRORS.create("qr-image-not-saved", []);
     expectSame(
       await saveQrBeside(payload, sheet),
       join(directory, "cards-qr-1.png"),
@@ -157,7 +198,7 @@ export async function runSelfTest(): Promise<void> {
       // runs without it (system-sandbox.ts).
       { name: "System sandbox", detail: sandboxReport(), run: () => undefined },
     ],
-    after: [QR_CHECK, QR_BESIDE_CHECK, cardExportCheck(nodeCardRenderer)],
+    after: [TEXT_FILE_INPUT_CHECK, QR_CHECK, QR_BESIDE_CHECK, cardExportCheck(nodeCardRenderer)],
   }).run();
   const rows = report.rows.map(
     (row) => [row.name, `${row.detail} (${row.milliseconds.toFixed(1)} ms)`] as const,

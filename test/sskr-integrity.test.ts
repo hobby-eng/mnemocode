@@ -84,7 +84,7 @@ describe("SSKR integrity (AUD-005-BLD005)", () => {
         );
         expect(result.code).not.toBe(0);
         expect(result.stdout).toBe("");
-        expect(result.stderr).toContain(
+        expect(result.stderr, `Damaged installation exit: ${result.code}`).toContain(
           "SSKR dependency integrity check failed. No secret was processed.",
         );
       });

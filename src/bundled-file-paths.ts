@@ -4,6 +4,8 @@
 
 /** The public test vectors that the self-test checks the transformations against. */
 export const PUBLIC_VECTORS_FILE = "vectors/mnemocode-v1.json";
+/** The standalone English guide that the menu can export for printing before recovery is needed. */
+export const MANUAL_RECOVERY_FILE = "docs/MANUAL_RECOVERY.md";
 /** The folder of the SSKR engine, which its manifest names its files from. */
 export const SSKR_ENGINE_FOLDER = "sskr-wasm/";
 /** The SHA-256 of each file of the engine, checked before it runs (sskr/runtime.ts). */

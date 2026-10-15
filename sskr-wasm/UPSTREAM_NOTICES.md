@@ -102,7 +102,7 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `rand_core` | 0.9.5 | MIT OR Apache-2.0 |
 | `rand_xoshiro` | 0.6.0 | MIT OR Apache-2.0 |
 | `rand_xoshiro` | 0.7.0 | MIT OR Apache-2.0 |
-| `recovery-sskr-wasm` | 0.1.6 | MIT OR Apache-2.0 (MIT text included in LICENSE) |
+| `recovery-sskr-wasm` | 0.1.7 | MIT OR Apache-2.0 (MIT text included in LICENSE) |
 | `rustc_version` | 0.4.1 | MIT OR Apache-2.0 |
 | `rustversion` | 1.0.23 | MIT OR Apache-2.0 |
 | `salsa20` | 0.10.2 | MIT OR Apache-2.0 |

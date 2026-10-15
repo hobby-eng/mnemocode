@@ -252,8 +252,10 @@ describe("encode, decode and the backup check on the private screen", () => {
           "12-word phrases support at most 4 dates.",
         ]),
       );
-      expect(promptsShown("Encoded seed phrase or record:", DECODE_DATES_PROMPT)).toEqual([
-        "Encoded seed phrase or record:",
+      expect(
+        promptsShown("Encoded seed phrase, record or text file path:", DECODE_DATES_PROMPT),
+      ).toEqual([
+        "Encoded seed phrase, record or text file path:",
         DECODE_DATES_PROMPT,
         DECODE_DATES_PROMPT,
         DECODE_DATES_PROMPT,
@@ -437,7 +439,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         "share repair search limit",
       );
       expect(terminal.questions).toEqual([]);
-      expect(promptsShown("Encoded seed phrase or record:")).toEqual([]);
+      expect(promptsShown("Encoded seed phrase, record or text file path:")).toEqual([]);
     });
   });
 });
@@ -452,7 +454,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       await runDecode({ "ask-secrets": true });
       expect(terminal.questions[0]).toBe("Was Seedshift used before it was split?");
       expect(seen.out).toEqual([TEST_PHRASE]);
-      expect(promptsShown("Encoded seed phrase or record:")).toHaveLength(2);
+      expect(promptsShown("Encoded seed phrase, record or text file path:")).toHaveLength(2);
       // --list-candidates where the codes have more candidates than a list shows.
       const codes = MASKED.split(" ");
       codes[11] = "?";
@@ -562,7 +564,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       expect(seen.out.at(-1)).toBe(TEST_PHRASE);
       expect(seen.notices).toContain("BIP39 checksum: valid.");
       // The codes were typed once.
-      expect(promptsShown("Encoded seed phrase or record:")).toHaveLength(1);
+      expect(promptsShown("Encoded seed phrase, record or text file path:")).toHaveLength(1);
     });
 
     it("keeps the dates when the codes are typed again, and ends when the person is done", async () => {

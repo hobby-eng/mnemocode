@@ -35,14 +35,14 @@ describe("AUD-010-API004: an on-or-off option takes no value", () => {
 });
 
 describe("AUD-010-UI002: the numbers of a wallet's place are named as such", () => {
-  it("calls --index the first address index beside a wallet, and a word index in table", () => {
+  it("calls --index the first address index beside a wallet, and a word index in table", async () => {
     expect(() => walletEvidence({ "bitcoin-address": BIP84_ADDRESS, index: "-1" })).toThrow(
       "The --index first address index value must be a base-10 integer",
     );
     expect(() => walletEvidence({ "bitcoin-address": BIP84_ADDRESS, account: "x" })).toThrow(
       "The --account address account value",
     );
-    expect(() => runTable({ index: "x" })).toThrow("word index");
+    await expect(runTable({ index: "x" })).rejects.toThrow("word index");
     expect(() => scanGapOf({ "scan-gap": "0" })).toThrow(
       "The --scan-gap address count value must be a base-10 integer from 1 through 1000.",
     );

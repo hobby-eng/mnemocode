@@ -315,7 +315,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "a candidate list with a damaged record",
     file: "dist/core/candidate-list.js",
-    from: 'throw new Error("The candidate list is damaged: its CRC-32 does not match.")',
+    from: 'throw ERRORS.create("candidate-list-damaged-crc-32-does-not-match", [])',
     to: "void 0",
     module: "core/candidate-list-self-test.js",
     run: "m.checkCandidateListStartup()",
@@ -342,7 +342,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "codes without a mark",
     file: "dist/core/missing-codes.js",
-    from: 'throw new Error("No code is marked: mark each code that cannot be read with ?.")',
+    from: 'throw ERRORS.create("no-code-marked-mark-each-code-cannot-read", [])',
     to: "void 0",
     module: "core/backup-reading-self-test.js",
     run: "m.checkBackupReadingStartup()",
@@ -351,7 +351,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "a word search without a forgotten word",
     file: "dist/core/candidates.js",
-    from: 'throw new Error("Mark each forgotten word with ?, a prefix with *, or a|b.")',
+    from: 'throw ERRORS.create("mark-each-forgotten-word-prefix-b", [])',
     to: "void 0",
     module: "core/candidates-self-test.js",
     run: "m.checkWordSearchStartup()",
@@ -369,7 +369,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "a public key that is not compressed",
     file: "dist/core/wallet-evidence.js",
-    from: 'throw new Error("A compressed public key must start with 02 or 03.")',
+    from: 'throw ERRORS.create("compressed-public-key-start-02-03", [])',
     to: "void 0",
     module: "core/wallet-evidence-self-test.js",
     run: "m.WALLET_EVIDENCE_SELF_TEST.check.run()",
@@ -387,7 +387,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "a heir sheet for shares of the Original Seedshift",
     file: "dist/core/masking.js",
-    from: "throw new Error(SPLIT_MODES_ONLY)",
+    from: 'throw ERRORS.create("split-modes-only", [])',
     to: "void 0",
     module: "export/heir-sheet-self-test.js",
     run: "m.heirSheetSelfTest(s.renderer).startup()",
@@ -396,7 +396,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "a share card QR code of another share",
     file: "dist/sskr/transport.js",
-    from: 'throw new Error("Share QR does not match the printed references.")',
+    from: 'throw ERRORS.create("share-qr-does-not-match-printed-references", [])',
     to: "void 0",
     module: "export/sskr-render-self-test.js",
     run: "m.shareCardsSelfTest(s.renderer).check.run()",

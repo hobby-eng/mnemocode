@@ -237,7 +237,9 @@ describe("AUD-009 follow-up: codes are checked before an object holds them", () 
     const Raw = EncodedBackup as unknown as Constructible<EncodedBackup>;
     expect(() => new Raw(holes<number>(12), "indexes", "direct")).toThrow(/integer from 0/u);
     expect(() => new Raw(zeros(), "indexes", "seedshift")).toThrow(/lack the BIP39 checksum/u);
-    expect(() => new Raw(zeros(), "bad", "direct")).toThrow("Unsupported encoded format: bad.");
+    expect(() => new Raw(zeros(), "bad", "direct")).toThrow(
+      expect.objectContaining({ code: "core.encoded-form.unsupported-encoded-format" }),
+    );
   });
 
   it("writes no colors for indexes with holes, which were left out without a word", () => {

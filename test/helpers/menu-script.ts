@@ -35,6 +35,16 @@ export const script = {
   digits: {} as Record<string, { value: unknown; digit?: number | undefined }[]>,
 };
 
+/** Width checks need each distinct screen once; the exhaustive walk otherwise retains gigabytes. */
+function keepScreen(screens: string[][], lines: string[]): void {
+  if (
+    !screens.some(
+      (seen) => seen.length === lines.length && seen.every((line, at) => line === lines[at]),
+    )
+  )
+    screens.push(lines);
+}
+
 /** The list and typed questions, answered by the script. */
 export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
   return {
@@ -44,12 +54,12 @@ export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
       choices: readonly { label: string; value: unknown }[],
       options: { readonly label: string; readonly explanation?: never; readonly warning?: string },
     ) => {
-      script.labels.push(options.label);
-      script.explanations.push(actual.explanationLines(options.explanation));
+      if (!script.labels.includes(options.label)) script.labels.push(options.label);
+      keepScreen(script.explanations, actual.explanationLines(options.explanation));
       const place = script.answers[script.asked.length] ?? 0;
       const labels = choices.map((choice) => choice.label);
       script.asked.push({ question, count: choices.length, labels, warning: options.warning });
-      script.lists.push(actual.listLines(choices as never, place));
+      keepScreen(script.lists, actual.listLines(choices as never, place));
       script.digits[question] = (choices as readonly { value: unknown; digit?: number }[]).map(
         ({ value, digit }) => ({ value, digit }),
       );
@@ -62,7 +72,7 @@ export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
     }) as TerminalChoice["choose"],
     askLine: (async (question: string, label: string, given?: LineQuestion) => {
       const options = given ?? {};
-      script.labels.push(label);
+      if (!script.labels.includes(label)) script.labels.push(label);
       for (let warning = options.warning; ;) {
         script.lines.push({ question, warning });
         const queued = script.typed[question];

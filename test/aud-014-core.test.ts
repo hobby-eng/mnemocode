@@ -203,7 +203,11 @@ describe("AUD-014 recommendations 1 and 2: one rule for index lists and counts",
     const words = [...Array<number>(11).fill(0), 3];
     expect(new WordCandidate(1, words).phrase).toBe(PHRASE);
     expect(() => new WordCandidate(0, words)).toThrow(
-      new RangeError("A candidate's number counts from 1."),
+      expect.objectContaining({
+        name: "RangeError",
+        message: "A candidate's number counts from 1.",
+        code: "core.candidates.candidate-s-number-counts-from-1",
+      }),
     );
     expect(() => new WordCandidate(1.5, words)).toThrow(RangeError);
     const sparse = [...words];
@@ -228,7 +232,11 @@ describe("AUD-014 recommendations 1 and 2: one rule for index lists and counts",
       mode: "seedshift",
     });
     await expect(search.run({ progressEvery: 0 })).rejects.toThrow(
-      new RangeError("progressEvery must be a whole number of 1 or more."),
+      expect.objectContaining({
+        name: "RangeError",
+        message: "progressEvery must be a whole number of 1 or more.",
+        code: "core.search-turns.whole-number-more",
+      }),
     );
     expect((await search.run({ progressEvery: 1 })).matchCount).toBe(1);
   });

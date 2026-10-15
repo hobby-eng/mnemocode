@@ -4,7 +4,13 @@
 import { terminalNotice, terminalResultHeader } from "./terminal.js";
 import { ownShareCards } from "../export/sskr-render.js";
 import { reportRenamedOutputs } from "./output-paths.js";
-import { assertSingleValues, integerOption, value, type ParsedArguments } from "./arguments.js";
+import {
+  assertSingleValues,
+  integerOption,
+  value,
+  choiceOption,
+  type ParsedArguments,
+} from "./arguments.js";
 import { dates, encodeFormat, phraseAndDates, transformMode } from "./input.js";
 import { DATE_COUNT_WORDS, Masking, type SplitMode } from "../core/masking.js";
 import { masterFingerprint } from "../bitcoin-evidence.js";
@@ -15,7 +21,15 @@ import { assertSskrSelfTest } from "../sskr/self-test.js";
 import { DEFAULT_SHARE_FORMAT, type ShareFormat } from "../sskr/transport.js";
 import { optionLabel } from "./option-copy.js";
 import { backupCheckAnswer, offerShareCheck } from "./backup-check.js";
-import { printEncodedBackup, printFingerprints } from "./encode-report.js";
+import {
+  printEncodedBackup,
+  printFingerprints,
+  printOriginalCopy,
+  ORIGINAL_COPY_FORMS,
+  type OriginalCopyForm,
+  maskedWordsRequested,
+  printMaskedWords,
+} from "./encode-report.js";
 import { preflightOutputs, saveHeirSheetOutput } from "./output-saving.js";
 import {
   assertShareCardsPrintable,
@@ -37,6 +51,7 @@ import { ErrorCatalog } from "../core/error-catalog.js";
 const ERRORS = new ErrorCatalog("cli.sskr-split-command", {
   "setting-not-available-sskr-mode-export-shares-pdf": (value0: string) =>
     `The ${value0} setting is not available in SSKR mode. Export shares to a PDF file or an individual-card output folder instead.`,
+  "original-codes-need-format": () => "Choose --format to show the original seed phrase in codes.",
 });
 
 export async function runSskrSplit(
@@ -76,6 +91,11 @@ export async function prepareSskrSplit(
     integrated && value(args, "format") !== undefined
       ? encodeFormat(value(args, "format"))
       : undefined;
+  const originalCopy = integrated
+    ? choiceOption(args, "show-original", ORIGINAL_COPY_FORMS)
+    : undefined;
+  if (originalCopy !== undefined && originalCopy !== "words" && representation === undefined)
+    throw ERRORS.create("original-codes-need-format", []);
   const format = integrated
     ? shareFormat({ format: value(args, "share-format") ?? DEFAULT_SHARE_FORMAT })
     : shareFormat(args);
@@ -83,6 +103,7 @@ export async function prepareSskrSplit(
   await preflightOutputs(args);
   await assertShareCardsPrintable(options);
   const mode = transformMode(args);
+  const maskedWords = maskedWordsRequested(args, mode);
   Masking.assertSplitMode(mode);
   // Dates given as options fit the mode before any secret is read; asked ones are checked then.
   if (args["ask-secrets"] !== true)
@@ -92,7 +113,17 @@ export async function prepareSskrSplit(
   return (known) =>
     splitChecked(
       args,
-      { mode, threshold, count, format, options, representation, checkAnswer },
+      {
+        mode,
+        threshold,
+        count,
+        format,
+        options,
+        representation,
+        originalCopy,
+        maskedWords,
+        checkAnswer,
+      },
       known,
     );
 }
@@ -105,6 +136,8 @@ interface CheckedSplit {
   readonly format: ShareFormat;
   readonly options: ReturnType<typeof exportOptions>;
   readonly representation: EncodedFormat | undefined;
+  readonly originalCopy: OriginalCopyForm | undefined;
+  readonly maskedWords: boolean;
   readonly checkAnswer: ReturnType<typeof backupCheckAnswer>;
 }
 
@@ -117,7 +150,17 @@ async function splitChecked(
   checked: CheckedSplit,
   known: string | undefined,
 ): Promise<Cancelled | undefined> {
-  const { mode, threshold, count, format, options, representation, checkAnswer } = checked;
+  const {
+    mode,
+    threshold,
+    count,
+    format,
+    options,
+    representation,
+    originalCopy,
+    maskedWords,
+    checkAnswer,
+  } = checked;
   const asked = await phraseAndDates(args, mode, DATE_COUNT_WORDS.split, known);
   if (asked === CANCELLED) return CANCELLED;
   const { mnemonic, dates: dateValues } = asked;
@@ -157,7 +200,7 @@ async function splitChecked(
   terminalNotice(`The shares hold ${Masking.of(mode).holds}.`);
   if (Masking.of(mode).masked)
     terminalNotice("The shares do not store the dates or the mode; keep them yourself.");
-  if (representation !== undefined) {
+  if (representation !== undefined && originalCopy === undefined) {
     printEncodedBackup(EncodedBackup.encode(mnemonic, dateValues, representation, mode).backup);
     // Shown for a person who keeps the whole phrase too, with the shares as a reserve.
     terminalNotice(
@@ -167,14 +210,18 @@ async function splitChecked(
       "warning",
     );
   }
-  printShares(inForm(shares, format), undefined, Masking.of(mode).holds);
+  // The optional original copy comes last, so it remains in view after long share blocks.
+  const show = async (): Promise<Cancelled | undefined> => {
+    if (
+      (await printShares(inForm(shares, format), undefined, Masking.of(mode).holds)) === CANCELLED
+    )
+      return CANCELLED;
+    // An English complete backup was already shown by the older --format-only form.
+    if (maskedWords && !(originalCopy === undefined && representation === "english"))
+      printMaskedWords(held, mode);
+    if (originalCopy !== undefined) printOriginalCopy(original, originalCopy, representation);
+  };
+  if ((await show()) === CANCELLED) return CANCELLED;
   printFingerprints(mode, masterFingerprint(original), masterFingerprint(held));
-  return offerShareCheck(
-    original,
-    mode,
-    threshold,
-    () => printShares(inForm(shares, format), undefined, Masking.of(mode).holds),
-    checkAnswer,
-    dateValues,
-  );
+  return offerShareCheck(original, mode, threshold, show, checkAnswer, dateValues);
 }

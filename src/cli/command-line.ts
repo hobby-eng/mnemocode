@@ -106,7 +106,7 @@ export async function runCommandLine(argv: readonly string[]): Promise<CommandEn
   assertAllowedArguments(arguments_, command, commandOptions[command]);
   if (facts.coreSelfTest) assertCoreSelfTest();
   const run = async (): Promise<CommandEnd> => (await HANDLERS[command](arguments_)) ?? undefined;
-  return facts.secret ? withSecrets(arguments_, run) : withOutputs(arguments_, run);
+  return facts.secret ? withSecrets(arguments_, run, command) : withOutputs(arguments_, run);
 }
 
 /**
@@ -130,6 +130,7 @@ async function withOutputs(
 async function withSecrets(
   args: ParsedArguments,
   run: () => Promise<CommandEnd>,
+  command: CommandName,
 ): Promise<CommandEnd> {
   assertProtected();
   return withPrivateScreen<undefined>(async () => {
@@ -146,5 +147,5 @@ async function withSecrets(
       warnOfCloudCopies(args);
       return run();
     });
-  });
+  }, command);
 }

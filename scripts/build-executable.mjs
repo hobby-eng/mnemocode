@@ -38,6 +38,7 @@ import { executableNotices } from "./executable-notices.mjs";
 import {
   ASSETS_FOLDER,
   PUBLIC_VECTORS_FILE,
+  MANUAL_RECOVERY_FILE,
   SSKR_BINARY,
   SSKR_BRIDGE,
   SSKR_ENGINE_FOLDER,
@@ -67,6 +68,7 @@ function bundledFiles() {
   const files = [
     ...[SSKR_MANIFEST, SSKR_BRIDGE, SSKR_BINARY].map((file) => `${SSKR_ENGINE_FOLDER}${file}`),
     PUBLIC_VECTORS_FILE,
+    MANUAL_RECOVERY_FILE,
   ];
   const walk = (folder) => {
     for (const entry of readdirSync(join(root, folder)).sort()) {

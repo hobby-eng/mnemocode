@@ -33,6 +33,27 @@ vi.mock("../src/export/image-export.js", async (importOriginal) =>
 answeredByScript();
 
 describe("start menu", () => {
+  it("exports the full dictionary and guide set into one new folder", async () => {
+    expect(await runOf(ENTRY.table, [4, 5])).toEqual([
+      "table",
+      "--word-lists-dir",
+      "mnemocode-recovery-pack",
+    ]);
+  });
+  it.each(["english", "chinese", "unicode", "mapping", "guide"])(
+    "exports the complete %s text from the word lookup entry",
+    async (format) => {
+      const choice = ["english", "chinese", "unicode", "mapping", "guide"].indexOf(format);
+      const run = await runOf(ENTRY.table, [4, choice]);
+      expect(run).toEqual([
+        "table",
+        ...(format === "guide" ? ["--recovery-guide"] : ["--all", "--table-format", format]),
+        "--output",
+        format === "guide" ? "mnemocode-manual-recovery.md" : `bip39-${format}.txt`,
+      ]);
+    },
+  );
+
   it("asks whether shares were masked as the Restore entry and the commands of shares ask it", async () => {
     // The Find entry, a code of a share, the wallet's fingerprint, then the share question: Yes.
     const run = await runOf(ENTRY.recover, [3, 0, 1]);
@@ -151,7 +172,7 @@ describe("start menu", () => {
       // Encode: word numbers, MnemoCode Seedshift, no shares, a record file, and heirs on A5.
       const record = join(files, "backup.txt");
       const heirs = "PDF file name";
-      const run = await runOf(ENTRY.encode, [0, 0, 0, 1, 1], {
+      const run = await runOf(ENTRY.encode, [0, 0, 0, 1, 0, 1], {
         "Record file name": [record],
         [heirs]: [record, join(files, "heirs.pdf")],
       });

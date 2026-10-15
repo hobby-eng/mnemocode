@@ -57,6 +57,9 @@ lockfile after installation.
 Latin and Cyrillic text used by the cards and sheets. Its upstream license
 notice is included as `assets/fonts/DejaVuSans-NOTICE`. The reproducible subset
 script is `scripts/build-ui-font.py`; it does not alter the character outlines.
+The script pins the upstream font and license by SHA-256 and uses the exact
+fontTools version in `scripts/build-ui-font-requirements.txt`. The subset keeps
+Latin diacritics, combining marks and typographic punctuation as well as Cyrillic.
 
 ## World map
 

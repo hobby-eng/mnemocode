@@ -6,6 +6,7 @@
 import { createHmac, randomFillSync } from "node:crypto";
 import { sskrEngine } from "./runtime.js";
 import { ONE_GROUP, type SharePlatform } from "./share-platform.js";
+import { CheckedSskrBridge } from "./bridge.js";
 
 /**
  * Node.js host: OpenSSL's HMAC and the bundled, integrity-checked SSKR WASM (runtime.ts). The
@@ -17,11 +18,13 @@ import { ONE_GROUP, type SharePlatform } from "./share-platform.js";
 export const nodeSharePlatform: SharePlatform = {
   hmacSha256: (key, message) => createHmac("sha256", key).update(message).digest(),
   combineShares: async (records) => (await sskrEngine()).recover_sskr_shares(records.join("\n")),
-  createShares: async (secret, threshold, count, seed) =>
-    (await sskrEngine())
-      .create_sskr_shares(secret, ONE_GROUP, Uint8Array.of(threshold, count), seed)
+  createShares: async (secret, threshold, count, seed) => {
+    const groups = CheckedSskrBridge.groupSpecifications(threshold, count);
+    return (await sskrEngine())
+      .create_sskr_shares(secret, ONE_GROUP, groups, seed)
       .trim()
-      .split("\n"),
+      .split("\n");
+  },
 };
 
 /** Node.js randomness for a split (split.ts): OpenSSL's generator fills the buffer in place. */

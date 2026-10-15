@@ -45,7 +45,7 @@ vi.mock("../src/export/private-file.js", async (importOriginal) => {
 const ELEVEN = "abandon ".repeat(11);
 /** The test phrase with its last word forgotten: 128 checksum-valid candidates. */
 const LAST_FORGOTTEN = `${ELEVEN}?`;
-const PHRASE_PROMPT = "Seed phrase, ? for each forgotten word:";
+const PHRASE_PROMPT = "Seed phrase or text file path, ? for each forgotten word:";
 const LIST_PROMPT = "Passphrase for the candidates list:";
 const LIST_PASSPHRASE = "public candidate test passphrase";
 
@@ -59,7 +59,7 @@ function recover(options: Record<string, string | boolean>): Promise<Cancelled |
 function promptsShown(): string[] {
   return [
     ...seen.screen.matchAll(
-      /(Seed phrase, \? for each forgotten word:|Passphrase for the candidates list:|The same passphrase again:)/gu,
+      /(Seed phrase or text file path, \? for each forgotten word:|Passphrase for the candidates list:|The same passphrase again:)/gu,
     ),
   ].map((match) => match[1]!);
 }

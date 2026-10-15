@@ -26,6 +26,7 @@ import { capitalized } from "../core/prose.js";
 import { compactCode } from "../core/code-text.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import type { EncodedFormat } from "../core/types.js";
+import { PrivateSteps } from "./private-steps.js";
 
 // The palette, under the name every module of the command line takes it by.
 export { STYLE };
@@ -94,6 +95,7 @@ export function terminalResultHeader(
   rows: readonly [string, string][],
   channel: Channel = "stdout",
 ): boolean {
+  PrivateSteps.showResult();
   const lines = resultHeaderLines(title, rows, channel);
   for (const line of lines) terminalLine(channel, line);
   return lines.length > 0;
@@ -139,6 +141,13 @@ export function terminalHint(message: string): void {
   for (const line of hintLines(message)) console.error(line);
 }
 
+/** Shows a slow private-screen step; scripts keep their existing machine-readable output. */
+export function terminalWork(message: string): void {
+  if (!PrivateSteps.active) return;
+  PrivateSteps.begin();
+  terminalHint(message);
+}
+
 /** The lines of terminalHint (hintLines of terminal-style.ts, on standard error). */
 export function hintLines(message: string): string[] {
   return styledHintLines(process.stderr, message);
@@ -146,6 +155,7 @@ export function hintLines(message: string): string[] {
 
 /** Human-facing status goes to stderr; redirected output contains no ANSI escapes. */
 export function terminalNotice(message: string, kind: NoticeKind = "info"): void {
+  if (kind === "warning") PrivateSteps.remember(message);
   for (const line of noticeLines(message, kind)) console.error(line);
 }
 

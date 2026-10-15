@@ -127,6 +127,7 @@ const PARTS: Readonly<Record<string, Part>> = {
       "src/core/encoded-backup.ts",
       "src/core/masking.ts",
       "src/core/missing-codes.ts",
+      "src/sskr/share-input.ts",
       "src/sskr/transport.ts",
     ],
   },
@@ -217,6 +218,7 @@ const PARTS: Readonly<Record<string, Part>> = {
       "src/core/encoded-backup.ts",
       "src/core/missing-codes.ts",
       "src/sskr/known-answers.ts",
+      "src/sskr/share-input.ts",
     ],
   },
   "src/core/candidates-self-test.ts": { uses: ["src/core/candidates.ts"] },
@@ -329,6 +331,7 @@ const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   // The sizes of a BIP39 phrase, which every module takes without a word list, and the English
   // words alone, which the share modules take without the Traditional Chinese list.
   "src/core/bip39-sizes.ts": [],
+  "src/core/byte-array.ts": [],
   "src/core/english-words.ts": [],
   "src/core/white-space.ts": [],
   // Text and lists cut into pieces of one width, which the readers of codes and bits share.
@@ -350,6 +353,8 @@ const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   // What every self-test check is made of, which the checks beside each feature share.
   "src/core/self-test-check.ts": [],
   "src/sskr/repair.ts": [],
+  "src/sskr/bridge.ts": [],
+  "src/export/file-name.ts": [],
   "src/export/study-backdrops.ts": ["pdf-lib"],
   "src/export/card-codes.ts": [],
   // The units of a page, which every renderer and the file formats share.

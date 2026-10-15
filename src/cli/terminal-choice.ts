@@ -7,7 +7,7 @@
 // (askLine); only Escape goes back.
 
 import {
-  dropRestOfPaste,
+  refusedLine,
   dropTypedAhead,
   readKey,
   readLine,
@@ -16,7 +16,7 @@ import {
   ESCAPE_ALIASES,
   NOT_UTF8,
 } from "./terminal-input.js";
-import { CANCELLED, type Cancelled, UnusableAnswerError, type NextByte } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled, type NextByte } from "./terminal-keys.js";
 import {
   answerEndRow,
   displayWidth,
@@ -38,6 +38,7 @@ import { isContinuation, validCharacters } from "./utf8.js";
 import type { WordHints } from "../core/word-hints.js";
 import { listInWords } from "../core/places.js";
 import { defined } from "../core/defined.js";
+import { PrivateSteps } from "./private-steps.js";
 
 /** Marker, number and the gaps before a label: "› 1  ". */
 const LABEL_INDENT = 5;
@@ -318,6 +319,7 @@ export async function choose<T>(
   // Keys pressed before the question showed, such as the rest of a paste, are dropped and wiped:
   // only keys pressed for it answer it.
   if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
+  PrivateSteps.begin();
   let selected = options.initial ?? 0;
   const hint = paint(STYLE.muted, keyHint(choices, options.quit ?? "goes back"));
   const explanation = explanationLines(options.explanation);
@@ -478,6 +480,7 @@ async function askLineOnce(
   options: LineQuestion,
   warning: string | undefined,
 ): Promise<LineOutcome> {
+  PrivateSteps.begin();
   const promptWidth = displayWidth(shown);
   const warned = warningLines(warning);
   return withRawTerminal(async (next, moreWithin) => {
@@ -513,13 +516,12 @@ async function askLineOnce(
         ...(options.hints === undefined ? {} : { hints: options.hints }),
       });
     } catch (error) {
-      if (!(error instanceof UnusableAnswerError)) throw error;
-      // The rest of a paste would otherwise answer the question when it is asked again.
-      if ((await dropRestOfPaste(next, moreWithin)) === CANCELLED) return { kind: "cancelled" };
+      const reason = await refusedLine(error, next, moreWithin);
+      if (reason === CANCELLED) return { kind: "cancelled" };
       endRow = Math.floor((promptWidth + characters) / terminalColumns());
       reachDown();
       erase();
-      return { kind: "refused", reason: error.message };
+      return { kind: "refused", reason };
     }
     if (typed === CANCELLED) return { kind: "cancelled" };
     if (typed !== undefined) endRow = answerEndRow(promptWidth, typed);

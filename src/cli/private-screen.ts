@@ -7,8 +7,14 @@
 
 import { ANSWER_LABEL_WIDTH, rowsOf, waitForEnter } from "./terminal-choice.js";
 import { terminalAvailable } from "./terminal-input.js";
-import { CLEAR_SCREEN, ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN } from "./terminal.js";
-import { factLine } from "./terminal-style.js";
+import {
+  CLEAR_SCREEN,
+  ENTER_ALTERNATE_SCREEN,
+  LEAVE_ALTERNATE_SCREEN,
+  noticeLines,
+} from "./terminal.js";
+import { PrivateSteps } from "./private-steps.js";
+import { factLine, headingLine } from "./terminal-style.js";
 import { protectionSummary } from "./protection.js";
 import { CANCELLED_EXIT_CODE } from "./exit-codes.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
@@ -35,12 +41,9 @@ export function privateScreenAvailable(): boolean {
   return terminalAvailable();
 }
 
-/** Set while a command runs on the private screen. */
-let active = false;
-
 /** Whether the private screen is shown now, so that a secret typed there may be shown too. */
 export function onPrivateScreen(): boolean {
-  return active;
+  return PrivateSteps.active;
 }
 
 /**
@@ -48,7 +51,7 @@ export function onPrivateScreen(): boolean {
  * screen opens, and again once a command has given up rights after its questions.
  */
 export function showProtection(): void {
-  if (!active) return;
+  if (!PrivateSteps.active) return;
   console.error(
     `${factLine(process.stderr, "Protection", protectionSummary(), ANSWER_LABEL_WIDTH)}\n`,
   );
@@ -60,7 +63,8 @@ export function showProtection(): void {
  * outside the private screen nothing is.
  */
 export function clearPrivateScreen(): boolean {
-  if (!active) return false;
+  if (!PrivateSteps.active) return false;
+  PrivateSteps.newPage();
   process.stderr.write(CLEAR_SCREEN);
   return true;
 }
@@ -75,11 +79,17 @@ export function clearPrivateScreen(): boolean {
  */
 export async function withPrivateScreen<T>(
   body: () => Promise<T | Cancelled>,
+  title = "Private operation",
 ): Promise<T | Cancelled> {
   if (!privateScreenAvailable()) return body();
   // Written raw: NO_COLOR removes colours, not the screen switch.
   process.stderr.write(ENTER_ALTERNATE_SCREEN);
-  active = true;
+  PrivateSteps.open((warnings) => {
+    process.stderr.write(CLEAR_SCREEN);
+    console.error(`${headingLine(process.stderr, title)}\n`);
+    for (const warning of warnings)
+      for (const line of noticeLines(warning, "warning")) console.error(line);
+  });
   const interrupted = (): void => {
     process.stderr.write(LEAVE_ALTERNATE_SCREEN);
     process.exit(CANCELLED_EXIT_CODE);
@@ -92,7 +102,7 @@ export async function withPrivateScreen<T>(
     process.stderr.write("\n");
     return (await waitForEnter(CLEAR_PROMPT)) === CANCELLED ? CANCELLED : result;
   } finally {
-    active = false;
+    PrivateSteps.close();
     process.off("SIGINT", interrupted);
     // A Windows console takes standard output asynchronously; the screen is left after it.
     await flushed(process.stdout);

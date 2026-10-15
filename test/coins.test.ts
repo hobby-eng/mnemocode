@@ -151,12 +151,8 @@ describe("the coins that a host offers (a host of one coin family)", () => {
 
   it("compares an address of an offered coin only", () => {
     const bitcoinOnly = new WalletEvidenceCheck(nodePbkdf2, [coinById("bitcoin")]);
-    expect(() => bitcoinOnly.assert(evidence)).toThrow(
-      'Unknown coin "ethereum"; the coins are bitcoin.',
-    );
-    expect(() => assertWalletEvidence(evidence, [coinById("bitcoin")])).toThrow(
-      'Unknown coin "ethereum"',
-    );
+    expect(() => bitcoinOnly.assert(evidence)).toThrow("Unknown coin; the coins are bitcoin.");
+    expect(() => assertWalletEvidence(evidence, [coinById("bitcoin")])).toThrow("Unknown coin");
     const offered = [coinById("bitcoin"), coinById("ethereum")];
     expect(
       new WalletEvidenceCheck(nodePbkdf2, offered).match(ABANDON, evidence, ethereum[1]),
@@ -338,7 +334,7 @@ describe("the comparison", () => {
     const first = { account: 0, branch: 0, index: 0 };
     const address = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
     const refused: readonly [WalletEvidence, string][] = [
-      [coinAddress("solana", address, first), 'Unknown coin "solana"; the coins are bitcoin,'],
+      [coinAddress("solana", address, first), "Unknown coin; the coins are bitcoin,"],
       [
         coinAddress("litecoin", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA", first),
         "it is not an address of Litecoin",
@@ -620,7 +616,7 @@ describe("the coins", () => {
     for (const coin of COINS) expect(coinById(coin.id)).toBe(coin);
     expect(coinById(" Bitcoin-Cash ").id).toBe("bitcoin-cash");
     expect(refusal(() => coinById("solana"))).toBe(
-      'Unknown coin "solana"; the coins are bitcoin, bitcoin-cash, cosmos, dash, dogecoin, ethereum, ethereum-classic, injective, litecoin, tron, xrp, zcash.',
+      "Unknown coin; the coins are bitcoin, bitcoin-cash, cosmos, dash, dogecoin, ethereum, ethereum-classic, injective, litecoin, tron, xrp, zcash.",
     );
   });
 

@@ -108,11 +108,11 @@ function checkShareCardsStartup(): void {
 }
 
 /**
- * Every check: the quick ones, the decoys after a share's codes and none in its QR code, no QR
- * code on separate cards, no cards for word numbers, and the A6 PDF of the first share with the
- * QR code it prints.
+ * The actual self-test plans and their known answers, without rendering a PDF: decoys, retained
+ * individual cards, refused layouts and QR payloads. Returns the public test plan that the full
+ * self-test renders, so a host can also check planning independently of PDF drawing.
  */
-async function checkShareCards(drawing: CardDrawing): Promise<void> {
+export async function shareCardPlanSelfTest(drawing: CardDrawing): Promise<ShareCardSet> {
   checkShareCardsStartup();
   const cards = await ShareCardSet.create(drawing, SHARES, OPTIONS, FIXED_DECOYS);
   const printed = cards.printedCodes(0);
@@ -141,6 +141,32 @@ async function checkShareCards(drawing: CardDrawing): Promise<void> {
     FIXED_DECOYS,
   );
   expectSame(separate.qrCodes.length, 0, "QR codes of separate cards");
+  const business = await ShareCardSet.create(
+    drawing,
+    SHARES,
+    { ...OPTIONS, style: "it", layout: "collection", shareFormat: "unicode" },
+    FIXED_DECOYS,
+  );
+  const retained = business.forIndividualCards();
+  expectSame(
+    retained.printedCodes(0).join(" "),
+    business
+      .printedCodes(0)
+      .slice(0, business.ownCodes(0) + 1)
+      .join(" "),
+    "Retained share codes and first decoy",
+  );
+  expectSame(
+    defined(retained.shares[0]).documents,
+    business.ownCodes(0) + 1,
+    "Retained share cards",
+  );
+  expectSame(retained.qrCodes.length, 0, "QR codes of retained individual cards");
+  expectRefused(
+    () => retained.forIndividualCards({ pageSize: "a4" }),
+    /business size/u,
+    "Retained individual cards on a sheet size",
+  );
   await expectRefusedLater(
     () =>
       ShareCardSet.create(drawing, SHARES, {
@@ -156,11 +182,6 @@ async function checkShareCards(drawing: CardDrawing): Promise<void> {
     /have no cards/u,
     "Share cards in word numbers",
   );
-  const pdf = await PDFDocument.load(await cards.renderShare(0));
-  if (pdf.getPageCount() < 1) throw ERRORS.create("share-card-pdf-no-page", []);
-  for (const page of pdf.getPages())
-    if (Math.abs(page.getWidth() - A6_WIDTH_POINTS) > WIDTH_TOLERANCE_POINTS)
-      throw ERRORS.create("share-card-a6-dimensions-mismatch", []);
   const [first] = cards.qrCodes;
   assertShareQr(sskrVector.firstShareColors, defined(first).payload);
   expectRefused(
@@ -179,6 +200,17 @@ async function checkShareCards(drawing: CardDrawing): Promise<void> {
     /does not match/u,
     "A QR code of another share beside Unicode codes",
   );
+  return cards;
+}
+
+/** All planning checks, followed by the A6 PDF of the first share. */
+async function checkShareCards(drawing: CardDrawing): Promise<void> {
+  const cards = await shareCardPlanSelfTest(drawing);
+  const pdf = await PDFDocument.load(await cards.renderShare(0));
+  if (pdf.getPageCount() < 1) throw ERRORS.create("share-card-pdf-no-page", []);
+  for (const page of pdf.getPages())
+    if (Math.abs(page.getWidth() - A6_WIDTH_POINTS) > WIDTH_TOLERANCE_POINTS)
+      throw ERRORS.create("share-card-a6-dimensions-mismatch", []);
 }
 
 /** The checks of share cards, drawn with the host's `drawing`, for a host that offers them. */

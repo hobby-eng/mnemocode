@@ -1,7 +1,20 @@
 """The checks of scripts/verify-terminal-input.py for Re-encode and for answers asked again in
 Decode and Restore."""
 
-from terminal_session import CTRL_D, ENTER, ESCAPE, Session, assert_kept_private, line_starting
+import tempfile
+import subprocess
+from pathlib import Path
+
+from terminal_session import (
+    COMMAND,
+    CTRL_D,
+    ENTER,
+    ESCAPE,
+    Session,
+    assert_kept_private,
+    assert_private_result_visible,
+    line_starting,
+)
 from terminal_answers import (
     ASKED_AGAIN,
     CARD_NAME,
@@ -29,8 +42,76 @@ from terminal_answers import (
     SHEET_DETAILS,
     TEST_PHRASE,
     THIRD_SHARE,
+    WORD_NUMBERS,
     answer_fingerprint,
 )
+
+
+def check_encode_result_visible():
+    """A screen-only backup stays visible while its optional check is offered and declined."""
+    for mode in ("direct", "seedshift"):
+        for shares in (False, True):
+            arguments = ["encode", "--ask-secrets", "--mode", mode, "--format", "2"]
+            if shares:
+                arguments += ["--sskr", "--threshold", "2", "--shares", "3"]
+            session = Session(arguments=arguments)
+            try:
+                session.wait_for("Seed phrase (English BIP39 words):")
+                session.type(TEST_PHRASE + ENTER)
+                if mode == "seedshift":
+                    session.wait_for("Dates (")
+                    session.type(MASK_DATE + ENTER)
+                session.wait_for("Check the backup now?")
+                session.wait_for("Esc skips the check")
+                codes = MASKED_WORD_NUMBERS if mode == "seedshift" else WORD_NUMBERS
+                markers = [codes]
+                if shares:
+                    markers += [f"SSKR share {number} of 3" for number in (1, 2, 3)]
+                assert_private_result_visible(session, markers)
+                session.type("2")
+                session.wait_for(CLEAR_PROMPT)
+                assert_private_result_visible(session, markers)
+                session.type(ENTER)
+                assert session.wait_for_exit() == 0
+                assert_kept_private(session, (TEST_PHRASE, MASK_DATE, codes))
+            finally:
+                session.close()
+            print(f"encode {mode}, shares={shares}: result visible before and after declining check")
+
+
+def check_phrase_display_choices():
+    """Optional original and masked words remain visible on the private result, then disappear."""
+    masked = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress"
+    original_codes = "#000064 #1EAB91 #3D0964 #5BB491 #7A1264 #98BD91 #B71B64 #D5C694"
+    for copy in (None, "words", "codes", "both"):
+        arguments = ["encode", "--ask-secrets", "--mode", "seedshift", "--format", "5",
+                     "--show-masked-words"]
+        if copy is not None:
+            arguments += ["--sskr", "--threshold", "2", "--shares", "3",
+                          "--share-format", "colors", "--show-original", copy]
+        session = Session(arguments=arguments)
+        try:
+            session.wait_for("Seed phrase (English BIP39 words):")
+            session.type(TEST_PHRASE + ENTER)
+            session.wait_for("Dates (")
+            session.type(MASK_DATE + ENTER)
+            session.wait_for("Check the backup now?")
+            session.wait_for("Esc skips the check")
+            markers = [masked]
+            if copy in ("words", "both"):
+                markers.append(TEST_PHRASE)
+            if copy in ("codes", "both"):
+                markers.append(original_codes)
+            assert_private_result_visible(session, markers)
+            session.type("2")
+            session.wait_for(CLEAR_PROMPT)
+            assert_private_result_visible(session, markers)
+            session.type(ENTER)
+            assert session.wait_for_exit() == 0
+            assert_kept_private(session, [TEST_PHRASE, MASK_DATE, *markers])
+        finally:
+            session.close()
+        print(f"encode original={copy}: requested original and Seedshift words stay private")
 
 
 def at_re_encode_confirmation(session):
@@ -50,6 +131,7 @@ def at_re_encode_confirmation(session):
     session.type(MASK_DATE + ENTER)
     session.wait_for(TEST_PHRASE)
     session.wait_for("Is this the seed phrase to re-encode?")
+    assert_private_result_visible(session, (TEST_PHRASE,))
 
 
 def check_re_encode_menu():
@@ -133,7 +215,7 @@ def check_re_encode_answer_refused():
         for detail in SHEET_DETAILS:
             session.wait_for(f"{detail} (Enter: random):")
             session.type((LONG_COMPANY if detail == "Company" else "") + ENTER)
-        session.wait_for("Also show the whole seed phrase?")
+        session.wait_for("Also show the original seed phrase, before Seedshift?")
         session.type("1")
         session.wait_for("Instructions for your heirs?")
         session.type("1")
@@ -302,7 +384,7 @@ def check_restore_share_asked_again():
         # Only that share is typed again: the first one is kept.
         session.wait_for("Type share 2 again")
         session.type("2")
-        retyped = session.wait_for("Share 2 again:")
+        retyped = session.wait_for("Share 2 again, or its text file path:")
         session.type(THIRD_SHARE + ENTER)
         session.wait_for(DATES_WITH_MARKS)
         assert SHARES not in session.output[retyped : session.seen], "all shares asked again"
@@ -323,3 +405,74 @@ def check_restore_share_asked_again():
     finally:
         session.close()
     print("restore in the menu: Ctrl+D and an unreadable share asked again, a ? date found")
+
+
+def check_decode_share_lines():
+    """Decode keeps members 1 and 3 from a share file or a two-line paste before asking dates."""
+    text = f"{FIRST_SHARE}\n{THIRD_SHARE}\n"
+    with tempfile.TemporaryDirectory(prefix="mnemocode-share-lines-") as folder:
+        path = Path(folder) / "shares.txt"
+        path.write_text(text, encoding="utf-8")
+        for source in ("file", "paste"):
+            arguments = ["decode", "--ask-secrets", "--mode", "seedshift"]
+            if source == "file":
+                arguments += ["--input-file", str(path)]
+            session = Session(arguments=arguments)
+            try:
+                if source == "paste":
+                    session.wait_for(HIDDEN_RECORD)
+                    session.type(text + ENTER)
+                session.wait_for(DATES_WITH_MARKS)
+                assert "More shares or text file path (" not in session.output, "Decode lost a share line"
+                session.type(MASK_DATE + ENTER)
+                session.wait_for(TEST_PHRASE)
+                session.wait_for(CLEAR_PROMPT)
+                session.type(ENTER)
+                assert session.wait_for_exit() == 0
+                assert_kept_private(session, (FIRST_SHARE, THIRD_SHARE, MASK_DATE, TEST_PHRASE))
+            finally:
+                session.close()
+            print(f"decode {source}: two share lines kept, dates restore the public test phrase")
+
+
+def check_file_or_text_input():
+    """Private prompts read MnemoCode share exports and MNC1 records, or raw recovery words."""
+    cases = (
+        ("shares", ["sskr-combine", "--ask-secrets", "--mode", "seedshift"], SHARES, None),
+        ("record", ["decode", "--ask-secrets"], HIDDEN_RECORD, None),
+        ("words", ["recover-word", "--ask-secrets"],
+         "Seed phrase or text file path, ? for each forgotten word:",
+         TEST_PHRASE.removesuffix("about") + "abo*\n"),
+    )
+    with tempfile.TemporaryDirectory(prefix="mnemocode-file-input-") as folder:
+        for kind, arguments, prompt, text in cases:
+            path = Path(folder) / f"public {kind}.txt"
+            if text is None:
+                options = ["encode", "--mnemonic", TEST_PHRASE, "--mode", "seedshift",
+                           "--dates", MASK_DATE, "--format", "indexes", "--output", str(path)]
+                if kind == "shares":
+                    options += ["--sskr", "--threshold", "2", "--shares", "3",
+                                "--share-format", "colors-unicode"]
+                subprocess.run([*COMMAND, *options], check=True, capture_output=True, timeout=30)
+                if kind == "shares":
+                    lines = path.read_text(encoding="utf-8").splitlines()
+                    assert len(lines) == 3, "the share export must hold three lines"
+                    # As when the owner keeps member 1 and member 3 and removes the middle line.
+                    path.write_text(f"{lines[0]}\n{lines[2]}\n", encoding="utf-8")
+            else:
+                path.write_text(text, encoding="utf-8")
+            session = Session(arguments=arguments)
+            try:
+                session.wait_for(prompt)
+                session.type(f'"{path}"' + ENTER)
+                if kind != "words":
+                    session.wait_for(DATES_WITH_MARKS)
+                    session.type(MASK_DATE + ENTER)
+                session.wait_for(TEST_PHRASE)
+                session.wait_for(CLEAR_PROMPT)
+                session.type(ENTER)
+                assert session.wait_for_exit() == 0
+                assert_kept_private(session, (TEST_PHRASE, FIRST_SHARE, THIRD_SHARE, MASK_DATE))
+            finally:
+                session.close()
+            print(f"private {kind} prompt: exported text file accepted without a source menu")

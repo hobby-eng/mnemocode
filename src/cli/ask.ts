@@ -8,10 +8,11 @@
 // before it showed (dropTypedAhead), so that only keys pressed for it answer it.
 //
 // The API for the commands:
-// - askSecretUntil(prompt, parse, { what, pastedLineBreak, hints }): a secret, asked until
+// - askSecretUntil(prompt, parse, { what, pastedLineBreak, hints, textFile }): a secret, asked until
 //   `parse` returns. An Error from `parse` is its one warning line; `hints` shows the words of a
 //   list below the words being typed. An empty answer or Ctrl+D asks again
 //   with "Type <what>, or press Ctrl+C to stop."; a real end of the input cancels.
+//   With textFile, a local text file path is read once before parse; its contents are not echoed.
 // - askValueUntil(prompt, parse, { what, fallback }): the same for a visible value that is no
 //   secret, such as a fingerprint or a file name; Escape goes back (undefined), and Enter alone
 //   takes the `fallback` where there is one.
@@ -31,8 +32,7 @@
 // - droppedPath(answer): a typed file name as the file system knows it, when the file was dragged
 //   into the terminal, which adds quotes or backslashes, or starts with ~.
 
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { TextFileInput } from "./text-file.js";
 import {
   type AddressLocation,
   type Coin,
@@ -47,6 +47,7 @@ import {
 import { parseAddressCount, defaultAddressCount } from "../core/address-scan.js";
 import { FIRST_RECEIVING, type WalletPlace } from "./bitcoin-options.js";
 import { onPrivateScreen } from "./private-screen.js";
+import { PrivateSteps } from "./private-steps.js";
 import { terminalNotice } from "./terminal.js";
 import {
   choose,
@@ -57,7 +58,7 @@ import {
   typeHint,
 } from "./terminal-choice.js";
 import {
-  dropRestOfPaste,
+  refusedLine,
   dropTypedAhead,
   readLine,
   terminalAvailable,
@@ -69,13 +70,12 @@ import {
   dumbTerminalReason,
   SECRET_SOURCE_ADVICE,
 } from "./terminal-input.js";
-import { CANCELLED, type Cancelled, UnusableAnswerError, type NextByte } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled, type NextByte } from "./terminal-keys.js";
 import { displayWidth } from "./terminal-geometry.js";
 import { trimWhiteSpace } from "../core/white-space.js";
 import { isFirstReceiving } from "../core/wallet-evidence.js";
 import { validCharacters } from "./utf8.js";
 import type { WordHints } from "../core/word-hints.js";
-import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.ask", {
@@ -102,6 +102,8 @@ export interface ValueAskOptions extends AskOptions {
 
 /** How a secret question is asked again. */
 export interface SecretAskOptions extends AskOptions {
+  /** Accept a local text file path too; this name, never the path, appears in file refusals. */
+  readonly textFile?: string;
   /**
    * The hints below the words being typed on the private screen, and Tab's completion
    * (core/word-hints.ts): where the answer is words of a list, such as a seed phrase.
@@ -192,10 +194,8 @@ async function readAnswer(
       if (ended) return { kind: "ended" };
       return { kind: wentBack ? "back" : "empty" };
     } catch (error) {
-      if (!(error instanceof UnusableAnswerError)) throw error;
-      // The rest of a paste would otherwise answer the question when it is asked again.
-      if ((await dropRestOfPaste(next, moreWithin)) === CANCELLED) return { kind: "cancelled" };
-      return { kind: "unusable", reason: error.message };
+      const reason = await refusedLine(error, next, moreWithin);
+      return reason === CANCELLED ? { kind: "cancelled" } : { kind: "unusable", reason };
     } finally {
       // The terminal did not show the Enter key either.
       process.stderr.write("\n");
@@ -205,15 +205,17 @@ async function readAnswer(
 
 /**
  * Asks for a secret until `parse` accepts the answer, as described at the top, and returns what
- * `parse` made of it, or CANCELLED at Ctrl+C or the end of the input. The answer is trimmed. On
- * the private screen it shows as it is typed.
+ * `parse` made of it, or CANCELLED at Ctrl+C or the end of the input. Typed text is trimmed; file
+ * contents reach parse unchanged. Only the typed answer is echoed on the private screen.
  */
 export async function askSecretUntil<T>(
   prompt: string,
   parse: AnswerParser<T>,
   options: SecretAskOptions = {},
 ): Promise<T | Cancelled> {
-  const answer = await askUntil(parse, async () => {
+  const read = (text: string): T | Promise<T> =>
+    parse(options.textFile === undefined ? text : TextFileInput.read(text, options.textFile));
+  const answer = await askUntil(read, async () => {
     const reading = await readAnswer(prompt, {
       echo: onPrivateScreen(),
       back: false,
@@ -268,14 +270,18 @@ async function askUntil<T>(
 ): Promise<T | undefined | Cancelled> {
   assertTerminal();
   for (let warning: string | undefined; ;) {
-    if (warning !== undefined) terminalNotice(warning, "warning");
+    if (warning !== undefined && PrivateSteps.active) PrivateSteps.remember(warning);
+    const redrawn = PrivateSteps.begin();
+    if (warning !== undefined && !redrawn) terminalNotice(warning, "warning");
     const answer = await turn();
     if (answer === "back") return undefined;
     if (answer === CANCELLED) return CANCELLED;
     if ("warning" in answer) warning = answer.warning;
     else
       try {
-        return await parse(answer.text);
+        const accepted = await parse(answer.text);
+        PrivateSteps.answerAccepted();
+        return accepted;
       } catch (error) {
         warning = refusal(error);
       }
@@ -689,27 +695,5 @@ async function askAddress(
   }));
 }
 
-/** Quotes that a terminal puts around a path dragged into it: GNOME's ', Windows Terminal's ". */
-const DROPPED_QUOTES = /^(['"])(.*)\1$/su;
-
-/**
- * A typed file name as the file system knows it. A file dragged into a terminal arrives quoted
- * (GNOME Terminal, Windows Terminal) or with a backslash before each space and other characters
- * that a shell reads (macOS Terminal); no shell undoes that here, and none expands a leading ~.
- * One pair of quotes around the whole answer is removed; otherwise, except on Windows, where the
- * backslash separates folders, each backslash escape is undone. A leading ~ is the home folder.
- */
-export function droppedPath(answer: string, platform: NodeJS.Platform = process.platform): string {
-  const text = answer.trim();
-  const quoted = DROPPED_QUOTES.exec(text);
-  const path =
-    quoted !== null
-      ? defined(quoted[2])
-      : platform === "win32"
-        ? text
-        : text.replace(/\\(.)/gsu, "$1");
-  if (path === "~") return homedir();
-  return path.startsWith("~/") || (platform === "win32" && path.startsWith("~\\"))
-    ? join(homedir(), path.slice(2))
-    : path;
-}
+// Keep the existing prompt helpers' import path while file admission owns path normalization.
+export { droppedPath } from "./text-file.js";

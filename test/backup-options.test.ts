@@ -28,7 +28,9 @@ describe("what a backup can be made of", () => {
     expect(shareFormatOf("english")).toBe("words");
     for (const form of ["indexes", "unicode", "colors", "colors-unicode"] as const)
       expect(shareFormatOf(form)).toBe(form);
-    expect(() => shareFormatOf("json" as never)).toThrow("Unsupported encoded format: json.");
+    expect(() => shareFormatOf("json" as never)).toThrow(
+      expect.objectContaining({ code: "core.encoded-form.unsupported-encoded-format" }),
+    );
   });
 
   it("always masks English words and word numbers, and calls the other forms weak unmasked", () => {

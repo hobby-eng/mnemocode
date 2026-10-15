@@ -68,6 +68,7 @@ const ERRORS = new ErrorCatalog("cli.share-repair", {
   "no-share-was-typed-at-place": (value0: string) => `No share was typed at place ${value0}.`,
   "mend-shares-refused": suppliedMessage,
   "search-share-repair-refused": suppliedMessage,
+  "one-share-at-a-time": () => "Give one share here, or a text file containing just that share.",
 });
 
 /** The restore of shares with Node's SSKR library: it keeps nothing of a restore. */
@@ -80,9 +81,9 @@ const SHARE_SEPARATOR_HINT = `separate shares with ${SHARE_SEPARATOR}`;
 /** How shares are typed in one answer, with the marks of what cannot be read. */
 export const SHARE_ANSWER_HINT = `${SHARE_SEPARATOR_HINT}, ? for each unreadable code or digit`;
 /** The question for every share at once; a line break in a paste separates shares too (ask.ts). */
-const SHARES_PROMPT = `Shamir shares (${SHARE_ANSWER_HINT}):`;
+const SHARES_PROMPT = `Shamir shares or text file path (${SHARE_ANSWER_HINT}):`;
 /** The question for shares added to those typed. */
-const MORE_SHARES_PROMPT = `More shares (${SHARE_SEPARATOR_HINT}):`;
+const MORE_SHARES_PROMPT = `More shares or text file path (${SHARE_SEPARATOR_HINT}):`;
 
 /** A share that another command's question took, such as Decode's, and where it came from. */
 export interface FirstShare {
@@ -130,7 +131,7 @@ export class TypedShares {
    */
   static async startingWith(first: FirstShare): Promise<TypedShares | Cancelled> {
     const shares = new TypedShares();
-    shares.input.add([first.text]);
+    shares.input.add(shares.input.sharesOfAnswer(first.text));
     if (first.fromQr) shares.#readFromQr();
     return (await shares.#retypeUnreadable()) ?? shares;
   }
@@ -162,7 +163,12 @@ export class TypedShares {
     const texts = await askSecretUntil(
       SHARES_PROMPT,
       (answer) => this.input.sharesOfAnswer(answer),
-      { what: "the shares", pastedLineBreak: SHARE_SEPARATOR, hints: SHARE_WORD_HINTS },
+      {
+        what: "the shares or their text file path",
+        textFile: "The share file",
+        pastedLineBreak: SHARE_SEPARATOR,
+        hints: SHARE_WORD_HINTS,
+      },
     );
     if (texts === CANCELLED) return CANCELLED;
     this.#fromQr = false;
@@ -187,6 +193,7 @@ export class TypedShares {
     this.#fromQr = false;
     return askSecretUntil(MORE_SHARES_PROMPT, (answer) => this.input.sharesOfAnswer(answer, true), {
       what: "the shares to add",
+      textFile: "The share file",
       hints: SHARE_WORD_HINTS,
       pastedLineBreak: SHARE_SEPARATOR,
     });
@@ -256,10 +263,19 @@ export class TypedShares {
         const kept = this.list.length > 1 ? await this.askLeaveOut(place) : "again";
         if (kept !== "again") return kept === "out" ? undefined : kept;
       }
-      const text = await askSecretUntil(`Share ${place} again:`, (answer) => answer, {
-        what: `share ${place}`,
-        hints: SHARE_WORD_HINTS,
-      });
+      const text = await askSecretUntil(
+        `Share ${place} again, or its text file path:`,
+        (answer) => {
+          const parts = this.input.sharesOfAnswer(answer);
+          if (parts.length !== 1) throw ERRORS.create("one-share-at-a-time", []);
+          return defined(parts[0]);
+        },
+        {
+          what: `share ${place} or its text file path`,
+          textFile: "The share file",
+          hints: SHARE_WORD_HINTS,
+        },
+      );
       if (text === CANCELLED) return CANCELLED;
       problem = this.input.readProblem(place, text);
       if (problem === undefined) {

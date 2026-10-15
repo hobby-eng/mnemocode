@@ -167,12 +167,18 @@ class Session:
         return self.exit_code
 
     def close(self):
-        if self.alive():
-            if WINDOWS:
-                self.process.terminate(force=True)
-            else:
-                os.kill(self.pid, 9)
-                os.waitpid(self.pid, 0)
+        try:
+            if self.alive():
+                if WINDOWS:
+                    self.process.terminate(force=True)
+                else:
+                    os.kill(self.pid, 9)
+                    os.waitpid(self.pid, 0)
+                    self.exit_code = -9
+        finally:
+            if not WINDOWS and self.fd is not None:
+                os.close(self.fd)
+                self.fd = None
 
 
 # A control sequence (ECMA-48 CSI): parameters, then one final byte.
@@ -182,11 +188,12 @@ CONTROL_SEQUENCE = re.compile(r"\x1b\[([0-9;?]*)([@-~])")
 class Screen:
     """The rows that a terminal `columns` wide shows after `text`, for what the menu draws: text,
     which waits at the right edge before it wraps, carriage return, line feed, and the sequences
-    for cursor up, cursor down, cursor right and erase to the end of the screen. Rows never scroll
-    away. Any other escape sequence fails the check."""
+    for cursor up, cursor down, cursor right, home and screen erasure. Rows scroll only when a
+    finite height is supplied. Any other escape sequence fails the check."""
 
-    def __init__(self, columns, text):
+    def __init__(self, columns, text, height=None):
         self.columns = columns
+        self.height = height
         self.rows = [[]]
         self.row = self.column = 0
         # Whether the cursor waits on the last column, where the next character wraps first.
@@ -216,6 +223,9 @@ class Screen:
         self.waiting = False
         while len(self.rows) <= self.row:
             self.rows.append([])
+        while self.height is not None and len(self.rows) > self.height:
+            del self.rows[0]
+            self.row -= 1
 
     def put(self, character):
         if self.waiting:
@@ -239,8 +249,29 @@ class Screen:
         elif final == "J" and parameters == "":
             del self.rows[self.row][self.column :]
             del self.rows[self.row + 1 :]
+        elif final == "H" and parameters == "":
+            self.move(0, 0)
+        elif final == "J" and parameters == "2":
+            self.rows = [[] for _ in range(self.row + 1)]
         else:
             raise AssertionError(f"unexpected sequence ESC [ {parameters}{final}")
+
+
+def assert_private_result_visible(session, markers):
+    """Checks the current private frame, including erases and scrolling, rather than its history.
+
+    ConPTY redraws its own screen and may omit the raw switch/clear sequences; there the regular
+    terminal tests check the output and the platform-neutral screen tests check frame contents.
+    """
+    if WINDOWS:
+        return
+    session.read_some(wait=0.05)
+    start = session.output.rfind(ENTER_ALTERNATE_SCREEN)
+    assert start >= 0, "the private screen was not opened"
+    text = session.output[start + len(ENTER_ALTERNATE_SCREEN) :]
+    frame = " ".join(" ".join(Screen(TERMINAL_COLUMNS, text, TERMINAL_ROWS).lines()).split())
+    for marker in markers:
+        assert marker in frame, f"the current private frame lost {marker!r}"
 
 
 def read_to_end(session):

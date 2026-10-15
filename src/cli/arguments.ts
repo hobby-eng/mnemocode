@@ -36,7 +36,9 @@ export function parseArguments(items: readonly string[]): ParsedArguments {
   const booleanOptions = new Set([
     "card-qr",
     "sskr",
+    "show-masked-words",
     "all",
+    "recovery-guide",
     "ask-secrets",
     "cards",
     "legacy-valid-last-word",

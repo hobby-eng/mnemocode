@@ -32,6 +32,7 @@ import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
 import { defined } from "../core/defined.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { PrivateResult } from "./private-result.js";
 
 /** Seconds between two progress updates of a long search. */
 const PROGRESS_SECONDS = 2;
@@ -252,10 +253,23 @@ async function listed(search: MissingCodesSearch): Promise<MissingOutcome | Canc
   if (dates === CANCELLED) return CANCELLED;
   const result = await ran(search.listed(dates?.known ?? []));
   if (result === CANCELLED) return CANCELLED;
-  if (result.kind === "list")
-    result.rows.forEach(({ codes, phrase, fingerprint }, index) =>
-      console.log(`${index + 1}\t${codes}\t${phrase}\t${fingerprint}`),
-    );
+  if (result.kind === "list") {
+    const lines = result.rows.flatMap(({ codes, phrase, fingerprint }, index) => [
+      `Candidate ${index + 1}`,
+      `Codes: ${codes}`,
+      `Phrase: ${phrase}`,
+      `Fingerprint: ${fingerprint}`,
+      "",
+    ]);
+    if (
+      (await new PrivateResult(lines).show(() => {
+        result.rows.forEach(({ codes, phrase, fingerprint }, index) =>
+          console.log(`${index + 1}\t${codes}\t${phrase}\t${fingerprint}`),
+        );
+      })) === CANCELLED
+    )
+      return CANCELLED;
+  }
   terminalHint(MISSING_CODES_TEXTS.list);
   return { kind: "shown" };
 }

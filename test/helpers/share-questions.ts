@@ -23,7 +23,7 @@ export const OTHER_SET_SHARE = vectors.deterministic[1]!.shares[0]!;
 
 /** The question for the shares. */
 export const SHARES_PROMPT =
-  "Shamir shares (separate shares with ;, ? for each unreadable code or digit):";
+  "Shamir shares or text file path (separate shares with ;, ? for each unreadable code or digit):";
 
 /** The second share in colours with the elements at `marks` unreadable. */
 export function marked(marks: readonly number[]): string {
@@ -34,7 +34,7 @@ export function marked(marks: readonly number[]): string {
 export function promptsShown(): string[] {
   return [
     ...seen.screen.matchAll(
-      /(Shamir shares[^:]*:|Share \d+ again:|More shares[^:]*:|Dates \([^:]*:|Original fingerprint of the wallet[^:]*:)/gu,
+      /(Shamir shares[^:]*:|Share \d+ again, or its text file path:|More shares[^:]*:|Dates \([^:]*:|Original fingerprint of the wallet[^:]*:)/gu,
     ),
   ].map((match) => match[1]!);
 }

@@ -5,6 +5,7 @@
 // used; what was answered before is kept.
 
 import { BackupReading } from "../core/backup-reading.js";
+import { SHARE_SEPARATOR } from "../sskr/share-input.js";
 import { EncodedBackup, MissingChecksumError } from "../core/encoded-backup.js";
 import type { MissingCodes } from "../core/missing-codes.js";
 import { Masking, PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
@@ -153,11 +154,13 @@ export function encodedFingerprintOf(backup: EncodedBackup): string | undefined 
 class BackupSource {
   #typed: boolean;
   readonly #qr: boolean;
+  readonly #shares: boolean;
   #reads = 0;
   readonly #args: ParsedArguments;
 
-  constructor(args: ParsedArguments) {
+  constructor(args: ParsedArguments, shares: boolean) {
     this.#args = args;
+    this.#shares = shares;
     this.#qr = value(args, "qr-file") !== undefined;
     this.#typed = !this.#qr && value(args, "input-file") === undefined;
   }
@@ -174,6 +177,14 @@ class BackupSource {
       : { label: "Read another file", note: "or type the encoded seed phrase", value: "again" };
   }
 
+  /** Resolves a record/option conflict using the record or reading this source again. */
+  recordOrAgain(
+    conflict: string,
+    recorded: Choice<"record">,
+  ): Promise<"record" | "again" | Cancelled> {
+    return askAfterFailure(conflict, [recorded, this.againChoice()], { escape: "asks again" });
+  }
+
   /**
    * The text of the next attempt; `problem`, shown first, is why the last one could not be used.
    * CANCELLED when the person cancels.
@@ -181,10 +192,19 @@ class BackupSource {
   async next(problem: string | undefined): Promise<string | Cancelled> {
     if (this.#typed) {
       if (problem !== undefined) terminalNotice(problem, "warning");
-      return askSecretUntil("Encoded seed phrase or record:", recordText, {
-        what: "the encoded seed phrase or its record",
-        hints: EncodedForm.typedWords,
-      });
+      const typed = await askSecretUntil(
+        "Encoded seed phrase, record or text file path:",
+        recordText,
+        {
+          what: "the encoded seed phrase or its record",
+          textFile: "The encoded input file",
+          hints: EncodedForm.typedWords,
+          pastedLineBreak: this.#shares ? SHARE_SEPARATOR : " ",
+        },
+      );
+      // Display pasted boundaries as ; without moving the editing cursor to another row. Keep
+      // them as line breaks for the library: English words still use whitespace, shares stay apart.
+      return typed === CANCELLED || !this.#shares ? typed : typed.replaceAll(SHARE_SEPARATOR, "\n");
     }
     if (this.#reads === 0) {
       this.#reads += 1;
@@ -245,7 +265,7 @@ interface Again {
  * person cancels.
  */
 export async function askEncodedBackup(question: BackupQuestion): Promise<ReadBackup | Cancelled> {
-  const source = new BackupSource(question.args);
+  const source = new BackupSource(question.args, question.shares === true);
   for (let problem: string | undefined; ;) {
     const text = await source.next(problem);
     if (text === CANCELLED) return CANCELLED;
@@ -307,15 +327,15 @@ async function checkedBackup(
   question: BackupQuestion,
   source: BackupSource,
 ): Promise<ReadBackup | Again | Cancelled> {
-  // --input-kind codes reads every text as codes, a share among them.
-  if (question.shares === true && question.inputKind !== "codes") {
-    const offered = await offeredRestore(text, source, question.inputKind);
-    if (offered === CANCELLED) return CANCELLED;
-    if (offered === "share") return { kind: "share", text, fromQr: source.readsQr };
-    if (offered === "again") return { again: undefined };
-  }
   let reading: BackupReading;
   try {
+    // --input-kind codes reads every text as codes, a share among them.
+    if (question.shares === true && question.inputKind !== "codes") {
+      const offered = await offeredRestore(text, source, question.inputKind);
+      if (offered === CANCELLED) return CANCELLED;
+      if (offered === "share") return { kind: "share", text, fromQr: source.readsQr };
+      if (offered === "again") return { again: undefined };
+    }
     reading = BackupReading.of(text, {
       seedshiftOnly: question.seedshiftOnly,
       shareReader: SHARE_READER,
@@ -413,14 +433,11 @@ async function settledMode(
   const conflict = reading.modeConflict(given);
   if (conflict !== undefined) {
     const named = defined(reading.mode());
-    const choice = await askAfterFailure(
-      conflict,
-      [
-        { label: "As the record says", note: Masking.of(named).name, value: "record" },
-        source.againChoice(),
-      ] as const,
-      { escape: "asks again" },
-    );
+    const choice = await source.recordOrAgain(conflict, {
+      label: "As the record says",
+      note: Masking.of(named).name,
+      value: "record",
+    });
     if (choice === CANCELLED) return CANCELLED;
     return choice === "record" ? named : undefined;
   }
@@ -462,14 +479,10 @@ async function settledFormat(
   const conflict = reading.formatConflict(given);
   if (conflict !== undefined) {
     const [recorded] = reading.formats();
-    const choice = await askAfterFailure(
-      conflict,
-      [
-        { label: `Read them as ${defined(recorded)}`, value: "record" },
-        source.againChoice(),
-      ] as const,
-      { escape: "asks again" },
-    );
+    const choice = await source.recordOrAgain(conflict, {
+      label: `Read them as ${defined(recorded)}`,
+      value: "record",
+    });
     if (choice === CANCELLED) return CANCELLED;
     return choice === "record" ? defined(recorded) : { again: undefined };
   }

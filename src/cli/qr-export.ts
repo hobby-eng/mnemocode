@@ -5,23 +5,42 @@
 import { basename, dirname, extname, join } from "node:path";
 import { exportQrPayload } from "../export/qr-image.js";
 import { firstFreeName } from "./output-paths.js";
-import { writeSaved } from "./save-retry.js";
+import { saveWithRetry } from "./save-retry.js";
+import { preflightFileDestination } from "./output-paths.js";
+import type { Cancelled } from "./terminal-keys.js";
 
 /**
  * The image of a QR code that a sheet prints, saved where the sheet is: beside the PDF `sheet`,
  * named after it, "cards.pdf" giving "cards-qr.png", with `suffix` before "-qr" if given. A
- * taken name gets a number (firstFreeName). Returns the name used.
+ * taken name gets a number (firstFreeName). Returns the name used, undefined when skipped, or
+ * CANCELLED at Ctrl+C, as every interactive save does.
  */
-export async function saveQrBeside(payload: string, sheet: string, suffix = ""): Promise<string> {
+export async function saveQrBeside(
+  payload: string,
+  sheet: string,
+  suffix = "",
+): Promise<string | undefined | Cancelled> {
   const name = basename(sheet, extname(sheet));
   const path = await firstFreeName(join(dirname(sheet), `${name}${suffix}-qr.png`));
-  await writeSaved(() => exportQrPayload(payload, path));
-  return path;
+  return saveQrAt(payload, path);
 }
 
-/** The same, inside the folder `folder` of the sheets, as "qr.png" or "<name>-qr.png". */
-export async function saveQrInside(payload: string, folder: string, name = ""): Promise<string> {
+/** The same outcomes inside the sheets' folder, as "qr.png" or "<name>-qr.png". */
+export async function saveQrInside(
+  payload: string,
+  folder: string,
+  name = "",
+): Promise<string | undefined | Cancelled> {
   const path = await firstFreeName(join(folder, name === "" ? "qr.png" : `${name}-qr.png`));
-  await writeSaved(() => exportQrPayload(payload, path));
-  return path;
+  return saveQrAt(payload, path);
+}
+
+function saveQrAt(payload: string, path: string): Promise<string | undefined | Cancelled> {
+  return saveWithRetry({
+    what: "The QR code of the sheet",
+    kind: "file",
+    path,
+    write: (name) => exportQrPayload(payload, name),
+    checkName: (name) => preflightFileDestination(name, false),
+  });
 }

@@ -240,7 +240,7 @@ describe("AUD-021-FUN003: one card plan through the production Encode dispatcher
         "cards",
       ]);
       expectSameCollection(observed.attempts, format);
-      expect(observed.fontReads).toBe(1);
+      expect(observed.fontReads).toBe(0);
       expect(observed.randomChoices).toBeGreaterThan(0);
       expect(observed.identityChoices).toBeGreaterThan(0);
       expect(observed.notices.filter((line) => line.startsWith("Saved"))).toEqual([
@@ -265,7 +265,7 @@ describe("AUD-021-FUN003: one card plan through the production Encode dispatcher
       "cards",
     ]);
     expectSameCollection(observed.attempts, "colors-unicode");
-    expect(observed.fontReads).toBe(1);
+    expect(observed.fontReads).toBe(0);
     expect(observed.saved.map(({ destination }) => destination)).toEqual([
       "pdf",
       "images",
@@ -290,7 +290,7 @@ describe("AUD-021-FUN003: one card plan through the production Encode dispatcher
     observed.choices = ["skip"];
     await runEncode(argumentsFor());
     expectSameCollection(observed.attempts, "colors-unicode");
-    expect(observed.fontReads).toBe(1);
+    expect(observed.fontReads).toBe(0);
     expect(observed.saved.map(({ destination }) => destination)).toEqual(["images", "cards"]);
     expect(observed.notices).toContain("The PDF was not saved.");
     expect(observed.notices.some((line) => line.startsWith("Saved PDF:"))).toBe(false);
@@ -308,7 +308,7 @@ describe("AUD-021-FUN003: one card plan through the production Encode dispatcher
     const args = argumentsFor();
     await runEncode(args);
     expectSameCollection(observed.attempts, "colors-unicode");
-    expect(observed.fontReads).toBe(1);
+    expect(observed.fontReads).toBe(0);
     expect(observed.saved[0]).toEqual({ destination: "pdf", path: other });
     expect(args.pdf).toBe(other);
     expect(observed.nameQuestions).toEqual(["New name for the PDF:"]);
@@ -319,14 +319,13 @@ describe("AUD-021-FUN003: one card plan through the production Encode dispatcher
     observed.privateScreen = true;
     observed.fontFailures = 1;
     observed.choices = ["again"];
-    await runEncode(argumentsFor());
+    const args = argumentsFor();
+    args["page-size"] = "a6";
+    delete args["cards-dir"];
+    await runEncode(args);
     expect(observed.fontReads).toBe(2);
     expectSameCollection(observed.attempts, "colors-unicode");
-    expect(observed.saved.map(({ destination }) => destination)).toEqual([
-      "pdf",
-      "images",
-      "cards",
-    ]);
+    expect(observed.saved.map(({ destination }) => destination)).toEqual(["pdf", "images"]);
     expect(observed.notices).toContain(
       `The PDF could not be saved as ${join(folder, "public.pdf")}: synthetic font read failure.`,
     );
@@ -365,7 +364,7 @@ describe("AUD-021-FUN003: one card plan through the production Encode dispatcher
     await runEncode(args);
     expectSameCollection(first, "colors-unicode");
     expectSameCollection(observed.attempts, "colors-unicode");
-    expect(observed.fontReads).toBe(2);
+    expect(observed.fontReads).toBe(0);
     expect(observed.attempts[0]!.job.content.colors).not.toEqual(first[0]!.job.content.colors);
   });
 });

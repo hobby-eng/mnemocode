@@ -309,15 +309,16 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<Cance
   target?.assertListable(passphrase);
   if (asked) assertAskedNotGiven(arguments_, PHRASE_SECRET_OPTIONS);
   const prompt = legacy
-    ? "Exact legacy Seedshift phrase with its old final word:"
+    ? "Exact legacy Seedshift phrase (old final word), or text file path:"
     : missing
-      ? "The words you have, in their order:"
-      : "Seed phrase, ? for each forgotten word:";
+      ? "The words you have, in order, or text file path:"
+      : "Seed phrase or text file path, ? for each forgotten word:";
   const read = async (): Promise<PhraseSearch | Cancelled> => {
     const rules = { legacy, missing, listed: target !== undefined };
     if (!asked) return parsePhrase(textInput(arguments_, "mnemonic"), rules);
     return askSecretUntil(prompt, (text) => parsePhrase(text, rules), {
       what: "the words",
+      textFile: "The seed phrase file",
       hints: WordList.BIP39,
     });
   };

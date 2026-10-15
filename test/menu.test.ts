@@ -111,8 +111,8 @@ describe("start menu", () => {
       "--card-qr",
     ]);
     // Word numbers, always masked, with MnemoCode Seedshift, split 2 of 3 into shares in word
-    // numbers too, on the screen, with the whole seed phrase beside them (--format).
-    expect(await runOf(ENTRY.encode, [0, 0, 1, 0, 1])).toEqual([
+    // numbers too, on the screen, with the original wallet phrase in word numbers beside them.
+    expect(await runOf(ENTRY.encode, [0, 0, 1, 0, 2, 0])).toEqual([
       "encode",
       "--sskr",
       "--ask-secrets",
@@ -124,6 +124,8 @@ describe("start menu", () => {
       "3",
       "--share-format",
       "indexes",
+      "--show-original",
+      "codes",
       "--format",
       "2",
     ]);
@@ -168,6 +170,18 @@ describe("start menu", () => {
       "--heir-sheet-size",
       "a5",
     ]);
+  });
+
+  it("offers independent choices for the original wallet phrase and the Seedshift words", async () => {
+    for (const [choice, form] of [undefined, "words", "codes", "both"].entries()) {
+      for (const words of [0, 1]) {
+        const run = (await runOf(ENTRY.encode, [0, 0, 1, 0, choice, words, 0]))!;
+        const args = parseArguments(run.slice(1));
+        expect(args["show-original"]).toBe(form);
+        expect(args.format).toBe(form === "codes" || form === "both" ? "2" : undefined);
+        expect(args["show-masked-words"]).toBe(words === 1 ? true : undefined);
+      }
+    }
   });
 });
 

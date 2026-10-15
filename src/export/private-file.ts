@@ -1,6 +1,19 @@
-import { chmod, link, lstat, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  link,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  rename,
+  rm,
+  rmdir,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+import { errorCode } from "../core/refusal.js";
+import { ExportFileName } from "./file-name.js";
 
 const ERRORS = new ErrorCatalog("export.private-file", {
   "new-folder-path-empty-one-refused": () => "A new folder needs a path; an empty one is refused.",
@@ -11,6 +24,11 @@ const ERRORS = new ErrorCatalog("export.private-file", {
 const PRIVATE_FILE_MODE = 0o600;
 /** Owner-only access to a folder of a backup's files. */
 const PRIVATE_FOLDER_MODE = 0o700;
+
+/** A child output path; refuses separators, traversal and Windows special name characters. */
+export function privateChildPath(folder: string, name: string): string {
+  return join(folder, ExportFileName.checked(name));
+}
 
 /**
  * Writes `bytes` as a new file at `path` that only its owner may read; fails with EEXIST when
@@ -132,9 +150,12 @@ export async function absentPath(path: string, taken: string): Promise<string> {
 
 /**
  * Publishes a new private folder at `target`: `write` fills a staging folder beside it, made with
- * `prefix` on the same file system, which becomes `target` only while nothing is there yet
- * (absentPath, refused with `taken`), then readable by its owner alone. On any failure the staging
- * folder is removed and no part of the export is left. Resolves with what `write` returns.
+ * `prefix` on the same file system. mkdir reserves the final name without replacement after the
+ * contents are complete. Its completed children move into that private reservation on every
+ * platform, without replacing a destination directory. Publication of several children is not
+ * atomic: a crash can leave an empty or partial folder. This guards concurrent creation, not
+ * hostile interference by another process with the same account. On failure the staging folder
+ * and the unchanged owned reservation are removed. Resolves with what `write` returns.
  */
 export async function publishNewFolder<T>(
   target: string,
@@ -144,16 +165,29 @@ export async function publishNewFolder<T>(
 ): Promise<T> {
   await mkdir(dirname(target), { recursive: true });
   const staging = await mkdtemp(join(dirname(target), prefix));
+  let reservation: Awaited<ReturnType<typeof lstat>> | undefined;
   try {
     const result = await write(staging);
-    // Private before it is published: the rename is the step that publishes it, and nothing can
-    // fail after it (AUD-012-FUN005).
+    // Everything is prepared privately before claiming the final name with mkdir.
     await chmod(staging, PRIVATE_FOLDER_MODE);
-    await absentPath(target, taken);
-    await rename(staging, target);
+    try {
+      await makePrivateFolder(target);
+    } catch (error) {
+      if (errorCode(error) === "EEXIST") throw ERRORS.create("absent-path-refused", [taken]);
+      throw error;
+    }
+    reservation = await lstat(target);
+    for (const name of await readdir(staging))
+      await rename(privateChildPath(staging, name), privateChildPath(target, name));
+    await rmdir(staging);
     return result;
   } catch (error) {
     await rm(staging, { recursive: true, force: true });
+    if (reservation !== undefined) {
+      const current = await lstat(target);
+      if (current.dev === reservation.dev && current.ino === reservation.ino)
+        await rm(target, { recursive: true, force: true });
+    }
     throw error;
   }
 }

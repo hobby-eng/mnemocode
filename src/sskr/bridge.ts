@@ -8,26 +8,47 @@
 // Needs from the host: the bridge, loaded (runtime.ts in Node.js); a page passes its own.
 // Does not: load or verify the WASM (runtime.ts), or change what the bridge returns.
 
-import type * as Engine from "../../sskr-wasm/generated/recovery_sskr_wasm.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { ByteArray } from "../core/byte-array.js";
+import { wipeAll } from "../core/bits.js";
+import { isRecordedQuorum } from "./share-layout.js";
 
 const ERRORS = new ErrorCatalog("sskr.bridge", {
   "unsupported-encoding": () => UNSUPPORTED_ENCODING,
   "unsupported-group-threshold": () => UNSUPPORTED_GROUP_THRESHOLD,
+  "byte-array-required": { kind: "type", text: () => "SSKR inputs must be attached byte arrays." },
+  "share-text-required": { kind: "type", text: () => "SSKR shares must be text." },
+  "member-quorum": () => "The SSKR member threshold and count must form a valid quorum.",
 });
 
-/** The generated bridge, as its glue exports it. */
-type Bridge = typeof Engine;
-
-/** The entries of the bridge that a host calls, with the codes of its encodings. */
-export type SskrBridge = Pick<
-  Bridge,
-  | "ShareEncoding"
-  | "create_sskr_shares"
-  | "create_sskr_shares_formatted"
-  | "recover_sskr_shares"
-  | "recover_sskr_shares_formatted"
->;
+/** The host's narrow share engine contract, independent of its generated files or loader. */
+export interface SskrBridge {
+  /** Numeric encodings and their reverse names; values come from the engine, never this adapter. */
+  readonly ShareEncoding: Readonly<{
+    readonly [code: number]: string;
+    readonly CompactUr: number;
+    readonly Bytewords: number;
+  }>;
+  /** Compact-UR shares; refuses invalid groups, secrets or random seeds. */
+  create_sskr_shares(
+    secret: Uint8Array,
+    group_threshold: number,
+    group_specs: Uint8Array,
+    random_seed: Uint8Array,
+  ): string;
+  /** Shares in the chosen engine encoding, with the same ownership and refusal contract. */
+  create_sskr_shares_formatted(
+    secret: Uint8Array,
+    group_threshold: number,
+    group_specs: Uint8Array,
+    random_seed: Uint8Array,
+    encoding: number,
+  ): string;
+  /** Restores newline-separated compact-UR shares to a fresh owned secret buffer. */
+  recover_sskr_shares(records: string): Uint8Array;
+  /** Restores newline-separated shares in the chosen engine encoding to a fresh secret buffer. */
+  recover_sskr_shares_formatted(records: string, encoding: number): Uint8Array;
+}
 
 /**
  * The bridge's own refusal of an unsupported encoding (UNSUPPORTED_ENCODING in
@@ -47,6 +68,11 @@ const U8_MAX = 0xff;
  * place (SskrBridge): an unchecked entry is not reachable through it.
  */
 export class CheckedSskrBridge implements SskrBridge {
+  /** A group's checked threshold/count bytes; never silently narrows host-supplied numbers. */
+  static groupSpecifications(threshold: number, count: number): Uint8Array {
+    if (!isRecordedQuorum(threshold, count)) throw ERRORS.create("member-quorum", []);
+    return Uint8Array.of(threshold, count);
+  }
   readonly #bridge: SskrBridge;
   /** The codes of the bridge's encodings: the numbers of its enum, which also maps them back. */
   readonly #encodings: readonly number[];
@@ -68,8 +94,7 @@ export class CheckedSskrBridge implements SskrBridge {
     group_specs: Uint8Array,
     random_seed: Uint8Array,
   ): string {
-    CheckedSskrBridge.#assertGroupThreshold(group_threshold);
-    return this.#bridge.create_sskr_shares(secret, group_threshold, group_specs, random_seed);
+    return this.#create(secret, group_threshold, group_specs, random_seed);
   }
 
   create_sskr_shares_formatted(
@@ -79,24 +104,55 @@ export class CheckedSskrBridge implements SskrBridge {
     random_seed: Uint8Array,
     encoding: number,
   ): string {
-    CheckedSskrBridge.#assertGroupThreshold(group_threshold);
     this.#assertEncoding(encoding);
-    return this.#bridge.create_sskr_shares_formatted(
-      secret,
-      group_threshold,
-      group_specs,
-      random_seed,
-      encoding,
-    );
+    return this.#create(secret, group_threshold, group_specs, random_seed, encoding);
   }
 
   recover_sskr_shares(records: string): Uint8Array {
+    CheckedSskrBridge.#assertRecords(records);
     return this.#bridge.recover_sskr_shares(records);
   }
 
   recover_sskr_shares_formatted(records: string, encoding: number): Uint8Array {
     this.#assertEncoding(encoding);
+    CheckedSskrBridge.#assertRecords(records);
     return this.#bridge.recover_sskr_shares_formatted(records, encoding);
+  }
+
+  /** Admits every array before any copy, then owns and wipes the inputs passed to generated glue. */
+  #create(
+    secret: Uint8Array,
+    threshold: number,
+    groups: Uint8Array,
+    seed: Uint8Array,
+    encoding?: number,
+  ): string {
+    CheckedSskrBridge.#assertGroupThreshold(threshold);
+    for (const input of [secret, groups, seed])
+      if (!ByteArray.is(input)) throw ERRORS.create("byte-array-required", []);
+    const owned: Uint8Array[] = [];
+    try {
+      for (const input of [secret, groups, seed]) owned.push(new Uint8Array(input));
+      const [copy, specifications, randomness] = owned;
+      // The three entries were made above; tuple construction keeps the glue inputs intrinsic.
+      if (copy === undefined || specifications === undefined || randomness === undefined)
+        throw ERRORS.create("byte-array-required", []);
+      return encoding === undefined
+        ? this.#bridge.create_sskr_shares(copy, threshold, specifications, randomness)
+        : this.#bridge.create_sskr_shares_formatted(
+            copy,
+            threshold,
+            specifications,
+            randomness,
+            encoding,
+          );
+    } finally {
+      wipeAll(owned);
+    }
+  }
+
+  static #assertRecords(records: unknown): void {
+    if (typeof records !== "string") throw ERRORS.create("share-text-required", []);
   }
 
   /** Refuses anything but the code of one of the bridge's encodings, a whole number as it is. */

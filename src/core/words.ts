@@ -48,6 +48,8 @@ const ERRORS = new ErrorCatalog("core.words", {
     "The selected mapped BIP39 character is not one Unicode scalar value.",
   "wordlist-index-from": (value0: string) => `A wordlist index must be from ${value0}.`,
   "word-table-row-refused": suppliedMessage,
+  "word-table-lookup": () => "Word table lookup must use a word, index or Unicode code.",
+  "word-table-format": () => "Word list format must be english, chinese, unicode or mapping.",
   "mode-exact-old-final-word-stands-no-word": () =>
     "This mode needs the exact old final word: ? stands for no word here.",
 });
@@ -242,6 +244,8 @@ const WORD_TABLE_LOOKUPS: Readonly<
 
 /** The row of a word, a word number or a Unicode code, as `mnemocode table` finds it. */
 export function wordTableRow(lookup: WordTableLookup, text: string): MappingRow {
+  if (typeof lookup !== "string" || !Object.hasOwn(WORD_TABLE_LOOKUPS, lookup))
+    throw ERRORS.create("word-table-lookup", []);
   const { find, refusal } = WORD_TABLE_LOOKUPS[lookup];
   const index = find(text.trim());
   if (index === undefined) throw ERRORS.create("word-table-row-refused", [refusal]);
@@ -251,10 +255,44 @@ export function wordTableRow(lookup: WordTableLookup, text: string): MappingRow 
 /** The columns of the word table as a text, in the order of MappingRow. */
 const WORD_TABLE_HEADER = ["index", "english", "unicode_hex"] as const;
 
-/** Every row, tab-separated with a header line, as `mnemocode table --all` prints it. */
-export function wordTableText(): string {
-  const rows = allMappingRows().map((row) => [row.index, row.english, row.unicodeHex]);
-  return [WORD_TABLE_HEADER, ...rows].map((columns) => columns.join("\t") + "\n").join("");
+/** Numbered dictionary exports; Chinese means the Traditional Chinese BIP39 word list. */
+export const WORD_TABLE_FORMATS = Object.freeze([
+  "english",
+  "chinese",
+  "unicode",
+  "mapping",
+] as const);
+/** The columns of a numbered BIP39 dictionary export. */
+export type WordTableFormat = (typeof WORD_TABLE_FORMATS)[number];
+
+/** Each column is read from the same canonical mapping, including the Chinese Unicode scalar. */
+const WORD_TABLE_COLUMNS = {
+  index: (row: MappingRow) => row.index,
+  english: (row: MappingRow) => row.english,
+  chinese: (row: MappingRow) => String.fromCodePoint(Number.parseInt(row.unicodeHex, 16)),
+  unicode_hex: (row: MappingRow) => row.unicodeHex,
+};
+const WORD_TABLE_LAYOUTS: Readonly<
+  Record<WordTableFormat, readonly (keyof typeof WORD_TABLE_COLUMNS)[]>
+> = {
+  english: ["index", "english"],
+  chinese: ["index", "chinese"],
+  unicode: ["index", "chinese", "unicode_hex"],
+  mapping: ["index", "english", "chinese", "unicode_hex"],
+};
+
+/**
+ * Every word, numbered from 1, as UTF-8 tab-separated text with a header. Omitted format keeps
+ * the original index/English/Unicode-code table. Refuses an unknown export format.
+ */
+export function wordTableText(format?: WordTableFormat): string {
+  if (format !== undefined && !WORD_TABLE_FORMATS.includes(format))
+    throw ERRORS.create("word-table-format", []);
+  const columns = format === undefined ? WORD_TABLE_HEADER : WORD_TABLE_LAYOUTS[format];
+  const rows = allMappingRows().map((row) =>
+    columns.map((column) => WORD_TABLE_COLUMNS[column](row)),
+  );
+  return [columns, ...rows].map((cells) => cells.join("\t") + "\n").join("");
 }
 
 /**

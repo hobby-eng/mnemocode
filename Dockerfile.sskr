@@ -71,7 +71,7 @@ RUN --network=none \
       "--remap-path-prefix=${RUSTUP_HOME}=/rustup" \
       '--remap-path-prefix=/workspace=/workspace' \
       '--cfg' 'getrandom_backend="wasm_js"')" \
-    cargo build --target wasm32-unknown-unknown --release --locked --offline \
+    cargo build --jobs 1 --target wasm32-unknown-unknown --release --locked --offline \
     && wasm-bindgen target/wasm32-unknown-unknown/release/recovery_sskr_wasm.wasm \
       --target web --out-dir /output
 

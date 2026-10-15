@@ -109,11 +109,14 @@ async function exportSet(
   terminalNotice(
     Masking.of(r.mode).masked ? PHRASE_WORDS.repairedMasked : PHRASE_WORDS.repairedUnknown,
   );
-  printShares(
-    written.shown,
-    written.total,
-    Masking.of(r.mode).masked ? PHRASE_WORDS.masked : undefined,
-  );
+  if (
+    (await printShares(
+      written.shown,
+      written.total,
+      Masking.of(r.mode).masked ? PHRASE_WORDS.masked : undefined,
+    )) === CANCELLED
+  )
+    return CANCELLED;
   return "exported";
 }
 
@@ -160,12 +163,12 @@ async function repairEach(
  * Shows every set that fits, `sets` of `phrases`, with the fingerprint of the phrase it holds,
  * its shares named by `places`; none is saved.
  */
-function showVariants(
+async function showVariants(
   phrases: readonly RestoredPhrase[],
   sets: readonly RepairedSet[],
   places: readonly number[],
   given: ShareFormat | undefined,
-): void {
+): Promise<Cancelled | undefined> {
   // Each with the wallet's own fingerprint, of the phrase after the dates (ShareRestore.variants),
   // in the order of their sets, which say what a repair filled in.
   const variants = ShareRestore.variants(phrases, places, given, masterFingerprint);
@@ -176,14 +179,17 @@ function showVariants(
     if (!terminalResultHeader(title, [[PHRASE_WORDS.originalFingerprint, fingerprint]]))
       console.log(`${title}, original fingerprint ${fingerprint}:`);
     reportRepairs(defined(sets[index]), places);
-    printShares(
-      variant.shares.map((share) => ({
-        ur: share.record,
-        format: share.format,
-        number: share.number,
-      })),
-      Math.max(...places),
-    );
+    if (
+      (await printShares(
+        variant.shares.map((share) => ({
+          ur: share.record,
+          format: share.format,
+          number: share.number,
+        })),
+        Math.max(...places),
+      )) === CANCELLED
+    )
+      return CANCELLED;
   }
   terminalHint("Each fingerprint is that of the phrase the shares hold, with an empty passphrase.");
 }
@@ -270,7 +276,7 @@ async function exportOnce(
   }
   const { sets, places } = restored;
   if (sets.length > 1) {
-    showVariants(restored.phrases, sets, places, given);
+    if ((await showVariants(restored.phrases, sets, places, given)) === CANCELLED) return CANCELLED;
     return undefined;
   }
   return settled(await exportSet(r, defined(sets[0]), places, given, checked, args));

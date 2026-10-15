@@ -201,7 +201,7 @@ export const MAX_CARD_TEXT_LENGTH = 100;
  * <label> must be non-empty text on one line" and then `blankEnding`, the caller's own rule.
  */
 export function cardText(text: unknown, label: string, blankEnding: string): string {
-  if (typeof text !== "string" || !text.trim() || /[\p{Cc}\p{Cf}]/u.test(text))
+  if (typeof text !== "string" || !text.trim() || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(text))
     throw ERRORS.create("card-non-empty-text-on-one-line", [`${label}`, `${blankEnding}`]);
   if (Array.from(text).length > MAX_CARD_TEXT_LENGTH)
     throw ERRORS.create("card-too-long-maximum-characters", [

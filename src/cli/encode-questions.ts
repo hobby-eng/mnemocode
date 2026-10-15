@@ -33,6 +33,7 @@ import {
 import { askOutputFile } from "./output-questions.js";
 import { askCards } from "./card-questions.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { ORIGINAL_COPY_FORMS, type OriginalCopyForm } from "./encode-report.js";
 
 /**
  * The phrase of the examples: a public BIP39 test vector (entropy 0x80 repeated). The usual test
@@ -130,7 +131,14 @@ const SHARES_EXPLANATION: Explanation = {
 
 /** What a whole copy beside the shares means, shown with the question whether to show one. */
 const COPY_EXPLANATION: Explanation = {
-  lines: ["It alone restores the wallet: keep it apart from the shares, or choose No."],
+  lines: ["Before Seedshift; no shares or dates needed. Keep it apart from the shares."],
+};
+
+/** The labels of the original-copy forms, in the same order as their command-line values. */
+const ORIGINAL_COPY_LABELS: Readonly<Record<OriginalCopyForm, string>> = {
+  words: "Words only",
+  codes: "Selected codes only",
+  both: "Words and selected codes",
 };
 
 /** What the sheet for heirs is, shown with the question whether to make it. */
@@ -280,6 +288,18 @@ export async function askEncoding(): Promise<string[] | undefined | Cancelled> {
   const run =
     set === null ? await askCopyDestination(form, mode) : await askSharesRun(set, form, mode);
   if (run === undefined || run === CANCELLED) return run;
+  if (mode !== "direct" && (set !== null || form !== "english")) {
+    const showWords = await choose(
+      "Also show the Seedshift phrase as English words?",
+      [
+        { label: "No", note: "keep only the codes or shares", value: false },
+        { label: "Yes", note: "the masked phrase; the dates are still needed", value: true },
+      ],
+      { label: "Decoy words" },
+    );
+    if (showWords === undefined || showWords === CANCELLED) return showWords;
+    if (showWords) run.push("--show-masked-words");
+  }
   const heirs = await askHeirSheet(mode);
   if (heirs === undefined || heirs === CANCELLED) return heirs;
   return [...run, ...heirs];
@@ -304,8 +324,8 @@ async function askCopyDestination(
 }
 
 /**
- * Shares in the chosen form, where they go, and whether the whole seed phrase is shown beside
- * them (--format), for a person who keeps it and holds the shares in reserve.
+ * Shares in the chosen form, where they go, and which forms of the original wallet phrase to
+ * show beside them (--show-original), if any.
  */
 async function askSharesRun(
   set: ShareSetChoice,
@@ -314,11 +334,11 @@ async function askSharesRun(
 ): Promise<string[] | undefined | Cancelled> {
   const shares = await askShares(set, shareFormatOf(form));
   if (shares === undefined || shares === CANCELLED) return shares;
-  const copy = await choose(
-    "Also show the whole seed phrase?",
+  const copy = await choose<OriginalCopyForm | null>(
+    "Also show the original seed phrase, before Seedshift?",
     [
-      { label: "No", note: "only the shares", value: false },
-      { label: "Yes", note: "in the same form, beside the shares", value: true },
+      { label: "No", note: "only the shares", value: null },
+      ...ORIGINAL_COPY_FORMS.map((value) => ({ label: ORIGINAL_COPY_LABELS[value], value })),
     ],
     { label: "Copy", explanation: COPY_EXPLANATION },
   );
@@ -330,7 +350,13 @@ async function askSharesRun(
     "--mode",
     mode,
     ...shares,
-    ...(copy ? ["--format", String(formatNumber(form))] : []),
+    ...(copy === null
+      ? []
+      : [
+          "--show-original",
+          copy,
+          ...(copy === "words" ? [] : ["--format", String(formatNumber(form))]),
+        ]),
   ];
 }
 

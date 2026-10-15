@@ -130,7 +130,10 @@ describe("EncodedBackup writes its codes back", () => {
       });
     }
     expect(() => EncodedBackup.of(MASKED.shiftedIndexes, "json" as never, "direct")).toThrow(
-      "Unsupported encoded format: json.",
+      expect.objectContaining({
+        code: "core.encoded-form.unsupported-encoded-format",
+        message: "Unsupported encoded format.",
+      }),
     );
   });
 

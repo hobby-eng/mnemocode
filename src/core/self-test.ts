@@ -46,6 +46,7 @@ import {
 } from "./master-fingerprint-self-test.js";
 import { formatEncoded } from "./representations.js";
 import { checkRepresentationStartup } from "./representations-self-test.js";
+import { checkWordTableStartup } from "./word-table-self-test.js";
 import {
   expectSame as equal,
   type SelfTestCheck,
@@ -402,6 +403,7 @@ function checkDateOrdering(): void {
  * runs them: each needs nothing from the host and takes milliseconds.
  */
 const FEATURE_STARTUP: readonly (() => void)[] = [
+  checkWordTableStartup,
   checkMasterFingerprintStartup,
   checkDateSearchStartup,
   checkBackupReadingStartup,
@@ -418,6 +420,11 @@ function featureChecks(host: SelfTestHost): SelfTestCheck[] {
   const withShares = (detail: string, shares: string) =>
     platform === undefined ? detail : `${detail}; ${shares}`;
   return [
+    {
+      name: "Word lists",
+      detail: "numbered English, Traditional Chinese, Unicode and full mapping; refusals",
+      run: checkWordTableStartup,
+    },
     {
       name: "BIP39 seed",
       detail:

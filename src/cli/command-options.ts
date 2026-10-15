@@ -123,7 +123,16 @@ export const commandOptions = {
     ...DRAWING_OPTIONS,
     ...businessOptionNames,
   ],
-  table: ["index", "word", "unicode", "all"],
+  table: [
+    "index",
+    "word",
+    "unicode",
+    "all",
+    "table-format",
+    "output",
+    "recovery-guide",
+    "word-lists-dir",
+  ],
   "self-test": [],
 } as const satisfies Record<string, readonly string[]>;
 

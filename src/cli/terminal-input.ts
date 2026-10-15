@@ -83,7 +83,19 @@ export const NOT_UTF8 = notUtf8Text("The answer");
 
 /** A key as the questions read it; "cancel" is Ctrl+C, which cancels the command. */
 export type Key =
-  | { readonly kind: "up" | "down" | "enter" | "back" | "cancel" | "other" }
+  | {
+      readonly kind:
+        | "up"
+        | "down"
+        | "page-up"
+        | "page-down"
+        | "home"
+        | "end"
+        | "enter"
+        | "back"
+        | "cancel"
+        | "other";
+    }
   | { readonly kind: "digit"; readonly digit: number };
 
 /**
@@ -234,6 +246,17 @@ export async function dropRestOfPaste(
     else if ((await next()) === KEY.CTRL_C) cancelled = true;
   }
   return cancelled ? CANCELLED : undefined;
+}
+
+/** Drains an unusable pasted line before retry; foreign failures pass through unchanged. */
+export async function refusedLine(
+  error: unknown,
+  next: NextByte,
+  moreWithin: MoreWithin,
+): Promise<string | Cancelled> {
+  if (!(error instanceof UnusableAnswerError)) throw error;
+  if ((await dropRestOfPaste(next, moreWithin)) === CANCELLED) return CANCELLED;
+  return error.message;
 }
 
 /**
@@ -478,10 +501,16 @@ export async function readKey(next: NextByte, moreWithin?: MoreWithin): Promise<
     sequence.readAgain.fill(0);
     return { kind: "other" };
   }
+  if (sequence.kind !== "alt" && sequence.final === KEY.SEQUENCE_TILDE) {
+    if (sequence.parameters === "5") return { kind: "page-up" };
+    if (sequence.parameters === "6") return { kind: "page-down" };
+  }
   // Only an arrow key without parameters counts.
   if (sequence.kind === "alt" || sequence.parameters !== "") return { kind: "other" };
   if (sequence.final === KEY.ARROW_UP) return { kind: "up" };
   if (sequence.final === KEY.ARROW_DOWN) return { kind: "down" };
+  if (sequence.final === KEY.HOME) return { kind: "home" };
+  if (sequence.final === KEY.END) return { kind: "end" };
   return { kind: "other" };
 }
 

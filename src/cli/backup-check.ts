@@ -32,9 +32,9 @@ import { type ParsedArguments, choiceOption } from "./arguments.js";
 import { askAfterFailure, askSecretUntil, WHAT_NOW } from "./ask.js";
 import { askDates, DATES_AGAIN_LABEL } from "./date-search.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
-import { onPrivateScreen } from "./private-screen.js";
+import { clearPrivateScreen, onPrivateScreen } from "./private-screen.js";
 import { choose } from "./terminal-choice.js";
-import { CLEAR_SCREEN, terminalNotice } from "./terminal.js";
+import { terminalNotice } from "./terminal.js";
 import { SHARE_SEPARATOR, SHARE_WORD_HINTS } from "../sskr/share-input.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { SHARE_ANSWER_HINT } from "./share-repair.js";
@@ -199,17 +199,17 @@ export function backupCheckAnswer(args: ParsedArguments): BackupCheckAnswer {
 async function offerCheck(
   parts: CheckedParts,
   check: () => Promise<CheckEnd | Cancelled>,
-  show: () => void,
+  show: () => void | Promise<Cancelled | undefined>,
   answer: BackupCheckAnswer,
 ): Promise<Cancelled | undefined> {
   for (let given = answer; ; given = undefined) {
     const wanted = given ?? (await askToCheck(parts));
     if (wanted !== "yes") return wanted === "no" ? undefined : wanted;
-    process.stderr.write(CLEAR_SCREEN);
+    clearPrivateScreen();
     const end = await check();
     if (end !== "show") return end === "done" ? undefined : end;
-    process.stderr.write(CLEAR_SCREEN);
-    show();
+    clearPrivateScreen();
+    if ((await show()) === CANCELLED) return CANCELLED;
   }
 }
 
@@ -319,7 +319,7 @@ export async function offerShareCheck(
   original: string,
   mode: SplitMode,
   threshold: number,
-  show: () => void,
+  show: () => void | Promise<Cancelled | undefined>,
   answer: BackupCheckAnswer,
   dates?: readonly DateShiftDate[],
 ): Promise<Cancelled | undefined> {

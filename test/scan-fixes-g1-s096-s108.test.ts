@@ -248,7 +248,10 @@ describe("G1-027: one owner of an opened candidate list", () => {
         own ? "records" : list.passphrase === undefined ? "none" : "list",
       );
       opened.wipe();
-      expect(opened.candidates()[0]!.phrase, list.name).toMatch(/^abandon abandon/u);
+      expect(() => opened.candidates(), list.name).toThrow(
+        expect.objectContaining({ code: "core.candidate-list.candidate-list-wiped" }),
+      );
+      expect(() => opened.wipe()).not.toThrow();
     }
   });
 

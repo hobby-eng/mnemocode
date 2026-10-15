@@ -69,9 +69,12 @@ describe("AUD-014-SEC001: only the three known protections, none only when chose
         () => protectionFor({ kind, passphrase: LIST_PASSPHRASE } as never),
         String(kind),
       ).toThrow(
-        new TypeError(
-          'The protection of a candidate list must be { kind: "key", recipient }, { kind: "passphrase", passphrase } or { kind: "none" }, each field a text and no other field.',
-        ),
+        expect.objectContaining({
+          name: "TypeError",
+          code: "core.candidate-encryption.not-protection-choice",
+          message:
+            'The protection of a candidate list must be { kind: "key", recipient }, { kind: "passphrase", passphrase } or { kind: "none" }, each field a text and no other field.',
+        }),
       );
   });
 
@@ -144,10 +147,18 @@ describe("AUD-014-API002: a file or standard input is valid UTF-8 or refused", (
   it("refuses the audit's passphrase file with byte FF instead of reading U+FFFD", () => {
     const path = fileWith(MALFORMED);
     expect(() => bip39Passphrase({ "bip39-passphrase-file": path })).toThrow(
-      new Error("The BIP39 passphrase file is not valid UTF-8 text."),
+      expect.objectContaining({
+        name: "Error",
+        message: "The BIP39 passphrase file is not valid UTF-8 text.",
+        code: "cli.utf8.strict-utf8text-refused",
+      }),
     );
     expect(() => readBoundedTextFile(path)).toThrow(
-      new Error("The text input is not valid UTF-8 text."),
+      expect.objectContaining({
+        name: "Error",
+        message: "The text input is not valid UTF-8 text.",
+        code: "cli.utf8.strict-utf8text-refused",
+      }),
     );
     expect(allWiped()).toBe(true);
   });
@@ -155,7 +166,11 @@ describe("AUD-014-API002: a file or standard input is valid UTF-8 or refused", (
   it("refuses malformed standard input, and wipes what it read", () => {
     standardInput = MALFORMED;
     expect(() => textInput({ "input-file": "-" }, "input")).toThrow(
-      new Error("Text input is not valid UTF-8 text."),
+      expect.objectContaining({
+        name: "Error",
+        message: "Text input is not valid UTF-8 text.",
+        code: "cli.utf8.strict-utf8text-refused",
+      }),
     );
     expect(allWiped()).toBe(true);
   });
@@ -169,7 +184,13 @@ describe("AUD-014-API002: a file or standard input is valid UTF-8 or refused", (
         "candidates-file": join(directory, "list.age"),
         "candidates-passphrase-file": passphraseFile,
       }),
-    ).rejects.toThrow(new Error("The passphrase file is not valid UTF-8 text."));
+    ).rejects.toThrow(
+      expect.objectContaining({
+        name: "Error",
+        message: "The passphrase file is not valid UTF-8 text.",
+        code: "cli.utf8.strict-utf8text-refused",
+      }),
+    );
   });
 
   it("refuses a surrogate, an overlong form and a cut character", () => {
@@ -180,7 +201,11 @@ describe("AUD-014-API002: a file or standard input is valid UTF-8 or refused", (
       [0xf5, 0x80, 0x80, 0x80],
     ])
       expect(() => strictUtf8Text(Uint8Array.from(bad), "The file"), String(bad)).toThrow(
-        new Error("The file is not valid UTF-8 text."),
+        expect.objectContaining({
+          name: "Error",
+          message: "The file is not valid UTF-8 text.",
+          code: "cli.utf8.strict-utf8text-refused",
+        }),
       );
   });
 

@@ -33,7 +33,7 @@ const NOT_A_LAST_WORD = "zoo";
 const OLD_WORD = "abandon";
 /** The test phrase without Seedshift as Unicode codes, from the BIP39 Chinese list. */
 const UNICODE = `${"7684".repeat(11)}5728`;
-const CODES_PROMPT = "Encoded seed phrase or record:";
+const CODES_PROMPT = "Encoded seed phrase, record or text file path:";
 const DATES_PROMPT = "Dates (up to 4, DD-MM-YYYY, separated by spaces):";
 const LAST_WORD_PROMPT = "Last word of the original seed phrase:";
 /** The questions after the phrase is shown: its confirmation, then Encode's offer of a check. */

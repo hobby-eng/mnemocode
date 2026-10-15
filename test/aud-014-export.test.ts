@@ -104,7 +104,7 @@ describe("AUD-014-API012: the facts of a sheet for heirs", () => {
       heirSheetText(facts({ kind: "shares", format: "ur", threshold: 4, count: 3 })),
     ).toThrow("A sheet for heirs needs a threshold from 1 to the number of shares");
     expect(() => heirSheetText(facts({ kind: "encoded", format: "unknown" }))).toThrow(
-      "Unsupported encoded format: unknown.",
+      expect.objectContaining({ code: "core.encoded-form.unsupported-encoded-format" }),
     );
   });
 

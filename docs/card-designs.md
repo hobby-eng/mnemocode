@@ -7,7 +7,7 @@ Thirteen templates are included; `mnemocode preview --list` prints their numbers
 - Every card prints one code: a color code in formats 4 and 5, a Unicode code in format 3.
 - In colors, a card shows its own color. In Unicode codes the colors only decorate the cards: one code always has one color, and different codes get colors that look as different as possible on every design.
 - Business cards take the hue, the brightness and some of the saturation of their color, so that pale, deep and dark colors look apart.
-- A set ends with a few random codes that belong to nothing, at least one, so that every row of a sheet is full. Separate cards end with as many. The QR code and the sheet for heirs know only the real codes.
+- A sheet ends with random codes that belong to nothing, at least one, so that every row is full. Separate cards have exactly one extra code: a 24-word phrase in Unicode codes gives 25 cards. The QR code and the sheet for heirs know only the real codes.
 - The number on a card is its place in the set; no card says how many cards there are.
 
 ## Collection sheets

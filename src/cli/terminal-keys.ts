@@ -24,6 +24,9 @@ export const KEY = {
   /** The final bytes of the escape sequences of the up and down arrows (ESC [ A, ESC [ B). */
   ARROW_UP: 0x41,
   ARROW_DOWN: 0x42,
+  HOME: 0x48,
+  END: 0x46,
+  SEQUENCE_TILDE: 0x7e,
   LOWER_Q: 0x71,
   UPPER_Q: 0x51,
   DELETE: 0x7f,

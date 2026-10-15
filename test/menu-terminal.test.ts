@@ -390,6 +390,50 @@ describe("what the menu does when a command cannot run or stops", () => {
   // The word table, a word, abandon: a command without a private screen.
   const LOOK_UP = [String(MENU_ENTRY_NAMES.table.digit), ENTER, `abandon${ENTER}`];
 
+  it.each([
+    ["word", 0, "Word", "abandon", "about"],
+    ["number", 1, "Word number", "55", "56"],
+    ["Unicode code", 2, "Unicode code", "591A", "7684"],
+  ] as const)(
+    "Enter repeats a %s lookup and Escape returns to the main menu",
+    async (_, choice, question, first, second) => {
+      let commands = 0;
+      terminal.exit = async () => {
+        commands++;
+        return 0;
+      };
+      const { asked } = await menuWith([
+        String(MENU_ENTRY_NAMES.table.digit),
+        `${DOWN.repeat(choice)}${ENTER}`,
+        first + ENTER,
+        ENTER,
+        second + ENTER,
+        ESCAPE,
+        ESCAPE,
+      ]);
+      expect(commands).toBe(2);
+      expect(asked.map((entry) => entry.question)).toEqual([
+        "What do you want to do?",
+        "What do you want to look up?",
+        question,
+        question,
+        "What do you want to do?",
+      ]);
+    },
+  );
+
+  it("Escape while entering a repeated lookup returns to the main menu", async () => {
+    terminal.exit = async () => 0;
+    const { asked } = await menuWith([...LOOK_UP, ENTER, ESCAPE, ESCAPE]);
+    expect(asked.map((entry) => entry.question)).toEqual([
+      "What do you want to do?",
+      "What do you want to look up?",
+      "Word",
+      "Word",
+      "What do you want to do?",
+    ]);
+  });
+
   it("says that a signal stopped a command, and starts it again on request", async () => {
     const codes = [137, 130];
     terminal.exit = async () => codes.shift()!;
@@ -413,7 +457,7 @@ describe("what the menu does when a command cannot run or stops", () => {
       terminal.events.push("command");
       return 0;
     };
-    await menuWith([...LOOK_UP, ENTER, ESCAPE]);
+    await menuWith([...LOOK_UP, ESCAPE, ESCAPE]);
     // A Windows console shows no key before a program reads it.
     expect(terminal.events).toEqual(
       process.platform === "win32"

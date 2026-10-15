@@ -54,6 +54,7 @@ import {
   DEFAULT_HEIR_SHEET_SIZE,
 } from "../export/heir-sheet.js";
 import { defined } from "../core/defined.js";
+import { ORIGINAL_COPY_FORMS } from "./encode-report.js";
 import { type HelpGroup, type HelpOption, type HelpRow } from "./help-types.js";
 
 /** The dates of a lone ?, every supported date: the attempts of one such date. */
@@ -264,9 +265,9 @@ export const imagesDir: HelpOption = {
 export const imageFormat: HelpOption = {
   flag: "--image-format",
   value: IMAGE_FORMATS.join("|"),
-  summary: "Image format for --images-dir and --cards-dir; default png",
+  summary: "Image format for page images and separate cards when requested",
   details: [
-    `jpeg is accepted for jpg. PNG keeps text and QR codes sharp; JPEG uses quality ${JPEG_QUALITY}. The rounded corners of a separate card are transparent in PNG and white in JPEG.`,
+    `--images-dir defaults to PNG. --cards-dir defaults to one PDF per card; --image-format selects images instead. jpeg is accepted for jpg. PNG keeps text and QR codes sharp; JPEG uses quality ${JPEG_QUALITY}. The rounded corners of a separate card are transparent in PNG and white in JPEG.`,
   ],
 };
 
@@ -581,7 +582,7 @@ export const encodeFormat: HelpOption = {
   value: "FORMAT",
   summary: `The form of the result, ${FORMAT_NUMBER_RANGE} or its name; default ${formatNumber("english")} (english)`,
   details: [
-    `${formatLegend(FORMAT_LEGEND_NAMES)}. Cards need ${CARD_FORMAT_NUMBERS}. See mnemocode help formats. With --sskr the whole phrase is shown beside the shares only when --format is given.`,
+    `${formatLegend(FORMAT_LEGEND_NAMES)}. Cards need ${CARD_FORMAT_NUMBERS}. See mnemocode help formats. With --sskr, --format alone shows the complete encoded backup beside the shares; --show-original instead shows the original wallet phrase in the requested forms.`,
   ],
 };
 
@@ -620,6 +621,13 @@ export const encodeOutputGroups: readonly HelpGroup[] = [
       heirSheet,
       heirSheetSize,
       backupCheck,
+      {
+        flag: "--show-masked-words",
+        summary: "Also show the English words after Seedshift, beside the codes or shares",
+        details: [
+          "The original dates are still needed. In the english format the same words are already shown once.",
+        ],
+      },
     ],
   },
   {
@@ -649,6 +657,14 @@ export const encodeOutputGroups: readonly HelpGroup[] = [
       },
       threshold,
       shares,
+      {
+        flag: "--show-original",
+        value: ORIGINAL_COPY_FORMS.join("|"),
+        summary: "Also show the original seed phrase before Seedshift; --sskr only",
+        details: [
+          "words shows English words; codes uses --format; both shows both. This copy needs no shares or dates. It is shown only, never added to exported share files.",
+        ],
+      },
       {
         flag: "--share-format",
         value: "FORMAT",

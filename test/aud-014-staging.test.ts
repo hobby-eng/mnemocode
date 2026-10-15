@@ -85,7 +85,10 @@ describe("a QR code saved beside its sheet, whose staging copy is left (AUD-015-
     const inside = await saveQrInside(PAYLOAD, join(sheet, ".."), "share-1");
     expect(beside).toMatch(/public-output-qr\.png$/u);
     expect(inside).toMatch(/share-1-qr\.png$/u);
-    for (const path of [beside, inside]) expect((await readFile(path)).length).toBeGreaterThan(0);
+    for (const path of [beside, inside]) {
+      if (typeof path !== "string") throw Error("The QR fixture was not saved.");
+      expect((await readFile(path)).length).toBeGreaterThan(0);
+    }
     expect(state.notices).toHaveLength(2);
     for (const notice of state.notices)
       expect(notice).toMatch(/could not be removed: delete it\.$/u);

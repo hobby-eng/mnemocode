@@ -4,7 +4,7 @@
 
 import { assertImageRenderer, claimImageFolder } from "../export/image-export.js";
 import { claimCardFolder } from "../export/individual-cards.js";
-import type { NewFolder } from "../export/private-file.js";
+import { NewFolder } from "../export/private-file.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { saveHeirSheet, validateHeirSheetOptions, type HeirSheetFacts } from "./heir-sheet.js";
 import { validateImageOptions } from "./image-options.js";
@@ -28,12 +28,15 @@ type SavedOutput = (typeof FILE_OUTPUTS)[number] | FolderOutput;
 const FOLDER_RULES = {
   "cards-dir": claimCardFolder,
   "images-dir": claimImageFolder,
+  "word-lists-dir": (path: string) =>
+    NewFolder.claim(path, "Choose a new folder for the word-list set."),
 } as const satisfies Readonly<Record<FolderOutput, (path: string) => Promise<NewFolder>>>;
 
-/** Refuses a new folder of `key` that exists already or could not be made where it is to go. */
-async function checkedFolder(key: FolderOutput, path: string): Promise<void> {
-  await FOLDER_RULES[key](path);
+/** Claims a new folder of `key`, refusing an occupied name or an unusable parent. */
+export async function claimOutputFolder(key: FolderOutput, path: string): Promise<NewFolder> {
+  const folder = await FOLDER_RULES[key](path);
   await preflightFolderDestination(path);
+  return folder;
 }
 
 function isFolderOutput(key: SavedOutput): key is FolderOutput {
@@ -52,7 +55,7 @@ export async function preflightOutputs(args: ParsedArguments): Promise<void> {
   // ask, is checked only for outputs that can be made.
   for (const key of FOLDER_OUTPUTS) {
     const path = value(args, key);
-    if (path !== undefined) await checkedFolder(key, path);
+    if (path !== undefined) await claimOutputFolder(key, path);
   }
   if (needsRenderer) await assertImageRenderer();
   for (const key of FILE_OUTPUTS) {
@@ -72,7 +75,7 @@ export async function checkOutputName(
   path: string,
 ): Promise<void> {
   assertUsableOutputPath(key, path);
-  if (isFolderOutput(key)) await checkedFolder(key, path);
+  if (isFolderOutput(key)) await claimOutputFolder(key, path);
   else await preflightFileDestination(path, false);
   await validateOutputPaths({ ...args, [key]: path });
 }

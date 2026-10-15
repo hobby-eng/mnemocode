@@ -19,12 +19,16 @@ mnemocode encode --sskr --ask-secrets \
 
 The shares are always shown in the terminal. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares-1.txt`, and MnemoCode says so. When a file cannot be saved on the private screen, for example because the disk is full, the shares are still shown, and MnemoCode offers to try again, to use another name, or to skip that file.
 
-| Option                   | Selects                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------- |
-| `--share-format FORMAT`  | How the shares are shown and saved (see [Share formats](#share-formats)); default `ur`   |
-| `--format 1\|2\|3\|4\|5` | Also shows the whole phrase beside the shares, in that form; without it, only the shares |
+| Option                               | Selects                                                                                              |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `--share-format FORMAT`              | How the shares are shown and saved (see [Share formats](#share-formats)); default `ur`               |
+| `--format 1\|2\|3\|4\|5`             | Alone, also shows the complete encoded backup beside the shares, in that form                        |
+| `--show-original words\|codes\|both` | Also shows the original wallet phrase, before Seedshift: English words, codes in `--format`, or both |
+| `--show-masked-words`                | Also shows the English words after Seedshift; the original dates are still needed                    |
 
 `sskr-split` is an older name for `encode --sskr`. In `sskr-split` and `sskr-export`, `--format` selects the share format. A text file saved with `--output` holds the shares in that format, one per line.
+
+The menu offers these display choices separately. The original copy restores the wallet without shares or dates: keep it apart from the shares. Neither display choice adds words or an original copy to exported share files. With `--show-original`, `--format` selects the original copy's codes instead of also showing a complete masked backup.
 
 ### Date masking before splitting
 
@@ -56,7 +60,7 @@ The last four write a share with the same signs as the form of an encoded phrase
 
 Color codes may be separated by spaces or joined, with or without `#`. **Their order matters.** A share in colors has its own colors: they are not the colors of the phrase itself.
 
-Share cards print a share in colors as its colors, and a share in Unicode codes as its codes, one code to a card; the colors of the cards of Unicode codes only decorate them, one color for each code. A few decoy cards that belong to nothing follow the share's own. A QR code on the sheet holds the share alone, without the decoys. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards.
+Share cards print a share in colors as its colors, and a share in Unicode codes as its codes, one code to a card; the colors of the cards of Unicode codes only decorate them, one color for each code. Separate cards add one decoy per share; sheets add enough to fill their rows. A QR code on the sheet holds the share alone, without the decoys. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards.
 
 The forms in colors, word numbers and Unicode codes are only other ways to write a share, not encryption. For developers of compatible programs, a share is written in colors in five steps:
 
@@ -116,6 +120,8 @@ mnemocode sskr-combine --share-qr ./first.png --share-qr ./second.png
 ```
 
 `--share`, `--share-file` and `--share-qr` may be repeated and used together. A text file holds shares one per line or separated by `;`. `--share-qr` reads a PNG image; it cannot read a PDF. The format of each share is found automatically, so formats can be mixed. Shares that another program made in several groups are accepted.
+
+On the private screen, enter the path to a saved text file in the share field, or paste the shares themselves. The file may hold any sufficient subset, such as shares 1 and 3 of a 2-of-3 set. When replacing just one unreadable share, give that share or a file containing only that share.
 
 The restored backup is shown in the form of the first share: word numbers, Unicode codes or colors for shares written that way, words for shares in Bytewords or `ur`. With `--mode seedshift` and the dates, the seed phrase follows.
 

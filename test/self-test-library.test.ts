@@ -23,6 +23,7 @@ const LIBRARY_ROWS = [
   "Public vectors",
   "Representation matrix",
   "Date ordering",
+  "Word lists",
   "BIP39 seed",
   "Dates",
   "Backup reading",

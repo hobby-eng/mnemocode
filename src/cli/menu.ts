@@ -13,7 +13,7 @@
 // may change in between.
 
 import type { SplitMode } from "../core/masking.js";
-import { UNICODE_CODE_HINT, wordTableRow } from "../core/words.js";
+import { UNICODE_CODE_HINT, wordTableRow, type WordTableLookup } from "../core/words.js";
 import { parseRecipient } from "../core/candidate-encryption.js";
 import { askWalletEvidence, type WalletValueAsker } from "./ask.js";
 import { MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
@@ -84,7 +84,12 @@ import {
   type Mode,
 } from "./encode-questions.js";
 import { askDesign } from "./card-questions.js";
-import { askOutputFile, forgetClaimedOutputs, inputFile } from "./output-questions.js";
+import {
+  askNewFolder,
+  askOutputFile,
+  forgetClaimedOutputs,
+  inputFile,
+} from "./output-questions.js";
 import { defined } from "../core/defined.js";
 
 /** The menu reads keys from a terminal and draws on one; anything else gets the help instead. */
@@ -96,7 +101,16 @@ export function menuAvailable(): boolean {
  * What an entry does once its questions are answered; undefined means that the person went back,
  * CANCELLED that they cancelled with Ctrl+C, which ends the menu as it ends a command.
  */
-type Action = { readonly run: readonly string[] } | "help" | "quit" | undefined | Cancelled;
+type Action =
+  | {
+      readonly run: readonly string[];
+      /** Asks for another value of the same kind after a successful lookup. */
+      readonly again?: () => Promise<Action>;
+    }
+  | "help"
+  | "quit"
+  | undefined
+  | Cancelled;
 
 /** What standard shares are, shown with the question how many to make in entry 4. */
 const STANDARD_SHARES_EXPLANATION: Explanation = {
@@ -507,7 +521,7 @@ interface Lookup {
   readonly hints?: WordHints;
 }
 
-const LOOKUPS: Readonly<Record<"word" | "index" | "unicode", Lookup>> = {
+const LOOKUPS: Readonly<Record<WordTableLookup, Lookup>> = {
   word: {
     question: "Word",
     label: "Word",
@@ -531,6 +545,61 @@ const LOOKUPS: Readonly<Record<"word" | "index" | "unicode", Lookup>> = {
   },
 };
 
+/** One value, keeping its lookup kind when the person asks to enter another. */
+async function lookupAction(lookup: WordTableLookup): Promise<Action> {
+  const { question, label, what, check, hints } = LOOKUPS[lookup];
+  const answer = await askLine(question, label, {
+    what,
+    check,
+    ...(hints === undefined ? {} : { hints }),
+  });
+  if (answer === undefined || answer === CANCELLED) return answer;
+  return { run: ["table", `--${lookup}`, answer], again: () => lookupAction(lookup) };
+}
+
+/** Saves a complete numbered word list or the standalone manual recovery guide. */
+async function tableExportAction(): Promise<Action> {
+  const format = await choose(
+    "What should be exported?",
+    [
+      { label: "English word list", value: "english" },
+      { label: "Traditional Chinese word list", value: "chinese" },
+      { label: "Unicode characters and codes", value: "unicode" },
+      {
+        label: "Full mapping",
+        note: "number, English, Chinese and Unicode code",
+        value: "mapping",
+      },
+      {
+        label: "Manual recovery instructions",
+        note: "English; keep a printed copy",
+        value: "guide",
+      },
+      { label: "Full set", note: "all lists, full mapping and instructions", value: "set" },
+    ] as const,
+    { label: "Export" },
+  );
+  if (format === undefined || format === CANCELLED) return format;
+  if (format === "set") {
+    const folder = await askNewFolder("mnemocode-recovery-pack");
+    if (folder === undefined || folder === CANCELLED) return folder;
+    return { run: ["table", "--word-lists-dir", folder] };
+  }
+  const path = await askOutputFile(
+    "Text file name",
+    format === "guide" ? "mnemocode-manual-recovery.md" : `bip39-${format}.txt`,
+  );
+  if (path === undefined || path === CANCELLED) return path;
+  return {
+    run: [
+      "table",
+      ...(format === "guide" ? ["--recovery-guide"] : ["--all", "--table-format", format]),
+      "--output",
+      path,
+    ],
+  };
+}
+
 /** Entry 8: one row of the word table, or all of it. */
 async function tableAction(): Promise<Action> {
   const lookup = await choose(
@@ -544,19 +613,18 @@ async function tableAction(): Promise<Action> {
       },
       { label: "A Unicode code", note: UNICODE_CODE_HINT, value: "unicode" },
       { label: "The whole table", note: "all 2,048 rows", value: "all" },
+      {
+        label: "Export word lists and guide",
+        note: "text files",
+        value: "export",
+      },
     ] as const,
     { label: "Look up" },
   );
   if (lookup === undefined || lookup === CANCELLED) return lookup;
   if (lookup === "all") return { run: ["table", "--all"] };
-  const { question, label, what, check, hints } = LOOKUPS[lookup];
-  const answer = await askLine(question, label, {
-    what,
-    check,
-    ...(hints === undefined ? {} : { hints }),
-  });
-  if (answer === undefined || answer === CANCELLED) return answer;
-  return { run: ["table", `--${lookup}`, answer] };
+  if (lookup === "export") return tableExportAction();
+  return lookupAction(lookup);
 }
 
 interface Entry {
@@ -577,7 +645,7 @@ export const MENU_ENTRIES: readonly Entry[] = [
   { ...MENU_ENTRY_NAMES.restore, action: askedAfresh(restoreAction), asksSecrets: true },
   { ...MENU_ENTRY_NAMES.recover, action: askedAfresh(recoverAction), asksSecrets: true },
   { ...MENU_ENTRY_NAMES.preview, action: askedAfresh(previewAction) },
-  { ...MENU_ENTRY_NAMES.table, action: tableAction },
+  { ...MENU_ENTRY_NAMES.table, action: askedAfresh(tableAction) },
   { ...MENU_ENTRY_NAMES.selfTest, action: async () => ({ run: ["self-test"] }) },
   { ...MENU_ENTRY_NAMES.help, action: async () => "help" },
   { ...MENU_ENTRY_NAMES.quit, action: async () => "quit" },
@@ -636,18 +704,23 @@ export async function runMenu(): Promise<Cancelled | undefined> {
   // Drawn again, as it is then, where going back draws the whole screen anew.
   startRecord(() => writeHeading(refusal));
   let selected: Entry = defined(MENU_ENTRIES[0]);
+  let again: (() => Promise<Action>) | undefined;
   for (;;) {
     const entries =
       refusal === undefined ? MENU_ENTRIES : MENU_ENTRIES.filter((item) => !item.asksSecrets);
     const before = answerMark();
-    const entry = await choose(
-      "What do you want to do?",
-      entries.map((item) => ({ label: item.label, digit: item.digit, value: item })),
-      { label: "Task", initial: Math.max(0, entries.indexOf(selected)), quit: "quits" },
-    );
+    const entry =
+      again === undefined
+        ? await choose(
+            "What do you want to do?",
+            entries.map((item) => ({ label: item.label, digit: item.digit, value: item })),
+            { label: "Task", initial: Math.max(0, entries.indexOf(selected)), quit: "quits" },
+          )
+        : selected;
     if (entry === undefined || entry === CANCELLED) return entry;
     selected = entry;
-    const action = await entry.action();
+    const action = await (again ?? entry.action)();
+    again = undefined;
     if (action === CANCELLED) return CANCELLED;
     if (action === "quit") return undefined;
     if (action === undefined) {
@@ -667,6 +740,7 @@ export async function runMenu(): Promise<Cancelled | undefined> {
       const code = await runCommand(action.run);
       if (code === CANCELLED) return CANCELLED;
       if (code === undefined || code === CANCELLED_EXIT_CODE) continue;
+      if (code === 0) again = action.again;
       // A copy that fails its own check is not trusted with a secret either.
       if (action.run[0] === "self-test" && code !== 0 && refusal === undefined) {
         refusal = "The self-test failed.";
@@ -683,10 +757,18 @@ export async function runMenu(): Promise<Cancelled | undefined> {
       }
     }
     console.error("");
-    // Only Escape quits here, not q or the rest of a paste meant for the command.
-    const back = await waitForEnter("Press Enter to return to the menu (Esc quits).", {
-      onlyEscapeLeaves: true,
-    });
+    // Repeated lookups keep their input kind; Escape there returns to the main menu.
+    // q or the rest of a paste meant for the command never dismisses a result.
+    const back = await waitForEnter(
+      again === undefined
+        ? "Press Enter to return to the menu (Esc quits)."
+        : "Press Enter for another lookup (Esc returns to the menu).",
+      { onlyEscapeLeaves: true },
+    );
+    if (back === "escape" && again !== undefined) {
+      again = undefined;
+      continue;
+    }
     if (back !== "enter") return back === "escape" ? undefined : back;
   }
 }

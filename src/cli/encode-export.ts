@@ -12,7 +12,7 @@ import { cardTemplate } from "./card-options.js";
 import { businessOptions } from "./business-options.js";
 import { indexesToColors } from "../core.js";
 import { type ParsedArguments, value } from "./arguments.js";
-import { colorCards, terminalNotice } from "./terminal.js";
+import { colorCards, terminalNotice, terminalWork } from "./terminal.js";
 import { exportQrPayload } from "../export/qr-image.js";
 import type { EncodeOutcome } from "./encode-command.js";
 
@@ -49,7 +49,7 @@ export class EncodeCardExport {
   }
 
   /**
-   * The same cards as separate card files draw them: turned as the person asked, not as a sheet.
+   * Every real code and one decoy as separate files, turned as the person asked, not as a sheet.
    */
   async separateJob(): Promise<CardJob> {
     return separateCardJob(
@@ -61,7 +61,7 @@ export class EncodeCardExport {
 
 /**
  * Saves the named destinations. Separate calls in one run share `cards`, so every file and retry
- * receives the same complete collection; a standalone call keeps its own collection. Shared
+ * receives the same plan for that layout; a standalone call keeps its own collection. Shared
  * `cards` belongs to this outcome and the run's one object of card options.
  */
 export async function saveEncodeResult(
@@ -74,6 +74,8 @@ export async function saveEncodeResult(
   const pdfPath = value(arguments_, "pdf");
   const imageDirectory = value(arguments_, "images-dir");
   const cardDirectory = value(arguments_, "cards-dir");
+  if (pdfPath !== undefined || imageDirectory !== undefined || cardDirectory !== undefined)
+    terminalWork("Rendering the cards…");
   const outputPath = value(arguments_, "output");
   if (outputPath !== undefined) {
     await wipedAfterAsync(Buffer.from(`${backup.record()}\n`, "utf8"), (record) =>

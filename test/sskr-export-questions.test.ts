@@ -99,7 +99,7 @@ describe("shares on the private screen", () => {
         "Share 1 fits 4 ways, so nothing is saved: use another copy of it, or more shares.",
       );
       expect(terminal.labels[0]).toEqual(["Type share 1 again", "Add more shares", "Done"]);
-      expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 1 again:"]);
+      expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 1 again, or its text file path:"]);
       // The four variants, then the share typed again.
       expect(seen.out).toHaveLength(5);
       expect(seen.out.at(-1)).toBe(writeShare(SHARES[0], "indexes"));
@@ -169,7 +169,7 @@ describe("shares on the private screen", () => {
       expect(seen.notices).toContain(
         "Shares 1 and 2 are of different sets, and nothing tells which is right.",
       );
-      expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again:"]);
+      expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again, or its text file path:"]);
       expect(seen.out).toEqual([
         writeShare(SHARES[0], "indexes"),
         writeShare(SHARES[2], "indexes"),

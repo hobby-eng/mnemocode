@@ -86,7 +86,7 @@ describe("shares on the private screen", () => {
       "Share 2 cannot be read: SSKR transport checksum does not match.",
     );
     expect(terminal.labels).toEqual([["Leave share 2 out", "Type share 2 again"]]);
-    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again:"]);
+    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again, or its text file path:"]);
     // The private screen shows what is typed; no warning repeats it.
     expect(seen.notices.join("\n")).not.toContain(wrong.slice(8));
   });
@@ -100,7 +100,7 @@ describe("shares on the private screen", () => {
     expect(seen.notices).toContain(
       "Share 2: color 3 has 5 of 6 symbols: write a ? for each digit that cannot be read, or a lone ? for the whole color.",
     );
-    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again:"]);
+    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again, or its text file path:"]);
     expect(seen.out).toContain(PHRASE);
   });
 
@@ -125,7 +125,7 @@ describe("shares on the private screen", () => {
       ["Leave share 3 out", "Type share 3 again"],
       ["Leave share 3 out", "Type share 3 again"],
     ]);
-    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 3 again:"]);
+    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 3 again, or its text file path:"]);
     expect(seen.out).toContain(PHRASE);
   });
 
@@ -182,7 +182,9 @@ describe("shares on the private screen", () => {
     terminal.answers = ["\r", ` ; \r`, `${SHARES[0]};${SHARES[1]}\r`];
     await combine();
     expect(seen.out).toContain(PHRASE);
-    expect(seen.notices).toContain("Type the shares, or press Ctrl+C to stop.");
+    expect(seen.notices).toContain(
+      "Type the shares or their text file path, or press Ctrl+C to stop.",
+    );
     expect(seen.notices).toContain("Type at least one share.");
   });
 
@@ -214,7 +216,10 @@ describe("shares on the private screen", () => {
       ["Share 1", "Share 2"],
     ]);
     expect(seen.notices).toContain("One share is not enough: this set needs 2.");
-    expect(promptsShown()).toEqual([SHARES_PROMPT, "More shares (separate shares with ;):"]);
+    expect(promptsShown()).toEqual([
+      SHARES_PROMPT,
+      "More shares or text file path (separate shares with ;):",
+    ]);
     expect(seen.out).toContain(PHRASE);
   });
 
@@ -241,7 +246,10 @@ describe("shares on the private screen", () => {
     terminal.answers = [`${SHARES[0]}\r`, `${SHARES[2]}\r`];
     await combine();
     expect(seen.notices).toContain("One share is not enough: this set needs 2.");
-    expect(promptsShown()).toEqual([SHARES_PROMPT, "More shares (separate shares with ;):"]);
+    expect(promptsShown()).toEqual([
+      SHARES_PROMPT,
+      "More shares or text file path (separate shares with ;):",
+    ]);
     expect(seen.out).toContain(PHRASE);
   });
 
@@ -310,7 +318,7 @@ describe("shares on the private screen", () => {
     // (test/scan-fixes.test.ts, S015).
     expect(terminal.questions.slice(1)).toEqual(["Which shares to change?", "Which share?"]);
     expect(terminal.labels[2]).toEqual(["Share 1", "Share 2"]);
-    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again:"]);
+    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again, or its text file path:"]);
     expect(seen.out).toContain(PHRASE);
   });
 

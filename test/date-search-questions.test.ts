@@ -46,7 +46,7 @@ function recover(options: Record<string, string>): Promise<Cancelled | undefined
 function promptsShown(): string[] {
   return [
     ...seen.screen.matchAll(
-      /(Encoded seed phrase or record:|Dates with \?[^:]*:|Original fingerprint of the wallet[^:]*:)/gu,
+      /(Encoded seed phrase, record or text file path:|Dates with \?[^:]*:|Original fingerprint of the wallet[^:]*:)/gu,
     ),
   ].map((match) => match[1]!);
 }
@@ -75,7 +75,7 @@ describe("recover-date on the private screen", () => {
       ]),
     );
     expect(promptsShown()).toEqual([
-      "Encoded seed phrase or record:",
+      "Encoded seed phrase, record or text file path:",
       DATES_PROMPT,
       DATES_PROMPT,
       DATES_PROMPT,
@@ -112,9 +112,9 @@ describe("recover-date on the private screen", () => {
       ]),
     );
     expect(promptsShown().slice(0, 4)).toEqual([
-      "Encoded seed phrase or record:",
-      "Encoded seed phrase or record:",
-      "Encoded seed phrase or record:",
+      "Encoded seed phrase, record or text file path:",
+      "Encoded seed phrase, record or text file path:",
+      "Encoded seed phrase, record or text file path:",
       DATES_PROMPT,
     ]);
     expect(seen.out).toEqual([FOUND]);
@@ -254,9 +254,9 @@ describe("recover-date on the private screen", () => {
       FOUND,
     ]);
     expect(promptsShown()).toEqual([
-      "Encoded seed phrase or record:",
+      "Encoded seed phrase, record or text file path:",
       DATES_PROMPT,
-      "Encoded seed phrase or record:",
+      "Encoded seed phrase, record or text file path:",
     ]);
   });
 
@@ -273,7 +273,11 @@ describe("recover-date on the private screen", () => {
       "Search 10 date combinations?",
       "Search 10 date combinations?",
     ]);
-    expect(promptsShown()).toEqual(["Encoded seed phrase or record:", DATES_PROMPT, DATES_PROMPT]);
+    expect(promptsShown()).toEqual([
+      "Encoded seed phrase, record or text file path:",
+      DATES_PROMPT,
+      DATES_PROMPT,
+    ]);
     expect(seen.out).toEqual([FOUND]);
   });
 

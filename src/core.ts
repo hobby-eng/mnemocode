@@ -21,6 +21,8 @@ export {
   allMappingRows,
   wordTableRow,
   wordTableText,
+  WORD_TABLE_FORMATS,
+  type WordTableFormat,
   UNICODE_CODE_HINT,
   type WordTableLookup,
   recoverLegacyValidLastWords,

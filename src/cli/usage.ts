@@ -194,7 +194,10 @@ export function printUsage(): void {
     topic.summary,
   ]);
   const mainExamples: HelpRow[] = [
-    ["mnemocode encode --ask-secrets --format 5", "Write a real phrase as colors; dates asked for"],
+    [
+      "mnemocode encode --mode seedshift --ask-secrets --format 5",
+      "Write a real phrase as colors; dates asked for",
+    ],
     [
       "mnemocode decode --input-file shifted.txt --dates 23-09-2026",
       "Turn a record back into the phrase",

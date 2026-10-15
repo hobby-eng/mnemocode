@@ -54,13 +54,13 @@ ENCODE_ENTRY, RE_ENCODE_ENTRY, DECODE_ENTRY, RESTORE_ENTRY = "1", "2", "3", "5"
 RECOVER_ENTRY, TABLE_ENTRY = "6", "8"
 # The test phrase without Seedshift as Unicode codes, written joined.
 JOINED_UNICODE = "7684" * 11 + "5728"
-HIDDEN_RECORD = "Encoded seed phrase or record: "
+HIDDEN_RECORD = "Encoded seed phrase, record or text file path: "
 # The warning that comes with a fingerprint's match (FINGERPRINT_WARNING, src/core/wallet-check.ts).
 FINGERPRINT_FILTER = "A master fingerprint is only 32 bits and is a filter, not proof of recovery."
 # The questions below are looked for without the space after them: the pseudo-console of Windows
 # need not draw a space at the end of a line before something follows it.
 SEED_PHRASE = "Seed phrase (English BIP39 words):"
-SHARES = "Shamir shares (separate shares with ;, ? for each unreadable code or digit):"
+SHARES = "Shamir shares or text file path (separate shares with ;, ? for each unreadable code or digit):"
 # The end of the question for dates that may hold ? (src/cli/date-search.ts, datesQuestion).
 DATES_WITH_MARKS = "? for what is forgotten, separated by spaces):"
 CLEAR_PROMPT = "Press Enter to clear this screen."

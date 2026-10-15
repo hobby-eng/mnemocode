@@ -42,6 +42,7 @@ It checks that
 """
 
 import sys
+from terminal_result_checks import check_private_result_pages
 
 from terminal_menu_checks import (
     check_back_from_entry,
@@ -52,13 +53,19 @@ from terminal_menu_checks import (
     check_decode_menu,
     check_lines_pasted_as_one_answer,
     check_long_line,
+    check_lookup_repeat,
+    check_table_exports,
     check_marked_codes_entry,
     check_menu_ctrl_c,
     check_share_word_hints,
     check_word_hints,
 )
 from terminal_secret_checks import (
+    check_file_or_text_input,
     check_decode_dates_asked_again,
+    check_decode_share_lines,
+    check_encode_result_visible,
+    check_phrase_display_choices,
     check_re_encode_answer_refused,
     check_re_encode_last_word_after_wrong_date,
     check_re_encode_menu,
@@ -77,15 +84,22 @@ def main():
     check_long_line()
     check_cursor_editing()
     check_word_hints()
+    check_lookup_repeat()
+    check_table_exports()
     check_share_word_hints()
     check_marked_codes_entry()
     check_lines_pasted_as_one_answer()
+    check_encode_result_visible()
+    check_phrase_display_choices()
     check_re_encode_menu()
     check_re_encode_answer_refused()
     check_re_encode_recognised()
     check_re_encode_last_word_after_wrong_date()
     check_decode_dates_asked_again()
+    check_decode_share_lines()
+    check_file_or_text_input()
     check_restore_share_asked_again()
+    check_private_result_pages()
     check_ctrl_c()
     check_date_search_ctrl_c()
     print("terminal input checks passed")

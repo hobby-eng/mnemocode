@@ -1,9 +1,10 @@
-import { closeSync, openSync, readSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { InputTooLargeError, MEBIBYTE } from "../core/byte-units.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.bounded-read", {
   "read-file-refuse-refused": suppliedMessage,
+  "regular-file-required": (what: string) => `${what} must be a regular text file.`,
 });
 
 /**
@@ -45,10 +46,22 @@ export function readBoundedDescriptor(descriptor: number, limit: number, what: s
   }
 }
 
-/** Opens `path` once and reads it with the bound of `readBoundedDescriptor`. */
-export function readBoundedFile(path: string, limit: number, what: string): Buffer {
-  const descriptor = openSync(path, "r");
+/**
+ * Opens `path` once and reads it with the bound of `readBoundedDescriptor`. With regularOnly,
+ * refuses directories, devices and pipes without waiting for a pipe's writer.
+ */
+export function readBoundedFile(
+  path: string,
+  limit: number,
+  what: string,
+  regularOnly = false,
+): Buffer {
+  // An interactive path must not block opening a pipe while no writer exists. Check the opened
+  // descriptor, rather than checking a name that could change before open.
+  const descriptor = openSync(path, regularOnly ? constants.O_RDONLY | constants.O_NONBLOCK : "r");
   try {
+    if (regularOnly && !fstatSync(descriptor).isFile())
+      throw ERRORS.create("regular-file-required", [what]);
     return readBoundedDescriptor(descriptor, limit, what);
   } finally {
     closeSync(descriptor);
@@ -64,9 +77,10 @@ export function readFileOrRefuse(
   limit: number,
   what: string,
   unreadable: string,
+  regularOnly = false,
 ): Buffer {
   try {
-    return readBoundedFile(path, limit, what);
+    return readBoundedFile(path, limit, what, regularOnly);
   } catch (error) {
     if (error instanceof InputTooLargeError) throw error;
     throw ERRORS.create("read-file-refuse-refused", [unreadable], { cause: error });

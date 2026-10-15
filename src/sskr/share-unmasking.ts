@@ -99,6 +99,7 @@ export class ShareUnmasking extends Redacted {
     const masked = Masking.isMaskedMode(options.mode);
     if (masked && !(options.dates instanceof DatesAnswer))
       throw ERRORS.create("seedshift-phrase-unmasked-dates-dates-answer", []);
+    Masking.of(options.mode).assertDateCount(options.dates?.count ?? 0);
     this.#mode = options.mode;
     this.#dates = masked ? options.dates : undefined;
     this.#walletCheck = options.walletCheck;
@@ -152,10 +153,23 @@ export class ShareUnmasking extends Redacted {
    * phrase takes.
    */
   async unmask(sets: readonly RepairedSet[], run: DateSearchRun = {}): Promise<Unmasked> {
+    // Snapshot every input before the first host callback can change a later set or its phrase.
+    // Read mnemonic once, even when a JavaScript host supplies an accessor for it.
+    const owned = Array.from(sets, ({ mnemonic, shares, unsettled, unchecked }) => ({
+      mnemonic,
+      shares: shares.map(({ ur, format, repaired, filled }) => ({
+        ur,
+        format,
+        repaired,
+        filled: filled.map(({ position, value }) => ({ position, value })),
+      })),
+      unsettled: unsettled.map(({ share, position }) => ({ share, position })),
+      ...(unchecked === undefined ? {} : { unchecked: [...unchecked] }),
+    }));
     const phrases: UnmaskedPhrase[] = [];
     const listed: string[] = [];
     const mode = this.#mode;
-    for (const set of sets) {
+    for (const set of owned) {
       if (this.#dates === undefined || !Masking.isMaskedMode(mode)) {
         if (await this.#matches(set.mnemonic)) phrases.push({ set, mnemonic: set.mnemonic });
         continue;

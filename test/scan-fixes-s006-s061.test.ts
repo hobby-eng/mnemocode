@@ -139,11 +139,11 @@ describe("S009: one look-up in the word table", () => {
     expect(() => wordTableRow("unicode", "0000")).toThrow("No BIP39 word has that code");
   });
 
-  it("the command line takes a word in capitals as the menu does", () => {
+  it("the command line takes a word in capitals as the menu does", async () => {
     const lines: string[] = [];
     const log = vi.spyOn(console, "log").mockImplementation((line: string) => lines.push(line));
     try {
-      runTable({ word: "Abandon" });
+      await runTable({ word: "Abandon" });
     } finally {
       log.mockRestore();
     }
@@ -348,12 +348,10 @@ describe("S024: one order of the steps of a backup check", () => {
 
 describe("S025: the share check names set problems as the restore does", () => {
   it("refuses a share of another set with ShareInput's words", async () => {
-    const { splitSskrMnemonic } = await import("../src/sskr/shares.js");
-    const phrase = "abandon ".repeat(11) + "about";
-    const [first, second] = [
-      await splitSskrMnemonic(phrase, 2, 3),
-      await splitSskrMnemonic(phrase, 2, 3),
-    ];
+    // Published fixed sets have distinct protocol identifiers; no random collision precondition.
+    const { sskrVector, sskrSetVector } = await import("../src/sskr/known-answers.js");
+    const [first, second] = [sskrVector.shares, sskrSetVector.shares];
+    expect(Share.read(first[0]!).info.identifier).not.toBe(Share.read(second[0]!).info.identifier);
     const texts = [first[0]!, second[1]!];
     const kept = KeptShares.of(texts);
     expect(kept.setProblem).toBe(
@@ -509,7 +507,9 @@ describe("S036: each form of codes knows its own facts", () => {
     expect(EncodedForm.of("unicode").writtenInColors).toBe(false);
     expect(EncodedForm.of("indexes").cardKind).toBeUndefined();
     expect(EncodedForm.of("english").alwaysMasked).toBe(true);
-    expect(() => EncodedForm.of("json" as never)).toThrow("Unsupported encoded format: json.");
+    expect(() => EncodedForm.of("json" as never)).toThrow(
+      expect.objectContaining({ code: "core.encoded-form.unsupported-encoded-format" }),
+    );
   });
 });
 

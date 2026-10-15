@@ -99,7 +99,7 @@ describe("export infrastructure", () => {
       kind: "colors",
       name: "",
       description: "",
-      render: vi.fn(async () => bytes),
+      render: vi.fn(async () => bytes.slice()),
     };
     const jobs = [{ template, content }];
     const original = await PDFDocument.load(bytes);

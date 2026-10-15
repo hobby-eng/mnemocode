@@ -1,10 +1,10 @@
 # Roadmap
 
-Plans, not promises. Nothing here is built yet unless it says so.
+Plans, not promises. Current capabilities are distinguished from future work below.
 
 ## Recovery in the Wallet Deriver
 
-The Wallet Deriver of the [multi-chain wallet tools](https://github.com/hobby-eng/multi-chain-wallet-tools) already compiles MnemoCode's own sources for its MnemoCode feature: the transformations, the record format and the cards ([how](https://github.com/hobby-eng/multi-chain-wallet-tools/blob/main/docs/MNEMOCODE_SOURCE.md)). The recovery functions are meant to follow, as a tab of their own:
+The Wallet Deriver of the [multi-chain wallet tools](https://github.com/hobby-eng/multi-chain-wallet-tools) compiles MnemoCode's own sources ([how](https://github.com/hobby-eng/multi-chain-wallet-tools/blob/main/docs/MNEMOCODE_SOURCE.md)). MnemoCode's host-neutral library already provides transformations, records, cards and recovery:
 
 - a forgotten word of a seed phrase;
 - forgotten digits of the dates;
@@ -15,8 +15,10 @@ The code that does this is written for any host, not only for Node.js. It import
 
 ## MnemoCode in Rust
 
-MnemoCode is to be rewritten in Rust, as mhfe is: one library crate with the command-line program, and a WASM build that the Deriver loads. The program and the Deriver would then run the same compiled code instead of the same TypeScript sources. Waiting for it:
+The Rust port is planned for the release after 0.1.0. It includes G1-001: give Bytewords/UR share transport one owner in Rust, instead of first consolidating the current TypeScript and Rust implementations in a separate change.
 
-- wallet checks for the coins of mhfe's address list, not only Bitcoin;
-- recovery of more than one forgotten word, checked against a fingerprint or an address, which native code makes several times faster;
+MnemoCode is to be rewritten in Rust, as mhfe is: one library crate with the command-line program, and a WASM build that the Deriver loads. The program and the Deriver would then run the same compiled code instead of the same TypeScript sources. The existing TypeScript library already checks the twelve supported coins and recovers several forgotten words against a fingerprint or address. Future work concerns the Rust implementation, faster searches and larger workloads:
+
+- preserve wallet checks for every supported coin;
+- speed up recovery of several forgotten words, with the same wallet checks;
 - handing very large lists of candidates to the scanner.

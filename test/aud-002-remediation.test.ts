@@ -69,7 +69,7 @@ describe("AUD-002-API001 canonical integer options", () => {
   });
 
   it("applies the shared parser to every affected command family", async () => {
-    expect(() => runTable({ index: "0x10" })).toThrow("base-10 integer");
+    await expect(runTable({ index: "0x10" })).rejects.toThrow("base-10 integer");
     expect(() =>
       walletEvidence({
         "bitcoin-address": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",

@@ -10,6 +10,7 @@ vi.mock("../src/cli/qr-export.js", async (importOriginal) => {
     // A QR image saved under a name that is not its sheet's.
     saveQrBeside: async (payload: string, sheet: string, suffix?: string) => {
       const path = await original.saveQrBeside(payload, sheet, suffix);
+      if (typeof path !== "string") throw Error("The QR fixture was not saved.");
       return qr.wrongName ? path.replace("-qr", "") : path;
     },
   };

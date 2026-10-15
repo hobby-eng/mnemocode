@@ -3,6 +3,7 @@ the card questions of Encode and Ctrl+C."""
 
 import shlex
 import tempfile
+from pathlib import Path
 
 from terminal_session import (
     BACKSPACE,
@@ -143,7 +144,9 @@ def check_word_hints():
         session.type(ENTER)
         session.wait_for("english:     about")
         session.wait_for("unicode hex: 5728")
-        session.wait_for("Press Enter to return to the menu")
+        session.wait_for("Press Enter for another lookup")
+        session.type(ESCAPE)
+        session.wait_for(MENU_SHOWN)
         session.type(ESCAPE)
         code = session.wait_for_exit()
         assert code == 0, f"Escape after the lookup gave exit code {code}"
@@ -154,6 +157,88 @@ def check_word_hints():
     finally:
         session.close()
     print("word hints in the menu: words below the line, Tab completes, gone after Enter")
+
+
+def check_lookup_repeat():
+    """Enter repeats the same lookup kind; Escape returns to the menu instead of quitting."""
+    for choice, question, first, second, first_word, second_word in (
+        ("1", "Word: ", "abandon", "about", "abandon", "about"),
+        ("2", "Word number: ", "55", "56", "almost", "alone"),
+        ("3", "Unicode code: ", "591A", "7684", "almost", "abandon"),
+    ):
+        session = Session()
+        try:
+            session.wait_for(MENU_SHOWN)
+            session.type(TABLE_ENTRY)
+            session.wait_for("What do you want to look up?")
+            session.type(choice)
+            session.wait_for(question)
+            session.type(first + ENTER)
+            session.wait_for(f"english:     {first_word}")
+            session.wait_for("Press Enter for another lookup")
+            session.type(ENTER)
+            session.wait_for(question)
+            session.type(second + ENTER)
+            session.wait_for(f"english:     {second_word}")
+            session.wait_for("Press Enter for another lookup")
+            session.type(ESCAPE)
+            session.wait_for(MENU_SHOWN)
+            session.type(ESCAPE)
+            assert session.wait_for_exit() == 0
+        finally:
+            session.close()
+    print("word/number/Unicode lookups repeat at Enter and return to the menu at Escape")
+
+
+def check_table_exports():
+    """The actual menu saves every full dictionary and its bundled standalone recovery guide."""
+    with tempfile.TemporaryDirectory(prefix="mnemocode-dictionaries-") as folder:
+        for choice, name, header in (
+            ("1", "english", "index\tenglish"),
+            ("2", "chinese", "index\tchinese"),
+            ("3", "unicode", "index\tchinese\tunicode_hex"),
+            ("4", "mapping", "index\tenglish\tchinese\tunicode_hex"),
+            ("5", "guide", "# MnemoCode: recovery without MnemoCode"),
+            ("6", "set", None),
+        ):
+            path = Path(folder) / f"public {name}.txt"
+            session = Session(folder=folder)
+            try:
+                session.wait_for(MENU_SHOWN)
+                session.type(TABLE_ENTRY)
+                session.wait_for("What do you want to look up?")
+                session.type("5")
+                session.wait_for("What should be exported?")
+                session.type(choice)
+                session.wait_for("Name of the new folder" if name == "set" else "Text file name")
+                session.type(str(path) + ENTER)
+                session.wait_for("Saved ")
+                session.wait_for("Press Enter to return to the menu")
+                session.type(ESCAPE)
+                assert session.wait_for_exit() == 0
+            finally:
+                session.close()
+            if name == "set":
+                assert sorted(child.name for child in path.iterdir()) == [
+                    "bip39-chinese.txt", "bip39-english.txt", "bip39-mapping.txt",
+                    "bip39-unicode.txt", "manual-recovery.md",
+                ]
+                mapping = path.joinpath("bip39-mapping.txt").read_text(encoding="utf-8")
+                assert mapping.splitlines()[-1].startswith("2048\tzoo\t")
+                guide = path.joinpath("manual-recovery.md").read_text(encoding="utf-8")
+                assert "t = (u - s_last) mod M" in guide
+                continue
+            text = path.read_text(encoding="utf-8")
+            assert text.splitlines()[0] == header
+            if name == "guide":
+                assert "t = (u - s_last) mod M" in text
+                assert "```python" in text
+            else:
+                lines = text.splitlines()
+                assert len(lines) == 2049
+                assert lines[1].startswith("1\t")
+                assert lines[-1].startswith("2048\t")
+    print("menu export: all four complete numbered dictionaries and standalone guide")
 
 
 def check_share_word_hints():
@@ -237,6 +322,8 @@ def check_lines_pasted_as_one_answer():
         session.wait_for("Split it into Shamir shares?")
         session.type("1")
         session.wait_for("Where should the result go?")
+        session.type("1")
+        session.wait_for("Also show the Seedshift phrase as English words?")
         session.type("1")
         session.wait_for("Instructions for your heirs?")
         session.type("1")

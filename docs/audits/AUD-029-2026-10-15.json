@@ -1,0 +1,1068 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-029",
+  "auditNumber": 29,
+  "date": "2026-10-15",
+  "title": "Scoped CORE conformance and remaining refactor assessment",
+  "reviewer": {
+    "name": "Codex coordinator and two scoped read-only reviewers; coordinator challenges findings",
+    "model": null,
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "f2d4cffa5d7df369910243734f287ce6521ed033",
+    "workingTree": "Pre-existing dirty main after completed AUD-028 remediation; only audit documents/harnesses/index changed in this review.",
+    "sourceFingerprint": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0"
+  },
+  "scope": {
+    "description": "All52CORE rules inventoried; whole TS/MJS declaration inventory plus selected semantic architecture, ownership, dependency and lifetime traces.",
+    "depth": "Focused conformance assessment, not a new full security/correctness/release audit.",
+    "exclusions": [
+      "No remediation during baseline",
+      "No builds/PDF/images/vectors/release/browser execution"
+    ]
+  },
+  "procedureHashes": {
+    ".github/instructions/audits.instructions.md": "6eed08f958c11bd530006c89489796db8efa759f8a93c501a514de262d0ab004",
+    ".github/instructions/bip-tools.instructions.md": "ef81bca2da68af5e47dceb9840fc86c9f5248182f6ce815aa12b7a4d407cf732",
+    ".github/instructions/ci.instructions.md": "22320f16f35a530bda5839a478ca9cce59cd2d1cabe64b75f96339af470cad41",
+    ".github/instructions/code-browser.instructions.md": "954f96b4c2c11ffd23ad6b85113e80eedfb049e2689dd5a134e45de84f130f10",
+    ".github/instructions/code-core.instructions.md": "c4e53460b1085d00628503b8b845edb0905c9dff809f1c75bcd37efffa49f6c6",
+    ".github/instructions/code-rust.instructions.md": "424ff73609b5fde131b7855e45fdf5c0937260e552a86da2696f38a6e125d82f",
+    ".github/instructions/code-tooling.instructions.md": "ba09a6530475e8ba08cc96dbf4100b043b6c250263e62def21321f178bb631f7",
+    ".github/instructions/code-typescript.instructions.md": "5984f573d7df64ebd494f79891ce838dd518f0cf27876a2965fe46df6ace3ec1",
+    ".github/instructions/docs.instructions.md": "1fc9e20ab2f2dad220dc3f6b507e7372c161a05208c80ed2aa8dc28525bb33bf",
+    "multi-chain-wallet-tools/docs/FULL_AUDIT_GUIDE.md": "e1b2fb641e4a25ebf292548fc1e2ef0c25dbd01faa5c2b580c6ba75df2afcab7",
+    "multi-chain-wallet-tools/docs/audits/AUDIT_STANDARD.md": "0c80621acaf5d210f85af76de28a994e545f89f3f660a129026ac0931bb38593",
+    "multi-chain-wallet-tools/docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+    "multi-chain-wallet-tools/docs/audit-report.schema.json": "989bf3de974d581579c1d1c1e143d5ab9fa232dc70cc8c6f84ad00531ae698fb"
+  },
+  "checks": [
+    {
+      "checkId": "CHECK-SEC-001",
+      "category": "SEC",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-SEC-002",
+      "category": "SEC",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-SEC-003",
+      "category": "SEC",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-SEC-004",
+      "category": "SEC",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-SEC-005",
+      "category": "SEC",
+      "outcome": "failed",
+      "evidence": "Representative owners lack explicit lifetime endings; no external leak demonstrated."
+    },
+    {
+      "checkId": "CHECK-SEC-006",
+      "category": "SEC",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-SEC-007",
+      "category": "SEC",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-FUN-001",
+      "category": "FUN",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-FUN-002",
+      "category": "FUN",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-FUN-003",
+      "category": "FUN",
+      "outcome": "not-applicable",
+      "evidence": "No corresponding transaction/signing/provider operation in MnemoCode."
+    },
+    {
+      "checkId": "CHECK-FUN-004",
+      "category": "FUN",
+      "outcome": "not-applicable",
+      "evidence": "No corresponding transaction/signing/provider operation in MnemoCode."
+    },
+    {
+      "checkId": "CHECK-FUN-005",
+      "category": "FUN",
+      "outcome": "not-applicable",
+      "evidence": "No corresponding transaction/signing/provider operation in MnemoCode."
+    },
+    {
+      "checkId": "CHECK-FUN-006",
+      "category": "FUN",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-FUN-007",
+      "category": "FUN",
+      "outcome": "not-applicable",
+      "evidence": "No corresponding transaction/signing/provider operation in MnemoCode."
+    },
+    {
+      "checkId": "CHECK-API-001",
+      "category": "API",
+      "outcome": "partial",
+      "evidence": "Scoped call/dependency/lifetime/cancellation review; exact-source fast gates retained."
+    },
+    {
+      "checkId": "CHECK-API-002",
+      "category": "API",
+      "outcome": "partial",
+      "evidence": "Scoped call/dependency/lifetime/cancellation review; exact-source fast gates retained."
+    },
+    {
+      "checkId": "CHECK-API-003",
+      "category": "API",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-API-004",
+      "category": "API",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-BLD-001",
+      "category": "BLD",
+      "outcome": "partial",
+      "evidence": "Scoped call/dependency/lifetime/cancellation review; exact-source fast gates retained."
+    },
+    {
+      "checkId": "CHECK-BLD-002",
+      "category": "BLD",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-BLD-003",
+      "category": "BLD",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-BLD-004",
+      "category": "BLD",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-BLD-005",
+      "category": "BLD",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-UI-001",
+      "category": "UI",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-UI-002",
+      "category": "UI",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-UI-003",
+      "category": "UI",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-ARC-001",
+      "category": "ARC",
+      "outcome": "failed",
+      "evidence": "Confirmed structure/composition findings; declaration inventory and selected semantic traces, not all-body proof."
+    },
+    {
+      "checkId": "CHECK-ARC-002",
+      "category": "ARC",
+      "outcome": "failed",
+      "evidence": "Confirmed structure/composition findings; declaration inventory and selected semantic traces, not all-body proof."
+    },
+    {
+      "checkId": "CHECK-ARC-003",
+      "category": "ARC",
+      "outcome": "partial",
+      "evidence": "Scoped call/dependency/lifetime/cancellation review; exact-source fast gates retained."
+    },
+    {
+      "checkId": "CHECK-DOC-001",
+      "category": "DOC",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-DOC-002",
+      "category": "DOC",
+      "outcome": "not-run",
+      "evidence": "Outside this focused runtime scope; retained results are not new execution."
+    },
+    {
+      "checkId": "CHECK-DOC-003",
+      "category": "DOC",
+      "outcome": "passed",
+      "evidence": "Canonical report/schema/IDs, source identity and old-handover reconciliation."
+    }
+  ],
+  "coreRules": [
+    {
+      "id": "CORE-01",
+      "title": "Logic lives in library modules",
+      "findings": [
+        "AUD-029-ARC006"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-02",
+      "title": "Modules are objects",
+      "findings": [
+        "AUD-029-ARC004"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-03",
+      "title": "Classes where they pay off",
+      "findings": [
+        "AUD-029-ARC001",
+        "AUD-029-ARC003"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-04",
+      "title": "Independent modules",
+      "findings": [
+        "AUD-029-ARC001"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-51",
+      "title": "Deep modules",
+      "findings": [
+        "AUD-029-ARC003"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-05",
+      "title": "Single responsibility",
+      "findings": [
+        "AUD-029-ARC006"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-06",
+      "title": "Open for extension",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-07",
+      "title": "Substitution",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-08",
+      "title": "Small interfaces",
+      "findings": [
+        "AUD-029-ARC002"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-09",
+      "title": "Depend on abstractions",
+      "findings": [
+        "AUD-029-ARC005"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-10",
+      "title": "One source for every rule",
+      "findings": [
+        "AUD-029-ARC003",
+        "AUD-029-ARC006"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-11",
+      "title": "Encapsulate what changes",
+      "findings": [
+        "AUD-029-ARC001",
+        "AUD-029-ARC004"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-12",
+      "title": "Composition over inheritance",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-13",
+      "title": "Program to interfaces",
+      "findings": [
+        "AUD-029-ARC002"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-14",
+      "title": "Delegation",
+      "findings": [
+        "AUD-029-ARC006"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-15",
+      "title": "800 lines per file; 100 per function, 150 when it is one whole",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-16",
+      "title": "Code for the reader",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-17",
+      "title": "Glossary words",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-18",
+      "title": "Named values",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-19",
+      "title": "Comments say why",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-20",
+      "title": "Doc comments on the public API",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-21",
+      "title": "One formatting style",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-22",
+      "title": "Refusals fail, outcomes return",
+      "findings": [
+        "AUD-029-ARC007"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-23",
+      "title": "Stable codes, one message source",
+      "findings": [
+        "AUD-029-ARC007"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-24",
+      "title": "Secrets live in owner types",
+      "findings": [
+        "AUD-029-SEC001"
+      ],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-46",
+      "title": "Cryptographic randomness",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-47",
+      "title": "Established cryptography",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-48",
+      "title": "Untrusted input at the boundary",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-49",
+      "title": "Least authority",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-50",
+      "title": "Bounded work",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-25",
+      "title": "Few dependencies, exact versions",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-26",
+      "title": "Checks come with the feature",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-27",
+      "title": "Startup self-test",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-28",
+      "title": "Checks able to fail",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-29",
+      "title": "Fast startup, slow checks on request",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-30",
+      "title": "Full self-test",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-31",
+      "title": "Checks travel with their feature",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-32",
+      "title": "Unit tests",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-33",
+      "title": "Regression tests",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-34",
+      "title": "Test names are sentences",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-35",
+      "title": "Sixteen colours, one meaning each",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-36",
+      "title": "Result layout",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-37",
+      "title": "Help layout",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-38",
+      "title": "Colour only on a terminal",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-39",
+      "title": "One screen per step",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-40",
+      "title": "Short screens",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-41",
+      "title": "Every menu answer is also an option",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-42",
+      "title": "Ask again",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-43",
+      "title": "Gates before \"done\"",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-44",
+      "title": "Clean fix",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-45",
+      "title": "Review before a commit",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    },
+    {
+      "id": "CORE-52",
+      "title": "Smells to weigh in review",
+      "findings": [],
+      "scope": "Current rule inventoried; focused static review/retained gates only, not every body semantically reread."
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUD-029-SEC001",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "Secret owners lack explicit lifetime endings",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "rules": [
+        "CORE-24",
+        "TS-07"
+      ],
+      "affectedFiles": [
+        "src/core/encoded-backup.ts:108",
+        "src/core/candidate-encryption.ts:260",
+        "src/core/re-encoding.ts:90",
+        "src/sskr/transport.ts:600"
+      ],
+      "reproduction": "Read the cited ownership/call trace; run the named isolated probe where applicable.",
+      "expected": "Current coding-guide conformance: CORE-24,TS-07",
+      "observed": "Five representative owners have no wipe/dispose. Fifteen of16Redacted classes lack wipe; these are leads, not15 separate security defects. Frozen indexes and retained passphrase strings have no explicit lifetime end.",
+      "impact": "Bounded lifetime/interface/maintainability gap. No external leak, wrong deterministic wallet result or release exploit established.",
+      "recommendedFix": "Use owned mutable secret storage and explicit wipe/dispose; migrate owning callers/hosts and classify borrowed wrappers separately.",
+      "requiredVerification": "Lifetime/disposal/refusal tests, original vectors, host cleanup and input-copy boundaries.",
+      "evidence": [
+        "Source trace independently reviewed and challenged against existing owners/counterexamples",
+        "secret-owner-probe"
+      ]
+    },
+    {
+      "id": "AUD-029-ARC001",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "Word table and coin capabilities lack granular package entries",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "rules": [
+        "CORE-03",
+        "CORE-04",
+        "CORE-11"
+      ],
+      "affectedFiles": [
+        "src/core/words.ts:197",
+        "src/core/words.ts:246",
+        "src/core/words.ts:288",
+        "src/core/coins.ts:17",
+        "src/index.ts:3",
+        "package.json:48"
+      ],
+      "reproduction": "Read the cited ownership/call trace; run the named isolated probe where applicable.",
+      "expected": "Current coding-guide conformance: CORE-03,CORE-04,CORE-11",
+      "observed": "Word-table capability reaches package consumers through aggregate root, which links Node crypto and file/render modules. Coins have standalone source families but only the all-family registry package entry. Existing granular entries and source vendoring work.",
+      "impact": "Bounded lifetime/interface/maintainability gap. No external leak, wrong deterministic wallet result or release exploit established.",
+      "recommendedFix": "Add a cohesive WordTable owner/entry and granular existing coin-family/composition exports. Keep legacy root adapters while migrating callers; no thin class per helper.",
+      "requiredVerification": "Browser-safe package imports, no eager all-coin graph, exact outputs and compatible host adaptation.",
+      "evidence": [
+        "Source trace independently reviewed and challenged against existing owners/counterexamples"
+      ]
+    },
+    {
+      "id": "AUD-029-ARC002",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "SSKR consumers require unused host capabilities",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "rules": [
+        "CORE-08",
+        "CORE-13"
+      ],
+      "affectedFiles": [
+        "src/sskr/share-platform.ts:11",
+        "src/sskr/share-set.ts:112",
+        "src/sskr/complete-shares.ts:137",
+        "src/sskr/joint-repair.ts:636",
+        "test/share-platform-injection.test.ts:49"
+      ],
+      "reproduction": "Read the cited ownership/call trace; run the named isolated probe where applicable.",
+      "expected": "Current coding-guide conformance: CORE-08,CORE-13",
+      "observed": "Recovery demands full SharePlatform though it only combines; repair also demands createShares. Existing fake supplies a throwing no-split stub. Dependencies are already injected, so no global-platform allegation.",
+      "impact": "Bounded lifetime/interface/maintainability gap. No external leak, wrong deterministic wallet result or release exploit established.",
+      "recommendedFix": "Narrow each operation to needed capabilities while retaining complete host-platform composition.",
+      "requiredVerification": "Combine-only/repair-only typechecks and real split/repair/restore controls.",
+      "evidence": [
+        "Source trace independently reviewed and challenged against existing owners/counterexamples"
+      ]
+    },
+    {
+      "id": "AUD-029-ARC003",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "Backup option forwarding adds unnecessary coupling",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "rules": [
+        "CORE-03",
+        "CORE-10",
+        "CORE-51"
+      ],
+      "affectedFiles": [
+        "src/core/backup-options.ts:22",
+        "src/core/backup-options.ts:39",
+        "src/core/backup-options.ts:44",
+        "src/core/backup-options.ts:52",
+        "src/cli/card-options.ts:58"
+      ],
+      "reproduction": "Read the cited ownership/call trace; run the named isolated probe where applicable.",
+      "expected": "Current coding-guide conformance: CORE-03,CORE-10,CORE-51",
+      "observed": "Several public functions only forward to Masking/EncodedForm, yet callers acquire a backup-options to SSKR split graph. ShareSetChoice and actual form-to-share mapping remain substantive.",
+      "impact": "Bounded lifetime/interface/maintainability gap. No external leak, wrong deterministic wallet result or release exploit established.",
+      "recommendedFix": "Use existing owners directly and expose EncodedForm separately; preserve real ShareSetChoice behavior and compatibility adapters.",
+      "requiredVerification": "Options/encoding regressions, import graph and narrow host entry checks.",
+      "evidence": [
+        "Source trace independently reviewed and challenged against existing owners/counterexamples"
+      ]
+    },
+    {
+      "id": "AUD-029-ARC004",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "Coin readers retain mutable configuration aliases",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "rules": [
+        "CORE-02",
+        "CORE-11"
+      ],
+      "affectedFiles": [
+        "src/core/coins/base58.ts:46",
+        "src/core/coins/base58.ts:60",
+        "src/core/coins/coin.ts:138",
+        "src/core/coins/coin.ts:385"
+      ],
+      "reproduction": "Read the cited ownership/call trace; run the named isolated probe where applicable.",
+      "expected": "Current coding-guide conformance: CORE-02,CORE-11",
+      "observed": "Base58Coin retains the caller version array and nested prefixes. Coin identity/path fields are only TypeScript-readonly. Main direct risk is custom host configuration; built-in descriptions normally lack external aliases.",
+      "impact": "Bounded lifetime/interface/maintainability gap. No external leak, wrong deterministic wallet result or release exploit established.",
+      "recommendedFix": "Snapshot version records/prefixes and stabilize identity/path properties behind private storage/getters.",
+      "requiredVerification": "Mutable/getter config and identity stability regressions, plus existing exact address/path vectors.",
+      "evidence": [
+        "Source trace independently reviewed and challenged against existing owners/counterexamples"
+      ]
+    },
+    {
+      "id": "AUD-029-ARC005",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "Search timing depends on a global clock",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "rules": [
+        "CORE-09"
+      ],
+      "affectedFiles": [
+        "src/core/search-turns.ts:52",
+        "src/core/search-turns.ts:60",
+        "src/core/date-search.ts:560",
+        "test/date-search-core.test.ts:366"
+      ],
+      "reproduction": "Read the cited ownership/call trace; run the named isolated probe where applicable.",
+      "expected": "Current coding-guide conformance: CORE-09",
+      "observed": "SearchRun injects scheduler and cancellation but timing uses performance.now globally. Current tests replace that global. This is a dependency/testability gap, not a browser availability defect.",
+      "impact": "Bounded lifetime/interface/maintainability gap. No external leak, wrong deterministic wallet result or release exploit established.",
+      "recommendedFix": "Inject an optional monotonic clock through search run and pace/turn owners, preserving the existing default.",
+      "requiredVerification": "Fake-clock boundaries, timing estimates, cancellation and ordinary host behavior.",
+      "evidence": [
+        "Source trace independently reviewed and challenged against existing owners/counterexamples"
+      ]
+    },
+    {
+      "id": "AUD-029-ARC006",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "SSKR export policy is duplicated across CLI and library",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "rules": [
+        "CORE-01",
+        "CORE-05",
+        "CORE-10",
+        "CORE-14"
+      ],
+      "affectedFiles": [
+        "src/cli/sskr-export-command.ts:266",
+        "src/sskr/share-restore.ts:561"
+      ],
+      "reproduction": "Read the cited ownership/call trace; run the named isolated probe where applicable.",
+      "expected": "Current coding-guide conformance: CORE-01,CORE-05,CORE-10,CORE-14",
+      "observed": "CLI and ShareRestore.repair separately select per-share repair after too-few, variants without saving, and single-set export. Low-level rules are shared; interactive prompts/re-reading legitimately stay in CLI.",
+      "impact": "Bounded lifetime/interface/maintainability gap. No external leak, wrong deterministic wallet result or release exploit established.",
+      "recommendedFix": "Extract one library outcome decision usable by interactive and noninteractive restoration; retain CLI questions/retries/fresh reads.",
+      "requiredVerification": "Too-few, intact, repaired, multiple-set, wallet and cancelled cases through both front ends.",
+      "evidence": [
+        "Source trace independently reviewed and challenged against existing owners/counterexamples"
+      ]
+    },
+    {
+      "id": "AUD-029-ARC007",
+      "category": "ARC",
+      "kind": "finding",
+      "title": "Release helper still throws cancellation",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "rules": [
+        "CORE-22",
+        "CORE-23"
+      ],
+      "affectedFiles": [
+        "scripts/sign-release.mjs:238",
+        "scripts/sign-release.mjs:270",
+        "scripts/sign-release.mjs:289",
+        "scripts/sign-release.mjs:598"
+      ],
+      "reproduction": "Read the cited ownership/call trace; run the named isolated probe where applicable.",
+      "expected": "Current coding-guide conformance: CORE-22,CORE-23",
+      "observed": "Isolated actual pre-child run rejects with Cancelled and no code; catch distinguishes it with instanceof. Zero children/signatures/publish operations ran. Ordinary CLI cancellation migration did not cover this helper.",
+      "impact": "Bounded lifetime/interface/maintainability gap. No external leak, wrong deterministic wallet result or release exploit established.",
+      "recommendedFix": "Return a cancellation outcome throughout the helper, retaining exit130 and stopping before later steps.",
+      "requiredVerification": "Safe fake-child pre-start/interrupted checks, one cancellation message, no later step; no real release action.",
+      "evidence": [
+        "Source trace independently reviewed and challenged against existing owners/counterexamples",
+        "sign-cancel-probe"
+      ]
+    }
+  ],
+  "observations": [],
+  "remediation": [
+    {
+      "id": "AUD-029-SEC001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Assessment baseline; not yet remediated."
+    },
+    {
+      "id": "AUD-029-ARC001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Assessment baseline; not yet remediated."
+    },
+    {
+      "id": "AUD-029-ARC002",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Assessment baseline; not yet remediated."
+    },
+    {
+      "id": "AUD-029-ARC003",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Assessment baseline; not yet remediated."
+    },
+    {
+      "id": "AUD-029-ARC004",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Assessment baseline; not yet remediated."
+    },
+    {
+      "id": "AUD-029-ARC005",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Assessment baseline; not yet remediated."
+    },
+    {
+      "id": "AUD-029-ARC006",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Assessment baseline; not yet remediated."
+    },
+    {
+      "id": "AUD-029-ARC007",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Assessment baseline; not yet remediated."
+    }
+  ],
+  "executions": [
+    {
+      "command": [
+        "node",
+        "--max-old-space-size=256",
+        "docs/audits/AUD-029-harnesses/core-inventory.mjs"
+      ],
+      "startedAtUtc": "2026-10-15T10:08:49.224048+00:00",
+      "endedAtUtc": "2026-10-15T10:08:49.867690+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 256,
+      "rssBudgetBytes": 1073741824,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 300,
+      "sourceBefore": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "sourceAfter": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "changedFiles": [],
+      "minimumAvailableBytes": 9262366720,
+      "peakProcessRssBytes": 147603456,
+      "logSha256": "c4e09935ed76b1e9d94ac35115152823c7c465332e028bc101fa4df144cc5235",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c",
+      "auditId": "AUD-029",
+      "label": "core-inventory",
+      "recordSha256": "53d7150e77cbaa60b98eff9c2ddf5cec78fd8254c25490efa5442b177ead0929"
+    },
+    {
+      "command": [
+        "node",
+        "docs/audits/AUD-029-harnesses/secret-owner-probe.mjs"
+      ],
+      "startedAtUtc": "2026-10-15T10:08:49.913784+00:00",
+      "endedAtUtc": "2026-10-15T10:08:50.145544+00:00",
+      "exitCode": 1,
+      "stopReason": null,
+      "nodeHeapMiB": 256,
+      "rssBudgetBytes": 1073741824,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 300,
+      "sourceBefore": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "sourceAfter": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "changedFiles": [],
+      "minimumAvailableBytes": 9347661824,
+      "peakProcessRssBytes": 27193344,
+      "logSha256": "ab5f1888042bf409cdf9150bc5fb7c5df69d12857fa02104c53fd33c44e97995",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c",
+      "auditId": "AUD-029",
+      "label": "secret-owner-probe",
+      "recordSha256": "fbe8adb1bb3aa49df29a6b18ab318fc5ce26af5d3c6a1ac1fdb8e2aab99d17c5"
+    },
+    {
+      "command": [
+        "node",
+        "docs/audits/AUD-029-harnesses/sign-cancel-probe.mjs"
+      ],
+      "startedAtUtc": "2026-10-15T10:12:36.686142+00:00",
+      "endedAtUtc": "2026-10-15T10:12:36.910661+00:00",
+      "exitCode": 1,
+      "stopReason": null,
+      "nodeHeapMiB": 256,
+      "rssBudgetBytes": 1073741824,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 300,
+      "sourceBefore": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "sourceAfter": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "changedFiles": [],
+      "minimumAvailableBytes": 9583280128,
+      "peakProcessRssBytes": 27123712,
+      "logSha256": "c97fc6cec2b004214ba29cf307cf7be02bac7e6b1ae6d49ccbb7af5af468d652",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c",
+      "auditId": "AUD-029",
+      "label": "sign-cancel-probe",
+      "recordSha256": "da9356087aca7e037e22d4f18bfdfc3e615198ac793f382234f6ea0f7dcf4ef4"
+    }
+  ],
+  "retainedEvidence": [
+    {
+      "path": "docs/audits/AUD-028-evidence/remediation-final-gates-v3.command.json",
+      "recordSha256": "18f4815d4fcbf25d894102cd3ecde340b5230971191a2d4005f21798a1bc32cd",
+      "command": [
+        "pnpm",
+        "check"
+      ],
+      "exitCode": 0,
+      "sourceBefore": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "sourceAfter": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "exactSourceMatch": true,
+      "logSha256": "675665742802f14b272ebda082bab10635555ffe54f32dac2ba724eb7c270f10"
+    },
+    {
+      "path": "docs/audits/AUD-028-evidence/remediation-format-final.command.json",
+      "recordSha256": "12149d7a5dd27f09aa6bd51c0bd65cf8ee4876f9c5d0c7c53eeda324356f3385",
+      "command": [
+        "pnpm",
+        "format:check"
+      ],
+      "exitCode": 0,
+      "sourceBefore": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "sourceAfter": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "exactSourceMatch": true,
+      "logSha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2"
+    },
+    {
+      "path": "docs/audits/AUD-028-evidence/remediation-wasm-final.command.json",
+      "recordSha256": "3f80f377fb3db2d972c86b9493f45150f0d6bef511aeb3e8f40ef2e7fdc3f920",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "test/sskr-output-wipe.test.ts",
+        "--maxWorkers=1",
+        "--no-file-parallelism",
+        "--reporter=dot"
+      ],
+      "exitCode": 0,
+      "sourceBefore": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "sourceAfter": "0a043cc331f95f371aa9eb753b2e266ba0e511f4755928768fa2c0a299ec53b0",
+      "exactSourceMatch": true,
+      "logSha256": "8ed926ecd79fb6c3ef937ea5f001592d0a0df8d3d41feb6c333c9c811a4da840"
+    }
+  ],
+  "inventorySummary": {
+    "files": 293,
+    "sourceFiles": 272,
+    "exportedClasses": 97,
+    "exportedFunctions": 861,
+    "classlessSourceModules": 188,
+    "redactedOwners": 16,
+    "ownersWithoutWipe": 15,
+    "nativeErrorSites": 0,
+    "emptyCatchSites": 1,
+    "implementationBarrelImports": 9,
+    "parseDiagnostics": 0
+  },
+  "planningEstimate": {
+    "hours": [
+      24,
+      44
+    ],
+    "meaning": "Rough sequential engineering time including scoped checks/host adaptation, not a completion promise; overlapping reviewer estimates are not added.",
+    "units": [
+      [
+        "Secret-owner lifetimes and owning callers",
+        10,
+        18
+      ],
+      [
+        "Granular entries and forwarding cleanup",
+        4,
+        7
+      ],
+      [
+        "Narrow SSKR capabilities and injected clocks",
+        3,
+        5
+      ],
+      [
+        "Shared SSKR export outcome policy",
+        2,
+        4
+      ],
+      [
+        "Coin configuration ownership",
+        1,
+        3
+      ],
+      [
+        "Release-helper cancellation",
+        1,
+        2
+      ],
+      [
+        "Integration checks and host handover",
+        3,
+        5
+      ]
+    ]
+  },
+  "priorWork": {
+    "done": [
+      "44f7c73/f2d4cff and AUD-025 completed ordinary CLI/library cancellation and stable-error migration",
+      "Exact-source pnpm check and formatter pass; zero direct native Error construction sites in maintained source/tooling",
+      "All17AUD-028 findings fixed; these are different scoped findings"
+    ],
+    "staleNote": "Local pre-migration handover predates f2d4cff/AUD-025; CORE-23 not-started statement is obsolete."
+  },
+  "limitations": [
+    "273source paths inventoried:272TS/MJS plus protection-flags.json;21tooling TS/MJS also parsed. Not every body newly read.",
+    "15of16Redacted owners lack wipe, but wrappers/borrowed metadata require classification before migration.",
+    "Free functions/DTOs/CLI translation are not automatically149violations; CORE-52 smells are judgement calls.",
+    "Byte/key/list wipe work exists; full TS-07-completion claims were too broad.",
+    "No proof of external compromise, wrong wallet output, complete CORE conformance or release/browser acceptance.",
+    "The earlier6-12hour estimate concerned a partly completed migration and is not a measured remaining-work budget."
+  ]
+}

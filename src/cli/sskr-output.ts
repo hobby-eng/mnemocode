@@ -8,7 +8,7 @@ import {
   resolveTemplateId,
 } from "../export/template-catalog.js";
 import { resolveSskrLayout, parseSskrLayout } from "../export/sskr-content.js";
-import { printCodes, terminalNotice, terminalResultHeader } from "./terminal.js";
+import { printCodes, terminalNotice, terminalResultHeader, terminalWork } from "./terminal.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import { value, type ParsedArguments } from "./arguments.js";
@@ -39,6 +39,7 @@ import { shareKeepingNote, type ShareCardPackaging } from "../export/sskr-keepin
 import { refusalMessage } from "../core/refusal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { PrivateResult } from "./private-result.js";
 
 const ERRORS = new ErrorCatalog("cli.sskr-output", {
   "share-formats-not-bip39-representations": (value0: string) =>
@@ -87,7 +88,9 @@ export function exportOptions(
 export async function assertShareCardsPrintable(
   options: ShareCardOptions | undefined,
 ): Promise<void> {
-  if (options !== undefined) await ShareCardSet.assertPrintable(nodeCardRenderer, options);
+  if (options === undefined) return;
+  terminalWork("Checking that the share cards can be printed…");
+  await ShareCardSet.assertPrintable(nodeCardRenderer, options);
 }
 
 export function shareFormat(args: ParsedArguments): ShareFormat {
@@ -127,14 +130,21 @@ export function printShareBlock(
  * they hold where that is known (PHRASE_WORDS), so that a masked phrase is not taken for the
  * wallet's.
  */
-export function printShares(
+export async function printShares(
   shares: readonly WrittenShare[],
   total: number = shares.length,
   holds?: string,
-): void {
-  for (const share of shares) {
-    printShareBlock(`SSKR share ${share.number} of ${total}`, share.ur, share.format, holds);
-  }
+): Promise<Cancelled | undefined> {
+  const lines = shares.flatMap((share) => [
+    `SSKR share ${share.number} of ${total} — ${SHARE_FORMAT_NAMES[share.format]}`,
+    ...(holds === undefined ? [] : [`Holds: ${holds}`]),
+    writeShare(share.ur, share.format),
+    "",
+  ]);
+  return new PrivateResult(lines).show(() => {
+    for (const share of shares)
+      printShareBlock(`SSKR share ${share.number} of ${total}`, share.ur, share.format, holds);
+  });
 }
 
 // Saving, with a choice after a failure (save-retry.ts).
@@ -154,6 +164,7 @@ export async function saveShares(
   const shares = shown.map((share) => share.ur);
   const keep = (packaging: ShareCardPackaging): void =>
     terminalNotice(shareKeepingNote(shares, packaging, masked));
+  if (options !== undefined) terminalWork("Rendering the share cards…");
   // One set of cards for every file, so that each shows the same decoys.
   if (
     options !== undefined &&
@@ -177,7 +188,7 @@ export async function saveShares(
 }
 
 /** The QR codes of the shares saved in `folder`, a folder of cards or images just saved. */
-function saveShareQrsInside(cards: ShareCardSet, folder: string): Promise<void> {
+function saveShareQrsInside(cards: ShareCardSet, folder: string): Promise<Cancelled | undefined> {
   return saveShareQrs(cards, (code) => saveQrInside(code.payload, folder, code.name));
 }
 
@@ -203,7 +214,7 @@ async function saveShareCards(
       `Saved ${cards} ${options.imageFormat.toUpperCase()} files to: ${directory}`,
       "success",
     );
-    await saveShareQrsInside(set, directory);
+    if ((await saveShareQrsInside(set, directory)) === CANCELLED) return CANCELLED;
     keep(
       options.layout === "individual"
         ? "folders"
@@ -219,7 +230,11 @@ async function saveShareCards(
   if (pdf !== undefined) {
     terminalNotice(`Saved SSKR collection PDF: ${pdf}`, "success");
     keep("file");
-    await saveShareQrs(set, (code) => saveQrBeside(code.payload, pdf, `-${code.reference}`));
+    if (
+      (await saveShareQrs(set, (code) => saveQrBeside(code.payload, pdf, `-${code.reference}`))) ===
+      CANCELLED
+    )
+      return CANCELLED;
   }
   let pages = 0;
   const images = await saveOutput(
@@ -234,7 +249,7 @@ async function saveShareCards(
   if (images !== undefined) {
     savedPagesNotice(args, pages, images, "SSKR");
     keep("folder");
-    await saveShareQrsInside(set, images);
+    if ((await saveShareQrsInside(set, images)) === CANCELLED) return CANCELLED;
   }
   return undefined;
 }
@@ -245,13 +260,18 @@ async function saveShareCards(
  */
 async function saveShareQrs(
   cards: ShareCardSet,
-  save: (code: ShareQrCode) => Promise<string>,
-): Promise<void> {
+  save: (code: ShareQrCode) => Promise<string | undefined | Cancelled>,
+): Promise<Cancelled | undefined> {
   const codes = cards.qrCodes;
-  for (const code of codes) await save(code);
-  if (codes.length > 0)
+  let saved = 0;
+  for (const code of codes) {
+    const path = await save(code);
+    if (path === CANCELLED) return CANCELLED;
+    if (path !== undefined) saved += 1;
+  }
+  if (saved > 0)
     terminalNotice(
-      `Saved the QR code of each share's sheets as an image beside them: ${codes.length} PNG ${codes.length === 1 ? "file" : "files"}.`,
+      `Saved the QR codes of the share sheets as images beside them: ${saved} PNG ${saved === 1 ? "file" : "files"}.`,
       "success",
     );
 }

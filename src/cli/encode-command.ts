@@ -7,12 +7,12 @@ import { businessOptions, TYPED_CARD_TEXT_OPTIONS } from "./business-options.js"
 import { type CardSettings, assertSheetQr } from "../export/card-settings.js";
 import { reportRenamedOutputs } from "./output-paths.js";
 import { prepareSskrSplit } from "./sskr-command.js";
-import { printEncodeResult } from "./encode-report.js";
+import { printEncodeResult, maskedWordsRequested } from "./encode-report.js";
 import { backupCheckAnswer, offerEncodedCheck } from "./backup-check.js";
 import { EncodeCardExport, saveEncodeResult } from "./encode-export.js";
 import { optionLabel } from "./option-copy.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
-import { terminalNotice } from "./terminal.js";
+import { terminalNotice, terminalWork } from "./terminal.js";
 import { EncodedBackup, type Encoding } from "../core/encoded-backup.js";
 import { COLOR_FORMAT_NUMBERS } from "./format-numbers.js";
 import { preflightOutputs, saveHeirSheetOutput, saveOutput } from "./output-saving.js";
@@ -49,6 +49,7 @@ async function validateEncodeOptions(
       throw ERRORS.create("setting-available-only-sskr-mode", [`${optionLabel(key)}`]);
   }
   const mode = transformMode(args);
+  maskedWordsRequested(args, mode);
   const format = encodeFormat(value(args, "format"));
   EncodedBackup.assertEncodable(mode, { validLastWord: args["legacy-valid-last-word"] === true });
   // Dates given as options fit the mode before any secret is read; asked ones are checked then.
@@ -141,6 +142,7 @@ async function assertCardsPrintable(saving: ParsedArguments, format: EncodedForm
     title: value(saving, "title"),
     colorForm: format,
   });
+  terminalWork("Checking that the cards can be printed…");
   await preview.assertColorsPrint(value(saving, "template"), { sheets, cards });
 }
 
@@ -166,8 +168,7 @@ async function saveResults(
     if (key === "output" && args.cards === true)
       await saveEncodeResult(onlyResult(saving, "cards", true), outcome, cards);
   }
-  await saveSheetQr(args, outcome, saved);
-  return undefined;
+  return saveSheetQr(args, outcome, saved);
 }
 
 /**
@@ -179,7 +180,7 @@ async function saveSheetQr(
   args: ParsedArguments,
   outcome: EncodeOutcome,
   saved: ReadonlyMap<string, string>,
-): Promise<void> {
+): Promise<Cancelled | undefined> {
   const { backup } = outcome.encoding;
   if (args["card-qr"] !== true || value(args, "qr") !== undefined) return;
   const pdf = saved.get("pdf");
@@ -189,7 +190,9 @@ async function saveSheetQr(
     pdf === undefined
       ? await saveQrInside(backup.text(), defined(images))
       : await saveQrBeside(backup.text(), pdf);
-  terminalNotice(`Saved the QR code of the sheet as an image: ${path}`, "success");
+  if (path === CANCELLED) return CANCELLED;
+  if (path !== undefined)
+    terminalNotice(`Saved the QR code of the sheet as an image: ${path}`, "success");
 }
 
 /**
@@ -234,7 +237,8 @@ async function encodeChecked(
 ): Promise<Cancelled | undefined> {
   const outcome = await createOutcome(args, mode, format, known);
   if (outcome === CANCELLED) return CANCELLED;
-  printEncodeResult(outcome);
+  const show = (): void => printEncodeResult(outcome, maskedWordsRequested(args, mode));
+  show();
   if ((await saveResults(args, saving, outcome)) === CANCELLED) return CANCELLED;
   const { backup, result } = outcome.encoding;
   // A record with a replaced last word never gets a sheet (validateEncodeOptions).
@@ -255,7 +259,7 @@ async function encodeChecked(
       codes: backup.indexes,
       dates: outcome.enteredDates,
     },
-    () => printEncodeResult(outcome),
+    show,
     checkAnswer,
   );
 }
