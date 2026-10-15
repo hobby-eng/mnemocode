@@ -59,6 +59,7 @@ FROM toolchain AS dependencies
 WORKDIR /workspace/packages/recovery-sskr-wasm/rust
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
+COPY vendor ./vendor
 RUN cargo fetch --locked
 
 FROM dependencies AS built

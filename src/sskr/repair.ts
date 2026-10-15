@@ -22,23 +22,20 @@
 // MarkedReading solves, repair-models.ts.
 
 import { apartHexUnits, codeTokens, withJoinedMarksHint, wholeMark } from "../core/code-text.js";
-import { SHARE_METADATA_BYTES } from "./share-layout.js";
-import { BitFields, combination, linearize, solve, unitVectors } from "./gf2.js";
-import { readShare, type ShareFormat } from "./transport.js";
-import { SHARE_UNITS } from "./share-units.js";
-import { xorInto } from "../core/bits.js";
+import { combination } from "./gf2.js";
+import { readShare } from "./transport.js";
 import { capitalized } from "../core/prose.js";
 import { defined } from "../core/defined.js";
-import {
-  isMarked,
-  MAX_REPAIR_TEXT_LENGTH,
-  type ReadBits,
-  type ReadingUnits,
-  type ShareRepairErrorCode,
-  type ShareStructure,
-} from "./repair-units.js";
-import { CODE_FORMS, type CodeForm, DIGIT_MARKED_WIDTHS, unitModels } from "./repair-models.js";
+import { isMarked, MAX_REPAIR_TEXT_LENGTH, type ShareRepairErrorCode } from "./repair-units.js";
+import { CODE_FORMS, type CodeForm, DIGIT_MARKED_WIDTHS } from "./repair-models.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+import { MarkedReading } from "./repair-owners.js";
+import type { ReadRepairableShare } from "./repair-types.js";
+
+/** Owned reading APIs, kept available through the original repair entry point. */
+export { MarkedReading, ReadingSpace, everyPick } from "./repair-owners.js";
+/** Repair result shapes shared through a leaf module without an owner import cycle. */
+export type { FilledElement, ReadRepairableShare } from "./repair-types.js";
 
 const ERRORS = new ErrorCatalog("sskr.repair", {
   "each-at-place": (value0: string) => `${value0}, each at its place.`,
@@ -61,24 +58,6 @@ export const MAX_CODE_CHOICES = 256;
  */
 export const LISTED_FREE_BITS = 4;
 
-/** An element filled in by a repair: its place, counted from 1, and what it is. */
-export interface FilledElement {
-  readonly position: number;
-  readonly value: string;
-}
-
-/**
- * A share as a repair reads it: its UR, its form, whether marked elements were filled in, and
- * which.
- */
-export interface ReadRepairableShare {
-  readonly ur: string;
-  readonly format: ShareFormat;
-  readonly repaired: boolean;
-  /** The marked elements as the repair filled them in, in order. */
-  readonly filled: readonly FilledElement[];
-}
-
 /** A complete share, read in its form, as a repair gives it back with nothing filled in. */
 export function unrepairedShare(text: string): ReadRepairableShare {
   return { ...readShare(text), repaired: false, filled: [] };
@@ -86,39 +65,23 @@ export function unrepairedShare(text: string): ReadRepairableShare {
 
 /**
  * Thrown when several shares fit the marked elements. The message names only their places: an
- * error may be shown where the screen is not private. The values are in `variants`, for the
- * caller to show where it shows secrets.
+ * error may be shown where the screen is not private. It retains count/place metadata only;
+ * callers obtain secret variants through repairCandidates(), never through this Error.
  */
 export class ShareVariantsError extends Error {
   readonly code: ShareRepairErrorCode = "share-variants";
 
-  constructor(readonly variants: readonly ReadRepairableShare[]) {
-    const places = defined(variants[0])
-      .filled.map((element) => element.position)
-      .join(", ");
-    super(
-      `${variants.length} shares fit the marked elements ${places}. Use another copy of this share, or another share.`,
-    );
-  }
-}
+  readonly places: readonly number[];
 
-/**
- * Every way to pick one item of each list, the first list's items varying slowest; undefined once
- * there are more than `limit`. The choices of candidate words and the readings of several shares
- * are both expanded through it.
- */
-export function everyPick<T>(
-  lists: readonly (readonly T[])[],
-  limit = Infinity,
-): T[][] | undefined {
-  let all: T[][] = [[]];
-  for (const list of lists) {
-    // Compared before the ways are made, and divided so that no product grows past the limit; an
-    // empty list leaves no way, which is within any limit.
-    if (list.length > 0 && all.length > Math.floor(limit / list.length)) return undefined;
-    all = all.flatMap((prefix) => list.map((item) => [...prefix, item]));
+  constructor(
+    readonly count: number,
+    places: readonly number[],
+  ) {
+    super(
+      `${count} shares fit the marked elements ${places.join(", ")}. Use another copy of this share, or another share.`,
+    );
+    this.places = Object.freeze([...places]);
   }
-  return all;
 }
 
 /**
@@ -138,379 +101,6 @@ export function placesWithin<Unit extends { readonly count: number }>(
     chosen.push(unit);
   }
   return chosen;
-}
-
-/**
- * One way to read a marked text: a form with its unit values, undefined where marked, and one
- * structure. A class, so that a reading is made only from text (MarkedReading.of) and every
- * question about it is answered by it: its marked places and the layout of their bits, the share
- * that values at them give, and its space of solutions. It never changes: values chosen for its
- * candidates make another reading (withValues). joint-repair.ts solves several shares together
- * from these.
- */
-export class MarkedReading {
-  readonly #units: ReadingUnits;
-  readonly #structure: ShareStructure;
-  /** The places of the marked units, in the order of their bits among the unknowns. */
-  readonly #holes: readonly number[];
-
-  private constructor(units: ReadingUnits, structure: ShareStructure) {
-    this.#units = units;
-    this.#structure = structure;
-    this.#holes = Object.freeze(
-      units.values.flatMap((value, index) => (value === undefined ? [index] : [])),
-    );
-  }
-
-  /**
-   * Every reading of `text`: each form and structure of a supported prefix before complete card
-   * decoys, or of the entire input for a standard form. Every genuine mark stays in the prefix.
-   */
-  static of(text: string): MarkedReading[] {
-    return unitModels(text).flatMap(({ structures, ...units }) =>
-      structures.map((structure) => new MarkedReading(units, structure)),
-    );
-  }
-
-  /** The form that the text is read in. */
-  get format(): ShareFormat {
-    return this.#units.format;
-  }
-
-  /** Whether the reading takes decoy cards after a prefix of the text (addUnitModel). */
-  get withDecoys(): boolean {
-    return this.#units.decoys === true;
-  }
-
-  /** The bits of one unit of the form. */
-  get unitBits(): number {
-    return SHARE_UNITS[this.format].unitBits;
-  }
-
-  /** The value of every unit, undefined where it is marked. */
-  get values(): readonly (number | undefined)[] {
-    return this.#units.values;
-  }
-
-  /** The layout of the share's bytes that this reading takes. */
-  get structure(): ShareStructure {
-    return this.#structure;
-  }
-
-  /** For each marked unit read in part, the bits that were read (ReadBits). */
-  get readBits(): readonly (ReadBits | undefined)[] | undefined {
-    return this.#units.readBits;
-  }
-
-  /** For each partly read unit whose digits are no bits of it, the values that fit them. */
-  get candidates(): readonly (readonly number[] | undefined)[] | undefined {
-    return this.#units.candidates;
-  }
-
-  /** The places of the marked units, in the order of their bits among the unknowns. */
-  get holes(): readonly number[] {
-    return this.#holes;
-  }
-
-  /** The unknown bits: those of every marked unit. */
-  get unknownBits(): number {
-    return this.#holes.length * this.unitBits;
-  }
-
-  /**
-   * Where the bits of the marked unit that comes `order`-th start among the unknowns: unit k at
-   * bits k * unitBits on. The one layout of the unknowns, which every reader of them asks through
-   * unitMask and valuesAt.
-   */
-  #shift(order: number): bigint {
-    return BigInt(order * this.unitBits);
-  }
-
-  /** The bits, among the unknowns, of the marked unit that comes `order`-th (holes[order]). */
-  unitMask(order: number): bigint {
-    return ((1n << BigInt(this.unitBits)) - 1n) << this.#shift(order);
-  }
-
-  /** The values of every unit with the unknown bits `bits` at the marked ones. */
-  valuesAt(bits: bigint): number[] {
-    const values = this.zeroFilled();
-    this.#holes.forEach((hole, order) => {
-      values[hole] = Number((bits & this.unitMask(order)) >> this.#shift(order));
-    });
-    return values;
-  }
-
-  /** The values of the units with every marked one taken as zero. */
-  zeroFilled(): number[] {
-    return this.values.map((value) => value ?? 0);
-  }
-
-  /**
-   * This reading with the units at the places of `chosen` taken as the values given, each one of
-   * its candidates: all their bits become equations, and they are still reported as filled in.
-   */
-  withValues(chosen: ReadonlyMap<number, number>): MarkedReading {
-    const mask = 2 ** this.unitBits - 1;
-    const readBits = this.values.map((_, place) => {
-      const value = chosen.get(place);
-      return value === undefined ? this.readBits?.[place] : { value, mask };
-    });
-    return new MarkedReading({ ...this.#units, readBits }, this.#structure);
-  }
-
-  /**
-   * Whether the bits of the marked unit at `place` reach the SSKR metadata of the share, its first
-   * SHARE_METADATA_BYTES payload bytes: the identifier and the thresholds, which all shares of a
-   * set carry, and the member number. Units that reach it tell the shares apart, and settle the
-   * most.
-   */
-  reachesMetadata(place: number): boolean {
-    const values = this.zeroFilled();
-    const before = this.#structure.evaluate(values).payload;
-    try {
-      for (let bit = 0; bit < this.unitBits; bit += 1) {
-        const flipped = [...values];
-        flipped[place] = defined(values[place]) ^ (1 << bit);
-        const after = this.#structure.evaluate(flipped).payload;
-        try {
-          for (let byte = 0; byte < SHARE_METADATA_BYTES; byte += 1)
-            if (after[byte] !== before[byte]) return true;
-        } finally {
-          // A share's part of the secret, needed only for this comparison.
-          after.fill(0);
-        }
-      }
-      return false;
-    } finally {
-      before.fill(0);
-    }
-  }
-
-  /**
-   * Every reading of this one with the candidate units at `places` taken value by value
-   * (withValues): one for each combination of their values.
-   */
-  choicesAt(places: readonly number[]): MarkedReading[] {
-    const { candidates } = this;
-    // Another reading of the share, such as another form, may have no candidates at these places.
-    const tried = places.filter((place) => candidates?.[place] !== undefined);
-    if (tried.length === 0) return [this];
-    return defined(everyPick(tried.map((place) => defined(defined(candidates)[place])))).map(
-      (values) =>
-        this.withValues(new Map(tried.map((place, index) => [place, defined(values[index])]))),
-    );
-  }
-
-  /** The candidate units of this reading: each with its place and its number of values. */
-  candidateCounts(): { readonly place: number; readonly count: number }[] {
-    return (this.candidates ?? []).flatMap((values, place) =>
-      values === undefined ? [] : [{ place, count: values.length }],
-    );
-  }
-
-  /**
-   * The share that this reading gives with `values` at its marks, read as an ordinary share
-   * (readShare), which checks everything again, with the elements filled in; undefined when the
-   * values do not fit what was read, the text is no share, or it reads as another form. The repair
-   * of one share and of several together both take their solutions through it.
-   */
-  solvedShare(values: readonly number[]): ReadRepairableShare | undefined {
-    const { fits } = this.#units;
-    if (fits !== undefined && !fits(values)) return undefined;
-    const units = SHARE_UNITS[this.format];
-    let read;
-    try {
-      read = readShare(units.text(values));
-    } catch {
-      return undefined;
-    }
-    if (read.format !== this.format) return undefined;
-    const filled = this.#holes.map((index) => ({
-      position: index + 1,
-      value: units.unitText(defined(values[index])),
-    }));
-    return { ur: read.ur, format: read.format, repaired: filled.length > 0, filled };
-  }
-
-  /** The solutions of this reading on its own (ReadingSpace.solve). */
-  space(): ReadingSpace | undefined {
-    return ReadingSpace.solve(this);
-  }
-
-  /** What `use` makes of the space of this reading, which is wiped after it (ReadingSpace.use). */
-  withSpace<T>(use: (space: ReadingSpace | undefined) => T): T {
-    return ReadingSpace.use(this, use);
-  }
-}
-
-/**
- * The solutions of one reading on its own, as an affine space over the bits of its marked units
- * (bit b of the k-th mark is bit k * unitBits + b): one solution, the basis of the rest, and the
- * payload at that solution with the change each basis vector makes to it. A class because it owns
- * a share's part of the secret, the payload and its changes, and wipes them (wipe). payloadAt
- * hands out a payload to read, always as a new array that the caller wipes; secretArrays gives the
- * space's own arrays only to an owner that wipes them (AssessmentSecrets, AUD-012-SEC004).
- */
-export class ReadingSpace {
-  readonly #reading: MarkedReading;
-  readonly #rank: number;
-  readonly #particular: bigint;
-  readonly #basis: readonly bigint[];
-  readonly #payload: Uint8Array;
-  readonly #payloadDeltas: readonly Uint8Array[];
-
-  private constructor(
-    reading: MarkedReading,
-    solved: {
-      readonly rank: number;
-      readonly particular: bigint;
-      readonly free: readonly bigint[];
-    },
-    payload: Uint8Array,
-    payloadDeltas: readonly Uint8Array[],
-  ) {
-    this.#reading = reading;
-    this.#rank = solved.rank;
-    this.#particular = solved.particular;
-    this.#basis = Object.freeze([...solved.free]);
-    this.#payload = payload;
-    this.#payloadDeltas = Object.freeze([...payloadDeltas]);
-  }
-
-  /** Solves one reading on its own; undefined when no values fit it. */
-  static solve(reading: MarkedReading): ReadingSpace | undefined {
-    const { holes, unitBits, unknownBits } = reading;
-    const at = (bits: bigint) => {
-      const values = reading.valuesAt(bits);
-      const evaluated = reading.structure.evaluate(values);
-      const { readBits } = reading;
-      if (readBits === undefined) return evaluated;
-      // The bits read of a partly read unit are equations too: each keeps the value it was read as.
-      const read = BitFields.of(
-        holes.map((hole) => {
-          const bitsRead = readBits[hole];
-          const change =
-            bitsRead === undefined ? 0 : (defined(values[hole]) ^ bitsRead.value) & bitsRead.mask;
-          return [change, unitBits] as const;
-        }),
-      );
-      return { ...evaluated, residual: (evaluated.residual << BigInt(unknownBits)) | read };
-    };
-    /** The residual alone at `bits`: the payload, a share's part of the secret, is wiped. */
-    const residualAt = (bits: bigint): bigint => {
-      const { residual, payload } = at(bits);
-      payload.fill(0);
-      return residual;
-    };
-    // The residual is affine in the missing bits: one column per bit, from flipping it alone.
-    const { value: baseline, columns } = linearize(residualAt, 0n, unitVectors(unknownBits));
-    const solved = solve(columns, baseline);
-    if (solved === undefined) return undefined;
-    const payload = at(solved.particular).payload;
-    // Each payload made here becomes the change from `payload` in place: the space owns both.
-    const payloadDeltas = solved.free.map((direction) => {
-      const delta = at(solved.particular ^ direction).payload;
-      xorInto(delta, payload);
-      return delta;
-    });
-    return new ReadingSpace(reading, solved, payload, payloadDeltas);
-  }
-
-  /**
-   * What `use` makes of the space of `reading` (undefined when no values fit it), for a caller
-   * that needs its solutions and not its payload: the space is wiped once `use` returns
-   * (AUD-012-SEC004).
-   */
-  static use<T>(reading: MarkedReading, use: (space: ReadingSpace | undefined) => T): T {
-    const space = ReadingSpace.solve(reading);
-    try {
-      return use(space);
-    } finally {
-      space?.wipe();
-    }
-  }
-
-  /** The reading that was solved. */
-  get reading(): MarkedReading {
-    return this.#reading;
-  }
-
-  /** The unknown bits: those of every marked unit. */
-  get unknownBits(): number {
-    return this.#reading.unknownBits;
-  }
-
-  /** The rank of the equations that the unknown bits meet. */
-  get rank(): number {
-    return this.#rank;
-  }
-
-  /** One solution, as the unknown bits. */
-  get particular(): bigint {
-    return this.#particular;
-  }
-
-  /** The basis of the differences between solutions. */
-  get basis(): readonly bigint[] {
-    return this.#basis;
-  }
-
-  /** The places of the marked units, in the order of their bits among the unknowns. */
-  get holes(): readonly number[] {
-    return this.#reading.holes;
-  }
-
-  /** The bits, among the unknowns, of the marked unit that comes `order`-th (holes[order]). */
-  unitMask(order: number): bigint {
-    return this.#reading.unitMask(order);
-  }
-
-  /** The values of every unit with the unknown bits `bits` at the marked ones. */
-  valuesAt(bits: bigint): number[] {
-    return this.#reading.valuesAt(bits);
-  }
-
-  /** The places of the marked units that `change`, a change of the unknown bits, touches. */
-  holesChangedBy(change: bigint): number[] {
-    return this.holes.filter((_, order) => (change & this.unitMask(order)) !== 0n);
-  }
-
-  /**
-   * The payload at the solution that the bits of `own` pick from the basis, bit j the j-th basis
-   * vector: a new array, which holds a share's part of the secret and which the caller wipes.
-   */
-  payloadAt(own: bigint): Uint8Array {
-    const payload = Uint8Array.from(this.#payload);
-    this.#payloadDeltas.forEach((delta, j) => {
-      if ((own >> BigInt(j)) & 1n) xorInto(payload, delta);
-    });
-    return payload;
-  }
-
-  /** The payload's byte at `index` when no solution changes it; undefined when one does. */
-  fixedPayloadByte(index: number): number | undefined {
-    return this.#payloadDeltas.every((delta) => delta[index] === 0)
-      ? this.#payload[index]
-      : undefined;
-  }
-
-  /**
-   * The space's own arrays that hold a share's part of the secret, the payload and the changes to
-   * it, not copies: only for an owner that keeps them to wipe them, such as AssessmentSecrets
-   * (AUD-012-SEC004).
-   */
-  secretArrays(): Uint8Array[] {
-    return [this.#payload, ...this.#payloadDeltas];
-  }
-
-  /** Wipes the share's part of the secret that the space holds. */
-  wipe(): void {
-    for (const array of this.secretArrays()) array.fill(0);
-  }
-
-  [Symbol.dispose](): void {
-    this.wipe();
-  }
 }
 
 /**
@@ -596,12 +186,18 @@ function solutions(
 ): { readonly found: number[][]; readonly tooMany: boolean } {
   return reading.withSpace((space) => {
     if (space === undefined) return { found: [], tooMany: false };
-    if (space.basis.length > freeBits) return { found: [], tooMany: true };
+    const basis = space.basis;
+    if (basis.length > freeBits) return { found: [], tooMany: true };
+    const particular = space.particular;
     const found: number[][] = [];
-    for (let choice = 0; choice < 1 << space.basis.length; choice += 1) {
-      found.push(space.valuesAt(space.particular ^ combination(space.basis, BigInt(choice))));
+    try {
+      for (let choice = 0; choice < 1 << basis.length; choice += 1)
+        found.push(space.valuesAt(particular ^ combination(basis, BigInt(choice))));
+      return { found, tooMany: false };
+    } catch (error) {
+      for (const values of found) values.fill(0);
+      throw error;
     }
-    return { found, tooMany: false };
   });
 }
 
@@ -636,17 +232,30 @@ export function repairCandidates(
   const problem = markProblem(text);
   if (problem !== undefined)
     throw ERRORS.create("repair-candidates-refused", [capitalized(problem)]);
-  const outcomes = MarkedReading.of(text)
-    .flatMap((reading) => triedReadings(reading, freeBits))
-    .map((model) => {
-      const solved = solutions(model, freeBits);
-      return {
-        withDecoys: model.withDecoys,
-        tooMany: solved.tooMany,
-        shares: solved.found.flatMap((values) => model.solvedShare(values) ?? []),
-      };
-    });
-  return sharesOfReadings(outcomes, text);
+  const roots = MarkedReading.of(text);
+  const owned = new Set(roots);
+  try {
+    const outcomes: ReadingOutcome[] = [];
+    for (const reading of roots) {
+      const tried = triedReadings(reading, freeBits);
+      for (const model of tried) owned.add(model);
+      for (const model of tried) {
+        const solved = solutions(model, freeBits);
+        try {
+          outcomes.push({
+            withDecoys: model.withDecoys,
+            tooMany: solved.tooMany,
+            shares: solved.found.flatMap((values) => model.solvedShare(values) ?? []),
+          });
+        } finally {
+          for (const values of solved.found) values.fill(0);
+        }
+      }
+    }
+    return sharesOfReadings(outcomes, text);
+  } finally {
+    for (const reading of owned) reading.wipe();
+  }
 }
 
 /** What one reading of a marked share gave (repairCandidates). */
@@ -690,9 +299,13 @@ export function sharesOfReadings(
   return [...found.values()];
 }
 
-/** The one share that `value` can be; several are listed as variants (ShareVariantsError). */
+/** One caller-owned share, or a metadata-only ShareVariantsError; use repairCandidates for variants. */
 export function readRepairableShare(value: string): ReadRepairableShare {
   const candidates = repairCandidates(value);
-  if (candidates.length > 1) throw new ShareVariantsError(candidates);
+  if (candidates.length > 1)
+    throw new ShareVariantsError(
+      candidates.length,
+      defined(candidates[0]).filled.map((element) => element.position),
+    );
   return defined(candidates[0]);
 }

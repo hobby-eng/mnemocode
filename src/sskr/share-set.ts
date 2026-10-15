@@ -20,7 +20,7 @@ import { JointRepair, searchOnce } from "./joint-repair.js";
 import { type MarkedElement, type RepairedSet, type RepairedShares } from "./joint-results.js";
 import type { ReadRepairableShare } from "./repair.js";
 import { NO_PHRASE_FITS } from "./repair-report.js";
-import type { SharePlatform } from "./share-platform.js";
+import type { ShareCombiner, ShareRepairPlatform } from "./share-platform.js";
 import {
   assertShareCount,
   assertShareFormat,
@@ -38,6 +38,9 @@ import { unrepairedShare } from "./repair.js";
 import { isMarked } from "./repair-units.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+import { SecretValue } from "../core/secret-value.js";
+import { ShareValues } from "./share-values.js";
+import { inWholeRange, wholeNumbersFrom } from "../core/typed-number.js";
 
 const ERRORS = new ErrorCatalog("sskr.share-set", {
   "share-set-at-least-one-share": () => "A share set has at least one share.",
@@ -48,6 +51,10 @@ const ERRORS = new ErrorCatalog("sskr.share-set", {
   "share-s-secret-no-bip39-length": () => "A share's secret has no BIP39 length.",
   "each-share-place-among-typed-whole-number-from": () =>
     "Each share needs its place among those typed, a whole number from 1.",
+  "repair-position": {
+    kind: "type",
+    text: () => "A repair needs whole positive share and element positions.",
+  },
 });
 
 // The copy rule belongs to set-topology.ts; here too for the modules that take it with a set.
@@ -91,17 +98,32 @@ export interface ShareGroup {
  * is restored and checked (its factories), and so that its phrase stays inside it: a caller takes
  * the phrase, or its fingerprint, on purpose; toString, toJSON and Node.js's inspect show none.
  */
-export class ShareSet extends Redacted {
-  readonly #set: RepairedSet;
+export class ShareSet extends Redacted implements Disposable {
+  readonly #mnemonic: SecretValue<string>;
+  readonly #shares: ShareValues;
+  readonly #unsettled: readonly MarkedElement[];
+  readonly #unchecked: readonly number[] | undefined;
   readonly #infos: readonly ShareInfo[];
 
   private constructor(set: RepairedSet) {
     super("ShareSet");
     if (set.shares.length === 0) throw ERRORS.create("share-set-at-least-one-share", []);
-    // A copy that nothing can change: the set is handed out (toRepairedSet, shares) and must stay
-    // what was restored and checked.
-    this.#set = frozenSet(set);
-    this.#infos = this.#set.shares.map((share) => Share.read(share.ur).info);
+    // Snapshot the admitted fields only; borrowed objects may contain extra private material.
+    const copy = frozenSet(set);
+    this.#infos = copy.shares.map((share) => {
+      using read = Share.read(share.ur);
+      return read.info;
+    });
+    const mnemonic = SecretValue.text(copy.mnemonic);
+    try {
+      this.#shares = new ShareValues(copy.shares);
+      this.#mnemonic = mnemonic;
+      this.#unsettled = copy.unsettled;
+      this.#unchecked = copy.unchecked;
+    } catch (error) {
+      mnemonic.wipe();
+      throw error;
+    }
   }
 
   /**
@@ -111,7 +133,7 @@ export class ShareSet extends Redacted {
    */
   static async restore(
     records: readonly string[],
-    platform: SharePlatform,
+    platform: ShareCombiner,
     places?: readonly number[],
   ): Promise<ShareSet> {
     assertShareCount(records.length);
@@ -139,7 +161,7 @@ export class ShareSet extends Redacted {
    */
   static async combine(
     records: readonly string[],
-    platform: SharePlatform,
+    platform: ShareRepairPlatform,
     places?: readonly number[],
   ): Promise<ShareSet> {
     if (!records.some(isMarked)) return ShareSet.restore(records, platform, places);
@@ -190,22 +212,22 @@ export class ShareSet extends Redacted {
 
   /** The phrase that the shares hold: for a Seedshift backup, the masked phrase. */
   get mnemonic(): string {
-    return this.#set.mnemonic;
+    return this.#mnemonic.value;
   }
 
   /** Every share, in the order given, as read or repaired. */
   get shares(): readonly ReadRepairableShare[] {
-    return this.#set.shares;
+    return this.#shares.shares;
   }
 
   /** Elements that the phrase does not depend on and nothing settles: their values are a guess. */
   get unsettled(): readonly MarkedElement[] {
-    return this.#set.unsettled;
+    return this.#unsettled;
   }
 
   /** Shares, counted from 1, of a group with fewer than its threshold: they took no part. */
   get unchecked(): readonly number[] {
-    return this.#set.unchecked ?? [];
+    return this.#unchecked ?? [];
   }
 
   /**
@@ -282,7 +304,23 @@ export class ShareSet extends Redacted {
    * The set as plain data, as combineSskrShareSet and the searches give it; it cannot be changed.
    */
   toRepairedSet(): RepairedSet {
-    return this.#set;
+    return Object.freeze({
+      mnemonic: this.mnemonic,
+      shares: this.shares,
+      unsettled: this.#unsettled,
+      ...(this.#unchecked === undefined ? {} : { unchecked: this.#unchecked }),
+    });
+  }
+
+  /** Ends the retained phrase/share lifetime; earlier caller-owned views remain independent. */
+  wipe(): void {
+    this.#mnemonic.wipe();
+    this.#shares.wipe();
+  }
+
+  /** Ends this set after all asynchronous uses and any explicit child snapshots are complete. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
@@ -306,13 +344,36 @@ function frozenSet(set: RepairedSet): RepairedSet {
     shares: Object.freeze(
       set.shares.map((share) =>
         Object.freeze({
-          ...share,
-          filled: Object.freeze(share.filled.map((element) => Object.freeze({ ...element }))),
+          ur: share.ur,
+          format: share.format,
+          repaired: share.repaired,
+          filled: Object.freeze(
+            share.filled.map(({ position, value }) => Object.freeze({ position, value })),
+          ),
         }),
       ),
     ),
-    unsettled: Object.freeze(set.unsettled.map((element) => Object.freeze({ ...element }))),
-    ...(set.unchecked === undefined ? {} : { unchecked: Object.freeze([...set.unchecked]) }),
+    unsettled: Object.freeze(
+      Array.from(set.unsettled, ({ share, position }) => {
+        if (
+          !inWholeRange(share, wholeNumbersFrom(1)) ||
+          !inWholeRange(position, wholeNumbersFrom(1))
+        )
+          throw ERRORS.create("repair-position", []);
+        return Object.freeze({ share, position });
+      }),
+    ),
+    ...(set.unchecked === undefined
+      ? {}
+      : {
+          unchecked: Object.freeze(
+            Array.from(set.unchecked, (share) => {
+              if (!inWholeRange(share, wholeNumbersFrom(1)))
+                throw ERRORS.create("repair-position", []);
+              return share;
+            }),
+          ),
+        }),
   });
 }
 
@@ -323,17 +384,22 @@ function frozenSet(set: RepairedSet): RepairedSet {
  * as the share. Copies of one share are shown as typed and saved once. A class, so that what is
  * shown, what is saved and the forms among them follow the same rules.
  */
-export class ShareExport {
-  readonly #shown: readonly WrittenShare[];
+export class ShareExport extends Redacted implements Disposable {
+  readonly #uris: SecretValue<readonly string[]>;
+  readonly #shown: readonly Omit<WrittenShare, "ur">[];
   readonly #leftOut: readonly number[];
   readonly #total: number;
 
   private constructor(shown: readonly WrittenShare[], leftOut: readonly number[], total: number) {
+    super("ShareExport");
     // Copied and frozen: the getters hand them out, and what is shown, saved and named must stay
     // what the export settled.
-    this.#shown = Object.freeze(shown.map((share) => Object.freeze({ ...share })));
+    this.#shown = Object.freeze(
+      shown.map(({ format, number }) => Object.freeze({ format, number })),
+    );
     this.#leftOut = Object.freeze([...leftOut]);
     this.#total = total;
+    this.#uris = SecretValue.texts(shown.map(({ ur }) => ur));
   }
 
   /**
@@ -375,12 +441,15 @@ export class ShareExport {
 
   /** The shares to show, in the order typed, copies included. */
   get shown(): readonly WrittenShare[] {
-    return this.#shown;
+    const uris = this.#uris.value;
+    return Object.freeze(
+      this.#shown.map((share, index) => Object.freeze({ ...share, ur: defined(uris[index]) })),
+    );
   }
 
   /** The shares to save: each once. */
   get saved(): readonly WrittenShare[] {
-    return distinct(this.#shown);
+    return distinct(this.shown);
   }
 
   /** The forms of the shares saved, each once, in their order. */
@@ -390,7 +459,7 @@ export class ShareExport {
 
   /** The shares shown, by place, as a check that they belong to one set takes them. */
   get members(): readonly { readonly place: number; readonly ur: string }[] {
-    return this.#shown.map((share) => ({ place: share.number, ur: share.ur }));
+    return this.shown.map((share) => ({ place: share.number, ur: share.ur }));
   }
 
   /** The highest place of the shares typed: the shares are shown as "N of" it. */
@@ -409,9 +478,19 @@ export class ShareExport {
   inForm(format: ShareFormat): ShareExport {
     assertShareFormat(format);
     return new ShareExport(
-      this.#shown.map((share) => ({ ...share, format })),
+      this.shown.map((share) => ({ ...share, format })),
       this.#leftOut,
       this.#total,
     );
+  }
+
+  /** Ends retained export URs, leaving independent inForm copies and borrowed sets untouched. */
+  wipe(): void {
+    this.#uris.wipe();
+  }
+
+  /** Ends this export after its display and asynchronous saves have settled. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }

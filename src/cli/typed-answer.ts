@@ -108,6 +108,7 @@ export class TypedAnswer {
   /** As End would; nothing is drawn when the cursor is there already. */
   moveToEnd(): void {
     if (this.#cursor !== this.#length) this.moveTo(this.#length);
+    this.#shown?.settleMarks();
   }
 
   /** Moves the cursor or deletes as `key` says. */
@@ -195,8 +196,11 @@ export class TypedAnswer {
   /** Clears the hint and wipes the answer. */
   wipe(): void {
     // Before the answer is wiped: its width says where the hint is.
-    this.#shown?.clearHint(this.#length);
-    this.#line.fill(0);
+    try {
+      this.#shown?.clearHint(this.#length);
+    } finally {
+      this.#line.fill(0);
+    }
   }
 
   [Symbol.dispose](): void {
@@ -227,6 +231,10 @@ class ShownLine {
    */
   #countedBytes = 0;
   #countedEnd: number;
+  /** The last character with an advance, which an appended nonspacing mark belongs to. */
+  #lastBase: number | undefined;
+  /** Its first mark put the cursor back at the right edge; further marks append there. */
+  #marksAtEdge = false;
   /** Whether a hint shows below the answer. */
   #hintShown = false;
   readonly #line: Buffer;
@@ -249,11 +257,10 @@ class ShownLine {
   /** Shows the answer of `length` bytes with the cursor at `cursor`; `typedAtEnd` only adds. */
   update(length: number, cursor: number, typedAtEnd = false): void {
     if (typedAtEnd) {
-      const end = this.#endOf(length);
-      process.stderr.write(this.#line.subarray(previousCharacter(this.#line, cursor), cursor));
-      this.#cursorRow = this.#settle(end);
+      this.#append(length, cursor);
       return;
     }
+    this.settleMarks();
     const out = process.stderr;
     out.write(`${cursorUp(this.#cursorRow)}\r${cursorRight(this.#start)}${ERASE_BELOW}`);
     // Erased with the answer: the next hint is drawn anew.
@@ -261,11 +268,43 @@ class ShownLine {
     out.write(this.#line.subarray(0, length));
     this.#countedBytes = 0;
     this.#countedEnd = this.#start;
+    this.#lastBase = undefined;
     const endRow = this.#settle(this.#endOf(length));
     const target = this.#cellOf(cursor, length);
     const row = Math.floor(target / this.#columns);
     out.write(`${cursorUp(endRow - row)}\r${cursorRight(target % this.#columns)}`);
     this.#cursorRow = row;
+  }
+
+  /**
+   * Adds only new bytes. A mark after a proactive edge newline redraws its base once, then keeps
+   * subsequent marks at that edge until the next advancing character wraps by itself. Neither a
+   * long decomposed paste nor a long run of marks rescans or rewrites the accumulated answer.
+   */
+  #append(length: number, cursor: number): void {
+    const before = this.#countedEnd;
+    const end = this.#endOf(length);
+    const out = process.stderr;
+    if (end === before && end > 0 && end % this.#columns === 0 && this.#lastBase !== undefined) {
+      if (!this.#marksAtEdge) {
+        const baseEnd = nextCharacter(this.#line, this.#lastBase, length);
+        const column = (end - displayWidthOf(this.#line, this.#lastBase, baseEnd)) % this.#columns;
+        out.write(`${cursorUp(1)}\r${cursorRight(column)}`);
+        out.write(this.#line.subarray(this.#lastBase, length));
+        this.#marksAtEdge = true;
+      } else out.write(this.#line.subarray(previousCharacter(this.#line, cursor), cursor));
+      return;
+    }
+    out.write(this.#line.subarray(previousCharacter(this.#line, cursor), cursor));
+    this.#marksAtEdge = false;
+    this.#cursorRow = this.#settle(end);
+  }
+
+  /** Settles a marked edge before editing, drawing hints, leaving or reporting a cursor row. */
+  settleMarks(): void {
+    if (!this.#marksAtEdge) return;
+    process.stderr.write("\r\n");
+    this.#marksAtEdge = false;
   }
 
   /**
@@ -276,6 +315,7 @@ class ShownLine {
   showHint(hint: WordHint, length: number, cursor: number): void {
     const rows = hintRows(hint, this.#columns);
     if (rows.length === 0 && !this.#hintShown) return;
+    this.settleMarks();
     const end = this.#endOf(length);
     const endRow = Math.floor(end / this.#columns);
     // Typing at the end needs no count from the start (endOf).
@@ -290,6 +330,7 @@ class ShownLine {
 
   /** Takes the hint off the screen, which leaves the cursor at the end of the answer. */
   clearHint(length: number): void {
+    this.settleMarks();
     if (!this.#hintShown) return;
     const end = this.#endOf(length);
     process.stderr.write(`${this.#toEnd(end)}${ERASE_BELOW}`);
@@ -324,13 +365,15 @@ class ShownLine {
     while (this.#countedBytes < length) {
       const size = characterSize(defined(this.#line[this.#countedBytes]));
       if (this.#countedBytes + size > length) break;
-      this.#countedEnd = placedAfter(
+      const end = placedAfter(
         this.#line,
         this.#countedBytes,
         this.#countedBytes + size,
         this.#countedEnd,
         this.#columns,
       );
+      if (end > this.#countedEnd) this.#lastBase = this.#countedBytes;
+      this.#countedEnd = end;
       this.#countedBytes += size;
     }
     return this.#countedEnd;

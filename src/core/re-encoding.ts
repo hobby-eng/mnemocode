@@ -26,6 +26,9 @@ import {
 } from "./wallet-check.js";
 import { capitalized } from "./prose.js";
 import { ErrorCatalog } from "./error-catalog.js";
+import { SecretValue } from "./secret-value.js";
+import { phraseOfIndexes } from "./english-words.js";
+import { defined } from "./defined.js";
 
 const ERRORS = new ErrorCatalog("core.re-encoding", {
   "last-word-not-taken": () => LAST_WORD_NOT_TAKEN,
@@ -88,20 +91,48 @@ export const NOT_CONFIRMED =
  * confirmed; `phrase` and `result` give it before, for the host to show.
  */
 export class ReEncoding extends Redacted {
-  readonly #result: DecodedResult;
+  readonly #indexes: SecretValue<readonly number[]>;
+  readonly #dates: SecretValue<readonly (readonly number[])[]>;
+  readonly #shifts: SecretValue<readonly number[]>;
+  readonly #checksumValid: boolean;
   #confirmation: ReEncodingConfirmation | undefined;
-  #confirmedPhrase: string | undefined;
 
   private constructor(result: DecodedResult) {
     super("ReEncoding");
     // Own every decoded field: a returned view or a caller's date must not change what a wallet
     // checked while its answer was awaited (AUD-021-API002).
-    this.#result = Object.freeze({
-      recoveredMnemonic: result.recoveredMnemonic,
-      recoveredIndexes: Object.freeze([...result.recoveredIndexes]),
-      dates: ownedDates(result.dates),
-      shifts: Object.freeze([...result.shifts]),
-      checksumValid: result.checksumValid,
+    const dates = ownedDates(result.dates);
+    const { recoveredIndexes, shifts, checksumValid } = result;
+    const indexes = SecretValue.numbers(recoveredIndexes);
+    let dateValues: SecretValue<readonly (readonly number[])[]> | undefined;
+    try {
+      dateValues = SecretValue.numberLists(dates.map(({ year, month, day }) => [year, month, day]));
+      this.#shifts = SecretValue.numbers(shifts);
+      this.#indexes = indexes;
+      this.#dates = dateValues;
+      this.#checksumValid = checksumValid;
+    } catch (error) {
+      indexes.wipe();
+      dateValues?.wipe();
+      throw error;
+    }
+  }
+
+  /** Builds a transient compatibility view; the owner retains only mutable bytes. */
+  get #result(): DecodedResult {
+    const indexes = this.#indexes.value;
+    return Object.freeze({
+      recoveredMnemonic: phraseOfIndexes(indexes),
+      recoveredIndexes: indexes,
+      dates: ownedDates(
+        this.#dates.value.map((parts) => ({
+          year: defined(parts[0]),
+          month: defined(parts[1]),
+          day: defined(parts[2]),
+        })),
+      ),
+      shifts: this.#shifts.value,
+      checksumValid: this.#checksumValid,
     });
   }
 
@@ -160,7 +191,7 @@ export class ReEncoding extends Redacted {
    * or they gave no wallet to compare it with on a command line of their own.
    */
   confirmByPerson(): void {
-    this.#confirmedPhrase = this.#result.recoveredMnemonic;
+    this.#indexes.assertLive();
     this.#confirmation = Object.freeze({ by: "person" });
   }
 
@@ -174,8 +205,9 @@ export class ReEncoding extends Redacted {
   async confirmByWallet<M extends WalletMatch>(check: WalletCheck<M>): Promise<M> {
     const phrase = this.#result.recoveredMnemonic;
     const match = await askWallet(check, phrase);
+    // A host may end the owner's lifetime while its wallet check is awaited.
+    this.#indexes.assertLive();
     if (match.matched) {
-      this.#confirmedPhrase = phrase;
       this.#confirmation = Object.freeze({
         by: "wallet",
         path: match.path,
@@ -204,7 +236,21 @@ export class ReEncoding extends Redacted {
 
   /** The phrase to encode again; refused until it is confirmed (NOT_CONFIRMED). */
   confirmedPhrase(): string {
-    if (this.#confirmedPhrase === undefined) throw ERRORS.create("not-confirmed", []);
-    return this.#confirmedPhrase;
+    this.#indexes.assertLive();
+    if (this.#confirmation === undefined) throw ERRORS.create("not-confirmed", []);
+    return this.phrase;
+  }
+
+  /** Overwrites retained indexes, dates and shifts and forgets the confirmation. */
+  wipe(): void {
+    this.#indexes.wipe();
+    this.#dates.wipe();
+    this.#shifts.wipe();
+    this.#confirmation = undefined;
+  }
+
+  /** Ends this owner's lifetime, independently of the backup borrowed by of(). */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }

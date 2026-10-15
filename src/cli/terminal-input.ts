@@ -50,6 +50,7 @@ import {
   readLateSequence,
 } from "./key-sequences.js";
 import { TypedAnswer } from "./typed-answer.js";
+import { InputBytes } from "./input-bytes.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.terminal-input", {
@@ -131,59 +132,11 @@ export function dumbTerminalReason(subject: string): string {
 }
 
 /**
- * Bytes read from the terminal but not yet used, in the order typed. Taking one is quick however
- * many wait, as for the rest of a long paste: Array.prototype.shift copies a large array each time.
- */
-class ByteQueue {
-  #bytes: number[] = [];
-  #head = 0;
-
-  get length(): number {
-    return this.#bytes.length - this.#head;
-  }
-
-  push(byte: number): void {
-    this.#bytes.push(byte);
-  }
-
-  shift(): number | undefined {
-    if (this.#head === this.#bytes.length) return undefined;
-    const byte = defined(this.#bytes[this.#head]);
-    // The byte may be part of a secret; its place is not needed any more.
-    this.#bytes[this.#head++] = 0;
-    // Once most of the array is taken, the rest moves to its start, once for many bytes.
-    if (this.#head >= COMPACT_AFTER && this.#head * 2 >= this.#bytes.length) {
-      this.#bytes.splice(0, this.#head);
-      this.#head = 0;
-    }
-    return byte;
-  }
-
-  includes(byte: number): boolean {
-    return this.#bytes.indexOf(byte, this.#head) >= 0;
-  }
-
-  /** Wipes and forgets every byte. */
-  wipe(): void {
-    this.#bytes.fill(0);
-    this.#bytes.length = 0;
-    this.#head = 0;
-  }
-
-  [Symbol.dispose](): void {
-    this.wipe();
-  }
-}
-
-/** Bytes taken from a ByteQueue before what is left moves to the start of its array. */
-const COMPACT_AFTER = 4096;
-
-/**
  * Bytes read from the terminal but not yet used: what was typed or pasted ahead of the next
  * question stays for it, as it would stay in the terminal's own buffer, until dropTypedAhead
  * drops it. Kept between questions.
  */
-const typedAhead = new ByteQueue();
+const typedAhead = new InputBytes();
 
 let inputEnded = false;
 
@@ -202,14 +155,13 @@ const TYPED_AHEAD_SETTLE_MS = 15;
  * are read again as keys of their own, before any byte typed after them (readEscapeSequence).
  * They count as typed ahead, so that dropTypedAhead wipes them too.
  */
-const keyBytesAgain: number[] = [];
+const keyBytesAgain = new InputBytes();
 
 /** Wipes and forgets the bytes typed ahead; true when Ctrl+C was among them. */
 function wipeTypedAhead(): boolean {
   const cancelled = typedAhead.includes(KEY.CTRL_C) || keyBytesAgain.includes(KEY.CTRL_C);
   typedAhead.wipe();
-  keyBytesAgain.fill(0);
-  keyBytesAgain.length = 0;
+  keyBytesAgain.wipe();
   return cancelled;
 }
 
@@ -497,8 +449,11 @@ export async function readKey(next: NextByte, moreWithin?: MoreWithin): Promise<
   if (more !== undefined && !(await more(ESCAPE_DELAY_MS))) return { kind: "back" };
   const sequence = await readEscapeSequence(take, more);
   if (sequence.kind === "none") {
-    keyBytesAgain.unshift(...sequence.readAgain);
-    sequence.readAgain.fill(0);
+    try {
+      keyBytesAgain.prepend(sequence.readAgain);
+    } finally {
+      sequence.readAgain.fill(0);
+    }
     return { kind: "other" };
   }
   if (sequence.kind !== "alt" && sequence.final === KEY.SEQUENCE_TILDE) {
@@ -576,7 +531,7 @@ export async function readLine(
   let escapeIgnoredAt: number | undefined;
   // Bytes read after an ESC, or after a [ or O typed late, that turned out to be no key's
   // sequence: read again, in order, before any byte typed after them.
-  const readAgain: number[] = [];
+  const readAgain = new InputBytes();
   const take: NextByte = async () => (readAgain.length > 0 ? readAgain.shift() : next());
   const more: MoreWithin | undefined =
     moreWithin && (async (milliseconds) => readAgain.length > 0 || moreWithin(milliseconds));
@@ -584,8 +539,11 @@ export async function readLine(
   const quiet = async (): Promise<boolean> => more === undefined || !(await more(PASTE_GAP_MS));
   /** Bytes that turned out to be no key's sequence, read again before the next. */
   const giveBack = (bytes: number[]): void => {
-    readAgain.unshift(...bytes);
-    bytes.fill(0);
+    try {
+      readAgain.prepend(bytes);
+    } finally {
+      bytes.fill(0);
+    }
   };
   try {
     for (;;) {
@@ -616,8 +574,13 @@ export async function readLine(
         const sequence = await readLateSequence(byte, take, defined(more));
         if ("key" in sequence) answer.edit(sequence.key);
         else {
-          answer.insert(byte);
-          giveBack(sequence.readAgain);
+          try {
+            answer.insert(byte);
+            giveBack(sequence.readAgain);
+          } finally {
+            // Insertion may refuse before the replay is admitted to its byte owner.
+            sequence.readAgain.fill(0);
+          }
         }
       } else if (byte === KEY.ESCAPE) {
         if (more !== undefined && !(await more(ESCAPE_DELAY_MS))) {
@@ -650,7 +613,10 @@ export async function readLine(
     if (error instanceof TypeError) throw new UnusableAnswerError(NOT_UTF8);
     throw error;
   } finally {
-    answer.wipe();
-    readAgain.fill(0);
+    try {
+      answer.wipe();
+    } finally {
+      readAgain.wipe();
+    }
   }
 }

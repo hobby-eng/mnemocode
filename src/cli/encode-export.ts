@@ -4,24 +4,38 @@ import { exportCards, renderCards } from "../export/pdf.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
 import { plannedCardJob, separateCardJob, type CardJob } from "../export/render.js";
 import { parseOrientation } from "../export/card-settings.js";
-import { backupCardContent } from "../export/backup-cards.js";
+import { backupCardContent, type CardBackup } from "../export/backup-cards.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import { exportIndividualCards } from "../export/individual-cards.js";
-import { cardTemplate } from "./card-options.js";
+import { cardTemplate, ENCODE_CARD_SETTINGS } from "./card-options.js";
 import { businessOptions } from "./business-options.js";
 import { indexesToColors } from "../core.js";
 import { type ParsedArguments, value } from "./arguments.js";
 import { colorCards, terminalNotice, terminalWork } from "./terminal.js";
 import { exportQrPayload } from "../export/qr-image.js";
 import type { EncodeOutcome } from "./encode-command.js";
+import { CardValues } from "../export/card-values.js";
+import { SecretValue } from "../core/secret-value.js";
+import { Redacted } from "../core/redacted.js";
+import { defined } from "../core/defined.js";
+import type { CardDrawing } from "../export/templates.js";
+import { ExportDetails } from "../export/export-details.js";
+
+const CARD_JOB_OPTIONS = [...ENCODE_CARD_SETTINGS, "all"] as const;
+
+interface OwnedCardJob {
+  readonly template: CardJob["template"];
+  readonly settings: Omit<CardJob["content"], "colors" | "labels" | "payload">;
+  readonly values: CardValues;
+}
 
 /**
  * The cards of Encode's backup and their design: what its PDF, its page images and its separate
  * card files all draw (backupCardContent), with the card settings of `arguments_` and its title.
  */
-function cardJob(arguments_: ParsedArguments, outcome: EncodeOutcome): CardJob {
-  const content = backupCardContent(outcome.encoding.backup, {
+function cardJob(arguments_: ParsedArguments, backup: CardBackup): CardJob {
+  const content = backupCardContent(backup, {
     settings: businessOptions(arguments_),
     title: value(arguments_, "title"),
   });
@@ -29,46 +43,107 @@ function cardJob(arguments_: ParsedArguments, outcome: EncodeOutcome): CardJob {
 }
 
 /** Retains the library's planned cards for the sequential saves and retries of one Encode run. */
-export class EncodeCardExport {
+export class EncodeCardExport extends Redacted implements Disposable {
   readonly #arguments: ParsedArguments;
-  readonly #outcome: EncodeOutcome;
-  #job: CardJob | undefined;
+  readonly #drawing: CardDrawing;
+  readonly #lifetime = SecretValue.utf16Texts([]);
+  #backup: CardBackup | undefined;
+  #job: OwnedCardJob | undefined;
+  #pending: Promise<void> | undefined;
 
-  constructor(arguments_: ParsedArguments, outcome: EncodeOutcome) {
-    this.#arguments = arguments_;
-    this.#outcome = outcome;
+  constructor(
+    arguments_: ParsedArguments,
+    outcome: EncodeOutcome,
+    drawing: CardDrawing = nodeCardRenderer,
+  ) {
+    super("EncodeCardExport");
+    this.#arguments = {};
+    // Retain only public card options, never argv's phrase, dates or unrelated output options.
+    for (const key of CARD_JOB_OPTIONS) {
+      const given = arguments_[key];
+      if (given !== undefined) this.#arguments[key] = Array.isArray(given) ? [...given] : given;
+    }
+    ExportDetails.reuseForSnapshot(arguments_, this.#arguments);
+    this.#backup = outcome.encoding.backup;
+    this.#drawing = drawing;
   }
 
-  /** Plans on the first card save, preserving when card details are drawn. */
+  /** Plans once on the first save; fresh decoded job views cannot be recalled after return. */
   async job(): Promise<CardJob> {
-    // Retain only a completed plan: a planning failure must still allow the destination's retry.
-    return (this.#job ??= await plannedCardJob(
-      nodeCardRenderer,
-      cardJob(this.#arguments, this.#outcome),
-    ));
+    this.#lifetime.assertLive();
+    if (this.#job === undefined) {
+      // Assign before invoking a host callback, including a callback that re-enters job().
+      const pending = (this.#pending ??= Promise.resolve().then(() => this.#plan()));
+      try {
+        await pending;
+      } finally {
+        if (this.#pending === pending) this.#pending = undefined;
+      }
+    }
+    this.#lifetime.assertLive();
+    const { template, settings, values } = defined(this.#job);
+    const { colors, labels, payload } = values.view;
+    return {
+      template,
+      content: { ...settings, colors, payload, ...(labels === undefined ? {} : { labels }) },
+    };
+  }
+
+  async #plan(): Promise<void> {
+    this.#lifetime.assertLive();
+    let values: CardValues | undefined;
+    try {
+      const job = await plannedCardJob(
+        this.#drawing,
+        cardJob(this.#arguments, defined(this.#backup)),
+      );
+      const { colors, labels, payload, ...settings } = job.content;
+      values = new CardValues({ colors, labels, payload });
+      this.#lifetime.assertLive();
+      this.#job = { template: job.template, settings, values };
+    } catch (error) {
+      values?.wipe();
+      // A failed plan is never cached; disposal also refuses a late host failure.
+      this.#lifetime.assertLive();
+      throw error;
+    }
   }
 
   /**
    * Every real code and one decoy as separate files, turned as the person asked, not as a sheet.
    */
   async separateJob(): Promise<CardJob> {
-    return separateCardJob(
-      await this.job(),
-      parseOrientation(value(this.#arguments, "orientation")),
-    );
+    const job = await this.job();
+    this.#lifetime.assertLive();
+    return separateCardJob(job, parseOrientation(value(this.#arguments, "orientation")));
+  }
+
+  /** Ends cached card values immediately, without disposing the borrowed backup. */
+  wipe(): void {
+    this.#lifetime.wipe();
+    this.#job?.values.wipe();
+    this.#job = undefined;
+    this.#backup = undefined;
+  }
+
+  /** Ends the owning scope after every asynchronous save/render has settled. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
 /**
  * Saves the named destinations. Separate calls in one run share `cards`, so every file and retry
  * receives the same plan for that layout; a standalone call keeps its own collection. Shared
- * `cards` belongs to this outcome and the run's one object of card options.
+ * `cards` is borrowed for this call; a standalone call disposes its own temporary helper.
  */
 export async function saveEncodeResult(
   arguments_: ParsedArguments,
   outcome: EncodeOutcome,
-  cards = new EncodeCardExport(arguments_, outcome),
+  cards?: EncodeCardExport,
 ): Promise<void> {
+  using ownedCards = cards === undefined ? new EncodeCardExport(arguments_, outcome) : undefined;
+  const plannedCards = cards ?? defined(ownedCards);
   const { backup } = outcome.encoding;
   const { format } = backup;
   const pdfPath = value(arguments_, "pdf");
@@ -87,19 +162,19 @@ export async function saveEncodeResult(
     console.error(colorCards(indexesToColors(backup.indexes)));
   }
   if (pdfPath !== undefined) {
-    await exportCards([await cards.job()], pdfPath);
+    await exportCards([await plannedCards.job()], pdfPath);
     terminalNotice(`Saved PDF: ${pdfPath}`, "success");
   }
   if (imageDirectory !== undefined) {
     // The rendered cards show the backup: wiped once their images are written.
     const count = await wipedAfterAsync(
-      await renderCards(nodeCardRenderer, [await cards.job()]),
+      await renderCards(nodeCardRenderer, [await plannedCards.job()]),
       (document) => exportPageImages(document, imageDirectory, imageFormat(arguments_)),
     );
     savedPagesNotice(arguments_, count, imageDirectory);
   }
   if (cardDirectory !== undefined) {
-    const { template, content } = await cards.separateJob();
+    const { template, content } = await plannedCards.separateJob();
     const count = await exportIndividualCards(
       template,
       content,

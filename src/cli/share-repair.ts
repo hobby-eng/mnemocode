@@ -24,13 +24,17 @@ import {
 } from "../sskr/share-input.js";
 import { nodeSharePlatform } from "../sskr/share-platform-node.js";
 import {
+  releaseRead,
   searchDecision,
   ShareRestore,
   type MarkedShares,
   type SearchLimits,
   type SharesRead,
 } from "../sskr/share-restore.js";
-import { integerOption, type ParsedArguments } from "./arguments.js";
+import { assertAskedNotGiven, integerOption, values, type ParsedArguments } from "./arguments.js";
+import { textInput } from "./input.js";
+import { readBoundedTextFile } from "./text-file.js";
+import { SHARE_SOURCE_OPTIONS } from "./share-options.js";
 import {
   askAfterFailure,
   askSecretUntil,
@@ -69,6 +73,13 @@ const ERRORS = new ErrorCatalog("cli.share-repair", {
   "mend-shares-refused": suppliedMessage,
   "search-share-repair-refused": suppliedMessage,
   "one-share-at-a-time": () => "Give one share here, or a text file containing just that share.",
+});
+
+// Keep the established source-reader refusal codes when their lifetime moves into TypedShares.
+const SOURCE_ERRORS = new ErrorCatalog("cli.sskr-restore-command", {
+  "standard-input-can-only-read-once": () => "Standard input can only be read once.",
+  "provide-at-least-one-complete-share-as-text": () =>
+    "Provide at least one complete share as text, in a text file, in a QR image, or through --ask-secrets. Additional share sources may be repeated.",
 });
 
 /** The restore of shares with Node's SSKR library: it keeps nothing of a restore. */
@@ -112,7 +123,7 @@ function printLines(lines: readonly ReportLine[]): void {
  * each with the place it was typed at (ShareInput). A share that cannot be read is typed again at
  * once, alone, or left out.
  */
-export class TypedShares {
+export class TypedShares implements Disposable {
   /**
    * The shares and their places, and every check of them; a seed phrase typed in place of a share
    * is sent to the menu's entry that decodes it. The one handle of the typed shares that callers
@@ -131,9 +142,66 @@ export class TypedShares {
    */
   static async startingWith(first: FirstShare): Promise<TypedShares | Cancelled> {
     const shares = new TypedShares();
-    shares.input.add(shares.input.sharesOfAnswer(first.text));
-    if (first.fromQr) shares.#readFromQr();
-    return (await shares.#retypeUnreadable()) ?? shares;
+    try {
+      shares.input.add(shares.input.sharesOfAnswer(first.text));
+      if (first.fromQr) shares.#readFromQr();
+      if ((await shares.#retypeUnreadable()) !== CANCELLED) return shares;
+      shares.wipe();
+      return CANCELLED;
+    } catch (error) {
+      shares.wipe();
+      throw error;
+    }
+  }
+
+  /** Owns shares from options/files/QR until the completed input is transferred to its caller. */
+  static async given(args: ParsedArguments): Promise<TypedShares> {
+    if (values(args, "share-file").filter((path) => path === "-").length > 1)
+      throw SOURCE_ERRORS.create("standard-input-can-only-read-once", []);
+    const shares = new TypedShares();
+    try {
+      const { input } = shares;
+      input.add(values(args, "share"));
+      for (const path of values(args, "share-file")) {
+        const text =
+          path === "-"
+            ? textInput({ "input-file": "-" }, "input")
+            : readBoundedTextFile(path, "The share file");
+        input.add(input.sharesOfText(text, "The file holds"));
+      }
+      for (const path of values(args, "share-qr")) input.add([await decodeQrPngFile(path)]);
+      if (input.list.length === 0)
+        throw SOURCE_ERRORS.create("provide-at-least-one-complete-share-as-text", []);
+      return shares;
+    } catch (error) {
+      shares.wipe();
+      throw error;
+    }
+  }
+
+  /** Asks on the private screen or reads options; the returned input is caller-owned. */
+  static async read(args: ParsedArguments): Promise<TypedShares | Cancelled> {
+    if (args["ask-secrets"] !== true) return TypedShares.given(args);
+    assertAskedNotGiven(args, SHARE_SOURCE_OPTIONS);
+    const shares = new TypedShares();
+    try {
+      if ((await shares.askAll()) !== CANCELLED) return shares;
+      shares.wipe();
+      return CANCELLED;
+    } catch (error) {
+      shares.wipe();
+      throw error;
+    }
+  }
+
+  /** Ends the typed input after the command's awaited restores, display and saves settle. */
+  wipe(): void {
+    this.input.wipe();
+  }
+
+  /** Ends this input's owning command scope. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 
   get list(): readonly TypedShare[] {
@@ -368,10 +436,15 @@ export async function assessShares(
 ): Promise<Exclude<SharesRead, { kind: "stopped" }> | Cancelled> {
   const { input } = shares;
   const read = await SHARE_RESTORE.read(input, withCtrlCWatch, nodeTurn);
-  printLines(read.lines);
-  // The person stopped the assessment with Ctrl+C.
-  if (read.kind === "stopped") return CANCELLED;
-  return read;
+  try {
+    printLines(read.lines);
+    // The person stopped the assessment with Ctrl+C.
+    if (read.kind === "stopped") return CANCELLED;
+    return read;
+  } catch (error) {
+    releaseRead(read);
+    throw error;
+  }
 }
 
 /** What can be done about shares that restore nothing, or nothing that is wanted. */

@@ -61,6 +61,7 @@ from terminal_menu_checks import (
     check_word_hints,
 )
 from terminal_secret_checks import (
+    check_marked_codes_result,
     check_file_or_text_input,
     check_decode_dates_asked_again,
     check_decode_share_lines,
@@ -88,6 +89,7 @@ def main():
     check_table_exports()
     check_share_word_hints()
     check_marked_codes_entry()
+    check_marked_codes_result()
     check_lines_pasted_as_one_answer()
     check_encode_result_visible()
     check_phrase_display_choices()

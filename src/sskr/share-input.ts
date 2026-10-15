@@ -5,26 +5,26 @@
 // share without which the others restore named; for an export of fewer shares than the threshold,
 // each share repaired alone.
 //
-// Needs from the host: a SharePlatform (share-platform.ts) to restore complete shares, and the name
+// Needs from the host: a ShareCombiner (share-platform.ts) to restore complete shares, and the name
 // of its own reader of an encoded seed phrase, which a seed phrase typed in place of a share is
 // sent to: the command line names its menu entry, a page its tab.
 // Does not: ask anything, show anything, or search shares with unreadable elements (joint-repair.ts
 // assesses and searches them; this module only names the trouble that an assessment finds).
 
 import { phraseChecksumValid, phraseOfIndexes } from "../core/english-words.js";
+import { SecretValue } from "../core/secret-value.js";
 import { placesInWords } from "../core/places.js";
 import { detectInputFormats, parseInput } from "../core/representations.js";
 import { jointMarkLimitProblem } from "./joint-repair.js";
 import { type JointAssessment, type RepairedSet, type RepairedShares } from "./joint-results.js";
 import {
   markProblem,
-  readRepairableShare,
-  ShareVariantsError,
+  repairCandidates,
   type ReadRepairableShare,
   unrepairedShare,
 } from "./repair.js";
 import { isMarked } from "./repair-units.js";
-import type { SharePlatform } from "./share-platform.js";
+import type { ShareCombiner } from "./share-platform.js";
 import { copiesAmong, ShareExport, ShareSet } from "./share-set.js";
 import { LineWordHints, type WordHints } from "../core/word-hints.js";
 import {
@@ -163,7 +163,8 @@ interface ReadShare extends PlacedShare {
 
 /** `share`, given at a place, with its metadata, as the checks of a set take it. */
 function withInfo(share: PlacedShare): ReadShare {
-  return { ...share, info: Share.read(share.ur).info };
+  using read = Share.read(share.ur);
+  return { ...share, info: read.info };
 }
 
 /**
@@ -294,8 +295,9 @@ function fewTrouble(shares: readonly ReadShare[]): ShareTrouble | undefined {
  * change, and so that a page binds one object to its share fields; its checks name every share by
  * its place.
  */
-export class ShareInput {
-  #shares: TypedShare[] = [];
+export class ShareInput implements Disposable {
+  #texts = SecretValue.utf16Texts([]);
+  #places: readonly number[] = [];
   #nextPlace = 1;
   readonly #decodeEntry: string;
 
@@ -308,6 +310,20 @@ export class ShareInput {
     if (typeof options?.decodeEntry !== "string" || options.decodeEntry.trim() === "")
       throw ERRORS.create("share-input-name-host-s-reader-seed-phrase", []);
     this.#decodeEntry = options.decodeEntry;
+  }
+
+  get #shares(): TypedShare[] {
+    return this.#texts.value.map((text, index) =>
+      Object.freeze({ place: defined(this.#places[index]), text }),
+    );
+  }
+
+  set #shares(shares: readonly TypedShare[]) {
+    this.#texts.assertLive();
+    const texts = SecretValue.utf16Texts(shares.map((share) => share.text));
+    this.#texts.wipe();
+    this.#texts = texts;
+    this.#places = shares.map((share) => share.place);
   }
 
   /**
@@ -401,6 +417,7 @@ export class ShareInput {
    * is refused as one: `subject` names the text in that message, "This is" or "The file holds".
    */
   sharesOfText(text: string, subject = "This is"): string[] {
+    this.#texts.assertLive();
     const shares = ShareInput.partsOfText(text);
     if (shares.length === 0) return [];
     // Looked for only when nothing reads as a share: a share in word numbers, wrapped or not, may
@@ -426,18 +443,23 @@ export class ShareInput {
 
   /** Adds shares after those typed, each at the next place; adding none changes nothing. */
   add(texts: readonly string[]): void {
+    this.#texts.assertLive();
     if (texts.length === 0) return;
-    assertShareCount(this.#shares.length + texts.length);
-    for (const text of texts)
-      this.#shares = [...this.#shares, Object.freeze({ place: this.#nextPlace++, text })];
+    const previous = this.#shares;
+    assertShareCount(previous.length + texts.length);
+    this.#shares = [
+      ...previous,
+      ...texts.map((text, index) => ({ place: this.#nextPlace + index, text })),
+    ];
+    this.#nextPlace += texts.length;
   }
 
   /** Takes `texts` in place of every share typed before, at places from 1. */
   replaceAll(texts: readonly string[]): void {
+    this.#texts.assertLive();
     assertShareCount(texts.length);
-    this.#shares = [];
-    this.#nextPlace = 1;
-    this.add(texts);
+    this.#shares = texts.map((text, index) => ({ place: index + 1, text }));
+    this.#nextPlace = texts.length + 1;
   }
 
   /** Takes `text` for the share at `place`, which keeps its place. */
@@ -459,6 +481,7 @@ export class ShareInput {
    * repair takes (planJointRepair), which tells later whether the rest of it fits.
    */
   readProblem(place: number, text: string): string | undefined {
+    this.#texts.assertLive();
     if (isMarked(text)) {
       const limit = jointMarkLimitProblem(place, text);
       if (limit !== undefined) return limit;
@@ -513,7 +536,7 @@ export class ShareInput {
    * phrase is named: each is left out once.
    */
   async restoreComplete(
-    platform: SharePlatform,
+    platform: ShareCombiner,
   ): Promise<{ readonly outcome: CompleteOutcome; readonly copies: readonly ShareCopy[] }> {
     const read = this.#readAll();
     if (!Array.isArray(read)) return { outcome: { kind: "trouble", trouble: read }, copies: [] };
@@ -522,7 +545,9 @@ export class ShareInput {
     const trouble = setTrouble(distinct) ?? fewTrouble(distinct);
     if (trouble !== undefined) return { outcome: { kind: "trouble", trouble }, copies };
     // Taken before the restore is awaited: the host may change the input meanwhile.
-    return { outcome: await this.#restoreChecked(distinct, this.texts(), platform), copies };
+    const outcome = await this.#restoreChecked(distinct, this.texts(), platform);
+    this.#texts.assertLive();
+    return { outcome, copies };
   }
 
   /**
@@ -547,32 +572,38 @@ export class ShareInput {
     form: ShareFormat | undefined,
   ): CheckedExport {
     const written = ShareExport.of(set, places, form);
-    if (written.shown.length === 0) return { kind: "none", written };
-    const trouble = ShareInput.looseSetTrouble(written.members);
-    if (trouble !== undefined) return { kind: "trouble", written, trouble };
-    return { kind: "written", written };
+    try {
+      if (written.shown.length === 0) return { kind: "none", written };
+      const trouble = ShareInput.looseSetTrouble(written.members);
+      if (trouble !== undefined) return { kind: "trouble", written, trouble };
+      return { kind: "written", written };
+    } catch (error) {
+      written.wipe();
+      throw error;
+    }
   }
 
   repairEach(): EachRepair {
     const shares: ReadRepairableShare[] = [];
     for (const { place, text } of this.#shares) {
       try {
-        shares.push(readRepairableShare(text));
+        const variants = repairCandidates(text);
+        if (variants.length > 1)
+          return {
+            kind: "variants",
+            place,
+            variants,
+            message: `Share ${place} fits ${variants.length} ways, so nothing is saved: use another copy of it, or more shares.`,
+          };
+        shares.push(defined(variants[0]));
       } catch (error) {
         // Narrowed here, not by refusalMessage: the result keeps the Error as its cause.
         if (!(error instanceof Error)) throw error;
-        if (!(error instanceof ShareVariantsError))
-          return {
-            kind: "unreadable",
-            place,
-            message: ShareInput.aboutShare(place, ": ", error.message),
-            cause: error,
-          };
         return {
-          kind: "variants",
+          kind: "unreadable",
           place,
-          variants: error.variants,
-          message: `Share ${place} fits ${error.variants.length} ways, so nothing is saved: use another copy of it, or more shares.`,
+          message: ShareInput.aboutShare(place, ": ", error.message),
+          cause: error,
         };
       }
     }
@@ -589,6 +620,7 @@ export class ShareInput {
     assessment: JointAssessment,
     places: readonly number[] = this.places(),
   ): ShareTrouble | undefined {
+    this.#texts.assertLive();
     if (assessment.reason === undefined) return undefined;
     // A share that no reading fits is typed again or left out, by its place.
     if (assessment.unfit !== undefined)
@@ -624,7 +656,7 @@ export class ShareInput {
     const trouble = this.firstUnreadable();
     if (trouble !== undefined) return trouble;
     return this.#shares.map(({ place, text }) => {
-      const share = Share.read(text);
+      using share = Share.read(text);
       return { place, ur: share.ur, info: share.info };
     });
   }
@@ -643,23 +675,32 @@ export class ShareInput {
   async #restoreChecked(
     read: readonly ReadShare[],
     texts: readonly string[],
-    platform: SharePlatform,
+    platform: ShareCombiner,
   ): Promise<CompleteOutcome> {
     const places = read.map((share) => share.place);
     try {
-      const set = (await ShareSet.restore(texts, platform, places)).toRepairedSet();
-      return { kind: "complete", set, secretBytes: defined(read[0]).info.secretLength, places };
+      using set = await ShareSet.restore(texts, platform, places);
+      this.#texts.assertLive();
+      return {
+        kind: "complete",
+        set: set.toRepairedSet(),
+        secretBytes: defined(read[0]).info.secretLength,
+        places,
+      };
     } catch (error) {
+      this.#texts.assertLive();
       const message = refusalMessage(error);
       const fits: number[] = [];
       for (const [index, share] of read.entries()) {
         try {
-          await ShareSet.restore(
+          using _otherSet = await ShareSet.restore(
             texts.filter((_, other) => other !== index),
             platform,
           );
+          this.#texts.assertLive();
           fits.push(share.place);
         } catch (other) {
+          this.#texts.assertLive();
           refusalMessage(other);
         }
       }
@@ -675,5 +716,16 @@ export class ShareInput {
       // The share set names each share by the place it was typed at.
       return { kind: "trouble", trouble: { kind: "refused", message } };
     }
+  }
+
+  /** Ends retained typed shares; replacements release their previous storage at once. */
+  wipe(): void {
+    this.#texts.wipe();
+    this.#places = [];
+  }
+
+  /** Ends this input after all awaited restores and any caller-owned snapshots are complete. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }

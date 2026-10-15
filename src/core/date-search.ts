@@ -40,11 +40,14 @@ import {
   startTimer,
   type SearchProgress,
   type SearchRun,
+  type MonotonicClock,
 } from "./search-turns.js";
 import type { Bip39WordCount, DatePattern, DateShiftDate } from "./types.js";
 import { askWallet, type WalletCheck } from "./wallet-check.js";
 import { assertWordCount } from "./words.js";
 import { Redacted } from "./redacted.js";
+import { SecretValue } from "./secret-value.js";
+import { defined } from "./defined.js";
 import { indexesOfWords, zeroEntropyPhrase } from "./english-words.js";
 import { SearchPlan, counted, counting } from "./search-plan.js";
 import { refusalMessage } from "./refusal.js";
@@ -175,14 +178,15 @@ function assertKeysFit(patterns: readonly DatePattern[], places: readonly number
 /**
  * The dates of one answer: the complete ones, and the ones with ? for forgotten digits. A class
  * pays off here: it is built only by `parse` or `of`, and its constructor refuses an answer that
- * cannot be searched, so every DatesAnswer can be; it never changes afterwards; and it keeps the
+ * cannot be searched, so every DatesAnswer can be; it stays fixed until wiped; and it keeps the
  * dates, which are part of a secret, out of toString, toJSON and Node.js's inspect.
  */
 export class DatesAnswer extends Redacted {
-  readonly #known: readonly DateShiftDate[];
-  readonly #patterns: readonly DatePattern[];
+  readonly #known: SecretValue<readonly (readonly number[])[]>;
+  readonly #patternValues: SecretValue<readonly (readonly number[])[]>;
+  readonly #patternKeys: SecretValue<readonly string[]>;
   /** The places, counted from 1 among the dates typed, of the dates with ?. */
-  readonly #incompletePlaces: readonly number[];
+  readonly #incompletePlaces: SecretValue<readonly number[]>;
   /** The combinations of the patterns, counted once: the patterns never change. */
   readonly #combinations: number;
 
@@ -201,16 +205,36 @@ export class DatesAnswer extends Redacted {
     // Copied and frozen, date by date: a caller that kept a date or a pattern could otherwise
     // change it after the limits were checked (AUD-009-FUN001). Array.from reads a hole of a
     // sparse list as undefined, which is refused; map would keep it.
-    this.#known = ownedDates(known);
-    this.#patterns = Object.freeze(Array.from(patterns, (pattern) => ownedPattern(pattern)));
-    this.#incompletePlaces = Object.freeze([...incompletePlaces]);
-    assertKeysFit(this.#patterns, this.#incompletePlaces);
-    // Counted once, so that no later question copies and counts the patterns again.
-    this.#combinations = datePatternCombinationCount(this.#patterns, HARD_MAX_COMBINATIONS);
-    if (this.#combinations > HARD_MAX_COMBINATIONS)
+    const knownDates = ownedDates(known);
+    const ownPatterns = Object.freeze(Array.from(patterns, (pattern) => ownedPattern(pattern)));
+    const places = [...incompletePlaces];
+    assertKeysFit(ownPatterns, places);
+    const combinations = datePatternCombinationCount(ownPatterns, HARD_MAX_COMBINATIONS);
+    if (combinations > HARD_MAX_COMBINATIONS)
       throw ERRORS.create("date-patterns-produce-more-than-combinations-which-exceeds", [
         `${counting(HARD_MAX_COMBINATIONS)}`,
       ]);
+    const knownValues = SecretValue.numberLists(
+      knownDates.map(({ year, month, day }) => [year, month, day]),
+    );
+    let patternValues: SecretValue<readonly (readonly number[])[]> | undefined;
+    let patternKeys: SecretValue<readonly string[]> | undefined;
+    try {
+      patternValues = SecretValue.numberLists(
+        ownPatterns.flatMap(({ years, months, days }) => [years, months, days]),
+      );
+      patternKeys = SecretValue.utf16Texts(ownPatterns.map(({ key }) => key));
+      this.#incompletePlaces = SecretValue.numbers(places);
+      this.#known = knownValues;
+      this.#patternValues = patternValues;
+      this.#patternKeys = patternKeys;
+      this.#combinations = combinations;
+    } catch (error) {
+      knownValues.wipe();
+      patternValues?.wipe();
+      patternKeys?.wipe();
+      throw error;
+    }
   }
 
   /**
@@ -261,22 +285,36 @@ export class DatesAnswer extends Redacted {
 
   /** The complete dates, in the order typed; a copy, so that the answer stays as it was built. */
   get known(): DateShiftDate[] {
-    return [...this.#known];
+    return this.#known.value.map((parts) =>
+      Object.freeze({
+        year: defined(parts[0]),
+        month: defined(parts[1]),
+        day: defined(parts[2]),
+      }),
+    );
   }
 
   /** The dates with ? for forgotten digits, in the order typed; none when every date is whole. */
   get patterns(): DatePattern[] {
-    return [...this.#patterns];
+    const values = this.#patternValues.value;
+    return this.#patternKeys.value.map((key, index) =>
+      Object.freeze({
+        key,
+        years: defined(values[index * 3]),
+        months: defined(values[index * 3 + 1]),
+        days: defined(values[index * 3 + 2]),
+      }),
+    );
   }
 
   /** How many dates the answer holds, complete or not. */
   get count(): number {
-    return this.#known.length + this.#patterns.length;
+    return this.#known.value.length + this.#patternKeys.value.length;
   }
 
   /** Whether a date holds ? for a forgotten digit, so that the dates must be searched. */
   get hasForgottenDigits(): boolean {
-    return this.#patterns.length > 0;
+    return this.#patternKeys.value.length > 0;
   }
 
   /** Standalone date recovery needs a pattern; combined code recovery also accepts known dates. */
@@ -290,12 +328,13 @@ export class DatesAnswer extends Redacted {
    * HARD_MAX_COMBINATIONS + 1 for any count above that limit.
    */
   get combinations(): number {
+    this.#known.assertLive();
     return this.#combinations;
   }
 
   /** The places, counted from 1 among the dates typed, of the dates that hold ?. */
   get incompletePlaces(): number[] {
-    return [...this.#incompletePlaces];
+    return [...this.#incompletePlaces.value];
   }
 
   /**
@@ -304,7 +343,7 @@ export class DatesAnswer extends Redacted {
    * when every date is whole.
    */
   get forgottenDigitsNote(): string | undefined {
-    const places = this.#incompletePlaces;
+    const places = this.incompletePlaces;
     if (places.length === 0) return undefined;
     const verb = places.length === 1 ? "has" : "have";
     return `${placesNamed("Date", places)} ${verb} forgotten digits: ${counted(this.combinations, "combination")}.`;
@@ -325,6 +364,24 @@ export class DatesAnswer extends Redacted {
     return words !== undefined && this.count > maximumDates(words)
       ? tooManyDatesMessage(words)
       : undefined;
+  }
+
+  /** A separate owner, preserving custom pattern keys and the original typed positions. */
+  copy(): DatesAnswer {
+    return new DatesAnswer(this.known, this.patterns, this.incompletePlaces);
+  }
+
+  /** Overwrites this answer's retained dates, pattern values, keys and typed positions. */
+  wipe(): void {
+    this.#known.wipe();
+    this.#patternValues.wipe();
+    this.#patternKeys.wipe();
+    this.#incompletePlaces.wipe();
+  }
+
+  /** Ends the owning answer scope after all uses have settled. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
@@ -427,9 +484,11 @@ function progressStep(every: number | undefined): number | undefined {
  * it checks against each other, and then tells its size and its work before it runs, as a page
  * shows them before the person starts the search; toString, toJSON and Node.js's inspect show
  * none of its codes or dates.
+ * Owns snapshots of its indexes and date answer; the caller's dates have an independent lifetime.
+ * The owning caller awaits the work before wiping or disposing the search.
  */
 export class DateSearch extends Redacted {
-  readonly #indexes: readonly number[];
+  readonly #indexes: SecretValue<readonly number[]>;
   readonly #dates: DatesAnswer;
   readonly #mode: SeedshiftMode;
   readonly #walletCheck: WalletCheck | undefined;
@@ -440,20 +499,33 @@ export class DateSearch extends Redacted {
     super("DateSearch");
     // Copied first and the copy checked, as EncodedBackup.of checks codes: a hole or a code outside
     // the BIP39 list is refused before the search tells its size, not at its first combination.
-    const indexes = Array.from(options.indexes);
-    const words = indexes.length;
-    assertWordCount(words);
-    assertWordIndexes(indexes);
-    Masking.assertMaskedMode(options.mode);
-    if (!(options.dates instanceof DatesAnswer)) throw ERRORS.create("dates-dates-answer", []);
-    if (!options.dates.fitsPhrase(words))
-      throw ERRORS.create("operation-refused", [tooManyDatesMessage(words)]);
-    this.#indexes = Object.freeze(indexes);
-    this.#dates = options.dates;
-    this.#mode = options.mode;
-    this.#walletCheck = options.walletCheck;
-    this.#maxShown = keptCount(options.maxShown, MAX_SHOWN_MATCHES, "maxShown");
-    this.#keep = keptCount(options.keep, 0, "keep");
+    const { indexes: inputIndexes, dates: inputDates, mode, walletCheck, maxShown, keep } = options;
+    const indexes = Array.from(inputIndexes);
+    try {
+      const words = indexes.length;
+      assertWordCount(words);
+      assertWordIndexes(indexes);
+      Masking.assertMaskedMode(mode);
+      if (!(inputDates instanceof DatesAnswer)) throw ERRORS.create("dates-dates-answer", []);
+      if (!inputDates.fitsPhrase(words))
+        throw ERRORS.create("operation-refused", [tooManyDatesMessage(words)]);
+      const shown = keptCount(maxShown, MAX_SHOWN_MATCHES, "maxShown");
+      const kept = keptCount(keep, 0, "keep");
+      const dates = inputDates.copy();
+      try {
+        this.#indexes = SecretValue.numbers(indexes);
+        this.#dates = dates;
+      } catch (error) {
+        dates.wipe();
+        throw error;
+      }
+      this.#mode = mode;
+      this.#walletCheck = walletCheck;
+      this.#maxShown = shown;
+      this.#keep = kept;
+    } finally {
+      indexes.fill(0);
+    }
   }
 
   /** The date combinations that the search tries. */
@@ -465,8 +537,8 @@ export class DateSearch extends Redacted {
    * Seconds that one call of `walletCheck` takes in this host, from a few checks of the public
    * test phrase, for estimatedSeconds. It may answer later, as a page's derivation does.
    */
-  static async secondsPerCheck(walletCheck: WalletCheck): Promise<number> {
-    const elapsed = startTimer();
+  static async secondsPerCheck(walletCheck: WalletCheck, now?: MonotonicClock): Promise<number> {
+    const elapsed = startTimer(now);
     for (let check = 0; check < PROBE_CHECKS; check += 1) await walletCheck(PROBE_PHRASE);
     return elapsed() / PROBE_CHECKS;
   }
@@ -480,9 +552,10 @@ export class DateSearch extends Redacted {
     mode: SeedshiftMode,
     dates: DatesAnswer,
     wordCount: Bip39WordCount,
+    now?: MonotonicClock,
   ): number {
     assertWordCount(wordCount);
-    const elapsed = startTimer();
+    const elapsed = startTimer(now);
     let decoded = 0;
     for (const candidates of dateRecoveryCandidates(
       probeIndexes(wordCount),
@@ -502,14 +575,18 @@ export class DateSearch extends Redacted {
    * The pace of this search in this host: one wallet check (secondsPerCheck), 0 without one, and
    * the decoding of one combination (secondsPerCombination), for estimatedSeconds.
    */
-  async pace(): Promise<SearchPace> {
+  async pace(now?: MonotonicClock): Promise<SearchPace> {
+    this.#indexes.assertLive();
     return {
       perCheck:
-        this.#walletCheck === undefined ? 0 : await DateSearch.secondsPerCheck(this.#walletCheck),
+        this.#walletCheck === undefined
+          ? 0
+          : await DateSearch.secondsPerCheck(this.#walletCheck, now),
       perCombination: DateSearch.secondsPerCombination(
         this.#mode,
         this.#dates,
-        this.#indexes.length as Bip39WordCount,
+        this.#indexes.value.length as Bip39WordCount,
+        now,
       ),
     };
   }
@@ -521,7 +598,7 @@ export class DateSearch extends Redacted {
    * a valid last word every last word whose checksum fits is tried, 2^(11 - bits) of them.
    */
   checks(): number {
-    return Masking.of(this.#mode).checksPerCombination(this.#indexes.length);
+    return Masking.of(this.#mode).checksPerCombination(this.#indexes.value.length);
   }
 
   /**
@@ -550,6 +627,7 @@ export class DateSearch extends Redacted {
 
   /** Runs the search; the host's callbacks and signal come in with `run`. */
   async run(run: DateSearchRun = {}): Promise<DateSearchResult> {
+    this.#indexes.assertLive();
     const progressEvery = progressStep(run.progressEvery);
     const combinations = this.combinations;
     const shown: DateMatch[] = [];
@@ -569,12 +647,13 @@ export class DateSearch extends Redacted {
     });
     if (turns.stopped) return result(true);
     for (const candidates of dateRecoveryCandidates(
-      this.#indexes,
+      this.#indexes.value,
       this.#dates.known,
       this.#dates.patterns,
       this.#mode,
     )) {
       const turn = await turns.due();
+      this.#indexes.assertLive();
       if (turn === "stopped") return result(true);
       checked += 1;
       const turned = turn === "turned";
@@ -585,6 +664,7 @@ export class DateSearch extends Redacted {
             ? undefined
             : await askWallet(this.#walletCheck, candidate.mnemonic);
         // An answer that came after a stop is neither counted nor published (AUD-015-API001).
+        this.#indexes.assertLive();
         if (!stillRunning(run)) return result(true);
         if (match !== undefined && !match.matched) continue;
         matchCount += 1;
@@ -599,6 +679,7 @@ export class DateSearch extends Redacted {
         };
         if (shown.length < this.#maxShown) shown.push(found);
         run.onMatch?.(found);
+        this.#indexes.assertLive();
       }
       const step = progressEvery === undefined ? turned : checked % progressEvery === 0;
       if (step || checked === combinations)
@@ -609,6 +690,18 @@ export class DateSearch extends Redacted {
           matched: matchCount,
         });
     }
+    this.#indexes.assertLive();
     return result(!stillRunning(run));
+  }
+
+  /** Wipes this search's indexes and owned dates; the caller's date answer stays live. */
+  wipe(): void {
+    this.#indexes.wipe();
+    this.#dates.wipe();
+  }
+
+  /** Ends the search scope after its asynchronous work has settled. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }

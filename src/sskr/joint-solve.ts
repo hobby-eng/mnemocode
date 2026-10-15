@@ -1,10 +1,10 @@
-// The solution of marked shares of one set together (joint-repair.ts): one reading of every share
-// (Joint), its equations over GF(2) with those of the set and its polynomial, and each solved way
-// to read the shares (Branch), whose open bits the 32-bit digest decides. Each owns what it
-// computes and the arrays of the secret that it holds, and wipes them.
+// Joint solves marked shares together over GF(2), including their set and polynomial equations.
+// Branch owns each solution's computed state and active digest work; Joint borrows spaces from
+// their assessment or selected plan (joint-repair.ts).
 
 import { BITS_PER_BYTE, xorInto } from "../core/bits.js";
 import { SearchTurns, type TurnState } from "../core/search-turns.js";
+import { SecretValue } from "../core/secret-value.js";
 import {
   BitFields,
   bytesToBits,
@@ -16,7 +16,7 @@ import {
 } from "./gf2.js";
 import { DIGEST_X, gfMultiply, lagrangeCoefficients, SECRET_X } from "./gf256.js";
 import { type ReadingSpace, type ReadRepairableShare } from "./repair.js";
-import type { SharePlatform } from "./share-platform.js";
+import type { ShareCombiner, ShareRepairPlatform } from "./share-platform.js";
 import { withoutCopies } from "./set-topology.js";
 import {
   GROUP_BYTE,
@@ -54,7 +54,8 @@ const MAX_HIDDEN_TRIES_BITS = 8;
 /**
  * One reading of every share, and their joint coordinates: bit offsets[s] + j is basis vector j of
  * share s. A class, so that the coordinates are laid out once and every question in them, a
- * share's marked bits or its payload at a joint point, is answered from that layout.
+ * share's marked bits or its payload at a joint point, is answered from that layout. The spaces
+ * are borrowed; their assessment or plan owns their lifetime.
  */
 export class Joint {
   readonly #spaces: readonly ReadingSpace[];
@@ -62,7 +63,7 @@ export class Joint {
   readonly #secretBytes: number;
 
   constructor(spaces: readonly ReadingSpace[], secretBytes: number) {
-    this.#spaces = spaces;
+    this.#spaces = [...spaces];
     this.#offsets = spaces.map((_, share) =>
       spaces.slice(0, share).reduce((sum, space) => sum + space.basis.length, 0),
     );
@@ -94,8 +95,10 @@ export class Joint {
    * answer: each holds a share's part of the secret, and only the answer is kept.
    */
   withPayloadsAt<T>(z: bigint, use: (payloads: readonly Uint8Array[]) => T): T {
-    const payloads = this.#spaces.map((space, share) => space.payloadAt(this.#own(share, z)));
+    const payloads: Uint8Array[] = [];
     try {
+      for (const [share, space] of this.#spaces.entries())
+        payloads.push(space.payloadAt(this.#own(share, z)));
       return use(payloads);
     } finally {
       for (const payload of payloads) payload.fill(0);
@@ -128,18 +131,32 @@ interface BranchParts {
   readonly secretAndDigest: Uint8Array;
 }
 
-/**
- * A solved way to read the shares: a threshold, a member number for each share, and the affine
- * space of the joint points that fit them, split into the directions that the digest decides and
- * those that it does not. A class because it holds a share's part of the secret, its (S, D) and
- * the changes to them, which it names for wiping (secretArrays), and because every question of
- * the plan and its search about one way to read the shares is answered by it.
- */
-export class Branch {
-  readonly #parts: BranchParts;
+/** Owns one solved branch's affine coordinates, (S, D) buffers and active work; borrows its spaces. */
+export class Branch implements Disposable {
+  readonly #parts: Omit<BranchParts, "particular" | "visible" | "hidden">;
+  readonly #coordinates: SecretValue<readonly bigint[]>;
+  readonly #visibleCount: number;
+  readonly #hiddenCount: number;
+  readonly #active = new Set<() => void>();
 
+  /** Owns the computed arrays and snapshots the coordinates; borrows the joint and its spaces. */
   constructor(parts: BranchParts) {
-    this.#parts = parts;
+    const { particular, visible, hidden } = parts;
+    this.#parts = {
+      joint: parts.joint,
+      threshold: parts.threshold,
+      members: [...parts.members],
+      visibleDeltas: [...parts.visibleDeltas],
+      secretAndDigest: parts.secretAndDigest,
+    };
+    try {
+      this.#coordinates = SecretValue.bigints([particular, ...visible, ...hidden]);
+    } catch (error) {
+      for (const array of this.secretArrays()) array.fill(0);
+      throw error;
+    }
+    this.#visibleCount = visible.length;
+    this.#hiddenCount = hidden.length;
   }
 
   /** The member threshold of this way to read the shares. */
@@ -154,7 +171,7 @@ export class Branch {
 
   /** Bits that only the digest can decide. */
   get openBits(): number {
-    return this.#parts.visible.length;
+    return this.#visibleCount;
   }
 
   /** The combinations that a search of this branch tries. */
@@ -177,9 +194,36 @@ export class Branch {
     return [...this.secretArrays(), ...this.#parts.joint.secretArrays()];
   }
 
+  /** Ends this branch and active work; shared readings remain with the assessment or plan. */
+  wipe(): void {
+    this.#coordinates.wipeAndClose(this.#active);
+    for (const array of this.secretArrays()) array.fill(0);
+  }
+
+  /** Ends the branch's owned state without disposing its borrowed joint. */
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
+
+  #directions(): { particular: bigint; visible: readonly bigint[]; hidden: readonly bigint[] } {
+    const values = this.#coordinates.value;
+    return {
+      particular: defined(values[0]),
+      visible: values.slice(1, 1 + this.#visibleCount),
+      hidden: values.slice(1 + this.#visibleCount),
+    };
+  }
+
+  #pointAt(step: number): bigint {
+    const { particular, visible } = this.#directions();
+    const gray = BigInt(step) ^ (BigInt(step) >> 1n);
+    return particular ^ combination(visible, gray);
+  }
+
   /** Open bits of this branch if marked element `hole` of share `share` were read. */
   openBitsIfRead(share: number, hole: number): number {
-    const { joint, visible, visibleDeltas, hidden } = this.#parts;
+    const { joint, visibleDeltas } = this.#parts;
+    const { visible, hidden } = this.#directions();
     const mask = defined(joint.spaces[share]).unitMask(hole);
     // Each direction with the change it makes in (S, D): a pair, typed as one so that a host that
     // compiles with noUncheckedIndexedAccess reads both of its parts as present.
@@ -217,40 +261,48 @@ export class Branch {
   }
 
   /**
-   * Tries every open combination of this branch against the digest, in Gray code order so that
-   * each step adds one known change to (S, D); each candidate that passes is read and restored by
-   * the SSKR library, and given to `found`. `tried` is told of every try; it may return a promise,
-   * such as a turn of the host, which is awaited before the next try.
+   * Tries digest candidates in Gray-code order and confirms matches through the SSKR library.
+   * Calls tried after each check, awaiting its returned turn before continuing.
    */
   async searchDigest(
-    platform: SharePlatform,
+    platform: ShareRepairPlatform,
     found: (set: RepairedSet) => void,
     tried: () => Promise<TurnState> | undefined,
   ): Promise<void> {
-    const { particular, visible, visibleDeltas } = this.#parts;
+    this.#coordinates.assertLive();
+    const { visibleDeltas } = this.#parts;
     const current = Uint8Array.from(this.#parts.secretAndDigest);
+    const close = () => current.fill(0);
+    this.#active.add(close);
     try {
       for (let step = 0; step < this.combinations; step += 1) {
+        this.#coordinates.assertLive();
         if (step > 0) {
           xorInto(current, defined(visibleDeltas[lowestBit(step)]));
         }
         if (digestFits(current, this.secretBytes, platform.hmacSha256)) {
-          const gray = BigInt(step) ^ (BigInt(step) >> 1n);
-          const repaired = await this.#confirm(particular ^ combination(visible, gray), platform);
+          const repaired = await this.#confirm(this.#pointAt(step), platform);
+          this.#coordinates.assertLive();
           if (repaired !== undefined) found(repaired);
         }
         const turn = tried();
         // A stop of the host ends this branch's search; the caller tells it (searchBranches).
-        if (turn !== undefined && (await turn) === "stopped") return;
+        if (turn !== undefined) {
+          const state = await turn;
+          this.#coordinates.assertLive();
+          if (state === "stopped") return;
+        }
       }
     } finally {
-      current.fill(0);
+      close();
+      this.#active.delete(close);
     }
   }
 
   /** Elements that a hidden direction changes. */
   unsettledElements(): MarkedElement[] {
-    const { joint, hidden } = this.#parts;
+    const { joint } = this.#parts;
+    const { hidden } = this.#directions();
     return joint.spaces.flatMap((space, share) => {
       const changed = hidden.reduce(
         (bits, direction) => bits | joint.holeChange(share, direction),
@@ -268,64 +320,111 @@ export class Branch {
     const shares: ReadRepairableShare[] = [];
     for (const [share, space] of joint.spaces.entries()) {
       const values = space.valuesAt(space.particular ^ joint.holeChange(share, z));
-      const read = space.reading.solvedShare(values);
-      if (read === undefined) return undefined;
-      shares.push(read);
+      try {
+        const read = space.reading.solvedShare(values);
+        if (read === undefined) return undefined;
+        shares.push(read);
+      } finally {
+        values.fill(0);
+      }
     }
     return shares;
   }
 
-  /**
-   * Reads the shares of a candidate that passed the digest and restores the phrase. Undetermined
-   * elements do not change the phrase; the first of their values with which every share reads are
-   * taken, and they are reported as unsettled.
-   */
-  async #confirm(z: bigint, platform: SharePlatform): Promise<RepairedSet | undefined> {
-    const { hidden } = this.#parts;
-    const hiddenBits = Math.min(hidden.length, MAX_HIDDEN_TRIES_BITS);
-    for (let choice = 0; choice < 2 ** hiddenBits; choice += 1) {
-      const shares = this.#readCandidate(z ^ combination(hidden, BigInt(choice)));
-      if (shares === undefined) continue;
-      const restored = await restore(shares, platform);
-      if (restored === undefined) return undefined;
-      const { mnemonic, unchecked } = restored;
-      return {
-        mnemonic,
-        shares,
-        unsettled: this.unsettledElements(),
-        ...uncheckedField(unchecked),
-      };
+  /** Confirms a digest match while owning active coordinates, share views and entropy buffers. */
+  async #confirm(z: bigint, platform: ShareRepairPlatform): Promise<RepairedSet | undefined> {
+    using point = SecretValue.bigints([z]);
+    z = 0n;
+    let shares: ReadRepairableShare[] | undefined;
+    // Retain returned buffers for disposal while a later surplus check awaits the host.
+    const entropy = new Set<Uint8Array>();
+    const assertLive = () => this.#coordinates.assertLive();
+    const close = () => {
+      point.wipe();
+      shares?.splice(0);
+      for (const bytes of entropy) bytes.fill(0);
+      entropy.clear();
+    };
+    const guarded: ShareCombiner = {
+      combineShares: async (records) => {
+        assertLive();
+        let bytes: Uint8Array | undefined;
+        try {
+          bytes = await platform.combineShares(records);
+          assertLive();
+          entropy.add(bytes);
+          return bytes;
+        } catch (error) {
+          bytes?.fill(0);
+          throw error;
+        }
+      },
+    };
+    this.#active.add(close);
+    try {
+      const hiddenBits = Math.min(this.#hiddenCount, MAX_HIDDEN_TRIES_BITS);
+      for (let choice = 0; choice < 2 ** hiddenBits; choice += 1) {
+        shares = this.#readHiddenCandidate(point, choice);
+        if (shares === undefined) continue;
+        const restored = await restore(shares, guarded, assertLive);
+        assertLive();
+        if (restored === undefined) return undefined;
+        const { mnemonic, unchecked } = restored;
+        return {
+          mnemonic,
+          shares,
+          unsettled: this.unsettledElements(),
+          ...uncheckedField(unchecked),
+        };
+      }
+      return undefined;
+    } finally {
+      // Successful plain shares have transferred; close only the remaining owned buffers.
+      shares = undefined;
+      close();
+      this.#active.delete(close);
     }
-    return undefined;
+  }
+
+  #readHiddenCandidate(
+    point: SecretValue<readonly bigint[]>,
+    choice: number,
+  ): ReadRepairableShare[] | undefined {
+    const { hidden } = this.#directions();
+    return this.#readCandidate(defined(point.value[0]) ^ combination(hidden, BigInt(choice)));
   }
 }
 
 /**
- * The arrays that hold a share's part of the secret, made while the shares are assessed: the
- * payloads of their readings with the changes to them, and the secret and digest of each branch
- * with the changes to those. A class because one owner gathers them wherever they are made, so
- * that once the plan is made every array that its search does not keep is wiped: the readings and
- * branches that a better reading replaced, those of a refusal or of an assessment too open to
- * search, and all of them when the assessment is stopped (AUD-012-SEC004). Each reading and branch
- * names its own arrays (secretArrays), so that what is gathered and what is kept are one list.
+ * Owns unique spaces, branches and their legacy arrays during assessment (AUD-012-SEC004).
+ * Disposes unselected state; selected branches transfer with every borrowed space they need.
  */
 export class AssessmentSecrets {
   readonly #made = new Set<Uint8Array>();
+  readonly #owners = new Set<ReadingSpace | Branch>();
 
   /** Readings of the shares, solved for the assessment. */
   addSpaces(spaces: readonly ReadingSpace[]): void {
+    for (const space of spaces) this.#owners.add(space);
     for (const array of spaces.flatMap((space) => space.secretArrays())) this.#made.add(array);
   }
 
   /** A way to read the shares, solved for the assessment. */
   addBranch(branch: Branch): void {
+    this.#owners.add(branch);
     for (const array of branch.secretArrays()) this.#made.add(array);
   }
 
-  /** Wipes every array made but those that `kept`, the branches of the plan's search, hold. */
+  /** Releases unselected owners and arrays; selected branches transfer with their unique spaces. */
   wipeAllBut(kept: readonly Branch[]): void {
+    const owners = new Set<ReadingSpace | Branch>([
+      ...kept,
+      ...kept.flatMap((branch) => branch.spaces),
+    ]);
     const keep = new Set(kept.flatMap((branch) => branch.allSecretArrays()));
+    for (const owner of this.#owners) if (!owners.has(owner)) owner.wipe();
     for (const array of this.#made) if (!keep.has(array)) array.fill(0);
+    this.#owners.clear();
     this.#made.clear();
   }
   /** Wipes every array made, when no search keeps any (TS-07). */
@@ -406,7 +505,7 @@ function secretAndDigest(
   return out;
 }
 
-type Hmac = SharePlatform["hmacSha256"];
+type Hmac = ShareRepairPlatform["hmacSha256"];
 
 /** bc-shamir's check: HMAC-SHA256(key: D[4..], message: S) begins with D[0..4]. */
 export function digestFits(
@@ -417,7 +516,7 @@ export function digestFits(
   const secret = secretAndDigestBytes.subarray(0, secretBytes);
   const digest = secretAndDigestBytes.subarray(secretBytes);
   const mac = hmac(digest.subarray(DIGEST_BYTES), secret);
-  // The MAC is the caller's (SharePlatform.hmacSha256): it is made from the secret, so it is wiped
+  // The MAC is the caller's (ShareRepairPlatform.hmacSha256): it is made from the secret, so it is wiped
   // once compared; the key and the message stay with their owner.
   try {
     for (let index = 0; index < DIGEST_BYTES; index += 1)
@@ -597,16 +696,25 @@ export async function solveJoint(
       joint.withPayloadsAt(z, (payloads) =>
         secretAndDigest(payloads, members, base, joint.secretBytes),
       );
-    const branch = new Branch({
-      joint,
-      threshold,
-      members,
-      particular,
-      ...splitByDigest(free, sdAt, particular),
-      secretAndDigest: sdAt(particular),
-    });
-    secrets.addBranch(branch);
-    solution.branches.push(branch);
+    const directions = splitByDigest(free, sdAt, particular);
+    let branch: Branch | undefined;
+    try {
+      branch = new Branch({
+        joint,
+        threshold,
+        members,
+        particular,
+        ...directions,
+        secretAndDigest: sdAt(particular),
+      });
+    } finally {
+      directions.visible.fill(0n);
+      directions.hidden.fill(0n);
+      if (branch === undefined) for (const delta of directions.visibleDeltas) delta.fill(0);
+    }
+    const made = defined(branch);
+    secrets.addBranch(made);
+    solution.branches.push(made);
   }
   return { ...solution, needsMore: !enoughMembers, duplicates };
 }
@@ -658,14 +766,11 @@ function lowestBit(value: number): number {
   return 31 - Math.clz32(low & -low);
 }
 
-/**
- * Restores the phrase from the shares read, as complete shares are restored (complete-shares.ts):
- * each copy once, every surplus member checked against the others, two different shares of one
- * member refused. Undefined when the shares do not restore one phrase.
- */
+/** Restores each distinct share through complete-shares; undefined for a live set's refusal. */
 async function restore(
   shares: readonly ReadRepairableShare[],
-  platform: SharePlatform,
+  platform: ShareCombiner,
+  assertLive: () => void,
 ): Promise<{ readonly mnemonic: string; readonly unchecked: readonly number[] } | undefined> {
   // Each copy once, the first typed (withoutCopies): the places of the shares kept, in order.
   const kept = withoutCopies(shares.map((share, place) => ({ place, ur: share.ur }))).map(
@@ -675,10 +780,14 @@ async function restore(
     const { mnemonic, unchecked } = await restoreCompleteShares(
       kept.map((place) => defined(shares[place]).ur),
       platform,
+      undefined,
+      assertLive,
     );
+    assertLive();
     // The places among the shares read, counted from 0, of the shares kept that took no part.
     return { mnemonic, unchecked: unchecked.map((index) => defined(kept[index])) };
   } catch {
+    assertLive();
     // A refusal of the set: this reading of the shares is not one of it.
     return undefined;
   }

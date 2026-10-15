@@ -28,6 +28,7 @@ import {
 import { phraseOfIndexes } from "./words.js";
 import { fingerprintOfValidPhrase } from "./english-words.js";
 import { Redacted } from "./redacted.js";
+import { SecretValue } from "./secret-value.js";
 import {
   BIP39_WORD_COUNTS,
   isBip39WordCount,
@@ -106,7 +107,7 @@ export { MissingChecksumError };
  * seed phrase itself, out of toString, toJSON and Node.js's inspect.
  */
 export class EncodedBackup extends Redacted {
-  readonly #indexes: readonly number[];
+  readonly #indexes: SecretValue<readonly number[]>;
   readonly #format: EncodedFormat;
   readonly #mode: MaskingMode;
 
@@ -124,14 +125,18 @@ export class EncodedBackup extends Redacted {
     // where some() alone would skip them, and a getter cannot give the check one value and the
     // copy another.
     const codes = Array.from(indexes);
-    if (!isBip39WordCount(codes.length))
-      throw ERRORS.create("encoded-seed-phrase", [
-        `${codes.length}`,
-        `${form.unit}`,
-        `${WORD_COUNTS_TEXT}`,
-      ]);
-    masking.assertCodes(codes);
-    this.#indexes = Object.freeze(codes);
+    try {
+      if (!isBip39WordCount(codes.length))
+        throw ERRORS.create("encoded-seed-phrase", [
+          `${codes.length}`,
+          `${form.unit}`,
+          `${WORD_COUNTS_TEXT}`,
+        ]);
+      masking.assertCodes(codes);
+      this.#indexes = SecretValue.numbers(codes);
+    } finally {
+      codes.fill(0);
+    }
     this.#format = format;
     this.#mode = mode;
   }
@@ -207,7 +212,7 @@ export class EncodedBackup extends Redacted {
   static whyUnreadable(text: string): string {
     const format = EncodedForm.likely(text);
     try {
-      EncodedBackup.read(text, format, "direct");
+      EncodedBackup.read(text, format, "direct").wipe();
     } catch (error) {
       return refusalMessage(error);
     }
@@ -216,7 +221,7 @@ export class EncodedBackup extends Redacted {
 
   /** The same codes as made with `mode`, held to the rules of `of`. */
   withMode(mode: MaskingMode): EncodedBackup {
-    return EncodedBackup.of(this.#indexes, this.#format, mode);
+    return EncodedBackup.of(this.indexes, this.#format, mode);
   }
 
   get mode(): MaskingMode {
@@ -229,12 +234,12 @@ export class EncodedBackup extends Redacted {
 
   /** The codes as BIP39 indexes, 0 to 2047: 12, 15, 18, 21 or 24 of them. */
   get indexes(): readonly number[] {
-    return this.#indexes;
+    return this.#indexes.value;
   }
 
   /** How many words the seed phrase has: one code a word, as the constructor checked. */
   get words(): Bip39WordCount {
-    return this.#indexes.length as Bip39WordCount;
+    return this.indexes.length as Bip39WordCount;
   }
 
   /**
@@ -252,12 +257,12 @@ export class EncodedBackup extends Redacted {
    * showed, it shows a mistyped code before any date is typed.
    */
   fingerprint<T>(fingerprintOf: (mnemonic: string) => T): T | undefined {
-    return fingerprintOfValidPhrase(phraseOfIndexes(this.#indexes), fingerprintOf);
+    return fingerprintOfValidPhrase(phraseOfIndexes(this.indexes), fingerprintOf);
   }
 
   /** The codes written in their form, as encode writes them. */
   text(): string {
-    return EncodedForm.of(this.#format).codes(this.#indexes);
+    return EncodedForm.of(this.#format).codes(this.indexes);
   }
 
   /** The codes as an MNC1 record, which names their mode and form (record.ts). */
@@ -272,12 +277,12 @@ export class EncodedBackup extends Redacted {
   decode(dates: readonly DateShiftDate[]): DecodedResult {
     if (this.givesSeveral)
       throw ERRORS.create("original-seedshift-valid-last-word-gives-several-phrases", []);
-    return defined(Masking.of(this.#mode).undo(this.#indexes, dates)[0]);
+    return defined(Masking.of(this.#mode).undo(this.indexes, dates)[0]);
   }
 
   /** Every phrase that the codes and the complete `dates` may give: one unless givesSeveral. */
   candidates(dates: readonly DateShiftDate[]): DecodedResult[] {
-    return Masking.of(this.#mode).undo(this.#indexes, dates);
+    return Masking.of(this.#mode).undo(this.indexes, dates);
   }
 
   /**
@@ -291,13 +296,22 @@ export class EncodedBackup extends Redacted {
     return BIP39_WORD_COUNTS.filter((words) => words < this.words).flatMap((words) => {
       let result: DecodedResult;
       try {
-        const start = EncodedBackup.of(this.#indexes.slice(0, words), this.#format, this.#mode);
+        using start = EncodedBackup.of(this.indexes.slice(0, words), this.#format, this.#mode);
         result = start.decode(dates);
       } catch {
         return [];
       }
       return result.checksumValid ? [{ words, result }] : [];
     });
+  }
+  /** Ends this backup's lifetime; callers finish every use before wiping it. */
+  wipe(): void {
+    this.#indexes.wipe();
+  }
+
+  /** Ends this backup's lifetime when its owning scope exits. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 

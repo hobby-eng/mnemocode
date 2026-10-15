@@ -1,14 +1,20 @@
 /**
- * Host services for SSKR shares: the digest check and the SSKR library.
+ * Host service for restoring complete SSKR shares.
  *
  * The share modules are platform-neutral (split.ts, share-set.ts, joint-repair.ts). What only the
- * host has comes in through this interface: Node.js supplies it through `share-platform-node.ts`,
+ * host has comes in through narrow interfaces: Node.js supplies them through `share-platform-node.ts`,
  * with node:crypto and the bundled SSKR WASM, and another host, such as a browser page, supplies
  * its own, as it does for the card renderers (export/platform.ts). Every share module that needs it
  * takes it as a parameter (split.ts, share-set.ts, share-input.ts, joint-repair.ts); none reads a
  * platform configured beforehand.
  */
-export interface SharePlatform {
+export interface ShareCombiner {
+  /** The secret that complete shares restore, from the host's SSKR library; throws if none. */
+  readonly combineShares: (records: readonly string[]) => Promise<Uint8Array>;
+}
+
+/** The host services needed to repair marked shares: digest checks and complete restoration. */
+export interface ShareRepairPlatform extends ShareCombiner {
   /**
    * HMAC-SHA256 of `message` under `key`. Synchronous: the search calls it for every try. Returns
    * a fresh array of the 32 bytes of the MAC, which the caller owns and may wipe once it has
@@ -16,8 +22,10 @@ export interface SharePlatform {
    * the caller's and are not changed.
    */
   readonly hmacSha256: (key: Uint8Array, message: Uint8Array) => Uint8Array;
-  /** The secret that complete shares restore, from the host's SSKR library; throws if none. */
-  readonly combineShares: (records: readonly string[]) => Promise<Uint8Array>;
+}
+
+/** The host services needed to split a phrase and verify that the created shares restore it. */
+export interface ShareSplitPlatform extends ShareCombiner {
   /**
    * Shares of one group that split `secret`, `threshold` of `count` needed, as UR records, from
    * the host's SSKR library; `seed` (SEED_BYTES of fresh randomness) seeds its random numbers.
@@ -30,6 +38,9 @@ export interface SharePlatform {
     seed: Uint8Array,
   ) => Promise<string[]>;
 }
+
+/** All SSKR host services together; operations accept only the subset they use. */
+export interface SharePlatform extends ShareRepairPlatform, ShareSplitPlatform {}
 
 /**
  * Random bytes that seed one split: the SSKR WASM takes exactly 32, the seed of its ChaCha20

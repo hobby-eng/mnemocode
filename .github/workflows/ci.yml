@@ -42,7 +42,11 @@ jobs:
         run: pnpm format:check && pnpm check && pnpm build
       - if: env.FULL == 'true'
         run: pnpm verify
-      - run: node dist/mnemocode.js self-test
+      # A public lookup runs assertCoreSelfTest through the normal protected command path.
+      - if: env.FULL != 'true'
+        run: node dist/mnemocode.js table --index 1
+      - if: env.FULL == 'true'
+        run: node dist/mnemocode.js self-test
       - name: Drive the menu and the hidden prompts in a pseudo-terminal
         timeout-minutes: 10
         uses: ./.github/actions/terminal-input
@@ -73,7 +77,10 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - run: pnpm build
-      - run: node dist/mnemocode.js self-test
+      - if: env.FULL != 'true'
+        run: node dist/mnemocode.js table --index 1
+      - if: env.FULL == 'true'
+        run: node dist/mnemocode.js self-test
       - if: env.FULL == 'true'
         run: pnpm test
       - name: Drive the menu and the hidden prompts in a pseudo-terminal

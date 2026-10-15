@@ -115,22 +115,32 @@ type RanResult = Exclude<MissingCodesResult, { readonly kind: "stopped" }> | Can
  */
 async function ran(way: MissingCodesWaySearch): Promise<RanResult> {
   const progress = new ProgressLine(PROGRESS_SECONDS);
+  let owned: MissingCodesResult | undefined;
   try {
-    const result = await withCtrlCWatch((signal) =>
-      way.run({
-        signal,
-        turn: nodeTurn,
-        onProgress: ({ checked, total, found }) =>
-          progress.showEvery(
-            () => `Checked ${counting(checked)} of about ${counting(total)}; ${found} found.`,
-          ),
-      }),
-    );
+    try {
+      await withCtrlCWatch(async (signal) => {
+        owned = await way.run({
+          signal,
+          turn: nodeTurn,
+          onProgress: ({ checked, total, found }) =>
+            progress.showEvery(
+              () => `Checked ${counting(checked)} of about ${counting(total)}; ${found} found.`,
+            ),
+        });
+        // Adopt before the terminal watch's own asynchronous finalization can fail.
+        return owned;
+      });
+    } finally {
+      progress.end();
+    }
+    const result = defined(owned);
     // The person stopped the search with Ctrl+C.
     if (result.kind === "stopped") return CANCELLED;
+    // Only after final progress output succeeds does this result belong to the next helper.
+    owned = undefined;
     return result;
   } finally {
-    progress.end();
+    if (owned?.kind === "found") owned.backup.wipe();
   }
 }
 
@@ -189,7 +199,8 @@ async function byEncodedFingerprint(
         { what: "the eight characters of the fingerprint" },
       );
   if (fingerprint === undefined || fingerprint === CANCELLED) return fingerprint;
-  return searched(search, search.byEncodedFingerprint(fingerprint), answers.maxCandidates);
+  using way = search.byEncodedFingerprint(fingerprint);
+  return await searched(search, way, answers.maxCandidates);
 }
 
 /**
@@ -203,10 +214,12 @@ async function byWallet(
 ): Promise<MissingOutcome | undefined | Cancelled> {
   const dates = search.needsDates ? await askCodeDates(search, true) : undefined;
   if (dates === CANCELLED) return CANCELLED;
+  using dateAnswer = dates;
   const evidence = given ? answers.evidence : await askWallet(answers.place);
   if (evidence === undefined || evidence === CANCELLED) return evidence;
-  const way = search.byWallet(defined(walletCheckOf(evidence, answers.passphrase)), dates);
-  return searched(search, way, answers.maxCandidates);
+  using walletCheck = defined(walletCheckOf(evidence, answers.passphrase));
+  using way = search.byWallet(walletCheck, dateAnswer);
+  return await searched(search, way, answers.maxCandidates);
 }
 
 /**
@@ -251,7 +264,9 @@ async function askWallet(
 async function listed(search: MissingCodesSearch): Promise<MissingOutcome | Cancelled> {
   const dates = search.needsDates ? await askCodeDates(search, false) : undefined;
   if (dates === CANCELLED) return CANCELLED;
-  const result = await ran(search.listed(dates?.known ?? []));
+  using dateAnswer = dates;
+  using way = search.listed(dateAnswer?.known ?? []);
+  const result = await ran(way);
   if (result === CANCELLED) return CANCELLED;
   if (result.kind === "list") {
     const lines = result.rows.flatMap(({ codes, phrase, fingerprint }, index) => [
@@ -261,8 +276,9 @@ async function listed(search: MissingCodesSearch): Promise<MissingOutcome | Canc
       `Fingerprint: ${fingerprint}`,
       "",
     ]);
+    using display = new PrivateResult(lines);
     if (
-      (await new PrivateResult(lines).show(() => {
+      (await display.show(() => {
         result.rows.forEach(({ codes, phrase, fingerprint }, index) =>
           console.log(`${index + 1}\t${codes}\t${phrase}\t${fingerprint}`),
         );
@@ -283,8 +299,13 @@ async function outcomeOf(
   result: Exclude<RanResult, Cancelled>,
 ): Promise<MissingOutcome | undefined | Cancelled> {
   if (result.kind === "found") {
-    reportFound(search.codes, result.backup, result.foundDates);
-    return result;
+    try {
+      reportFound(search.codes, result.backup, result.foundDates);
+      return result;
+    } catch (error) {
+      result.backup.wipe();
+      throw error;
+    }
   }
   if (result.kind === "none") {
     terminalNotice(result.message, "warning");

@@ -150,8 +150,13 @@ export async function askDates(question: DatesQuestion): Promise<DatesAnswer | C
     question.prompt ?? datesQuestion(question),
     (line) => {
       const answer = DatesAnswer.parse(line, question);
-      question.check?.(answer);
-      return answer;
+      try {
+        question.check?.(answer);
+        return answer;
+      } catch (error) {
+        answer.wipe();
+        throw error;
+      }
     },
     { what: "the dates" },
   );
@@ -228,8 +233,8 @@ export async function withDateProgress<T>(
 export async function searchDates(
   request: DateSearchRequest,
 ): Promise<DateSearchResult | undefined | Cancelled> {
-  const walletCheck = walletCheckOf(request.evidence, request.passphrase);
-  const search = new DateSearch({
+  using walletCheck = walletCheckOf(request.evidence, request.passphrase);
+  using search = new DateSearch({
     indexes: request.indexes,
     dates: request.dates,
     mode: request.mode,

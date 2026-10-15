@@ -56,8 +56,14 @@ export function create_sskr_shares(secret, group_threshold, group_specs, random_
         deferred5_1 = len4;
         return getStringFromWasm0(ptr4, len4);
     } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-        wasm.__wbindgen_export2(deferred5_0, deferred5_1, 1);
+        try {
+            if (deferred5_0 !== undefined) {
+                getArrayU8FromWasm0(deferred5_0, deferred5_1).fill(0);
+            }
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export2(deferred5_0, deferred5_1, 1);
+        }
     }
 }
 
@@ -99,8 +105,14 @@ export function create_sskr_shares_formatted(secret, group_threshold, group_spec
         deferred5_1 = len4;
         return getStringFromWasm0(ptr4, len4);
     } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-        wasm.__wbindgen_export2(deferred5_0, deferred5_1, 1);
+        try {
+            if (deferred5_0 !== undefined) {
+                getArrayU8FromWasm0(deferred5_0, deferred5_1).fill(0);
+            }
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export2(deferred5_0, deferred5_1, 1);
+        }
     }
 }
 
@@ -126,8 +138,11 @@ export function recover_sskr_shares(records) {
         try {
             return v2.slice();
         } finally {
-            v2.fill(0);
-            wasm.__wbindgen_export2(r0, r1 * 1, 1);
+            try {
+                v2.fill(0);
+            } finally {
+                wasm.__wbindgen_export2(r0, r1 * 1, 1);
+            }
         }
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
@@ -158,8 +173,11 @@ export function recover_sskr_shares_formatted(records, encoding) {
         try {
             return v2.slice();
         } finally {
-            v2.fill(0);
-            wasm.__wbindgen_export2(r0, r1 * 1, 1);
+            try {
+                v2.fill(0);
+            } finally {
+                wasm.__wbindgen_export2(r0, r1 * 1, 1);
+            }
         }
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);

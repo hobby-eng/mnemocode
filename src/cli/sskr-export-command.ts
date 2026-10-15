@@ -82,42 +82,49 @@ async function exportSet(
 ): Promise<"exported" | "changed" | Cancelled> {
   reportRepairs(set, places);
   const checkedExport = ShareInput.checkedExport(set, places, given);
-  let { written } = checkedExport;
-  for (const message of written.leftOutMessages()) terminalNotice(message, "warning");
-  if (checkedExport.kind === "none") {
-    if (!r.interactive) throw ERRORS.create("no-share-settled", []);
-    for (const place of written.leftOut)
-      if ((await r.shares.retype(place)) === CANCELLED) return CANCELLED;
-    return "changed";
+  using initialExport = checkedExport.written;
+  let written = initialExport;
+  let reformatted: typeof written | undefined;
+  try {
+    for (const message of written.leftOutMessages()) terminalNotice(message, "warning");
+    if (checkedExport.kind === "none") {
+      if (!r.interactive) throw ERRORS.create("no-share-settled", []);
+      for (const place of written.leftOut)
+        if ((await r.shares.retype(place)) === CANCELLED) return CANCELLED;
+      return "changed";
+    }
+    if (checkedExport.kind === "trouble")
+      return (await mendShares(r.shares, checkedExport.trouble, r.interactive)) ?? "changed";
+    if (checked !== undefined && written.forms.length > 1) {
+      const form = await cardForm(written.forms, r.interactive);
+      if (form === CANCELLED) return CANCELLED;
+      reformatted = written.inForm(form);
+      written = reformatted;
+    }
+    const saved = written.saved;
+    const options =
+      checked === undefined ? undefined : { ...checked, shareFormat: defined(saved[0]).format };
+    if ((await saveShares(saved, args, options, Masking.of(r.mode).masked)) === CANCELLED)
+      return CANCELLED;
+    reportRenamedOutputs();
+    if (written.copiesNote !== undefined) terminalNotice(written.copiesNote);
+    // The shares come back as they were split: a page and this screen name what they hold, so
+    // that a masked phrase is not taken for the wallet's.
+    terminalNotice(
+      Masking.of(r.mode).masked ? PHRASE_WORDS.repairedMasked : PHRASE_WORDS.repairedUnknown,
+    );
+    if (
+      (await printShares(
+        written.shown,
+        written.total,
+        Masking.of(r.mode).masked ? PHRASE_WORDS.masked : undefined,
+      )) === CANCELLED
+    )
+      return CANCELLED;
+    return "exported";
+  } finally {
+    reformatted?.wipe();
   }
-  if (checkedExport.kind === "trouble")
-    return (await mendShares(r.shares, checkedExport.trouble, r.interactive)) ?? "changed";
-  if (checked !== undefined && written.forms.length > 1) {
-    const form = await cardForm(written.forms, r.interactive);
-    if (form === CANCELLED) return CANCELLED;
-    written = written.inForm(form);
-  }
-  const saved = written.saved;
-  const options =
-    checked === undefined ? undefined : { ...checked, shareFormat: defined(saved[0]).format };
-  if ((await saveShares(saved, args, options, Masking.of(r.mode).masked)) === CANCELLED)
-    return CANCELLED;
-  reportRenamedOutputs();
-  if (written.copiesNote !== undefined) terminalNotice(written.copiesNote);
-  // The shares come back as they were split: a page and this screen name what they hold, so
-  // that a masked phrase is not taken for the wallet's.
-  terminalNotice(
-    Masking.of(r.mode).masked ? PHRASE_WORDS.repairedMasked : PHRASE_WORDS.repairedUnknown,
-  );
-  if (
-    (await printShares(
-      written.shown,
-      written.total,
-      Masking.of(r.mode).masked ? PHRASE_WORDS.masked : undefined,
-    )) === CANCELLED
-  )
-    return CANCELLED;
-  return "exported";
 }
 
 /**
@@ -234,15 +241,21 @@ export async function runSskrExport(args: ParsedArguments): Promise<Cancelled | 
   // In colors where the shares keep their own form, which is known only once they are typed.
   await assertShareCardsPrintable(checked);
   const settings = await recoverySettings(args);
+  using initialDates = settings.dates;
   // Refused before the shares are asked.
   const refusal = ShareRestore.repairRefusal(settings.mode, settings.evidence !== undefined);
   if (refusal !== undefined) throw ERRORS.create("run-sskr-export-refused", [refusal]);
   const shares = await typedShares(args);
   if (shares === CANCELLED) return CANCELLED;
-  const r: Recovery = { ...settings, shares };
-  for (;;) {
-    const exported = await exportOnce(r, given, checked, args);
-    if (exported !== "changed") return exported;
+  using ownedShares = shares;
+  const r: Recovery = { ...settings, dates: initialDates, shares: ownedShares };
+  try {
+    for (;;) {
+      const exported = await exportOnce(r, given, checked, args);
+      if (exported !== "changed") return exported;
+    }
+  } finally {
+    r.dates?.wipe();
   }
 }
 
@@ -265,21 +278,27 @@ async function exportOnce(
   }
   const restored = await restorePhrases(r, { few: () => fewForExport(r), one: true });
   if (restored === CANCELLED) return CANCELLED;
-  if (restored.kind === "few") {
+  if (
+    restored.kind === "few" &&
+    ShareRestore.rewritesOnly(r.shares.input, r.evidence !== undefined)
+  )
+    return "changed";
+  const decision = ShareRestore.exportDecision(restored, r.evidence !== undefined);
+  if (decision.kind === "trouble") throw ERRORS.create("few-export-refused", [decision.message]);
+  if (decision.kind === "each") {
     // Without the wallet check complete shares are only written again (rewritesOnly), above.
-    if (ShareRestore.rewritesOnly(r.shares.input, r.evidence !== undefined)) return "changed";
     // Fewer shares than the threshold restore no phrase; each is then repaired on its own.
     const shares = await repairEach(r, given);
     if (shares === undefined || shares === "changed" || shares === CANCELLED) return shares;
     const set = { shares, unsettled: [] };
     return settled(await exportSet(r, set, r.shares.places(), given, checked, args));
   }
-  const { sets, places } = restored;
-  if (sets.length > 1) {
-    if ((await showVariants(restored.phrases, sets, places, given)) === CANCELLED) return CANCELLED;
+  const { sets, places, phrases } = decision.found;
+  if (decision.kind === "variants") {
+    if ((await showVariants(phrases, sets, places, given)) === CANCELLED) return CANCELLED;
     return undefined;
   }
-  return settled(await exportSet(r, defined(sets[0]), places, given, checked, args));
+  return settled(await exportSet(r, decision.set, places, given, checked, args));
 }
 
 /** What exportSet gave, as exportOnce ends: undefined once the shares were exported. */

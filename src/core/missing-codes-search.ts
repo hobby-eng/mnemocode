@@ -12,12 +12,18 @@
 // Host-neutral: it reaches only core modules and the BIP39 word list.
 
 import type { SeedshiftMode } from "./date-recovery.js";
-import { DateSearch, type DatesAnswer, type DateMatch } from "./date-search.js";
+import { DateSearch, DatesAnswer, type DateMatch } from "./date-search.js";
 import { EncodedBackup } from "./encoded-backup.js";
 import { EncodedForm } from "./encoded-form.js";
 import { Masking } from "./masking.js";
 import type { MissingCodes } from "./missing-codes.js";
-import { stillRunning, startTimer, type SearchProgress, type SearchRun } from "./search-turns.js";
+import {
+  stillRunning,
+  startTimer,
+  type SearchProgress,
+  type SearchRun,
+  type MonotonicClock,
+} from "./search-turns.js";
 import type { DateShiftDate } from "./types.js";
 import {
   askWallet,
@@ -42,6 +48,9 @@ const ERRORS = new ErrorCatalog("core.missing-codes-search", {
     "Codes that were not masked have no dates to search.",
   "dates-found-do-not-decode-codes-wallet-matched": () =>
     "The dates found do not decode the codes to the wallet that matched.",
+  "list-overflow": () =>
+    `More than ${MAX_LISTED} candidates fit these codes and dates. Narrow the codes or use a wallet check instead of listing them.`,
+  "way-wiped": () => "This prepared code search has been wiped.",
   "operation-refused": suppliedMessage,
 });
 
@@ -119,10 +128,79 @@ export interface MissingCodesRun extends SearchRun {
   readonly onProgress?: ((progress: MissingCodesProgress) => void) | undefined;
 }
 
-/** One way prepared with its answers: its plan first, then its run. */
-export interface MissingCodesWaySearch {
-  plan(limit?: number): Promise<MissingCodesPlan>;
+/**
+ * One owned way prepared with its answers: its plan first, then its run. Dispose it after both
+ * settle. Codes and incomplete date answers are borrowed; complete dates are owned snapshots.
+ * A found backup is transferred to the caller and survives disposal of this way.
+ */
+export interface MissingCodesWaySearch extends Disposable {
+  plan(limit?: number, now?: MonotonicClock): Promise<MissingCodesPlan>;
   run(run?: MissingCodesRun): Promise<MissingCodesResult>;
+  /** Ends this prepared way, releases its inputs and refuses further planning/publication. */
+  wipe(): void;
+}
+
+/** The lifetime shared by prepared ways; borrowed inputs are released, never disposed here. */
+class CodeSearchInput implements Disposable {
+  #codes: MissingCodes | undefined;
+  #dates: DatesAnswer | undefined;
+  #patterns: DatesAnswer | undefined;
+
+  constructor(codes: MissingCodes, dates: readonly DateShiftDate[] = [], patterns?: DatesAnswer) {
+    const known = ownedDates(dates);
+    this.#codes = codes;
+    this.#dates = known.length === 0 ? undefined : DatesAnswer.of(known);
+    this.#patterns = patterns;
+  }
+
+  assertLive(): void {
+    if (this.#codes === undefined) throw ERRORS.create("way-wiped", []);
+  }
+
+  get codes(): MissingCodes {
+    this.assertLive();
+    return defined(this.#codes);
+  }
+
+  get dates(): readonly DateShiftDate[] {
+    this.assertLive();
+    return this.#dates?.known ?? [];
+  }
+
+  get patterns(): DatesAnswer {
+    this.assertLive();
+    return defined(this.#patterns);
+  }
+
+  /** A host callback may end this owner synchronously or while its answer is awaited. */
+  async checked<Value>(read: () => Value | PromiseLike<Value>): Promise<Value> {
+    this.assertLive();
+    const value = await read();
+    this.assertLive();
+    return value;
+  }
+
+  /** A probe owns no live iterator after the first candidate has been copied. */
+  first(): number[] | undefined {
+    const candidates = this.codes.candidates();
+    try {
+      const first = candidates.next();
+      return first.done === true ? undefined : first.value;
+    } finally {
+      candidates.return(undefined);
+    }
+  }
+
+  wipe(): void {
+    this.#dates?.wipe();
+    this.#dates = undefined;
+    this.#patterns = undefined;
+    this.#codes = undefined;
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
 }
 
 // The host's fingerprint of a phrase (wallet-check.ts), here too for the hosts that take it with
@@ -146,21 +224,27 @@ function phrasesOf(backup: EncodedBackup, dates: readonly DateShiftDate[]): stri
 }
 
 /** Seconds that decoding `backup` with `dates` takes in this host, phrases and checksums too. */
-function secondsToDecode(backup: EncodedBackup, dates: readonly DateShiftDate[]): number {
-  const elapsed = startTimer();
+function secondsToDecode(
+  backup: EncodedBackup,
+  dates: readonly DateShiftDate[],
+  now?: MonotonicClock,
+): number {
+  const elapsed = startTimer(now);
   phrasesOf(backup, dates);
   return elapsed();
 }
 
 /** The one set found, none, or several, as a result; or that the host stopped the search. */
 function foundOne(
-  { found, passed, stopped }: SearchedCodes,
+  searchedCodes: SearchedCodes,
   nothing: string,
   dates: readonly DateShiftDate[] | undefined,
+  run: MissingCodesRun,
 ): MissingCodesResult {
-  if (stopped) return STOPPED;
+  const { passed, stopped } = searchedCodes;
+  if (stopped || !stillRunning(run)) return STOPPED;
   if (passed === 0) return { kind: "none", message: nothing };
-  if (passed === 1) return { kind: "found", backup: defined(found[0]), dates };
+  if (passed === 1) return { kind: "found", backup: searchedCodes.takeOnly(), dates };
   // Counted by every set that passed, as the progress counts them, not by those kept.
   return {
     kind: "several",
@@ -240,7 +324,8 @@ export class MissingCodesSearch {
   /**
    * Whether `way` can tell these codes when the person names it ahead, as an option does: the
    * encoded fingerprint wherever the codes keep a checksum, the wallet always, the list where the
-   * candidates are few.
+   * estimated candidates are few. A listed run also checks its actual result size and refuses
+   * an overflow; an estimate is not a completeness bound.
    */
   fits(way: MissingCodesWay): boolean {
     return this.whyNot(way) === undefined;
@@ -268,6 +353,7 @@ export class MissingCodesSearch {
    * The codes whose phrase, with `dates`, matches the wallet. Dates with forgotten digits are
    * searched for each candidate of the codes (DateSearch), so that codes and dates are found
    * together; without dates the codes were not masked.
+   * An incomplete date answer is borrowed: keep it live through this way's plan and run.
    */
   byWallet(walletCheck: WalletCheck, dates?: DatesAnswer): MissingCodesWaySearch {
     return dates?.hasForgottenDigits === true
@@ -275,17 +361,46 @@ export class MissingCodesSearch {
       : new WalletWay(this.#codes, walletCheck, dates?.known ?? []);
   }
 
-  /** Every candidate with its phrase, with the complete `dates`, and its fingerprint. */
+  /**
+   * Every candidate with its phrase, complete `dates` and fingerprint. Refuses with list-overflow
+   * if the actual count exceeds MAX_LISTED, even when the estimate permitted this way.
+   */
   listed(dates: readonly DateShiftDate[]): MissingCodesWaySearch {
     return new ListWay(this.#codes, this.#fingerprint, dates);
   }
 }
 
 /** What a search of the codes kept, how many sets of codes passed in all, and whether it stopped. */
-interface SearchedCodes {
-  readonly found: readonly EncodedBackup[];
+class SearchedCodes implements Disposable {
+  #found: EncodedBackup[];
   readonly passed: number;
   readonly stopped: boolean;
+
+  constructor(found: readonly EncodedBackup[], passed: number, stopped: boolean) {
+    this.#found = [...found];
+    this.passed = passed;
+    this.stopped = stopped;
+  }
+
+  get found(): readonly EncodedBackup[] {
+    return this.#found;
+  }
+
+  /** Transfers the sole backup, after all checks that could fail have completed. */
+  takeOnly(): EncodedBackup {
+    const only = defined(this.#found[0]);
+    this.#found = [];
+    return only;
+  }
+
+  wipe(): void {
+    for (const backup of this.#found) backup.wipe();
+    this.#found = [];
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
 }
 
 /** The search of `codes` with `check`, with the host's progress and signal. */
@@ -293,43 +408,46 @@ async function searched(
   codes: MissingCodes,
   check: (indexes: readonly number[]) => boolean | Promise<boolean>,
   run: MissingCodesRun,
+  maxFound?: number,
 ): Promise<SearchedCodes> {
   const result = await codes.run({
     check,
+    maxFound,
     signal: run.signal,
     turn: run.turn,
+    now: run.now,
     onProgress:
       run.onProgress === undefined
         ? undefined
         : ({ checked, found }) =>
             defined(run.onProgress)({ checked, total: codes.expected, found }),
   });
-  return {
-    found: result.found,
-    passed: result.passed,
-    stopped: result.stopped || !stillRunning(run),
-  };
+  return new SearchedCodes(result.found, result.passed, result.stopped || !stillRunning(run));
 }
 
 /** The way of the encoded fingerprint, which needs no dates. */
 class EncodedFingerprintWay implements MissingCodesWaySearch {
-  readonly #codes: MissingCodes;
-  readonly #fingerprintOf: PhraseFingerprint;
+  readonly #input: CodeSearchInput;
+  #fingerprintOf: PhraseFingerprint | undefined;
   readonly #fingerprint: string;
 
   constructor(codes: MissingCodes, fingerprintOf: PhraseFingerprint, fingerprint: string) {
-    this.#codes = codes;
-    this.#fingerprintOf = fingerprintOf;
     // Read as every fingerprint is: a wrong one is refused when the way is made.
     this.#fingerprint = parseMasterFingerprint(fingerprint);
+    this.#input = new CodeSearchInput(codes);
+    this.#fingerprintOf = fingerprintOf;
   }
 
-  async plan(limit?: number): Promise<MissingCodesPlan> {
-    const fingerprintOf = this.#fingerprintOf;
-    const perFingerprint = await DateSearch.secondsPerCheck(async (mnemonic) => ({
-      matched: (await fingerprintOf(mnemonic)) === "",
-    }));
-    const expected = this.#codes.expected;
+  async plan(limit?: number, now?: MonotonicClock): Promise<MissingCodesPlan> {
+    this.#input.assertLive();
+    const fingerprintOf = defined(this.#fingerprintOf);
+    const perFingerprint = await DateSearch.secondsPerCheck(
+      async (mnemonic) => ({
+        matched: (await this.#input.checked(() => fingerprintOf(mnemonic))) === "",
+      }),
+      now,
+    );
+    const expected = this.#input.codes.expected;
     return SearchPlan.of(
       counted(expected, "candidate"),
       expected,
@@ -339,105 +457,142 @@ class EncodedFingerprintWay implements MissingCodesWaySearch {
   }
 
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
-    const walletCheck = fingerprintWalletCheck(this.#fingerprintOf, this.#fingerprint);
-    const found = await searched(
-      this.#codes,
-      async (indexes) => (await walletCheck(phraseOfIndexes(indexes))).matched,
+    const codes = this.#input.codes;
+    const walletCheck = fingerprintWalletCheck(defined(this.#fingerprintOf), this.#fingerprint);
+    using found = await searched(
+      codes,
+      async (indexes) => {
+        const answer = await this.#input.checked(() => walletCheck(phraseOfIndexes(indexes)));
+        return answer.matched;
+      },
       run,
     );
+    this.#input.assertLive();
     // The codes are found without dates, which are asked afterwards as for complete codes.
-    return foundOne(found, MISSING_CODES_TEXTS.noneByFingerprint, undefined);
+    return foundOne(found, MISSING_CODES_TEXTS.noneByFingerprint, undefined, run);
+  }
+
+  wipe(): void {
+    this.#input.wipe();
+    this.#fingerprintOf = undefined;
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
 /** The way of the wallet with complete dates, or none where the codes were not masked. */
 class WalletWay implements MissingCodesWaySearch {
-  readonly #codes: MissingCodes;
-  readonly #walletCheck: WalletCheck;
-  readonly #dates: readonly DateShiftDate[];
+  readonly #input: CodeSearchInput;
+  #walletCheck: WalletCheck | undefined;
 
   constructor(codes: MissingCodes, walletCheck: WalletCheck, dates: readonly DateShiftDate[]) {
-    this.#codes = codes;
+    this.#input = new CodeSearchInput(codes, dates);
     this.#walletCheck = walletCheck;
-    // Copied and checked, so that a date the host changes later reaches no candidate.
-    this.#dates = ownedDates(dates);
   }
 
   /**
    * The time of the search: for each candidate, its decoding with the dates, timed on the first,
    * and the wallet checks of the phrases it gives, as many as its mode gives (checksPerDecoding).
    */
-  async plan(limit?: number): Promise<MissingCodesPlan> {
-    const codes = this.#codes;
+  async plan(limit?: number, now?: MonotonicClock): Promise<MissingCodesPlan> {
+    const codes = this.#input.codes;
     const expected = codes.expected;
-    const perCheck = await DateSearch.secondsPerCheck(this.#walletCheck);
+    const perCheck = await DateSearch.secondsPerCheck(
+      (phrase) => this.#input.checked(() => defined(this.#walletCheck)(phrase)),
+      now,
+    );
+    this.#input.assertLive();
     const checks = Masking.of(codes.mode).checksPerDecoding(codes.wordCount);
-    const first = codes.candidates().next();
-    const perDecoding =
-      first.done === true
-        ? 0
-        : secondsToDecode(EncodedBackup.of(first.value, codes.format, codes.mode), this.#dates);
+    const first = this.#input.first();
+    let perDecoding = 0;
+    if (first !== undefined) {
+      try {
+        using backup = EncodedBackup.of(first, codes.format, codes.mode);
+        perDecoding = secondsToDecode(backup, this.#input.dates, now);
+      } finally {
+        first.fill(0);
+      }
+    }
     const seconds = expected * (perDecoding + checks * perCheck);
+    this.#input.assertLive();
     return SearchPlan.of(counted(expected, "candidate"), expected, seconds, limit);
   }
 
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
-    const codes = this.#codes;
-    const found = await searched(
+    const codes = this.#input.codes;
+    using found = await searched(
       codes,
       async (indexes) => {
-        for (const phrase of phrasesOf(
-          EncodedBackup.of(indexes, codes.format, codes.mode),
-          this.#dates,
-        ))
-          if ((await askWallet(this.#walletCheck, phrase)).matched) return true;
+        this.#input.assertLive();
+        using backup = EncodedBackup.of(indexes, codes.format, codes.mode);
+        for (const phrase of phrasesOf(backup, this.#input.dates)) {
+          const match = await this.#input.checked(() =>
+            askWallet(defined(this.#walletCheck), phrase),
+          );
+          if (match.matched) return true;
+        }
         return false;
       },
       run,
     );
-    return foundOne(found, MISSING_CODES_TEXTS.noneByWallet, this.#dates);
+    return foundOne(found, MISSING_CODES_TEXTS.noneByWallet, this.#input.dates, run);
+  }
+
+  wipe(): void {
+    this.#input.wipe();
+    this.#walletCheck = undefined;
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
 /** The way of the wallet where dates have forgotten digits: codes and dates found together. */
 class WalletAndDatesWay implements MissingCodesWaySearch {
-  readonly #codes: MissingCodes;
+  readonly #input: CodeSearchInput;
   readonly #mode: SeedshiftMode;
-  readonly #walletCheck: WalletCheck;
-  readonly #dates: DatesAnswer;
+  #walletCheck: WalletCheck | undefined;
 
   constructor(codes: MissingCodes, walletCheck: WalletCheck, dates: DatesAnswer) {
     const { mode } = codes;
     if (!Masking.isMaskedMode(mode))
       throw ERRORS.create("codes-were-not-masked-no-dates-search", []);
-    this.#codes = codes;
+    this.#input = new CodeSearchInput(codes, [], dates);
     this.#mode = mode;
     this.#walletCheck = walletCheck;
-    this.#dates = dates;
   }
 
   /** The date search of one candidate of the codes, which stops at its first match. */
   #searchOf(indexes: readonly number[]): DateSearch {
     return new DateSearch({
       indexes,
-      dates: this.#dates,
+      dates: this.#input.patterns,
       mode: this.#mode,
-      walletCheck: this.#walletCheck,
+      walletCheck: (phrase) => this.#input.checked(() => defined(this.#walletCheck)(phrase)),
       maxShown: 1,
     });
   }
 
-  async plan(limit?: number): Promise<MissingCodesPlan> {
-    const codes = this.#codes;
-    const dates = this.#dates;
+  async plan(limit?: number, now?: MonotonicClock): Promise<MissingCodesPlan> {
+    const codes = this.#input.codes;
+    const dates = this.#input.patterns;
     const size = `${counted(codes.expected, "candidate")} with ${counted(dates.combinations, "date combination")} each`;
     const count = codes.expected * dates.combinations;
-    const first = codes.candidates().next();
+    const first = this.#input.first();
     // No candidate at all: nothing to try or time, and the run finds none at once.
-    if (first.done === true) return SearchPlan.of(size, 0, 0, limit);
-    const probe = this.#searchOf(first.value);
-    const seconds = codes.expected * probe.estimatedSeconds(await probe.pace());
-    return SearchPlan.of(size, count, seconds, limit);
+    if (first === undefined) return SearchPlan.of(size, 0, 0, limit);
+    try {
+      using probe = this.#searchOf(first);
+      first.fill(0);
+      const seconds = codes.expected * probe.estimatedSeconds(await probe.pace(now));
+      this.#input.assertLive();
+      return SearchPlan.of(size, count, seconds, limit);
+    } finally {
+      first.fill(0);
+    }
   }
 
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
@@ -446,10 +601,16 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
     // that no phrase or dates are held that nothing shows.
     let first: DateMatch | undefined;
     let matched = 0;
-    const found = await searched(
-      this.#codes,
+    using found = await searched(
+      this.#input.codes,
       async (indexes) => {
-        const result = await this.#searchOf(indexes).run({ signal: run.signal, turn: run.turn });
+        using search = this.#searchOf(indexes);
+        const result = await search.run({
+          signal: run.signal,
+          turn: run.turn,
+          now: run.now,
+        });
+        this.#input.assertLive();
         // A stop is heard by the search of the codes too, at its next turn.
         if (result.stopped) return false;
         const match = result.shown[0];
@@ -460,23 +621,38 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
       },
       run,
     );
-    const result = foundOne(found, MISSING_CODES_TEXTS.noneByWallet, []);
-    if (result.kind !== "found") return result;
+    this.#input.assertLive();
+    if (found.stopped || found.passed !== 1)
+      return foundOne(found, MISSING_CODES_TEXTS.noneByWallet, [], run);
     const match = defined(first);
     // The codes are decoded with every date, the known ones too: the guessed ones alone give
     // another phrase (AUD-012-FUN001). Checked here, so that no host decodes another wallet.
-    const phrases = result.backup.candidates(match.allDates);
+    const phrases = defined(found.found[0]).candidates(match.allDates);
     if (!phrases.some((phrase) => phrase.recoveredMnemonic === match.mnemonic))
       throw ERRORS.create("dates-found-do-not-decode-codes-wallet-matched", []);
-    return { ...result, dates: match.allDates, foundDates: match.dates };
+    if (!stillRunning(run)) return STOPPED;
+    return {
+      kind: "found",
+      backup: found.takeOnly(),
+      dates: match.allDates,
+      foundDates: match.dates,
+    };
+  }
+
+  wipe(): void {
+    this.#input.wipe();
+    this.#walletCheck = undefined;
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
 /** The way of the list: every candidate, where they are few. */
 class ListWay implements MissingCodesWaySearch {
-  readonly #codes: MissingCodes;
-  readonly #fingerprintOf: PhraseFingerprint;
-  readonly #dates: readonly DateShiftDate[];
+  readonly #input: CodeSearchInput;
+  #fingerprintOf: PhraseFingerprint | undefined;
 
   constructor(
     codes: MissingCodes,
@@ -485,24 +661,28 @@ class ListWay implements MissingCodesWaySearch {
   ) {
     if (codes.expected > MAX_LISTED)
       throw ERRORS.create("operation-refused", [tooManyToList(codes.expected)]);
-    this.#codes = codes;
+    this.#input = new CodeSearchInput(codes, dates);
     this.#fingerprintOf = fingerprintOf;
-    // Copied and checked, so that a date the host changes later reaches no candidate.
-    this.#dates = ownedDates(dates);
   }
 
   async plan(limit?: number): Promise<MissingCodesPlan> {
-    const expected = this.#codes.expected;
+    const expected = this.#input.codes.expected;
     return SearchPlan.of(counted(expected, "candidate"), expected, 0, limit);
   }
 
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
-    const { found, stopped } = await searched(this.#codes, () => true, run);
-    if (stopped) return STOPPED;
+    using result = await searched(this.#input.codes, () => true, run, MAX_LISTED);
+    this.#input.assertLive();
+    const { found, passed, stopped } = result;
+    if (stopped || !stillRunning(run)) return STOPPED;
+    // expected is an average; passed counts every candidate even when storage is capped.
+    if (passed > MAX_LISTED) throw ERRORS.create("list-overflow", []);
     const rows: MissingCodesRow[] = [];
     for (const backup of found)
-      for (const phrase of phrasesOf(backup, this.#dates)) {
-        const fingerprint = await this.#fingerprintOf(phrase);
+      for (const phrase of phrasesOf(backup, this.#input.dates)) {
+        // One set of legacy valid-last-word codes may decode to several phrases.
+        if (rows.length === MAX_LISTED) throw ERRORS.create("list-overflow", []);
+        const fingerprint = await this.#input.checked(() => defined(this.#fingerprintOf)(phrase));
         if (!stillRunning(run)) return STOPPED;
         rows.push({
           codes: backup.text(),
@@ -512,5 +692,14 @@ class ListWay implements MissingCodesWaySearch {
       }
     // The host's fingerprints are waited for after the search: a stop meanwhile lists nothing.
     return stillRunning(run) ? { kind: "list", rows } : STOPPED;
+  }
+
+  wipe(): void {
+    this.#input.wipe();
+    this.#fingerprintOf = undefined;
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }

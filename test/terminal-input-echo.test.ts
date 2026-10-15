@@ -4,6 +4,7 @@ import { WordList } from "../src/core/word-hints.js";
 import { answerEndRow, rowsOfText, terminalColumns } from "../src/cli/terminal-geometry.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 import type { Cancelled } from "../src/cli/terminal-keys.js";
+import { TypedAnswer } from "../src/cli/typed-answer.js";
 
 const LEFT = "\x1b[D";
 const HOME = "\x1b[H";
@@ -91,6 +92,9 @@ function expectedTyping(
 
 /** The columns of each sample character, and 1 for every other one (the prompt's letters). */
 const WIDTHS = new Map(SAMPLES);
+// Literal oracle for this regression, independent of production geometry.
+WIDTHS.set("\u0301", 0);
+WIDTHS.set("\u0300", 0);
 
 /**
  * A terminal screen as xterm, VTE and Windows Terminal keep it, for what readLine writes: printable
@@ -145,6 +149,12 @@ class Screen {
   }
 
   #put(character: string, width: number): void {
+    if (width === 0) {
+      const previous = this.#pending ? this.column : this.column - 1;
+      const row = this.#cells[this.row];
+      if (previous >= 0 && row?.[previous] !== undefined) row[previous] += character;
+      return;
+    }
     if (this.#pending) {
       this.row += 1;
       this.column = 0;
@@ -259,6 +269,60 @@ async function typeOnScreen(keys: readonly string[], columns: number, promptWidt
 }
 
 const originalColumns = process.stderr.columns;
+
+describe("A combining mark typed after a base at the right edge", () => {
+  restoreTerminalAroundEach();
+
+  it("redraws the base and mark together and keeps the next character on the next row", async () => {
+    const { answer, screen: written } = await showTyping("e\u0301x\r", 5, { promptWidth: 4 });
+    const screen = new Screen(5);
+    screen.write("PPPP" + written);
+    expect(answer).toBe("e\u0301x");
+    expect(screen.rows()).toEqual(["PPPPe\u0301", "x"]);
+    expect(screen.cursor()).toEqual([1, 1]);
+  });
+
+  it.each([5, 80])("keeps appended decomposed text linear on a %s-column terminal", (columns) => {
+    process.stderr.columns = columns;
+    for (const text of ["e\u0301".repeat(2000), "a".repeat(columns) + "\u0301".repeat(2000)]) {
+      let written = 0;
+      vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+        written += typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.length;
+        return true;
+      });
+      const bytes = Buffer.from(text);
+      using answer = new TypedAnswer(bytes.length, true, 0, undefined);
+      for (const byte of bytes) answer.insert(byte);
+      answer.moveToEnd();
+      expect(answer.text()).toBe(text);
+      // A fixed output-per-input budget, not a wall-clock threshold or the production width rule.
+      expect(written).toBeLessThan(bytes.length * 8);
+      vi.restoreAllMocks();
+    }
+  });
+
+  it.each([
+    {
+      keys: "e\u0301\u0300x\r",
+      answer: "e\u0301\u0300x",
+      rows: ["PPPPe\u0301\u0300", "x"],
+      column: 1,
+    },
+    { keys: "e\u0301" + BACKSPACE + "x\r", answer: "ex", rows: ["PPPPe", "x"], column: 1 },
+    { keys: "e\u0301" + HOME + "x\r", answer: "xe\u0301", rows: ["PPPPx", "e\u0301"], column: 1 },
+    { keys: "e\u0301" + LEFT + "x\r", answer: "ex\u0301", rows: ["PPPPe", "x\u0301"], column: 1 },
+    { keys: "e\u0301\r", answer: "e\u0301", rows: ["PPPPe\u0301"], column: 0 },
+  ])("keeps marked edge edits correct for $answer", async ({ keys, answer, rows, column }) => {
+    const shown = await showTyping(keys, 5, { promptWidth: 4 });
+    const screen = new Screen(5);
+    screen.write("PPPP" + shown.screen);
+    expect(shown.answer).toBe(answer);
+    expect(screen.rows().filter((row, index, all) => row !== "" || index < all.length - 1)).toEqual(
+      rows,
+    );
+    expect(screen.cursor()).toEqual([1, column]);
+  });
+});
 
 /** Puts back the mocks and the width of the terminal around each test. */
 function restoreTerminalAroundEach(): void {

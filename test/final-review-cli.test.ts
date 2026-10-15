@@ -12,8 +12,11 @@ import { phraseAndDates } from "../src/cli/input.js";
 import { runSskrSplit } from "../src/cli/sskr-split-command.js";
 import { recoverySettings } from "../src/cli/sskr-restore-command.js";
 import { exportColorPalette } from "../src/color-export.js";
-import { decodeCandidateList } from "../src/core/candidate-list.js";
+import { decodeCandidateList, MAX_PASSPHRASE_BYTES } from "../src/core/candidate-list.js";
 import { CandidateListWriter, type CandidateListFile } from "../src/core/candidate-list-writer.js";
+import { EncodedBackup } from "../src/core/encoded-backup.js";
+import { runEncode } from "../src/cli/encode-command.js";
+import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { englishWordlist } from "../src/core/english-words.js";
 import { encodeMnemonic, indexesToColors, parseDate } from "../src/core.js";
 import { searchDates } from "../src/cli/date-search.js";
@@ -43,6 +46,41 @@ afterEach(async () => {
 });
 
 describe("CC-01: a saved candidate list leaves no copy of the entropies", () => {
+  it("wipes transferred entropies when preparing their output refuses a passphrase", async () => {
+    using target = await CandidatesFile.of({
+      "candidates-file": join(directory, "refused.mncl"),
+      "plaintext-candidates": true,
+    });
+    const entropy = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
+    await expect(
+      target!.saveEntropies([entropy], "x".repeat(MAX_PASSPHRASE_BYTES + 1)),
+    ).rejects.toThrow("longer than");
+    expect(entropy.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("wipes transferred entropies when output preparation is cancelled", async () => {
+    using target = await CandidatesFile.of({
+      "candidates-file": join(directory, "cancelled.mncl"),
+      "plaintext-candidates": true,
+    });
+    vi.spyOn(target!, "prepare").mockResolvedValueOnce(CANCELLED);
+    const entropy = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
+    expect(await target!.saveEntropies([entropy])).toBe(CANCELLED);
+    expect(entropy.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("closes its owned writer when the command's output scope ends", async () => {
+    const target = await CandidatesFile.of({
+      "candidates-file": join(directory, "unused.mncl"),
+      "plaintext-candidates": true,
+    });
+    const writer = await target!.prepare("");
+    expect(writer).not.toBe(CANCELLED);
+    if (writer === CANCELLED) return;
+    target![Symbol.dispose]();
+    await expect(writer.writePhrases([TEST_PHRASE])).rejects.toThrow("has been wiped");
+  });
+
   it("wipes the bytes of a list without encryption once they are written", async () => {
     // oxlint-disable-next-line typescript/unbound-method -- the spy calls it on its own instance
     const write = CandidateListWriter.prototype.write;
@@ -68,6 +106,28 @@ describe("CC-01: a saved candidate list leaves no copy of the entropies", () => 
     expect(saved.records.map((record) => [...record.entropy])).toEqual([
       [...mnemonicToEntropy(TEST_PHRASE, englishWordlist)],
     ]);
+  });
+});
+
+describe("Encoded command result lifetimes", () => {
+  it("releases the encoded backup after the command has shown its result", async () => {
+    const encode = vi.spyOn(EncodedBackup, "encode");
+    await runEncode({ mnemonic: TEST_PHRASE, mode: "direct", format: "english" });
+    const outcome = encode.mock.results[0]!;
+    expect(outcome.type).toBe("return");
+    if (outcome.type !== "return") return;
+    expect(() => outcome.value.backup.text()).toThrow("has been wiped");
+  });
+
+  it("releases both the read backup and its mode-specific copy after decoding", async () => {
+    const read = vi.spyOn(EncodedBackup, "read");
+    const copy = vi.spyOn(EncodedBackup.prototype, "withMode");
+    await runDecode({ input: TEST_PHRASE, mode: "direct", format: "english" });
+    for (const result of [read.mock.results[0]!, copy.mock.results[0]!]) {
+      expect(result.type).toBe("return");
+      if (result.type !== "return") continue;
+      expect(() => result.value.text()).toThrow("has been wiped");
+    }
   });
 });
 

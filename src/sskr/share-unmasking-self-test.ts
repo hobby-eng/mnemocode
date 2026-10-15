@@ -81,16 +81,17 @@ export async function checkShareUnmasking(
     MASKED_SET.mnemonic,
     "Shares without Seedshift",
   );
-  const wholeDate = DatesAnswer.parse(MASKED_DATE, { patterns: false });
+  using wholeDate = DatesAnswer.parse(MASKED_DATE, { patterns: false });
   expectSame(
     await unmasked(new ShareUnmasking({ mode: "seedshift", dates: wholeDate })),
     PUBLIC_MNEMONIC,
     "Shares unmasked with their date",
   );
   // The masked phrase's date with its last digit forgotten, which the wallet tells.
+  using forgottenDates = DatesAnswer.parse("23-09-202?", { patterns: true });
   const forgottenDigit = new ShareUnmasking({
     mode: "seedshift",
-    dates: DatesAnswer.parse("23-09-202?", { patterns: true }),
+    dates: forgottenDates,
     walletCheck: fingerprintWalletCheck(fingerprint, PUBLIC_FINGERPRINT),
   });
   expectSame(
@@ -98,7 +99,7 @@ export async function checkShareUnmasking(
     `${PUBLIC_MNEMONIC} at ${MASKED_DATE}`,
     "Shares unmasked with a forgotten digit",
   );
-  const fiveDates = DatesAnswer.parse(FIVE_DATES, { patterns: false });
+  using fiveDates = DatesAnswer.parse(FIVE_DATES, { patterns: false });
   expectSame(
     await unmasked(new ShareUnmasking({ mode: "seedshift", dates: fiveDates })),
     "12-word phrases support at most 4 dates.",

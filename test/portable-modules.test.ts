@@ -316,7 +316,7 @@ const PARTS: Readonly<Record<string, Part>> = {
  * Modules that hosts compile unchanged besides the parts, each with the packages beyond BIP39 that
  * it reaches: the transformations as one module (core.ts, which re-exports core/), the record
  * format, and modules the parts are built on that the Deriver vendors as they are. They have no
- * export of their own.
+ * feature entry of their own; PUBLIC_MODULES lists the lower-level package entries.
  */
 const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   "src/core.ts": [],
@@ -333,6 +333,8 @@ const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   "src/core/bip39-sizes.ts": [],
   "src/core/byte-array.ts": [],
   "src/core/english-words.ts": [],
+  "src/core/word-table.ts": [],
+  "src/core/encoded-form.ts": [],
   "src/core/white-space.ts": [],
   // Text and lists cut into pieces of one width, which the readers of codes and bits share.
   "src/core/pieces.ts": [],
@@ -347,6 +349,7 @@ const SHARED_MODULES: Readonly<Record<string, readonly string[]>> = {
   "src/core/code-text.ts": [],
   "src/core/prose.ts": [],
   "src/core/redacted.ts": [],
+  "src/core/secret-value.ts": [],
   // What a thrown value says, which readers of input and the self-tests share.
   "src/core/refusal.ts": [],
   "src/core/candidate-file-refusal.ts": [],
@@ -404,6 +407,29 @@ const BARREL = "src/core.ts";
 
 /** The package's entries from before the parts, which stay for compatibility. */
 const COMPATIBILITY_EXPORTS = [".", "./cards", "./sskr"];
+
+/** Lower-level owners and coin families that hosts can import without a feature aggregator. */
+const PUBLIC_MODULES = [
+  "core/word-table",
+  "core/encoded-form",
+  "core/coins/coin",
+  "core/coins/base58",
+  "core/coins/bitcoin-like",
+  "core/coins/bitcoin-cash",
+  "core/coins/dash",
+  "core/coins/ethereum",
+  "core/coins/evm",
+  "core/coins/cosmos",
+  "core/coins/xrp",
+  "core/coins/coin-self-test",
+  "core/coins/bitcoin-like-self-test",
+  "core/coins/bitcoin-cash-self-test",
+  "core/coins/dash-self-test",
+  "core/coins/ethereum-self-test",
+  "core/coins/evm-self-test",
+  "core/coins/cosmos-self-test",
+  "core/coins/xrp-self-test",
+] as const;
 
 /** Globals that exist in Node.js but not in a browser page. */
 const NODE_ONLY_GLOBALS = [
@@ -580,7 +606,7 @@ describe("Parts for other hosts, each imported alone", () => {
       exports: Record<string, { types: string; import: string }>;
     };
     const expected = Object.fromEntries(
-      Object.keys(PARTS).map((part) => {
+      [...Object.keys(PARTS), ...PUBLIC_MODULES.map((name) => `src/${name}.ts`)].map((part) => {
         const path = part.replace(/^src\//u, "").replace(/\.ts$/u, "");
         return [`./${path}`, { types: `./dist/${path}.d.ts`, import: `./dist/${path}.js` }];
       }),
@@ -590,6 +616,7 @@ describe("Parts for other hosts, each imported alone", () => {
     );
     expect(parts).toEqual(expected);
     expect(Object.keys(exports)).toEqual(expect.arrayContaining(COMPATIBILITY_EXPORTS));
+    for (const name of PUBLIC_MODULES) expect(SHARED_MODULES).toHaveProperty([`src/${name}.ts`]);
   });
 });
 

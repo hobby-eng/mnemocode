@@ -12,6 +12,7 @@
 import { type DateShiftDate, type DecodedResult } from "../core.js";
 import { walletNeeded, type DatesAnswer } from "../core/date-search.js";
 import type { EncodedBackup } from "../core/encoded-backup.js";
+import type { MissingCodes } from "../core/missing-codes.js";
 import { Masking, PHRASE_WORDS } from "../core/masking.js";
 import {
   masterFingerprint,
@@ -115,7 +116,8 @@ async function decodeFromOptions(arguments_: ParsedArguments): Promise<Cancelled
     throw ERRORS.create("answers-question-decode-ask-secrets-where-dates-codes", [`${unused}`]);
   const read = await backupAndDatesFromOptions(arguments_);
   if (read === CANCELLED) return CANCELLED;
-  const { backup, dates: enteredDates } = read;
+  using backup = read.backup;
+  const enteredDates = read.dates;
   if (backup.givesSeveral) showLegacyValidCandidates(backup.candidates(enteredDates));
   else {
     const result = backup.decode(enteredDates);
@@ -367,86 +369,99 @@ export async function decodeWithQuestions(
   // and the line that names the codes found, shown again with the result.
   let foundDates: readonly DateShiftDate[] | undefined;
   let foundCodes: (() => void) | undefined;
-  for (let step: Step | Cancelled = "backup"; step !== "done";) {
-    if (step === CANCELLED) return CANCELLED;
-    if (step === "backup") {
-      foundDates = undefined;
-      foundCodes = undefined;
-      const read = await askEncodedBackup({
-        args: backupArgs,
-        seedshiftOnly: false,
-        recordMode,
-        marks: use.searches,
-        shares: use.searches,
-        inputKind,
-      });
-      if (read === CANCELLED) return CANCELLED;
-      // A Shamir share typed here is restored from, with its mode if Decode was given one.
-      if (read.kind === "share") {
-        const restore = { text: read.text, fromQr: read.fromQr };
-        const restored = await restoreFromShare(handedToRestore(args), restore);
-        if (restored !== "back") return restored === "done" ? undefined : restored;
-        // Escape at the question whether Seedshift was used: the codes are given again.
-        backupArgs = typedAfterFile(args);
-        continue;
+  let markedCodes: MissingCodes | undefined;
+  try {
+    for (let step: Step | Cancelled = "backup"; step !== "done";) {
+      if (step === CANCELLED) return CANCELLED;
+      if (step === "backup") {
+        markedCodes?.wipe();
+        markedCodes = undefined;
+        backup?.wipe();
+        backup = undefined;
+        foundDates = undefined;
+        foundCodes = undefined;
+        const read = await askEncodedBackup({
+          args: backupArgs,
+          seedshiftOnly: false,
+          recordMode,
+          marks: use.searches,
+          shares: use.searches,
+          inputKind,
+        });
+        if (read === CANCELLED) return CANCELLED;
+        // A Shamir share typed here is restored from, with its mode if Decode was given one.
+        if (read.kind === "share") {
+          const restore = { text: read.text, fromQr: read.fromQr };
+          const restored = await restoreFromShare(handedToRestore(args), restore);
+          if (restored !== "back") return restored === "done" ? undefined : restored;
+          // Escape at the question whether Seedshift was used: the codes are given again.
+          backupArgs = typedAfterFile(args);
+          continue;
+        }
+        recordMode = read.recordMode ?? recordMode;
+        if (read.kind === "missing") {
+          markedCodes = read.codes;
+          const outcome = await searchMissingCodes(read.codes, given);
+          if (outcome === CANCELLED) return CANCELLED;
+          if (outcome.kind !== "found") {
+            step = outcome.kind === "shown" ? "done" : "backup";
+            if (step === "backup") backupArgs = typedAfterFile(args);
+            continue;
+          }
+          backup = outcome.backup;
+          const { codes } = read;
+          const { backup: found, foundDates: dates } = outcome;
+          foundCodes = () => reportFound(codes, found, dates);
+          if (outcome.dates !== undefined) {
+            foundDates = outcome.dates;
+            step = "decode";
+            continue;
+          }
+        } else backup = read.backup;
+        step = stepAfterCodes(backup, typedDates);
+      } else if (step === "dates") {
+        const asked = await askDates({
+          wordCount: defined(backup).indexes.length,
+          patterns: use.searches,
+        });
+        if (asked === CANCELLED) return CANCELLED;
+        typedDates?.wipe();
+        typedDates = asked;
+        step = afterDates(typedDates);
+      } else if (step === "wallet") {
+        const wallet = await askedWallet(defined(backup), given, { evidence, withoutWallet });
+        if (wallet === CANCELLED) return CANCELLED;
+        ({ step, evidence, withoutWallet } = wallet);
+      } else if (step === "search") {
+        const searched = await searchAndShow(
+          defined(backup),
+          defined(typedDates),
+          evidence,
+          backupArgs,
+          given,
+        );
+        if (searched === CANCELLED) return CANCELLED;
+        ({ step, evidence } = searched);
+        withoutWallet = evidence === undefined;
+      } else {
+        step = await decodeAndShow(
+          defined(backup),
+          foundDates ?? typedDates?.known ?? [],
+          backupArgs,
+          use,
+          foundCodes,
+        );
       }
-      recordMode = read.recordMode ?? recordMode;
-      if (read.kind === "missing") {
-        const outcome = await searchMissingCodes(read.codes, given);
-        if (outcome === CANCELLED) return CANCELLED;
-        if (outcome.kind !== "found") {
-          step = outcome.kind === "shown" ? "done" : "backup";
-          if (step === "backup") backupArgs = typedAfterFile(args);
-          continue;
-        }
-        backup = outcome.backup;
-        const { codes } = read;
-        const { backup: found, foundDates: dates } = outcome;
-        foundCodes = () => reportFound(codes, found, dates);
-        if (outcome.dates !== undefined) {
-          foundDates = outcome.dates;
-          step = "decode";
-          continue;
-        }
-      } else backup = read.backup;
-      step = stepAfterCodes(backup, typedDates);
-    } else if (step === "dates") {
-      const asked = await askDates({
-        wordCount: defined(backup).indexes.length,
-        patterns: use.searches,
-      });
-      if (asked === CANCELLED) return CANCELLED;
-      typedDates = asked;
-      step = afterDates(typedDates);
-    } else if (step === "wallet") {
-      const wallet = await askedWallet(defined(backup), given, { evidence, withoutWallet });
-      if (wallet === CANCELLED) return CANCELLED;
-      ({ step, evidence, withoutWallet } = wallet);
-    } else if (step === "search") {
-      const searched = await searchAndShow(
-        defined(backup),
-        defined(typedDates),
-        evidence,
-        backupArgs,
-        given,
-      );
-      if (searched === CANCELLED) return CANCELLED;
-      ({ step, evidence } = searched);
-      withoutWallet = evidence === undefined;
-    } else {
-      step = await decodeAndShow(
-        defined(backup),
-        foundDates ?? typedDates?.known ?? [],
-        backupArgs,
-        use,
-        foundCodes,
-      );
+      // The same file would give the same phrase: it is typed this time, and its mode asked again
+      // unless --mode or a record named it.
+      if (step === "backup") backupArgs = typedAfterFile(args);
     }
-    // The same file would give the same phrase: it is typed this time, and its mode asked again
-    // unless --mode or a record named it.
-    if (step === "backup") backupArgs = typedAfterFile(args);
+    return undefined;
+  } finally {
+    markedCodes?.wipe();
+    backup?.wipe();
+    typedDates?.wipe();
   }
-  return undefined;
 }
 
 /**

@@ -59,7 +59,8 @@ async function assertCheckedRecords(records: readonly string[]): Promise<void> {
 /** The phrase of complete shares, each as read, in the shape of a repair. */
 export async function restoreShareSet(records: readonly string[]): Promise<RepairedSet> {
   await assertCheckedRecords(records);
-  return (await ShareSet.restore(records, nodeSharePlatform)).toRepairedSet();
+  using set = await ShareSet.restore(records, nodeSharePlatform);
+  return set.toRepairedSet();
 }
 
 /**
@@ -83,7 +84,8 @@ export async function planShareRepair(
  */
 export async function combineSskrShareSet(records: readonly string[]): Promise<RepairedSet> {
   await assertCheckedRecords(records);
-  return (await ShareSet.combine(records, nodeSharePlatform)).toRepairedSet();
+  using set = await ShareSet.combine(records, nodeSharePlatform);
+  return set.toRepairedSet();
 }
 
 /**
@@ -93,7 +95,7 @@ export async function combineSskrShareSet(records: readonly string[]): Promise<R
  */
 export async function combineSskrShares(records: readonly string[]): Promise<string> {
   await assertCheckedRecords(records);
-  const restored = await ShareSet.combine(records, nodeSharePlatform);
+  using restored = await ShareSet.combine(records, nodeSharePlatform);
   if (!restored.checked)
     throw ERRORS.create("some-shares-repaired-elements-could-not-checked-use", []);
   return restored.mnemonic;

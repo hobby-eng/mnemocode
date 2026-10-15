@@ -13,7 +13,7 @@
 // may change in between.
 
 import type { SplitMode } from "../core/masking.js";
-import { UNICODE_CODE_HINT, wordTableRow, type WordTableLookup } from "../core/words.js";
+import { UNICODE_CODE_HINT, WordTable, type WordTableLookup } from "../core/word-table.js";
 import { parseRecipient } from "../core/candidate-encryption.js";
 import { askWalletEvidence, type WalletValueAsker } from "./ask.js";
 import { MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
@@ -527,7 +527,7 @@ const LOOKUPS: Readonly<Record<WordTableLookup, Lookup>> = {
     label: "Word",
     what: "a word of the English BIP39 list",
     // Given as the table writes it, in lower case.
-    check: (answer) => wordTableRow("word", answer).english,
+    check: (answer) => WordTable.lookup("word", answer).english,
     hints: WordList.BIP39,
   },
   index: {
@@ -535,13 +535,13 @@ const LOOKUPS: Readonly<Record<WordTableLookup, Lookup>> = {
     label: "Number",
     what: `a number from ${WORD_NUMBERS}`,
     // Written as the command line takes it, without leading zeros.
-    check: (answer) => String(wordTableRow("index", answer).index),
+    check: (answer) => String(WordTable.lookup("index", answer).index),
   },
   unicode: {
     question: "Unicode code",
     label: "Code",
     what: UNICODE_CODE_HINT,
-    check: (answer) => wordTableRow("unicode", answer).unicodeHex,
+    check: (answer) => WordTable.lookup("unicode", answer).unicodeHex,
   },
 };
 

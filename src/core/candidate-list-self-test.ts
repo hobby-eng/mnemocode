@@ -5,7 +5,7 @@
 //
 // It needs nothing from the host. It holds public test data, no secret.
 //
-// Host-neutral: it imports only core/candidate-list.ts and core/self-test-check.ts.
+// Host-neutral: it imports only core modules.
 
 import {
   decodeCandidateList,
@@ -16,6 +16,7 @@ import {
 } from "./candidate-list.js";
 import { bytesOfHex, expectRefused, expectSame, hexOfBytes } from "./self-test-check.js";
 import { defined } from "./defined.js";
+import { SecretValue } from "./secret-value.js";
 
 /**
  * vectors/candidates-v1.json, "three phrases": the entropy of the public phrases of BIP39's first,
@@ -79,6 +80,8 @@ const PADME_LENGTHS: readonly (readonly [number, number])[] = [
 
 /** The list of three phrases written and read, the padded lengths, and the lists refused. */
 export function checkCandidateListStartup(): void {
+  using passphrase = SecretValue.text("\uFEFFTREZOR");
+  expectSame(passphrase.value, "\uFEFFTREZOR", "Retained BIP39 passphrase with leading U+FEFF");
   // Independent Python arithmetic for the maximum MNCL v1 fields, CRC and Padmé padding.
   expectSame(MAX_CANDIDATE_LIST_BYTES, 155_189_248, "Maximum candidate list bytes");
   OpenedCandidateList.assertSize(MAX_CANDIDATE_LIST_BYTES);

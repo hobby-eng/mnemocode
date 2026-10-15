@@ -136,22 +136,42 @@ export const WRONG_LENGTH = "it has the wrong length";
  * how its addresses are written.
  */
 export abstract class Coin implements CoinDescription {
-  readonly id: CoinId;
-  readonly name: string;
-  readonly addressForms: string;
-  readonly coinTypes: readonly number[];
+  readonly #id: CoinId;
+  readonly #name: string;
+  readonly #addressForms: string;
+  readonly #coinTypes: readonly number[];
   readonly #testnetAddressForms: string | undefined;
   readonly #commitments: Readonly<Partial<Record<AddressType, KeyCommitment>>>;
   readonly #purposes: Readonly<Partial<Record<AddressType, number>>>;
 
   constructor(description: CoinDescription & CoinRules) {
-    this.id = description.id;
-    this.name = description.name;
-    this.addressForms = description.addressForms;
+    this.#id = description.id;
+    this.#name = description.name;
+    this.#addressForms = description.addressForms;
     this.#testnetAddressForms = description.testnetAddressForms;
-    this.coinTypes = Object.freeze([...description.coinTypes]);
+    this.#coinTypes = Object.freeze([...description.coinTypes]);
     this.#commitments = Object.freeze({ ...description.commitments });
     this.#purposes = Object.freeze({ ...description.purposes });
+  }
+
+  /** The stable identifier under which a host registers this coin. */
+  get id(): CoinId {
+    return this.#id;
+  }
+
+  /** The coin's name for a person. */
+  get name(): string {
+    return this.#name;
+  }
+
+  /** How the coin's supported main-network addresses begin. */
+  get addressForms(): string {
+    return this.#addressForms;
+  }
+
+  /** The owned, read-only SLIP-44 coin types of the main network's paths. */
+  get coinTypes(): readonly number[] {
+    return this.#coinTypes;
   }
 
   /**

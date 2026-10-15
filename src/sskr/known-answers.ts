@@ -3,12 +3,12 @@
 // secret, 32 bytes, that scripts/verify-sskr-known-answers.py restores without the library. A
 // host checks its own SSKR library with them before it trusts it with a secret.
 //
-// From the host it needs only its SharePlatform (share-platform.ts), whose combineShares restores
+// From the host it needs only its ShareCombiner (share-platform.ts), whose combineShares restores
 // the vectors and whose createShares reproduces a deterministic test set. All data is public.
 //
 // Host-neutral: it imports only other host-neutral sskr modules (test/portable-modules.test.ts).
 
-import type { SharePlatform } from "./share-platform.js";
+import type { ShareCombiner, ShareSplitPlatform } from "./share-platform.js";
 import {
   CHECKSUM_BYTES,
   colorsToShare,
@@ -163,7 +163,7 @@ function changedShareValue(): string {
 
 /** The host's restoring of `shares` compared with `entropy`; `name` names the check. */
 async function expectRestored(
-  platform: SharePlatform,
+  platform: ShareCombiner,
   shares: readonly string[],
   entropy: string,
   name: string,
@@ -181,7 +181,7 @@ async function expectRestored(
  * Compares the colour transport and the host's SSKR library with the known answers; throws, before
  * any secret is touched, at the first difference.
  */
-export async function checkSskrKnownAnswers(platform: SharePlatform): Promise<void> {
+export async function checkSskrKnownAnswers(platform: ShareSplitPlatform): Promise<void> {
   checkSskrTransportStartup();
   if (
     shareToColors(sskrVector.shares[0]).join(" ") !== sskrVector.firstShareColors.join(" ") ||

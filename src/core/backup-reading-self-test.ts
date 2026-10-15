@@ -94,7 +94,7 @@ function withMarks(text: string, places: readonly number[]): string {
  * come among them.
  */
 function checkMarked(marked: MarkedCase): void {
-  const codes = MissingCodes.read(marked.text, marked.format, "seedshift");
+  using codes = MissingCodes.read(marked.text, marked.format, "seedshift");
   expectSame(codes.combinations, marked.combinations, `Marked ${marked.format} combinations`);
   let count = 0;
   let right = 0;
@@ -120,16 +120,20 @@ export function checkBackupReadingStartup(): void {
   for (const text of [
     codes.join(" "),
     codes.map((code) => (code === "?" ? code : String.fromCodePoint(parseInt(code, 16)))).join(""),
-  ])
-    expectSame(
-      BackupReading.of(`MNC1:direct:colors-unicode:${text}`, {
-        words,
-        seedshiftOnly: false,
-        shareReader: SHARE_READER,
-      }).marked,
-      true,
-      "Color Unicode mark with a declared word count",
+  ]) {
+    using reading = BackupReading.of(`MNC1:direct:colors-unicode:${text}`, {
+      words,
+      seedshiftOnly: false,
+      shareReader: SHARE_READER,
+    });
+    expectSame(reading.marked, true, "Color Unicode mark with a declared word count");
+    reading.wipe();
+    expectRefused(
+      () => reading.codes("colors-unicode"),
+      /has been wiped/u,
+      "An ended backup reading",
     );
+  }
   checkMarked(MARKED_DIGITS);
   checkMarked(MARKED_UNICODE);
   expectSame(
@@ -137,14 +141,17 @@ export function checkBackupReadingStartup(): void {
     "indexes",
     "Forms of marked word numbers",
   );
-  const unchecked = MissingCodes.read(MARKED_DIGITS.text, "indexes", "seedshift-legacy");
+  using unchecked = MissingCodes.read(MARKED_DIGITS.text, "indexes", "seedshift-legacy");
   expectSame(unchecked.expected, MARKED_DIGITS.combinations, "Original Seedshift candidates");
   // Codes without Seedshift are the phrase itself, whose checksum holds them as Seedshift's does.
+  using direct = MissingCodes.read(MARKED_DIGITS.text, "indexes", "direct");
   expectSame(
-    [...MissingCodes.read(MARKED_DIGITS.text, "indexes", "direct").candidates()].length,
+    [...direct.candidates()].length,
     MARKED_DIGITS.candidates,
     "Candidates without Seedshift",
   );
+  unchecked.wipe();
+  expectRefused(() => unchecked.candidates(), /has been wiped/u, "An ended marked-code search");
   expectRefused(
     () => MissingCodes.read(MASKED_COLORS.replace("#200B38", "#200B3?"), "colors", "seedshift"),
     /one \? in place of the whole color/u,
@@ -206,17 +213,20 @@ export function checkBackupReadingStartup(): void {
 export async function checkBackupReading(fingerprint: PhraseFingerprint): Promise<void> {
   checkBackupReadingStartup();
   checkMarked(MARKED_COLOR);
-  expectSame(
-    await EncodedBackup.read(MASKED_ENGLISH, "english", "seedshift").fingerprint(fingerprint),
-    ENCODED_FINGERPRINT,
-    "Encoded fingerprint",
-  );
-  const result = await MissingCodes.read(MARKED_DIGITS.text, "indexes", "seedshift").run({
-    check: async (codes) =>
-      (await EncodedBackup.of(codes, "indexes", "seedshift").fingerprint(fingerprint)) ===
-      ENCODED_FINGERPRINT,
+  using backup = EncodedBackup.read(MASKED_ENGLISH, "english", "seedshift");
+  expectSame(await backup.fingerprint(fingerprint), ENCODED_FINGERPRINT, "Encoded fingerprint");
+  using codes = MissingCodes.read(MARKED_DIGITS.text, "indexes", "seedshift");
+  const result = await codes.run({
+    check: async (codes) => {
+      using candidate = EncodedBackup.of(codes, "indexes", "seedshift");
+      return (await candidate.fingerprint(fingerprint)) === ENCODED_FINGERPRINT;
+    },
   });
-  expectSame(result.count, MARKED_DIGITS.candidates, "Marked codes checked");
-  expectSame(result.passed, 1, "Marked codes with the encoded fingerprint");
-  expectSame(result.found[0]?.text(), MASKED_NUMBERS, "Marked codes found");
+  try {
+    expectSame(result.count, MARKED_DIGITS.candidates, "Marked codes checked");
+    expectSame(result.passed, 1, "Marked codes with the encoded fingerprint");
+    expectSame(result.found[0]?.text(), MASKED_NUMBERS, "Marked codes found");
+  } finally {
+    for (const found of result.found) found.wipe();
+  }
 }

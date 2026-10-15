@@ -244,6 +244,82 @@
     "./export/heir-sheet-self-test": {
       "types": "./dist/export/heir-sheet-self-test.d.ts",
       "import": "./dist/export/heir-sheet-self-test.js"
+    },
+    "./core/word-table": {
+      "types": "./dist/core/word-table.d.ts",
+      "import": "./dist/core/word-table.js"
+    },
+    "./core/encoded-form": {
+      "types": "./dist/core/encoded-form.d.ts",
+      "import": "./dist/core/encoded-form.js"
+    },
+    "./core/coins/coin": {
+      "types": "./dist/core/coins/coin.d.ts",
+      "import": "./dist/core/coins/coin.js"
+    },
+    "./core/coins/base58": {
+      "types": "./dist/core/coins/base58.d.ts",
+      "import": "./dist/core/coins/base58.js"
+    },
+    "./core/coins/bitcoin-like": {
+      "types": "./dist/core/coins/bitcoin-like.d.ts",
+      "import": "./dist/core/coins/bitcoin-like.js"
+    },
+    "./core/coins/bitcoin-cash": {
+      "types": "./dist/core/coins/bitcoin-cash.d.ts",
+      "import": "./dist/core/coins/bitcoin-cash.js"
+    },
+    "./core/coins/dash": {
+      "types": "./dist/core/coins/dash.d.ts",
+      "import": "./dist/core/coins/dash.js"
+    },
+    "./core/coins/ethereum": {
+      "types": "./dist/core/coins/ethereum.d.ts",
+      "import": "./dist/core/coins/ethereum.js"
+    },
+    "./core/coins/evm": {
+      "types": "./dist/core/coins/evm.d.ts",
+      "import": "./dist/core/coins/evm.js"
+    },
+    "./core/coins/cosmos": {
+      "types": "./dist/core/coins/cosmos.d.ts",
+      "import": "./dist/core/coins/cosmos.js"
+    },
+    "./core/coins/xrp": {
+      "types": "./dist/core/coins/xrp.d.ts",
+      "import": "./dist/core/coins/xrp.js"
+    },
+    "./core/coins/coin-self-test": {
+      "types": "./dist/core/coins/coin-self-test.d.ts",
+      "import": "./dist/core/coins/coin-self-test.js"
+    },
+    "./core/coins/bitcoin-like-self-test": {
+      "types": "./dist/core/coins/bitcoin-like-self-test.d.ts",
+      "import": "./dist/core/coins/bitcoin-like-self-test.js"
+    },
+    "./core/coins/bitcoin-cash-self-test": {
+      "types": "./dist/core/coins/bitcoin-cash-self-test.d.ts",
+      "import": "./dist/core/coins/bitcoin-cash-self-test.js"
+    },
+    "./core/coins/dash-self-test": {
+      "types": "./dist/core/coins/dash-self-test.d.ts",
+      "import": "./dist/core/coins/dash-self-test.js"
+    },
+    "./core/coins/ethereum-self-test": {
+      "types": "./dist/core/coins/ethereum-self-test.d.ts",
+      "import": "./dist/core/coins/ethereum-self-test.js"
+    },
+    "./core/coins/evm-self-test": {
+      "types": "./dist/core/coins/evm-self-test.d.ts",
+      "import": "./dist/core/coins/evm-self-test.js"
+    },
+    "./core/coins/cosmos-self-test": {
+      "types": "./dist/core/coins/cosmos-self-test.d.ts",
+      "import": "./dist/core/coins/cosmos-self-test.js"
+    },
+    "./core/coins/xrp-self-test": {
+      "types": "./dist/core/coins/xrp-self-test.d.ts",
+      "import": "./dist/core/coins/xrp-self-test.js"
     }
   },
   "files": [
@@ -257,6 +333,7 @@
     "THIRD_PARTY_NOTICES.md",
     "sskr-wasm",
     "docs/*.md",
+    "docs/releases/*.md",
     "docs/audits/README.md",
     "docs/audits/AUD-*.md",
     "docs/audits/AUD-*.json",
@@ -273,7 +350,7 @@
     "check:audit-package": "node scripts/verify-audit-package.mjs",
     "check:copies": "node scripts/verify-no-copies.mjs",
     "check:code-rules": "node scripts/verify-code-rules.mjs",
-    "check:rust": "cd sskr-wasm/rust && cargo clippy --locked --all-targets --target-dir ../../node_modules/.cache/sskr-cargo -- -D warnings && cargo fmt --check",
+    "check:rust": "cd sskr-wasm/rust && cargo clippy --locked --workspace --all-targets --target-dir ../../node_modules/.cache/sskr-cargo -- -D warnings && cargo fmt --all --check",
     "lint": "oxlint --type-aware --tsconfig tsconfig.tests.json --report-unused-disable-directives src test scripts vitest.config.ts",
     "check": "pnpm check:toolchain && pnpm check:markdown && pnpm check:audit-privacy && pnpm check:audit-package && pnpm check:copies && pnpm check:code-rules && pnpm lint && pnpm check:rust && tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p tsconfig.cards.json",
     "format": "prettier --write .",

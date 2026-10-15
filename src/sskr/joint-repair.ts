@@ -9,28 +9,28 @@
 // Every phrase that passes is reported; none is chosen.
 //
 // Only sets of one group are repaired, which is all that MnemoCode writes. JointRepair, at the
-// end, is the entry: built with the host's SharePlatform (share-platform.ts), whose HMAC-SHA256
+// end, is the entry: built with the host's ShareRepairPlatform (share-platform.ts), whose HMAC-SHA256
 // checks each candidate and whose SSKR library restores it, it assesses the shares and searches
 // them. Long work gives the host a turn now and then (SearchTurns, as every search of the library
 // does), so that it can show progress or stop it. Joint and Branch (joint-solve.ts) are one
-// reading of every share and a solved way to read them; each owns what it computes and the arrays
-// of the secret that it holds. What a repair tells is joint-results.ts. The functions before
-// JointRepair stay for the hosts that already call them, and take the host's SharePlatform as
+// reading of every share and a solved way to read them; branches own computed state, and the plan
+// owns their selected spaces. What a repair tells is joint-results.ts. The functions before
+// JointRepair stay for the hosts that already call them, and take the host's ShareRepairPlatform as
 // JointRepair does: no platform is read from elsewhere.
 //
-// Needs from the host: its SharePlatform, the places at which the shares were typed, by which its
+// Needs from the host: its ShareRepairPlatform, the places at which the shares were typed, by which its
 // refusals name them, and an AbortSignal, a turn and a progress callback for a search.
 // Does not: ask whether to search, say what a repair filled in (repair-report.ts), or tell which
 // shares a person typed (share-input.ts).
 
 import { withJoinedMarksHint } from "../core/code-text.js";
-import { wipeAll } from "../core/bits.js";
 import { BIP39_ENTROPY_BYTES } from "../core/bip39-sizes.js";
 import {
   SearchTurns,
   startTimer,
   type SearchProgress,
   type SearchRun,
+  type MonotonicClock,
   type TurnState,
 } from "../core/search-turns.js";
 import {
@@ -45,7 +45,7 @@ import {
 } from "./repair.js";
 import { AMBIGUOUS_MARK_WIDTHS, AmbiguousMarksError } from "./repair-models.js";
 import { MAX_PARTIAL_UNIT_CANDIDATES } from "./repair-units.js";
-import type { SharePlatform } from "./share-platform.js";
+import type { ShareRepairPlatform } from "./share-platform.js";
 import { assertShareCount } from "./transport.js";
 import { SHARE_METADATA_BYTES } from "./share-layout.js";
 import { afterPlace } from "../core/prose.js";
@@ -74,6 +74,7 @@ import {
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("sskr.joint-repair", {
+  "plan-wiped": () => "This joint repair plan has been wiped.",
   "readings-refused": suppliedMessage,
   "plan-joint-repair-refused": suppliedMessage,
   "share-repair-host-s-share-platform": {
@@ -135,11 +136,69 @@ export interface JointPlan {
   readonly assessment: JointAssessment;
   /**
    * Tries every open combination; resolves with every phrase that passes, possibly none, and
-   * whether the host stopped the search.
+   * whether the host stopped the search. Refused with sskr.joint-repair.plan-wiped after wipe,
+   * including when the plan ends while a host confirmation or turn is awaited.
    */
   readonly search: (options?: SearchOptions) => Promise<RepairSearch>;
   /** Wipes what the search keeps of the shares' secret; the plan searches no more after it. */
   readonly wipe: () => void;
+}
+
+/** Owns selected branches and unique spaces; plain search results transfer to the caller. */
+class OwnedJointPlan implements JointPlan, Disposable {
+  readonly assessment: JointAssessment;
+  readonly #branches: readonly Branch[];
+  readonly #platform: ShareRepairPlatform | undefined;
+  readonly #secrets = new AssessmentSecrets();
+  readonly #active = new Set<() => void>();
+  #wiped = false;
+
+  constructor(
+    assessment: JointAssessment,
+    branches: readonly Branch[] = [],
+    platform?: ShareRepairPlatform,
+  ) {
+    this.assessment = assessment;
+    this.#branches = [...branches];
+    this.#platform = platform;
+    for (const branch of branches) this.#secrets.addBranch(branch);
+    this.#secrets.addSpaces(branches.flatMap((branch) => branch.spaces));
+  }
+
+  readonly search = async (options?: SearchOptions): Promise<RepairSearch> => {
+    this.#assertLive();
+    if (this.#platform === undefined) return NOTHING_SEARCHED;
+    try {
+      const result = await searchBranches(
+        this.#branches,
+        this.#platform,
+        () => this.#assertLive(),
+        this.#active,
+        options,
+      );
+      this.#assertLive();
+      return result;
+    } catch (error) {
+      this.#assertLive();
+      throw error;
+    }
+  };
+
+  readonly wipe = (): void => {
+    if (this.#wiped) return;
+    this.#wiped = true;
+    for (const close of this.#active) close();
+    this.#active.clear();
+    this.#secrets.wipe();
+  };
+
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
+
+  #assertLive(): void {
+    if (this.#wiped) throw ERRORS.create("plan-wiped", []);
+  }
 }
 
 /** The phrases of `plan`'s one search; what the plan kept of the secret is wiped after it. */
@@ -155,13 +214,16 @@ export async function searchOnce(plan: JointPlan, options?: SearchOptions): Prom
  * Digest checks per second in this host, from a short run on zero bytes, with `platform`'s
  * HMAC-SHA256 (JointRepair.triesPerSecond).
  */
-export function measureTriesPerSecond(platform: Pick<SharePlatform, "hmacSha256">): number {
+export function measureTriesPerSecond(
+  platform: Pick<ShareRepairPlatform, "hmacSha256">,
+  now?: MonotonicClock,
+): number {
   const { hmacSha256 } = platform;
   // The longest secret, so that the rate holds for every phrase.
   const secretBytes = Math.max(...BIP39_ENTROPY_BYTES);
   const sample = new Uint8Array(2 * secretBytes);
   const tries = 10_000;
-  const elapsed = startTimer();
+  const elapsed = startTimer(now);
   for (let index = 0; index < tries; index += 1) digestFits(sample, secretBytes, hmacSha256);
   const seconds = elapsed();
   return tries / Math.max(seconds, 1e-6);
@@ -191,28 +253,42 @@ function readingsOf(place: number, text: string): MarkedReading[] {
   }
 }
 
+/** Solves owned readings, retaining spaces independently; a refinement may also borrow one. */
+function spacesFrom(
+  readings: readonly MarkedReading[],
+  secrets: AssessmentSecrets,
+  borrowed?: MarkedReading,
+): ReadingSpace[] {
+  try {
+    return readings.flatMap((reading) => {
+      const space = reading.space();
+      if (space === undefined) return [];
+      secrets.addSpaces([space]);
+      return [space];
+    });
+  } finally {
+    for (const reading of new Set(readings)) if (reading !== borrowed) reading.wipe();
+  }
+}
+
 function refusal(
   shares: readonly ShareAssessment[],
   verdict: JointAssessment["verdict"],
   reason: string,
   unfit?: number,
 ): JointPlan {
-  return {
-    assessment: {
-      shares,
-      branches: 0,
-      openBits: 0,
-      combinations: 0,
-      expectedFalse: 0,
-      moreShares: 0,
-      helps: [],
-      verdict,
-      reason,
-      ...(unfit === undefined ? {} : { unfit }),
-    },
-    search: async () => NOTHING_SEARCHED,
-    wipe: () => undefined,
-  };
+  return new OwnedJointPlan({
+    shares,
+    branches: 0,
+    openBits: 0,
+    combinations: 0,
+    expectedFalse: 0,
+    moreShares: 0,
+    helps: [],
+    verdict,
+    reason,
+    ...(unfit === undefined ? {} : { unfit }),
+  });
 }
 
 /** The search of a plan that refuses: nothing to try. */
@@ -364,13 +440,10 @@ async function refined(
     // The caller sees a stop in `turns`.
     if ((await turns.take()) === "stopped") return undefined;
     const places = chosen.filter((unit) => unit.share === share).map((unit) => unit.place);
-    const tried = spaces.flatMap((space) =>
-      space.reading
-        .choicesAt(places)
-        .map((reading) => reading.space())
-        .filter((reading): reading is ReadingSpace => reading !== undefined),
-    );
-    secrets.addSpaces(tried);
+    const tried = spaces.flatMap((space) => {
+      const reading = space.reading;
+      return spacesFrom(reading.choicesAt(places), secrets, reading);
+    });
     expanded.push(tried);
   }
   if (expanded.some((spaces) => spaces.length === 0)) return undefined;
@@ -382,7 +455,7 @@ async function refined(
 /** How planJointRepair assesses the shares. */
 export interface PlanOptions extends SearchRun {
   /** The host's services, with which the search checks and restores each candidate. */
-  readonly platform: SharePlatform;
+  readonly platform: ShareRepairPlatform;
   /**
    * The place at which each share was typed, by its index among `records`, by which a refusal
    * names it; by its index, counted from 1, where none is given.
@@ -412,8 +485,8 @@ export async function planJointRepair(
     const problem = jointMarkLimitProblem(placeOf(places, index + 1), text);
     if (problem !== undefined) throw ERRORS.create("plan-joint-repair-refused", [problem]);
   }
-  // A plan that can search keeps the arrays of its branches for its searches; every other array
-  // made for the assessment is wiped, all of them when it is stopped (AUD-012-SEC004).
+  // A searchable plan takes its branches and unique spaces; every unselected owner and array is
+  // released, all of them when assessment stops (AUD-012-SEC004).
   const secrets = new AssessmentSecrets();
   let assessed: Assessed | undefined;
   try {
@@ -422,10 +495,7 @@ export async function planJointRepair(
       // A turn between the shares, however quick: reading one is quick, but many add up, and a
       // stop typed meanwhile is heard (SearchTurns.take): the assessment then plans nothing.
       if ((await turns.take()) === "stopped") return refusal([], "stopped", STOPPED_REASON);
-      const spaces = readingsOf(placeOf(places, index + 1), text)
-        .map((reading) => reading.space())
-        .filter((space): space is ReadingSpace => space !== undefined);
-      secrets.addSpaces(spaces);
+      const spaces = spacesFrom(readingsOf(placeOf(places, index + 1), text), secrets);
       spacesOf.push(spaces);
     }
     assessed = await assessReadings(spacesOf, texts, { platform, places, turns, secrets });
@@ -445,7 +515,7 @@ interface Assessed {
 
 /** What an assessment runs with: the host's platform and places, its turns, and its secrets. */
 interface AssessmentRun {
-  readonly platform: SharePlatform;
+  readonly platform: ShareRepairPlatform;
   readonly places: readonly number[] | undefined;
   readonly turns: SearchTurns;
   readonly secrets: AssessmentSecrets;
@@ -473,7 +543,11 @@ async function assessReadings(
   });
   const plan = async (branches: readonly Branch[]): Promise<Assessed> => {
     const made = await planOf(shares, branches, platform, turns);
-    return turns.stopped ? refuse("stopped", STOPPED_REASON) : { plan: made, kept: branches };
+    if (turns.stopped) {
+      made.wipe();
+      return refuse("stopped", STOPPED_REASON);
+    }
+    return { plan: made, kept: branches };
   };
   const unfit = spacesOf.findIndex((spaces) => spaces.length === 0);
   if (unfit >= 0) {
@@ -531,7 +605,7 @@ async function assessReadings(
 async function planOf(
   shares: readonly ShareAssessment[],
   branches: readonly Branch[],
-  platform: SharePlatform,
+  platform: ShareRepairPlatform,
   turns: SearchTurns,
 ): Promise<JointPlan> {
   const openBits = Math.max(...branches.map((branch) => branch.openBits));
@@ -556,12 +630,7 @@ async function planOf(
         }
       : {}),
   };
-  if (tooOpen) return { assessment, search: async () => NOTHING_SEARCHED, wipe: () => undefined };
-  return {
-    assessment,
-    search: (options) => searchBranches(branches, platform, options),
-    wipe: () => wipeAll(branches.flatMap((branch) => branch.allSecretArrays())),
-  };
+  return new OwnedJointPlan(assessment, tooOpen ? [] : branches, tooOpen ? undefined : platform);
 }
 
 /**
@@ -572,7 +641,9 @@ async function planOf(
  */
 async function searchBranches(
   branches: readonly Branch[],
-  platform: SharePlatform,
+  platform: ShareRepairPlatform,
+  assertLive: () => void,
+  active: Set<() => void>,
   options: SearchOptions = {},
 ): Promise<RepairSearch> {
   // A signal that is already aborted stops the search before any check.
@@ -580,25 +651,39 @@ async function searchBranches(
   if (turns.stopped) return { sets: [], stopped: true };
   const total = combinationsOf(branches);
   const found = new Map<string, RepairedSet>();
+  const close = () => found.clear();
+  active.add(close);
   const progress = (checked: number): RepairProgress => ({ checked, total, found: found.size });
   let done = 0;
   const tried = (): Promise<TurnState> | undefined => {
+    assertLive();
     done += 1;
     if (done % TRIES_PER_PROGRESS !== 0) return undefined;
     options.onProgress?.(progress(done));
+    assertLive();
     return turns.due();
   };
   const add = (repaired: RepairedSet): void => {
+    assertLive();
+    // Confirmation awaited a host combiner; it may have completed after cancellation.
+    if (turns.stopped) return;
     const known = found.get(repaired.mnemonic);
     found.set(repaired.mnemonic, known === undefined ? repaired : merged(known, repaired));
   };
-  for (const branch of branches) {
-    await branch.searchDigest(platform, add, tried);
-    // The sets found before a stop are given as such: only those (CORE-22).
-    if (turns.stopped) return { sets: [...found.values()], stopped: true };
+  try {
+    for (const branch of branches) {
+      await branch.searchDigest(platform, add, tried);
+      assertLive();
+      // The sets found before a stop are given as such: only those (CORE-22).
+      if (turns.stopped) return { sets: [...found.values()], stopped: true };
+    }
+    options.onProgress?.(progress(total));
+    assertLive();
+    return { sets: [...found.values()], stopped: turns.stopped };
+  } finally {
+    close();
+    active.delete(close);
   }
-  options.onProgress?.(progress(total));
-  return { sets: [...found.values()], stopped: turns.stopped };
 }
 
 /**
@@ -633,7 +718,7 @@ function merged(first: RepairedSet, other: RepairedSet): RepairedSet {
  * `platform`, refused unless it has what a repair calls: the digest check and the restore of the
  * SSKR library. A host written in JavaScript may leave it out, which the types alone do not stop.
  */
-function checkedPlatform(platform: SharePlatform | undefined): SharePlatform {
+function checkedPlatform(platform: ShareRepairPlatform | undefined): ShareRepairPlatform {
   if (typeof platform?.hmacSha256 !== "function" || typeof platform.combineShares !== "function")
     throw ERRORS.create("share-repair-host-s-share-platform", []);
   return platform;
@@ -641,12 +726,12 @@ function checkedPlatform(platform: SharePlatform | undefined): SharePlatform {
 
 /**
  * The repair of marked shares with the host's services. A class, so that a page binds its
- * SharePlatform once and every assessment, search and measure of its pace uses it.
+ * ShareRepairPlatform once and every assessment, search and measure of its pace uses it.
  */
 export class JointRepair {
-  readonly #platform: SharePlatform;
+  readonly #platform: ShareRepairPlatform;
 
-  constructor(platform: SharePlatform) {
+  constructor(platform: ShareRepairPlatform) {
     this.#platform = checkedPlatform(platform);
   }
 
@@ -666,7 +751,7 @@ export class JointRepair {
   }
 
   /** Digest checks per second in this host, for the time of a search (RepairReport). */
-  triesPerSecond(): number {
-    return measureTriesPerSecond(this.#platform);
+  triesPerSecond(now?: MonotonicClock): number {
+    return measureTriesPerSecond(this.#platform, now);
   }
 }

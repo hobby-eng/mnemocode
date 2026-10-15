@@ -22,6 +22,7 @@ import {
   statusLine,
 } from "../src/cli/terminal-style.ts";
 import { CANCELLED_EXIT_CODE, CANCELLED_MESSAGE } from "../src/cli/exit-codes.ts";
+import { CANCELLED } from "../src/cli/terminal-keys.ts";
 import { typedLine } from "../src/cli/shell-command.ts";
 import { describeError } from "../src/core/refusal.ts";
 // SHA256SUMS joins the checksum files of build-executable.mjs; their lines and names come from
@@ -235,8 +236,6 @@ const INSTALL_HINTS = {
   sha256sum: "install GNU coreutils",
 };
 
-class Cancelled extends Error {}
-
 /**
  * Set by Ctrl+C. The terminal sends SIGINT to gh or gpg as well as to Node, so Node only notes it,
  * waits for the step that runs, and stops before the next one.
@@ -267,7 +266,7 @@ function lastLine(text) {
  */
 async function run(step, { cwd = root, terminal = false } = {}) {
   await nextTurn();
-  if (interrupted) throw new Cancelled();
+  if (interrupted) return CANCELLED;
   const [command, args] = step;
   const result = await new Promise((resolve) => {
     const child = spawn(command, args, {
@@ -282,11 +281,11 @@ async function run(step, { cwd = root, terminal = false } = {}) {
   });
   // A program that catches Ctrl+C may end before Node's listener has run.
   await nextTurn();
+  if (interrupted || result.signal === "SIGINT") return CANCELLED;
   if (result.error?.code === "ENOENT") {
     throw ERRORS.create("not-installed", [`${command}`, `${INSTALL_HINTS[command]}`]);
   }
   if (result.error !== undefined) throw result.error;
-  if (interrupted || result.signal === "SIGINT") throw new Cancelled();
   return result;
 }
 
@@ -299,12 +298,14 @@ function failure(what, result) {
 
 /** Whether a checking command succeeds. */
 async function succeeds(step) {
-  return (await run(step)).status === 0;
+  const result = await run(step);
+  return result === CANCELLED ? CANCELLED : result.status === 0;
 }
 
 /** Runs a command that only reads or checks and returns its output; a failure stops the script. */
 async function runQuietly(what, step, cwd = root) {
   const result = await run(step, { cwd });
+  if (result === CANCELLED) return CANCELLED;
   if (result.status !== 0) throw failure(what, result);
   return result.stdout;
 }
@@ -312,6 +313,7 @@ async function runQuietly(what, step, cwd = root) {
 /** Runs a command in the terminal, where GnuPG can ask for the passphrase itself. */
 async function runInTerminal(what, step, cwd) {
   const result = await run(step, { cwd, terminal: true });
+  if (result === CANCELLED) return CANCELLED;
   if (result.status !== 0) throw failure(what, result);
 }
 
@@ -406,14 +408,19 @@ function printPlan({ tag, publish }, folder) {
 
 /** Checks before anything is downloaded that the tools and the signing key are there. */
 async function checkTools() {
-  if (!(await succeeds(COMMANDS.attestationTool()))) {
+  const attestation = await succeeds(COMMANDS.attestationTool());
+  if (attestation === CANCELLED) return CANCELLED;
+  if (!attestation) {
     throw ERRORS.create("git-hub-cli-no-gh-attestation-command-install", []);
   }
-  if (!(await succeeds(COMMANDS.secretKey()))) {
+  const key = await succeeds(COMMANDS.secretKey());
+  if (key === CANCELLED) return CANCELLED;
+  if (!key) {
     throw ERRORS.create("gnu-pg-on-computer-no-secret-key", [`${SIGNING_KEY}`]);
   }
-  if (!(await succeeds(COMMANDS.checksumTool())))
-    throw ERRORS.create("sha256sum-version-failed", []);
+  const checksums = await succeeds(COMMANDS.checksumTool());
+  if (checksums === CANCELLED) return CANCELLED;
+  if (!checksums) throw ERRORS.create("sha256sum-version-failed", []);
 }
 
 /**
@@ -422,6 +429,7 @@ async function checkTools() {
  */
 async function checkDraft(tag) {
   const output = await runQuietly(`Reading the releases of ${REPOSITORY}`, COMMANDS.releases(tag));
+  if (output === CANCELLED) return CANCELLED;
   const releases = output
     .split("\n")
     .filter((line) => line !== "")
@@ -491,6 +499,7 @@ function listedFiles(folderPath, version) {
 /** sha256sum names each file that differs from its line in SHA256SUMS: "<file>: FAILED". */
 async function checkChecksums(folderPath) {
   const result = await run(COMMANDS.checksums(), { cwd: folderPath });
+  if (result === CANCELLED) return CANCELLED;
   if (result.status === 0) return;
   const differing = result.stdout
     .split("\n")
@@ -511,6 +520,7 @@ async function checkChecksums(folderPath) {
  */
 async function checkSignature(folderPath) {
   const status = await runQuietly(`Checking ${SIGNATURE}`, COMMANDS.verify(), folderPath);
+  if (status === CANCELLED) return CANCELLED;
   const valid = status
     .split("\n")
     .filter((line) => line.startsWith("[GNUPG:] VALIDSIG "))
@@ -538,30 +548,57 @@ async function signRelease({ tag, publish }, folder) {
   const folderPath = join(root, folder);
   if (existsSync(folderPath)) throw folderExistsError(folder);
   listenForCtrlC();
-  await checkTools();
+  if ((await checkTools()) === CANCELLED) return CANCELLED;
   const draftPage = await checkDraft(tag);
+  if (draftPage === CANCELLED) return CANCELLED;
   passed("Draft", tag);
 
   makeFolder(folder);
-  await runQuietly(`Downloading the draft ${tag}`, COMMANDS.download(tag, folder));
+  if (
+    (await runQuietly(`Downloading the draft ${tag}`, COMMANDS.download(tag, folder))) === CANCELLED
+  )
+    return CANCELLED;
   const files = listedFiles(folderPath, version);
-  await checkChecksums(folderPath);
+  if ((await checkChecksums(folderPath)) === CANCELLED) return CANCELLED;
   passed("Checksums", `${files.length} files match ${CHECKSUMS}`);
   for (const file of files) {
-    await runQuietly(`Checking the attestation of ${file}`, COMMANDS.attestation(file), folderPath);
+    if (
+      (await runQuietly(
+        `Checking the attestation of ${file}`,
+        COMMANDS.attestation(file),
+        folderPath,
+      )) === CANCELLED
+    )
+      return CANCELLED;
     passed("Attestation", file);
   }
 
-  await runInTerminal(`Signing ${CHECKSUMS}`, COMMANDS.sign(), folderPath);
-  await checkSignature(folderPath);
+  if ((await runInTerminal(`Signing ${CHECKSUMS}`, COMMANDS.sign(), folderPath)) === CANCELLED)
+    return CANCELLED;
+  if ((await checkSignature(folderPath)) === CANCELLED) return CANCELLED;
   passed("Signature", `${SIGNATURE} by ${SIGNING_KEY}`);
-  await runQuietly(`Exporting the public key ${SIGNING_KEY}`, COMMANDS.exportKey(), folderPath);
+  if (
+    (await runQuietly(
+      `Exporting the public key ${SIGNING_KEY}`,
+      COMMANDS.exportKey(),
+      folderPath,
+    )) === CANCELLED
+  )
+    return CANCELLED;
   checkPublicKey(folderPath);
   passed("Public key", PUBLIC_KEY);
 
-  await runQuietly(`Uploading ${SIGNATURE} and ${PUBLIC_KEY}`, COMMANDS.upload(tag), folderPath);
+  if (
+    (await runQuietly(
+      `Uploading ${SIGNATURE} and ${PUBLIC_KEY}`,
+      COMMANDS.upload(tag),
+      folderPath,
+    )) === CANCELLED
+  )
+    return CANCELLED;
   passed("Uploaded", `${SIGNATURE} ${PUBLIC_KEY}`);
-  if (publish) await runQuietly(`Publishing ${tag}`, COMMANDS.publish(tag));
+  if (publish && (await runQuietly(`Publishing ${tag}`, COMMANDS.publish(tag))) === CANCELLED)
+    return CANCELLED;
 
   printResult(publish ? "Release signed and published" : "Release signed", [
     ["Release", tag],
@@ -589,17 +626,15 @@ async function main(argv) {
   }
   const folder = `release-signing-${options.tag}`;
   if (options.dryRun) printPlan(options, folder);
-  else await signRelease(options, folder);
+  else return signRelease(options, folder);
 }
 
 try {
-  await main(process.argv.slice(2));
-} catch (error) {
-  if (error instanceof Cancelled) {
+  if ((await main(process.argv.slice(2))) === CANCELLED) {
     console.error(CANCELLED_MESSAGE);
     process.exitCode = CANCELLED_EXIT_CODE;
-  } else {
-    fail(describeError(error));
-    process.exitCode = 1;
   }
+} catch (error) {
+  fail(describeError(error));
+  process.exitCode = 1;
 }

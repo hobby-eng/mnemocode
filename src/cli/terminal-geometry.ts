@@ -127,7 +127,17 @@ const WIDE_RANGES: readonly (readonly [number, number])[] = [
   [0x20000, 0x3fffd],
 ];
 
+/**
+ * Unicode nonspacing marks (Mn/Me) have no advance of their own in this terminal model. Check
+ * before East Asian width: that property also assigns wide ranges to some combining marks.
+ * This is not a model of every emoji sequence or terminal's fallback for an isolated mark.
+ */
+const NONSPACING_MARK = /[\p{Mn}\p{Me}]/u;
+const MAX_UNICODE_CODE_POINT = 0x10ffff;
+
 function codePointWidth(point: number): number {
+  if (point <= MAX_UNICODE_CODE_POINT && NONSPACING_MARK.test(String.fromCodePoint(point)))
+    return 0;
   return WIDE_RANGES.some(([first, last]) => point >= first && point <= last) ? 2 : 1;
 }
 

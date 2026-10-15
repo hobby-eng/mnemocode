@@ -11,6 +11,9 @@
 
 ### Audit follow-up
 
+- Retained recovery results, wallet checks, dates and card plans own mutable secret storage with explicit `wipe()` and disposal lifetimes. Their creating callers clean up after cancellation, failed callbacks and failed saves; borrowed inputs and independently copied plans keep separate lifetimes. Previously returned strings and runtime copies cannot be guaranteed erased.
+- SSKR decoding failures keep their stable code without repeating share input. The pinned native engine clears creation and recovery intermediates; malformed runtime integrity manifests receive the same safe integrity refusal and permit a healthy retry.
+- Terminal replay and typed-ahead bytes use mutable byte storage, including cleanup when answer insertion or terminal output fails. Recoloured artwork scratch is cleared after PNG encoding, and unsupported-font errors name the field without repeating a typed character. The package includes its release notes.
 - Fix AUD-028: recovered shares keep the input revision checked by the wallet; direct mode refuses dates. Word-table selectors have stable refusal codes, card text refuses Unicode line separators, and dropped POSIX paths keep apostrophes.
 - Long private share sets and missing-code candidates have revisitable pages, including on narrow terminals. The SSKR glue wipes recovered entropy before freeing its intermediate, also when the host copy fails. Terminal tests close their PTY descriptors.
 - Correct stale regression contracts for selectors, asynchronous table lookups, disposed candidate lists, owned PDF buffers and separate-card plans. Mixed-set tests use fixed distinct identifiers; help and release notes describe the current card defaults.

@@ -16,3 +16,10 @@ embedded in the pinned transport implementation.
 
 This is the Rust implementation, not the separately audited C implementation.
 Upstream describes the Rust library as Community Review.
+
+The runtime source of sskr 0.12.0 is retained under
+[rust/vendor/sskr-0.12.0](rust/vendor/sskr-0.12.0/UPSTREAM.json), with its original
+BSD-2-Clause-Patent license. The local patch adds secret-owner cleanup and
+redacted Debug output, and wraps direct Shamir result buffers in zeroizing
+owners. It preserves the pinned algorithms and wire formats. The provenance
+record identifies the registry archive and each original source file.

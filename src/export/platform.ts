@@ -55,6 +55,10 @@ export interface RenderPlatform {
   /** Uniform integer from 0 up to, but not including, the limit. */
   readonly randomInt: UniformChoice;
   readonly decodePng: (bytes: Uint8Array) => RasterImage;
+  /**
+   * Borrows the RGBA image synchronously, without retaining it. Returns owned PNG bytes; the
+   * caller can wipe the input as soon as this call returns, including after an encoding failure.
+   */
   readonly encodePng: (image: RasterImage, deflateLevel: number) => Uint8Array;
   /** QR matrix with the error correction level QR_ERROR_CORRECTION_LEVEL. */
   readonly qrModules: (payload: string) => QrModules;

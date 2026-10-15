@@ -3,6 +3,8 @@
 // the editing keys that a visible answer takes from them (terminal-input.ts).
 
 import { ESCAPE_DELAY_MS, type MoreWithin, type NextByte, PASTE_GAP_MS } from "./terminal-keys.js";
+import { InputBytes } from "./input-bytes.js";
+import { defined } from "../core/defined.js";
 
 /** The bytes after ESC that start a control sequence (CSI, "[") or a single shift (SS3, "O"). */
 const CSI_INTRODUCER = 0x5b;
@@ -26,6 +28,24 @@ const PRINTABLE_LAST = 0x7e;
 
 /** Longer than any key's sequence, such as ESC [ 2 4 ; 5 ~ (Ctrl+F12). */
 const MAX_KEY_SEQUENCE_BYTES = 8;
+
+/** A transient replay view transferred to the caller, which clears it after replay admission. */
+function replayOf(bytes: InputBytes): number[] {
+  const replay: number[] = [];
+  while (bytes.length > 0) replay.push(defined(bytes.shift()));
+  return replay;
+}
+
+function parametersOf(bytes: InputBytes): string {
+  const replay = replayOf(bytes);
+  try {
+    // The final byte is already held by the caller as the key discriminator.
+    replay.pop();
+    return String.fromCharCode(...replay);
+  } finally {
+    replay.fill(0);
+  }
+}
 
 /** What followed an ESC that more bytes followed at once. */
 type EscapeSequence =
@@ -62,20 +82,19 @@ export async function readEscapeSequence(
     const printable = introducer >= PRINTABLE_FIRST && introducer <= PRINTABLE_LAST;
     return printable ? { kind: "alt" } : { kind: "none", readAgain: [introducer] };
   }
-  const read: number[] = [];
+  using read = new InputBytes();
   while (read.length < MAX_KEY_SEQUENCE_BYTES) {
     if (moreWithin !== undefined && !(await moreWithin(ESCAPE_DELAY_MS))) break;
     const byte = await next();
     if (byte === undefined) break;
     read.push(byte);
     if (byte >= FINAL_FIRST && byte <= FINAL_LAST) {
-      const parameters = String.fromCharCode(...read.slice(0, -1));
-      read.fill(0);
+      const parameters = parametersOf(read);
       return { kind: "sequence", introducer, parameters, final: byte };
     }
     if (byte < PARAMETER_FIRST || byte > PARAMETER_LAST) break;
   }
-  return { kind: "none", readAgain: read };
+  return { kind: "none", readAgain: replayOf(read) };
 }
 
 /**
@@ -117,7 +136,7 @@ export async function readLateSequence(
   next: NextByte,
   moreWithin: MoreWithin,
 ): Promise<{ readonly key: EditKey } | { readonly readAgain: number[] }> {
-  const rest: number[] = [];
+  using rest = new InputBytes();
   const finals = introducer === CSI_INTRODUCER ? CSI_KEY_FINALS : SS3_KEY_FINALS;
   while (rest.length < MAX_KEY_SEQUENCE_BYTES && (await moreWithin(PASTE_GAP_MS))) {
     const byte = await next();
@@ -125,14 +144,13 @@ export async function readLateSequence(
     rest.push(byte);
     if (finals.has(byte)) {
       if (await moreWithin(PASTE_GAP_MS)) break;
-      const parameters = String.fromCharCode(...rest.slice(0, -1));
-      rest.fill(0);
+      const parameters = parametersOf(rest);
       return { key: editKeyOf(introducer, parameters, byte) };
     }
     const parameter = byte >= PARAMETER_FIRST && byte <= PARAMETER_LAST;
     if (introducer !== CSI_INTRODUCER || !parameter) break;
   }
-  return { readAgain: rest };
+  return { readAgain: replayOf(rest) };
 }
 
 /** The keys of a visible answer that move the cursor or delete, read from their escape sequence. */

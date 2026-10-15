@@ -1,6 +1,6 @@
 // Splits a BIP39 seed phrase into the SSKR shares of one group, and checks that they give it back.
 //
-// Needs from the host: a SharePlatform (share-platform.ts) for its SSKR library, createShares and
+// Needs from the host: a ShareSplitPlatform (share-platform.ts) for its SSKR library, createShares and
 // combineShares, and a function that fills a buffer with secure random bytes, for the seed of the
 // split (crypto.getRandomValues in a browser, nodeFillRandom in Node.js).
 // Does not: run the SSKR self-test (the Node.js wrapper in shares.ts does, before it splits), or
@@ -12,7 +12,7 @@ import { englishWordlist as wordlist } from "../core/english-words.js";
 import { validatedEnglishWords } from "../core/words.js";
 import { Masking, type SplitMode } from "../core/masking.js";
 import type { DateShiftDate } from "../core/types.js";
-import { ONE_GROUP, SEED_BYTES, type SharePlatform } from "./share-platform.js";
+import { ONE_GROUP, SEED_BYTES, type ShareSplitPlatform } from "./share-platform.js";
 import { Share } from "./transport.js";
 import { isRecordedQuorum, MAX_GROUP_MEMBERS, MIN_DIGEST_THRESHOLD } from "./share-layout.js";
 import { restoreCompleteShares } from "./complete-shares.js";
@@ -61,10 +61,10 @@ export interface BackupSplit {
  * no secret between two splits: the entropy and the seed of each are wiped before it returns.
  */
 export class ShareSplit {
-  readonly #platform: SharePlatform;
+  readonly #platform: ShareSplitPlatform;
   readonly #fillRandom: (bytes: Uint8Array) => void;
 
-  constructor(platform: SharePlatform, fillRandom: (bytes: Uint8Array) => void) {
+  constructor(platform: ShareSplitPlatform, fillRandom: (bytes: Uint8Array) => void) {
     this.#platform = platform;
     this.#fillRandom = fillRandom;
   }
@@ -95,10 +95,14 @@ export class ShareSplit {
       if (records.length !== count)
         throw ERRORS.create("sskr-engine-returned-unexpected-share-count", []);
       const shares = Share.readSet(records);
-      ShareSplit.#assertAsked(shares, threshold, entropy.length);
-      const validated = shares.map((share) => share.ur);
-      await this.#assertRestores(validated, entropy);
-      return validated;
+      try {
+        ShareSplit.#assertAsked(shares, threshold, entropy.length);
+        const validated = shares.map((share) => share.ur);
+        await this.#assertRestores(validated, entropy);
+        return validated;
+      } finally {
+        for (const share of shares) share.wipe();
+      }
     } finally {
       entropy.fill(0);
       seed.fill(0);

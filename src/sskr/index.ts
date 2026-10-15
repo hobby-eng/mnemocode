@@ -29,4 +29,9 @@ export type { BackupSplit, BackupSplitRequest } from "./split.js";
 export { ShareInput } from "./share-input.js";
 export { RepairReport } from "./repair-report.js";
 export { nodeFillRandom, nodeSharePlatform } from "./share-platform-node.js";
-export type { SharePlatform } from "./share-platform.js";
+export type {
+  ShareCombiner,
+  ShareRepairPlatform,
+  ShareSplitPlatform,
+  SharePlatform,
+} from "./share-platform.js";

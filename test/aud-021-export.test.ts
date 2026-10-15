@@ -192,7 +192,8 @@ function expectSameCollection(attempts: readonly Attempt[], format: EncodedForma
     if (attempt.destination === "cards") {
       expect(attempt.job.content).toEqual(separateCardJob(first.job, undefined).content);
     } else {
-      expect(attempt.job.content).toBe(content);
+      // Each save borrows fresh decoded views of the same byte-owned plan.
+      expect(attempt.job.content).toEqual(content);
     }
     expect(attempt.job.template).toBe(first.job.template);
     expect(attempt.randomChoices).toBe(first.randomChoices);

@@ -5,7 +5,7 @@
     "declaration": false,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022", "ESNext.Disposable", "DOM"],
     "types": []
   },
   "include": ["src/cards.ts"]

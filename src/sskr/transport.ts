@@ -68,6 +68,7 @@ import {
 import { runTogetherNumbers, unicodeIndexesOf, WORD_NUMBERS_RUN_TOGETHER } from "../core/words.js";
 import { WORD_NUMBERS_THROUGH } from "../core/bip39-sizes.js";
 import { Redacted } from "../core/redacted.js";
+import { SecretValue } from "../core/secret-value.js";
 import { wipedAfter } from "../core/bits.js";
 import { type EncodedFormat } from "../core/types.js";
 import { EncodedForm } from "../core/encoded-form.js";
@@ -588,7 +589,12 @@ export function assertShareCount(count: number): void {
  * Share.readSet.
  */
 export function validateShareSet(records: readonly string[], requireQuorum = true): string[] {
-  return Share.readSet(records, requireQuorum).map((share) => share.ur);
+  const shares = Share.readSet(records, requireQuorum);
+  try {
+    return shares.map((share) => share.ur);
+  } finally {
+    for (const share of shares) share.wipe();
+  }
 }
 
 /**
@@ -598,16 +604,16 @@ export function validateShareSet(records: readonly string[], requireQuorum = tru
  * toString, toJSON or Node.js's inspect.
  */
 export class Share extends Redacted {
-  readonly #ur: string;
+  readonly #ur: SecretValue<string>;
   readonly #format: ShareFormat;
   /** Read once, with the share: every question about its set, group and member is asked of it. */
   readonly #info: ShareInfo;
 
   private constructor(ur: string, format: ShareFormat) {
     super("Share");
-    this.#ur = ur;
     this.#format = format;
     this.#info = Object.freeze(wipedAfter(urToTransport(ur), shareInfo));
+    this.#ur = SecretValue.text(ur);
   }
 
   /** The forms that a share is written in (SHARE_FORMATS). */
@@ -626,15 +632,20 @@ export class Share extends Redacted {
    */
   static readSet(records: readonly string[], requireQuorum = true): Share[] {
     assertShareCount(records.length);
-    const shares = records.map((record) => Share.read(record));
-    const infos = shares.map((share) => share.info);
-    const conflict = SetTopology.firstConflict(infos);
-    if (conflict !== undefined)
-      throw ERRORS.create("read-set-refused", [SET_CONFLICT_TEXTS[conflict.kind].refusal]);
-    if (requireQuorum && !new SetTopology(infos).enough) {
-      throw ERRORS.create("not-enough-sskr-shares-meet-recorded-threshold", []);
+    const shares: Share[] = [];
+    try {
+      for (const record of records) shares.push(Share.read(record));
+      const infos = shares.map((share) => share.info);
+      const conflict = SetTopology.firstConflict(infos);
+      if (conflict !== undefined)
+        throw ERRORS.create("read-set-refused", [SET_CONFLICT_TEXTS[conflict.kind].refusal]);
+      if (requireQuorum && !new SetTopology(infos).enough)
+        throw ERRORS.create("not-enough-sskr-shares-meet-recorded-threshold", []);
+      return shares;
+    } catch (error) {
+      for (const share of shares) share.wipe();
+      throw error;
     }
-    return shares;
   }
 
   /** Whether `text` reads as a whole share: its own checksum makes other text pass one in 2^32. */
@@ -649,7 +660,7 @@ export class Share extends Redacted {
 
   /** The share as its UR, ur:sskr/…, the form that the SSKR library takes. */
   get ur(): string {
-    return this.#ur;
+    return this.#ur.value;
   }
 
   /** The form the share was written in. */
@@ -664,11 +675,20 @@ export class Share extends Redacted {
 
   /** The share written in `format`, by default the one it was read in. */
   write(format: ShareFormat = this.#format): string {
-    return writeShare(this.#ur, format);
+    return writeShare(this.#ur.value, format);
   }
 
   /** Whether `other` is the same share, however either of them was written. */
   sameAs(other: Share): boolean {
-    return other.#ur === this.#ur;
+    return other.#ur.value === this.#ur.value;
+  }
+  /** Overwrites this share's retained UR bytes; returned text copies cannot be recalled. */
+  wipe(): void {
+    this.#ur.wipe();
+  }
+
+  /** Ends this share's lifetime in its owning scope. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }

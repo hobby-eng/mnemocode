@@ -141,7 +141,8 @@ export async function printShares(
     writeShare(share.ur, share.format),
     "",
   ]);
-  return new PrivateResult(lines).show(() => {
+  using display = new PrivateResult(lines);
+  return await display.show(() => {
     for (const share of shares)
       printShareBlock(`SSKR share ${share.number} of ${total}`, share.ur, share.format, holds);
   });
@@ -166,11 +167,10 @@ export async function saveShares(
     terminalNotice(shareKeepingNote(shares, packaging, masked));
   if (options !== undefined) terminalWork("Rendering the share cards…");
   // One set of cards for every file, so that each shows the same decoys.
-  if (
-    options !== undefined &&
-    (await saveShareCards(await nodeShareCards(shares, options), args, options, keep)) === CANCELLED
-  )
-    return CANCELLED;
+  if (options !== undefined) {
+    using cards = await nodeShareCards(shares, options);
+    if ((await saveShareCards(cards, args, options, keep)) === CANCELLED) return CANCELLED;
+  }
   // Each share in its form, as the terminal shows it.
   const lines = shown.map((share) => writeShare(share.ur, share.format));
   const output = await saveOutput(args, "output", "The file of the shares", (path) =>

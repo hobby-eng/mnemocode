@@ -19,18 +19,10 @@
 // imports @noble/hashes for the checksum.
 
 import { sha256 } from "@noble/hashes/sha2.js";
-import {
-  BIP39_DICTIONARY_SIZE,
-  BIP39_INDEX_BITS,
-  englishTokens,
-  englishWordlist,
-  ENGLISH_INDEX,
-  phraseOfIndexes,
-} from "./words.js";
+import { BIP39_DICTIONARY_SIZE, englishTokens, englishWordlist, ENGLISH_INDEX } from "./words.js";
 import {
   checksumBits,
   checksumPassShare,
-  entropyBytes,
   areWordIndexes,
   assertPhraseIndexes,
   assertWordIndexes,
@@ -39,7 +31,7 @@ import {
   WORD_COUNTS_TEXT,
   WORD_COUNTS_LESS_ONE_TEXT,
 } from "./bip39-sizes.js";
-import { BITS_PER_BYTE, lastWordChecksumBits, wipeAll } from "./bits.js";
+import { BITS_PER_BYTE, wipeAll } from "./bits.js";
 import {
   stillRunning,
   keptCount,
@@ -50,9 +42,17 @@ import {
 import { askWallet, type WalletCheck, type WalletMatch } from "./wallet-check.js";
 import { Redacted } from "./redacted.js";
 import { counting } from "./search-plan.js";
-import { inWholeRange, wholeNumbersFrom } from "./typed-number.js";
+import { SecretValue } from "./secret-value.js";
+import { WordCandidate, entropyOfWords, type CandidateWords } from "./word-candidate.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog } from "./error-catalog.js";
+
+export {
+  WordCandidate,
+  entropyOfWords,
+  phraseOfWords,
+  type CandidateWords,
+} from "./word-candidate.js";
 
 const ERRORS = new ErrorCatalog("core.candidates", {
   "no-bip39-word-starts-letters-at": (value0: string) =>
@@ -76,11 +76,6 @@ const ERRORS = new ErrorCatalog("core.candidates", {
   "search-more-than-combinations": (value0: string, value1: string) =>
     `This search has more than ${value0} combinations: ${value1}.`,
   "every-place-search-at-least-one-word": () => "Every place of a search needs at least one word.",
-  "candidate-s-number-counts-from-1": {
-    kind: "range",
-    text: () => "A candidate's number counts from 1.",
-  },
-  "candidate-bip39-indexes": (value0: string) => `A candidate needs ${value0} BIP39 indexes.`,
 });
 
 /** Combinations that one search may check; at a few microseconds each, about a minute. */
@@ -91,8 +86,6 @@ export const MAX_SEARCH_COMBINATIONS = 2 ** 24;
  * that shows only those that match.
  */
 export const MAX_SHOWN_CANDIDATES = 2_048;
-/** The numbers of candidates, counted from 1 among those of their search. */
-const CANDIDATE_NUMBERS = wholeNumbersFrom(1);
 /** How a word search with too many combinations or candidates is narrowed, in every message. */
 export const NARROW_WORD_SEARCH = "give more of the words, or a few letters of them";
 /** How candidates that are not shown are told apart: by the wallet. */
@@ -122,9 +115,6 @@ export type WordPlace = readonly number[];
 export type WordSearch =
   | { readonly kind: "unknown-words"; readonly places: readonly WordPlace[] }
   | { readonly kind: "missing-word"; readonly written: readonly number[] };
-
-/** A candidate: the word indexes of the whole phrase. */
-export type CandidateWords = readonly number[];
 
 /** How many candidates a search finds: exactly, where the checksum tells it, or about. */
 export interface ExpectedCandidates {
@@ -280,29 +270,6 @@ export function expectedCandidates(search: WordSearch): ExpectedCandidates {
 }
 
 /**
- * The BIP39 entropy that the words carry, without their checksum bits. A deliberate fast path of
- * bits.ts's bitsOfIndexes and bitsToBytes, packed in a number rather than a string because the
- * word search calls it for every combination; test/candidates.test.ts keeps it in step with
- * @scure/bip39's own checksum.
- */
-export function entropyOfWords(words: CandidateWords): Uint8Array {
-  const entropy = new Uint8Array(entropyBytes(words.length));
-  let buffer = 0;
-  let bits = 0;
-  let filled = 0;
-  for (const word of words) {
-    buffer = (buffer << BIP39_INDEX_BITS) | word;
-    bits += BIP39_INDEX_BITS;
-    while (bits >= BITS_PER_BYTE && filled < entropy.length) {
-      bits -= BITS_PER_BYTE;
-      entropy[filled++] = (buffer >>> bits) & 0xff;
-    }
-    buffer &= (1 << bits) - 1;
-  }
-  return entropy;
-}
-
-/**
  * Whether `words`, a phrase of BIP39 word indexes, ends with the checksum of its entropy. A host
  * may pass anything at run time, so the indexes are checked first (assertPhraseIndexes): an index
  * out of range is no phrase at all, not one of a valid or wrong checksum.
@@ -325,9 +292,6 @@ function checksumFits(words: CandidateWords): boolean {
   entropy.fill(0);
   return (defined(words.at(-1)) & ((1 << checksumLength) - 1)) === expected;
 }
-
-/** The English phrase of word indexes (words.ts). */
-export const phraseOfWords: (words: CandidateWords) => string = phraseOfIndexes;
 
 /**
  * Every combination of the places, in lexicographic order of their words with the last place
@@ -352,17 +316,22 @@ export function placeCombinations(places: readonly WordPlace[]): Generator<reado
 function* combinationsOf(places: readonly WordPlace[]): Generator<readonly number[]> {
   const counters = places.map(() => 0);
   const words = places.map((place) => defined(place[0]));
-  for (;;) {
-    yield words;
-    let place = places.length - 1;
-    while (place >= 0 && counters[place] === defined(places[place]).length - 1) {
-      counters[place] = 0;
-      words[place] = defined(defined(places[place])[0]);
-      place -= 1;
+  try {
+    for (;;) {
+      yield words;
+      let place = places.length - 1;
+      while (place >= 0 && counters[place] === defined(places[place]).length - 1) {
+        counters[place] = 0;
+        words[place] = defined(defined(places[place])[0]);
+        place -= 1;
+      }
+      if (place < 0) return;
+      counters[place] = defined(counters[place]) + 1;
+      words[place] = defined(defined(places[place])[defined(counters[place])]);
     }
-    if (place < 0) return;
-    counters[place] = defined(counters[place]) + 1;
-    words[place] = defined(defined(places[place])[defined(counters[place])]);
+  } finally {
+    words.fill(0);
+    counters.fill(0);
   }
 }
 
@@ -374,7 +343,12 @@ function* missingWordCombinations(written: readonly number[]): Generator<number[
   for (let place = 0; place <= written.length; place += 1)
     for (let word = 0; word < BIP39_DICTIONARY_SIZE; word += 1) {
       if (place > 0 && written[place - 1] === word) continue;
-      yield [...written.slice(0, place), word, ...written.slice(place)];
+      const words = [...written.slice(0, place), word, ...written.slice(place)];
+      try {
+        yield words;
+      } finally {
+        words.fill(0);
+      }
     }
 }
 
@@ -450,7 +424,7 @@ export interface WordSearchRun<M extends WalletMatch = WalletMatch> extends Sear
   readonly onProgress?: ((progress: WordSearchProgress) => void) | undefined;
 }
 
-/** A candidate kept to be shown, with what the wallet check said of it. */
+/** A caller-owned candidate kept to be shown; the caller wipes it after display. */
 export interface ShownCandidate<M extends WalletMatch = WalletMatch> {
   readonly candidate: WordCandidate;
   readonly match?: M;
@@ -458,7 +432,7 @@ export interface ShownCandidate<M extends WalletMatch = WalletMatch> {
 
 /** What a word search found. */
 export interface WordSearchResult<M extends WalletMatch = WalletMatch> {
-  /** The first `maxShown` candidates, and every later one that matched the wallet. */
+  /** Caller-owned candidates: the first `maxShown` and every later match; wipe each after use. */
   readonly shown: readonly ShownCandidate<M>[];
   /** The entropy of every candidate for a list, record N for candidate N; the caller wipes them. */
   readonly entropies: Uint8Array[];
@@ -478,55 +452,15 @@ export interface WordSearchResult<M extends WalletMatch = WalletMatch> {
   readonly stopped: boolean;
 }
 
-/**
- * One candidate of a word search: its number among the candidates, counting from 1, and its
- * words. A class pays off here: a candidate may be the wallet's own seed phrase, so it never shows
- * its words through toString, toJSON or Node's inspect, and it tells its phrase, its entropy and
- * its checksum bits itself, so that every host shows the same.
- */
-export class WordCandidate extends Redacted {
-  readonly #number: number;
-  readonly #words: readonly number[];
+/** A private working copy; it is scrubbed when its iterator ends or its owner is wiped. */
+type WorkingSearch =
+  | { readonly kind: "unknown-words"; readonly places: number[][] }
+  | { readonly kind: "missing-word"; readonly written: number[] };
 
-  constructor(number: number, words: CandidateWords) {
-    super("WordCandidate");
-    if (!inWholeRange(number, CANDIDATE_NUMBERS))
-      throw ERRORS.create("candidate-s-number-counts-from-1", []);
-    if (!Array.isArray(words))
-      throw ERRORS.create("candidate-bip39-indexes", [`${WORD_COUNTS_TEXT}`]);
-    // A copy, checked itself: a search reuses its array for the next combination, and a getter
-    // cannot give the check one value and the copy another.
-    const copy = Array.from<unknown>(words);
-    if (!isBip39WordCount(copy.length) || !areWordIndexes(copy))
-      throw ERRORS.create("candidate-bip39-indexes", [`${WORD_COUNTS_TEXT}`]);
-    this.#number = number;
-    this.#words = Object.freeze(copy);
-  }
-
-  /** Its number among the candidates of its search, counting from 1, the same in every host. */
-  get number(): number {
-    return this.#number;
-  }
-
-  /** The BIP39 indexes of its words, 0 to 2047. */
-  get words(): readonly number[] {
-    return this.#words;
-  }
-
-  /** Its English phrase. */
-  get phrase(): string {
-    return phraseOfWords(this.#words);
-  }
-
-  /** Its BIP39 entropy, for a candidate list: a new array each time, which the caller wipes. */
-  entropy(): Uint8Array {
-    return entropyOfWords(this.#words);
-  }
-
-  /** The checksum bits at the end of its last word, as a candidate table shows them. */
-  get checksumBits(): string {
-    return lastWordChecksumBits(defined(this.#words.at(-1)), this.#words.length);
-  }
+function wipeWorkingSearch(search: WorkingSearch): void {
+  if (search.kind === "unknown-words") {
+    for (const place of search.places) place.fill(0);
+  } else search.written.fill(0);
 }
 
 /**
@@ -534,10 +468,16 @@ export class WordCandidate extends Redacted {
  * that a host made itself (of). A class pays off here: it checks itself once, so that an invalid
  * search, or one of more than MAX_SEARCH_COMBINATIONS combinations, cannot exist; it tells its
  * size and the candidates it will find before it runs, as a page shows them while the person
- * types; and it keeps the known words private.
+ * types; and it keeps the known words in owned bytes. Input arrays are borrowed and copied.
+ * The search must stay live until its asynchronous work settles. wipe/dispose refuse later
+ * secret reads and publication with core.secret-value.wiped; yielded/returned candidates are
+ * transferred to their caller and remain independently live.
  */
-export class WordCandidateSearch extends Redacted {
-  readonly #search: WordSearch;
+export class WordCandidateSearch extends Redacted implements Disposable {
+  readonly #values: SecretValue<readonly WordPlace[]>;
+  readonly #active = new Set<() => void>();
+  readonly #kind: WordSearch["kind"];
+  readonly #wordCount: number;
   readonly #combinations: number;
   /** The places, counting from 0, that may hold more than one word. */
   readonly #unknownPlaces: readonly number[];
@@ -546,15 +486,24 @@ export class WordCandidateSearch extends Redacted {
     super("WordCandidateSearch");
     assertSearch(search);
     // A copy, so that the caller's arrays cannot change the search once it is checked.
-    const copy: WordSearch =
+    const copy: WorkingSearch =
       search.kind === "unknown-words"
         ? { kind: search.kind, places: search.places.map((place) => [...place]) }
         : { kind: search.kind, written: [...search.written] };
-    const combinations = searchCombinations(copy);
-    assertSearchable(combinations);
-    this.#search = copy;
-    this.#combinations = combinations;
-    this.#unknownPlaces = copy.kind === "unknown-words" ? unknownPlacesOf(copy.places) : [];
+    try {
+      const combinations = searchCombinations(copy);
+      assertSearchable(combinations);
+      this.#values = SecretValue.numberLists(
+        copy.kind === "unknown-words" ? copy.places : [copy.written],
+      );
+      this.#kind = copy.kind;
+      this.#wordCount =
+        copy.kind === "unknown-words" ? copy.places.length : copy.written.length + 1;
+      this.#combinations = combinations;
+      this.#unknownPlaces = copy.kind === "unknown-words" ? unknownPlacesOf(copy.places) : [];
+    } finally {
+      wipeWorkingSearch(copy);
+    }
   }
 
   /**
@@ -572,15 +521,14 @@ export class WordCandidateSearch extends Redacted {
     return new WordCandidateSearch(search);
   }
 
+  /** The search kind; remains available as metadata after disposal. */
   get kind(): WordSearch["kind"] {
-    return this.#search.kind;
+    return this.#kind;
   }
 
   /** The words of every candidate: 12, 15, 18, 21 or 24. */
   get wordCount(): number {
-    return this.#search.kind === "unknown-words"
-      ? this.#search.places.length
-      : this.#search.written.length + 1;
+    return this.#wordCount;
   }
 
   /** The combinations that the search checks, at most MAX_SEARCH_COMBINATIONS. */
@@ -590,7 +538,7 @@ export class WordCandidateSearch extends Redacted {
 
   /** How many candidates the search finds (expectedCandidates). */
   get expected(): ExpectedCandidates {
-    return expectedCandidates(this.#search);
+    return expectedCandidates(this.#snapshot());
   }
 
   /**
@@ -606,20 +554,47 @@ export class WordCandidateSearch extends Redacted {
    * or the place of the missing word, the first of a run of equal words (insertedPlace).
    */
   placesOf(candidate: WordCandidate): number[] {
-    if (this.#search.kind === "unknown-words") return [...this.#unknownPlaces];
-    return [insertedPlace(this.#search.written, candidate.words)];
+    this.#values.assertLive();
+    if (this.#kind === "unknown-words") return [...this.#unknownPlaces];
+    return [insertedPlace(defined(this.#values.value[0]), candidate.words)];
+  }
+
+  #snapshot(): WordSearch {
+    const values = this.#values.value;
+    return this.#kind === "unknown-words"
+      ? { kind: this.#kind, places: values }
+      : { kind: this.#kind, written: defined(values[0]) };
   }
 
   /**
    * The candidates in the order of docs/CANDIDATES.md, numbered from 1. A host takes as many at a
    * time as suits it, as a page does that lets its event loop run between batches, and stops when
-   * it wants.
+   * it wants. Each candidate transfers to the caller, who wipes it. Disposal clears this
+   * iterator's working state and refuses its next read, without wiping transferred candidates.
    */
   *candidates(): Generator<WordCandidate> {
-    let number = 0;
-    for (const words of searchCandidates(this.#search)) {
-      number += 1;
-      yield new WordCandidate(number, words);
+    const values = this.#values.value.map((place) => [...place]);
+    const search: WorkingSearch =
+      this.#kind === "unknown-words"
+        ? { kind: this.#kind, places: values }
+        : { kind: this.#kind, written: defined(values[0]) };
+    const source = searchCandidates(search);
+    const close = (): void => {
+      source.return(undefined);
+      wipeWorkingSearch(search);
+    };
+    this.#active.add(close);
+    try {
+      let number = 0;
+      for (const words of source) {
+        this.#values.assertLive();
+        number += 1;
+        yield new WordCandidate(number, words);
+        this.#values.assertLive();
+      }
+    } finally {
+      close();
+      this.#active.delete(close);
     }
   }
 
@@ -629,11 +604,14 @@ export class WordCandidateSearch extends Redacted {
    * number; the entropy of every candidate, up to `keep`, record N for candidate N. When there are
    * more candidates than `keep`, onListFull is called once: a host that throws there stops the
    * search; otherwise the entropies kept are wiped and the search goes on without them. The
-   * entropies are wiped too when the search is stopped or fails.
+   * entropies are wiped too when the search is stopped or fails. Unshown candidates are wiped
+   * immediately; failures/disposal wipe all unpublished candidates. Successful and stopped
+   * results transfer their shown candidates to the caller, who wipes them after use.
    */
   async run<M extends WalletMatch = WalletMatch>(
     run: WordSearchRun<M> = {},
   ): Promise<WordSearchResult<M>> {
+    this.#values.assertLive();
     const maxShown = keptCount(run.maxShown, MAX_SHOWN_CANDIDATES, "maxShown");
     const keep = keptCount(run.keep, 0, "keep");
     const shown: ShownCandidate<M>[] = [];
@@ -642,50 +620,86 @@ export class WordCandidateSearch extends Redacted {
     const tally = new MatchTally();
     let listFull = false;
     let stopped = false;
+    let current: WordCandidate | undefined;
+    const cleanup = (): void => {
+      current?.wipe();
+      for (const { candidate } of shown) candidate.wipe();
+      wipeAll(entropies);
+    };
+    this.#active.add(cleanup);
     try {
       const turns = SearchTurns.of(run);
       for (const candidate of this.candidates()) {
-        if (turns.stopped) {
-          stopped = true;
-          break;
+        current = candidate;
+        let kept = false;
+        try {
+          if (turns.stopped) {
+            stopped = true;
+            break;
+          }
+          const match =
+            run.walletCheck === undefined
+              ? undefined
+              : await askWallet(run.walletCheck, candidate.phrase);
+          this.#values.assertLive();
+          // An answer that came after a stop is neither counted nor shown (AUD-015-API001).
+          if (!stillRunning(run)) {
+            stopped = true;
+            break;
+          }
+          count += 1;
+          if (keep > 0 && !listFull && count > keep) {
+            listFull = true;
+            wipeAll(entropies);
+            entropies = [];
+            run.onListFull?.();
+            this.#values.assertLive();
+          }
+          tally.add(match);
+          if (keep > 0 && !listFull) entropies.push(candidate.entropy());
+          if (count <= maxShown || match?.matched === true) {
+            shown.push(match === undefined ? { candidate } : { candidate, match });
+            kept = true;
+          } else candidate.wipe();
+          // Every checked candidate is a phrase whose BIP39 checksum holds.
+          const turn = await turns.due();
+          this.#values.assertLive();
+          if (turn === "stopped") {
+            stopped = true;
+            break;
+          }
+          if (turn === "turned")
+            run.onProgress?.({ checked: count, found: count, matched: tally.matched });
+          this.#values.assertLive();
+        } finally {
+          if (!kept) candidate.wipe();
+          current = undefined;
         }
-        const match =
-          run.walletCheck === undefined
-            ? undefined
-            : await askWallet(run.walletCheck, candidate.phrase);
-        // An answer that came after a stop is neither counted nor shown (AUD-015-API001).
-        if (!stillRunning(run)) {
-          stopped = true;
-          break;
-        }
-        count += 1;
-        if (keep > 0 && !listFull && count > keep) {
-          listFull = true;
-          wipeAll(entropies);
-          entropies = [];
-          run.onListFull?.();
-        }
-        tally.add(match);
-        if (keep > 0 && !listFull) entropies.push(candidate.entropy());
-        if (count <= maxShown || match?.matched === true)
-          shown.push(match === undefined ? { candidate } : { candidate, match });
-        // Every candidate is a phrase whose checksum holds: each one checked is one found.
-        const turn = await turns.due();
-        if (turn === "turned")
-          run.onProgress?.({ checked: count, found: count, matched: tally.matched });
       }
+      this.#values.assertLive();
+      // A stop after the final turn still makes the result partial, with no complete list.
+      if (!stillRunning(run)) stopped = true;
+      if (stopped) {
+        wipeAll(entropies);
+        entropies = [];
+      }
+      const { matched, warning } = tally;
+      return { shown, entropies, count, matched, warning, listFull, stopped };
     } catch (error) {
-      wipeAll(entropies);
+      cleanup();
       throw error;
+    } finally {
+      this.#active.delete(cleanup);
     }
-    // A stop heard only after the last candidate still tells the search as stopped, as every
-    // search tells it.
-    if (!stillRunning(run)) stopped = true;
-    if (stopped) {
-      wipeAll(entropies);
-      entropies = [];
-    }
-    const { matched, warning } = tally;
-    return { shown, entropies, count, matched, warning, listFull, stopped };
+  }
+
+  /** Wipes retained bytes and active working state; already transferred candidates stay live. */
+  wipe(): void {
+    this.#values.wipeAndClose(this.#active);
+  }
+
+  /** Ends the search lifetime; asynchronous work must settle before the caller leaves its scope. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }

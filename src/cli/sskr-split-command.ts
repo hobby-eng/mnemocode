@@ -201,7 +201,8 @@ async function splitChecked(
   if (Masking.of(mode).masked)
     terminalNotice("The shares do not store the dates or the mode; keep them yourself.");
   if (representation !== undefined && originalCopy === undefined) {
-    printEncodedBackup(EncodedBackup.encode(mnemonic, dateValues, representation, mode).backup);
+    using backup = EncodedBackup.encode(mnemonic, dateValues, representation, mode).backup;
+    printEncodedBackup(backup);
     // Shown for a person who keeps the whole phrase too, with the shares as a reserve.
     terminalNotice(
       Masking.of(mode).masked

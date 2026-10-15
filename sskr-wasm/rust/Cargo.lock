@@ -990,12 +990,11 @@ dependencies = [
 [[package]]
 name = "sskr"
 version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ef3a90a4a282e53765d6ba384c6f7e1ed7c9efef8373d7a71310a0649e6c795"
 dependencies = [
  "bc-rand",
  "bc-shamir",
  "thiserror",
+ "zeroize",
 ]
 
 [[package]]

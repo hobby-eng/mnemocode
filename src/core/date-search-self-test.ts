@@ -91,12 +91,10 @@ const REFUSED_DATES: readonly (readonly [string, RegExp])[] = [
 
 /** The combinations of each of `patterns`, as DatesAnswer counts them. */
 function checkCombinations(patterns: readonly (readonly [string, number])[]): void {
-  for (const [typed, combinations] of patterns)
-    expectSame(
-      DatesAnswer.parse(typed, TWELVE_WORDS).combinations,
-      combinations,
-      `Date pattern ${typed} combinations`,
-    );
+  for (const [typed, combinations] of patterns) {
+    using dates = DatesAnswer.parse(typed, TWELVE_WORDS);
+    expectSame(dates.combinations, combinations, `Date pattern ${typed} combinations`);
+  }
 }
 
 /**
@@ -116,10 +114,13 @@ export function checkDateSearchStartup(): void {
     /type every date in full/u,
     "A forgotten digit where dates are not searched",
   );
-  const dates = DatesAnswer.parse(FORGOTTEN_LAST_DIGIT, TWELVE_WORDS);
+  using dates = DatesAnswer.parse(FORGOTTEN_LAST_DIGIT, TWELVE_WORDS);
   dates.assertIncomplete();
   expectRefused(
-    () => DatesAnswer.parse(MASKED_DATE, TWELVE_WORDS).assertIncomplete(),
+    () => {
+      using complete = DatesAnswer.parse(MASKED_DATE, TWELVE_WORDS);
+      complete.assertIncomplete();
+    },
     /At least one date must contain a forgotten digit/u,
     "Standalone date recovery with no incomplete date",
   );
@@ -147,7 +148,7 @@ export function checkDateSearchStartup(): void {
  */
 function checkShiftsTriedOnce(): void {
   const searched = (indexes: readonly number[], typed: string, wordCount: 12 | 24) => {
-    const dates = DatesAnswer.parse(typed, { wordCount, patterns: true });
+    using dates = DatesAnswer.parse(typed, { wordCount, patterns: true });
     let combinations = 0;
     const phrases: string[] = [];
     const found: string[] = [];
@@ -188,12 +189,14 @@ function checkShiftsTriedOnce(): void {
 export async function checkDateSearch(fingerprint: PhraseFingerprint): Promise<void> {
   checkDateSearchStartup();
   checkCombinations(SLOW_COMBINATIONS);
-  const result = await new DateSearch({
+  using dates = DatesAnswer.parse(FORGOTTEN_LAST_DIGIT, TWELVE_WORDS);
+  using search = new DateSearch({
     indexes: MASKED_INDEXES,
-    dates: DatesAnswer.parse(FORGOTTEN_LAST_DIGIT, TWELVE_WORDS),
+    dates,
     mode: "seedshift",
     walletCheck: fingerprintWalletCheck(fingerprint, PUBLIC_FINGERPRINT),
-  }).run();
+  });
+  const result = await search.run();
   expectSame(result.combinations, 10, "Date search combinations");
   // MnemoCode Seedshift gives a valid phrase for every date: only the wallet tells them apart.
   expectSame(result.checksumValid, 10, "Date search checksum-valid phrases");

@@ -9,9 +9,6 @@ import { formatEncoded, representMnemonic, type EncodedFormat } from "../core.js
 import { listInWords } from "../core/places.js";
 import {
   ALWAYS_MASKED_NOTE,
-  alwaysMasked,
-  capabilities,
-  cardKindOf,
   shareFormatOf,
   ShareSetChoice,
   UNMASKED_NOTE,
@@ -23,6 +20,7 @@ import { askLine, choose, notesRoom, type Choice, type Explanation } from "./ter
 import { readmeLink } from "./terminal.js";
 import { isColorShareFormat, shareFormatHasCards } from "../sskr/transport.js";
 import { EncodedForm } from "../core/encoded-form.js";
+import { Masking } from "../core/masking.js";
 import { COLOR_COUNTS_TEXT } from "../core/colors.js";
 import {
   HEIR_SHEET_FILE,
@@ -235,7 +233,7 @@ async function askQrFile(): Promise<string[] | undefined | Cancelled> {
 async function askResultDestination(
   form: EncodedFormat,
 ): Promise<string[] | undefined | Cancelled> {
-  const withCards = cardKindOf(form) !== undefined;
+  const withCards = EncodedForm.of(form).cardKind !== undefined;
   const choices: Choice<"screen" | "record" | "qr" | "cards" | "all">[] = [
     { label: "Only on this screen", value: "screen" },
     { label: "Also in a record file", note: "text that Decode reads back", value: "record" },
@@ -278,10 +276,12 @@ export async function askEncoding(): Promise<string[] | undefined | Cancelled> {
     label: "Form",
   });
   if (form === undefined || form === CANCELLED) return form;
-  const mode = await askSeedshift("Use Seedshift?", { required: alwaysMasked(form) });
+  const mode = await askSeedshift("Use Seedshift?", {
+    required: EncodedForm.of(form).alwaysMasked,
+  });
   if (mode === undefined || mode === CANCELLED) return mode;
   // The Original Seedshift cannot be split into shares (mnemocode encode --help).
-  const set = capabilities(mode).split
+  const set = Masking.of(mode).capabilities.split
     ? await askShareSet("Split it into Shamir shares?", SHARES_EXPLANATION, true)
     : null;
   if (set === undefined || set === CANCELLED) return set;
@@ -371,7 +371,7 @@ const HEIR_SHEET_NOTES: Readonly<Record<HeirSheetSize, string>> = {
  * where a backup made in `mode` can have one.
  */
 export async function askHeirSheet(mode: Mode): Promise<string[] | undefined | Cancelled> {
-  if (!capabilities(mode).heirSheet) return [];
+  if (!Masking.of(mode).capabilities.heirSheet) return [];
   const size = await choose(
     "Instructions for your heirs?",
     [

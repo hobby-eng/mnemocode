@@ -26,6 +26,7 @@ import {
   type PartChecks,
 } from "../core/backup-check.js";
 import type { DateShiftDate } from "../core.js";
+import type { DatesAnswer } from "../core/date-search.js";
 import { nodeSharePlatform } from "../sskr/share-platform-node.js";
 import { assertSskrSelfTest } from "../sskr/self-test.js";
 import { type ParsedArguments, choiceOption } from "./arguments.js";
@@ -74,7 +75,7 @@ export async function checkShareBackup(
 ): Promise<CheckResult> {
   try {
     await assertSskrSelfTest();
-    const check = new ShareBackupCheck(
+    using check = new ShareBackupCheck(
       { mnemonic: original, mode, threshold: 1 },
       nodeSharePlatform,
       SHARE_CHECK_TEXTS,
@@ -114,43 +115,49 @@ function restores(): CheckEnd {
   return "done";
 }
 
-/** The dates of the backup, typed again whole: no ? for a forgotten digit. */
-async function askBackupDates(wordCount: number): Promise<readonly DateShiftDate[] | Cancelled> {
-  const dates = await askDates({ wordCount, patterns: false });
-  return dates === CANCELLED ? CANCELLED : dates.known;
-}
-
 /**
  * One check of a backup in the library's order (nextFinding): what was written down, asked with
  * `ask`, then the dates, each compared at once and typed again, as the person chooses after a
  * mismatch, until they fit; what still fits is kept. CANCELLED when the command is cancelled.
  */
-async function runCheck<Written>(
+async function runCheck<Written extends Disposable>(
   steps: PartChecks<Written>,
   ask: () => Promise<Written | Cancelled>,
 ): Promise<CheckEnd | Cancelled> {
   let written: Written | undefined;
-  let dates: readonly DateShiftDate[] | undefined;
-  for (;;) {
-    if (written === undefined) {
-      const answer = await ask();
-      if (answer === CANCELLED) return CANCELLED;
-      written = answer;
+  let dates: DatesAnswer | undefined;
+  try {
+    for (;;) {
+      if (written === undefined) {
+        const answer = await ask();
+        if (answer === CANCELLED) return CANCELLED;
+        written = answer;
+      }
+      let found =
+        dates === undefined
+          ? nextFinding(steps, written)
+          : nextFinding(steps, written, dates.known);
+      if (found === "dates") {
+        const typed = await askDates({ wordCount: steps.wordCount, patterns: false });
+        if (typed === CANCELLED) return CANCELLED;
+        dates = typed;
+        found = nextFinding(steps, written, dates.known);
+      }
+      if (found === undefined) return restores();
+      const next = await afterMismatch(found);
+      if (next === CANCELLED) return CANCELLED;
+      if (next !== "again") return next === "show" ? "show" : "done";
+      if (found.part === "dates") {
+        dates?.wipe();
+        dates = undefined;
+      } else {
+        written[Symbol.dispose]();
+        written = undefined;
+      }
     }
-    let found =
-      dates === undefined ? nextFinding(steps, written) : nextFinding(steps, written, dates);
-    if (found === "dates") {
-      const typed = await askBackupDates(steps.wordCount);
-      if (typed === CANCELLED) return CANCELLED;
-      dates = typed;
-      found = nextFinding(steps, written, dates);
-    }
-    if (found === undefined) return restores();
-    const next = await afterMismatch(found);
-    if (next === CANCELLED) return CANCELLED;
-    if (next !== "again") return next === "show" ? "show" : "done";
-    if (found.part === "dates") dates = undefined;
-    else written = undefined;
+  } finally {
+    written?.[Symbol.dispose]();
+    dates?.wipe();
   }
 }
 
@@ -220,8 +227,8 @@ export async function offerEncodedCheck(
   answer: BackupCheckAnswer,
 ): Promise<Cancelled | undefined> {
   if (!onPrivateScreen() || !EncodedBackupCheck.supports(original.mode)) return undefined;
-  const check = new EncodedBackupCheck(original);
-  return offerCheck(
+  using check = new EncodedBackupCheck(original);
+  return await offerCheck(
     { what: "the codes", dated: check.dated },
     () => checkCodes(check),
     show,
@@ -294,10 +301,16 @@ async function askRestoredShares(check: ShareBackupCheck): Promise<RestoredShare
   for (let problem: string | undefined; ;) {
     const shares = await askShares(check, problem);
     if (shares === CANCELLED) return CANCELLED;
-    const kept = KeptShares.of(shares);
-    for (const note of kept.notes) terminalNotice(note);
+    let kept: KeptShares;
     try {
-      return await check.restore(kept);
+      kept = KeptShares.of(shares);
+    } finally {
+      shares.fill("");
+    }
+    using ownedKept = kept;
+    for (const note of ownedKept.notes) terminalNotice(note);
+    try {
+      return await check.restore(ownedKept);
     } catch (error) {
       problem = refusalMessage(error);
     }
@@ -324,12 +337,12 @@ export async function offerShareCheck(
   dates?: readonly DateShiftDate[],
 ): Promise<Cancelled | undefined> {
   if (!onPrivateScreen()) return undefined;
-  const check = new ShareBackupCheck(
+  using check = new ShareBackupCheck(
     { mnemonic: original, mode, threshold, dates },
     nodeSharePlatform,
     SHARE_CHECK_TEXTS,
   );
-  return offerCheck(
+  return await offerCheck(
     { what: `${threshold} shares`, dated: check.dated },
     () => checkShares(check),
     show,

@@ -100,25 +100,30 @@ async function settingsOf(args: ParsedArguments): Promise<Settings> {
   });
   const maxCandidates = maxCandidatesOf(args);
   const target = await CandidatesFile.of(args);
-  // A record may name another mode or format; askEncodedCodes and backupFromOptions settle that.
-  if (value(args, "mode") !== undefined && !Masking.isMaskedMode(transformMode(args)))
-    throw ERRORS.create("seedshift-mode-only", []);
-  givenInputFormat(args);
-  const { evidence, place, passphrase } = givenWallet(args);
-  if (args["ask-secrets"] !== true && value(args, "mode") !== undefined) {
-    // From the command line nothing can be asked later; a record names its own mode.
-    assertEvidenceGiven(transformMode(args), evidence);
+  try {
+    // A record may name another mode or format; askEncodedCodes and backupFromOptions settle that.
+    if (value(args, "mode") !== undefined && !Masking.isMaskedMode(transformMode(args)))
+      throw ERRORS.create("seedshift-mode-only", []);
+    givenInputFormat(args);
+    const { evidence, place, passphrase } = givenWallet(args);
+    if (args["ask-secrets"] !== true && value(args, "mode") !== undefined) {
+      // From the command line nothing can be asked later; a record names its own mode.
+      assertEvidenceGiven(transformMode(args), evidence);
+    }
+    target?.assertListable(passphrase);
+    return {
+      maxResults,
+      progressEvery,
+      maxCandidates,
+      target,
+      evidence,
+      place,
+      passphrase,
+    };
+  } catch (error) {
+    target?.wipe();
+    throw error;
   }
-  target?.assertListable(passphrase);
-  return {
-    maxResults,
-    progressEvery,
-    maxCandidates,
-    target,
-    evidence,
-    place,
-    passphrase,
-  };
 }
 
 /** Why recover-date refuses a mode given or chosen: only a masked phrase has dates to search. */
@@ -127,8 +132,12 @@ const SEEDSHIFT_MODE_ONLY = "Date recovery is available only when a Seedshift mo
 /** Searches the forgotten digits of the dates; CANCELLED when the person cancelled. */
 export async function runRecoverDate(arguments_: ParsedArguments): Promise<Cancelled | undefined> {
   const settings = await settingsOf(arguments_);
-  if (arguments_["ask-secrets"] === true) return recoverWithQuestions(arguments_, settings);
-  return recoverFromOptions(arguments_, settings);
+  try {
+    if (arguments_["ask-secrets"] === true) return await recoverWithQuestions(arguments_, settings);
+    return await recoverFromOptions(arguments_, settings);
+  } finally {
+    settings.target?.wipe();
+  }
 }
 
 /** The standalone search's refusal belongs to the date answer, shared with browser hosts. */
@@ -147,14 +156,15 @@ async function recoverFromOptions(
 ): Promise<Cancelled | undefined> {
   const read = await backupFromOptions(args, true);
   if (read === CANCELLED) return CANCELLED;
-  const { backup, mode } = read;
+  using backup = read.backup;
+  const { mode } = read;
   if (!Masking.isMaskedMode(mode)) throw ERRORS.create("seedshift-mode-only", []);
   assertEvidenceGiven(mode, settings.evidence);
   const indexes = backup.indexes;
   const dateValues = values(args, "date");
   if (dateValues.length === 0)
     throw ERRORS.create("provide-dates-including-at-least-one-pattern-containing", []);
-  const dates = DatesAnswer.parse(dateValues.join(" "), {
+  using dates = DatesAnswer.parse(dateValues.join(" "), {
     wordCount: indexes.length,
     patterns: true,
   });
@@ -238,82 +248,89 @@ async function recoverWithQuestions(
   // Whether the list was saved, and how many matched the last search, for a list that was not.
   let listed = false;
   let lastMatches = 0;
-  for (let step: Step = "backup"; step !== "done";) {
-    if (step === "backup") {
-      const read = await askEncodedCodes({ args: backupArgs, seedshiftOnly: true, recordMode });
-      if (read === CANCELLED) return CANCELLED;
-      backup = read.backup;
-      recordMode = read.recordMode ?? recordMode;
-      showEncodedFingerprint(encodedFingerprintOf(backup));
-      // Dates kept from before still count if the new phrase takes as many.
-      step = dates?.fitsPhrase(backup.indexes.length) === true ? "wallet" : "dates";
-    } else if (step === "dates") {
-      const asked = await askRecoveryDates(defined(backup));
-      if (asked === CANCELLED) return CANCELLED;
-      dates = asked;
-      step = "wallet";
-    } else if (step === "wallet") {
-      if (evidence !== undefined || !walletNeeded(defined(backup).mode)) step = "search";
-      else {
-        const answer = await askWalletEvidence({
-          optional: false,
-          explanation: walletExplanation(defined(backup).mode),
-          place: settings.place,
+  try {
+    for (let step: Step = "backup"; step !== "done";) {
+      if (step === "backup") {
+        const read = await askEncodedCodes({ args: backupArgs, seedshiftOnly: true, recordMode });
+        if (read === CANCELLED) return CANCELLED;
+        backup?.wipe();
+        backup = read.backup;
+        recordMode = read.recordMode ?? recordMode;
+        showEncodedFingerprint(encodedFingerprintOf(backup));
+        // Dates kept from before still count if the new phrase takes as many.
+        step = dates?.fitsPhrase(backup.indexes.length) === true ? "wallet" : "dates";
+      } else if (step === "dates") {
+        const asked = await askRecoveryDates(defined(backup));
+        if (asked === CANCELLED) return CANCELLED;
+        dates?.wipe();
+        dates = asked;
+        step = "wallet";
+      } else if (step === "wallet") {
+        if (evidence !== undefined || !walletNeeded(defined(backup).mode)) step = "search";
+        else {
+          const answer = await askWalletEvidence({
+            optional: false,
+            explanation: walletExplanation(defined(backup).mode),
+            place: settings.place,
+          });
+          if (answer === CANCELLED) return CANCELLED;
+          if (answer.kind === "wallet") evidence = answer.evidence;
+          step = answer.kind === "back" ? "dates" : "search";
+        }
+      } else {
+        const { mode } = defined(backup);
+        Masking.assertMaskedMode(mode);
+        if ((await settings.target?.prepare(settings.passphrase)) === CANCELLED) return CANCELLED;
+        const result = await search(
+          defined(backup).indexes,
+          defined(dates),
+          mode,
+          evidence,
+          settings,
+        );
+        if (result === CANCELLED) return CANCELLED;
+        // A search longer than allowed that the person did not want: the dates are typed again.
+        if (result === undefined) {
+          step = "dates";
+          continue;
+        }
+        reportDateMatches(result, { mode, evidence, maxResults: settings.maxResults });
+        const listable = settings.target === undefined || candidateListHolds(result.matchCount);
+        lastMatches = result.matchCount;
+        if (result.matchCount > 0 && listable) {
+          if (settings.target !== undefined && (await saveList(settings, result)) === CANCELLED)
+            return CANCELLED;
+          listed = true;
+          dateMatchNotes(evidence);
+        } else if (!listable)
+          terminalNotice(new TooManyForListError(NARROW_DATE_SEARCH).message, "warning");
+        const next = await askAfterDateSearch(result, {
+          evidence,
+          mode,
+          maxResults: settings.maxResults,
+          again: backupChoice(backupArgs),
+          wallet: { explanation: walletExplanation(mode), place: settings.place },
+          listing: settings.target !== undefined,
         });
-        if (answer === CANCELLED) return CANCELLED;
-        if (answer.kind === "wallet") evidence = answer.evidence;
-        step = answer.kind === "back" ? "dates" : "search";
+        if (next === CANCELLED) return CANCELLED;
+        if (typeof next === "string") step = next;
+        else {
+          evidence = next.evidence;
+          step = "search";
+        }
+        // The same file would give the same phrase: it is typed this time, and its mode asked again
+        // unless --mode or a record named it.
+        if (step === "backup") backupArgs = typedAfterFile(args);
       }
-    } else {
-      const { mode } = defined(backup);
-      Masking.assertMaskedMode(mode);
-      if ((await settings.target?.prepare(settings.passphrase)) === CANCELLED) return CANCELLED;
-      const result = await search(
-        defined(backup).indexes,
-        defined(dates),
-        mode,
-        evidence,
-        settings,
-      );
-      if (result === CANCELLED) return CANCELLED;
-      // A search longer than allowed that the person did not want: the dates are typed again.
-      if (result === undefined) {
-        step = "dates";
-        continue;
-      }
-      reportDateMatches(result, { mode, evidence, maxResults: settings.maxResults });
-      const listable = settings.target === undefined || candidateListHolds(result.matchCount);
-      lastMatches = result.matchCount;
-      if (result.matchCount > 0 && listable) {
-        if (settings.target !== undefined && (await saveList(settings, result)) === CANCELLED)
-          return CANCELLED;
-        listed = true;
-        dateMatchNotes(evidence);
-      } else if (!listable)
-        terminalNotice(new TooManyForListError(NARROW_DATE_SEARCH).message, "warning");
-      const next = await askAfterDateSearch(result, {
-        evidence,
-        mode,
-        maxResults: settings.maxResults,
-        again: backupChoice(backupArgs),
-        wallet: { explanation: walletExplanation(mode), place: settings.place },
-        listing: settings.target !== undefined,
-      });
-      if (next === CANCELLED) return CANCELLED;
-      if (typeof next === "string") step = next;
-      else {
-        evidence = next.evidence;
-        step = "search";
-      }
-      // The same file would give the same phrase: it is typed this time, and its mode asked again
-      // unless --mode or a record named it.
-      if (step === "backup") backupArgs = typedAfterFile(args);
     }
+    if (settings.target === undefined || listed) return undefined;
+    if (lastMatches === 0) return await settings.target.saveEntropies([]);
+    settings.target.discard();
+    return undefined;
+  } finally {
+    backup?.wipe();
+    dates?.wipe();
   }
-  if (settings.target === undefined || listed) return undefined;
-  if (lastMatches === 0) return settings.target.saveEntropies([]);
-  settings.target.discard();
-  return undefined;
 }
 
 /** Asks for the dates with ? until they can be used; CANCELLED when the person cancelled. */

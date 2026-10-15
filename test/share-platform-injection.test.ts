@@ -19,7 +19,9 @@ import {
   type PlanOptions,
 } from "../src/sskr/joint-repair.js";
 import { sskrEngine } from "../src/sskr/runtime.js";
-import type { SharePlatform } from "../src/sskr/share-platform.js";
+import { ONE_GROUP, type ShareRepairPlatform } from "../src/sskr/share-platform.js";
+import { CheckedSskrBridge } from "../src/sskr/bridge.js";
+import { ShareSplit } from "../src/sskr/split.js";
 import { ShareSet } from "../src/sskr/share-set.js";
 import { ShareUnmasking } from "../src/sskr/share-unmasking.js";
 import { writeShare } from "../src/sskr/transport.js";
@@ -34,7 +36,9 @@ const [FIRST, SECOND] = VECTOR.shares as [string, string, string];
 const DATE = parseDate("23-09-2026");
 
 /** The host's own platform, which counts its calls: node:crypto's HMAC and the bundled SSKR. */
-function hostPlatform(): SharePlatform & { readonly calls: { hmac: number; combine: number } } {
+function hostPlatform(): ShareRepairPlatform & {
+  readonly calls: { hmac: number; combine: number };
+} {
   const calls = { hmac: 0, combine: 0 };
   return {
     calls,
@@ -45,9 +49,6 @@ function hostPlatform(): SharePlatform & { readonly calls: { hmac: number; combi
     combineShares: async (records) => {
       calls.combine += 1;
       return (await sskrEngine()).recover_sskr_shares(records.join("\n"));
-    },
-    createShares: async () => {
-      throw new Error("No split here.");
     },
   };
 }
@@ -95,6 +96,34 @@ describe("the share parts with the host's platform", () => {
     expect(platform.calls.combine).toBeGreaterThan(before);
   });
 
+  it("restores, repairs and splits with only the host services each operation uses", async () => {
+    const { combineShares, hmacSha256 } = hostPlatform();
+    const combined = await ShareSet.restore([FIRST, SECOND], { combineShares });
+    expect(combined.mnemonic).toBe(PHRASE);
+
+    const plan = await new JointRepair({ combineShares, hmacSha256 }).plan([FIRST, marked(5)]);
+    expect((await plan.search()).sets.map((one) => one.mnemonic)).toEqual([PHRASE]);
+
+    const createShares = async (
+      secret: Uint8Array,
+      threshold: number,
+      count: number,
+      seed: Uint8Array,
+    ) =>
+      (await sskrEngine())
+        .create_sskr_shares(
+          secret,
+          ONE_GROUP,
+          CheckedSskrBridge.groupSpecifications(threshold, count),
+          seed,
+        )
+        .trim()
+        .split("\n");
+    const split = new ShareSplit({ combineShares, createShares }, (seed) => seed.fill(0));
+    const records = await split.split(PHRASE, 2, 3);
+    expect((await ShareSet.restore(records, { combineShares })).mnemonic).toBe(PHRASE);
+  });
+
   it("plan, search and measure with the platform of a JointRepair", async () => {
     const platform = hostPlatform();
     const repair = new JointRepair(platform);
@@ -107,7 +136,11 @@ describe("the share parts with the host's platform", () => {
     expect(repair.triesPerSecond()).toBeGreaterThan(0);
     expect(platform.calls.hmac).toBeGreaterThan(searched);
     expect(measureTriesPerSecond(platform)).toBeGreaterThan(0);
-    expect(() => new JointRepair({} as SharePlatform)).toThrow(TypeError);
+    const beforeMeasure = platform.calls.hmac;
+    let milliseconds = 0;
+    const rate = repair.triesPerSecond(() => (milliseconds += 2_000));
+    expect(rate).toBe((platform.calls.hmac - beforeMeasure) / 2);
+    expect(() => new JointRepair({} as ShareRepairPlatform)).toThrow(TypeError);
   });
 });
 

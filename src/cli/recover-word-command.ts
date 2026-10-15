@@ -14,6 +14,7 @@ import {
   NARROW_WORD_SEARCH,
   WordCandidateSearch,
   type WordCandidate,
+  type WordSearchResult,
   MatchTally,
   unshownCandidatesNotice,
 } from "../core/candidates.js";
@@ -59,6 +60,7 @@ import { closingRows } from "./private-screen.js";
 import { defined } from "../core/defined.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { SecretValue } from "../core/secret-value.js";
 
 const ERRORS = new ErrorCatalog("cli.recover-word-command", {
   "codes-not-words": () => CODES_NOT_WORDS,
@@ -138,21 +140,47 @@ function phraseOf(text: string, rules: PhraseRules): PhraseSearch {
     return { kind: "legacy", replacements: recoverLegacyValidLastWords(text) };
   }
   const search = WordCandidateSearch.parse(text, rules.missing ? "missing-word" : "unknown-words");
-  const expected = search.expected;
-  if (rules.listed && expected.exact && !candidateListHolds(expected.count))
-    throw new TooManyForListError(NARROW_WORD_SEARCH);
-  return { kind: "words", search };
+  try {
+    const expected = search.expected;
+    if (rules.listed && expected.exact && !candidateListHolds(expected.count))
+      throw new TooManyForListError(NARROW_WORD_SEARCH);
+    return { kind: "words", search };
+  } catch (error) {
+    search.wipe();
+    throw error;
+  }
 }
 
 /**
  * A shown row: its table columns, its phrase, the candidate's number, counting from 1, and the
  * wallet check if there was one.
  */
-interface Row {
-  readonly columns: readonly string[];
-  readonly mnemonic: string;
+class Row implements Disposable {
+  readonly #fields: SecretValue<readonly string[]>;
   readonly number: number;
-  readonly match?: EvidenceMatch;
+  readonly match: EvidenceMatch | undefined;
+
+  constructor(columns: readonly string[], mnemonic: string, number: number, match?: EvidenceMatch) {
+    this.#fields = SecretValue.texts([...columns, mnemonic]);
+    this.number = number;
+    this.match = match;
+  }
+
+  get columns(): readonly string[] {
+    return this.#fields.value.slice(0, -1);
+  }
+
+  get mnemonic(): string {
+    return defined(this.#fields.value.at(-1));
+  }
+
+  wipe(): void {
+    this.#fields.wipe();
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
 }
 
 /** The heading of a search's table: its columns, and the facts of its heading. */
@@ -217,64 +245,87 @@ interface Found {
  * the wallet.
  */
 async function collect(phrase: PhraseSearch, context: SearchContext): Promise<Found | Cancelled> {
-  const walletCheck = walletCheckOf(context.evidence, context.passphrase);
+  using walletCheck = walletCheckOf(context.evidence, context.passphrase);
+  const rows: Row[] = [];
   if (phrase.kind === "legacy") {
-    const rows = phrase.replacements.map((candidate, index): Row => {
-      const match = walletCheck?.(candidate.mnemonic);
+    try {
+      for (const [index, candidate] of phrase.replacements.entries()) {
+        const match = walletCheck?.(candidate.mnemonic);
+        rows.push(
+          new Row(
+            [
+              candidate.word,
+              String(candidate.wordIndex),
+              candidate.checksumBits,
+              candidate.preservesLegacyEntropy ? "preserved" : "alternative",
+            ],
+            candidate.mnemonic,
+            index + 1,
+            match,
+          ),
+        );
+      }
+      // Counted as the word search counts its candidates (MatchTally).
+      const tally = new MatchTally();
+      for (const row of rows) tally.add(row.match);
       return {
-        columns: [
-          candidate.word,
-          String(candidate.wordIndex),
-          candidate.checksumBits,
-          candidate.preservesLegacyEntropy ? "preserved" : "alternative",
-        ],
-        mnemonic: candidate.mnemonic,
-        number: index + 1,
-        ...(match === undefined ? {} : { match }),
+        rows,
+        entropies: [],
+        count: rows.length,
+        matched: tally.matched,
+        warning: tally.warning,
       };
-    });
-    // Counted as the word search counts its candidates (MatchTally).
-    const tally = new MatchTally();
-    for (const row of rows) tally.add(row.match);
-    return {
-      rows,
-      entropies: [],
-      count: rows.length,
-      matched: tally.matched,
-      warning: tally.warning,
-    };
+    } catch (error) {
+      for (const row of rows) row.wipe();
+      throw error;
+    }
   }
   const { search } = phrase;
   const table = tableOf(search);
   const progress = new ProgressLine(SEARCH_PROGRESS_SECONDS);
-  const result = await withCtrlCWatch((signal) =>
-    search.run({
-      walletCheck,
-      keep: context.target === undefined ? 0 : MAX_CANDIDATE_RECORDS,
-      onListFull: () => {
-        throw new TooManyForListError(NARROW_WORD_SEARCH);
-      },
-      onProgress: ({ checked }) =>
-        progress.showEvery(() => `${counting(checked)} candidates so far.`),
-      signal,
-      turn: nodeTurn,
-    }),
-  ).finally(() => progress.end());
-  // The person stopped the search with Ctrl+C.
-  if (result.stopped) return CANCELLED;
-  const rows = result.shown.map(({ candidate, match }): Row => ({
-    columns: table.row(candidate),
-    mnemonic: candidate.phrase,
-    number: candidate.number,
-    ...(match === undefined ? {} : { match }),
-  }));
-  return {
-    rows,
-    entropies: result.entropies,
-    count: result.count,
-    matched: result.matched,
-    warning: result.warning,
-  };
+  let result: WordSearchResult<EvidenceMatch> | undefined;
+  try {
+    try {
+      await withCtrlCWatch(async (signal) => {
+        result = await search.run({
+          walletCheck,
+          keep: context.target === undefined ? 0 : MAX_CANDIDATE_RECORDS,
+          onListFull: () => {
+            throw new TooManyForListError(NARROW_WORD_SEARCH);
+          },
+          onProgress: ({ checked }) =>
+            progress.showEvery(() => `${counting(checked)} candidates so far.`),
+          signal,
+          turn: nodeTurn,
+        });
+        // The result is owned before raw-terminal cleanup or the terminal signal can fail.
+        return result;
+      });
+    } finally {
+      progress.end();
+    }
+    const completed = defined(result);
+    if (completed.stopped) {
+      wipeAll(completed.entropies);
+      return CANCELLED;
+    }
+    // Rows take their own byte copies before the run's transferred candidates are released.
+    for (const { candidate, match } of completed.shown)
+      rows.push(new Row(table.row(candidate), candidate.phrase, candidate.number, match));
+    return {
+      rows,
+      entropies: completed.entropies,
+      count: completed.count,
+      matched: completed.matched,
+      warning: completed.warning,
+    };
+  } catch (error) {
+    for (const row of rows) row.wipe();
+    if (result !== undefined) wipeAll(result.entropies);
+    throw error;
+  } finally {
+    if (result !== undefined) for (const { candidate } of result.shown) candidate.wipe();
+  }
 }
 
 /** What comes after a search on the private screen. */
@@ -298,7 +349,8 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<Cance
   const missing = arguments_["missing-word"] === true;
   if (legacy && missing)
     throw ERRORS.create("legacy-valid-last-word-missing-word-cannot-combined", []);
-  let target = await CandidatesFile.of(arguments_);
+  using requestedTarget = await CandidatesFile.of(arguments_);
+  let target = requestedTarget;
   // The replacements are stored phrases, not wallets: the Scanner would search the wrong ones.
   if (legacy && target !== undefined)
     throw ERRORS.create("legacy-valid-last-word-lists-replacements-not-wallets", []);
@@ -324,20 +376,25 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<Cance
   };
   let phrase = await read();
   if (phrase === CANCELLED) return CANCELLED;
-  // Only once the phrase can be searched: a list passphrase typed for nothing is lost work.
-  if ((await target?.prepare(passphrase)) === CANCELLED) return CANCELLED;
-  for (;;) {
-    const next = await searchAndShow(phrase, { target, evidence, passphrase, place }, asked);
-    if (next === CANCELLED) return CANCELLED;
-    if (next.kind === "done") return undefined;
-    if (next.kind === "phrase") {
-      const typed = await read();
-      if (typed === CANCELLED) return CANCELLED;
-      phrase = typed;
-    } else {
-      evidence = next.evidence;
-      if (!next.listed) target = undefined;
+  try {
+    // Only once the phrase can be searched: a list passphrase typed for nothing is lost work.
+    if ((await target?.prepare(passphrase)) === CANCELLED) return CANCELLED;
+    for (;;) {
+      const next = await searchAndShow(phrase, { target, evidence, passphrase, place }, asked);
+      if (next === CANCELLED) return CANCELLED;
+      if (next.kind === "done") return undefined;
+      if (next.kind === "phrase") {
+        const typed = await read();
+        if (typed === CANCELLED) return CANCELLED;
+        if (phrase.kind === "words") phrase.search.wipe();
+        phrase = typed;
+      } else {
+        evidence = next.evidence;
+        if (!next.listed) target = undefined;
+      }
     }
+  } finally {
+    if (phrase.kind === "words") phrase.search.wipe();
   }
 }
 
@@ -376,6 +433,7 @@ async function searchAndShow(
   try {
     return await show(phrase, table, found, context, asked);
   } finally {
+    for (const row of found.rows) row.wipe();
     wipeAll(found.entropies);
   }
 }

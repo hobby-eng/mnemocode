@@ -35,6 +35,33 @@ function marked(format: Parameters<typeof formatEncoded>[1], places: readonly nu
 }
 
 describe("codes marked with ? (core/missing-codes.ts)", () => {
+  it("reports cancellation from the final progress callback while keeping earlier results", async () => {
+    const codes = MissingCodes.read("abandon ".repeat(11) + "?", "english", "direct");
+    for (const stopAt of [undefined, 1, 128]) {
+      const stop = new AbortController();
+      let ticks = 0;
+      const result = await codes.run({
+        check: () => true,
+        maxFound: 1,
+        signal: stop.signal,
+        now: () => (ticks += 100),
+        turn: async () => {},
+        onProgress: ({ checked }) => {
+          if (checked === stopAt) stop.abort();
+        },
+      });
+      try {
+        expect(result.stopped).toBe(stopAt !== undefined);
+        expect(result.count).toBe(stopAt ?? 128);
+        expect(result.passed).toBe(stopAt ?? 128);
+        expect(result.found).toHaveLength(1);
+        expect(result.found[0]!.indexes).toHaveLength(12);
+      } finally {
+        for (const backup of result.found) backup.wipe();
+      }
+    }
+  });
+
   it("finds a missing code in every form by the encoded fingerprint", async () => {
     for (const format of ["english", "indexes", "unicode", "colors", "colors-unicode"] as const) {
       const text = marked(format, [2]);

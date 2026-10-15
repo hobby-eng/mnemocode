@@ -1,5 +1,5 @@
 import { terminalNotice, terminalResultHeader } from "./terminal.js";
-import { mappingRow, wordTableRow, wordTableText, WORD_TABLE_FORMATS } from "../core/words.js";
+import { WordTable, WORD_TABLE_FORMATS } from "../core/word-table.js";
 import { WORD_NUMBER_RANGE } from "../core/bip39-sizes.js";
 import { choiceOption, integerOption, type ParsedArguments, value } from "./arguments.js";
 import { defined } from "../core/defined.js";
@@ -21,7 +21,7 @@ const ERRORS = new ErrorCatalog("cli.table-command", {
     "--table-format requires --all; --output requires --all or --recovery-guide.",
 });
 
-function printRow(row: ReturnType<typeof mappingRow>): void {
+function printRow(row: ReturnType<typeof WordTable.row>): void {
   terminalResultHeader("Word mapping", []);
   console.log(`index:       ${row.index}`);
   console.log(`english:     ${row.english}`);
@@ -37,7 +37,7 @@ async function saveFullSet(directory: string): Promise<void> {
       for (const format of WORD_TABLE_FORMATS)
         await writeNewPrivateFile(
           privateChildPath(staging, `bip39-${format}.txt`),
-          Buffer.from(wordTableText(format), "utf8"),
+          Buffer.from(WordTable.text(format), "utf8"),
         );
       await writeNewPrivateFile(privateChildPath(staging, "manual-recovery.md"), guide);
     });
@@ -73,7 +73,7 @@ export async function runTable(arguments_: ParsedArguments): Promise<void> {
   if (arguments_.all === true || guide) {
     const text = guide
       ? new TextDecoder().decode(await readBundledFile(MANUAL_RECOVERY_FILE))
-      : wordTableText(format);
+      : WordTable.text(format);
     if (output === undefined) process.stdout.write(text);
     else {
       await writeSaved(() => publishNewPrivateFile(output, Buffer.from(text, "utf8")));
@@ -86,8 +86,10 @@ export async function runTable(arguments_: ParsedArguments): Promise<void> {
   }
   // A number is read as every whole-number option is (arguments.ts); the row from the table.
   if (indexValue !== undefined)
-    return printRow(mappingRow(integerOption(arguments_, "index", WORD_NUMBER_RANGE)));
+    return printRow(WordTable.row(integerOption(arguments_, "index", WORD_NUMBER_RANGE)));
   printRow(
-    word !== undefined ? wordTableRow("word", word) : wordTableRow("unicode", defined(unicode)),
+    word !== undefined
+      ? WordTable.lookup("word", word)
+      : WordTable.lookup("unicode", defined(unicode)),
   );
 }

@@ -5,12 +5,12 @@
 // nothing that answers later, so core/self-test.ts runs their check before every command too; the
 // shares, which the SSKR library restores, in the full self-test.
 //
-// From the host it needs, for the shares only, its SharePlatform (sskr/share-platform.ts). It
+// From the host it needs, for the shares only, its ShareRepairPlatform (sskr/share-platform.ts). It
 // holds public test data, no secret.
 //
 // Host-neutral: it imports only core modules, the share modules and their known answers.
 
-import type { SharePlatform } from "../sskr/share-platform.js";
+import type { ShareRepairPlatform } from "../sskr/share-platform.js";
 import { sskrSetVector } from "../sskr/known-answers.js";
 import { EncodedBackupCheck, ShareBackupCheck, type BackupResult } from "./backup-check.js";
 import { parseDate } from "./dates.js";
@@ -47,7 +47,7 @@ function verdictOf(result: BackupResult): string {
  * quick known answer that runs before every command.
  */
 export function checkBackupCheckStartup(): void {
-  const check = new EncodedBackupCheck({
+  using check = new EncodedBackupCheck({
     mnemonic: PUBLIC_MNEMONIC,
     format: "english",
     mode: "seedshift",
@@ -69,8 +69,8 @@ export function checkBackupCheckStartup(): void {
  * Shares of the published set typed again: two of them right, one with a color unread right too,
  * two of another set wrong, and one with a wrong color unreadable at its place.
  */
-async function checkShareBackup(platform: SharePlatform): Promise<void> {
-  const check = new ShareBackupCheck(
+async function checkShareBackup(platform: ShareRepairPlatform): Promise<void> {
+  using check = new ShareBackupCheck(
     { mnemonic: sskrSetVector.phrase, mode: "direct", threshold: 2 },
     platform,
     { decodeEntry: DECODE_ENTRY },
@@ -92,7 +92,7 @@ async function checkShareBackup(platform: SharePlatform): Promise<void> {
 }
 
 /** Every check: the encoded backup, and with the host's SSKR library the shares. */
-export async function checkBackupCheck(platform?: SharePlatform): Promise<void> {
+export async function checkBackupCheck(platform?: ShareRepairPlatform): Promise<void> {
   checkBackupCheckStartup();
   if (platform !== undefined) await checkShareBackup(platform);
 }

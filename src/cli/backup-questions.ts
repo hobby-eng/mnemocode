@@ -7,7 +7,7 @@
 import { BackupReading } from "../core/backup-reading.js";
 import { SHARE_SEPARATOR } from "../sskr/share-input.js";
 import { EncodedBackup, MissingChecksumError } from "../core/encoded-backup.js";
-import type { MissingCodes } from "../core/missing-codes.js";
+import { MissingCodes } from "../core/missing-codes.js";
 import { Masking, PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
 import { masterFingerprint } from "../bitcoin-evidence.js";
 import { parseRecord } from "../record.js";
@@ -327,7 +327,7 @@ async function checkedBackup(
   question: BackupQuestion,
   source: BackupSource,
 ): Promise<ReadBackup | Again | Cancelled> {
-  let reading: BackupReading;
+  let created: BackupReading;
   try {
     // --input-kind codes reads every text as codes, a share among them.
     if (question.shares === true && question.inputKind !== "codes") {
@@ -336,7 +336,7 @@ async function checkedBackup(
       if (offered === "share") return { kind: "share", text, fromQr: source.readsQr };
       if (offered === "again") return { again: undefined };
     }
-    reading = BackupReading.of(text, {
+    created = BackupReading.of(text, {
       seedshiftOnly: question.seedshiftOnly,
       shareReader: SHARE_READER,
       words: phraseWords(question.args),
@@ -344,17 +344,20 @@ async function checkedBackup(
   } catch (error) {
     return { again: refusal(error) };
   }
+  using reading = created;
   const settled = await settledMode(reading, question, source);
   if (settled === CANCELLED) return CANCELLED;
   if (settled === undefined) return { again: undefined };
-  if (reading.marked) return markedBackup(reading, settled, question, source);
+  // The reading stays live across the questions awaited by markedBackup.
+  if (reading.marked) return await markedBackup(reading, settled, question, source);
   // Read first as not masked, which has no rule beyond the codes and their count: codes that name
   // no mode are asked about only once they are known to be a phrase's.
   const read = await codesAndMode(reading, settled, question, source, false, (format) =>
     reading.codes(format),
   );
   if (read === CANCELLED || "again" in read) return read;
-  const { codes, mode } = read;
+  using codes = read.codes;
+  const { mode } = read;
   const recordMode = reading.mode();
   try {
     return { kind: "codes", backup: codes.withMode(mode), recordMode };
@@ -388,7 +391,8 @@ async function markedBackup(
     reading.missingCodes(format),
   );
   if (read === CANCELLED || "again" in read) return read;
-  return { kind: "missing", codes: read.codes.withMode(read.mode), recordMode: reading.mode() };
+  using codes = read.codes;
+  return { kind: "missing", codes: codes.withMode(read.mode), recordMode: reading.mode() };
 }
 
 /**
@@ -413,10 +417,17 @@ async function codesAndMode<Codes>(
   } catch (error) {
     return { again: refusal(error) };
   }
-  const mode = settled === "ask" ? await askedMode(question.seedshiftOnly) : settled;
-  if (mode === CANCELLED) return CANCELLED;
-  if (mode === undefined) return { again: undefined };
-  return { codes, mode };
+  let handedOut = false;
+  try {
+    const mode = settled === "ask" ? await askedMode(question.seedshiftOnly) : settled;
+    if (mode === CANCELLED) return CANCELLED;
+    if (mode === undefined) return { again: undefined };
+    handedOut = true;
+    return { codes, mode };
+  } finally {
+    if (!handedOut && (codes instanceof EncodedBackup || codes instanceof MissingCodes))
+      codes.wipe();
+  }
 }
 
 /**

@@ -197,7 +197,8 @@ describe("addresses of every coin, where the wallets of the public phrase put th
     const evidence = coinAddress(coin, address, locationOf(path));
     const expected = { matched: true, kind: "coin-address", derived: address, path };
     expect(matchBitcoinEvidence(ABANDON, evidence)).toEqual(expected);
-    expect(walletCheckOf(evidence)!(ABANDON)).toEqual(expected);
+    using ownedCheck = walletCheckOf(evidence)!;
+    expect(ownedCheck(ABANDON)).toEqual(expected);
     const later = new WalletEvidenceCheck(
       async (...parameters) => nodePbkdf2(...parameters),
       COINS,

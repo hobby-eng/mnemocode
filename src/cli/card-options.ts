@@ -5,7 +5,7 @@ import { type CardKind, type EncodedFormat } from "../core/types.js";
 
 import { value, type ParsedArguments } from "./arguments.js";
 import { CARD_FORMAT_NUMBERS, noCardTemplateMessage } from "./format-numbers.js";
-import { cardKindOf } from "../core/backup-options.js";
+import { EncodedForm } from "../core/encoded-form.js";
 import { assertIndividualTemplate } from "../export/render.js";
 import { isCardPageSize, parsePageSize } from "../export/card-settings.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
@@ -49,13 +49,13 @@ export function assertCardOutput(args: ParsedArguments, settings: readonly strin
 }
 
 /** Encode's card settings, which a card output must use (assertCardOutput). */
-const ENCODE_CARD_SETTINGS = ["template", "title", ...businessOptionNames] as const;
+export const ENCODE_CARD_SETTINGS = ["template", "title", ...businessOptionNames] as const;
 
 /** Refuses card options that cannot draw cards of codes in `format`, before a secret is asked. */
 export function validateCardOptions(args: ParsedArguments, format: EncodedFormat): void {
   const { sheets, cards } = assertCardOutput(args, ENCODE_CARD_SETTINGS);
   if (!sheets && !cards) return;
-  const kind = cardKindOf(format);
+  const kind = EncodedForm.of(format).cardKind;
   if (kind === undefined)
     throw ERRORS.create("card-export-requires-format", [`${CARD_FORMAT_NUMBERS}`]);
   // A card page size makes a PDF or page images of separate cards too, which only some designs

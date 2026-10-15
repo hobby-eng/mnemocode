@@ -73,15 +73,21 @@ export class BusinessArtwork {
     const { hueOrigin, tint } = businessDesigns[style];
     const reference = new ReferenceTint(hex);
     const out = createRasterImage(base.width, base.height);
-    out.data.set(base.data);
-    for (let p = 0; p < out.data.length; p += RGBA_CHANNELS) {
-      const pixel = pixelHsv(out.data, p);
-      if (ReferenceTint.keeps(pixel)) continue;
-      const [red, green, blue] = rgbOfHsv(...reference.pixel(pixel, tint, hueOrigin));
-      out.data[p] = red;
-      out.data[p + 1] = green;
-      out.data[p + 2] = blue;
+    try {
+      out.data.set(base.data);
+      for (let p = 0; p < out.data.length; p += RGBA_CHANNELS) {
+        const pixel = pixelHsv(out.data, p);
+        if (ReferenceTint.keeps(pixel)) continue;
+        const [red, green, blue] = rgbOfHsv(...reference.pixel(pixel, tint, hueOrigin));
+        out.data[p] = red;
+        out.data[p + 1] = green;
+        out.data[p + 2] = blue;
+      }
+      const png = this.#codec.encodePng(out, 6);
+      // Detach an accidental host alias before retiring the borrowed recoloured pixels.
+      return png.buffer === out.data.buffer ? Uint8Array.from(png) : png;
+    } finally {
+      out.data.fill(0);
     }
-    return this.#codec.encodePng(out, 6);
   }
 }

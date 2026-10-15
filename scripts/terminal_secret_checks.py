@@ -11,6 +11,7 @@ from terminal_session import (
     ENTER,
     ESCAPE,
     Session,
+    WINDOWS,
     assert_kept_private,
     assert_private_result_visible,
     line_starting,
@@ -22,6 +23,7 @@ from terminal_answers import (
     DATES_WITH_MARKS,
     DECODE_ENTRY,
     FINGERPRINT_FILTER,
+    FINGERPRINT,
     FIRST_SHARE,
     FORGOTTEN_DIGIT,
     HIDDEN_RECORD,
@@ -45,6 +47,30 @@ from terminal_answers import (
     WORD_NUMBERS,
     answer_fingerprint,
 )
+
+
+def check_marked_codes_result():
+    """Marked codes stay live through the later redisplay of the recovered phrase."""
+    session = Session((
+        "decode", "--ask-secrets", "--mode", "direct", "--format", "indexes",
+        "--encoded-fingerprint", FINGERPRINT,
+    ))
+    marked = " ".join(["1"] * 11 + ["?"])
+    try:
+        session.wait_for(HIDDEN_RECORD)
+        session.type(marked + ENTER)
+        session.wait_for("Code 12 found:")
+        session.wait_for(TEST_PHRASE)
+        session.wait_for(CLEAR_PROMPT)
+        # ConPTY redraws the screen and need not emit each line exactly as the program wrote it.
+        if not WINDOWS:
+            assert session.output.count("Code 12 found:") == 2, "the correction was not redisplayed"
+        session.type(ENTER)
+        assert session.wait_for_exit() == 0
+        assert_kept_private(session, (marked, TEST_PHRASE))
+    finally:
+        session.close()
+    print("marked codes: correction redisplayed with the phrase before the owner is disposed")
 
 
 def check_encode_result_visible():

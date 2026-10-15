@@ -123,6 +123,22 @@ describe("walletNeeded", () => {
 });
 
 describe("DateSearch", () => {
+  it("uses the host's monotonic clock for decoding and wallet estimates", async () => {
+    let milliseconds = 0;
+    const now = () => milliseconds;
+    const search = new DateSearch({
+      indexes: MASKED,
+      dates: dates("23-09-2026"),
+      mode: "seedshift",
+      walletCheck: async () => {
+        milliseconds += 125;
+        return { matched: false };
+      },
+    });
+    expect(await search.pace(now)).toEqual({ perCheck: 0.125, perCombination: 0 });
+    expect(search.estimatedSeconds(await search.pace(now))).toBe(0.125);
+  });
+
   it("times the host's wallet check, which may answer later", async () => {
     const check = vi.fn(async (mnemonic: string) => ({ matched: mnemonic === TEST_PHRASE }));
     const seconds = await DateSearch.secondsPerCheck(check);
@@ -363,11 +379,11 @@ describe("DateSearch", () => {
 
     // Every combination takes longer than a turn's time here, so the search turns before each.
     let now = 0;
-    vi.spyOn(performance, "now").mockImplementation(() => (now += 1000));
     const controller = new AbortController();
     let turns = 0;
     const checked: number[] = [];
     const result = await search.run({
+      now: () => (now += 1000),
       signal: controller.signal,
       progressEvery: 1,
       onProgress: (step) => checked.push(step.checked),

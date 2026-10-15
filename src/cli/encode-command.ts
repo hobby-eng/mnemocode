@@ -16,7 +16,7 @@ import { terminalNotice, terminalWork } from "./terminal.js";
 import { EncodedBackup, type Encoding } from "../core/encoded-backup.js";
 import { COLOR_FORMAT_NUMBERS } from "./format-numbers.js";
 import { preflightOutputs, saveHeirSheetOutput, saveOutput } from "./output-saving.js";
-import { writtenInColors } from "../core/backup-options.js";
+import { EncodedForm } from "../core/encoded-form.js";
 import { CardPreview, LONGEST_SAMPLE_WORDS } from "../export/card-preview.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
 import { ENCODE_SSKR_ONLY_OPTIONS } from "./encode-option-groups.js";
@@ -62,7 +62,7 @@ async function validateEncodeOptions(
     args["heir-sheet"] !== undefined
   )
     Masking.assertHeirSheetMode(replacement.mode);
-  if (args.cards === true && !writtenInColors(format))
+  if (args.cards === true && !EncodedForm.of(format).writtenInColors)
     throw ERRORS.create("terminal-color-cards-available-only-rgb-color-formats", [
       `${COLOR_FORMAT_NUMBERS}`,
     ]);
@@ -132,7 +132,7 @@ function cardsMayFail(saving: ParsedArguments, settings: CardSettings): boolean 
  * made where nothing can fail. Nothing is written.
  */
 async function assertCardsPrintable(saving: ParsedArguments, format: EncodedFormat): Promise<void> {
-  if (!writtenInColors(format)) return;
+  if (!EncodedForm.of(format).writtenInColors) return;
   const { sheets, cards } = cardOutputs(saving);
   const settings = businessOptions(saving);
   if ((!sheets && !cards) || !cardsMayFail(saving, settings)) return;
@@ -157,7 +157,7 @@ async function saveResults(
   outcome: EncodeOutcome,
 ): Promise<Cancelled | undefined> {
   const saved = new Map<string, string>();
-  const cards = new EncodeCardExport(saving, outcome);
+  using cards = new EncodeCardExport(saving, outcome);
   for (const [key, what] of SAVED_RESULTS) {
     const path = await saveOutput(args, key, what, (path) =>
       saveEncodeResult(onlyResult(saving, key, path), outcome, cards),
@@ -168,7 +168,7 @@ async function saveResults(
     if (key === "output" && args.cards === true)
       await saveEncodeResult(onlyResult(saving, "cards", true), outcome, cards);
   }
-  return saveSheetQr(args, outcome, saved);
+  return await saveSheetQr(args, outcome, saved);
 }
 
 /**
@@ -237,10 +237,11 @@ async function encodeChecked(
 ): Promise<Cancelled | undefined> {
   const outcome = await createOutcome(args, mode, format, known);
   if (outcome === CANCELLED) return CANCELLED;
+  using backup = outcome.encoding.backup;
   const show = (): void => printEncodeResult(outcome, maskedWordsRequested(args, mode));
   show();
   if ((await saveResults(args, saving, outcome)) === CANCELLED) return CANCELLED;
-  const { backup, result } = outcome.encoding;
+  const { result } = outcome.encoding;
   // A record with a replaced last word never gets a sheet (validateEncodeOptions).
   const sheet = Masking.isHeirSheetMode(backup.mode)
     ? await saveHeirSheetOutput(args, {
@@ -251,7 +252,7 @@ async function encodeChecked(
     : undefined;
   if (sheet === CANCELLED) return CANCELLED;
   reportRenamedOutputs();
-  return offerEncodedCheck(
+  return await offerEncodedCheck(
     {
       mnemonic: result.sourceMnemonic,
       format: backup.format,

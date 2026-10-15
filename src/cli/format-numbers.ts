@@ -2,7 +2,7 @@
 // counted from 1. The help, the messages and the questions name the forms by them, so that no
 // number is written by hand anywhere (AUD-011-ARC037).
 
-import { cardKindOf, writtenInColors } from "../core/backup-options.js";
+import { EncodedForm } from "../core/encoded-form.js";
 import { ENCODED_FORMATS, type EncodedFormat } from "../core/types.js";
 import { listInWords } from "../core/places.js";
 import { findTemplate, type NoCardTemplateError } from "../export/template-catalog.js";
@@ -25,11 +25,14 @@ function numbersOf(formats: readonly EncodedFormat[], last: string): string {
 export const FORMAT_NUMBER_RANGE = `${formatNumber(ENCODED_FORMATS[0])} to ${formatNumber(defined(ENCODED_FORMATS.at(-1)))}`;
 
 /** The forms written in colors, by their numbers, as the help and the messages name them. */
-export const COLOR_FORMAT_NUMBERS = numbersOf(ENCODED_FORMATS.filter(writtenInColors), "and");
+export const COLOR_FORMAT_NUMBERS = numbersOf(
+  ENCODED_FORMATS.filter((format) => EncodedForm.of(format).writtenInColors),
+  "and",
+);
 
 /** The forms that print on cards, by their numbers, as a refusal names them: "3, 4 or 5". */
 export const CARD_FORMAT_NUMBERS = numbersOf(
-  ENCODED_FORMATS.filter((format) => cardKindOf(format) !== undefined),
+  ENCODED_FORMATS.filter((format) => EncodedForm.of(format).cardKind !== undefined),
   "or",
 );
 
@@ -38,9 +41,9 @@ export const CARD_FORMAT_NUMBERS = numbersOf(
  * cards a design draws, by their numbers: "… Format 3 has no template; use format 4 or 5."
  */
 export function noCardTemplateMessage(refusal: NoCardTemplateError): string {
-  const own = ENCODED_FORMATS.filter((format) => cardKindOf(format) === refusal.kind);
+  const own = ENCODED_FORMATS.filter((format) => EncodedForm.of(format).cardKind === refusal.kind);
   const drawn = ENCODED_FORMATS.filter((format) => {
-    const kind = cardKindOf(format);
+    const kind = EncodedForm.of(format).cardKind;
     return kind !== undefined && findTemplate(undefined, kind) !== undefined;
   });
   if (drawn.length === 0) return refusal.message;

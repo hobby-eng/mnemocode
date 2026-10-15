@@ -115,10 +115,15 @@ function matchOf(evidence: WalletEvidence, passphrase = ""): string {
 function checkWalletEvidenceStartup(): void {
   for (const kind of ["constructor", "toString", "hasOwnProperty", "__proto__"])
     expectSame(isPlacedKind(kind), false, "Inherited wallet evidence kind");
-  expectSame(
-    matchOf(located("address", KEYS.address84, ["native-segwit"])),
-    "matched at m/84'/0'/0'/0/0",
-    "BIP84 address",
+  using comparison = checks.prepare(located("address", KEYS.address84, ["native-segwit"]));
+  const match = comparison.match(PUBLIC_MNEMONIC);
+  expectSame(match.matched, true, "BIP84 address");
+  expectSame(match.path, "m/84'/0'/0'/0/0", "BIP84 address path");
+  comparison.wipe();
+  expectRefused(
+    () => comparison.match(PUBLIC_MNEMONIC),
+    /has been wiped/u,
+    "A disposed wallet comparison",
   );
   expectSame(
     matchOf(located("address", KEYS.change84, ["native-segwit"])),

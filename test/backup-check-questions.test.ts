@@ -4,6 +4,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { formatEncoded, parseDate, representMnemonic } from "../src/core.js";
 import { backupCheckAnswer, offerEncodedCheck, offerShareCheck } from "../src/cli/backup-check.js";
+import { EncodedBackup } from "../src/core/encoded-backup.js";
+import { runEncode } from "../src/cli/encode-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
@@ -31,6 +33,22 @@ questionsOnPrivateScreen();
 
 describe("encode, decode and the backup check on the private screen", () => {
   describe("the backup check", () => {
+    it("keeps its backup live while an asynchronous check asks to show it again, then disposes it", async () => {
+      const direct = formatEncoded(representMnemonic(TEST_PHRASE), "indexes");
+      const wrong = direct.replace(/^\d+/u, "2");
+      const encode = vi.spyOn(EncodedBackup, "encode");
+      terminal.answers = [`${TEST_PHRASE}\r`, `${wrong}\r`];
+      terminal.choices = ["yes", "show", "no"];
+      await expect(
+        runEncode({ "ask-secrets": true, mode: "direct", format: "indexes" }),
+      ).resolves.toBeUndefined();
+      expect(terminal.questions).toContain("What now?");
+      const result = encode.mock.results[0]!;
+      expect(result.type).toBe("return");
+      if (result.type !== "return") return;
+      expect(() => result.value.backup.text()).toThrow("has been wiped");
+    });
+
     it("names the codes and the date that differ, and asks only that part again", async () => {
       const codes = MASKED.split(" ");
       codes[2] = "25";

@@ -1,5 +1,5 @@
 import { entropyToMnemonic } from "@scure/bip39";
-import { completeHexUnits, fitsPattern, UNICODE_CODE_DIGITS, hexCodePoint } from "./code-text.js";
+import { completeHexUnits, fitsPattern, UNICODE_CODE_DIGITS } from "./code-text.js";
 import { wordlist as traditionalChineseWordlist } from "@scure/bip39/wordlists/traditional-chinese.js";
 import {
   BIP39_DICTIONARY_SIZE,
@@ -8,7 +8,6 @@ import {
   lastWordEntropyBits,
   lastWordEntropyValues,
   WORD_NUMBER_DIGITS,
-  WORD_NUMBER_RANGE,
   WORD_NUMBERS_THROUGH,
   isBip39WordCount,
   WORD_COUNTS_TEXT,
@@ -26,9 +25,16 @@ import {
 } from "./english-words.js";
 import { bitsOf, bitsOfIndexes, bitsToBytes, lastWordChecksumBits } from "./bits.js";
 import type { MappingRow, MissingWordCandidate } from "./types.js";
-import { inWholeRange, wholeNumberOf } from "./typed-number.js";
 import { defined } from "./defined.js";
-import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
+import { ErrorCatalog } from "./error-catalog.js";
+import { WordTable, type WordTableLookup, type WordTableFormat } from "./word-table.js";
+
+export {
+  WORD_TABLE_FORMATS,
+  UNICODE_CODE_HINT,
+  type WordTableLookup,
+  type WordTableFormat,
+} from "./word-table.js";
 
 const ERRORS = new ErrorCatalog("core.words", {
   "words-fail-bip39-checksum-check-each-word-their": () =>
@@ -44,12 +50,6 @@ const ERRORS = new ErrorCatalog("core.words", {
   "unicode-codes-four-hexadecimal-digits-each-separated-by": () =>
     "Unicode codes have four hexadecimal digits each, separated by spaces or joined.",
   "unicode-code-not-bip39-word": (value0: string) => `Unicode code ${value0} is not a BIP39 word.`,
-  "selected-mapped-bip39-character-not-one-unicode-scalar": () =>
-    "The selected mapped BIP39 character is not one Unicode scalar value.",
-  "wordlist-index-from": (value0: string) => `A wordlist index must be from ${value0}.`,
-  "word-table-row-refused": suppliedMessage,
-  "word-table-lookup": () => "Word table lookup must use a word, index or Unicode code.",
-  "word-table-format": () => "Word list format must be english, chinese, unicode or mapping.",
   "mode-exact-old-final-word-stands-no-word": () =>
     "This mode needs the exact old final word: ? stands for no word here.",
 });
@@ -84,9 +84,7 @@ export function validatedEnglishWords(mnemonic: string): string[] {
 
 // Lookup keys are four-digit code points, not the visible Chinese characters.
 /** The Unicode code of each word, by its index: four hexadecimal digits of its Chinese word. */
-export const UNICODE_CODES: readonly string[] = Object.freeze(
-  traditionalChineseWordlist.map(unicodeHex),
-);
+export const UNICODE_CODES: readonly string[] = Object.freeze(WordTable.unicodeCodes);
 /** The word number, from 0, of each Unicode code of the BIP39 Chinese word list. */
 export const UNICODE_INDEX: ReadonlyMap<string, number> = new Map(
   UNICODE_CODES.map((code, index) => [code, index]),
@@ -128,8 +126,7 @@ const WORD_NUMBER = /^\d+$/u;
  * (phrases, shares, the word table, marked codes) reads them through it.
  */
 export function wordIndexOf(token: string, syntax: RegExp = WORD_NUMBER): number | undefined {
-  const number = wholeNumberOf(token, syntax, WORD_NUMBER_RANGE);
-  return number === undefined ? undefined : number - WORD_NUMBER_RANGE.min;
+  return WordTable.indexOfNumber(token, syntax);
 }
 
 /**
@@ -174,7 +171,7 @@ export function unicodeIndexesOf(text: string): number[] {
   if (codes === undefined)
     throw ERRORS.create("unicode-codes-four-hexadecimal-digits-each-separated-by", []);
   return codes.map((code, place) => {
-    const index = UNICODE_INDEX.get(code);
+    const index = WordTable.indexOfUnicode(code);
     if (index === undefined) throw ERRORS.create("unicode-code-not-bip39-word", [`${place + 1}`]);
     return index;
   });
@@ -188,111 +185,27 @@ export { assertWordCount };
  * capitals.
  */
 export function unicodeHex(symbol: string): string {
-  const points = Array.from(symbol);
-  if (points.length !== 1)
-    throw ERRORS.create("selected-mapped-bip39-character-not-one-unicode-scalar", []);
-  return hexCodePoint(defined(defined(points[0]).codePointAt(0)));
+  return WordTable.unicodeHex(symbol);
 }
 
 /** The row of the word table for word number `index`, from 1 through 2,048. */
 export function mappingRow(index: number): MappingRow {
-  if (!inWholeRange(index, WORD_NUMBER_RANGE))
-    throw ERRORS.create("wordlist-index-from", [`${WORD_NUMBERS_THROUGH}`]);
-  const zeroBased = index - 1;
-  return {
-    index,
-    english: defined(englishWordlist[zeroBased]),
-    unicodeHex: defined(UNICODE_CODES[zeroBased]),
-  };
+  return WordTable.row(index);
 }
 
 /** Every row of the word table, in the order of the word numbers. */
 export function allMappingRows(): MappingRow[] {
-  return Array.from({ length: BIP39_DICTIONARY_SIZE }, (_, index) => mappingRow(index + 1));
+  return WordTable.rows();
 }
 
-/** What a look-up in the word table starts from: a word, its number or its Unicode code. */
-export type WordTableLookup = "word" | "index" | "unicode";
-
-/** How a Unicode code of the word table is written, for hints. */
-export const UNICODE_CODE_HINT = "four hexadecimal digits, such as 5BF6";
-
-/** Each look-up: the index, counted from 0, of the row that `typed` names, and its refusal. */
-const WORD_TABLE_LOOKUPS: Readonly<
-  Record<
-    WordTableLookup,
-    { readonly find: (typed: string) => number | undefined; readonly refusal: string }
-  >
-> = {
-  word: {
-    // As a phrase reads its words: one word, in any case.
-    find: (typed) => {
-      const words = englishTokens(typed);
-      return words.length === 1 ? ENGLISH_INDEX.get(defined(words[0])) : undefined;
-    },
-    refusal: "That word is not in the English BIP39 list.",
-  },
-  index: {
-    find: (typed) => wordIndexOf(typed),
-    refusal: `A word number is a whole number from ${WORD_NUMBERS_THROUGH}.`,
-  },
-  unicode: {
-    find: (typed) => UNICODE_INDEX.get(typed.toUpperCase()),
-    refusal: `No BIP39 word has that code; type ${UNICODE_CODE_HINT}.`,
-  },
-};
-
-/** The row of a word, a word number or a Unicode code, as `mnemocode table` finds it. */
+/** Compatibility lookup; new hosts import WordTable from core/word-table. */
 export function wordTableRow(lookup: WordTableLookup, text: string): MappingRow {
-  if (typeof lookup !== "string" || !Object.hasOwn(WORD_TABLE_LOOKUPS, lookup))
-    throw ERRORS.create("word-table-lookup", []);
-  const { find, refusal } = WORD_TABLE_LOOKUPS[lookup];
-  const index = find(text.trim());
-  if (index === undefined) throw ERRORS.create("word-table-row-refused", [refusal]);
-  return mappingRow(index + 1);
+  return WordTable.lookup(lookup, text);
 }
 
-/** The columns of the word table as a text, in the order of MappingRow. */
-const WORD_TABLE_HEADER = ["index", "english", "unicode_hex"] as const;
-
-/** Numbered dictionary exports; Chinese means the Traditional Chinese BIP39 word list. */
-export const WORD_TABLE_FORMATS = Object.freeze([
-  "english",
-  "chinese",
-  "unicode",
-  "mapping",
-] as const);
-/** The columns of a numbered BIP39 dictionary export. */
-export type WordTableFormat = (typeof WORD_TABLE_FORMATS)[number];
-
-/** Each column is read from the same canonical mapping, including the Chinese Unicode scalar. */
-const WORD_TABLE_COLUMNS = {
-  index: (row: MappingRow) => row.index,
-  english: (row: MappingRow) => row.english,
-  chinese: (row: MappingRow) => String.fromCodePoint(Number.parseInt(row.unicodeHex, 16)),
-  unicode_hex: (row: MappingRow) => row.unicodeHex,
-};
-const WORD_TABLE_LAYOUTS: Readonly<
-  Record<WordTableFormat, readonly (keyof typeof WORD_TABLE_COLUMNS)[]>
-> = {
-  english: ["index", "english"],
-  chinese: ["index", "chinese"],
-  unicode: ["index", "chinese", "unicode_hex"],
-  mapping: ["index", "english", "chinese", "unicode_hex"],
-};
-
-/**
- * Every word, numbered from 1, as UTF-8 tab-separated text with a header. Omitted format keeps
- * the original index/English/Unicode-code table. Refuses an unknown export format.
- */
+/** Compatibility text export; new hosts import WordTable from core/word-table. */
 export function wordTableText(format?: WordTableFormat): string {
-  if (format !== undefined && !WORD_TABLE_FORMATS.includes(format))
-    throw ERRORS.create("word-table-format", []);
-  const columns = format === undefined ? WORD_TABLE_HEADER : WORD_TABLE_LAYOUTS[format];
-  const rows = allMappingRows().map((row) =>
-    columns.map((column) => WORD_TABLE_COLUMNS[column](row)),
-  );
-  return [columns, ...rows].map((cells) => cells.join("\t") + "\n").join("");
+  return WordTable.text(format);
 }
 
 /**

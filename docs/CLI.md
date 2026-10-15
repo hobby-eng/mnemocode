@@ -251,12 +251,17 @@ import { EncodedBackup } from "mnemocode/core/encoded-backup";
 const dates = ["10-07-1963", "31-01-4489"].map(parseDate);
 const encoded = encodeMnemonic(mnemonic, dates);
 const unicode = formatEncoded(encoded, "unicode");
-const recovered = EncodedBackup.read(unicode, "unicode", "seedshift").decode(dates);
+using encodedBackup = EncodedBackup.read(unicode, "unicode", "seedshift");
+const recovered = encodedBackup.decode(dates);
 // recovered.recoveredMnemonic is secret; do not log it.
 const originalFingerprint = masterFingerprint(mnemonic);
 
 // The same phrase in another form, without dates.
 import { representMnemonic } from "mnemocode";
 const direct = formatEncoded(representMnemonic(mnemonic), "unicode");
-const sameMnemonic = EncodedBackup.read(direct, "unicode", "direct").decode([]);
+using directBackup = EncodedBackup.read(direct, "unicode", "direct");
+const sameMnemonic = directBackup.decode([]);
 ```
+
+The creating scope disposes both backups, including when decoding fails. Returned strings and
+copied views belong to the caller; JavaScript cannot erase them when their owner is disposed.

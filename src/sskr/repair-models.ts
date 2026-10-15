@@ -28,7 +28,6 @@ import { listPieces } from "../core/pieces.js";
 import { defined } from "../core/defined.js";
 import {
   CODE_DIGITS,
-  CODE_POINT_TEXT,
   COLOR_DIGITS,
   HEX_DIGIT_BITS,
   isMarked,
@@ -201,21 +200,12 @@ function addUnicodeModel(models: UnitModel[], text: string): void {
     readInPart(code) ? unicodeCodesFitting(code) : undefined,
   );
   if (candidates.some((words) => words?.length === 0)) return;
-  const fitting = candidates.map((words) => (words === undefined ? undefined : new Set(words)));
   addUnitModel(
     models,
     {
       format: "unicode",
       values,
-      ...(candidates.some((words) => words !== undefined)
-        ? {
-            candidates,
-            fits: (filled: readonly number[]) =>
-              fitting
-                .slice(0, filled.length)
-                .every((words, place) => words?.has(defined(filled[place])) ?? true),
-          }
-        : {}),
+      ...(candidates.some((words) => words !== undefined) ? { candidates } : {}),
     },
     !readAcrossSeparators(text, CODE_DIGITS),
   );
@@ -464,14 +454,13 @@ function colorUnicodePairings(
 /**
  * Colors written as Unicode codes, two per color: each mark may stand for one of the two codes or
  * for a whole color, and every way that fits is tried (colorUnicodePairings). A color with a mark
- * is unknown as a whole; one with one code given keeps that code (`fits`).
+ * is unknown as a whole; one with one code given keeps that code as a symbolic constraint.
  */
 function addColorUnicodeModels(models: UnitModel[], text: string): void {
   // Run together only: a ? among the codes' digits marks no digit of a color (CODE_FORMS).
   const scalars = markedColorSymbols(text) ?? withinRepair(joinedHexUnits(text, CODE_DIGITS));
   if (scalars === undefined) return;
   if (!scalars.every((code) => code === "?" || isColorUnicodePoint(parseInt(code, 16)))) return;
-  const { unitText } = SHARE_UNITS["colors-unicode"];
   for (const { pairs, decoys } of colorUnicodePairings(scalars)) {
     // Every color whose codes are all read is one (colorUnicodePairings); one with a mark in
     // either of its codes is unknown as a whole.
@@ -487,11 +476,7 @@ function addColorUnicodeModels(models: UnitModel[], text: string): void {
       values,
       decoys,
       structures: structuresOf("colors-unicode", pairs.length),
-      fits: (filled) =>
-        pairs.every((pair, index) => {
-          const written = defined(unitText(defined(filled[index])).match(CODE_POINT_TEXT));
-          return pair.every((code, half) => code === "?" || code === written[half]);
-        }),
+      codeConstraints: { pairs, prefix: false },
     });
   }
 }
@@ -511,7 +496,7 @@ function colorsFitting(pair: readonly string[]): number[] | undefined {
     COLOR_CODE_POINTS.filter((point) => fitsPattern(code, point)),
   );
   const { valueOf } = SHARE_UNITS["colors-unicode"];
-  // Broad constraints stay symbolic in fits: no candidates are truncated or eagerly expanded.
+  // Broad constraints stay symbolic: no candidates are truncated or eagerly expanded.
   if (defined(high).length > Math.floor(MAX_PARTIAL_UNIT_CANDIDATES / defined(low).length))
     return undefined;
   return defined(high).flatMap((first) =>
@@ -535,7 +520,7 @@ function addColorUnicodeDigitModel(models: UnitModel[], text: string): void {
   if (codes === undefined || !codes.some(readInPart)) return;
   if (codes.length % COLOR_UNICODE_POINTS_PER_COLOR !== 0) return;
   const pairs = listPieces(codes, COLOR_UNICODE_POINTS_PER_COLOR);
-  const { valueOf, unitText } = SHARE_UNITS["colors-unicode"];
+  const { valueOf } = SHARE_UNITS["colors-unicode"];
   const values: (number | undefined)[] = [];
   const candidates: (number[] | undefined)[] = [];
   for (const pair of pairs) {
@@ -553,21 +538,12 @@ function addColorUnicodeDigitModel(models: UnitModel[], text: string): void {
       candidates.push(undefined);
     }
   }
-  const fitting = candidates.map((colors) => (colors === undefined ? undefined : new Set(colors)));
   addUnitModel(models, {
     format: "colors-unicode",
     values,
     ...(candidates.some((colors) => colors !== undefined) ? { candidates } : {}),
     // A solution keeps every digit read, also beside a code that cannot be read.
-    fits: (filled) =>
-      pairs.slice(0, filled.length).every((pair, index) => {
-        if (fitting[index] !== undefined)
-          return defined(fitting[index]).has(defined(filled[index]));
-        const written = defined(unitText(defined(filled[index])).match(CODE_POINT_TEXT));
-        return pair.every(
-          (code, half) => wholeMark(code) || fitsPattern(code, defined(written[half])),
-        );
-      }),
+    codeConstraints: { pairs, prefix: true },
   });
 }
 

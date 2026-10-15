@@ -8,7 +8,7 @@ export const PUBLIC_VECTORS_FILE = "vectors/mnemocode-v1.json";
 export const MANUAL_RECOVERY_FILE = "docs/MANUAL_RECOVERY.md";
 /** The folder of the SSKR engine, which its manifest names its files from. */
 export const SSKR_ENGINE_FOLDER = "sskr-wasm/";
-/** The SHA-256 of each file of the engine, checked before it runs (sskr/runtime.ts). */
+/** Pins for engine inputs and outputs; runtime verifies generated JS and WASM before loading. */
 export const SSKR_MANIFEST = "integrity.json";
 /** The engine's JavaScript bridge and its WebAssembly, by the names the manifest gives them. */
 export const SSKR_BRIDGE = "generated/recovery_sskr_wasm.js";

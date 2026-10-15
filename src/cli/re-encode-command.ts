@@ -212,11 +212,11 @@ export async function runReEncode(args: ParsedArguments): Promise<Cancelled | un
       ? await askedReEncoding(old, given, confirmedBy, encode)
       : await confirmedFromOptions(old, given, defined(encode));
   if (confirmed === CANCELLED) return CANCELLED;
+  using reEncoding = confirmed.reEncoding;
   newBackupScreen(confirmed.notices);
   // The rights that the answers do not need were given up after the questions: what holds now.
   if (encode === undefined) showProtection();
-  if ((await confirmed.encode(confirmed.reEncoding.confirmedPhrase())) === CANCELLED)
-    return CANCELLED;
+  if ((await confirmed.encode(reEncoding.confirmedPhrase())) === CANCELLED) return CANCELLED;
   terminalNotice(RE_ENCODING_WORDS.oldBackupStillOpens, "warning");
   return undefined;
 }
@@ -234,17 +234,23 @@ async function reEncodingFromOptions(
   const reEncoding = await ofOldBackup(async () => {
     const read = await backupAndDatesFromOptions(old);
     if (read === CANCELLED) return CANCELLED;
-    return ReEncoding.of(read.backup, read.dates, value(old, LAST_WORD_OPTION));
+    using backup = read.backup;
+    return ReEncoding.of(backup, read.dates, value(old, LAST_WORD_OPTION));
   });
   if (reEncoding === CANCELLED) return CANCELLED;
-  showOldFingerprint(reEncoding.result);
-  if (given.evidence === undefined) {
-    reEncoding.confirmByPerson();
-    return { reEncoding, notices: RECOGNISED };
+  try {
+    showOldFingerprint(reEncoding.result);
+    if (given.evidence === undefined) {
+      reEncoding.confirmByPerson();
+      return { reEncoding, notices: RECOGNISED };
+    }
+    const notices = await walletConfirms(reEncoding, given.evidence, given.passphrase);
+    if (notices === undefined) throw ERRORS.create("nothing-was-re-encoded", []);
+    return { reEncoding, notices };
+  } catch (error) {
+    reEncoding.wipe();
+    throw error;
   }
-  const notices = await walletConfirms(reEncoding, given.evidence, given.passphrase);
-  if (notices === undefined) throw ERRORS.create("nothing-was-re-encoded", []);
-  return { reEncoding, notices };
 }
 
 /** The old backup confirmed from the options (reEncodingFromOptions), made new by `encode`. */
@@ -286,17 +292,23 @@ async function askedReEncoding(
     reEncoding: ReEncoding,
     backup: EncodedBackup,
   ): Promise<AfterDecoded | Cancelled> => {
-    for (;;) {
-      const next = await confirmation(reEncoding, backup, old, given, confirmedBy);
-      if (next === CANCELLED || typeof next === "string") return next;
-      const chosen = encode ?? (await newBackupAskedUntilTaken(next.notices));
-      if (chosen === CANCELLED) return CANCELLED;
-      if (chosen !== undefined) {
-        confirmed = { reEncoding, notices: next.notices, encode: chosen };
-        return "done";
+    let handedOut = false;
+    try {
+      for (;;) {
+        const next = await confirmation(reEncoding, backup, old, given, confirmedBy);
+        if (next === CANCELLED || typeof next === "string") return next;
+        const chosen = encode ?? (await newBackupAskedUntilTaken(next.notices));
+        if (chosen === CANCELLED) return CANCELLED;
+        if (chosen !== undefined) {
+          confirmed = { reEncoding, notices: next.notices, encode: chosen };
+          handedOut = true;
+          return "done";
+        }
+        clearPrivateScreen();
+        showOldPhrase(reEncoding.result, backup.mode, backup.format);
       }
-      clearPrivateScreen();
-      showOldPhrase(reEncoding.result, backup.mode, backup.format);
+    } finally {
+      if (!handedOut) reEncoding.wipe();
     }
   };
   const decoded = await decodeWithQuestions(old, {
@@ -305,9 +317,14 @@ async function askedReEncoding(
     async several(backup, dates) {
       const reEncoding = await askLastWord(backup, dates, old);
       if (reEncoding === CANCELLED || typeof reEncoding === "string") return reEncoding;
-      clearPrivateScreen();
-      showOldPhrase(reEncoding.result, backup.mode, backup.format);
-      return confirmAndAsk(reEncoding, backup);
+      try {
+        clearPrivateScreen();
+        showOldPhrase(reEncoding.result, backup.mode, backup.format);
+        return await confirmAndAsk(reEncoding, backup);
+      } catch (error) {
+        reEncoding.wipe();
+        throw error;
+      }
     },
     decoded: (backup, dates) => confirmAndAsk(ReEncoding.of(backup, dates), backup),
     show: showOldPhrase,

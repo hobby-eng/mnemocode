@@ -19,8 +19,8 @@ import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("export.business-render-primitives", {
-  "contains-character-not-supported-by-card-font": (value0: string, value1: string) =>
-    `${value0} contains a character not supported by the card font: ${value1}`,
+  "contains-character-not-supported-by-card-font": (label: string) =>
+    `${label} contains a character not supported by the card font.`,
   "too-long-fit-legibly-on-card-shorten": (value0: string) =>
     `${value0} is too long to fit legibly on the card; shorten it.`,
 });
@@ -51,10 +51,7 @@ export function fit(
     (c) => !font.getCharacterSet().includes(defined(c.codePointAt(0))),
   );
   if (unsupported !== undefined)
-    throw ERRORS.create("contains-character-not-supported-by-card-font", [
-      `${label}`,
-      `${unsupported}`,
-    ]);
+    throw ERRORS.create("contains-character-not-supported-by-card-font", [label]);
   const size = Math.min(
     preferred,
     width / Math.max(font.widthOfTextAtSize(text, 1), MIN_MEASURED_WIDTH),

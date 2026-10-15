@@ -16,7 +16,7 @@ A seed phrase written on paper is easy to recognise, and whoever finds it can ta
 
 - **Another form.** The words were written as numbers (each word's place in the list), as short codes of digits and letters, or as color codes such as `#1EAB91`, sometimes printed on cards that look like ordinary design samples.
 - **Secret dates (Seedshift).** The words were masked with one or more dates meaningful to the owner, such as a birthday. Their year, month and day shift the words along the BIP39 list: with 23-09-2026, "abandon" becomes "wool". Use the owner's dates to undo the shift. MnemoCode Seedshift gives a valid seed phrase even for wrong dates; the Original Seedshift may instead report a checksum error. A valid checksum does not confirm the owner's wallet. The dates have nothing to do with today, the backup date or the day you open the wallet. They are written nowhere; the owner may have left a hint on the sheet.
-- **Shamir shares.** The backup was split into several shares, kept in different places. A certain number of them, for example any 3 of 5, restore it; fewer reveal nothing at all.
+- **Shamir shares.** The backup was split into several shares, kept in different places. A certain number of different shares, for example any 3 of 5, restore it. Fewer are not enough to restore the phrase, but still show details such as how many shares are needed and how long the phrase is. Keep every share private.
 
 MnemoCode undoes all of this on your computer, without the internet.
 

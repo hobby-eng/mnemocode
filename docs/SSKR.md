@@ -1,8 +1,8 @@
 # Shamir secret sharing (SSKR)
 
-MnemoCode splits a phrase into shares with Shamir secret sharing. You choose how many shares to make (M) and how many of them restore the phrase (N), for example any 2 of 3. Fewer than N shares reveal nothing about the phrase. N is at least 2, and M is at most 16.
+MnemoCode splits a phrase into shares with Shamir secret sharing. You choose how many shares to make (M) and how many different shares restore the phrase (N), for example any 2 of 3. Fewer than N shares are not enough to reconstruct the phrase. They still reveal the set identifier, group and member numbers, thresholds and phrase length. N is at least 2, and M is at most 16.
 
-With 2 of 3 you can lose one share and still restore the phrase, and a single share is useless to anyone who finds it.
+With 2 of 3 you can lose one share and still restore the phrase. One share alone cannot restore it; keep every share private as wallet recovery material.
 
 The shares are written in SSKR (Sharded Secret Key Reconstruction), the open format from Blockchain Commons. Other programs that support this format can read them.
 

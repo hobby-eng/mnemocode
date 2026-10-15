@@ -5,7 +5,7 @@
 // host passes to a run. A small service that the date search, the word search, the search of
 // marked codes and the share repair use by composition; it holds nothing.
 //
-// Needs from the host: nothing; setTimeout, which every host has, is the default turn.
+// The host may supply its turn and monotonic clock; setTimeout and performance.now are defaults.
 
 import { inWholeRange, wholeNumbersFrom } from "./typed-number.js";
 import { ErrorCatalog } from "./error-catalog.js";
@@ -53,13 +53,16 @@ function now(): number {
   return performance.now();
 }
 
+/** Milliseconds from a monotonic clock supplied by the host; it must never move backwards. */
+export type MonotonicClock = () => number;
+
 /**
  * Starts timing: the function returned gives the seconds since. How every search times its pace,
  * with the start and the end read from one clock.
  */
-export function startTimer(): () => number {
-  const start = now();
-  return () => (now() - start) / MILLISECONDS_PER_SECOND;
+export function startTimer(clock: MonotonicClock = now): () => number {
+  const start = clock();
+  return () => (clock() - start) / MILLISECONDS_PER_SECOND;
 }
 
 /** Milliseconds of search between two turns of the host's event loop. */
@@ -80,6 +83,8 @@ export interface SearchRun {
   readonly signal?: AbortSignal | undefined;
   /** How the search lets the host's event loop run; a zero timeout by default. */
   readonly turn?: (() => Promise<void>) | undefined;
+  /** The host's monotonic clock, in milliseconds; performance.now by default. */
+  readonly now?: MonotonicClock | undefined;
 }
 
 /**
@@ -112,18 +117,24 @@ export type TurnState = "running" | "turned" | "stopped";
 export class SearchTurns {
   readonly #turn: () => Promise<void>;
   readonly #signal: AbortSignal | undefined;
+  readonly #now: MonotonicClock;
   #last: number;
 
   /** Starts the turns of a search; with a signal already aborted, it is stopped at once. */
-  constructor(signal?: AbortSignal, turn: () => Promise<void> = nextTask) {
+  constructor(
+    signal?: AbortSignal,
+    turn: () => Promise<void> = nextTask,
+    clock: MonotonicClock = now,
+  ) {
     this.#signal = signal;
     this.#turn = turn;
-    this.#last = now();
+    this.#now = clock;
+    this.#last = this.#now();
   }
 
   /** The turns of a search that runs with `run`: its signal, and its turn or a zero timeout. */
   static of(run: SearchRun): SearchTurns {
-    return new SearchTurns(run.signal, run.turn);
+    return new SearchTurns(run.signal, run.turn, run.now);
   }
 
   /** Whether the host's signal says stop. */
@@ -138,7 +149,7 @@ export class SearchTurns {
   async due(): Promise<TurnState> {
     // Heard at once: a host may stop a search from its progress, between two turns.
     if (this.stopped) return "stopped";
-    if (now() - this.#last < TURN_MILLISECONDS) return "running";
+    if (this.#now() - this.#last < TURN_MILLISECONDS) return "running";
     return (await this.take()) === "stopped" ? "stopped" : "turned";
   }
 
@@ -150,7 +161,7 @@ export class SearchTurns {
   async take(): Promise<"running" | "stopped"> {
     if (this.stopped) return "stopped";
     await this.#turn();
-    this.#last = now();
+    this.#last = this.#now();
     return this.stopped ? "stopped" : "running";
   }
 }

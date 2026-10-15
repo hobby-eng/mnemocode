@@ -28,6 +28,7 @@ import { Masking } from "./masking.js";
 import { MissingCodes } from "./missing-codes.js";
 import { detectInputFormats } from "./representations.js";
 import { Redacted } from "./redacted.js";
+import { SecretValue } from "./secret-value.js";
 import { CRC32_BYTES } from "../sskr/checksum.js";
 import { BITS_PER_BYTE } from "./bits.js";
 import type { MaskingMode } from "./types.js";
@@ -76,9 +77,9 @@ const SURE_SHARE_UNKNOWN_BITS = CRC32_BYTES * BITS_PER_BYTE;
  * later rule works on the same reading; it keeps the text, which may be the seed phrase itself, out
  * of toString, toJSON and Node.js's inspect.
  */
-export class BackupReading extends Redacted {
-  readonly #record: MnemoCodeRecord | undefined;
-  readonly #payload: string;
+export class BackupReading extends Redacted implements Disposable {
+  readonly #record: Pick<MnemoCodeRecord, "mode" | "format"> | undefined;
+  readonly #text: SecretValue<string>;
   readonly #words: Bip39WordCount | undefined;
 
   private constructor(
@@ -87,9 +88,14 @@ export class BackupReading extends Redacted {
     words: Bip39WordCount | undefined,
   ) {
     super("BackupReading");
-    this.#record = record;
-    this.#payload = payload;
+    // Keep only the header: retaining record itself would keep its immutable secret payload too.
+    this.#record = record === undefined ? undefined : { mode: record.mode, format: record.format };
+    this.#text = SecretValue.text(payload);
     this.#words = words;
+  }
+
+  get #payload(): string {
+    return this.#text.value;
   }
 
   /**
@@ -160,14 +166,18 @@ export class BackupReading extends Redacted {
     const part = parts[0] ?? text;
     if (Share.reads(part)) return "share";
     if (!MissingCodes.marked(part)) return undefined;
-    // The unknown bits of each reading that has a solution; the spaces themselves are wiped.
+    // Spaces own copies: the classifier must also end every original factory reading.
     let unknownBits: number[] = [];
+    let readings: MarkedReading[] = [];
     try {
-      unknownBits = MarkedReading.of(part.trim()).flatMap((reading) =>
+      readings = MarkedReading.of(part.trim());
+      unknownBits = readings.flatMap((reading) =>
         reading.withSpace((space) => (space === undefined ? [] : [space.unknownBits])),
       );
     } catch {
       return undefined;
+    } finally {
+      for (const reading of new Set(readings)) reading.wipe();
     }
     if (unknownBits.length === 0) return undefined;
     // A share's checksum and layout are more than 50 bits of rules: marks of up to 32 unknown bits
@@ -286,6 +296,18 @@ export class BackupReading extends Redacted {
    */
   codes(format: EncodedFormat): EncodedBackup {
     return EncodedBackup.read(this.#payloadIn(format), format, "direct");
+  }
+
+  /**
+   * Ends this reading's payload lifetime. Header metadata remains available; child backups and
+   * marked-code searches own independent copies. Returned JavaScript strings cannot be erased.
+   */
+  wipe(): void {
+    this.#text.wipe();
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 

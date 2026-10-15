@@ -206,3 +206,11 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
 TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
+
+## Patched SSKR source
+
+The sskr 0.12.0 runtime source is included in
+[rust/vendor/sskr-0.12.0](rust/vendor/sskr-0.12.0/UPSTREAM.json). Its local
+lifetime patch reuses zeroize 1.9.1 already pinned by the bridge. Its original
+[license](rust/vendor/sskr-0.12.0/LICENSE.md) is retained. Source changes do not
+upgrade any crate or change the SSKR arithmetic or transport formats.

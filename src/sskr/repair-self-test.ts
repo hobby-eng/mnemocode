@@ -5,7 +5,7 @@
 // shares repaired together, also one of which nothing could be read. core/self-test.ts runs the
 // quick part before every command of the command line and all of it in the full self-test.
 //
-// From the host it needs, for the full check only, its SharePlatform (sskr/share-platform.ts). It
+// From the host it needs, for the full check only, its ShareRepairPlatform (sskr/share-platform.ts). It
 // holds public test data, no secret.
 //
 // Host-neutral: it imports only other host-neutral sskr modules and core/self-test-check.ts.
@@ -18,7 +18,8 @@ import { colorsToUnicode } from "../core/colors.js";
 import { UNICODE_CODE_DIGITS } from "../core/code-text.js";
 import { textPieces } from "../core/pieces.js";
 import { ShareSet } from "./share-set.js";
-import type { SharePlatform } from "./share-platform.js";
+import { ShareValues } from "./share-values.js";
+import type { ShareRepairPlatform } from "./share-platform.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
@@ -46,12 +47,16 @@ function marked(text: string, element: string, mark = "?"): string {
 /** Checks that `text` is repaired into `ur`, its marked elements filled in as `filled` says. */
 function checkRepair(text: string, ur: string, filled: string, name: string): void {
   const repaired = readRepairableShare(text);
+  using held = new ShareValues([repaired]);
+  expectSame(defined(held.shares[0]).ur, ur, `${name} owned share`);
   expectSame(repaired.ur, ur, `${name} share`);
   expectSame(
     repaired.filled.map((element) => `${element.position}:${element.value}`).join(" "),
     filled,
     `${name} filled elements`,
   );
+  held.wipe();
+  expectRefused(() => held.shares, /has been wiped/u, `${name} ended owner`);
 }
 
 /**
@@ -122,7 +127,7 @@ export function checkShareRepairStartup(): void {
  * colors unread on one share and a digit on the other, which restores the phrase of the vector;
  * then the third share, of which nothing was read, found from the other two.
  */
-export async function checkShareRepair(platform: SharePlatform): Promise<void> {
+export async function checkShareRepair(platform: ShareRepairPlatform): Promise<void> {
   checkShareRepairStartup();
   const repair = new JointRepair(platform);
   const records = [
@@ -145,7 +150,7 @@ export async function checkShareRepair(platform: SharePlatform): Promise<void> {
     .split(" ")
     .map(() => "?")
     .join(" ");
-  const set = await ShareSet.combine([SET_SHARES[1], SET_SHARES[2], unread], platform);
+  using set = await ShareSet.combine([SET_SHARES[1], SET_SHARES[2], unread], platform);
   expectSame(set.mnemonic, SET_PHRASE, "A share of which nothing was read: phrase");
   expectSame(set.shares[2]?.ur, SET_SHARES[0], "A share of which nothing was read: share");
   // A marked share with an unmarked error too is refused, not repaired into another share.

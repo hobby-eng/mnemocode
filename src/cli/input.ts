@@ -204,7 +204,7 @@ export async function backupFromOptions(
   seedshiftOnly: boolean,
   modeKnown?: (mode: MaskingMode) => void,
 ): Promise<{ readonly backup: EncodedBackup; readonly mode: MaskingMode } | Cancelled> {
-  const reading = BackupReading.of(await encodedInput(arguments_), {
+  using reading = BackupReading.of(await encodedInput(arguments_), {
     seedshiftOnly,
     shareReader: SHARE_READER,
     words: phraseWords(arguments_),
@@ -227,7 +227,8 @@ export async function backupFromOptions(
     if (chosen === undefined || chosen === CANCELLED) return CANCELLED;
     format = chosen;
   }
-  return { backup: reading.codes(format).withMode(mode), mode };
+  using codes = reading.codes(format);
+  return { backup: codes.withMode(mode), mode };
 }
 
 export function encodeFormat(value_: string | undefined): EncodedFormat {
@@ -295,7 +296,8 @@ function typedSeedPhrase(answer: string): string {
  * and words of the core's dates (DatesAnswer.parse without ?).
  */
 function typedDates(line: string, wordCount: number | undefined): DateShiftDate[] {
-  return DatesAnswer.parse(line, { wordCount, patterns: false }).known;
+  using dates = DatesAnswer.parse(line, { wordCount, patterns: false });
+  return dates.known;
 }
 
 /**

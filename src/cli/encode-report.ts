@@ -69,11 +69,10 @@ export function printOriginalCopy(
       console.log("Original seed phrase (before Seedshift):");
     if (!terminalPhrase(mnemonic)) console.log(mnemonic);
   }
-  if (form !== "words" && format !== "english")
-    printEncodedBackup(
-      EncodedBackup.encode(mnemonic, [], defined(format), "direct").backup,
-      "Original seed phrase in codes",
-    );
+  if (form !== "words" && format !== "english") {
+    using backup = EncodedBackup.encode(mnemonic, [], defined(format), "direct").backup;
+    printEncodedBackup(backup, "Original seed phrase in codes");
+  }
   terminalNotice("This is the original wallet backup: no shares or dates are needed.", "warning");
 }
 

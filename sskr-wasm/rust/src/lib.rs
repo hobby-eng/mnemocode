@@ -145,19 +145,16 @@ fn encode_share(share: &UrShare, encoding: ShareEncoding) -> String {
 
 fn decode_share(record: &str, encoding: ShareEncoding) -> Result<Vec<u8>, Refusal> {
     let share = match encoding {
-        ShareEncoding::CompactUr => {
-            UrShare::from_ur_string(record).map_err(|error| Refusal::Decode(message(error)))?
-        }
+        ShareEncoding::CompactUr => UrShare::from_ur_string(record).map_err(|_| Refusal::Decode)?,
         ShareEncoding::Bytewords => {
             let data = bytewords::decode(record, bytewords::Style::Standard)
-                .map_err(|error| Refusal::Decode(message(error)))?;
-            let cbor =
-                CBOR::try_from_data(data).map_err(|error| Refusal::Decode(message(error)))?;
+                .map_err(|_| Refusal::Decode)?;
+            let cbor = CBOR::try_from_data(data).map_err(|_| Refusal::Decode)?;
             // Standard textual SSKR Bytewords carries the registered CBOR tag.
             // Accept the earlier CKD untagged wrapper for existing backups only.
             UrShare::from_tagged_cbor(cbor.clone())
                 .or_else(|_| UrShare::from_untagged_cbor(cbor))
-                .map_err(|error| Refusal::Decode(message(error)))?
+                .map_err(|_| Refusal::Decode)?
         }
     };
     Ok(share.into_bytes())
@@ -387,5 +384,45 @@ mod tests {
             .unwrap(),
             secret,
         );
+    }
+}
+
+#[cfg(test)]
+mod decode_tests {
+    use super::*;
+
+    // Published BCR-2020-011 share and its independently retained Bytewords, unchanged.
+    const SHARE: &str = "ur:sskr/gogrrsbyadaefmnlbnctaaecvoqdfnjpbzecstfgaxtifpsskbfw";
+    const WORDS: &str = "tuna next keep gyro gear runs body acid able film nail barn cost aqua epic veto quad fern jump buzz epic slot frog apex taxi grim fern twin leaf";
+
+    #[test]
+    fn preserves_literal_public_encodings() {
+        bc_tags::register_tags();
+        let share = UrShare::from_ur_string(SHARE).unwrap();
+        assert_eq!(encode_share(&share, ShareEncoding::CompactUr), SHARE);
+        assert_eq!(encode_share(&share, ShareEncoding::Bytewords), WORDS);
+        assert_eq!(
+            decode_share(WORDS, ShareEncoding::Bytewords).unwrap(),
+            share.0
+        );
+    }
+
+    #[test]
+    fn discards_wrong_type_and_malformed_decoder_details() {
+        bc_tags::register_tags();
+        let wrong_type = SHARE.replacen("ur:sskr/", "ur:private-user-token/", 1);
+        let bad_checksum = format!("{}ae", &SHARE[..SHARE.len() - 2]);
+        for (record, encoding) in [
+            (wrong_type.as_str(), ShareEncoding::CompactUr),
+            (bad_checksum.as_str(), ShareEncoding::CompactUr),
+            ("private-user-token invalid words", ShareEncoding::Bytewords),
+        ] {
+            let refusal = decode_share(record, encoding).unwrap_err();
+            assert_eq!(refusal, Refusal::Decode);
+            assert_eq!(refusal.code(), "sskr.engine.decode");
+            assert_eq!(refusal.to_string(), "The SSKR share could not be decoded.");
+            assert_eq!(format!("{refusal:?}"), "Decode");
+            assert!(std::error::Error::source(&refusal).is_none());
+        }
     }
 }

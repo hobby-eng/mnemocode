@@ -13,6 +13,11 @@ import { resolveCardPresentation, type CardCopyOverrides } from "./card-copy.js"
 import { createCardIdentity, sectorForStyle } from "./card-identities.js";
 import type { UniformChoice } from "./platform.js";
 import type { CardPresentation, CardProfile, CardSettings } from "./card-settings.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("export.export-details", {
+  "snapshot-keys": { kind: "type", text: () => "Card export settings must be objects." },
+});
 
 /**
  * The person and the texts that the cards of one export print. A class, so that both are settled
@@ -34,6 +39,24 @@ export class ExportDetails {
     this.profile = Object.freeze({ ...profile });
     this.presentation = Object.freeze({ ...presentation });
     Object.freeze(this);
+  }
+
+  /**
+   * Reuses already settled public details for an options snapshot of the same export. Chooses
+   * nothing when the original has no details yet, and keeps an already settled snapshot. The
+   * original key is borrowed only during this call; invalid keys fail with
+   * export.export-details.snapshot-keys. No phrase or share is retained here.
+   */
+  static reuseForSnapshot(original: object, snapshot: object): void {
+    if (
+      [original, snapshot].some(
+        (key) => key === null || (typeof key !== "object" && typeof key !== "function"),
+      )
+    )
+      throw ERRORS.create("snapshot-keys", []);
+    if (ExportDetails.#settled.has(snapshot)) return;
+    const details = ExportDetails.#settled.get(original);
+    if (details !== undefined) ExportDetails.#settled.set(snapshot, details);
   }
 
   /**

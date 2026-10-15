@@ -78,20 +78,26 @@ export interface ShareStructure {
   };
 }
 
+/** Symbolic Color Unicode constraints; prefix readings inspect only their own filled units. */
+export interface ReadingCodeConstraints {
+  readonly pairs: readonly (readonly string[])[];
+  readonly prefix: boolean;
+}
+
 /**
- * A share read as units of one form: their values, undefined where marked. The form writes the
- * units (SHARE_UNITS).
+ * A share read as units of one form: their values, undefined where marked. Constraints are data
+ * for the reading owner to snapshot, never callbacks retaining the secret parser input.
  */
 export interface ReadingUnits {
   readonly format: ShareFormat;
   readonly values: readonly (number | undefined)[];
-  /** Rejects values that the written text rules out, such as a color code given half. */
-  readonly fits?: (values: readonly number[]) => boolean;
+  /** Codes read in full or in part, including broad patterns not expanded into candidates. */
+  readonly codeConstraints?: ReadingCodeConstraints;
   /** For each marked unit read in part, the bits that were read (ReadBits); equations too. */
   readonly readBits?: readonly (ReadBits | undefined)[];
   /**
    * For each partly read unit whose digits are no bits of it, such as a Unicode code, the values
-   * that fit the digits read: a solution takes one of them (fits), and withValues tries them.
+   * that fit the digits read: a solution must belong to the list, and withValues tries them.
    */
   readonly candidates?: readonly (readonly number[] | undefined)[];
   /** Whether complete decoy cards follow these units, as a prefix of the text (addUnitModel). */

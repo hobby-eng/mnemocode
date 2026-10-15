@@ -44,7 +44,6 @@ import {
   type ShareFormat,
 } from "../src/sskr/transport.js";
 import { markUnits, shareUnits } from "./helpers/shares.js";
-import { anyOf } from "./helpers/matchers.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
@@ -328,19 +327,25 @@ describe("S048: one progress and one way to turn for every search", () => {
     expect(turns).toBeGreaterThan(0);
   });
 
-  it("gives a restore's own turn to its assessment too", async () => {
+  it("stops restore from its assessment turn before the host combines a secret", async () => {
     const input = new ShareInput({ decodeEntry: "The Decode tab" });
     input.add([SHARES[0]!, markUnits(SHARES[1]!, "colors", [5])]);
-    const read = vi.spyOn(ShareRestore.prototype, "read");
-    const turn = async () => undefined;
-    const restored = await new ShareRestore(nodeSharePlatform).restore({
+    const stop = new AbortController();
+    const combineShares = vi.fn(nodeSharePlatform.combineShares);
+    let turns = 0;
+    const restored = await new ShareRestore({ ...nodeSharePlatform, combineShares }).restore({
       input,
       mode: "direct",
       confirmed: true,
-      turn,
+      signal: stop.signal,
+      turn: async () => {
+        turns += 1;
+        stop.abort();
+      },
     });
-    expect(restored.kind).toBe("phrases");
-    expect(read).toHaveBeenCalledWith(input, anyOf(Function), turn);
+    expect(restored.kind).toBe("stopped");
+    expect(turns).toBeGreaterThan(0);
+    expect(combineShares).not.toHaveBeenCalled();
   });
 });
 

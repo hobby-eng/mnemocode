@@ -61,6 +61,7 @@ import {
   WORD_NUMBERS_RUN_TOGETHER,
 } from "./words.js";
 import { Redacted } from "./redacted.js";
+import { SecretValue } from "./secret-value.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
 
@@ -224,8 +225,9 @@ export interface CodesCheckResult {
  * because the places are read and checked once, and then tell their size, are searched and give
  * EncodedBackups; toString, toJSON and Node's inspect show none of the codes.
  */
-export class MissingCodes extends Redacted {
-  readonly #places: readonly WordPlace[];
+export class MissingCodes extends Redacted implements Disposable {
+  readonly #values: SecretValue<readonly WordPlace[]>;
+  readonly #active = new Set<() => void>();
   readonly #format: EncodedFormat;
   readonly #masking: Masking;
   readonly #combinations: number;
@@ -242,10 +244,14 @@ export class MissingCodes extends Redacted {
     // Counted and bounded as the word search counts and bounds its places (candidates.ts).
     const combinations = searchCombinations({ kind: "unknown-words", places });
     assertSearchable(combinations, NARROW_MARKED_CODES);
-    this.#places = Object.freeze(places.map((place) => Object.freeze([...place])));
+    this.#values = SecretValue.numberLists(places);
     this.#format = format;
     this.#masking = masking;
     this.#combinations = combinations;
+  }
+
+  get #places(): readonly WordPlace[] {
+    return this.#values.value;
   }
 
   /**
@@ -318,40 +324,83 @@ export class MissingCodes extends Redacted {
     return expectedCandidates({ kind: "unknown-words", places: this.#places }).count;
   }
 
-  /** The candidates, as BIP39 indexes, in a steady order; each array is a fresh copy. */
-  *candidates(): Generator<number[]> {
-    if (this.checksummed) {
-      for (const words of searchCandidates({ kind: "unknown-words", places: this.#places }))
-        yield [...words];
-      return;
+  /**
+   * Candidates in steady order, each a caller-owned copy. Ending this owner closes active
+   * iterators; a new iteration after disposal is refused.
+   */
+  candidates(): Generator<number[]> {
+    this.#values.assertLive();
+    const iterator = this.#iterate((active) => {
+      if (active) this.#active.add(close);
+      else this.#active.delete(close);
+    });
+    const finish = iterator.return.bind(iterator);
+    const close = (): void => {
+      finish(undefined);
+    };
+    return iterator;
+  }
+
+  *#iterate(state: (active: boolean) => void): Generator<number[], void, unknown> {
+    this.#values.assertLive();
+    state(true);
+    try {
+      const places = this.#places;
+      if (this.checksummed) {
+        for (const words of searchCandidates({ kind: "unknown-words", places })) yield [...words];
+      } else {
+        for (const codes of placeCombinations(places)) yield [...codes];
+      }
+    } finally {
+      state(false);
     }
-    for (const codes of placeCombinations(this.#places)) yield [...codes];
   }
 
   /**
    * Checks every candidate with the host's check, letting its event loop run now and then, and
-   * keeps the first maxFound that pass, as EncodedBackups of this form and mode.
+   * keeps the first maxFound that pass, as EncodedBackups of this form and mode. Returned backups
+   * belong to the caller, including stopped partial results. A failed run wipes its kept backups;
+   * the codes must stay live until the run ends.
    */
   async run(run: CodesCheckRun): Promise<CodesCheckResult> {
+    this.#values.assertLive();
     const maxFound = keptCount(run.maxFound, MAX_FOUND_CODES, "maxFound", 1);
     const found: EncodedBackup[] = [];
     let count = 0;
     let passed = 0;
     const turns = SearchTurns.of(run);
-    for (const codes of this.candidates()) {
-      if (turns.stopped) return { found, passed, count, stopped: true };
-      const passes = await run.check(codes);
-      // An answer that came after a stop is not counted (AUD-015-API001).
-      if (turns.stopped) return { found, passed, count, stopped: true };
-      count += 1;
-      if (passes) {
-        passed += 1;
-        if (found.length < maxFound) found.push(EncodedBackup.of(codes, this.#format, this.mode));
+    try {
+      for (const codes of this.candidates()) {
+        if (turns.stopped) return { found, passed, count, stopped: true };
+        const passes = await run.check(codes);
+        this.#values.assertLive();
+        // An answer that came after a stop is not counted (AUD-015-API001).
+        if (turns.stopped) return { found, passed, count, stopped: true };
+        count += 1;
+        if (passes) {
+          passed += 1;
+          if (found.length < maxFound) found.push(EncodedBackup.of(codes, this.#format, this.mode));
+        }
+        const turn = await turns.due();
+        this.#values.assertLive();
+        if (turn === "stopped") return { found, passed, count, stopped: true };
+        if (turn === "turned") run.onProgress?.({ checked: count, found: passed });
       }
-      const turn = await turns.due();
-      if (turn === "stopped") return { found, passed, count, stopped: true };
-      if (turn === "turned") run.onProgress?.({ checked: count, found: passed });
+      this.#values.assertLive();
+      // The final progress callback can stop the run after its last turn.
+      return { found, passed, count, stopped: turns.stopped };
+    } catch (error) {
+      for (const backup of found) backup.wipe();
+      throw error;
     }
-    return { found, passed, count, stopped: false };
+  }
+
+  /** Ends the retained code lifetime and closes every active candidate iterator; idempotent. */
+  wipe(): void {
+    this.#values.wipeAndClose(this.#active);
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }

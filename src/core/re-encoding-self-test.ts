@@ -16,6 +16,7 @@
 
 import { EncodedBackup } from "./encoded-backup.js";
 import { parseDate } from "./dates.js";
+import type { DateShiftDate } from "./types.js";
 import { CHECKSUM_FAILS, LAST_WORD_NEEDED, NOT_CONFIRMED, ReEncoding } from "./re-encoding.js";
 import {
   expectRefused,
@@ -51,8 +52,9 @@ const FINGERPRINT_WALLET: WalletCheck = (mnemonic) =>
     PUBLIC_FINGERPRINT,
   );
 
-function maskedBackup(): EncodedBackup {
-  return EncodedBackup.read(MASKED_NUMBERS, "indexes", "seedshift");
+function reEncodingAt(date: DateShiftDate): ReEncoding {
+  using backup = EncodedBackup.read(MASKED_NUMBERS, "indexes", "seedshift");
+  return ReEncoding.of(backup, [date]);
 }
 
 const NOT_CONFIRMED_REFUSAL = new RegExp(NOT_CONFIRMED.slice(0, 40), "u");
@@ -62,7 +64,7 @@ const NOT_CONFIRMED_REFUSAL = new RegExp(NOT_CONFIRMED.slice(0, 40), "u");
  * wrong date's valid phrase; and a failing checksum refused.
  */
 function checkReEncodingStartup(): void {
-  const reEncoding = ReEncoding.of(maskedBackup(), [RIGHT_DATE]);
+  using reEncoding = reEncodingAt(RIGHT_DATE);
   expectSame(reEncoding.phrase, PUBLIC_PHRASE, "Re-encoded phrase");
   expectRefused(
     () => reEncoding.confirmedPhrase(),
@@ -77,31 +79,39 @@ function checkReEncodingStartup(): void {
   );
   expectSame(reEncoding.confirmation?.by, "person", "Confirmation by the person");
   const encoded = EncodedBackup.encode(reEncoding.confirmedPhrase(), [], "unicode", "direct");
-  expectSame(encoded.backup.text(), PUBLIC_UNICODE, "Phrase encoded again");
+  using encodedBackup = encoded.backup;
+  expectSame(encodedBackup.text(), PUBLIC_UNICODE, "Phrase encoded again");
   // Every date gives MnemoCode Seedshift a valid phrase, which the checksum cannot tell apart.
-  expectSame(
-    ReEncoding.of(maskedBackup(), [WRONG_DATE]).phrase === PUBLIC_PHRASE,
-    false,
-    "Phrase of a wrong date",
-  );
-  const legacy = EncodedBackup.read(LEGACY_UNICODE, "unicode", "seedshift-legacy");
-  expectSame(ReEncoding.of(legacy, [RIGHT_DATE]).phrase, PUBLIC_PHRASE, "Original Seedshift");
+  using wrongDate = reEncodingAt(WRONG_DATE);
+  expectSame(wrongDate.phrase === PUBLIC_PHRASE, false, "Phrase of a wrong date");
+  using legacy = EncodedBackup.read(LEGACY_UNICODE, "unicode", "seedshift-legacy");
+  using old = ReEncoding.of(legacy, [RIGHT_DATE]);
+  expectSame(old.phrase, PUBLIC_PHRASE, "Original Seedshift");
   expectRefused(
-    () => ReEncoding.of(legacy, [WRONG_DATE]),
+    () => {
+      using unexpected = ReEncoding.of(legacy, [WRONG_DATE]);
+      return unexpected.phrase;
+    },
     new RegExp(CHECKSUM_FAILS.slice(0, 40), "u"),
     "Original Seedshift with a wrong date",
   );
   // Made with a valid last word, it gives a phrase for each possible last word: the original one,
   // which the person remembers, picks it.
-  const several = EncodedBackup.encode(PUBLIC_PHRASE, [RIGHT_DATE], "indexes", "seedshift-legacy", {
+  using several = EncodedBackup.encode(PUBLIC_PHRASE, [RIGHT_DATE], "indexes", "seedshift-legacy", {
     validLastWord: true,
   }).backup;
   expectRefused(
-    () => ReEncoding.of(several, [RIGHT_DATE]),
+    () => {
+      using unexpected = ReEncoding.of(several, [RIGHT_DATE]);
+      return unexpected.phrase;
+    },
     new RegExp(LAST_WORD_NEEDED.slice(0, 40), "u"),
     "Valid last word without the original one",
   );
-  expectSame(ReEncoding.of(several, [RIGHT_DATE], "about").phrase, PUBLIC_PHRASE, "Last word");
+  using selected = ReEncoding.of(several, [RIGHT_DATE], "about");
+  expectSame(selected.phrase, PUBLIC_PHRASE, "Last word");
+  reEncoding.wipe();
+  expectRefused(() => reEncoding.phrase, /has been wiped/u, "Re-encoding after disposal");
 }
 
 /**
@@ -111,7 +121,7 @@ function checkReEncodingStartup(): void {
  */
 async function checkReEncoding(): Promise<void> {
   checkReEncodingStartup();
-  const reEncoding = ReEncoding.of(maskedBackup(), [RIGHT_DATE]);
+  using reEncoding = reEncodingAt(RIGHT_DATE);
   expectSame((await reEncoding.confirmByWallet(OTHER_WALLET)).matched, false, "Other wallet");
   expectRefused(
     () => reEncoding.confirmedPhrase(),
@@ -122,11 +132,11 @@ async function checkReEncoding(): Promise<void> {
   expectSame(reEncoding.confirmation?.by, "wallet", "Confirmation by the wallet");
   expectSame(warningOf(reEncoding), undefined, "Warning of an address");
   expectSame(reEncoding.confirmedPhrase(), PUBLIC_PHRASE, "Phrase confirmed by the wallet");
-  const byFingerprint = ReEncoding.of(maskedBackup(), [RIGHT_DATE]);
+  using byFingerprint = reEncodingAt(RIGHT_DATE);
   const match = await byFingerprint.confirmByWallet(FINGERPRINT_WALLET);
   expectSame(match.matched && match.warning, FINGERPRINT_WARNING, "Fingerprint's warning");
   expectSame(warningOf(byFingerprint), FINGERPRINT_WARNING, "Fingerprint's confirmation");
-  const wrong = ReEncoding.of(maskedBackup(), [WRONG_DATE]);
+  using wrong = reEncodingAt(WRONG_DATE);
   expectSame((await wrong.confirmByWallet(PUBLIC_WALLET)).matched, false, "Wrong date's wallet");
 }
 

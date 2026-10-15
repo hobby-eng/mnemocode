@@ -50,6 +50,36 @@ function type(keys: string): void {
 }
 
 describe("finite private result pages", () => {
+  it("keeps the admitted lines independent from later changes to the caller's array", async () => {
+    const lines = ["Initial public row", ...Array.from({ length: 40 }, () => "Public fixture")];
+    using result = new PrivateResult(lines);
+    lines[0] = "Changed public row";
+    type("\r");
+    await result.show(vi.fn());
+    expect(frames[0]).toContain("Initial public row");
+    expect(frames[0]).not.toContain("Changed public row");
+  });
+
+  it("refuses a private or plain replay after disposal", async () => {
+    const result = new PrivateResult(["Public fixture"]);
+    result.wipe();
+    result[Symbol.dispose]();
+    const plain = vi.fn();
+    await expect(result.show(plain)).rejects.toHaveProperty("code", "core.secret-value.wiped");
+    expect(plain).not.toHaveBeenCalled();
+  });
+
+  it.each(["\r", "\x03", "\x1b"])(
+    "disposes the share display after its final key (%j)",
+    async (key) => {
+      type(key);
+      const wipe = vi.spyOn(PrivateResult.prototype, "wipe");
+      const shares = Array.from({ length: 16 }, () => sskrSetVector.shares[0]);
+      await printShares(inForm(shares, SHARE_FORMATS[0]!));
+      expect(wipe).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it.each([
     [80, 24],
     [32, 12],

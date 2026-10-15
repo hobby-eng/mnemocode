@@ -99,7 +99,7 @@ function seedInput(
   const phrase = nfkd(mnemonic);
   if (!isBip39WordCount(phrase.split(" ").length)) throw ERRORS.create("invalid-mnemonic", []);
   // Checked before the template below would turn it into text.
-  if (typeof passphrase !== "string") throw ERRORS.create("expected-string-passphrase", []);
+  Bip39Seed.assertPassphraseType(passphrase);
   return { phrase, salt: nfkd(`${SEED_SALT_PREFIX}${passphrase}`) };
 }
 
@@ -120,6 +120,11 @@ function checkedSeed(seed: unknown): Uint8Array {
  */
 export class Bip39Seed {
   readonly #pbkdf2: Pbkdf2HmacSha512;
+
+  /** Refuses a non-text passphrase before it is retained or interpolated; no normalization. */
+  static assertPassphraseType(value: unknown): asserts value is string {
+    if (typeof value !== "string") throw ERRORS.create("expected-string-passphrase", []);
+  }
 
   constructor(pbkdf2: Pbkdf2HmacSha512) {
     if (typeof pbkdf2 !== "function")

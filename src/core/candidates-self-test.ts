@@ -100,31 +100,59 @@ const REFUSED_SEARCHES: readonly (readonly [string, RegExp])[] = [
 
 /** The combinations, the candidate count and the numbered candidates of `search`. */
 function checkSearch(search: SearchCase): void {
-  const parsed = WordCandidateSearch.parse(search.text, search.kind);
+  using parsed = WordCandidateSearch.parse(search.text, search.kind);
   expectSame(parsed.combinations, search.combinations, "Word search combinations");
   const wanted = new Map(search.candidates.map((candidate) => [candidate[0], candidate]));
   let count = 0;
-  for (const candidate of parsed.candidates()) {
+  for (const next of parsed.candidates()) {
+    using candidate = next;
     count += 1;
     const expected = wanted.get(candidate.number);
     if (expected === undefined) continue;
     expectSame(candidate.phrase, expected[1], `Word search candidate ${candidate.number}`);
     if (expected[2] !== undefined) {
       const entropy = candidate.entropy();
-      expectSame(hexOfBytes(entropy), expected[2], `Word search entropy ${candidate.number}`);
-      entropy.fill(0);
+      try {
+        expectSame(hexOfBytes(entropy), expected[2], `Word search entropy ${candidate.number}`);
+      } finally {
+        entropy.fill(0);
+      }
     }
   }
   expectSame(count, search.count, "Word search candidate count");
 }
 
+/** Cheap lifetime controls alongside the public known answers; no wallet derivation. */
+function checkLifetimes(): void {
+  using search = WordCandidateSearch.parse(PREFIX_AND_CHOICE.text, "unknown-words");
+  const candidates = search.candidates();
+  try {
+    const first = candidates.next();
+    expectSame(first.done, false, "Word search yields its public candidate");
+    if (first.done) return;
+    using candidate = first.value;
+    search.wipe();
+    expectSame(candidate.phrase, `${ABANDON_ELEVEN} about`, "Transferred word candidate");
+    expectRefused(() => search.expected, /has been wiped/u, "Disposed word search");
+    expectRefused(() => candidates.next(), /has been wiped/u, "Disposed word iterator");
+    candidate.wipe();
+    expectRefused(() => candidate.words, /has been wiped/u, "Disposed word candidate");
+  } finally {
+    candidates.return(undefined);
+  }
+}
+
 /** The quick known answers: two searches of marked places, and the searches refused. */
 export function checkWordSearchStartup(): void {
+  checkLifetimes();
   checkSearch(PREFIX_AND_CHOICE);
   checkSearch(WORD_IN_THE_MIDDLE);
   for (const [text, because] of REFUSED_SEARCHES)
     expectRefused(
-      () => WordCandidateSearch.parse(text, "unknown-words"),
+      () => {
+        using search = WordCandidateSearch.parse(text, "unknown-words");
+        return search;
+      },
       because,
       "A refused word search",
     );
@@ -139,7 +167,8 @@ export async function checkWordSearch(fingerprint: PhraseFingerprint): Promise<v
   checkWordSearchStartup();
   checkSearch(MISSING_AMONG_REPEATED);
   checkSearch(MISSING_OF_24);
-  const result = await WordCandidateSearch.parse(PREFIX_AND_CHOICE.text, "unknown-words").run({
+  using search = WordCandidateSearch.parse(PREFIX_AND_CHOICE.text, "unknown-words");
+  const result = await search.run({
     walletCheck: fingerprintWalletCheck(fingerprint, PUBLIC_FINGERPRINT),
     keep: PREFIX_AND_CHOICE.count,
   });
@@ -153,6 +182,7 @@ export async function checkWordSearch(fingerprint: PhraseFingerprint): Promise<v
       "Word search entropies for a list",
     );
   } finally {
+    for (const { candidate } of result.shown) candidate.wipe();
     wipeAll(result.entropies);
   }
 }

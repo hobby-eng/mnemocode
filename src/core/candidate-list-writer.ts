@@ -15,6 +15,8 @@ import { mnemonicToEntropy } from "@scure/bip39";
 import type { ListProtection } from "./candidate-encryption.js";
 import { assertListPassphrase, candidateListHolds, encodeCandidateList } from "./candidate-list.js";
 import { englishWordlist } from "./english-words.js";
+import { SecretValue } from "./secret-value.js";
+import { Redacted } from "./redacted.js";
 
 /** A candidate list ready to be saved. */
 export interface CandidateListFile {
@@ -47,21 +49,28 @@ export const NO_CANDIDATE_TO_SAVE = "No candidate to save, so no list was writte
  * list needs is settled when the writer is made, before the search: a BIP39 passphrase that no
  * list can take is refused at once instead of after a long search.
  */
-export class CandidateListWriter {
+export class CandidateListWriter extends Redacted {
   readonly #protection: ListProtection;
-  readonly #passphrase: string;
+  readonly #passphrase: SecretValue<string>;
 
   /** `passphrase` is the BIP39 passphrase that the list stores for every record; "" stores none. */
   constructor(protection: ListProtection, passphrase = "") {
+    super("CandidateListWriter");
     // The label says that the limit is the list's: BIP39 itself takes a longer passphrase.
     assertListPassphrase(passphrase, "BIP39 passphrase that the list stores");
     this.#protection = protection;
-    this.#passphrase = passphrase;
+    this.#passphrase = SecretValue.text(passphrase);
+  }
+
+  /** Whether this live writer uses the same BIP39 passphrase; it never gives the passphrase out. */
+  usesPassphrase(passphrase: string): boolean {
+    return this.#passphrase.value === passphrase;
   }
 
   /** The list of `entropies`, record N for candidate N; they are this call's and wiped after it. */
   async write(entropies: Uint8Array[]): Promise<ListOutcome> {
     try {
+      this.#passphrase.assertLive();
       if (!candidateListHolds(entropies.length)) return { kind: "full" };
       if (entropies.length === 0) return { kind: "empty" };
       return { kind: "list", list: await this.#encode(entropies) };
@@ -72,6 +81,7 @@ export class CandidateListWriter {
 
   /** The list of `phrases`, English BIP39 phrases in their order, as write() makes it. */
   async writePhrases(phrases: readonly string[]): Promise<ListOutcome> {
+    this.#passphrase.assertLive();
     // Too many are told before any phrase is turned into entropy.
     if (!candidateListHolds(phrases.length)) return { kind: "full" };
     const entropies: Uint8Array[] = [];
@@ -88,18 +98,37 @@ export class CandidateListWriter {
   async #encode(entropies: readonly Uint8Array[]): Promise<CandidateListFile> {
     const records = entropies.map((entropy) => ({ entropy }));
     // An empty passphrase is stored as none (CandidateList.passphrase).
-    const plain = encodeCandidateList({ passphrase: this.#passphrase, records });
+    const plain = encodeCandidateList({ passphrase: this.#passphrase.value, records });
+    let bytes: Uint8Array | undefined;
+    let protectedBytes: Uint8Array | undefined;
+    let handedOut = false;
     try {
       // A copy: a list without encryption may be the very array that is wiped below.
-      const bytes = new Uint8Array(await this.#protection.protect(plain));
-      return {
+      protectedBytes = await this.#protection.protect(plain);
+      bytes = new Uint8Array(protectedBytes);
+      this.#passphrase.assertLive();
+      const list = {
         bytes,
         description: this.#protection.description,
         encrypted: this.#protection.encrypted,
         records: records.length,
       };
+      handedOut = true;
+      return list;
     } finally {
       plain.fill(0);
+      protectedBytes?.fill(0);
+      if (!handedOut) bytes?.fill(0);
     }
+  }
+
+  /** Wipes this writer's BIP39 passphrase; the supplied protection is borrowed, never disposed here. */
+  wipe(): void {
+    this.#passphrase.wipe();
+  }
+
+  /** Ends the owning writer scope after its asynchronous uses have settled. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }

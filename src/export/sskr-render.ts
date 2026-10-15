@@ -48,6 +48,9 @@ import { codeColors } from "./card-palette.js";
 import { ownCards, keptIndividualCards } from "./card-decoys.js";
 import { withPlannedDecoys, type SheetShaper } from "./card-plan.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { Redacted } from "../core/redacted.js";
+import { defined } from "../core/defined.js";
+import { CardValues } from "./card-values.js";
 
 const ERRORS = new ErrorCatalog("export.sskr-render", {
   "unsupported-sskr-card-style": () => "Unsupported SSKR card style.",
@@ -104,16 +107,28 @@ type ResolvedOptions = Omit<SskrRenderOptions, "layout"> & { readonly layout: Ss
 interface Member {
   readonly share: ShareCardShare;
   readonly memberIndex: number;
-  readonly content: SskrCardContent;
+  readonly settings: Omit<SskrCardContent, "colors" | "labels" | "payload">;
+  readonly values: CardValues;
+}
+
+function ownedMember(share: ShareCardShare, memberIndex: number, content: SskrCardContent): Member {
+  const { colors, labels, payload, ...settings } = content;
+  return { share, memberIndex, settings, values: new CardValues({ colors, labels, payload }) };
+}
+
+function contentOf(member: Member): SskrCardContent {
+  const { colors, labels, payload } = member.values.view;
+  return { ...member.settings, colors, payload, ...(labels === undefined ? {} : { labels }) };
 }
 
 /**
  * The cards of one set of shares. A class, so that the options, the shares, the invented details
  * and the decoys are checked and settled once, as the set is made (ShareCardSet.create), and every
  * document rendered from it belongs to the same set. It renders on request and keeps no rendered
- * document, only the shares it was given, as text, for as long as it is kept.
+ * document. Its retained codes live in owned bytes until wipe/dispose; returned views cannot be
+ * recalled. Its creating caller keeps it live through awaited renders, then ends its scope.
  */
-export class ShareCardSet {
+export class ShareCardSet extends Redacted implements Disposable {
   readonly #drawing: CardDrawing;
   readonly #options: ResolvedOptions;
   /** The design of the cards, whose family draws them (template-catalog.ts). */
@@ -126,6 +141,7 @@ export class ShareCardSet {
     design: CatalogEntry,
     members: readonly Member[],
   ) {
+    super("ShareCardSet");
     this.#drawing = drawing;
     this.#options = options;
     this.#design = design;
@@ -169,33 +185,40 @@ export class ShareCardSet {
     // were.
     const { presentation, profile } = ExportDetails.of(drawing.randomInt, options, options.style);
     const shares = Share.readSet(records, false);
-    const separate = options.layout === "individual";
-    const shaper: SheetShaper = (shapeDrawing, cards, pageSize) =>
-      catalogSheetShape(design, shapeDrawing, cards, pageSize);
     const members: Member[] = [];
-    for (const read of shares) {
-      const reference = shareReference(read);
-      const cards: SskrCardContent = {
-        ...options,
-        kind: "sskr",
-        ...shareCardFace(read, format),
-        collectionReference: reference,
-        qrCard: options.layout === "qr",
-        cardQr: options.layout === "qr" || options.cardQr === true,
-        presentation,
-        profile,
-      };
-      const content = await withPlannedDecoys(shaper, drawing, cards, separate, randomInt);
-      const name = `collection-${reference}`;
-      const share: ShareCardShare = Object.freeze({
-        reference,
-        name,
-        documents: separate ? content.colors.length : 1,
-        folder: separate ? name : undefined,
-      });
-      members.push({ share, memberIndex: read.info.memberIndex, content });
+    try {
+      const separate = options.layout === "individual";
+      const shaper: SheetShaper = (shapeDrawing, cards, pageSize) =>
+        catalogSheetShape(design, shapeDrawing, cards, pageSize);
+      for (const read of shares) {
+        const reference = shareReference(read);
+        const cards: SskrCardContent = {
+          ...options,
+          kind: "sskr",
+          ...shareCardFace(read, format),
+          collectionReference: reference,
+          qrCard: options.layout === "qr",
+          cardQr: options.layout === "qr" || options.cardQr === true,
+          presentation,
+          profile,
+        };
+        const content = await withPlannedDecoys(shaper, drawing, cards, separate, randomInt);
+        const name = `collection-${reference}`;
+        const share: ShareCardShare = Object.freeze({
+          reference,
+          name,
+          documents: separate ? content.colors.length : 1,
+          folder: separate ? name : undefined,
+        });
+        members.push(ownedMember(share, read.info.memberIndex, content));
+      }
+      return new ShareCardSet(drawing, options, design, members);
+    } catch (error) {
+      for (const member of members) member.values.wipe();
+      throw error;
+    } finally {
+      for (const share of shares) share.wipe();
     }
-    return new ShareCardSet(drawing, options, design, members);
   }
 
   /**
@@ -206,6 +229,7 @@ export class ShareCardSet {
    * and leaves this set unchanged; no separate card carries a whole-share QR code.
    */
   forIndividualCards(requested: Pick<CardSettings, "pageSize" | "orientation"> = {}): ShareCardSet {
+    this.#assertLive();
     if (requested === null || typeof requested !== "object" || Array.isArray(requested))
       throw ERRORS.create("individual-settings-object", []);
     if (this.#options.layout === "qr") throw ERRORS.create("qr-cards-cannot-become-fragments", []);
@@ -222,19 +246,23 @@ export class ShareCardSet {
     assertPageSettings(individual);
     assertSeparateCardSize(individual.pageSize);
     const options: ResolvedOptions = { ...this.#options, ...individual };
-    const members = this.#members.map((member) => {
-      const content = { ...keptIndividualCards(member.content), ...individual };
-      return {
-        ...member,
-        content,
-        share: Object.freeze({
+    const members: Member[] = [];
+    try {
+      for (const member of this.#members) {
+        const content = { ...keptIndividualCards(contentOf(member)), ...individual };
+        const share = Object.freeze({
           ...member.share,
           documents: content.colors.length,
           folder: member.share.name,
-        }),
-      };
-    });
-    return new ShareCardSet(this.#drawing, options, this.#design, members);
+        });
+        members.push(ownedMember(share, member.memberIndex, content));
+      }
+      this.#assertLive();
+      return new ShareCardSet(this.#drawing, options, this.#design, members);
+    } catch (error) {
+      for (const member of members) member.values.wipe();
+      throw error;
+    }
   }
 
   /**
@@ -257,14 +285,15 @@ export class ShareCardSet {
    * one, nor for sheets without a QR code.
    */
   get qrCodes(): readonly ShareQrCode[] {
+    this.#assertLive();
     if (this.#options.layout === "individual") return [];
     return this.#members
-      .filter((member) => member.content.cardQr === true)
+      .filter((member) => member.settings.cardQr === true)
       .map((member) =>
         Object.freeze({
           reference: member.share.reference,
           name: member.share.name,
-          payload: member.content.payload,
+          payload: member.values.view.payload,
         }),
       );
   }
@@ -274,13 +303,13 @@ export class ShareCardSet {
    * the hex codes of its colors, or its Unicode codes, then the decoys.
    */
   printedCodes(place: number): readonly string[] {
-    const { content } = this.#member(place);
+    const content = contentOf(this.#member(place));
     return content.colors.map((_, index) => printedCode(content, index));
   }
 
   /** How many cards of the share at `place` print the share's own codes, before the decoys. */
   ownCodes(place: number): number {
-    return ownCards(this.#member(place).content);
+    return ownCards(contentOf(this.#member(place)));
   }
 
   /** The documents of the share at `place` (counted from 0), rendered one at a time, in order. */
@@ -288,7 +317,15 @@ export class ShareCardSet {
     const member = this.#member(place);
     for (let index = 0; index < member.share.documents; index++) {
       const bytes = await this.#render(member, index);
-      yield { name: this.#documentName(member, index), bytes };
+      let name: string;
+      try {
+        this.#assertLive();
+        name = this.#documentName(member, index);
+      } catch (error) {
+        bytes.fill(0);
+        throw error;
+      }
+      yield { name, bytes };
     }
   }
 
@@ -301,7 +338,7 @@ export class ShareCardSet {
    */
   static async assertPrintable(drawing: CardDrawing, requested: SskrRenderOptions): Promise<void> {
     try {
-      const set = await ShareCardSet.create(drawing, [...sskrLongVector.shares], requested);
+      using set = await ShareCardSet.create(drawing, [...sskrLongVector.shares], requested);
       (await set.renderShare(0)).fill(0);
     } catch (error) {
       throw ERRORS.create("share-cards-cannot-printed-every-seed-phrase-longest", [
@@ -321,6 +358,7 @@ export class ShareCardSet {
   }
 
   #member(place: number): Member {
+    this.#assertLive();
     const member = Number.isSafeInteger(place) ? this.#members[place] : undefined;
     if (member === undefined) throw ERRORS.create("there-no-share-at-place-set", []);
     return member;
@@ -332,27 +370,35 @@ export class ShareCardSet {
    */
   #documentName(member: Member, index: number): string {
     if (member.share.folder === undefined) return member.share.name;
-    return separateCardName(member.content, index);
+    return separateCardName(contentOf(member), index);
   }
 
   /** The document `index` of `member`: a separate card, a collection sheet or a QR card. */
-  #render(member: Member, index: number): Promise<Uint8Array> {
+  async #render(member: Member, index: number): Promise<Uint8Array> {
+    this.#assertLive();
     const { layout } = this.#options;
     // Only separate cards are asked for by their index; a sheet and a QR card are one document.
     const fragment = layout === "individual" ? index : undefined;
     // On QR cards the mixed style starts each share's sheet at another design, by its member.
     const businessOffset = layout === "qr" ? member.memberIndex : 0;
-    return renderCatalogDesign(
-      this.#design,
-      this.#drawing,
-      member.content,
-      fragment,
-      businessOffset,
-    );
+    try {
+      const bytes = await renderCatalogDesign(
+        this.#design,
+        this.#drawing,
+        contentOf(member),
+        fragment,
+        businessOffset,
+      );
+      return member.values.checkedBytes(bytes);
+    } catch (error) {
+      this.#assertLive();
+      throw error;
+    }
   }
 
   /** The pages of every document of `members`, in order, in one PDF without metadata. */
-  #combined(members: readonly Member[]): Promise<Uint8Array> {
+  async #combined(members: readonly Member[]): Promise<Uint8Array> {
+    this.#assertLive();
     // Each document is drawn only when its pages are joined, so that one at a time is in memory.
     const render = (member: Member, index: number) => this.#render(member, index);
     async function* documents(): AsyncGenerator<Uint8Array> {
@@ -366,7 +412,27 @@ export class ShareCardSet {
           }
         }
     }
-    return joinedDocuments(documents());
+    try {
+      const bytes = await joinedDocuments(documents());
+      return defined(this.#members[0]).values.checkedBytes(bytes);
+    } catch (error) {
+      this.#assertLive();
+      throw error;
+    }
+  }
+
+  #assertLive(): void {
+    defined(this.#members[0]).values.assertLive();
+  }
+
+  /** Overwrites retained card values immediately; public layout and share metadata remain. */
+  wipe(): void {
+    for (const member of this.#members) member.values.wipe();
+  }
+
+  /** Ends this plan after its borrowed renders/conversions have settled. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
@@ -376,7 +442,8 @@ export class ShareCardSet {
  */
 export function ownShareCards(record: string, format: ShareFormat): number | undefined {
   if (!shareFormatHasCards(format)) return undefined;
-  return shareCardFace(Share.read(record), format).colors.length;
+  using share = Share.read(record);
+  return shareCardFace(share, format).colors.length;
 }
 
 /** The reference that the cards of `share` print: its set, group and member, such as 4BBF-1-2. */
@@ -420,5 +487,6 @@ export async function renderSskrPdf(
   records: readonly string[],
   options: SskrRenderOptions,
 ): Promise<Uint8Array> {
-  return (await ShareCardSet.create(drawing, records, options)).renderAll();
+  using cards = await ShareCardSet.create(drawing, records, options);
+  return await cards.renderAll();
 }

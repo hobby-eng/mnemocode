@@ -45,7 +45,11 @@ export class Base58Coin extends Coin {
 
   constructor(description: Base58CoinDescription) {
     super(description);
-    this.#versions = description.versions;
+    this.#versions = Object.freeze(
+      description.versions.map(({ prefix, type, testnet }) =>
+        Object.freeze({ prefix: Object.freeze([...prefix]), type, testnet }),
+      ),
+    );
     this.#alphabet = description.alphabet ?? base58;
   }
 

@@ -98,15 +98,28 @@ export function masterFingerprint(mnemonic: string, passphrase = ""): string {
 }
 
 /**
+ * A callable wallet check with its own retained passphrase/evidence lifetime. Its caller uses
+ * using or finally to dispose it after all searches; later calls refuse with core.secret-value.wiped.
+ */
+export type OwnedWalletCheck = ((mnemonic: string) => EvidenceMatch) &
+  Disposable & {
+    readonly wipe: () => void;
+  };
+
+/**
  * The wallet check that the searches take (core/wallet-check.ts): each phrase compared with
  * `evidence` and the wallet's BIP39 `passphrase`; none without evidence, when every candidate is
- * kept.
+ * kept. The returned callable owns its retained values and must be disposed after its final use.
  */
 export function walletCheckOf(
   evidence: WalletEvidence | undefined,
   passphrase = "",
-): ((mnemonic: string) => EvidenceMatch) | undefined {
-  return evidence === undefined
-    ? undefined
-    : (mnemonic) => matchWalletEvidence(mnemonic, evidence, passphrase);
+): OwnedWalletCheck | undefined {
+  if (evidence === undefined) return undefined;
+  const owner = walletEvidence.prepare(evidence, passphrase);
+  const wipe = () => owner.wipe();
+  return Object.assign((mnemonic: string) => owner.match(mnemonic), {
+    wipe,
+    [Symbol.dispose]: wipe,
+  });
 }

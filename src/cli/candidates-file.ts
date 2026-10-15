@@ -12,7 +12,7 @@ import {
   parseListPassphrase,
   PassphraseProtection,
   ScannerKeyProtection,
-  type ListProtection,
+  type OwnedListProtection,
 } from "../core/candidate-encryption.js";
 import { assertListPassphrase, TooManyForListError } from "../core/candidate-list.js";
 import {
@@ -34,6 +34,7 @@ import { counted } from "../core/search-plan.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.candidates-file", {
+  wiped: () => "This candidate-list output has been wiped.",
   "choose-one-protection-candidates-scanner-s-key-passphrase": () =>
     "Choose one protection for the candidates: the Scanner's key, a passphrase, or none.",
   "protect-candidates-candidates-key-scanner-s-age1-key": () =>
@@ -47,7 +48,7 @@ const ERRORS = new ErrorCatalog("cli.candidates-file", {
  * The protection chosen with the options; none when, on the private screen, a passphrase is asked
  * later.
  */
-function protectionOf(args: ParsedArguments): ListProtection | undefined {
+function protectionOf(args: ParsedArguments): OwnedListProtection | undefined {
   const key = value(args, "candidates-key");
   const keyFile = value(args, "candidates-key-file");
   const passphraseFile = value(args, "candidates-passphrase-file");
@@ -86,10 +87,15 @@ export class CandidatesFile {
   /** The options of the command, whose other outputs another name is checked against. */
   readonly #args: ParsedArguments;
   readonly #path: string;
-  #protection: ListProtection | undefined;
-  #writer: { readonly passphrase: string; readonly writer: CandidateListWriter } | undefined;
+  #protection: OwnedListProtection | undefined;
+  #writer: CandidateListWriter | undefined;
+  #wiped = false;
 
-  private constructor(args: ParsedArguments, path: string, protection: ListProtection | undefined) {
+  private constructor(
+    args: ParsedArguments,
+    path: string,
+    protection: OwnedListProtection | undefined,
+  ) {
     this.#args = args;
     this.#path = path;
     this.#protection = protection;
@@ -123,14 +129,34 @@ export class CandidatesFile {
    * finished search; only Ctrl+C leaves, which gives CANCELLED.
    */
   async prepare(bip39Passphrase: string): Promise<CandidateListWriter | Cancelled> {
-    if (this.#writer?.passphrase === bip39Passphrase) return this.#writer.writer;
+    if (this.#wiped) throw ERRORS.create("wiped", []);
+    if (this.#writer?.usesPassphrase(bip39Passphrase) === true) return this.#writer;
     assertListPassphrase(bip39Passphrase);
     const protection = this.#protection ?? (await askListPassphrase());
     if (protection === CANCELLED) return CANCELLED;
+    if (this.#wiped) {
+      protection.wipe();
+      throw ERRORS.create("wiped", []);
+    }
     this.#protection = protection;
     const writer = new CandidateListWriter(protection, bip39Passphrase);
-    this.#writer = { passphrase: bip39Passphrase, writer };
+    this.#writer?.wipe();
+    this.#writer = writer;
     return writer;
+  }
+
+  /** Releases this output's own writer/protection; callers finish asynchronous saves first. */
+  wipe(): void {
+    this.#wiped = true;
+    this.#writer?.wipe();
+    this.#protection?.wipe();
+    this.#writer = undefined;
+    this.#protection = undefined;
+  }
+
+  /** Ends the command's candidate-output scope on success, failure and cancellation. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 
   /**
@@ -163,12 +189,13 @@ export class CandidatesFile {
     entropies: Uint8Array[],
     bip39Passphrase = "",
   ): Promise<Cancelled | undefined> {
-    const writer = await this.prepare(bip39Passphrase);
-    if (writer === CANCELLED) {
+    try {
+      const writer = await this.prepare(bip39Passphrase);
+      if (writer === CANCELLED) return CANCELLED;
+      return await this.#save(writer.write(entropies));
+    } finally {
       wipeAll(entropies);
-      return CANCELLED;
     }
-    return this.#save(writer.write(entropies));
   }
 
   async #save(made: Promise<ListOutcome>): Promise<Cancelled | undefined> {
@@ -209,7 +236,7 @@ export class CandidatesFile {
 }
 
 /** The passphrase for a list, asked twice on the private screen until both agree. */
-async function askListPassphrase(): Promise<ListProtection | Cancelled> {
+async function askListPassphrase(): Promise<OwnedListProtection | Cancelled> {
   if (!onPrivateScreen())
     throw ERRORS.create("give-passphrase-candidates-candidates-passphrase-file", []);
   for (;;) {

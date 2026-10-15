@@ -15,7 +15,7 @@
 // and asks again where an answer cannot be used. A search that a host does not make is released
 // (`releaseRead`), so that what the assessment kept of the shares' secret is wiped.
 //
-// Needs from the host: its SSKR library and HMAC-SHA256 (SharePlatform), the dates, a wallet check
+// Needs from the host: its SSKR library and HMAC-SHA256 (ShareRepairPlatform), the dates, a wallet check
 // and, for a set of shares that fits several ways, the master fingerprint of a phrase. Asks
 // nothing and shows nothing.
 //
@@ -39,11 +39,11 @@ import {
   type ShareRepairs,
 } from "./repair-report.js";
 import { ShareInput, type SharesTrouble } from "./share-input.js";
-import type { SharePlatform } from "./share-platform.js";
+import type { ShareRepairPlatform } from "./share-platform.js";
 import { ShareSet, type SetBackup } from "./share-set.js";
 import { ShareUnmasking, type ShareMode, type UnmaskedPhrase } from "./share-unmasking.js";
 import { writeShare, type ShareFormat } from "./transport.js";
-import { type SearchRun } from "../core/search-turns.js";
+import type { SearchRun, MonotonicClock } from "../core/search-turns.js";
 import { defined } from "../core/defined.js";
 
 /** Why a wallet check of shares needs a whole set: no phrase is restored from fewer. */
@@ -297,6 +297,21 @@ export type ShareRestoreOutcome =
       readonly notes: readonly string[];
     });
 
+/**
+ * The export path after restoration. The source result stays typed so that each host keeps its
+ * own report context; only this library decides whether to repair each share, show variants or
+ * export one set. A wallet cannot check fewer shares than the threshold.
+ */
+export type ShareExportDecision<Result extends PhrasesFound | { readonly kind: "few" }> =
+  | { readonly kind: "each"; readonly few: Extract<Result, { readonly kind: "few" }> }
+  | { readonly kind: "variants"; readonly found: Extract<Result, PhrasesFound> }
+  | {
+      readonly kind: "set";
+      readonly found: Extract<Result, PhrasesFound>;
+      readonly set: RepairedSet;
+    }
+  | { readonly kind: "trouble"; readonly message: string };
+
 /** A share written again, by its place among those typed. */
 export interface RepairedShare {
   readonly number: number;
@@ -368,10 +383,10 @@ function noticeLine(text: string): ReportLine {
  * bound once and every step uses it; it keeps nothing of a restore.
  */
 export class ShareRestore {
-  readonly #platform: SharePlatform;
+  readonly #platform: ShareRepairPlatform;
   readonly #repair: JointRepair;
 
-  constructor(platform: SharePlatform) {
+  constructor(platform: ShareRepairPlatform) {
     this.#platform = platform;
     this.#repair = new JointRepair(platform);
   }
@@ -388,6 +403,7 @@ export class ShareRestore {
     input: ShareInput,
     watch: AssessmentWatch = unwatched,
     turn?: SearchRun["turn"],
+    now?: MonotonicClock,
   ): Promise<SharesRead> {
     if (!input.marked) {
       const { outcome, copies } = await input.restoreComplete(this.#platform);
@@ -395,7 +411,8 @@ export class ShareRestore {
       if (outcome.kind === "trouble") return { kind: "trouble", trouble: outcome.trouble, lines };
       // Copies were left out: the shares that remain keep their places, those of the set restored,
       // never of the input as a host may have changed it during the restore (AUD-014-API004).
-      const unchecked = ShareSet.of(outcome.set).uncheckedNote(outcome.places);
+      using set = ShareSet.of(outcome.set);
+      const unchecked = set.uncheckedNote(outcome.places);
       return { ...outcome, lines, ...(unchecked === undefined ? {} : { unchecked }) };
     }
     const unreadable = input.firstUnreadable();
@@ -409,7 +426,7 @@ export class ShareRestore {
     try {
       plan = await watch(async (signal) => {
         assessmentSignal = signal;
-        made = await this.#repair.plan(texts, { signal, places, turn });
+        made = await this.#repair.plan(texts, { signal, places, turn, now });
         return made;
       });
     } catch (error) {
@@ -424,7 +441,7 @@ export class ShareRestore {
       // The host can cancel after the assessment's last turn, while its watch returns the plan.
       if (assessmentSignal?.aborted === true || plan.assessment.verdict === "stopped")
         return { kind: "stopped", lines: [] };
-      const report = new RepairReport(plan.assessment, this.#repair.triesPerSecond(), places);
+      const report = new RepairReport(plan.assessment, this.#repair.triesPerSecond(now), places);
       const lines = report.lines();
       const trouble = input.assessmentTrouble(plan.assessment, places);
       if (trouble !== undefined) return { kind: "trouble", trouble, lines };
@@ -443,12 +460,16 @@ export class ShareRestore {
     const { sets, stopped } = await searchOnce(marked.plan, {
       signal: run.signal,
       turn: run.turn,
+      now: run.now,
       // Without a wallet yet, every phrase found is one that matched.
       onProgress: (progress) => run.onProgress?.({ ...progress, matched: progress.found }),
     });
     if (stopped) return { kind: "stopped" };
     if (sets.length === 0) return { kind: "none", message: NO_PHRASE_FITS };
-    const notes = sets.flatMap((set) => ShareSet.of(set).uncheckedNote(marked.places) ?? []);
+    const notes = sets.flatMap((set) => {
+      using restored = ShareSet.of(set);
+      return restored.uncheckedNote(marked.places) ?? [];
+    });
     return { kind: "sets", sets, notes };
   }
 
@@ -468,7 +489,7 @@ export class ShareRestore {
     });
     if (unmasking.needsWallet && walletCheck === undefined)
       return { kind: "trouble", message: walletReason(request.mode), lines: [] };
-    const work = await unmasking.dateWork();
+    const work = await unmasking.dateWork(request.now);
     const found = await this.#sets(request, work);
     if (found.kind !== "sets") return found;
     // The date search tells its progress at its own turns, as every search does.
@@ -476,6 +497,7 @@ export class ShareRestore {
       onProgress: request.onProgress,
       signal: request.signal,
       turn: request.turn,
+      now: request.now,
     });
     if (restored.kind === "stopped") return { kind: "stopped", lines: found.lines };
     if (restored.kind !== "phrases")
@@ -511,7 +533,8 @@ export class ShareRestore {
         message: ShareSet.walletMismatch(sets.length, unmasking.searchedCombinations),
       };
     const phrases = unmasked.phrases.map((phrase): RestoredPhrase => {
-      const backup = ShareSet.of(phrase.set).backup(phrase.mnemonic);
+      using set = ShareSet.of(phrase.set);
+      const backup = set.backup(phrase.mnemonic);
       return {
         ...phrase,
         held: phrase.set.mnemonic,
@@ -539,6 +562,26 @@ export class ShareRestore {
     return !input.marked && !walletGiven;
   }
 
+  /** Selects the shared export path from a restore; a stopped or refused restore never enters it. */
+  static exportDecision<Result extends PhrasesFound | { readonly kind: "few" }>(
+    restored: Result,
+    walletGiven: boolean,
+  ): ShareExportDecision<Result>;
+  static exportDecision(
+    restored: PhrasesFound | { readonly kind: "few" },
+    walletGiven: boolean,
+  ): ShareExportDecision<PhrasesFound | { readonly kind: "few" }> {
+    if (restored.kind === "few")
+      return walletGiven
+        ? { kind: "trouble", message: WALLET_CHECK_NEEDS_THRESHOLD }
+        : { kind: "each", few: restored };
+    const sets = [...restored.sets];
+    if (sets.length === 0) return { kind: "trouble", message: NO_PHRASE_FITS };
+    return sets.length > 1
+      ? { kind: "variants", found: restored }
+      : { kind: "set", found: restored, set: defined(sets[0]) };
+  }
+
   /**
    * Damaged shares written again whole, as sskr-export writes them: each in its own form, or in
    * `form`; the phrase is never given. Complete shares need no quorum; marked ones are repaired
@@ -559,32 +602,20 @@ export class ShareRestore {
     }
     // sskr-export writes no candidate list, so a repair keeps no phrase for one.
     const restored = await this.restore({ ...request, keep: 0 });
-    if (restored.kind === "few") {
-      if (walletCheck !== undefined)
-        return { kind: "trouble", message: WALLET_CHECK_NEEDS_THRESHOLD, lines: restored.lines };
-      return ShareRestore.#repairEach(input, form, restored.message);
-    }
-    if (restored.kind !== "phrases") return restored;
-    const { sets } = restored;
-    if (sets.length > 1)
+    if (restored.kind !== "few" && restored.kind !== "phrases") return restored;
+    const decision = ShareRestore.exportDecision(restored, walletGiven);
+    if (decision.kind === "trouble") return { ...decision, lines: restored.lines };
+    if (decision.kind === "each")
+      return ShareRestore.#repairEach(input, form, decision.few.message);
+    const { found } = decision;
+    if (decision.kind === "variants")
       return {
         kind: "variants",
-        message: variantsMessage(sets.length),
-        variants: ShareRestore.variants(
-          restored.phrases,
-          restored.places,
-          form,
-          request.fingerprintOf,
-        ),
-        lines: restored.lines,
+        message: variantsMessage(found.sets.length),
+        variants: ShareRestore.variants(found.phrases, found.places, form, request.fingerprintOf),
+        lines: found.lines,
       };
-    return ShareRestore.#exportOutcome(
-      defined(sets[0]),
-      restored.places,
-      form,
-      restored.lines,
-      restored.notes,
-    );
+    return ShareRestore.#exportOutcome(decision.set, found.places, form, found.lines, found.notes);
   }
 
   /**
@@ -612,47 +643,54 @@ export class ShareRestore {
     work: DateWork | undefined,
   ): Promise<ShareStop | FewShares | FoundSets> {
     const { dates, confirmed } = request;
-    const read = await this.read(request.input, signalWatch(request.signal), request.turn);
-    if (read.kind === "stopped") return read;
-    if (read.kind === "trouble")
-      return {
-        kind: read.trouble.kind === "few" ? "few" : "trouble",
-        message: read.trouble.message,
-        lines: read.lines,
-      };
-    const tooMany = dates?.tooManyFor(wordCountOf(read));
-    if (tooMany !== undefined) {
-      releaseRead(read);
-      return { kind: "trouble", message: tooMany, lines: read.lines };
-    }
-    // A search longer than MnemoCode starts without asking waits for the person's yes; the share
-    // search and the date search of each phrase it finds are timed together. The host asks again
-    // with the same shares, which are then read anew.
-    const decision = searchDecision(read, work, request.limits);
-    if (decision.question !== undefined && !confirmed) {
-      releaseRead(read);
-      return { kind: "question", question: decision.question, lines: read.lines };
-    }
-    const notice = decision.notice === undefined ? [] : [decision.notice];
-    if (read.kind === "complete")
+    const read = await this.read(
+      request.input,
+      signalWatch(request.signal),
+      request.turn,
+      request.now,
+    );
+    try {
+      if (read.kind === "stopped") return read;
+      if (read.kind === "trouble")
+        return {
+          kind: read.trouble.kind === "few" ? "few" : "trouble",
+          message: read.trouble.message,
+          lines: read.lines,
+        };
+      const tooMany = dates?.tooManyFor(wordCountOf(read));
+      if (tooMany !== undefined) {
+        return { kind: "trouble", message: tooMany, lines: read.lines };
+      }
+      // A search longer than MnemoCode starts without asking waits for the person's yes; the share
+      // search and the date search of each phrase it finds are timed together. The host asks again
+      // with the same shares, which are then read anew.
+      const decision = searchDecision(read, work, request.limits);
+      if (decision.question !== undefined && !confirmed) {
+        return { kind: "question", question: decision.question, lines: read.lines };
+      }
+      const notice = decision.notice === undefined ? [] : [decision.notice];
+      if (read.kind === "complete")
+        return {
+          kind: "sets",
+          sets: [read.set],
+          places: read.places,
+          lines: read.lines,
+          notes: [...(read.unchecked === undefined ? [] : [read.unchecked]), ...notice],
+        };
+      const found = await this.search(read, request);
+      if (found.kind === "stopped") return { kind: "stopped", lines: read.lines };
+      if (found.kind === "none")
+        return { kind: "trouble", message: found.message, lines: read.lines };
       return {
         kind: "sets",
-        sets: [read.set],
+        sets: found.sets,
         places: read.places,
         lines: read.lines,
-        notes: [...(read.unchecked === undefined ? [] : [read.unchecked]), ...notice],
+        notes: [...found.notes, ...notice],
       };
-    const found = await this.search(read, request);
-    if (found.kind === "stopped") return { kind: "stopped", lines: read.lines };
-    if (found.kind === "none")
-      return { kind: "trouble", message: found.message, lines: read.lines };
-    return {
-      kind: "sets",
-      sets: found.sets,
-      places: read.places,
-      lines: read.lines,
-      notes: [...found.notes, ...notice],
-    };
+    } finally {
+      releaseRead(read);
+    }
   }
 
   /** Fewer shares than the threshold restore no phrase: each is repaired from its own checks. */
@@ -693,12 +731,12 @@ export class ShareRestore {
     notes: readonly string[],
   ): ShareRepairOutcome {
     const checked = ShareInput.checkedExport(set, places, form);
-    const leftOut = checked.written.leftOutMessages();
+    using written = checked.written;
+    const leftOut = written.leftOutMessages();
     if (checked.kind === "none")
       return { kind: "trouble", message: [NO_SHARE_SETTLED, ...leftOut].join(" "), lines };
     if (checked.kind === "trouble")
       return { kind: "trouble", message: checked.trouble.message, lines };
-    const { written } = checked;
     const forms = new Set(written.shown.map((share) => share.format));
     return {
       kind: "shares",

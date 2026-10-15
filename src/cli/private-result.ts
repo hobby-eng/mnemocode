@@ -5,20 +5,24 @@ import { terminalColumns, terminalRows, displayWidth, rowsOfText } from "./termi
 import { withRawTerminal, dropTypedAhead, readKey } from "./terminal-input.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { CLEAR_SCREEN } from "./terminal.js";
+import { SecretValue } from "../core/secret-value.js";
+import { Redacted } from "../core/redacted.js";
 
 const NAVIGATION = ["↑/PgUp previous · ↓/PgDn next", "Home/End · Enter done · Esc cancel"];
 
 /** A multiline result that remains navigable until the person finishes copying it. */
-export class PrivateResult {
-  readonly #lines: readonly string[];
+export class PrivateResult extends Redacted {
+  readonly #lines: SecretValue<readonly string[]>;
 
-  /** Keeps only this result's display lines; no file, shell or persistent history is involved. */
+  /** Owns a UTF-8 snapshot of this result's lines; no file or persistent history is involved. */
   constructor(lines: readonly string[]) {
-    this.#lines = lines;
+    super("PrivateResult");
+    this.#lines = SecretValue.texts(lines);
   }
 
   /** Shows long private results by pages; other output uses its original complete writer. */
   async show(plain: () => void): Promise<Cancelled | undefined> {
+    this.#lines.assertLive();
     if (
       !PrivateSteps.active ||
       process.stdout.isTTY !== true ||
@@ -68,6 +72,16 @@ export class PrivateResult {
     });
   }
 
+  /** Ends this display's lifetime after the asynchronous viewer has settled. */
+  wipe(): void {
+    this.#lines.wipe();
+  }
+
+  /** Releases the display snapshot when its owning scope exits. */
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
+
   #reserved(): number {
     // Page count plus the cursor's final row; navigation wraps too on a narrow terminal.
     return 2 + NAVIGATION.reduce((rows, line) => rows + rowsOfText(line), 0);
@@ -75,7 +89,7 @@ export class PrivateResult {
 
   #wrapped(): string[] {
     const columns = terminalColumns();
-    return this.#lines.flatMap((text) =>
+    return this.#lines.value.flatMap((text) =>
       text.split("\n").flatMap((line) => {
         const result: string[] = [];
         let shown = "";

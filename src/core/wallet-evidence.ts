@@ -67,6 +67,7 @@ import { hexOfBytes, bytesOfHex, equalBytes, HEX_DIGITS_PER_BYTE } from "./bits.
 import { listInWords } from "./places.js";
 import { defined } from "./defined.js";
 import { ERRORS } from "./wallet-evidence-errors.js";
+import { PreparedWalletEvidence } from "./wallet-evidence-owner.js";
 
 // What every caller of this module used here before the split keeps working.
 export { parseMasterFingerprint, type Pbkdf2HmacSha512 };
@@ -266,21 +267,26 @@ export class WalletEvidenceCheck {
   }
 
   /**
+   * An independently owned comparison retained across many phrases. Dispose it after its final
+   * awaited use; it owns the parsed evidence and passphrase, and borrows this service's seed rule.
+   */
+  prepare(evidence: WalletEvidence, passphrase = ""): PreparedWalletEvidence {
+    const expected = evidenceOf(evidence, this.#coins);
+    return new PreparedWalletEvidence(
+      this.#seed,
+      expected,
+      versionsOf(expected.network),
+      passphrase,
+    );
+  }
+
+  /**
    * Compares a recovered phrase with `evidence` locally. Evidence that no wallet can match is
    * refused before the seed is derived, as `assert` refuses it.
    */
   match(mnemonic: string, evidence: WalletEvidence, passphrase = ""): EvidenceMatch {
-    const expected = evidenceOf(evidence, this.#coins);
-    try {
-      return this.#seed.withRoot(
-        mnemonic,
-        passphrase,
-        (root) => expected.compare(root),
-        versionsOf(expected.network),
-      );
-    } finally {
-      expected.wipe();
-    }
+    using comparison = this.prepare(evidence, passphrase);
+    return comparison.match(mnemonic);
   }
 
   /** The same as match, with a PBKDF2 that may answer later. */
@@ -289,17 +295,8 @@ export class WalletEvidenceCheck {
     evidence: WalletEvidence,
     passphrase = "",
   ): Promise<EvidenceMatch> {
-    const expected = evidenceOf(evidence, this.#coins);
-    try {
-      return await this.#seed.withRootLater(
-        mnemonic,
-        passphrase,
-        (root) => expected.compare(root),
-        versionsOf(expected.network),
-      );
-    } finally {
-      expected.wipe();
-    }
+    using comparison = this.prepare(evidence, passphrase);
+    return await comparison.matchAsync(mnemonic);
   }
 
   /** The standard four-byte BIP32 master fingerprint as lowercase hexadecimal. */

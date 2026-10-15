@@ -2,11 +2,12 @@
 // is in what was saved. The command line and a page say it alike, each adding its own words about
 // the file it saved.
 //
-// Host-neutral and without PDF: it imports only the words of the core (masking.ts) and the share
-// forms (transport.ts), which read the set's own threshold from the shares.
+// Host-neutral and without PDF: the shares carry the set's threshold, and SetTopology owns the
+// member identity used to count repeated copies once.
 
 import { PHRASE_WORDS } from "../core/masking.js";
 import { Share } from "../sskr/transport.js";
+import { SetTopology } from "../sskr/set-topology.js";
 import { counted } from "../core/search-plan.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -43,6 +44,13 @@ const LAYOUTS: Readonly<Record<ShareCardPackaging, string>> = Object.freeze({
  */
 const MASKED_GOAL = `to restore ${PHRASE_WORDS.masked}, which the owner's dates turn back into ${PHRASE_WORDS.original}`;
 
+function singleGroupQuorum(count: number, threshold: number, goal: string, noun: string): string {
+  if (count < threshold) return `These shares are fewer than the ${threshold} needed ${goal}`;
+  if (threshold === 1) return `Any single share is enough ${goal}`;
+  if (threshold === count) return `All ${counted(count, noun)} are needed ${goal}`;
+  return `Any ${threshold} of the ${counted(count, noun)} are enough ${goal}`;
+}
+
 /**
  * How many of `records`, UR records of one set, restore the phrase: read from the shares, whose
  * threshold and groups they carry. Cards may print fewer shares than restore, such as one share
@@ -50,15 +58,23 @@ const MASKED_GOAL = `to restore ${PHRASE_WORDS.masked}, which the owner's dates 
  */
 function quorum(records: readonly string[], masked: boolean): string {
   const goal = masked ? MASKED_GOAL : "for recovery";
-  const { info } = Share.read(defined(records[0]));
+  using first = Share.read(defined(records[0]));
+  const { info } = first;
   if (info.groupCount > 1)
     return `These shares belong to ${info.groupCount} groups, each needing enough of its own ${goal}`;
-  const threshold = info.memberThreshold;
-  const count = records.length;
-  if (count < threshold) return `These shares are fewer than the ${threshold} needed ${goal}`;
-  if (threshold === 1) return `Any single share is enough ${goal}`;
-  if (threshold === count) return `All ${counted(count, "share")} are needed ${goal}`;
-  return `Any ${threshold} of the ${counted(count, "share")} are enough ${goal}`;
+  const members = new Set<string>();
+  for (const record of records) {
+    using share = Share.read(record);
+    members.add(SetTopology.memberOf(share.info));
+  }
+  const repeated = members.size < records.length;
+  const text = singleGroupQuorum(
+    members.size,
+    info.memberThreshold,
+    goal,
+    repeated ? "distinct share" : "share",
+  );
+  return repeated ? `${text}; repeated copies count as one share` : text;
 }
 
 /**

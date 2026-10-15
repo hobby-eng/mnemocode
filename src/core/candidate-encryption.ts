@@ -14,6 +14,7 @@
 
 import { Decrypter, Encrypter, generateX25519Identity, identityToRecipient } from "age-encryption";
 import { Redacted } from "./redacted.js";
+import { SecretValue } from "./secret-value.js";
 import { withoutByteOrderMark } from "./white-space.js";
 import { describeError } from "./refusal.js";
 import { listInWords } from "./places.js";
@@ -219,12 +220,18 @@ export interface ListProtection {
   readonly encrypted: boolean;
   /** How the saved file is protected, as the line that reports a save says it. */
   readonly description: string;
-  /** The file to write for an encoded list (encodeCandidateList). */
+  /** The file to write: fresh owned bytes or `list` itself; the caller copies and wipes them. */
   protect(list: Uint8Array): Promise<Uint8Array>;
 }
 
+/** A protection created by this module; its owning caller disposes it after all uses settle. */
+export interface OwnedListProtection extends ListProtection, Disposable {
+  /** Overwrites any retained secret state; public-key/open-list adapters keep no secret. */
+  wipe(): void;
+}
+
 /** A list encrypted to the Discovery Scanner's one-time X25519 key (age1…). */
-export class ScannerKeyProtection implements ListProtection {
+export class ScannerKeyProtection implements OwnedListProtection {
   readonly #recipient: string;
 
   /** Takes the key as typed, pasted or read from a file, and refuses one that is not an age key. */
@@ -250,6 +257,14 @@ export class ScannerKeyProtection implements ListProtection {
   protect(list: Uint8Array): Promise<Uint8Array> {
     return encryptCandidates(list, this.#recipient);
   }
+
+  /** This adapter retains only a public recipient key; there is no secret allocation to erase. */
+  wipe(): void {}
+
+  /** Ends its owning scope; public metadata needs no erasure. */
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
 }
 
 /**
@@ -257,13 +272,13 @@ export class ScannerKeyProtection implements ListProtection {
  * read by the rule of parseListPassphrase, so that a short one cannot be used, and it is kept only
  * here, never shown through toString, toJSON or Node's inspect.
  */
-export class PassphraseProtection extends Redacted implements ListProtection {
-  readonly #passphrase: string;
+export class PassphraseProtection extends Redacted implements OwnedListProtection {
+  readonly #passphrase: SecretValue<string>;
 
   /** Takes the passphrase as typed or read from a file (parseListPassphrase). */
   constructor(text: string) {
     super("PassphraseProtection");
-    this.#passphrase = parseListPassphrase(text);
+    this.#passphrase = SecretValue.text(parseListPassphrase(text));
   }
 
   // Getters, as in ScannerKeyProtection: they cannot be overwritten.
@@ -276,12 +291,22 @@ export class PassphraseProtection extends Redacted implements ListProtection {
   }
 
   protect(list: Uint8Array): Promise<Uint8Array> {
-    return encryptCandidatesWithPassphrase(list, this.#passphrase);
+    return encryptCandidatesWithPassphrase(list, this.#passphrase.value);
+  }
+
+  /** Erases retained passphrase bytes after all protect calls have settled. */
+  wipe(): void {
+    this.#passphrase.wipe();
+  }
+
+  /** Ends the owning scope's passphrase lifetime. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
 /** A list written without encryption, only on the person's explicit request. */
-export class NoProtection implements ListProtection {
+export class NoProtection implements OwnedListProtection {
   // Getters, as in ScannerKeyProtection: a list in the open must never be reported as encrypted.
   get encrypted(): boolean {
     return false;
@@ -295,6 +320,14 @@ export class NoProtection implements ListProtection {
   protect(list: Uint8Array): Promise<Uint8Array> {
     CandidateFileAdmission.assertSize(list.byteLength, "plaintext");
     return Promise.resolve(list);
+  }
+
+  /** This stateless adapter retains no secret; its caller wipes each returned list. */
+  wipe(): void {}
+
+  /** Ends its owning scope; list bytes belong to each protect caller. */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 }
 
@@ -346,7 +379,7 @@ function checkedChoice(given: unknown): ListProtectionChoice {
  * The protection that a host's `choice` names (ListProtectionChoice); a list in the open only for
  * an explicit `{ kind: "none" }`, and anything else that is not one of the three is refused.
  */
-export function protectionFor(choice: ListProtectionChoice): ListProtection {
+export function protectionFor(choice: ListProtectionChoice): OwnedListProtection {
   const checked = checkedChoice(choice);
   switch (checked.kind) {
     case "key":

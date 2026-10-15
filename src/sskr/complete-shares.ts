@@ -3,15 +3,15 @@
 // a joint repair filled in (joint-repair.ts). Not a part of its own: it sits below both, which
 // could not import each other.
 //
-// Needs from the host: a SharePlatform whose combineShares is the host's SSKR library.
+// Needs from the host: a ShareCombiner whose combineShares is the host's SSKR library.
 
 import { entropyToMnemonic } from "@scure/bip39";
 import { englishWordlist as wordlist } from "../core/english-words.js";
 import { BIP39_ENTROPY_BYTES } from "../core/bip39-sizes.js";
 import { SetTopology, surplusWindow } from "./set-topology.js";
 import { MIN_DIGEST_THRESHOLD } from "./share-layout.js";
-import type { SharePlatform } from "./share-platform.js";
-import { Share } from "./transport.js";
+import type { ShareCombiner } from "./share-platform.js";
+import { Share, type ShareInfo } from "./transport.js";
 import { equalBytes } from "../core/bits.js";
 import { placeOf } from "../core/places.js";
 import { defined } from "../core/defined.js";
@@ -46,6 +46,16 @@ interface Reference {
   readonly checked: boolean;
 }
 
+// A disposal refusal must release entropy even between two async handoffs, before its next use.
+function assertEntropyLive(entropy: Uint8Array | undefined, assertLive?: () => void): void {
+  try {
+    assertLive?.();
+  } catch (error) {
+    entropy?.fill(0);
+    throw error;
+  }
+}
+
 /** Every choice of `count` of `items`, in their order: [a, b], [a, c], …, [b, c], … */
 function* choicesOf<T>(items: readonly T[], count: number, from = 0): Generator<T[]> {
   if (count === 0) {
@@ -70,10 +80,12 @@ async function referenceOf(
   groupThreshold: number,
   memberThreshold: (group: Group) => number,
   restore: (groups: readonly Group[]) => Promise<Uint8Array | undefined>,
+  assertLive?: () => void,
 ): Promise<Reference> {
   const checkable = complete.filter((group) => memberThreshold(group) >= MIN_DIGEST_THRESHOLD);
   if (groupThreshold < MIN_DIGEST_THRESHOLD && checkable.length === 0) {
     const entropy = await restore(complete.slice(0, 1));
+    assertEntropyLive(entropy, assertLive);
     if (entropy === undefined) throw ERRORS.create("no-secret", []);
     return { groups: complete.slice(0, 1), entropy, checked: false };
   }
@@ -86,6 +98,7 @@ async function referenceOf(
     if (tries === MAX_REFERENCE_TRIES) throw ERRORS.create("too-many-failing", []);
     tries += 1;
     const entropy = await restore(groups);
+    assertEntropyLive(entropy, assertLive);
     if (entropy !== undefined) return { groups, entropy, checked: true };
   }
   // A group of member threshold 1 may still restore, unchecked: no share is named, so that no
@@ -133,65 +146,94 @@ export function uncheckedField(unchecked: readonly number[]): {
  * shares of a group with fewer members than its threshold take no part and cannot be checked: they
  * are returned, counted from 0. A refusal names each share by its place in `places`, by its index;
  * by its index, counted from 1, without them.
+ * An optional internal assertLive guard refuses work after disposal at async handoffs and before
+ * further host calls. It throws the owning operation's refusal; late entropy is wiped first.
+ * Existing callers need no guard. The host's ShareCombiner contract is unchanged.
  */
 export async function restoreCompleteShares(
   records: readonly string[],
-  platform: SharePlatform,
+  platform: ShareCombiner,
   places?: readonly number[],
+  assertLive?: () => void,
 ): Promise<{ readonly mnemonic: string; readonly unchecked: readonly number[] }> {
+  assertLive?.();
   const shares = Share.readSet(records);
-  const normalized = shares.map((share) => share.ur);
-  const infos = shares.map((share) => share.info);
-  const topology = new SetTopology(infos);
-  const threshold = (group: Group) => topology.thresholdOf(group);
-  const { complete } = topology;
-  const unchecked = topology.incomplete;
-  const firstMembers = (group: Group) => group.slice(0, threshold(group));
-  /** The entropy that the SSKR library restores from `members`, or undefined when it refuses. */
-  const recoverWith = async (members: readonly number[]): Promise<Uint8Array | undefined> => {
-    try {
-      return await platform.combineShares(members.map((member) => defined(normalized[member])));
-    } catch {
-      return undefined;
-    }
-  };
-  const reference = await referenceOf(
-    complete,
-    defined(infos[0]).groupThreshold,
-    threshold,
-    (choice) => recoverWith(choice.flatMap(firstMembers)),
-  );
-  const { groups: used, entropy } = reference;
+  let normalized: string[] = [];
+  let infos: ShareInfo[];
   try {
-    if (!BIP39_ENTROPY_BYTES.includes(entropy.length))
-      throw ERRORS.create("recovered-sskr-secret-not-bip39-entropy", []);
-    /** The secret with `group` in place of one of the groups used: its own place, or the last. */
-    const agrees = async (group: Group, members: readonly number[]): Promise<boolean> => {
-      const at = used.includes(group) ? used.indexOf(group) : used.length - 1;
-      const set = used.map((other, index) => (index === at ? members : firstMembers(other)));
-      const again = await recoverWith(set.flat());
-      try {
-        return again !== undefined && equalBytes(again, entropy);
-      } finally {
-        again?.fill(0);
-      }
-    };
-    // Without a digest, a disagreement shows only that some share is wrong, not which one.
-    const refuse = (message: string): never => {
-      throw ERRORS.create("operation-refused", [
-        reference.checked ? message : UNCHECKED_DISAGREEMENT,
-      ]);
-    };
-    for (const group of complete) {
-      const first = firstMembers(group);
-      if (!used.includes(group) && !(await agrees(group, first)))
-        refuse(otherGroupMismatch(first, places));
-      for (const member of group.slice(first.length))
-        if (!(await agrees(group, surplusWindow(first, member))))
-          refuse(misfitMessage(placeOf(places, member + 1)));
-    }
-    return { mnemonic: entropyToMnemonic(entropy, wordlist), unchecked };
+    normalized = shares.map((share) => share.ur);
+    infos = shares.map((share) => share.info);
   } finally {
-    entropy.fill(0);
+    // Only copied UR views and public metadata are needed across a host await.
+    for (const share of shares) share.wipe();
+  }
+  try {
+    const topology = new SetTopology(infos);
+    const threshold = (group: Group) => topology.thresholdOf(group);
+    const { complete } = topology;
+    const unchecked = topology.incomplete;
+    const firstMembers = (group: Group) => group.slice(0, threshold(group));
+    /** The entropy that the SSKR library restores from `members`, or undefined when it refuses. */
+    const recoverWith = async (members: readonly number[]): Promise<Uint8Array | undefined> => {
+      assertLive?.();
+      let entropy: Uint8Array | undefined;
+      try {
+        entropy = await platform.combineShares(
+          members.map((member) => defined(normalized[member])),
+        );
+      } catch {
+        entropy = undefined;
+      }
+      // Outside the expected-combination refusal catch: disposal cannot become another try.
+      assertEntropyLive(entropy, assertLive);
+      return entropy;
+    };
+    const reference = await referenceOf(
+      complete,
+      defined(infos[0]).groupThreshold,
+      threshold,
+      (choice) => recoverWith(choice.flatMap(firstMembers)),
+      assertLive,
+    );
+    const { groups: used, entropy } = reference;
+    try {
+      assertLive?.();
+      if (!BIP39_ENTROPY_BYTES.includes(entropy.length))
+        throw ERRORS.create("recovered-sskr-secret-not-bip39-entropy", []);
+      /** The secret with `group` in place of one of the groups used: its own place, or the last. */
+      const agrees = async (group: Group, members: readonly number[]): Promise<boolean> => {
+        const at = used.includes(group) ? used.indexOf(group) : used.length - 1;
+        const set = used.map((other, index) => (index === at ? members : firstMembers(other)));
+        const again = await recoverWith(set.flat());
+        try {
+          assertLive?.();
+          return again !== undefined && equalBytes(again, entropy);
+        } finally {
+          again?.fill(0);
+        }
+      };
+      // Without a digest, a disagreement shows only that some share is wrong, not which one.
+      const refuse = (message: string): never => {
+        throw ERRORS.create("operation-refused", [
+          reference.checked ? message : UNCHECKED_DISAGREEMENT,
+        ]);
+      };
+      for (const group of complete) {
+        const first = firstMembers(group);
+        const groupFits = used.includes(group) || (await agrees(group, first));
+        assertLive?.();
+        if (!groupFits) refuse(otherGroupMismatch(first, places));
+        for (const member of group.slice(first.length)) {
+          const memberFits = await agrees(group, surplusWindow(first, member));
+          assertLive?.();
+          if (!memberFits) refuse(misfitMessage(placeOf(places, member + 1)));
+        }
+      }
+      return { mnemonic: entropyToMnemonic(entropy, wordlist), unchecked };
+    } finally {
+      entropy.fill(0);
+    }
+  } finally {
+    normalized.length = 0;
   }
 }
