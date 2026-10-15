@@ -1,0 +1,311 @@
+{
+  "title": "All-file baseline after the date-owner checkpoint and shared audit skill update",
+  "findings": [
+    {
+      "id": "AUD-029-SEC001",
+      "category": "SEC",
+      "title": "Retained secret owners still lack a complete ending lifetime",
+      "severity": "low",
+      "relatedRules": [
+        "CORE-24",
+        "TS-07",
+        "RUST-13"
+      ],
+      "affectedFiles": [
+        "src/core/backup-reading.ts:79",
+        "src/core/backup-check.ts:261",
+        "src/core/candidates.ts:487",
+        "src/core/missing-codes.ts:227",
+        "src/core/missing-codes-search.ts:369",
+        "src/sskr/share-input.ts:298",
+        "src/sskr/share-set.ts:94",
+        "src/sskr/repair.ts:151",
+        "src/sskr/joint-repair.ts:567",
+        "src/bitcoin-evidence.ts:105",
+        "sskr-wasm/rust/src/lib.rs:191",
+        "sskr-wasm/generated/recovery_sskr_wasm.js:57"
+      ],
+      "reproduction": "Construct the retained owners from public fixtures and trace their fields and disposal callers after success, refusal and cancellation. The protocol review enumerates each variant and distinguishes borrowed wrappers from owning containers. This is a static lifetime finding, not a heap-forensics experiment.",
+      "expected": "A retained secret has a practical explicit owning lifetime with cleanup at its end; borrowed inputs remain independent. Fixed representative owners do not discharge unrelated remaining owners.",
+      "observed": "Backup readings and plans, word and missing-code candidates, typed/kept/restored shares, repair readings, callback passphrase closures, upstream Rust secret vectors and generated split strings still retain secret material without complete end-of-work cleanup. The reviewed date owners and SecretValue are controls, not new open variants.",
+      "impact": "Material can remain reachable longer than its operation. No external disclosure or guaranteed erasure attack is demonstrated; JavaScript immutable strings and host/OS copies remain practical limits even after remediation.",
+      "recommendedFix": "Continue under the original AUD-029-SEC001 ID: finish explicit owner/dispose APIs and all retaining callers, document borrowed versus owned values, and handle upstream/native/generated copies through the canonical build process.",
+      "requiredVerification": "Literal public protocol controls plus success/refusal/cancel/late-result lifetime regressions for each owner family, no caller-input wiping, targeted native/WASM checks and independent review of each cohesive fix.",
+      "evidenceLabels": [
+        "protocol-review.json",
+        "interface-review.json"
+      ],
+      "releaseBlockingReason": "No demonstrated release exploit; this remains an open CORE conformance requirement and prevents a claim that all remarks are closed.",
+      "classificationNote": "Continued original finding, not a newly allocated AUD-030 defect. Pre-baseline owner fixes remain credited with their exact reviewed evidence."
+    },
+    {
+      "id": "AUD-030-SEC001",
+      "category": "SEC",
+      "title": "The checked SSKR bridge repeats an untrusted UR type in its refusal",
+      "severity": "low",
+      "relatedRules": [
+        "CORE-24",
+        "CORE-48"
+      ],
+      "affectedFiles": [
+        "sskr-wasm/rust/src/lib.rs:149",
+        "sskr-wasm/rust/src/refusal.rs:74"
+      ],
+      "reproduction": "Use sskrEngine() with the first published sskrSetVector share. Replace only ur:sskr/ with ur:private-user-token/ and call recover_sskr_shares. The valid public body is unchanged. Run the published boundary-probes.mjs against the recorded dist build.",
+      "expected": "A wrong-type decode refusal keeps its stable code and a bounded safe message without repeating arbitrary typed text.",
+      "observed": "The checked bridge throws code sskr.engine.decode and message 'expected UR type sskr, but found private-user-token'. Separate malformed-checksum and invalid-Bytewords controls do not repeat the token.",
+      "impact": "A direct raw/checked-bridge host that displays or retains the error can repeat private text mistakenly supplied in the type field. Normal Share.readSet/transport validation rejects the wrong type before the engine; no ordinary CLI disclosure is demonstrated.",
+      "recommendedFix": "Map dependency decode failures to a safe first-party message, preserving the stable refusal code and ensuring any exposed cause is also safe. Keep changes to generated output in the canonical Docker workflow.",
+      "requiredVerification": "The synthetic wrong-type message/cause must not contain the token; valid Compact UR recovery and malformed checksum/Bytewords controls must still behave correctly. Verify the rebuilt canonical bridge and caller-facing redaction.",
+      "evidenceLabels": [
+        "boundary-acceptance",
+        "protocol-boundary-probes",
+        "decoder-message-variants"
+      ],
+      "releaseBlockingReason": "Narrow direct bridge diagnostic surface; no demonstrated normal CLI secret leak."
+    },
+    {
+      "id": "AUD-015-API001",
+      "category": "API",
+      "title": "Joint repair publishes a candidate completed after cancellation",
+      "severity": "low",
+      "relatedRules": [
+        "CORE-22",
+        "CORE-24"
+      ],
+      "affectedFiles": [
+        "src/sskr/joint-solve.ts:238",
+        "src/sskr/joint-repair.ts:595"
+      ],
+      "reproduction": "Create a direct JointPlan from two published valid 2-of-3 shares. Inject a combiner that delegates to nodeSharePlatform.combineShares, then aborts immediately before returning its bytes during search. Arm it after assessment. Compare with the same non-aborting wrapper.",
+      "expected": "The direct plan's partial sets contain candidates completed before the stop. The consuming continuation checks the signal after its awaited confirmation and before adding a new set.",
+      "observed": "The aborting case returns stopped:true with sets.length=1; the sole candidate was confirmed after the signal stopped. The non-aborting control returns stopped:false and one set.",
+      "impact": "A direct host can retain a late secret-bearing candidate despite the stated stop boundary. ShareRestore.search discards sets on stop, so this does not demonstrate publication by the normal higher-level restore path, a wrong mnemonic or a CLI leak.",
+      "recommendedFix": "Check the stop state immediately after awaited confirmation and before collecting or publishing a candidate, cleaning up material that completes late.",
+      "requiredVerification": "The aborting one-branch fixture returns no late set; normal completion still returns one. A separately completed pre-stop result remains eligible for a partial result. Keep the original date/wallet cancellation regressions.",
+      "evidenceLabels": [
+        "boundary-acceptance",
+        "joint-late-cancel-probe"
+      ],
+      "releaseBlockingReason": "Limited direct-plan late-publication contract; higher-level restore already drops stopped results.",
+      "classificationNote": "A newly confirmed SSKR variant of the consuming-continuation root cause from AUD-015-API001. The historical date-case fix and its evidence are preserved; this record does not claim they were rerun or disproved."
+    },
+    {
+      "id": "AUD-030-API001",
+      "category": "API",
+      "title": "MissingCodes reports completion when its final progress callback cancels",
+      "severity": "low",
+      "relatedRules": [
+        "CORE-22"
+      ],
+      "affectedFiles": [
+        "src/core/missing-codes.ts:353",
+        "src/core/missing-codes.ts:355"
+      ],
+      "reproduction": "Read eleven public 'abandon' words and a missing final word as direct English codes. Run the 128 candidates with a false checker, advancing injected clock and onProgress that aborts at checked=128. Compare with a non-aborting callback.",
+      "expected": "The public CodesCheckResult reports the supplied cancellation rather than completed negative search, including cancellation requested by its final progress callback.",
+      "observed": "The callback sets signal.aborted=true, count is 128, but stopped remains false. The non-aborting control also returns stopped:false.",
+      "impact": "The cancellation status returned to a direct caller is inconsistent with the stop requested by its final callback. All 128 candidates were actually checked in this reproduction: it does not establish omitted candidates, an incomplete mathematical negative result or a late-published candidate. MissingCodesSearch.searched rechecks the signal and corrects the flag, limiting the affected surface.",
+      "recommendedFix": "Recheck cancellation after callbacks and when constructing the final result. Preserve genuinely completed counts and any contractually allowed partial results.",
+      "requiredVerification": "Final-callback cancellation must set stopped:true, with normal completion, early stop and retained partial-result controls through the direct public API.",
+      "evidenceLabels": [
+        "boundary-acceptance",
+        "protocol-boundary-probes"
+      ],
+      "releaseBlockingReason": "Bounded direct API outcome flag; higher-level search already corrects it."
+    },
+    {
+      "id": "AUD-030-API002",
+      "category": "API",
+      "title": "Unicode scalar conversion accepts isolated UTF-16 surrogates",
+      "severity": "low",
+      "relatedRules": [
+        "CORE-48"
+      ],
+      "affectedFiles": [
+        "src/core/word-table.ts:96",
+        "src/core/word-table.ts:100"
+      ],
+      "reproduction": "Call WordTable.unicodeHex with one isolated high surrogate U+D800 and low surrogate U+DC00. Also call it with the valid CJK scalar U+7684 and astral scalar U+1F600. The compatibility core.unicodeHex wrapper shares the same path.",
+      "expected": "The documented single-Unicode-scalar contract refuses isolated surrogates while preserving real BMP and astral scalar conversion.",
+      "observed": "The invalid inputs are accepted as D800 and DC00. The normal controls return 7684 and 1F600.",
+      "impact": "A bounded public conversion/refusal contract is violated. Built-in BIP39 mappings contain real scalars; no wrong wallet or mnemonic result is demonstrated.",
+      "recommendedFix": "Reject values in the surrogate interval after extracting the single code point; retain the separate opaque UTF-16 pattern-key contract in SecretValue/DatesAnswer.",
+      "requiredVerification": "High/low isolated surrogate refusals, valid BMP/astral values and existing word-table outputs. Opaque custom date keys must remain exact UTF-16 data rather than inheriting this scalar restriction.",
+      "evidenceLabels": [
+        "boundary-acceptance",
+        "protocol-boundary-probes"
+      ],
+      "releaseBlockingReason": "Small conversion surface with valid built-in mappings unaffected."
+    },
+    {
+      "id": "AUD-030-API003",
+      "category": "API",
+      "title": "Keeping guidance counts printed copies as distinct recovery members",
+      "severity": "low",
+      "relatedRules": [
+        "CORE-14",
+        "CORE-28"
+      ],
+      "affectedFiles": [
+        "src/export/sskr-keeping-text.ts:58",
+        "src/export/sskr-keeping-text.ts:69"
+      ],
+      "reproduction": "Pass [s0,s0] from the same valid published 2-of-3 set to shareKeepingNote with packaging='files' and masked=false. Its helper contract explicitly permits a share printed again. Compare validateShareSet on the same input and the distinct [s0,s1] guidance.",
+      "expected": "Two copies of one member are below quorum and must not be described as sufficient for recovery. Distinct-member identity and physical print count are separate facts.",
+      "observed": "The note begins 'All 2 shares are needed for recovery', while validateShareSet correctly refuses the duplicate. Distinct two-member guidance has the same sufficient-quorum prefix.",
+      "impact": "A direct host can attach a false recovery-readiness statement to duplicate prints. Normal CLI rendering uses validated ShareCardSet input; no broken split/restore or actual loss is demonstrated.",
+      "recommendedFix": "Count unique set/group/member identities for quorum statements while preserving print counts, supported below-quorum selections and conservative masked/multi-group wording.",
+      "requiredVerification": "[s0,s0] stays below quorum; [s0,s1] and [s0,s1,s2] remain correct; [s0,s1,s1] never promises any arbitrary two files suffice. Preserve masked and multi-group cases.",
+      "evidenceLabels": [
+        "boundary-acceptance",
+        "reviewer-boundary-probes",
+        "interface-review.json"
+      ],
+      "releaseBlockingReason": "Guidance-only direct API defect; validated normal CLI inputs limit exposure."
+    },
+    {
+      "id": "AUD-030-BLD001",
+      "category": "BLD",
+      "title": "Push CI invokes the full self-test despite its fast-only policy",
+      "severity": "low",
+      "relatedRules": [
+        "CI-04",
+        "CORE-29",
+        "CORE-30"
+      ],
+      "affectedFiles": [
+        ".github/workflows/ci.yml:46",
+        ".github/workflows/ci.yml:74",
+        "src/cli/self-test.ts",
+        "src/core/self-test.ts"
+      ],
+      "reproduction": "Statically follow the push event with FULL=false through both unconditional node dist/mnemocode.js self-test steps, the command dispatcher and MnemoCodeSelfTest.run composition.",
+      "expected": "Push runs fast gates and startup checks; slower full self-tests remain behind the explicitly full/manual/tag condition required by CI-04.",
+      "observed": "Both jobs still invoke the full self-test, including age scrypt and QR/PDF/card-render checks. The FULL condition gates other steps, not these invocations.",
+      "impact": "Ordinary pushes run unnecessary slow checks contrary to the agreed CI resource policy. No new CI run was dispatched and no fresh full-self-test runtime was measured; this finding does not claim a full Vitest/vector replay on push.",
+      "recommendedFix": "Put the full self-test behind the existing full-run condition and use the actual inexpensive startup entry for fast pushes, retaining full/manual coverage.",
+      "requiredVerification": "Check both push and full event paths and the real command composition. Confirm fast pushes omit full checks and full runs still include them, without paid audit CI dispatch.",
+      "evidenceLabels": [
+        "interface-review.json",
+        "coordinator-review-progress.json"
+      ],
+      "releaseBlockingReason": "CI efficiency/policy mismatch, without demonstrated artifact integrity failure."
+    },
+    {
+      "id": "AUD-030-DOC001",
+      "category": "DOC",
+      "title": "SSKR guidance overstates what fewer-than-quorum shares conceal",
+      "severity": "low",
+      "relatedRules": [
+        "DOC-07",
+        "DOC-06",
+        "CORE-19"
+      ],
+      "affectedFiles": [
+        "docs/HEIRS.md:19",
+        "docs/SSKR.md:3"
+      ],
+      "reproduction": "Read Share.info for one published share below its 2-of-3 threshold. Inspect secretLength, thresholds and set metadata, then attempt one-share recovery with the actual platform as a refusal control.",
+      "expected": "Safety prose distinguishes the recovery threshold from visible length/set metadata and states the demonstrated guarantee without an absolute information-hiding claim.",
+      "observed": "The documents say fewer shares 'reveal nothing at all' or nothing about the phrase. One share still exposes a 16-byte secret width, corresponding to a 12-word BIP39 phrase, plus set and threshold metadata. Recovery correctly refuses insufficient shares.",
+      "impact": "Readers can overestimate privacy of below-quorum shares. This is a narrow documentation correction, not evidence of phrase recovery, a practical guessing attack or a quantified loss of cryptographic strength.",
+      "recommendedFix": "Say that the required distinct-share threshold is needed to restore the phrase, while acknowledging visible format/set/length information. Avoid unsupported perfect-secrecy or cryptanalytic claims.",
+      "requiredVerification": "Review the statement against actual decoded public metadata and below-quorum refusal; search equivalent safety prose for the same absolute wording. Do not add an unexecuted attack claim.",
+      "evidenceLabels": [
+        "subquorum-metadata",
+        "protocol-sskr-guarantee.json"
+      ],
+      "releaseBlockingReason": "Limited overstatement; actual insufficient-share recovery correctly refuses."
+    },
+    {
+      "id": "AUD-030-UI001",
+      "category": "UI",
+      "title": "Terminal geometry counts a combining mark as an occupied cell",
+      "severity": "low",
+      "relatedRules": [
+        "CORE-32",
+        "CORE-39"
+      ],
+      "affectedFiles": [
+        "src/cli/terminal-geometry.ts:130"
+      ],
+      "reproduction": "Call displayWidth('e' + U+0301) and compare displayWidth('e'). Independently query local POSIX libc wcwidth for each code point. The published boundary probe retains literal expected widths.",
+      "expected": "The supported decomposed combining mark contributes zero additional cells; the accented text occupies one cell under the independently checked local terminal-width convention.",
+      "observed": "Production returns 2 for decomposed text and 1 for ASCII. libc gives [1,0] for the decomposed input, [1] for precomposed U+00E9 and [0] for the isolated mark. codePointWidth feeds both displayWidthOf and placedAfter.",
+      "impact": "Cell, wrapping and erase/reflow calculations disagree with the independent width oracle for accepted visible text such as UTF-8 filenames. Actual garbled editing in a terminal was not reproduced; no byte corruption, secret disclosure or crash is claimed. Emoji/ZWJ widths remain outside this proof.",
+      "recommendedFix": "Define and share the supported zero-width policy in both geometry paths, preserving wide scalar and control/ANSI handling. Avoid a test oracle that imports the same width implementation.",
+      "requiredVerification": "Literal decomposed/precomposed/isolated-mark and near-wrap assertions, wide/ANSI controls and a focused real-terminal redraw regression. Keep the existing PTY suite.",
+      "evidenceLabels": [
+        "boundary-acceptance",
+        "reviewer-boundary-probes",
+        "terminal-width-oracle",
+        "interface-review.json"
+      ],
+      "releaseBlockingReason": "Confirmed numerical UI defect, with actual terminal consequence not yet reproduced."
+    },
+    {
+      "id": "AUD-030-DOC002",
+      "category": "DOC",
+      "title": "Two harness READMEs link commit-rewrite provenance to themselves",
+      "severity": "low",
+      "relatedRules": [
+        "DOC-06"
+      ],
+      "affectedFiles": [
+        "docs/audits/AUD-001-harnesses/README.md:6",
+        "docs/audits/AUD-002-harnesses/README.md:6"
+      ],
+      "reproduction": "Resolve the relative Markdown target from each harness directory and compare headings; no browser or harness execution required.",
+      "expected": "Navigate to docs/audits/README.md#commit-identifiers-in-these-reports, whose heading is at line58.",
+      "observed": "README.md#... resolves to the same harness README, which has no matching heading. The existing link target file exists, so file-existence-only validation misses the bad anchor.",
+      "impact": "Reader loses the documented explanation of rewritten commit IDs when trying to identify the historical snapshot. This is a provenance-navigation defect, not evidence that audit findings or source hashes are invalid.",
+      "recommendedFix": "Use ../README.md#commit-identifiers-in-these-reports in both harness READMEs, preserving original source/check identities.",
+      "requiredVerification": "Check local Markdown fragments relative to their containing file, with a self-README wrong-anchor negative control.",
+      "evidenceLabels": [
+        "history-review.json",
+        "record-acceptance"
+      ],
+      "releaseBlockingReason": "Historical navigation/replay-metadata limitation; no demonstrated invalid production result or false original audit conclusion."
+    },
+    {
+      "id": "AUD-030-DOC003",
+      "category": "DOC",
+      "title": "AUD-002 documented relocated recorder writes the wrong cwd metadata",
+      "severity": "low",
+      "relatedRules": [
+        "DOC-06"
+      ],
+      "affectedFiles": [
+        "docs/audits/AUD-002-harnesses/README.md:29",
+        "docs/audits/AUD-002-harnesses/README.md:39",
+        "docs/audits/AUD-002-harnesses/lib.sh:4",
+        "docs/audits/AUD-002-harnesses/lib.sh:12"
+      ],
+      "reproduction": "Static path evaluation: published harness directory plus three parents is <repo>; documented evidence/harnesses directory plus three parents is <repo>/docs. Read line12 cwd assignment. No files copied and no harness executed.",
+      "expected": "The command record cwd must identify the actual repository root from which the child runs.",
+      "observed": "ROOT uses dirname(BASH_SOURCE[0])/../../.., which is <repo>/docs in the documented extra-deep replay location. The Python record writes cwd=root, while bash -c runs in the caller repository root. Manually correcting E as instructed does not correct the separately recorded ROOT/cwd.",
+      "impact": "A replay can retain an incorrect working-directory identity even when its log files are placed correctly. No claim is made that original historical records used this edited replay helper or that production tests passed incorrectly.",
+      "recommendedFix": "Make recorder cwd metadata use the actual command working directory, or derive repository root correctly for both documented locations and align the README. Keep original execution records immutable and distinguish any replay helper correction.",
+      "requiredVerification": "Pure-path checks for published and documented relocated layout; a coordinator-scheduled harmless command control can compare record.cwd with actual cwd after a separately authorized historical-helper fix.",
+      "evidenceLabels": [
+        "history-review.json",
+        "record-acceptance"
+      ],
+      "releaseBlockingReason": "Historical navigation/replay-metadata limitation; no demonstrated invalid production result or false original audit conclusion."
+    }
+  ],
+  "limitations": [
+    "This all-file first-party review is not independent specialist certification, a cryptographic proof or proof that no defects remain.",
+    "The reviewed tree was already dirty. HEAD alone does not identify it; the 555-file source and 958-file baseline manifests are authoritative. No commit or push was made.",
+    "Static bodies/contracts, repetitive data structure/provenance checks, retained executions, new commands and host-reported checks are separate evidence classes. Reviewed declarations include types and compatibility re-exports, not only executable operations.",
+    "No full pnpm verify, full vector/search replay, complete PDF/QR gallery, executable build, uncached canonical Docker/WASM reproduction or release signing/publication was performed for this audit.",
+    "Linux PTY checks ran. Native Windows/macOS, actual browser engines, host worker/DOM lifecycle and a complete browser matrix were not executed here. The external host's source-bound report is attributed, not independent execution in this checkout.",
+    "Semgrep, CodeQL and uv were absent. No scanner rule set/database/SARIF or supply-chain publisher concentration result exists. npm/Rust advisory snapshots do not audit every upstream dependency implementation.",
+    "cargo-mutants preview found 45 syntactic edits and two encoding-only candidates. Zero mutants were compiled or executed; the dirty checkout and lack of exclusive access prevent the controlled campaign. Preview is neither a mutation score nor a bug count.",
+    "No statistical timing, optimized assembly zeroization, sanitizer, fuzzing, instrumented coverage or Wycheproof campaign ran. Source review cannot establish constant time or perfect secret erasure.",
+    "Historical record schema/hash/claim review does not newly execute old probes. Unavailable historical logs/artifacts and documented privacy-only metadata changes are not reconstructed as fresh passes.",
+    "Binary assets were reviewed through identity, provenance and consumer/bundling contracts; every glyph/pixel was not manually inspected. Large literal/generated tables received structural/provenance review, not mathematical rederivation.",
+    "Production, project tests, dependencies, workflows and canonical generated outputs remained frozen. Every confirmed finding remains open for a separate remediation phase; no release acceptance or full CORE conformance is declared."
+  ]
+}

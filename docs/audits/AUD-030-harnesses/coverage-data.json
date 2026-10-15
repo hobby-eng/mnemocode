@@ -1,0 +1,254 @@
+{
+  "checks": {
+    "CHECK-SEC-001": [
+      "failed",
+      "Threat boundary and every retained secret owner traced; original AUD-029-SEC001 remains open. Fixed date/secret owners retain their separate evidence."
+    ],
+    "CHECK-SEC-002": [
+      "passed",
+      "Node permission/sandbox authority and host-neutral bridge boundaries reviewed. No standalone HTML, Secret Vault or CSP document exists in this repository; host browser enforcement is outside this checkout."
+    ],
+    "CHECK-SEC-003": [
+      "passed",
+      "Standalone offline graph, local evidence matching and protection paths reviewed; no blockchain provider/broadcast feature. Advisory and repository-metadata requests were audit tooling, not product behavior."
+    ],
+    "CHECK-SEC-004": [
+      "passed",
+      "CSPRNG injection and native/browser adapters, age protection, BIP39 seed encoding and SSKR dependency integration reviewed. Seven native Rust tests and the independent SSKR oracle passed; no statistical timing or full expensive vector replay."
+    ],
+    "CHECK-SEC-005": [
+      "failed",
+      "Owner/caller cleanup and cancellation reviewed; remaining original lifetime variants and raw bridge message reflection are confirmed. Practical reference/buffer cleanup is distinct from perfect memory erasure."
+    ],
+    "CHECK-SEC-006": [
+      "not-applicable",
+      "No first-party browser page, DOM, storage or worker controller. Portable API/error handling is reviewed under SEC-005/API; actual host lifecycle is explicitly external."
+    ],
+    "CHECK-SEC-007": [
+      "passed",
+      "Input/parser/count/search/image/work bounds reviewed and boundary regressions passed. This does not include an exhaustion attack; direct cancellation defects are recorded under API-002."
+    ],
+    "CHECK-FUN-001": [
+      "passed",
+      "BIP39 normalization/entropy/checksum/seed and literal vector origins reviewed; targeted core/secret/boundary tests and exact-source retained date tests passed. No new full BIP39/coin vector replay."
+    ],
+    "CHECK-FUN-002": [
+      "passed",
+      "Every first-party coin/profile implementation and local wallet-evidence path reviewed statically, including derivation path/network/account/branch/index and literal test sources. Runtime sampling is bounded; it is not every-profile execution or an audit of all upstream curves."
+    ],
+    "CHECK-FUN-003": [
+      "not-applicable",
+      "No BIP85, BIP38, signed-message or Silent Payments feature in this repository."
+    ],
+    "CHECK-FUN-004": [
+      "not-applicable",
+      "No script/descriptor/Miniscript policy builder or multisig coordinator. Bitcoin single-key profile comparison remains in FUN-002."
+    ],
+    "CHECK-FUN-005": [
+      "not-applicable",
+      "No transaction builder/parser, PSBT schema or transaction signing feature."
+    ],
+    "CHECK-FUN-006": [
+      "passed",
+      "Representation/Seedshift/SSKR split, import/export, repair and recovery contracts and tests reviewed, including public vectors and independent Python oracle. Direct API refusal/stop defects are reported separately; no full combinatorial repair replay."
+    ],
+    "CHECK-FUN-007": [
+      "not-applicable",
+      "No discovery scanner, connected providers, balances/history/proofs or accounting; wallet evidence is compared locally."
+    ],
+    "CHECK-API-001": [
+      "failed",
+      "Pinned dependency calls, Rust/WASM glue and checked bridge reviewed; wrong UR type reaches a reflected dependency diagnostic. Normal transport refuses earlier."
+    ],
+    "CHECK-API-002": [
+      "failed",
+      "Async request/copy/borrow/owner lifetimes and consuming continuations traced. Direct MissingCodes final progress stop and JointPlan late confirmation reproduced; higher-level protections are retained controls."
+    ],
+    "CHECK-API-003": [
+      "failed",
+      "Encoded record/share/card/keeping export contracts reviewed; duplicate printed members receive misleading quorum guidance. Monetary report fidelity is inapplicable."
+    ],
+    "CHECK-API-004": [
+      "failed",
+      "Public encodings/word-table/UR/Bytewords/CBOR/image admission and interoperability reviewed. Lone surrogates violate the documented scalar refusal contract; opaque date keys use a different intentional UTF-16 contract."
+    ],
+    "CHECK-BLD-001": [
+      "passed",
+      "Manifest/package exports, Node/browser type closure, feature composition, permission flags and startup admission reviewed. Exact-source gates/build passed; no fresh all-edition executable/browser matrix."
+    ],
+    "CHECK-BLD-002": [
+      "not-run",
+      "Source matrix and retained host report examined, Linux CLI/PTYS exercised. Full browser, Windows/macOS and complete executable/composition runtime matrices were not newly run."
+    ],
+    "CHECK-BLD-003": [
+      "passed",
+      "Exact pins, lockfile structure/integrities, licenses and generated provenance reviewed. pnpm audit returned no advisories; RustSec returned no known vulnerabilities and one unmaintained paste advisory. Publisher concentration/upstream internals remain gaps."
+    ],
+    "CHECK-BLD-004": [
+      "not-run",
+      "Canonical WASM hashes/interfaces and documented Docker build reviewed; no uncached canonical reproduction or generated-file replacement during this baseline."
+    ],
+    "CHECK-BLD-005": [
+      "failed",
+      "CI/action event/permission/pin/concurrency/release and npm package boundaries reviewed. Push still invokes full self-test. No paid CI, signing, upload, tag or release operation executed."
+    ],
+    "CHECK-UI-001": [
+      "failed",
+      "Card geometry/drawing/QR/layout consumers and terminal cell math reviewed; small real public PDF exports passed. Combining-mark cell defect confirmed numerically; full visual gallery and actual terminal consequence not reproduced."
+    ],
+    "CHECK-UI-002": [
+      "passed",
+      "Every command/menu/option path and terminal input/navigation lifecycle reviewed. Full existing Linux PTY suite passed; cross-platform and external browser UI remain unexecuted."
+    ],
+    "CHECK-UI-003": [
+      "passed",
+      "Private screens/redaction/help/QR admission and output-save paths reviewed; targeted secret/file tests and Linux PTYS passed. No claim of every QR artwork/scanner or external browser accessibility execution."
+    ],
+    "CHECK-ARC-001": [
+      "failed",
+      "All first-party ownership/import/composition/public contracts reviewed with CORE-01..53 ledger. Seven earlier ARC checkpoint fixes retain their evidence; original SEC001 lifetime work remains incomplete."
+    ],
+    "CHECK-ARC-002": [
+      "passed",
+      "Dead/duplicate/pass-through candidates challenged against actual callers. Exact-source copies/lint/code-rules gates passed; classless pure calculations and historical API probes were not mechanically called defects."
+    ],
+    "CHECK-ARC-003": [
+      "passed",
+      "Ordinary test bodies and self-test assertion origins/negative cases read, including fakes, cleanup and production-path fidelity. No new blanket coverage percentage, mutation score or full test-suite execution is claimed."
+    ],
+    "CHECK-DOC-001": [
+      "failed",
+      "All user safety/capability/format material checked against implementation. Below-quorum SSKR absolute secrecy wording overstates visible metadata concealment."
+    ],
+    "CHECK-DOC-002": [
+      "failed",
+      "Commands, versions, licenses and provenance links reviewed. Two old harness README anchors and a documented relocated recorder cwd are wrong; original historical evidence is preserved."
+    ],
+    "CHECK-DOC-003": [
+      "passed",
+      "All 403 historical files received stated-depth review; 28 canonical pairs passed schema/duplicate-key/pairing validation. 427 direct path-hash bindings checked, with 18 explicitly explained historical differences. This is not a rerun of old audits."
+    ]
+  },
+  "guarantees": [
+    [
+      "Offline operation",
+      "src/cli/protection.ts; src/core/wallet-evidence.ts; package.json",
+      "Static graph/protection review; no product network feature; actual sandbox scenarios in retained targeted tests."
+    ],
+    [
+      "Reversible BIP39 representations",
+      "src/core/encoded-backup.ts; src/core/words.ts; src/core/word-table.ts",
+      "All supported form contracts and test literal origins reviewed; scalar refusal defect recorded separately."
+    ],
+    [
+      "BIP39 seed normalization and byte encoding",
+      "src/core/master-fingerprint.ts; src/bitcoin-evidence.ts",
+      "Static sync/async adapter trace plus exact-source retained literal/BOM/UTF-16 regressions; no new complete vector replay."
+    ],
+    [
+      "Date-shift masking is not encryption",
+      "src/core/masking.ts; docs/SEEDSHIFT_CONSTRUCTION.md",
+      "Public transformation/date boundaries and safety wording reviewed; guessing resistance is not assumed."
+    ],
+    [
+      "Opaque date keys preserve UTF-16",
+      "src/core/secret-value.ts; src/core/date-search.ts",
+      "Pre-baseline corrected owner tests include every UTF-16 code unit; source-bound retained result, not a new property campaign."
+    ],
+    [
+      "Search bounds, monotonic turns and stopped outcomes",
+      "src/core/search-turns.ts; src/core/date-search.ts; src/core/missing-codes.ts; src/sskr/joint-solve.ts",
+      "Static all-search flow review and bounded new cancellation probes; two direct API stop defects remain."
+    ],
+    [
+      "Wallet evidence never contacts a provider",
+      "src/core/wallet-evidence.ts; src/core/coins/",
+      "All first-party coin/profile implementations reviewed statically; finite range/location validation and literal vector assertions inspected."
+    ],
+    [
+      "SSKR threshold and metadata",
+      "src/sskr/transport.ts; sskr-wasm/rust/src/; docs/SSKR.md",
+      "Independent public oracle and seven native tests passed; actual single-share refusal/metadata observed; absolute secrecy prose is a finding."
+    ],
+    [
+      "Bounded UR, Bytewords and CBOR input",
+      "src/sskr/transport.ts; sskr-wasm/rust/src/lib.rs",
+      "Source trace and malformed/refusal controls; direct checked bridge type reflection confirmed."
+    ],
+    [
+      "Partial repairs are visibly partial",
+      "src/sskr/joint-repair.ts; src/sskr/share-restore.ts",
+      "Direct and wrapped contracts distinguished; late direct-plan candidate retained under original AUD-015-API001."
+    ],
+    [
+      "Owners release retained secrets",
+      "src/core/secret-value.ts; src/core/; src/sskr/; src/cli/",
+      "Original AUD-029-SEC001 remains open; fixed owners/caller checks are controls, not proof of whole-project cleanup."
+    ],
+    [
+      "Safe refusals do not repeat typed private text",
+      "src/core/error-catalog.ts; src/cli/exit-codes.ts; sskr-wasm/rust/src/refusal.rs",
+      "Stable-code and redaction source/test review; narrow raw-bridge violation reproduced."
+    ],
+    [
+      "Private terminal input and cancellation",
+      "src/cli/terminal-input.ts; src/cli/private-screen.ts",
+      "Full existing Linux real-PTY script passed; native Windows/macOS not rerun."
+    ],
+    [
+      "Private output, no-clobber and cleanup",
+      "src/export/private-file.ts; src/cli/private-result.ts; src/cli/output-saving.ts",
+      "Targeted file/fallback/privacy regressions and static exceptional-path review; intentional private exports remain explicit."
+    ],
+    [
+      "QR/image size and decompression bounds",
+      "src/cli/qr-input.ts; src/export/",
+      "Admission/decoder consumers and boundary tests reviewed; no exhaustive image fuzz or every scanner/gallery execution."
+    ],
+    [
+      "Cards carry the intended secret fragments",
+      "src/export/; scripts/card-fixtures.mjs",
+      "Full renderer source/contracts and literal test assertions read; bounded public PDFs exported; no full visual/scanner matrix."
+    ],
+    [
+      "Keeping instructions express distinct quorum",
+      "src/export/sskr-keeping-text.ts",
+      "Duplicate member counterexample confirmed; validated CLI input narrows reachability."
+    ],
+    [
+      "Startup is fast and fail-closed",
+      "src/cli/self-test.ts; src/core/self-test.ts; src/core/self-test-check.ts",
+      "Retained exact-source startup ~366ms passed; static admission/composition read; full-self-test-on-push mismatch remains."
+    ],
+    [
+      "Browser hosts import independent portable parts",
+      "package.json exports; tsconfig.cards.json; test/portable-modules.test.ts",
+      "Exact-source gates and portable tests passed; external host admission/report attributed separately, actual browser matrix not executed here."
+    ],
+    [
+      "Generated engine identity is checked",
+      "sskr-wasm/integrity.json; src/sskr/runtime.ts",
+      "Hash/interface/static binding and integrity tests reviewed; no new canonical reproducibility claim."
+    ],
+    [
+      "Packages exclude local evidence and exports",
+      "package.json; scripts/verify-audit-package.mjs",
+      "Actual dry-run file list and final publication gates; no real package publication."
+    ],
+    [
+      "Signed releases and private vulnerability reporting",
+      "scripts/sign-release.mjs; docs/RELEASING.md; SECURITY.md",
+      "Source/release-cancellation tests reviewed and read-only GitHub reporting endpoint enabled; no signing or upload performed."
+    ],
+    [
+      "Historical provenance remains inspectable",
+      "docs/audits/",
+      "403 stated-depth file reviews and 28 pair checks; two navigation/replay defects and unavailable original evidence distinguished."
+    ],
+    [
+      "Full CORE compliance",
+      "workspace code-core.instructions.md; docs/ARCHITECTURE.md",
+      "53-rule review ledger and retained gates are evidence, not certification; remaining owner and API/CI findings preclude a complete-conformance claim."
+    ]
+  ]
+}

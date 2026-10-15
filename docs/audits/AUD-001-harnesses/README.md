@@ -3,7 +3,7 @@
 These are the audit-only scripts of [AUD-001](../AUD-001-2026-09-27.md), the full audit of
 mnemocode at commit `f17c323268f431d54123fbcbe018d9add4312cd5` with a dirty working tree. That
 commit belongs to the history before the rewrite of 2026-09-28 (see
-[Commit identifiers in these reports](README.md#commit-identifiers-in-these-reports)). The scripts
+[Commit identifiers in these reports](../README.md#commit-identifiers-in-these-reports)). The scripts
 produced the command logs and probe results the report cites. Those logs are kept locally by the
 maintainer and are not published; the report states the commands, counts and outcomes.
 

@@ -3,11 +3,14 @@
 These are the audit-only scripts of [AUD-002](../AUD-002-2026-09-27.md), the full audit of
 mnemocode at commit `b4f334f982044ef586002c9b9816646631b3751e`, which belongs to the history
 before the rewrite of 2026-09-28 (see
-[Commit identifiers in these reports](README.md#commit-identifiers-in-these-reports)). They
+[Commit identifiers in these reports](../README.md#commit-identifiers-in-these-reports)). They
 produced command logs and probe results the report cites. Those logs are kept locally by the
 maintainer and are not published; the report states the commands, counts and outcomes.
 
-The scripts are kept byte for byte as they ran. They were run from the repository root while they
+The probes retain their original algorithms and public inputs. AUD-030 corrected `lib.sh` to
+resolve the checkout independently of its location and to record the command's actual working
+directory and runtime versions. Original logs and outcomes were not rewritten or rerun.
+The probes were run from the repository root while they
 lay in `docs/audits/AUD-002-evidence/harnesses/`, so their imports climb four folders
 (`../../../../dist/...`) and some of them read or write files in `docs/audits/AUD-002-evidence/`.
 Use a disposable checkout and only the public test inputs they contain; never point them at real
@@ -30,8 +33,10 @@ wallet data.
    cp docs/audits/AUD-002-harnesses/* docs/audits/AUD-002-evidence/harnesses/
    ```
 
-   `lib.sh` sets its evidence folder `E` to the audit machine's path; change it to the checkout's
-   `docs/audits/AUD-002-evidence` first.
+   `lib.sh` uses Git to find the checkout and defaults `E` to its
+   `docs/audits/AUD-002-evidence`. Set `E` to a fresh evidence folder after sourcing it when
+   preserving existing logs. `run` executes its command arguments directly; use an explicit
+   `bash -c '...'` argument for shell syntax.
 
 3. From the repository root, as the audit did:
 

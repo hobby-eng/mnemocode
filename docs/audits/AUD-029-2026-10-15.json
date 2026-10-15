@@ -815,59 +815,59 @@
   "remediation": [
     {
       "id": "AUD-029-SEC001",
-      "status": "open",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "Assessment baseline; not yet remediated."
+      "status": "verified",
+      "fixCommit": "d4776f76ed5030c295604192608e8b250067975f",
+      "verificationCommit": "d4776f76ed5030c295604192608e8b250067975f",
+      "evidence": "Current producer owner variants verified at the 607-file AUD-031 remediation snapshot; see currentVerification and AUD-031 dated follow-up. Prior dynamic row retained; external host/release acceptance remains separate."
     },
     {
       "id": "AUD-029-ARC001",
-      "status": "open",
+      "status": "fixed",
       "fixCommit": null,
       "verificationCommit": null,
-      "evidence": "Assessment baseline; not yet remediated."
+      "evidence": "WordTable owns lookup/export; standalone package entries expose it, EncodedForm, CoinList/Base58Coin, coin families and self-tests. Legacy wrappers preserve values and codes. Worktree after signed checkpoint 0d7898fed2efc4af59b2bff91b0da77d1f99315f."
     },
     {
       "id": "AUD-029-ARC002",
-      "status": "open",
+      "status": "fixed",
       "fixCommit": null,
       "verificationCommit": null,
-      "evidence": "Assessment baseline; not yet remediated."
+      "evidence": "SSKR restore/repair/split consumers accept ShareCombiner/ShareRepairPlatform/ShareSplitPlatform; no throwing no-split stub is needed. Worktree after signed checkpoint 0d7898fed2efc4af59b2bff91b0da77d1f99315f."
     },
     {
       "id": "AUD-029-ARC003",
-      "status": "open",
+      "status": "fixed",
       "fixCommit": null,
       "verificationCommit": null,
-      "evidence": "Assessment baseline; not yet remediated."
+      "evidence": "Internal callers use EncodedForm/Masking owners directly; backup-options retains substantive ShareSetChoice/mirroring and compatibility adapters. Worktree after signed checkpoint 0d7898fed2efc4af59b2bff91b0da77d1f99315f."
     },
     {
       "id": "AUD-029-ARC004",
-      "status": "open",
+      "status": "fixed",
       "fixCommit": null,
       "verificationCommit": null,
-      "evidence": "Assessment baseline; not yet remediated."
+      "evidence": "Base58 version records/prefixes are owned snapshots; Coin identity/path properties have private storage and getter-only access. Worktree after signed checkpoint 0d7898fed2efc4af59b2bff91b0da77d1f99315f."
     },
     {
       "id": "AUD-029-ARC005",
-      "status": "open",
+      "status": "fixed",
       "fixCommit": null,
       "verificationCommit": null,
-      "evidence": "Assessment baseline; not yet remediated."
+      "evidence": "SearchRun.now and optional timing parameters supply a monotonic millisecond clock, forwarded through nested code/date/share searches; default unchanged. Worktree after signed checkpoint 0d7898fed2efc4af59b2bff91b0da77d1f99315f."
     },
     {
       "id": "AUD-029-ARC006",
-      "status": "open",
+      "status": "fixed",
       "fixCommit": null,
       "verificationCommit": null,
-      "evidence": "Assessment baseline; not yet remediated."
+      "evidence": "ShareRestore.exportDecision is shared by library repair and interactive export; fresh input reads/questions remain in the CLI. Worktree after signed checkpoint 0d7898fed2efc4af59b2bff91b0da77d1f99315f."
     },
     {
       "id": "AUD-029-ARC007",
-      "status": "open",
+      "status": "fixed",
       "fixCommit": null,
       "verificationCommit": null,
-      "evidence": "Assessment baseline; not yet remediated."
+      "evidence": "Release helper returns CANCELLED through every step, keeps exit130/one message and stops before later steps; real release tools never ran in verification. Worktree after signed checkpoint 0d7898fed2efc4af59b2bff91b0da77d1f99315f."
     }
   ],
   "executions": [
@@ -1064,5 +1064,459 @@
     "Byte/key/list wipe work exists; full TS-07-completion claims were too broad.",
     "No proof of external compromise, wrong wallet output, complete CORE conformance or release/browser acceptance.",
     "The earlier6-12hour estimate concerned a partly completed migration and is not a measured remaining-work budget."
-  ]
+  ],
+  "remediationAddendum": {
+    "phase": "CORE migration in progress",
+    "baseCommit": "0d7898fed2efc4af59b2bff91b0da77d1f99315f",
+    "completedFindings": [
+      "AUD-029-ARC001",
+      "AUD-029-ARC002",
+      "AUD-029-ARC003",
+      "AUD-029-ARC004",
+      "AUD-029-ARC005",
+      "AUD-029-ARC006",
+      "AUD-029-ARC007"
+    ],
+    "remainingFindings": [
+      "AUD-029-SEC001"
+    ],
+    "sourceFingerprint": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3",
+    "finalGateLabel": "secret-lifetimes-reviewed-fast-gates-v2",
+    "executions": [
+      {
+        "label": "coin-ownership-red",
+        "recordSha256": "dae2f77cdacbe8b6fa5bb4449bbde6a15e67fe4263035e2eddba5af870c7f342",
+        "logSha256": "c73347a3ab0a4dfc5550fb088c5b8f873ca72100e1be86351e2ea5ed67aaf370",
+        "exitCode": 1,
+        "sourceBefore": "6b00db5cab0ecb12b0534c7b315988a9608079a65c6e6c9c00f3aa8018e5b7ff",
+        "sourceAfter": "6b00db5cab0ecb12b0534c7b315988a9608079a65c6e6c9c00f3aa8018e5b7ff"
+      },
+      {
+        "label": "coin-ownership-green",
+        "recordSha256": "7ccffde360515953ab120e58348077bc3c1fa9a419ba4687c18638b29f0ffa92",
+        "logSha256": "d47cb200fac7c4f1b27503093fb6acada0b0802c2ed1c132f84eb5ee3299504f",
+        "exitCode": 0,
+        "sourceBefore": "b77f979793cdc7dcdb322daf69bea05a353a5186f70f33d2ded7adee76f3e00b",
+        "sourceAfter": "b77f979793cdc7dcdb322daf69bea05a353a5186f70f33d2ded7adee76f3e00b"
+      },
+      {
+        "label": "share-capabilities-red-focused",
+        "recordSha256": "726eded44f1d82faf926c3e9e8229b621dcd997121b31a784c27a542b9091bf8",
+        "logSha256": "e5f2d345865fbdfbd724dd2a90ad9cf669b130fb05344d97157b660277739f0f",
+        "exitCode": 1,
+        "sourceBefore": "0e1e2032cda5c0ea90c1db76dfd746bc277d24c49b1950724528f14fd3bab16e",
+        "sourceAfter": "0e1e2032cda5c0ea90c1db76dfd746bc277d24c49b1950724528f14fd3bab16e"
+      },
+      {
+        "label": "share-capabilities-types-green-v2",
+        "recordSha256": "0aa4256ce2d177767af5ef8fc9d3111b3d828bd3c639836f3b492146be0c7548",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exitCode": 0,
+        "sourceBefore": "bd0a0f598c256fd8ae97cf0e0c10c60d9466dcf9e0cef6c76b77072d57d3c5ec",
+        "sourceAfter": "bd0a0f598c256fd8ae97cf0e0c10c60d9466dcf9e0cef6c76b77072d57d3c5ec"
+      },
+      {
+        "label": "checkpoint-one-gates",
+        "recordSha256": "5ed086dfc30df7a84ed1fe8f5439be7a6f6ecb52757b3f3e57decb6343cbf619",
+        "logSha256": "965cb029e08eaa169cd15c484c00318030e4331f0eda4698cd155335d4a593b6",
+        "exitCode": 0,
+        "sourceBefore": "4b19f75f1cbfa184b7c07f52a0035f89a726fa7aa546d2e8e3f39dd14d7b07d5",
+        "sourceAfter": "4b19f75f1cbfa184b7c07f52a0035f89a726fa7aa546d2e8e3f39dd14d7b07d5"
+      },
+      {
+        "label": "checkpoint-one-tests-serial",
+        "recordSha256": "63deba503311b3ce18b1177af3dc710fe40a19742965c0e26756a44b99b9c726",
+        "logSha256": "344431982d71667f762c4a88c7bf1198cc05da7bafc488105fbf7a1eb76f3d86",
+        "exitCode": 0,
+        "sourceBefore": "d93539106beda4f1bd612980e9669c6ae5d83bb31cb78731a5992b865aed00f1",
+        "sourceAfter": "d93539106beda4f1bd612980e9669c6ae5d83bb31cb78731a5992b865aed00f1"
+      },
+      {
+        "label": "search-clock-red",
+        "recordSha256": "3effcf4a58c978caf8a409b388d3a75ee2416ac320b4268f48e11ebf720d4874",
+        "logSha256": "69fbd4436ce9d2c0f784170cd85812d6b11c929ccc765badfda0fed9107eb621",
+        "exitCode": 1,
+        "sourceBefore": "cf5570219d82b7a4a73201034b86a86544b087ea417f0bf2d8588d1dc13c3958",
+        "sourceAfter": "cf5570219d82b7a4a73201034b86a86544b087ea417f0bf2d8588d1dc13c3958"
+      },
+      {
+        "label": "search-clock-green",
+        "recordSha256": "46caf97c86d6ad3688e80764e2722e7ad55bb31d0133c41c8244fcd305a37d5c",
+        "logSha256": "7abad3c441297715259adbee31f5bace53907fc7e42524fd16d2c83d334768b4",
+        "exitCode": 0,
+        "sourceBefore": "1fa7d2ccb73e728aa01c77da2dc03a56a6140663607a26ae4cbe7172e356eef9",
+        "sourceAfter": "1fa7d2ccb73e728aa01c77da2dc03a56a6140663607a26ae4cbe7172e356eef9"
+      },
+      {
+        "label": "release-cancel-integration-green",
+        "recordSha256": "56006d8b1b59c217f4f2a5e2a17ad87a838976902869f7775e83e3bb1784f17d",
+        "logSha256": "08a8a6e834c50d1fb0805b722f727302af14c199be6a2aff845776d0fd9f98ff",
+        "exitCode": 0,
+        "sourceBefore": "103f72e7a84c4e0c1263ab5a4362b13efd362bb905a6371df967fe0b911e1eb0",
+        "sourceAfter": "103f72e7a84c4e0c1263ab5a4362b13efd362bb905a6371df967fe0b911e1eb0"
+      },
+      {
+        "label": "release-cancel-return-green",
+        "recordSha256": "18cb204ed25d513a0892ba7fbb744f95ab15895240c4d2cf39dce2d717d304f3",
+        "logSha256": "6169c1d738bbfa74a47e40ba68a305f0513fe58ed4ea173ee8db53313c417554",
+        "exitCode": 0,
+        "sourceBefore": "103f72e7a84c4e0c1263ab5a4362b13efd362bb905a6371df967fe0b911e1eb0",
+        "sourceAfter": "103f72e7a84c4e0c1263ab5a4362b13efd362bb905a6371df967fe0b911e1eb0"
+      },
+      {
+        "label": "checkpoint-two-tests",
+        "recordSha256": "5a3f8ac58f0e60388539c1f8a3f3108845806f45613c376429d57f8d5dfa8d1d",
+        "logSha256": "2e4b55deb53907eeaf207eccecc7bc14c78017dba51665e7a2a71a31fd53b83b",
+        "exitCode": 0,
+        "sourceBefore": "a9e02648022dce755b7ce8a0a1a7d9c29632829e332082ae8e50143949d7e505",
+        "sourceAfter": "a9e02648022dce755b7ce8a0a1a7d9c29632829e332082ae8e50143949d7e505"
+      },
+      {
+        "label": "checkpoint-two-build",
+        "recordSha256": "184f9a82bfcfad9e64ceca05d3aeaec6addeb74f1511b85a07d13e576d4390f1",
+        "logSha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494",
+        "exitCode": 0,
+        "sourceBefore": "a9e02648022dce755b7ce8a0a1a7d9c29632829e332082ae8e50143949d7e505",
+        "sourceAfter": "a9e02648022dce755b7ce8a0a1a7d9c29632829e332082ae8e50143949d7e505"
+      },
+      {
+        "label": "checkpoint-two-gates-final",
+        "recordSha256": "aadce5434c54d0fb152a316025a5f4abd7d9eabadaaf511cb1acd3e0ce644463",
+        "logSha256": "635a02db40a4e326fc64ef8084cde7a2739bf4f1382827e4a3134d4032cf2f74",
+        "exitCode": 0,
+        "sourceBefore": "a9e02648022dce755b7ce8a0a1a7d9c29632829e332082ae8e50143949d7e505",
+        "sourceAfter": "a9e02648022dce755b7ce8a0a1a7d9c29632829e332082ae8e50143949d7e505"
+      },
+      {
+        "label": "secret-lifetimes-reviewed-fast-gates-v2",
+        "recordSha256": "c1645e9f34b848c4015735530ae2c35553de17c209420a8cef2d21af6e52f81d",
+        "logSha256": "5445011553f713b4816b830372c6593538adc98b87869ccbe736c00c7859d46b",
+        "exitCode": 0,
+        "sourceBefore": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3",
+        "sourceAfter": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3"
+      },
+      {
+        "label": "secret-lifetimes-reviewed-regressions",
+        "recordSha256": "ba993760a6106ddab6b44354cdc621c5f424afc6e2efe240adb1a3a825e5565f",
+        "logSha256": "968d9f25e8879aecf1eaa5e1816c5bbcfdd47dad7d230dd7d47163cf6ef67ce6",
+        "exitCode": 0,
+        "sourceBefore": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3",
+        "sourceAfter": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3"
+      },
+      {
+        "label": "secret-lifetimes-reviewed-build",
+        "recordSha256": "a5b04b39296a182f9a0d03bdb98ac3d98c3899097728961c803bf6e6022b7a01",
+        "logSha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494",
+        "exitCode": 0,
+        "sourceBefore": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3",
+        "sourceAfter": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3"
+      },
+      {
+        "label": "secret-display-lifetimes-terminal",
+        "recordSha256": "4fa41a1e5bad79d2a220459287d8da7b20df035d1aeaa2c1e13f3cfca893854a",
+        "logSha256": "757b8d8642386c2aa90aa8c90f3ffbffb5c6726b17d5880beab0a5ec63ddfc6e",
+        "exitCode": 0,
+        "sourceBefore": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3",
+        "sourceAfter": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3"
+      },
+      {
+        "label": "secret-lifetimes-reviewed-startup",
+        "recordSha256": "eefdb838ed4380552fdbaf687bad7c705fd22b923be95366664dc71f309a1a62",
+        "logSha256": "aaabd65f47545c9ab3a31d51d0e8ae2eefd9840d4aac47181adb15c01fc9c5f7",
+        "exitCode": 0,
+        "sourceBefore": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3",
+        "sourceAfter": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3"
+      }
+    ],
+    "hostIntegration": {
+      "phase1": "Host admitted all18 portable deltas by hash;32 targeted tests in5 files passed, own final typecheck pending.",
+      "phase2": "Host admitted191files by hashes; WordTable UI/export calls migrated; repair delegates to ShareRestore.repair/exportDecision. Typecheck passed,25targeted tests/3files and overlapping72cases/10files passed; no new WASM generation.",
+      "lifetimes": "Host accepted192closure files/19deltas on b564 snapshot and adapted owning backups/shares/writers/protection/re-encoding. Host reported48focused tests/4files, additional overlapping51cases, BOM+parity34cases andclosure10cases; pnpm check and owner lint passed. Host independent CORE53 review in progress; new date source not imported."
+    },
+    "releaseAcceptance": false,
+    "next": "Finish owner/borrower classification and mutable byte lifetimes for remaining owners, wrappers and callers, including asynchronous refusal/cancellation. Recheck all53 current CORE rules sequentially; the original baseline inventoried52 rules before CORE-53 was approved.",
+    "independentReview": {
+      "scope": "ARC001..ARC007 at completed checkpoint-two only; SEC001 explicitly excluded as in progress.",
+      "snapshot": "a9e02648022dce755b7ce8a0a1a7d9c29632829e332082ae8e50143949d7e505",
+      "method": "One human-authorized read-only independent reviewer;22portable files reconstructed in memory from signed base and retained patch, all hashes matched. No new tests/network/release tools, no edits.",
+      "verdict": "All7 fixes accepted; no confirmed actionable defects.",
+      "memory": "MemAvailable sampled5.38..6.27GiB, above3GiBreserve; reviewer closed after completion.",
+      "limits": "Static review and retained checks; individual later sign/upload/publish interruption steps were not executed. No whole-project or release acceptance."
+    },
+    "reviewPolicy": {
+      "rule": "CORE-53",
+      "guideSha256": "51ac92ddffea253bb7ed2f1926eb4cab6c2f52d336af95c1d63f3ebdd9fce066",
+      "scope": "Owner-approved shared guide plus global Codex pointer; main implements sequentially, one independent read-only reviewer per cohesive fix, at most two for a specific additional risk with sufficient memory.",
+      "policyReview": "Independent static review found no confirmed actionable defects; reserve held; reviewer closed.",
+      "globalFilesCommitted": false
+    },
+    "lifetimeCheckpoint": {
+      "phase": "Scoped first lifetime and private-display blocks accepted after U+FEFF correction; SEC001 open",
+      "sourceFingerprint": "21fa9630c52c2a5c34ef8f6019bb320f81c73342261a2e11d92d259abd66c33b",
+      "manifestSha256": "0bab671350ddad00b8e88295a1252924b76cab6c4572288afb01ed07f1b40b06",
+      "owners": [
+        "EncodedBackup",
+        "ReEncoding",
+        "Share",
+        "PassphraseProtection",
+        "CandidateListWriter",
+        "CandidatesFile"
+      ],
+      "helper": "SecretValue owns mutable UTF-8/binary64 bytes; returned compatibility views cannot be recalled.",
+      "verification": {
+        "fastGates": {
+          "command": "pnpm check",
+          "exitCode": 0
+        },
+        "nearestRegressions": {
+          "files": 10,
+          "passed": 258,
+          "workers": 1,
+          "exitCode": 0
+        },
+        "build": {
+          "command": "pnpm build",
+          "exitCode": 0
+        },
+        "terminal": {
+          "command": "python3 scripts/verify-terminal-input.py",
+          "exitCode": 0
+        },
+        "startup": {
+          "command": "assertCoreSelfTest on built modules only",
+          "milliseconds": 397.477431,
+          "exitCode": 0
+        }
+      },
+      "resourceLimits": {
+        "reserveMiB": 3072,
+        "checksRssMiB": 1024,
+        "reviewerRssMiB": 512,
+        "heavyChecks": "sequential"
+      },
+      "remainingFinding": "AUD-029-SEC001",
+      "limitations": [
+        "Other retained owners, wrappers and their callers remain under migration.",
+        "No guaranteed JavaScript erasure claim; previously returned strings and arrays remain caller-owned.",
+        "Full release checks, general PDF/image gallery and full-cost vector replays were not run."
+      ],
+      "initialReview": {
+        "reviewer": "one independent read-only reviewer",
+        "sourceFingerprint": "21fa9630c52c2a5c34ef8f6019bb320f81c73342261a2e11d92d259abd66c33b",
+        "confirmedFindings": [
+          {
+            "id": "AUD-029-SEC001-review-001",
+            "priority": "P2",
+            "summary": "Default TextDecoder removed initial U+FEFF from retained/exported BIP39 passphrases",
+            "status": "Fixed, regressions passed and independent follow-up accepted",
+            "regressionBefore": "3 failed and1 internal-BOM control passed",
+            "regressionAfter": "33 tests in2 files passed before adding the startup known-answer",
+            "change": "ignoreBOM:true preserves exact UTF-8 values; quick startup known-answer retains leading U+FEFF"
+          }
+        ],
+        "unexecutedChecks": "Static review only; reviewer ran no tests/builds/crypto/network checks.",
+        "memoryReserveMiB": 3072
+      },
+      "latestCandidate": {
+        "sourceFingerprint": "b56481a48a3d68c8c117920af38b58cba2f7a19932f794838d991485d6fee1d3",
+        "manifestSha256": "b0c067ae44af1a7cef356d8072c99eeefae7232203296737258e3b9d4280e20f",
+        "portablePatchSha256": "f8977bd4c6ea55d4a6859687ccec565ec82431175d3393f6315dfca9b5cffcd4",
+        "privateDisplayOwner": "PrivateResult snapshots display lines into bytes; both callers await show before disposing it.",
+        "regressions": {
+          "files": 13,
+          "passed": 341,
+          "workers": 1,
+          "exitCode": 0
+        },
+        "fastGatesExitCode": 0,
+        "buildExitCode": 0,
+        "targetedRealPtyExitCode": 0,
+        "startupMilliseconds": 312.517925,
+        "independentFollowUp": "Accepted with no new actionable findings; original P2 fixed, reviewer closed",
+        "hostAdmission": "192closure files/19deltas imported by hashes; owner adapters/final host checks pending",
+        "remainingOwners": [
+          "DatesAnswer",
+          "DateSearch",
+          "MissingCodes",
+          "WordCandidate",
+          "WordCandidateSearch",
+          "BackupReading",
+          "WrittenCodes",
+          "KeptShares",
+          "RestoredShares",
+          "ShareSet",
+          "ShareUnmasking",
+          "Other retained backup-check/export plans need ownership classification"
+        ]
+      }
+    },
+    "dateLifetimeCheckpoint": {
+      "phase": "Implemented and checked; independent review and real terminal checks in progress",
+      "sourceFingerprint": "224182af25ba20958fdc1e6ce2e018e0f1d0063416d40b0bedf21296f1c757e7",
+      "manifestSha256": "813cc34d45fbcfc1be561079cac369014e6cbacb501d8e19ddc9749b236b12b3",
+      "portablePatchSha256": "47395040bade643e30b12a0aab885cfa435fb12c702448ece48265dd1e9fb24a",
+      "owners": [
+        "DatesAnswer",
+        "DateSearch"
+      ],
+      "contracts": [
+        "DatesAnswer.copy preserves numeric lists, exact custom keys and interleaved typed positions; own bytes wiped/disposed.",
+        "DateSearch owns an independent copy of dates and indexes; late wallet publication after wipe is refused.",
+        "Incomplete date answers passed to MissingCodesSearch.byWallet and ShareUnmasking remain borrowed through all work; the caller keeps them live.",
+        "Owning producers/CLI loops wipe rejected/replaced answers and dispose on all outcomes, after asynchronous uses finish.",
+        "No result-union or cancellation/cryptographic arithmetic changes."
+      ],
+      "verification": {
+        "initialRed": {
+          "failed": 6,
+          "label": "date-secret-lifetimes-red"
+        },
+        "finalApi": {
+          "passed": 27,
+          "files": 2,
+          "label": "date-secret-lifetimes-final-api",
+          "exitCode": 0
+        },
+        "retainedRegressionsBeforeDocumentationOnlyEdits": {
+          "passed": 292,
+          "files": 11,
+          "label": "date-secret-lifetimes-regressions",
+          "exitCode": 0
+        },
+        "additionalSskrRegressions": {
+          "passed": 40,
+          "files": 2,
+          "label": "date-secret-lifetimes-additional",
+          "exitCode": 0
+        },
+        "fastGates": {
+          "label": "date-secret-lifetimes-final-gates",
+          "exitCode": 0
+        },
+        "build": {
+          "label": "date-secret-lifetimes-build",
+          "exitCode": 0
+        }
+      },
+      "limitations": [
+        "Earlier broad invocation included one unmatched share-unmasking.test.ts pattern; it is not counted. Existing sskr-share-modules and sskr-export-questions then ran separately and passed.",
+        "No full test suite/release/vector replay or general PDF gallery was run.",
+        "SEC001 stays open for remaining owners and wrappers."
+      ],
+      "releaseAcceptance": false
+    },
+    "dateLifetimeCorrection": {
+      "sourceFingerprint": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+      "admissionManifestSha256": "551883665e0d874e24e1f87d7c16530a5291c1068ea1208a705751c7de146ec2",
+      "reviewedManifestSha256": "0b4a99900b5f754a8b4538e50547f39d35faf1d97424f0ffa9f0c4134ed01185",
+      "portablePatchSha256": "0a8d6082304d85588d73b986c3dd058a32f7366f49780b80b8b69f7592b35491",
+      "phase": "Corrected and independently reviewed; host admission pending",
+      "initialRejectedSnapshot": "224182af25ba20958fdc1e6ce2e018e0f1d0063416d40b0bedf21296f1c757e7",
+      "initialFinding": "UTF-8 conflated arbitrary lone-surrogate keys; red reproduced one failing case.",
+      "independentReview": {
+        "reviewer": "Lovelace",
+        "agentId": "01a13f5f-e38e-7c91-bd0c-69825b379d6f",
+        "reviewedFingerprint": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+        "reviewedManifestSha256": "0b4a99900b5f754a8b4538e50547f39d35faf1d97424f0ffa9f0c4134ed01185",
+        "initialFinding": "UTF-8 conflated arbitrary lone-surrogate keys; red reproduced one failing case.",
+        "followup": "Accepted corrected UTF-16LE key storage; no other confirmed defect in bounded static follow-up. All 555 source files, 18 deltas and 7 portable deltas matched before/after.",
+        "limitations": [
+          "Static review only; executions performed by coordinator.",
+          "SEC001 remains open."
+        ],
+        "closed": true
+      },
+      "executions": [
+        {
+          "label": "date-opaque-keys-red",
+          "recordSha256": "da700f3a3cab31a0c3d48952f69a31ad3bf96f06578fb7f7412292e1e730ed18",
+          "exitCode": 1,
+          "sourceBefore": "dc315de9e7c245d4965656f60738a62df58bcbf9da9a359ad63fe1601c89f20e",
+          "sourceAfter": "dc315de9e7c245d4965656f60738a62df58bcbf9da9a359ad63fe1601c89f20e",
+          "logSha256": "1bef549f2ecdd159e613b3db27626ade9d5b7f93c3900988c0cd9a7635832a04"
+        },
+        {
+          "label": "date-opaque-keys-green",
+          "recordSha256": "71b65e29af89f1539ce184e1124d34a2053573a1694420ce2fa84ece9decd92e",
+          "exitCode": 0,
+          "sourceBefore": "7b279a78345b7a2967f8fbc63331b64faa4c628a459853685d2c7972583b13ca",
+          "sourceAfter": "7b279a78345b7a2967f8fbc63331b64faa4c628a459853685d2c7972583b13ca",
+          "logSha256": "a9603b72c44f46ceba5dbf45da3f867c9444c7dae204cd9a2c0c8ab1cd4e9af7"
+        },
+        {
+          "label": "date-opaque-keys-final-tests",
+          "recordSha256": "a300ea871f7144213b3eca76c2cbf6756533ae6e62d162209a9051e716ee7068",
+          "exitCode": 0,
+          "sourceBefore": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "sourceAfter": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "logSha256": "f852a32633ad85563f5fc52d9b17948c9fb44807bd1fc832e351f665f744ebc4"
+        },
+        {
+          "label": "date-opaque-keys-final-gates",
+          "recordSha256": "7b438c07a5f09cbe29bba3831fa27493a74a79b9af1d37381b6c778053c4584a",
+          "exitCode": 0,
+          "sourceBefore": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "sourceAfter": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "logSha256": "abadab7cec49ff08bc6a064b16705eccf8116460f88b423e89da385683400888"
+        },
+        {
+          "label": "date-opaque-keys-final-build",
+          "recordSha256": "7125bc059bb007664e934fc8eb2258682a58677a3c69f25d824d2bfb9e50cf80",
+          "exitCode": 0,
+          "sourceBefore": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "sourceAfter": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "logSha256": "b4a0bcd3a19166a72281ffad6a15215a99d6fae576db7490a4c4364c66f08494"
+        },
+        {
+          "label": "date-opaque-keys-final-terminal",
+          "recordSha256": "f449818d1175e9c4ad5e3ee615c0e39ffda5abf300875c6c271505f5931d70dc",
+          "exitCode": 0,
+          "sourceBefore": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "sourceAfter": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "logSha256": "8df9db3fa3d0ca556b2889f5f65dd917e75be04685e1c7601c440c57ffac33d6"
+        },
+        {
+          "label": "date-opaque-keys-final-startup",
+          "recordSha256": "4486bb72d6d0c3a29f3ca9815a2511a108ba8271f055f0ed7d0c3bf80c48461e",
+          "exitCode": 1,
+          "sourceBefore": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "sourceAfter": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "logSha256": "7da696bcb34a38560d0f49796a4bcefaffbddd8343924a83fbdae6b089797f87"
+        },
+        {
+          "label": "date-opaque-keys-final-startup-v2",
+          "recordSha256": "1da8822289b4deafb2904d2ed01e6eae44f5cf8d7433948e2313cfb37ad0aa6a",
+          "exitCode": 0,
+          "sourceBefore": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "sourceAfter": "45a2b48aadba5193d512bfc532f67052c04234e31d6c048c3d53f2917c728cf6",
+          "logSha256": "6ecae5f43d17ca42911ae0ccd04b7e3efc16630b7af46e43cf1598814a308c42"
+        }
+      ],
+      "startupMilliseconds": 366.016615,
+      "remainingFinding": "AUD-029-SEC001"
+    }
+  },
+  "currentVerification": {
+    "updatedAtUtc": "2026-10-15T18:55:17.529364Z",
+    "scope": "Current MnemoCode producer remediation; historical baseline findings and executions remain unchanged.",
+    "sourceFingerprint": "eb39e55876f8fc5187e785895c0c54944106cf697bb3c20c19ffa8d282e3fa2c",
+    "sourceFiles": 607,
+    "codeCommit": "d4776f76ed5030c295604192608e8b250067975f",
+    "followupReport": "AUD-031-2026-10-15.json",
+    "followupReportSha256": "e5452b35bc164c125b0a84ba6a754eed7dc88fad8feb68aeecb61e9728b92b06",
+    "followupMarkdownSha256": "4ff050d0642ed0d428e2e241eb6951bf7190e19c97f89348b865fc7f4d4fe40c",
+    "producerOwnerFinding": "AUD-029-SEC001",
+    "producerOwnerStatus": "verified",
+    "priorDynamicOwnerRow": {
+      "id": "AUD-029-SEC001",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "Assessment baseline; not yet remediated."
+    },
+    "priorReportJsonSha256": "aae1096b0d0355bf5446752da0b957d0cb1ffcabfef464984740e876634b80eb",
+    "priorReportMarkdownSha256": "8e6cf0f885a4afa216e82cbb77e01ea036bbe42a5769ea257ff9cce9473963ae",
+    "hostAcceptance": "Normal 200-file sync reported complete; host cached-plan borrower/retirement adaptation and its checks remain separate and pending.",
+    "limitations": "No new full audit, full release matrix, canonical native replay or universal memory-erasure guarantee. See the exact current and qualified retained checks in AUD-031."
+  }
 }
