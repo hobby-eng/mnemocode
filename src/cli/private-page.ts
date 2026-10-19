@@ -65,7 +65,8 @@ class PageRecord extends Redacted implements Disposable {
   /**
    * The most rows the page can take on a terminal `columns` wide, read from its bytes without a
    * copy of its text: each line break, and each row that its bytes could fill, as every column
-   * takes a byte at least, but those to which a tab moves on, as many as TAB_STOP.
+   * takes a byte at least, but those to which a tab moves on, as many as TAB_STOP. It holds for
+   * what MnemoCode writes, which moves the cursor down only over rows drawn already.
    */
   mostRows(columns: number): number {
     const bytes = this.#bytes.subarray(0, this.#length);
