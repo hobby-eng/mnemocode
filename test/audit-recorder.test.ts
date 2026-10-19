@@ -13,7 +13,9 @@ describe.skipIf(process.platform === "win32")("Historical recorder path metadata
     "records cwd, arguments and failure after relocation=$moved, exit=$code",
     async ({ moved, code }) => {
       const root = resolve(".");
-      const folder = await mkdtemp(join(root, "docs/audits/AUD-030-evidence/r08-replay-"));
+      const evidence = join(root, "docs/audits/AUD-030-evidence");
+      await mkdir(evidence, { recursive: true });
+      const folder = await mkdtemp(join(evidence, "r08-replay-"));
       try {
         const original = resolve("docs/audits/AUD-002-harnesses/lib.sh");
         const script = moved ? join(folder, "harnesses/lib.sh") : original;
@@ -31,6 +33,8 @@ describe.skipIf(process.platform === "win32")("Historical recorder path metadata
             "-c",
             [
               'source "$1"',
+              // Check the recorder with the caller's installed tools, not its historical local PATH.
+              'export PATH="$6"',
               'E="$2"',
               'cd "$3"',
               'printf "%s\\n" "$ROOT"',
@@ -42,6 +46,7 @@ describe.skipIf(process.platform === "win32")("Historical recorder path metadata
             invocation,
             "two words with spaces",
             String(code),
+            process.env.PATH ?? "",
           ],
           { encoding: "utf8" },
         );

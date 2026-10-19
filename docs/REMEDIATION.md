@@ -32,15 +32,70 @@ group was split without changing its assertions or relaxing the line limit.
 The owner requested no additional agents. The main agent reviewed this delta;
 the concurrent audit's original reproduction is retained separately. No new
 independent review of the correction or full-suite replay is implied. Portable
-library and native-engine bytes are unchanged. The fresh standalone build and
-the native/browser acceptance of this corrected candidate remain pending.
+library and native-engine bytes are unchanged. The corrected standalone Linux file now passes all nine empty-folder checks
+and the complete real pseudo-terminal suite. Its SHA-256 is
+`f3a35d61000a7231bad3e0edd974c03e63479e5fdffbba91ec47d6be3166c634`;
+the file is `release/local-7facfcc/mnemocode-0.1.0-linux-x64`.
+The [Executable run](https://github.com/hobby-eng/mnemocode/actions/runs/39288756606)
+for signed source `7facfccedd950a084df94933a230ca2f7a0f473a` also passes
+build, executable acceptance and real terminal checks on Linux, Windows and
+macOS. This establishes execution of the files on those systems, separately
+from the full source-test results below.
 
 The owner subsequently authorized pushing the signed checkpoints and running
-full CI and Executable checks, without a tag or release. Those jobs were
-queued for `abf7729`; they do not yet check this later CLI correction and will
-be superseded by its final candidate. GitHub reported delayed Actions workflow
-processing on 2026-10-19 in its [incident record](https://www.githubstatus.com/incidents/8tzbpcnl75jp). This is recorded as an external execution delay,
-not passing Windows/macOS acceptance.
+full CI and Executable checks, without a tag or release. The initial jobs checked `abf7729` and were superseded by `7facfcc`.
+GitHub's delayed Actions processing was an external execution delay, recorded in
+its [incident record](https://www.githubstatus.com/incidents/8tzbpcnl75jp),
+not passing platform acceptance.
+
+## Full-CI test portability follow-up (2026-10-19)
+
+The full source-test runs for both signed snapshots exposed test-support
+problems that the existing local evidence had not reached. Their failing logs
+remain retained, separately from successful executable acceptance.
+
+- The historical recorder test now creates its ignored evidence parent in a clean checkout and runs its recorder with the caller's installed tools rather than a historical machine-specific PATH.
+- Child-only self-test fault injection passes its preload as a file URL, including on Windows drive paths. The actual faults and exact critical-refusal assertions remain in place.
+- The independent Python arithmetic test normalizes CRLF before comparing logical output lines; every word number, refusal and checksum assertion remains exact.
+- Cancellation tests assert Windows' intentional raw-mode retention and Unix's immediate line-mode restoration, while continuing to require stopped reads, removed listeners, cancellation, wiped input and propagated failures.
+- Exhaustive Encode menu checks are registered by all five first-form answers, with the same subsequent traversal and assertions. The real-screen walk also checks Escape before that first answer. Every case retains the original 60-second limit; no path is intentionally omitted.
+
+The first six-file Linux follow-up passes all 111 cases. Its earlier sandboxed
+attempt could not start Bash/Python/Node children (`EPERM`) and is not a
+successful application check. The final two-file menu run passes all 68 cases, including the separate
+first-question Escape control. Both walks assert the complete agreed first-form
+list, so adding a form cannot silently escape their registration. These totals
+overlap the earlier run and are not added. `pnpm check` passes: strict types,
+type-aware lint, duplication, rule, privacy/package and Rust gates.
+The corrected full source-test matrix still needs to run after this checkpoint. No production, dependency, native-engine
+or portable-library input changes in this follow-up. The owner requested no
+additional agents; review is by the main agent, with no independent acceptance
+claimed.
+
+## Browser acceptance follow-up (2026-10-19)
+
+Both remaining encrypted candidate-list scenarios now pass in Firefox 157.0,
+one in each edition. Each actual Deriver writes the list to the Scanner key;
+the Scanner opens it and removes it. The main session reconciled the raw
+reports, logs, current harness identities and all four literal HTML hashes.
+Both executions exit zero, with no HTTP requests or page errors, and all owned
+children are reaped. The measured aggregate peaks are 1,791,956 KiB and
+1,860,624 KiB, within the 1,920 MiB budget; the 3 GiB system reserve is retained.
+
+Current evidence therefore contains **60 passing scenarios**: the 58 retained
+cases below and these two new executions. The 96 raster exports remain inside
+the four raster cases, not additional scenarios. No replay of all 58 is implied.
+Selected producer/host library and artifact identities remain unchanged.
+
+Each new Firefox run also records three unsupported `clipboard-write` warnings
+and two fixed `invalid tag` stream errors. Source tracing identifies a matching
+startup negative control: it changes the last byte of a public encrypted
+fixture and requires decryption to refuse it. Attribution of these exact console
+events to that control is a static inference, not an instrumented rerun. The
+messages are retained without filtering; no zero-console-error claim is made.
+The runtime handoffs pass their original assertions. This closes the two
+previously missing cases, without claiming every option combination or native
+OS protections in a browser.
 
 ## Retained AUD-036 follow-up
 

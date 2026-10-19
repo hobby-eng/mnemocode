@@ -90,10 +90,13 @@ export function answeredByScript(): void {
   });
 }
 
-/** Every command line that the questions of `entry` can build, one per path through them. */
-export async function everyPath(entry: (typeof MENU_ENTRIES)[number]): Promise<string[][]> {
+/** Every command line after a fixed answer prefix, or the whole entry when it is empty. */
+export async function everyPath(
+  entry: (typeof MENU_ENTRIES)[number],
+  prefix: readonly number[] = [],
+): Promise<string[][]> {
   const runs: string[][] = [];
-  const pending: number[][] = [[]];
+  const pending: number[][] = [[...prefix]];
   const taken = new Set<string>();
   while (pending.length > 0) {
     script.answers = pending.pop()!;

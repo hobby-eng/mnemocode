@@ -59,6 +59,11 @@ import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
 import { writeShare } from "../src/sskr/transport.js";
 
+// Windows deliberately keeps raw mode between reads so that ConPTY cannot lose Ctrl+C.
+// Pausing and removing listeners still ends the watch; Unix also restores line mode immediately.
+const RAW_ENTRY = process.platform === "win32" ? [false, true] : [true];
+const RAW_SESSION = process.platform === "win32" ? [false, true] : [true, false];
+
 const CTRL_C = "\x03";
 /** Any date: the Seedshift test only needs the question for it asked. */
 const TEST_DATE = "23-09-2026";
@@ -97,9 +102,9 @@ class Keyboard extends EventEmitter {
 
 let keys = new Keyboard();
 
-/** Expects the terminal given back as the watch found it: raw mode left, nothing read. */
+/** Expects an idle terminal with no listeners, retaining raw mode only on Windows. */
 function expectTerminalGivenBack(): void {
-  expect(terminal.rawModes.at(-1)).toBe(false);
+  expect(terminal.rawModes.at(-1)).toBe(process.platform === "win32");
   expect(keys.flowing).toBe(false);
   expect(keys.listenerCount("data")).toBe(0);
 }
@@ -147,13 +152,13 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     terminal.atAssessment = () => setTimeout(() => keys.type(CTRL_C), 0);
     expect(await run({ share: markedShares(OPEN_MARKS) })).toBe(CANCELLED);
     // The watch ran during the assessment, gave it its signal, and the assessment stopped.
-    expect(terminal.modesAtAssessments).toEqual([[true]]);
+    expect(terminal.modesAtAssessments).toEqual([RAW_ENTRY]);
     expect(terminal.signals).toHaveLength(1);
     expect(terminal.signals[0]?.aborted).toBe(true);
     // A stop is no failure of the assessment (CORE-22): it ends with the verdict "stopped".
     expect(terminal.assessmentErrors).toEqual([]);
     expect(terminal.assessmentVerdicts).toEqual(["stopped"]);
-    expect(terminal.rawModes).toEqual([true, false]);
+    expect(terminal.rawModes).toEqual(RAW_SESSION);
     expectTerminalGivenBack();
     // Nothing is shown or saved.
     expect(console.log).not.toHaveBeenCalled();
@@ -166,7 +171,7 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     expect(await runSskrCombine({ share: markedShares(SETTLED_MARK) })).toBe(CANCELLED);
     // The assessment ended without hearing it; the check after it did.
     expect(terminal.assessmentErrors).toEqual([]);
-    expect(terminal.rawModes).toEqual([true, false]);
+    expect(terminal.rawModes).toEqual(RAW_SESSION);
     expectTerminalGivenBack();
     expect(console.log).not.toHaveBeenCalled();
   });
@@ -178,8 +183,8 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     await expect(runSskrCombine({ share: markedShares(SETTLED_MARK) })).rejects.toThrow(
       "The assessment failed.",
     );
-    expect(terminal.modesAtAssessments).toEqual([[true]]);
-    expect(terminal.rawModes).toEqual([true, false]);
+    expect(terminal.modesAtAssessments).toEqual([RAW_ENTRY]);
+    expect(terminal.rawModes).toEqual(RAW_SESSION);
     expectTerminalGivenBack();
   });
 
@@ -197,11 +202,11 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     terminal.answers = [markedShares(SETTLED_MARK).join(";"), TEST_DATE];
     await runSskrCombine({ mode: "seedshift", "ask-secrets": true });
     // The shares are asked before the assessment, the dates after it; neither while it is watched.
-    expect(terminal.modesAtQuestions).toEqual([[], [true, false]]);
-    expect(terminal.modesAtAssessments).toEqual([[true]]);
+    expect(terminal.modesAtQuestions).toEqual([[], RAW_SESSION]);
+    expect(terminal.modesAtAssessments).toEqual([RAW_ENTRY]);
     expect(terminal.signals[0]?.aborted).toBe(false);
     // Then the search is watched on its own (share-repair.ts).
-    expect(terminal.rawModes).toEqual([true, false, true, false]);
+    expect(terminal.rawModes).toEqual([...RAW_SESSION, ...RAW_SESSION]);
     expectTerminalGivenBack();
     expect(console.log).toHaveBeenCalled();
   });

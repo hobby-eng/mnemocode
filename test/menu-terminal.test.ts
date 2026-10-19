@@ -12,6 +12,7 @@ import { askLine, choose, waitForEnter } from "../src/cli/terminal-choice.js";
 import { ErrorCatalog } from "../src/core/error-catalog.js";
 import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
 import { terminal, type Question } from "./helpers/keyed-terminal.js";
+import { ENCODE_FORM_LABELS } from "./helpers/encode-form-cases.js";
 import {
   answer,
   answerLine,
@@ -314,34 +315,53 @@ describe("going back from an entry of the start menu", () => {
     },
   );
 
-  // Every entry that asks questions: from Encode to the word table.
-  it.each(
-    MENU_ENTRIES.filter(
-      (entry) =>
-        entry.digit !== null && entry.digit >= 1 && entry.digit <= MENU_ENTRY_NAMES.table.digit,
-    ),
-  )("$digit $label: Escape at any question shows the menu under the same record", async (entry) => {
-    firstPath.clear();
-    const quit = await runEntry(undefined, []);
-    expect(quit.above).toHaveLength(1);
-    const pending: number[][] = [[]];
-    let backs = 0;
-    while (pending.length > 0) {
-      const answers = pending.pop()!;
-      const run = await runEntry(entry.digit ?? undefined, answers);
-      // The entry built its command line before a question for Escape came: nothing to check.
-      if (run.askings.length <= answers.length) continue;
-      backs += 1;
-      const path = run.askings.map((asking) => asking.question.question).join(" / ");
-      // No line of the task or of its answers is left above the menu, nor below it at the end.
-      expect(run.above, path).toEqual([quit.above[0], quit.above[0]]);
-      expect(run.screen, path).toEqual(quit.screen);
-      const next = run.askings[answers.length]!;
-      const count = answersOf(next.question, next.again, answers).length;
-      for (let place = 0; place < count; place += 1) pending.push([...answers, place]);
-    }
-    expect(backs).toBeGreaterThan(0);
-  });
+  // Encode's complete product exceeds one hosted test's limit. Cover Escape before its first
+  // answer separately, then every later question under each of the five first-form answers.
+  const entries = MENU_ENTRIES.filter(
+    (entry) =>
+      entry.digit !== null && entry.digit >= 1 && entry.digit <= MENU_ENTRY_NAMES.table.digit,
+  );
+  const walks = entries.flatMap((entry) =>
+    entry.digit === MENU_ENTRY_NAMES.encode.digit
+      ? [
+          { label: `${entry.label}: before choosing a form`, entry, prefix: [], firstOnly: true },
+          ...ENCODE_FORM_LABELS.map((form, index) => ({
+            label: `${entry.label}: ${form}`,
+            entry,
+            prefix: [index],
+            firstOnly: false,
+          })),
+        ]
+      : [{ label: entry.label, entry, prefix: [], firstOnly: false }],
+  );
+  it.each(walks)(
+    "$label: Escape at any question shows the menu under the same record",
+    async ({ entry, prefix, firstOnly }) => {
+      firstPath.clear();
+      const quit = await runEntry(undefined, []);
+      expect(quit.above).toHaveLength(1);
+      const pending: number[][] = [[...prefix]];
+      let backs = 0;
+      while (pending.length > 0) {
+        const answers = pending.pop()!;
+        const run = await runEntry(entry.digit ?? undefined, answers);
+        if (entry.digit === MENU_ENTRY_NAMES.encode.digit)
+          expect(run.askings[0]?.question.labels).toEqual(ENCODE_FORM_LABELS);
+        // The entry built its command line before a question for Escape came: nothing to check.
+        if (run.askings.length <= answers.length) continue;
+        backs += 1;
+        const path = run.askings.map((asking) => asking.question.question).join(" / ");
+        // No line of the task or of its answers is left above the menu, nor below it at the end.
+        expect(run.above, path).toEqual([quit.above[0], quit.above[0]]);
+        expect(run.screen, path).toEqual(quit.screen);
+        if (firstOnly) continue;
+        const next = run.askings[answers.length]!;
+        const count = answersOf(next.question, next.again, answers).length;
+        for (let place = 0; place < count; place += 1) pending.push([...answers, place]);
+      }
+      expect(backs).toBeGreaterThan(0);
+    },
+  );
 
   it("asks only the refused number of shares again, without it in the record", async () => {
     // Encode: word numbers, MnemoCode Seedshift, Other, then 1 share in all, which SSKR refuses.

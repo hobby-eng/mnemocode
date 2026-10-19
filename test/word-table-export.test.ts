@@ -108,7 +108,7 @@ describe("the guide's standalone Python arithmetic", () => {
       encoding: "utf8",
       timeout: 5000,
       stdio: "pipe",
-    });
+    }).replaceAll("\r\n", "\n");
   }
 
   it("keeps direct word numbers unchanged without dates", async () => {

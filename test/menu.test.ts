@@ -29,6 +29,7 @@ import {
   warningsAt,
 } from "./helpers/menu-paths.js";
 import { script } from "./helpers/menu-script.js";
+import { ENCODE_FORM_LABELS } from "./helpers/encode-form-cases.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/menu-script.js"));
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
@@ -57,14 +58,25 @@ describe("start menu", () => {
     ]);
   });
 
-  it.each(MENU_ENTRIES.map((entry) => [entry.label, entry] as const))(
-    "%s: every answer builds a command line that MnemoCode accepts",
-    async (_, entry) => {
+  // Split the large Encode product at its first answer, keeping every later path and the same
+  // 60-second limit per test. No fixture or validation is removed on slower hosted runners.
+  const walks = MENU_ENTRIES.flatMap((entry) =>
+    entry.digit === ENTRY.encode.digit
+      ? ENCODE_FORM_LABELS.map((form, index) => ({
+          label: `${entry.label}: ${form}`,
+          entry,
+          prefix: [index],
+        }))
+      : [{ label: entry.label, entry, prefix: [] }],
+  );
+  it.each(walks)(
+    "$label: every answer builds a command line that MnemoCode accepts",
+    async ({ entry, prefix }) => {
       script.lists = [];
       script.explanations = [];
       script.labels = [];
       script.cutNotes = [];
-      for (const run of await everyPath(entry)) {
+      for (const run of await everyPath(entry, prefix)) {
         const [command, ...rest] = run;
         expect(isCommandName(command!), typedCommand(run)).toBe(true);
         const parsed = parseArguments(rest);
@@ -81,6 +93,8 @@ describe("start menu", () => {
         ];
         if (secret.includes(command!)) expect(parsed["ask-secrets"], typedCommand(run)).toBe(true);
       }
+      if (entry.digit === ENTRY.encode.digit)
+        expect(script.asked[0]?.labels).toEqual(ENCODE_FORM_LABELS);
       // Lists and explanations fit a terminal of 80 columns unwrapped (TEXT_WIDTH), and no note of
       // a list is cut to fit.
       for (const line of [...script.lists.flat(), ...script.explanations.flat()])

@@ -66,7 +66,7 @@ function overlayOptions(directory: string) {
   };
 }
 
-const OVERLAY_PRELOAD = resolve("test/helpers/virtual-build.mjs");
+const OVERLAY_PRELOAD = pathToFileURL(resolve("test/helpers/virtual-build.mjs")).href;
 
 /** Runs the actual protected CLI with only the declared test faults and public file material. */
 function cliArguments(directory: string, ...args: string[]): string[] {

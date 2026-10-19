@@ -41,6 +41,11 @@ import { writeShare } from "../src/sskr/transport.js";
 
 const TEST_PHRASE =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+// Windows deliberately keeps raw mode between reads so that ConPTY cannot lose Ctrl+C.
+// Pausing and removing listeners still ends the watch; Unix also restores line mode immediately.
+const RAW_ENTRY = process.platform === "win32" ? [false, true] : [true];
+const RAW_SESSION = process.platform === "win32" ? [false, true] : [true, false];
+
 const CTRL_C = "\x03";
 const CTRL_BACKSLASH = "\x1c";
 const CTRL_Z = "\x1a";
@@ -76,9 +81,9 @@ class Keyboard extends EventEmitter {
 
 let keys = new Keyboard();
 
-/** Expects the terminal given back as watchForCtrlC found it: raw mode left, nothing read. */
+/** Expects an idle terminal with no listeners, retaining raw mode only on Windows. */
 function expectTerminalGivenBack(): void {
-  expect(terminal.rawModes.at(-1)).toBe(false);
+  expect(terminal.rawModes.at(-1)).toBe(process.platform === "win32");
   expect(keys.flowing).toBe(false);
   expect(keys.listenerCount("data")).toBe(0);
 }
@@ -104,7 +109,7 @@ afterEach(() => {
 describe("Ctrl+C during a long search", () => {
   it("is read as a key in raw mode; other keys are dropped unseen and wiped", async () => {
     const watch = watchForCtrlC();
-    expect(terminal.rawModes).toEqual([true]);
+    expect(terminal.rawModes).toEqual(RAW_ENTRY);
     expect(keys.flowing).toBe(true);
     const typed = keys.type("abandon\r");
     expect(watch.signal.aborted).toBe(false);
@@ -116,7 +121,7 @@ describe("Ctrl+C during a long search", () => {
     expectTerminalGivenBack();
     // A second stop changes nothing.
     await watch.stop();
-    expect(terminal.rawModes).toEqual([true, false]);
+    expect(terminal.rawModes).toEqual(RAW_SESSION);
   });
 
   it("takes Ctrl+\\ for Ctrl+C, so that no SIGQUIT ends the tool on the private screen", async () => {
@@ -191,7 +196,7 @@ describe("Ctrl+C during a long search", () => {
       }),
     ).rejects.toBe(failure);
     expectTerminalGivenBack();
-    expect(terminal.rawModes).toEqual([true, false, true, false]);
+    expect(terminal.rawModes).toEqual([...RAW_SESSION, ...RAW_SESSION]);
   });
 });
 
@@ -219,7 +224,7 @@ describe("Ctrl+C during a long search", () => {
     });
     setTimeout(() => keys.type(CTRL_C), 10);
     expect(await search).toBe(CANCELLED);
-    expect(terminal.rawModes).toEqual([true, false]);
+    expect(terminal.rawModes).toEqual(RAW_SESSION);
     expectTerminalGivenBack();
   });
 
@@ -228,7 +233,7 @@ describe("Ctrl+C during a long search", () => {
     const search = runRecoverWord({ mnemonic: `? ? ${TEST_PHRASE.split(" ").slice(2).join(" ")}` });
     setTimeout(() => keys.type(CTRL_C), 10);
     expect(await search).toBe(CANCELLED);
-    expect(terminal.rawModes).toEqual([true, false]);
+    expect(terminal.rawModes).toEqual(RAW_SESSION);
     expectTerminalGivenBack();
   });
 
@@ -260,7 +265,7 @@ describe("Ctrl+C during a long search", () => {
     // The question drops the keys typed ahead itself (choose, replaced here); the watch takes raw
     // mode only after it.
     expect(terminal.modesAtQuestions).toEqual([[]]);
-    expect(terminal.rawModes).toEqual([true, false]);
+    expect(terminal.rawModes).toEqual(RAW_SESSION);
     expectTerminalGivenBack();
   });
 });
