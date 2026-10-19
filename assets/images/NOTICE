@@ -1,0 +1,21 @@
+Card artwork
+
+The twelve images of the card designs in this folder were made for MnemoCode
+with OpenAI's image generation in ChatGPT, from prompts that asked for images
+like reference photographs found on the web; no reference image is included.
+MnemoCode distributes them under its MIT license (LICENSE at the root of the
+repository).
+
+SHA-256 of each image:
+  4bfddabbf33c260f6e03c422ae4ff199a9a894d97c40d3e7d070b53807c5d481  business-architect-v1.png
+  1790643225ce3534e42796f37b9a59893f808f2f2a510456a201856a58268c2a  business-contact-v1.png
+  233526f85e90dc9a64fafd19ca275bf6079dfa89229e5d328a476fce229834b9  business-curves-v1.png
+  8d86f1b346fdb589248407d9c9ac2b7192706320a50e07d6c71746d11f48c991  business-diagonal-v1.png
+  461011832d3a5faf220917ca1f0e03a5630accc44f29b9629857b9892a5d022f  business-estate-v1.png
+  943e9ec17582ea66a7bee2ffbb020b455e4a0da5c5874f31cdb842f1aec6bbef  business-facets-v1.png
+  645adfbbf2a5f71d9829273c9eb8e3a4ef619eec63e74570f1510069ab6029c1  business-it-v1.png
+  882f379d90a06faa160222de7c483eb7169698660b4044a2a11c21c91f28c73a  material-enclosure.jpg
+  1d4a3aef87582305113b37d871700249df29e8cdde7768aac9d5968c17f8ffde  material-kitchen.jpg
+  df84b6bafa45f1f849f84da6e677e291033e522ea8d81d555f45a94d689339cf  material-switch.jpg
+  1513cb1d4d6f9b844728128e6e309305e9d47752d4ef093767322fdbac6c11e2  material-tile.jpg
+  35b8e0d4cd34fb3228d1bf922e043388d677ffe73ba55bcc3d16f3360b0f6993  material-vehicle.jpg

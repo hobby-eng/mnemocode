@@ -65,6 +65,10 @@ Latin diacritics, combining marks and typographic punctuation as well as Cyrilli
 
 The world map on collection sheets is drawn from the Natural Earth land polygons at 1:110 million scale, stored as `assets/maps/ne_110m_land.geojson`. Natural Earth map data is in the public domain; see `assets/maps/NOTICE`.
 
+## Card artwork
+
+The images of the card designs in `assets/images` were made for MnemoCode with OpenAI's image generation in ChatGPT, from prompts that asked for images like reference photographs found on the web; no reference image is included. MnemoCode distributes them under its MIT license; `assets/images/NOTICE` lists each image with its SHA-256.
+
 ## PDF export dependencies
 
 Cards and sheets are drawn with the MIT-licensed `pdf-lib` (1.17.1) and

@@ -1,8 +1,8 @@
 // Assembles the license notices of a single executable: MnemoCode's own license and notices, the
 // Node.js runtime that the executable contains, every npm package that esbuild bundled into it,
 // the SSKR engine with the license texts of every crate it links (sskr-licenses.mjs), and the
-// bundled fonts and map data. MIT, the BSD licenses, Apache-2.0 and Blue Oak ask for their notices
-// to travel with a binary. The build fails without the Node.js license; a
+// bundled fonts, map data and card artwork. MIT, the BSD licenses, Apache-2.0 and Blue Oak ask
+// for their notices to travel with a binary. The build fails without the Node.js license; a
 // package that publishes no license file is named with the license its package.json declares.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -27,7 +27,7 @@ const PROJECT_FILES = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"];
 const SSKR_FILES = ["LICENSE", "NOTICE.md", "UPSTREAM_NOTICES.md", "LINKED_LICENSES.txt"].map(
   (file) => `${SSKR_ENGINE_FOLDER}${file}`,
 );
-const ASSET_FILES = ["fonts/DejaVuSans-NOTICE", "maps/NOTICE"].map(
+const ASSET_FILES = ["fonts/DejaVuSans-NOTICE", "maps/NOTICE", "images/NOTICE"].map(
   (file) => `${ASSETS_FOLDER}${file}`,
 );
 
@@ -96,11 +96,12 @@ export function executableNotices({ root, name, version, metafile }) {
     `License notices for ${name} (MnemoCode ${version})\n\n` +
       "This file travels with the executable. The executable contains MnemoCode, the Node.js " +
       "runtime it was built with, the npm packages listed below, the SSKR engine compiled to " +
-      "WebAssembly, and bundled fonts and map data. Each part keeps its own license.\n",
+      "WebAssembly, and bundled fonts, map data and card artwork. Each part keeps its own " +
+      "license.\n",
     heading("MnemoCode") + PROJECT_FILES.map(read).join("\n"),
     heading(`Node.js ${process.version}`) + nodeLicense(),
     ...packages.map((item) => item.text),
     heading("SSKR engine (sskr-wasm)") + SSKR_FILES.map(read).join("\n"),
-    heading("Fonts and map data") + ASSET_FILES.map(read).join("\n"),
+    heading("Fonts, map data and card artwork") + ASSET_FILES.map(read).join("\n"),
   ].join("\n");
 }

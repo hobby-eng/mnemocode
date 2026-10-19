@@ -289,4 +289,4 @@ See the [architecture](docs/ARCHITECTURE.md) and [audit index](docs/audits/READM
 
 ## Provenance and license
 
-MnemoCode is an independent TypeScript implementation, not an official fork of Seedshift or BIP39Colors. Its source is MIT licensed. [NOTICE](NOTICE) attributes the compatible formats to [Seedshift](https://github.com/mifunetoshiro/Seedshift) (MIT) and [BIP39Colors](https://github.com/EnteroPositivo/bip39colors) (CC BY 4.0). [Third-party notices](THIRD_PARTY_NOTICES.md) record dependencies and word-list origins.
+MnemoCode is an independent TypeScript implementation, not an official fork of Seedshift or BIP39Colors. Its source is MIT licensed. [NOTICE](NOTICE) attributes the compatible formats to [Seedshift](https://github.com/mifunetoshiro/Seedshift) (MIT) and [BIP39Colors](https://github.com/EnteroPositivo/bip39colors) (CC BY 4.0). [Third-party notices](THIRD_PARTY_NOTICES.md) record dependencies, word-list origins and the origin of the card artwork.
