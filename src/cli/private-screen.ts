@@ -87,12 +87,15 @@ export async function withPrivateScreen<T>(
   if (!privateScreenAvailable()) return body();
   // Written raw: NO_COLOR removes colours, not the screen switch.
   process.stderr.write(ENTER_ALTERNATE_SCREEN);
-  PrivateSteps.open((warnings) => {
-    process.stderr.write(CLEAR_SCREEN);
-    console.error(`${headingLine(process.stderr, title)}\n`);
-    for (const warning of warnings)
+  PrivateSteps.open(
+    () => {
+      process.stderr.write(CLEAR_SCREEN);
+      console.error(`${headingLine(process.stderr, title)}\n`);
+    },
+    (warning) => {
       for (const line of noticeLines(warning, "warning")) console.error(line);
-  });
+    },
+  );
   const interrupted = (): void => {
     process.stderr.write(LEAVE_ALTERNATE_SCREEN);
     process.exit(CANCELLED_EXIT_CODE);

@@ -340,7 +340,7 @@ export async function choose<T>(
       erase();
       writeAnswer(options.label, defined(choices[index]).label);
       // The lines kept for this question on the private screen go with its answer.
-      PrivateSteps.answered();
+      PrivateSteps.questionEnded();
       return defined(choices[index]).value;
     };
     let drawn = draw();
@@ -349,6 +349,7 @@ export async function choose<T>(
       if (key.kind === "cancel") return CANCELLED;
       if (key.kind === "back") {
         erase();
+        PrivateSteps.questionEnded();
         return undefined;
       }
       if (key.kind === "enter") return answer(selected);
@@ -468,6 +469,8 @@ export async function askLine(
   let warning = options.warning;
   for (;;) {
     const outcome = await askLineOnce(shown, label, options, warning);
+    // The lines kept for this question on the private screen go once it is answered or left.
+    if (outcome.kind === "back" || outcome.kind === "answer") PrivateSteps.questionEnded();
     if (outcome.kind === "back") return undefined;
     if (outcome.kind === "cancelled") return CANCELLED;
     if (outcome.kind === "answer") return outcome.answer;

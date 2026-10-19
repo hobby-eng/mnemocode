@@ -190,13 +190,13 @@ function showNotices(notices: Notices): void {
 
 /**
  * A screen of the new backup: the phrase of the old one leaves the private screen, and the notices
- * of its confirmation stay at the top. Without a private screen nothing is cleared, and the
- * notices were shown already.
+ * of its confirmation stay under the title of each step screen, above a warning about the question
+ * asked. Without a private screen nothing is cleared, and the notices were shown already.
  */
 function newBackupScreen(notices: Notices): void {
   if (!clearPrivateScreen()) return;
   PrivateSteps.keep(() => {
-    terminalPart("New backup", true);
+    terminalPart("New backup", true, "stderr");
     showNotices(notices);
   }, "page");
 }

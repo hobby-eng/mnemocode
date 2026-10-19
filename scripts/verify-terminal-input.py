@@ -44,7 +44,13 @@ It checks that
 """
 
 import sys
-from terminal_context_checks import check_fingerprint_before_dates, check_question_reason_kept
+from terminal_context_checks import (
+    check_context_ends_at_escape,
+    check_fingerprint_before_dates,
+    check_fingerprint_before_dates_in_menu,
+    check_new_backup_heading_on_screen,
+    check_question_reason_kept,
+)
 from terminal_result_checks import check_private_result_pages
 
 from terminal_menu_checks import (
@@ -103,7 +109,10 @@ def main():
     check_re_encode_last_word_after_wrong_date()
     check_decode_dates_asked_again()
     check_fingerprint_before_dates()
+    check_fingerprint_before_dates_in_menu()
     check_question_reason_kept()
+    check_context_ends_at_escape()
+    check_new_backup_heading_on_screen()
     check_decode_share_lines()
     check_file_or_text_input()
     check_restore_share_asked_again()

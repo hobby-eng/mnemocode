@@ -31,7 +31,10 @@ beforeEach(() => {
   process.stderr.columns = 80;
   process.stderr.rows = 24;
   Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
-  PrivateSteps.open(() => undefined);
+  PrivateSteps.open(
+    () => undefined,
+    () => undefined,
+  );
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(console, "error").mockImplementation((line: unknown) => {
     frames.push(String(line));

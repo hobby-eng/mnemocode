@@ -39,9 +39,10 @@ ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN = "\x1b[?1049h", "\x1b[?1049l"
 class Session:
     """MnemoCode started in a pseudo-terminal; `output` collects everything it has written."""
 
-    def __init__(self, arguments=(), folder=None, colour=False):
+    def __init__(self, arguments=(), folder=None, colour=False, stdout_file=None):
         """Starts MnemoCode with `arguments` in `folder`, or in the current folder; without
-        colour (NO_COLOR) unless `colour`, as a terminal shows it by default."""
+        colour (NO_COLOR) unless `colour`, as a terminal shows it by default. With `stdout_file`,
+        standard output goes to that file instead of the terminal (POSIX only)."""
         self.output = ""
         # Where the last text waited for ends; the next wait looks only after it.
         self.seen = 0
@@ -73,6 +74,9 @@ class Session:
             if self.pid == 0:
                 if folder is not None:
                     os.chdir(folder)
+                if stdout_file is not None:
+                    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                    os.dup2(os.open(stdout_file, flags, 0o600), 1)
                 os.execvpe(command[0], command, environment)
             size = struct.pack("HHHH", TERMINAL_ROWS, TERMINAL_COLUMNS, 0, 0)
             fcntl.ioctl(self.fd, termios.TIOCSWINSZ, size)
@@ -269,8 +273,9 @@ class Screen:
             raise AssertionError(f"unexpected sequence ESC [ {parameters}{final}")
 
 
-def assert_private_result_visible(session, markers):
-    """Checks the current private frame, including erases and scrolling, rather than its history.
+def assert_private_result_visible(session, markers, absent=(), once=()):
+    """Checks the current private frame, including erases and scrolling, rather than its history:
+    each of `markers` is on it, none of `absent`, and each of `once` exactly once.
 
     ConPTY redraws its own screen and may omit the raw switch/clear sequences; there the regular
     terminal tests check the output and the platform-neutral screen tests check frame contents.
@@ -284,6 +289,11 @@ def assert_private_result_visible(session, markers):
     frame = " ".join(" ".join(Screen(TERMINAL_COLUMNS, text, TERMINAL_ROWS).lines()).split())
     for marker in markers:
         assert marker in frame, f"the current private frame lost {marker!r}"
+    for marker in absent:
+        assert marker not in frame, f"the current private frame still shows {marker!r}"
+    for marker in once:
+        count = frame.count(marker)
+        assert count == 1, f"the current private frame shows {marker!r} {count} times"
 
 
 def read_to_end(session):

@@ -139,8 +139,8 @@ export function fromFile(args: ParsedArguments): boolean {
  */
 export function showEncodedFingerprint(fingerprint: string | undefined): void {
   if (fingerprint === undefined) return;
-  // Kept on the screen of the next question, the dates: it is shown so that a mistyped code is
-  // seen before any date is typed.
+  // Kept on the screen of the next question, the dates unless they were typed before: it is shown
+  // so that a mistyped code is seen before any date is typed.
   PrivateSteps.keep(() =>
     reportFingerprint(
       PHRASE_WORDS.encodedFingerprint,
@@ -277,6 +277,8 @@ export async function askEncodedBackup(question: BackupQuestion): Promise<ReadBa
     const checked = await checkedBackup(text, question, source);
     if (checked === CANCELLED) return CANCELLED;
     if (!("again" in checked)) return checked;
+    // What was kept for the questions about these codes, such as their format, goes with them.
+    PrivateSteps.questionEnded();
     problem = checked.again;
   }
 }

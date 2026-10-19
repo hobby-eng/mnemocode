@@ -128,7 +128,10 @@ it.each(CONTROLS)(
   async (_, raw, shown) => {
     const path = `public-${raw}-record.txt`;
     const written: string[] = [];
-    PrivateSteps.open((warnings) => output.push(...warnings));
+    PrivateSteps.open(
+      () => undefined,
+      (warning) => output.push(warning),
+    );
     for (const code of ["EACCES", undefined]) {
       keyboard.bytes = [0x1b];
       const failure = new Error(`Synthetic callback failure at ${path}`);
@@ -186,7 +189,10 @@ it.each(CONTROLS)(
 );
 
 it("keeps ordinary path spelling and the established save-failure text", async () => {
-  PrivateSteps.open(() => undefined);
+  PrivateSteps.open(
+    () => undefined,
+    () => undefined,
+  );
   keyboard.bytes = [0x1b];
   await saveWithRetry({
     what: "The record",

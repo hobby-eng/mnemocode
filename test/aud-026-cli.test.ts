@@ -98,8 +98,11 @@ it("refuses conflicting table selectors before writing any rows", async () => {
 });
 
 it("retains startup warnings and the current step warning until the private command ends", () => {
-  const redraws: unknown[] = [];
-  PrivateSteps.open((warning) => redraws.push(warning));
+  const redraws: string[][] = [];
+  PrivateSteps.open(
+    () => redraws.push([]),
+    (warning) => redraws.at(-1)?.push(warning),
+  );
   PrivateSteps.remember("Public swap warning");
   PrivateSteps.remember("Public cloud warning");
   PrivateSteps.remember("Public cloud warning");

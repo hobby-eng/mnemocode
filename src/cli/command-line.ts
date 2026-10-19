@@ -15,7 +15,7 @@ import { showProtection, withPrivateScreen } from "./private-screen.js";
 import { assertProtected, dropUnneeded } from "./protection.js";
 import { swapWarning } from "./swap-check.js";
 import { warnOfCloudCopies } from "./cloud-folders.js";
-import { terminalMore, terminalNotice } from "./terminal.js";
+import { terminalWarningWithMore } from "./terminal.js";
 import { type ParsedArguments } from "./arguments.js";
 import { runPreview } from "./preview-command.js";
 import { helpNames, printCommandHelp, printNamedHelp, printUsage } from "./usage.js";
@@ -143,10 +143,7 @@ async function withSecrets(
   return withPrivateScreen<undefined>(async () => {
     showProtection();
     const swap = swapWarning();
-    if (swap !== undefined) {
-      terminalNotice(swap, "warning");
-      terminalMore("unencrypted-swap");
-    }
+    if (swap !== undefined) terminalWarningWithMore(swap, "unencrypted-swap");
     // The outputs are settled before the warnings about where files go, which then name the files
     // as they will be saved; a command reports its own renamed names, and any left are reported
     // still on the private screen.

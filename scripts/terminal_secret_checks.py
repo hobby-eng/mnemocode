@@ -229,12 +229,13 @@ def check_re_encode_menu():
         session.wait_for(FINGERPRINT_FILTER)
         session.wait_for("The fingerprint matches: the seed phrase is accepted, not proven.")
         session.wait_for("Which form should the seed phrase take?")
-        # On the screen itself, not only written before the question cleared it (AUD-037-UI001).
-        assert_private_result_visible(
-            session, ("New backup", "The fingerprint matches: the seed phrase is accepted")
-        )
+        # On the screen itself, not only written before the question cleared it (AUD-037-UI001),
+        # and the warning once, not also as a warning retained apart.
+        kept = ("New backup", "The fingerprint matches: the seed phrase is accepted")
+        assert_private_result_visible(session, kept, once=(FINGERPRINT_FILTER,))
         session.type("2")
         session.wait_for("Use Seedshift?")
+        assert_private_result_visible(session, kept, once=(FINGERPRINT_FILTER,))
         session.type("2")
         session.wait_for("Split it into Shamir shares?")
         session.type("1")
@@ -261,6 +262,7 @@ def check_re_encode_menu():
 # A company name that each answer takes (up to 100 characters) and that does not fit on share
 # cards of the IT design, which Encode refuses once every answer is given (AUD-022-UI001).
 LONG_COMPANY = "Northern Atlantic Consolidated Engineering and Logistics Holdings"
+CARD_REFUSAL = "Company is too long to fit legibly on the card"
 
 
 def check_re_encode_answer_refused():
@@ -303,9 +305,15 @@ def check_re_encode_answer_refused():
         session.type("1")
         # The refusal, then the same questions under the confirmed phrase: nothing is typed again.
         session.wait_for("You recognised the seed phrase: it is confirmed.")
-        session.wait_for("Company is too long to fit legibly on the card")
+        session.wait_for(CARD_REFUSAL)
         session.wait_for("Which form should the seed phrase take?")
-        # Escape at the first question goes back to the phrase, and Stop to the menu.
+        # The refusal stays on the screens of the questions asked again, after a chosen answer
+        # too, until the new backup is made.
+        assert_private_result_visible(session, (CARD_REFUSAL,))
+        session.type("3")
+        session.wait_for("Use Seedshift?")
+        assert_private_result_visible(session, (CARD_REFUSAL,))
+        # Escape goes back to the phrase, and Stop to the menu.
         session.type(ESCAPE)
         session.wait_for("Is this the seed phrase to re-encode?")
         session.type("5")

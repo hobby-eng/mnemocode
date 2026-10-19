@@ -26,11 +26,13 @@ keyedQuestions();
 beforeEach(() => {
   terminal.atTerminal = true;
   vi.stubEnv("NO_COLOR", "1");
-  PrivateSteps.open((warnings) => {
-    process.stderr.write(CLEAR_SCREEN);
-    console.error("MnemoCode · encode");
-    for (const warning of warnings) console.error(warning);
-  });
+  PrivateSteps.open(
+    () => {
+      process.stderr.write(CLEAR_SCREEN);
+      console.error("MnemoCode · encode");
+    },
+    (warning) => console.error(warning),
+  );
 });
 afterEach(() => {
   PrivateSteps.close();

@@ -357,6 +357,17 @@ export function terminalMore(anchor: string): void {
   console.error(moreLine(anchor));
 }
 
+/**
+ * A warning and the README section that explains it (terminalMore). On the private screen both
+ * stay on every step screen of the command, as a warning alone does (PrivateSteps.remember).
+ */
+export function terminalWarningWithMore(message: string, anchor: string): void {
+  PrivateSteps.keep(() => {
+    terminalNotice(message, "warning");
+    terminalMore(anchor);
+  }, "command");
+}
+
 /** The line of terminalMore, grey; not wrapped: a link must stay whole to be clicked or copied. */
 export function moreLine(anchor: string): string {
   return terminalPaint("stderr", STYLE.muted, `More: ${readmeLink(anchor)}`);

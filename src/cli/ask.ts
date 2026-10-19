@@ -274,7 +274,10 @@ async function askUntil<T>(
     const redrawn = PrivateSteps.begin();
     if (warning !== undefined && !redrawn) terminalNotice(warning, "warning");
     const answer = await turn();
-    if (answer === "back") return undefined;
+    if (answer === "back") {
+      PrivateSteps.questionEnded();
+      return undefined;
+    }
     if (answer === CANCELLED) return CANCELLED;
     if ("warning" in answer) warning = answer.warning;
     else
