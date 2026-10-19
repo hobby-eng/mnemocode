@@ -2,12 +2,12 @@
 // is in what was saved. The command line and a page say it alike, each adding its own words about
 // the file it saved.
 //
-// Host-neutral and without PDF: the shares carry the set's threshold, and SetTopology owns the
-// member identity used to count repeated copies once.
+// Host-neutral and without PDF: the shares carry the set's threshold, set-topology.ts owns the rule
+// that counts an exact copy of a share once, and the conflicts that refuse shares of no one set.
 
 import { PHRASE_WORDS } from "../core/masking.js";
-import { Share, type ShareInfo } from "../sskr/transport.js";
-import { SET_CONFLICT_TEXTS, SetTopology } from "../sskr/set-topology.js";
+import { Share } from "../sskr/transport.js";
+import { SET_CONFLICT_TEXTS, SetTopology, withoutCopies } from "../sskr/set-topology.js";
 import { counted } from "../core/search-plan.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -15,8 +15,8 @@ import { ErrorCatalog } from "../core/error-catalog.js";
 const ERRORS = new ErrorCatalog("export.sskr-keeping-text", {
   "there-no-shares-keep": () => "There are no shares to keep.",
   "shares-not-one-set": (conflict: string) => `${conflict} Only the shares of one set are kept.`,
-  "packaging-unknown": () =>
-    "Name how the shares were saved: file, folder, files, folders or pages.",
+  "packaging-unknown": (packagings: string) =>
+    `Name how the shares were saved, as one of: ${packagings}.`,
 });
 
 /** How the cards or records of the shares were saved. */
@@ -57,33 +57,34 @@ function singleGroupQuorum(count: number, threshold: number, goal: string, noun:
 /**
  * How many of `records`, UR records of one set, restore the phrase: read from the shares, whose
  * threshold and groups they carry. Cards may print fewer shares than restore, such as one share
- * printed again, and a set may have several groups. Shares of another set, or that give their
- * group another threshold, are refused: no quorum holds for them (AUD-037-API007).
+ * printed again, and a set may have several groups. An exact copy counts once; shares of another
+ * set, two different shares of one member, or a group with two thresholds are refused, as a
+ * restore refuses them: no quorum holds for them (AUD-037-API007).
  */
 function quorum(records: readonly string[], masked: boolean): string {
   const goal = masked ? MASKED_GOAL : "for recovery";
-  // Each member once, of its own set, so that a copy printed again counts as one share.
-  const members = new Map<string, ShareInfo>();
-  for (const record of records) {
-    using share = Share.read(record);
-    const { info } = share;
-    members.set(`${SetTopology.setOf(info)}/${SetTopology.memberOf(info)}`, info);
+  const shares: Share[] = [];
+  try {
+    for (const record of records) shares.push(Share.read(record));
+    const kept = withoutCopies(shares.map((share, place) => ({ place, ur: share.ur })));
+    const infos = kept.map(({ place }) => defined(shares[place]).info);
+    const conflict = SetTopology.firstConflict(infos);
+    if (conflict !== undefined)
+      throw ERRORS.create("shares-not-one-set", [SET_CONFLICT_TEXTS[conflict.kind].refusal]);
+    const info = defined(infos[0]);
+    if (info.groupCount > 1)
+      return `These shares belong to ${info.groupCount} groups, each needing enough of its own ${goal}`;
+    const repeated = infos.length < records.length;
+    const text = singleGroupQuorum(
+      infos.length,
+      info.memberThreshold,
+      goal,
+      repeated ? "distinct share" : "share",
+    );
+    return repeated ? `${text}; repeated copies count as one share` : text;
+  } finally {
+    for (const share of shares) share.wipe();
   }
-  const infos = [...members.values()];
-  const conflict = SetTopology.firstConflict(infos);
-  if (conflict !== undefined)
-    throw ERRORS.create("shares-not-one-set", [SET_CONFLICT_TEXTS[conflict.kind].refusal]);
-  const info = defined(infos[0]);
-  if (info.groupCount > 1)
-    return `These shares belong to ${info.groupCount} groups, each needing enough of its own ${goal}`;
-  const repeated = members.size < records.length;
-  const text = singleGroupQuorum(
-    members.size,
-    info.memberThreshold,
-    goal,
-    repeated ? "distinct share" : "share",
-  );
-  return repeated ? `${text}; repeated copies count as one share` : text;
 }
 
 /**
@@ -97,6 +98,7 @@ export function shareKeepingNote(
   masked: boolean,
 ): string {
   if (records.length === 0) throw ERRORS.create("there-no-shares-keep", []);
-  if (!Object.hasOwn(LAYOUTS, packaging)) throw ERRORS.create("packaging-unknown", []);
+  if (!Object.hasOwn(LAYOUTS, packaging))
+    throw ERRORS.create("packaging-unknown", [Object.keys(LAYOUTS).join(", ")]);
   return `${quorum(records, masked)}; ${LAYOUTS[packaging]}. Store the shares apart.`;
 }

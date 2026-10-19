@@ -3,6 +3,7 @@ import { shareKeepingNote } from "../src/export/sskr-keeping-text.js";
 import { sskrSetVector, sskrVector } from "../src/sskr/known-answers.js";
 import { PHRASE_WORDS } from "../src/core/masking.js";
 import { defined } from "../src/core/defined.js";
+import { wrongValue } from "./helpers/shares.js";
 
 describe("Keeping distinct SSKR members", () => {
   const [first, second, third] = sskrSetVector.shares;
@@ -38,8 +39,13 @@ describe("Keeping distinct SSKR members", () => {
     expect(() => shareKeepingNote([first, defined(sskrVector.shares[0])], "files", false)).toThrow(
       expect.objectContaining({ code: "export.sskr-keeping-text.shares-not-one-set" }),
     );
-    expect(() => shareKeepingNote([first, second], "boxes" as never, false)).toThrow(
-      expect.objectContaining({ code: "export.sskr-keeping-text.packaging-unknown" }),
+    // Two different shares of one member are no copies: no quorum holds for them.
+    expect(() => shareKeepingNote([first, wrongValue(first), second], "files", false)).toThrow(
+      expect.objectContaining({ code: "export.sskr-keeping-text.shares-not-one-set" }),
     );
+    for (const packaging of ["boxes", "toString"])
+      expect(() => shareKeepingNote([first, second], packaging as never, false)).toThrow(
+        expect.objectContaining({ code: "export.sskr-keeping-text.packaging-unknown" }),
+      );
   });
 });
