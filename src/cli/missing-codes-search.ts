@@ -13,6 +13,7 @@ import {
 import type { DatesAnswer } from "../core/date-search.js";
 import type { EncodedBackup } from "../core/encoded-backup.js";
 import {
+  foundAmongOthers,
   MISSING_CODES_TEXTS,
   MissingCodesSearch,
   type MissingCodesResult,
@@ -36,7 +37,7 @@ import {
   terminalNotice,
   terminalStatus,
 } from "./terminal.js";
-import { counted, counting } from "../core/search-plan.js";
+import { counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
 import { defined } from "../core/defined.js";
@@ -102,11 +103,7 @@ export function reportFound(
   terminalStatus(`${MissingCodesSearch.placesText(codes)} found:`, backup.text());
   if (foundDates !== undefined) terminalStatus("Dates found:", foundDates);
   // Other codes with other dates give the same phrase: those found need not be those written.
-  if (others !== undefined)
-    terminalNotice(
-      `${counted(others + 1, "set")} of codes and dates give this phrase; those found are one of them, so keep the dates you used.`,
-      "warning",
-    );
+  if (others !== undefined) terminalNotice(foundAmongOthers(others), "warning");
   else terminalHint(MISSING_CODES_TEXTS.correct);
 }
 

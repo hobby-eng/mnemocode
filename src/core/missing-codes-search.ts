@@ -75,6 +75,15 @@ export const MISSING_CODES_TEXTS = Object.freeze({
   list: "Each line: the codes, the seed phrase they give, and its fingerprint with an empty BIP39 passphrase. Compare the fingerprint with your wallet.",
 });
 
+/**
+ * What a host says of a find whose phrase `others` other sets of codes and dates give too
+ * (MissingCodesFound.others), instead of MISSING_CODES_TEXTS.correct: the codes and dates found
+ * need not be those written.
+ */
+export function foundAmongOthers(others: number): string {
+  return `${counted(others + 1, "set")} of codes and dates give this phrase; those found are one of them, so keep the dates you used.`;
+}
+
 /** One candidate of a listed search: the codes, the phrase they give, and its fingerprint. */
 export interface MissingCodesRow {
   readonly codes: string;
