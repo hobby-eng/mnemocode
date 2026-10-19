@@ -611,10 +611,14 @@ export async function readLine(
       // Any other control character is left out: shown, it would move the cursor.
     }
     answer.moveToEnd();
-    return answer.text();
-  } catch (error) {
-    if (error instanceof TypeError) throw new UnusableAnswerError(NOT_UTF8);
-    throw error;
+    try {
+      return answer.text();
+    } catch (error) {
+      // Only the decoding of the answer refuses bytes that are not UTF-8, with a TypeError of its
+      // own; any other failure of the line is passed on as it is (refusedLine).
+      if (error instanceof TypeError) throw new UnusableAnswerError(NOT_UTF8);
+      throw error;
+    }
   } finally {
     try {
       answer.wipe();

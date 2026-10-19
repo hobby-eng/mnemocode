@@ -1,6 +1,7 @@
 // AUD-011: each rule that the audit found written more than once now has one owner. These tests
 // check the places that used to disagree, through every reader that now shares the rule.
 
+import { hexUnits, UNICODE_CODE_DIGITS } from "../src/core/code-text.js";
 import { describe, expect, it } from "vitest";
 import {
   BIP39_ENTROPY_BYTES,
@@ -157,9 +158,11 @@ describe("AUD-011-ARC002, ARC003, ARC020: the color form has one decoder and der
     expect(unicodeToColors(text)).toEqual(colors);
     const oversized = "EA3EE000" + text.slice(8);
     expect(() => unicodeToColors(oversized)).toThrow("outside the #RRGGBB range");
-    expect(() =>
-      MissingCodes.read(oversized.slice(0, -8) + "????????", "colors-unicode", "seedshift"),
-    ).toThrow("outside the #RRGGBB range");
+    // Marked, the last color unread: its two codes are ? each, apart as marks are written.
+    const marked = [...hexUnits(oversized, UNICODE_CODE_DIGITS)!.slice(0, -2), "????", "????"];
+    expect(() => MissingCodes.read(marked.join(" "), "colors-unicode", "seedshift")).toThrow(
+      "outside the #RRGGBB range",
+    );
   });
 });
 

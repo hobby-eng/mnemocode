@@ -306,6 +306,24 @@ describe("hidden line", () => {
   });
 });
 
+describe("failures while a line is read", () => {
+  it("pass on a failure that is not of the answer's bytes (AUD-037-API005)", async () => {
+    const failing = (): never => {
+      throw new TypeError("Synthetic fault of the host.");
+    };
+    // Escape alone, which nothing follows, goes back, and the host's step fails there.
+    const options = {
+      echo: true,
+      escapeGoesBack: true,
+      moreWithin: async () => false,
+      onBack: failing,
+    };
+    await expect(readLine(typed("ab\x1b"), options)).rejects.toThrow(
+      "Synthetic fault of the host.",
+    );
+  });
+});
+
 describe("rows of output", () => {
   it("counts a tab to the next stop of eight columns, then wraps the line", () => {
     // "1" and a tab take 8 columns: 72 more characters fill a row of 80, 73 wrap onto a second.

@@ -47,6 +47,8 @@ import {
   wordPositionPlacements,
   markedColorSymbols,
   RGB_HEX_DIGITS,
+  RGB_REFERENCE_COUNTS,
+  COLOR_COUNTS_TEXT,
 } from "./colors.js";
 import { EncodedBackup, type EncodedFormat } from "./encoded-backup.js";
 import { Masking } from "./masking.js";
@@ -79,6 +81,8 @@ const ERRORS = new ErrorCatalog("core.missing-codes", {
   "codes-cannot-marked-form": () => "These codes cannot be marked in this form.",
   "codes-seed-phrase": (value0: string, value1: string) =>
     `These are ${value0} codes; a seed phrase has ${value1}.`,
+  "colors-seed-phrase": (count: string, counts: string) =>
+    `These are ${count} colors; a seed phrase has ${counts}.`,
   "no-code-marked-mark-each-code-cannot-read": () =>
     "No code is marked: mark each code that cannot be read with ?.",
 });
@@ -143,6 +147,12 @@ function unicodeColors(text: string): (string | undefined)[] {
   const points = markedColorSymbols(text) ?? hexUnits(text, UNICODE_CODE_DIGITS);
   if (points === undefined || points.length % COLOR_UNICODE_POINTS_PER_COLOR !== 0)
     throw ERRORS.create("unicode-colors-refused", [withJoinedMarksHint(COLOR_UNICODE_PAIRS, text)]);
+  // A count of colors that no phrase has is refused before any color is read (AUD-037-SEC008).
+  if (!RGB_REFERENCE_COUNTS.includes(points.length / COLOR_UNICODE_POINTS_PER_COLOR))
+    throw ERRORS.create("colors-seed-phrase", [
+      `${points.length / COLOR_UNICODE_POINTS_PER_COLOR}`,
+      COLOR_COUNTS_TEXT,
+    ]);
   return Array.from({ length: points.length / COLOR_UNICODE_POINTS_PER_COLOR }, (_, color) => {
     const pair = points.slice(
       color * COLOR_UNICODE_POINTS_PER_COLOR,
@@ -153,6 +163,16 @@ function unicodeColors(text: string): (string | undefined)[] {
     const [high, low] = pair.map((code) => Number.parseInt(code, 16));
     return colorOfUnicodePair(defined(high), defined(low));
   });
+}
+
+/**
+ * `units`, one a word, when there are as many as a seed phrase has words; refused before any of
+ * them is read, so that a long text costs no reading of its places (AUD-037-SEC008).
+ */
+function counted<T>(units: readonly T[]): readonly T[] {
+  if (!isBip39WordCount(units.length))
+    throw ERRORS.create("codes-seed-phrase", [`${units.length}`, `${WORD_COUNTS_TEXT}`]);
+  return units;
 }
 
 /**
@@ -177,9 +197,14 @@ function colorPlaces(colors: readonly (string | undefined)[]): WordPlace[][] {
 function placementsOf(text: string, format: EncodedFormat): WordPlace[][] {
   switch (format) {
     case "english":
-      return [englishTokens(text).map((word, index) => wordPlaceOf(word, index + 1))];
-    case "indexes":
-      return [codeTokens(text).map((token, index) => numberPlace(token, index + 1))];
+      return [counted(englishTokens(text)).map((word, index) => wordPlaceOf(word, index + 1))];
+    case "indexes": {
+      const tokens = codeTokens(text);
+      // Numbers written without spaces are one token: that, not their count, is what is wrong.
+      if (!isBip39WordCount(tokens.length) && tokens.some(runTogetherNumbers))
+        throw ERRORS.create("word-numbers-run-together", []);
+      return [counted(tokens).map((token, index) => numberPlace(token, index + 1))];
+    }
     case "unicode": {
       const codes = hexUnits(text, UNICODE_CODE_DIGITS);
       if (codes === undefined)
@@ -189,7 +214,7 @@ function placementsOf(text: string, format: EncodedFormat): WordPlace[][] {
             text,
           ),
         ]);
-      return [codes.map((code, index) => codePlace(code, index + 1))];
+      return [counted(codes).map((code, index) => codePlace(code, index + 1))];
     }
     case "colors": {
       const colors = hexUnits(text, RGB_HEX_DIGITS);

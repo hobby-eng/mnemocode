@@ -172,3 +172,19 @@ describe("dates with what is forgotten (core/dates.ts)", () => {
     );
   });
 });
+
+describe("marked codes of a count that no phrase has (AUD-037-SEC008)", () => {
+  it("are refused before any place is read", () => {
+    // Twenty-five marked words, each of which would be read as a list of words.
+    const many = Array.from({ length: 25 }, () => "ab*").join(" ");
+    expect(() => MissingCodes.read(many, "english", "seedshift")).toThrow(
+      "These are 25 codes; a seed phrase has",
+    );
+    expect(() => MissingCodes.read("7684 ????", "unicode", "seedshift")).toThrow(
+      "These are 2 codes",
+    );
+    expect(() => MissingCodes.read("E000 E000 ???? ????", "colors-unicode", "seedshift")).toThrow(
+      "These are 2 colors; a seed phrase has 8 to 16.",
+    );
+  });
+});
