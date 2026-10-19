@@ -12,7 +12,7 @@
 
 ### Audit follow-up
 
-- Unreadable colours of a record whose order tags start later than 0, as older records may, are searched in every placement that the tags read allow; the search no longer assumes the tags start at 0 and reports no fitting codes.
+- Unreadable colors of a record whose order tags start later than 0, as older records may, are searched in every placement that the tags read allow; the search no longer assumes the tags start at 0 and reports no fitting codes.
 - Decode's joint search of unreadable codes and forgotten date digits reports several sets, not one found, when two dates of the same codes pass the wallet check, which a fingerprint allows by chance; it showed the phrase of the first date before.
 - Ctrl+C while card images are drawn on the private screen removes the temporary folders of the export, which hold private copies, says `Cancelled.` once and ends with exit code 130, as Ctrl+C at a question does.
 - PNG and JPEG export runs only a `pdftocairo` found by its full path in a folder of `PATH`, never one in the current folder or in an empty or relative entry of `PATH`, which Windows, and Linux for an empty entry, would otherwise run first.

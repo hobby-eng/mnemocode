@@ -183,21 +183,25 @@ export function colorsToIndexes(given: readonly string[]): number[] {
  * be read (undefined): "?" for every digit of such a color, for each placement that the order tags
  * read allow. The colors may come in any order, as colorsToIndexes takes them: the tags of those
  * that can be read place them, and one that cannot be read takes a tag that is left. MnemoCode
- * counts the tags from 0, and older records may start them later (docs/MANUAL_RECOVERY.md): where
+ * counts the tags from 0, and older records may start them later (docs/MANUAL_RECOVERY.md). Where
  * the tags read fit more than one start, as when the lowest or the highest color cannot be read,
- * each start gives a placement, 0 first (AUD-037-FUN004).
+ * colors typed in the order of their tags, as a record prints them, tell the start by their
+ * places; colors typed in another order give a placement for each start, the lowest first
+ * (AUD-037-FUN004).
  */
 export function wordPositionPlacements(colors: readonly (string | undefined)[]): string[][] {
   const given = Array.from(colors);
   assertColorCount(given.length);
   const step = orderTagStep(given.length);
   const payloads = new Map<number, string>();
-  for (const color of given) {
-    if (color === undefined) continue;
+  // The tag of each color in the order given; none for a color that cannot be read.
+  const tagsGiven = given.map((color) => {
+    if (color === undefined) return undefined;
     const { tag, payload } = tagAndPayload(color);
     if (payloads.has(tag)) throw ERRORS.create("invalid-color-set", []);
     payloads.set(tag, payload);
-  }
+    return tag;
+  });
   const tags = [...payloads.keys()];
   const fits = (offset: number) =>
     tags.every((tag) => (tag - offset) % step === 0 && (tag - offset) / step < given.length);
@@ -207,7 +211,10 @@ export function wordPositionPlacements(colors: readonly (string | undefined)[]):
     (_, o) => o,
   ).filter((offset) => offset <= lowest && fits(offset));
   if (offsets.length === 0) throw ERRORS.create("colors-can-read-do-not-tell-where-others", []);
-  return offsets.map((offset) =>
+  const inOrder = offsets.filter((offset) =>
+    tagsGiven.every((tag, place) => tag === undefined || tag === offset + place * step),
+  );
+  return (inOrder.length > 0 ? inOrder : offsets).map((offset) =>
     wordPositionsOf(
       given
         .map((_, slot) => payloads.get(offset + slot * step) ?? "?".repeat(RGB_PAYLOAD_DIGITS))

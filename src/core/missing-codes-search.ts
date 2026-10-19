@@ -285,8 +285,8 @@ export class MissingCodesSearch {
 
   /**
    * The places of `codes` that cannot be read: "Code 6", "Codes 6 and 9"; "Words 10 and 11" for
-   * colours, whose marks leave words open (EncodedForm.placeName), and "Words 11 and 12 or words 1
-   * and 2" where their tags leave two placements open, of which one is right.
+   * colours, whose marks leave words open (EncodedForm.placeName), and "Words 1 and 2 or words 11
+   * and 12" where their tags leave two placements open, of which one is right.
    */
   static placesText(codes: MissingCodes): string {
     const name = EncodedForm.of(codes.format).placeName;

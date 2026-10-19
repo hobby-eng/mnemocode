@@ -8,6 +8,7 @@ import {
   wordPositionPlacements,
 } from "../src/core/colors.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
+import { DatesAnswer } from "../src/core/date-search.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 
@@ -84,22 +85,33 @@ describe("marked colors of a record whose tags start later", () => {
           .run();
         expect(found.kind, `offset ${offset}`).toBe("found");
         if (found.kind === "found") expect(found.backup.indexes).toEqual(indexes);
+        // And the wallet, with the date known.
+        const wallet = await new MissingCodesSearch(codes, fingerprint)
+          .byWallet(async (mnemonic) => ({ matched: mnemonic === phrase }), DatesAnswer.of([DATE]))
+          .run();
+        expect(wallet.kind, `offset ${offset}, wallet`).toBe("found");
       }
     },
   );
 
-  it("search every placement that the tags allow, and each candidate once", () => {
+  it("take the placement that colors typed in order tell, and every one in another order", () => {
     const colors = indexesToColors(encodeMnemonic(PHRASES[0]!, [DATE]).shiftedIndexes);
-    // Tags from 0 with the first color unread fit a start one step later too.
-    const placements = wordPositionPlacements([undefined, ...colors.slice(1)]);
+    // Tags from 0 with the first color unread fit a start one step later too: in their order the
+    // colors tell 0, in another order both starts are placements, the lowest first.
+    const [unread, ...read] = [undefined, ...colors.slice(1)];
+    expect(wordPositionPlacements([unread, ...read])).toHaveLength(1);
+    const placements = wordPositionPlacements([...[...read].reverse(), unread]);
     expect(placements.map((patterns) => [patterns[0], patterns.at(-1)])).toEqual([
       ["????", expect.stringMatching(/^\d{4}$/u)],
       [expect.stringMatching(/^\d{4}$/u), "????"],
     ]);
     // Where the later start gives no word, as nearly always, the record keeps its one placement.
-    const first = MissingCodes.read(marked(colors, 0, "colors"), "colors", "seedshift");
-    expect(first.placements).toEqual([[1, 2]]);
-    // Colors whose words fit both: the same six digits under every tag, the highest unread.
+    const shuffled = marked(colors.slice(1).reverse().concat(colors[0]!), 7, "colors");
+    expect(MissingCodes.read(shuffled, "colors", "seedshift").placements).toEqual([[1, 2]]);
+  });
+
+  it("search every placement once, and each candidate once", () => {
+    // Colors whose words fit both starts: the same six digits under every tag from 2.
     const same = Array.from(
       { length: 8 },
       (_, at) =>
@@ -108,11 +120,24 @@ describe("marked colors of a record whose tags start later", () => {
           .toUpperCase()
           .padStart(6, "0")}`,
     );
-    using both = MissingCodes.read(marked(same, 7, "colors"), "colors", "seedshift");
+    // Typed in order, the highest unread: the start of 2, and the first color unread: 0.
+    using last = MissingCodes.read(marked(same, 7, "colors"), "colors", "seedshift");
+    expect(last.placements).toEqual([[11, 12]]);
+    const typedFirst = ["?", ...same.slice(0, 7).map((color) => color.slice(1))].join(" ");
+    using first = MissingCodes.read(typedFirst, "colors", "seedshift");
+    expect(first.placements).toEqual([[1, 2]]);
+    // In another order, both: counted and bounded together, and named.
+    const shuffled = same
+      .slice(0, 7)
+      .reverse()
+      .map((color) => color.slice(1));
+    using both = MissingCodes.read([...shuffled, "?"].join(" "), "colors", "seedshift");
     expect(both.placements).toEqual([
       [1, 2],
       [11, 12],
     ]);
+    expect(both.combinations).toBe(first.combinations + last.combinations);
+    expect(both.expected).toBe(first.expected + last.expected);
     expect(MissingCodesSearch.placesText(both)).toBe("Words 1 and 2 or words 11 and 12");
     // Each placement gives its candidates, and the codes that both give come once.
     const candidates = [...both.candidates()];
