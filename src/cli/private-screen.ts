@@ -10,6 +10,7 @@ import { terminalAvailable } from "./terminal-input.js";
 import {
   CLEAR_SCREEN,
   ENTER_ALTERNATE_SCREEN,
+  flushed,
   LEAVE_ALTERNATE_SCREEN,
   noticeLines,
   printableText,
@@ -131,8 +132,4 @@ export async function withPrivateScreen<T>(
 /** What is said of a temporary folder of an export that could not be removed. */
 function leftFolderNotice(folder: string): string {
   return `A private temporary folder, which may hold a copy of the export, could not be removed: ${printableText(folder)}. Delete it.`;
-}
-
-function flushed(stream: NodeJS.WriteStream): Promise<void> {
-  return new Promise((resolve) => stream.write("", () => resolve()));
 }

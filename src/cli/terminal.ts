@@ -68,6 +68,14 @@ export const ENTER_ALTERNATE_SCREEN = `\x1b[?1049h${CLEAR_SCREEN}`;
  */
 export const LEAVE_ALTERNATE_SCREEN = `${CLEAR_SCREEN}\x1b[?1049l`;
 
+/**
+ * Resolves once everything written to `stream` before has been handed on: a Windows console takes
+ * standard output asynchronously.
+ */
+export function flushed(stream: NodeJS.WriteStream): Promise<void> {
+  return new Promise((resolve) => stream.write("", () => resolve()));
+}
+
 /** A standard stream that a result is written to. */
 export type Channel = "stdout" | "stderr";
 

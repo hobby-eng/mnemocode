@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PrivatePage, pageStarts } from "../src/cli/private-page.js";
-import { screenRows } from "../src/cli/screen-rows.js";
+import { PrivatePage } from "../src/cli/private-page.js";
 import { printShares, inForm } from "../src/cli/sskr-output.js";
 import { CLEAR_SCREEN } from "../src/cli/terminal.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
@@ -9,6 +8,7 @@ import { Masking } from "../src/core/masking.js";
 import { sskrSetVector } from "../src/sskr/known-answers.js";
 import { SHARE_FORMATS } from "../src/sskr/transport.js";
 import { PrivateTerminal } from "./helpers/private-terminal.js";
+import { Screen } from "./helpers/terminal-screen.js";
 
 // The page of the private screen (private-page.ts): what was written since the screen was last
 // cleared, shown by pages before a question or an Enter prompt when it does not fit with them.
@@ -32,12 +32,22 @@ function type(keys: string): void {
   keyboard.bytes = Array.from(Buffer.from(keys));
 }
 
+/** The rows that `frame` takes on the terminal, as a screen of its own reads them. */
+function rowsOf(frame: string): string[] {
+  const screen = new Screen(process.stderr.columns);
+  screen.write(frame);
+  return screen.lines().map((row) => row.replace(STYLE_CODES, ""));
+}
+
 /** What the terminal shows now: the rows since its last clear. */
 function screen(): string[] {
-  const shown = terminal.written.slice(
-    terminal.written.lastIndexOf(CLEAR_SCREEN) + CLEAR_SCREEN.length,
-  );
-  return screenRows(shown, process.stderr.columns).rows.map((row) => row.replace(STYLE_CODES, ""));
+  return rowsOf(terminal.frames().at(-1) ?? "");
+}
+
+/** `count` blocks of a heading and three rows, each after a blank row. */
+function blocks(count: number): void {
+  for (let block = 0; block < count; block += 1)
+    console.log(`\nBlock ${block}\nfirst row\nsecond row\nthird row`);
 }
 
 beforeEach(() => {
@@ -49,7 +59,7 @@ describe("the page of the private screen", () => {
   it("leaves a page that fits with what comes under it as it is", async () => {
     console.log("A short result");
     type("");
-    expect(await PrivatePage.settle(2)).toBeUndefined();
+    expect(await PrivatePage.keepReadable(2)).toBeUndefined();
     expect(terminal.written).not.toContain("Page ");
   });
 
@@ -59,7 +69,7 @@ describe("the page of the private screen", () => {
     console.error("The shares do not store the dates or the mode; keep them yourself.");
     for (let row = 0; row < 60; row += 1) console.log(`Public row ${row}`);
     type("\x1b[6~".repeat(10) + "\x1b[1~" + "\x1b[4~" + "\r");
-    expect(await PrivatePage.settle(2)).toBeUndefined();
+    expect(await PrivatePage.keepReadable(2)).toBeUndefined();
     const shown = terminal.frames().join("\n");
     expect(shown).toContain("MnemoCode · SSKR export");
     expect(shown).toContain("keep them yourself.");
@@ -81,7 +91,7 @@ describe("the page of the private screen", () => {
       console.log("\x1b[1mMnemoCode · SSKR share 1 of 3\x1b[0m");
       for (let row = 0; row < 40; row += 1) console.log(`Public row ${row}`);
       type("\r");
-      await PrivatePage.settle(2);
+      await PrivatePage.keepReadable(2);
       expect(terminal.written).toContain("\x1b[90mPage 1/");
       expect(terminal.written).toContain("\x1b[1mMnemoCode · SSKR share 1 of 3\x1b[0m");
     } finally {
@@ -93,24 +103,49 @@ describe("the page of the private screen", () => {
     process.stderr.write(CLEAR_SCREEN);
     for (let row = 0; row < 40; row += 1) console.log(`Public row ${row}`);
     type("\r");
-    await PrivatePage.settle(2);
+    await PrivatePage.keepReadable(2);
     const after = screen();
     expect(after.join("\n")).not.toMatch(/Page |Enter done/u);
     expect(after.at(-2)).toBe("Public row 39");
     expect(after).toHaveLength(23);
     // What is under it now fits: no second round of pages.
     const drawn = terminal.written.length;
-    expect(await PrivatePage.settle(2)).toBeUndefined();
+    expect(await PrivatePage.keepReadable(2)).toBeUndefined();
     expect(terminal.written.length).toBe(drawn);
   });
 
-  it.each(["\x03", "\x1b"])("cancels at %j and releases the resize listener", async (key) => {
+  it.each([
+    ["\x03", CANCELLED],
+    // Escape, q and Ctrl+D end the pages as Enter does: the question under them says what Escape
+    // does there.
+    ["\x1b", undefined],
+    ["q", undefined],
+  ] as const)("ends at %j with %s and releases the resize listener", async (key, ended) => {
     process.stderr.write(CLEAR_SCREEN);
     for (let row = 0; row < 40; row += 1) console.log(`Public row ${row}`);
     type(key);
     const listeners = process.listenerCount("SIGWINCH");
-    expect(await PrivatePage.settle(2)).toBe(CANCELLED);
+    expect(await PrivatePage.keepReadable(2)).toBe(ended);
     expect(process.listenerCount("SIGWINCH")).toBe(listeners);
+  });
+
+  it("shows again only when rows written since it was read do not fit (AUD-037-UI002)", async () => {
+    process.stderr.write(CLEAR_SCREEN);
+    for (let row = 0; row < 40; row += 1) console.log(`Public row ${row}`);
+    type("\r");
+    await PrivatePage.keepReadable(3);
+    // An answer refused again and again: each try is read as it is typed, and none is paged.
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      console.error(`Answer: wrong ${attempt}\n! It is refused.`);
+      const drawn = terminal.written.length;
+      expect(await PrivatePage.keepReadable(3)).toBeUndefined();
+      expect(terminal.written.length).toBe(drawn);
+    }
+    // A result longer than the screen after them is.
+    for (let row = 0; row < 30; row += 1) console.log(`Later row ${row}`);
+    type("\r");
+    await PrivatePage.keepReadable(3);
+    expect(terminal.frames().some((frame) => frame.includes("Later row 0"))).toBe(true);
   });
 
   it("reflows the page when the terminal is resized while it waits", async () => {
@@ -127,11 +162,11 @@ describe("the page of the private screen", () => {
       }
       return true;
     });
-    await PrivatePage.settle(2);
+    await PrivatePage.keepReadable(2);
     const pages = terminal.frames().filter((frame) => frame.includes("Page 1/"));
     expect(pages).toHaveLength(2);
     expect(pages[1]).toContain("First public row");
-    expect(screenRows(pages[1] ?? "", 32).rows.length).toBeLessThanOrEqual(12);
+    expect(rowsOf(pages[1] ?? "").length).toBeLessThanOrEqual(12);
   });
 
   it("records no output that goes to a file", async () => {
@@ -141,7 +176,7 @@ describe("the page of the private screen", () => {
     process.stderr.write(CLEAR_SCREEN);
     for (let row = 0; row < 60; row += 1) console.log(`Public row ${row}`);
     type("");
-    expect(await PrivatePage.settle(2)).toBeUndefined();
+    expect(await PrivatePage.keepReadable(2)).toBeUndefined();
     expect(terminal.written).not.toContain("Page ");
   });
 
@@ -157,10 +192,37 @@ describe("the page of the private screen", () => {
     PrivatePage.open();
   });
 
-  it("ends a page after a blank row where one falls in its second half", () => {
-    const rows = ["a", "b", "", "c", "d", "", "e", "f", "g", "h"];
-    expect(pageStarts(rows, 4)).toEqual([0, 3, 6]);
-    expect(pageStarts(["a", "b", "c", "d", "e"], 2)).toEqual([0, 2, 4]);
+  it("ends a page after a blank row where one falls in its second half", async () => {
+    process.stderr.rows = 12;
+    process.stderr.write(CLEAR_SCREEN);
+    blocks(6);
+    type("\x1b[6~".repeat(10) + "\r");
+    await PrivatePage.keepReadable(2);
+    const pages = terminal.frames().filter((frame) => frame.includes("Page "));
+    expect(pages.length).toBeGreaterThan(1);
+    // Each page but the first starts with a block's heading, after the blank row before it.
+    for (const page of pages.slice(1)) expect(rowsOf(page)[0]).toMatch(/^Block \d$/u);
+  });
+
+  it.each([
+    [80, 24],
+    [32, 12],
+    [120, 40],
+  ])("draws each page within a %i by %i terminal", async (width, height) => {
+    process.stderr.columns = width;
+    process.stderr.rows = height;
+    process.stderr.write(CLEAR_SCREEN);
+    for (let row = 0; row < 85; row += 1) console.log(`Public row ${row} ${"的".repeat(row % 50)}`);
+    // Page by page, then the last and the first as a VT220 or rxvt sends End and Home.
+    type("\x1b[6~".repeat(100) + "\x1b[8~\x1b[7~\r");
+    await PrivatePage.keepReadable(2);
+    const pages = terminal.frames().filter((frame) => frame.includes("Page "));
+    for (const page of pages) expect(rowsOf(page).length).toBeLessThanOrEqual(height);
+    for (let row = 0; row < 85; row += 1)
+      expect(pages.some((page) => new RegExp(`Public row ${row}(?!\\d)`, "u").test(page))).toBe(
+        true,
+      );
+    expect(pages.at(-1)).toContain("Page 1/");
   });
 });
 
@@ -171,7 +233,7 @@ describe("shares on the private screen", () => {
     const shares = Array.from({ length: 16 }, (_, at) => sskrSetVector.shares[at % 3]!);
     printShares(inForm(shares, form));
     type("\x1b[6~".repeat(200) + "\r");
-    await PrivatePage.settle(2);
+    await PrivatePage.keepReadable(2);
     for (let number = 1; number <= 16; number += 1)
       expect(terminal.frames().join("\n")).toContain(`SSKR share ${number} of 16`);
   });
@@ -187,7 +249,7 @@ describe("shares on the private screen", () => {
         printShares(inForm(sskrSetVector.shares, form), 3, Masking.of("direct").holds);
         console.log("Original fingerprint 73c5da0a");
         type("\x1b[6~".repeat(20) + "\r");
-        await PrivatePage.settle(8);
+        await PrivatePage.keepReadable(8);
         const shown = terminal.frames().join("\n");
         for (let number = 1; number <= 3; number += 1)
           expect(shown).toContain(`SSKR share ${number} of 3`);

@@ -609,7 +609,7 @@ export async function waitForEnter(
   options: EnterOptions = {},
 ): Promise<"enter" | "escape" | Cancelled> {
   // The prompt stays under what the screen shows: a page that would scroll away is read first.
-  if ((await PrivatePage.settle(rowsOf([message]))) === CANCELLED) return CANCELLED;
+  if ((await PrivatePage.keepReadable(rowsOf([message]))) === CANCELLED) return CANCELLED;
   return withRawTerminal(async (next, moreWithin) => {
     if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
     writePrompt(message);

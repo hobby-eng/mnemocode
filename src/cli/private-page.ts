@@ -7,17 +7,20 @@
 // goes to a file or a pipe is written there as before and is not part of the page.
 
 import { PrivateSteps } from "./private-steps.js";
+import { Redacted } from "../core/redacted.js";
 import { screenRows, type ScreenRows } from "./screen-rows.js";
-import { CLEAR_SCREEN } from "./terminal.js";
+import { CLEAR_SCREEN, flushed } from "./terminal.js";
 import { rowsOfText, terminalColumns, terminalRows } from "./terminal-geometry.js";
 import { dropTypedAhead, readKey, withRawTerminal } from "./terminal-input.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { paint, STYLE, STYLE_CODES } from "./terminal-style.js";
 
 /** The keys of the pages, under each page. */
-const NAVIGATION = ["↑/PgUp previous · ↓/PgDn next", "Home/End · Enter done · Esc cancel"];
+const NAVIGATION = ["↑/PgUp previous · ↓/PgDn next", "Home/End · Enter done · Ctrl+C cancel"];
 /** The bytes of CLEAR_SCREEN, where a new page starts. */
 const CLEAR_BYTES = Buffer.from(CLEAR_SCREEN, "utf8");
+/** The byte of a line break. */
+const LINE_FEED = 0x0a;
 /** The bytes a record holds at first; it doubles as it grows. */
 const FIRST_RECORD_BYTES = 16 * 1024;
 const DECODER = new TextDecoder("utf-8");
@@ -26,9 +29,24 @@ const DECODER = new TextDecoder("utf-8");
  * What was written to the terminal since the screen was last cleared, as bytes that are wiped when
  * the page ends: the page holds the secrets that were shown on it.
  */
-class PageRecord {
+class PageRecord extends Redacted implements Disposable {
   #bytes = new Uint8Array(FIRST_RECORD_BYTES);
   #length = 0;
+  #seenRows = 0;
+
+  constructor() {
+    super("PageRecord");
+  }
+
+  /** The rows from the top of the page that were on the screen whole when it was last kept. */
+  get seenRows(): number {
+    return this.#seenRows;
+  }
+
+  /** Notes that the rows down to `rows` were on the screen whole. */
+  markSeen(rows: number): void {
+    this.#seenRows = rows;
+  }
 
   /** Adds a chunk that a stream was given: text, or bytes such as a typed secret's echo. */
   add(chunk: unknown): void {
@@ -42,6 +60,16 @@ class PageRecord {
     } else if (chunk instanceof Uint8Array) this.#addBytes(chunk);
   }
 
+  /**
+   * The most rows the page can take on a terminal `columns` wide, read from its bytes without a
+   * copy of its text: each line break, and each row that its bytes could fill, as every column
+   * takes a byte at least.
+   */
+  mostRows(columns: number): number {
+    const bytes = this.#bytes.subarray(0, this.#length);
+    return bytes.filter((byte) => byte === LINE_FEED).length + Math.ceil(this.#length / columns);
+  }
+
   /** The page as text, for the time it is drawn. */
   text(): string {
     return DECODER.decode(this.#bytes.subarray(0, this.#length));
@@ -51,6 +79,11 @@ class PageRecord {
   wipe(): void {
     this.#bytes.fill(0);
     this.#length = 0;
+    this.#seenRows = 0;
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 
   #addBytes(chunk: Uint8Array): void {
@@ -85,7 +118,7 @@ export class PrivatePage {
   static open(): void {
     PrivatePage.close();
     const add = (chunk: unknown): void => {
-      if (!PrivatePage.#paging) PrivatePage.#record.add(chunk);
+      if (PrivatePage.#stop !== undefined && !PrivatePage.#paging) PrivatePage.#record.add(chunk);
     };
     const streams =
       process.stdout.isTTY === true ? [process.stderr, process.stdout] : [process.stderr];
@@ -103,34 +136,47 @@ export class PrivatePage {
   }
 
   /**
-   * Before `reserve` rows are drawn under the page, down to the row the cursor then waits on: a
-   * page that does not fit on the terminal with them is shown by pages until Enter, and then its
-   * last rows that fit stay above them. CANCELLED at Escape or Ctrl+C.
+   * Keeps the page readable before `reserve` rows are drawn under it, down to the row the cursor
+   * then waits on. Rows that were on the screen whole when it was last kept may scroll away; where
+   * the rows written since do not fit with `reserve`, the whole page is shown by pages until Enter
+   * or Escape, and then its last rows that fit stay above. CANCELLED at Ctrl+C.
    */
-  static async settle(reserve: number): Promise<Cancelled | undefined> {
+  static async keepReadable(reserve: number): Promise<Cancelled | undefined> {
+    const record = PrivatePage.#record;
     if (PrivatePage.#stop === undefined) return undefined;
-    const page = (): ScreenRows => screenRows(PrivatePage.#record.text(), terminalColumns());
-    if (page().cursorRow + reserve <= terminalRows()) return undefined;
+    // A page that cannot fill the terminal is not read: no copy of its text is made.
+    if (record.mostRows(terminalColumns()) - record.seenRows + reserve <= terminalRows())
+      return undefined;
+    // A Windows console takes standard output later: the page is read once it has.
+    await flushed(process.stdout);
+    const page = (): ScreenRows => screenRows(record.text(), terminalColumns());
+    const { cursorRow } = page();
+    if (cursorRow - record.seenRows + reserve <= terminalRows()) {
+      record.markSeen(cursorRow);
+      return undefined;
+    }
     PrivatePage.#paging = true;
     try {
       if ((await showPages(() => page().rows)) === CANCELLED) return CANCELLED;
     } finally {
       PrivatePage.#paging = false;
     }
-    const { rows, cursorRow } = page();
+    const { rows } = page();
     const room = Math.max(0, terminalRows() - reserve);
-    const above = room === 0 ? [] : rows.slice(0, cursorRow).slice(-room);
-    // Written through the record: the end of the page is the page now, which fits.
+    const above = room === 0 ? [] : rows.slice(0, page().cursorRow).slice(-room);
+    // Written through the record: the end of the page is the page now, and was read.
     process.stderr.write(`${CLEAR_SCREEN}${above.map((row) => `${row}\n`).join("")}`);
-    return undefined;
+    record.markSeen(above.length);
+    // Keys typed with the one that ended the pages answer nothing under them.
+    return (await dropTypedAhead()) === CANCELLED ? CANCELLED : undefined;
   }
 
   /**
-   * settle before a question of `rows` rows under a displayed result. A question on a step screen
-   * of its own needs none: its screen is cleared first (PrivateSteps.begin).
+   * keepReadable before a question of `rows` rows under a displayed result. A question on a step
+   * screen of its own needs none: its screen is cleared first (PrivateSteps.begin).
    */
   static async beforeQuestion(rows: number): Promise<Cancelled | undefined> {
-    return PrivateSteps.showingResult ? PrivatePage.settle(rows) : undefined;
+    return PrivateSteps.showingResult ? PrivatePage.keepReadable(rows) : undefined;
   }
 }
 
@@ -138,19 +184,23 @@ export class PrivatePage {
 function recordWrites(stream: NodeJS.WriteStream, add: (chunk: unknown) => void): () => void {
   const own = Object.getOwnPropertyDescriptor(stream, "write");
   const write = stream.write.bind(stream);
-  stream.write = (chunk: unknown, ...rest: unknown[]): boolean => {
+  const recorded = (chunk: unknown, ...rest: unknown[]): boolean => {
     add(chunk);
     return Reflect.apply(write, undefined, [chunk, ...rest]) !== false;
   };
+  stream.write = recorded;
   return () => {
+    // Only while it is the writer: one put over it since gives back its own.
+    if (Object.getOwnPropertyDescriptor(stream, "write")?.value !== recorded) return;
     if (own === undefined) Reflect.deleteProperty(stream, "write");
     else Object.defineProperty(stream, "write", own);
   };
 }
 
 /**
- * Shows `rows` by pages, the keys under each, until Enter (undefined), or Escape or Ctrl+C
- * (CANCELLED). When the terminal is resized, the rows are read again at its new width.
+ * Shows `rows` by pages, the keys under each, until Enter or Escape (undefined), or Ctrl+C
+ * (CANCELLED): Escape means what it means at the question under the pages, which comes next. When
+ * the terminal is resized, the rows are read again at its new width.
  */
 async function showPages(rows: () => readonly string[]): Promise<Cancelled | undefined> {
   return withRawTerminal(async (next, moreWithin) => {
@@ -173,8 +223,8 @@ async function showPages(rows: () => readonly string[]): Promise<Cancelled | und
       draw();
       for (;;) {
         const key = await readKey(next, moreWithin);
-        if (key.kind === "cancel" || key.kind === "back") return CANCELLED;
-        if (key.kind === "enter") return undefined;
+        if (key.kind === "cancel") return CANCELLED;
+        if (key.kind === "enter" || key.kind === "back") return undefined;
         const before = page;
         if (key.kind === "up" || key.kind === "page-up") page = Math.max(0, page - 1);
         else if (key.kind === "down" || key.kind === "page-down")
@@ -193,7 +243,7 @@ async function showPages(rows: () => readonly string[]): Promise<Cancelled | und
  * Where each page of `rows` starts: a page holds `capacity` rows, and ends after a blank row when
  * one falls in its second half, so that a block, such as a share with its heading, stays whole.
  */
-export function pageStarts(rows: readonly string[], capacity: number): number[] {
+function pageStarts(rows: readonly string[], capacity: number): number[] {
   const starts = [0];
   for (let start = 0; start + capacity < rows.length;) {
     let end = start + capacity;

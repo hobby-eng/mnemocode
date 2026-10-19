@@ -34,6 +34,8 @@ It checks that
 - the encoded fingerprint stays on the screen of the dates in Decode, recover-date and a restore
   from shares, with and without colour, also from the menu; a question keeps the line that says
   why it is asked, and loses it when the question is left with Escape;
+- a result longer than the screen, a share set with its heading, notices and fingerprints, is
+  read whole by pages before the question or prompt under it, at 80x24 and 32x12;
 - Re-encode keeps the heading and the notices of its confirmation on the screens of the new
   backup, the wallet warning once, and a refusal above the questions asked again, also after a
   chosen answer; the heading never goes to standard output, and a refused answer warns of no
@@ -59,7 +61,7 @@ from terminal_context_checks import (
     check_question_reason_kept,
 )
 from terminal_export_checks import check_ctrl_c_during_image_export
-from terminal_result_checks import check_private_result_pages, check_share_pages_in_colour
+from terminal_result_checks import check_private_result_pages, check_share_pages
 
 from terminal_menu_checks import (
     check_back_from_entry,
@@ -126,7 +128,7 @@ def main():
     check_file_or_text_input()
     check_restore_share_asked_again()
     check_private_result_pages()
-    check_share_pages_in_colour()
+    check_share_pages()
     check_candidate_passphrase_roles()
     check_ctrl_c()
     check_ctrl_c_during_image_export()

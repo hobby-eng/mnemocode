@@ -5,7 +5,7 @@
 // what scrolled over the top edge of a screen that keeps no scrollback. Other escape sequences,
 // such as the switch to the alternate screen, are passed over.
 
-import { codePointWidth } from "./terminal-geometry.js";
+import { codePointWidth, TAB_STOP, wrapsBefore } from "./terminal-geometry.js";
 import { SGR_RESET } from "./terminal-style.js";
 
 /** One cell of the screen: what is drawn in it, and the colour codes it is drawn with. */
@@ -25,8 +25,6 @@ export interface ScreenRows {
 /** A control sequence: ESC [, its parameters and its final character (ECMA-48 CSI). */
 // oxlint-disable-next-line no-control-regex -- a control sequence begins with ESC, which it must match
 const CONTROL_SEQUENCE = /\x1b\[([0-9;?]*)([@-~])/uy;
-/** The columns from one tab stop to the next. */
-const TAB_STOP = 8;
 /** An empty cell, as an erase leaves it. */
 const BLANK: Cell = { text: " ", style: "" };
 
@@ -102,7 +100,7 @@ class Screen {
       if (cell !== undefined) cells[before] = { text: cell.text + text, style: cell.style };
       return;
     }
-    if (this.#column + width > this.#columns) this.#moveTo(this.#row + 1, 0);
+    if (wrapsBefore(this.#column, width, this.#columns)) this.#moveTo(this.#row + 1, 0);
     const row = this.#rowCells();
     while (row.length < this.#column) row.push(BLANK);
     row[this.#column] = { text, style: this.#style };

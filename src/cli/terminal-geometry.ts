@@ -25,7 +25,7 @@ export function terminalRows(): number {
 }
 
 /** A tab moves on to the next of the stops that terminals set every 8 columns. */
-const TAB_STOP = 8;
+export const TAB_STOP = 8;
 
 /**
  * The rows that one line of plain output, such as a row of a result table, takes on a terminal
@@ -64,11 +64,19 @@ export function placedAfter(
     if (index + size > to) break;
     const width = codePointWidth(codePointAt(line, index, size));
     const column = end % columns;
-    if (column > 0 && column + width > columns) end += columns - column;
+    if (wrapsBefore(column, width, columns)) end += columns - column;
     end += width;
     index += size;
   }
   return end;
+}
+
+/**
+ * Whether a character `width` columns wide, written at `column` of a row `columns` wide, goes whole
+ * to the next row: one that does not fit there, as a wide one at the last column (placedAfter).
+ */
+export function wrapsBefore(column: number, width: number, columns: number): boolean {
+  return column > 0 && column + width > columns;
 }
 
 /** Placement of `text` from `offset` on a terminal `columns` wide (placedAfter). */

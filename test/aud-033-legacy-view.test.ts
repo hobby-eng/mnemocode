@@ -45,7 +45,7 @@ describe("finite private legacy-valid candidate results", () => {
     keyboard.bytes = Array.from(Buffer.from("\x1b[F\x1b[H\r"));
     await runDecode(parseArguments(ARGS));
     // The clear prompt comes under the candidates: they are read by pages first.
-    expect(await PrivatePage.settle(closingRows())).toBeUndefined();
+    expect(await PrivatePage.keepReadable(closingRows())).toBeUndefined();
     expect(shown().some((frame) => frame.includes(TEST_PHRASE))).toBe(true);
     expect(shown().some((frame) => frame.includes("abandon ".repeat(11) + "wrap"))).toBe(true);
     expect(shown().at(-2)).toContain(TEST_PHRASE);
@@ -53,9 +53,9 @@ describe("finite private legacy-valid candidate results", () => {
   });
 
   it("propagates cancellation instead of treating an unread result as done", async () => {
-    keyboard.bytes = [0x1b];
+    keyboard.bytes = [0x03];
     await runDecode(parseArguments(ARGS));
-    expect(await PrivatePage.settle(closingRows())).toBe(CANCELLED);
+    expect(await PrivatePage.keepReadable(closingRows())).toBe(CANCELLED);
     expect(process.listenerCount("SIGWINCH")).toBe(0);
   });
 

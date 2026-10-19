@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 
 import terminal_session as terminal
-from terminal_answers import CLEAR_PROMPT, MASK_DATE, TEST_PHRASE
+from terminal_answers import CANCELLED, CLEAR_PROMPT, FINGERPRINT, MASK_DATE, TEST_PHRASE
 
 NAVIGATION = "Home/End"
 PAGE_DOWN = "\x1b[6~"
@@ -97,7 +97,7 @@ def check_private_result_pages():
             try:
                 navigate(session, "Code 24 cannot be read", ("Candidate 1", "Candidate 8"))
                 session.type(terminal.CTRL_C)
-                assert session.wait_for_exit() == 130
+                assert session.wait_for_exit() == CANCELLED
                 terminal.assert_kept_private(session, ("Candidate 1", "abandon abandon"))
             finally:
                 descriptor = session.fd if not terminal.WINDOWS else None
@@ -110,37 +110,38 @@ def check_private_result_pages():
         terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS = previous
 
 
-def check_share_pages_in_colour():
-    """With colour, the default on a terminal, every share of a set is on the screen beside the
-    lines around it or on a page: the export heading, its notices and the fingerprints, at 80x24
-    and at 32x12, before the backup question and after its answer (AUD-037-UI002, UI004)."""
+def check_share_pages():
+    """Every share of a set is on the screen beside the lines around it or on a page: the export
+    heading, its notices and the fingerprints, with colour, the default on a terminal, at 80x24
+    and at 32x12, and without, and with a complete backup or an original copy beside the shares,
+    before the backup question and after its answer (AUD-037-UI002, UI004)."""
     previous = terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS
-    cases = (
-        ("2", "3", "words", "direct"),
-        ("3", "3", "words", "direct"),
-        ("2", "3", "ur", "direct"),
-        ("2", "3", "unicode", "seedshift"),
-    )
+    sets = (("2", "3", "words", "direct"), ("3", "3", "words", "direct"))
+    runs = [
+        *((size, True, case, ()) for size in ((24, 80), (12, 32)) for case in sets),
+        *(((12, 32), True, case, ()) for case in (("2", "3", "ur", "direct"),)),
+        ((24, 80), True, ("2", "3", "unicode", "seedshift"), ("--format", "english")),
+        ((24, 80), True, ("2", "3", "words", "direct"), ("--show-original", "words")),
+        *(((24, 80), False, case, ()) for case in sets),
+    ]
     try:
-        for (height, width), (threshold, count, form, mode) in (
-            (size, case) for size in ((24, 80), (12, 32)) for case in cases
-        ):
+        for (height, width), colour, (threshold, count, form, mode), options in runs:
             terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS = height, width
             arguments = (
                 *("encode", "--sskr", "--ask-secrets", "--mode", mode, "--threshold", threshold),
-                *("--shares", count, "--share-format", form),
+                *("--shares", count, "--share-format", form, *options),
             )
-            session = terminal.Session(arguments, colour=True)
+            session = terminal.Session(arguments, colour=colour)
             try:
-                read_share_set(session, mode, count)
+                read_share_set(session, mode, count, colour)
             finally:
                 session.close()
-        print("share sets in colour: every share on the screen or on a page, at 80x24 and 32x12")
+        print("share sets: every share on the screen or on a page, at 80x24 and 32x12")
     finally:
         terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS = previous
 
 
-def read_share_set(session, mode, count):
+def read_share_set(session, mode, count, colour):
     """Encodes the test phrase in `session` and checks what the backup question is drawn under.
     Each question is found by its first word: with colour, it is bold apart from the rest."""
     session.wait_for("Seed phrase")
@@ -150,13 +151,18 @@ def read_share_set(session, mode, count):
         session.type(MASK_DATE + terminal.ENTER)
     shown = ""
     if session.wait_for_any((NAVIGATION, "Check the backup now?")) == NAVIGATION:
-        assert "\x1b[90mPage 1/" in session.output, "the keys of the pages are not grey"
+        if colour:
+            assert "\x1b[90mPage 1/" in session.output, "the keys of the pages are not grey"
         shown = " ".join(pages_from_here(session))
-        session.type(terminal.ENTER)
+        # A second Enter typed with the one that ends the pages answers nothing.
+        session.type(terminal.ENTER + terminal.ENTER)
         session.wait_for("Check the backup now?")
+        session.read_some(wait=0.5)
+        terminal.assert_private_result_visible(session, ("Enter selects",))
     shown += " " + terminal.private_frame(session)
     titles = (f"share {number} of {count}" for number in range(1, int(count) + 1))
-    wanted = ["SSKR export", "Original fingerprint", *titles]
+    # The heading of the export, or without colour its plain line, and the wallet's fingerprint.
+    wanted = ["SSKR export" if colour else "shares required", FINGERPRINT, *titles]
     for marker in wanted:
         assert marker in shown, f"{marker!r} was neither on the screen nor on a page"
     session.type("2")

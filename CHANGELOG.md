@@ -7,7 +7,7 @@
 - Correct the Share cards self-test's collection-to-individual example: it no longer inherits the whole-share QR layout. Its actual planning checks can also run without drawing a PDF.
 - Restore and recovery prompts accept a local text file path in the same field as manual input. Exported share files keep every share line, and MNC1 records keep their format and Seedshift metadata. Unreadable files are asked for again.
 - Decode keeps every share from a multiline paste or text file, including members 1 and 3 of a 2-of-3 set. Later shares are no longer mistaken for extra card codes after the first share; an unreadable line is named for correction.
-- Keep encoded backups, Shamir shares and re-encode confirmations visible beside follow-up questions on the private screen. Clear the result only when moving to another page or starting the written-backup check; terminal regressions now inspect the current frame rather than only its output history.
+- Keep encoded backups, Shamir shares and re-encode confirmations on the private screen with the follow-up questions: a result that does not fit beside them is read by pages first, and its end stays above them. Clear the result only when moving to another page or starting the written-backup check; terminal regressions now inspect the current frame rather than only its output history.
 - Encode offers the original wallet phrase beside shares as words, selected codes or both, and separately offers the English words after Seedshift. Neither choice adds the words or the original copy to exported share files. Private card operations name the printability check and rendering while they run.
 
 ### Audit follow-up

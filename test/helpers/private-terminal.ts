@@ -23,10 +23,10 @@ export class PrivateTerminal {
     process.stderr.columns = columns;
     process.stderr.rows = rows;
     Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => this.write(chunk));
+    vi.spyOn(process.stdout, "write").mockImplementation((...given) => this.write(...given));
     this.stderr = vi
       .spyOn(process.stderr, "write")
-      .mockImplementation((chunk) => this.write(chunk));
+      .mockImplementation((...given) => this.write(...given));
     vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
       process.stdout.write(`${format(...parts)}\n`);
     });
@@ -50,8 +50,15 @@ export class PrivateTerminal {
   }
 
   /** Adds a chunk that either stream was given. */
-  write(chunk: unknown): true {
-    this.written += typeof chunk === "string" ? chunk : Buffer.from(String(chunk)).toString();
+  write(chunk: unknown, ...rest: unknown[]): true {
+    // The callback given with the chunk, called once it is handed on, as a stream does.
+    const handedOn = rest.find((part) => typeof part === "function");
+    if (typeof handedOn === "function")
+      queueMicrotask(() => {
+        Reflect.apply(handedOn, undefined, []);
+      });
+    if (typeof chunk === "string") this.written += chunk;
+    else if (chunk instanceof Uint8Array) this.written += Buffer.from(chunk).toString();
     return true;
   }
 
