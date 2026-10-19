@@ -20,6 +20,8 @@ const SECRET_BYTE = 0x42;
 const SEED_BYTE = 0x07;
 const SECRET_BYTES = 16;
 const PHRASE = entropyToMnemonic(new Uint8Array(SECRET_BYTES).fill(SECRET_BYTE), wordlist);
+/** The refusal of a phrase that some part of the restore left unchecked (combineSskrShares). */
+const UNCHECKED = "sskr.shares.some-shares-repaired-elements-could-not-checked-use";
 
 /** The shares of PHRASE in `groups`, each [member threshold, member count], from the engine. */
 async function sharesOf(groupThreshold: number, groups: readonly number[][]): Promise<string[]> {
@@ -223,7 +225,9 @@ describe("AUD-008 follow-up: the reference is checked by a digest, and restores"
 
   it("says that unchecked shares disagree, without naming one of them", async () => {
     const pair = await sharesOf(1, [[1, 2]]);
-    expect(await combineSskrShares(pair)).toBe(PHRASE);
+    // Restored, but no digest checks it (AUD-037-API004): only the set says the phrase.
+    expect((await restoreShareSet(pair)).mnemonic).toBe(PHRASE);
+    await expect(combineSskrShares(pair)).rejects.toMatchObject({ code: UNCHECKED });
     const wrong = wrongValue(pair[0]!);
     const groups = await sharesOf(1, [
       [1, 1],
@@ -248,7 +252,8 @@ describe("AUD-008 follow-up: the reference is checked by a digest, and restores"
       [1, 1],
       [2, 3],
     ]);
-    expect(await combineSskrShares([shares[0]!])).toBe(PHRASE);
+    expect((await restoreShareSet([shares[0]!])).mnemonic).toBe(PHRASE);
+    await expect(combineSskrShares([shares[0]!])).rejects.toMatchObject({ code: UNCHECKED });
     expect(await restoreShareSet([shares[0]!, shares[1]!])).toMatchObject({
       mnemonic: PHRASE,
       unchecked: [2],

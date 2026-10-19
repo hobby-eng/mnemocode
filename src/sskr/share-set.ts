@@ -31,6 +31,7 @@ import {
 } from "./transport.js";
 import { copiesAmong, SetTopology, type PlacedShare, withoutCopies } from "./set-topology.js";
 import { restoreCompleteShares, uncheckedField } from "./complete-shares.js";
+import { MIN_DIGEST_THRESHOLD } from "./share-layout.js";
 import { Redacted } from "../core/redacted.js";
 import { counted } from "../core/search-plan.js";
 import { placeOf } from "../core/places.js";
@@ -72,6 +73,10 @@ export const SHARE_FORMAT_NAMES: Readonly<Record<ShareFormat, string>> = {
 
 /** The form in which a restored backup is shown: the one its shares look like (transport.ts). */
 export const RESTORED_FORM: Readonly<Record<ShareFormat, EncodedFormat>> = MIRRORED_FORM;
+
+/** What is said of shares that keep no digest of the secret (ShareSet.digestChecked). */
+const NO_DIGEST_NOTE =
+  "Each group of these shares restores from one share, so SSKR keeps no digest: the phrase is not checked, and a changed share would give another one.";
 
 /** Digest checks that a combine makes on its own: well under a second. */
 const MAX_LIBRARY_TRIES = 2 ** 16;
@@ -232,17 +237,47 @@ export class ShareSet extends Redacted implements Disposable {
 
   /**
    * The warning for the shares that took no part, each named by its place in `places`, by its
-   * index in the set; undefined when every share took part.
+   * index in the set, and for a phrase that no digest checked (digestChecked); undefined when every
+   * share took part and a digest checked the phrase.
    */
   uncheckedNote(places?: readonly number[]): string | undefined {
-    if (this.unchecked.length === 0) return undefined;
     const named = this.unchecked.map((share) => placeOf(places, share));
-    return `Share ${named.join(", ")}: too few shares of its group to take part; not checked.`;
+    const notes = [
+      ...(named.length === 0
+        ? []
+        : [`Share ${named.join(", ")}: too few shares of its group to take part; not checked.`]),
+      ...(this.digestChecked ? [] : [NO_DIGEST_NOTE]),
+    ];
+    return notes.length === 0 ? undefined : notes.join(" ");
   }
 
-  /** Whether every share took part in the restore and every element of it is settled. */
+  /**
+   * Whether SSKR's digest checked the secret: it keeps one where two or more groups restore it, or
+   * two or more members of a group whose shares are all here. Shares whose given groups each
+   * restore from one member, under a group threshold of 1, keep none, so that a changed share
+   * restores another phrase that nothing tells (AUD-037-API004). MnemoCode never writes them.
+   */
+  get digestChecked(): boolean {
+    if (this.groupThreshold >= MIN_DIGEST_THRESHOLD) return true;
+    const members = new Map<number, Set<number>>();
+    for (const info of this.#infos)
+      members.set(
+        info.groupIndex,
+        new Set([...(members.get(info.groupIndex) ?? []), info.memberIndex]),
+      );
+    return this.#infos.some(
+      (info) =>
+        info.memberThreshold >= MIN_DIGEST_THRESHOLD &&
+        defined(members.get(info.groupIndex)).size >= info.memberThreshold,
+    );
+  }
+
+  /**
+   * Whether every share took part in the restore, every element of it is settled, and a digest
+   * checked the phrase.
+   */
   get checked(): boolean {
-    return this.unchecked.length === 0 && this.unsettled.length === 0;
+    return this.unchecked.length === 0 && this.unsettled.length === 0 && this.digestChecked;
   }
 
   /** Groups of the set that restore the phrase. */
