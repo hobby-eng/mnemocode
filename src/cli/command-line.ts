@@ -1,4 +1,9 @@
-import { assertAllowedArguments, parseArguments } from "./arguments.js";
+import {
+  assertAllowedArguments,
+  assertPrivateFileSources,
+  assertSafeMaterialArgv,
+  parseArguments,
+} from "./arguments.js";
 import { runDecode } from "./decode-command.js";
 import { runEncode } from "./encode-command.js";
 import { runReEncode } from "./re-encode-command.js";
@@ -73,6 +78,7 @@ const HANDLERS: Readonly<
  * CANCELLED when the person cancelled the command.
  */
 export async function runCommandLine(argv: readonly string[]): Promise<CommandEnd> {
+  assertSafeMaterialArgv(argv);
   const [command, ...rest] = argv;
   if (command === undefined || isFlagOf(HELP_FLAGS, command)) {
     printUsage();
@@ -93,7 +99,7 @@ export async function runCommandLine(argv: readonly string[]): Promise<CommandEn
   }
   if (!isCommandName(command))
     throw ERRORS.create("there-no-command-run-mnemocode-help-see-commands", []);
-  // A help request wins over every other option, so that it works on a half-typed command.
+  // Help still accepts half-typed non-secret options; forbidden material flags are refused first.
   if (rest.some((argument) => isFlagOf(HELP_FLAGS, argument))) {
     printCommandHelp(command, rest.includes(HELP_FLAGS.long));
     return undefined;
@@ -104,6 +110,7 @@ export async function runCommandLine(argv: readonly string[]): Promise<CommandEn
   // Before anything is read: what this command does not need is given up for good.
   dropUnneeded(facts.alwaysWrites, arguments_, facts.asksOutputs?.(arguments_) === true);
   assertAllowedArguments(arguments_, command, commandOptions[command]);
+  assertPrivateFileSources(arguments_);
   if (facts.coreSelfTest) assertCoreSelfTest();
   const run = async (): Promise<CommandEnd> => (await HANDLERS[command](arguments_)) ?? undefined;
   return facts.secret ? withSecrets(arguments_, run, command) : withOutputs(arguments_, run);

@@ -26,18 +26,19 @@
     "Add deterministic ownership/error-path tests in secret.rs with a cfg(test) pre-free Drop observer.",
     "Minimal manifest pins existing graph versions; no new crate version, feature or toolchain.",
     "Error-variant documentation and an equivalent infallible GroupSpec default support existing workspace rules; the unchanged seven-argument metadata constructor needs no lint expectation.",
-    "No Shamir arithmetic, thresholds, metadata, randomness consumption, serialization or error messages are changed.",
-    "Format runtime sources with the pinned workspace rustfmt; upstream compact formatting and import order are not retained."
+    "Format runtime sources with the pinned workspace rustfmt; upstream compact formatting and import order are not retained.",
+    "Use the pinned local bc-shamir 0.13.0 recovery-secret owner.",
+    "Refuse a decoded group index outside its declared group count with GroupIndexInvalid; successful metadata/wire outputs and algorithms are preserved."
   ],
   "downstreamSourceSha256": {
-    "Cargo.toml": "3fc7babd5fa9eb7ead3be149c4bfd7cf59b91df9e8227b81014b3268e057296f",
+    "Cargo.toml": "d3208e6da5126544ae50a4f657e178d6662c87a7f18cdcbe61c0e75b968cdeb7",
     "LICENSE.md": "d2c043c3d4bfc59d9898cc60366d4a8d26a677d152148859477dd02be24d2acc",
     "clippy.toml": "42205e005acff1dd5d36837c3c1a93000bd677f84b81f7722fec94c75e609c46",
+    "src/encoding.rs": "7a4879c14f4277837944f53d1a857e3a4a61d88c6eb498b83cb1f73333b6cc0d",
+    "src/error.rs": "e5870a349193659e0bdae5f57cc10a22e518f37b56894204108b0126132a4391",
     "src/lib.rs": "be376af622920486442403de7b2a7875174395258e4dac5a4d0ca8c7bd0284d5",
     "src/secret.rs": "59a04706e87e2675315e42326b2914b14cd49986a55b5f719df7e6d6827c53b9",
-    "src/encoding.rs": "61fdfe628a20189b585713dc765b308279f63c0c7a579436cee2b41e2f4a30a8",
     "src/share.rs": "4615fd979e15998397e209ddb08c3209f43ed08a4d284c0fa19a397be913b01a",
-    "src/spec.rs": "bdeb4fab24e8c833ec0436064898fc828d1e2ae384be7374518a96c24b94634c",
-    "src/error.rs": "06a2fa7ddd6b5801ae3db5646e7f6324ff7770cf9aa17dfa1ecb2092d2c4cf25"
+    "src/spec.rs": "bdeb4fab24e8c833ec0436064898fc828d1e2ae384be7374518a96c24b94634c"
   }
 }

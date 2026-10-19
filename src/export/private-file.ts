@@ -47,19 +47,22 @@ export async function makePrivateFolder(path: string): Promise<void> {
 export type PrivateFileErrorCode = "left-staging-copy";
 
 /**
- * A file saved in full whose private staging folder, which holds a copy of it, could not be
- * removed afterwards. Not a failed save: the file is complete, and the person is told that it is
- * saved and that the folder is to be deleted, never left unaware of the copy (AUD-014,
- * adjudication "Cleanup can fail after file publication").
+ * A file saved in full whose private staging folder could not be removed afterwards. It may
+ * retain an extra copy after hard-link publication, or be empty after rename publication.
+ * Not a failed save: the person is told that the file is saved and the folder needs cleanup
+ * (AUD-014, adjudication "Cleanup can fail after file publication").
  */
 export class LeftStagingCopyError extends Error {
+  /** Stable code distinguishing completed publication with failed staging cleanup. */
   readonly code: PrivateFileErrorCode = "left-staging-copy";
+  /** Destination reported as successfully published, rather than a failed-save path. */
   readonly saved: string;
+  /** Retained private staging folder requiring cleanup; it may still contain an extra copy. */
   readonly staging: string;
 
   constructor(saved: string, staging: string, cause: unknown) {
     super(
-      `Saved ${saved}, but its private staging folder ${staging}, which holds a copy of it, could not be removed: delete it.`,
+      `Saved ${saved}, but its private staging folder ${staging}, which may still hold a copy of it, could not be removed: delete it.`,
       { cause },
     );
     this.name = "LeftStagingCopyError";

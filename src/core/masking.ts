@@ -276,6 +276,7 @@ export class Masking {
     return Masking.#values[mode];
   }
 
+  /** This mode's stable record and command-line identifier. */
   get mode(): MaskingMode {
     return this.#mode;
   }
@@ -370,6 +371,7 @@ export class Masking {
     return this.#variant.givesSeveral;
   }
 
+  /** The supported operations that hosts consult before offering this mode's controls. */
   get capabilities(): MaskingCapabilities {
     return this.#variant.capabilities;
   }
@@ -483,6 +485,7 @@ export class Masking {
     return this.#variant.lastShift(wordCount);
   }
 
+  /** The stable mode identifier, rather than its human-readable name. */
   toString(): string {
     return this.#mode;
   }
@@ -493,7 +496,9 @@ export type MaskingErrorCode = "missing-checksum";
 
 /** Codes that lack the BIP39 checksum that their mode gives every phrase it writes. */
 export class MissingChecksumError extends Error {
+  /** Stable code for encoded codes lacking their mode's required BIP39 checksum. */
   readonly code: MaskingErrorCode = "missing-checksum";
+  /** The transformation mode whose encoded checksum is missing. */
   readonly mode: MaskingMode;
 
   constructor(mode: MaskingMode) {

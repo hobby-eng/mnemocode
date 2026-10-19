@@ -29,6 +29,7 @@ import { repairCandidates } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { writeShare, type ShareFormat } from "../src/sskr/transport.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { PublicCliFiles } from "./helpers/public-cli-files.js";
 
 const SHARE_SETS = (
   JSON.parse(readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8")) as {
@@ -200,8 +201,7 @@ describe("AUD-022-FUN002: separate cards keep their own page", () => {
     const folder = mkdtempSync(join(tmpdir(), "mnemocode-aud022-"));
     try {
       const phrase = `${"abandon ".repeat(23)}art`;
-      await promisify(execFile)(process.execPath, [
-        join(process.cwd(), "dist", "mnemocode.js"),
+      using material = new PublicCliFiles([
         "encode",
         "--mnemonic",
         phrase,
@@ -213,6 +213,10 @@ describe("AUD-022-FUN002: separate cards keep their own page", () => {
         "business-it",
         "--cards-dir",
         join(folder, "cards"),
+      ]);
+      await promisify(execFile)(process.execPath, [
+        join(process.cwd(), "dist", "mnemocode.js"),
+        ...material.arguments,
       ]);
       const files = readdirSync(join(folder, "cards"));
       expect(files.length).toBeGreaterThan(16);

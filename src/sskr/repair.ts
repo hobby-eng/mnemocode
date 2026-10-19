@@ -41,6 +41,7 @@ const ERRORS = new ErrorCatalog("sskr.repair", {
   "each-at-place": (value0: string) => `${value0}, each at its place.`,
   "repair-candidates-refused": suppliedMessage,
   "shares-readings-refused": suppliedMessage,
+  "free-bits-budget": () => `freeBits must be a whole number from 0 to ${MAX_LISTED_FREE_BITS}.`,
 });
 
 /** More marked elements than this leave too few checksum bits to find them. */
@@ -58,6 +59,9 @@ export const MAX_CODE_CHOICES = 256;
  */
 export const LISTED_FREE_BITS = 4;
 
+/** Largest single-share listing budget: at most 256 solutions per solved reading. */
+export const MAX_LISTED_FREE_BITS = 8;
+
 /** A complete share, read in its form, as a repair gives it back with nothing filled in. */
 export function unrepairedShare(text: string): ReadRepairableShare {
   return { ...readShare(text), repaired: false, filled: [] };
@@ -69,11 +73,14 @@ export function unrepairedShare(text: string): ReadRepairableShare {
  * callers obtain secret variants through repairCandidates(), never through this Error.
  */
 export class ShareVariantsError extends Error {
+  /** Stable code for several complete share variants, without retaining the secret variants. */
   readonly code: ShareRepairErrorCode = "share-variants";
 
+  /** Immutable one-based positions of the marked elements that leave several variants. */
   readonly places: readonly number[];
 
   constructor(
+    /** Number of complete variants; this error retains only count and place metadata. */
     readonly count: number,
     places: readonly number[],
   ) {
@@ -191,7 +198,7 @@ function solutions(
     const particular = space.particular;
     const found: number[][] = [];
     try {
-      for (let choice = 0; choice < 1 << basis.length; choice += 1)
+      for (let choice = 0; choice < 2 ** basis.length; choice += 1)
         found.push(space.valuesAt(particular ^ combination(basis, BigInt(choice))));
       return { found, tooMany: false };
     } catch (error) {
@@ -219,12 +226,15 @@ function triedReadings(reading: MarkedReading, freeBits: number): MarkedReading[
 /**
  * Every share that `value` can be, in any form, with up to MAX_MARKED_ELEMENTS elements marked with
  * ? where they are unreadable; at most 2^freeBits of them. Every candidate passes the ordinary
- * reader, so its checksum and its SSKR metadata are checked as for any share.
+ * reader, so its checksum and its SSKR metadata are checked as for any share. `freeBits` must be
+ * a whole number from 0 to MAX_LISTED_FREE_BITS; an unsupported budget is refused before reading.
  */
 export function repairCandidates(
   value: string,
   freeBits: number = LISTED_FREE_BITS,
 ): ReadRepairableShare[] {
+  if (!Number.isInteger(freeBits) || freeBits < 0 || freeBits > MAX_LISTED_FREE_BITS)
+    throw ERRORS.create("free-bits-budget", []);
   if (!isMarked(value)) return [unrepairedShare(value)];
   const text = value.trim();
   if (exceedsMarks(text, MAX_MARKED_ELEMENTS))

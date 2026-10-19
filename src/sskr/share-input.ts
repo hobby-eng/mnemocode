@@ -42,7 +42,7 @@ import {
   withoutCopies,
   type PlacedShare,
 } from "./set-topology.js";
-import { misfitMessage } from "./complete-shares.js";
+import { isCompleteShareRefusal, misfitMessage } from "./complete-shares.js";
 import { refusalMessage } from "../core/refusal.js";
 import { afterPlace } from "../core/prose.js";
 import { defined } from "../core/defined.js";
@@ -583,6 +583,10 @@ export class ShareInput implements Disposable {
     }
   }
 
+  /**
+   * Repairs shares independently, returning the first ambiguous or unreadable share instead of
+   * guessing. A successful result returns every share in input order; a wiped input is refused.
+   */
   repairEach(): EachRepair {
     const shares: ReadRepairableShare[] = [];
     for (const { place, text } of this.#shares) {
@@ -689,9 +693,14 @@ export class ShareInput implements Disposable {
       };
     } catch (error) {
       this.#texts.assertLive();
+      if (!isCompleteShareRefusal(error)) throw error;
       const message = refusalMessage(error);
       const fits: number[] = [];
       for (const [index, share] of read.entries()) {
+        const remaining = read.filter((_, other) => other !== index);
+        // Too few shares cannot identify a wrong one, and are not a host failure.
+        if (remaining.length === 0 || !new SetTopology(remaining.map((other) => other.info)).enough)
+          continue;
         try {
           using _otherSet = await ShareSet.restore(
             texts.filter((_, other) => other !== index),
@@ -701,7 +710,7 @@ export class ShareInput implements Disposable {
           fits.push(share.place);
         } catch (other) {
           this.#texts.assertLive();
-          refusalMessage(other);
+          if (!isCompleteShareRefusal(other)) throw other;
         }
       }
       if (fits.length === 1)

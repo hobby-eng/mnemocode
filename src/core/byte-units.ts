@@ -11,6 +11,7 @@ export type ByteLimitErrorCode = "too-large";
 
 /** The refusal of an input larger than its limit: "`what` exceeds the 1 MiB safety limit." */
 export class InputTooLargeError extends Error {
+  /** Stable code identifying an input that exceeds its admitted byte limit. */
   readonly code: ByteLimitErrorCode = "too-large";
 
   constructor(what: string, limit: number) {

@@ -13,6 +13,7 @@ import {
   noticeLines as styledNoticeLines,
   type NoticeKind,
   paint,
+  printableText,
   resultLines,
   statusLine,
   streamCanRedraw,
@@ -29,7 +30,7 @@ import type { EncodedFormat } from "../core/types.js";
 import { PrivateSteps } from "./private-steps.js";
 
 // The palette, under the name every module of the command line takes it by.
-export { STYLE };
+export { STYLE, printableText };
 
 // The running text and its width are terminal-style's, which a maintainer script takes too.
 export { TEXT_WIDTH, NOTICE_TEXT_WIDTH, wrapText, type NoticeKind };
@@ -111,21 +112,6 @@ export function resultHeaderLines(
   channel: Channel = "stdout",
 ): string[] {
   return terminalColor(channel) ? resultLines(process[channel], title, rows) : [];
-}
-
-/**
- * Control characters: C0, DEL and C1, which move the cursor, erase or ring rather than show, and
- * the marks and controls of text direction, which reorder what is shown.
- */
-// oxlint-disable-next-line no-control-regex -- it finds the control characters to replace them
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu;
-
-/**
- * Text that came from outside the program, such as a QR code image, as it may be shown: each
- * control character becomes U+FFFD, so that the text cannot move the cursor or erase a line.
- */
-export function printableText(text: string): string {
-  return text.replace(CONTROL_CHARACTERS, "\ufffd");
 }
 
 /**
@@ -277,10 +263,14 @@ export function terminalFingerprint(
     channel,
     `${paint(STYLE.muted, label)}  ${paint(STYLE.strong, value)}  ${paint(STYLE.muted, `(${note})`)}`,
   );
+  terminalLine(channel, paint(STYLE.muted, FINGERPRINT_DISCLOSURE));
 }
 
 /** What the fingerprints of the command line are made with, as their note says. */
 export const FINGERPRINT_NOTE = "empty BIP39 passphrase";
+
+/** The explanation accompanying openly shown original and encoded fingerprints (DOC-05). */
+export const FINGERPRINT_DISCLOSURE = "They do not reveal the phrase.";
 
 /** Returns to the start of the line and erases it (VT100 "erase in line"). */
 const REWRITE_LINE = "\r\x1b[2K";

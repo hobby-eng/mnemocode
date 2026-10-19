@@ -15,6 +15,7 @@ export const ENCODE_SHARED_OPTIONS = Object.freeze([
   "mnemonic-file",
   "ask-secrets",
   "date",
+  "dates-file",
   "format",
   "show-masked-words",
   "output",

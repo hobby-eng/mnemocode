@@ -25,6 +25,15 @@ import {
 } from "./candidate-file-admission.js";
 import { CandidateFileRefusedError } from "./candidate-file-refusal.js";
 import { ErrorCatalog } from "./error-catalog.js";
+import { CandidateEncryptionChecks } from "./candidate-encryption-checks.js";
+import type {
+  CandidateCipherOperations,
+  CandidateFileKey,
+  SessionIdentity,
+} from "./candidate-encryption-types.js";
+
+/** Existing public session identity shape, shared with its known-answer verifier. */
+export type { SessionIdentity } from "./candidate-encryption-types.js";
 
 const ERRORS = new ErrorCatalog("core.candidate-encryption", {
   "no-webcrypto": () => NO_WEBCRYPTO,
@@ -34,6 +43,8 @@ const ERRORS = new ErrorCatalog("core.candidate-encryption", {
     `Use at least ${value0} characters for the passphrase: it is all that protects these seed phrases.`,
   "passphrase-candidates-empty": () => "The passphrase for the candidates is empty.",
   "not-protection-choice": { kind: "type", text: () => NOT_A_PROTECTION_CHOICE },
+  "self-test-failed": () => "Candidate encryption is unavailable because its self-test failed.",
+  "unsupported-lock": () => "Candidate encryption needs either a Scanner key or a passphrase.",
 });
 
 // Keep the existing import paths valid for hosts that already use this module.
@@ -60,16 +71,8 @@ function requireWebCryptoX25519(): void {
     throw ERRORS.create("no-webcrypto", []);
 }
 
-/** A one-time key: the identity that opens the file, and the recipient a writer encrypts to. */
-export interface SessionIdentity {
-  /** AGE-SECRET-KEY-1…: keep it only for the session, never write it down. */
-  readonly identity: string;
-  /** age1…, 62 characters, to copy into the program that writes the list. */
-  readonly recipient: string;
-}
-
 /** Makes a one-time X25519 key; X25519 explicitly, whatever age-encryption's default becomes. */
-export async function createSessionIdentity(): Promise<SessionIdentity> {
+async function createSessionIdentityUnchecked(): Promise<SessionIdentity> {
   requireWebCryptoX25519();
   const identity = await generateX25519Identity();
   return { identity, recipient: await identityToRecipient(identity) };
@@ -93,7 +96,10 @@ export function parseRecipient(text: string): string {
 }
 
 /** Encrypts a list to the Scanner's one-time key. */
-export async function encryptCandidates(plain: Uint8Array, recipient: string): Promise<Uint8Array> {
+async function encryptCandidatesUnchecked(
+  plain: Uint8Array,
+  recipient: string,
+): Promise<Uint8Array> {
   CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
   requireWebCryptoX25519();
   const encrypter = new Encrypter();
@@ -119,7 +125,7 @@ export function parseListPassphrase(text: string): string {
  * Encrypts a list under a passphrase, at the fixed scrypt work factor. The passphrase is used as
  * given: a host reads it with parseListPassphrase first.
  */
-export async function encryptCandidatesWithPassphrase(
+async function encryptCandidatesWithPassphraseUnchecked(
   plain: Uint8Array,
   passphrase: string,
 ): Promise<Uint8Array> {
@@ -149,9 +155,9 @@ export function listFileLock(file: Uint8Array): ListFileLock {
  * its header has exactly one stanza, of the kind that key opens (listFileLock). The whole file is
  * authenticated before it is returned.
  */
-export async function decryptCandidates(
+async function decryptCandidatesUnchecked(
   file: Uint8Array,
-  key: { readonly identity: string } | { readonly passphrase: string },
+  key: CandidateFileKey,
 ): Promise<Uint8Array> {
   const given: ListFileLock = "identity" in key ? "key" : "passphrase";
   CandidateFileAdmission.assertLock(file, given);
@@ -208,6 +214,182 @@ function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
       if (offset === bytes.byteLength) controller.close();
     },
   });
+}
+
+/** One asynchronous feature check, shared by concurrent calls and retried after a failed check. */
+class CipherHealth {
+  readonly #check: () => Promise<void>;
+  #pending: Promise<void> | undefined;
+  #failureEpoch = Symbol();
+
+  constructor(check: () => Promise<void>) {
+    this.#check = check;
+  }
+
+  ready(): Promise<void> {
+    return this.#pending ?? this.refresh();
+  }
+
+  refresh(after?: Promise<void>): Promise<void> {
+    const pending = Promise.resolve(after).then(this.#check);
+    this.#pending = pending;
+    void pending.catch(() => {
+      if (this.#pending === pending) {
+        this.#failureEpoch = Symbol();
+        this.#pending = undefined;
+      }
+    });
+    return pending;
+  }
+
+  current(pending: Promise<void>): boolean {
+    return this.#pending === pending;
+  }
+
+  failureEpoch(): symbol {
+    return this.#failureEpoch;
+  }
+}
+
+const RAW_OPERATIONS: CandidateCipherOperations = {
+  createSessionIdentity: createSessionIdentityUnchecked,
+  encryptCandidates: encryptCandidatesUnchecked,
+  decryptCandidates: decryptCandidatesUnchecked,
+};
+const SYMMETRIC_HEALTH = new CipherHealth(() => CandidateEncryptionChecks.symmetric());
+const KEY_HEALTH = new CipherHealth(() => new CandidateEncryptionChecks(RAW_OPERATIONS).quick());
+
+interface CipherState {
+  readonly symmetric: Promise<void>;
+  readonly key: Promise<void> | undefined;
+  readonly symmetricEpoch: symbol;
+  readonly keyEpoch: symbol | undefined;
+}
+
+function assertNoCipherFailure(state: CipherState): void {
+  if (
+    SYMMETRIC_HEALTH.failureEpoch() !== state.symmetricEpoch ||
+    (state.keyEpoch !== undefined && KEY_HEALTH.failureEpoch() !== state.keyEpoch)
+  )
+    throw ERRORS.create("self-test-failed", []);
+}
+
+function currentCipher(state: CipherState): boolean {
+  return (
+    SYMMETRIC_HEALTH.current(state.symmetric) &&
+    (state.key === undefined || KEY_HEALTH.current(state.key))
+  );
+}
+
+async function cipherState(kind: ListFileLock): Promise<CipherState> {
+  if (kind !== "key" && kind !== "passphrase") throw ERRORS.create("unsupported-lock", []);
+  if (kind === "key") requireWebCryptoX25519();
+  try {
+    for (;;) {
+      const symmetric = SYMMETRIC_HEALTH.ready();
+      await symmetric;
+      const key = kind === "key" ? KEY_HEALTH.ready() : undefined;
+      if (key !== undefined) await key;
+      const state = {
+        symmetric,
+        key,
+        symmetricEpoch: SYMMETRIC_HEALTH.failureEpoch(),
+        keyEpoch: key === undefined ? undefined : KEY_HEALTH.failureEpoch(),
+      };
+      if (currentCipher(state)) return state;
+    }
+  } catch {
+    throw ERRORS.create("self-test-failed", []);
+  }
+}
+
+/** A forced recheck is a barrier before work and before publishing its asynchronous result. */
+async function withCipherHealth<Value>(
+  kind: ListFileLock,
+  use: () => Promise<Value>,
+  retire?: (value: Value) => void,
+): Promise<Value> {
+  for (;;) {
+    const state = await cipherState(kind);
+    if (!currentCipher(state)) continue;
+    const value = await use();
+    try {
+      for (;;) {
+        // A later successful retry may admit fresh work, but cannot rehabilitate this result.
+        assertNoCipherFailure(state);
+        const checked = await cipherState(kind);
+        assertNoCipherFailure(state);
+        if (currentCipher(checked)) return value;
+      }
+    } catch (error) {
+      retire?.(value);
+      throw error;
+    }
+  }
+}
+
+/**
+ * Fast lazy integrity gate before a host enables candidate encryption controls. Passphrase
+ * operations need only the symmetric check; key operations additionally require WebCrypto and
+ * X25519 known answers. Successful checks are cached; failures leave the feature unavailable.
+ */
+export async function assertCandidateEncryptionReady(kind: ListFileLock): Promise<void> {
+  for (;;) {
+    const state = await cipherState(kind);
+    if (currentCipher(state)) return;
+  }
+}
+
+/** Reruns all fast known answers explicitly, without scrypt or the first-use cache. */
+export async function checkCandidateEncryptionQuick(): Promise<void> {
+  // Publish both barriers synchronously: new operations cannot reuse an earlier successful run.
+  const symmetric = SYMMETRIC_HEALTH.refresh();
+  const key = KEY_HEALTH.refresh(symmetric);
+  await Promise.all([symmetric, key]);
+}
+
+/** Generates a session identity only after the fast key feature checks pass. */
+export async function createSessionIdentity(): Promise<SessionIdentity> {
+  return withCipherHealth("key", createSessionIdentityUnchecked);
+}
+
+/** Encrypts borrowed plaintext to a validated Scanner key after the fast key integrity gate. */
+export async function encryptCandidates(plain: Uint8Array, recipient: string): Promise<Uint8Array> {
+  CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
+  const checked = parseRecipient(recipient);
+  return withCipherHealth(
+    "key",
+    () => encryptCandidatesUnchecked(plain, checked),
+    (bytes) => bytes.fill(0),
+  );
+}
+
+/** Encrypts borrowed plaintext with fixed-cost scrypt after the fast symmetric integrity gate. */
+export async function encryptCandidatesWithPassphrase(
+  plain: Uint8Array,
+  passphrase: string,
+): Promise<Uint8Array> {
+  CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
+  if (passphrase === "") throw ERRORS.create("passphrase-candidates-empty", []);
+  return withCipherHealth(
+    "passphrase",
+    () => encryptCandidatesWithPassphraseUnchecked(plain, passphrase),
+    (bytes) => bytes.fill(0),
+  );
+}
+
+/** Authenticates borrowed file bytes after admission and the appropriate fast feature gate. */
+export async function decryptCandidates(
+  file: Uint8Array,
+  key: CandidateFileKey,
+): Promise<Uint8Array> {
+  const kind = "identity" in key ? "key" : "passphrase";
+  CandidateFileAdmission.assertLock(file, kind);
+  return withCipherHealth(
+    kind,
+    () => decryptCandidatesUnchecked(file, key),
+    (bytes) => bytes.fill(0),
+  );
 }
 
 /**
@@ -290,8 +472,20 @@ export class PassphraseProtection extends Redacted implements OwnedListProtectio
     return "encrypted with the passphrase";
   }
 
-  protect(list: Uint8Array): Promise<Uint8Array> {
-    return encryptCandidatesWithPassphrase(list, this.#passphrase.value);
+  async protect(list: Uint8Array): Promise<Uint8Array> {
+    this.#passphrase.assertLive();
+    const bytes = await withCipherHealth(
+      "passphrase",
+      () => encryptCandidatesWithPassphraseUnchecked(list, this.#passphrase.value),
+      (held) => held.fill(0),
+    );
+    try {
+      this.#passphrase.assertLive();
+      return bytes;
+    } catch (error) {
+      bytes.fill(0);
+      throw error;
+    }
   }
 
   /** Erases retained passphrase bytes after all protect calls have settled. */

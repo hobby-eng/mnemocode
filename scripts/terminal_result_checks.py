@@ -1,4 +1,5 @@
 """Finite private result navigation on the real terminal, using public fixtures only."""
+import errno
 import os
 from pathlib import Path
 import tempfile
@@ -9,6 +10,17 @@ from terminal_answers import TEST_PHRASE, CLEAR_PROMPT
 NAVIGATION = "Home/End"
 PAGE_DOWN = "\x1b[6~"
 PAGE_UP = "\x1b[5~"
+
+
+def assert_closed_descriptor(descriptor):
+    """Confirms a closed PTY descriptor; an unrelated OS failure must not count as closure."""
+    try:
+        os.fstat(descriptor)
+    except OSError as error:
+        if error.errno != errno.EBADF:
+            raise
+    else:
+        raise AssertionError("The closed PTY descriptor is still open")
 
 
 def navigate(session, first):
@@ -70,12 +82,7 @@ def check_private_result_pages():
                 session.close()
                 session.close()
             if descriptor is not None:
-                try:
-                    os.fstat(descriptor)
-                except OSError:
-                    pass
-                else:
-                    raise AssertionError("The closed PTY descriptor is still open")
+                assert_closed_descriptor(descriptor)
         print("private candidate pages: revisitable, Ctrl+C exits 130, PTY closed twice safely")
     finally:
         terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS = previous

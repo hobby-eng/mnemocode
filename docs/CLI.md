@@ -34,33 +34,40 @@ The file holds Node.js, the program, artwork, fonts and the SSKR engine. Image e
 ## Public command examples
 
 ```bash
-# Public test data; use --ask-secrets for your own seed phrase.
+# Public fixtures only; use the private screen or protected local files for real material.
 TEST_MNEMONIC='abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+mkdir -p output
+printf '%s\n' "$TEST_MNEMONIC" > output/public-mnemonic.txt
+printf '%s\n' '23-09-2026' > output/public-dates.txt
 
 # Write the phrase as Unicode codes without changing it.
-mnemocode encode --mode direct --mnemonic "$TEST_MNEMONIC" --format 3
+mnemocode encode --mode direct --mnemonic-file output/public-mnemonic.txt --format 3
 
-# Mask the phrase with a date and show the result as words.
-mnemocode encode --mode seedshift --mnemonic "$TEST_MNEMONIC" \
-  --dates 23-09-2026 --format 1
+# Mask the phrase with file dates and also save a self-describing record.
+mnemocode encode --mnemonic-file output/public-mnemonic.txt \
+  --dates-file output/public-dates.txt --format 1 --output output/public-shifted.txt
 
 # Make the same record as the original Seedshift program.
-mnemocode encode --mode seedshift-legacy --mnemonic "$TEST_MNEMONIC" \
-  --dates 23-09-2026 --format 1
+mnemocode encode --mode seedshift-legacy --mnemonic-file output/public-mnemonic.txt \
+  --dates-file output/public-dates.txt --format 1
 
-# Decode a legacy record typed by hand. It has no header, so give the mode and the form.
+# Decode a public legacy record without a header: give its mode and form.
+printf '%s\n' '8F44901950118F44901950118F44901950118F4490194F5C' > output/public-legacy.txt
 mnemocode decode --mode seedshift-legacy \
-  --input "8F44901950118F44901950118F44901950118F4490194F5C" \
-  --format 3 --dates 23-09-2026
+  --input-file output/public-legacy.txt --format 3 --dates-file output/public-dates.txt
 
 # Find a forgotten day and check it against the fingerprint.
+printf '%s\n' '??-09-2026' > output/public-date-patterns.txt
 mnemocode recover-date --mode seedshift \
-  --input "wool abuse actual wool abuse actual wool abuse actual wool abuse congress" \
-  --format 1 --dates "??-09-2026" --master-fingerprint 73c5da0a
+  --input-file output/public-shifted.txt \
+  --dates-file output/public-date-patterns.txt --master-fingerprint 73c5da0a
 
 # Find one forgotten word. Every word that passes the checksum test is shown.
-mnemocode recover-word \
-  --mnemonic "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ?"
+printf '%s\n' 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ?' > output/public-word-pattern.txt
+mnemocode recover-word --mnemonic-file output/public-word-pattern.txt
+
+# One material source may come from standard input, without an intermediate input file.
+printf '%s\n' "$TEST_MNEMONIC" | mnemocode encode --mode direct --mnemonic-file - --format 3
 
 # Mark the candidates that match a known fingerprint.
 mnemocode recover-word --ask-secrets --master-fingerprint 73c5da0a
@@ -72,9 +79,9 @@ mnemocode table --unicode 5BF6
 mnemocode table --all
 
 # Save all numbered words, characters and codes, and a standalone English recovery guide.
-mnemocode table --all --table-format mapping --output bip39-mapping.txt
-mnemocode table --recovery-guide --output manual-recovery.md
-mnemocode table --word-lists-dir ./recovery-pack
+mnemocode table --all --table-format mapping --output output/bip39-mapping.txt
+mnemocode table --recovery-guide --output output/manual-recovery.md
+mnemocode table --word-lists-dir output/recovery-pack
 ```
 
 ## Word lists and manual recovery
@@ -110,9 +117,17 @@ For `decode` and `recover-date`, `--format` is usually optional. MnemoCode picks
 
 On the private screen, the fields for Shamir shares, forgotten words and encoded backups also accept a local text file path. Enter the path directly or drag the file into the terminal; no source selection is needed. MnemoCode reads its exported share files and MNC1 records unchanged. Paths with spaces may be quoted, and local `file:///` links work. Prefix a filename without an extension with `./`.
 
-Long share sets and missing-code candidate lists use private result pages. Use Up/Down or PageUp/PageDown to move, Home/End to reach the first or last page, and Enter when finished copying. Escape or Ctrl+C cancels. Output redirected to a file or pipe stays complete and has no page controls.
+Control and text-direction characters in displayed paths are replaced with U+FFFD; the actual filesystem names are unchanged. A command preview containing such characters is omitted, with a warning.
+
+Long share sets, missing-code candidate lists and decoded Original Seedshift records with a replaced last word use private result pages. Use Up/Down or PageUp/PageDown to move, Home/End to reach the first or last page, and Enter when finished copying. Escape or Ctrl+C cancels. Output redirected to a file or pipe stays complete and has no page controls.
 
 `--mnemonic-file PATH` reads a phrase; `--input-file PATH` reads codes or a record. The path `-` reads standard input. With `--ask-secrets`, Decode and date recovery can read `--input-file` or `--qr-file` and then ask only for dates. Decode also accepts a file of Shamir shares, one per line, and passes every share to restoration.
+
+Raw `--mnemonic`, `--input`, `--share`, `--date`/`--dates`, `--old-date`/`--old-dates` and `--last-word` values are refused, including public fixtures. Help identifies these old forms as refused rather than providing an exception.
+
+Refusal cannot remove text already entered in shell history or process arguments. Choose a safe input source before entering real material.
+
+For headless operations, `--dates-file PATH` reads whitespace-separated dates; `recover-date` also accepts its `?` patterns there. Re-encode uses `--old-dates-file PATH` for the old backup and `--dates-file PATH` for the new one; a legacy-valid backup takes its original final word from `--last-word-file PATH`. These three options also accept `-`. Only one material source may read standard input in a command. Do not combine these date/final-word files with `--ask-secrets`, which asks for those answers itself. Protect and keep date files yourself: dates are not added to encoded records.
 
 Text input may be up to 1 MiB. A QR image may be up to 16 MiB, 4096 pixels on either side and 8 megapixels, with up to 8 bits per sample. Larger inputs are refused. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
 

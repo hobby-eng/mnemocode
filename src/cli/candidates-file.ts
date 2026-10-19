@@ -8,6 +8,7 @@
 
 import {
   MIN_LIST_PASSPHRASE_LENGTH,
+  assertCandidateEncryptionReady,
   NoProtection,
   parseListPassphrase,
   PassphraseProtection,
@@ -28,7 +29,7 @@ import { wipeAll } from "../core/bits.js";
 import { readBoundedTextFile } from "./text-file.js";
 import { discardRenamedOutput, preflightFileDestination } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
-import { terminalNotice } from "./terminal.js";
+import { printableText, terminalNotice } from "./terminal.js";
 import { saveOutput } from "./output-saving.js";
 import { counted } from "../core/search-plan.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -48,7 +49,7 @@ const ERRORS = new ErrorCatalog("cli.candidates-file", {
  * The protection chosen with the options; none when, on the private screen, a passphrase is asked
  * later.
  */
-function protectionOf(args: ParsedArguments): OwnedListProtection | undefined {
+async function protectionOf(args: ParsedArguments): Promise<OwnedListProtection | undefined> {
   const key = value(args, "candidates-key");
   const keyFile = value(args, "candidates-key-file");
   const passphraseFile = value(args, "candidates-passphrase-file");
@@ -56,11 +57,18 @@ function protectionOf(args: ParsedArguments): OwnedListProtection | undefined {
   const given = [key, keyFile, passphraseFile].filter((item) => item !== undefined).length;
   if (given + (plaintext ? 1 : 0) > 1)
     throw ERRORS.create("choose-one-protection-candidates-scanner-s-key-passphrase", []);
-  if (key !== undefined) return new ScannerKeyProtection(key);
-  if (keyFile !== undefined)
+  if (key !== undefined) {
+    await assertCandidateEncryptionReady("key");
+    return new ScannerKeyProtection(key);
+  }
+  if (keyFile !== undefined) {
+    await assertCandidateEncryptionReady("key");
     return new ScannerKeyProtection(readBoundedTextFile(keyFile, "The Scanner's key file"));
-  if (passphraseFile !== undefined)
+  }
+  if (passphraseFile !== undefined) {
+    await assertCandidateEncryptionReady("passphrase");
     return new PassphraseProtection(readBoundedTextFile(passphraseFile, "The passphrase file"));
+  }
   if (plaintext) return new NoProtection();
   if (args["ask-secrets"] === true) return undefined;
   throw ERRORS.create("protect-candidates-candidates-key-scanner-s-age1-key", []);
@@ -111,7 +119,7 @@ export class CandidatesFile {
       return undefined;
     }
     await preflightFileDestination(path, false);
-    return new CandidatesFile(args, path, protectionOf(args));
+    return new CandidatesFile(args, path, await protectionOf(args));
   }
 
   /**
@@ -222,7 +230,7 @@ export class CandidatesFile {
     }
     if (saved === undefined || saved === CANCELLED) return saved;
     terminalNotice(
-      `Saved ${counted(list.records, "candidate phrase")}, ${list.description}: ${saved} (record N is candidate N).`,
+      `Saved ${counted(list.records, "candidate phrase")}, ${list.description}: ${printableText(saved)} (record N is candidate N).`,
       "success",
     );
     terminalNotice(
@@ -235,16 +243,19 @@ export class CandidatesFile {
   }
 }
 
+const LIST_PASSPHRASE_ROLE = "candidate list encryption passphrase (not the BIP39 passphrase)";
+
 /** The passphrase for a list, asked twice on the private screen until both agree. */
 async function askListPassphrase(): Promise<OwnedListProtection | Cancelled> {
   if (!onPrivateScreen())
     throw ERRORS.create("give-passphrase-candidates-candidates-passphrase-file", []);
+  await assertCandidateEncryptionReady("passphrase");
   for (;;) {
-    const first = await askSecretUntil("Passphrase for the candidates list:", parseListPassphrase, {
+    const first = await askSecretUntil(`Enter the ${LIST_PASSPHRASE_ROLE}:`, parseListPassphrase, {
       what: `a passphrase of at least ${MIN_LIST_PASSPHRASE_LENGTH} characters`,
     });
     if (first === CANCELLED) return CANCELLED;
-    const again = await askSecretUntil("The same passphrase again:", (answer) => answer, {
+    const again = await askSecretUntil(`Repeat the ${LIST_PASSPHRASE_ROLE}:`, (answer) => answer, {
       what: "the same passphrase again",
     });
     if (again === CANCELLED) return CANCELLED;

@@ -12,6 +12,7 @@ import {
   cardQr,
   cardsDir,
   dates,
+  datesFile,
   heirSheet,
   heirSheetSize,
   identityGroup,
@@ -43,8 +44,7 @@ export const SHARE_COMMAND_HELP: Readonly<
       "With --ask-secrets each share is read as soon as the answer is given: a share that cannot be read is named and typed again alone, and a result that cannot be used offers what to change. Where nothing tells which of two shares is wrong, such as two that are the same member of the set but differ, both are named and you choose which to change or leave out.",
       "On the private screen with --mode seedshift, complete shares show the encoded fingerprint of the masked phrase they hold before the dates are asked for, to compare with the one the split showed. A date may then hold ? for each forgotten digit, also together with ? in the shares: the dates are searched as recover-date searches them, after the wallet's fingerprint or one of its first receiving addresses, of Bitcoin or another coin, is asked for, and the work, share combinations times date combinations, is shown first.",
     ],
-    usage:
-      "[OPTIONS] (--ask-secrets | --share <TEXT> ... | --share-file <PATH> | --share-qr <PNG>)",
+    usage: "[OPTIONS] (--ask-secrets | --share-file <PATH> | --share-qr <PNG>)",
     groups: [
       {
         heading: "Options:",
@@ -59,6 +59,7 @@ export const SHARE_COMMAND_HELP: Readonly<
             ],
           },
           dates,
+          datesFile,
           maxTries,
           maxCandidates,
         ],
@@ -82,8 +83,8 @@ export const SHARE_COMMAND_HELP: Readonly<
         "Shares and dates on the private screen, ? for a forgotten digit",
       ],
       [
-        'mnemocode sskr-combine --share "ur:sskr/FIRST_COMPLETE_SHARE" --share "ur:sskr/SECOND_COMPLETE_SHARE"',
-        "Two shares typed as text",
+        "mnemocode sskr-combine --share-file ./first-share.txt --share-file ./second-share.txt",
+        "Two shares from separate protected files",
       ],
       ["mnemocode sskr-combine --share-file ./selected-shares.txt", "Shares from a file"],
       [
@@ -91,7 +92,7 @@ export const SHARE_COMMAND_HELP: Readonly<
         "Shares from QR images",
       ],
       [
-        "mnemocode sskr-combine --share-file ./shares.txt --mode seedshift --dates 23-09-2026",
+        "mnemocode sskr-combine --share-file ./shares.txt --mode seedshift --dates-file dates.txt",
         "Shares of a phrase masked before splitting",
       ],
     ],
@@ -108,8 +109,7 @@ export const SHARE_COMMAND_HELP: Readonly<
       "Prints shares made earlier as cards, PDFs, images or a share file. It changes only the presentation and never makes new shares.",
       "Shares with elements typed as ? come back whole, repaired together as by sskr-combine, without the phrase being shown. When more than one set of shares fits, each is shown with the fingerprint of the phrase it holds, and none is saved; a wallet check keeps the right one.",
     ],
-    usage:
-      "[OPTIONS] (--ask-secrets | --share <TEXT> ... | --share-file <PATH> | --share-qr <PNG>)",
+    usage: "[OPTIONS] (--ask-secrets | --share-file <PATH> | --share-qr <PNG>)",
     groups: [
       { heading: "The shares:", options: [...shareInputs, maxTries, maxCandidates] },
       {
@@ -168,6 +168,7 @@ export const SHARE_COMMAND_HELP: Readonly<
             ],
           },
           dates,
+          datesFile,
         ],
       },
     ],
@@ -210,6 +211,7 @@ export const SHARE_COMMAND_HELP: Readonly<
           mnemonicText,
           { flag: "--mode", value: "MODE", summary: "direct (default) or seedshift" },
           dates,
+          datesFile,
           threshold,
           shares,
           {

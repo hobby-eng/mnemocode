@@ -155,7 +155,7 @@ describe("ShareSet", () => {
     const refusing: SharePlatform = {
       ...nodeSharePlatform,
       combineShares: async () => {
-        throw new Error("No secret.");
+        throw Object.assign(new Error("No secret."), { code: "sskr.engine.combine" });
       },
     };
     await expect(ShareSet.restore([SHARES[0], SHARES[1]], refusing)).rejects.toThrow(

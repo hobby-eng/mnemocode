@@ -1,49 +1,108 @@
 import { describe, expect, it } from "vitest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { cp, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { PROTECTION_FLAGS } from "../src/cli/protection.js";
 
 const execute = promisify(execFile);
 const publicMnemonic = "abandon ".repeat(11) + "about";
 
-/** Damage disposable installation files only, never the real build or vectors. */
-async function withInstallation(check: (directory: string) => Promise<void>): Promise<void> {
+/** Declared file-read faults only; the real installation is neither copied nor modified. */
+async function withVirtualBuild(check: (directory: string) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "mnemocode-integrity-"));
   try {
-    await cp(resolve("dist"), join(directory, "dist"), { recursive: true });
-    await cp(resolve("vectors"), join(directory, "vectors"), { recursive: true });
-    await writeFile(join(directory, "package.json"), '{"type":"module"}');
-    for (const name of ["node_modules", "assets", "sskr-wasm"]) {
-      await symlink(resolve(name), join(directory, name), "junction");
-    }
+    await writeFile(
+      join(directory, "overlay.json"),
+      JSON.stringify({ root: resolve("."), files: {} }),
+    );
+    await writeFile(join(directory, "public-mnemonic.txt"), publicMnemonic);
     await check(directory);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 }
 
-describe("Installed self-test integrity", () => {
+/** Adds one small public-code/data fixture, never a complete build or source-tree copy. */
+async function overlayText(directory: string, file: string, text: string): Promise<void> {
+  if (
+    isAbsolute(file) ||
+    file.split(/[\\/]/u).includes("..") ||
+    !(file.startsWith("dist/") || file.startsWith("vectors/"))
+  )
+    throw new Error("An integrity fixture must stay below its own overlay folder.");
+  const target = join(directory, file);
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, text);
+  const raw: unknown = JSON.parse(await readFile(join(directory, "overlay.json"), "utf8"));
+  if (
+    raw === null ||
+    typeof raw !== "object" ||
+    !("root" in raw) ||
+    typeof raw.root !== "string" ||
+    !("files" in raw) ||
+    raw.files === null ||
+    typeof raw.files !== "object" ||
+    Array.isArray(raw.files)
+  )
+    throw new Error("The integrity fixture manifest has the wrong shape.");
+  const entries: [string, string][] = [];
+  for (const [name, value] of Object.entries(raw.files)) {
+    if (typeof value !== "string") throw new Error("An integrity fixture path must be text.");
+    entries.push([name, value]);
+  }
+  const files = Object.fromEntries(entries);
+  const manifest = { root: raw.root, files };
+  manifest.files[file] = target;
+  await writeFile(join(directory, "overlay.json"), JSON.stringify(manifest));
+}
+
+/** Child-only preload settings; no production entry point or environment is changed. */
+function overlayOptions(directory: string) {
+  return {
+    env: { ...process.env, MNEMOCODE_TEST_BUILD_OVERLAY: join(directory, "overlay.json") },
+  };
+}
+
+const OVERLAY_PRELOAD = resolve("test/helpers/virtual-build.mjs");
+
+/** Runs the actual protected CLI with only the declared test faults and public file material. */
+function cliArguments(directory: string, ...args: string[]): string[] {
+  return [
+    ...PROTECTION_FLAGS,
+    "--import",
+    OVERLAY_PRELOAD,
+    resolve("dist/mnemocode.js"),
+    ...args,
+    ...(args[0] === "encode" ? ["--mnemonic-file", join(directory, "public-mnemonic.txt")] : []),
+  ];
+}
+
+/** The expected refusal of a catalogue missing its required public vector. */
+function assertCatalogueRefusal(result: { readonly code: number; readonly stderr: string }): void {
+  expect(result.code).toBe(1);
+  expect(result.stderr).toContain("Public vector file is missing required vector: direct-12.");
+  expect(result.stderr).not.toContain("The declared virtual-build fault was not reached.");
+}
+
+describe("Self-test integrity under child-only faults", () => {
   it("fails before encoding when the pinned word-list expectation is damaged", async () => {
-    await withInstallation(async (directory) => {
-      const module = join(directory, "dist/core/self-test.js");
-      const source = await readFile(module, "utf8");
+    await withVirtualBuild(async (directory) => {
+      const module = "dist/core/self-test.js";
+      const source = await readFile(resolve(module), "utf8");
       const corrupted = source.replace(
         "187db04a869dd9bc7be80d21a86497d692c0db6abd3aa8cb6be5d618ff757fae",
         "0".repeat(64),
       );
       expect(corrupted).not.toBe(source);
-      await writeFile(module, corrupted);
-      const result = await execute(process.execPath, [
-        join(directory, "dist/mnemocode.js"),
-        "encode",
-        "--mode",
-        "direct",
-        "--mnemonic",
-        publicMnemonic,
-      ]).then(
+      await overlayText(directory, module, corrupted);
+      const result = await execute(
+        process.execPath,
+        cliArguments(directory, "encode", "--mode", "direct"),
+        overlayOptions(directory),
+      ).then(
         (output) => ({ code: 0, ...output }),
         (error: { code: number; stdout: string; stderr: string }) => error,
       );
@@ -51,30 +110,35 @@ describe("Installed self-test integrity", () => {
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("CRITICAL: MnemoCode core self-test failed.");
       expect(result.stderr).not.toContain(publicMnemonic);
+      expect(await readFile(resolve(module), "utf8")).toBe(source);
     });
   });
 
   it("AUD-001-FUN002: refuses an empty public-vector catalogue", async () => {
-    await withInstallation(async (directory) => {
-      await writeFile(
-        join(directory, "vectors/mnemocode-v1.json"),
+    await withVirtualBuild(async (directory) => {
+      const original = await readFile(resolve("vectors/mnemocode-v1.json"), "utf8");
+      await overlayText(
+        directory,
+        "vectors/mnemocode-v1.json",
         JSON.stringify({ version: 1, vectors: [] }),
       );
-      const exitCode = await execute(process.execPath, [
-        join(directory, "dist/mnemocode.js"),
-        "self-test",
-      ]).then(
-        () => 0,
-        (error: { code: number }) => error.code,
+      const result = await execute(
+        process.execPath,
+        cliArguments(directory, "self-test"),
+        overlayOptions(directory),
+      ).then(
+        (output) => ({ code: 0, stderr: output.stderr }),
+        (error: { code: number; stderr: string }) => ({ code: error.code, stderr: error.stderr }),
       );
-      expect(exitCode).not.toBe(0);
+      assertCatalogueRefusal(result);
+      expect(await readFile(resolve("vectors/mnemocode-v1.json"), "utf8")).toBe(original);
     });
   }, 20_000);
 });
 
 /**
- * Runs `expression` in a fresh Node.js process against the installation in `directory`, with `m`
- * the module `file` of its dist and `s` the host's services: the master fingerprint, PBKDF2, the
+ * Runs `expression` against the real build with declared faults in `directory`, with `m`
+ * the module `file` of dist and `s` the host's services: the master fingerprint, PBKDF2, the
  * SSKR platform of Node.js (s.platform) and the Node.js card renderer (s.renderer). Gives its exit
  * code and stderr.
  */
@@ -83,7 +147,7 @@ async function runCheck(
   file: string,
   expression: string,
 ): Promise<{ code: number; stderr: string }> {
-  const dist = pathToFileURL(join(directory, "dist")).href;
+  const dist = pathToFileURL(resolve("dist")).href;
   const script = `
     import { pbkdf2Sync } from "node:crypto";
     const [dist, file, expression] = process.argv.slice(1);
@@ -101,32 +165,28 @@ async function runCheck(
     const m = await import(dist + "/" + file);
     await new Function("m", "s", "return " + expression)(m, s);
   `;
-  return execute(process.execPath, [
-    "--input-type=module",
-    "-e",
-    script,
-    dist,
-    file,
-    expression,
-  ]).then(
+  return execute(
+    process.execPath,
+    ["--import", OVERLAY_PRELOAD, "--input-type=module", "-e", script, dist, file, expression],
+    overlayOptions(directory),
+  ).then(
     (output) => ({ code: 0, stderr: output.stderr }),
     (error: { code: number; stderr: string }) => ({ code: error.code, stderr: error.stderr }),
   );
 }
 
-/** Replaces the first `from` in the installed `file` by `to`; the text must be there. */
-async function patchInstalled(directory: string, file: string, from: string, to: string) {
-  const path = join(directory, file);
-  const source = await readFile(path, "utf8");
+/** Overrides the first `from` in one build module by `to`; the actual build stays unchanged. */
+async function patchBuild(directory: string, file: string, from: string, to: string) {
+  const source = await readFile(resolve(file), "utf8");
   const patched = source.replace(from, to);
   expect(patched, `${file} holds ${from}`).not.toBe(source);
-  await writeFile(path, patched);
+  await overlayText(directory, file, patched);
 }
 
-/** One check, the change made to the installation, and what the check must then say. */
+/** One check, its declared child-only fault and what the check must then say. */
 interface DamagedCase {
   readonly name: string;
-  /** The installed file changed, its text and what replaces it. */
+  /** The build file overridden for this child, its text and what replaces it. */
   readonly file: string;
   readonly from: string;
   readonly to: string;
@@ -140,7 +200,7 @@ const WALLET = "dist/core/wallet-evidence-self-test.js";
 
 /**
  * Each check of the self-test with one of its known answers damaged: it must fail, naming what
- * did not match. Public test data only; the damage is made to a disposable copy of the build.
+ * did not match. Public test data only; each child receives only its declared read overrides.
  */
 const DAMAGED_ANSWERS: readonly DamagedCase[] = [
   {
@@ -208,7 +268,7 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
   },
   {
     name: "bytes of a candidate list",
-    file: "dist/core/candidate-list-self-test.js",
+    file: "dist/core/candidate-list-answers.js",
     from: '98854aa000";',
     to: '98854aa001";',
     module: "core/candidate-list-self-test.js",
@@ -217,12 +277,12 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
   },
   {
     name: "list that the age files hold",
-    file: "dist/core/candidate-list-self-test.js",
+    file: "dist/core/candidate-list-answers.js",
     from: '98854aa000";',
     to: '98854aa001";',
     module: "core/candidate-encryption-self-test.js",
     run: "m.checkCandidateEncryptionQuick()",
-    fails: /Candidate file to the session key mismatch/u,
+    fails: /Published age symmetric payload mismatch/u,
   },
   {
     name: "finding of a wrong date",
@@ -263,11 +323,11 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
   {
     name: "place of BIP84's first address",
     file: WALLET,
-    from: '"matched at m/84\'/0\'/0\'/0/0", "BIP84 address"',
-    to: '"matched at m/84\'/0\'/0\'/0/1", "BIP84 address"',
+    from: '"m/84\'/0\'/0\'/0/0", "BIP84 address path"',
+    to: '"m/84\'/0\'/0\'/0/1", "BIP84 address path"',
     module: "core/wallet-evidence-self-test.js",
     run: "m.WALLET_EVIDENCE_SELF_TEST.startup()",
-    fails: /BIP84 address mismatch/u,
+    fails: /BIP84 address path mismatch/u,
   },
   {
     name: "path of a Litecoin address",
@@ -333,7 +393,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "dates beyond the safety limit",
     file: "dist/core/date-search.js",
-    from: "if (this.#combinations > HARD_MAX_COMBINATIONS)",
+    from: "if (combinations > HARD_MAX_COMBINATIONS)",
     to: "if (false)",
     module: "core/date-search-self-test.js",
     run: "m.checkDateSearchStartup()",
@@ -405,8 +465,22 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
 ];
 
 describe("Each self-test check can fail", () => {
+  it("does not count an unreached child-only fault as a successful integrity control", async () => {
+    await withVirtualBuild(async (directory) => {
+      await overlayText(
+        directory,
+        "dist/unused-integrity-fixture.js",
+        "throw new Error('unused');",
+      );
+      const result = await runCheck(directory, "core/word-hints.js", "Promise.resolve()");
+      expect(result.code).toBe(97);
+      expect(result.stderr).toContain("The declared virtual-build fault was not reached.");
+      expect(() => assertCatalogueRefusal(result)).toThrow();
+    });
+  });
+
   it("passes on the build as it is", async () => {
-    await withInstallation(async (directory) => {
+    await withVirtualBuild(async (directory) => {
       for (const { module, run } of [...DAMAGED_ANSWERS, ...LOST_REFUSALS]) {
         const result = await runCheck(directory, module, run);
         expect(result, `${module}: ${run}`).toEqual({ code: 0, stderr: "" });
@@ -416,8 +490,8 @@ describe("Each self-test check can fail", () => {
 
   for (const damaged of [...DAMAGED_ANSWERS, ...LOST_REFUSALS])
     it(`fails with ${damaged.name}`, async () => {
-      await withInstallation(async (directory) => {
-        await patchInstalled(directory, damaged.file, damaged.from, damaged.to);
+      await withVirtualBuild(async (directory) => {
+        await patchBuild(directory, damaged.file, damaged.from, damaged.to);
         const result = await runCheck(directory, damaged.module, damaged.run);
         expect(result.code).not.toBe(0);
         expect(result.stderr).toMatch(damaged.fails);
@@ -425,24 +499,21 @@ describe("Each self-test check can fail", () => {
     });
 
   it("stops every command before a secret when a feature's startup answer is damaged", async () => {
-    await withInstallation(async (directory) => {
+    await withVirtualBuild(async (directory) => {
       const { file, from, to } = DAMAGED_ANSWERS.find((damaged) => damaged.file === WALLET)!;
-      await patchInstalled(directory, file, from, to);
-      const result = await execute(process.execPath, [
-        join(directory, "dist/mnemocode.js"),
-        "encode",
-        "--mode",
-        "direct",
-        "--mnemonic",
-        publicMnemonic,
-      ]).then(
+      await patchBuild(directory, file, from, to);
+      const result = await execute(
+        process.execPath,
+        cliArguments(directory, "encode", "--mode", "direct"),
+        overlayOptions(directory),
+      ).then(
         (output) => ({ code: 0, ...output }),
         (error: { code: number; stdout: string; stderr: string }) => error,
       );
       expect(result.code).not.toBe(0);
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("CRITICAL: MnemoCode core self-test failed.");
-      expect(result.stderr).toContain("BIP84 address mismatch.");
+      expect(result.stderr).toContain("BIP84 address path mismatch.");
       expect(result.stderr).not.toContain(publicMnemonic);
     });
   });

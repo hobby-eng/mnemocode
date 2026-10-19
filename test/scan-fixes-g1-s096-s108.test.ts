@@ -734,6 +734,7 @@ describe("S108: the renderers and the share modules keep no platform of their ow
     expect(Object.keys(await import("../src/sskr/share-platform.js")).sort()).toEqual([
       "ONE_GROUP",
       "SEED_BYTES",
+      "ShareCombineRefusalError",
     ]);
   });
 

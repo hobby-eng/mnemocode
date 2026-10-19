@@ -101,18 +101,22 @@ export class WordList implements WordHints {
    * run together that some word lacks.
    */
   constructor(names: WordNames, words: readonly string[], spacing: WordSpacing = {}) {
-    words.forEach((word, index) => {
-      if (!WORD_CHARACTERS.test(word) || word !== word.toLowerCase())
+    const admitted = Array.from(words);
+    admitted.forEach((word, index) => {
+      if (typeof word !== "string" || !WORD_CHARACTERS.test(word) || word !== word.toLowerCase())
         throw ERRORS.create("word-list-holds-lower-case-letters-hyphens-only", []);
-      if (index > 0 && defined(words[index - 1]) >= word)
+      if (index > 0 && defined(admitted[index - 1]) >= word)
         throw ERRORS.create("word-list-alphabetical-order-without-repeats", []);
     });
     this.#names = Object.freeze({ ...names });
-    this.#words = Object.freeze([...words]);
-    this.#longest = Math.max(0, ...words.map((word) => word.length));
+    this.#words = Object.freeze(admitted);
+    this.#longest = admitted.reduce((longest, word) => Math.max(longest, word.length), 0);
     this.#separators = spacing.separators ?? WHITE_SPACE;
     this.#runTogether = spacing.runTogether;
-    if (this.#runTogether !== undefined && words.some((word) => word.length !== this.#runTogether))
+    if (
+      this.#runTogether !== undefined &&
+      admitted.some((word) => word.length !== this.#runTogether)
+    )
       throw ERRORS.create("words-run-together-all-same-length", []);
   }
 
@@ -209,11 +213,13 @@ export class LineWordHints implements WordHints {
     this.#partOf = partOf;
   }
 
+  /** Hint for the selected line part, or no hint without a list; propagates selector failures. */
   hint(line: string): WordHint {
     const part = this.#partOf(line);
     return this.#listOf(part)?.hint(part) ?? NOTHING;
   }
 
+  /** Completion for the selected part, or none without a list; propagates selector failures. */
   completion(line: string): WordCompletion {
     const part = this.#partOf(line);
     return this.#listOf(part)?.completion(part) ?? NO_COMPLETION;

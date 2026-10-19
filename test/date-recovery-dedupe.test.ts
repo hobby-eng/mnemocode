@@ -107,26 +107,21 @@ function dates(count: number, first: number): string[] {
 describe("date recovery tries each effective shift once (AUD-010-FUN001)", () => {
   for (const { words, known, patterns } of CASES)
     for (const mode of MODES) {
-      // The Original Seedshift with a valid last word decodes 2^(11 - bits) phrases a date.
-      const slow = mode === "seedshift-legacy-valid" && words < 21;
-      it.skipIf(slow && patterns.length > 1)(
-        `${mode}, ${words} words, ${known.length} known, ${patterns.join(" ")}`,
-        () => {
-          const phrase = zeroPhrase(words);
-          const knownDates = known.map(parseDate);
-          const masked = Masking.of(mode).encode(phrase, [
-            ...knownDates,
-            ...patterns.map(() => parseDate("05-05-2020")),
-          ]);
-          const parsed = patterns.map(parseDatePattern);
-          const indexes = masked.shiftedIndexes;
-          const expected = reference(indexes, knownDates, parsed, mode);
-          const actual = searched(indexes, knownDates, parsed, mode);
-          expect(actual).toEqual(expected);
-          const all = actual.flat();
-          expect(new Set(all).size).toBe(all.length);
-        },
-      );
+      it(`tries each effective shift once for ${mode}, ${words} words, ${known.length} known dates and ${patterns.join(" ")}`, () => {
+        const phrase = zeroPhrase(words);
+        const knownDates = known.map(parseDate);
+        const masked = Masking.of(mode).encode(phrase, [
+          ...knownDates,
+          ...patterns.map(() => parseDate("05-05-2020")),
+        ]);
+        const parsed = patterns.map(parseDatePattern);
+        const indexes = masked.shiftedIndexes;
+        const expected = reference(indexes, knownDates, parsed, mode);
+        const actual = searched(indexes, knownDates, parsed, mode);
+        expect(actual).toEqual(expected);
+        const all = actual.flat();
+        expect(new Set(all).size).toBe(all.length);
+      });
     }
 
   it("reports a phrase once where the latest date's day moves only part of the last word", () => {

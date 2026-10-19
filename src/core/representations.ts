@@ -41,7 +41,11 @@ export function detectInputFormats(value: string): Array<EncodedFormat> {
   return ENCODED_FORMATS.filter((format) => {
     try {
       const indexes = parseInput(value, format);
-      return isBip39WordCount(indexes.length);
+      try {
+        return isBip39WordCount(indexes.length);
+      } finally {
+        indexes.fill(0);
+      }
     } catch {
       return false;
     }

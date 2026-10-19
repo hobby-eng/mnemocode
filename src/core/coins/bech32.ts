@@ -53,6 +53,7 @@ export class Bech32Prefixes {
     this.#testnet = testnet;
   }
 
+  /** The main-network human-readable part, without the separator or encoded data. */
   get mainnet(): string {
     return this.#mainnet;
   }

@@ -102,7 +102,49 @@ describe("module error catalogs", () => {
     expect(errorCode(Object.assign(new Error("Synthetic fault."), { code: 17 }))).toBeUndefined();
     expect(errorCode(undefined)).toBeUndefined();
   });
+});
 
+describe("cross-runtime error identification", () => {
+  it("keeps the import-free catalog guard in step with the refusal reader", () => {
+    for (const [value, matched] of [
+      [undefined, false],
+      [{ code: "fixture.missing" }, false],
+      [new Error("Synthetic uncoded failure."), false],
+      [Object.assign(new Error("Synthetic numeric code."), { code: 17 }), false],
+      [Object.assign(new Error("Synthetic string code."), { code: "fixture.missing" }), true],
+      [Object.assign(new Error("Synthetic unrelated code."), { code: "EIO" }), false],
+    ] as const) {
+      expect(catalog.matches(value, ["missing"])).toBe(matched);
+      expect(errorCode(value) === "fixture.missing").toBe(matched);
+    }
+    for (const read of [
+      (error: Error) => catalog.matches(error, ["missing"]),
+      (error: Error) => errorCode(error),
+    ]) {
+      let reads = 0;
+      const error = new Error("Synthetic changing external code.");
+      Object.defineProperty(error, "code", {
+        configurable: true,
+        get: () => {
+          reads += 1;
+          return reads === 1 ? "fixture.missing" : "EIO";
+        },
+      });
+      read(error);
+      expect(reads).toBe(1);
+      const fault = new Error("Synthetic code getter failure.");
+      Object.defineProperty(error, "code", {
+        configurable: true,
+        get: () => {
+          throw fault;
+        },
+      });
+      expect(() => read(error)).toThrow(fault);
+    }
+  });
+});
+
+describe("executable failure preservation", () => {
   it("keeps every cause of a failed executable publication and rollback", async () => {
     const path = new URL("../scripts/executable-build-errors.mjs", import.meta.url).href;
     const module: unknown = await import(path);

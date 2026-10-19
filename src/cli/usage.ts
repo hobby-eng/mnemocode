@@ -32,9 +32,18 @@ const OPTION_INDENT = 2;
 const SHORT_FORM_WIDTH = 4;
 /** Indent of the explanation of an option in `--help`, as clap prints it. */
 const OPTION_TEXT_INDENT = 10;
+const RECOVERY_SAFETY =
+  "Recovery material: a record, with its dates if it has any, restores the wallet; it is not encryption.";
 
 const paint = (code: string, text: string): string => terminalPaint("stdout", code, text);
 const heading = (text: string): string => paint(STYLE.heading, text);
+
+/** One closing safety message and warning style for overview, command and topic help. */
+function closingSafety(): string {
+  return wrapText(RECOVERY_SAFETY, HELP_WIDTH)
+    .map((line) => paint(STYLE.warning, line))
+    .join("\n");
+}
 
 /**
  * "    --mode <MODE>": the option in the accent colour and its value in grey. An option without a
@@ -199,7 +208,7 @@ export function printUsage(): void {
       "Write a real phrase as colors; dates asked for",
     ],
     [
-      "mnemocode decode --input-file shifted.txt --dates 23-09-2026",
+      "mnemocode decode --input-file shifted.txt --dates-file dates.txt",
       "Turn a record back into the phrase",
     ],
     ["mnemocode recover-word --ask-secrets", "Find forgotten words"],
@@ -231,13 +240,7 @@ export function printUsage(): void {
     notes([
       "Started without a command in a terminal, mnemocode shows a menu that asks step by step, asks again after an answer that cannot be used, and shows the command it runs. Use --ask-secrets for a real phrase: text typed in a command can stay in the shell history. Work on a trusted computer without a network connection. -h gives a short summary of a command, --help the full explanation.",
     ]),
-    // The safety line wraps like every other text of the help, so that it stays whole.
-    wrapText(
-      "Recovery material: a record, with its dates if it has any, restores the wallet; it is not encryption.",
-      HELP_WIDTH,
-    )
-      .map((line) => paint(STYLE.warning, line))
-      .join("\n"),
+    closingSafety(),
   ];
   console.log(blocks.join("\n\n"));
 }
@@ -260,6 +263,7 @@ export function printCommandHelp(name: CommandName, detailed: boolean): void {
   if (detailed && name === "preview") blocks.push(section("Designs:", templateRows()));
   blocks.push(examples(page.examples));
   if (detailed && page.notes !== undefined) blocks.push(notes(page.notes));
+  blocks.push(closingSafety());
   console.log(blocks.join("\n\n"));
 }
 
@@ -306,6 +310,7 @@ export function printTopicHelp(name: string): void {
     blocks.push(section(part.heading, lines));
   }
   if (topic.examples !== undefined) blocks.push(examples(topic.examples));
+  blocks.push(closingSafety());
   console.log(blocks.join("\n\n"));
 }
 

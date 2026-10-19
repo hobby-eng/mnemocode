@@ -16,6 +16,7 @@ export type CandidateFileProblem = "unsupported" | "key" | "damaged";
  * failed, is the `cause`.
  */
 export class CandidateFileRefusedError extends Error {
+  /** Stable failure category for admission, key mismatch or damaged authenticated contents. */
   readonly code: CandidateFileProblem;
 
   constructor(code: CandidateFileProblem, message: string, cause?: unknown) {

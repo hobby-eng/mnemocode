@@ -63,11 +63,14 @@ export function strictUtf8Text(bytes: Uint8Array, what: string): string {
 
 /** Whether `bytes`, one character's, are valid UTF-8. */
 function isValidCharacter(bytes: readonly number[]): boolean {
+  const scratch = Uint8Array.from(bytes);
   try {
-    STRICT_UTF8.decode(Uint8Array.from(bytes));
+    STRICT_UTF8.decode(scratch);
     return true;
   } catch {
     return false;
+  } finally {
+    scratch.fill(0);
   }
 }
 

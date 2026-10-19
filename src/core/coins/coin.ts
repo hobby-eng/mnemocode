@@ -106,7 +106,9 @@ export type AddressRefusalKind = "not-single-key" | "unreadable" | "other";
  * that a caller tells the reasons apart by it and never by the words of the message.
  */
 export class AddressRefusalError extends Error {
+  /** Human-readable explanation; callers distinguish refusal categories with code instead. */
   readonly reason: string;
+  /** Stable category identifying the refused address form or unreadable input. */
   readonly code: AddressRefusalKind;
 
   constructor(reason: string, code: AddressRefusalKind = "other") {
@@ -310,7 +312,9 @@ export abstract class Coin implements CoinDescription {
  * address.
  */
 export class CoinAddress {
+  /** The coin whose address rules and derivation paths describe this value. */
   readonly coin: Coin;
+  /** The single-key address form interpreted by this coin. */
   readonly type: AddressType;
   /** A Bitcoin testnet or signet address, or a Dash Platform testnet one: coin type 1. */
   readonly testnet: boolean;

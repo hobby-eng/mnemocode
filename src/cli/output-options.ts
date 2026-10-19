@@ -7,15 +7,22 @@ export const FILE_OUTPUTS = ["output", "pdf", "qr", "heir-sheet", "candidates-fi
 export const FOLDER_OUTPUTS = ["cards-dir", "images-dir", "word-lists-dir"] as const;
 export const SAVED_OPTIONS = [...FILE_OUTPUTS, ...FOLDER_OUTPUTS] as const;
 
-/**
- * Options that name a file the command reads: no output may overlap one, and an output is never
- * renamed to the name of one (output-paths.ts). A test keeps every option that names a file or a
- * folder in exactly one of these lists.
- */
-export const FILE_INPUTS = [
+/** Text-file inputs that also accept "-" for the command's single standard-input source. */
+export const STDIN_INPUT_OPTIONS = [
   "mnemonic-file",
   "input-file",
   "share-file",
+  "dates-file",
+  "old-dates-file",
+  "last-word-file",
+] as const;
+
+/**
+ * File inputs cannot overlap an output or be numbered as its replacement (output-paths.ts).
+ * A test keeps every file/folder option in exactly one input/output list.
+ */
+export const FILE_INPUTS = [
+  ...STDIN_INPUT_OPTIONS,
   "share-qr",
   "candidates-key-file",
   "candidates-passphrase-file",

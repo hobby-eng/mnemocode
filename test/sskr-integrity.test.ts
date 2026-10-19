@@ -10,6 +10,7 @@ import { readBundledFile } from "../src/bundled-files.js";
 import { bytesOfHex } from "../src/core/bits.js";
 import { PROTECTION_FLAGS } from "../src/cli/protection.js";
 import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { PublicCliFiles } from "./helpers/public-cli-files.js";
 
 const execute = promisify(execFile);
 const bridge = resolve("sskr-wasm");
@@ -61,6 +62,10 @@ async function protectedCli(
   mutate: boolean,
   quorum: readonly string[],
 ): Promise<CliResult> {
+  using material = new PublicCliFiles([
+    "sskr-combine",
+    ...quorum.flatMap((share) => ["--share", share]),
+  ]);
   try {
     const output = await execute(
       process.execPath,
@@ -69,8 +74,7 @@ async function protectedCli(
         "--import",
         `data:text/javascript,${encodeURIComponent(corruptEngineRead)}`,
         resolve("dist/mnemocode.js"),
-        "sskr-combine",
-        ...quorum.flatMap((share) => ["--share", share]),
+        ...material.arguments,
       ],
       {
         env: {

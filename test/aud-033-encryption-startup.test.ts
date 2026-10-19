@@ -1,0 +1,77 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Decrypter, Encrypter } from "age-encryption";
+import {
+  assertCandidateEncryptionReady,
+  createSessionIdentity,
+  encryptCandidates,
+  PassphraseProtection,
+} from "../src/core/candidate-encryption.js";
+import { candidateVectors } from "./helpers/vectors.js";
+import { MnemoCodeSelfTest } from "../src/core/self-test.js";
+
+afterEach(() => vi.restoreAllMocks());
+
+describe("the first candidate encryption operation", () => {
+  it("fails closed on a fast known-answer failure before encrypting caller material", async () => {
+    vi.spyOn(Decrypter.prototype, "addIdentity").mockImplementationOnce(() => {
+      throw new Error("Synthetic known-answer backend failure.");
+    });
+    const writes = vi.spyOn(Encrypter.prototype, "encrypt");
+    const plain = Uint8Array.of(1, 2, 3);
+    const pending = encryptCandidates(plain, candidateVectors().age.recipient);
+    try {
+      await expect(pending).rejects.toHaveProperty(
+        "code",
+        "core.candidate-encryption.self-test-failed",
+      );
+      expect(writes).not.toHaveBeenCalled();
+      expect([...plain]).toEqual([1, 2, 3]);
+    } finally {
+      await pending.then(
+        (bytes) => bytes.fill(0),
+        () => undefined,
+      );
+      plain.fill(0);
+    }
+  });
+
+  it("retries a failed first check and shares the passing result across concurrent operations", async () => {
+    const reads = vi.spyOn(Decrypter.prototype, "addIdentity");
+    const results = await Promise.all([
+      createSessionIdentity(),
+      createSessionIdentity(),
+      createSessionIdentity(),
+    ]);
+    expect(results.every((pair) => pair.recipient.startsWith("age1"))).toBe(true);
+    const checked = reads.mock.calls.length;
+    expect(checked).toBeGreaterThan(0);
+    await createSessionIdentity();
+    expect(reads).toHaveBeenCalledTimes(checked);
+  });
+
+  it("refuses a missing protection kind instead of silently enabling a different feature", async () => {
+    const invalid: unknown = Reflect.apply(assertCandidateEncryptionReady, undefined, ["none"]);
+    await expect(invalid).rejects.toHaveProperty(
+      "code",
+      "core.candidate-encryption.unsupported-lock",
+    );
+  });
+
+  it("does not start asynchronous cipher checks during ordinary synchronous core startup", () => {
+    const identities = vi.spyOn(Decrypter.prototype, "addIdentity");
+    MnemoCodeSelfTest.core();
+    expect(identities).not.toHaveBeenCalled();
+  });
+
+  it("refuses protection disposed while its first-use await is pending before user encryption", async () => {
+    const encryption = vi.spyOn(Encrypter.prototype, "encrypt");
+    const protection = new PassphraseProtection("public synthetic test passphrase");
+    const input = Uint8Array.of(1, 2, 3);
+    const pending = protection.protect(input);
+    protection.wipe();
+    await expect(pending).rejects.toHaveProperty("code", "core.secret-value.wiped");
+    expect(encryption).not.toHaveBeenCalled();
+    expect([...input]).toEqual([1, 2, 3]);
+    input.fill(0);
+  });
+});

@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { containing, matching } from "./helpers/matchers.js";
+import { PublicCliFiles } from "./helpers/public-cli-files.js";
 
 /** The limit of the one test that starts the command line fifteen times. */
 const FIFTEEN_STARTS_TIME_LIMIT_MS = 300_000;
@@ -16,7 +17,8 @@ const mnemonic =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 async function run(arguments_: readonly string[], environment?: NodeJS.ProcessEnv) {
-  return execFileAsync(process.execPath, [cli, ...arguments_], {
+  using material = new PublicCliFiles(arguments_);
+  return await execFileAsync(process.execPath, [cli, ...material.arguments], {
     cwd: process.cwd(),
     env: environment ?? process.env,
     maxBuffer: 1024 * 1024,

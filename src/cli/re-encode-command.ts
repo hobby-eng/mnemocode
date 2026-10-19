@@ -37,7 +37,13 @@ import {
 import { warnOfCloudCopies } from "./cloud-folders.js";
 import { givenWallet, type GivenWallet } from "./bitcoin-options.js";
 import { backupChoice, datesAgainChoice } from "./date-search.js";
-import { DATES_OPTION, ENCODED_SECRET_OPTIONS, givenInputFormat, transformMode } from "./input.js";
+import {
+  DATES_OPTION,
+  ENCODED_SECRET_OPTIONS,
+  givenInputFormat,
+  textInput,
+  transformMode,
+} from "./input.js";
 import {
   backupAndDatesFromOptions,
   comparedPassphrase,
@@ -198,8 +204,11 @@ export async function runReEncode(args: ParsedArguments): Promise<Cancelled | un
   assertAskedNotGiven(args, [
     ...ENCODED_SECRET_OPTIONS,
     OLD_DATES_KEY,
+    "old-dates-file",
     LAST_WORD_OPTION,
+    "last-word-file",
     DATES_OPTION,
+    "dates-file",
   ]);
   const { old, fresh } = splitOptions(args);
   // The new backup's options, its destinations and cards, are checked before any question; without
@@ -235,7 +244,11 @@ async function reEncodingFromOptions(
     const read = await backupAndDatesFromOptions(old);
     if (read === CANCELLED) return CANCELLED;
     using backup = read.backup;
-    return ReEncoding.of(backup, read.dates, value(old, LAST_WORD_OPTION));
+    const lastWord =
+      value(old, "last-word-file") === undefined
+        ? value(old, LAST_WORD_OPTION)
+        : textInput(old, "last-word").trim();
+    return ReEncoding.of(backup, read.dates, lastWord);
   });
   if (reEncoding === CANCELLED) return CANCELLED;
   try {

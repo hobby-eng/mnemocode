@@ -227,6 +227,7 @@ export class EncodedForm {
     return defined(LIKELY_ORDER.find((format) => VARIANTS[format].looks(text)));
   }
 
+  /** This representation's stable record and command-line identifier. */
   get format(): EncodedFormat {
     return this.#format;
   }
@@ -294,6 +295,7 @@ export class EncodedForm {
     return width === undefined ? undefined : textPieces(compactCode(text), width);
   }
 
+  /** The matching CardKind, or undefined when this representation has no card kind. */
   get cardKind(): CardKind | undefined {
     return this.#variant.cardKind;
   }
@@ -311,6 +313,7 @@ export class EncodedForm {
     return this.#variant.colors;
   }
 
+  /** Whether front ends should require masking for directly readable words or indexes. */
   get alwaysMasked(): boolean {
     return this.#variant.alwaysMasked;
   }

@@ -79,8 +79,8 @@ describe("recover-date on the private screen", () => {
       DATES_PROMPT,
       DATES_PROMPT,
       DATES_PROMPT,
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):",
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):",
+      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
+      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
     ]);
     expect(terminal.questions).toEqual(["How can MnemoCode recognise the wallet?"]);
     // The private screen shows what is typed; no warning repeats it.

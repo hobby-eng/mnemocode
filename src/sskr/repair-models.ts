@@ -258,6 +258,7 @@ export const AMBIGUOUS_MARK_WIDTHS =
  * of them is left out unsaid. A joint repair names the share by its place.
  */
 export class AmbiguousMarksError extends Error {
+  /** Stable code for marked Color Unicode input exceeding the bounded reading search. */
   readonly code: ShareRepairErrorCode = "ambiguous-marks";
 
   constructor() {

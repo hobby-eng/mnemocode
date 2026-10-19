@@ -14,7 +14,7 @@ MASKED_WORD_NUMBERS = "2027 10 24 2027 10 24 2027 10 24 2027 10 377"
 # The test phrase masked with the same date by the Original Seedshift with a valid last word,
 # which keeps nothing of its last word, made with
 #   mnemocode encode --mode seedshift-legacy --legacy-valid-last-word \
-#     --mnemonic "abandon ... about" --dates 23-09-2026 --format 2
+#     --mnemonic-file public-mnemonic.txt --dates-file public-dates.txt --format 2
 # With the date one day later, no phrase that it gives ends with that last word.
 LEGACY_VALID_WORD_NUMBERS = "2027 10 24 2027 10 24 2027 10 24 2027 10 23"
 LAST_WORD = "about"
@@ -25,8 +25,8 @@ MISTYPED_DATE = "23-09-26"
 # The BIP32 master fingerprint of the test phrase without a BIP39 passphrase.
 FINGERPRINT = "73c5da0a"
 # Shares 1 and 3 of a 2-of-3 split of the masked test phrase, made with
-#   mnemocode encode --sskr --mode seedshift --mnemonic "abandon ... about" \
-#     --dates 23-09-2026 --threshold 2 --shares 3
+#   mnemocode encode --sskr --mode seedshift --mnemonic-file public-mnemonic.txt \
+#     --dates-file public-dates.txt --threshold 2 --shares 3
 # and share 3 with one byteword changed (pa to ae), so that its checksum fails.
 FIRST_SHARE = "ur:sskr/gomuttaeadaernclmdemdtlftsswsospsrjnjpwzuetlfhdltahh"
 THIRD_SHARE = "ur:sskr/gomuttaeadaojytnhyvtpaqdmobwreoyykutjtkofedicanladwm"
@@ -103,5 +103,8 @@ def answer_fingerprint(session):
     """Tells the wallet by the fingerprint of the test phrase, as the date search asks for it."""
     session.wait_for("How can MnemoCode recognise the wallet?")
     session.type("1")
-    session.wait_for("Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):")
+    session.wait_for(
+        "Original fingerprint of the wallet, such as 73c5da0a "
+        "(not the encoded one; They do not reveal the phrase.):"
+    )
     session.type(FINGERPRINT + ENTER)

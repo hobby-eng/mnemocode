@@ -15,7 +15,7 @@ import {
   type DateSearchResult,
 } from "../core/date-search.js";
 import type { EncodedBackup } from "../core/encoded-backup.js";
-import { integerOption, type ParsedArguments, value, values } from "./arguments.js";
+import { integerOption, type ParsedArguments, value } from "./arguments.js";
 import { askWalletEvidence } from "./ask.js";
 import { type WalletPlace, givenWallet } from "./bitcoin-options.js";
 import { CandidatesFile } from "./candidates-file.js";
@@ -43,6 +43,7 @@ import {
   givenInputFormat,
   backupFromOptions,
   transformMode,
+  dateInputText,
 } from "./input.js";
 import { terminalNotice } from "./terminal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
@@ -161,10 +162,10 @@ async function recoverFromOptions(
   if (!Masking.isMaskedMode(mode)) throw ERRORS.create("seedshift-mode-only", []);
   assertEvidenceGiven(mode, settings.evidence);
   const indexes = backup.indexes;
-  const dateValues = values(args, "date");
+  const dateValues = dateInputText(args);
   if (dateValues.length === 0)
     throw ERRORS.create("provide-dates-including-at-least-one-pattern-containing", []);
-  using dates = DatesAnswer.parse(dateValues.join(" "), {
+  using dates = DatesAnswer.parse(dateValues, {
     wordCount: indexes.length,
     patterns: true,
   });

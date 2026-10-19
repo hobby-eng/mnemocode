@@ -126,10 +126,12 @@ export class ShareSetChoice {
     );
   }
 
+  /** The minimum number of distinct shares required to restore the phrase. */
   get threshold(): number {
     return this.#threshold;
   }
 
+  /** The total number of shares in this validated split. */
   get count(): number {
     return this.#count;
   }

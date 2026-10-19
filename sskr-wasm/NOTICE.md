@@ -4,7 +4,7 @@ MnemoCode's SSKR engine is the Rust source in `rust/src/lib.rs`. `Dockerfile.ssk
 (`pnpm build:sskr`) builds it into the JavaScript/WASM adapter in `generated/`.
 The bridge was written for multi-chain-wallet-tools and taken from its revision
 `a0dad9e`; it is kept and built here now. Bridge package: `recovery-sskr-wasm`
-0.1.7. The retained bridge copyright and MIT terms are in [LICENSE](LICENSE).
+0.1.8. The retained bridge copyright and MIT terms are in [LICENSE](LICENSE).
 File hashes are in `integrity.json`.
 
 Core libraries: Blockchain Commons `sskr` 0.12.0, `bc-shamir` 0.13.0,
@@ -23,3 +23,9 @@ BSD-2-Clause-Patent license. The local patch adds secret-owner cleanup and
 redacted Debug output, and wraps direct Shamir result buffers in zeroizing
 owners. It preserves the pinned algorithms and wire formats. The provenance
 record identifies the registry archive and each original source file.
+
+The pinned [bc-shamir 0.13.0 runtime source](rust/vendor/bc-shamir-0.13.0/UPSTREAM.json)
+also owns reconstructed entropy until its digest is checked, so failed
+authentication retires that buffer. The SSKR decoder refuses a group index
+outside the declared group count. Valid share encodings and recovered values
+keep their meaning. Both retained dependencies include their original licenses.

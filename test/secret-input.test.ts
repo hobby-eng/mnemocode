@@ -30,7 +30,7 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
 });
 
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -115,15 +115,19 @@ describe("secret input", () => {
     const record = join(directory, "record.txt");
     const printed = vi.spyOn(console, "log").mockImplementation(() => undefined);
     try {
+      const words = join(directory, "public-mnemonic.txt");
+      const dates = join(directory, "public-dates.txt");
+      await writeFile(words, TEST_PHRASE, "utf8");
+      await writeFile(dates, "23-09-2026", "utf8");
       await promisify(execFile)(process.execPath, [
         "dist/mnemocode.js",
         "encode",
-        "--mnemonic",
-        TEST_PHRASE,
+        "--mnemonic-file",
+        words,
         "--format",
         "3",
-        "--dates",
-        "23-09-2026",
+        "--dates-file",
+        dates,
         "--output",
         record,
       ]);

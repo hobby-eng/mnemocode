@@ -1,7 +1,7 @@
 import { type DateShiftDate } from "../core.js";
 import { Masking } from "../core/masking.js";
 import { type ParsedArguments, value } from "./arguments.js";
-import { dates, encodeFormat, transformMode, phraseAndDates } from "./input.js";
+import { assertDateInputMode, encodeFormat, transformMode, phraseAndDates } from "./input.js";
 import { validateCardOptions, cardOutputs } from "./card-options.js";
 import { businessOptions, TYPED_CARD_TEXT_OPTIONS } from "./business-options.js";
 import { type CardSettings, assertSheetQr } from "../export/card-settings.js";
@@ -12,7 +12,7 @@ import { backupCheckAnswer, offerEncodedCheck } from "./backup-check.js";
 import { EncodeCardExport, saveEncodeResult } from "./encode-export.js";
 import { optionLabel } from "./option-copy.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
-import { terminalNotice, terminalWork } from "./terminal.js";
+import { printableText, terminalNotice, terminalWork } from "./terminal.js";
 import { EncodedBackup, type Encoding } from "../core/encoded-backup.js";
 import { COLOR_FORMAT_NUMBERS } from "./format-numbers.js";
 import { preflightOutputs, saveHeirSheetOutput, saveOutput } from "./output-saving.js";
@@ -52,8 +52,7 @@ async function validateEncodeOptions(
   maskedWordsRequested(args, mode);
   const format = encodeFormat(value(args, "format"));
   EncodedBackup.assertEncodable(mode, { validLastWord: args["legacy-valid-last-word"] === true });
-  // Dates given as options fit the mode before any secret is read; asked ones are checked then.
-  if (args["ask-secrets"] !== true) Masking.of(mode).assertDateCount(dates(args).length);
+  assertDateInputMode(args, mode);
   // The sheet leads through the menu, whose Decode does not offer a replaced last word.
   const replacement = Masking.of(mode).withValidLastWord;
   if (
@@ -192,7 +191,7 @@ async function saveSheetQr(
       : await saveQrBeside(backup.text(), pdf);
   if (path === CANCELLED) return CANCELLED;
   if (path !== undefined)
-    terminalNotice(`Saved the QR code of the sheet as an image: ${path}`, "success");
+    terminalNotice(`Saved the QR code of the sheet as an image: ${printableText(path)}`, "success");
 }
 
 /**

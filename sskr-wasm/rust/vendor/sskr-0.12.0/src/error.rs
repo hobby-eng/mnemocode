@@ -15,6 +15,10 @@ pub enum Error {
     #[error("When creating a split spec, the group count is invalid")]
     GroupCountInvalid,
 
+    /// A serialized share names a group outside its declared group count.
+    #[error("SSKR group index is invalid")]
+    GroupIndexInvalid,
+
     /// The group threshold is unsupported.
     #[error("SSKR group threshold is invalid")]
     GroupThresholdInvalid,

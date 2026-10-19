@@ -3,17 +3,22 @@
 // it is never reported as a failed save, nor left unmentioned. Only the removal of the staging
 // folder is made to fail; the file and its bytes are real. Public test data only.
 
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir } from "node:fs/promises";
 import * as actualFs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ failCleanup: false, notices: [] as string[] }));
+const state = vi.hoisted(() => ({ failCleanup: false, failLink: false, notices: [] as string[] }));
 vi.mock("node:fs/promises", async (original) => {
   const fs = await original<typeof import("node:fs/promises")>();
   return {
     ...fs,
+    link: async (...args: Parameters<typeof fs.link>) => {
+      if (state.failLink)
+        throw Object.assign(new Error("Synthetic unsupported hard link."), { code: "ENOTSUP" });
+      await fs.link(...args);
+    },
     rm: async (...args: Parameters<typeof fs.rm>) => {
       if (state.failCleanup && String(args[0]).includes(".mnemocode-export-"))
         throw Object.assign(new Error("staging cleanup denied"), { code: "EACCES" });
@@ -35,6 +40,7 @@ const folders: string[] = [];
 
 afterEach(async () => {
   state.failCleanup = false;
+  state.failLink = false;
   state.notices = [];
   for (const path of folders.splice(0)) await actualFs.rm(path, { recursive: true, force: true });
 });
@@ -62,6 +68,18 @@ describe("a staging copy left after a complete save", () => {
     await expect(writeSaved(() => publishNewPrivateFile(path, BYTES))).resolves.toBeUndefined();
     expect(state.notices).toHaveLength(1);
     expect(state.notices[0]).toMatch(/staging folder .* could not be removed: delete it\.$/u);
+  });
+
+  it("describes an empty retained staging folder accurately after rename publication", async () => {
+    const path = await newPath();
+    state.failLink = true;
+    state.failCleanup = true;
+    const failure = await publishNewPrivateFile(path, BYTES).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(LeftStagingCopyError);
+    if (!(failure instanceof LeftStagingCopyError)) throw new Error("Expected staging cleanup.");
+    expect(await readFile(path, "utf8")).toBe("public fixture");
+    expect(await readdir(failure.staging)).toEqual([]);
+    expect(failure.message).toContain("may still hold a copy");
   });
 
   it("keeps every other failure a failure, and an ordinary save silent", async () => {

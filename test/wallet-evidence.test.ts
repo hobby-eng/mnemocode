@@ -223,7 +223,7 @@ const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
 ];
 
 describe("every kind of wallet evidence, with a page's PBKDF2", () => {
-  it.each(cases)("%s", (_, evidence, expected) => {
+  it.each(cases)("gives the declared wallet-check result for %s", (_, evidence, expected) => {
     expect(browserCheck.match(publicMnemonic, evidence)).toEqual(expected);
     // The Node.js module gives the same result from node:crypto.
     expect(matchBitcoinEvidence(publicMnemonic, evidence)).toEqual(expected);

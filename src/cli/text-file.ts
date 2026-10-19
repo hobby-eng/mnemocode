@@ -1,6 +1,6 @@
 // Text read within the input limit (bounded-read.ts) and decoded as strict UTF-8 (utf8.ts): a file
 // that a command reads, such as a share, a WIF or a passphrase file, and standard input.
-import { MAX_TEXT_INPUT_BYTES, readFileOrRefuse } from "./bounded-read.js";
+import { MAX_TEXT_INPUT_BYTES, readBoundedDescriptor, readFileOrRefuse } from "./bounded-read.js";
 import { strictUtf8Text } from "./utf8.js";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -83,6 +83,22 @@ export function decodedText(bytes: Buffer, what: string): string {
   } finally {
     bytes.fill(0);
   }
+}
+
+/** Standard input's descriptor; shared by every explicitly stdin-capable material file option. */
+const STANDARD_INPUT_DESCRIPTOR = 0;
+const STANDARD_INPUT_NAME = "Text input";
+
+/**
+ * A bounded strict UTF-8 file, or "-" for standard input. Decoding retires its owned bytes;
+ * the caller handles the returned immutable text under the material's own parsing rule.
+ */
+export function readInputTextFile(path: string, inputName = "The text input"): string {
+  if (path !== "-") return readBoundedTextFile(path, inputName);
+  return decodedText(
+    readBoundedDescriptor(STANDARD_INPUT_DESCRIPTOR, MAX_TEXT_INPUT_BYTES, STANDARD_INPUT_NAME),
+    STANDARD_INPUT_NAME,
+  );
 }
 
 /**

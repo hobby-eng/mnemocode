@@ -490,20 +490,26 @@ def check_ctrl_c():
 
 def check_date_search_ctrl_c():
     # A date search of hours must stop at Ctrl+C and leave the private screen (AUD-008-API001).
-    session = Session((
-        "recover-date", "--mode", "seedshift", "--format", "english", "--input", TEST_PHRASE,
-        "--date", "01-01-????", "--master-fingerprint", "deadbeef",
-        "--max-candidates", "10000", "--progress-every", "1",
-    ))
-    try:
-        session.wait_for("Checked 1/9999 date combinations")
-        session.type(CTRL_C)
-        code = session.wait_for_exit(limit=SEARCH_STOP_LIMIT)
-        assert code == CANCELLED, f"Ctrl+C during the date search gave exit code {code}"
-        if not WINDOWS:
-            assert LEAVE_ALTERNATE_SCREEN in session.output, "the private screen was not left"
-    finally:
-        session.close()
+    with tempfile.TemporaryDirectory(prefix="mnemocode-public-date-stop-") as folder:
+        words = Path(folder) / "public-record.txt"
+        dates = Path(folder) / "public-patterns.txt"
+        words.write_text(TEST_PHRASE, encoding="utf-8")
+        dates.write_text("01-01-????", encoding="utf-8")
+        session = Session((
+            "recover-date", "--mode", "seedshift", "--format", "english",
+            "--input-file", str(words), "--dates-file", str(dates),
+            "--master-fingerprint", "deadbeef",
+            "--max-candidates", "10000", "--progress-every", "1",
+        ))
+        try:
+            session.wait_for("Checked 1/9999 date combinations")
+            session.type(CTRL_C)
+            code = session.wait_for_exit(limit=SEARCH_STOP_LIMIT)
+            assert code == CANCELLED, f"Ctrl+C during the date search gave exit code {code}"
+            if not WINDOWS:
+                assert LEAVE_ALTERNATE_SCREEN in session.output, "the private screen was not left"
+        finally:
+            session.close()
     print(f"Ctrl+C during a date search: the private screen left, exit code {CANCELLED}")
 
 

@@ -46,7 +46,9 @@ const ELEVEN = "abandon ".repeat(11);
 /** The test phrase with its last word forgotten: 128 checksum-valid candidates. */
 const LAST_FORGOTTEN = `${ELEVEN}?`;
 const PHRASE_PROMPT = "Seed phrase or text file path, ? for each forgotten word:";
-const LIST_PROMPT = "Passphrase for the candidates list:";
+const LIST_PROMPT = "Enter the candidate list encryption passphrase (not the BIP39 passphrase):";
+const REPEAT_LIST_PROMPT =
+  "Repeat the candidate list encryption passphrase (not the BIP39 passphrase):";
 const LIST_PASSPHRASE = "public candidate test passphrase";
 
 let directory: string;
@@ -59,7 +61,7 @@ function recover(options: Record<string, string | boolean>): Promise<Cancelled |
 function promptsShown(): string[] {
   return [
     ...seen.screen.matchAll(
-      /(Seed phrase or text file path, \? for each forgotten word:|Passphrase for the candidates list:|The same passphrase again:)/gu,
+      /(Seed phrase or text file path, \? for each forgotten word:|Enter the candidate list encryption passphrase \(not the BIP39 passphrase\):|Repeat the candidate list encryption passphrase \(not the BIP39 passphrase\):)/gu,
     ),
   ].map((match) => match[1]!);
 }
@@ -101,9 +103,9 @@ describe("recover-word on the private screen", () => {
       PHRASE_PROMPT,
       LIST_PROMPT,
       LIST_PROMPT,
-      "The same passphrase again:",
+      REPEAT_LIST_PROMPT,
       LIST_PROMPT,
-      "The same passphrase again:",
+      REPEAT_LIST_PROMPT,
     ]);
     const list = decodeCandidateList(
       await decryptCandidates(await readFile(path), { passphrase: LIST_PASSPHRASE }),

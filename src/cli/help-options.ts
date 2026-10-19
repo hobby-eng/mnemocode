@@ -103,22 +103,19 @@ export const TEST_FINGERPRINT = "73c5da0a";
 
 export const askSecrets: HelpOption = {
   flag: "--ask-secrets",
-  summary: "Ask for the secrets on a private screen instead of the command line",
+  summary: "Ask for the secrets on a private screen",
   details: [
     "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that nothing stays in the scrollback. This works on Linux, macOS and Windows alike.",
     "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While an answer is typed, Escape does nothing, so that a slip loses nothing; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
     "Standard input must be the terminal; without one, or in a terminal that says TERM=dumb, the command stops at once. Output sent to a file goes there as before.",
-    "Use it for every real secret: text typed in a command can stay in the shell history and is visible in the list of running programs.",
+    "Raw phrase, record, share, date and final-word arguments are refused, including public fixtures. Use the private screen or the corresponding file/stdin option.",
   ],
 };
 
 export const mnemonicText: HelpOption = {
   flag: "--mnemonic",
   value: "TEXT",
-  summary: "The phrase as text; only for public test phrases",
-  details: [
-    "English BIP39 words separated by spaces. A real phrase typed here can stay in the shell history; use --ask-secrets or --mnemonic-file instead.",
-  ],
+  summary: "Refused material argument; use --mnemonic-file or --ask-secrets",
 };
 
 export const mnemonicFile: HelpOption = {
@@ -131,20 +128,42 @@ export const mnemonicFile: HelpOption = {
 export const dates: HelpOption = {
   flag: "--dates",
   value: "DATE ...",
-  summary: "One or more dates, DD-MM-YYYY, separated by spaces",
+  summary: "Refused material argument; use --dates-file or --ask-secrets",
+};
+
+export const datesFile: HelpOption = {
+  flag: "--dates-file",
+  value: "PATH",
+  summary: "Read dates from a local UTF-8 file; - reads standard input",
   details: [
+    "Dates are separated by whitespace. recover-date also accepts date patterns in this file. Do not combine it with --ask-secrets, which asks for the dates itself.",
     "YYYY-MM-DD is also accepted. The order does not matter: the dates are sorted, oldest first. A year always has four digits, 0001 to 9999, so the year 26 is written 0026.",
-    `Up to one date for every three words: ${listInWords(BIP39_WORD_COUNTS.map(maximumDates), "or")} dates for ${WORD_COUNTS_TEXT} words. Dates are never stored; keep them yourself.`,
+    `DD-MM-YYYY, up to one date for every three words: ${listInWords(BIP39_WORD_COUNTS.map(maximumDates), "or")} dates for ${WORD_COUNTS_TEXT} words. Dates are not written into the encoded record; protect and keep the date file yourself.`,
+    "Only one material file option may read standard input in one command; use local files for the other sources.",
   ],
 };
+
+/** Re-encode's original final word: the raw form is recognized only to explain its refusal. */
+export const lastWordInputs: readonly HelpOption[] = [
+  {
+    flag: "--last-word",
+    value: "WORD",
+    summary: "Refused material argument; use --last-word-file or --ask-secrets",
+  },
+  {
+    flag: "--last-word-file",
+    value: "PATH",
+    summary: "Read the original final word for seedshift-legacy-valid from a file or -",
+    details: [
+      "The backup gives a phrase for each possible last word; the original one picks it. Not with --ask-secrets, which asks for that word privately.",
+    ],
+  },
+];
 
 export const encodedText: HelpOption = {
   flag: "--input",
   value: "TEXT",
-  summary: "The encoded record as text",
-  details: [
-    `Any of the ${numberWord(ENCODED_FORMATS.length)} formats, with or without an MNC1 header.`,
-  ],
+  summary: "Refused material argument; use --input-file, --qr-file or --ask-secrets",
 };
 
 export const encodedFile: HelpOption = {
@@ -152,7 +171,7 @@ export const encodedFile: HelpOption = {
   value: "PATH",
   summary: "Read the encoded record from a file; - reads standard input",
   details: [
-    "A file saved with encode --output names its mode and format, so only the dates are needed with it.",
+    `Any of the ${numberWord(ENCODED_FORMATS.length)} formats, with or without an MNC1 header. A file saved with encode --output names its mode and format, so only the dates are needed with it.`,
   ],
 };
 
@@ -528,15 +547,15 @@ export const shareInputs: readonly HelpOption[] = [
   {
     flag: "--share",
     value: "TEXT",
-    summary: "One share as text, ? for each unreadable element; repeat for each share",
-    details: [
-      "ur:sskr/..., Bytewords, word numbers, Unicode codes, colors or colors as Unicode codes; the form is found automatically.",
-    ],
+    summary: "Refused material argument; use --share-file, --share-qr or --ask-secrets",
   },
   {
     flag: "--share-file",
     value: "PATH",
     summary: `A file of shares, one per line or with ${SHARE_SEPARATOR} between them; may be repeated`,
+    details: [
+      "Use - to read standard input once. ur:sskr/..., Bytewords, word numbers, Unicode codes, colors or colors as Unicode codes are detected automatically; ? marks an unreadable element.",
+    ],
   },
   {
     flag: "--share-qr",
@@ -574,7 +593,9 @@ export const encodeMode: HelpOption = {
   flag: "--mode",
   value: "MODE",
   summary: `${listInWords(ENCODE_MODES, "or")}; see mnemocode help modes`,
-  details: ["Without --mode, MnemoCode uses seedshift when --dates is given and direct otherwise."],
+  details: [
+    "Without --mode, MnemoCode uses seedshift when --dates-file is given and direct otherwise.",
+  ],
 };
 
 export const encodeFormat: HelpOption = {

@@ -1,3 +1,5 @@
+import { errorCode } from "../core/refusal.js";
+
 /**
  * Host service for restoring complete SSKR shares.
  *
@@ -9,8 +11,30 @@
  * platform configured beforehand.
  */
 export interface ShareCombiner {
-  /** The secret that complete shares restore, from the host's SSKR library; throws if none. */
+  /**
+   * Fresh owned entropy, or ShareCombineRefusalError/the matching native code for an invalid
+   * quorum only. Other host/initialization failures propagate, never become failed candidates.
+   */
   readonly combineShares: (records: readonly string[]) => Promise<Uint8Array>;
+}
+
+// Deliberate copy of Refusal::Combine.code() in the pinned Rust engine: hosts need the refusal
+// contract without loading WASM. The native code interoperability is tested with actual quorums.
+const COMBINATION_REFUSAL = "sskr.engine.combine";
+
+/** An expected invalid-quorum/digest outcome for a host-provided SSKR combiner. */
+export class ShareCombineRefusalError extends Error {
+  /** Stable native-compatible code, never an operational/initialization failure. */
+  readonly code = COMBINATION_REFUSAL;
+
+  constructor() {
+    super("The SSKR shares do not restore a secret.");
+  }
+
+  /** Classifies an explicit host/native combination refusal; never matches message text. */
+  static is(error: unknown): boolean {
+    return errorCode(error) === COMBINATION_REFUSAL;
+  }
 }
 
 /** The host services needed to repair marked shares: digest checks and complete restoration. */

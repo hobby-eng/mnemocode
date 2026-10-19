@@ -6,7 +6,7 @@
 import { writeFile } from "node:fs/promises";
 import { MENU_ENTRY_NAMES } from "../src/cli/menu-entries.js";
 import { join } from "node:path";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { MENU_ENTRIES, runMenu } from "../src/cli/menu.js";
 import { askLine, choose, waitForEnter } from "../src/cli/terminal-choice.js";
 import { ErrorCatalog } from "../src/core/error-catalog.js";
@@ -50,6 +50,7 @@ vi.mock("../src/export/image-export.js", async (importOriginal) =>
 );
 
 keyedQuestions();
+afterEach(() => vi.unstubAllEnvs());
 
 describe("a typed answer leaves only its line in the record of answers", () => {
   it("shows no byte of an answer that is not UTF-8, and says why above the question", async () => {
@@ -137,7 +138,8 @@ const TYPED: Readonly<Record<string, string>> = {
   "Word number": "1",
   "Unicode code": "4E00",
   // The public test phrase's fingerprint and its first native SegWit address.
-  "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)": "73c5da0a",
+  "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.)":
+    "73c5da0a",
   "Bitcoin address (one of the first receiving ones)": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
   // The public test phrase\'s first address in each other coin.
   ...COIN_ADDRESS_ANSWERS,
@@ -267,6 +269,51 @@ describe("going back from an entry of the start menu", () => {
       await writeFile(longFileName(fallback), "");
   });
 
+  it.each([40, 80])(
+    "keeps the fingerprint explanation beside its value in a %i-column answer record",
+    async (columns) => {
+      vi.stubEnv("CLICOLOR_FORCE", "1");
+      vi.stubEnv("NO_COLOR", undefined);
+      const screen = watchScreen(columns);
+      const written: string[] = [];
+      const write = process.stderr.write.bind(process.stderr);
+      vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string | Uint8Array) => {
+        written.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+        return write(chunk);
+      }) as typeof process.stderr.write);
+      const keys = [
+        String(MENU_ENTRY_NAMES.recover.digit),
+        `${DOWN.repeat(2)}${ENTER}`,
+        ENTER,
+        ENTER,
+        ENTER,
+        ENTER,
+        `73c5da0a${ENTER}`,
+        ESCAPE,
+      ];
+      let recorded: string[] = [];
+      terminal.keysFor = () => {
+        const next = keys.shift();
+        if (next === undefined) throw new Error("The menu asked more than was answered.");
+        return next;
+      };
+      terminal.exit = async () => {
+        recorded = screen.lines();
+        return 130;
+      };
+      await runMenu();
+      const expected = screenOf(
+        columns,
+        answerLine("Fingerprint", "73c5da0a · They do not reveal the phrase."),
+      ).lines;
+      expect(recorded).toEqual(expect.arrayContaining(expected.filter((line) => line !== "")));
+      expect(written.join("")).toContain(
+        "\x1b[36m73c5da0a · \x1b[90mThey do not reveal the phrase.\x1b[0m",
+      );
+      expect(keys).toEqual([]);
+    },
+  );
+
   // Every entry that asks questions: from Encode to the word table.
   it.each(
     MENU_ENTRIES.filter(
@@ -365,6 +412,41 @@ describe("going back on a terminal shorter than the record of answers", () => {
     ]);
     expect(deep).toEqual(quit);
   });
+});
+
+it("omits an unsafe command preview without refusing the actual filename or running twice", async () => {
+  const path = join(folder, "public-\u202e-word-list.txt");
+  const keys = [
+    String(MENU_ENTRY_NAMES.table.digit),
+    `${DOWN.repeat(4)}${ENTER}`,
+    ENTER,
+    `${path}${ENTER}`,
+    ESCAPE,
+  ];
+  watchScreen(80);
+  const messages: string[] = [];
+  const originalError = console.error.bind(console);
+  vi.spyOn(console, "error").mockImplementation((...values: unknown[]) => {
+    messages.push(values.map(String).join(" "));
+    originalError(...values);
+  });
+  let commands = 0;
+  let preview = "";
+  terminal.exit = async () => {
+    commands += 1;
+    preview = messages.at(-1) ?? "";
+    return 130;
+  };
+  terminal.keysFor = () => {
+    const next = keys.shift();
+    if (next === undefined) throw new Error("The menu asked more than was answered.");
+    return next;
+  };
+  await runMenu();
+  stopWatching();
+  expect(commands).toBe(1);
+  expect(preview).toContain("Command preview omitted: an argument contains display controls.");
+  expect(preview).not.toContain("\u202e");
 });
 
 describe("what the menu does when a command cannot run or stops", () => {

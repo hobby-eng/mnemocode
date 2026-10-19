@@ -17,8 +17,7 @@ import { DatesAnswer } from "../core/date-search.js";
 import { WordList } from "../core/word-hints.js";
 import { DATE_COUNT_WORDS, Masking, type DateCountWords } from "../core/masking.js";
 import { validatedEnglishWords } from "../core/words.js";
-import { MAX_TEXT_INPUT_BYTES, readBoundedDescriptor } from "./bounded-read.js";
-import { decodedText, readBoundedTextFile } from "./text-file.js";
+import { readInputTextFile } from "./text-file.js";
 import { decodeQrPngFile } from "./qr-input.js";
 
 import {
@@ -75,34 +74,32 @@ export function phraseWords(args: ParsedArguments): Bip39WordCount | undefined {
   return words;
 }
 
-/** Standard input, as its refusals name it. */
-const STANDARD_INPUT = "Text input";
-/** The file descriptor of standard input. */
-const STANDARD_INPUT_DESCRIPTOR = 0;
-
-function readBoundedStdin(): string {
-  return decodedText(
-    readBoundedDescriptor(STANDARD_INPUT_DESCRIPTOR, MAX_TEXT_INPUT_BYTES, STANDARD_INPUT),
-    STANDARD_INPUT,
-  );
-}
-
-export function textInput(arguments_: ParsedArguments, key: "input" | "mnemonic"): string {
+export function textInput(
+  arguments_: ParsedArguments,
+  key: "input" | "mnemonic" | "last-word",
+): string {
   const direct = value(arguments_, key);
   const path = value(arguments_, `${key}-file`);
-  const subject = key === "mnemonic" ? "the mnemonic" : "the encoded input";
+  const subject =
+    key === "mnemonic"
+      ? "the mnemonic"
+      : key === "last-word"
+        ? "the original final word"
+        : "the encoded input";
   if (direct !== undefined && path !== undefined)
     throw ERRORS.create("provide-either-as-direct-text-file-but-not", [`${subject}`]);
   if (direct === undefined && path === undefined)
     throw ERRORS.create("provide-as-direct-text-file-through-ask-secrets", [`${subject}`]);
   return (
     direct ??
-    (path === "-"
-      ? readBoundedStdin()
-      : readBoundedTextFile(
-          defined(path),
-          key === "mnemonic" ? "The mnemonic file" : "The encoded input file",
-        ))
+    readInputTextFile(
+      defined(path),
+      key === "mnemonic"
+        ? "The mnemonic file"
+        : key === "last-word"
+          ? "The original final-word file"
+          : "The encoded input file",
+    )
   );
 }
 
@@ -112,7 +109,7 @@ export function textInput(arguments_: ParsedArguments, key: "input" | "mnemonic"
  * recover-date check it before their first question.
  */
 export function assertAskedEncodedInput(arguments_: ParsedArguments): void {
-  assertAskedNotGiven(arguments_, [...ENCODED_SECRET_OPTIONS, DATES_OPTION]);
+  assertAskedNotGiven(arguments_, [...ENCODED_SECRET_OPTIONS, DATES_OPTION, "dates-file"]);
 }
 
 /**
@@ -244,7 +241,9 @@ export function transformMode(arguments_: ParsedArguments, embedded?: MaskingMod
   if (conflict !== undefined) throw ERRORS.create("transform-mode-refused", [conflict]);
   if (explicit !== undefined) return explicit as MaskingMode;
   if (embedded !== undefined) return embedded;
-  return values(arguments_, "date").length > 0 ? "seedshift" : "direct";
+  return values(arguments_, "date").length > 0 || value(arguments_, "dates-file") !== undefined
+    ? "seedshift"
+    : "direct";
 }
 
 export function encodedOutputLabel(format: EncodedFormat, mode: MaskingMode): string {
@@ -260,8 +259,35 @@ const FORM_LABELS: Readonly<Record<EncodedFormat, string>> = {
   "colors-unicode": "MnemoCode color Unicode code points",
 };
 
+/** Dates or date patterns as one bounded file/stdin answer, or trusted in-process values. */
+export function dateInputText(arguments_: ParsedArguments): string {
+  const direct = values(arguments_, "date");
+  const path = value(arguments_, "dates-file");
+  if (path !== undefined && direct.length > 0)
+    throw ERRORS.create("provide-either-as-direct-text-file-but-not", ["the dates"]);
+  return path === undefined ? direct.join(" ") : readInputTextFile(path, "The dates file");
+}
+
 export function dates(arguments_: ParsedArguments): DateShiftDate[] {
-  return values(arguments_, "date").map(parseDate);
+  if (value(arguments_, "dates-file") === undefined)
+    return values(arguments_, "date").map(parseDate);
+  using answer = DatesAnswer.parse(dateInputText(arguments_), { patterns: false });
+  return answer.known;
+}
+
+/**
+ * Checks the configured date source against the mode before material is read. A file signals an
+ * intended date source; its actual contents/count are checked at use, without consuming stdin twice.
+ */
+export function assertDateInputMode(
+  args: ParsedArguments,
+  mode: MaskingMode,
+  words: DateCountWords = DATE_COUNT_WORDS.codes,
+): void {
+  if (args["ask-secrets"] === true) return;
+  // One represents source presence, not a claim about the still-unread file's actual date count.
+  const count = value(args, "dates-file") === undefined ? dates(args).length : 1;
+  Masking.of(mode).assertDateCount(count, false, words);
 }
 
 /**
@@ -334,7 +360,7 @@ export async function promptedEncodeInputs(
   known?: string,
 ): Promise<{ readonly mnemonic: string; readonly dates: DateShiftDate[] } | undefined | Cancelled> {
   if (arguments_["ask-secrets"] !== true) return undefined;
-  assertAskedNotGiven(arguments_, [...PHRASE_SECRET_OPTIONS, DATES_OPTION]);
+  assertAskedNotGiven(arguments_, [...PHRASE_SECRET_OPTIONS, DATES_OPTION, "dates-file"]);
   const mnemonic =
     known ??
     (await askSecretUntil("Seed phrase (English BIP39 words):", typedSeedPhrase, {

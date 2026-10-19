@@ -112,6 +112,9 @@ fn deserialize_share(source: &[u8]) -> Result<SSKRShare> {
 
     let identifier = ((source[0] as u16) << 8) | source[1] as u16;
     let group_index = (source[3] >> 4) as usize;
+    if group_index >= group_count {
+        return Err(Error::GroupIndexInvalid);
+    }
     let member_threshold = ((source[3] & 0xf) + 1) as usize;
     let reserved = source[4] >> 4;
     if reserved != 0 {

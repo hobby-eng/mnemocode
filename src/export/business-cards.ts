@@ -30,6 +30,7 @@ import { peakRelativeLuma } from "./color-math.js";
 import { artworkBrightness } from "./business-tint.js";
 import { documentWithFont } from "./pdf-documents.js";
 import { defined } from "../core/defined.js";
+import { wipedAfterAsync } from "../core/bits.js";
 
 /** The top of the reference line's box on a separate card, in millimetres. */
 const REFERENCE_TOP = 46;
@@ -111,7 +112,7 @@ export async function renderBusinessCards(
     if (!pending) {
       pending = drawing.businessArtwork
         .recoloured(design, code)
-        .then((bytes) => doc.embedPng(bytes));
+        .then((bytes) => wipedAfterAsync(bytes, (png) => doc.embedPng(png)));
       artworkCache.set(key, pending);
     }
     return pending;

@@ -79,7 +79,7 @@ const ERRORS = new ErrorCatalog("cli.share-repair", {
 const SOURCE_ERRORS = new ErrorCatalog("cli.sskr-restore-command", {
   "standard-input-can-only-read-once": () => "Standard input can only be read once.",
   "provide-at-least-one-complete-share-as-text": () =>
-    "Provide at least one complete share as text, in a text file, in a QR image, or through --ask-secrets. Additional share sources may be repeated.",
+    "Provide at least one complete share in a text file, in a QR image, or through --ask-secrets. Additional share sources may be repeated.",
 });
 
 /** The restore of shares with Node's SSKR library: it keeps nothing of a restore. */

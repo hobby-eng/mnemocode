@@ -17,6 +17,7 @@ import {
   parseDatePattern,
 } from "../src/core.js";
 import { containing } from "./helpers/matchers.js";
+import { PublicCliFiles } from "./helpers/public-cli-files.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -24,7 +25,8 @@ const publicMnemonic =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 async function run(arguments_: readonly string[]) {
-  return execFileAsync(process.execPath, [cli, ...arguments_], {
+  using material = new PublicCliFiles(arguments_);
+  return await execFileAsync(process.execPath, [cli, ...material.arguments], {
     cwd: process.cwd(),
     maxBuffer: 1024 * 1024,
   });

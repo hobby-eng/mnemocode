@@ -25,6 +25,7 @@ import { crc32 } from "./checksum.js";
 import { expectRefused, expectRefusedLater, expectSame } from "../core/self-test-check.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { SHARE_UNITS } from "./share-units.js";
 
 const ERRORS = new ErrorCatalog("sskr.known-answers", {
   "self-test-failed-no-secret-was-processed": (value0: string) =>
@@ -161,6 +162,26 @@ function changedShareValue(): string {
   }
 }
 
+/** Public two-of-three fixture with group 1 outside its declared one-group set. */
+function impossibleGroupQuorum(): string[] {
+  return sskrSetVector.shares.slice(0, 2).map((record) => {
+    const bytes = urToTransport(record);
+    try {
+      // This fixed 21-byte payload has one CBOR head byte; metadata byte 3 follows at byte 4.
+      expectSame(defined(bytes[0]), 0x55, "SSKR metadata fixture framing");
+      bytes[4] = (defined(bytes[4]) & 0x0f) | 0x10;
+      new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(
+        bytes.length - CHECKSUM_BYTES,
+        crc32(bytes.subarray(0, -CHECKSUM_BYTES)),
+      );
+      // Reach the native boundary: normal transportToUr correctly refuses this metadata first.
+      return SHARE_UNITS.ur.text(Array.from(bytes));
+    } finally {
+      bytes.fill(0);
+    }
+  });
+}
+
 /** The host's restoring of `shares` compared with `entropy`; `name` names the check. */
 async function expectRestored(
   platform: ShareCombiner,
@@ -212,6 +233,7 @@ export async function checkSskrKnownAnswers(platform: ShareSplitPlatform): Promi
   for (const [name, shares] of [
     ["SSKR engine incomplete quorum", sskrVector.shares.slice(0, -1)],
     ["SSKR engine damaged value", [changedShareValue(), ...sskrVector.shares.slice(1)]],
+    ["SSKR engine impossible group index", impossibleGroupQuorum()],
   ] as const)
     await expectRefusedLater(
       async () => {

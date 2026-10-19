@@ -289,6 +289,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn refuses_a_group_index_outside_its_declared_group_count_in_both_encodings() {
+        bc_tags::register_tags();
+        for encoding in [ShareEncoding::CompactUr, ShareEncoding::Bytewords] {
+            let mut payload = vec![0, 0, 0, 0, 0];
+            payload.extend_from_slice(&[0x24; 16]);
+            let valid = encode_share(&UrShare(payload.clone()), encoding);
+            assert_eq!(combine(&valid, encoding as u8).unwrap(), vec![0x24; 16]);
+            payload[3] = 0x10;
+            let invalid = encode_share(&UrShare(payload), encoding);
+            assert!(matches!(
+                combine(&invalid, encoding as u8),
+                Err(Refusal::Combine(_))
+            ));
+        }
+    }
+
+    #[test]
     fn restores_legacy_untagged_bytewords() {
         bc_tags::register_tags();
         let secret = vec![0x24; 16];
@@ -311,7 +328,7 @@ mod tests {
     }
 
     #[test]
-    fn encoding_codes() {
+    fn accepts_known_encoding_codes_and_refuses_unknown_codes() {
         assert_eq!(ShareEncoding::try_from(0), Ok(ShareEncoding::CompactUr));
         assert_eq!(ShareEncoding::try_from(1), Ok(ShareEncoding::Bytewords));
         for code in [2, u8::MAX] {
@@ -357,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn grouped_round_trip() {
+    fn restores_secret_from_grouped_compact_ur_and_bytewords_quorums() {
         let secret = vec![0x42; 16];
         let records = create_sskr_shares(secret.clone(), 2, vec![2, 3, 1, 2], vec![7; 32]).unwrap();
         let lines: Vec<_> = records.lines().collect();

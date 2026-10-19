@@ -36,7 +36,9 @@ describe("AUD-001 regression contracts", () => {
       await mkdir(real);
       await symlink(real, join(directory, "alias"), "junction");
       const source = join(real, "input.txt");
+      const dateFile = join(directory, "public-dates.txt");
       await writeFile(source, publicMnemonic);
+      await writeFile(dateFile, "23-09-2026", "utf8");
       const result = await promisify(execFile)(process.execPath, [
         resolve("dist/mnemocode.js"),
         "encode",
@@ -44,8 +46,8 @@ describe("AUD-001 regression contracts", () => {
         "seedshift",
         "--mnemonic-file",
         source,
-        "--dates",
-        "23-09-2026",
+        "--dates-file",
+        dateFile,
         "--output",
         join(directory, "alias", "input.txt"),
       ]).then(

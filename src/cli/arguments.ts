@@ -4,6 +4,7 @@ import { listInWords } from "../core/places.js";
 import { SHARE_SOURCE_OPTIONS } from "./share-options.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { STDIN_INPUT_OPTIONS } from "./output-options.js";
 
 const ERRORS = new ErrorCatalog("cli.arguments", {
   "command-does-not-accept-unnamed-value-use-appropriate": () =>
@@ -24,9 +25,41 @@ const ERRORS = new ErrorCatalog("cli.arguments", {
     `The ${value0} command does not support the ${value1} setting.`,
   "on-off-choice-does-not-accept-separate-value": (value0: string) =>
     `${value0} is an on-or-off choice and does not accept a separate value.`,
+  "private-material-argv": (flag: string, advice: string) =>
+    `Secret material for ${flag} must not be passed as a command-line value. Use ${advice}.`,
+  "multiple-standard-input-sources": () =>
+    "Standard input can supply only one material source per command; use local files for the other sources.",
 });
 
 export type ParsedArguments = Record<string, string | boolean | string[]>;
+
+const DATE_SOURCE_ADVICE = "--dates-file PATH or --ask-secrets";
+const OLD_DATE_SOURCE_ADVICE = "--old-dates-file PATH or --ask-secrets";
+const PRIVATE_MATERIAL_FLAGS: Readonly<Record<string, string>> = Object.freeze({
+  "--mnemonic": "--mnemonic-file PATH or --ask-secrets",
+  "--input": "--input-file PATH, --qr-file PATH or --ask-secrets",
+  "--share": "--share-file PATH, --share-qr PATH or --ask-secrets",
+  "--date": DATE_SOURCE_ADVICE,
+  "--dates": DATE_SOURCE_ADVICE,
+  "--old-date": OLD_DATE_SOURCE_ADVICE,
+  "--old-dates": OLD_DATE_SOURCE_ADVICE,
+  "--last-word": "--last-word-file PATH or --ask-secrets",
+});
+
+/** Refuses material-bearing argv flags without inspecting or repeating their values. */
+export function assertSafeMaterialArgv(argv: readonly string[]): void {
+  const flag = argv.find((item) => Object.hasOwn(PRIVATE_MATERIAL_FLAGS, item));
+  if (flag !== undefined)
+    throw ERRORS.create("private-material-argv", [flag, defined(PRIVATE_MATERIAL_FLAGS[flag])]);
+}
+
+/** Refuses mixed date question/file answers and standard input shared by different options. */
+export function assertPrivateFileSources(args: ParsedArguments): void {
+  assertAskedNotGiven(args, ["dates-file", "old-dates-file", "last-word-file"]);
+  // Repeated --share-file - retains TypedShares.given's existing per-share refusal.
+  const sources = STDIN_INPUT_OPTIONS.filter((key) => values(args, key).includes("-"));
+  if (sources.length > 1) throw ERRORS.create("multiple-standard-input-sources", []);
+}
 
 export function parseArguments(items: readonly string[]): ParsedArguments {
   // No prototype: every typed name is an own key of its own, "--__proto__" too, which on an

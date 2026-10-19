@@ -189,11 +189,11 @@ function __wbg_get_imports() {
         __wbg___wbindgen_throw_41e9ee4f547fc59a: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbg_new_04162cd42c43e379: function(arg0, arg1) {
+        __wbg_new_c5b7857e7876d329: function(arg0, arg1) {
             const ret = new Error(getStringFromWasm0(arg0, arg1));
             return addHeapObject(ret);
         },
-        __wbg_set_code_5a730805b54237fb: function(arg0, arg1, arg2) {
+        __wbg_set_code_5873373eea432bc9: function(arg0, arg1, arg2) {
             getObject(arg0).code = getStringFromWasm0(arg1, arg2);
         },
     };

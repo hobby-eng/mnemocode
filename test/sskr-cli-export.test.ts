@@ -12,9 +12,11 @@ import { type ShareFormat } from "../src/sskr/transport.js";
 import { markUnits } from "./helpers/shares.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { PublicCliFiles } from "./helpers/public-cli-files.js";
 
 function cli(args: string[]) {
-  const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...args], {
+  using material = new PublicCliFiles(args);
+  const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...material.arguments], {
     encoding: "utf8",
     env: { ...process.env, NO_COLOR: "1" },
   });
@@ -145,6 +147,7 @@ describe("integrated SSKR CLI", () => {
         "--qr-file",
         join(directory, "cards-qr.png"),
       ]);
+      expect(decoded.status, decoded.stderr).toBe(0);
       expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
       // The shares: one image for each, named after its reference.
       const shares = join(directory, "shares.pdf");
@@ -165,7 +168,7 @@ describe("integrated SSKR CLI", () => {
       ]);
       expect(split.status, split.stderr).toBe(0);
       expect(split.stderr).toContain(
-        "Saved the QR code of each share's sheets as an image beside them: 3 PNG files.",
+        "Saved the QR codes of the share sheets as images beside them: 3 PNG files.",
       );
       const images = readdirSync(directory)
         .filter((name) => /^shares-.+-qr\.png$/u.test(name))
@@ -178,6 +181,7 @@ describe("integrated SSKR CLI", () => {
         "--share-qr",
         join(directory, images[2]!),
       ]);
+      expect(restored.status, restored.stderr).toBe(0);
       // The backup in the form of the shares comes first, then the seed phrase.
       expect(restored.stdout.trim().split("\n").at(-1)).toBe(TEST_PHRASE);
     } finally {

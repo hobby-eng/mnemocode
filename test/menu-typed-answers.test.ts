@@ -67,15 +67,15 @@ describe("start menu", () => {
   describe("typed answers are checked at once and asked again", () => {
     it("asks the fingerprint and the address again until a wallet can have them", async () => {
       const fingerprint = await runOf(ENTRY.recover, [...DATE_WALLET, 0], {
-        "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)": [
-          "",
-          "73c5da0",
-          "73C5DA0A",
-        ],
+        "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.)":
+          ["", "73c5da0", "73C5DA0A"],
       });
       expect(fingerprint).toEqual(expect.arrayContaining(["--master-fingerprint", "73c5da0a"]));
+      expect(script.labels).toContain("Fingerprint");
       expect(
-        warningsAt("Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)"),
+        warningsAt(
+          "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.)",
+        ),
       ).toEqual([
         undefined,
         "Type the eight characters of the fingerprint.",

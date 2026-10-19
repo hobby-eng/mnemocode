@@ -109,12 +109,17 @@ export class BitFields {
     return packed.vector;
   }
 
+  /**
+   * Appends the low `width` bits above earlier fields; width is a non-negative whole bit count.
+   * Numeric arguments that cannot be converted to BigInt throw its conversion error.
+   */
   add(value: number, width: number): void {
     const bits = BigInt(width);
     this.#vector |= (BigInt(value) & ((1n << bits) - 1n)) << this.#width;
     this.#width += bits;
   }
 
+  /** The currently packed bit vector, with the first field in its least-significant bits. */
   get vector(): bigint {
     return this.#vector;
   }

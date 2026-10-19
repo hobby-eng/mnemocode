@@ -3,10 +3,12 @@ Decode and Restore."""
 
 import tempfile
 import subprocess
+import time
 from pathlib import Path
 
 from terminal_session import (
     COMMAND,
+    CTRL_C,
     CTRL_D,
     ENTER,
     ESCAPE,
@@ -47,6 +49,56 @@ from terminal_answers import (
     WORD_NUMBERS,
     answer_fingerprint,
 )
+
+
+def check_candidate_passphrase_roles():
+    """Both separate encryption-passphrase screens identify their secret and its role."""
+    expected = ("candidate list", "encryption passphrase", "not the BIP39 passphrase")
+
+    def role_visible(session, since=0):
+        if WINDOWS:
+            session.read_some(wait=0.05)
+            text = " ".join(session.output[since:].split())
+            return all(marker in text for marker in expected)
+        try:
+            assert_private_result_visible(session, expected)
+        except AssertionError:
+            return False
+        return True
+
+    with tempfile.TemporaryDirectory(prefix="mnemocode-public-passphrase-role-") as folder:
+        path = Path(folder) / "candidates.age"
+        session = Session(("recover-word", "--ask-secrets", "--candidates-file", str(path)))
+        try:
+            session.wait_for("Seed phrase or text file path, ? for each forgotten word:")
+            session.type("abandon " * 11 + "?" + ENTER)
+            session.wait_for("list")
+            first = role_visible(session)
+            start = len(session.output)
+            session.type("public synthetic cipher phrase" + ENTER)
+            end = time.monotonic() + 30
+            while time.monotonic() < end:
+                shown = session.output[start:]
+                repeat = shown.find("The same passphrase again:")
+                if repeat < 0:
+                    repeat = shown.find("Repeat the candidate list encryption passphrase")
+                if repeat >= 0:
+                    repeat_start = start + repeat
+                    break
+                session.read_some()
+            else:
+                raise AssertionError("The repeat-passphrase screen did not appear")
+            second = role_visible(session, repeat_start)
+            assert first and second, (
+                f"Secret/role identity missing on consecutive screens: first={first}, second={second}"
+            )
+            session.type(CTRL_C)
+            assert session.wait_for_exit() == 130
+            assert not path.exists(), "Cancelling the repeat prompt wrote a candidate file"
+            assert_kept_private(session, ("public synthetic cipher phrase",))
+        finally:
+            session.close()
+    print("candidate-list passphrase: identity/role on both screens, private cancellation, no save")
 
 
 def check_marked_codes_result():
@@ -471,11 +523,15 @@ def check_file_or_text_input():
          TEST_PHRASE.removesuffix("about") + "abo*\n"),
     )
     with tempfile.TemporaryDirectory(prefix="mnemocode-file-input-") as folder:
+        words = Path(folder) / "public-mnemonic.txt"
+        dates = Path(folder) / "public-dates.txt"
+        words.write_text(TEST_PHRASE, encoding="utf-8")
+        dates.write_text(MASK_DATE, encoding="utf-8")
         for kind, arguments, prompt, text in cases:
             path = Path(folder) / f"public {kind}.txt"
             if text is None:
-                options = ["encode", "--mnemonic", TEST_PHRASE, "--mode", "seedshift",
-                           "--dates", MASK_DATE, "--format", "indexes", "--output", str(path)]
+                options = ["encode", "--mnemonic-file", str(words), "--mode", "seedshift",
+                           "--dates-file", str(dates), "--format", "indexes", "--output", str(path)]
                 if kind == "shares":
                     options += ["--sskr", "--threshold", "2", "--shares", "3",
                                 "--share-format", "colors-unicode"]

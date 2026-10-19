@@ -306,6 +306,7 @@ export class BackupReading extends Redacted implements Disposable {
     this.#text.wipe();
   }
 
+  /** Ends the payload lifetime through wipe(); independently owned child results remain live. */
   [Symbol.dispose](): void {
     this.wipe();
   }

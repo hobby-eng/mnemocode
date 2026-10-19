@@ -102,7 +102,7 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `rand_core` | 0.9.5 | MIT OR Apache-2.0 |
 | `rand_xoshiro` | 0.6.0 | MIT OR Apache-2.0 |
 | `rand_xoshiro` | 0.7.0 | MIT OR Apache-2.0 |
-| `recovery-sskr-wasm` | 0.1.7 | MIT OR Apache-2.0 (MIT text included in LICENSE) |
+| `recovery-sskr-wasm` | 0.1.8 | MIT OR Apache-2.0 (MIT text included in LICENSE) |
 | `rustc_version` | 0.4.1 | MIT OR Apache-2.0 |
 | `rustversion` | 1.0.23 | MIT OR Apache-2.0 |
 | `salsa20` | 0.10.2 | MIT OR Apache-2.0 |
@@ -207,10 +207,16 @@ TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## Patched SSKR source
+## Patched SSKR and Shamir sources
 
 The sskr 0.12.0 runtime source is included in
 [rust/vendor/sskr-0.12.0](rust/vendor/sskr-0.12.0/UPSTREAM.json). Its local
 lifetime patch reuses zeroize 1.9.1 already pinned by the bridge. Its original
 [license](rust/vendor/sskr-0.12.0/LICENSE.md) is retained. Source changes do not
 upgrade any crate or change the SSKR arithmetic or transport formats.
+
+The [bc-shamir 0.13.0 runtime source](rust/vendor/bc-shamir-0.13.0/UPSTREAM.json)
+retains the reconstructed entropy in a zeroizing owner until digest validation
+succeeds. Its original [license](rust/vendor/bc-shamir-0.13.0/LICENSE.md) is
+included. The SSKR decoder also rejects an impossible group index. Provenance
+records bind both source subsets to their registry archives and local files.

@@ -282,10 +282,12 @@ export class WrittenCodes extends Redacted implements Disposable {
     return new WrittenCodes(record?.mode ?? mode, codes);
   }
 
+  /** The recorded mode, or the supplied mode without a record; retained after the codes are wiped. */
   get mode(): MaskingMode {
     return this.#mode;
   }
 
+  /** The written codes as zero-based BIP39 indexes; refuses access after wiping. */
   get indexes(): readonly number[] {
     return this.#codes.indexes;
   }

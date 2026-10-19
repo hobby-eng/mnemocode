@@ -57,7 +57,9 @@ You can also show the phrase after Seedshift as words. When creating shares, you
 | `seedshift`        | Date masking with a valid BIP39 result        | Required |
 | `seedshift-legacy` | Compatibility with Original Seedshift         | Required |
 
-Without `--mode`, supplying `--dates` selects `seedshift`; otherwise the mode is `direct`.
+Without `--mode`, supplying `--dates-file` selects `seedshift`; otherwise the mode is `direct`.
+
+Enter recovery material on the private screen or through local files, never as command-line text. Raw phrase, backup, share, date and final-word arguments are refused, even for public examples. Headless operations accept `--mnemonic-file`, `--input-file`, `--share-file`, `--dates-file`, `--old-dates-file` and `--last-word-file`; one source may use `-` for standard input. Refusal cannot remove text already entered from shell history or process arguments. See [input files and limits](docs/CLI.md#input-files-and-limits).
 
 **Wrong dates can produce a valid phrase for a different wallet.** A checksum does not confirm the dates. Keep an original fingerprint, address or public key for a [recovery check](#exact-local-recovery-checks).
 
@@ -181,7 +183,7 @@ Typed codes and QR codes have no header: retain the original mode. MnemoCode can
 mnemocode re-encode --ask-secrets --input-file shifted-colors.txt --mode seedshift --format 5
 ```
 
-Use `--old-mode`, `--old-format` and `--old-dates` for the input; the ordinary encoding options describe the output. Legacy-valid input also needs the remembered original `--last-word`. For scripts, supply a wallet reference or `--recognised`. Recover missing codes or dates first. The old backup remains usable after re-encoding.
+Use `--old-mode`, `--old-format` and `--old-dates-file` for the input; the ordinary encoding options describe the output. Legacy-valid input also needs the remembered original final word, entered privately or supplied with `--last-word-file`. For scripts, supply a wallet reference or `--recognised`. Recover missing codes or dates first. The old backup remains usable after re-encoding.
 
 ## Recovery
 

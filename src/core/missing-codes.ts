@@ -200,7 +200,10 @@ function placesOf(text: string, format: EncodedFormat): WordPlace[] {
  * run). The search of one way (missing-codes-search.ts) builds it.
  */
 export interface CodesCheckRun extends SearchRun {
-  /** Whether the codes, BIP39 indexes from 0 to 2047, are the right ones; may answer later. */
+  /**
+   * Whether the codes, BIP39 indexes from 0 to 2047, are the right ones; may answer later.
+   * Borrows the array until this check settles; run wipes it after making any retained backup.
+   */
   readonly check: (codes: readonly number[]) => boolean | Promise<boolean>;
   /** How many codes that passed are kept; MAX_FOUND_CODES by default. */
   readonly maxFound?: number | undefined;
@@ -284,14 +287,17 @@ export class MissingCodes extends Redacted implements Disposable {
     return new MissingCodes(this.#places, this.#format, mode);
   }
 
+  /** The validated representation format of these marked codes. */
   get format(): EncodedFormat {
     return this.#format;
   }
 
+  /** The validated transformation mode used when a candidate is decoded. */
   get mode(): MaskingMode {
     return this.#masking.mode;
   }
 
+  /** Number of BIP39 word positions in the encoded phrase, before candidate expansion. */
   get wordCount(): number {
     return this.#places.length;
   }
@@ -371,15 +377,20 @@ export class MissingCodes extends Redacted implements Disposable {
     const turns = SearchTurns.of(run);
     try {
       for (const codes of this.candidates()) {
-        if (turns.stopped) return { found, passed, count, stopped: true };
-        const passes = await run.check(codes);
-        this.#values.assertLive();
-        // An answer that came after a stop is not counted (AUD-015-API001).
-        if (turns.stopped) return { found, passed, count, stopped: true };
-        count += 1;
-        if (passes) {
-          passed += 1;
-          if (found.length < maxFound) found.push(EncodedBackup.of(codes, this.#format, this.mode));
+        try {
+          if (turns.stopped) return { found, passed, count, stopped: true };
+          const passes = await run.check(codes);
+          this.#values.assertLive();
+          // An answer that came after a stop is not counted (AUD-015-API001).
+          if (turns.stopped) return { found, passed, count, stopped: true };
+          count += 1;
+          if (passes) {
+            passed += 1;
+            if (found.length < maxFound)
+              found.push(EncodedBackup.of(codes, this.#format, this.mode));
+          }
+        } finally {
+          codes.fill(0);
         }
         const turn = await turns.due();
         this.#values.assertLive();
@@ -400,6 +411,7 @@ export class MissingCodes extends Redacted implements Disposable {
     this.#values.wipeAndClose(this.#active);
   }
 
+  /** Ends retained-code access and active candidate iterators through the idempotent wipe(). */
   [Symbol.dispose](): void {
     this.wipe();
   }

@@ -219,6 +219,10 @@ export class MasterFingerprintCheck {
     return this.#seed.withRoot(mnemonic, passphrase, fingerprintOfKey);
   }
 
+  /**
+   * The four-byte BIP32 fingerprint as eight lowercase hexadecimal digits, awaiting PBKDF2.
+   * Propagates the supplied PBKDF2's failures and retires the owned seed and master key.
+   */
   async fingerprintAsync(mnemonic: string, passphrase = ""): Promise<string> {
     return this.#seed.withRootLater(mnemonic, passphrase, fingerprintOfKey);
   }
@@ -233,6 +237,10 @@ export class MasterFingerprintCheck {
     return fingerprintMatch(this.fingerprint(mnemonic, passphrase), wanted);
   }
 
+  /**
+   * Asynchronous match(): refuses an invalid expected fingerprint before awaiting PBKDF2 and
+   * propagates its failures. A match remains a filter carrying FINGERPRINT_WARNING, not proof.
+   */
   async matchAsync(mnemonic: string, expected: string, passphrase = ""): Promise<WalletMatch> {
     const wanted = parseMasterFingerprint(expected);
     return fingerprintMatch(await this.fingerprintAsync(mnemonic, passphrase), wanted);

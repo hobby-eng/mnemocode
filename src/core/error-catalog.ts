@@ -71,6 +71,23 @@ export class ErrorCatalog<
   }
 
   /**
+   * Whether an Error carries one of this catalog's selected codes. Reads an outside code once;
+   * unrelated errors are not refusals merely because their text resembles a catalog message.
+   */
+  matches(error: unknown, codes: readonly Extract<keyof Definitions, string>[]): boolean {
+    // deliberate copy of refusal.errorCode's guard: native Node release scripts load both
+    // TypeScript leaves before .js imports exist. Cross-runtime regression tests keep them in step.
+    if (!(error instanceof Error) || !("code" in error)) return false;
+    const actual: unknown = error.code;
+    return (
+      actual !== undefined &&
+      codes.some(
+        (code) => Object.hasOwn(this.#definitions, code) && actual === `${this.#namespace}.${code}`,
+      )
+    );
+  }
+
+  /**
    * Builds one failure. Parameters are evaluated by the caller in their original order and are
    * not retained separately. An unknown code or non-string message is a coded TypeError without
    * echoing the supplied value; a message factory's own operational failure still propagates.

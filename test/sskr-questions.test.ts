@@ -370,7 +370,7 @@ describe("shares on the private screen", () => {
     ]);
     expect(promptsShown()).toEqual([
       SHARES_PROMPT,
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):",
+      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
     ]);
     expect(seen.out).toContain(PHRASE);
   });
@@ -476,7 +476,7 @@ describe("shares on the private screen", () => {
       expect(promptsShown()).toEqual([
         SHARES_PROMPT,
         "Dates (up to 4, DD-MM-YYYY, ? for what is forgotten, separated by spaces):",
-        "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):",
+        "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
       ]);
       expect(
         seen.notices.some((line) => line.startsWith("The search tries 10 date combinations:")),

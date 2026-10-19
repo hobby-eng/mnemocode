@@ -1,5 +1,5 @@
 import type { StudyTheme } from "./collection-layout.js";
-import { channelsHex, rgbChannels } from "./color-math.js";
+import { channelsHex, linearChannel, rgbChannels } from "./color-math.js";
 import { isRgbReference, rgbReferenceDigits } from "../core/colors.js";
 import type { MaterialStyle } from "./card-settings.js";
 import { capitalized } from "../core/prose.js";
@@ -473,10 +473,10 @@ export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
 // sRGB transfer curve and D65 XYZ-to-Lab conversion. Distances choose decoration only;
 // the original hexadecimal reference remains untouched and fully recoverable.
 function lab(hex: string): [number, number, number] {
-  const channels = rgbChannels(hex).map((v) =>
-    v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4,
-  );
-  const [r, g, b] = channels as [number, number, number];
+  const [red, green, blue] = rgbChannels(hex);
+  const r = linearChannel(red);
+  const g = linearChannel(green);
+  const b = linearChannel(blue);
   const f = (v: number) => (v > 216 / 24389 ? Math.cbrt(v) : ((24389 / 27) * v + 16) / 116);
   const x = f((0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047);
   const y = f(0.2126729 * r + 0.7151522 * g + 0.072175 * b);

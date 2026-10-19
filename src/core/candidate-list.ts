@@ -86,6 +86,7 @@ const CRC_BYTES = CRC32_BYTES;
  * "give more of the words, or a few letters of them".
  */
 export class TooManyForListError extends Error {
+  /** Stable code for a candidate count beyond one list's capacity. */
   readonly code: CandidateListErrorCode = "too-many-for-list";
 
   constructor(advice: string) {
@@ -418,6 +419,7 @@ export class OpenedCandidateList extends Redacted {
     this.#wiped = true;
   }
 
+  /** Ends candidate access through wipe(); count and passphrase-policy metadata remain readable. */
   [Symbol.dispose](): void {
     this.wipe();
   }

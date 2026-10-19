@@ -9,10 +9,10 @@
 // test/card-drawing.test.ts reads the cards of every renderer through it. Anything else is
 // refused: an image that silently lacks a part of the card would be worse than no image.
 //
-// Needs from the host: the PDF bytes, such as those a renderer returned. Host-neutral: it imports
-// only pdf-lib and fontkit.
-// Does not: paint (the host turns the steps into pixels), keep a PDF or its steps after it
-// returns, or read PDFs that other programs wrote, which may use any other command.
+// Needs from the host: PDF bytes, such as those a renderer returned. Host-neutral: PDF/font
+// decoding and shared core helpers, without Node.js I/O.
+// Does not paint or read arbitrary external PDFs. Reusable readers retain their document until
+// wipe(); the one-shot helper transfers image storage and releases its reader.
 
 import fontkit from "@pdf-lib/fontkit";
 import {
@@ -28,108 +28,37 @@ import {
   type PDFRef,
 } from "pdf-lib";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { wipedAfter } from "../core/bits.js";
+import type {
+  Matrix,
+  PathSegment,
+  CardImage,
+  BlendMode,
+  ClipRule,
+  GraphicsSettings,
+  DrawingStep,
+  CardPageDrawing,
+} from "./card-drawing-types.js";
+
+/** Drawing contracts preserved through the original public reader entry point. */
+export type {
+  Matrix,
+  PathSegment,
+  CardImage,
+  BlendMode,
+  ClipRule,
+  GraphicsSettings,
+  DrawingStep,
+  CardPageDrawing,
+} from "./card-drawing-types.js";
 
 const ERRORS = new ErrorCatalog("export.card-drawing", {
   "save-cards-as-pdf": (value0: string, value1: string) =>
     `${value0}: ${value1}. Save the cards as PDF.`,
+  "reader-wiped": () => "This card PDF reader has been wiped.",
 });
 
-/** The six numbers of a PDF transformation: x' = a·x + c·y + e, y' = b·x + d·y + f. */
-export type Matrix = readonly [a: number, b: number, c: number, d: number, e: number, f: number];
 const IDENTITY_MATRIX: Matrix = [1, 0, 0, 1, 0, 0];
-
-/**
- * One step of a path: move or line to a point, a cubic curve with its two control points, or close.
- */
-export type PathSegment =
-  | { readonly to: "move" | "line"; readonly x: number; readonly y: number }
-  | {
-      readonly to: "curve";
-      readonly x1: number;
-      readonly y1: number;
-      readonly x2: number;
-      readonly y2: number;
-      readonly x: number;
-      readonly y: number;
-    }
-  // Only the outlines of letters use this curve with one control point.
-  | {
-      readonly to: "quadratic";
-      readonly x1: number;
-      readonly y1: number;
-      readonly x: number;
-      readonly y: number;
-    }
-  | { readonly to: "close" };
-
-/**
- * An image that a drawing places: its size in pixels and its pixels as RGB bytes or a JPEG file.
- */
-export interface CardImage {
-  readonly width: number;
-  readonly height: number;
-  /** `rgb` is three bytes for every pixel, row by row. `jpeg` is a complete JPEG file. */
-  readonly format: "rgb" | "jpeg";
-  readonly data: Uint8Array;
-  /** One byte of opacity for every pixel; absent when the image is opaque. */
-  readonly alpha?: Uint8Array;
-}
-
-/** PDF blend modes the cards use: plain painting, and the hue and colourfulness of a tint. */
-export type BlendMode = "normal" | "color";
-
-/** Which inside of a path counts for a clip: `W` uses the nonzero rule, `W*` the even-odd rule. */
-export type ClipRule = "nonzero" | "evenodd";
-
-/** The settings of one graphics state (`gs`) that the cards use. */
-export interface GraphicsSettings {
-  /** The opacity of fills and of text. */
-  readonly fill?: number;
-  /** The opacity of strokes. */
-  readonly stroke?: number;
-  readonly blend?: BlendMode;
-}
-
-/**
- * One step of the drawing of a card page: save or restore the state, transform, fill or stroke a
- * path, clip, or draw an image.
- */
-export type DrawingStep =
-  | { readonly do: "save" | "restore" }
-  | { readonly do: "transform"; readonly matrix: Matrix }
-  | {
-      readonly do: "fillColor" | "strokeColor";
-      readonly red: number;
-      readonly green: number;
-      readonly blue: number;
-    }
-  | ({ readonly do: "graphicsState" } & GraphicsSettings)
-  | { readonly do: "lineWidth"; readonly width: number }
-  | { readonly do: "dash"; readonly pattern: readonly number[]; readonly phase: number }
-  | {
-      readonly do: "path";
-      readonly segments: readonly PathSegment[];
-      readonly fill: boolean;
-      readonly stroke: boolean;
-      /** The path also limits everything drawn until the matching `restore`. */
-      readonly clip: boolean;
-      readonly clipRule: ClipRule;
-    }
-  /** Outlines of the letters of one piece of text, already placed one after another. */
-  | { readonly do: "text"; readonly matrix: Matrix; readonly segments: readonly PathSegment[] }
-  /** Drawn into the square from (0, 0) to (1, 1) of the current transformation. */
-  | { readonly do: "image"; readonly image: CardImage };
-
-/**
- * The drawing of one card page, its size in PDF points and its steps, which a host replays on its
- * own canvas.
- */
-export interface CardPageDrawing {
-  /** Page size in PDF points, 72 to an inch. */
-  readonly width: number;
-  readonly height: number;
-  readonly steps: readonly DrawingStep[];
-}
 
 /** What every refusal says first, so that a host can tell it from other failures. */
 export const CARD_DRAWING_REFUSAL = "Image export cannot draw this card";
@@ -168,13 +97,19 @@ function translated(base: Matrix, x: number, y: number): Matrix {
   return [a, b, c, d, e + x * a + y * c, f + x * b + y * d];
 }
 
-/** The bytes of a stream, decoded by pdf-lib; a stream with decoding parameters is refused. */
+/** Owned decoded bytes; detaches any decoder view of borrowed compressed input. */
 function decoded(stream: PDFRawStream, what: string): Uint8Array {
   // pdf-lib's Flate decoder ignores a predictor, which would give wrong bytes silently. pdf-lib
   // writes no decoding parameters in the streams of the cards.
   if (stream.dict.has(PDFName.of("DecodeParms")))
     throw unsupported(`${what} is stored with decoding parameters`);
-  return decodePDFRawStream(stream).decode();
+  const data = decodePDFRawStream(stream).decode();
+  const source = stream.contents;
+  const overlaps =
+    data.buffer === source.buffer &&
+    data.byteOffset < source.byteOffset + source.byteLength &&
+    source.byteOffset < data.byteOffset + data.byteLength;
+  return overlaps ? Uint8Array.from(data) : data;
 }
 
 interface OutlineCommand {
@@ -251,6 +186,7 @@ const GLYPH_TEXT = /^<([0-9A-Fa-f]*)>$/u;
 /** The letters of one embedded font, each outline read once. */
 class LetterFont {
   readonly #program: ReturnType<typeof fontkit.create>;
+  readonly #bytes: Uint8Array;
   readonly #letters = new Map<number, Letter>();
 
   constructor(font: PDFDict) {
@@ -261,7 +197,18 @@ class LetterFont {
       ?.lookupMaybe(PDFName.of("FontDescriptor"), PDFDict)
       ?.lookup(PDFName.of("FontFile2"));
     if (!(program instanceof PDFRawStream)) throw unsupported("its font has no TrueType program");
-    this.#program = fontkit.create(decoded(program, "its font"));
+    this.#bytes = decoded(program, "its font");
+    try {
+      this.#program = fontkit.create(this.#bytes);
+    } catch (error) {
+      this.#bytes.fill(0);
+      throw error;
+    }
+  }
+
+  wipe(): void {
+    this.#bytes.fill(0);
+    this.#letters.clear();
   }
 
   /**
@@ -324,23 +271,31 @@ function readImage(document: PDFDocument, stream: PDFRawStream): CardImage {
   const width = dimension(stream.dict, "Width");
   const height = dimension(stream.dict, "Height");
   // pdf-lib cannot decode DCT, and the host's canvas reads the JPEG file itself.
-  if (name("Filter") === DCT) return { width, height, format: "jpeg", data: stream.contents };
+  if (name("Filter") === DCT)
+    return { width, height, format: "jpeg", data: Uint8Array.from(stream.contents) };
   if (name("Filter") !== FLATE) throw unsupported(`an image uses the filter ${name("Filter")}`);
   const data = decoded(stream, "an image");
-  if (data.length !== width * height * RGB_BYTES_PER_PIXEL)
-    throw unsupported("an image has an unexpected amount of data");
-  const mask = stream.dict.get(PDFName.of("SMask"));
-  if (mask === undefined) return { width, height, format: "rgb", data };
-  const maskStream = document.context.lookup(mask);
-  if (
-    !(maskStream instanceof PDFRawStream) ||
-    maskStream.dict.get(PDFName.of("Filter"))?.toString() !== FLATE
-  )
-    throw unsupported("the transparency of an image is stored in an unknown way");
-  const alpha = decoded(maskStream, "the transparency of an image");
-  if (alpha.length !== width * height * ALPHA_BYTES_PER_PIXEL)
-    throw unsupported("the transparency of an image has an unexpected size");
-  return { width, height, format: "rgb", data, alpha };
+  let alpha: Uint8Array | undefined;
+  try {
+    if (data.length !== width * height * RGB_BYTES_PER_PIXEL)
+      throw unsupported("an image has an unexpected amount of data");
+    const mask = stream.dict.get(PDFName.of("SMask"));
+    if (mask === undefined) return { width, height, format: "rgb", data };
+    const maskStream = document.context.lookup(mask);
+    if (
+      !(maskStream instanceof PDFRawStream) ||
+      maskStream.dict.get(PDFName.of("Filter"))?.toString() !== FLATE
+    )
+      throw unsupported("the transparency of an image is stored in an unknown way");
+    alpha = decoded(maskStream, "the transparency of an image");
+    if (alpha.length !== width * height * ALPHA_BYTES_PER_PIXEL)
+      throw unsupported("the transparency of an image has an unexpected size");
+    return { width, height, format: "rgb", data, alpha };
+  } catch (error) {
+    data.fill(0);
+    alpha?.fill(0);
+    throw error;
+  }
 }
 
 /**
@@ -417,10 +372,24 @@ class DocumentObjects {
     if (image === undefined) {
       const stream = this.#document.context.lookup(reference);
       if (!(stream instanceof PDFRawStream)) throw unsupported("an image cannot be read");
-      image = readImage(this.#document, stream);
+      image = Object.freeze(readImage(this.#document, stream));
       this.#images.set(key, image);
     }
     return image;
+  }
+
+  releaseImages(): void {
+    this.#images.clear();
+  }
+
+  wipe(): void {
+    for (const image of this.#images.values()) {
+      image.data.fill(0);
+      image.alpha?.fill(0);
+    }
+    for (const font of this.#fonts.values()) font.wipe();
+    this.#images.clear();
+    this.#fonts.clear();
   }
 
   graphicsState(reference: PDFRef | PDFDict): GraphicsSettings {
@@ -435,7 +404,9 @@ class DocumentObjects {
         const stream = this.#document.context.lookup(reference as PDFRef);
         if (!(stream instanceof PDFRawStream)) throw unsupported("its page content cannot be read");
         // The streams of pdf-lib contain commands, numbers and names: one byte is one character.
-        return new TextDecoder("latin1").decode(decoded(stream, "its page content"));
+        return wipedAfter(decoded(stream, "its page content"), (bytes) =>
+          new TextDecoder("latin1").decode(bytes),
+        );
       })
       .join("\n");
   }
@@ -717,9 +688,9 @@ export const ACCEPTED_OPERATORS: readonly string[] = Object.freeze([...OPERATION
  * A card PDF as drawing steps, page by page. A class, because the document and the fonts and
  * images it holds are read once for all its pages, which share them.
  */
-export class CardPdfReader {
-  readonly #document: PDFDocument;
-  readonly #objects: DocumentObjects;
+export class CardPdfReader implements Disposable {
+  #document: PDFDocument | undefined;
+  #objects: DocumentObjects | undefined;
 
   private constructor(document: PDFDocument) {
     this.#document = document;
@@ -731,28 +702,63 @@ export class CardPdfReader {
     return new CardPdfReader(await PDFDocument.load(pdf));
   }
 
+  /** Number of pages; refuses access after this reader is wiped. */
   get pageCount(): number {
-    return this.#document.getPageCount();
+    return this.#live().document.getPageCount();
   }
 
-  /** The drawing steps of every page, in order. */
+  /** Drawing steps in page order; image bytes are borrowed until wipe(). */
   pages(): CardPageDrawing[] {
-    return this.#document.getPages().map((page) => this.#page(page));
+    const { document, objects } = this.#live();
+    return document.getPages().map((page) => this.#page(page, objects));
   }
 
-  #page(page: PDFPage): CardPageDrawing {
+  /** Transfers image storage to the caller and ends this reader; caller wipes those images. */
+  takePages(): CardPageDrawing[] {
+    try {
+      const pages = this.pages();
+      this.#live().objects.releaseImages();
+      return pages;
+    } finally {
+      this.wipe();
+    }
+  }
+
+  /** Overwrites retained image/font bytes and releases document references; idempotent. */
+  wipe(): void {
+    this.#objects?.wipe();
+    this.#objects = undefined;
+    this.#document = undefined;
+  }
+
+  /** Ends this reader's owned lifetime, with the same contract as wipe(). */
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
+
+  #live(): { document: PDFDocument; objects: DocumentObjects } {
+    if (this.#document === undefined || this.#objects === undefined)
+      throw ERRORS.create("reader-wiped", []);
+    return { document: this.#document, objects: this.#objects };
+  }
+
+  #page(page: PDFPage, objects: DocumentObjects): CardPageDrawing {
     const box = page.getMediaBox();
     if (box.x !== 0 || box.y !== 0 || page.getRotation().angle !== 0)
       throw unsupported("its page is moved or turned");
     const resources = page.node.Resources();
     if (resources === undefined) throw unsupported("its page has no resources");
-    const content = this.#objects.content(page.node.Contents());
-    const steps = new PageContent(new PageResources(this.#objects, resources)).read(content);
+    const content = objects.content(page.node.Contents());
+    const steps = new PageContent(new PageResources(objects, resources)).read(content);
     return { width: box.width, height: box.height, steps };
   }
 }
 
-/** The drawing steps of every page of the card PDF `pdf` (CardPdfReader). */
+/**
+ * Drawing steps of every page, with image bytes transferred to the caller. The temporary reader
+ * ends before return; caller wipes each image's data/alpha after painting, once per shared image.
+ */
 export async function readCardPages(pdf: Uint8Array): Promise<CardPageDrawing[]> {
-  return (await CardPdfReader.load(pdf)).pages();
+  using reader = await CardPdfReader.load(pdf);
+  return reader.takePages();
 }

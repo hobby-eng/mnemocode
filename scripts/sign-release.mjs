@@ -38,21 +38,11 @@ const ERRORS = new ErrorCatalog("scripts.sign-release", {
    */
   "not-installed": (value0, value1) => `${value0} is not installed; ${value1}.`,
   "failure-refused": suppliedMessage,
-  /**
-   * @param {string} value0
-   */
-  "unknown-option-see-help": (value0) => `Unknown option ${value0}; see --help.`,
-  /**
-   * @param {string} value0
-   */
-  "give-one-release-tag-not-too": (value0) => `Give one release tag, not ${value0} too.`,
+  "unknown-option-see-help": () => "Unknown option; see --help.",
+  "give-one-release-tag-not-too": () => "Give exactly one release tag.",
   "give-release-tag-example-node-scripts-sign-release": () =>
     "Give the release tag, for example: node scripts/sign-release.mjs v0.1.0",
-  /**
-   * @param {string} value0
-   */
-  "not-release-tag-looks-like-v0-1-0": (value0) =>
-    `${value0} is not a release tag; it looks like v0.1.0.`,
+  "not-release-tag-looks-like-v0-1-0": () => "The release tag must look like v0.1.0.",
   "git-hub-cli-no-gh-attestation-command-install": () =>
     "This GitHub CLI has no gh attestation command; install a newer one.",
   /**
@@ -317,24 +307,28 @@ async function runInTerminal(what, step, cwd) {
   if (result.status !== 0) throw failure(what, result);
 }
 
-function parseArguments(argv) {
+/**
+ * Reads signing switches and one release tag without performing any release operation.
+ * Throws a stable argument refusal; help may return without a tag.
+ * @param {string[]} argv
+ */
+export function parseReleaseArguments(argv) {
   /** @type {{ tag: string | undefined, publish: boolean, dryRun: boolean, help: boolean }} */
   const options = { tag: undefined, publish: false, dryRun: false, help: false };
   for (const argument of argv) {
     if (argument === "--publish") options.publish = true;
     else if (argument === "--dry-run") options.dryRun = true;
     else if (argument === "-h" || argument === "--help") options.help = true;
-    else if (argument.startsWith("-"))
-      throw ERRORS.create("unknown-option-see-help", [`${argument}`]);
+    else if (argument.startsWith("-")) throw ERRORS.create("unknown-option-see-help", []);
     else if (options.tag === undefined) options.tag = argument;
-    else throw ERRORS.create("give-one-release-tag-not-too", [`${argument}`]);
+    else throw ERRORS.create("give-one-release-tag-not-too", []);
   }
   if (options.help) return options;
   if (options.tag === undefined) {
     throw ERRORS.create("give-release-tag-example-node-scripts-sign-release", []);
   }
   if (!TAG.test(options.tag)) {
-    throw ERRORS.create("not-release-tag-looks-like-v0-1-0", [`${options.tag}`]);
+    throw ERRORS.create("not-release-tag-looks-like-v0-1-0", []);
   }
   return options;
 }
@@ -619,7 +613,7 @@ async function signRelease({ tag, publish }, folder) {
 }
 
 async function main(argv) {
-  const options = parseArguments(argv);
+  const options = parseReleaseArguments(argv);
   if (options.help) {
     printHelp();
     return;
@@ -629,12 +623,14 @@ async function main(argv) {
   else return signRelease(options, folder);
 }
 
-try {
-  if ((await main(process.argv.slice(2))) === CANCELLED) {
-    console.error(CANCELLED_MESSAGE);
-    process.exitCode = CANCELLED_EXIT_CODE;
+if (import.meta.main) {
+  try {
+    if ((await main(process.argv.slice(2))) === CANCELLED) {
+      console.error(CANCELLED_MESSAGE);
+      process.exitCode = CANCELLED_EXIT_CODE;
+    }
+  } catch (error) {
+    fail(describeError(error));
+    process.exitCode = 1;
   }
-} catch (error) {
-  fail(describeError(error));
-  process.exitCode = 1;
 }

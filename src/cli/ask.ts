@@ -48,7 +48,7 @@ import { parseAddressCount, defaultAddressCount } from "../core/address-scan.js"
 import { FIRST_RECEIVING, type WalletPlace } from "./bitcoin-options.js";
 import { onPrivateScreen } from "./private-screen.js";
 import { PrivateSteps } from "./private-steps.js";
-import { terminalNotice } from "./terminal.js";
+import { FINGERPRINT_DISCLOSURE, terminalNotice } from "./terminal.js";
 import {
   choose,
   writePrompt,
@@ -488,7 +488,7 @@ class WalletQuestionWords {
   // As mhfe asks it (src/bin/mhfe/check.rs), every coin in the same list (owner, 2026-10-13).
   static readonly COIN_QUESTION = "Which coin is the address for?";
   static readonly FINGERPRINT: AskedValue = Object.freeze({
-    prompt: "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)",
+    prompt: `Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; ${FINGERPRINT_DISCLOSURE})`,
     what: "the eight characters of the fingerprint",
   });
 
@@ -585,6 +585,8 @@ async function withAddressCount(
 export interface WalletValue extends AskedValue {
   /** Its line in the record of answers, where the front end keeps one. */
   readonly label: string;
+  /** Explanation kept beside its accepted value in a front end's answer record. */
+  readonly note?: string;
   /** The answer that Enter alone gives, if any. */
   readonly fallback?: string;
 }
@@ -639,7 +641,11 @@ export async function askWalletEvidence(
     const typed =
       kind === "fingerprint"
         ? await asker.ask(
-            { ...WalletQuestionWords.FINGERPRINT, label: "Fingerprint" },
+            {
+              ...WalletQuestionWords.FINGERPRINT,
+              label: "Fingerprint",
+              note: FINGERPRINT_DISCLOSURE,
+            },
             (answer): WalletEvidence => ({
               kind: "master-fingerprint",
               value: parseMasterFingerprint(answer),

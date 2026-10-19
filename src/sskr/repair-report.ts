@@ -187,6 +187,7 @@ export class RepairReport {
     return lines;
   }
 
+  /** Report-owned frozen assessment snapshot, independent of the constructor's caller input. */
   get assessment(): JointAssessment {
     return this.#assessment;
   }

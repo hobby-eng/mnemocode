@@ -15,13 +15,12 @@ const RENDERED = "public generated-document fixture";
 
 // Only the expensive seams are stubbed: rendering, and the check that pdftocairo runs. Every
 // publication, claim and preflight is the real one.
-vi.mock("../src/export/render.js", () => ({
+vi.mock("../src/export/render.js", async (original) => ({
+  ...(await original<typeof import("../src/export/render.js")>()),
   renderCards: vi.fn(async () => {
     await render.before?.();
     return new TextEncoder().encode(RENDERED);
   }),
-  // The decoys are planned with the real rule elsewhere; here the cards are taken as they are.
-  plannedCardJob: vi.fn(async (_drawing: unknown, job: unknown) => job),
 }));
 vi.mock("../src/export/image-export.js", async (original) => ({
   ...(await original<typeof import("../src/export/image-export.js")>()),
@@ -43,8 +42,10 @@ import { runPreview } from "../src/cli/preview-command.js";
 import { PROTECTION_FLAGS } from "../src/cli/protection.js";
 import { swapWarning, unencryptedSwap } from "../src/cli/swap-check.js";
 import { assertImageRenderer, IMAGE_FOLDER_TAKEN } from "../src/export/image-export.js";
-import { exportCards } from "../src/export/pdf.js";
-import { NewFolder } from "../src/export/private-file.js";
+import { plannedCardJob } from "../src/export/render.js";
+import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { selectTemplate } from "../src/export/templates.js";
+import { NewFolder, publishNewPrivateFile } from "../src/export/private-file.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const folders: string[] = [];
@@ -99,6 +100,22 @@ function swappedCase(path: string): string {
 /** The heading of /proc/swaps; the areas follow, one per line. */
 const SWAPS_HEADER = "Filename\tType\tSize\tUsed\tPriority\n";
 
+it("refuses invalid card settings through the real planner even when drawing is replaced", async () => {
+  const operation: unknown = Reflect.apply(plannedCardJob, undefined, [
+    nodeCardRenderer,
+    {
+      template: selectTemplate("business-it"),
+      content: {
+        kind: "colors",
+        colors: ["123456"],
+        payload: "public card-planning fixture",
+        pageSize: "synthetic-invalid-page-size",
+      },
+    },
+  ]);
+  await expect(operation).rejects.toHaveProperty("code", "export.card-settings.page-size");
+});
+
 describe("AUD-014-SEC002: a swap table that cannot be read is not taken for no swap", () => {
   it("reports an unreadable table as unknown, and keeps the known answers", async () => {
     const missing = await scratch();
@@ -125,11 +142,13 @@ describe("AUD-014-SEC002: a swap table that cannot be read is not taken for no s
 
   it.runIf(process.platform === "linux")(
     "warns in a real protected run whose permissions deny /proc/swaps",
-    () => {
+    async () => {
       const cwd = process.cwd();
+      const publicFile = join(await scratch(), "public-mnemonic.txt");
+      await writeFile(publicFile, TEST_PHRASE, "utf8");
       const run = protectedRun(
-        ["encode", "--mode", "direct", "--format", "indexes", "--mnemonic", TEST_PHRASE],
-        [cwd, swappedCase(cwd)],
+        ["encode", "--mode", "direct", "--format", "indexes", "--mnemonic-file", publicFile],
+        [cwd, swappedCase(cwd), publicFile],
       );
       expect(run.status, run.stderr).toBe(0);
       expect(run.stderr).toContain(
@@ -214,21 +233,24 @@ describe("AUD-014-FUN003: a PDF is never saved over a name taken after the prefl
   /** The content of the file that took the name while the PDF was rendered. */
   const LATE = "public file created during rendering";
 
+  // These publisher controls need no fake card job; the CLI case below keeps real planning.
   it("refuses the name taken after the real preflight, keeping that file", async () => {
     const folder = await scratch();
     const path = join(folder, "public-output.bin");
     await settleOutputPaths({ pdf: path });
     await preflightFileDestination(path, false);
     await writeFile(path, LATE);
-    await expect(exportCards([], path)).rejects.toMatchObject({ code: "EEXIST" });
+    await expect(
+      publishNewPrivateFile(path, new TextEncoder().encode(RENDERED)),
+    ).rejects.toMatchObject({ code: "EEXIST" });
     expect(await readFile(path, "utf8")).toBe(LATE);
     expect(await readdir(folder)).toEqual(["public-output.bin"]);
   });
 
-  it("publishes a new private PDF where nothing is", async () => {
+  it("publishes new private bytes where nothing is", async () => {
     const folder = await scratch();
     const path = join(folder, "public-output.pdf");
-    await exportCards([], path);
+    await publishNewPrivateFile(path, new TextEncoder().encode(RENDERED));
     expect(await readFile(path, "utf8")).toBe(RENDERED);
     if (process.platform !== "win32") expect((await stat(path)).mode & 0o777).toBe(0o600);
     expect(await readdir(folder)).toEqual(["public-output.pdf"]);
@@ -285,6 +307,6 @@ describe("AUD-014 recommendation 27: the release script reports through describe
       env: { ...process.env, NO_COLOR: "1" },
     });
     expect(run.status).toBe(1);
-    expect(run.stderr.trim()).toBe("sign-release: Unknown option --bogus; see --help.");
+    expect(run.stderr.trim()).toBe("sign-release: Unknown option; see --help.");
   });
 });

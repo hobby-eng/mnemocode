@@ -75,7 +75,7 @@ describe("help", () => {
   });
 
   it("answers a help request on a half-typed command without running it", async () => {
-    const { stdout } = await run(["decode", "--input", "unfinished", "--help"]);
+    const { stdout } = await run(["decode", "--input-file", "unfinished", "--help"]);
     expect(stdout).toContain("Usage: mnemocode decode");
   });
 

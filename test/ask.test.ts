@@ -258,8 +258,14 @@ describe("questions asked again until the answer can be used", () => {
 describe("questions asked again until the answer can be used", () => {
   it("asks for the wallet and checks each value at once, as bitcoin-evidence.ts does", async () => {
     terminal.choices = ["fingerprint"];
-    at("Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):", "zz\r");
-    at("Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):", "73C5DA0A\r");
+    at(
+      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
+      "zz\r",
+    );
+    at(
+      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
+      "73C5DA0A\r",
+    );
     expect(await askWalletEvidence({ optional: false })).toEqual({
       kind: "wallet",
       evidence: { kind: "master-fingerprint", value: "73c5da0a", network: "mainnet" },
@@ -309,7 +315,10 @@ describe("questions asked again until the answer can be used", () => {
     ).toMatchObject({ evidence: { kind: "address", addresses: 5 } });
     // Escape at the value goes back to the list; Escape there goes back from the question.
     terminal.choices = ["fingerprint"];
-    at("Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):", ESCAPE);
+    at(
+      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
+      ESCAPE,
+    );
     expect(await askWalletEvidence({ optional: true })).toEqual({ kind: "back" });
     terminal.choices = ["none"];
     expect(await askWalletEvidence({ optional: true })).toEqual({ kind: "none" });
@@ -370,7 +379,10 @@ describe("questions asked again until the answer can be used", () => {
       profiles: bitcoinProfiles,
     });
     terminal.choices = ["fingerprint"];
-    at("Original fingerprint of the wallet, such as 73c5da0a (not the encoded one):", "73c5da0a\r");
+    at(
+      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
+      "73c5da0a\r",
+    );
     expect(
       await askWalletEvidence({ optional: false, place: walletPlaceOf(fingerprint, {}) }),
     ).toEqual({ kind: "wallet", evidence: { ...fingerprint, value: "73c5da0a" } });

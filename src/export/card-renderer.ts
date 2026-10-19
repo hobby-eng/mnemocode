@@ -40,6 +40,7 @@ export class CardRenderer implements CardDrawing {
   readonly readAsset: (path: RenderAsset) => Promise<Uint8Array>;
   readonly randomInt: UniformChoice;
   readonly qrModules: (payload: string) => QrModules;
+  /** Renderer-local cache of bundled public artwork, prepared with this renderer's platform. */
   readonly businessArtwork: BusinessArtwork;
 
   constructor(platform: RenderPlatform) {

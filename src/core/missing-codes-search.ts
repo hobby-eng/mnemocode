@@ -280,6 +280,7 @@ export class MissingCodesSearch {
     return placesNamed(EncodedForm.of(codes.format).placeName, codes.missingPlaces);
   }
 
+  /** The borrowed marked-code owner; its creating caller remains responsible for its lifetime. */
   get codes(): MissingCodes {
     return this.#codes;
   }

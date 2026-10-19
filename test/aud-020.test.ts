@@ -10,6 +10,7 @@ import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { ReEncoding } from "../src/core/re-encoding.js";
 import { FINGERPRINT_WARNING, fingerprintMatch } from "../src/core/wallet-check.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { PublicCliFiles } from "./helpers/public-cli-files.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -20,24 +21,23 @@ const UNICODE = `${"7684".repeat(11)}5728`;
 const ACCEPTED = "The fingerprint matches: the seed phrase is accepted, not proven.";
 
 /** re-encode of the test phrase, typed as words without Seedshift, as Unicode codes. */
-function reEncode(...wallet: readonly string[]) {
-  return execFileAsync(
-    process.execPath,
-    [
-      cli,
-      "re-encode",
-      "--input",
-      TEST_PHRASE,
-      "--old-mode",
-      "direct",
-      "--old-format",
-      "english",
-      "--format",
-      "3",
-      ...wallet,
-    ],
-    { env: { ...process.env, NO_COLOR: "1" }, maxBuffer: 1024 * 1024 },
-  );
+async function reEncode(...wallet: readonly string[]) {
+  using material = new PublicCliFiles([
+    "re-encode",
+    "--input",
+    TEST_PHRASE,
+    "--old-mode",
+    "direct",
+    "--old-format",
+    "english",
+    "--format",
+    "3",
+    ...wallet,
+  ]);
+  return await execFileAsync(process.execPath, [cli, ...material.arguments], {
+    env: { ...process.env, NO_COLOR: "1" },
+    maxBuffer: 1024 * 1024,
+  });
 }
 
 describe("AUD-020-SEC001: a fingerprint's match is accepted with its warning", () => {

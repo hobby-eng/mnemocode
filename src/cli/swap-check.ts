@@ -5,6 +5,7 @@
 
 import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
+import { printableText } from "./terminal-style.js";
 
 /** The dm uuid of a dm-crypt device starts with this (cryptsetup). */
 const CRYPT_UUID_PREFIX = "CRYPT-";
@@ -98,5 +99,5 @@ export function swapWarning(root = "/"): string | undefined {
   } catch {
     return `${SWAP_RISK}: MnemoCode cannot read /${SWAP_TABLE} to tell`;
   }
-  return risky.length === 0 ? undefined : `${SWAP_RISK}: ${risky.join(", ")}`;
+  return risky.length === 0 ? undefined : `${SWAP_RISK}: ${risky.map(printableText).join(", ")}`;
 }

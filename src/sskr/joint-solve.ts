@@ -28,7 +28,11 @@ import {
   MIN_DIGEST_THRESHOLD,
   storedCount,
 } from "./share-layout.js";
-import { restoreCompleteShares, uncheckedField } from "./complete-shares.js";
+import {
+  isCompleteShareRefusal,
+  restoreCompleteShares,
+  uncheckedField,
+} from "./complete-shares.js";
 import { defined } from "../core/defined.js";
 import {
   type ElementHelp,
@@ -432,6 +436,7 @@ export class AssessmentSecrets {
     this.wipeAllBut([]);
   }
 
+  /** Ends the assessment scope by releasing every untransferred owner and intermediate array. */
   [Symbol.dispose](): void {
     this.wipe();
   }
@@ -786,8 +791,9 @@ async function restore(
     assertLive();
     // The places among the shares read, counted from 0, of the shares kept that took no part.
     return { mnemonic, unchecked: unchecked.map((index) => defined(kept[index])) };
-  } catch {
+  } catch (error) {
     assertLive();
+    if (!isCompleteShareRefusal(error)) throw error;
     // A refusal of the set: this reading of the shares is not one of it.
     return undefined;
   }

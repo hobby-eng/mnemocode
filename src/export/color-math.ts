@@ -56,8 +56,13 @@ function toByte(channel: number): number {
  * artwork and the terminal's color cards read a color's channels through it.
  */
 export function rgbBytes(color: string): [number, number, number] {
-  const [red, green, blue] = bytesOfHex(color.startsWith("#") ? color.slice(1) : color);
-  return [defined(red), defined(green), defined(blue)];
+  const bytes = bytesOfHex(color.startsWith("#") ? color.slice(1) : color);
+  try {
+    const [red, green, blue] = bytes;
+    return [defined(red), defined(green), defined(blue)];
+  } finally {
+    bytes.fill(0);
+  }
 }
 
 /** The same channels from 0 to 1, as PDF colors and the color spaces take them. */
@@ -117,7 +122,7 @@ export function rgbOfHsv(hue: number, saturation: number, value: number): [numbe
 }
 
 /** An sRGB channel from 0 to 1 as linear light (IEC 61966-2-1). */
-function linearChannel(channel: number): number {
+export function linearChannel(channel: number): number {
   return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
 }
 

@@ -147,7 +147,12 @@ export class EncodedBackup extends Redacted {
    * mode.
    */
   static read(text: string, format: EncodedFormat, mode: MaskingMode): EncodedBackup {
-    return EncodedBackup.of(parseInput(text, format), format, mode);
+    const indexes = parseInput(text, format);
+    try {
+      return EncodedBackup.of(indexes, format, mode);
+    } finally {
+      indexes.fill(0);
+    }
   }
 
   /**
@@ -224,10 +229,12 @@ export class EncodedBackup extends Redacted {
     return EncodedBackup.of(this.indexes, this.#format, mode);
   }
 
+  /** The validated transformation mode; header metadata remains readable after wiping. */
   get mode(): MaskingMode {
     return this.#mode;
   }
 
+  /** The validated representation format; header metadata remains readable after wiping. */
   get format(): EncodedFormat {
     return this.#format;
   }
@@ -294,12 +301,15 @@ export class EncodedBackup extends Redacted {
   shorterPhrases(dates: readonly DateShiftDate[]): ShorterPhrase[] {
     if (this.givesSeveral) return [];
     return BIP39_WORD_COUNTS.filter((words) => words < this.words).flatMap((words) => {
+      const indexes = this.indexes.slice(0, words);
       let result: DecodedResult;
       try {
-        using start = EncodedBackup.of(this.indexes.slice(0, words), this.#format, this.#mode);
+        using start = EncodedBackup.of(indexes, this.#format, this.#mode);
         result = start.decode(dates);
       } catch {
         return [];
+      } finally {
+        indexes.fill(0);
       }
       return result.checksumValid ? [{ words, result }] : [];
     });

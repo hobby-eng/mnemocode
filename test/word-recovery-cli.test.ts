@@ -11,6 +11,7 @@ import { EncodedForm } from "../src/core/encoded-form.js";
 import { createSessionIdentity, decryptCandidates } from "../src/core/candidate-encryption.js";
 import { containing } from "./helpers/matchers.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { PublicCliFiles } from "./helpers/public-cli-files.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -20,7 +21,8 @@ const invalidLegacy =
   "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
 
 async function run(arguments_: readonly string[]) {
-  return execFileAsync(process.execPath, [cli, ...arguments_], {
+  using material = new PublicCliFiles(arguments_);
+  return await execFileAsync(process.execPath, [cli, ...material.arguments], {
     cwd: process.cwd(),
     env: process.env,
     maxBuffer: 1024 * 1024,

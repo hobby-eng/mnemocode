@@ -4,6 +4,7 @@
 
 import { characterLength } from "./utf8.js";
 import { defined } from "../core/defined.js";
+import { wipedAfter } from "../core/bits.js";
 
 /** Terminal width when the terminal does not say. */
 const DEFAULT_COLUMNS = 80;
@@ -73,7 +74,7 @@ export function placedAfter(
 /** Placement of `text` from `offset` on a terminal `columns` wide (placedAfter). */
 function placedTextAfter(text: string, offset: number, columns: number): number {
   const bytes = Buffer.from(text, "utf8");
-  return placedAfter(bytes, 0, bytes.length, offset, columns);
+  return wipedAfter(bytes, () => placedAfter(bytes, 0, bytes.length, offset, columns));
 }
 
 /**
@@ -163,5 +164,6 @@ export function displayWidthOf(line: Buffer, from: number, to: number): number {
 
 /** The columns that a prompt takes on a terminal. */
 export function displayWidth(text: string): number {
-  return displayWidthOf(Buffer.from(text, "utf8"), 0, Buffer.byteLength(text, "utf8"));
+  const bytes = Buffer.from(text, "utf8");
+  return wipedAfter(bytes, () => displayWidthOf(bytes, 0, bytes.length));
 }

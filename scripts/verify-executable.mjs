@@ -89,12 +89,15 @@ try {
   }[process.platform];
   if (sandboxMark !== undefined)
     check(selfTest.includes(sandboxMark), `is held by the system's sandbox (${sandboxMark})`);
+  writeFileSync(join(folder, "public-mnemonic.txt"), `${TEST_PHRASE}\n`);
+  writeFileSync(join(folder, "public-dates.txt"), "23-09-2026\n");
+  writeFileSync(join(folder, "public-shifted.txt"), `${SHIFTED}\n`);
   const shifted = run(
     "encode",
-    "--mnemonic",
-    TEST_PHRASE,
-    "--dates",
-    "23-09-2026",
+    "--mnemonic-file",
+    "public-mnemonic.txt",
+    "--dates-file",
+    "public-dates.txt",
     "--format",
     "1",
   );
@@ -103,12 +106,12 @@ try {
   // the Unicode codes of its words (7684 is abandon, 5728 about).
   const reEncoded = run(
     "re-encode",
-    "--input",
-    SHIFTED,
+    "--input-file",
+    "public-shifted.txt",
     "--old-mode",
     "seedshift",
-    "--old-dates",
-    "23-09-2026",
+    "--old-dates-file",
+    "public-dates.txt",
     "--format",
     "3",
     "--master-fingerprint",
@@ -118,8 +121,8 @@ try {
   run(
     "encode",
     "--sskr",
-    "--mnemonic",
-    TEST_PHRASE,
+    "--mnemonic-file",
+    "public-mnemonic.txt",
     "--threshold",
     "2",
     "--shares",

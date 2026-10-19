@@ -7,9 +7,8 @@ import { sskrExportOptions, sskrInputOptions } from "./sskr-command.js";
 import { asksNewBackup, RE_ENCODE_OPTIONS } from "./re-encode-options.js";
 import type { ParsedArguments } from "./arguments.js";
 
-// The options each command accepts, by their parser keys ("--dates" is stored as "date"). The
-// command line refuses any other option, and the help of a command documents exactly these; a test
-// keeps the two in step.
+// Recognized parser keys, including legacy material keys that the argv policy refuses first.
+// Help names those refused forms explicitly, and a test keeps every recognized option documented.
 
 /** The flags that ask for help: the short one for a summary, the long one for everything. */
 export const HELP_FLAGS = Object.freeze({ short: "-h", long: "--help" } as const);
@@ -38,6 +37,7 @@ export const commandOptions = {
     "qr-file",
     "ask-secrets",
     "date",
+    "dates-file",
     "format",
     "words",
     "input-kind",
@@ -56,6 +56,7 @@ export const commandOptions = {
     "qr-file",
     "ask-secrets",
     "date",
+    "dates-file",
     "format",
     "words",
     ...WALLET_EVIDENCE_OPTIONS,
@@ -76,6 +77,7 @@ export const commandOptions = {
   "sskr-combine": [
     "mode",
     "date",
+    "dates-file",
     ...sskrInputOptions,
     "max-tries",
     "max-candidates",
@@ -85,6 +87,7 @@ export const commandOptions = {
   "sskr-export": [
     "mode",
     "date",
+    "dates-file",
     "max-tries",
     "max-candidates",
     ...WALLET_EVIDENCE_OPTIONS,
@@ -101,6 +104,7 @@ export const commandOptions = {
     "mnemonic-file",
     "ask-secrets",
     "date",
+    "dates-file",
     "threshold",
     "shares",
     "format",

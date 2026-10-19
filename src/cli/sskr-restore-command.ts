@@ -159,10 +159,10 @@ export async function recoverySettings(
   args: ParsedArguments,
 ): Promise<Omit<Recovery, "shares" | "target">> {
   const mode = shareMode(args);
-  const given = dates(args);
   // Dates are secret: with --ask-secrets they are asked on the private screen, as every command
   // that takes them does, and never also taken from the command line.
-  assertAskedNotGiven(args, [DATES_OPTION]);
+  assertAskedNotGiven(args, [DATES_OPTION, "dates-file"]);
+  const given = dates(args);
   Masking.of(mode).assertDateCount(
     given.length,
     args["ask-secrets"] === true,

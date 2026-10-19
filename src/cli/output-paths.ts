@@ -5,7 +5,7 @@ import { basename, dirname, extname, resolve, sep } from "node:path";
 import { pathsOverlap } from "./path-within.js";
 import { value, values, type ParsedArguments } from "./arguments.js";
 import { optionLabel } from "./option-copy.js";
-import { terminalNotice } from "./terminal.js";
+import { printableText, terminalNotice } from "./terminal.js";
 import { FILE_INPUTS, FILE_OUTPUTS, FOLDER_OUTPUTS, SAVED_OPTIONS } from "./output-options.js";
 import { DOCUMENT_EXTENSIONS } from "../export/document-formats.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -96,7 +96,9 @@ async function firstFreeNumberedName(path: string, folder: boolean): Promise<str
     const free = numberedName(path, number, folder);
     if ((await entryAt(free)) === "none") return free;
   }
-  throw ERRORS.create("too-many-numbered-copies-already-choose-another-name", [`${path}`]);
+  throw ERRORS.create("too-many-numbered-copies-already-choose-another-name", [
+    printableText(path),
+  ]);
 }
 
 /**
@@ -138,7 +140,10 @@ export function discardRenamedOutput(path: string): void {
 /** After saving: one warning for each result saved under a numbered name. */
 export function reportRenamedOutputs(): void {
   for (const [used, given] of renamedOutputs)
-    terminalNotice(`${given} already exists: saved as ${used} instead.`, "warning");
+    terminalNotice(
+      `${printableText(given)} already exists: saved as ${printableText(used)} instead.`,
+      "warning",
+    );
   renamedOutputs.clear();
 }
 

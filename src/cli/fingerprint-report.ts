@@ -7,6 +7,7 @@ import { PHRASE_WORDS } from "../core/masking.js";
 import { capitalized } from "../core/prose.js";
 import {
   FINGERPRINT_NOTE,
+  FINGERPRINT_DISCLOSURE,
   type Channel,
   terminalColor,
   terminalLine,
@@ -50,6 +51,7 @@ export function reportFingerprint(label: string, value: string, plainLine: strin
     terminalStatus(label, value);
     terminalHint(FINGERPRINT_HINT);
   } else console.error(plainLine);
+  terminalHint(FINGERPRINT_DISCLOSURE);
 }
 
 /** The fingerprint of the original seed phrase `mnemonic`, as reportFingerprint shows it. */

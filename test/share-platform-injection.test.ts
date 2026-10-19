@@ -62,10 +62,11 @@ function marked(place: number): string {
 
 describe("the share parts with the host's platform", () => {
   it("keep no platform of their own, and refuse a plan without the host's", async () => {
-    // Only the interface and two constants: no platform to configure, none to read.
+    // The refusal contract and constants, not a platform configured for later calls.
     expect(Object.keys(await import("../src/sskr/share-platform.js")).sort()).toEqual([
       "ONE_GROUP",
       "SEED_BYTES",
+      "ShareCombineRefusalError",
     ]);
     // A host in JavaScript may leave it out; the plan refuses before any share is read.
     await expect(planJointRepair([FIRST, marked(5)], {} as PlanOptions)).rejects.toThrow(

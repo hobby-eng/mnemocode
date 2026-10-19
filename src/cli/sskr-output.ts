@@ -8,7 +8,13 @@ import {
   resolveTemplateId,
 } from "../export/template-catalog.js";
 import { resolveSskrLayout, parseSskrLayout } from "../export/sskr-content.js";
-import { printCodes, terminalNotice, terminalResultHeader, terminalWork } from "./terminal.js";
+import {
+  printableText,
+  printCodes,
+  terminalNotice,
+  terminalResultHeader,
+  terminalWork,
+} from "./terminal.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import { value, type ParsedArguments } from "./arguments.js";
@@ -181,7 +187,10 @@ export async function saveShares(
   );
   if (output === CANCELLED) return CANCELLED;
   if (output !== undefined) {
-    terminalNotice(`Saved SSKR records: ${output} (one complete share per line).`, "success");
+    terminalNotice(
+      `Saved SSKR records: ${printableText(output)} (one complete share per line).`,
+      "success",
+    );
     keep("file");
   }
   return undefined;
@@ -211,7 +220,7 @@ async function saveShareCards(
   if (directory === CANCELLED) return CANCELLED;
   if (directory !== undefined) {
     terminalNotice(
-      `Saved ${cards} ${options.imageFormat.toUpperCase()} files to: ${directory}`,
+      `Saved ${cards} ${options.imageFormat.toUpperCase()} files to: ${printableText(directory)}`,
       "success",
     );
     if ((await saveShareQrsInside(set, directory)) === CANCELLED) return CANCELLED;
@@ -228,7 +237,7 @@ async function saveShareCards(
   );
   if (pdf === CANCELLED) return CANCELLED;
   if (pdf !== undefined) {
-    terminalNotice(`Saved SSKR collection PDF: ${pdf}`, "success");
+    terminalNotice(`Saved SSKR collection PDF: ${printableText(pdf)}`, "success");
     keep("file");
     if (
       (await saveShareQrs(set, (code) => saveQrBeside(code.payload, pdf, `-${code.reference}`))) ===

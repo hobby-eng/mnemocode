@@ -10,12 +10,14 @@ import { A5, A6, renderHeirSheet } from "../src/export/heir-sheet.js";
 import { HeirInstructions, type HeirRoute } from "../src/export/heir-sheet-text.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { PublicCliFiles } from "./helpers/public-cli-files.js";
 
 // The public dates of the examples.
 const DATES = ["23-09-2026", "08-08-1988"];
 
 function cli(args: string[]) {
-  const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...args], {
+  using material = new PublicCliFiles(args);
+  const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...material.arguments], {
     encoding: "utf8",
     env: { ...process.env, NO_COLOR: "1" },
   });

@@ -10,7 +10,7 @@ import { askAfterFailure, askValueUntil, droppedPath, WHAT_NOW } from "./ask.js"
 import { warnOfCloudCopy } from "./cloud-folders.js";
 import { discardRenamedOutput } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
-import { terminalNotice } from "./terminal.js";
+import { printableText, terminalNotice } from "./terminal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { lowerFirst } from "../core/prose.js";
 import { describeError, errorCode } from "../core/refusal.js";
@@ -48,7 +48,7 @@ function saveFailure(what: string, path: string, error: unknown): string {
   const code = errorCode(error);
   const known =
     code !== undefined && Object.hasOwn(SAVE_FAILURES, code) ? SAVE_FAILURES[code] : undefined;
-  return `${what} could not be saved as ${path}: ${known ?? otherFailure(error)}.`;
+  return `${what} could not be saved as ${printableText(path)}: ${known ?? otherFailure(error)}.`;
 }
 
 /**
@@ -56,7 +56,7 @@ function saveFailure(what: string, path: string, error: unknown): string {
  * which inside this one starts in lower case and loses its full stop.
  */
 function otherFailure(error: unknown): string {
-  const described = describeError(error);
+  const described = printableText(describeError(error));
   return error instanceof Error ? lowerFirst(described.replace(/\.$/u, "")) : described;
 }
 
@@ -90,7 +90,7 @@ export async function writeSaved(write: () => Promise<unknown>): Promise<void> {
     await write();
   } catch (error) {
     if (!(error instanceof LeftStagingCopyError)) throw error;
-    terminalNotice(error.message, "warning");
+    terminalNotice(printableText(error.message), "warning");
   }
 }
 

@@ -28,7 +28,7 @@ import {
   TYPED_SOURCE,
 } from "./menu-entries.js";
 import { MNEMOCODE_VERSION } from "../version.js";
-import { README_URL, terminalNotice } from "./terminal.js";
+import { printableText, README_URL, terminalNotice } from "./terminal.js";
 import {
   answerLabel,
   ENCODED_SEEDSHIFT_QUESTION,
@@ -136,5 +136,5 @@ export async function saveHeirSheet(args: ParsedArguments, facts: HeirSheetFacts
   if (path === undefined) return;
   const bytes = await renderHeirSheet(nodeRenderPlatform, heirSheetText(facts), sheetFormat(args));
   await publishNewPrivateFile(path, bytes);
-  terminalNotice(`Saved instructions for heirs: ${path}`, "success");
+  terminalNotice(`Saved instructions for heirs: ${printableText(path)}`, "success");
 }

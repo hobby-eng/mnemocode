@@ -53,6 +53,7 @@ export type CandidatePrefixReader = (length: number) => Promise<Uint8Array>;
 
 /** Size and header checks that a page, worker, or command-line reader delegates to unchanged. */
 export class CandidateFileAdmission {
+  /** Shared immutable limits for the header, plaintext and ciphertext, all in bytes. */
   static parameters(): typeof PARAMETERS {
     return PARAMETERS;
   }

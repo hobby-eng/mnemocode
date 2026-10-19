@@ -39,7 +39,8 @@ const USUAL: Readonly<Record<string, string>> = {
   "How many shares in all? (2 to 16)": "7",
   "How many of them restore the seed phrase?": "4",
   // The public test phrase's fingerprint and its first native SegWit address.
-  "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)": "73c5da0a",
+  "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.)":
+    "73c5da0a",
   "Bitcoin address (one of the first receiving ones)": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
   // The public test phrase\'s first address in each other coin.
   ...COIN_ADDRESS_ANSWERS,

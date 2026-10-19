@@ -5,7 +5,7 @@
 import { homedir } from "node:os";
 import { relative, resolve, sep } from "node:path";
 import { pathWithin } from "./path-within.js";
-import { terminalMore, terminalNotice } from "./terminal.js";
+import { printableText, terminalMore, terminalNotice } from "./terminal.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { SAVED_OPTIONS } from "./output-options.js";
 import { defined } from "../core/defined.js";
@@ -62,7 +62,10 @@ export function cloudServiceOf(
 export function warnOfCloudCopy(path: string | undefined): void {
   const service = path === undefined ? undefined : cloudServiceOf(path);
   if (service === undefined) return;
-  terminalNotice(`${service} keeps a copy of ${defined(path)}`, "warning");
+  terminalNotice(
+    `${printableText(service)} keeps a copy of ${printableText(defined(path))}`,
+    "warning",
+  );
   terminalMore("cloud-folders");
 }
 

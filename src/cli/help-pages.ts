@@ -31,12 +31,14 @@ import { numberWord } from "../core/prose.js";
 import { COINS } from "../core/coins.js";
 import { defined } from "../core/defined.js";
 import { type CommandHelp, type TopicHelp } from "./help-types.js";
+import { FINGERPRINT_DISCLOSURE } from "./terminal.js";
 import {
   askSecrets,
   candidateListGroup,
   cardQr,
   cardsDir,
   dates,
+  datesFile,
   decodeFormat,
   decodeMode,
   encodedFile,
@@ -54,6 +56,7 @@ import {
   imagesDir,
   legacyValidCandidates,
   legacyValidLastWord,
+  lastWordInputs,
   LIST_PASSPHRASE_ASK,
   MASKED_MODES,
   maxCandidates,
@@ -65,11 +68,9 @@ import {
   pdf,
   phraseWords,
   recordFormatOf,
-  SHIFTED_TEST_PHRASE,
   TABLE_COLUMN,
   template,
   TEST_FINGERPRINT,
-  TEST_PHRASE,
   TEST_PHRASE_VARIABLE,
   title,
 } from "./help-options.js";
@@ -81,7 +82,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     about: [
       "Writes an English BIP39 phrase as words, numbers, Unicode codes or colors, after masking it with dates in seedshift mode. It can show the result in the terminal, save it as a record file or a QR code, print it as cards, or split it into Shamir shares. After encoding it prints the fingerprint of the original phrase and of the masked phrase.",
     ],
-    usage: "[OPTIONS] (--ask-secrets | --mnemonic-file <PATH> | --mnemonic <TEXT>)",
+    usage: "[OPTIONS] (--ask-secrets | --mnemonic-file <PATH>)",
     groups: [
       {
         heading: "The phrase and the transformation:",
@@ -91,6 +92,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           mnemonicText,
           encodeMode,
           dates,
+          datesFile,
           encodeFormat,
           encodeLegacyValidLastWord,
         ],
@@ -108,20 +110,20 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         "A real phrase, dates asked for, as Unicode",
       ],
       [
-        `mnemocode encode --mode direct --mnemonic ${TEST_PHRASE_VARIABLE} --format 5 --cards`,
+        `printf '%s\\n' ${TEST_PHRASE_VARIABLE} | mnemocode encode --mode direct --mnemonic-file - --format 5 --cards`,
         "The test phrase as colors, shown as cards in the terminal",
       ],
       [
-        `mnemocode encode --mnemonic ${TEST_PHRASE_VARIABLE} --dates 23-09-2026 --format 1`,
-        `Masked with one date: ${SHIFTED_TEST_PHRASE}`,
+        "mnemocode encode --mode seedshift --ask-secrets --format 1",
+        "Mask the phrase with dates, both typed on the private screen",
       ],
       [
-        `mnemocode encode --mnemonic ${TEST_PHRASE_VARIABLE} --dates 23-09-2026 --format 5 --output shifted.txt`,
-        "Also save the record; decode needs only the file and the date",
+        "mnemocode encode --mnemonic-file phrase.txt --dates-file dates.txt --format 5 --output shifted.txt",
+        "Use protected local files and save the record; Decode also needs the dates",
       ],
       [
-        `mnemocode encode --mode seedshift-legacy --mnemonic ${TEST_PHRASE_VARIABLE} --dates 23-09-2026 --format 1`,
-        "The same record as the original Seedshift program",
+        "mnemocode encode --mode seedshift-legacy --ask-secrets --format 1",
+        "Use the original Seedshift mode with private inputs",
       ],
       [
         "mnemocode encode --mode seedshift --ask-secrets --format 5 --template business-it --page-size a4 --pdf cards.pdf",
@@ -145,7 +147,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       ],
     ],
     notes: [
-      "Fingerprints are calculated for an empty BIP39 passphrase. They do not reveal the phrase. A legacy result is a valid phrase only by chance; when it is not, only the original fingerprint is shown.",
+      `Fingerprints are calculated for an empty BIP39 passphrase. ${FINGERPRINT_DISCLOSURE} A legacy result is a valid phrase only by chance; when it is not, only the original fingerprint is shown.`,
       "Note the encoded fingerprint too: decode, recover-date and sskr-combine show it again on the private screen once the codes or shares are read, before the dates, so that a code written or typed wrongly shows before the dates are typed.",
       "Individual cards are not Shamir sharing: every card is needed, and each reveals a part of the encoded phrase.",
     ],
@@ -159,7 +161,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       "A date may then hold ? for each forgotten digit, as in recover-date: the dates are searched, and the matches listed as recover-date lists them. Before the search the wallet's fingerprint or one of its first receiving addresses, of Bitcoin or another coin, is asked for. It is needed where every date gives a valid phrase, as in seedshift mode; with seedshift-legacy, whose checksum sorts out most dates, it may be left out.",
       "On the private screen the codes may hold ? where one cannot be read: a word number, a word, a Unicode code or a whole color, narrowed by a few letters (ab*), words joined by |, or a ? for one digit. The right codes are told by the encoded fingerprint that encode showed, by the wallet with the dates, which may hold ? too, or by a list where they are few. A Shamir share typed in place of the codes, or read from a QR code, leads to the restore from shares, the share kept as the first; after a share from a QR code the next can be read from another.",
     ],
-    usage: "[OPTIONS] (--ask-secrets | --input-file <PATH> | --qr-file <PNG> | --input <TEXT>)",
+    usage: "[OPTIONS] (--ask-secrets | --input-file <PATH> | --qr-file <PNG>)",
     groups: [
       {
         heading: "Options:",
@@ -169,6 +171,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           encodedQr,
           encodedText,
           dates,
+          datesFile,
           decodeMode,
           decodeFormat,
           phraseWords,
@@ -248,20 +251,20 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         "Only the dates on the private screen, ? for a forgotten digit",
       ],
       [
-        "mnemocode decode --input-file shifted.txt --dates 23-09-2026",
+        "mnemocode decode --input-file shifted.txt --dates-file dates.txt",
         "A record file names its mode and format; only the dates are needed",
       ],
       [
-        `mnemocode decode --mode seedshift --input "${SHIFTED_TEST_PHRASE}" --dates 23-09-2026`,
-        `Typed text: give the mode; the fingerprint is ${TEST_FINGERPRINT}`,
+        "mnemocode decode --mode seedshift --ask-secrets",
+        "Type the Seedshift backup and its dates privately",
       ],
       [
-        "mnemocode decode --mode seedshift --qr-file my-qr.png --dates 23-09-2026",
+        "mnemocode decode --mode seedshift --qr-file my-qr.png --dates-file dates.txt",
         "Read a QR code saved by encode --qr",
       ],
       [
-        'mnemocode decode --mode seedshift-legacy --input "8F44901950118F44901950118F44901950118F4490194F5C" --format 3 --dates 23-09-2026',
-        "A legacy record of Unicode codes typed by hand",
+        "mnemocode decode --mode seedshift-legacy --ask-secrets --format 3",
+        "Type a legacy Unicode-code backup and its dates privately",
       ],
     ],
     notes: [
@@ -277,7 +280,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       "With --ask-secrets the codes are asked first, then at once their dates, then the phrase is shown to confirm; only then, unless options give it, the new backup is asked, with the questions of Encode in the menu. A backup of the original Seedshift with a valid last word keeps nothing of the original last word: give it, as you remember it.",
       "Every code and date of the old backup is needed: decode and recover-date find what is forgotten. Afterwards the old backup still restores the same wallet.",
     ],
-    usage: "[OPTIONS] (--ask-secrets | --input-file <PATH> | --qr-file <PNG> | --input <TEXT>)",
+    usage: "[OPTIONS] (--ask-secrets | --input-file <PATH> | --qr-file <PNG>)",
     groups: [
       {
         heading: "The old backup:",
@@ -286,7 +289,16 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           encodedFile,
           encodedQrOf("--old-mode"),
           encodedText,
-          { ...dates, flag: "--old-dates", summary: "The dates of the old backup, DD-MM-YYYY" },
+          {
+            ...dates,
+            flag: "--old-dates",
+            summary: "Refused material argument; use --old-dates-file or --ask-secrets",
+          },
+          {
+            ...datesFile,
+            flag: "--old-dates-file",
+            summary: "Read the old backup's dates from a file or -",
+          },
           {
             flag: "--old-mode",
             value: "MODE",
@@ -300,20 +312,13 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             `The format of the old backup, ${FORMAT_NUMBER_RANGE} or its name; usually found automatically`,
           ),
           phraseWords,
-          {
-            flag: "--last-word",
-            value: "WORD",
-            summary: "The last word of the original seed phrase, for seedshift-legacy-valid",
-            details: [
-              "Its backup gives a phrase for each possible last word; the original one picks it. With --ask-secrets it is asked on the private screen instead.",
-            ],
-          },
+          ...lastWordInputs,
         ],
       },
       {
         heading:
           "The new backup (without these, --ask-secrets asks it once the phrase is confirmed):",
-        options: [encodeMode, dates, encodeFormat, encodeLegacyValidLastWord],
+        options: [encodeMode, dates, datesFile, encodeFormat, encodeLegacyValidLastWord],
       },
       ...encodeOutputGroups,
       {
@@ -360,7 +365,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         "A record file masked again with new dates, as colors",
       ],
       [
-        `mnemocode re-encode --input "${SHIFTED_TEST_PHRASE}" --old-mode seedshift --old-dates 23-09-2026 --mode direct --format 3 --master-fingerprint ${TEST_FINGERPRINT}`,
+        `mnemocode re-encode --input-file shifted.txt --old-mode seedshift --old-dates-file old-dates.txt --mode direct --format 3 --master-fingerprint ${TEST_FINGERPRINT}`,
         "The test phrase unmasked as Unicode codes, accepted by its fingerprint (a filter, not proof)",
       ],
       [
@@ -380,7 +385,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       `In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of ${checksumBits(BIP39_WORD_COUNTS[0])} to ${checksumBits(defined(BIP39_WORD_COUNTS.at(-1)))} bits.`,
       "With --ask-secrets the encoded fingerprint of the codes is shown once they are read, before the dates, as decode shows it, so that a code typed wrongly shows before a long search.",
     ],
-    usage: "[OPTIONS] (--ask-secrets | --dates <PATTERN ...>) [<RECOVERY CHECK>]",
+    usage: "[OPTIONS] (--ask-secrets | --dates-file <PATH>) [<RECOVERY CHECK>]",
     groups: [
       {
         heading: "The record and the dates:",
@@ -392,7 +397,11 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           {
             ...dates,
             value: "PATTERN ...",
-            summary: "The dates, with ? for what is forgotten, such as ?-09-2026",
+            summary: "Refused material argument; put patterns in --dates-file or use --ask-secrets",
+          },
+          {
+            ...datesFile,
+            summary: "Read dates with ? for forgotten digits from a file or -",
             details: [
               "?3-09-2026 tries days ending in 3, 0?-09-2026 days 1 to 9, 05|15-09-2026 day 5 or 15, 15-?-2025 the 15th of every month, ?-?-2026 every date in 2026, a lone ? every supported date. One to three dates may be incomplete; two identical patterns are tried once.",
             ],
@@ -437,11 +446,11 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         "Record and date patterns on the private screen",
       ],
       [
-        `mnemocode recover-date --mode seedshift --input "${SHIFTED_TEST_PHRASE}" --format 1 --dates "??-09-2026" --master-fingerprint ${TEST_FINGERPRINT}`,
+        `mnemocode recover-date --mode seedshift --input-file shifted.txt --dates-file date-patterns.txt --master-fingerprint ${TEST_FINGERPRINT}`,
         "Find the forgotten day with the fingerprint",
       ],
       [
-        `mnemocode recover-date --mode seedshift --input "${SHIFTED_TEST_PHRASE}" --format 1 --dates "??-09-2026" --bitcoin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu --bitcoin-profile native-segwit`,
+        "mnemocode recover-date --mode seedshift --input-file shifted.txt --dates-file date-patterns.txt --bitcoin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu --bitcoin-profile native-segwit",
         "The same with the first native SegWit receiving address, m/84'/0'/0'/0/0",
       ],
     ],
@@ -455,14 +464,14 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     about: [
       `Put ? in place of each forgotten word, ab* for a word that starts with ab, or rich|rice for one of a few words. MnemoCode tries every combination, up to ${counting(MAX_SEARCH_COMBINATIONS)}, and lists those that pass the checksum test: for one forgotten word about 128 in a 12-word phrase, about 8 in 24 words. With one forgotten word each row shows the word, its number in the BIP39 list, the checksum bits and the whole phrase. A recovery check marks the matching rows; the other candidates are still shown. More than ${counting(MAX_SHOWN_CANDIDATES)} candidates are not shown: save them with --candidates-file, or check them against the wallet.`,
     ],
-    usage: "[OPTIONS] (--ask-secrets | --mnemonic-file <PATH> | --mnemonic <TEXT>)",
+    usage: "[OPTIONS] (--ask-secrets | --mnemonic-file <PATH>)",
     groups: [
       {
         heading: "The phrase:",
         options: [
           askSecrets,
           mnemonicFile,
-          { ...mnemonicText, summary: "The phrase with ? in place of each forgotten word" },
+          mnemonicText,
           {
             flag: "--missing-word",
             summary: "One word is missing, and where is not known",
@@ -493,7 +502,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     examples: [
       ["mnemocode recover-word --ask-secrets", "The phrase with ? on the private screen"],
       [
-        `mnemocode recover-word --mnemonic "${TEST_PHRASE.replace(/about$/u, "?")}"`,
+        "mnemocode recover-word --mnemonic-file words-with-marks.txt",
         "Every word that passes the checksum",
       ],
       [
@@ -660,7 +669,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
           ["direct", "Writes the phrase in another form without changing it. No dates."],
           [
             "seedshift",
-            "Masks the phrase with dates. The result is always a valid BIP39 phrase, and the same dates give the original back without a search. The default when --dates is given.",
+            "Masks the phrase with dates. The result is always a valid BIP39 phrase, and the same dates give the original back without a search. The default when --dates-file is given.",
           ],
           [
             "seedshift-legacy",
@@ -701,8 +710,8 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
     ],
     examples: [
       [
-        `mnemocode encode --mode seedshift --mnemonic ${TEST_PHRASE_VARIABLE} --dates 23-09-2026 --format 1`,
-        `Gives ${SHIFTED_TEST_PHRASE}`,
+        "mnemocode encode --mode seedshift --ask-secrets --format 1",
+        "Enter the phrase and its dates privately",
       ],
     ],
   },
@@ -726,7 +735,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
     ],
     examples: [
       [
-        `mnemocode encode --mode direct --mnemonic ${TEST_PHRASE_VARIABLE} --format 3`,
+        `printf '%s\\n' ${TEST_PHRASE_VARIABLE} | mnemocode encode --mode direct --mnemonic-file - --format 3`,
         "The test phrase as Unicode codes",
       ],
       [

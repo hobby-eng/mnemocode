@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { createCardSession } from "../src/cards.js";
-import { nodeRenderPlatform } from "../src/export/platform-node.js";
+import type { UniformChoice } from "../src/export/platform.js";
+
+const FIRST_CHOICE: UniformChoice = () => 0;
+const REPEATED_EXPORTS = 20;
 
 describe("card session", () => {
   it("gives the same invented details for every export of one session", () => {
-    const session = createCardSession(nodeRenderPlatform.randomInt);
+    const session = createCardSession(FIRST_CHOICE);
     const first = session.settingsFor("business-it");
-    for (let attempt = 0; attempt < 20; attempt += 1)
+    for (let attempt = 0; attempt < REPEATED_EXPORTS; attempt += 1)
       expect(session.settingsFor("business-it")).toEqual(first);
     // The studio and the person stay; only the employer follows the sector of the design.
     const other = session.settingsFor("business-architect");
@@ -16,19 +19,37 @@ describe("card session", () => {
     expect(session.settingsFor("material-tile")).toEqual(session.settingsFor("material-tile"));
   });
 
-  it("starts again with a new session", () => {
-    const seen = new Set<string>();
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      const { profile, presentation } = createCardSession(nodeRenderPlatform.randomInt).settingsFor(
-        "business-it",
-      );
-      seen.add(`${profile.name}|${profile.company}|${presentation.studioName}`);
-    }
-    expect(seen.size).toBeGreaterThan(1);
+  it("uses fresh scripted host choices for a new session without changing an existing one", () => {
+    let last = false;
+    let choices = 0;
+    const choose: UniformChoice = (upperExclusive) => {
+      choices += 1;
+      return last ? upperExclusive - 1 : 0;
+    };
+    const first = createCardSession(choose);
+    const original = first.settingsFor("business-it");
+    expect(original.profile).toMatchObject({
+      name: "Alex Morgan",
+      company: "Norvale Systems",
+      role: "Software Engineer",
+    });
+    expect(original.presentation.studioName).toBe("Alder & Vale");
+    last = true;
+    expect(first.settingsFor("business-it")).toEqual(original);
+    const before = choices;
+    const fresh = createCardSession(choose).settingsFor("business-it");
+    expect(choices).toBeGreaterThan(before);
+    expect(fresh.profile).toMatchObject({
+      name: "Amina Diallo",
+      company: "Fenwick Networks",
+      role: "Project Manager",
+    });
+    expect(fresh.presentation.studioName).toBe("Fallow & Reed");
+    expect(first.settingsFor("business-it")).toEqual(original);
   });
 
   it("prints what the user supplies and keeps the rest", () => {
-    const session = createCardSession(nodeRenderPlatform.randomInt);
+    const session = createCardSession(FIRST_CHOICE);
     const invented = session.settingsFor("business-it");
     const own = session.settingsFor(
       "business-it",

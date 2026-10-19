@@ -1,7 +1,7 @@
 import { imageFormat, cardFileFormat, savedPagesNotice } from "./image-options.js";
 import { writeSaved } from "./save-retry.js";
 import { exportPageImages } from "../export/image-export.js";
-import { terminalNotice, terminalResultHeader } from "./terminal.js";
+import { printableText, terminalNotice, terminalResultHeader } from "./terminal.js";
 import { exportIndividualCards } from "../export/individual-cards.js";
 import { validateCardOptions } from "./card-options.js";
 import { businessOptions, businessOptionNames } from "./business-options.js";
@@ -104,12 +104,15 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
       directory,
       cardFileFormat(args),
     );
-    terminalNotice(`Saved ${count} individual card preview files to: ${directory}`, "success");
+    terminalNotice(
+      `Saved ${count} individual card preview files to: ${printableText(directory)}`,
+      "success",
+    );
   }
   if (path !== undefined) {
     await writeSaved(() => exportCards(jobs, path));
     terminalNotice(
-      `Saved preview PDF (${jobs.length} ${jobs.length === 1 ? "template" : "templates"}): ${path}`,
+      `Saved preview PDF (${jobs.length} ${jobs.length === 1 ? "template" : "templates"}): ${printableText(path)}`,
       "success",
     );
   }

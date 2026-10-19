@@ -8,7 +8,12 @@ import {
   WALLET_CHECK_NEEDS_THRESHOLD,
   type RestoredPhrase,
 } from "../sskr/share-restore.js";
-import { terminalHint, terminalNotice, terminalResultHeader } from "./terminal.js";
+import {
+  FINGERPRINT_DISCLOSURE,
+  terminalHint,
+  terminalNotice,
+  terminalResultHeader,
+} from "./terminal.js";
 import { reportRenamedOutputs } from "./output-paths.js";
 import { assertSingleValues, value, type ParsedArguments } from "./arguments.js";
 import { Masking, PHRASE_WORDS } from "../core/masking.js";
@@ -180,6 +185,9 @@ async function showVariants(
   // in the order of their sets, which say what a repair filled in.
   const variants = ShareRestore.variants(phrases, places, given, masterFingerprint);
   terminalNotice(variantsMessage(variants.length), "warning");
+  terminalHint(
+    `Each fingerprint is that of the phrase the shares hold, with an empty passphrase. ${FINGERPRINT_DISCLOSURE}`,
+  );
   for (const [index, variant] of variants.entries()) {
     const title = `Variant ${index + 1} of ${variants.length}`;
     const fingerprint = defined(variant.fingerprint);
@@ -198,7 +206,6 @@ async function showVariants(
     )
       return CANCELLED;
   }
-  terminalHint("Each fingerprint is that of the phrase the shares hold, with an empty passphrase.");
 }
 
 /**

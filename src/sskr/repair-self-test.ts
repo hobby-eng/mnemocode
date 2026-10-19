@@ -13,7 +13,12 @@
 import { expectRefused, expectRefusedLater, expectSame } from "../core/self-test-check.js";
 import { JointRepair, searchOnce } from "./joint-repair.js";
 import { sskrSetVector, sskrVector } from "./known-answers.js";
-import { MAX_MARKED_ELEMENTS, readRepairableShare } from "./repair.js";
+import {
+  MAX_LISTED_FREE_BITS,
+  MAX_MARKED_ELEMENTS,
+  readRepairableShare,
+  repairCandidates,
+} from "./repair.js";
 import { colorsToUnicode } from "../core/colors.js";
 import { UNICODE_CODE_DIGITS } from "../core/code-text.js";
 import { textPieces } from "../core/pieces.js";
@@ -67,6 +72,11 @@ function checkRepair(text: string, ur: string, filled: string, name: string): vo
  * marks, or a ? for a digit of a word number.
  */
 export function checkShareRepairStartup(): void {
+  expectRefused(
+    () => repairCandidates(sskrVector.shares[0], MAX_LISTED_FREE_BITS + 1),
+    /freeBits must be a whole number/u,
+    "An excessive single-share listing budget",
+  );
   checkRepair(
     `${marked(defined(SET_COLORS[0]), "#1F9121")} #000000`,
     defined(SET_SHARES[0]),

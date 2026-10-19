@@ -2,6 +2,7 @@
 the keys it types, the session that drives it and the screen that reads what it wrote back."""
 
 import codecs
+import errno
 import os
 import queue
 import re
@@ -26,6 +27,8 @@ TERMINAL_ROWS, TERMINAL_COLUMNS = 40, 120
 TYPING_PIECE = 256
 # Seconds that typing waits for the tool to take more input before the check fails.
 TYPING_LIMIT = 30
+# POSIX PTYs report their closed slave as EIO; readiness can race with a non-blocking read.
+PTY_READ_END_OR_RACE = frozenset((errno.EIO, errno.EAGAIN, errno.EWOULDBLOCK))
 
 UP, DOWN, ENTER, CTRL_UP, ESCAPE = "\x1b[A", "\x1b[B", "\r", "\x1b[1;5A", "\x1b"
 HOME, END, DELETE = "\x1b[H", "\x1b[F", "\x1b[3~"
@@ -97,8 +100,9 @@ class Session:
         if ready:
             try:
                 self.output += self.decoder.decode(os.read(self.fd, 65536))
-            except OSError:
-                pass
+            except OSError as error:
+                if error.errno not in PTY_READ_END_OR_RACE:
+                    raise
 
     def wait_for(self, needle, limit=30):
         """Reads until `needle` appears after the text last waited for; returns where it ends."""

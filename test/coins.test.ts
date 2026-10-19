@@ -182,15 +182,18 @@ describe("addresses of every coin, where the wallets of the public phrase put th
     expect(new Set(ADDRESSES.map(([coin]) => coin))).toEqual(new Set(COINS.map(({ id }) => id)));
   });
 
-  it.each(ADDRESSES)("%s %j at %s: %s", (coin, passphrase, path, address) => {
-    const evidence = coinAddress(coin, address, locationOf(path));
-    expect(check.match(ABANDON, evidence, passphrase)).toEqual({
-      matched: true,
-      kind: "coin-address",
-      derived: address,
-      path,
-    });
-  });
+  it.each(ADDRESSES)(
+    "matches %s with passphrase %j at %s to %s",
+    (coin, passphrase, path, address) => {
+      const evidence = coinAddress(coin, address, locationOf(path));
+      expect(check.match(ABANDON, evidence, passphrase)).toEqual({
+        matched: true,
+        kind: "coin-address",
+        derived: address,
+        path,
+      });
+    },
+  );
 
   it("are found by the Node.js module and with a PBKDF2 that answers later", async () => {
     const [coin, , path, address] = ADDRESSES[34]!;

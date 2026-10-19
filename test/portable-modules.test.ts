@@ -224,7 +224,7 @@ const PARTS: Readonly<Record<string, Part>> = {
   "src/core/candidates-self-test.ts": { uses: ["src/core/candidates.ts"] },
   "src/core/candidate-list-self-test.ts": { uses: ["src/core/candidate-list.ts"] },
   "src/core/candidate-encryption-self-test.ts": {
-    uses: ["src/core/candidate-encryption.ts", "src/core/candidate-list-self-test.ts"],
+    uses: ["src/core/candidate-encryption.ts"],
   },
   "src/core/backup-check-self-test.ts": {
     uses: ["src/core/backup-check.ts", "src/sskr/known-answers.ts", "src/sskr/share-platform.ts"],

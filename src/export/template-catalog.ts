@@ -136,7 +136,9 @@ export type TemplateCatalogErrorCode = "no-card-template";
  * adds how its person chooses another kind, such as the command line's form numbers.
  */
 export class NoCardTemplateError extends Error {
+  /** Stable code identifying a catalog without a design for the requested CardKind. */
   readonly code: TemplateCatalogErrorCode = "no-card-template";
+  /** Requested CardKind, or undefined when no kind filter was given. */
   readonly kind: CardKind | undefined;
 
   constructor(kind: CardKind | undefined) {

@@ -31,7 +31,9 @@ export class ExportDetails {
   /** The details settled for an object of settings or of options, which an export lives with. */
   static readonly #settled = new WeakMap<object, ExportDetails>();
 
+  /** Frozen complete card identity shared by every page and output of this export. */
   readonly profile: Required<CardProfile>;
+  /** Frozen presentation texts shared by every page and output of this export. */
   readonly presentation: CardPresentation;
 
   private constructor(profile: Required<CardProfile>, presentation: CardPresentation) {

@@ -11,7 +11,7 @@ import {
   choiceOption,
   type ParsedArguments,
 } from "./arguments.js";
-import { dates, encodeFormat, phraseAndDates, transformMode } from "./input.js";
+import { assertDateInputMode, encodeFormat, phraseAndDates, transformMode } from "./input.js";
 import { DATE_COUNT_WORDS, Masking, type SplitMode } from "../core/masking.js";
 import { masterFingerprint } from "../bitcoin-evidence.js";
 import { splitSskrBackup } from "../sskr/shares.js";
@@ -105,9 +105,7 @@ export async function prepareSskrSplit(
   const mode = transformMode(args);
   const maskedWords = maskedWordsRequested(args, mode);
   Masking.assertSplitMode(mode);
-  // Dates given as options fit the mode before any secret is read; asked ones are checked then.
-  if (args["ask-secrets"] !== true)
-    Masking.of(mode).assertDateCount(dates(args).length, false, DATE_COUNT_WORDS.split);
+  assertDateInputMode(args, mode, DATE_COUNT_WORDS.split);
   // Before the first question: a failure here is no answer's fault, and nothing typed is lost.
   await assertSskrSelfTest();
   return (known) =>

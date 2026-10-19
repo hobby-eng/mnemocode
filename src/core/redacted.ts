@@ -17,14 +17,17 @@ export abstract class Redacted {
     this.#shown = `[${label}: redacted]`;
   }
 
+  /** Fixed redacted label for string conversion, without traversing this owner's fields. */
   toString(): string {
     return this.#shown;
   }
 
+  /** The redacted label that JSON serialization uses instead of this owner's fields. */
   toJSON(): string {
     return this.#shown;
   }
 
+  /** The same fixed label for Node.js inspection, without revealing retained field values. */
   [NODE_INSPECT](): string {
     return this.#shown;
   }

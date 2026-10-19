@@ -56,6 +56,17 @@ export const SGR_RESET = "\x1b[0m";
 // oxlint-disable-next-line no-control-regex -- an SGR sequence begins with ESC, which it must match
 export const STYLE_CODES = /\x1b\[[0-9;]*m/gu;
 
+/**
+ * C0, DEL/C1, line separators and direction controls are unsafe before owned terminal styling.
+ */
+// oxlint-disable-next-line no-control-regex -- it identifies unsafe display controls
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Bidi_Control}]/gu;
+
+/** Outside text for display only: control characters become U+FFFD; original data is unchanged. */
+export function printableText(text: string): string {
+  return text.replace(CONTROL_CHARACTERS, "\ufffd");
+}
+
 /** `text` in the style `code` when `stream` gets colour, otherwise unchanged. */
 export function paint(stream: ColorStream, code: string, text: string): string {
   return streamGetsColor(stream) ? `\x1b[${code}m${text}${SGR_RESET}` : text;
@@ -162,6 +173,7 @@ export function statusLine(stream: ColorStream, label: string, value: string, go
 
 /** An error after a red "✗ Error:", or after "`program`:" on a stream without colour. */
 export function failureLine(stream: ColorStream, program: string, message: string): string {
-  if (!streamGetsColor(stream)) return `${program}: ${message}`;
-  return `${paint(stream, STYLE.bad, "✗ Error:")} ${message}`;
+  const text = printableText(message);
+  if (!streamGetsColor(stream)) return `${program}: ${text}`;
+  return `${paint(stream, STYLE.bad, "✗ Error:")} ${text}`;
 }

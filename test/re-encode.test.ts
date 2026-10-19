@@ -28,6 +28,7 @@ import {
 } from "../src/cli/re-encode-options.js";
 import { containing } from "./helpers/matchers.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { PublicCliFiles } from "./helpers/public-cli-files.js";
 
 const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "dist", "mnemocode.js");
@@ -45,8 +46,9 @@ function masked(): EncodedBackup {
   return EncodedBackup.read(MASKED_WORDS, "english", "seedshift");
 }
 
-async function run(arguments_: readonly string[]) {
-  return execFileAsync(process.execPath, [cli, "re-encode", ...arguments_], {
+async function run(arguments_: readonly string[], command = "re-encode") {
+  using material = new PublicCliFiles([command, ...arguments_]);
+  return await execFileAsync(process.execPath, [cli, ...material.arguments], {
     cwd: process.cwd(),
     env: { ...process.env, NO_COLOR: "1" },
     maxBuffer: 1024 * 1024,
@@ -241,18 +243,19 @@ describe("re-encode CLI", () => {
     ]);
     expect(result.stderr).toContain("Address found at m/84'/0'/0'/0/0: the wallet matches");
     // The new backup decodes back to the phrase with its new date.
-    const back = await execFileAsync(process.execPath, [
-      cli,
+    const back = await run(
+      [
+        "--mode",
+        "seedshift",
+        "--format",
+        "2",
+        "--input",
+        result.stdout.trim().split("\n").at(-1)!,
+        "--dates",
+        "01-01-2030",
+      ],
       "decode",
-      "--mode",
-      "seedshift",
-      "--format",
-      "2",
-      "--input",
-      result.stdout.trim().split("\n").at(-1)!,
-      "--dates",
-      "01-01-2030",
-    ]);
+    );
     expect(back.stdout).toContain(TEST_PHRASE);
   });
 
@@ -261,18 +264,10 @@ describe("re-encode CLI", () => {
     try {
       const old = join(dir, "old.txt");
       const fresh = join(dir, "new.txt");
-      await execFileAsync(process.execPath, [
-        cli,
+      await run(
+        ["--mnemonic", TEST_PHRASE, "--dates", "23-09-2026", "--format", "5", "--output", old],
         "encode",
-        "--mnemonic",
-        TEST_PHRASE,
-        "--dates",
-        "23-09-2026",
-        "--format",
-        "5",
-        "--output",
-        old,
-      ]);
+      );
       await run([
         "--input-file",
         old,
@@ -334,10 +329,14 @@ describe("re-encode CLI", () => {
       run([...OLD, "--recognised", "--master-fingerprint", TEST_FINGERPRINT]),
     ).rejects.toMatchObject({ stderr: containing("give one") });
     await expect(run(["--ask-secrets", "--old-dates", "23-09-2026"])).rejects.toMatchObject({
-      stderr: containing("--ask-secrets cannot be combined with --old-dates"),
+      stderr: containing(
+        "Secret material for --old-dates must not be passed as a command-line value",
+      ),
     });
-    await expect(run(["--mnemonic", TEST_PHRASE, "--recognised"])).rejects.toMatchObject({
-      stderr: containing("does not support the mnemonic text setting"),
+    await expect(
+      run(["--mnemonic-file", "must-not-be-read", "--recognised"]),
+    ).rejects.toMatchObject({
+      stderr: containing("does not support the mnemonic file setting"),
     });
   });
 

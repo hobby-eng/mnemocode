@@ -61,6 +61,7 @@ from terminal_menu_checks import (
     check_word_hints,
 )
 from terminal_secret_checks import (
+    check_candidate_passphrase_roles,
     check_marked_codes_result,
     check_file_or_text_input,
     check_decode_dates_asked_again,
@@ -102,6 +103,7 @@ def main():
     check_file_or_text_input()
     check_restore_share_asked_again()
     check_private_result_pages()
+    check_candidate_passphrase_roles()
     check_ctrl_c()
     check_date_search_ctrl_c()
     print("terminal input checks passed")

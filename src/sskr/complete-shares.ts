@@ -10,7 +10,7 @@ import { englishWordlist as wordlist } from "../core/english-words.js";
 import { BIP39_ENTROPY_BYTES } from "../core/bip39-sizes.js";
 import { SetTopology, surplusWindow } from "./set-topology.js";
 import { MIN_DIGEST_THRESHOLD } from "./share-layout.js";
-import type { ShareCombiner } from "./share-platform.js";
+import { ShareCombineRefusalError, type ShareCombiner } from "./share-platform.js";
 import { Share, type ShareInfo } from "./transport.js";
 import { equalBytes } from "../core/bits.js";
 import { placeOf } from "../core/places.js";
@@ -35,6 +35,11 @@ const NO_SECRET =
   "These shares do not restore a secret: check them, and that all belong to one set.";
 const TOO_MANY_FAILING =
   "Too many combinations of these groups fail to restore a secret: leave out the groups you doubt, or check them.";
+
+/** Only a completed negative share-set result, not a host failure or exhausted search budget. */
+export function isCompleteShareRefusal(error: unknown): boolean {
+  return ERRORS.matches(error, ["no-secret", "operation-refused"]);
+}
 
 /** A group: the indexes of its shares in the input, counted from 0. */
 type Group = readonly number[];
@@ -148,7 +153,8 @@ export function uncheckedField(unchecked: readonly number[]): {
  * by its index, counted from 1, without them.
  * An optional internal assertLive guard refuses work after disposal at async handoffs and before
  * further host calls. It throws the owning operation's refusal; late entropy is wiped first.
- * Existing callers need no guard. The host's ShareCombiner contract is unchanged.
+ * Existing callers need no guard. Hosts declare expected invalid-quorum refusals through the
+ * ShareCombiner contract; operational failures propagate rather than becoming bad candidates.
  */
 export async function restoreCompleteShares(
   records: readonly string[],
@@ -181,7 +187,8 @@ export async function restoreCompleteShares(
         entropy = await platform.combineShares(
           members.map((member) => defined(normalized[member])),
         );
-      } catch {
+      } catch (error) {
+        if (!ShareCombineRefusalError.is(error)) throw error;
         entropy = undefined;
       }
       // Outside the expected-combination refusal catch: disposal cannot become another try.

@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { KeptShares, RestoredShares, ShareBackupCheck } from "../src/core/backup-check.js";
 import { ShareSet } from "../src/sskr/share-set.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
+import { ShareCombineRefusalError } from "../src/sskr/share-platform.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
@@ -66,7 +67,7 @@ describe("A share backup check across an awaited host recovery", () => {
           combineShares: async (records) => {
             entered.release();
             await gate.promise;
-            if (outcome === "refusal") throw new Error("Synthetic host recovery refusal.");
+            if (outcome === "refusal") throw new ShareCombineRefusalError();
             return nodeSharePlatform.combineShares(records);
           },
         },

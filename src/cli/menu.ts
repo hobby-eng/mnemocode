@@ -50,12 +50,15 @@ import {
 import { terminalAvailable } from "./terminal-input.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import {
+  printableText,
   readmeLink,
   STYLE,
   terminalFailure,
   terminalMore,
   terminalNotice,
   terminalPaint,
+  terminalHint,
+  FINGERPRINT_DISCLOSURE,
 } from "./terminal.js";
 import { printUsage } from "./usage.js";
 import { REPAIR_ANCHOR } from "../sskr/repair-report.js";
@@ -111,6 +114,9 @@ type Action =
   | "quit"
   | undefined
   | Cancelled;
+
+/** Visible wallet-reference settings that make the command preview show a fingerprint. */
+const FINGERPRINT_PREVIEW_FLAGS = ["--master-fingerprint", "--encoded-fingerprint"] as const;
 
 /** What standard shares are, shown with the question how many to make in entry 4. */
 const STANDARD_SHARES_EXPLANATION: Explanation = {
@@ -490,7 +496,7 @@ const MENU_ASKER: WalletValueAsker = {
       ...(value.fallback === undefined ? {} : { fallback: value.fallback }),
       check: (text) => {
         parsed = parse(text);
-        return text;
+        return value.note === undefined ? text : `${text} · ${paint(STYLE.muted, value.note)}`;
       },
     });
     if (answer === undefined || answer === CANCELLED) return answer;
@@ -733,9 +739,18 @@ export async function runMenu(): Promise<Cancelled | undefined> {
     if (action === "help") {
       printUsage();
     } else {
-      // Shown before the command asks anything: the same answers typed after mnemocode.
-      console.error(`\n${paint(STYLE.muted, "The same as:")}`);
-      console.error(paint(STYLE.accent, commandDisplay(action.run)));
+      const command = commandDisplay(action.run);
+      if (printableText(command) === command) {
+        console.error(`\n${paint(STYLE.muted, "The same as:")}`);
+        console.error(paint(STYLE.accent, command));
+        if (FINGERPRINT_PREVIEW_FLAGS.some((flag) => action.run.includes(flag)))
+          terminalHint(FINGERPRINT_DISCLOSURE);
+      } else {
+        terminalNotice(
+          "Command preview omitted: an argument contains display controls.",
+          "warning",
+        );
+      }
       // The command reports its own result, error or cancellation (Ctrl+C), then the menu goes on.
       const code = await runCommand(action.run);
       if (code === CANCELLED) return CANCELLED;

@@ -9,6 +9,7 @@ import {
   terminalStatus,
   terminalPhrase,
   terminalNotice,
+  FINGERPRINT_DISCLOSURE,
 } from "./terminal.js";
 import { encodedOutputLabel } from "./input.js";
 import type { EncodeOutcome } from "./encode-command.js";
@@ -96,14 +97,15 @@ export function printFingerprints(
     else terminalStatus(masking.encodedFingerprintLabel, encoded);
     terminalHint(FINGERPRINTS_HINT);
     if (masking.masked) terminalHint(PHRASE_WORDS.fingerprintRoles);
-    return;
+  } else {
+    console.error(plainFingerprintLine("original", original));
+    console.error(
+      encoded === undefined
+        ? `Encoded BIP32 master fingerprint: ${NO_ENCODED_FINGERPRINT}.`
+        : plainFingerprintLine("encoded", encoded, masking.masked),
+    );
   }
-  console.error(plainFingerprintLine("original", original));
-  console.error(
-    encoded === undefined
-      ? `Encoded BIP32 master fingerprint: ${NO_ENCODED_FINGERPRINT}.`
-      : plainFingerprintLine("encoded", encoded, masking.masked),
-  );
+  terminalHint(FINGERPRINT_DISCLOSURE);
 }
 
 /**

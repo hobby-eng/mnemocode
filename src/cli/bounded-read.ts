@@ -48,7 +48,8 @@ export function readBoundedDescriptor(descriptor: number, limit: number, what: s
 
 /**
  * Opens `path` once and reads it with the bound of `readBoundedDescriptor`. With regularOnly,
- * refuses directories, devices and pipes without waiting for a pipe's writer.
+ * refuses directories, devices and pipes without waiting for a pipe's writer. The result remains
+ * owned here until closing succeeds; a close failure wipes the unreturned bytes.
  */
 export function readBoundedFile(
   path: string,
@@ -59,12 +60,19 @@ export function readBoundedFile(
   // An interactive path must not block opening a pipe while no writer exists. Check the opened
   // descriptor, rather than checking a name that could change before open.
   const descriptor = openSync(path, regularOnly ? constants.O_RDONLY | constants.O_NONBLOCK : "r");
+  let result: Buffer | undefined;
   try {
-    if (regularOnly && !fstatSync(descriptor).isFile())
-      throw ERRORS.create("regular-file-required", [what]);
-    return readBoundedDescriptor(descriptor, limit, what);
-  } finally {
-    closeSync(descriptor);
+    try {
+      if (regularOnly && !fstatSync(descriptor).isFile())
+        throw ERRORS.create("regular-file-required", [what]);
+      result = readBoundedDescriptor(descriptor, limit, what);
+      return result;
+    } finally {
+      closeSync(descriptor);
+    }
+  } catch (error) {
+    result?.fill(0);
+    throw error;
   }
 }
 

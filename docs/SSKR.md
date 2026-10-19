@@ -43,7 +43,7 @@ With `--mode seedshift`, the phrase is first masked with the dates and then spli
 
 The split shows the fingerprint of the original phrase and that of the masked phrase, the encoded fingerprint. They do not reveal the phrase. On the private screen (`sskr-combine --ask-secrets --mode seedshift`, or Restore in the menu), complete shares show the encoded fingerprint again before the dates are asked for: if it is not the one you noted, a share is wrong, and you find out before typing the dates.
 
-When a digit of a date is forgotten, type `?` in its place on the private screen (`sskr-combine --ask-secrets`, or Restore in the menu), also when share codes hold `?`. MnemoCode then restores the masked phrase from the shares, asks for the wallet's fingerprint or one of its first receiving addresses, and searches the dates as `recover-date` does, for each phrase that the shares can give. Before the search it shows the whole work, share combinations times date combinations, and about how long it takes. `sskr-export --ask-secrets --mode seedshift`, which gives the shares back whole and takes the wallet from its options, searches such dates too. Dates given with `--dates` must be complete.
+When a digit of a date is forgotten, type `?` in its place on the private screen (`sskr-combine --ask-secrets`, or Restore in the menu), also when share codes hold `?`. MnemoCode then restores the masked phrase from the shares, asks for the wallet's fingerprint or one of its first receiving addresses, and searches the dates as `recover-date` does, for each phrase that the shares can give. Before the search it shows the whole work, share combinations times date combinations, and about how long it takes. `sskr-export --ask-secrets --mode seedshift`, which gives the shares back whole and takes the wallet from its options, searches such dates too. Dates read with `--dates-file` must be complete in the share commands.
 
 ## Share formats
 
@@ -112,14 +112,14 @@ mnemocode sskr-combine --ask-secrets
 # Type the shares, separated by semicolons, on the private screen.
 
 mnemocode sskr-combine \
-  --share "ur:sskr/FIRST_COMPLETE_SHARE" \
-  --share "ur:sskr/SECOND_COMPLETE_SHARE"
+  --share-file ./first-share.txt \
+  --share-file ./second-share.txt
 
 mnemocode sskr-combine --share-file ./selected-shares.txt
 mnemocode sskr-combine --share-qr ./first.png --share-qr ./second.png
 ```
 
-`--share`, `--share-file` and `--share-qr` may be repeated and used together. A text file holds shares one per line or separated by `;`. `--share-qr` reads a PNG image; it cannot read a PDF. The format of each share is found automatically, so formats can be mixed. Shares that another program made in several groups are accepted.
+`--share-file` and `--share-qr` may be repeated and used together. A text file holds shares one per line or separated by `;`; one `--share-file -` can read standard input. Raw `--share` values are refused: type shares on the private screen or read them from files/QR images. `--share-qr` reads a PNG image; it cannot read a PDF. The format of each share is found automatically, so formats can be mixed. Shares that another program made in several groups are accepted.
 
 On the private screen, enter the path to a saved text file in the share field, or paste the shares themselves. The file may hold any sufficient subset, such as shares 1 and 3 of a 2-of-3 set. When replacing just one unreadable share, give that share or a file containing only that share.
 
@@ -134,6 +134,10 @@ Every supplied member of a complete group is checked for consistency, including 
 For library callers, `combineSskrShares` returns a phrase only when no supplied shares or repaired elements remain unchecked. `combineSskrShareSet` returns the phrase together with `unchecked` (share numbers counted from 1) and `unsettled` repair elements; callers using this partial-recovery API must report those limits. Both functions, and `restoreShareSet` for complete input, are exported from `mnemocode/sskr`. For complete shares they refuse a member given more than once, even as an exact copy; `sskr-combine` leaves such copies out before it calls them.
 
 ### Damaged shares
+
+The library's single-share `repairCandidates` listing uses a default `freeBits` budget of 4 and accepts whole-number budgets from 0 to 8, at most 256 solutions per solved reading. Unsupported budgets are refused before the share is read; they never produce a silently truncated candidate list. Joint recovery has its own search limits described below.
+
+A host implementing `ShareCombiner` returns fresh entropy or throws `ShareCombineRefusalError` for an invalid quorum or digest. The pinned native engine's matching `sskr.engine.combine` code has the same meaning. Other engine, initialization and host failures propagate as failures, not as an empty candidate list or an accusation that valid shares are wrong. A joint confirmation skips only a completed negative share-set result; an unavailable engine or an exhausted reference budget is not such a result.
 
 Replace each unreadable element of a share with `?`, keeping its place: a word number, a four-digit Unicode code, a color code, a color Unicode code or pair, a Bytewords word, or a two-letter pair inside `ur:sskr/...`. In Color Unicode codes run together, each `?` stands for one code or for a whole color, and both kinds may be mixed in one share; marks that fit more than 256 ways are refused, so read more of those codes. `sskr-combine`, `sskr-export` and the backup check fill them in. Spaces are needed around a missing word number; fixed-width codes, Bytewords, which all have four letters, and UR pairs may stay joined. Do not remove the element. Any of the shares may have marks, up to 64 on one share, and a share may be given twice when two damaged copies of it are kept.
 

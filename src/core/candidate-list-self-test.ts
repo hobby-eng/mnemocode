@@ -17,6 +17,7 @@ import {
 import { bytesOfHex, expectRefused, expectSame, hexOfBytes } from "./self-test-check.js";
 import { defined } from "./defined.js";
 import { SecretValue } from "./secret-value.js";
+import { THREE_PHRASES_LIST } from "./candidate-list-answers.js";
 
 /**
  * vectors/candidates-v1.json, "three phrases": the entropy of the public phrases of BIP39's first,
@@ -32,8 +33,7 @@ export const THREE_PHRASES_ENTROPY = [
  * The bytes, in hexadecimal, of the list that the startup check writes of THREE_PHRASES: the known
  * answer that the writer must give and the reader take back.
  */
-export const THREE_PHRASES_LIST =
-  "4d4e434c01001000000003000000000000000000000000000000007f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7fffffffffffffffffffffffffffffffff98854aa000";
+export { THREE_PHRASES_LIST } from "./candidate-list-answers.js";
 
 /**
  * vectors/candidates-v1.json, "a passphrase for all": the three phrases with the list passphrase

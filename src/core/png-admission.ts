@@ -237,6 +237,7 @@ export class PngAdmission {
     return new PngAdmission(parts, budget);
   }
 
+  /** Exact inflated scanline bytes, including filter bytes and each nonempty Adam7 pass. */
   get filteredBytes(): number {
     return this.#filteredBytes;
   }

@@ -91,12 +91,11 @@ dependencies = [
 [[package]]
 name = "bc-shamir"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d283bf658d34e351bf65dd105a01d2a4e480750b58a218e768cd641a2d0eceb4"
 dependencies = [
  "bc-crypto",
  "bc-rand",
  "thiserror",
+ "zeroize",
 ]
 
 [[package]]
@@ -833,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "recovery-sskr-wasm"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "bc-rand",
  "bc-tags",

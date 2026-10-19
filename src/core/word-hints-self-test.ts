@@ -67,6 +67,13 @@ function checkWordHints(): void {
     /alphabetical order/u,
     "List out of order",
   );
+  const sparse = ["abandon"];
+  sparse.length += 1;
+  expectRefused(
+    () => new WordList({ one: "word", many: "words" }, sparse),
+    /lower-case letters/u,
+    "A missing word-list slot",
+  );
 }
 
 /** The checks of the hints, for a host that shows them. */

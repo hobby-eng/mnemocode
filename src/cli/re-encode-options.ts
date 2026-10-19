@@ -33,7 +33,9 @@ export const OLD_BACKUP_OPTIONS: Readonly<Record<string, string>> = Object.freez
   "old-mode": "mode",
   "old-format": "format",
   [OLD_DATES_KEY]: "date",
+  "old-dates-file": "dates-file",
   [LAST_WORD_OPTION]: LAST_WORD_OPTION,
+  "last-word-file": "last-word-file",
   ...Object.fromEntries(WALLET_EVIDENCE_OPTIONS.map((key) => [key, key])),
 });
 

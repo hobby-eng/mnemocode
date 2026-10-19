@@ -26,7 +26,13 @@ import { askDates } from "./date-search.js";
 import { choose } from "./terminal-choice.js";
 import { askToSearch } from "./search-consent.js";
 import { withCtrlCWatch, nodeTurn } from "./terminal-input.js";
-import { ProgressLine, terminalHint, terminalNotice, terminalStatus } from "./terminal.js";
+import {
+  FINGERPRINT_DISCLOSURE,
+  ProgressLine,
+  terminalHint,
+  terminalNotice,
+  terminalStatus,
+} from "./terminal.js";
 import { counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
@@ -194,7 +200,7 @@ async function byEncodedFingerprint(
   const fingerprint = given
     ? answers.encodedFingerprint
     : await askValueUntil(
-        "Encoded fingerprint of these codes, such as 1a2b3c4d:",
+        `Encoded fingerprint of these codes, such as 1a2b3c4d (${FINGERPRINT_DISCLOSURE}):`,
         parseMasterFingerprint,
         { what: "the eight characters of the fingerprint" },
       );
@@ -269,19 +275,24 @@ async function listed(search: MissingCodesSearch): Promise<MissingOutcome | Canc
   const result = await ran(way);
   if (result === CANCELLED) return CANCELLED;
   if (result.kind === "list") {
-    const lines = result.rows.flatMap(({ codes, phrase, fingerprint }, index) => [
-      `Candidate ${index + 1}`,
-      `Codes: ${codes}`,
-      `Phrase: ${phrase}`,
-      `Fingerprint: ${fingerprint}`,
+    const lines = [
+      FINGERPRINT_DISCLOSURE,
       "",
-    ]);
+      ...result.rows.flatMap(({ codes, phrase, fingerprint }, index) => [
+        `Candidate ${index + 1}`,
+        `Codes: ${codes}`,
+        `Phrase: ${phrase}`,
+        `Fingerprint: ${fingerprint}`,
+        "",
+      ]),
+    ];
     using display = new PrivateResult(lines);
     if (
       (await display.show(() => {
         result.rows.forEach(({ codes, phrase, fingerprint }, index) =>
           console.log(`${index + 1}\t${codes}\t${phrase}\t${fingerprint}`),
         );
+        console.error(FINGERPRINT_DISCLOSURE);
       })) === CANCELLED
     )
       return CANCELLED;

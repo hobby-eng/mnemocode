@@ -1,4 +1,4 @@
-import { terminalNotice, terminalResultHeader } from "./terminal.js";
+import { printableText, terminalNotice, terminalResultHeader } from "./terminal.js";
 import { WordTable, WORD_TABLE_FORMATS } from "../core/word-table.js";
 import { WORD_NUMBER_RANGE } from "../core/bip39-sizes.js";
 import { choiceOption, integerOption, type ParsedArguments, value } from "./arguments.js";
@@ -42,7 +42,7 @@ async function saveFullSet(directory: string): Promise<void> {
       await writeNewPrivateFile(privateChildPath(staging, "manual-recovery.md"), guide);
     });
   });
-  terminalNotice(`Saved full word-list and recovery set: ${directory}`, "success");
+  terminalNotice(`Saved full word-list and recovery set: ${printableText(directory)}`, "success");
 }
 
 export async function runTable(arguments_: ParsedArguments): Promise<void> {
@@ -78,7 +78,7 @@ export async function runTable(arguments_: ParsedArguments): Promise<void> {
     else {
       await writeSaved(() => publishNewPrivateFile(output, Buffer.from(text, "utf8")));
       terminalNotice(
-        `Saved ${guide ? "manual recovery instructions" : "numbered BIP39 word list"}: ${output}`,
+        `Saved ${guide ? "manual recovery instructions" : "numbered BIP39 word list"}: ${printableText(output)}`,
         "success",
       );
     }

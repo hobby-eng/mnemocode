@@ -1,0 +1,1273 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-034",
+  "auditNumber": 34,
+  "date": "2026-10-18",
+  "title": "Current prerelease and CORE-conformance audit of standalone MnemoCode",
+  "reviewer": {
+    "name": "Copilot coordinator with bounded protocol and final evidence reviewers",
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "261aaedaedeb17ac1e32cd31371c850f740d2ba5",
+    "commitComplete": true,
+    "workingTree": "Existing main checkout with preserved uncommitted authorized fixes. Audit-only additions do not identify a clean release commit.",
+    "sourceFingerprint": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+    "sourceFiles": 630,
+    "baselinePaths": 1080,
+    "branch": "main",
+    "manifest": {
+      "localOnly": true,
+      "path": "docs/audits/AUD-034-evidence/snapshot.json",
+      "sha256": "ac304eec992d6174799dc76d130e2ca5187d48008155e9f566cdcabba2176349"
+    }
+  },
+  "scope": {
+    "program": "Standalone TypeScript MnemoCode, its vendored Rust/WASM engine, tests, scripts, assets/vectors, all documentation and historical audit records.",
+    "core": "All53 CORE and104 guide rule IDs accounted for; applicability is assessed individually.",
+    "methods": "Fresh full local release checks and selected body/caller/claim challenges, plus exact qualified admission of unchanged original and corrective semantic reviews. This is not a repeat whole-body read of every function.",
+    "exclusions": "No other repository audit, Rust port, production edits, dependency update, commit/push/tag/sign/upload/release or paid CI dispatch."
+  },
+  "checks": [
+    {
+      "checkId": "CHECK-SEC-001",
+      "category": "SEC",
+      "title": "Threat model and secret ownership",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current trust/ownership/isolation boundaries, safe refusals and exception/cancellation tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "failed",
+      "assessment": "Additional AUD-029-SEC001 close-error variant: one unreturned owned text Buffer remains unwiped. Earlier corrected owner paths stay verified; no direct disclosure is claimed.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-SEC-002",
+      "category": "SEC",
+      "title": "Secret Vault, CSP, sandbox, and transport",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current trust/ownership/isolation boundaries, safe refusals and exception/cancellation tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh protected CLI self-test and real Linux PTY exercise permission/sandbox/private-screen boundaries. No application vault/CSP is implemented here; external host enforcement is not claimed.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-SEC-003",
+      "category": "SEC",
+      "title": "Network egress and secret guards",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current trust/ownership/isolation boundaries, safe refusals and exception/cancellation tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "The standalone program has no network feature; current permission/sandbox tests and full self-test check enforced Linux restrictions. Audit-only advisory/remote lookups are separate.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-SEC-004",
+      "category": "SEC",
+      "title": "Randomness, encryption, and authentication",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current trust/ownership/isolation boundaries, safe refusals and exception/cancellation tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Current cipher-readiness/failed-refresh contracts are challenged with exact accepted review context, fresh encryption tests and full real scrypt known answers; OS-injected randomness remains unchanged.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-SEC-005",
+      "category": "SEC",
+      "title": "Secret lifecycle and exceptional paths",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current trust/ownership/isolation boundaries, safe refusals and exception/cancellation tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "failed",
+      "assessment": "The actual bounded file-read public path retains all27 result bytes after an injected OS-close failure. Healthy control passes and original close exception propagates, isolating the missing result cleanup.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-SEC-006",
+      "category": "SEC",
+      "title": "Browser injection, persistence, and sensitive APIs",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current trust/ownership/isolation boundaries, safe refusals and exception/cancellation tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "not-applicable",
+      "assessment": "No DOM, page, iframe, browser storage or worker installer belongs to this standalone checkout. Host-neutral parts are checked; external browser integration is a separate unexecuted prerequisite.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-SEC-007",
+      "category": "SEC",
+      "title": "Read-only guarantees and availability bounds",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current trust/ownership/isolation boundaries, safe refusals and exception/cancellation tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Full runtime boundaries cover input sizes, candidate budgets, no-overwrite/private publication, refusal and cancellation; only public fixtures are used.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-FUN-001",
+      "category": "FUN",
+      "title": "BIP39, entropy, and seed interpretation",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current body/caller challenge, exact admitted semantic review, public vectors and fresh default tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh default tests and full self-test cover all supported phrase lengths, fixed forward/reverse vectors, checksum failures and seed interpretation.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-FUN-002",
+      "category": "FUN",
+      "title": "HD derivation and every coin/profile",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current body/caller challenge, exact admitted semantic review, public vectors and fresh default tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh coin/wallet tests and full self-test exercise every supported coin family/profile and exact local address/fingerprint contracts; no live funds or provider assurance claimed.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-FUN-003",
+      "category": "FUN",
+      "title": "BIP85, BIP38, messages, and Silent Payments",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current body/caller challenge, exact admitted semantic review, public vectors and fresh default tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "not-applicable",
+      "assessment": "BIP85, BIP38, signed messages and Silent Payments are not implemented operations of MnemoCode. Date masking and candidate encryption are checked under their actual protocols.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-FUN-004",
+      "category": "FUN",
+      "title": "Scripts, descriptors, Miniscript, and multisig",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current body/caller challenge, exact admitted semantic review, public vectors and fresh default tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "not-applicable",
+      "assessment": "There is no descriptor/Miniscript/multisig wallet-construction or inspection feature. The actual address/key evidence derivations are covered by FUN002.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-FUN-005",
+      "category": "FUN",
+      "title": "Transactions, PSBT version context, and commitments",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current body/caller challenge, exact admitted semantic review, public vectors and fresh default tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "not-applicable",
+      "assessment": "There is no transaction/PSBT parsing, signing, broadcasting, fee or commitment workflow.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-FUN-006",
+      "category": "FUN",
+      "title": "Recovery and backup formats",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current body/caller challenge, exact admitted semantic review, public vectors and fresh default tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh recovery, all format/mode tests, share threshold/repair/refusal controls, official independent SSKR oracle and real PDF/PNG/QR recovery cover supported backup formats.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-FUN-007",
+      "category": "FUN",
+      "title": "Discovery, providers, proofs, and accounting",
+      "primaryOwner": "protocol-reviewer",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current body/caller challenge, exact admitted semantic review, public vectors and fresh default tests.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "not-applicable",
+      "assessment": "No connected discovery/provider/balance/accounting feature exists. Candidate-list output for an external Scanner is checked as a file/API contract, not as execution of that application.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-API-001",
+      "category": "API",
+      "title": "Actual dependency call contracts",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Actual public API/CLI inventory, dependency and caller contracts, deterministic boundary cases.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Current declaration inventory plus exact semantic/corrective caller contexts and fresh integration tests check actual library, host, renderer and crypto dependency contracts; dependency-wide internals are not recertified.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-API-002",
+      "category": "API",
+      "title": "Async state, cancellation, and revisions",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Actual public API/CLI inventory, dependency and caller contracts, deterministic boundary cases.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh cancellation, revision, concurrent refresh, late-result retirement and cleanup tests; stopped/unknown failures remain distinct from empty successful results.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-API-003",
+      "category": "API",
+      "title": "Public export schema and monetary fidelity",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Actual public API/CLI inventory, dependency and caller contracts, deterministic boundary cases.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Current CLI/library output schemas, owned result transfer and exact MNCL/record/share assertions are exercised. There are no monetary calculations to certify.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-API-004",
+      "category": "API",
+      "title": "Encoding and import/export interoperability",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Actual public API/CLI inventory, dependency and caller contracts, deterministic boundary cases.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh UTF-8/file/stdin, safe argv refusal, all representations/transports and independent quorum recovery verify supported import/export behavior.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-BLD-001",
+      "category": "BLD",
+      "title": "Manifest, flags, and feature composition",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Fresh serial gates/build/tests/package/advisories, current artifact acceptance and explicitly retained canonical evidence.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh pins, complete strict source/test/browser-neutral types, full-scope lint, Rust gates and build; selective-coin/package composition tests are in the fresh default suite.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-BLD-002",
+      "category": "BLD",
+      "title": "Matrix depth and runtime sampling",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Fresh serial gates/build/tests/package/advisories, current artifact acceptance and explicitly retained canonical evidence.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "blocked",
+      "assessment": "Current Linux and host-neutral composition checks pass. Windows/macOS runtime/PTY and external browser-host acceptance were not executed in this Linux-only audit.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-BLD-003",
+      "category": "BLD",
+      "title": "Lockfiles, source provenance, and licenses",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Fresh serial gates/build/tests/package/advisories, current artifact acceptance and explicitly retained canonical evidence.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Unchanged exact dependency/lock inputs, fresh npm advisories, complete package-path/legal review and current bundled notices. No fresh authoritative Rust advisory database or upstream-wide audit claimed.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-BLD-004",
+      "category": "BLD",
+      "title": "Canonical WASM and Docker bytes",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Fresh serial gates/build/tests/package/advisories, current artifact acceptance and explicitly retained canonical evidence.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Exact same-source admission of today's approved canonical write and separate fresh-final-stage comparison: all22 input/output pins and four generated files match. Retained, not rerun by AUD034; cached toolchain/dependency qualifications preserved.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-BLD-005",
+      "category": "BLD",
+      "title": "Artifacts, CI, and release workflows",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Fresh serial gates/build/tests/package/advisories, current artifact acceptance and explicitly retained canonical evidence.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "blocked",
+      "assessment": "Current Linux artifact acceptance and workflow/pin/metadata checks pass. Source remains uncommitted/unreleased; final portable assets, release CI, signing and attestations require their normal authorized release process.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-UI-001",
+      "category": "UI",
+      "title": "Real files and representative viewports",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Actual Linux PTY, real PDF/PNG/QR and finite private views; external host/portable gaps remain distinct.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Actual Linux terminal/private finite-view scenarios at recorded dimensions and real PDF rasterization/QR recovery. No browser screenshot, every-pixel/glyph or physical-print claim.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-UI-002",
+      "category": "UI",
+      "title": "Navigation, inputs, and state preservation",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Actual Linux PTY, real PDF/PNG/QR and finite private views; external host/portable gaps remain distinct.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh real PTY navigation/editing/retry/state-preservation/cancellation plus complete default menu/input regressions; source is not replaced by test-side domain mocks.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-UI-003",
+      "category": "UI",
+      "title": "Secret visibility, help, QR, and accessibility",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Actual Linux PTY, real PDF/PNG/QR and finite private views; external host/portable gaps remain distinct.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh private-screen leakage, help-warning, passphrase-role, safe displayed-path and QR tests. External browser accessibility remains outside this standalone scope.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-ARC-001",
+      "category": "ARC",
+      "title": "Ownership, imports, and composition seams",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Every CORE/language rule disposition, file-depth ledger, current imports/consumers and test fidelity.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Explicit source/owner/caller assessment and exact admitted prior body/corrective depth; no gate or declaration inventory is promoted to a whole-body semantic proof.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-ARC-002",
+      "category": "ARC",
+      "title": "Dead code, duplication, and false positives",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Every CORE/language rule disposition, file-depth ledger, current imports/consumers and test fidelity.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh no-copy/code-rule/type-aware import/correctness gates plus scoped deletion/ownership/consumer review; necessary compatibility aliases and documented deliberate copies are not automatically defects.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-ARC-003",
+      "category": "ARC",
+      "title": "Comments, tests, and production-path fidelity",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Every CORE/language rule disposition, file-depth ledger, current imports/consumers and test fidelity.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Current API contract comments and behavioral test controls, real card planner, deterministic injected choices and no-copy integrity faults are assessed at their stated source scopes and freshly exercised.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-DOC-001",
+      "category": "DOC",
+      "title": "User-facing capability and safety descriptions",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current docs/help/metadata/legal/CI claims and final report/evidence validation.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Current README/security/CLI/API ownership and safe file/private-input claims agree at the read/admitted depth; limitations of date masking, JS memory and sandbox enforcement remain explicit.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-DOC-002",
+      "category": "DOC",
+      "title": "Commands, metadata, links, and legal materials",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current docs/help/metadata/legal/CI claims and final report/evidence validation.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "Fresh help/README anchors, metadata/version/key gates, action-pin table and legal/package checks; unreleased version/date/signing steps remain preparation tasks rather than fabricated completed releases.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    },
+    {
+      "checkId": "CHECK-DOC-003",
+      "category": "DOC",
+      "title": "Audit records and evidence consistency",
+      "primaryOwner": "coordinator",
+      "scope": "Current standalone MnemoCode; unsupported disciplines receive individual reasons.",
+      "expectedEvidence": "Current docs/help/metadata/legal/CI claims and final report/evidence validation.",
+      "skepticalOwner": "final-evidence-reviewer",
+      "outcome": "passed",
+      "assessment": "All31 published historical record pairs validate against the canonical schema; final dispositions are retained without historical replay, private records are not published, and new report/evidence consistency is independently challenged.",
+      "evidence": {
+        "localOnly": true,
+        "source": "docs/audits/AUD-034-evidence/protocol-review.json",
+        "coordinator": "docs/audits/AUD-034-evidence/coordinator-source-review.json",
+        "runtime": "docs/audits/AUD-034-evidence/suite-summary.json"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUD-029-SEC001",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "Additional close-error variant leaves an owned text-input Buffer unwiped",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "releaseBlockingReason": "Rare OS-close failure retains one bounded input allocation until reclamation; no direct disclosure, persistence or broad compromise was demonstrated. This does prevent a full CORE-conformance claim.",
+      "confidence": "9/10",
+      "affectedFiles": [
+        "src/cli/bounded-read.ts:46-65",
+        "src/cli/text-file.ts:76-116"
+      ],
+      "rules": [
+        "CORE-24",
+        "TS-07"
+      ],
+      "reproduction": {
+        "command": "node docs/audits/AUD-034-harnesses/close-error-probe.mjs",
+        "fixture": "A synthetic27-byte public text file, never wallet material.",
+        "fault": "Perform the real close, then inject EIO at the OS close adapter. Buffer.concat only observes its original unchanged result; no program rule is replaced.",
+        "controls": "Healthy exact-byte read succeeds and its caller wipes the result. The fault is propagated and the actual descriptor closes.",
+        "exitCode": 1,
+        "assertionReached": "CLOSE_ERROR_CLEANUP_ASSERTION_REACHED",
+        "prerequisite": "An OS/host close failure after a successful bounded read. Runtime evidence uses synthetic fault injection, not a naturally failing filesystem."
+      },
+      "expected": "When descriptor closure prevents a completed read from returning, the still-owned result Buffer is wiped before the failure leaves; normal success transfers live bytes to its caller.",
+      "observed": "readBoundedDescriptor constructs its result and wipes read chunks. readBoundedFile then executes finally closeSync; if it throws, decodedText/caller never receives the result. The actual observed result allocation retained all27 nonzero bytes after refusal.",
+      "impact": "Material-bearing file input can leave an additional unwiped bounded heap allocation after a rare close error. There is no output/log/network exposure in this reproduction and no guaranteed-GC or memory-recovery exploit is claimed.",
+      "recommendedFix": "Keep the newly read Buffer owned locally until close succeeds. If close fails, wipe that unreturned result and propagate the established refusal/error contract; do not wipe a successfully transferred result before its caller can consume it.",
+      "requiredVerification": "Preserve this healthy control and observed red. Add a public-path regression requiring the same close failure to propagate with the abandoned result zeroed; retain normal byte-exact file/stdin reads, caller ownership and chunk cleanup on read failure.",
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/close-error-cleanup.command.json",
+        "log": "docs/audits/AUD-034-evidence/close-error-cleanup.log",
+        "result": "docs/audits/AUD-034-evidence/close-error-probe.json",
+        "harness": "docs/audits/AUD-034-harnesses/close-error-probe.mjs"
+      },
+      "priorFindingReconciliation": "Reuse the original owned-secret-cleanup family ID for this newly demonstrated additional path. The four earlier corrected paths stay verified; this is not a rollback or false claim that their accepted fixes failed.",
+      "fixApplied": false
+    }
+  ],
+  "observations": [],
+  "remediation": [
+    {
+      "id": "AUD-029-SEC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "date": "2026-10-18",
+      "evidence": {
+        "localOnly": true,
+        "record": "docs/audits/AUD-034-evidence/followup/remediation.json",
+        "review": "docs/audits/AUD-034-evidence/followup/review.json",
+        "reviewSha256": "a0ad17be61c54a88552e263e7635654f273aaba9a74c1dc1f849dcd3fd07c08b"
+      },
+      "meaning": "Separate authorized post-baseline fix of the additional close-error path. The original finding remains open as a historical baseline record, not a claim about the corrected source."
+    }
+  ],
+  "localCoverageFollowup": {
+    "date": "2026-10-18",
+    "status": "verified",
+    "sourceFingerprint": "a1d79fa9ffe68ced1f3f9e20de901e14f67380f90fd7791345c1a16b04f9ad2b",
+    "sourceFiles": 631,
+    "changedOnly": "test/date-recovery-dedupe.test.ts",
+    "change": "Remove the cost-based registration skip and give the parameterized cases behavioral names. All15fixtures,three modes,reference/production bodies,actual test callbacks,assertions and memory-retention threshold remain unchanged.",
+    "freshExecution": {
+      "testFileCases": 48,
+      "passed": 48,
+      "skipped": 0,
+      "failed": 0,
+      "previouslySkippedNowExecuted": 4,
+      "slowestCaseMilliseconds": 19613.503132999995,
+      "originalTestTimeoutMilliseconds": 60000
+    },
+    "otherFreshChecks": "Touched-file formatting, complete strict TypeScript7 test project, canonical full-scope type-aware lint and code rules pass.",
+    "independentReview": {
+      "localOnly": true,
+      "path": "docs/audits/AUD-034-evidence/date-gap-2026-10-18/review.json",
+      "sha256": "4d303f6ae364866fea277f0719f35b63e8f4889e7aa7e9f37f8ce440ec914fad",
+      "meaning": "Verbatim substantive direct review from the independent parent coordinator, not an implementer-authored reviewer dossier."
+    },
+    "counting": "This48-case execution overlaps44baseline passes and adds actual execution of the four former skips. It is not added to2947 or42, and no new full default-suite total is inferred.",
+    "artifactAdmission": "The accepted5afb07d46cd536a46aae22cef50d03a6cfba43ca69214d685bea63462e0839a0 Linux executable is unchanged: every actual program/build/dependency/config input is byte-identical; only an unbundled test changed. No rebuild is falsely claimed.",
+    "remainingLimits": "The former four-case local skip gap is closed. External browser-host/Windows/macOS acceptance and the other stated assurance/release limitations were not executed or waived."
+  },
+  "postBaselineRemediation": {
+    "date": "2026-10-18",
+    "sourceFingerprint": "2fa5fa05be20d0063973ec726335b17270de59ae0f921af2acc21d63a089111f",
+    "sourceFiles": 631,
+    "changedExistingSource": "src/cli/bounded-read.ts",
+    "newRegressionFile": "test/bounded-read-cleanup.test.ts",
+    "result": "The unreturned result is wiped on failure; normal live transfer and existing read/close error identity and precedence are preserved.",
+    "freshTargetedTests": 42,
+    "originalProbe": "Same cleanup assertion changes from27nonzero bytes before fix to0after fix, with the real read/close boundary and a healthy control.",
+    "full203FileSuiteRepeatedAfterFix": false,
+    "baselineCountsNotAddedToTargetedCounts": true,
+    "currentLinuxArtifact": {
+      "path": "release/aud034-fixed/mnemocode-0.1.0-linux-x64",
+      "sha256": "5afb07d46cd536a46aae22cef50d03a6cfba43ca69214d685bea63462e0839a0",
+      "acceptance": "Fresh build, checksums and empty-folder full self-test/sandbox/masking/re-encoding/threshold recovery/PDF/help/notices passed."
+    },
+    "currentConformanceMeaning": "The identified CORE-24/TS-07 violation is corrected and independently verified. This is not a new full audit or unqualified global CORE/platform/browser certification.",
+    "evidencePreservation": "One fixed-path green probe briefly replaced its JSON result. The original red was restored byte-for-byte from its immutable actual red log and matched the independently reviewed hash. Green output is retained separately. Only optional result destination and exclusive wx output creation were then added to prevent recurrence; all original assertions are preserved.",
+    "unexecutedAfterFix": "No repeated full default suite, external browser-host/Windows/macOS matrix, signature, attestation or publication. The Rust/WASM producer inputs and all22 pins are unchanged."
+  },
+  "informationalObservations": [
+    "The complete fresh local default suite is green; four pre-existing cost-skipped legacy date-search cases remain skips, not passes.",
+    "Published release metadata is empty. Successful remote push CI covers HEAD, not the current uncommitted source.",
+    "The private prior conformance record and its accepted dated corrections remain private and unchanged.",
+    "The abandoned AUD-023 number has no report by design; a wrong initial historical-count assertion was a retained audit-harness error."
+  ],
+  "executions": [
+    {
+      "label": "action-pins",
+      "command": [
+        "node",
+        "../.github/scripts/verify-action-pins.mjs",
+        "."
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:03:16.505441+00:00",
+      "endedAtUtc": "2026-10-18T13:03:16.736871+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6816526336,
+      "peakProcessRssBytes": 27631616,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/action-pins.command.json",
+        "receiptSha256": "b207e836f18d33777258b1e25e1da470602f667f9fae7f473f3e9c2a220e4fbf",
+        "logSha256": "2b0934385af938816fd6e907b861d4efe3fa82c46b79bf93796eb9e7c1271953"
+      }
+    },
+    {
+      "label": "audit-pair-package",
+      "command": [
+        "bash",
+        "-c",
+        "set -euo pipefail; pnpm check:audit-privacy; pnpm check:audit-package; set -o noclobber; npm pack --dry-run --json --ignore-scripts > docs/audits/AUD-034-evidence/package-with-report.json"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:40:18.127284+00:00",
+      "endedAtUtc": "2026-10-18T13:40:22.092735+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 8659685376,
+      "peakProcessRssBytes": 342175744,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/audit-pair-package.command.json",
+        "receiptSha256": "d1cbd4bf26fa81f1946fa32ff55026119a300867c73f81175157484c2af104a9",
+        "logSha256": "802c58b1a027dd1096c2b3b3ce99a9192c9b3221425d8b0fb60a94c1a980c8fd"
+      }
+    },
+    {
+      "label": "close-error-cleanup",
+      "command": [
+        "node",
+        "docs/audits/AUD-034-harnesses/close-error-probe.mjs"
+      ],
+      "exitCode": 1,
+      "outcome": "failed",
+      "startedAtUtc": "2026-10-18T13:36:11.502204+00:00",
+      "endedAtUtc": "2026-10-18T13:36:11.729795+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 8884826112,
+      "peakProcessRssBytes": 27488256,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/close-error-cleanup.command.json",
+        "receiptSha256": "bbfa3d9e15c79bc9b68b90148ec5d08409214b2797dd65629fa83b84050663a7",
+        "logSha256": "01398552f20b85b1b44bce68409c243da6ae623bfe25fc46b4d92e09b803487d"
+      }
+    },
+    {
+      "label": "full-self-test",
+      "command": [
+        "/home/user/.local/share/nodejs/node-v26.10.0-linux-x64/bin/node",
+        "dist/mnemocode.js",
+        "self-test"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:19:06.254730+00:00",
+      "endedAtUtc": "2026-10-18T13:19:13.844699+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6102171648,
+      "peakProcessRssBytes": 588779520,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/full-self-test.command.json",
+        "receiptSha256": "630c743d1883cfa5351c8d89f0e21e8c75231b9110d9ce99f62518930f63142d",
+        "logSha256": "8630bcd88e5b08eadbd14706549500aa3d3e5ca7923cf677781dcc382326dfcc"
+      }
+    },
+    {
+      "label": "history-and-environment-corrected",
+      "command": [
+        "python3",
+        "-B",
+        "-"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:02:09.814127+00:00",
+      "endedAtUtc": "2026-10-18T13:02:10.475051+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6766825472,
+      "peakProcessRssBytes": 74674176,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/history-and-environment-corrected.command.json",
+        "receiptSha256": "e9bb2705102ef2054304b74be61e6311f1857cd3b48b144d4a3073ea5127e9b1",
+        "logSha256": "c29ede3629fbc5592e41fd4c8803b36a56f28b82fac5356a66df93ef262efee3"
+      }
+    },
+    {
+      "label": "history-and-environment",
+      "command": [
+        "python3",
+        "-B",
+        "-"
+      ],
+      "exitCode": 1,
+      "outcome": "failed",
+      "startedAtUtc": "2026-10-18T13:01:21.148357+00:00",
+      "endedAtUtc": "2026-10-18T13:01:21.590548+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6714597376,
+      "peakProcessRssBytes": 73363456,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/history-and-environment.command.json",
+        "receiptSha256": "a1e2c499e07634d49595ffdd6781ad73981deea56148ef51b4c167af424615ec",
+        "logSha256": "a29d5661403667d90963ba1bdcc2cc64ecf9ccd2ab1dee8b777327e37b98e14f"
+      }
+    },
+    {
+      "label": "history-rerunnable",
+      "command": [
+        "node",
+        "docs/audits/AUD-034-harnesses/history.mjs"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:25:33.835974+00:00",
+      "endedAtUtc": "2026-10-18T13:25:34.488936+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 8718913536,
+      "peakProcessRssBytes": 117964800,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/history-rerunnable.command.json",
+        "receiptSha256": "eb04a124f34ef873b4d8319a93b426e06ac6134da62146e21ed64a35f00496f0",
+        "logSha256": "c29ede3629fbc5592e41fd4c8803b36a56f28b82fac5356a66df93ef262efee3"
+      }
+    },
+    {
+      "label": "independent-sskr",
+      "command": [
+        "python3",
+        "-B",
+        "scripts/verify-sskr-known-answers.py"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:19:14.241832+00:00",
+      "endedAtUtc": "2026-10-18T13:19:14.473351+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6468730880,
+      "peakProcessRssBytes": 10285056,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/independent-sskr.command.json",
+        "receiptSha256": "55848acad4b8a01fd04a8179cbda757d585adedc4a3d105c0332ac2457a2c42d",
+        "logSha256": "5735ee7eb756a60aed4b573aa88b44d0e009a26f3a4101d87048b4f1845d664c"
+      }
+    },
+    {
+      "label": "linux-acceptance",
+      "command": [
+        "/home/user/.local/share/nodejs/node-v26.10.0-linux-x64/bin/node",
+        "scripts/verify-executable.mjs",
+        "release/aud033-arc002-closed/mnemocode-0.1.0-linux-x64"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:22:06.541806+00:00",
+      "endedAtUtc": "2026-10-18T13:22:18.031426+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6450094080,
+      "peakProcessRssBytes": 520183808,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/linux-acceptance.command.json",
+        "receiptSha256": "2869af12753587321c467debc2b654b9818f77bedf09368d1cc7cd23a57371ad",
+        "logSha256": "8eeda2f808d02772d1f4f1a2ebe74532de58db85b326270c7adbb84d42726b94"
+      }
+    },
+    {
+      "label": "native-sskr",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "sskr-wasm/rust/Cargo.toml",
+        "--workspace",
+        "--all-targets",
+        "--jobs",
+        "1",
+        "--target-dir",
+        "node_modules/.cache/sskr-cargo",
+        "--",
+        "--test-threads=1"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:19:13.927242+00:00",
+      "endedAtUtc": "2026-10-18T13:19:14.165269+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6469562368,
+      "peakProcessRssBytes": 266240,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/native-sskr.command.json",
+        "receiptSha256": "7434ea3b1f36dc711e2482d29907cc21aa16f27e50d8fa93ac51a37534b2c713",
+        "logSha256": "6e09bba1d2a1f361ab4a84c64d5094986101455b8c9f2065219fe3c4b4838015"
+      }
+    },
+    {
+      "label": "npm-advisories",
+      "command": [
+        "bash",
+        "-c",
+        "set -euo pipefail; set -o noclobber; pnpm audit --audit-level high --json > docs/audits/AUD-034-evidence/npm-advisories.json"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:22:18.104460+00:00",
+      "endedAtUtc": "2026-10-18T13:22:19.180852+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6792736768,
+      "peakProcessRssBytes": 93777920,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/npm-advisories.command.json",
+        "receiptSha256": "c5bcab2644923d8e5285ec77504b94d51b960d17b185dee428d419976f1c21c4",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "package-dry-run",
+      "command": [
+        "bash",
+        "-c",
+        "set -euo pipefail; set -o noclobber; npm pack --dry-run --json --ignore-scripts > docs/audits/AUD-034-evidence/package-dry-run.json"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:22:19.259683+00:00",
+      "endedAtUtc": "2026-10-18T13:22:21.165201+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6818103296,
+      "peakProcessRssBytes": 195796992,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/package-dry-run.command.json",
+        "receiptSha256": "f8fe00ba06da7a2345fe9b958823cf24143c83701909b70577758a6956495cec",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "real-card-output",
+      "command": [
+        "/home/user/.local/share/nodejs/node-v26.10.0-linux-x64/bin/node",
+        "scripts/check-card-output.mjs",
+        "output/aud034-card-output"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:20:57.218328+00:00",
+      "endedAtUtc": "2026-10-18T13:22:06.470583+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6178115584,
+      "peakProcessRssBytes": 780840960,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/real-card-output.command.json",
+        "receiptSha256": "29f72660db112908845e0410d31b18e09a3d78ada6d7b1b4a574f0c1436a23a7",
+        "logSha256": "26c483e2af6de52c1af607948b6b89876ac8e8af8e4d9320e7648943f76d529d"
+      }
+    },
+    {
+      "label": "real-terminal",
+      "command": [
+        "python3",
+        "-B",
+        "scripts/verify-terminal-input.py"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T13:19:14.551372+00:00",
+      "endedAtUtc": "2026-10-18T13:20:57.143234+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6133764096,
+      "peakProcessRssBytes": 677638144,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/real-terminal.command.json",
+        "receiptSha256": "be951238dd2d888cd041709990f0e2e3062f434ca157399047eaa21cc0b91aa3",
+        "logSha256": "45011468c37b4c450c3c980d81d1d454e196b90a2da21c1b61635b0cd354e281"
+      }
+    },
+    {
+      "label": "release-gates",
+      "command": [
+        "env",
+        "GOMAXPROCS=1",
+        "GOMEMLIMIT=384MiB",
+        "bash",
+        "-c",
+        "set -euo pipefail; pnpm format:check; pnpm check:toolchain; pnpm check:markdown; pnpm check:audit-privacy; pnpm check:audit-package; pnpm check:copies; pnpm check:code-rules; node node_modules/oxlint/bin/oxlint --threads=1 --type-aware --tsconfig tsconfig.tests.json --report-unused-disable-directives src test scripts vitest.config.ts; pnpm check:rust; node node_modules/typescript/bin/tsc --noEmit; node node_modules/typescript/bin/tsc -p tsconfig.tests.json; node node_modules/typescript/bin/tsc -p tsconfig.cards.json; pnpm build"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T12:52:51.715073+00:00",
+      "endedAtUtc": "2026-10-18T12:53:15.722247+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 4850692096,
+      "peakProcessRssBytes": 698736640,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/release-gates.command.json",
+        "receiptSha256": "b39f234f15989cae00ede90aff159d92ae36e72868d3260781d80093084f8145",
+        "logSha256": "0c2c5c1b6944dcf93b776c1d2be14f5357dae5317a6952a44600be57c85c491c"
+      }
+    },
+    {
+      "label": "remote-metadata",
+      "command": [
+        "bash",
+        "-c",
+        "set -euo pipefail; git fetch --no-tags origin; git rev-list --left-right --count HEAD...origin/main; gh api \"repos/hobby-eng/mnemocode/releases?per_page=5\" --jq \"map({tag_name,draft,prerelease,published_at,target_commitish,html_url})\"; gh run list --repo hobby-eng/mnemocode --limit 5 --json databaseId,headSha,event,conclusion,workflowName,url,createdAt; git tag --list"
+      ],
+      "exitCode": 0,
+      "outcome": "passed",
+      "startedAtUtc": "2026-10-18T12:58:22.228976+00:00",
+      "endedAtUtc": "2026-10-18T12:58:27.866549+00:00",
+      "sourceBefore": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "sourceAfter": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "minimumAvailableBytes": 6738038784,
+      "peakProcessRssBytes": 52035584,
+      "evidence": {
+        "localOnly": true,
+        "receipt": "docs/audits/AUD-034-evidence/remote-metadata.command.json",
+        "receiptSha256": "7728d19f96bfc24b9eaf716ccbfb5a7d28657a3ade6822a4400009a36577dd84",
+        "logSha256": "e5ba9f110f71e5eec366fdad6c1fcd887790391666800f2222a51d9a164048e6"
+      }
+    }
+  ],
+  "fullDefaultSuite": {
+    "executedFresh": true,
+    "files": 203,
+    "assertionStatuses": {
+      "passed": 2947,
+      "skipped": 4
+    },
+    "skipped": [
+      {
+        "file": "/home/user/Documents/bip_tools/mnemocode/test/date-recovery-dedupe.test.ts",
+        "name": "date recovery tries each effective shift once (AUD-010-FUN001) seedshift-legacy-valid, 12 words, 1 known, 15-06-1975|4023 0?-01-2001|4049"
+      },
+      {
+        "file": "/home/user/Documents/bip_tools/mnemocode/test/date-recovery-dedupe.test.ts",
+        "name": "date recovery tries each effective shift once (AUD-010-FUN001) seedshift-legacy-valid, 12 words, 1 known, 1?-05-2020 ?5-05-2020"
+      },
+      {
+        "file": "/home/user/Documents/bip_tools/mnemocode/test/date-recovery-dedupe.test.ts",
+        "name": "date recovery tries each effective shift once (AUD-010-FUN001) seedshift-legacy-valid, 12 words, 0 known, 1?-05-2020 ?5-05-2020 15-0?-2020"
+      },
+      {
+        "file": "/home/user/Documents/bip_tools/mnemocode/test/date-recovery-dedupe.test.ts",
+        "name": "date recovery tries each effective shift once (AUD-010-FUN001) seedshift-legacy-valid, 12 words, 1 known, ?-03-2020 ?-03-2020"
+      }
+    ],
+    "overlappingTotals": false,
+    "evidence": {
+      "localOnly": true,
+      "path": "docs/audits/AUD-034-evidence/suite-summary.json",
+      "sha256": "405a43383ad3bc49e5d32c43cc4b7906131dd7edb7c30273fb9e3dcf257f285d"
+    }
+  },
+  "conformance": {
+    "verdict": "NOT FULLY CONFORMANT",
+    "rules": 104,
+    "coreRules": 53,
+    "confirmedCurrentViolations": 1,
+    "ruleLedger": {
+      "localOnly": true,
+      "path": "docs/audits/AUD-034-evidence/rule-coverage.json",
+      "sha256": "f718906368d4ca560d63361b21092a3a2fd31ccb576c2b5046173f6866db63b7"
+    },
+    "fileLedger": {
+      "localOnly": true,
+      "path": "docs/audits/AUD-034-evidence/file-coverage.json",
+      "sha256": "fef9d8e721cd45fcbf0e584774846d38ddc085e0c188d3296e893e7b6820abae"
+    },
+    "publicDeclarations": 1978,
+    "meaning": "No mechanical inventory, passing gate or absence of findings is treated as a formal complete-conformance or cryptographic proof."
+  },
+  "artifact": {
+    "linux": {
+      "path": "release/aud033-arc002-closed/mnemocode-0.1.0-linux-x64",
+      "sha256": "4700274c218779bd6a5eedbbcf66a581c8ccc72388115b379d7ab6b8ce22b8df",
+      "sourceFingerprint": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+      "buildStatus": "Existing same-source artifact built earlier on2026-10-18, not rebuilt by AUD034; acceptance executed fresh.",
+      "licenseSha256": "8200c500c4673cb7fe5edfd1cc02e25b08e618cee06514dcb1cca75c3cb7bdb8"
+    },
+    "package": {
+      "paths": 1100,
+      "uniquePathListSha256": "665dbdbf478071e6f75a45c2f43377a694f4afd920d229f2cb40e0f727dae704",
+      "evidenceOrExportPaths": 0,
+      "phase": "Current final report/harness path listing before allowed final-review link metadata update; no archive/content digest claimed.",
+      "requiredFiles": {
+        "README.md": true,
+        "SECURITY.md": true,
+        "THIRD_PARTY_NOTICES.md": true,
+        "docs/releases/v0.1.0.md": true,
+        "dist/mnemocode.js": true
+      }
+    },
+    "advisories": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0
+      },
+      "dependencies": 50,
+      "devDependencies": 153,
+      "optionalDependencies": 112,
+      "totalDependencies": 217
+    },
+    "description": "Current same-source Linux executable release/aud033-arc002-closed/mnemocode-0.1.0-linux-x64, SHA-2564700274c218779bd6a5eedbbcf66a581c8ccc72388115b379d7ab6b8ce22b8df, passed fresh standalone acceptance. It was built earlier on2026-10-18, not rebuilt by this audit. The package dry-run contains no private evidence or generated exports; final report/harness path inclusion is separately validated. The fresh npm advisory lookup reports zero vulnerabilities over217 total dependencies. No archive, signature, attestation or release was produced. The complete report/harness package path listing contains1100 files and both new records; only its path-set identity, not a tarball hash, is claimed."
+  },
+  "canonicalBuild": {
+    "evidenceKind": "Retained same-day canonical write and separate fresh-final-stage comparison, not executed again by AUD034.",
+    "record": "docs/audits/AUD-033-evidence/arc002-2026-10-18/ARC002-CLOSURE-2026-10-18.json",
+    "sha256": "950d92879e64fb07c60e0241300d6c50e2749a1c7ad323091122b06c1f94ecdd",
+    "sameSourceFingerprint": "a1293d752f9c3f0d7de2db1616a83aeebb6e89053c6eff4f128fdc0dc9f20e39",
+    "generated": [
+      {
+        "path": "sskr-wasm/generated/recovery_sskr_wasm_bg.wasm.d.ts",
+        "sha256": "1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04",
+        "unchanged": true
+      },
+      {
+        "path": "sskr-wasm/generated/recovery_sskr_wasm.d.ts",
+        "sha256": "4fe377e3834fbd460e5aeaa668cd16c343c50bd50606cf9390a2491797bdb2ac",
+        "unchanged": true
+      },
+      {
+        "path": "sskr-wasm/generated/recovery_sskr_wasm_bg.wasm",
+        "sha256": "38006748a315d90cb7207a6f6e04874b8dd54129447ba39412202c6b59d3b20f",
+        "unchanged": true
+      },
+      {
+        "path": "sskr-wasm/generated/recovery_sskr_wasm.js",
+        "sha256": "a0f2f7750c5758c8c16f47303ee5bced39e214e56a1f0a593d41ed8724225251",
+        "unchanged": true
+      }
+    ],
+    "qualification": "Both final Rust/wasm-bindgen compilation stages were uncached, one Cargo job, offline and network disabled. Toolchain layers were cached. The write build fetched locked dependencies in its normal dependency stage; the comparison reused that layer. Not a wholly offline or entirely cold build, nor independent-machine reproduction.",
+    "inputsAndPins": 22
+  },
+  "procedureHashes": [
+    {
+      "path": "../multi-chain-wallet-tools/docs/FULL_AUDIT_GUIDE.md",
+      "sha256": "e1b2fb641e4a25ebf292548fc1e2ef0c25dbd01faa5c2b580c6ba75df2afcab7"
+    },
+    {
+      "path": "../multi-chain-wallet-tools/docs/audits/AUDIT_STANDARD.md",
+      "sha256": "0c80621acaf5d210f85af76de28a994e545f89f3f660a129026ac0931bb38593"
+    },
+    {
+      "path": "../multi-chain-wallet-tools/docs/audits/AUDIT_TEMPLATE.md",
+      "sha256": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210"
+    },
+    {
+      "path": "../multi-chain-wallet-tools/docs/audit-report.schema.json",
+      "sha256": "989bf3de974d581579c1d1c1e143d5ab9fa232dc70cc8c6f84ad00531ae698fb"
+    }
+  ],
+  "instructionHashes": [
+    {
+      "path": "../AGENTS.md",
+      "sha256": "1f2bd03825f0a0056dbf430da8b0243423ea34f130ac3dbe08b7235eb5d920d3"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "010e36d201ce9cae1a23c856ff8d67e4fa101c97291d7bc70c40cf6a5d344653"
+    },
+    {
+      "path": "../.github/agents/wallet-tools-maintainer.agent.md",
+      "sha256": "4f8a3d23596eaae3248c148ec1d723195f6d6c25d9305b5f578dfd7df31c6c72"
+    },
+    {
+      "path": "../.github/instructions/code-core.instructions.md",
+      "sha256": "51ac92ddffea253bb7ed2f1926eb4cab6c2f52d336af95c1d63f3ebdd9fce066"
+    },
+    {
+      "path": "../.github/instructions/code-typescript.instructions.md",
+      "sha256": "5984f573d7df64ebd494f79891ce838dd518f0cf27876a2965fe46df6ace3ec1"
+    },
+    {
+      "path": "../.github/instructions/code-rust.instructions.md",
+      "sha256": "08bb268d4da1d1e01e93e6294b028a9471a062565eeaf7eb7355fd6592bdcc9c"
+    },
+    {
+      "path": "../.github/instructions/code-tooling.instructions.md",
+      "sha256": "ba09a6530475e8ba08cc96dbf4100b043b6c250263e62def21321f178bb631f7"
+    },
+    {
+      "path": "../.github/instructions/code-browser.instructions.md",
+      "sha256": "954f96b4c2c11ffd23ad6b85113e80eedfb049e2689dd5a134e45de84f130f10"
+    },
+    {
+      "path": "../.github/instructions/docs.instructions.md",
+      "sha256": "1fc9e20ab2f2dad220dc3f6b507e7372c161a05208c80ed2aa8dc28525bb33bf"
+    },
+    {
+      "path": "../.github/instructions/ci.instructions.md",
+      "sha256": "22320f16f35a530bda5839a478ca9cce59cd2d1cabe64b75f96339af470cad41"
+    },
+    {
+      "path": "../.github/instructions/audits.instructions.md",
+      "sha256": "6eed08f958c11bd530006c89489796db8efa759f8a93c501a514de262d0ab004"
+    }
+  ],
+  "environment": {
+    "os": "Linux",
+    "machine": "x86_64",
+    "kernel": "7.0.0-38-generic",
+    "node": "v26.10.0",
+    "pnpm": "12.8.1",
+    "python": "3.14.4"
+  },
+  "historicalRecords": {
+    "publishedReportPairs": 31,
+    "abandoned": "AUD-023 explicitly has no report; first count-assumption failure is retained as a harness error.",
+    "privateRecord": "The reserved private conformance report is neither copied nor published here.",
+    "currentRemediation": "Earlier confirmed conformance groups have accepted dated closure; no old open status is silently treated as current or refiled."
+  },
+  "releaseReadiness": {
+    "verdict": "STANDARD LOCAL CHECKS PASS; ONE LOW FINDING OPEN AND RELEASE ACCEPTANCE INCOMPLETE",
+    "reason": "The additional cleanup-boundary probe fails while the complete standard suite remains green. No high/medium or independently designated release-blocking code defect was established, but full CORE conformance is false. External browser/portable acceptance, the four stated skips, uncommitted source and normal release prerequisites remain visible."
+  },
+  "limitations": [
+    "Fresh execution covers the actual203-file default universe:2947 passed and four unchanged cost-skipped legacy-valid multi-pattern date-recovery cases. Those four are not passes.",
+    "Every1080 baseline path has a documented method/depth. Current selected semantic review and exact inherited body/corrective evidence are not a fresh every-function/every-rule reread or formal proof.",
+    "Windows/macOS runtime/PTY and external browser-host regression, accessibility and acceptance were not executed; no neighboring host was modified.",
+    "Canonical SSKR evidence is retained from today's exact same-source approved write and comparison, not rerun here. No wholly offline, cold-toolchain or independent-machine reproduction is claimed.",
+    "No fresh authoritative Rust advisory database, all-upstream-dependency audit, optimizer-resistant erasure certification, every-pixel/glyph inspection or physical-print acceptance.",
+    "Original owner-deferred G1-001 transport ownership remains separate; no new risk acceptance, closure, duplicate finding or release-blocker claim is invented.",
+    "The Linux executable was built earlier today from the exact current source and accepted fresh here; it is not a freshAUD034 build, publisher signature, attestation or portable release matrix.",
+    "The existing remote success is fast push CI atHEAD, not full release validation of these uncommitted changes. No release/tag/signing/upload/paid dispatch or source modification occurred."
+  ],
+  "finalIndependentReview": {
+    "status": "accepted-with-explicit-limits",
+    "localOnly": true,
+    "path": "docs/audits/AUD-034-evidence/final-review.json",
+    "sha256": "c0f9879bc86b38d91cf73eef71a8512fc311f3e531ccc83f59e9817d5a669b29",
+    "baselineMeaning": "One additional low owned-buffer cleanup variant remains open in this exact baseline; standard local checks pass. Not full CORE conformance or publication approval."
+  }
+}
