@@ -226,6 +226,16 @@ describe("the page of the private screen", () => {
   });
 });
 
+describe("the rows that a page takes", () => {
+  it("counts a tab as the columns it moves on when it bounds the page's rows", async () => {
+    // Nine tabs and nine letters take 81 columns of an 80-column terminal from 18 bytes: two rows.
+    for (let row = 0; row < 11; row += 1) console.log(`${"\t".repeat(9)}${"x".repeat(9)}`);
+    type("\r");
+    expect(await PrivatePage.keepReadable(3)).toBeUndefined();
+    expect(terminal.frames().join("\n")).toContain("Page 1/");
+  });
+});
+
 describe("shares on the private screen", () => {
   it.each(SHARE_FORMATS)("keeps every one of 16 shares in %s reachable", async (form) => {
     process.stderr.rows = 12;

@@ -10,7 +10,7 @@ import { PrivateSteps } from "./private-steps.js";
 import { Redacted } from "../core/redacted.js";
 import { screenRows, type ScreenRows } from "./screen-rows.js";
 import { CLEAR_SCREEN, flushed } from "./terminal.js";
-import { rowsOfText, terminalColumns, terminalRows } from "./terminal-geometry.js";
+import { rowsOfText, TAB_STOP, terminalColumns, terminalRows } from "./terminal-geometry.js";
 import { dropTypedAhead, readKey, withRawTerminal } from "./terminal-input.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { paint, STYLE, STYLE_CODES } from "./terminal-style.js";
@@ -21,6 +21,8 @@ const NAVIGATION = ["↑/PgUp previous · ↓/PgDn next", "Home/End · Enter don
 const CLEAR_BYTES = Buffer.from(CLEAR_SCREEN, "utf8");
 /** The byte of a line break. */
 const LINE_FEED = 0x0a;
+/** The byte of a tab. */
+const TAB = 0x09;
 /** The bytes a record holds at first; it doubles as it grows. */
 const FIRST_RECORD_BYTES = 16 * 1024;
 const DECODER = new TextDecoder("utf-8");
@@ -63,11 +65,13 @@ class PageRecord extends Redacted implements Disposable {
   /**
    * The most rows the page can take on a terminal `columns` wide, read from its bytes without a
    * copy of its text: each line break, and each row that its bytes could fill, as every column
-   * takes a byte at least.
+   * takes a byte at least, but those to which a tab moves on, as many as TAB_STOP.
    */
   mostRows(columns: number): number {
     const bytes = this.#bytes.subarray(0, this.#length);
-    return bytes.filter((byte) => byte === LINE_FEED).length + Math.ceil(this.#length / columns);
+    const count = (value: number): number => bytes.filter((byte) => byte === value).length;
+    const widest = this.#length + count(TAB) * (TAB_STOP - 1);
+    return count(LINE_FEED) + Math.ceil(widest / columns);
   }
 
   /** The page as text, for the time it is drawn. */
