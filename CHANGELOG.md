@@ -2,6 +2,7 @@
 
 ## 0.1.0 (unreleased)
 
+- Keep every SSKR share reachable on a 24-row private screen, including ordinary three-share backups in Unicode forms. Pagination measures the same headers and separated/joined code lines that the terminal prints.
 - Enter repeats a word, number or Unicode lookup; Escape returns to the main menu. The lookup entry exports numbered English/Traditional Chinese dictionaries, Unicode characters and codes, the complete mapping and a standalone English manual recovery guide. Full set saves them together in one folder. The same exports are available with `table --all --table-format ... --output ...`, `table --recovery-guide` and `table --word-lists-dir ...`.
 - Correct the Share cards self-test's collection-to-individual example: it no longer inherits the whole-share QR layout. Its actual planning checks can also run without drawing a PDF.
 - Restore and recovery prompts accept a local text file path in the same field as manual input. Exported share files keep every share line, and MNC1 records keep their format and Seedshift metadata. Unreadable files are asked for again.

@@ -10,11 +10,15 @@ import {
 import { resolveSskrLayout, parseSskrLayout } from "../export/sskr-content.js";
 import {
   printableText,
-  printCodes,
+  codeLines,
+  resultHeaderLines,
+  terminalLine,
   terminalNotice,
-  terminalResultHeader,
   terminalWork,
+  type Channel,
 } from "./terminal.js";
+import { PrivateSteps } from "./private-steps.js";
+import { STYLE_CODES } from "./terminal-style.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import { value, type ParsedArguments } from "./arguments.js";
@@ -122,13 +126,36 @@ export function printShareBlock(
   format: ShareFormat,
   holds?: string,
 ): void {
+  printShareLines(shareBlockLines(title, ur, format, holds));
+}
+
+type ShareLine = readonly [Channel, string];
+
+function shareBlockLines(
+  title: string,
+  ur: string,
+  format: ShareFormat,
+  holds: string | undefined,
+): ShareLine[] {
   const form = SHARE_FORMAT_NAMES[format];
   const facts: [string, string][] = [["Format", form]];
   if (holds !== undefined) facts.push(["Holds", holds]);
-  if (!terminalResultHeader(title, facts))
-    console.error(`${title} — ${form}${holds === undefined ? "" : `, holds ${holds}`}:`);
-  // In Unicode codes and in colors as Unicode codes, apart and joined (printCodes).
-  printCodes(writeShare(ur, format), MIRRORED_FORM[format]);
+  const header = resultHeaderLines(title, facts);
+  const heading: ShareLine[] =
+    header.length === 0
+      ? [["stderr", `${title} — ${form}${holds === undefined ? "" : `, holds ${holds}`}:`]]
+      : header.map((line) => ["stdout", line] as const);
+  return [
+    ...heading,
+    ...codeLines(writeShare(ur, format), MIRRORED_FORM[format]).map(
+      (line) => ["stdout", line] as const,
+    ),
+  ];
+}
+
+function printShareLines(lines: readonly ShareLine[]): void {
+  PrivateSteps.showResult();
+  for (const [channel, line] of lines) terminalLine(channel, line);
 }
 
 /**
@@ -141,17 +168,13 @@ export async function printShares(
   total: number = shares.length,
   holds?: string,
 ): Promise<Cancelled | undefined> {
-  const lines = shares.flatMap((share) => [
-    `SSKR share ${share.number} of ${total} — ${SHARE_FORMAT_NAMES[share.format]}`,
-    ...(holds === undefined ? [] : [`Holds: ${holds}`]),
-    writeShare(share.ur, share.format),
-    "",
-  ]);
-  using display = new PrivateResult(lines);
-  return await display.show(() => {
-    for (const share of shares)
-      printShareBlock(`SSKR share ${share.number} of ${total}`, share.ur, share.format, holds);
-  });
+  const lines = shares.flatMap((share) =>
+    shareBlockLines(`SSKR share ${share.number} of ${total}`, share.ur, share.format, holds),
+  );
+  // Measure what the fallback actually prints; styling has no terminal width. A compact summary
+  // omits the result facts and the separated-code view, so even three shares can overflow it.
+  using display = new PrivateResult(lines.map(([, line]) => line.replace(STYLE_CODES, "")));
+  return await display.show(() => printShareLines(lines));
 }
 
 // Saving, with a choice after a failure (save-retry.ts).

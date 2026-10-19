@@ -11,9 +11,43 @@ path is recorded as a coverage gap instead. Tests, source identity and review
 must support a `verified` state. Local verification and external host/platform acceptance are separate states;
 pending host acceptance remains visible even after a local variant is verified.
 
-## Current AUD-036 follow-up
+## Latest private-output correction (2026-10-19)
 
-The latest complete local replay has **2,988 passing project tests in 210
+An additional pagination coverage gap was confirmed from the concurrent audit's
+ordinary 2-of-3 Unicode and colors-as-Unicode examples. The private viewer sized
+a compact summary, while the terminal printed more header facts and both code
+views. All three shares now use one rendered-line source for printing and
+pagination. The pager strips only owned styling before measuring those lines;
+redirected payloads and their stderr headers retain their original channels.
+
+This is tracked beside AUD-033-UI001 as the common-SSKR-layout variant.
+Both new regressions fail before the correction. The nearest four-file run
+passes all 31 cases with no skips; a registration-only split then passes all
+21 cases in the affected file. These overlapping totals are not added.
+`pnpm check`, the source build and the complete real pseudo-terminal checks
+pass. Earlier resource stops and the initial overlong test-group lint refusal
+remain in local evidence; neither was counted as a program pass. The test
+group was split without changing its assertions or relaxing the line limit.
+
+The owner requested no additional agents. The main agent reviewed this delta;
+the concurrent audit's original reproduction is retained separately. No new
+independent review of the correction or full-suite replay is implied. Portable
+library and native-engine bytes are unchanged. The fresh standalone build and
+the native/browser acceptance of this corrected candidate remain pending.
+
+The owner subsequently authorized pushing the signed checkpoints and running
+full CI and Executable checks, without a tag or release. Those jobs were
+queued for `abf7729`; they do not yet check this later CLI correction and will
+be superseded by its final candidate. GitHub reported delayed Actions workflow
+processing on 2026-10-19 in its [incident record](https://www.githubstatus.com/incidents/8tzbpcnl75jp). This is recorded as an external execution delay,
+not passing Windows/macOS acceptance.
+
+## Retained AUD-036 follow-up
+
+This section retains the status recorded before the later push authorization
+and the CLI correction above. Its execution and artifact identities are historical.
+
+The recorded AUD-036 complete local replay has **2,988 passing project tests in 210
 versionable files, zero failed or skipped**. Unchanged default discovery also
 executes one ignored historical diagnostic: the raw result is 2,989 passed in
 211 files. These counts describe the same execution and are never added.

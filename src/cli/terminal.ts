@@ -231,21 +231,33 @@ export function terminalPhrase(phrase: string, channel: Channel = "stdout"): boo
  */
 export function terminalCodes(codes: readonly string[], joined: string): boolean {
   if (!terminalColor("stdout")) return false;
-  for (const line of wrapText(codes.join(" ")))
-    console.log(terminalPaint("stdout", STYLE.strong, line));
-  console.log(terminalPaint("stdout", STYLE.muted, "Joined, for copying:"));
-  console.log(joined);
+  for (const line of joinedCodeLines(codes, joined)) console.log(line);
   return true;
+}
+
+function joinedCodeLines(codes: readonly string[], joined: string): string[] {
+  return [
+    ...wrapText(codes.join(" ")).map((line) => terminalPaint("stdout", STYLE.strong, line)),
+    terminalPaint("stdout", STYLE.muted, "Joined, for copying:"),
+    joined,
+  ];
+}
+
+/** The exact lines printCodes writes, including the separated and joined terminal views. */
+export function codeLines(text: string, format: EncodedFormat): string[] {
+  const apart = EncodedForm.of(format).apartCodes(text);
+  return apart === undefined || !terminalColor("stdout")
+    ? [text]
+    : joinedCodeLines(apart, compactCode(text));
 }
 
 /**
  * `text`, codes written in `format`, on standard output: on a terminal, where the form writes its
- * codes joined, apart and numbered beside the joined text (terminalCodes); as written otherwise,
+ * codes joined, apart beside the joined text (terminalCodes); as written otherwise,
  * and always for a file or a pipe, which keep one plain line.
  */
 export function printCodes(text: string, format: EncodedFormat): void {
-  const apart = EncodedForm.of(format).apartCodes(text);
-  if (apart === undefined || !terminalCodes(apart, compactCode(text))) console.log(text);
+  for (const line of codeLines(text, format)) console.log(line);
 }
 
 /**

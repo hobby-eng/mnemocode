@@ -6,6 +6,7 @@ import { displayWidth } from "../src/cli/terminal-geometry.js";
 import { printShares, inForm } from "../src/cli/sskr-output.js";
 import { SHARE_FORMATS } from "../src/sskr/transport.js";
 import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { Masking } from "../src/core/masking.js";
 
 const keyboard = vi.hoisted(() => ({ bytes: [] as number[] }));
 vi.mock("../src/cli/terminal-input.js", async (original) => ({
@@ -169,5 +170,40 @@ describe("finite private result pages", () => {
         1,
       ),
     ).toBeLessThanOrEqual(12);
+  });
+});
+
+describe("private share rendering", () => {
+  it.each(["unicode", "colors-unicode"] as const)(
+    "keeps all three %s shares reachable when their actual terminal form fills 24 rows",
+    async (format) => {
+      vi.stubEnv("CLICOLOR_FORCE", "1");
+      vi.stubEnv("NO_COLOR", "");
+      try {
+        type("\x1b[6~".repeat(20) + "\x1b[H\r");
+        const output = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        await printShares(inForm(sskrSetVector.shares, format), 3, Masking.of("direct").holds);
+        expect(frames.some((frame) => frame.includes("Page "))).toBe(true);
+        for (let number = 1; number <= 3; number++)
+          expect(frames.join("\n")).toContain(`SSKR share ${number} of 3`);
+        expect(frames.join("\n")).toContain("Joined, for copying:");
+        expect(frames.at(-1)).toContain("SSKR share 1 of 3");
+        for (const frame of frames) expect(frame.split("\n").length + 1).toBeLessThanOrEqual(24);
+        expect(output).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+
+  it("keeps every redirected share on stdout and its plain header on stderr", async () => {
+    Object.defineProperty(process.stdout, "isTTY", { value: false, configurable: true });
+    const output = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await printShares(inForm(sskrSetVector.shares, "ur"), 3, Masking.of("direct").holds);
+    for (const share of sskrSetVector.shares) expect(output).toHaveBeenCalledWith(share);
+    for (let number = 1; number <= 3; number++)
+      expect(frames.join("\n")).toContain(`SSKR share ${number} of 3`);
+    expect(frames.join("\n")).not.toContain("Page ");
+    expect(output.mock.calls.flat().join("\n")).not.toContain("\x1b");
   });
 });
