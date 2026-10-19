@@ -78,8 +78,29 @@ describe("the code rules of the coding guide", () => {
       "CORE-15",
     ]);
     // A Rust file's unit tests at its end do not count.
-    const rust = `${"fn f() {}\n".repeat(700)}#[cfg(test)]\nmod tests {\n${"//\n".repeat(200)}}\n`;
+    const rust = `${"fn f() {}\n".repeat(700)}#[cfg(test)]\nmod tests {\n${"fn t() {}\n".repeat(200)}}\n`;
     expect(rulesBroken({ "crate/src/lib.rs": rust })).toEqual([]);
+    // A #[cfg(test)] on anything but that final module leaves every line counted.
+    const early = `#[cfg(test)]\nfn helper() {}\n${"fn f() {}\n".repeat(801)}`;
+    expect(rulesBroken({ "crate/src/lib.rs": early })).toEqual(["CORE-15"]);
+    const middle = `#[cfg(test)]\nmod early {\n}\n${"fn f() {}\n".repeat(801)}`;
+    expect(rulesBroken({ "crate/src/lib.rs": middle })).toEqual(["CORE-15"]);
+  });
+
+  it("count lines of code only: comment lines and blank lines are left out (CORE-15)", () => {
+    const code = (count: number, line: string): string => `${line}\n`.repeat(count);
+    // 800 lines of code with comments and blank lines between them stay within the limit.
+    const rust = `${code(800, "fn f() {}")}${code(300, "// Why.")}/* A block\n${code(100, "of text")}*/\n${"\n".repeat(200)}`;
+    expect(rulesBroken({ "crate/src/lib.rs": rust })).toEqual([]);
+    expect(rulesBroken({ "crate/src/lib.rs": code(801, "fn f() {}") })).toEqual(["CORE-15"]);
+    // A line of code that ends in a comment counts once.
+    expect(rulesBroken({ "crate/src/lib.rs": code(801, "fn f() {} // why") })).toEqual(["CORE-15"]);
+    const python = `${code(800, "x = 1")}${code(300, "# Why.")}${"\n".repeat(100)}`;
+    expect(rulesBroken({ "scripts/a.py": python })).toEqual([]);
+    expect(rulesBroken({ "scripts/a.py": code(801, "x = 1") })).toEqual(["CORE-15"]);
+    const markdown = `${code(800, "A sentence.")}<!--\n${code(300, "a note")}-->\n${"\n".repeat(300)}`;
+    expect(rulesBroken({ "docs/a.md": markdown })).toEqual([]);
+    expect(rulesBroken({ "docs/a.md": code(801, "A sentence.") })).toEqual(["CORE-15"]);
   });
 
   it("refuse a shell script that does not stop on its first error", () => {
@@ -93,6 +114,22 @@ describe("the code rules of the coding guide", () => {
     expect(rulesBroken({ "tools/run": "#!/usr/bin/env -S bash -e\nset -u\necho\n" })).toEqual([
       "TOOL-02",
     ]);
+  });
+
+  it("refuse an expansion outside quotes in a shell script, not one inside them", () => {
+    const script = (body: string): string => `#!/usr/bin/env bash\nset -euo pipefail\n${body}\n`;
+    for (const body of ["rm -rf $1/build", "cp ${source} out", "echo $(date)", 'echo "a" $name'])
+      expect(rulesBroken({ "scripts/run.sh": script(body) })).toEqual(["TOOL-02"]);
+    for (const body of [
+      'rm -rf "$1/build"',
+      'cp "${source}" out',
+      'echo "$(date)"',
+      "echo '$literal'",
+      "echo price \\$5",
+      "# $comment",
+      'echo "done" # $note',
+    ])
+      expect(rulesBroken({ "scripts/run.sh": script(body) })).toEqual([]);
   });
 
   it.skipIf(!PYTHON)("refuse a Python package without its pin and hashes", () => {
@@ -158,6 +195,10 @@ describe("the code rules of the coding guide", () => {
 describe("the code rules of the coding guide", () => {
   it("refuse an error class without the Error suffix or a readonly code", () => {
     expect(rulesBroken({ "src/a.ts": "class Refused extends Error {}\n" })).toEqual(["TS-06"]);
+    // A generic class is an error class too.
+    expect(rulesBroken({ "src/cli/a.ts": "class Failure<D> extends Error {}\n" })).toEqual([
+      "TS-06",
+    ]);
     const coded = [
       'class RefusedError extends Error {\n  readonly code: "refused" = "refused";\n}',
       // A subclass carries its parent's code.

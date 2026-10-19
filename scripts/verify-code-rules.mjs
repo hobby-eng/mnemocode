@@ -4,10 +4,11 @@
 // guide:
 //
 // - CORE-15: a file that the linter does not measure (anything but TypeScript and JavaScript) has
-//   at most 800 lines. A Rust file's #[cfg(test)] module and the generated files listed below are
-//   left out; a comment "long: <reason>" on the first line, or the second after a "#!" line,
-//   exempts a file.
-// - TOOL-02: a shell script starts with `set -euo pipefail`.
+//   at most 800 lines of code: a line that holds nothing but a comment, in the comment syntax of
+//   its kind, and a blank line are left out. A Rust file's #[cfg(test)] module at its end and the
+//   generated files listed below are left out; a comment "long: <reason>" on the first line, or
+//   the second after a "#!" line, exempts a file.
+// - TOOL-02: a shell script starts with `set -euo pipefail` and quotes every expansion.
 // - TOOL-03: a Python script imports the standard library alone, or packages pinned with their
 //   hashes in "<script>-requirements.txt" next to it.
 // - TS-09: the names of the files in src/, test/ and scripts/ are kebab-case.
@@ -152,26 +153,107 @@ function linesOf(text) {
   return lines;
 }
 
-/** CORE-15: the length of a file the linter does not measure. */
+/**
+ * CORE-15: the comment syntax of each kind of file whose length this check measures. Only lines of
+ * code count: a line that holds nothing but a comment, and a blank line, are left out.
+ */
+const HASH_COMMENTS = { line: ["#"], block: [] };
+const COMMENT_SYNTAX = {
+  ".rs": { line: ["//"], block: [["/*", "*/"]] },
+  ".md": { line: [], block: [["<!--", "-->"]] },
+  ".py": HASH_COMMENTS,
+  ".sh": HASH_COMMENTS,
+  ".toml": HASH_COMMENTS,
+  ".txt": HASH_COMMENTS,
+  ".yaml": HASH_COMMENTS,
+  ".yml": HASH_COMMENTS,
+  Dockerfile: HASH_COMMENTS,
+};
+
+/**
+ * Whether `line`, read after the comment that `open` says is still open, holds code: anything but
+ * blanks and comments. Returns the closing marker of a block comment left open at its end, if any.
+ */
+function codeOfLine(line, syntax, open) {
+  let rest = line.trim();
+  let closer = open;
+  for (;;) {
+    if (closer !== undefined) {
+      const end = rest.indexOf(closer);
+      if (end < 0) return { code: false, open: closer };
+      rest = rest.slice(end + closer.length).trim();
+      closer = undefined;
+    }
+    if (rest === "" || syntax.line.some((marker) => rest.startsWith(marker)))
+      return { code: false, open: undefined };
+    const block = syntax.block.find(([start]) => rest.startsWith(start));
+    if (block === undefined) return { code: true, open: undefined };
+    rest = rest.slice(block[0].length);
+    closer = block[1];
+  }
+}
+
+/** CORE-15: how many of `lines` hold code, by the comment syntax of the file's kind. */
+function linesOfCode(lines, syntax) {
+  let count = 0;
+  let open;
+  for (const line of lines) {
+    const read = codeOfLine(line, syntax, open);
+    open = read.open;
+    if (read.code) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Where a Rust file's unit tests start: a `#[cfg(test)]` module whose block closes at the end of
+ * the file (RUST-08); -1 when there is none. A `#[cfg(test)]` on anything else counts as code.
+ */
+function rustTestModuleStart(lines) {
+  for (let at = 0; at < lines.length; at += 1) {
+    if (lines[at].trim() !== "#[cfg(test)]") continue;
+    let module = at + 1;
+    while (module < lines.length && lines[module].trim().startsWith("#[")) module += 1;
+    if (!/^(?:pub(?:\([a-z]+\))?\s+)?mod\s+\w+\s*\{/u.test(lines[module]?.trim() ?? "")) continue;
+    let depth = 0;
+    let last = module;
+    for (let line = module; line < lines.length; line += 1) {
+      for (const character of lines[line]) {
+        if (character === "{") depth += 1;
+        else if (character === "}") depth -= 1;
+      }
+      if (lines[line].trim() !== "") last = line;
+      if (depth === 0) break;
+    }
+    const after = lines.slice(last + 1).every((line) => line.trim() === "");
+    if (depth === 0 && after) return at;
+  }
+  return -1;
+}
+
+/** CORE-15: the length of a file the linter does not measure, in lines of code. */
 function checkLength(path, text) {
   const name = basename(path);
   if (GENERATED.has(path)) return;
-  if (!MEASURED.has(extname(name)) && !name.startsWith("Dockerfile")) return;
+  const syntax = name.startsWith("Dockerfile")
+    ? COMMENT_SYNTAX.Dockerfile
+    : MEASURED.has(extname(name))
+      ? COMMENT_SYNTAX[extname(name)]
+      : undefined;
+  if (syntax === undefined) return;
   const lines = linesOf(text);
   const exemption = lines[0]?.startsWith("#!") ? lines[1] : lines[0];
   // The exemption is a comment that starts the line, not "long:" anywhere in it.
   if (exemption !== undefined && /^\s*(?:#|\/\/|\/\*|<!--)\s*long:\s*\S/u.test(exemption)) return;
   // A Rust file's unit tests sit at its end (RUST-08) and do not count.
-  const tests = path.endsWith(".rs")
-    ? lines.findIndex((line) => line.trim() === "#[cfg(test)]")
-    : -1;
-  const counted = tests < 0 ? lines.length : tests;
+  const tests = path.endsWith(".rs") ? rustTestModuleStart(lines) : -1;
+  const counted = linesOfCode(tests < 0 ? lines : lines.slice(0, tests), syntax);
   if (counted > MAX_FILE_LINES)
     report(
       path,
       MAX_FILE_LINES + 1,
       "CORE-15",
-      `${counted} lines, more than ${MAX_FILE_LINES}: split it, or say why it reads best whole in a "long: <reason>" comment on its first line`,
+      `${counted} lines of code, more than ${MAX_FILE_LINES}: split it, or say why it reads best whole in a "long: <reason>" comment on its first line`,
     );
 }
 
@@ -189,6 +271,37 @@ function checkShellHeader(path, text) {
   const first = lines.findIndex((line) => line.trim() !== "" && !line.trimStart().startsWith("#"));
   if (first < 0 || !/^set -euo pipefail\s*(?:#.*)?$/u.test(lines[first].trim()))
     report(path, first + 1, "TOOL-02", "a shell script starts with `set -euo pipefail`");
+}
+
+/**
+ * TOOL-02: an expansion outside quotes ($name, ${name}, $(command), $1) in a shell script; the text
+ * after an unquoted # is a comment.
+ */
+function unquotedExpansion(line) {
+  let quote;
+  for (let at = 0; at < line.length; at += 1) {
+    const character = line[at];
+    if (character === "\\" && quote !== "'") {
+      at += 1;
+      continue;
+    }
+    if (quote !== undefined) {
+      if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === "'" || character === '"') quote = character;
+    else if (character === "#" && (at === 0 || /\s/u.test(line[at - 1]))) return false;
+    else if (character === "$" && /[\p{L}_{(0-9@*#?!-]/u.test(line[at + 1] ?? "")) return true;
+  }
+  return false;
+}
+
+/** TOOL-02: every expansion of a shell script is quoted. */
+function checkShellQuoting(path, text) {
+  linesOf(text).forEach((line, index) => {
+    if (unquotedExpansion(line))
+      report(path, index + 1, "TOOL-02", 'an expansion outside quotes: write "$name"');
+  });
 }
 
 /** The names of Python's standard library, as the installed Python 3 lists them. */
@@ -423,7 +536,9 @@ function classesOf(tokens) {
     const open = tokens.findIndex((candidate, index) => index > at && candidate.key === "{");
     if (open < 0) return;
     const head = tokens.slice(at + 2, open).map((candidate) => candidate.key);
-    const parent = head[0] === "extends" ? head[1] : undefined;
+    // After type parameters too: class Failure<Detail> extends Error.
+    const extendsAt = head.indexOf("extends");
+    const parent = extendsAt < 0 ? undefined : head[extendsAt + 1];
     const body = tokens.slice(open, afterBlock(tokens, open)).map((candidate) => candidate.key);
     const code = body.some((key, index) => key === "readonly" && body[index + 1] === "code");
     classes.push({ name, parent, line: token.line, code });
@@ -588,7 +703,10 @@ for (const path of files) {
   if (text === undefined) continue;
   checkFileName(path);
   checkLength(path, text);
-  if (isShellScript(path, text)) checkShellHeader(path, text);
+  if (isShellScript(path, text)) {
+    checkShellHeader(path, text);
+    checkShellQuoting(path, text);
+  }
   if (path.endsWith(".py"))
     checkPythonPackages(path, pythonFiles.get(path), standardLibrary, pythonFiles);
   if (/requirements[^/]*\.txt$/u.test(path)) checkRequirements(path, text);

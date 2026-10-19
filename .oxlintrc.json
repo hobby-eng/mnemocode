@@ -10,16 +10,16 @@
       "error",
       {
         "max": 800,
-        "skipBlankLines": false,
-        "skipComments": false
+        "skipBlankLines": true,
+        "skipComments": true
       }
     ],
     "max-lines-per-function": [
       "error",
       {
         "max": 150,
-        "skipBlankLines": false,
-        "skipComments": false
+        "skipBlankLines": true,
+        "skipComments": true
       }
     ],
     "import/no-cycle": "error",
