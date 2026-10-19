@@ -14,7 +14,7 @@ import { printableText, terminalNotice } from "./terminal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { lowerFirst } from "../core/prose.js";
 import { describeError, errorCode } from "../core/refusal.js";
-import { LeftStagingCopyError } from "../export/private-file.js";
+import { FailedSaveLeftCopyError, LeftStagingCopyError } from "../export/private-file.js";
 
 /** Plain words for the errors of a file system that a save may meet (errno names). */
 const SAVE_FAILURES: Readonly<Record<string, string>> = {
@@ -111,7 +111,14 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined 
         return path;
       } catch (error) {
         if (!onPrivateScreen()) throw error;
-        terminalNotice(saveFailure(saving.what, path, error), "warning");
+        // A failed save that left its staging folder: why it failed, then the folder to delete.
+        const left = error instanceof FailedSaveLeftCopyError ? error : undefined;
+        terminalNotice(saveFailure(saving.what, path, left?.cause ?? error), "warning");
+        if (left !== undefined)
+          terminalNotice(
+            `Its private staging folder ${printableText(left.staging)}, which may hold a copy, could not be removed: delete it.`,
+            "warning",
+          );
       }
     const next = await askAfterFailure(
       WHAT_NOW,

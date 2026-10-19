@@ -1,7 +1,7 @@
 import { chmod, link, lstat, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
-import { errorCode } from "../core/refusal.js";
+import { describeError, errorCode } from "../core/refusal.js";
 import { ExportFileName } from "./file-name.js";
 import { fillingFolder, makeTemporaryFolder, removeTemporaryFolder } from "./temporary-folders.js";
 
@@ -37,8 +37,11 @@ export async function makePrivateFolder(path: string): Promise<void> {
   await mkdir(path, { mode: PRIVATE_FOLDER_MODE });
 }
 
-/** The code of a file saved whose staging copy was left behind, this module's own error. */
-export type PrivateFileErrorCode = "left-staging-copy";
+/**
+ * The codes of this module's own errors: a file saved whose staging copy was left behind, and a
+ * save that failed whose staging copy was left behind too.
+ */
+export type PrivateFileErrorCode = "left-staging-copy" | "failed-save-left-staging-copy";
 
 /**
  * A file saved in full whose private staging folder could not be removed afterwards. It may
@@ -66,10 +69,45 @@ export class LeftStagingCopyError extends Error {
 }
 
 /**
+ * A save that failed, whose private staging folder could not be removed either: it may hold a
+ * private copy. The failure of the save is its `cause`, which says why the save failed
+ * (AUD-037-SEC007).
+ */
+export class FailedSaveLeftCopyError extends Error {
+  /** Stable code distinguishing a failed save that also left its staging folder. */
+  readonly code: PrivateFileErrorCode = "failed-save-left-staging-copy";
+  /** The private staging folder left behind, which may hold a copy. */
+  readonly staging: string;
+
+  constructor(staging: string, cause: unknown) {
+    super(
+      `The save failed (${describeError(cause).replace(/\.$/u, "")}), and its private staging folder ${staging}, which may hold a copy, could not be removed: delete it.`,
+      { cause },
+    );
+    this.name = "FailedSaveLeftCopyError";
+    this.staging = staging;
+  }
+}
+
+/**
+ * Removes `staging` after a save failed with `failure`, and gives what the caller throws: the
+ * failure, or, where the folder cannot be removed either, a FailedSaveLeftCopyError that keeps it.
+ */
+async function afterFailedSave(staging: string, failure: unknown): Promise<unknown> {
+  try {
+    await removeTemporaryFolder(staging);
+    return failure;
+  } catch {
+    return new FailedSaveLeftCopyError(staging, failure);
+  }
+}
+
+/**
  * Writes `bytes` to a new private file in a staging folder beside `destination`, on its file
  * system, so that a link to it or a rename of it is atomic, and hands it to `publish`; the staging
  * folder is removed afterwards, whatever happens. A removal that fails after the file was
- * published is a LeftStagingCopyError, not a failed save.
+ * published is a LeftStagingCopyError, not a failed save; one that fails after a failed save is a
+ * FailedSaveLeftCopyError.
  */
 async function withStagedFile(
   destination: string,
@@ -82,9 +120,8 @@ async function withStagedFile(
     await writeNewPrivateFile(temporary, bytes);
     await publish(temporary);
   } catch (error) {
-    // A removal that fails is what the caller hears of, as the folder may hold a copy.
-    await removeTemporaryFolder(staging);
-    throw error;
+    // A removal that fails is heard of beside the failure, as the folder may hold a copy.
+    throw await afterFailedSave(staging, error);
   }
   try {
     await removeTemporaryFolder(staging);
@@ -183,13 +220,13 @@ export async function publishNewFolder<T>(
     await removeTemporaryFolder(staging, { empty: true });
     return result;
   } catch (error) {
-    await removeTemporaryFolder(staging);
+    const thrown = await afterFailedSave(staging, error);
     if (reservation !== undefined) {
       const current = await lstat(target);
       if (current.dev === reservation.dev && current.ino === reservation.ino)
         await rm(target, { recursive: true, force: true });
     }
-    throw error;
+    throw thrown;
   } finally {
     filled?.();
   }
