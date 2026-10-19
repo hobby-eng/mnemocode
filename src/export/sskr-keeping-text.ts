@@ -6,14 +6,17 @@
 // member identity used to count repeated copies once.
 
 import { PHRASE_WORDS } from "../core/masking.js";
-import { Share } from "../sskr/transport.js";
-import { SetTopology } from "../sskr/set-topology.js";
+import { Share, type ShareInfo } from "../sskr/transport.js";
+import { SET_CONFLICT_TEXTS, SetTopology } from "../sskr/set-topology.js";
 import { counted } from "../core/search-plan.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("export.sskr-keeping-text", {
   "there-no-shares-keep": () => "There are no shares to keep.",
+  "shares-not-one-set": (conflict: string) => `${conflict} Only the shares of one set are kept.`,
+  "packaging-unknown": () =>
+    "Name how the shares were saved: file, folder, files, folders or pages.",
 });
 
 /** How the cards or records of the shares were saved. */
@@ -54,19 +57,25 @@ function singleGroupQuorum(count: number, threshold: number, goal: string, noun:
 /**
  * How many of `records`, UR records of one set, restore the phrase: read from the shares, whose
  * threshold and groups they carry. Cards may print fewer shares than restore, such as one share
- * printed again, and a set may have several groups.
+ * printed again, and a set may have several groups. Shares of another set, or that give their
+ * group another threshold, are refused: no quorum holds for them (AUD-037-API007).
  */
 function quorum(records: readonly string[], masked: boolean): string {
   const goal = masked ? MASKED_GOAL : "for recovery";
-  using first = Share.read(defined(records[0]));
-  const { info } = first;
-  if (info.groupCount > 1)
-    return `These shares belong to ${info.groupCount} groups, each needing enough of its own ${goal}`;
-  const members = new Set<string>();
+  // Each member once, of its own set, so that a copy printed again counts as one share.
+  const members = new Map<string, ShareInfo>();
   for (const record of records) {
     using share = Share.read(record);
-    members.add(SetTopology.memberOf(share.info));
+    const { info } = share;
+    members.set(`${SetTopology.setOf(info)}/${SetTopology.memberOf(info)}`, info);
   }
+  const infos = [...members.values()];
+  const conflict = SetTopology.firstConflict(infos);
+  if (conflict !== undefined)
+    throw ERRORS.create("shares-not-one-set", [SET_CONFLICT_TEXTS[conflict.kind].refusal]);
+  const info = defined(infos[0]);
+  if (info.groupCount > 1)
+    return `These shares belong to ${info.groupCount} groups, each needing enough of its own ${goal}`;
   const repeated = members.size < records.length;
   const text = singleGroupQuorum(
     members.size,
@@ -79,7 +88,8 @@ function quorum(records: readonly string[], masked: boolean): string {
 
 /**
  * How the shares saved as `packaging` are kept: how many restore what (Seedshift `masked` the
- * phrase before the split, or not), and where each share is; one sentence or two.
+ * phrase before the split, or not), and where each share is; one sentence or two. `records` are
+ * the shares of one set, any of them repeated; others, or a packaging not named, are refused.
  */
 export function shareKeepingNote(
   records: readonly string[],
@@ -87,5 +97,6 @@ export function shareKeepingNote(
   masked: boolean,
 ): string {
   if (records.length === 0) throw ERRORS.create("there-no-shares-keep", []);
+  if (!Object.hasOwn(LAYOUTS, packaging)) throw ERRORS.create("packaging-unknown", []);
   return `${quorum(records, masked)}; ${LAYOUTS[packaging]}. Store the shares apart.`;
 }

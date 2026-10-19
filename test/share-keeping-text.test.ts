@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { shareKeepingNote } from "../src/export/sskr-keeping-text.js";
 import { sskrSetVector, sskrVector } from "../src/sskr/known-answers.js";
 import { PHRASE_WORDS } from "../src/core/masking.js";
+import { defined } from "../src/core/defined.js";
 
 describe("Keeping distinct SSKR members", () => {
   const [first, second, third] = sskrSetVector.shares;
@@ -30,6 +31,15 @@ describe("Keeping distinct SSKR members", () => {
     );
     expect(shareKeepingNote(sskrVector.shares, "file", false)).toBe(
       "These shares belong to 2 groups, each needing enough of its own for recovery; the file holds every share. Store the shares apart.",
+    );
+  });
+
+  it("refuses shares of different sets and a packaging it does not name (AUD-037-API007)", () => {
+    expect(() => shareKeepingNote([first, defined(sskrVector.shares[0])], "files", false)).toThrow(
+      expect.objectContaining({ code: "export.sskr-keeping-text.shares-not-one-set" }),
+    );
+    expect(() => shareKeepingNote([first, second], "boxes" as never, false)).toThrow(
+      expect.objectContaining({ code: "export.sskr-keeping-text.packaging-unknown" }),
     );
   });
 });
