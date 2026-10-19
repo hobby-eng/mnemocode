@@ -138,6 +138,37 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
 });
 
 describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
+  it("counts two sets of dates of one set of codes as two sets, either first (AUD-037-FUN001)", async () => {
+    const search = new MissingCodesSearch(
+      MissingCodes.read(ONE, "indexes", "seedshift"),
+      fingerprint,
+    );
+    const dates = (): DatesAnswer =>
+      DatesAnswer.parse("23-09-202?", { wordCount: 12, patterns: true });
+    // The phrases that the wallet is asked about, a year of the date after another.
+    const asked: string[] = [];
+    await search
+      .byWallet(async (mnemonic) => {
+        asked.push(mnemonic);
+        return { matched: false };
+      }, dates())
+      .run();
+    const others = asked.filter((phrase) => phrase !== TEST_PHRASE);
+    expect(others).toHaveLength(9);
+    // A wallet check that another date passes too, by chance, before the true one or after it.
+    for (const chance of [others[0], others.at(-1)]) {
+      const two: WalletCheck = async (mnemonic) => ({
+        matched: mnemonic === TEST_PHRASE || mnemonic === chance,
+        path: "m",
+      });
+      expect(await search.byWallet(two, dates()).run()).toEqual({
+        kind: "several",
+        count: 2,
+        message: "2 sets of codes and dates fit; the wallet tells which is yours.",
+      });
+    }
+  });
+
   it("lists every candidate with its phrase and fingerprint where they are few", async () => {
     const search = new MissingCodesSearch(
       MissingCodes.read(FEW, "indexes", "seedshift"),

@@ -566,7 +566,10 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
     this.#walletCheck = walletCheck;
   }
 
-  /** The date search of one candidate of the codes, which stops at its first match. */
+  /**
+   * The date search of one candidate of the codes: it tries every combination of the dates, and
+   * keeps the first match.
+   */
   #searchOf(indexes: readonly number[]): DateSearch {
     return new DateSearch({
       indexes,
@@ -597,34 +600,47 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
   }
 
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
-    // The match of the first set of codes that matched, which is the result where it is the only
-    // one (foundOne): a second set makes the result a count alone, and then no match is kept, so
-    // that no phrase or dates are held that nothing shows.
+    // The match of the first set of codes and dates that matched, which is the result where it is
+    // the only one: a second set, of other codes or of other dates of the same codes, makes the
+    // result a count alone, and then no match is kept, so that no phrase or dates are held that
+    // nothing shows.
     let first: DateMatch | undefined;
-    let matched = 0;
+    let sets = 0;
     using found = await searched(
       this.#input.codes,
       async (indexes) => {
         using search = this.#searchOf(indexes);
+        // Each phrase that the wallet check passed, once: equivalent dates that give the same
+        // phrase are one set (AUD-010-FUN001).
+        const phrases = new Set<string>();
         const result = await search.run({
           signal: run.signal,
           turn: run.turn,
           now: run.now,
+          onMatch: (match) => phrases.add(match.mnemonic),
         });
         this.#input.assertLive();
         // A stop is heard by the search of the codes too, at its next turn.
         if (result.stopped) return false;
         const match = result.shown[0];
         if (match === undefined) return false;
-        matched += 1;
-        first = matched === 1 ? match : undefined;
+        sets += phrases.size;
+        first = sets === 1 ? match : undefined;
         return true;
       },
       run,
     );
     this.#input.assertLive();
-    if (found.stopped || found.passed !== 1)
-      return foundOne(found, MISSING_CODES_TEXTS.noneByWallet, [], run);
+    if (found.stopped || !stillRunning(run)) return STOPPED;
+    // Two sets fit, which a fingerprint leaves only by chance: the wallet tells which is yours,
+    // whether they differ in their codes or only in their dates (AUD-037-FUN001).
+    if (sets > 1)
+      return {
+        kind: "several",
+        count: sets,
+        message: `${sets} sets of codes and dates fit; the wallet tells which is yours.`,
+      };
+    if (found.passed !== 1) return foundOne(found, MISSING_CODES_TEXTS.noneByWallet, [], run);
     const match = defined(first);
     // The codes are decoded with every date, the known ones too: the guessed ones alone give
     // another phrase (AUD-012-FUN001). Checked here, so that no host decodes another wallet.

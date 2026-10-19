@@ -335,9 +335,10 @@ describe("AUD-014 recommendations 7 and 9: counts kept once, one match kept", ()
     }
     const several = await search.byWallet(answering({ matched: true }), dates).run();
     expect(several.kind).toBe("several");
-    // Seedshift gives a valid phrase for every date, so each candidate of the codes passes.
+    // Seedshift gives a valid phrase for every date, so each candidate of the codes passes with
+    // each of the ten days, and each pair is a set (AUD-037-FUN001).
     if (several.kind === "several")
-      expect(several.count).toBe([...search.codes.candidates()].length);
+      expect(several.count).toBe([...search.codes.candidates()].length * 10);
   });
 });
 

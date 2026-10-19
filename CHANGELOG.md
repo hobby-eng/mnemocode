@@ -12,6 +12,7 @@
 
 ### Audit follow-up
 
+- Decode's joint search of unreadable codes and forgotten date digits reports several sets, not one found, when two dates of the same codes pass the wallet check, which a fingerprint allows by chance; it showed the phrase of the first date before.
 - Ctrl+C while card images are drawn on the private screen removes the temporary folders of the export, which hold private copies, says `Cancelled.` once and ends with exit code 130, as Ctrl+C at a question does.
 - PNG and JPEG export runs only a `pdftocairo` found by its full path in a folder of `PATH`, never one in the current folder or in an empty or relative entry of `PATH`, which Windows, and Linux for an empty entry, would otherwise run first.
 - Explain displayed wallet fingerprints with one shared sentence. Keep the short menu label, grey secondary explanation and unchanged wallet values and legacy TSV rows; terminal regressions cover narrow and normal screens.
