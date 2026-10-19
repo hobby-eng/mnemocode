@@ -19,7 +19,7 @@ import {
 } from "../core/date-search.js";
 import { EncodedBackup } from "../core/encoded-backup.js";
 import { Masking, type SplitMode } from "../core/masking.js";
-import { askWallet, type WalletCheck } from "../core/wallet-check.js";
+import { askWallet, type WalletCheck, type WalletMatch } from "../core/wallet-check.js";
 import type { RepairedSet } from "./joint-results.js";
 import type { DateWork } from "./repair-report.js";
 import { Redacted } from "../core/redacted.js";
@@ -59,6 +59,16 @@ export interface UnmaskedPhrase {
   readonly dates?: string | undefined;
   /** Where the wallet matched in a date search, such as m/84'/0'/0'/0/0. */
   readonly matchedAt?: string | undefined;
+  /**
+   * What the wallet check said of the match, such as that a master fingerprint is only a filter
+   * (WalletMatch.warning); absent where it said nothing (AUD-037-SEC004).
+   */
+  readonly warning?: string | undefined;
+}
+
+/** The warning of a wallet's match as a field of an UnmaskedPhrase, or no field. */
+function warningField(warning: string | undefined): { readonly warning?: string } {
+  return warning === undefined ? {} : { warning };
 }
 
 /** What the sets give: the phrases kept, and every one for a list; or why the dates do not fit. */
@@ -175,7 +185,9 @@ export class ShareUnmasking extends Redacted {
     const mode = this.#mode;
     for (const set of owned) {
       if (this.#dates === undefined || !Masking.isMaskedMode(mode)) {
-        if (await this.#matches(set.mnemonic)) phrases.push({ set, mnemonic: set.mnemonic });
+        const match = await this.#check(set.mnemonic);
+        if (match.matched)
+          phrases.push({ set, mnemonic: set.mnemonic, ...warningField(match.warning) });
         continue;
       }
       using backup = EncodedBackup.read(set.mnemonic, "english", mode);
@@ -183,7 +195,8 @@ export class ShareUnmasking extends Redacted {
       if (tooMany !== undefined) return { kind: "dates", message: tooMany };
       if (!this.#dates.hasForgottenDigits) {
         const mnemonic = backup.decode(this.#dates.known).recoveredMnemonic;
-        if (await this.#matches(mnemonic)) phrases.push({ set, mnemonic });
+        const match = await this.#check(mnemonic);
+        if (match.matched) phrases.push({ set, mnemonic, ...warningField(match.warning) });
         continue;
       }
       const keep = this.#keep ?? 0;
@@ -203,6 +216,7 @@ export class ShareUnmasking extends Redacted {
           mnemonic: match.mnemonic,
           dates: match.dates,
           matchedAt: match.evidence,
+          ...warningField(match.warning),
         });
       // A list takes every match; without one, those shown stand for the matches.
       listed.push(...(keep > 0 ? result.kept : result.shown.map((match) => match.mnemonic)));
@@ -212,10 +226,10 @@ export class ShareUnmasking extends Redacted {
     return { kind: "phrases", phrases, listed };
   }
 
-  /** Whether `mnemonic` is the wallet's; every phrase is without a wallet check. */
-  async #matches(mnemonic: string): Promise<boolean> {
-    return (
-      this.#walletCheck === undefined || (await askWallet(this.#walletCheck, mnemonic)).matched
-    );
+  /** What the wallet check says of `mnemonic`; every phrase matches without a wallet check. */
+  async #check(mnemonic: string): Promise<WalletMatch> {
+    return this.#walletCheck === undefined
+      ? { matched: true }
+      : askWallet(this.#walletCheck, mnemonic);
   }
 }

@@ -704,6 +704,15 @@ function numberedOf(place: RestoredPlace): string {
   return place.of > 1 ? `, phrase ${place.index + 1} of ${place.of}` : "";
 }
 
+/**
+ * What the wallet check said of the phrase's match, such as that a fingerprint is only a filter
+ * (AUD-037-SEC004), where a wallet was given.
+ */
+function reportWalletWarning(phrase: RestoredPhrase, place: RestoredPlace): void {
+  if (place.evidence !== undefined && phrase.warning !== undefined)
+    terminalNotice(phrase.warning, "warning");
+}
+
 /** "matches the address at m/84'/0'/0'/0/3", for the wallet fact. */
 function walletFact(phrase: RestoredPhrase, place: RestoredPlace): string | undefined {
   if (place.evidence === undefined) return undefined;
@@ -726,6 +735,7 @@ function showRestoredParts(phrase: RestoredPhrase, mode: SplitMode, place: Resto
     ...(wallet === undefined ? [] : ([["Wallet", wallet]] as [string, string][])),
   ]);
   reportSet(phrase, place, true);
+  reportWalletWarning(phrase, place);
   const backup = restoredBackup(phrase, mode);
   if (backup !== undefined) {
     terminalPart(backup.label);
@@ -746,6 +756,7 @@ function showRestoredParts(phrase: RestoredPhrase, mode: SplitMode, place: Resto
 /** A restored phrase as plain lines, for a file, a pipe or a terminal without colour. */
 function showRestoredPlain(phrase: RestoredPhrase, mode: SplitMode, place: RestoredPlace): void {
   reportSet(phrase, place, false);
+  reportWalletWarning(phrase, place);
   const { mnemonic } = phrase;
   const ordinal = place.of > 1 ? `phrase ${place.index + 1} of ${place.of}` : undefined;
   const backup = restoredBackup(phrase, mode);

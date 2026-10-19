@@ -192,7 +192,7 @@ async function recoverFromOptions(
     if (!candidateListHolds(result.matchCount)) throw new TooManyForListError(NARROW_DATE_SEARCH);
     if ((await saveList(settings, result)) === CANCELLED) return CANCELLED;
   }
-  dateMatchNotes(settings.evidence);
+  dateMatchNotes(settings.evidence, result.warning);
   return undefined;
 }
 
@@ -302,7 +302,7 @@ async function recoverWithQuestions(
           if (settings.target !== undefined && (await saveList(settings, result)) === CANCELLED)
             return CANCELLED;
           listed = true;
-          dateMatchNotes(evidence);
+          dateMatchNotes(evidence, result.warning);
         } else if (!listable)
           terminalNotice(new TooManyForListError(NARROW_DATE_SEARCH).message, "warning");
         const next = await askAfterDateSearch(result, {

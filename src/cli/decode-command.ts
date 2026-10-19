@@ -433,8 +433,7 @@ export async function decodeWithQuestions(
           }
           backup = outcome.backup;
           const { codes } = read;
-          const { backup: found, foundDates: dates, others } = outcome;
-          foundCodes = () => reportFound(codes, found, dates, others);
+          foundCodes = () => reportFound(codes, outcome);
           if (outcome.dates !== undefined) {
             foundDates = outcome.dates;
             step = "decode";
@@ -586,7 +585,7 @@ async function searchAndShow(
   if (result === undefined) return { step: "dates", evidence };
   if (result === CANCELLED) return CANCELLED;
   reportDateMatches(result, { mode, evidence, maxResults });
-  if (result.matchCount > 0) dateMatchNotes(evidence);
+  if (result.matchCount > 0) dateMatchNotes(evidence, result.warning);
   const next = await askAfterDateSearch(result, {
     evidence,
     mode,

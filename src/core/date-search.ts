@@ -397,6 +397,11 @@ export interface DateMatch {
   readonly mnemonic: string;
   /** Where the wallet matched; absent without a wallet check, or a match without a path. */
   readonly evidence?: string | undefined;
+  /**
+   * What the wallet check said of the match, such as that a master fingerprint is only a filter
+   * (WalletMatch.warning); absent where it said nothing (AUD-037-SEC004).
+   */
+  readonly warning?: string | undefined;
 }
 
 /** How far a search has come. */
@@ -423,6 +428,8 @@ export interface DateSearchResult {
   readonly shown: readonly DateMatch[];
   /** The phrase of every match, kept only when `keep` is above 0, at most `keep` of them. */
   readonly kept: readonly string[];
+  /** The first warning that the wallet check gave with a match (DateMatch.warning). */
+  readonly warning?: string | undefined;
   /** The date combinations checked: all of them, unless the search was stopped. */
   readonly checked: number;
   /**
@@ -635,6 +642,7 @@ export class DateSearch extends Redacted {
     let checked = 0;
     let checksumValid = 0;
     let matchCount = 0;
+    let warning: string | undefined;
     const turns = SearchTurns.of(run);
     const result = (stopped: boolean): DateSearchResult => ({
       combinations,
@@ -644,6 +652,7 @@ export class DateSearch extends Redacted {
       kept,
       checked,
       stopped,
+      ...(warning === undefined ? {} : { warning }),
     });
     if (turns.stopped) return result(true);
     for (const candidates of dateRecoveryCandidates(
@@ -668,6 +677,7 @@ export class DateSearch extends Redacted {
         if (!stillRunning(run)) return result(true);
         if (match !== undefined && !match.matched) continue;
         matchCount += 1;
+        warning ??= match?.warning;
         if (kept.length < this.#keep) kept.push(candidate.mnemonic);
         if (shown.length >= this.#maxShown && run.onMatch === undefined) continue;
         const found: DateMatch = {
@@ -676,6 +686,7 @@ export class DateSearch extends Redacted {
           mnemonic: candidate.mnemonic,
           // Only a match of the wallet at a path names one; without a check there is no key.
           ...(match?.path === undefined ? {} : { evidence: match.path }),
+          ...(match?.warning === undefined ? {} : { warning: match.warning }),
         };
         if (shown.length < this.#maxShown) shown.push(found);
         run.onMatch?.(found);

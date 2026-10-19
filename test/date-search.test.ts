@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeMnemonic, encodeMnemonicLegacy, parseDate } from "../src/core.js";
 import { HARD_MAX_COMBINATIONS, reportDateMatches, searchDates } from "../src/cli/date-search.js";
 import { DatesAnswer, DateSearch, type DateSearchResult } from "../src/core/date-search.js";
+import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 
 /** The result of a search that was made and not stopped. */
@@ -124,6 +125,7 @@ describe("the date search", () => {
         allDates: [{ year: 2026, month: 9, day: 23 }],
         mnemonic: TEST_PHRASE,
         evidence: "m",
+        warning: FINGERPRINT_WARNING,
       },
     ]);
     // The size of each search first, then its progress.
@@ -238,6 +240,7 @@ describe("the date search", () => {
         "err Checked 10/10 date combinations; found 1 match.",
         `out 23-09-2026\t${TEST_PHRASE}\tmatched at m`,
         "err Each displayed candidate matched the requested master fingerprint locally.",
+        `err ${FINGERPRINT_WARNING}`,
       ],
     ],
     [

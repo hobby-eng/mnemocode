@@ -11,7 +11,6 @@ import {
   type WalletEvidence,
 } from "../bitcoin-evidence.js";
 import type { DatesAnswer } from "../core/date-search.js";
-import type { EncodedBackup } from "../core/encoded-backup.js";
 import {
   foundAmongOthers,
   MISSING_CODES_TEXTS,
@@ -93,18 +92,16 @@ function givenWay(
 
 /**
  * Says what the search filled in, the codes whole with those found, so that the written copy can
- * be corrected; the decode shows it again with its result.
+ * be corrected, and what the wallet check said of its match; the decode shows it again with its
+ * result.
  */
-export function reportFound(
-  codes: MissingCodes,
-  backup: EncodedBackup,
-  foundDates?: string,
-  others?: number,
-): void {
-  terminalStatus(`${MissingCodesSearch.placesText(codes)} found:`, backup.text());
-  if (foundDates !== undefined) terminalStatus("Dates found:", foundDates);
+export function reportFound(codes: MissingCodes, found: MissingCodesFound): void {
+  terminalStatus(`${MissingCodesSearch.placesText(codes)} found:`, found.backup.text());
+  if (found.foundDates !== undefined) terminalStatus("Dates found:", found.foundDates);
+  // A fingerprint is only a filter (AUD-037-SEC004).
+  if (found.warning !== undefined) terminalNotice(found.warning, "warning");
   // Other codes with other dates give the same phrase: those found need not be those written.
-  if (others !== undefined) terminalNotice(foundAmongOthers(others), "warning");
+  if (found.others !== undefined) terminalNotice(foundAmongOthers(found.others), "warning");
   else terminalHint(MISSING_CODES_TEXTS.correct);
 }
 
@@ -337,7 +334,7 @@ async function outcomeOf(
 ): Promise<MissingOutcome | undefined | Cancelled> {
   if (result.kind === "found") {
     try {
-      reportFound(search.codes, result.backup, result.foundDates, result.others);
+      reportFound(search.codes, result);
       return result;
     } catch (error) {
       result.backup.wipe();

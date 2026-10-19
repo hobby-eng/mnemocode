@@ -106,6 +106,11 @@ export interface MissingCodesFound {
    * codes and dates found are one of them, not always those written (AUD-037-FUN001).
    */
   readonly others?: number | undefined;
+  /**
+   * What the wallet check said of the match, such as that a master fingerprint is only a filter
+   * (WalletMatch.warning); absent where it said nothing (AUD-037-SEC004).
+   */
+  readonly warning?: string | undefined;
 }
 
 /** What one way found. */
@@ -260,17 +265,27 @@ function secondsToDecode(
   return elapsed();
 }
 
-/** The one set found, none, or several, as a result; or that the host stopped the search. */
+/**
+ * The one set found, with the `warning` of the wallet check that passed it, none, or several, as a
+ * result; or that the host stopped the search.
+ */
 function foundOne(
   searchedCodes: SearchedCodes,
   nothing: string,
   dates: readonly DateShiftDate[] | undefined,
   run: MissingCodesRun,
+  warning?: string,
 ): MissingCodesResult {
   const { passed, stopped } = searchedCodes;
   if (stopped || !stillRunning(run)) return STOPPED;
   if (passed === 0) return { kind: "none", message: nothing };
-  if (passed === 1) return { kind: "found", backup: searchedCodes.takeOnly(), dates };
+  if (passed === 1)
+    return {
+      kind: "found",
+      backup: searchedCodes.takeOnly(),
+      dates,
+      ...(warning === undefined ? {} : { warning }),
+    };
   // Counted by every set that passed, as the progress counts them, not by those kept.
   return severalSets(passed, "codes");
 }
@@ -569,6 +584,7 @@ class WalletWay implements MissingCodesWaySearch {
 
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
     const codes = this.#input.codes;
+    let warning: string | undefined;
     using found = await searched(
       codes,
       async (indexes) => {
@@ -578,13 +594,15 @@ class WalletWay implements MissingCodesWaySearch {
           const match = await this.#input.checked(() =>
             askWallet(defined(this.#walletCheck), phrase),
           );
-          if (match.matched) return true;
+          if (!match.matched) continue;
+          warning ??= match.warning;
+          return true;
         }
         return false;
       },
       run,
     );
-    return foundOne(found, MISSING_CODES_TEXTS.noneByWallet, this.#input.dates, run);
+    return foundOne(found, MISSING_CODES_TEXTS.noneByWallet, this.#input.dates, run, warning);
   }
 
   wipe(): void {
@@ -698,6 +716,7 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
       dates: match.allDates,
       foundDates: match.dates,
       ...(sets > 1 ? { others: sets - 1 } : {}),
+      ...(match.warning === undefined ? {} : { warning: match.warning }),
     };
   }
 

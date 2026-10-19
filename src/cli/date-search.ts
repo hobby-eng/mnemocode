@@ -336,26 +336,33 @@ function matchLine(match: DateMatch): string {
 export function matchesFitScreen(result: DateSearchResult, report: MatchesReport): boolean {
   const beside =
     rowsOf(resultHeaderLines(MATCHES_TITLE, matchFacts(result, report))) +
-    rowsOf(dateMatchNoteLines(report.evidence)) +
+    rowsOf(dateMatchNoteLines(report.evidence, result.warning)) +
     closingRows();
   return linesFitPrivateScreen(result.shown.map(matchLine), beside);
 }
 
-/** The note after shown matches: what a valid checksum proves, or what the wallet check did. */
-export function dateMatchNotes(evidence: WalletEvidence | undefined): void {
-  for (const line of dateMatchNoteLines(evidence)) console.error(line);
+/**
+ * The note after shown matches: what a valid checksum proves, or what the wallet check did, with
+ * the `warning` that the check gave with its matches, such as that a fingerprint is only a filter
+ * (DateSearchResult.warning, AUD-037-SEC004).
+ */
+export function dateMatchNotes(evidence: WalletEvidence | undefined, warning?: string): void {
+  for (const line of dateMatchNoteLines(evidence, warning)) console.error(line);
 }
 
 /** The lines of dateMatchNotes. */
-function dateMatchNoteLines(evidence: WalletEvidence | undefined): string[] {
-  return evidence === undefined
-    ? [
-        ...noticeLines("A valid checksum does not prove the date: compare an address."),
-        moreLine("exact-local-recovery-checks"),
-      ]
-    : noticeLines(
-        `Each displayed candidate matched the requested ${evidenceLabel(evidence)} locally.`,
-      );
+function dateMatchNoteLines(evidence: WalletEvidence | undefined, warning?: string): string[] {
+  if (evidence === undefined)
+    return [
+      ...noticeLines("A valid checksum does not prove the date: compare an address."),
+      moreLine("exact-local-recovery-checks"),
+    ];
+  return [
+    ...noticeLines(
+      `Each displayed candidate matched the requested ${evidenceLabel(evidence)} locally.`,
+    ),
+    ...(warning === undefined ? [] : noticeLines(warning, "warning")),
+  ];
 }
 
 /** The answer that types the dates again, after a phrase or a part that does not fit. */
