@@ -187,8 +187,9 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     const found = await search.byWallet(wallet, dates).run();
     expect(found.kind).toBe("found");
     if (found.kind !== "found") return;
-    expect(found.others).toBeGreaterThan(0);
-    expect(foundAmongOthers(found.others ?? 0)).toMatch(/^\d+ sets of codes and dates give/u);
+    // Each of the other eight days with its own last code gives the same phrase.
+    expect(found.others).toBe(8);
+    expect(foundAmongOthers(8)).toMatch(/^9 sets of codes and dates give this phrase;/u);
   });
 
   it("lists every candidate with its phrase and fingerprint where they are few", async () => {
