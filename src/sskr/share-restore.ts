@@ -478,6 +478,7 @@ export class ShareRestore {
    * as a set, marked ones repaired together, then unmasked with the dates, searched where a date
    * holds ?, and compared with the wallet if one is given. A long search waits for the person's
    * yes; several sets that fit are all given, with a note that the wallet tells them apart.
+   * Refused with core.secret-value.wiped when the input ends while a host step is awaited.
    */
   async restore(request: ShareRestoreRequest): Promise<ShareRestoreOutcome> {
     const { dates, walletCheck } = request;
@@ -490,6 +491,9 @@ export class ShareRestore {
     if (unmasking.needsWallet && walletCheck === undefined)
       return { kind: "trouble", message: walletReason(request.mode), lines: [] };
     const work = await unmasking.dateWork(request.now);
+    // Each awaited host step may end the input: nothing that follows its end is published
+    // (AUD-037-API001).
+    request.input.assertLive();
     const found = await this.#sets(request, work);
     if (found.kind !== "sets") return found;
     // The date search tells its progress at its own turns, as every search does.
@@ -499,6 +503,7 @@ export class ShareRestore {
       turn: request.turn,
       now: request.now,
     });
+    request.input.assertLive();
     if (restored.kind === "stopped") return { kind: "stopped", lines: found.lines };
     if (restored.kind !== "phrases")
       return { kind: "trouble", message: restored.message, lines: found.lines };
@@ -600,7 +605,8 @@ export class ShareRestore {
         return { kind: "trouble", message: typed.trouble.message, lines: [] };
       return ShareRestore.#exportOutcome(typed.set, input.places(), form, [], []);
     }
-    // sskr-export writes no candidate list, so a repair keeps no phrase for one.
+    // sskr-export writes no candidate list, so a repair keeps no phrase for one. The restore
+    // refuses once the input ended during it (AUD-037-API001).
     const restored = await this.restore({ ...request, keep: 0 });
     if (restored.kind !== "few" && restored.kind !== "phrases") return restored;
     const decision = ShareRestore.exportDecision(restored, walletGiven);
@@ -678,6 +684,7 @@ export class ShareRestore {
           notes: [...(read.unchecked === undefined ? [] : [read.unchecked]), ...notice],
         };
       const found = await this.search(read, request);
+      request.input.assertLive();
       if (found.kind === "stopped") return { kind: "stopped", lines: read.lines };
       if (found.kind === "none")
         return { kind: "trouble", message: found.message, lines: read.lines };

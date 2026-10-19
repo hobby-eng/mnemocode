@@ -730,6 +730,14 @@ export class ShareInput implements Disposable {
     }
   }
 
+  /**
+   * Refuses (core.secret-value.wiped) once this input was ended: a restore asks it after each
+   * awaited host step, so that what a host answers after the end is never published.
+   */
+  assertLive(): void {
+    this.#texts.assertLive();
+  }
+
   /** Ends retained typed shares; replacements release their previous storage at once. */
   wipe(): void {
     this.#texts.wipe();
