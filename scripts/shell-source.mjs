@@ -2,8 +2,9 @@
 // (CORE-15) and which expansions stand outside quotes (TOOL-02). The whole text is read at once,
 // as quotes, command substitutions and here-documents may span lines, and each opens a context of
 // its own: in "$(dirname "$0")" both expansions are quoted, while in "$(basename $file)" the inner
-// one is not. The body of a here-document is text, not code. A `case` pattern's `)` inside a
-// command substitution is not told apart from the one that closes it.
+// one is not. The body of a here-document is text, not code: a command substitution in it is not
+// checked. A `case` pattern's `)` inside a command substitution is not told apart from the one
+// that closes it.
 
 import { SourceCursor } from "./source-cursor.mjs";
 
@@ -44,7 +45,10 @@ class ShellReader {
   /** The line of every expansion outside quotes. */
   unquoted = [];
   #cursor;
-  /** The open contexts, innermost last: `kind`, and for code and arithmetic the depth of `(`. */
+  /**
+   * The open contexts, innermost last: `kind`; the `closer` of a command substitution's code, ")";
+   * and for code and arithmetic the `depth` of the parentheses open in it.
+   */
   #contexts = [{ kind: "code", closer: undefined, depth: 0 }];
   /** The here-documents whose bodies start after the current line: their delimiters. */
   #pending = [];
@@ -69,16 +73,23 @@ class ShellReader {
     else if (character === "\n") {
       cursor.take();
       this.#hereDocumentBodies();
-    } else if (character === "#" && this.#wordStarts()) cursor.takeLine(true);
+    } else if (character === "#" && this.#wordStarts()) cursor.takeCommentLine();
     else if (character === "'") {
       cursor.take();
       cursor.takePast("'");
-    } else if (cursor.sees("$'")) this.#ansiString();
-    else if (character === '"' || cursor.sees('$"')) this.#open("double", cursor.sees("$") ? 2 : 1);
+    } else if (cursor.sees("$'")) {
+      // $'…', a string whose backslashes escape, its own quote included.
+      cursor.take(2);
+      cursor.takeQuoted("'");
+    } else if (character === '"' || cursor.sees('$"'))
+      this.#open("double", cursor.sees("$") ? 2 : 1);
     else if (character === "$" || character === "`") this.#expansion(context, true);
-    else if (cursor.sees("((") && this.#wordStarts()) this.#open("arithmetic", 2);
+    // (( … )) is arithmetic wherever it stands, also in while((…)) and for((…)), as bash reads it.
+    else if (cursor.sees("((")) this.#open("arithmetic", 2);
     else if (character === "(" || character === ")") this.#parenthesis(context);
-    else if (cursor.sees("<<") && !cursor.sees("<<<")) this.#hereDocument();
+    // A here-string, <<< word, is code; only << opens a here-document.
+    else if (cursor.sees("<<<")) cursor.take(3);
+    else if (cursor.sees("<<")) this.#hereDocument();
     else cursor.take();
   }
 
@@ -143,26 +154,13 @@ class ShellReader {
       if (character === "\\") cursor.take(2);
       else if (character === "'" || character === '"') {
         cursor.take();
-        this.#quotedPast(character);
+        cursor.takeQuoted(character);
       } else {
         if (character === "{") depth += 1;
         else if (character === "}") depth -= 1;
         cursor.take();
       }
     }
-  }
-
-  /** The rest of a quoted string as far as its closing `quote`, past escaped characters. */
-  #quotedPast(quote) {
-    const cursor = this.#cursor;
-    while (!cursor.done && cursor.peek() !== quote) cursor.take(cursor.peek() === "\\" ? 2 : 1);
-    cursor.take();
-  }
-
-  /** $'…', a string whose backslashes escape, its own quote included. */
-  #ansiString() {
-    this.#cursor.take(2);
-    this.#quotedPast("'");
   }
 
   /** A parenthesis in code: it closes a command substitution only at the depth it opened at. */
@@ -192,7 +190,8 @@ class ShellReader {
     const cursor = this.#cursor;
     for (const { delimiter, tabs } of this.#pending.splice(0))
       while (!cursor.done) {
-        const line = cursor.restOfLine();
+        // A script with Windows line ends has its delimiter before a carriage return.
+        const line = cursor.restOfLine().replace(/\r$/u, "");
         cursor.takeLine();
         cursor.take();
         if ((tabs ? line.replace(/^\t+/u, "") : line) === delimiter) break;

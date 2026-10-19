@@ -5,9 +5,9 @@
 //
 // - CORE-15: a file that the linter does not measure (anything but TypeScript and JavaScript) has
 //   at most 800 lines of code (lines-of-code.mjs): a line that holds nothing but a comment, in the
-//   comment syntax of its language, and a blank line are left out, and so are a Rust file's
-//   #[cfg(test)] modules and the generated files listed below; a comment "long: <reason>" on the
-//   first line, or the second after a "#!" line, exempts a file.
+//   comment syntax of its language (a Python docstring included), and a blank line are left out,
+//   and so are a Rust file's #[cfg(test)] modules and the generated files listed below; a comment
+//   "long: <reason>" on the first line, or the second after a "#!" line, exempts a file.
 // - TOOL-02: a shell script starts with `set -euo pipefail` and quotes every expansion
 //   (shell-source.mjs).
 // - TOOL-03: a Python script imports the standard library alone, or packages pinned with their
@@ -157,9 +157,11 @@ function checkLength(path, text) {
   const code = linesOfCode(path, text);
   if (code === undefined || code.length <= MAX_FILE_LINES) return;
   const lines = linesOf(text);
-  const exemption = lines[0]?.startsWith("#!") ? lines[1] : lines[0];
-  // The exemption is a comment that starts the line, not "long:" anywhere in it.
-  if (exemption !== undefined && /^\s*(?:#|\/\/|\/\*|<!--)\s*long:\s*\S/u.test(exemption)) return;
+  const exemption = lines[0]?.startsWith("#!") ? 2 : 1;
+  // The exemption is a comment that starts the line, in its language's syntax: a line that holds
+  // no code, whose text after the comment's mark starts with "long:".
+  const marked = /^\s*[^\w\s]+\s*long:\s*\S/u.test(lines[exemption - 1] ?? "");
+  if (marked && !code.includes(exemption)) return;
   report(
     path,
     code[MAX_FILE_LINES],
@@ -168,17 +170,22 @@ function checkLength(path, text) {
   );
 }
 
-/** TOOL-02: a shell script stops on its first error. */
-function checkShellHeader(path, text) {
-  const lines = linesOf(text);
-  const first = lines.findIndex((line) => line.trim() !== "" && !line.trimStart().startsWith("#"));
-  if (first < 0 || !/^set -euo pipefail\s*(?:#.*)?$/u.test(lines[first].trim()))
-    report(path, first + 1, "TOOL-02", "a shell script starts with `set -euo pipefail`");
+/** TOOL-02: a shell script, read as `shell` (readShell), stops on its first error. */
+function checkShellHeader(path, text, shell) {
+  const first = Math.min(...shell.code);
+  const line = linesOf(text)[first - 1]?.trim() ?? "";
+  if (!/^set -euo pipefail\s*(?:#.*)?$/u.test(line))
+    report(
+      path,
+      Number.isFinite(first) ? first : 1,
+      "TOOL-02",
+      "a shell script starts with `set -euo pipefail`",
+    );
 }
 
-/** TOOL-02: every expansion of a shell script is quoted. */
-function checkShellQuoting(path, text) {
-  for (const line of new Set(readShell(text).unquoted))
+/** TOOL-02: every expansion of a shell script, read as `shell` (readShell), is quoted. */
+function checkShellQuoting(path, shell) {
+  for (const line of new Set(shell.unquoted))
     report(path, line, "TOOL-02", 'an expansion outside quotes: write "$name"');
 }
 
@@ -588,8 +595,9 @@ for (const path of files) {
   checkFileName(path);
   checkLength(path, text);
   if (isShellScript(path, text)) {
-    checkShellHeader(path, text);
-    checkShellQuoting(path, text);
+    const shell = readShell(text);
+    checkShellHeader(path, text, shell);
+    checkShellQuoting(path, shell);
   }
   if (path.endsWith(".py"))
     checkPythonPackages(path, pythonFiles.get(path), standardLibrary, pythonFiles);

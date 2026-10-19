@@ -183,47 +183,6 @@ describe("the length of a file in lines of code (CORE-15)", () => {
       );
   });
 
-  it("read Rust's strings, character literals and nested comments", () => {
-    const over = repeated(800, "fn f() {}");
-    // Lines inside a string that start like a comment are code.
-    expect(rulesBroken({ "a.rs": `const G: &str = "src/**\n/*.rs";\n${over}` })).toEqual([
-      "CORE-15",
-    ]);
-    expect(rulesBroken({ "a.rs": `const R: &str = r#"\n// "quoted"\n"#;\n${over}` })).toEqual([
-      "CORE-15",
-    ]);
-    // Lifetimes start no character literal: each of these lines counts.
-    expect(rulesBroken({ "a.rs": repeated(801, "fn f<'a>(x: &'a str) -> &'a str { x }") })).toEqual(
-      ["CORE-15"],
-    );
-    // The text after a nested comment's inner close is still comment.
-    const nested = `/* An outer /* inner */ comment\n${repeated(300, "still a comment")}*/\n${over}`;
-    expect(rulesBroken({ "a.rs": nested })).toEqual([]);
-    // A comment that opens after code on its line goes on over the lines after it.
-    const after = `fn g() {} /* Why:\n${repeated(300, "the reason")}*/\n${repeated(799, "fn f() {}")}`;
-    expect(rulesBroken({ "a.rs": after })).toEqual([]);
-  });
-
-  it("read the strings and blocks of Markdown, Python, TOML and shell", () => {
-    // A Markdown code block, and inline code, are text, whatever they hold.
-    const fenced = `\`\`\`html\n<!-- An example.\n\`\`\`\n${repeated(800, "A sentence.")}`;
-    expect(rulesBroken({ "docs/a.md": fenced })).toEqual(["CORE-15"]);
-    const inline = `Write \`<!--\` to open a comment.\n${repeated(800, "A sentence.")}`;
-    expect(rulesBroken({ "docs/a.md": inline })).toEqual(["CORE-15"]);
-    // A line of a Python string that starts with # is text.
-    const python = `TEXT = """\n${repeated(801, "# A heading of the text.")}"""\n`;
-    expect(rulesBroken({ "scripts/a.py": python })).toEqual(["CORE-15"]);
-    // A TOML literal string takes no escapes: 'C:\' ends where it seems to.
-    const toml = `path = 'C:\\'\n${repeated(300, "# Why.")}${repeated(799, "a = 1")}`;
-    expect(rulesBroken({ "a.toml": toml })).toEqual([]);
-    // A here-document's body is text; a comment of the script is not.
-    const shell = "#!/usr/bin/env bash\nset -euo pipefail\n";
-    const body = `${shell}cat <<'EOF'\n${repeated(800, "# A line of the text.")}EOF\n`;
-    expect(rulesBroken({ "scripts/a.sh": body })).toEqual(["CORE-15"]);
-    const commented = `${shell}${repeated(300, "# Why.")}${repeated(799, "echo")}`;
-    expect(rulesBroken({ "scripts/a.sh": commented })).toEqual([]);
-  });
-
   it("name the first line of code over the limit", () => {
     const text = `${repeated(300, "// Why.")}${repeated(801, "fn f() {}")}`;
     expect(problemsOf({ "a.rs": text })).toEqual(["a.rs:1101 CORE-15"]);
@@ -243,6 +202,88 @@ describe("the length of a file in lines of code (CORE-15)", () => {
     const markdown = `${code(800, "A sentence.")}<!--\n${code(300, "a note")}-->\n${"\n".repeat(300)}`;
     expect(rulesBroken({ "docs/a.md": markdown })).toEqual([]);
     expect(rulesBroken({ "docs/a.md": code(801, "A sentence.") })).toEqual(["CORE-15"]);
+  });
+});
+
+describe("the lines of code of each language (CORE-15)", () => {
+  it("read Rust's strings, character literals and nested comments", () => {
+    const over = repeated(800, "fn f() {}");
+    // Lines inside a string that start like a comment are code.
+    expect(rulesBroken({ "a.rs": `const G: &str = "src/**\n/*.rs";\n${over}` })).toEqual([
+      "CORE-15",
+    ]);
+    expect(rulesBroken({ "a.rs": `const R: &str = r#"\n// "quoted"\n"#;\n${over}` })).toEqual([
+      "CORE-15",
+    ]);
+    // Lifetimes start no character literal: each of these lines counts.
+    expect(rulesBroken({ "a.rs": repeated(801, "fn f<'a>(x: &'a str) -> &'a str { x }") })).toEqual(
+      ["CORE-15"],
+    );
+    // The text after a nested comment's inner close is still comment.
+    const nested = `/* An outer /* inner */ comment\n${repeated(300, "still a comment")}*/\n${over}`;
+    expect(rulesBroken({ "a.rs": nested })).toEqual([]);
+    // Byte strings, C strings, raw strings that hold a quote and a hash, and raw names.
+    for (const line of [
+      'const B: &[u8] = b"/*";',
+      'const C: &CStr = c"/*";',
+      'const R: &str = r##"a "# /* b"##;',
+      'let r#type = "/*";',
+    ])
+      expect(rulesBroken({ "a.rs": repeated(801, line) })).toEqual(["CORE-15"]);
+    // A quote in a character literal opens no string.
+    const quote = `let q = '"';\n${repeated(300, '// " is no string')}${repeated(799, "fn f() {}")}`;
+    expect(rulesBroken({ "a.rs": quote })).toEqual([]);
+    // A comment that opens after code on its line goes on over the lines after it.
+    const after = `fn g() {} /* Why:\n${repeated(300, "the reason")}*/\n${repeated(799, "fn f() {}")}`;
+    expect(rulesBroken({ "a.rs": after })).toEqual([]);
+  });
+
+  it("read Markdown's code blocks and inline code as text, and its comments", () => {
+    const over = repeated(800, "A sentence.");
+    // A code block, fenced with backticks or tildes, indented in a list or not, and inline code
+    // are text, whatever they hold.
+    for (const fence of ["```html", "~~~", "      ```"])
+      expect(
+        rulesBroken({ "docs/a.md": `${fence}\n<!-- An example.\n${fence.trim()}\n${over}` }),
+      ).toEqual(["CORE-15"]);
+    const inline = `Write \`<!--\` to open a comment.\n${over}`;
+    expect(rulesBroken({ "docs/a.md": inline })).toEqual(["CORE-15"]);
+    // A shorter fence, or one with text after it, closes no block.
+    for (const inside of ["```", "``` text"])
+      expect(
+        rulesBroken({ "docs/a.md": `\`\`\`\`\n${inside}\n<!-- An example.\n\`\`\`\`\n${over}` }),
+      ).toEqual(["CORE-15"]);
+    // Backticks after a fence of backticks make it no fence: the comment below it is one.
+    const notFence = `\`\`\` a\`b\n<!--\n${repeated(300, "a note")}-->\n${repeated(799, "A sentence.")}`;
+    expect(rulesBroken({ "docs/a.md": notFence })).toEqual([]);
+    // Text after a comment that closes on its line is a line of text.
+    expect(rulesBroken({ "docs/a.md": repeated(801, "<!-- A note. --> A sentence.") })).toEqual([
+      "CORE-15",
+    ]);
+  });
+
+  it("read Python's and TOML's strings, and leave out Python's docstrings", () => {
+    // A line of a Python string that starts with # is text.
+    const python = `TEXT = """\n${repeated(801, "# A heading of the text.")}"""\n`;
+    expect(rulesBroken({ "scripts/a.py": python })).toEqual(["CORE-15"]);
+    // A docstring, of the module or of a function, is the language's documentation comment.
+    const notes = repeated(300, "    Why it is so.");
+    const documented = `"""The module.\n${notes}"""\ndef f():\n    """What f does.\n${notes}    """\n${repeated(799, "x = 1")}`;
+    expect(rulesBroken({ "scripts/a.py": documented })).toEqual([]);
+    // A TOML literal string takes no escapes: 'C:\' ends where it seems to.
+    const toml = `path = 'C:\\'\n${repeated(300, "# Why.")}${repeated(799, "a = 1")}`;
+    expect(rulesBroken({ "a.toml": toml })).toEqual([]);
+  });
+
+  it("read a shell script's here-documents as text and its here-strings as code", () => {
+    const shell = "#!/usr/bin/env bash\nset -euo pipefail\n";
+    const body = `${shell}cat <<'EOF'\n${repeated(800, "# A line of the text.")}EOF\n`;
+    expect(rulesBroken({ "scripts/a.sh": body })).toEqual(["CORE-15"]);
+    const commented = `${shell}${repeated(300, "# Why.")}${repeated(799, "echo")}`;
+    expect(rulesBroken({ "scripts/a.sh": commented })).toEqual([]);
+    // A here-string opens no here-document: the comments after it are comments.
+    const here = `${shell}grep -q x <<< "$text"\n${repeated(300, "# Why.")}${repeated(798, "echo")}`;
+    expect(rulesBroken({ "scripts/a.sh": here })).toEqual([]);
   });
 });
 
@@ -291,6 +332,7 @@ describe("the shell scripts of the coding guide (TOOL-02)", () => {
       'echo "first\n$second"',
       'echo "$((1 + $count))"',
       "(( count += $step ))",
+      'for((i = 0; i < $n; i++)); do echo "$i"; done',
       'x="${a:-$b}"',
       // The body of a here-document is text.
       "cat <<EOF\nVersion: $version\nEOF",
@@ -298,10 +340,19 @@ describe("the shell scripts of the coding guide (TOOL-02)", () => {
       "cat <<-EOF\n\t$x\n\tEOF",
     ])
       expect(rulesBroken({ "scripts/run.sh": script(body) })).toEqual([]);
-    // After a here-document, the script is code again: line 6 is its first line after the body.
-    expect(problemsOf({ "scripts/run.sh": script("cat <<EOF\n$x\nEOF\necho $after") })).toEqual([
-      "scripts/run.sh:6 TOOL-02",
-    ]);
+    // After a here-document, the script is code again: line 6 is its first line after the body,
+    // also with Windows line ends.
+    for (const end of ["\n", "\r\n"])
+      expect(
+        problemsOf({
+          "scripts/run.sh": script(["cat <<EOF", "$x", "EOF", "echo $after"].join(end)),
+        }),
+      ).toEqual(["scripts/run.sh:6 TOOL-02"]);
+    // A here-string is code, quoted or not: the line after it is read too.
+    for (const here of ['grep -q x <<< "$text"', "grep -q x <<<'word'", "read -r a b <<< word"])
+      expect(problemsOf({ "scripts/run.sh": script(`${here}\nrm -rf $dir`) })).toEqual([
+        "scripts/run.sh:4 TOOL-02",
+      ]);
   });
 });
 

@@ -2,7 +2,8 @@
 // the checks that read code need no package: the copy check (verify-no-copies.mjs) and the code
 // rules (verify-code-rules.mjs). Not a full parser of TypeScript, but the same code always gives
 // the same tokens, and strings, templates, regular expressions and comments are told apart from
-// code.
+// code. afterGroup finds a closing bracket in these tokens and in any others with a `key`, such as
+// the Rust tokens of lines-of-code.mjs.
 
 /** After these tokens a slash starts a regular expression, not a division. */
 const BEFORE_REGEX = new Set([

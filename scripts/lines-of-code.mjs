@@ -1,8 +1,10 @@
 // The lines of code of a file that the linter does not measure, for CORE-15 of the coding guide: a
 // line that holds nothing but a comment, in the comment syntax of the file's language, and a blank
-// line are left out, and so are the lines of a Rust file's #[cfg(test)] modules. Each language is
-// read with its strings, so that a comment marker inside a string, a raw string or a Markdown code
-// block is text, and text that starts with "#" or "/*" stays code.
+// line are left out, and so are the lines of a Rust file's #[cfg(test)] modules. A Python
+// docstring is the language's documentation comment, as /** … */ is in TypeScript and /// in
+// Rust, and is left out too. Each language is read with its strings, so that a comment marker
+// inside a string, a raw string or a Markdown code block is text, and text that starts with "#" or
+// "/*" stays code.
 
 import { basename, extname } from "node:path";
 import { SourceCursor } from "./source-cursor.mjs";
@@ -20,8 +22,14 @@ const RUST_CHARACTER =
 const RUST_WORD = /r#[\p{L}_][\p{L}\p{N}_]*|[\p{L}\p{N}_]+/uy;
 /** The attribute that marks a Rust module of unit tests, as its tokens. */
 const TEST_ATTRIBUTE = ["#", "[", "cfg", "(", "test", ")", "]"];
-/** A sticky match of a Markdown code fence that starts a line, and the rest of that line. */
-const FENCE = /( {0,3})(`{3,}|~{3,})([^\n]*)/uy;
+/**
+ * A sticky match of a Markdown code fence that starts a line, and the rest of that line; indented
+ * as far as a list item nested in others takes it.
+ */
+const FENCE = /([ \t]*)(`{3,}|~{3,})([^\n]*)/uy;
+/** The marks that open and close an HTML comment in Markdown. */
+const COMMENT_OPEN = "<!--";
+const COMMENT_CLOSE = "-->";
 
 /**
  * Reads the code of each language whose files this check measures; the linter measures TypeScript
@@ -29,14 +37,14 @@ const FENCE = /( {0,3})(`{3,}|~{3,})([^\n]*)/uy;
  */
 const READERS = {
   ".md": markdownCode,
-  ".py": (text) => hashCode(text, ['"', "'"]),
+  ".py": (text) => hashCommentCode(text, ['"', "'"], true),
   ".rs": rustCode,
   ".sh": (text) => readShell(text).code,
   // TOML's literal strings, '…', take no escapes.
-  ".toml": (text) => hashCode(text, ['"']),
-  ".txt": hashLineCode,
-  ".yaml": hashLineCode,
-  ".yml": hashLineCode,
+  ".toml": (text) => hashCommentCode(text, ['"'], false),
+  ".txt": wholeLineCommentCode,
+  ".yaml": wholeLineCommentCode,
+  ".yml": wholeLineCommentCode,
 };
 
 /**
@@ -46,7 +54,7 @@ const READERS = {
 export function linesOfCode(path, text) {
   const name = basename(path);
   let read = Object.hasOwn(READERS, extname(name)) ? READERS[extname(name)] : undefined;
-  if (name.startsWith("Dockerfile")) read = hashLineCode;
+  if (name.startsWith("Dockerfile")) read = wholeLineCommentCode;
   else if (read === undefined && isShellScript(path, text)) read = READERS[".sh"];
   return read === undefined ? undefined : [...read(text)].sort((a, b) => a - b);
 }
@@ -54,23 +62,44 @@ export function linesOfCode(path, text) {
 /**
  * The lines of code of a language whose comments run from "#" to the end of the line, with strings
  * in single, double and tripled quotes that may span lines (Python, TOML); `escaping` lists the
- * quotes whose strings take backslash escapes.
+ * quotes whose strings take backslash escapes. With `docstrings`, a string in tripled quotes that
+ * starts a line at the top of the file or after a line that ends in ":" is a comment (PEP 257).
  */
-function hashCode(text, escaping) {
+function hashCommentCode(text, escaping, docstrings) {
   const cursor = new SourceCursor(text);
+  // The last character of code read: a docstring follows none, or a ":".
+  let last = "";
   while (!cursor.done) {
     const character = cursor.peek();
-    if (character === "#") cursor.takeLine(true);
+    if (character === "#") cursor.takeCommentLine();
     else if (character === '"' || character === "'") {
-      const closer = cursor.sees(character.repeat(3)) ? character.repeat(3) : character;
-      cursor.take(closer.length);
-      // A string in single quotes ends at its line, closed or not.
-      while (!cursor.done && !cursor.sees(closer) && (closer.length > 1 || cursor.peek() !== "\n"))
-        cursor.take(escaping.includes(character) && cursor.peek() === "\\" ? 2 : 1);
-      if (cursor.sees(closer)) cursor.take(closer.length);
-    } else cursor.take();
+      const triple = character.repeat(3);
+      const closer = cursor.sees(triple) ? triple : character;
+      const docstring =
+        docstrings &&
+        closer === triple &&
+        (last === "" || last === ":") &&
+        cursor.lineSoFar().trim() === "";
+      takeHashString(cursor, closer, escaping.includes(character), docstring);
+      last = character;
+    } else {
+      if (!/\s/u.test(character)) last = character;
+      cursor.take();
+    }
   }
   return cursor.code;
+}
+
+/**
+ * A string of hashCommentCode from its opening quotes to its `closer`; a string in single quotes
+ * ends at its line, closed or not. A `comment` makes no line hold code.
+ */
+function takeHashString(cursor, closer, escapes, comment) {
+  const move = (count) => (comment ? cursor.takeComment(count) : cursor.take(count));
+  move(closer.length);
+  while (!cursor.done && !cursor.sees(closer) && (closer.length > 1 || cursor.peek() !== "\n"))
+    move(escapes && cursor.peek() === "\\" ? 2 : 1);
+  if (cursor.sees(closer)) move(closer.length);
 }
 
 /**
@@ -78,7 +107,7 @@ function hashCode(text, escaping) {
  * files, Dockerfiles). A block of YAML text is read the same way: what it holds is a script whose
  * comments start with "#" too, such as a workflow's `run: |`.
  */
-function hashLineCode(text) {
+function wholeLineCommentCode(text) {
   const code = new Set();
   text.split("\n").forEach((line, index) => {
     const trimmed = line.trim();
@@ -124,11 +153,11 @@ function markdownProse(cursor, inComment) {
   let open = inComment;
   while (!cursor.done && cursor.peek() !== "\n") {
     if (open) {
-      const end = cursor.restOfLine().indexOf("-->");
-      cursor.take(end < 0 ? cursor.restOfLine().length : end + 3, true);
+      const end = cursor.restOfLine().indexOf(COMMENT_CLOSE);
+      cursor.takeComment(end < 0 ? cursor.restOfLine().length : end + COMMENT_CLOSE.length);
       open = end < 0;
-    } else if (cursor.sees("<!--")) {
-      cursor.take(4, true);
+    } else if (cursor.sees(COMMENT_OPEN)) {
+      cursor.takeComment(COMMENT_OPEN.length);
       open = true;
     } else if (cursor.peek() === "`") {
       // A span of inline code ends at the next run of as many backticks on its line.
@@ -152,7 +181,7 @@ function rustCode(text) {
   const tokens = [];
   while (!cursor.done) {
     const line = cursor.line;
-    if (cursor.sees("//")) cursor.takeLine(true);
+    if (cursor.sees("//")) cursor.takeCommentLine();
     else if (cursor.sees("/*")) rustComment(cursor);
     else if (/\s/u.test(cursor.peek())) cursor.take();
     else tokens.push({ key: rustToken(cursor), line });
@@ -171,7 +200,7 @@ function rustComment(cursor) {
   do {
     if (cursor.sees("/*")) depth += 1;
     else if (cursor.sees("*/")) depth -= 1;
-    cursor.take(cursor.sees("/*") || cursor.sees("*/") ? 2 : 1, true);
+    cursor.takeComment(cursor.sees("/*") || cursor.sees("*/") ? 2 : 1);
   } while (depth > 0 && !cursor.done);
 }
 
@@ -191,20 +220,14 @@ function rustToken(cursor) {
     return '""';
   }
   if (string !== undefined) {
-    rustString(cursor, string[0].length);
+    cursor.take(string[0].length);
+    cursor.takeQuoted('"');
     return '""';
   }
   // A quote that starts no character literal starts a lifetime or a label, 'a.
   const key = (literal ?? word)?.[0] ?? cursor.peek();
   cursor.take(key.length);
   return literal === undefined ? key : "''";
-}
-
-/** A Rust string after its `opening` characters, as far as its closing quote, past escapes. */
-function rustString(cursor, opening) {
-  cursor.take(opening);
-  while (!cursor.done && cursor.peek() !== '"') cursor.take(cursor.peek() === "\\" ? 2 : 1);
-  cursor.take();
 }
 
 /**
