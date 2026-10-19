@@ -55,9 +55,10 @@ describe("the temporary folders of exports", () => {
 
   it("remove an output folder left part filled, while it is the one made", () => {
     const output = join(root, "cards");
+    // Noted when made, then filled, as publishNewFolder does: filling it changes its times.
     mkdirSync(output);
-    writeFileSync(join(output, "01-card.png"), "public fixture");
     fillingFolder(output, lstatSync(output));
+    writeFileSync(join(output, "01-card.png"), "public fixture");
     expect(removeLeftFolders()).toEqual([]);
     expect(existsSync(output)).toBe(false);
     // A folder that took its name since is someone else's. The one made is moved away, not

@@ -17,10 +17,17 @@ const folders = new Set<string>();
 const filling = new Map<string, Identity>();
 
 /**
- * What tells a folder from one made at its path after it was removed: its device and inode, which
- * a file system such as ext4 gives again at once, and its birth time.
+ * What tells a folder from another: its device and inode. No time goes with them: a birth time is
+ * the change time on some systems, which filling the folder changes. A folder removed and made
+ * again at its path may get the same inode, as on ext4, but that takes another process removing a
+ * private folder while it is filled, which these folders do not guard against.
  */
-type Identity = Pick<Stats, "dev" | "ino" | "birthtimeMs">;
+type Identity = Pick<Stats, "dev" | "ino">;
+
+/** Whether the folder `now` is the one `made`, by their identities; no folder is none. */
+export function sameFolder(now: Identity | undefined, made: Identity): boolean {
+  return now?.dev === made.dev && now.ino === made.ino;
+}
 
 /**
  * Makes a new temporary folder whose name starts with `prefix`, a path (mkdtemp); rejects with the
@@ -50,7 +57,7 @@ export async function removeTemporaryFolder(
  * once it is filled or removed.
  */
 export function fillingFolder(path: string, made: Identity): () => void {
-  filling.set(path, { dev: made.dev, ino: made.ino, birthtimeMs: made.birthtimeMs });
+  filling.set(path, { dev: made.dev, ino: made.ino });
   return () => {
     filling.delete(path);
   };
@@ -73,10 +80,7 @@ export function removeLeftFolders(): string[] {
   for (const folder of folders) remove(folder);
   for (const [folder, made] of filling) {
     try {
-      const now = lstatSync(folder, { throwIfNoEntry: false });
-      const same =
-        now?.dev === made.dev && now.ino === made.ino && now.birthtimeMs === made.birthtimeMs;
-      if (same) remove(folder);
+      if (sameFolder(lstatSync(folder, { throwIfNoEntry: false }), made)) remove(folder);
     } catch {
       left.push(folder);
     }

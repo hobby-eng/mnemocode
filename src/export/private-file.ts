@@ -1,9 +1,15 @@
 import { chmod, link, lstat, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import type { Stats } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 import { describeError, errorCode } from "../core/refusal.js";
 import { ExportFileName } from "./file-name.js";
-import { fillingFolder, makeTemporaryFolder, removeTemporaryFolder } from "./temporary-folders.js";
+import {
+  fillingFolder,
+  makeTemporaryFolder,
+  removeTemporaryFolder,
+  sameFolder,
+} from "./temporary-folders.js";
 
 const ERRORS = new ErrorCatalog("export.private-file", {
   "new-folder-path-empty-one-refused": () => "A new folder needs a path; an empty one is refused.",
@@ -199,7 +205,7 @@ export async function publishNewFolder<T>(
 ): Promise<T> {
   await mkdir(dirname(target), { recursive: true });
   const staging = await makeTemporaryFolder(join(dirname(target), prefix));
-  let reservation: Awaited<ReturnType<typeof lstat>> | undefined;
+  let reservation: Stats | undefined;
   // While the finished files are moved in, an exit at once removes the folder part filled.
   let filled: (() => void) | undefined;
   try {
@@ -222,8 +228,7 @@ export async function publishNewFolder<T>(
   } catch (error) {
     const thrown = await afterFailedSave(staging, error);
     if (reservation !== undefined) {
-      const current = await lstat(target);
-      if (current.dev === reservation.dev && current.ino === reservation.ino)
+      if (sameFolder(await lstat(target), reservation))
         await rm(target, { recursive: true, force: true });
     }
     throw thrown;

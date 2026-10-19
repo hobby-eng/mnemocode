@@ -177,6 +177,8 @@ def check_interrupt_at_clear_prompt():
         after = session.output[mark:]
         leave = after.find(terminal.LEAVE_ALTERNATE_SCREEN)
         assert -1 < leave < after.find("Cancelled."), f"the private screen stayed: {after!r}"
+        left = session.output.count(terminal.LEAVE_ALTERNATE_SCREEN)
+        assert left == 1, f"the private screen was left {left} times"
     finally:
         session.close()
     print("SIGINT at the prompt after a result: the private screen is left, then cancelled")
