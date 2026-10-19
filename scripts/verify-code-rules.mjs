@@ -37,6 +37,7 @@ import { fileURLToPath } from "node:url";
 import { linesOfCode } from "./lines-of-code.mjs";
 import { isShellScript, readShell } from "./shell-source.mjs";
 import { afterGroup, tokensOf } from "./source-tokens.mjs";
+import { isRepositoryTopLevel } from "./git-top-level.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 /** CORE-15: the most lines of code a file may have. */
@@ -111,10 +112,7 @@ function repositoryFiles() {
  * of the scripts in a test, every file under the root.
  */
 function listFiles() {
-  const topLevel = spawnSync("git", ["-C", root, "rev-parse", "--show-toplevel"], {
-    encoding: "utf8",
-  });
-  if (topLevel.status === 0 && resolve(topLevel.stdout.trim()) === root)
+  if (isRepositoryTopLevel(root))
     return execFileSync(
       "git",
       ["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],

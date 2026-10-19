@@ -1,7 +1,8 @@
 // Checks that every commit named in .git-blame-ignore-revs is in the history of HEAD
 // (AUD-037-BLD003): git and GitHub skip a name they cannot find without a word, so that a
 // formatting commit rewritten under a new hash would be blamed again. A clone without the whole
-// history, such as the shallow one of CI, cannot tell and says so.
+// history, such as the shallow one of CI, or a copy that is no Git checkout of the repository, such
+// as a review snapshot or an unpacked archive, cannot tell and says so.
 //
 //   node scripts/verify-blame-ignore.mjs
 
@@ -9,11 +10,12 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isRepositoryTopLevel } from "./git-top-level.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FILE = ".git-blame-ignore-revs";
-/** A commit's full name, which the file must give. */
-const COMMIT = /^[0-9a-f]{40}$/u;
+/** A commit's full name, SHA-1 or SHA-256, which the file must give. */
+const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 
 function git(...arguments_) {
   return execFileSync("git", arguments_, { cwd: root, encoding: "utf8", stdio: "pipe" }).trim();
@@ -30,11 +32,14 @@ function inHistory(name) {
   }
 }
 
+// As Git reads the file: a "#" begins a comment, also after a name, and names are in either case.
 const names = readFileSync(join(root, FILE), "utf8")
   .split("\n")
-  .map((line) => line.trim())
-  .filter((line) => line !== "" && !line.startsWith("#"));
-if (git("rev-parse", "--is-shallow-repository") === "true") {
+  .map((line) => line.replace(/#.*/u, "").trim().toLowerCase())
+  .filter((line) => line !== "");
+if (!isRepositoryTopLevel(root)) {
+  console.log(`This folder is no Git checkout of the repository: ${FILE} is not checked.`);
+} else if (git("rev-parse", "--is-shallow-repository") === "true") {
   console.log(`The history is shallow: the commits of ${FILE} are not checked.`);
 } else {
   const missing = names.filter((name) => !inHistory(name));

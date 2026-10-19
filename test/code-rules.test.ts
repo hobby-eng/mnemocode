@@ -23,6 +23,7 @@ const GATE = [
   "shell-source.mjs",
   "source-cursor.mjs",
   "source-tokens.mjs",
+  "git-top-level.mjs",
 ];
 
 /** Whether Python 3 runs here, which the gate asks for its standard library (TOOL-03). */
