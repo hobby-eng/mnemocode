@@ -12,11 +12,8 @@ import { SourceCursor } from "./source-cursor.mjs";
 const WORD_BREAK = /[\s;&|()<>]/u;
 /** What makes a `$` an expansion: a name, a digit or a special parameter; `${` and `$(` aside. */
 const PARAMETER = /[\p{L}_0-9@*#?!$-]/u;
-/**
- * Where a command starts, as the line so far ends: at its start, after a control operator, or after
- * a word that a command or a condition follows.
- */
-const COMMAND_PLACE = /(?:^|[;&|({!]|\b(?:then|do|else|elif|if|while|until|for))\s*$/u;
+/** The operators of an extended pattern before its parentheses, such as @(a|b) and +(a). */
+const PATTERN_OPERATORS = new Set(["?", "*", "+", "@"]);
 /** A here-document's operator and its delimiter: <<EOF, <<-'EOF', << "EOF", <<\EOF. */
 const HERE_DOCUMENT = /<<(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([\w.-]+))/uy;
 
@@ -52,9 +49,10 @@ class ShellReader {
   #cursor;
   /**
    * The open contexts, innermost last: `kind`; the `closer` of a command substitution's code, ")";
-   * and for code and arithmetic the `depth` of the parentheses open in it.
+   * for code and arithmetic the `depth` of the parentheses open in it; for code the `tests` open
+   * in it, [[ … ]].
    */
-  #contexts = [{ kind: "code", closer: undefined, depth: 0 }];
+  #contexts = [{ kind: "code", closer: undefined, depth: 0, tests: 0 }];
   /** The here-documents whose bodies start after the current line: their delimiters. */
   #pending = [];
 
@@ -81,7 +79,7 @@ class ShellReader {
     } else if (character === "#" && this.#wordStarts()) cursor.takeCommentLine();
     else if (character === "'") {
       cursor.take();
-      cursor.takePast("'");
+      cursor.takeString("'", { escapes: false });
     } else if (cursor.sees("$'")) {
       // $'…', a string whose backslashes escape, its own quote included.
       cursor.take(2);
@@ -89,9 +87,12 @@ class ShellReader {
     } else if (character === '"' || cursor.sees('$"'))
       this.#open("double", cursor.sees("$") ? 2 : 1);
     else if (character === "$" || character === "`") this.#expansion(context, true);
-    // (( … )) is arithmetic where a command starts, also in while((…)) and for((…)); elsewhere, as
-    // in a pattern ^((a|b)c)$ of [[ =~ ]] or @((a|b)c), the parentheses group.
-    else if (cursor.sees("((") && COMMAND_PLACE.test(cursor.lineSoFar()))
+    // [[ … ]] holds patterns, in which parentheses group: ^((a|b)c)$ after =~ is no arithmetic.
+    else if (cursor.sees("[[") && this.#wordStarts()) this.#test(context, 1);
+    else if (cursor.sees("]]") && context.tests > 0) this.#test(context, -1);
+    // (( … )) is arithmetic, also in while((…)), in a case arm and after time, but for the group of
+    // an extended pattern, @((a|b)c), and parentheses inside [[ … ]].
+    else if (cursor.sees("((") && context.tests === 0 && !PATTERN_OPERATORS.has(cursor.peek(-1)))
       this.#open("arithmetic", 2);
     else if (character === "(" || character === ")") this.#parenthesis(context);
     // A here-string, <<< word, is code; only << opens a here-document.
@@ -214,7 +215,13 @@ class ShellReader {
   /** Opens a context of `kind` after its `length` opening characters. */
   #open(kind, length, closer) {
     this.#cursor.take(length);
-    this.#contexts.push({ kind, closer, depth: 0 });
+    this.#contexts.push({ kind, closer, depth: 0, tests: 0 });
+  }
+
+  /** A test's [[ (`change` 1) or its ]] (-1) in the code of `context`. */
+  #test(context, change) {
+    context.tests += change;
+    this.#cursor.take(2);
   }
 
   /** Closes the innermost context after its `length` closing characters. */

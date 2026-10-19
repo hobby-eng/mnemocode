@@ -158,7 +158,7 @@ function checkLength(path, text) {
   if (code === undefined || code.length <= MAX_FILE_LINES) return;
   const lines = linesOf(text);
   // After a "#!" line, not a Rust attribute of the crate, #![…].
-  const exemption = /^#!(?!\[)/u.test(lines[0] ?? "") ? 2 : 1;
+  const exemption = /^#!(?!\s*\[)/u.test(lines[0] ?? "") ? 2 : 1;
   // The exemption is a comment that starts the line, in its language's syntax: a line that holds
   // no code, whose text after the comment's mark starts with "long:".
   const marked = /^\s*[^\w\s]+\s*long:\s*\S/u.test(lines[exemption - 1] ?? "");

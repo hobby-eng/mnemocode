@@ -78,12 +78,6 @@ export class SourceCursor {
     this.takeComment(this.restOfLine().length);
   }
 
-  /** Moves as far as the end of the first `closer` ahead, or the end of the text. */
-  takePast(closer) {
-    const end = this.#text.indexOf(closer, this.#at);
-    this.take(end < 0 ? this.#text.length - this.#at : end - this.#at + closer.length);
-  }
-
   /**
    * Moves past the rest of a string as far as its `closer`: past a backslash and the character it
    * escapes where it `escapes`, and only to the end of its line, closed or not, where it

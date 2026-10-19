@@ -296,11 +296,15 @@ describe("the lines of code of each language (CORE-15)", () => {
     const body = (string: string): string =>
       `def f():\n${string}\n${notes}"""\n${repeated(500, "x = 1")}`;
     for (const string of [
+      '    return"""Not a docstring.',
       '    f"""Not a docstring.',
       '    x = 1\n    """Not first.',
       '    d = {\n        "key":\n        """A value.',
     ])
       expect(rulesBroken({ "scripts/a.py": body(string) })).toEqual(["CORE-15"]);
+    // Nor is a string after a def whose body is on its own line.
+    const after = `def f(): return 1\n"""Not a docstring.\n${notes}"""\n${repeated(500, "x = 1")}`;
+    expect(rulesBroken({ "scripts/a.py": after })).toEqual(["CORE-15"]);
     // A TOML literal string takes no escapes: 'C:\' ends where it seems to.
     const toml = `path = 'C:\\'\n${repeated(300, "# Why.")}${repeated(799, "a = 1")}`;
     expect(rulesBroken({ "a.toml": toml })).toEqual([]);
@@ -365,6 +369,9 @@ describe("the shell scripts of the coding guide (TOOL-02)", () => {
       "(( count += $step ))",
       'for((i = 0; i < $n; i++)); do echo "$i"; done',
       'while((i < $n)); do echo "$i"; break; done',
+      // Arithmetic in a case arm and after time.
+      'case "$1" in -n) ((count = $2)) ;; esac',
+      "time ((total = $a + $b))",
       'x="${a:-$b}"',
       // The body of a here-document is text.
       "cat <<EOF\nVersion: $version\nEOF",
@@ -381,7 +388,13 @@ describe("the shell scripts of the coding guide (TOOL-02)", () => {
         }),
       ).toEqual(["scripts/run.sh:6 TOOL-02"]);
     // Parentheses that group a pattern open no arithmetic: the line after them is read too.
-    for (const test of ['[[ "$x" =~ ^((a|b)c)$ ]]', '[[ "$x" == @((a|b)c) ]]'])
+    for (const test of [
+      '[[ "$x" =~ ^((a|b)c)$ ]]',
+      '[[ "$x" =~ a|((b|c)d) ]]',
+      '[[ "$x" == @((a|b)c) ]]',
+      // A shift inside arithmetic opens no here-document.
+      'case "$1" in -s) ((mask |= 1 << bit)) ;; esac',
+    ])
       expect(problemsOf({ "scripts/run.sh": script(`${test}\nrm -rf $dir`) })).toEqual([
         "scripts/run.sh:4 TOOL-02",
       ]);

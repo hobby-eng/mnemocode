@@ -25,13 +25,16 @@ const TEST_ATTRIBUTE = ["#", "[", "cfg", "(", "test", ")", "]"];
 /**
  * A sticky match of a Markdown code fence that starts a line, and the rest of that line; indented
  * as far as a list item nested in others takes it. An indented code block that shows a fence is
- * read as one, which can only count more lines.
+ * read as one.
  */
 const FENCE = /([ \t]*)(`{3,}|~{3,})([^\n]*)/uy;
 /** How far a closing fence may stand right of its opening one: less than an indented code block. */
 const FENCE_SHIFT = 4;
-/** A sticky match of the start of a Python or TOML string: its prefix letters and its quotes. */
-const HASH_STRING = /(?<![\w])([rRuUbBfF]{0,2})("""|'''|"|')/uy;
+/**
+ * A sticky match of the start of a Python or TOML string: its prefix letters, which only a word
+ * break comes before, and its quotes, which may follow a word, as in return"""…""".
+ */
+const HASH_STRING = /(?:(?<![\w])([rRuUbBfFtT]{1,2}))?("""|'''|"|')/uy;
 /** A Python statement whose first string is its docstring (PEP 257). */
 const DOCUMENTED = /^\s*(?:async\s+def|def|class)\b/u;
 /** The marks that open and close an HTML comment in Markdown. */
@@ -79,6 +82,8 @@ function hashCommentCode(text, { escaping, docstrings = false }) {
   let before;
   let statement;
   let brackets = 0;
+  // The last character of code read: a docstring follows a ":" that ends its def or class line.
+  let last = "";
   while (!cursor.done) {
     const character = cursor.peek();
     const string = cursor.match(HASH_STRING);
@@ -86,13 +91,13 @@ function hashCommentCode(text, { escaping, docstrings = false }) {
     if (starts) [before, statement] = [statement, cursor.restOfLine()];
     if (character === "#") cursor.takeCommentLine();
     else if (string !== undefined) {
-      const [whole, prefix, quotes] = string;
+      const [whole, prefix = "", quotes] = string;
       const docstring =
         docstrings &&
         starts &&
         quotes.length === 3 &&
         /^[rRuU]?$/u.test(prefix) &&
-        (before === undefined || DOCUMENTED.test(before));
+        (before === undefined || (DOCUMENTED.test(before) && last === ":"));
       if (docstring) cursor.takeComment(whole.length);
       else cursor.take(whole.length);
       cursor.takeString(quotes, {
@@ -100,7 +105,9 @@ function hashCommentCode(text, { escaping, docstrings = false }) {
         endsAtLine: quotes.length === 1,
         comment: docstring,
       });
+      last = quotes[0];
     } else {
+      if (!/\s/u.test(character)) last = character;
       if ("([{".includes(character)) brackets += 1;
       else if (")]}".includes(character)) brackets = Math.max(0, brackets - 1);
       cursor.take();
@@ -231,7 +238,7 @@ function rustToken(cursor) {
   if (raw !== undefined) {
     // A raw string ends at a quote followed by as many hashes as it opened with; it has no escapes.
     cursor.take(raw[0].length);
-    cursor.takePast(`"${raw[1]}`);
+    cursor.takeString(`"${raw[1]}`, { escapes: false });
     return '""';
   }
   if (string !== undefined) {
