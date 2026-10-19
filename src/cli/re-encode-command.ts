@@ -442,10 +442,13 @@ async function askedNewBackup(
   const fresh = parseArguments(encoding.slice(1));
   await settleOutputPaths(fresh);
   const prepared = await prepareEncode(fresh);
-  // Only answers that are taken name files that will be saved: a refused one warns of none.
-  warnOfCloudCopies(fresh);
   dropUnneededAfterAnswers(fresh);
-  return prepared;
+  // Only answers that are taken name files that will be saved: a refused one warns of none. The
+  // warning is given when the new backup is made, on the screen of its result.
+  return async (known) => {
+    warnOfCloudCopies(fresh);
+    return prepared(known);
+  };
 }
 
 /** The question below the phrase shown, and why it is asked. */

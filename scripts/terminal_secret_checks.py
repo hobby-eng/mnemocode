@@ -20,6 +20,7 @@ from terminal_session import (
 )
 from terminal_answers import (
     ASKED_AGAIN,
+    CANCELLED,
     CARD_NAME,
     CLEAR_PROMPT,
     DATES_WITH_MARKS,
@@ -93,7 +94,7 @@ def check_candidate_passphrase_roles():
                 f"Secret/role identity missing on consecutive screens: first={first}, second={second}"
             )
             session.type(CTRL_C)
-            assert session.wait_for_exit() == 130
+            assert session.wait_for_exit() == CANCELLED
             assert not path.exists(), "Cancelling the repeat prompt wrote a candidate file"
             assert_kept_private(session, ("public synthetic cipher phrase",))
         finally:

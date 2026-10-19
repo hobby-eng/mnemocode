@@ -65,7 +65,7 @@ function otherFailure(error: unknown): string {
  * the person goes back with Escape, CANCELLED at Ctrl+C.
  */
 async function askOtherName(saving: Saving): Promise<string | undefined | Cancelled> {
-  const path = await askValueUntil(
+  return askValueUntil(
     `New name for ${lowerFirst(saving.what)}:`,
     async (answer) => {
       const typed = droppedPath(answer);
@@ -74,7 +74,6 @@ async function askOtherName(saving: Saving): Promise<string | undefined | Cancel
     },
     { what: saving.kind === "file" ? "the name of a new file" : "the name of a new folder" },
   );
-  return path;
 }
 
 /**

@@ -38,8 +38,6 @@ It checks that
   backup, the wallet warning once, and a refusal above the questions asked again, also after a
   chosen answer; the heading never goes to standard output, and a refused answer warns of no
   cloud folder; a cloud warning given with the options stays with its link on every screen;
-- a result longer than the screen, a share set with its heading, notices and fingerprints in
-  colour too, is read whole by pages before the question or prompt under it, at 80x24 and 32x12;
 - Restore from Shamir shares asks again after Ctrl+D on an empty line, takes two shares pasted
   as two lines as one answer, asks again only for the share that cannot be read, and finds a date
   with ? by the fingerprint;
