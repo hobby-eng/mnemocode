@@ -71,7 +71,7 @@ export async function checkMissingCodesSearch(fingerprint: PhraseFingerprint): P
   const tooMany = new MissingCodesSearch(legacyCodes, fingerprint);
   expectRefused(
     () => tooMany.listed([parseDate(MASKED_DATE)]),
-    /A list holds at most 16 candidates/u,
+    /A list holds at most 16 phrases/u,
     "A list of more phrases than it holds",
   );
 }
