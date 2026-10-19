@@ -134,7 +134,7 @@
     {
       "checkId": "CHECK-API-002",
       "outcome": "qualified",
-      "assessment": "Fresh source and executable PTY;132 current nearest tests. Record presentation retains parsed-domain return and cancellation; host async acceptance remains external.",
+      "assessment": "Fresh source and executable PTY;132 current nearest tests. Record presentation retains parsed-domain return and cancellation; host async acceptance remains external. Current consumer evidence adds 58 scenarios, including lifecycle, input, full self-test and candidate handoff; two Firefox handoff cases remain pending.",
       "depth": "Scoped follow-up disposition; original all-files AUD-035 remains historical."
     },
     {
@@ -182,7 +182,7 @@
     {
       "checkId": "CHECK-UI-001",
       "outcome": "qualified",
-      "assessment": "Actual PDF/PNG/QR checks pass. Retained visual review is qualified; no fresh all-pixel/glyph/physical-print claim.",
+      "assessment": "Actual PDF/PNG/QR checks pass. Retained visual review is qualified; no fresh all-pixel/glyph/physical-print claim. Four current consumer raster scenarios perform 96 native image decodes; four card scenarios use independent Poppler/image checks. This is not every-glyph or physical-print proof.",
       "depth": "Scoped follow-up disposition; original all-files AUD-035 remains historical."
     },
     {
@@ -229,8 +229,8 @@
     },
     {
       "checkId": "CHECK-DOC-003",
-      "outcome": "in-progress",
-      "assessment": "Canonical pair/index/schema/privacy/evidence reconciliation is finalized only after all current receipts are available.",
+      "outcome": "qualified",
+      "assessment": "Local canonical pair and partial consumer evidence reconciled; final doc-only schema/privacy/package checks and independent claims review are bound separately. Full browser/platform acceptance remains incomplete.",
       "depth": "Scoped follow-up disposition; original all-files AUD-035 remains historical."
     }
   ],
@@ -451,8 +451,8 @@
     {
       "id": "AUD-036-DOC001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
+      "verificationCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
       "evidence": [
         {
           "localOnly": true,
@@ -475,13 +475,13 @@
           "sha256": "faa8da366c721c42fdad02ded20b1d33c985d1be107e89fe3163902950a3c340"
         }
       ],
-      "qualification": "Bounded current disclosure/record correction; original finding and the first full-run failure remain historical. No universal conformance or release claim."
+      "qualification": "Bounded current disclosure/record correction; original finding and the first full-run failure remain historical. No universal conformance or release claim. Signed code identity maps the retained checks by exact input bytes; execution dates remain those in the receipts, not a claimed new full-suite execution."
     },
     {
       "id": "AUD-036-UI001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
+      "verificationCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
       "evidence": [
         {
           "localOnly": true,
@@ -499,13 +499,13 @@
           "sha256": "ba70974f52ff54572d4ce3faeb723bd5f71716ea390f73528b93dc5fbba568a9"
         }
       ],
-      "qualification": "Same two forced-color40/80-column cases fail before the one-line muted-note correction and pass afterwards.29 filtered cases are not full-suite skips."
+      "qualification": "Same two forced-color40/80-column cases fail before the one-line muted-note correction and pass afterwards.29 filtered cases are not full-suite skips. Signed code identity maps the retained checks by exact input bytes; execution dates remain those in the receipts, not a claimed new full-suite execution."
     },
     {
       "id": "AUD-036-BLD001",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
+      "verificationCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
       "evidence": [
         {
           "localOnly": true,
@@ -523,13 +523,13 @@
           "sha256": "38de69e1edc8a5af984993f92e94485decffaf06d414e7f41ca3983849832d7c"
         }
       ],
-      "qualification": "Audit-only evidence validator, not a MnemoCode production defect. Original current suite independently reconciled correctly. No new package installation or clean-environment replay."
+      "qualification": "Audit-only evidence validator, not a MnemoCode production defect. Original current suite independently reconciled correctly. No new package installation or clean-environment replay. Signed code identity maps the retained checks by exact input bytes; execution dates remain those in the receipts, not a claimed new full-suite execution."
     },
     {
       "id": "AUD-036-BLD002",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
+      "verificationCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
       "evidence": [
         {
           "localOnly": true,
@@ -547,13 +547,13 @@
           "sha256": "38de69e1edc8a5af984993f92e94485decffaf06d414e7f41ca3983849832d7c"
         }
       ],
-      "qualification": "Audit-only evidence validator, not a MnemoCode production defect. Original current suite independently reconciled correctly. No new package installation or clean-environment replay."
+      "qualification": "Audit-only evidence validator, not a MnemoCode production defect. Original current suite independently reconciled correctly. No new package installation or clean-environment replay. Signed code identity maps the retained checks by exact input bytes; execution dates remain those in the receipts, not a claimed new full-suite execution."
     },
     {
       "id": "AUD-036-BLD003",
       "status": "verified",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "fixCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
+      "verificationCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
       "evidence": [
         {
           "localOnly": true,
@@ -571,18 +571,19 @@
           "sha256": "38de69e1edc8a5af984993f92e94485decffaf06d414e7f41ca3983849832d7c"
         }
       ],
-      "qualification": "Audit-only evidence validator, not a MnemoCode production defect. Original current suite independently reconciled correctly. No new package installation or clean-environment replay."
+      "qualification": "Audit-only evidence validator, not a MnemoCode production defect. Original current suite independently reconciled correctly. No new package installation or clean-environment replay. Signed code identity maps the retained checks by exact input bytes; execution dates remain those in the receipts, not a claimed new full-suite execution."
     }
   ],
   "limitations": [
-    "Current Windows/macOS source/executable/PTY acceptance unexecuted: remote main is old261aaeda and owner holds every push; no source-upload workaround or old-main result counted.",
-    "Final MnemoCode-only browser acceptance remains pending; coherent V5 metadata, build success and earlier source-bound controls alone do not establish the corrected browser matrix. Unrelated host/MHFE release provenance is a separate project scope.",
-    "This is a scoped precommit CODE review and release follow-up, not a fresh complete all-files semantic audit or proof every defect is absent. Original AUD035 scope and limitations remain historical.",
-    "G1-001 ownership rework remains explicitly owner-deferred. Passing copy gates do not establish universal semantic uniqueness or unconditional CORE certification.",
-    "No benchmarks establish globally optimal code; no fuzz, timing, sanitizer, optimized-assembly or physical-erasure proof. Immutable/runtime/dependency copies remain qualified.",
-    "No tag/release/package publication, release-file signature, attestation or upload. Local source commit/signature is recorded separately when made.",
-    "Final complete suite passed; final report/package/schema/privacy reconciliation and independent report-claims review are recorded separately before local commit.",
-    "Two known published history presentation items, ee4499e fixup! and8aa9b25 work-in-progress title, still need an explicit pre-release history decision. No rewrite, force-push or audit-identity substitution was performed."
+    "Two current Firefox encrypted candidate-list handoff scenarios remain INCOMPLETE: Multi-Chain stopped at its 1728 MiB budget; Dash was not executed. A conditional 1920 MiB grant requires fresh available memory of at least 5760 MiB and a 3 GiB runtime reserve; that choice was not added or launched in this packet.",
+    "Current Windows/macOS source/executable/PTY acceptance remains unexecuted while the owner explicitly holds every push. Old-main results or alternate source uploads are not substituted.",
+    "Presence of all reviewed operations/settings does not establish identical defaults, input domains or OS capabilities. Static 11-command/91-option/337-binding review is not every parameter combination or a new all-files host audit.",
+    "Two Firefox full-self-test console diagnostics contain a fixed invalid-tag message. They are retained separately from zero unhandled page/HTTP errors; no zero-console-error guarantee is made.",
+    "G1-001 TypeScript/Rust Bytewords/UR ownership remains explicitly owner-deferred. Scoped changed-code review, copy gates and tests do not establish globally optimal code, universal CORE conformance, physical erasure or absence of every defect.",
+    "No new fuzz, timing, sanitizer, assembly, independent-machine/full-offline build or physical-print proof. Original AUD-035 coverage and all retained execution identities keep their original limitations.",
+    "The owner confirmed a concurrent independent Claude audit (AUD-037). Its files and findings are outside this follow-up; current package listings may include its uncommitted files. No acceptance of that audit is implied.",
+    "No push, tag, history rewrite, release publication, release-file signature, attestation or upload. The published fixup!/work-in-progress history items still need an explicit pre-release decision.",
+    "Separate MHFE work may resume under the later owner instruction. Local source signing and qualified browser evidence do not establish a complete MnemoCode release or unrelated host canonical provenance."
   ],
   "toolsAndSkills": {
     "newlyInstalled": [],
@@ -593,7 +594,45 @@
     ],
     "newRepositoryHarnesses": [
       "AUD-036 run.mjs adapter reuses frozen recorders; validate.py checks evidence consistency; requirements.md refers to existing hash-pinned audit-only Python inputs."
-    ]
+    ],
+    "consumerBrowserEvidence": {
+      "recordedUtc": "2026-10-19T15:21:54.495Z",
+      "node": "26.10.0",
+      "python": "3.14.4",
+      "packages": {
+        "oxlint": "1.88.0",
+        "oxlint-tsgolint": "7.0.2004",
+        "playwright": "1.64.0",
+        "prettier": "3.9.9",
+        "typescript": "7.0.2",
+        "vitest": "5.0.3"
+      },
+      "browsers": [
+        "firefox 157.0",
+        "chromium 156.0.8078.4"
+      ],
+      "installedForThisPass": [],
+      "localEvidenceTools": [
+        "Whitelisted static AST catalogue extraction",
+        "Linux pidfd/subreaper native command supervisor with sampled aggregate RSS and a 3 GiB availability reserve"
+      ],
+      "qualification": "The supervisor sampling is not a kernel memory cap. Tool presence alone is not coverage evidence."
+    },
+    "consumerSkills": {
+      "activeInThisParityRemediation": [
+        "spec-to-code-compliance",
+        "javascript-testing-expert",
+        "wallet-security-review",
+        "variant-analysis"
+      ],
+      "retainedAuditWorkflow": [
+        "wallet-full-audit",
+        "wallet-derivation-validation",
+        "wallet-public-data-validation"
+      ],
+      "newlyInstalled": []
+    },
+    "newlyInstalledForThisFollowup": []
   },
   "helperDiagnostics": [
     "Two new boundary tests first registered inside another test; moved top-level without changing assertions or fixtures.",
@@ -609,7 +648,8 @@
     "Follow-up reviewer appended a dated fixture addendum with the prior review hash. The original pre-addendum JSON was recovered byte-exact from unchanged original fields and retained separately.",
     "The first five-ID gate caught that the new requirements.txt did not match the existing package file extensions. Renamed only this new audit manifest to requirements.md, preserving its bytes and existing package boundary; its source and pip recipe remain pinned. No package/runtime/dependency input changed.",
     "The new evidence validator initially allowed optimized Python to remove assertions, did not compare reported execution facts/recompute fingerprints, and lacked an adjacent reproducible Python pin recipe. Three Low audit-support findings are retained separately from the two presentation findings. Their corrections do not alter independently reconciled program results.",
-    "Initial sandbox final-gates stopped at spawnSync git EPERM; the identical gate command outside the execution sandbox passed. CLI application protection flags were unchanged."
+    "Initial sandbox final-gates stopped at spawnSync git EPERM; the identical gate command outside the execution sandbox passed. CLI application protection flags were unchanged.",
+    "Fresh producer build first stopped at its 1152 MiB RSS guard; the successful retry used 1280 MiB with the same heap and 3 GiB reserve. Consumer budget stops and a pre-launch argparse refusal remain historical INCOMPLETE diagnostics; no application assertion failure or pass is inferred."
   ],
   "historicalEvidence": {
     "aud035": "Original report and sealed evidence preserved; do not rewrite original findings as clean.",
@@ -628,12 +668,12 @@
       "sha256": "9f003b8288c0d92ecf88a8d4decac260148ec15e61273c75fe5d2ccf466665a3"
     }
   },
-  "completedAtUtc": null,
+  "completedAtUtc": "2026-10-19T16:11:10.740558+00:00",
   "timeZone": "UTC (+00:00)",
   "documentationDelta": {
-    "localOnly": true,
     "path": "docs/audits/AUD-036-evidence/final-documentation-source.json",
-    "sha256": "c0ac743bdeea832206ba71cb5a976d2ddf4cbbb932789c7bd4b565a1e3ec2d6e"
+    "sha256": "6223f01f853de5d6ecf6ad01ab497940b11dc5be3bc21ba87da79f704759825c",
+    "localOnly": true
   },
   "executions": [
     {
@@ -998,6 +1038,54 @@
         "path": "docs/audits/AUD-036-evidence/five-id-packaging-fixed-gates.log",
         "sha256": "7804720d3fad5c53c87493c1164b0830420c53d4f37c158cefd093aacd221800"
       }
+    },
+    {
+      "label": "local-build-4978a62/build-retry",
+      "command": [
+        "node",
+        "scripts/build-executable.mjs",
+        "release/local-4978a62"
+      ],
+      "exitCode": 0,
+      "stopReason": null,
+      "sourceBefore": "2e6d3372390888f6fc0104a9d9eb96d131aa98f00bbb174a5b075e7b7fee525d",
+      "sourceAfter": "2e6d3372390888f6fc0104a9d9eb96d131aa98f00bbb174a5b075e7b7fee525d",
+      "peakProcessRssBytes": 1235038208,
+      "minimumAvailableBytes": 5538377728,
+      "receipt": {
+        "path": "docs/audits/AUD-036-evidence/local-build-4978a62/build-retry.command.json",
+        "sha256": "b81c5cd920fc39ddac98461bf3bcedfbfdbce9fc32661c1a1f6dd35747602f95",
+        "localOnly": true
+      },
+      "log": {
+        "path": "docs/audits/AUD-036-evidence/local-build-4978a62/build-retry.log",
+        "sha256": "5673c783782842a7b54d79904a0e50469828d4770be5ca0aea21c5d06f4f346e",
+        "localOnly": true
+      }
+    },
+    {
+      "label": "local-build-4978a62/acceptance",
+      "command": [
+        "node",
+        "scripts/verify-executable.mjs",
+        "release/local-4978a62"
+      ],
+      "exitCode": 0,
+      "stopReason": null,
+      "sourceBefore": "2e6d3372390888f6fc0104a9d9eb96d131aa98f00bbb174a5b075e7b7fee525d",
+      "sourceAfter": "2e6d3372390888f6fc0104a9d9eb96d131aa98f00bbb174a5b075e7b7fee525d",
+      "peakProcessRssBytes": 516964352,
+      "minimumAvailableBytes": 6306451456,
+      "receipt": {
+        "path": "docs/audits/AUD-036-evidence/local-build-4978a62/acceptance.command.json",
+        "sha256": "75eef2e2becd820845b9c36ce390d28aad46cb383aaa2baf481f055079d1ae06",
+        "localOnly": true
+      },
+      "log": {
+        "path": "docs/audits/AUD-036-evidence/local-build-4978a62/acceptance.log",
+        "sha256": "8eeda2f808d02772d1f4f1a2ebe74532de58db85b326270c7adbb84d42726b94",
+        "localOnly": true
+      }
     }
   ],
   "verdict": {
@@ -1007,7 +1095,8 @@
     "releaseAcceptance": "incomplete",
     "push": "Explicitly held by owner; no source upload workaround.",
     "knownAuditSupportFindings": 3,
-    "auditSupportFollowup": "verified"
+    "auditSupportFollowup": "verified",
+    "currentBrowserAcceptance": "incomplete: two Firefox encrypted candidate-list cases pending"
   },
   "runtime": {
     "fullDefaultSuite": {
@@ -6798,6 +6887,17 @@
       "wasmSha256": "ca60c5db3cbe0868af83e944710a97146d59bdb84f7a4e5217c2d8c37e1da87e",
       "jsSha256": "f3dbb5a1dde247503455a3bfa00eab3e42ec9558eabd639d4a130366203cb4eb",
       "canonical": "Retained accepted write/separate uncached-final-stage compare, all35 capsule files unchanged;32pins/fouroutputs, retained toolchain/dependency layers."
+    },
+    "latestLocalLinux": {
+      "path": "release/local-4978a62/mnemocode-0.1.0-linux-x64",
+      "sha256": "129798bce6fd43bb13ee26420ad81120af1667d27dd94ec5a26c0b7a889d2307",
+      "bytes": 157953149,
+      "result": {
+        "path": "docs/audits/AUD-036-evidence/local-build-4978a62/result.json",
+        "sha256": "237701f8aeccbacdd89977eee58a195a4327dce787defc2902874f1013a7dbe6",
+        "localOnly": true
+      },
+      "qualification": "Fresh same-machine build and nine empty-folder checks pass; byte-identical to the retained aud036 executable. The first 1152 MiB budget stop is retained, not a success; retry used 1280 MiB RSS / unchanged 256 MiB heap / 3 GiB reserve."
     }
   },
   "independentReview": {
@@ -6829,31 +6929,1373 @@
     "reviewerExecution": "Read-only source/receipt review, not an independent runtime replay. Prior v5 acceptance missed the short-label geometry regression, which actual unchanged full-suite assertions exposed."
   },
   "host": {
-    "status": "Coherent V5 admission and all239 selected producer-host triples verified;240 host-manifest entries include one retainedLICENSE. All287 TypeScript/35 native producer inputs are unchanged from V4. Final actual current-browser acceptance remains pending. The host reports corrected card-text truncation and is remediating introduced visibility-reset variants in Restore/Repair/Encode. Metadata, builds and earlier browser executions do not establish the final corrected matrix. MnemoCode-only acceptance has priority; MHFE integration is deferred until after the MnemoCode release. Unrelated whole-host/MHFE provenance is not a standalone MnemoCode code finding.",
-    "evidence": [
+    "status": "PARTIAL current browser acceptance; two Firefox encrypted candidate-list scenarios remain INCOMPLETE.",
+    "receiver": {
+      "path": "docs/audits/AUD-036-evidence/host-partial-v1/receiver-reconciliation.json",
+      "sha256": "8d72277f0779d39c685404080cdbbf14a84c376f92b556520a772af39f60237d",
+      "localOnly": true
+    },
+    "packet": {
+      "path": "docs/audits/AUD-036-evidence/host-partial-v1/mnemocode-browser-parity-packet-v1.json",
+      "sha256": "2c1a839567ada108d3f47f7421c264b47f9f0aeca7359062777e5bddf186daaa",
+      "localOnly": true
+    },
+    "consumerReport": {
+      "path": "docs/audits/AUD-036-evidence/host-partial-v1/mnemocode-browser-parity-report-v1.md",
+      "sha256": "ad574cad44f9a752dada4ffea45fec9f0a39943c920b3352a0e666cbb571d5fb",
+      "localOnly": true
+    },
+    "source": {
+      "codeCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
+      "selectedProducerFiles": 239,
+      "retainedHostLicenseFiles": 1,
+      "totalPinnedFiles": 240,
+      "hostInputHashesChecked": 1446,
+      "laterChangedHarnessInputs": [
+        "tooling/browser-cases/mnemocode-print-settings.mjs",
+        "tooling/browser-regressions/cards.mjs"
+      ]
+    },
+    "independentSourceReview": {
+      "commands": 11,
+      "uniqueOptions": 91,
+      "commandOptionBindings": 337,
+      "hostFilesRead": 63,
+      "producerFilesRead": 26,
+      "mappedOwners": 31,
+      "confirmedMissingFunctions": [],
+      "kind": "Static source and caller/library tracing; not an exhaustive runtime/cartesian proof.",
+      "reviewerPeakRssKiB": 120400,
+      "acceptedManifests": [
+        {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/source-review/mnemocode-apart-retirement-review-v11.json",
+          "sha256": "061435e0bd619eded7d7e3084f7adc3b14fdbb6524a1a32272678319dc1d5afc",
+          "localOnly": true
+        },
+        {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/source-review/mnemocode-raster-oracle-review-v12.json",
+          "sha256": "37496625707cce2e1e47f4e0de8f72f6ebac639836a1973b7054d340d6ce3682",
+          "localOnly": true
+        },
+        {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/source-review/mnemocode-csp-safe-raster-review-v14.json",
+          "sha256": "61014d4304644740f1ae54b318e8b2539594b7afd56a08a9d0e4a6520334cb44",
+          "localOnly": true
+        }
+      ],
+      "attribution": "Wallet-tools independent static source/caller review; received and qualified here, not independently repeated by the coordinator."
+    },
+    "currentCaseGroups": {
+      "lifecycle": 16,
+      "raster": 4,
+      "functional": 32,
+      "cards": 4,
+      "candidateLists": 2
+    },
+    "currentCasesPassed": 58,
+    "rasterScenariosIncludedIn58": 4,
+    "rasterExportsWithinThose4": 96,
+    "counting": "The 96 exports belong to four of the 58 scenarios. Do not add 58 and 96.",
+    "actualCommands": [
       {
-        "localOnly": true,
-        "path": "docs/audits/AUD-036-evidence/host-intake-v5-reconciled.json",
-        "sha256": "956acd2f08ffc034528e1eeba07cea5536acb625457f3cc506fb99ca77dd5375"
+        "id": "native-mnemocode-apart-retirement-after-v1",
+        "family": "lifecycle",
+        "runs": 16,
+        "code": 0,
+        "sourceLogSha256": "45409e96ad31fd9450d4e3e8c2d63f40eefc98fca946253772f3e443f58d545c",
+        "sourceReportSha256": "51c7032446cd37440eef6f4b3dac5aad5516ef5913fbae1e021d96bc87b376fa",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1439952,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T14:43:58.882206+00:00",
+        "endedAtUtc": "2026-10-19T14:44:27.925519+00:00",
+        "selectedCases": [
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-source-hints"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-encoded-retirement"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-unicode-retirement"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-colors-unicode-retirement"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-source-hints"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-encoded-retirement"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-unicode-retirement"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-colors-unicode-retirement"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-source-hints"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-encoded-retirement"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-unicode-retirement"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-colors-unicode-retirement"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-source-hints"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-encoded-retirement"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-unicode-retirement"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-colors-unicode-retirement"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-apart-retirement-after-v1.log",
+          "sha256": "45409e96ad31fd9450d4e3e8c2d63f40eefc98fca946253772f3e443f58d545c",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-apart-retirement-after-v1/report.json",
+          "sha256": "51c7032446cd37440eef6f4b3dac5aad5516ef5913fbae1e021d96bc87b376fa",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-raster-chromium-multi-v2",
+        "family": "raster",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "2d4d7eaa98a8c42798fa394d840cadbed19560a81a419e4cf20993cfaa48f1a0",
+        "sourceReportSha256": "20a7fed97298ebfb07dd218cd7d2a19ebe1d140fc6503148b7f4921f6dc7df44",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1335096,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T14:46:42.773383+00:00",
+        "endedAtUtc": "2026-10-19T14:48:23.994465+00:00",
+        "selectedCases": [
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-raster-settings"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-raster-chromium-multi-v2.log",
+          "sha256": "2d4d7eaa98a8c42798fa394d840cadbed19560a81a419e4cf20993cfaa48f1a0",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-raster-chromium-multi-v2/report.json",
+          "sha256": "20a7fed97298ebfb07dd218cd7d2a19ebe1d140fc6503148b7f4921f6dc7df44",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-raster-chromium-dash-v1",
+        "family": "raster",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "c59a90267fbf790757b5c20850d0484939799cf85916691de322e91ac73ed6a0",
+        "sourceReportSha256": "43602a52a3aff16f35bef973dd7e09dfdbb71f6cd0b3eec882f6c33ee91add6b",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1373712,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T14:49:11.373282+00:00",
+        "endedAtUtc": "2026-10-19T14:50:58.997810+00:00",
+        "selectedCases": [
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-raster-settings"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-raster-chromium-dash-v1.log",
+          "sha256": "c59a90267fbf790757b5c20850d0484939799cf85916691de322e91ac73ed6a0",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-raster-chromium-dash-v1/report.json",
+          "sha256": "43602a52a3aff16f35bef973dd7e09dfdbb71f6cd0b3eec882f6c33ee91add6b",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-raster-firefox-multi-v1",
+        "family": "raster",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "0041d7bf9cea367d7010094c31364f7ab0455a5063ff43b4da89dceafb68bf9d",
+        "sourceReportSha256": "9955175e0865b35a8c819db13e41c5d859f5ac6c09f2e346da2876486be3d1b9",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1551736,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T14:51:19.001826+00:00",
+        "endedAtUtc": "2026-10-19T14:53:29.513091+00:00",
+        "selectedCases": [
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-raster-settings"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-raster-firefox-multi-v1.log",
+          "sha256": "0041d7bf9cea367d7010094c31364f7ab0455a5063ff43b4da89dceafb68bf9d",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-raster-firefox-multi-v1/report.json",
+          "sha256": "9955175e0865b35a8c819db13e41c5d859f5ac6c09f2e346da2876486be3d1b9",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-raster-firefox-dash-v3",
+        "family": "raster",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "cc966d0d73ea069dcb863020bf9a842bbea9238eb51c3d5cb10f0a2801ed343d",
+        "sourceReportSha256": "b6730e130accb9f0304f92255b338e3ccb606583af06c08d11b781c1c3017933",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1653124,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:01:57.835365+00:00",
+        "endedAtUtc": "2026-10-19T15:03:54.235420+00:00",
+        "selectedCases": [
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-raster-settings"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-raster-firefox-dash-v3.log",
+          "sha256": "cc966d0d73ea069dcb863020bf9a842bbea9238eb51c3d5cb10f0a2801ed343d",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-raster-firefox-dash-v3/report.json",
+          "sha256": "b6730e130accb9f0304f92255b338e3ccb606583af06c08d11b781c1c3017933",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-current-chromium-multi-v2",
+        "family": "functional",
+        "runs": 8,
+        "code": 0,
+        "sourceLogSha256": "94586dce5dcfa87e961f763efff55a57026d309f8a3e5538a474769a077cc4f2",
+        "sourceReportSha256": "a9dbf8b8a137b53894aefabf371f02147b3a76f86463b88015e1623008ccdcb7",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1255420,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:04:20.079544+00:00",
+        "endedAtUtc": "2026-10-19T15:04:49.254998+00:00",
+        "selectedCases": [
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-roundtrip"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-self-test"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-shares"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-public-references"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-capability-catalogs"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-file-inputs"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-late-cards"
+          },
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-coin-evidence"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-current-chromium-multi-v2.log",
+          "sha256": "94586dce5dcfa87e961f763efff55a57026d309f8a3e5538a474769a077cc4f2",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-current-chromium-multi-v2/report.json",
+          "sha256": "a9dbf8b8a137b53894aefabf371f02147b3a76f86463b88015e1623008ccdcb7",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-current-chromium-dash-v1",
+        "family": "functional",
+        "runs": 8,
+        "code": 0,
+        "sourceLogSha256": "fda7b2f6d7e6b2da057e4bf48a1083aa5f4e44e4d3954dd6a85d1a456c99faa1",
+        "sourceReportSha256": "340bc468f4033fdbb262a980c582e719db4974a1e0a649bfb08cc30567e4ea32",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1301460,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:05:15.767776+00:00",
+        "endedAtUtc": "2026-10-19T15:05:47.725144+00:00",
+        "selectedCases": [
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-roundtrip"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-self-test"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-shares"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-public-references"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-capability-catalogs"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-file-inputs"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-late-cards"
+          },
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-coin-evidence"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-current-chromium-dash-v1.log",
+          "sha256": "fda7b2f6d7e6b2da057e4bf48a1083aa5f4e44e4d3954dd6a85d1a456c99faa1",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-current-chromium-dash-v1/report.json",
+          "sha256": "340bc468f4033fdbb262a980c582e719db4974a1e0a649bfb08cc30567e4ea32",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-current-firefox-multi-v2",
+        "family": "functional",
+        "runs": 8,
+        "code": 0,
+        "sourceLogSha256": "66cf88d7c8787490441c11ef82ba892c5631a2c313a8aba67079140d66013f5c",
+        "sourceReportSha256": "634bd0f16f3d74e76f4377e37d83322c2aa9e9ed2e8c468fa0a6e0b59622f842",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1737576,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:11:45.162943+00:00",
+        "endedAtUtc": "2026-10-19T15:12:28.940263+00:00",
+        "selectedCases": [
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-roundtrip"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-self-test"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-shares"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-public-references"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-capability-catalogs"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-file-inputs"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-late-cards"
+          },
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-coin-evidence"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-current-firefox-multi-v2.log",
+          "sha256": "66cf88d7c8787490441c11ef82ba892c5631a2c313a8aba67079140d66013f5c",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-current-firefox-multi-v2/report.json",
+          "sha256": "634bd0f16f3d74e76f4377e37d83322c2aa9e9ed2e8c468fa0a6e0b59622f842",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-current-firefox-dash-v2",
+        "family": "functional",
+        "runs": 8,
+        "code": 0,
+        "sourceLogSha256": "10b3bbca0648c4e702b786d4465a3f4cbc3a04bf465ad5bda78b5cd6280c0e62",
+        "sourceReportSha256": "9580b0eb1796f32b57e09e66911ec65794272cbba98998676b8957eb2094ac35",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1755900,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:15:15.338715+00:00",
+        "endedAtUtc": "2026-10-19T15:16:06.560469+00:00",
+        "selectedCases": [
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-roundtrip"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-self-test"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-shares"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-public-references"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-capability-catalogs"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-file-inputs"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-late-cards"
+          },
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-coin-evidence"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-current-firefox-dash-v2.log",
+          "sha256": "10b3bbca0648c4e702b786d4465a3f4cbc3a04bf465ad5bda78b5cd6280c0e62",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-current-firefox-dash-v2/report.json",
+          "sha256": "9580b0eb1796f32b57e09e66911ec65794272cbba98998676b8957eb2094ac35",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-cards-chromium-multi-v2",
+        "family": "cards",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "16b46b4b939034b23cee2f42fbcf6da8d6652a750e8785aca6bb9c4be4ae2fb3",
+        "sourceReportSha256": "7390cdfa8d67798926bd2b1e679cac276cb559954b67922b90c5cd52a5bd4df7",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1090184,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:10:24.426812+00:00",
+        "endedAtUtc": "2026-10-19T15:10:59.200487+00:00",
+        "selectedCases": [
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-cards"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-cards-chromium-multi-v2.log",
+          "sha256": "16b46b4b939034b23cee2f42fbcf6da8d6652a750e8785aca6bb9c4be4ae2fb3",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-cards-chromium-multi-v2/report.json",
+          "sha256": "7390cdfa8d67798926bd2b1e679cac276cb559954b67922b90c5cd52a5bd4df7",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-cards-chromium-dash-v1",
+        "family": "cards",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "bee159029c45a19ca7c8483004207bbecf8e7b9e12a49c7ee7a70f18527ce854",
+        "sourceReportSha256": "71ea6eb17e37ae4c209b7a7ea71c161dce3a9c06ca3ed1cc10bd8283a2f37b89",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1141868,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:14:03.726619+00:00",
+        "endedAtUtc": "2026-10-19T15:14:39.110264+00:00",
+        "selectedCases": [
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-cards"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-cards-chromium-dash-v1.log",
+          "sha256": "bee159029c45a19ca7c8483004207bbecf8e7b9e12a49c7ee7a70f18527ce854",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-cards-chromium-dash-v1/report.json",
+          "sha256": "71ea6eb17e37ae4c209b7a7ea71c161dce3a9c06ca3ed1cc10bd8283a2f37b89",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-cards-firefox-multi-v1",
+        "family": "cards",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "294a3e0044988c305313adce13e416619107d457f8d2d65f64b9595306b78f48",
+        "sourceReportSha256": "e4adfaae4c54fcf78c2f070a47e2653e9ed54b7d4da295e4ac2385a2be44407e",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1459340,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:16:42.129700+00:00",
+        "endedAtUtc": "2026-10-19T15:17:25.751746+00:00",
+        "selectedCases": [
+          {
+            "browser": "firefox",
+            "profile": "multi-chain",
+            "name": "mnemocode-cards"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-cards-firefox-multi-v1.log",
+          "sha256": "294a3e0044988c305313adce13e416619107d457f8d2d65f64b9595306b78f48",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-cards-firefox-multi-v1/report.json",
+          "sha256": "e4adfaae4c54fcf78c2f070a47e2653e9ed54b7d4da295e4ac2385a2be44407e",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-cards-firefox-dash-v1",
+        "family": "cards",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "75e017d44d45803f902f424f4c1fba56f977b16531f2598d4bf71a5a033d7d27",
+        "sourceReportSha256": "491bdd37cd24894b8a136bdd1a9fa7742cbb5b1aae263aa4030e6657856ee922",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1585940,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:17:43.674184+00:00",
+        "endedAtUtc": "2026-10-19T15:18:30.306924+00:00",
+        "selectedCases": [
+          {
+            "browser": "firefox",
+            "profile": "dash-community",
+            "name": "mnemocode-cards"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-cards-firefox-dash-v1.log",
+          "sha256": "75e017d44d45803f902f424f4c1fba56f977b16531f2598d4bf71a5a033d7d27",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-cards-firefox-dash-v1/report.json",
+          "sha256": "491bdd37cd24894b8a136bdd1a9fa7742cbb5b1aae263aa4030e6657856ee922",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-candidate-list-chromium-multi-v1",
+        "family": "candidateLists",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "cf36eaec84974a15e6bfda16a1e61a8a672742d2d6dc023902e0255ef96bae6b",
+        "sourceReportSha256": "61ba82b67113ff74d512fa1ee7faa749e83653166bf9cb0b0568a46a16c0d4f4",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1249492,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:19:44.444080+00:00",
+        "endedAtUtc": "2026-10-19T15:19:49.032431+00:00",
+        "selectedCases": [
+          {
+            "browser": "chromium",
+            "profile": "multi-chain",
+            "name": "mnemocode-share-list"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-candidate-list-chromium-multi-v1.log",
+          "sha256": "cf36eaec84974a15e6bfda16a1e61a8a672742d2d6dc023902e0255ef96bae6b",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-candidate-list-chromium-multi-v1/report.json",
+          "sha256": "61ba82b67113ff74d512fa1ee7faa749e83653166bf9cb0b0568a46a16c0d4f4",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
+      },
+      {
+        "id": "native-mnemocode-candidate-list-chromium-dash-v1",
+        "family": "candidateLists",
+        "runs": 1,
+        "code": 0,
+        "sourceLogSha256": "75ac0d2a181448b8e8c2499065f3e1a183221d2240fb70008cd9ffa02c318894",
+        "sourceReportSha256": "b0e108dd10a81cdffd5171561bfcd0f085d3e77da21b5514e03d61712e5df879",
+        "remainingOwnedPids": [],
+        "sampledAggregateMaxRssKiB": 1344180,
+        "command": [
+          "node",
+          "--max-old-space-size=384",
+          "tooling/verify-browser-regressions.mjs"
+        ],
+        "startedAtUtc": "2026-10-19T15:20:28.074089+00:00",
+        "endedAtUtc": "2026-10-19T15:20:32.754606+00:00",
+        "selectedCases": [
+          {
+            "browser": "chromium",
+            "profile": "dash-community",
+            "name": "mnemocode-share-list"
+          }
+        ],
+        "log": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-candidate-list-chromium-dash-v1.log",
+          "sha256": "75ac0d2a181448b8e8c2499065f3e1a183221d2240fb70008cd9ffa02c318894",
+          "localOnly": true
+        },
+        "report": {
+          "path": "docs/audits/AUD-036-evidence/host-partial-v1/commands/native-mnemocode-candidate-list-chromium-dash-v1/report.json",
+          "sha256": "b0e108dd10a81cdffd5171561bfcd0f085d3e77da21b5514e03d61712e5df879",
+          "localOnly": true
+        },
+        "qualification": "Recorded argv and actual selected cases; no reconstruction of unrecorded environment variables or new execution."
       }
     ],
-    "producerPackets": [
-      {
-        "localOnly": true,
-        "path": "docs/audits/AUD-036-evidence/producer-intake-v5.json",
-        "sha256": "00fa7066fe144965f2c42778418a9e4c1696fa9a67c6a1e076d6d36315b79d9b"
-      },
-      {
-        "localOnly": true,
-        "path": "docs/audits/AUD-036-evidence/producer-intake-supplement-v5.json",
-        "sha256": "9df162f14d37389750de0185e87862b446c887a0c439f58f280820f7db7cdb0b"
-      },
-      {
-        "localOnly": true,
-        "path": "docs/audits/AUD-036-evidence/producer-intake-docs-supplement-v5.json",
-        "sha256": "b2b152702cdc9c9435585f383c29e7fc2ae06f549e6a77893f7c880a21ea2b73"
+    "currentHtmlArtifacts": {
+      "sourceRepository": "multi-chain-wallet-tools",
+      "localOnly": true,
+      "files": {
+        "dist/custom-builds/mnemocode-parity-v8/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "3695a391a9f0616597683b85ffb88b06e0ed6f54cd72d2074732aab5570640d5",
+        "dist/custom-builds/mnemocode-parity-v8/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "ace10f165cd44a13cb22b9e8f9fd30e4be8f765503c7cdc2de603bc878baf9df",
+        "dist/custom-builds/mnemocode-parity-v8/multi-chain-edition/discovery-scanner/Wallet_Discovery_Scanner.html": "45f24cfe14a011bfd8d11565ad4f1001602df48cba008ab7ebde846826aa3a18",
+        "dist/custom-builds/mnemocode-parity-v8/dash-community-edition/discovery-scanner/Dash_Community_Discovery_Scanner.html": "46aa2c7703893282dc43e7d32bc9f230942bb2987010dc38afe5c2ddcbe6d60b"
       }
-    ]
+    },
+    "consoleDiagnostics": [
+      {
+        "browser": "firefox",
+        "profile": "multi-chain",
+        "case": "mnemocode-self-test",
+        "count": 1,
+        "classification": "Fixed-tag console diagnostic retained by host; no claim of zero console errors."
+      },
+      {
+        "browser": "firefox",
+        "profile": "dash-community",
+        "case": "mnemocode-self-test",
+        "count": 1,
+        "classification": "Fixed-tag console diagnostic retained by host; no claim of zero console errors."
+      }
+    ],
+    "pendingEvidence": [
+      {
+        "case": "mnemocode-share-list",
+        "browser": "firefox",
+        "profile": "multi-chain",
+        "status": "1728 MiB aggregate budget stopped the command before acceptance; retained log, all owned children reaped."
+      },
+      {
+        "case": "mnemocode-share-list",
+        "browser": "firefox",
+        "profile": "dash-community",
+        "status": "Not executed; safe memory admission unavailable."
+      }
+    ],
+    "differences": [
+      "CLI SSKR option default is UR; browser display starts with words. Both choices are offered.",
+      "Browser orientation starts with landscape; the library-planned option is available.",
+      "Browser raw backup text limit is 65536 UTF-16 code units; CLI bounded text-file input allows 1 MiB UTF-8. This review did not establish a missing normal wallet operation from that difference.",
+      "Browser downloads/ZIP replace native destination paths and directories; native file permissions, Node permission flags, memory locking and core-dump controls are not reproduced.",
+      "Dash/selective builds deliberately offer only included coin families; the full Multi-Chain MC build offers all twelve producer coins."
+    ],
+    "retained": [
+      {
+        "id": "native-mnemocode-modes-v1",
+        "logSha256": "196f4cbd83031477ba903d616f944a792b1358c028543486a918a786c04bd00b",
+        "reportSha256": "fb5780912c271a65223cf017f0218a30394fc5d2fcf503cdfa2dd3f17a16bc72",
+        "supervisor": {
+          "startedUtc": "2026-10-19T13:23:48.432047+00:00",
+          "endedUtc": "2026-10-19T13:28:25.867802+00:00",
+          "argv": [
+            "node",
+            "--max-old-space-size=256",
+            "tooling/verify-browser-regressions.mjs"
+          ],
+          "runnerSha256": "f73baafd7388152b542fb65d49caf4de7db97cbfa1a441e554e13b18c7bb425c",
+          "code": 0,
+          "reason": null,
+          "sampledAggregateMaxRssKiB": 1405592,
+          "remainingOwnedPids": [],
+          "qualification": "25ms aggregate RSS sampling including supervisor; shared pages counted repeatedly; short peaks may be missed; all tasks' children traversed within explicit bounds; not a kernel cap. Only unreaped direct children acquire pidfds; all signals use those handles."
+        },
+        "runs": [
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "multi-chain",
+            "name": "mnemocode-mode-format-lengths",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v2/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "f493cbec89871c5683018df7400597c61f6871257d23308588db146e3ce08389"
+            },
+            "checks": [
+              "100 actual UI mode/form/length paths; legacy-valid retains the original among candidates."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "dash-community",
+            "name": "mnemocode-mode-format-lengths",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v2/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "2430c384e19000120f54694b0b99ab34ad0873904810bff4049f7b951dbab31a"
+            },
+            "checks": [
+              "100 actual UI mode/form/length paths; legacy-valid retains the original among candidates."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "multi-chain",
+            "name": "mnemocode-mode-format-lengths",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v2/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "f493cbec89871c5683018df7400597c61f6871257d23308588db146e3ce08389"
+            },
+            "checks": [
+              "100 actual UI mode/form/length paths; legacy-valid retains the original among candidates."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "dash-community",
+            "name": "mnemocode-mode-format-lengths",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v2/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "2430c384e19000120f54694b0b99ab34ad0873904810bff4049f7b951dbab31a"
+            },
+            "checks": [
+              "100 actual UI mode/form/length paths; legacy-valid retains the original among candidates."
+            ],
+            "consoleErrors": 0
+          }
+        ],
+        "qualification": "V2 HTML: 400 mode/representation/word-count UI paths; prior fingerprint wording and host lifecycle fixes.",
+        "localOnly": true
+      },
+      {
+        "id": "native-mnemocode-new-operations-v1",
+        "logSha256": "8d49fc83479e11723b0e9a649835d6c7e33133a62605fbbefc8393f80d749494",
+        "reportSha256": "e40f152e56262de62e37305a0ac47c2ec16846a9ac06894f7c22aa42fc4e8d66",
+        "supervisor": {
+          "startedUtc": "2026-10-19T13:32:45.929307+00:00",
+          "endedUtc": "2026-10-19T13:34:36.421784+00:00",
+          "argv": [
+            "node",
+            "--max-old-space-size=256",
+            "tooling/verify-browser-regressions.mjs"
+          ],
+          "runnerSha256": "f73baafd7388152b542fb65d49caf4de7db97cbfa1a441e554e13b18c7bb425c",
+          "code": 0,
+          "reason": null,
+          "sampledAggregateMaxRssKiB": 1450212,
+          "remainingOwnedPids": [],
+          "qualification": "25ms aggregate RSS sampling including supervisor; shared pages counted repeatedly; short peaks may be missed; all tasks' children traversed within explicit bounds; not a kernel cap. Only unreaped direct children acquire pidfds; all signals use those handles."
+        },
+        "runs": [
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "multi-chain",
+            "name": "mnemocode-reencoding",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "6ad7929a9823e98fd56696d7c4561e1d389b6e893274b1c4745b8d101aeec7a4"
+            },
+            "checks": [
+              "Re-encode requires explicit confirmation, links the confirmed phrase into a new dated backup, and revokes confirmation on editing; host binding proof, not an independent cryptographic oracle."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "multi-chain",
+            "name": "mnemocode-share-forms",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "6ad7929a9823e98fd56696d7c4561e1d389b6e893274b1c4745b8d101aeec7a4"
+            },
+            "checks": [
+              "All six share forms split, restore, export through Forgotten, save exact text and restore again; host binding proof, complemented by the library's independent SSKR oracle."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "multi-chain",
+            "name": "recovery-diagnostic-retirement",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "6ad7929a9823e98fd56696d7c4561e1d389b6e893274b1c4745b8d101aeec7a4"
+            },
+            "checks": [
+              "Recovered diagnostic nodes retire before edit, replacement and Clear."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "multi-chain",
+            "name": "mnemocode-card-text-lengths",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "6ad7929a9823e98fd56696d7c4561e1d389b6e893274b1c4745b8d101aeec7a4"
+            },
+            "checks": [
+              "Native profile/copy fields preserve 100 supplementary scalars; 101 ASCII or supplementary code points remain intact and are refused without an export."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "dash-community",
+            "name": "mnemocode-reencoding",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "4a4f24b41aa0a6f237d02c8e6191546d87c9aeff84cd4adf54d45dea1f783794"
+            },
+            "checks": [
+              "Re-encode requires explicit confirmation, links the confirmed phrase into a new dated backup, and revokes confirmation on editing; host binding proof, not an independent cryptographic oracle."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "dash-community",
+            "name": "mnemocode-share-forms",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "4a4f24b41aa0a6f237d02c8e6191546d87c9aeff84cd4adf54d45dea1f783794"
+            },
+            "checks": [
+              "All six share forms split, restore, export through Forgotten, save exact text and restore again; host binding proof, complemented by the library's independent SSKR oracle."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "dash-community",
+            "name": "recovery-diagnostic-retirement",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "4a4f24b41aa0a6f237d02c8e6191546d87c9aeff84cd4adf54d45dea1f783794"
+            },
+            "checks": [
+              "Recovered diagnostic nodes retire before edit, replacement and Clear."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "dash-community",
+            "name": "mnemocode-card-text-lengths",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "4a4f24b41aa0a6f237d02c8e6191546d87c9aeff84cd4adf54d45dea1f783794"
+            },
+            "checks": [
+              "Native profile/copy fields preserve 100 supplementary scalars; 101 ASCII or supplementary code points remain intact and are refused without an export."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "multi-chain",
+            "name": "mnemocode-reencoding",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "6ad7929a9823e98fd56696d7c4561e1d389b6e893274b1c4745b8d101aeec7a4"
+            },
+            "checks": [
+              "Re-encode requires explicit confirmation, links the confirmed phrase into a new dated backup, and revokes confirmation on editing; host binding proof, not an independent cryptographic oracle."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "multi-chain",
+            "name": "mnemocode-share-forms",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "6ad7929a9823e98fd56696d7c4561e1d389b6e893274b1c4745b8d101aeec7a4"
+            },
+            "checks": [
+              "All six share forms split, restore, export through Forgotten, save exact text and restore again; host binding proof, complemented by the library's independent SSKR oracle."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "multi-chain",
+            "name": "recovery-diagnostic-retirement",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "6ad7929a9823e98fd56696d7c4561e1d389b6e893274b1c4745b8d101aeec7a4"
+            },
+            "checks": [
+              "Recovered diagnostic nodes retire before edit, replacement and Clear."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "multi-chain",
+            "name": "mnemocode-card-text-lengths",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "6ad7929a9823e98fd56696d7c4561e1d389b6e893274b1c4745b8d101aeec7a4"
+            },
+            "checks": [
+              "Native profile/copy fields preserve 100 supplementary scalars; 101 ASCII or supplementary code points remain intact and are refused without an export."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "dash-community",
+            "name": "mnemocode-reencoding",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "4a4f24b41aa0a6f237d02c8e6191546d87c9aeff84cd4adf54d45dea1f783794"
+            },
+            "checks": [
+              "Re-encode requires explicit confirmation, links the confirmed phrase into a new dated backup, and revokes confirmation on editing; host binding proof, not an independent cryptographic oracle."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "dash-community",
+            "name": "mnemocode-share-forms",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "4a4f24b41aa0a6f237d02c8e6191546d87c9aeff84cd4adf54d45dea1f783794"
+            },
+            "checks": [
+              "All six share forms split, restore, export through Forgotten, save exact text and restore again; host binding proof, complemented by the library's independent SSKR oracle."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "dash-community",
+            "name": "recovery-diagnostic-retirement",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "4a4f24b41aa0a6f237d02c8e6191546d87c9aeff84cd4adf54d45dea1f783794"
+            },
+            "checks": [
+              "Recovered diagnostic nodes retire before edit, replacement and Clear."
+            ],
+            "consoleErrors": 0
+          },
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "dash-community",
+            "name": "mnemocode-card-text-lengths",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v3/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "4a4f24b41aa0a6f237d02c8e6191546d87c9aeff84cd4adf54d45dea1f783794"
+            },
+            "checks": [
+              "Native profile/copy fields preserve 100 supplementary scalars; 101 ASCII or supplementary code points remain intact and are refused without an export."
+            ],
+            "consoleErrors": 0
+          }
+        ],
+        "qualification": "V3 HTML: 16 re-encode/share-form/diagnostic/card-text cases, prior final wording and host lifecycle fixes.",
+        "localOnly": true
+      },
+      {
+        "id": "native-mnemocode-print-chromium-multi-v3",
+        "logSha256": "ee8ece4dcd856ee8c2511b4d859a02a85dc7304907fe12c7e6cc38b8aac12637",
+        "reportSha256": "8a468e42fabac01cdd5895dcb875ee0efe5ebf652b9834251d4f6d2351b171d3",
+        "supervisor": {
+          "startedUtc": "2026-10-19T13:54:06.863697+00:00",
+          "endedUtc": "2026-10-19T13:54:47.988375+00:00",
+          "argv": [
+            "node",
+            "--max-old-space-size=384",
+            "tooling/verify-browser-regressions.mjs"
+          ],
+          "runnerSha256": "f73baafd7388152b542fb65d49caf4de7db97cbfa1a441e554e13b18c7bb425c",
+          "code": 0,
+          "reason": null,
+          "sampledAggregateMaxRssKiB": 1068980,
+          "remainingOwnedPids": [],
+          "qualification": "25ms aggregate RSS sampling including supervisor; shared pages counted repeatedly; short peaks may be missed; all tasks' children traversed within explicit bounds; not a kernel cap. Only unreaped direct children acquire pidfds; all signals use those handles."
+        },
+        "runs": [
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "multi-chain",
+            "name": "mnemocode-print-settings",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v5/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "b847b6671df989a00e449d5bfc1c1a0076d303b52b691855aabe159a9e4ac6e2"
+            },
+            "checks": [
+              "All thirteen templates draw; A6/A5/A4 portrait/landscape/planned PNG/JPEG images and A5/A6 two-page heir PDFs have the expected dimensions."
+            ],
+            "consoleErrors": 0
+          }
+        ],
+        "qualification": "V5 HTML: all thirteen designs as PDF, PDF page/orientation/automatic settings, A6 raster and A5/A6 two-page heir instructions; prior host disclosure fixes.",
+        "localOnly": true
+      },
+      {
+        "id": "native-mnemocode-print-chromium-dash-v1",
+        "logSha256": "064b46525836317397a4414e5f58116104ab763428e8d53b806a23dcddf6b077",
+        "reportSha256": "3103d11b2144706cd714043e5a0e76e5b9b05fb04fd5046e0a111292bc21fd13",
+        "supervisor": {
+          "startedUtc": "2026-10-19T13:55:25.758899+00:00",
+          "endedUtc": "2026-10-19T13:56:08.759379+00:00",
+          "argv": [
+            "node",
+            "--max-old-space-size=384",
+            "tooling/verify-browser-regressions.mjs"
+          ],
+          "runnerSha256": "f73baafd7388152b542fb65d49caf4de7db97cbfa1a441e554e13b18c7bb425c",
+          "code": 0,
+          "reason": null,
+          "sampledAggregateMaxRssKiB": 1137532,
+          "remainingOwnedPids": [],
+          "qualification": "25ms aggregate RSS sampling including supervisor; shared pages counted repeatedly; short peaks may be missed; all tasks' children traversed within explicit bounds; not a kernel cap. Only unreaped direct children acquire pidfds; all signals use those handles."
+        },
+        "runs": [
+          {
+            "browser": "chromium",
+            "version": "156.0.8078.4",
+            "profile": "dash-community",
+            "name": "mnemocode-print-settings",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v5/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "2b17bfdd6243dac0abff3af06b77143f0b89872080bbe5ed44606bb66504a433"
+            },
+            "checks": [
+              "All thirteen templates draw; A6/A5/A4 portrait/landscape/planned PNG/JPEG images and A5/A6 two-page heir PDFs have the expected dimensions."
+            ],
+            "consoleErrors": 0
+          }
+        ],
+        "qualification": "V5 HTML: all thirteen designs as PDF, PDF page/orientation/automatic settings, A6 raster and A5/A6 two-page heir instructions; prior host disclosure fixes.",
+        "localOnly": true
+      },
+      {
+        "id": "native-mnemocode-print-firefox-multi-v1",
+        "logSha256": "3f7268f0d155a694f2ed9c1b8d70b94e8434533a7636744cee3f4abd62e9d6c8",
+        "reportSha256": "64268541ceee3bc133d62aef3ce560df398390b0a1ed5dd096d48f28ccaf1810",
+        "supervisor": {
+          "startedUtc": "2026-10-19T13:56:40.082043+00:00",
+          "endedUtc": "2026-10-19T13:57:37.490465+00:00",
+          "argv": [
+            "node",
+            "--max-old-space-size=384",
+            "tooling/verify-browser-regressions.mjs"
+          ],
+          "runnerSha256": "f73baafd7388152b542fb65d49caf4de7db97cbfa1a441e554e13b18c7bb425c",
+          "code": 0,
+          "reason": null,
+          "sampledAggregateMaxRssKiB": 1517392,
+          "remainingOwnedPids": [],
+          "qualification": "25ms aggregate RSS sampling including supervisor; shared pages counted repeatedly; short peaks may be missed; all tasks' children traversed within explicit bounds; not a kernel cap. Only unreaped direct children acquire pidfds; all signals use those handles."
+        },
+        "runs": [
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "multi-chain",
+            "name": "mnemocode-print-settings",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v5/multi-chain-edition/key-derivation/Wallet_Key_Derivation_Tool.html": "b847b6671df989a00e449d5bfc1c1a0076d303b52b691855aabe159a9e4ac6e2"
+            },
+            "checks": [
+              "All thirteen templates draw; A6/A5/A4 portrait/landscape/planned PNG/JPEG images and A5/A6 two-page heir PDFs have the expected dimensions."
+            ],
+            "consoleErrors": 0
+          }
+        ],
+        "qualification": "V5 HTML: all thirteen designs as PDF, PDF page/orientation/automatic settings, A6 raster and A5/A6 two-page heir instructions; prior host disclosure fixes.",
+        "localOnly": true
+      },
+      {
+        "id": "native-mnemocode-print-firefox-dash-v1",
+        "logSha256": "17ec7d2e02b830a09f520309386fe4e1a97ec34b808cdb051f29b1728c363ba8",
+        "reportSha256": "a5e3e5e33e2f651e03b23e9584b601b7f15314956b811e038cf3421555cb16bc",
+        "supervisor": {
+          "startedUtc": "2026-10-19T13:58:16.142411+00:00",
+          "endedUtc": "2026-10-19T13:59:14.232016+00:00",
+          "argv": [
+            "node",
+            "--max-old-space-size=384",
+            "tooling/verify-browser-regressions.mjs"
+          ],
+          "runnerSha256": "f73baafd7388152b542fb65d49caf4de7db97cbfa1a441e554e13b18c7bb425c",
+          "code": 0,
+          "reason": null,
+          "sampledAggregateMaxRssKiB": 1520316,
+          "remainingOwnedPids": [],
+          "qualification": "25ms aggregate RSS sampling including supervisor; shared pages counted repeatedly; short peaks may be missed; all tasks' children traversed within explicit bounds; not a kernel cap. Only unreaped direct children acquire pidfds; all signals use those handles."
+        },
+        "runs": [
+          {
+            "browser": "firefox",
+            "version": "157.0",
+            "profile": "dash-community",
+            "name": "mnemocode-print-settings",
+            "passed": true,
+            "artifacts": {
+              "dist/custom-builds/mnemocode-parity-v5/dash-community-edition/key-derivation/Dash_Community_Key_Derivation_Tool.html": "2b17bfdd6243dac0abff3af06b77143f0b89872080bbe5ed44606bb66504a433"
+            },
+            "checks": [
+              "All thirteen templates draw; A6/A5/A4 portrait/landscape/planned PNG/JPEG images and A5/A6 two-page heir PDFs have the expected dimensions."
+            ],
+            "consoleErrors": 0
+          }
+        ],
+        "qualification": "V5 HTML: all thirteen designs as PDF, PDF page/orientation/automatic settings, A6 raster and A5/A6 two-page heir instructions; prior host disclosure fixes.",
+        "localOnly": true
+      }
+    ],
+    "retainedQualification": "Earlier V2/V3/V5 executions retain their original source/artifact identities and are not new V8 executions or totals to add.",
+    "claimsReview": {
+      "source": "Wallet-tools message from source thread01a13ecf-e5ab-72b2-9887-78aa986141b4",
+      "reportedVerdict": "Independent final claims scoped ACCEPTED2/2, no changes required.",
+      "manifestSha256": "d330095386b6ff21b1d6609fec0be3db9b92f493bb478cfb387b56cc8b048441",
+      "qualification": "Actual two-file hash manifest retained; peer verdict is attributed, not fabricated as a fresh reviewer execution.",
+      "manifest": {
+        "path": "docs/audits/AUD-036-evidence/host-partial-v1/mnemocode-parity-claims-review-v1.json",
+        "sha256": "d330095386b6ff21b1d6609fec0be3db9b92f493bb478cfb387b56cc8b048441",
+        "localOnly": true
+      }
+    },
+    "resource": {
+      "remainingFirefoxGrant": "Conditional exclusive 1920 MiB aggregate / unchanged Node 384 MiB heap / 3 GiB runtime availability reserve; fresh MemAvailable must be at least 5760 MiB including conservative static headroom.",
+      "latestMemAvailableKiB": 3753548,
+      "latestObservedUtc": "2026-10-19T15:26:30Z",
+      "activeOwnedHeavyProcesses": [],
+      "runnerSha256": "30ef018116c86ac900353dabceacf4463949c99ccb1f46954a8749f609dca832",
+      "runner1920ChoiceAdded": false,
+      "qualification": "25 ms aggregate RSS sampling counts shared pages repeatedly and can miss short peaks. It is not a kernel memory cap."
+    },
+    "notEstablished": [
+      "Complete current Firefox encrypted candidate-list acceptance in both editions",
+      "All possible parameter combinations",
+      "Visual correctness of every glyph/background in every design and format",
+      "Full host CORE compliance, full privacy/secret erasure guarantees, or a new all-files audit",
+      "Native Windows/macOS release checks; publishing remains held by the owner"
+    ],
+    "integrationScope": "MnemoCode only. A later owner instruction permitted separate MHFE work to resume; this is not MnemoCode release acceptance or permission to push. Unrelated whole-host provenance is outside this conclusion."
   },
   "platformAcceptance": {
     "plan": {
@@ -6871,7 +8313,20 @@
     "reserveMiB": 3072,
     "heavyChecks": "One at a time machine-wide, with explicit slot returns. Reviewers static128MiB; main check RSS1152MiB/heap256MiB; fresh serial one-worker/file suite.",
     "minimumAvailableBytes": 4610068480,
-    "peakProcessRssBytes": 1164111872,
-    "qualification": "Sampled process-tree/host observations, not kernel caps or absolute-peak proof."
+    "peakProcessRssBytes": 1235038208,
+    "qualification": "Sampled process-tree/host observations, not kernel caps or absolute-peak proof. Producer command sampling is separate from consumer aggregate browser sampling; the latter counts shared pages repeatedly. Fresh producer build retry used 1280 MiB after a recorded 1152 MiB stop. No global memory peak or kernel cap is established."
+  },
+  "signedCodeCheckpoint": {
+    "path": "docs/audits/AUD-036-evidence/signed-checkpoint.json",
+    "sha256": "c2f6ba2c8f2aebcd5e860e9c30ae6f792595ccddf49311abfff25c657937e3c5",
+    "localOnly": true
+  },
+  "documentedFollowup": {
+    "recordedAtUtc": "2026-10-19T16:11:10.740558+00:00",
+    "plannedAtUtc": "2026-10-19T15:45:53.505478+00:00",
+    "codeCommit": "4978a620d43a8571b89ccfc01f3b5a58b3a8c421",
+    "scope": "Document-only integration of qualified partial browser evidence; no production/test/native/dependency changes and no new runtime replay.",
+    "codeAndRuntimeInputsChanged": false,
+    "qualification": "Original runtime snapshot and findings remain historical. Its 649-row manifest predates three root prose updates. The signed code checkpoint and subsequent fresh executable checks bind unchanged production, test, native, dependency and build inputs; no full-suite replay after prose changes is implied."
   }
 }
