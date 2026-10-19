@@ -242,7 +242,10 @@ export class EncodedForm {
     return this.#variant.read(text);
   }
 
-  /** The codes of `result` written in this form. */
+  /**
+   * The codes of `result` written in this form; indexes that are no phrase are refused
+   * (core.bip39-sizes.*, codes).
+   */
   write(result: EncodedResult): string {
     return this.codes(result.shiftedIndexes);
   }

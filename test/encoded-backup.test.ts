@@ -60,7 +60,12 @@ describe("writing codes", () => {
         [...phrase.slice(1), 2048],
         [...phrase.slice(1), -1],
         [...phrase.slice(1), 1.5],
+        [...phrase.slice(1), Number.NaN],
+        // An index left undefined is refused, as a hole is.
+        Object.assign([...phrase], { 11: undefined }) as unknown as number[],
         phrase.slice(1),
+        [...phrase, 0],
+        [],
       ])
         expect(() => form.codes(indexes), format).toThrow(
           expect.objectContaining({ code: matching(/^core\.bip39-sizes\./u) }),
@@ -70,9 +75,10 @@ describe("writing codes", () => {
       ...representMnemonic(TEST_PHRASE),
       shiftedIndexes: [...phrase.slice(1), 2048],
     };
-    expect(() => formatEncoded(result, "json")).toThrow(
-      expect.objectContaining({ code: "core.bip39-sizes.assert-word-indexes-refused" }),
-    );
+    for (const format of ["json", ...ENCODED_FORMATS] as const)
+      expect(() => formatEncoded(result, format), format).toThrow(
+        expect.objectContaining({ code: "core.bip39-sizes.assert-word-indexes-refused" }),
+      );
   });
 });
 
