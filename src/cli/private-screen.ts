@@ -13,16 +13,13 @@ import {
   flushed,
   LEAVE_ALTERNATE_SCREEN,
   noticeLines,
-  printableText,
-  terminalHint,
-  terminalNotice,
 } from "./terminal.js";
 import { PrivatePage } from "./private-page.js";
 import { PrivateSteps } from "./private-steps.js";
 import { factLine, headingLine } from "./terminal-style.js";
 import { protectionSummary } from "./protection.js";
-import { CANCELLED_EXIT_CODE, CANCELLED_MESSAGE } from "./exit-codes.js";
-import { removeLeftFolders } from "../export/temporary-folders.js";
+import { CANCELLED_EXIT_CODE } from "./exit-codes.js";
+import { interruptible } from "./interruption.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 
 /** What the private screen asks before it is cleared, after a blank line. */
@@ -84,8 +81,7 @@ export function clearPrivateScreen(): boolean {
  * error is shown on the main screen. Ctrl+C also leaves it first: at a question and during a long
  * search it is read as a key (watchForCtrlC), and `body` gives CANCELLED, as the question after
  * the result does at Ctrl+C; SIGINT, from Ctrl+C while `body` computes something else or sent by
- * other means, is handled here: the screen is left, the temporary folders of an export are removed
- * (temporary-folders.ts), and the command ends as cancelled, with exit code 130.
+ * other means, leaves the screen before the command ends as cancelled (interruption.ts).
  */
 export async function withPrivateScreen<T>(
   body: () => Promise<T | Cancelled>,
@@ -104,17 +100,9 @@ export async function withPrivateScreen<T>(
       for (const line of noticeLines(warning, "warning")) console.error(line);
     },
   );
-  const interrupted = (): void => {
-    process.stderr.write(LEAVE_ALTERNATE_SCREEN);
-    // The process ends now, before the owners of an export's temporary folders could remove them.
-    const left = removeLeftFolders();
-    terminalHint(CANCELLED_MESSAGE);
-    for (const folder of left) terminalNotice(leftFolderNotice(folder), "warning");
-    process.exit(CANCELLED_EXIT_CODE);
-  };
-  process.once("SIGINT", interrupted);
   try {
-    const result = await body();
+    // Ctrl+C while the command works leaves the private screen before the command ends.
+    const result = await interruptible(body, () => process.stderr.write(LEAVE_ALTERNATE_SCREEN));
     if (result === CANCELLED) return CANCELLED;
     await flushed(process.stdout);
     process.stderr.write("\n");
@@ -122,14 +110,8 @@ export async function withPrivateScreen<T>(
   } finally {
     PrivateSteps.close();
     PrivatePage.close();
-    process.off("SIGINT", interrupted);
     // A Windows console takes standard output asynchronously; the screen is left after it.
     await flushed(process.stdout);
     process.stderr.write(LEAVE_ALTERNATE_SCREEN);
   }
-}
-
-/** What is said of a temporary folder of an export that could not be removed. */
-function leftFolderNotice(folder: string): string {
-  return `A private temporary folder, which may hold a copy of the export, could not be removed: ${printableText(folder)}. Delete it.`;
 }

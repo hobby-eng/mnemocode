@@ -68,39 +68,40 @@ Core modules do not import CLI input, PDF renderers, image tools or the share ru
 
 `mnemocode.ts` starts the menu (`cli/menu.ts`) when there is no command and a terminal, and otherwise `cli/command-line.ts`, which dispatches commands and rejects unsupported flags. The menu only builds a command line from its questions and runs it through the same dispatcher. `cli/input.ts` owns interactive and file input. `arguments.ts` and the option modules validate values.
 
-| Module                    | Responsibility                                                                    |
-| ------------------------- | --------------------------------------------------------------------------------- |
-| `cli/terminal-input.ts`   | Raw terminal keys and typed answers, the same on Linux, macOS and Windows         |
-| `cli/terminal-keys.ts`    | The keys acted on, the readers of typed bytes, and the refusals of a question     |
-| `cli/key-sequences.ts`    | Escape sequences of keys read to their end, and the editing keys among them       |
-| `cli/typed-answer.ts`     | The answer being edited, wiped after it, and what shows of it on the terminal     |
-| `cli/terminal-choice.ts`  | Lists chosen with the arrow keys, typed answers and the pause for Enter           |
-| `cli/private-screen.ts`   | The alternate screen for typed secrets and their results, cleared after Enter     |
-| `cli/protection.ts`       | No core dumps, the permission model, and what a command gives up before it runs   |
-| `cli/system-sandbox.ts`   | What the operating system enforces below the permission model, read back          |
-| `cli/sandbox-record.ts`   | The interface of a system's sandbox, and the record of what held and what not     |
-| `cli/sandbox-linux.ts`    | No core dumps, seccomp and Landlock for every thread                              |
-| `cli/sandbox-macos.ts`    | No debugger attach, the macOS sandbox                                             |
-| `cli/sandbox-windows.ts`  | Crash reports without the heap, mitigation policies, a job object                 |
-| `cli/typed-hints.ts`      | The rows of the word hints below a line being typed                               |
-| `cli/swap-check.ts`       | Whether swap is encrypted (Linux)                                                 |
-| `cli/cloud-folders.ts`    | Whether an output path lies in a cloud-synchronised folder                        |
-| `cli/menu.ts`             | The entries, their questions and the command line each answer builds              |
-| `cli/ask.ts`              | Questions asked again until their answer can be used                              |
-| `cli/search-consent.ts`   | The question before a long search, the same for every search                      |
-| `cli/screen-fit.ts`       | Whether a result fits on the private screen, which keeps no scrollback            |
-| `cli/private-page.ts`     | The page of the private screen, recorded, and shown by pages when it does not fit |
-| `cli/screen-rows.ts`      | What a terminal shows after a stream of text and control sequences, row by row    |
-| `cli/terminal-style.ts`   | The palette and the colour rule, which the release-signing script also takes      |
-| `cli/save-retry.ts`       | A save that fails on the private screen: try again, another name, or skip         |
-| `cli/encode-questions.ts` | The questions of a new backup: its form, Seedshift, shares and where it goes      |
-| `cli/card-questions.ts`   | The questions of a backup's printable cards: design, layout, files and details    |
-| `cli/output-questions.ts` | The files and folders that those answers name, each checked and claimed once      |
-| `cli/menu-entries.ts`     | The entries of the start menu, by which every message and the sheet name them     |
-| `cli/backup-questions.ts` | The encoded seed phrase and its mode on the screen, checked before the dates      |
-| `cli/date-search.ts`      | The dates on the screen, the search, and what follows it                          |
-| `cli/backup-check.ts`     | The questions of the optional check of a backup typed again after Encode          |
-| `cli/heir-sheet.ts`       | The route through the menu that the sheet for heirs prints (`--heir-sheet`)       |
+| Module                    | Responsibility                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `cli/terminal-input.ts`   | Raw terminal keys and typed answers, the same on Linux, macOS and Windows               |
+| `cli/terminal-keys.ts`    | The keys acted on, the readers of typed bytes, and the refusals of a question           |
+| `cli/key-sequences.ts`    | Escape sequences of keys read to their end, and the editing keys among them             |
+| `cli/typed-answer.ts`     | The answer being edited, wiped after it, and what shows of it on the terminal           |
+| `cli/terminal-choice.ts`  | Lists chosen with the arrow keys, typed answers and the pause for Enter                 |
+| `cli/private-screen.ts`   | The alternate screen for typed secrets and their results, cleared after Enter           |
+| `cli/protection.ts`       | No core dumps, the permission model, and what a command gives up before it runs         |
+| `cli/system-sandbox.ts`   | What the operating system enforces below the permission model, read back                |
+| `cli/sandbox-record.ts`   | The interface of a system's sandbox, and the record of what held and what not           |
+| `cli/sandbox-linux.ts`    | No core dumps, seccomp and Landlock for every thread                                    |
+| `cli/sandbox-macos.ts`    | No debugger attach, the macOS sandbox                                                   |
+| `cli/sandbox-windows.ts`  | Crash reports without the heap, mitigation policies, a job object                       |
+| `cli/typed-hints.ts`      | The rows of the word hints below a line being typed                                     |
+| `cli/swap-check.ts`       | Whether swap is encrypted (Linux)                                                       |
+| `cli/cloud-folders.ts`    | Whether an output path lies in a cloud-synchronised folder                              |
+| `cli/menu.ts`             | The entries, their questions and the command line each answer builds                    |
+| `cli/ask.ts`              | Questions asked again until their answer can be used                                    |
+| `cli/search-consent.ts`   | The question before a long search, the same for every search                            |
+| `cli/screen-fit.ts`       | Whether a result fits on the private screen, which keeps no scrollback                  |
+| `cli/private-page.ts`     | The page of the private screen, recorded, and shown by pages when it does not fit       |
+| `cli/interruption.ts`     | Ctrl+C while a command works: the screen left, the temporary folders removed, cancelled |
+| `cli/screen-rows.ts`      | What a terminal shows after a stream of text and control sequences, row by row          |
+| `cli/terminal-style.ts`   | The palette and the colour rule, which the release-signing script also takes            |
+| `cli/save-retry.ts`       | A save that fails on the private screen: try again, another name, or skip               |
+| `cli/encode-questions.ts` | The questions of a new backup: its form, Seedshift, shares and where it goes            |
+| `cli/card-questions.ts`   | The questions of a backup's printable cards: design, layout, files and details          |
+| `cli/output-questions.ts` | The files and folders that those answers name, each checked and claimed once            |
+| `cli/menu-entries.ts`     | The entries of the start menu, by which every message and the sheet name them           |
+| `cli/backup-questions.ts` | The encoded seed phrase and its mode on the screen, checked before the dates            |
+| `cli/date-search.ts`      | The dates on the screen, the search, and what follows it                                |
+| `cli/backup-check.ts`     | The questions of the optional check of a backup typed again after Encode                |
+| `cli/heir-sheet.ts`       | The route through the menu that the sheet for heirs prints (`--heir-sheet`)             |
 
 `scripts/verify-terminal-input.py` drives the menu and the prompts for secrets in a real pseudo-terminal: a Unix one on Linux and macOS, a Windows pseudo-console through pywinpty. Its session and screen are `scripts/terminal_session.py`, the public answers it types are `scripts/terminal_answers.py`, and its checks are `scripts/terminal_menu_checks.py` and `scripts/terminal_secret_checks.py`.
 
@@ -122,7 +123,7 @@ The renderers contain no Node.js code. They get bundled files, random choices, P
 
 `ShareCardSet.forIndividualCards({ pageSize, orientation })` turns an existing collection into separate cards without rendering or drawing new random values. It retains every share's codes, decorative colors, first decoy, identity and references; the original sheet stays unchanged. The size defaults to `business`, only the explicitly requested orientation applies, and whole-share QR cards and sheet-only designs are refused.
 
-`heir-sheet-text.ts` writes the words of the sheet for heirs, along the route through the host's own program that the host passes, and `heir-sheet.ts` lays out both sides in A5 or A6. `sskr-render.ts` renders the cards of shares. `backup-cards.ts` builds the content of the cards of an encoded backup (`backupCardContent`), which every save, Encode's dry run and the sample cards draw. `template-catalog.ts` lists the designs by id, kind and style and reads a design named by its id or its number (`resolveTemplateId`), without the renderers that `templates.ts` adds; the employer on business cards follows the style (`sectorForStyle`). A set of cards is planned before it is drawn: `card-palette.ts` gives the cards that print codes their colors, `card-decoys.ts` adds the decoys after a backup's codes and keeps the ones a plan takes, and `card-plan.ts` keeps exactly one decoy for separate cards. For sheets it plans their number and the orientation through `planCollectionSheet` in `collection-layout.ts`, which lays out the sheets that `collection-sheet.ts` draws, with the sheet shape of each design (`CardTemplate.sheetShape`). `business-tint.ts` holds the tint of the business artwork that the recoloring, the ink of the curves design and the palette share. `pdf.ts`, `individual-cards.ts` and `sskr-cards.ts` organize documents and destinations. `image-export.ts` converts those same PDFs to images with local Poppler. `private-file.ts` publishes file exports as new private files through a staging directory on the same filesystem, never over an existing name. Artwork derived from a user's references is cached only for the current document; shared caches contain fixed bundled artwork.
+`heir-sheet-text.ts` writes the words of the sheet for heirs, along the route through the host's own program that the host passes, and `heir-sheet.ts` lays out both sides in A5 or A6. `sskr-render.ts` renders the cards of shares. `backup-cards.ts` builds the content of the cards of an encoded backup (`backupCardContent`), which every save, Encode's dry run and the sample cards draw. `template-catalog.ts` lists the designs by id, kind and style and reads a design named by its id or its number (`resolveTemplateId`), without the renderers that `templates.ts` adds; the employer on business cards follows the style (`sectorForStyle`). A set of cards is planned before it is drawn: `card-palette.ts` gives the cards that print codes their colors, `card-decoys.ts` adds the decoys after a backup's codes and keeps the ones a plan takes, and `card-plan.ts` keeps exactly one decoy for separate cards. For sheets it plans their number and the orientation through `planCollectionSheet` in `collection-layout.ts`, which lays out the sheets that `collection-sheet.ts` draws, with the sheet shape of each design (`CardTemplate.sheetShape`). `business-tint.ts` holds the tint of the business artwork that the recoloring, the ink of the curves design and the palette share. `pdf.ts`, `individual-cards.ts` and `sskr-cards.ts` organize documents and destinations. `image-export.ts` converts those same PDFs to images with local Poppler. `private-file.ts` publishes file exports as new private files through a staging directory on the same filesystem, never over an existing name. `temporary-folders.ts` keeps the staging and raster folders of exports while they exist, so that a process stopped at once removes them. Artwork derived from a user's references is cached only for the current document; shared caches contain fixed bundled artwork.
 
 ## Modules for other hosts
 
@@ -261,7 +262,7 @@ For repeated wallet comparisons, `WalletEvidenceCheck.prepare(evidence, passphra
 
 Refusals use `core/error-catalog.ts`: each module owns its stable code list and default English messages, while one shared implementation creates the error. The code is immutable; the existing message, native `TypeError` or `RangeError` identity, and `cause` are preserved. `CodedFailure` is exported as a type from the core API. A host may display the default message or choose its own wording from the code; changing wording does not change a code. A refusal supplied by an existing shared rule uses `suppliedMessage`, without copying the rule's formatter. Existing specialized error classes keep their codes. Operational failures thrown by dependencies or host callbacks still pass through; they are not reclassified as cancellation.
 
-Terminal questions return `CANCELLED` for Ctrl+C or ended input, rather than throwing. Yes/no answers are `"yes"` and `"no"`; waiting for a key gives `"enter"`, `"escape"` or `CANCELLED`. The entry point prints the cancellation line and sets exit code 130 once. Library searches use their documented stopped result, and a host must keep it separate from a completed search with no matches. If a host cancels after the final share-assessment callback, `ShareRestore.read` wipes the plan and returns the stopped result before timing or handing it out.
+Terminal questions return `CANCELLED` for Ctrl+C or ended input, rather than throwing. Yes/no answers are `"yes"` and `"no"`; waiting for a key gives `"enter"`, `"escape"` or `CANCELLED`. The entry point prints the cancellation line and sets exit code 130 once; Ctrl+C while a command works and no question reads keys arrives as SIGINT, and `cli/interruption.ts` ends the command the same way, after leaving the private screen and removing the temporary folders of an export. Library searches use their documented stopped result, and a host must keep it separate from a completed search with no matches. If a host cancels after the final share-assessment callback, `ShareRestore.read` wipes the plan and returns the stopped result before timing or handing it out.
 
 `BackupReading` owns its retained payload bytes until `wipe()` or `[Symbol.dispose]()`. Hosts keep it live through asynchronous mode/format questions and dispose it after creating the child backup or marked-code search, including refusal and cancellation paths. Those children own independent copies; ending the reading does not dispose them. Record mode/format metadata remains available after disposal, while payload-dependent operations refuse. Decoded strings and caller-owned inputs cannot be recalled or erased by this owner.
 

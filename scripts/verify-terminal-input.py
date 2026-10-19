@@ -60,7 +60,10 @@ from terminal_context_checks import (
     check_new_backup_heading_on_screen,
     check_question_reason_kept,
 )
-from terminal_export_checks import check_ctrl_c_during_image_export
+from terminal_export_checks import (
+    check_ctrl_c_during_image_export,
+    check_interrupt_without_terminal,
+)
 from terminal_result_checks import check_private_result_pages, check_share_pages
 
 from terminal_menu_checks import (
@@ -132,6 +135,7 @@ def main():
     check_candidate_passphrase_roles()
     check_ctrl_c()
     check_ctrl_c_during_image_export()
+    check_interrupt_without_terminal()
     check_date_search_ctrl_c()
     print("terminal input checks passed")
 

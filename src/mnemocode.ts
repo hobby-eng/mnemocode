@@ -2,7 +2,7 @@
 import { runCommandLine } from "./cli/command-line.js";
 import { menuAvailable, runMenu } from "./cli/menu.js";
 import { hardenProcess, relaunchProtected, underProtection } from "./cli/protection.js";
-import { CANCELLED_EXIT_CODE, CANCELLED_MESSAGE } from "./cli/exit-codes.js";
+import { endCancelled } from "./cli/interruption.js";
 import { dumbTerminalReason, terminalTooDumb } from "./cli/terminal-input.js";
 import { CANCELLED, type Cancelled } from "./cli/terminal-keys.js";
 import { terminalFailure, terminalHint } from "./cli/terminal.js";
@@ -28,9 +28,7 @@ async function main(): Promise<Cancelled | undefined> {
 // A cancelled run says so in one line and ends as a process that Ctrl+C stopped (exit-codes.ts).
 void main().then(
   (end) => {
-    if (end !== CANCELLED) return;
-    terminalHint(CANCELLED_MESSAGE);
-    process.exitCode = CANCELLED_EXIT_CODE;
+    if (end === CANCELLED) endCancelled();
   },
   (error: unknown) => {
     terminalFailure(describeError(error));

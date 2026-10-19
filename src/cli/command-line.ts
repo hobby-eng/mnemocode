@@ -11,6 +11,7 @@ import { runRecoverDate } from "./recover-date-command.js";
 import { runRecoverWord } from "./recover-word-command.js";
 import { assertCoreSelfTest, runSelfTest } from "./self-test.js";
 import { runTable } from "./table-command.js";
+import { interruptible } from "./interruption.js";
 import { showProtection, withPrivateScreen } from "./private-screen.js";
 import { assertProtected, dropUnneeded } from "./protection.js";
 import { swapWarning } from "./swap-check.js";
@@ -113,7 +114,9 @@ export async function runCommandLine(argv: readonly string[]): Promise<CommandEn
   assertPrivateFileSources(arguments_);
   if (facts.coreSelfTest) assertCoreSelfTest();
   const run = async (): Promise<CommandEnd> => (await HANDLERS[command](arguments_)) ?? undefined;
-  return facts.secret ? withSecrets(arguments_, run, command) : withOutputs(arguments_, run);
+  return interruptible(() =>
+    facts.secret ? withSecrets(arguments_, run, command) : withOutputs(arguments_, run),
+  );
 }
 
 /**

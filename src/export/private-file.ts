@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 import { errorCode } from "../core/refusal.js";
 import { ExportFileName } from "./file-name.js";
-import { makeTemporaryFolder, removeTemporaryFolder } from "./temporary-folders.js";
+import { fillingFolder, makeTemporaryFolder, removeTemporaryFolder } from "./temporary-folders.js";
 
 const ERRORS = new ErrorCatalog("export.private-file", {
   "new-folder-path-empty-one-refused": () => "A new folder needs a path; an empty one is refused.",
@@ -159,6 +159,8 @@ export async function publishNewFolder<T>(
   await mkdir(dirname(target), { recursive: true });
   const staging = await makeTemporaryFolder(join(dirname(target), prefix));
   let reservation: Awaited<ReturnType<typeof lstat>> | undefined;
+  // While the finished files are moved in, an exit at once removes the folder part filled.
+  let filled: (() => void) | undefined;
   try {
     const result = await write(staging);
     // Everything is prepared privately before claiming the final name with mkdir.
@@ -170,6 +172,7 @@ export async function publishNewFolder<T>(
       throw error;
     }
     reservation = await lstat(target);
+    filled = fillingFolder(target, reservation);
     for (const name of await readdir(staging))
       await rename(privateChildPath(staging, name), privateChildPath(target, name));
     // Every file was moved: a staging folder that is not empty fails the export.
@@ -183,6 +186,8 @@ export async function publishNewFolder<T>(
         await rm(target, { recursive: true, force: true });
     }
     throw error;
+  } finally {
+    filled?.();
   }
 }
 
