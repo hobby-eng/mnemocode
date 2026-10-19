@@ -217,6 +217,12 @@ describe("Joint repair of the shares of one set", () => {
     });
     expect(one.assessment.verdict).toBe("not-enough");
     expect(one.assessment.reason).toMatch(/threshold/u);
+    // Its search says why, and the plan searches no more after it (AUD-037-API003).
+    await expect(searchOnce(one)).rejects.toMatchObject({
+      code: "sskr.joint-repair.plan-not-searchable",
+      message: expect.stringMatching(/threshold/u) as unknown,
+    });
+    await expect(one.search()).rejects.toMatchObject({ code: "sskr.joint-repair.plan-wiped" });
     const twice = await planJointRepair(
       [markUnits(vector.shares[0]!, "indexes", [4]), vector.shares[0]!],
       { platform: nodeSharePlatform },

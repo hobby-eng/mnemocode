@@ -171,7 +171,7 @@ class OwnedJointPlan implements JointPlan, Disposable {
   readonly search = async (options?: SearchOptions): Promise<RepairSearch> => {
     this.#assertLive();
     if (this.#platform === undefined) {
-      if (this.assessment.verdict === "stopped") return STOPPED_SEARCH;
+      if (this.assessment.verdict === "stopped") return stoppedSearch();
       throw ERRORS.create("plan-not-searchable", [defined(this.assessment.reason)]);
     }
     try {
@@ -297,8 +297,13 @@ function refusal(
   });
 }
 
-/** The search of a plan whose assessment the host stopped: stopped before it began. */
-const STOPPED_SEARCH: RepairSearch = Object.freeze({ sets: [], stopped: true });
+/**
+ * The search of a plan whose assessment the host stopped: stopped before it began; a new one each
+ * time, as its sets are the caller's.
+ */
+function stoppedSearch(): RepairSearch {
+  return { sets: [], stopped: true };
+}
 
 /** Why an assessment that the host stopped plans nothing (verdict "stopped"). */
 const STOPPED_REASON = "The assessment was stopped.";
@@ -471,7 +476,8 @@ export interface PlanOptions extends SearchRun {
 
 /**
  * Assesses the shares as typed, with ? for each unreadable element, and returns a plan whose search
- * finds every phrase they can restore. Nothing is tried before `search` is called. The run's
+ * finds every phrase they can restore, where its verdict lets it be searched; the search of a plan
+ * that refused is refused (JointPlan.search). Nothing is tried before `search` is called. The run's
  * signal stops the assessment, which can take a while for many marks, and its turn lets the host
  * run now and then (SearchTurns).
  */
@@ -746,7 +752,8 @@ export class JointRepair {
 
   /**
    * Assesses `records`, the shares as typed with ? for each unreadable element, and returns the
-   * plan whose search finds every phrase they can restore (planJointRepair). `places` names each
+   * plan whose search finds every phrase they can restore, or refuses as its verdict says
+   * (planJointRepair). `places` names each
    * share in a refusal by the place it was typed at.
    */
   plan(
