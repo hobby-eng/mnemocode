@@ -33,6 +33,7 @@ import {
   type WalletCheck,
 } from "./wallet-check.js";
 import { placesNamed } from "./places.js";
+import { lowerFirst } from "./prose.js";
 import { phraseOfIndexes } from "./words.js";
 import { ownedDates } from "./dates.js";
 import { CORRECT_WRITTEN_COPY, SearchPlan, counted } from "./search-plan.js";
@@ -274,10 +275,17 @@ export class MissingCodesSearch {
 
   /**
    * The places of `codes` that cannot be read: "Code 6", "Codes 6 and 9"; "Words 10 and 11" for
-   * colours, whose marks leave words open (EncodedForm.placeName).
+   * colours, whose marks leave words open (EncodedForm.placeName), and "Words 11 and 12 or words 1
+   * and 2" where their tags leave two placements open, of which one is right.
    */
   static placesText(codes: MissingCodes): string {
-    return placesNamed(EncodedForm.of(codes.format).placeName, codes.missingPlaces);
+    const name = EncodedForm.of(codes.format).placeName;
+    return codes.placements
+      .map((places, placement) => {
+        const named = placesNamed(name, places);
+        return placement === 0 ? named : lowerFirst(named);
+      })
+      .join(" or ");
   }
 
   /** The borrowed marked-code owner; its creating caller remains responsible for its lifetime. */

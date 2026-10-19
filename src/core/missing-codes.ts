@@ -44,7 +44,7 @@ import {
   colorOfUnicodePair,
   COLOR_UNICODE_PAIRS,
   COLOR_UNICODE_POINTS_PER_COLOR,
-  wordPositionPatterns,
+  wordPositionPlacements,
   markedColorSymbols,
   RGB_HEX_DIGITS,
 } from "./colors.js";
@@ -155,22 +155,31 @@ function unicodeColors(text: string): (string | undefined)[] {
   });
 }
 
-/** The places of colors, each word a pattern of its four position digits (wordPositionPatterns). */
-function colorPlaces(colors: readonly (string | undefined)[]): WordPlace[] {
-  return wordPositionPatterns(colors).map((pattern, place) => {
-    const words = wordsOfNumber(pattern, true);
-    if (words.length === 0) throw ERRORS.create("colors-give-no-word-at-place", [`${place + 1}`]);
-    return words;
-  });
+/**
+ * The places of colors in each placement that their tags allow (wordPositionPlacements), each
+ * word a pattern of its four position digits. A placement that leaves no word at a place is not
+ * the record's; where none is left, the first one says where.
+ */
+function colorPlaces(colors: readonly (string | undefined)[]): WordPlace[][] {
+  const placements = wordPositionPlacements(colors).map((patterns) =>
+    patterns.map((pattern) => wordsOfNumber(pattern, true)),
+  );
+  const possible = placements.filter((places) => places.every((words) => words.length > 0));
+  if (possible.length > 0) return possible;
+  const place = defined(placements[0]).findIndex((words) => words.length === 0);
+  throw ERRORS.create("colors-give-no-word-at-place", [`${place + 1}`]);
 }
 
-/** The places of `text` read in `format`, each with the codes it may hold. */
-function placesOf(text: string, format: EncodedFormat): WordPlace[] {
+/**
+ * The places of `text` read in `format`, each with the codes it may hold, in each placement that
+ * the codes allow: one, but for colors whose tags leave it open.
+ */
+function placementsOf(text: string, format: EncodedFormat): WordPlace[][] {
   switch (format) {
     case "english":
-      return englishTokens(text).map((word, index) => wordPlaceOf(word, index + 1));
+      return [englishTokens(text).map((word, index) => wordPlaceOf(word, index + 1))];
     case "indexes":
-      return codeTokens(text).map((token, index) => numberPlace(token, index + 1));
+      return [codeTokens(text).map((token, index) => numberPlace(token, index + 1))];
     case "unicode": {
       const codes = hexUnits(text, UNICODE_CODE_DIGITS);
       if (codes === undefined)
@@ -180,7 +189,7 @@ function placesOf(text: string, format: EncodedFormat): WordPlace[] {
             text,
           ),
         ]);
-      return codes.map((code, index) => codePlace(code, index + 1));
+      return [codes.map((code, index) => codePlace(code, index + 1))];
     }
     case "colors": {
       const colors = hexUnits(text, RGB_HEX_DIGITS);
@@ -229,32 +238,48 @@ export interface CodesCheckResult {
  * EncodedBackups; toString, toJSON and Node's inspect show none of the codes.
  */
 export class MissingCodes extends Redacted implements Disposable {
+  /** The places of every placement, one after another, each `#wordCount` long. */
   readonly #values: SecretValue<readonly WordPlace[]>;
+  readonly #wordCount: number;
   readonly #active = new Set<() => void>();
   readonly #format: EncodedFormat;
   readonly #masking: Masking;
   readonly #combinations: number;
 
-  private constructor(places: readonly WordPlace[], format: EncodedFormat, mode: MaskingMode) {
+  private constructor(
+    placements: readonly (readonly WordPlace[])[],
+    format: EncodedFormat,
+    mode: MaskingMode,
+  ) {
     super("MissingCodes");
     // A JavaScript host may pass any value, which would be refused only by a later operation
     // (AUD-014-API006): refused here by the guard that complete codes have (EncodedBackup).
     const masking = Masking.of(mode);
-    if (!isBip39WordCount(places.length))
-      throw ERRORS.create("codes-seed-phrase", [`${places.length}`, `${WORD_COUNTS_TEXT}`]);
-    if (places.every((place) => place.length === 1))
+    const wordCount = placements[0]?.length ?? 0;
+    if (!isBip39WordCount(wordCount))
+      throw ERRORS.create("codes-seed-phrase", [`${wordCount}`, `${WORD_COUNTS_TEXT}`]);
+    if (placements.some((places) => places.every((place) => place.length === 1)))
       throw ERRORS.create("no-code-marked-mark-each-code-cannot-read", []);
-    // Counted and bounded as the word search counts and bounds its places (candidates.ts).
-    const combinations = searchCombinations({ kind: "unknown-words", places });
+    // Counted and bounded as the word search counts and bounds its places (candidates.ts), every
+    // placement together.
+    const combinations = placements.reduce(
+      (total, places) => total + searchCombinations({ kind: "unknown-words", places }),
+      0,
+    );
     assertSearchable(combinations, NARROW_MARKED_CODES);
-    this.#values = SecretValue.numberLists(places);
+    this.#values = SecretValue.numberLists(placements.flat());
+    this.#wordCount = wordCount;
     this.#format = format;
     this.#masking = masking;
     this.#combinations = combinations;
   }
 
-  get #places(): readonly WordPlace[] {
-    return this.#values.value;
+  /** The places of each placement that the codes allow: one, but for colors (placementsOf). */
+  get #placements(): readonly (readonly WordPlace[])[] {
+    const places = this.#values.value;
+    return Array.from({ length: places.length / this.#wordCount }, (_, placement) =>
+      places.slice(placement * this.#wordCount, (placement + 1) * this.#wordCount),
+    );
   }
 
   /**
@@ -270,7 +295,7 @@ export class MissingCodes extends Redacted implements Disposable {
     // Codes of every form may be marked; detection tries them in their order.
     return ENCODED_FORMATS.filter((format) => {
       try {
-        return isBip39WordCount(placesOf(text, format).length);
+        return isBip39WordCount(placementsOf(text, format)[0]?.length ?? 0);
       } catch {
         return false;
       }
@@ -279,12 +304,12 @@ export class MissingCodes extends Redacted implements Disposable {
 
   /** Reads the marked codes of `text` in `format`, taken with `mode`; throws why they cannot be. */
   static read(text: string, format: EncodedFormat, mode: MaskingMode): MissingCodes {
-    return new MissingCodes(placesOf(text, format), format, mode);
+    return new MissingCodes(placementsOf(text, format), format, mode);
   }
 
   /** The same codes taken with another mode. */
   withMode(mode: MaskingMode): MissingCodes {
-    return new MissingCodes(this.#places, this.#format, mode);
+    return new MissingCodes(this.#placements, this.#format, mode);
   }
 
   /** The validated representation format of these marked codes. */
@@ -299,12 +324,21 @@ export class MissingCodes extends Redacted implements Disposable {
 
   /** Number of BIP39 word positions in the encoded phrase, before candidate expansion. */
   get wordCount(): number {
-    return this.#places.length;
+    this.#values.assertLive();
+    return this.#wordCount;
   }
 
-  /** The places, counted from 1, whose code is not known. */
+  /** The places, counted from 1, whose code is not known, in any placement. */
   get missingPlaces(): number[] {
-    return unknownPlacesOf(this.#places).map((index) => index + 1);
+    return [...new Set(this.placements.flat())].sort((a, b) => a - b);
+  }
+
+  /**
+   * The places, counted from 1, whose code is not known, for each placement that the codes allow:
+   * one, but for colors whose tags leave it open (wordPositionPlacements).
+   */
+  get placements(): number[][] {
+    return this.#placements.map((places) => unknownPlacesOf(places).map((index) => index + 1));
   }
 
   /** The combinations of codes that the marks leave. */
@@ -327,7 +361,10 @@ export class MissingCodes extends Redacted implements Disposable {
    */
   get expected(): number {
     if (!this.checksummed) return this.#combinations;
-    return expectedCandidates({ kind: "unknown-words", places: this.#places }).count;
+    return this.#placements.reduce(
+      (total, places) => total + expectedCandidates({ kind: "unknown-words", places }).count,
+      0,
+    );
   }
 
   /**
@@ -351,11 +388,16 @@ export class MissingCodes extends Redacted implements Disposable {
     this.#values.assertLive();
     state(true);
     try {
-      const places = this.#places;
-      if (this.checksummed) {
-        for (const words of searchCandidates({ kind: "unknown-words", places })) yield [...words];
-      } else {
-        for (const codes of placeCombinations(places)) yield [...codes];
+      const placements = this.#placements;
+      for (const [placement, places] of placements.entries()) {
+        const candidates = this.checksummed
+          ? searchCandidates({ kind: "unknown-words", places })
+          : placeCombinations(places);
+        // A candidate that an earlier placement gives too is given once.
+        const earlier = placements.slice(0, placement);
+        for (const codes of candidates)
+          if (!earlier.some((other) => other.every((place, at) => place.includes(codes[at] ?? -1))))
+            yield [...codes];
       }
     } finally {
       state(false);

@@ -15,7 +15,7 @@ import {
   colorsToUnicode,
   indexesToColors,
   unicodeToColors,
-  wordPositionPatterns,
+  wordPositionPlacements,
 } from "../src/core/colors.js";
 import { parseInput } from "../src/core/representations.js";
 import { SHARE_LENGTHS } from "../src/sskr/transport.js";
@@ -143,9 +143,9 @@ describe("AUD-011-ARC002, ARC003, ARC020: the color form has one decoder and der
     expect(colors).toHaveLength(8);
     expect(colorsToIndexes([...colors].reverse())).toEqual(indexes);
     // The positions that marked reading gives are those of complete reading.
-    const patterns = wordPositionPatterns(colors);
+    const [patterns = []] = wordPositionPlacements(colors);
     expect(patterns.map(Number)).toEqual(indexes.map((index) => index + 1));
-    expect(wordPositionPatterns([undefined, ...colors.slice(1)])[0]).toBe("????");
+    expect(wordPositionPlacements([undefined, ...colors.slice(1)])[0]?.[0]).toBe("????");
   });
 
   it("refuses a pair of Private Use codes that writes no #RRGGBB color, marked or not", () => {
