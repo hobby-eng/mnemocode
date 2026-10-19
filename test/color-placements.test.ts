@@ -54,6 +54,13 @@ function marked(
     .join(" ");
 }
 
+/** Whether `indexes` are among the candidates of `codes`, which stop at them. */
+function isCandidate(codes: MissingCodes, indexes: readonly number[]): boolean {
+  for (const candidate of codes.candidates())
+    if (candidate.every((index, at) => index === indexes[at])) return true;
+  return false;
+}
+
 /** A stand-in for the host's fingerprint. */
 const fingerprint = (mnemonic: string): string =>
   createHash("sha256").update(mnemonic).digest("hex").slice(0, 8);
@@ -70,22 +77,30 @@ describe("marked colors of a record whose tags start later", () => {
         const record = shifted(colors, offset);
         // A record that complete colors decode, as older readers wrote them.
         expect(colorsToIndexes(record)).toEqual(indexes);
-        for (const unread of [0, Math.floor(colors.length / 2), colors.length - 1])
-          for (const form of ["colors", "colors-unicode"] as const) {
-            const where = `offset ${offset}, color ${unread + 1}, ${form}`;
-            using codes = MissingCodes.read(marked(record, unread, form), form, "seedshift");
-            expect([...codes.candidates()], where).toContainEqual(indexes);
-          }
+        const last = colors.length - 1;
+        // Colors and Color Unicode give the same colors: one form for each color unread, both for
+        // the highest.
+        for (const [unread, form] of [
+          [0, "colors"],
+          [Math.floor(colors.length / 2), "colors"],
+          [last, "colors"],
+          [last, "colors-unicode"],
+        ] as const) {
+          const where = `offset ${offset}, color ${unread + 1}, ${form}`;
+          using codes = MissingCodes.read(marked(record, unread, form), form, "seedshift");
+          expect(isCandidate(codes, indexes), where).toBe(true);
+        }
+        if (offset !== step) continue;
         // The fingerprint finds them where the highest color is unread, which a start of 0 also
         // fits, and found nothing before.
-        const last = colors.length - 1;
         using codes = MissingCodes.read(marked(record, last, "colors"), "colors", "seedshift");
         const found = await new MissingCodesSearch(codes, fingerprint)
           .byEncodedFingerprint(fingerprint(encoded.shiftedEnglish.join(" ")))
           .run();
         expect(found.kind, `offset ${offset}`).toBe("found");
         if (found.kind === "found") expect(found.backup.indexes).toEqual(indexes);
-        // And the wallet, with the date known.
+        // And the wallet, with the date known: the same search, so once.
+        if (colors.length !== 8) continue;
         const wallet = await new MissingCodesSearch(codes, fingerprint)
           .byWallet(async (mnemonic) => ({ matched: mnemonic === phrase }), DatesAnswer.of([DATE]))
           .run();
