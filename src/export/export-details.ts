@@ -9,7 +9,11 @@
 // Does not: draw cards, or remember details from one export to the next (card-session.ts does,
 // for a host that asks for that). The details are independent of every seed phrase and share.
 
-import { resolveCardPresentation, type CardCopyOverrides } from "./card-copy.js";
+import {
+  checkedCardPresentation,
+  resolveCardPresentation,
+  type CardCopyOverrides,
+} from "./card-copy.js";
 import { createCardIdentity, sectorForStyle } from "./card-identities.js";
 import type { UniformChoice } from "./platform.js";
 import type { CardPresentation, CardProfile, CardSettings } from "./card-settings.js";
@@ -129,7 +133,9 @@ export class ExportDetails {
     return ExportDetails.#once(settings, () => {
       // Both orders evaluate the same two rules; only which one runs first differs.
       const texts = (): CardPresentation =>
-        settings.presentation ?? resolveCardPresentation(choose);
+        settings.presentation === undefined
+          ? resolveCardPresentation(choose)
+          : checkedCardPresentation(settings.presentation);
       const person = (): Required<CardProfile> =>
         ExportDetails.#person(choose, settings.profile, style);
       if (personFirst) {

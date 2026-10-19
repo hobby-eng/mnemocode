@@ -143,6 +143,23 @@ function copyValue(value: string | undefined, fallback: () => string, label: str
   return cardText(value, label, "; use - to hide it.");
 }
 /**
+ * A presentation that a host gives whole, as one settled already: each text checked by the rule
+ * of card text (cardText), and "" where its line is hidden. A text that is missing or breaks the
+ * rule is refused before anything is drawn, as a given profile is (AUD-037-API006).
+ */
+export function checkedCardPresentation(given: CardPresentation): CardPresentation {
+  return Object.freeze(
+    Object.fromEntries(
+      COPY_FIELDS.map((field) => {
+        const value: unknown = given[field];
+        const { label } = COPY_TEXTS[field];
+        return [field, value === "" ? "" : cardText(value, label, '; give "" to hide its line.')];
+      }),
+    ),
+  ) as CardPresentation;
+}
+
+/**
  * The texts of a design: those of `copy`, checked, and the rest chosen with `choose`. An export
  * settles them once (ExportDetails, export-details.ts); independent of all mnemonic data.
  */

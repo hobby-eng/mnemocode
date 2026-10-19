@@ -1,4 +1,5 @@
 import { ExportDetails } from "./export-details.js";
+import { checkedCardPresentation } from "./card-copy.js";
 import {
   assertPageSettings,
   assertSheetQr,
@@ -113,7 +114,10 @@ export async function renderCards(
       // A design's own texts and details print over those of the export.
       const resolved: CardContent = {
         ...content,
-        presentation: content.presentation ?? details.presentation,
+        presentation:
+          content.presentation === undefined
+            ? details.presentation
+            : checkedCardPresentation(content.presentation),
         profile: { ...details.profile, ...content.profile },
         cardQr: content.cardQr === true,
       };
