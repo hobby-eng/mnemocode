@@ -1,6 +1,6 @@
 [package]
 name = "recovery-sskr-wasm"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 rust-version = "1.85.1"
 license = "MIT OR Apache-2.0"
@@ -13,7 +13,6 @@ crate-type = ["cdylib", "rlib"]
 bc-rand = "=0.5.0"
 bc-ur = "=0.19.2"
 bc-tags = "=0.12.0"
-dcbor = "=0.25.2"
 sskr = { version = "=0.12.0", path = "vendor/sskr-0.12.0" }
 rand_chacha = "=0.9.0"
 rand_core = "=0.9.5"

@@ -1,13 +1,13 @@
 {
-  "rust/Cargo.lock": "19c3a62d8981b1d5847ddba58cee4fbc5dd8061f759af8b483c5fd25ec5d4a9e",
-  "rust/Cargo.toml": "0d230636c6a7a72813d5f9867b7c61eb35e3699df2bf641df4e9399d40cef589",
+  "rust/Cargo.lock": "e89d5c0dea66c76d2982e0f953ee540bc3420a3c2a84cefa1655120b14d54d2a",
+  "rust/Cargo.toml": "984bf47d258d58eaa0c0a5eb4d31055c80272a7d26cb909b024358286cb6cd2a",
   "rust/clippy.toml": "42205e005acff1dd5d36837c3c1a93000bd677f84b81f7722fec94c75e609c46",
   "rust/rust-toolchain.toml": "58036485dea1e5bb8ccb7ca06d881ac7ea052a17e3c5b879a70259292c036797",
   "generated/recovery_sskr_wasm_bg.wasm.d.ts": "1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04",
   "generated/recovery_sskr_wasm.d.ts": "4fe377e3834fbd460e5aeaa668cd16c343c50bd50606cf9390a2491797bdb2ac",
-  "generated/recovery_sskr_wasm_bg.wasm": "ca60c5db3cbe0868af83e944710a97146d59bdb84f7a4e5217c2d8c37e1da87e",
-  "generated/recovery_sskr_wasm.js": "f3dbb5a1dde247503455a3bfa00eab3e42ec9558eabd639d4a130366203cb4eb",
-  "rust/src/lib.rs": "67d8614d53bbcc3ac20f984f84000f4284df81e8aae58d122b46ee16fbe10b33",
+  "generated/recovery_sskr_wasm_bg.wasm": "72568bea563b383718960a3b1ebfed6aa15a86019858ad10750f5dac82f13eee",
+  "generated/recovery_sskr_wasm.js": "e1b79a3c40e92704034b8bb72c4f8dff54746c53219d93eb01f952909f6c0f2c",
+  "rust/src/lib.rs": "5189fdfe651832e12d32bbe6881aa255fa0c0874fbc0bc7c43e57dc54528b1d7",
   "rust/src/refusal.rs": "e360e6ae6e0bbb272aea03965686ca8efe1bf817bbb25b2b1c4d28744e3d8060",
   "rust/vendor/sskr-0.12.0/Cargo.toml": "d3208e6da5126544ae50a4f657e178d6662c87a7f18cdcbe61c0e75b968cdeb7",
   "rust/vendor/sskr-0.12.0/LICENSE.md": "d2c043c3d4bfc59d9898cc60366d4a8d26a677d152148859477dd02be24d2acc",
@@ -30,5 +30,6 @@
   "rust/vendor/bc-shamir-0.13.0/src/interpolate.rs": "9c9d8c4df2a101870cdfcb5f87f5470dbb1fea1c61504df46a1919a09e517ac0",
   "rust/vendor/bc-shamir-0.13.0/src/lib.rs": "8da1461a0526add4864754a5a342d1a4b8f1371f0ce7baf84c54fba0ea064b1a",
   "rust/vendor/bc-shamir-0.13.0/src/recovery_secret.rs": "bdc3e1c0d72ffb6411c6720e4cf163d508e77a0decc728cab273f3bee27aa0b9",
-  "rust/vendor/bc-shamir-0.13.0/src/shamir.rs": "a3c0327301038028c1523466ec432ca9493c0fdde1cacde9625893e062681de6"
+  "rust/vendor/bc-shamir-0.13.0/src/shamir.rs": "a3c0327301038028c1523466ec432ca9493c0fdde1cacde9625893e062681de6",
+  "rust/src/share_text.rs": "ced8c1282137b2707a0c770ff8ea879ac9eea6e276767b55630e85e30fb5c16f"
 }

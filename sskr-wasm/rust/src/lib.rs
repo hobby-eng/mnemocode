@@ -1,10 +1,14 @@
 //! The SSKR engine of MnemoCode, built into WebAssembly: Blockchain Commons' SSKR, which splits a
 //! secret into Shamir shares and restores it, with the shares written as compact URs or standard
-//! Bytewords. The host gives the fresh randomness of a split and reads the shares one per line;
-//! the copies of a secret, a seed or a share that the engine keeps are wiped once it is done.
+//! Bytewords. The host gives the fresh randomness of a split and reads the shares one per line.
+//! Once a call returns, its memory holds no copy of a secret, a seed or a share that the engine or
+//! its dependencies made while working: the buffers it owns are wiped, the text of a share is
+//! written and read here (share_text.rs), and the stack that the SSKR library worked on is
+//! overwritten (scrub_stack); test/sskr-engine-memory.test.ts searches the whole memory for them.
+//! What a call returns to the host, the text of the shares or the secret, the glue that
+//! scripts/build-sskr-wasm.mjs writes wipes in this memory once the host holds its copy.
 
 use bc_rand::RandomNumberGenerator;
-use bc_ur::{bytewords, prelude::*};
 use rand_chacha::ChaCha20Rng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sskr::{sskr_combine, sskr_generate_using, GroupSpec, Secret, Spec};
@@ -12,7 +16,24 @@ use wasm_bindgen::prelude::*;
 use zeroize::{Zeroize, Zeroizing};
 
 mod refusal;
+mod share_text;
 pub use refusal::Refusal;
+
+/// The bytes of the stack below an entry's frame that scrub_stack overwrites once the SSKR library
+/// has returned: far more than the deepest that a split or a restore goes, which the memory test
+/// would show (AUD-037-SEC005).
+const STACK_SCRUB_BYTES: usize = 64 * 1024;
+
+/// Overwrites with zeros the stack below its caller, where the SSKR library and its dependencies
+/// leave what they do not wipe, such as the message of the HMAC that checks a restored secret: a
+/// buffer as large as STACK_SCRUB_BYTES on the stack, written byte by byte so that no write is left
+/// out, and never inlined, so that it lies below the frame that called it.
+#[inline(never)]
+fn scrub_stack() {
+    let mut area = [0_u8; STACK_SCRUB_BYTES];
+    area.zeroize();
+    std::hint::black_box(&mut area);
+}
 
 /// The seed of a split's generator: as many bytes as ChaCha20 takes. The hosts' SEED_BYTES
 /// (src/sskr/share-platform.ts) is a deliberate copy, which test/sskr-vectors.test.ts keeps in step
@@ -46,51 +67,12 @@ impl Drop for HostSeedRng {
     }
 }
 
-#[derive(Clone)]
+/// The bytes of one share, wiped when it is dropped.
 struct UrShare(Vec<u8>);
 
 impl Drop for UrShare {
     fn drop(&mut self) {
         self.0.zeroize();
-    }
-}
-
-impl UrShare {
-    /// The share's bytes, moved out of it; the emptied share has nothing left to wipe.
-    fn into_bytes(mut self) -> Vec<u8> {
-        std::mem::take(&mut self.0)
-    }
-}
-
-impl CBORTagged for UrShare {
-    fn cbor_tags() -> Vec<Tag> {
-        tags_for_values(&[bc_tags::TAG_SSKR_SHARE, bc_tags::TAG_SSKR_SHARE_V1])
-    }
-}
-
-impl From<UrShare> for CBOR {
-    fn from(value: UrShare) -> Self {
-        value.tagged_cbor()
-    }
-}
-
-impl CBORTaggedEncodable for UrShare {
-    fn untagged_cbor(&self) -> CBOR {
-        CBOR::to_byte_string(&self.0)
-    }
-}
-
-impl TryFrom<CBOR> for UrShare {
-    type Error = dcbor::Error;
-
-    fn try_from(cbor: CBOR) -> dcbor::Result<Self> {
-        Self::from_tagged_cbor(cbor)
-    }
-}
-
-impl CBORTaggedDecodable for UrShare {
-    fn from_untagged_cbor(cbor: CBOR) -> dcbor::Result<Self> {
-        Ok(Self(cbor.try_into_byte_string()?.to_vec()))
     }
 }
 
@@ -135,29 +117,16 @@ const NO_SHARES: &str = "Enter at least one SSKR share.";
 
 fn encode_share(share: &UrShare, encoding: ShareEncoding) -> String {
     match encoding {
-        ShareEncoding::CompactUr => share.ur_string(),
-        ShareEncoding::Bytewords => bytewords::encode(
-            share.tagged_cbor().to_cbor_data(),
-            bytewords::Style::Standard,
-        ),
+        ShareEncoding::CompactUr => share_text::compact_ur(&share.0),
+        ShareEncoding::Bytewords => share_text::standard_bytewords(&share.0),
     }
 }
 
-fn decode_share(record: &str, encoding: ShareEncoding) -> Result<Vec<u8>, Refusal> {
-    let share = match encoding {
-        ShareEncoding::CompactUr => UrShare::from_ur_string(record).map_err(|_| Refusal::Decode)?,
-        ShareEncoding::Bytewords => {
-            let data = bytewords::decode(record, bytewords::Style::Standard)
-                .map_err(|_| Refusal::Decode)?;
-            let cbor = CBOR::try_from_data(data).map_err(|_| Refusal::Decode)?;
-            // Standard textual SSKR Bytewords carries the registered CBOR tag.
-            // Accept the earlier CKD untagged wrapper for existing backups only.
-            UrShare::from_tagged_cbor(cbor.clone())
-                .or_else(|_| UrShare::from_untagged_cbor(cbor))
-                .map_err(|_| Refusal::Decode)?
-        }
-    };
-    Ok(share.into_bytes())
+fn decode_share(record: &str, encoding: ShareEncoding) -> Result<Zeroizing<Vec<u8>>, Refusal> {
+    match encoding {
+        ShareEncoding::CompactUr => share_text::read_compact_ur(record),
+        ShareEncoding::Bytewords => share_text::read_standard_bytewords(record),
+    }
 }
 
 /// The shares of `secret` in `encoding`, one per line, from the generator seeded with
@@ -213,7 +182,7 @@ fn combine(records: &str, encoding: u8) -> Result<Vec<u8>, Refusal> {
         .lines()
         .map(str::trim)
         .filter(|record| !record.is_empty())
-        .map(|record| decode_share(record, encoding).map(Zeroizing::new))
+        .map(|record| decode_share(record, encoding))
         .collect::<Result<Vec<_>, _>>()?;
     if shares.is_empty() {
         return Err(Refusal::NoShares);
@@ -252,7 +221,6 @@ pub fn create_sskr_shares_formatted(
     mut random_seed: Vec<u8>,
     encoding: u8,
 ) -> Result<String, JsValue> {
-    bc_tags::register_tags();
     let result = split(
         &secret,
         group_threshold,
@@ -262,6 +230,7 @@ pub fn create_sskr_shares_formatted(
     );
     secret.zeroize();
     random_seed.zeroize();
+    scrub_stack();
     result.map_err(Refusal::thrown)
 }
 
@@ -278,9 +247,9 @@ pub fn recover_sskr_shares_formatted(
     mut records: String,
     encoding: u8,
 ) -> Result<Vec<u8>, JsValue> {
-    bc_tags::register_tags();
     let result = combine(&records, encoding);
     records.zeroize();
+    scrub_stack();
     result.map_err(Refusal::thrown)
 }
 
@@ -290,7 +259,6 @@ mod tests {
 
     #[test]
     fn refuses_a_group_index_outside_its_declared_group_count_in_both_encodings() {
-        bc_tags::register_tags();
         for encoding in [ShareEncoding::CompactUr, ShareEncoding::Bytewords] {
             let mut payload = vec![0, 0, 0, 0, 0];
             payload.extend_from_slice(&[0x24; 16]);
@@ -307,14 +275,13 @@ mod tests {
 
     #[test]
     fn restores_legacy_untagged_bytewords() {
-        bc_tags::register_tags();
         let secret = vec![0x24; 16];
         let records = create_sskr_shares(secret.clone(), 1, vec![2, 3], vec![5; 32]).unwrap();
         let legacy = records
             .lines()
             .map(|record| {
-                let share = UrShare::from_ur_string(record).unwrap();
-                bytewords::encode(share.ur().cbor().to_cbor_data(), bytewords::Style::Standard)
+                let share = share_text::read_compact_ur(record).unwrap();
+                share_text::untagged_standard_bytewords(&share)
             })
             .collect::<Vec<_>>();
         assert_eq!(
@@ -414,19 +381,23 @@ mod decode_tests {
 
     #[test]
     fn preserves_literal_public_encodings() {
-        bc_tags::register_tags();
-        let share = UrShare::from_ur_string(SHARE).unwrap();
+        let share = UrShare(
+            decode_share(SHARE, ShareEncoding::CompactUr)
+                .unwrap()
+                .to_vec(),
+        );
         assert_eq!(encode_share(&share, ShareEncoding::CompactUr), SHARE);
         assert_eq!(encode_share(&share, ShareEncoding::Bytewords), WORDS);
         assert_eq!(
-            decode_share(WORDS, ShareEncoding::Bytewords).unwrap(),
+            decode_share(WORDS, ShareEncoding::Bytewords)
+                .unwrap()
+                .to_vec(),
             share.0
         );
     }
 
     #[test]
     fn discards_wrong_type_and_malformed_decoder_details() {
-        bc_tags::register_tags();
         let wrong_type = SHARE.replacen("ur:sskr/", "ur:private-user-token/", 1);
         let bad_checksum = format!("{}ae", &SHARE[..SHARE.len() - 2]);
         for (record, encoding) in [
