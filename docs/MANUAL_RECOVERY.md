@@ -33,13 +33,15 @@ words the seed phrase has, with the cards: that number tells where the backup en
 ## Printed cards
 
 Cards printed by MnemoCode end with codes that belong to nothing: exactly one on
-separate cards, and on a sheet at least one, then as many as fill its last row.
+separate cards, and on a sheet at least one, then as many as fill all its rows,
+which can be a whole row of them.
 They are not marked, and a color among them repeats the order tag of a real
 color. The backup is the first cards by their printed card number: one card per
 word for Word Unicode, and one per color for colors and Color Unicode, 8, 10, 12,
 14 or 16 of them for a 12-, 15-, 18-, 21- or 24-word phrase. The sheet for heirs,
 or the number of words you recorded, tells how many. Set aside every card after
-them before any step below.
+them before any step below. Cards of a Shamir share end the same way, and the
+sheet for heirs tells how many codes each share has.
 
 ## 1. Obtain the stored word numbers
 
@@ -86,7 +88,9 @@ For example, `#000064` is decimal 100, written `00000100`: tag `00`, payload
 Color Unicode is different from Word Unicode. It stores each RGB color in two
 Private Use code points. Split hexadecimal text into four-digit code points,
 and take them in pairs. Older copies may show the actual Private Use characters;
-read their numeric Unicode code points instead.
+read their numeric Unicode code points instead. Cards in Color Unicode print
+each color as its six hexadecimal RGB digits: for those, use the RGB procedure
+above directly.
 
 For a pair with hexadecimal values `H` and `L`, convert to decimal and calculate:
 
