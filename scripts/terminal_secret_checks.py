@@ -234,7 +234,8 @@ def check_re_encode_menu():
         # and the warning once, not also as a warning retained apart.
         kept = ("New backup", "The fingerprint matches: the seed phrase is accepted")
         assert_private_result_visible(session, kept, once=(FINGERPRINT_FILTER,))
-        session.type("2")
+        # Unicode codes, form 3.
+        session.type("3")
         session.wait_for("Use Seedshift?")
         assert_private_result_visible(session, kept, once=(FINGERPRINT_FILTER,))
         session.type("2")
@@ -286,7 +287,8 @@ def check_re_encode_answer_refused():
             session.wait_for("Which form should the seed phrase take?")
             kept = dict(once=(FINGERPRINT_FILTER,), absent=("Dropbox keeps a copy of",))
             assert_private_result_visible(session, (CARD_REFUSAL,), **kept)
-            session.type("3")
+            # Colors, form 5.
+            session.type("5")
             session.wait_for("Use Seedshift?")
             assert_private_result_visible(session, (CARD_REFUSAL,), **kept)
             # Escape goes back to the phrase, and Stop to the menu.
@@ -307,7 +309,7 @@ def answer_refused_cards(session):
     """Answers the new backup as shares in colors on A6 sheets of the IT design, in Dropbox, with
     a company name too long for the cards, which Encode refuses once every answer is given."""
     for question, key in (
-        ("Which form should the seed phrase take?", "3"),
+        ("Which form should the seed phrase take?", "5"),
         ("Use Seedshift?", "2"),
         ("Split it into Shamir shares?", "2"),
         ("Where should the shares go?", "3"),

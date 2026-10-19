@@ -158,9 +158,9 @@ export function warningsAt(question: string): (string | undefined)[] {
 }
 
 /** Colors, no Seedshift, no shares, printable cards. */
-export const SINGLE = [2, 1, 0, 3];
+export const SINGLE = [4, 1, 0, 3];
 /** Colors, no Seedshift, 2 of 3 shares, printable cards. */
-export const SHARES = [2, 1, 1, 2];
+export const SHARES = [4, 1, 1, 2];
 
 /**
  * The options after --template and its design, for the answers to the card questions: the

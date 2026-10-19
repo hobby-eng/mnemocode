@@ -314,8 +314,8 @@ def check_lines_pasted_as_one_answer():
         session.wait_for(MENU_SHOWN)
         session.type(ENCODE_ENTRY)
         session.wait_for("Which form should the seed phrase take?")
-        # Each form is chosen by its place in the list: 1 for word numbers.
-        session.type("1")
+        # Each form is chosen by its place in the list, its --format number: 2 for word numbers.
+        session.type("2")
         # Word numbers are always masked: the menu asks only which Seedshift.
         session.wait_for("Which Seedshift?")
         session.type("1")
@@ -358,8 +358,8 @@ def at_card_files(session):
     up to the first question of how they are saved: the kind of file, then their layout."""
     session.type(ENCODE_ENTRY)
     session.wait_for("Which form should the seed phrase take?")
-    # Each form is chosen by its place in the list: 3 for colors.
-    session.type("3")
+    # Each form is chosen by its place in the list, its --format number: 5 for colors.
+    session.type("5")
     session.wait_for("Use Seedshift?")
     session.type("2")
     session.wait_for("Split it into Shamir shares?")

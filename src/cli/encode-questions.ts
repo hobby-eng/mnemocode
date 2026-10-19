@@ -6,6 +6,7 @@
 // card-questions.ts, and the files and folders that the answers name output-questions.ts.
 
 import { formatEncoded, representMnemonic, type EncodedFormat } from "../core.js";
+import { ENCODED_FORMATS } from "../core/types.js";
 import { listInWords } from "../core/places.js";
 import {
   ALWAYS_MASKED_NOTE,
@@ -71,42 +72,39 @@ function withSamples<T>(choices: readonly Choice<T>[]): Choice<T>[] {
   );
 }
 
+/** What the question says of each form, beside its name. */
+const FORM_TEXTS: Readonly<
+  Record<EncodedFormat, { readonly label: string; readonly note: string }>
+> = {
+  english: { label: "English words", note: "the seed phrase itself, masked with your dates" },
+  indexes: {
+    label: "Word numbers",
+    note: "its place in the BIP39 word list, masked with your dates",
+  },
+  unicode: {
+    label: "Unicode codes",
+    note: "four-digit hexadecimal codes of the Chinese BIP39 words",
+  },
+  "colors-unicode": {
+    label: "Colors as text",
+    note: "the colors written as Unicode codes, no font needed",
+  },
+  colors: { label: "Colors", note: `color codes, ${COLOR_COUNTS_TEXT} for the whole seed phrase` },
+};
+
 /**
- * The forms in the order of the question, the first three being the usual ones, each answered by
- * its place in the list; the command shown names the form by its --format number.
+ * The forms in the order of their --format numbers (ENCODED_FORMATS), so that the place of a form
+ * in the list is its number everywhere (owner, 2026-10-20); each but the words themselves with a
+ * sample.
  */
 function formChoices(): Choice<EncodedFormat>[] {
-  return withSamples([
-    {
-      label: "Word numbers",
-      note: "its place in the BIP39 word list, masked with your dates",
-      example: example("indexes"),
-      value: "indexes",
-    },
-    {
-      label: "Unicode codes",
-      note: "four-digit hexadecimal codes of the Chinese BIP39 words",
-      example: example("unicode"),
-      value: "unicode",
-    },
-    {
-      label: "Colors",
-      note: `color codes, ${COLOR_COUNTS_TEXT} for the whole seed phrase`,
-      example: example("colors"),
-      value: "colors",
-    },
-    {
-      label: "Colors as text",
-      note: "the same colors written as Unicode codes, no font needed",
-      example: example("colors-unicode"),
-      value: "colors-unicode",
-    },
-    {
-      label: "English words",
-      note: "the seed phrase itself, masked with your dates",
-      value: "english",
-    },
-  ]);
+  return withSamples(
+    ENCODED_FORMATS.map((value) => ({
+      ...FORM_TEXTS[value],
+      ...(value === "english" ? {} : { example: example(value) }),
+      value,
+    })),
+  );
 }
 
 /** What Seedshift is, shown with the first question about it; the README explains it. */

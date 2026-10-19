@@ -119,7 +119,7 @@ describe("start menu", () => {
       const count = "How many shares in all? (2 to 16)";
       const threshold = "How many of them restore the seed phrase?";
       expect(
-        await runOf(ENTRY.encode, [1, 1, 7, 0, 0, 0], {
+        await runOf(ENTRY.encode, [2, 1, 7, 0, 0, 0], {
           [count]: ["1", "17", "3"],
           [threshold]: ["4", "3"],
         }),
@@ -142,7 +142,7 @@ describe("start menu", () => {
     it("refuses file names that the command could not use", async () => {
       const name = "QR code file name";
       // Encode: word numbers, MnemoCode Seedshift, no shares, a QR code image.
-      const qr = [0, 0, 0, 2];
+      const qr = [1, 0, 0, 2];
       const folder = join(files, "folder");
       const refused: [string, string][] = [
         ["-", "- is no file name here; type the name of a file."],
@@ -172,7 +172,7 @@ describe("start menu", () => {
       // Encode: word numbers, MnemoCode Seedshift, no shares, a record file, and heirs on A5.
       const record = join(files, "backup.txt");
       const heirs = "PDF file name";
-      const run = await runOf(ENTRY.encode, [0, 0, 0, 1, 0, 1], {
+      const run = await runOf(ENTRY.encode, [1, 0, 0, 1, 0, 1], {
         "Record file name": [record],
         [heirs]: [record, join(files, "heirs.pdf")],
       });
@@ -182,12 +182,12 @@ describe("start menu", () => {
         "Another file of this task has this name or this folder; choose another one.",
       ]);
       // The next task starts afresh: the same name may be used again.
-      await runOf(ENTRY.encode, [0, 0, 0, 1, 0], { "Record file name": [record] });
+      await runOf(ENTRY.encode, [1, 0, 0, 1, 0], { "Record file name": [record] });
       expect(warningsAt("Record file name")).toEqual([undefined, undefined]);
       // A new folder for cards may not hold a file of the same task either.
       script.lines = [];
       const cards = join(files, "cards");
-      await runOf(ENTRY.encode, [2, 1, 0, 3, 0, 3, 0, 0, 1], {
+      await runOf(ENTRY.encode, [4, 1, 0, 3, 0, 3, 0, 0, 1], {
         "Name of the new folder": [cards],
         [heirs]: [join(cards, "heirs.pdf"), join(files, "heirs.pdf")],
       });
@@ -229,7 +229,7 @@ describe("start menu", () => {
       // Printing sample cards has no folder; Encode's separate cards do. Missing folders are made
       // by the command.
       const deep = join(files, "a", "b", "cards");
-      const run = await runOf(ENTRY.encode, [2, 1, 0, 3, 0, 3, 0, 0], {
+      const run = await runOf(ENTRY.encode, [4, 1, 0, 3, 0, 3, 0, 0], {
         "Name of the new folder": [
           join(files, "record.txt", "cards"),
           "''",

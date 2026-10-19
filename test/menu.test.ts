@@ -15,6 +15,7 @@ import { ENCODED_SEEDSHIFT_QUESTION } from "../src/cli/seedshift-choices.js";
 import { MENU_ENTRIES, typedCommand } from "../src/cli/menu.js";
 import { MENU_ENTRY_NAMES as ENTRY } from "../src/cli/menu-entries.js";
 import { formatNumber } from "../src/cli/format-numbers.js";
+import { isEncodedFormat } from "../src/core/types.js";
 import { anyOf, containing } from "./helpers/matchers.js";
 import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import {
@@ -111,7 +112,7 @@ describe("start menu", () => {
   it("builds the command lines of the usual answers", async () => {
     // Colors, no Seedshift, no shares, as printable cards in the first design, in one PDF of A6
     // sheets turned the way the cards are largest, with a QR code each, with random details.
-    expect(await runOf(ENTRY.encode, [2, 1, 0, 3, 0, 0, 2, 0, 0])).toEqual([
+    expect(await runOf(ENTRY.encode, [4, 1, 0, 3, 0, 0, 2, 0, 0])).toEqual([
       "encode",
       "--ask-secrets",
       "--format",
@@ -126,7 +127,7 @@ describe("start menu", () => {
     ]);
     // Word numbers, always masked, with MnemoCode Seedshift, split 2 of 3 into shares in word
     // numbers too, on the screen, with the original wallet phrase in word numbers beside them.
-    expect(await runOf(ENTRY.encode, [0, 0, 1, 0, 2, 0])).toEqual([
+    expect(await runOf(ENTRY.encode, [1, 0, 1, 0, 2, 0])).toEqual([
       "encode",
       "--sskr",
       "--ask-secrets",
@@ -144,14 +145,14 @@ describe("start menu", () => {
       "2",
     ]);
     // Colors give color shares without a question about their look.
-    expect(await runOf(ENTRY.encode, [2, 1, 1, 0])).toEqual(
+    expect(await runOf(ENTRY.encode, [4, 1, 1, 0])).toEqual(
       expect.arrayContaining(["--share-format", "colors"]),
     );
     expect(script.asked.map((asked) => asked.question)).not.toContain(
       "How should each share be written?",
     );
     // English words are always masked; the original Seedshift asks nothing about shares.
-    expect(await runOf(ENTRY.encode, [4, 1, 0])).toEqual([
+    expect(await runOf(ENTRY.encode, [0, 1, 0])).toEqual([
       "encode",
       "--ask-secrets",
       "--format",
@@ -167,7 +168,7 @@ describe("start menu", () => {
     ]);
     // Unicode codes, no Seedshift, a threshold typed under Other, no whole copy, and a sheet for
     // heirs.
-    expect(await runOf(ENTRY.encode, [1, 1, 7, 0, 0, 1])).toEqual([
+    expect(await runOf(ENTRY.encode, [2, 1, 7, 0, 0, 1])).toEqual([
       "encode",
       "--sskr",
       "--ask-secrets",
@@ -189,7 +190,7 @@ describe("start menu", () => {
   it("offers independent choices for the original wallet phrase and the Seedshift words", async () => {
     for (const [choice, form] of [undefined, "words", "codes", "both"].entries()) {
       for (const words of [0, 1]) {
-        const run = (await runOf(ENTRY.encode, [0, 0, 1, 0, choice, words, 0]))!;
+        const run = (await runOf(ENTRY.encode, [1, 0, 1, 0, choice, words, 0]))!;
         const args = parseArguments(run.slice(1));
         expect(args["show-original"]).toBe(form);
         expect(args.format).toBe(form === "codes" || form === "both" ? "2" : undefined);
@@ -224,20 +225,22 @@ describe("start menu", () => {
     ]);
   });
 
-  it("numbers the forms by their place in the list; the command names the --format number", async () => {
-    // English words, listed last, are answered with 5 and are form 1 of the command built.
-    const run = (await runOf(ENTRY.encode, [4, 1, 0])) ?? [];
+  it("numbers the forms by their place in the list, which is their --format number", async () => {
+    // English words, listed first, are answered with 1 and are --format 1 of the command built.
+    const run = (await runOf(ENTRY.encode, [0, 1, 0])) ?? [];
     expect(run[run.indexOf("--format") + 1]).toBe(String(formatNumber("english")));
     const forms = script.digits["Which form should the seed phrase take?"]!;
     expect(forms.map(({ digit }) => digit)).toEqual(forms.map(() => undefined));
     const list = script.lists[0]!.map((line) => line.replace(STYLE_CODES, ""));
     const places = list.map((line) => line.match(/^[›\s]\s(\d)\s/u)?.[1]).filter(Boolean);
     expect(places).toEqual(["1", "2", "3", "4", "5"]);
-    expect(forms.at(-1)).toEqual({ value: "english", digit: undefined });
+    // Each form's place is its number (owner, 2026-10-20).
+    const numbers = forms.map(({ value }) => (isEncodedFormat(value) ? formatNumber(value) : 0));
+    expect(numbers).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("always masks word numbers and words, and calls an unmasked copy weak", async () => {
-    for (const form of [0, 4]) {
+    for (const form of [1, 0]) {
       await runOf(ENTRY.encode, [form]);
       const questions = script.asked.map((asked) => asked.question);
       expect(questions).not.toContain("Use Seedshift?");
@@ -245,7 +248,7 @@ describe("start menu", () => {
     }
     // Unicode codes may stay unmasked, but the answer says how weak that is.
     script.lists = [];
-    await runOf(ENTRY.encode, [1]);
+    await runOf(ENTRY.encode, [2]);
     expect(script.asked[1]!.question).toBe("Use Seedshift?");
     expect(script.lists[1]!.join(" ")).toContain("weak: only disguised");
   });
@@ -304,23 +307,23 @@ describe("start menu", () => {
       return script.asked.find((asked) => asked.question.startsWith("Where should"))!.labels;
     };
     // Word numbers, MnemoCode Seedshift, no shares: a record or a QR code, no cards.
-    expect(await destinations([0, 0, 0])).not.toContain("Also as printable cards");
+    expect(await destinations([1, 0, 0])).not.toContain("Also as printable cards");
     // Colors and Unicode codes: cards too.
+    expect(await destinations([4, 1, 0])).toContain("Also as printable cards");
     expect(await destinations([2, 1, 0])).toContain("Also as printable cards");
-    expect(await destinations([1, 1, 0])).toContain("Also as printable cards");
     // Shares of word numbers have no cards; shares of Unicode codes print their codes, with
     // colors that only decorate them, and shares of colors print their colors.
-    expect(await destinations([0, 0, 1, 0])).toEqual([
+    expect(await destinations([1, 0, 1, 0])).toEqual([
       "Only on this screen",
       "Also in a text file",
     ]);
-    expect(await destinations([1, 1, 1, 0])).toEqual([
+    expect(await destinations([2, 1, 1, 0])).toEqual([
       "Only on this screen",
       "Also in a text file",
       "Also as printable cards",
       "All of these",
     ]);
-    expect(await destinations([2, 1, 1])).toEqual([
+    expect(await destinations([4, 1, 1])).toEqual([
       "Only on this screen",
       "Also in a text file",
       "Also as printable cards",
@@ -330,7 +333,7 @@ describe("start menu", () => {
 
   it("saves to every place at once with All of these, the screen included", async () => {
     // Word numbers, MnemoCode Seedshift, no shares: a record file and a QR code, no cards.
-    expect(await runOf(ENTRY.encode, [0, 0, 0, 3, 0])).toEqual([
+    expect(await runOf(ENTRY.encode, [1, 0, 0, 3, 0])).toEqual([
       "encode",
       "--ask-secrets",
       "--format",
@@ -346,7 +349,7 @@ describe("start menu", () => {
     expect(all.labels.at(-1)).toBe("All of these");
     // Colors, no Seedshift, no shares: the record, the QR code, then the questions of the cards,
     // a PDF of A6 sheets in the first design here.
-    const run = (await runOf(ENTRY.encode, [2, 1, 0, 4, 0, 0, 0, 0, 0, 0, 0]))!;
+    const run = (await runOf(ENTRY.encode, [4, 1, 0, 4, 0, 0, 0, 0, 0, 0, 0]))!;
     expect(run.slice(run.indexOf("--output"), run.indexOf("--qr") + 2)).toEqual([
       "--output",
       anyOf(String),
@@ -355,7 +358,7 @@ describe("start menu", () => {
     ]);
     expect(run).toContain("--pdf");
     // Shares of colors: a text file and their cards.
-    const shares = (await runOf(ENTRY.encode, [2, 1, 1, 3, 0, 0, 0, 0, 0, 0, 0]))!;
+    const shares = (await runOf(ENTRY.encode, [4, 1, 1, 3, 0, 0, 0, 0, 0, 0, 0]))!;
     expect(shares[shares.indexOf("--output") + 1]).toEqual(anyOf(String));
     expect(shares).toContain("--template");
   });

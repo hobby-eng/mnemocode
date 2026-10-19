@@ -149,7 +149,8 @@ def check_new_backup_heading_on_screen():
             session.type(terminal.ENTER)
             session.wait_for("Which form should the seed phrase take?")
             terminal.assert_private_result_visible(session, ("New backup",))
-            session.type("2")
+            # Unicode codes, form 3.
+            session.type("3")
             session.wait_for("Use Seedshift?")
             terminal.assert_private_result_visible(session, ("New backup",))
             session.type(terminal.CTRL_C)
