@@ -12,6 +12,7 @@
 
 ### Audit follow-up
 
+- The SSKR engine carries the license texts of every crate that its WebAssembly links, written from the crates' own sources, including the MIT notices of libsecp256k1, ur and phf, in the repository, the npm package and each executable's license notices.
 - The guide to recovery without MnemoCode says where printed cards' extra codes are: the backup is the first cards by number, as the sheet for heirs says, and a color among the extra cards repeats an order tag.
 - Unreadable colors of a record whose order tags start later than 0, as older records may, are searched in every placement that the tags read allow; the search no longer assumes the tags start at 0 and reports no fitting codes.
 - Decode's joint search of unreadable codes and forgotten date digits reports several sets, not one found, when two dates of the same codes pass the wallet check, which a fingerprint allows by chance; it showed the phrase of the first date before.

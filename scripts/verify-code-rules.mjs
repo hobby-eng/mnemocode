@@ -46,7 +46,7 @@ const MAX_FILE_LINES = 800;
  */
 const LEFT_OUT = ["docs/audits/", "sskr-wasm/generated/"];
 /** Files that a tool writes, left out of the file length (CORE-15). */
-const GENERATED = new Set(["pnpm-lock.yaml"]);
+const GENERATED = new Set(["pnpm-lock.yaml", "sskr-wasm/LINKED_LICENSES.txt"]);
 /** Lockfiles of the package managers other than pnpm (TOOL-05). */
 const OTHER_LOCKFILES = new Set([
   "package-lock.json",

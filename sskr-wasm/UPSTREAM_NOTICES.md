@@ -6,6 +6,10 @@ filtered against that lockfile; they are not a new upstream license audit. Some
 entries are build-time or platform-specific and need not appear in the WASM binary.
 Crate sources and their license files remain authoritative.
 
+The license texts of every crate that the WebAssembly links, with their copyright lines, are in
+[LINKED_LICENSES.txt](LINKED_LICENSES.txt), written from the crates' own sources by
+`scripts/sskr-licenses.mjs` and checked by `pnpm check:rust`.
+
 The bridge source is included in `rust/src/lib.rs`, with its manifest and lockfile.
 The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 `integrity.json` pins the source, manifests and generated JS/WASM files.
@@ -108,7 +112,7 @@ The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 | `salsa20` | 0.10.2 | MIT OR Apache-2.0 |
 | `scrypt` | 0.11.0 | MIT OR Apache-2.0 |
 | `secp256k1` | 0.31.1 | CC0-1.0 |
-| `secp256k1-sys` | 0.11.0 | CC0-1.0 |
+| `secp256k1-sys` | 0.11.0 | CC0-1.0; the C library libsecp256k1 that it compiles is under MIT |
 | `semver` | 1.0.28 | MIT OR Apache-2.0 |
 | `serde` | 1.0.229 | MIT OR Apache-2.0 |
 | `serde_core` | 1.0.229 | MIT OR Apache-2.0 |

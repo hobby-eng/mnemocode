@@ -72,4 +72,4 @@ Cards and sheets are drawn with the MIT-licensed `pdf-lib` (1.17.1) and
 
 ## Standalone SSKR
 
-The SSKR Rust/WASM bridge in `sskr-wasm/` uses Blockchain Commons `sskr 0.12.0` / `bc-shamir 0.13.0` and the Bytewords transport. See [bridge notices](sskr-wasm/NOTICE.md), [SSKR dependency notices and licenses](sskr-wasm/UPSTREAM_NOTICES.md), and the retained Cargo.lock for exact dependencies.
+The SSKR Rust/WASM bridge in `sskr-wasm/` uses Blockchain Commons `sskr 0.12.0` / `bc-shamir 0.13.0` and the Bytewords transport. See [bridge notices](sskr-wasm/NOTICE.md), [SSKR dependency notices and licenses](sskr-wasm/UPSTREAM_NOTICES.md), the [license texts of every crate the WebAssembly links](sskr-wasm/LINKED_LICENSES.txt), and the retained Cargo.lock for exact dependencies.

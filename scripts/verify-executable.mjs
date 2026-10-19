@@ -150,6 +150,11 @@ try {
     ),
     "has its license notices next to it",
   );
+  // The holders of the code under MIT alone that the SSKR engine links (AUD-037-BLD002).
+  check(
+    ["Pieter Wuille", "Dominik Spicher", "Steven Fackler"].every((holder) => text.includes(holder)),
+    "names the holders of every license that the SSKR engine links",
+  );
 } finally {
   rmSync(folder, { recursive: true, force: true });
 }

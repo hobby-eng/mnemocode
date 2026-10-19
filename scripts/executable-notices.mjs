@@ -1,7 +1,8 @@
 // Assembles the license notices of a single executable: MnemoCode's own license and notices, the
 // Node.js runtime that the executable contains, every npm package that esbuild bundled into it,
-// the SSKR engine and the bundled fonts and map data. MIT, Apache-2.0 and BSD-2-Clause-Patent ask
-// for their notices to travel with a binary. The build fails without the Node.js license; a
+// the SSKR engine with the license texts of every crate it links (sskr-licenses.mjs), and the
+// bundled fonts and map data. MIT, the BSD licenses, Apache-2.0 and Blue Oak ask for their notices
+// to travel with a binary. The build fails without the Node.js license; a
 // package that publishes no license file is named with the license its package.json declares.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -23,7 +24,7 @@ const LICENSE_FILE = /^(licen[cs]e|copying|notice)(\.(md|txt))?$/iu;
 const PROJECT_FILES = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"];
 // The notices of the SSKR engine and of the bundled assets, in the folders that the executable
 // embeds them from (bundled-file-paths.ts), as build-executable.mjs reads them.
-const SSKR_FILES = ["LICENSE", "NOTICE.md", "UPSTREAM_NOTICES.md"].map(
+const SSKR_FILES = ["LICENSE", "NOTICE.md", "UPSTREAM_NOTICES.md", "LINKED_LICENSES.txt"].map(
   (file) => `${SSKR_ENGINE_FOLDER}${file}`,
 );
 const ASSET_FILES = ["fonts/DejaVuSans-NOTICE", "maps/NOTICE"].map(
