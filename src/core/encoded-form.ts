@@ -30,6 +30,7 @@ import {
   isColorUnicodeSymbol,
   colorSymbolsOf,
   parseColors,
+  typedPlacesOfColors,
   unicodeToColors,
 } from "./colors.js";
 import { englishTokens, indexesOfWords, wordsOfIndexes } from "./english-words.js";
@@ -73,6 +74,18 @@ interface Variant {
   readonly write: (indexes: readonly number[]) => string;
   /** What its codes are called in a message about their count. */
   readonly unit: string;
+  /** What one of its codes is called in a message about it. */
+  readonly one: string;
+  /**
+   * Its codes of `indexes` one by one, as a person types them, in the order of the indexes; one
+   * for each word where it is absent.
+   */
+  readonly codesOf?: (indexes: readonly number[]) => string[];
+  /**
+   * For each code of `text`, read in the order of codesOf, its place among the codes as typed,
+   * counted from 0; the same order where it is absent, as where codes cannot be typed in another.
+   */
+  readonly typedPlaces?: (text: string) => number[];
   /** Whether typed text looks like this form, judged by its characters alone. */
   readonly looks: (text: string) => boolean;
   /** The digits of each code where the codes are written joined, which a sample spaces apart. */
@@ -108,6 +121,7 @@ const VARIANTS = Object.freeze({
     words: WordList.BIP39,
     write: (indexes) => wordsOfIndexes(indexes).join(" "),
     unit: "words",
+    one: "word",
     // What looks like no other form is taken for words.
     looks: () => true,
     elementUnit: "word",
@@ -120,6 +134,7 @@ const VARIANTS = Object.freeze({
     read: (text) => codeTokens(text).map(wordIndexOfNumber),
     write: (indexes) => indexes.map((index) => String(wordNumberOf(index))).join(" "),
     unit: "word numbers",
+    one: "word number",
     // The looks split the elements as the readers do (code-text.ts, elementsFit).
     looks: (text) => elementsFit(text, /^\d+$/u),
     elementUnit: "word",
@@ -132,6 +147,7 @@ const VARIANTS = Object.freeze({
     read: unicodeIndexesOf,
     write: (indexes) => unicodeCodesOfIndexes(indexes).join(""),
     unit: "codes",
+    one: "code",
     looks: (text) => elementsFit(text, /^[0-9A-F]+$/u),
     joinedWidth: UNICODE_CODE_DIGITS,
     elementUnit: "word",
@@ -146,6 +162,17 @@ const VARIANTS = Object.freeze({
     read: (text) => colorsToIndexes(unicodeToColors(text)),
     write: (indexes) => colorsToUnicode(indexesToColors(indexes)),
     unit: "codes",
+    one: "code",
+    // Two four-digit codes for each color, as the screen shows them apart.
+    codesOf: (indexes) =>
+      textPieces(colorsToUnicode(indexesToColors(indexes)), UNICODE_CODE_DIGITS),
+    typedPlaces: (text) =>
+      typedPlacesOfColors(unicodeToColors(text)).flatMap((color) =>
+        Array.from(
+          { length: COLOR_UNICODE_POINTS_PER_COLOR },
+          (_, point) => color * COLOR_UNICODE_POINTS_PER_COLOR + point,
+        ),
+      ),
     // MnemoCode's colour codes are characters of its part of the Private Use Area (colors.ts).
     looks: (text) => Array.from(text).some(isColorUnicodeSymbol),
     // One code point: a ? stands for one in every reader, and a color takes two (owner,
@@ -167,6 +194,9 @@ const VARIANTS = Object.freeze({
     read: (text) => colorsToIndexes(parseColors(text)),
     write: (indexes) => indexesToColors(indexes).join(" "),
     unit: "codes",
+    one: "code",
+    codesOf: indexesToColors,
+    typedPlaces: (text) => typedPlacesOfColors(parseColors(text)),
     looks: (text) => text.includes("#"),
     elementUnit: "color",
     leading: (text, count) =>
@@ -287,12 +317,26 @@ export class EncodedForm {
   }
 
   /**
-   * The elements of the codes of `indexes`, one for each word, or one for each colour where the
-   * codes are colours: two equal only where they are the same, so that what differs between two
-   * phrases is named by the places of the elements a person typed (AUD-037-FUN003).
+   * The codes of `indexes` one by one, as a person types them in this form: a word or its number,
+   * a Unicode code, a colour, or one of the two codes of a colour in Color Unicode. Two are equal
+   * only where they are the same, so that what differs between two phrases is named by the place
+   * of the code a person typed (AUD-037-FUN003).
    */
   elements(indexes: readonly number[]): readonly string[] {
-    return this.#variant.elementUnit === "word" ? indexes.map(String) : indexesToColors(indexes);
+    return this.#variant.codesOf?.(indexes) ?? indexes.map(String);
+  }
+
+  /**
+   * For each of the `count` codes of `text` (elements), read in this form, its place among the
+   * codes as typed, counted from 0: colours may be typed in any order (typedPlacesOfColors).
+   */
+  typedPlaces(text: string, count: number): readonly number[] {
+    return this.#variant.typedPlaces?.(text) ?? Array.from({ length: count }, (_, place) => place);
+  }
+
+  /** What one code is called in a message about it: "word", "word number", "code". */
+  get one(): string {
+    return this.#variant.one;
   }
 
   /** What the codes are called in a message about their count: "words", "word numbers", "codes". */

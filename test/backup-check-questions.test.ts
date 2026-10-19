@@ -66,7 +66,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         "",
         "Type the codes you wrote down, or press Ctrl+C to stop.",
         "These are 3 word numbers; an encoded seed phrase has 12, 15, 18, 21 or 24.",
-        "The code at place 3 differs from the result.",
+        "The word number at place 3 differs from the result.",
         "Date 1 is not one of the dates of this backup.",
         "The backup restores this seed phrase.",
       ]);

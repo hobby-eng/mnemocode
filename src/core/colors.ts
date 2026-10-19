@@ -160,6 +160,17 @@ export function parseColors(value: string): string[] {
 }
 
 /**
+ * The place of each of `given` colors among them as given, counted from 0, in the order of their
+ * tags, which colorsToIndexes reads them in: colors may be typed in any order, and a color that
+ * differs is named by the place it was typed at (AUD-037-FUN003).
+ */
+export function typedPlacesOfColors(given: readonly string[]): number[] {
+  return Array.from(given, (color, place) => ({ tag: tagAndPayload(color).tag, place }))
+    .sort((left, right) => left.tag - right.tag)
+    .map(({ place }) => place);
+}
+
+/**
  * The word numbers that `given` colors stand for, from 0; refuses a count of colors that no phrase
  * has and a color that is no word's.
  */

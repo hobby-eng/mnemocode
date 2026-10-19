@@ -28,6 +28,7 @@ import { DatesAnswer } from "./date-search.js";
 import { formatDate } from "./dates.js";
 import { EncodedBackup } from "./encoded-backup.js";
 import { EncodedForm } from "./encoded-form.js";
+import { defined } from "./defined.js";
 import { Masking, type SplitMode } from "./masking.js";
 import { placesInWords, placesNamed } from "./places.js";
 import { type DateShiftDate, type MaskingMode, type EncodedFormat } from "./types.js";
@@ -266,11 +267,14 @@ export interface EncodedOriginal {
 export class WrittenCodes extends Redacted implements Disposable {
   readonly #mode: MaskingMode;
   readonly #codes: EncodedBackup;
+  /** For each code, in the order of EncodedForm.elements, its place as typed, from 0. */
+  readonly #places: readonly number[];
 
-  private constructor(mode: MaskingMode, codes: EncodedBackup) {
+  private constructor(mode: MaskingMode, codes: EncodedBackup, places: readonly number[]) {
     super("WrittenCodes");
     this.#mode = mode;
     this.#codes = codes;
+    this.#places = places;
   }
 
   /**
@@ -279,8 +283,26 @@ export class WrittenCodes extends Redacted implements Disposable {
    */
   static read(typed: string, format: EncodedFormat, mode: MaskingMode): WrittenCodes {
     const record = parseRecord(typed);
-    const codes = EncodedBackup.read(record?.payload ?? typed, record?.format ?? format, "direct");
-    return new WrittenCodes(record?.mode ?? mode, codes);
+    const text = record?.payload ?? typed;
+    const codes = EncodedBackup.read(text, record?.format ?? format, "direct");
+    try {
+      const form = EncodedForm.of(codes.format);
+      const places = form.typedPlaces(text, form.elements(codes.indexes).length);
+      return new WrittenCodes(record?.mode ?? mode, codes, places);
+    } catch (error) {
+      codes.wipe();
+      throw error;
+    }
+  }
+
+  /** The form the codes were written in: a record's own, or the one they were read in. */
+  get format(): EncodedFormat {
+    return this.#codes.format;
+  }
+
+  /** The place as typed, from 0, of the code at `place` in the order of EncodedForm.elements. */
+  typedPlace(place: number): number {
+    return defined(this.#places[place]);
   }
 
   /** The recorded mode, or the supplied mode without a record; retained after the codes are wiped. */
@@ -371,15 +393,18 @@ export class EncodedBackupCheck implements BackupCheck {
     return readDates(line, this.wordCount);
   }
 
-  /** How codes that can be read differ from those of the result: their mode, count or places. */
+  /**
+   * How codes that can be read differ from those of the result: their mode, count or places. Both
+   * are counted and placed in the form the codes were written in, as they were typed: colours by
+   * the place they were typed at, in Color Unicode each of their two codes (AUD-037-FUN003).
+   */
   compareCodes(codes: WrittenCodes): BackupFinding | undefined {
     this.#secrets.assertLive();
     const typed = codes.indexes;
     const original = this.#codes.value;
     const conflict = modeConflictOf(codes.mode, this.#secrets.mode);
     if (conflict !== undefined) return finding("codes", "mode", conflict);
-    // Counted and placed as typed: by the colours where the codes are colours.
-    const form = EncodedForm.of(this.#format);
+    const form = EncodedForm.of(codes.format);
     const [written, result] = [form.elements(typed), form.elements(original)];
     if (written.length !== result.length)
       return finding(
@@ -387,14 +412,16 @@ export class EncodedBackupCheck implements BackupCheck {
         "count",
         `The backup has ${result.length} ${form.unit}; these are ${written.length}.`,
       );
-    const places = written.flatMap((code, place) => (code === result[place] ? [] : [place + 1]));
+    const places = written
+      .flatMap((code, place) => (code === result[place] ? [] : [codes.typedPlace(place) + 1]))
+      .sort((left, right) => left - right);
     if (places.length === 0) return undefined;
     return finding(
       "codes",
       "places",
       places.length === 1
-        ? `The code at place ${places[0]} differs from the result.`
-        : `The codes at places ${placesInWords(places)} differ from the result.`,
+        ? `The ${form.one} at place ${places[0]} differs from the result.`
+        : `The ${form.unit} at places ${placesInWords(places)} differ from the result.`,
       places,
     );
   }

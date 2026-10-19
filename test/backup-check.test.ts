@@ -103,6 +103,118 @@ function changedAt(numbers: string, places: readonly number[]): string {
     .join(" ");
 }
 
+describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", () => {
+  it("names colours that differ, and counts them, as they were typed (AUD-037-FUN003)", () => {
+    const original = encoded([DATE], "colors");
+    const check = new EncodedBackupCheck(original);
+    const colors = EncodedForm.of("colors");
+    // Word 12 lies in colour 8 of 8, word 1 in colour 1.
+    const changed = original.codes.map((code, place) =>
+      place === 0 || place === 11 ? (code + 1) % 2048 : code,
+    );
+    expect(check.compareCodes(check.readCodes(colors.codes(changed)))).toMatchObject({
+      places: [1, 8],
+      message: "The codes at places 1 and 8 differ from the result.",
+    });
+    const longer = encodeMnemonic(`${"abandon ".repeat(14)}address`, [parseDate(DATE)]);
+    expect(check.compareCodes(check.readCodes(formatEncoded(longer, "colors")))).toMatchObject({
+      kind: "count",
+      message: "The backup has 8 codes; these are 10.",
+    });
+    const words = new EncodedBackupCheck(encoded([DATE], "english"));
+    expect(words.compareCodes(words.readCodes(formatEncoded(longer, "english")))?.message).toBe(
+      "The backup has 12 words; these are 15.",
+    );
+  });
+
+  it("places a code as typed in Color Unicode, two codes to a colour, and counts them so", () => {
+    for (const [phrase, last] of [
+      [PHRASE, 16],
+      [`${"abandon ".repeat(23)}art`, 32],
+    ] as const) {
+      const masked = encodeMnemonic(phrase, [parseDate(DATE)]);
+      const check = new EncodedBackupCheck({
+        mnemonic: phrase,
+        format: "colors-unicode",
+        mode: "seedshift",
+        codes: masked.shiftedIndexes,
+        dates: [parseDate(DATE)],
+      });
+      const unicode = EncodedForm.of("colors-unicode");
+      const words = masked.shiftedIndexes.length;
+      // The first word is in the second code of colour 1, the last in the second of the last.
+      for (const [word, place] of [
+        [0, 2],
+        [words - 1, last],
+      ]) {
+        const changed = masked.shiftedIndexes.map((code, index) =>
+          index === word ? (code + 1) % 2048 : code,
+        );
+        expect(check.compareCodes(check.readCodes(unicode.codes(changed)))).toMatchObject({
+          places: [place],
+          message: `The code at place ${place} differs from the result.`,
+        });
+      }
+    }
+    const check = new EncodedBackupCheck(encoded([DATE], "colors-unicode"));
+    const longer = encodeMnemonic(`${"abandon ".repeat(14)}address`, [parseDate(DATE)]);
+    expect(
+      check.compareCodes(check.readCodes(formatEncoded(longer, "colors-unicode")))?.message,
+    ).toBe("The backup has 16 codes; these are 20.");
+  });
+
+  it("places colours as they were typed, in any order, also the last of 24 words", () => {
+    const phrase = `${"abandon ".repeat(23)}art`;
+    const masked = encodeMnemonic(phrase, [parseDate(DATE)]);
+    const check = new EncodedBackupCheck({
+      mnemonic: phrase,
+      format: "colors",
+      mode: "seedshift",
+      codes: masked.shiftedIndexes,
+      dates: [parseDate(DATE)],
+    });
+    const colors = EncodedForm.of("colors");
+    const changed = masked.shiftedIndexes.map((code, index) =>
+      index === 0 || index === 23 ? (code + 1) % 2048 : code,
+    );
+    const typed = colors.codes(changed).split(" ");
+    expect(check.compareCodes(check.readCodes(typed.join(" ")))).toMatchObject({ places: [1, 16] });
+    // Typed in reverse: colour 1 is typed last, colour 16 first.
+    expect(check.compareCodes(check.readCodes(typed.reverse().join(" ")))).toMatchObject({
+      places: [1, 16],
+      message: "The codes at places 1 and 16 differ from the result.",
+    });
+    const once = masked.shiftedIndexes.map((code, index) =>
+      index === 0 ? (code + 1) % 2048 : code,
+    );
+    const reversed = colors.codes(once).split(" ").reverse().join(" ");
+    expect(check.compareCodes(check.readCodes(reversed))?.places).toEqual([16]);
+  });
+
+  it("counts and places a record in the form it was written in", () => {
+    const original = encoded([DATE], "indexes");
+    const check = new EncodedBackupCheck(original);
+    const changed = original.codes.map((code, index) =>
+      index === 2 || index === 11 ? (code + 1) % 2048 : code,
+    );
+    const colors = serializeRecord("seedshift", "colors", EncodedForm.of("colors").codes(changed));
+    expect(check.compareCodes(check.readCodes(colors))).toMatchObject({
+      places: [2, 8],
+      message: "The codes at places 2 and 8 differ from the result.",
+    });
+    const words = new EncodedBackupCheck(encoded([DATE], "colors"));
+    const english = serializeRecord(
+      "seedshift",
+      "english",
+      EncodedForm.of("english").codes(changed),
+    );
+    expect(words.compareCodes(words.readCodes(english))).toMatchObject({
+      places: [3, 12],
+      message: "The words at places 3 and 12 differ from the result.",
+    });
+  });
+});
+
 describe("checking a written-down encoded seed phrase", () => {
   it("accepts the codes as written, with or without dates", async () => {
     const direct = new EncodedBackupCheck(encoded([], "indexes"));
@@ -142,34 +254,11 @@ describe("checking a written-down encoded seed phrase", () => {
       part: "codes",
       kind: "places",
       places: [5],
-      message: "The code at place 5 differs from the result.",
+      message: "The word number at place 5 differs from the result.",
     });
     const three = check.compareCodes(check.readCodes(changedAt(written(original), [2, 7, 12])));
     expect(three).toMatchObject({ places: [2, 7, 12] });
-    expect(three?.message).toBe("The codes at places 2, 7 and 12 differ from the result.");
-  });
-
-  it("names colours that differ, and counts them, as they were typed (AUD-037-FUN003)", () => {
-    const original = encoded([DATE], "colors");
-    const check = new EncodedBackupCheck(original);
-    const colors = EncodedForm.of("colors");
-    // Word 12 lies in colour 8 of 8, word 1 in colour 1.
-    const changed = original.codes.map((code, place) =>
-      place === 0 || place === 11 ? (code + 1) % 2048 : code,
-    );
-    expect(check.compareCodes(check.readCodes(colors.codes(changed)))).toMatchObject({
-      places: [1, 8],
-      message: "The codes at places 1 and 8 differ from the result.",
-    });
-    const longer = encodeMnemonic(`${"abandon ".repeat(14)}address`, [parseDate(DATE)]);
-    expect(check.compareCodes(check.readCodes(formatEncoded(longer, "colors")))).toMatchObject({
-      kind: "count",
-      message: "The backup has 8 codes; these are 10.",
-    });
-    const words = new EncodedBackupCheck(encoded([DATE], "english"));
-    expect(words.compareCodes(words.readCodes(formatEncoded(longer, "english")))?.message).toBe(
-      "The backup has 12 words; these are 15.",
-    );
+    expect(three?.message).toBe("The word numbers at places 2, 7 and 12 differ from the result.");
   });
 
   it("names a wrong date by its place, whatever the order of the dates", async () => {
