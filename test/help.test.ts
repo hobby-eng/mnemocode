@@ -7,6 +7,7 @@ import { commandOptions, type CommandName } from "../src/cli/command-options.js"
 import { commandHelp, topicHelp } from "../src/cli/help-pages.js";
 import { printCommandHelp, printNamedHelp } from "../src/cli/usage.js";
 import { runCommandLine } from "../src/cli/command-line.js";
+import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { QUESTION_HOURS } from "../src/core/search-turns.js";
 import { DEFAULT_ADDRESS_COUNT } from "../src/core/address-scan.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
@@ -71,8 +72,10 @@ describe("help", () => {
       log.mockRestore();
     }
     // AUD-037-UI008: a heading is wrapped like the rest; only the test phrase cannot be split.
-    for (const line of lines.filter((text) => !text.trimStart().startsWith("TEST_PHRASE=")))
-      expect(line.length, line).toBeLessThanOrEqual(80);
+    // Measured as shown: colour codes, which CLICOLOR_FORCE may add, take no column.
+    for (const line of lines.map((text) => text.replace(STYLE_CODES, "")))
+      if (!line.trimStart().startsWith("TEST_PHRASE="))
+        expect(line.length, line).toBeLessThanOrEqual(80);
   });
 
   it("prints the help of version and of help", async () => {
@@ -81,6 +84,8 @@ describe("help", () => {
       ["help", "version"],
       ["version", "--help"],
       ["version", "-h"],
+      ["-V", "--help"],
+      ["--version", "-h"],
       ["help", "help"],
       ["help", "--help"],
       ["help", "-h"],
@@ -97,6 +102,8 @@ describe("help", () => {
     expect(pages.get("help version")).toContain("Usage: mnemocode version");
     expect(pages.get("version --help")).toBe(pages.get("help version"));
     expect(pages.get("version -h")).toBe(pages.get("help version"));
+    expect(pages.get("-V --help")).toBe(pages.get("help version"));
+    expect(pages.get("--version -h")).toBe(pages.get("help version"));
     expect(pages.get("help help")).toContain("Usage: mnemocode help [<COMMAND|TOPIC>]");
     expect(pages.get("help --help")).toBe(pages.get("help help"));
     expect(pages.get("help -h")).toBe(pages.get("help help"));

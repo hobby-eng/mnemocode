@@ -94,8 +94,9 @@ export async function runCommandLine(argv: readonly string[]): Promise<CommandEn
     return undefined;
   }
   if (isFlagOf(VERSION_FLAGS, command) || command === "version") {
-    if (command === "version" && rest.length === 1 && isFlagOf(HELP_FLAGS, rest[0])) {
-      printNamedHelp(command);
+    // `version --help`, as `-V --help`: the help of version.
+    if (rest.length === 1 && isFlagOf(HELP_FLAGS, rest[0])) {
+      printNamedHelp("version");
       return undefined;
     }
     if (rest.length > 0)
