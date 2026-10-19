@@ -12,6 +12,7 @@
 
 ### Audit follow-up
 
+- PNG and JPEG export runs only a `pdftocairo` found by its full path in a folder of `PATH`, never one in the current folder or in an empty or relative entry of `PATH`, which Windows, and Linux for an empty entry, would otherwise run first.
 - Explain displayed wallet fingerprints with one shared sentence. Keep the short menu label, grey secondary explanation and unchanged wallet values and legacy TSV rows; terminal regressions cover narrow and normal screens.
 - Retire parsed backup, format-detection, shorter-phrase, RGB and UTF-8 scratch buffers after use. Complete-share input diagnosis propagates operational engine failures and still identifies declared invalid share combinations. An invalid minimum quorum keeps the diagnosis of invalid shares instead of failing on an insufficient diagnostic subset.
 - Retire reconstructed native entropy when its SSKR digest fails, and refuse a share whose group index is outside its declared group count. The pinned upstream versions and valid share formats remain unchanged; the fast SSKR check includes the malformed metadata case.

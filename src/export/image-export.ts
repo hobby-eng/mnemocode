@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
-import { accessSync, constants } from "node:fs";
-import { join } from "node:path";
+import { accessSync, constants, statSync } from "node:fs";
+import { delimiter, isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { PDFDocument } from "pdf-lib";
 import { pageFileName } from "./card-codes.js";
@@ -54,19 +54,56 @@ const PAGE_TIMEOUT_MS = 120_000;
 /** The renderer's own messages kept: its pages go to files, so only a few lines come back. */
 const RENDERER_OUTPUT_BYTES = 64 * 1024;
 
-let renderer: Promise<void> | undefined;
+let renderer: Promise<string> | undefined;
 
-/** Optional local Poppler adapter; never downloads a renderer or sends data online. */
-export function assertImageRenderer(): Promise<void> {
-  return (renderer ??= execute(IMAGE_RENDERER, ["-v"], {
-    timeout: PROBE_TIMEOUT_MS,
-    maxBuffer: RENDERER_OUTPUT_BYTES,
-  })
-    .then(() => undefined)
-    .catch(() => {
-      renderer = undefined;
-      throw ERRORS.create("png-jpeg-export-requires-local-poppler-pdftocairo-program", []);
-    }));
+/**
+ * The local Poppler renderer by its absolute name, found and answering for its version
+ * (foundRenderer) once; never downloads a renderer or sends data online.
+ */
+function imageRenderer(): Promise<string> {
+  return (renderer ??= foundRenderer().catch((error: unknown) => {
+    renderer = undefined;
+    throw error;
+  }));
+}
+
+/**
+ * The renderer's program in the first folder of PATH that holds it, by its absolute name, once it
+ * has answered for its version. Only absolute folders count: an empty or a relative entry, and the
+ * working folder, which Windows searches first for a bare name, could hold a program that someone
+ * else put there, which would then receive the private PDF.
+ */
+async function foundRenderer(): Promise<string> {
+  const names = process.platform === "win32" ? [`${IMAGE_RENDERER}.exe`] : [IMAGE_RENDERER];
+  // On Windows process.env gives Path under this name too.
+  const folders = (process.env["PATH"] ?? "").split(delimiter);
+  const program = folders
+    .filter((folder) => folder !== "" && isAbsolute(folder))
+    .flatMap((folder) => names.map((name) => join(folder, name)))
+    .find(isRunnable);
+  const answers =
+    program !== undefined &&
+    (await execute(program, ["-v"], { timeout: PROBE_TIMEOUT_MS, maxBuffer: RENDERER_OUTPUT_BYTES })
+      .then(() => true)
+      .catch(() => false));
+  if (program === undefined || !answers)
+    throw ERRORS.create("png-jpeg-export-requires-local-poppler-pdftocairo-program", []);
+  return program;
+}
+
+/** Whether `file` is a file that this process may run. */
+function isRunnable(file: string): boolean {
+  try {
+    accessSync(file, constants.X_OK);
+    return statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** Refuses image export where no local Poppler renderer can be run (foundRenderer). */
+export async function assertImageRenderer(): Promise<void> {
+  await imageRenderer();
 }
 
 /** Why an image folder is refused: something is there already. */
@@ -110,7 +147,7 @@ export async function writeRenderedDocument(
   }
   // A JavaScript host may pass any value: it is read as a person's answer is.
   const image = parseImageFormat(format);
-  await assertImageRenderer();
+  const program = await imageRenderer();
   const temporary = await mkdtemp(join(rasterFolder(), "mnemocode-raster-"));
   try {
     const input = join(temporary, "document.pdf");
@@ -120,7 +157,7 @@ export async function writeRenderedDocument(
     for (const [index, page] of pages.entries()) {
       const number = String(index + 1);
       await execute(
-        IMAGE_RENDERER,
+        program,
         [
           "-r",
           String(IMAGE_DPI),
@@ -145,7 +182,8 @@ export async function writeRenderedDocument(
           input,
           join(temporary, `page-${number}`),
         ],
-        { timeout: PAGE_TIMEOUT_MS, maxBuffer: RENDERER_OUTPUT_BYTES },
+        // In the private folder, which holds nothing else that it could start.
+        { cwd: temporary, timeout: PAGE_TIMEOUT_MS, maxBuffer: RENDERER_OUTPUT_BYTES },
       );
     }
     const files = (await readdir(temporary))
