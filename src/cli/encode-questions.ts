@@ -123,7 +123,10 @@ export const VARIANT_EXPLANATION: Explanation = {
 
 /** What Shamir shares are, shown with the question how many to make. */
 const SHARES_EXPLANATION: Explanation = {
-  lines: ["Shares in this form; restoring gives it back. Fewer reveal nothing."],
+  lines: [
+    "Shares in this form; restoring gives it back.",
+    "Fewer cannot restore it, but still show its length.",
+  ],
   more: [readmeLink("splitting-a-mnemonic-into-shares")],
 };
 

@@ -100,12 +100,12 @@ The guide explains date sorting, the repeating year/month/day shifts, modular ad
 
 The [format table](../README.md#commands) lists names and numbers. Input syntax differs by form:
 
-| Form          | Accepted separators                                                                                   |
-| ------------- | ----------------------------------------------------------------------------------------------------- |
-| Word numbers  | Spaces or commas; joined numbers are ambiguous and refused                                            |
-| Word Unicode  | Four hexadecimal digits per code, separated or joined                                                 |
-| Colors        | Separated codes, joined `#RRGGBB` codes, or one joined `RRGGBB` line                                  |
-| Color Unicode | Two four-digit Private Use Area codes per color, separated or joined; older symbols are also accepted |
+| Form          | Accepted separators                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------------- |
+| Word numbers  | Spaces or commas; joined numbers are ambiguous and refused                                                     |
+| Word Unicode  | Four hexadecimal digits per code, separated or joined                                                          |
+| Colors        | Separated codes, joined `#RRGGBB` codes, or one joined `RRGGBB` line                                           |
+| Color Unicode | Two four-digit Private Use Area codes per color, separated or joined, or the Private Use characters themselves |
 
 Color Unicode needs no special font when written as hexadecimal text.
 
@@ -123,7 +123,7 @@ On the private screen, a result that does not fit with the question or prompt un
 
 `--mnemonic-file PATH` reads a phrase; `--input-file PATH` reads codes or a record. The path `-` reads standard input. With `--ask-secrets`, Decode and date recovery can read `--input-file` or `--qr-file` and then ask only for dates. Decode also accepts a file of Shamir shares, one per line, and passes every share to restoration.
 
-Raw `--mnemonic`, `--input`, `--share`, `--date`/`--dates`, `--old-date`/`--old-dates` and `--last-word` values are refused, including public fixtures. Help identifies these old forms as refused rather than providing an exception.
+Raw `--mnemonic`, `--input`, `--share`, `--date`/`--dates`, `--old-date`/`--old-dates` and `--last-word` values are refused, including public fixtures. Help names them as refused, with the option to use instead; none is accepted as an exception.
 
 Refusal cannot remove text already entered in shell history or process arguments. Choose a safe input source before entering real material.
 
@@ -171,43 +171,46 @@ Complete and incomplete dates can be combined, such as `10-1?-2010 15-?-2025` or
 
 Several incomplete dates multiply the number of attempts. Two identical patterns are tried once, not once for each order. Dates that shift every word alike are tried once too: Seedshift adds the year to a word number modulo the 2,048 words, so a year and the year 2,048 years later give the same phrase. A forgotten year therefore finds a phrase once, with the earliest year that gives it, not four or five times.
 
-The command shows the number of attempts before it starts, and with a wallet check about how long they take on your computer. A search of up to 12 hours starts at once; a longer one is asked for first, or needs `--max-candidates` with at least its number of attempts. No search has more than 2,147,483,648 attempts. `--max-results` sets how many candidates are shown (100 by default), and `--progress-every` sets how often progress is reported. A search of every date has 3,652,059 attempts.
+The command shows the number of attempts before it starts, and with a wallet check about how long they take on your computer. A search of up to 12 hours starts at once; a longer one is asked for first, or needs `--max-candidates` with at least its number of attempts. No date search has more than 2,147,483,648 date combinations. Decode tries each candidate of marked codes with every date combination, so their joint search can be larger; it is timed and asked for as any search is. `--max-results` sets how many candidates are shown (100 by default), and `--progress-every` sets how often progress is reported. A search of every date has 3,652,059 attempts.
 
 In the `seedshift` and `seedshift-legacy-valid` modes every date gives a valid phrase, so `recover-date` requires one of the [recovery checks](../README.md#exact-local-recovery-checks). In `seedshift-legacy` mode it can instead keep the candidates that pass the checksum test. A checksum of 4 to 8 bits is a weak filter.
 
-Decode and Restore use the same date search on the private screen, even when codes or shares are also marked. They ask for a wallet reference when required; with original Seedshift, Decode also offers the choice "It cannot" to list checksum-valid results. Restore estimates the combined work for all share and date combinations. Dates passed with `--dates` must be complete except in `recover-date`.
+Decode and Restore use the same date search on the private screen, even when codes or shares are also marked. They ask for a wallet reference when required; with original Seedshift, Decode also offers the choice "It cannot" to list checksum-valid results. Restore estimates the combined work for all share and date combinations. Dates in `--dates-file` must be complete except in `recover-date`.
 
 ## Wallet-check examples and address forms
 
 ```bash
-# Public stored phrase used by all four examples below:
-STORED_PHRASE='wool abuse actual wool abuse actual wool abuse actual wool abuse congress'
+# The public stored phrase and the date pattern of all four examples below, in local files:
+mkdir -p output
+printf '%s\n' 'wool abuse actual wool abuse actual wool abuse actual wool abuse congress' \
+  > output/public-stored.txt
+printf '%s\n' '??-09-2026' > output/public-date-pattern.txt
 
 # A native-SegWit receiving address, one of the first 20: here m/84'/0'/0'/0/0.
 mnemocode recover-date --mode seedshift \
-  --input "$STORED_PHRASE" \
-  --format 1 --dates "??-09-2026" \
+  --input-file output/public-stored.txt \
+  --format 1 --dates-file output/public-date-pattern.txt \
   --bitcoin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu \
   --bitcoin-profile native-segwit
 
 # A master or account extended public key. Standard and SLIP-132 forms are accepted:
 # xpub, ypub, zpub, Ypub, Zpub; testnet tpub, upub, vpub, Upub, Vpub.
 mnemocode recover-date --mode seedshift \
-  --input "$STORED_PHRASE" \
-  --format 1 --dates "??-09-2026" \
+  --input-file output/public-stored.txt \
+  --format 1 --dates-file output/public-date-pattern.txt \
   --account-xpub zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs \
   --bitcoin-profile native-segwit
 
 # An address of another coin, here the first Ethereum one: m/44'/60'/0'/0/0.
 mnemocode recover-date --mode seedshift \
-  --input "$STORED_PHRASE" \
-  --format 1 --dates "??-09-2026" \
+  --input-file output/public-stored.txt \
+  --format 1 --dates-file output/public-date-pattern.txt \
   --coin ethereum --coin-address 0x9858EfFD232B4033E47d90003D41EC34EcaEda94
 
 # A 33-byte compressed public key at exactly one BIP44/49/84/86 path.
 mnemocode recover-date --mode seedshift \
-  --input "$STORED_PHRASE" \
-  --format 1 --dates "??-09-2026" \
+  --input-file output/public-stored.txt \
+  --format 1 --dates-file output/public-date-pattern.txt \
   --compressed-public-key 03cc8a4bc64d897bddc5fbc2f670f7a8ba0b386779106cf1223c6fc5d7cd6fc115 \
   --bitcoin-profile taproot --account 0 --branch 0 --index 0 --scan-gap 1
 ```
@@ -230,7 +233,7 @@ A WIF can spend the funds. Never put it in a shell command or an issue report.
 
 ## Installation checks
 
-Before processing data, MnemoCode runs quick checks without files, renderers or a share engine. Known answers come from published vectors or an independent implementation that first reproduces one. They cover:
+Before processing data, MnemoCode runs its startup self-test: quick checks without files, renderers or a share engine. Known answers come from published vectors or an independent implementation that first reproduces one. They cover:
 
 - Both BIP39 word lists' lengths and SHA-256 hashes, the BIP39 seed and master fingerprint.
 - Every transformation mode; exact 12- and 24-word answers in all five representations, 15-, 18- and 21-word answers with MnemoCode Seedshift, and independent legacy-valid answers for all five lengths, with numbering, checksum and Color Unicode refusals.
@@ -247,13 +250,13 @@ No mnemonic data was processed.
 
 Before it splits or combines shares, MnemoCode also restores an official grouped set and a set holding the 32-byte secret of a 24-word phrase, creates an exact deterministic test set, and checks that the engine refuses an incomplete quorum and a damaged share value even when its transport checksum is correct. The fixed creation seed is public test data and is never used for a person's shares.
 
-For a fuller installation check, including PDF rendering:
+For the full self-test, including PDF rendering:
 
 ```bash
 mnemocode self-test
 ```
 
-The full test includes the quick checks plus every phrase length/format/mode combination, date sorting, the public test file, 24 English BIP39 seed vectors, wallet-assisted searches, encrypted candidate lists, joint share/date repair, every coin vector and actual heir-sheet/card/QR exports with all artwork and fonts. Each feature gets a refusal case too. Finished groups show their times, followed by an overall result.
+The full self-test includes the startup self-test plus every phrase length/format/mode combination, date sorting, the public test file, 24 English BIP39 seed vectors, wallet-assisted searches, encrypted candidate lists, joint share/date repair, every coin vector and actual heir-sheet/card/QR exports with all artwork and fonts. Each feature gets a refusal case too. Finished groups show their times, followed by an overall result.
 
 The public test data is in [`vectors/mnemocode-v1.json`](../vectors/mnemocode-v1.json). It contains only well-known test phrases.
 

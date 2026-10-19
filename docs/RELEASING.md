@@ -8,6 +8,8 @@ In `CHANGELOG.md`, replace "(unreleased)" in the version's heading with the rele
 
 Write `docs/releases/v<version>.md` from the version's section of `CHANGELOG.md`. It becomes the text of the release; a tag without it stops the workflow.
 
+Update the status line at the top of `README.md` ("This README describes version …"), which says whether the version described is released.
+
 ## Version
 
 Set the version in `package.json` and in `src/version.ts`. `pnpm check` fails when the two differ, and the workflow stops when the tag is not `v` followed by that version.
@@ -85,7 +87,7 @@ gh release edit v0.1.0 --repo hobby-eng/mnemocode --draft=false
 
 ## Verify a download
 
-Anyone can check a release this way; the README shows the same steps.
+Anyone can check a release this way; [docs/CLI.md](CLI.md#download-verification) shows the same steps.
 
 ```sh
 gpg --show-keys RELEASE-SIGNING-KEY.asc

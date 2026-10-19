@@ -136,7 +136,7 @@ describe("CC-03: a palette without designs", () => {
     const colors = indexesToColors(Array.from({ length: 12 }, () => 0));
     await expect(
       exportColorPalette({ colors, templates: [], pdfPath: join(directory, "p.pdf") }),
-    ).rejects.toThrow("No approved card templates are installed yet.");
+    ).rejects.toThrow("No cards to render: no design was given.");
   });
 });
 

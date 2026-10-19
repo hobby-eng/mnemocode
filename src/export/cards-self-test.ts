@@ -56,7 +56,7 @@ async function checkCardExports(drawing: CardDrawing): Promise<void> {
 export function cardExportCheck(drawing: CardDrawing): SelfTestCheck {
   return Object.freeze({
     name: "Card export assets",
-    detail: "approved templates, fonts, artwork and single-page A6 PDF",
+    detail: "templates, fonts, artwork and single-page A6 PDF",
     run: () => checkCardExports(drawing),
   });
 }

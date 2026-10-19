@@ -106,7 +106,7 @@ export const askSecrets: HelpOption = {
   summary: "Ask for the secrets on a private screen",
   details: [
     "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that nothing stays in the scrollback. This works on Linux, macOS and Windows alike.",
-    "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While an answer is typed, Escape does nothing, so that a slip loses nothing; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
+    "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While a secret is typed, Escape does nothing, so that a slip loses nothing; at a visible value, such as a fingerprint, an address or a file name, it goes back to the question before and drops what was typed there; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
     "Standard input must be the terminal; without one, or in a terminal that says TERM=dumb, the command stops at once. Output sent to a file goes there as before.",
     "Raw phrase, record, share, date and final-word arguments are refused, including public fixtures. Use the private screen or the corresponding file/stdin option.",
   ],
@@ -673,7 +673,7 @@ export const encodeOutputGroups: readonly HelpGroup[] = [
         flag: "--sskr",
         summary: "Split the result into Shamir shares (SSKR) as the last step",
         details: [
-          "The shares use the Blockchain Commons SSKR format. Fewer shares than --threshold reveal nothing about the phrase. A BIP39 passphrase, the mode and the dates are not stored in the shares. The legacy modes cannot be used with shares.",
+          "The shares use the Blockchain Commons SSKR format. Fewer shares than --threshold cannot restore the phrase, but each share still shows the set identifier, the thresholds and the length of the phrase; keep every share private. A BIP39 passphrase, the mode and the dates are not stored in the shares. The legacy modes cannot be used with shares.",
         ],
       },
       threshold,

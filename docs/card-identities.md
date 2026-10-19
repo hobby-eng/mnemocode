@@ -20,4 +20,4 @@ The design studio named on a collection sheet is picked separately from the empl
 
 ## Your own details
 
-The README lists the options that replace these defaults: [personal details](../README.md#cards-and-qr-codes) and [sheet text](../README.md#collection-sheet-identity).
+These options replace the defaults: [personal details](CLI.md#card-options) and [sheet text](../README.md#collection-sheet-identity).

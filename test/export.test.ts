@@ -41,7 +41,7 @@ const fixedIdentity = {
 };
 
 describe("export infrastructure", () => {
-  it("ships thirteen approved templates, separate cards in the business card designs only", () => {
+  it("ships thirteen templates, separate cards in the business card designs only", () => {
     expect(cardTemplates).toHaveLength(13);
     expect(new Set(cardTemplates.map((t) => t.id)).size).toBe(13);
     // A material design is printed on sheets only (drawsSeparateCards).
@@ -189,7 +189,7 @@ describe("export infrastructure", () => {
       description: "",
       render: () => fixture(2),
     };
-    await expect(renderCards(nodeCardRenderer, [])).rejects.toThrow("No approved");
+    await expect(renderCards(nodeCardRenderer, [])).rejects.toThrow("No cards to render");
     expect(
       (
         await PDFDocument.load(

@@ -132,7 +132,7 @@ function wordsOf(entry: CatalogEntry): Pick<CardTemplate, "name" | "description"
         name: `${businessNames[style]} card collection`,
         description:
           style === "mixed"
-            ? `One identity across all approved designs; ${SHEET_SIZES_TEXT} sheets or individual cards.`
+            ? `One identity across all designs; ${SHEET_SIZES_TEXT} sheets or individual cards.`
             : `Editable contact details; ${SHEET_SIZES_TEXT} sheets or individual ${pageSizeLabel(SEPARATE_CARD_SIZE)} cards.`,
       };
     }

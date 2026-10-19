@@ -50,10 +50,7 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
       ["Installed", String(cardTemplates.length)],
       ["Prints", `format ${CARD_FORMAT_NUMBERS}`],
     ]);
-    if (!cardTemplates.length)
-      console.log(
-        "No approved card templates are installed yet. Each design will be added after individual approval.",
-      );
+    if (!cardTemplates.length) console.log("No card designs are installed.");
     // Each with its number, which --template takes as well as the id (findTemplate).
     const numberWidth = String(cardTemplates.length).length;
     const idWidth = Math.max(...cardTemplates.map((template) => template.id.length));

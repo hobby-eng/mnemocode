@@ -197,9 +197,9 @@ export const SHARE_COMMAND_HELP: Readonly<
   },
 
   "sskr-split": {
-    summary: "Older name for encode --sskr",
+    summary: "encode --sskr, with --format for the share format",
     about: [
-      "Kept for compatibility. It splits the phrase like encode --sskr, but here --format selects the share format. Prefer mnemocode encode --sskr.",
+      "Splits the phrase like encode --sskr, but here --format selects the share format, as --share-format does there.",
     ],
     usage: "[OPTIONS] --threshold <N> --shares <M> (--ask-secrets | --mnemonic-file <PATH>)",
     groups: [

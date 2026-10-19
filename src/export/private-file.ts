@@ -21,14 +21,18 @@ export function privateChildPath(folder: string, name: string): string {
 }
 
 /**
- * Writes `bytes` as a new file at `path` that only its owner may read; fails with EEXIST when
- * something is there already, so that nothing is ever written over or through it.
+ * Writes `bytes` as a new file at `path` that only its owner may read, where the file system keeps
+ * Unix permissions (Linux and macOS; not Windows ACLs or FAT and exFAT media); fails with EEXIST
+ * when something is there already, so that nothing is ever written over or through it.
  */
 export async function writeNewPrivateFile(path: string, bytes: Uint8Array): Promise<void> {
   await writeFile(path, bytes, { flag: "wx", mode: PRIVATE_FILE_MODE });
 }
 
-/** Makes the new folder `path`, which only its owner may open. */
+/**
+ * Makes the new folder `path`, which only its owner may open where the file system keeps Unix
+ * permissions (Linux and macOS; not Windows ACLs or FAT and exFAT media).
+ */
 export async function makePrivateFolder(path: string): Promise<void> {
   await mkdir(path, { mode: PRIVATE_FOLDER_MODE });
 }

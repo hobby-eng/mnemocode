@@ -91,7 +91,7 @@ For scripts, `--mnemonic-file PATH` and `--input-file PATH` read local files; `-
 | `colors-unicode` / `4` | Each color represented by two four-digit Unicode codes                     |
 | `colors` / `5`         | `#RRGGBB` codes: 8, 10, 12, 14 or 16 for 12, 15, 18, 21 or 24 words        |
 
-Colors can be reordered, but every real code is needed. The 12- and 24-word color forms are compatible with BIP39Colors. Color Unicode is MnemoCode's text format, not a Unicode standard; old Private Use symbol records remain readable. [Separators and public command examples](docs/CLI.md#representation-details) cover copying each form.
+Colors can be reordered, but every real code is needed. The 12- and 24-word color forms are compatible with BIP39Colors. Color Unicode is MnemoCode's text format, not a Unicode standard; it is also read as the Private Use characters themselves. [Separators and public command examples](docs/CLI.md#representation-details) cover copying each form.
 
 Encode shows two fingerprints: **original** identifies the wallet with an empty BIP39 passphrase; **encoded** identifies the stored phrase. They do not reveal the phrase. The encoded fingerprint checks the written codes without dates; a wallet reference checks the result after undoing dates. An invalid legacy phrase has no encoded fingerprint.
 
@@ -239,7 +239,7 @@ Candidates can be compared offline with an address, compressed public key, maste
 
 Bitcoin searches default to mainnet, account 0, receiving branch 0 and indexes 0–19, trying BIP44/49/84/86. `--account`, `--branch`, `--index`, `--scan-gap` (up to 1000), `--network` and `--bitcoin-profile` select the range. An exact location with `--scan-gap 1` is faster. Eleven other coins use their standard single-key paths and infer the network from the address.
 
-If the wallet uses a BIP39 passphrase, supply it through the private screen or `--bip39-passphrase-file`; it is separate from the masking dates. [Reference options, supported coins and examples](docs/CLI.md#wallet-check-examples-and-address-forms) cover the details. WIFs are private keys: keep them out of command arguments and reports.
+If the wallet uses a BIP39 passphrase, give it with `--bip39-passphrase-file`, also together with `--ask-secrets`; the private screen and the menu do not ask for it, and without the file wallet checks use an empty passphrase. It is separate from the masking dates. [Reference options, supported coins and examples](docs/CLI.md#wallet-check-examples-and-address-forms) cover the details. WIFs are private keys: keep them out of command arguments and reports.
 
 ## Candidate lists for discovery
 
@@ -249,9 +249,9 @@ With no known reference, save candidates using `--candidates-file candidates.age
 
 ## Self-tests and public vectors
 
-Quick known-answer and refusal checks run before secret operations; a failure stops the operation. Share operations also check the SSKR engine against published answers. These checks do not replace verifying a download or the stored backup.
+The startup self-test, quick known-answer and refusal checks, runs before secret operations; a failure stops the operation. Share operations also check the SSKR engine against published answers. These checks do not replace verifying a download or the stored backup.
 
-`mnemocode self-test` runs the fuller installation check, including PDF and QR rendering, and can take longer. [Check coverage](docs/CLI.md#installation-checks) lists what it exercises; [public vectors](vectors/mnemocode-v1.json) are available for independent verification.
+`mnemocode self-test` runs the full self-test, the startup self-test and more, including PDF and QR rendering, and can take longer. [Check coverage](docs/CLI.md#installation-checks) lists what it exercises; [public vectors](vectors/mnemocode-v1.json) are available for independent verification.
 
 ## Compatibility and safety notes
 

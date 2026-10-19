@@ -30,7 +30,7 @@ Use a computer that you trust, for example your own. Do not do this on a compute
 
 Download MnemoCode from its release page, `https://github.com/hobby-eng/mnemocode/releases`, and from nowhere else. Choose the file for your computer: the one ending in `win-x64.exe` for Windows, `macos-arm64` for a Mac with an Apple processor, `linux-x64` for Linux.
 
-The release page also has a file called `SHA256SUMS`, signed by the maintainer of MnemoCode. It lets you check that the file you downloaded is exactly the one that was published. The [README](../README.md#one-executable-file) shows how to check the file and the signature. If this is too technical, ask someone you trust to check it with you; they do not need to see the backup for this.
+The release page also has a file called `SHA256SUMS`, signed by the maintainer of MnemoCode. It lets you check that the file you downloaded is exactly the one that was published. The [download verification](CLI.md#download-verification) shows how to check the file and the signature. If this is too technical, ask someone you trust to check it with you; they do not need to see the backup for this.
 
 Then disconnect the computer from the internet: unplug the cable and turn off Wi-Fi.
 

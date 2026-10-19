@@ -22,7 +22,7 @@ import { ExportFileName } from "./file-name.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("export.render", {
-  "no-approved-card-templates-installed-yet": () => "No approved card templates are installed yet.",
+  "no-cards-to-render": () => "No cards to render: no design was given.",
   "template-does-not-support": (value0: string, value1: string) =>
     `Template ${value0} does not support ${value1}.`,
   "template-rendered-empty-document": (value0: string) =>
@@ -88,7 +88,7 @@ export async function renderCards(
   drawing: CardDrawing,
   jobs: readonly CardJob[],
 ): Promise<Uint8Array> {
-  if (jobs.length === 0) throw ERRORS.create("no-approved-card-templates-installed-yet", []);
+  if (jobs.length === 0) throw ERRORS.create("no-cards-to-render", []);
   // Every page setting is checked before any choice is made or any template draws
   // (AUD-012-FUN006), and so is every design that a card page size draws as separate cards.
   for (const { template, content } of jobs) {
