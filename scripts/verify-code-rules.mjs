@@ -4,11 +4,12 @@
 // guide:
 //
 // - CORE-15: a file that the linter does not measure (anything but TypeScript and JavaScript) has
-//   at most 800 lines of code: a line that holds nothing but a comment, in the comment syntax of
-//   its kind, and a blank line are left out. A Rust file's #[cfg(test)] module at its end and the
-//   generated files listed below are left out; a comment "long: <reason>" on the first line, or
-//   the second after a "#!" line, exempts a file.
-// - TOOL-02: a shell script starts with `set -euo pipefail` and quotes every expansion.
+//   at most 800 lines of code (lines-of-code.mjs): a line that holds nothing but a comment, in the
+//   comment syntax of its language, and a blank line are left out, and so are a Rust file's
+//   #[cfg(test)] modules and the generated files listed below; a comment "long: <reason>" on the
+//   first line, or the second after a "#!" line, exempts a file.
+// - TOOL-02: a shell script starts with `set -euo pipefail` and quotes every expansion
+//   (shell-source.mjs).
 // - TOOL-03: a Python script imports the standard library alone, or packages pinned with their
 //   hashes in "<script>-requirements.txt" next to it.
 // - TS-09: the names of the files in src/, test/ and scripts/ are kebab-case.
@@ -31,12 +32,14 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tokensOf } from "./source-tokens.mjs";
+import { linesOfCode } from "./lines-of-code.mjs";
+import { isShellScript, readShell } from "./shell-source.mjs";
+import { afterGroup, tokensOf } from "./source-tokens.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
-/** CORE-15: the most lines a file may have. */
+/** CORE-15: the most lines of code a file may have. */
 const MAX_FILE_LINES = 800;
 /**
  * Frozen evidence, never changed after its audit, and a build's output: left out of every check.
@@ -44,11 +47,6 @@ const MAX_FILE_LINES = 800;
 const LEFT_OUT = ["docs/audits/", "sskr-wasm/generated/"];
 /** Files that a tool writes, left out of the file length (CORE-15). */
 const GENERATED = new Set(["pnpm-lock.yaml"]);
-/**
- * The kinds of file whose length this check measures; the linter measures TypeScript and
- * JavaScript.
- */
-const MEASURED = new Set([".md", ".py", ".rs", ".sh", ".toml", ".txt", ".yaml", ".yml"]);
 /** Lockfiles of the package managers other than pnpm (TOOL-05). */
 const OTHER_LOCKFILES = new Set([
   "package-lock.json",
@@ -153,115 +151,20 @@ function linesOf(text) {
   return lines;
 }
 
-/**
- * CORE-15: the comment syntax of each kind of file whose length this check measures. Only lines of
- * code count: a line that holds nothing but a comment, and a blank line, are left out.
- */
-const HASH_COMMENTS = { line: ["#"], block: [] };
-const COMMENT_SYNTAX = {
-  ".rs": { line: ["//"], block: [["/*", "*/"]] },
-  ".md": { line: [], block: [["<!--", "-->"]] },
-  ".py": HASH_COMMENTS,
-  ".sh": HASH_COMMENTS,
-  ".toml": HASH_COMMENTS,
-  ".txt": HASH_COMMENTS,
-  ".yaml": HASH_COMMENTS,
-  ".yml": HASH_COMMENTS,
-  Dockerfile: HASH_COMMENTS,
-};
-
-/**
- * Whether `line`, read after the comment that `open` says is still open, holds code: anything but
- * blanks and comments. Returns the closing marker of a block comment left open at its end, if any.
- */
-function codeOfLine(line, syntax, open) {
-  let rest = line.trim();
-  let closer = open;
-  for (;;) {
-    if (closer !== undefined) {
-      const end = rest.indexOf(closer);
-      if (end < 0) return { code: false, open: closer };
-      rest = rest.slice(end + closer.length).trim();
-      closer = undefined;
-    }
-    if (rest === "" || syntax.line.some((marker) => rest.startsWith(marker)))
-      return { code: false, open: undefined };
-    const block = syntax.block.find(([start]) => rest.startsWith(start));
-    if (block === undefined) return { code: true, open: undefined };
-    rest = rest.slice(block[0].length);
-    closer = block[1];
-  }
-}
-
-/** CORE-15: how many of `lines` hold code, by the comment syntax of the file's kind. */
-function linesOfCode(lines, syntax) {
-  let count = 0;
-  let open;
-  for (const line of lines) {
-    const read = codeOfLine(line, syntax, open);
-    open = read.open;
-    if (read.code) count += 1;
-  }
-  return count;
-}
-
-/**
- * Where a Rust file's unit tests start: a `#[cfg(test)]` module whose block closes at the end of
- * the file (RUST-08); -1 when there is none. A `#[cfg(test)]` on anything else counts as code.
- */
-function rustTestModuleStart(lines) {
-  for (let at = 0; at < lines.length; at += 1) {
-    if (lines[at].trim() !== "#[cfg(test)]") continue;
-    let module = at + 1;
-    while (module < lines.length && lines[module].trim().startsWith("#[")) module += 1;
-    if (!/^(?:pub(?:\([a-z]+\))?\s+)?mod\s+\w+\s*\{/u.test(lines[module]?.trim() ?? "")) continue;
-    let depth = 0;
-    let last = module;
-    for (let line = module; line < lines.length; line += 1) {
-      for (const character of lines[line]) {
-        if (character === "{") depth += 1;
-        else if (character === "}") depth -= 1;
-      }
-      if (lines[line].trim() !== "") last = line;
-      if (depth === 0) break;
-    }
-    const after = lines.slice(last + 1).every((line) => line.trim() === "");
-    if (depth === 0 && after) return at;
-  }
-  return -1;
-}
-
 /** CORE-15: the length of a file the linter does not measure, in lines of code. */
 function checkLength(path, text) {
-  const name = basename(path);
   if (GENERATED.has(path)) return;
-  const syntax = name.startsWith("Dockerfile")
-    ? COMMENT_SYNTAX.Dockerfile
-    : MEASURED.has(extname(name))
-      ? COMMENT_SYNTAX[extname(name)]
-      : undefined;
-  if (syntax === undefined) return;
+  const code = linesOfCode(path, text);
+  if (code === undefined || code.length <= MAX_FILE_LINES) return;
   const lines = linesOf(text);
   const exemption = lines[0]?.startsWith("#!") ? lines[1] : lines[0];
   // The exemption is a comment that starts the line, not "long:" anywhere in it.
   if (exemption !== undefined && /^\s*(?:#|\/\/|\/\*|<!--)\s*long:\s*\S/u.test(exemption)) return;
-  // A Rust file's unit tests sit at its end (RUST-08) and do not count.
-  const tests = path.endsWith(".rs") ? rustTestModuleStart(lines) : -1;
-  const counted = linesOfCode(tests < 0 ? lines : lines.slice(0, tests), syntax);
-  if (counted > MAX_FILE_LINES)
-    report(
-      path,
-      MAX_FILE_LINES + 1,
-      "CORE-15",
-      `${counted} lines of code, more than ${MAX_FILE_LINES}: split it, or say why it reads best whole in a "long: <reason>" comment on its first line`,
-    );
-}
-
-/** Whether `text` is a shell script: by its name or by its first line. */
-function isShellScript(path, text) {
-  return (
-    path.endsWith(".sh") ||
-    /^#!\s*\/(?:usr\/)?bin\/(?:env\s+(?:-S\s+)?)?(?:ba|da|z)?sh\b/u.test(text)
+  report(
+    path,
+    code[MAX_FILE_LINES],
+    "CORE-15",
+    `${code.length} lines of code, more than ${MAX_FILE_LINES}: split it, or say why it reads best whole in a "long: <reason>" comment on its first line`,
   );
 }
 
@@ -273,35 +176,10 @@ function checkShellHeader(path, text) {
     report(path, first + 1, "TOOL-02", "a shell script starts with `set -euo pipefail`");
 }
 
-/**
- * TOOL-02: an expansion outside quotes ($name, ${name}, $(command), $1) in a shell script; the text
- * after an unquoted # is a comment.
- */
-function unquotedExpansion(line) {
-  let quote;
-  for (let at = 0; at < line.length; at += 1) {
-    const character = line[at];
-    if (character === "\\" && quote !== "'") {
-      at += 1;
-      continue;
-    }
-    if (quote !== undefined) {
-      if (character === quote) quote = undefined;
-      continue;
-    }
-    if (character === "'" || character === '"') quote = character;
-    else if (character === "#" && (at === 0 || /\s/u.test(line[at - 1]))) return false;
-    else if (character === "$" && /[\p{L}_{(0-9@*#?!-]/u.test(line[at + 1] ?? "")) return true;
-  }
-  return false;
-}
-
 /** TOOL-02: every expansion of a shell script is quoted. */
 function checkShellQuoting(path, text) {
-  linesOf(text).forEach((line, index) => {
-    if (unquotedExpansion(line))
-      report(path, index + 1, "TOOL-02", 'an expansion outside quotes: write "$name"');
-  });
+  for (const line of new Set(readShell(text).unquoted))
+    report(path, line, "TOOL-02", 'an expansion outside quotes: write "$name"');
 }
 
 /** The names of Python's standard library, as the installed Python 3 lists them. */
@@ -516,12 +394,17 @@ function checkFileName(path) {
     report(path, 1, "TS-09", "file names are kebab-case: lower-case words joined by hyphens");
 }
 
-/** The index of the token after the brace that closes the one at `open`. */
-function afterBlock(tokens, open) {
+/**
+ * The index of the token after the angle brackets that open at `at`: `at` itself when none open
+ * there. The `>` of an arrow type, (x: T) => U, closes none.
+ */
+function afterAngles(tokens, at) {
+  if (tokens[at]?.key !== "<") return at;
   let depth = 0;
-  for (let at = open; at < tokens.length; at += 1) {
-    if (tokens[at].key === "{") depth += 1;
-    else if (tokens[at].key === "}" && --depth === 0) return at + 1;
+  for (let next = at; next < tokens.length; next += 1) {
+    const key = tokens[next].key;
+    if (key === "<") depth += 1;
+    else if (key === ">" && tokens[next - 1].key !== "=" && --depth === 0) return next + 1;
   }
   return tokens.length;
 }
@@ -533,13 +416,14 @@ function classesOf(tokens) {
     if (token.key !== "class" || tokens[at - 1]?.key === ".") return;
     const name = tokens[at + 1]?.key;
     if (name === undefined || !/^[\p{L}_$][\p{L}\p{N}_$]*$/u.test(name)) return;
-    const open = tokens.findIndex((candidate, index) => index > at && candidate.key === "{");
-    if (open < 0) return;
-    const head = tokens.slice(at + 2, open).map((candidate) => candidate.key);
-    // After type parameters too: class Failure<Detail> extends Error.
-    const extendsAt = head.indexOf("extends");
-    const parent = extendsAt < 0 ? undefined : head[extendsAt + 1];
-    const body = tokens.slice(open, afterBlock(tokens, open)).map((candidate) => candidate.key);
+    // The parent follows the type parameters: class Failure<D extends object> extends Error.
+    let open = afterAngles(tokens, at + 2);
+    const parent = tokens[open]?.key === "extends" ? tokens[open + 1]?.key : undefined;
+    // The body opens at the first brace outside angle brackets: extends Base<{ a: 1 }> is a type.
+    while (open < tokens.length && tokens[open].key !== "{")
+      open = tokens[open].key === "<" ? afterAngles(tokens, open) : open + 1;
+    if (open === tokens.length) return;
+    const body = tokens.slice(open, afterGroup(tokens, open)).map((candidate) => candidate.key);
     const code = body.some((key, index) => key === "readonly" && body[index + 1] === "code");
     classes.push({ name, parent, line: token.line, code });
   });

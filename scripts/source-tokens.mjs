@@ -105,3 +105,20 @@ export function tokensOf(text) {
   }
   return { tokens, comments };
 }
+
+/** The bracket that closes each opening one. */
+const CLOSING = { "(": ")", "[": "]", "{": "}" };
+
+/**
+ * The index of the token after the bracket that closes the one at `open`, a `(`, `[` or `{`, in
+ * any list of tokens with a `key`; the length of the list when it never closes.
+ */
+export function afterGroup(tokens, open) {
+  const opening = tokens[open].key;
+  let depth = 0;
+  for (let at = open; at < tokens.length; at += 1) {
+    if (tokens[at].key === opening) depth += 1;
+    else if (tokens[at].key === CLOSING[opening] && --depth === 0) return at + 1;
+  }
+  return tokens.length;
+}

@@ -8,8 +8,9 @@ import { describe, expect, it } from "vitest";
 // script of package.json), run over one small file in a temporary folder.
 
 const CONFIG = resolve(".oxlintrc.json");
-const OXLINT = resolve("node_modules", ".bin", "oxlint");
-/** The flags of the lint script that decide what fails, read from package.json. */
+/** Oxlint's script, run with this Node.js: the shims in node_modules/.bin do not start on Windows. */
+const OXLINT = resolve("node_modules", "oxlint", "bin", "oxlint");
+/** The lint script of package.json, whose flags decide what fails. */
 const LINT_SCRIPT = (
   JSON.parse(readFileSync("package.json", "utf8")) as { scripts: { lint: string } }
 ).scripts.lint;
@@ -21,7 +22,9 @@ function lint(text: string): { readonly status: number | null; readonly output: 
   try {
     const file = join(folder, "probe.ts");
     writeFileSync(file, text);
-    const run = spawnSync(OXLINT, ["-c", CONFIG, STALE_SEVERITY, file], { encoding: "utf8" });
+    const run = spawnSync(process.execPath, [OXLINT, "-c", CONFIG, STALE_SEVERITY, file], {
+      encoding: "utf8",
+    });
     return { status: run.status, output: `${run.stdout}${run.stderr}` };
   } finally {
     rmSync(folder, { recursive: true, force: true });
@@ -57,15 +60,17 @@ describe("the lint gate of the coding guide", () => {
   });
 
   it("counts a function's lines of code only (CORE-15)", () => {
-    const body = (lines: number, comments: number): string =>
+    const body = (lines: number, others: number): string =>
       [
         "export function f(): number {",
         "  let total = 0;",
         ...Array.from({ length: lines - 4 }, (_, at) => `  total += ${at};`),
-        ...Array.from({ length: comments }, () => "  // Why the sum goes on."),
+        ...Array.from({ length: others }, () => "  // Why the sum goes on."),
+        ...Array.from({ length: others }, () => ""),
         "  return total;",
         "}",
       ].join("\n");
+    // 150 lines of code beside 200 lines of comments and 200 blank lines: within the limit.
     expect(lint(`${body(150, 200)}\n`).status).toBe(0);
     const over = lint(`${body(151, 0)}\n`);
     expect(over.status).not.toBe(0);

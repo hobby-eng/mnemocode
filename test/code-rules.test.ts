@@ -16,6 +16,15 @@ const BASE: Readonly<Record<string, string>> = {
   "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
 };
 
+/** The gate's script and the modules it imports. */
+const GATE = [
+  "verify-code-rules.mjs",
+  "lines-of-code.mjs",
+  "shell-source.mjs",
+  "source-cursor.mjs",
+  "source-tokens.mjs",
+];
+
 /** Whether Python 3 runs here, which the gate asks for its standard library (TOOL-03). */
 const PYTHON = spawnSync("python3", ["--version"]).status === 0;
 
@@ -27,8 +36,7 @@ function codeRules(files: Readonly<Record<string, string | null>>): {
   const root = mkdtempSync(join(tmpdir(), "mnemocode-code-rules-"));
   try {
     mkdirSync(join(root, "scripts"));
-    for (const script of ["verify-code-rules.mjs", "source-tokens.mjs"])
-      copyFileSync(join("scripts", script), join(root, "scripts", script));
+    for (const script of GATE) copyFileSync(join("scripts", script), join(root, "scripts", script));
     for (const [path, text] of Object.entries({ ...BASE, ...files })) {
       if (text === null) continue;
       mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -41,6 +49,16 @@ function codeRules(files: Readonly<Record<string, string | null>>): {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+}
+
+/** The problems that the gate prints for `files`, each as its path, line and rule. */
+function problemsOf(files: Readonly<Record<string, string | null>>): string[] {
+  return [...codeRules(files).problems.matchAll(/^(\S+:\d+ \S+) /gmu)].map((match) => match[1]!);
+}
+
+/** `count` copies of `line`, each with its line break. */
+function repeated(count: number, line: string): string {
+  return `${line}\n`.repeat(count);
 }
 
 /** The rule IDs that the gate names for `files`, each once. */
@@ -65,71 +83,6 @@ describe("the code rules of the coding guide", () => {
 
   it("pass a tree that keeps every rule", () => {
     expect(codeRules({})).toEqual({ status: 0, problems: "" });
-  });
-
-  it("refuse a file of more than 800 lines that the linter does not measure, unless it says why", () => {
-    const long = "line\n".repeat(801);
-    expect(rulesBroken({ "docs/long.md": long })).toEqual(["CORE-15"]);
-    expect(
-      rulesBroken({ "docs/long.md": `<!-- long: one table of every code -->\n${long}` }),
-    ).toEqual([]);
-    // Only a comment that starts the line exempts a file, not "long:" anywhere in it.
-    expect(rulesBroken({ "docs/long.md": `A table too long: every code\n${long}` })).toEqual([
-      "CORE-15",
-    ]);
-    // A Rust file's unit tests at its end do not count.
-    const rust = `${"fn f() {}\n".repeat(700)}#[cfg(test)]\nmod tests {\n${"fn t() {}\n".repeat(200)}}\n`;
-    expect(rulesBroken({ "crate/src/lib.rs": rust })).toEqual([]);
-    // A #[cfg(test)] on anything but that final module leaves every line counted.
-    const early = `#[cfg(test)]\nfn helper() {}\n${"fn f() {}\n".repeat(801)}`;
-    expect(rulesBroken({ "crate/src/lib.rs": early })).toEqual(["CORE-15"]);
-    const middle = `#[cfg(test)]\nmod early {\n}\n${"fn f() {}\n".repeat(801)}`;
-    expect(rulesBroken({ "crate/src/lib.rs": middle })).toEqual(["CORE-15"]);
-  });
-
-  it("count lines of code only: comment lines and blank lines are left out (CORE-15)", () => {
-    const code = (count: number, line: string): string => `${line}\n`.repeat(count);
-    // 800 lines of code with comments and blank lines between them stay within the limit.
-    const rust = `${code(800, "fn f() {}")}${code(300, "// Why.")}/* A block\n${code(100, "of text")}*/\n${"\n".repeat(200)}`;
-    expect(rulesBroken({ "crate/src/lib.rs": rust })).toEqual([]);
-    expect(rulesBroken({ "crate/src/lib.rs": code(801, "fn f() {}") })).toEqual(["CORE-15"]);
-    // A line of code that ends in a comment counts once.
-    expect(rulesBroken({ "crate/src/lib.rs": code(801, "fn f() {} // why") })).toEqual(["CORE-15"]);
-    const python = `${code(800, "x = 1")}${code(300, "# Why.")}${"\n".repeat(100)}`;
-    expect(rulesBroken({ "scripts/a.py": python })).toEqual([]);
-    expect(rulesBroken({ "scripts/a.py": code(801, "x = 1") })).toEqual(["CORE-15"]);
-    const markdown = `${code(800, "A sentence.")}<!--\n${code(300, "a note")}-->\n${"\n".repeat(300)}`;
-    expect(rulesBroken({ "docs/a.md": markdown })).toEqual([]);
-    expect(rulesBroken({ "docs/a.md": code(801, "A sentence.") })).toEqual(["CORE-15"]);
-  });
-
-  it("refuse a shell script that does not stop on its first error", () => {
-    expect(rulesBroken({ "scripts/run.sh": "#!/usr/bin/env bash\nset -u\necho\n" })).toEqual([
-      "TOOL-02",
-    ]);
-    expect(
-      rulesBroken({ "scripts/run.sh": "#!/usr/bin/env bash\n# Runs it.\nset -euo pipefail\n" }),
-    ).toEqual([]);
-    // A script without the .sh ending, started through env -S, is a shell script too.
-    expect(rulesBroken({ "tools/run": "#!/usr/bin/env -S bash -e\nset -u\necho\n" })).toEqual([
-      "TOOL-02",
-    ]);
-  });
-
-  it("refuse an expansion outside quotes in a shell script, not one inside them", () => {
-    const script = (body: string): string => `#!/usr/bin/env bash\nset -euo pipefail\n${body}\n`;
-    for (const body of ["rm -rf $1/build", "cp ${source} out", "echo $(date)", 'echo "a" $name'])
-      expect(rulesBroken({ "scripts/run.sh": script(body) })).toEqual(["TOOL-02"]);
-    for (const body of [
-      'rm -rf "$1/build"',
-      'cp "${source}" out',
-      'echo "$(date)"',
-      "echo '$literal'",
-      "echo price \\$5",
-      "# $comment",
-      'echo "done" # $note',
-    ])
-      expect(rulesBroken({ "scripts/run.sh": script(body) })).toEqual([]);
   });
 
   it.skipIf(!PYTHON)("refuse a Python package without its pin and hashes", () => {
@@ -192,13 +145,185 @@ describe("the code rules of the coding guide", () => {
   });
 });
 
-describe("the code rules of the coding guide", () => {
+describe("the length of a file in lines of code (CORE-15)", () => {
+  it("refuse a file of more than 800 lines of code, unless it says why", () => {
+    const long = "line\n".repeat(801);
+    expect(rulesBroken({ "docs/long.md": long })).toEqual(["CORE-15"]);
+    expect(
+      rulesBroken({ "docs/long.md": `<!-- long: one table of every code -->\n${long}` }),
+    ).toEqual([]);
+    // Only a comment that starts the line exempts a file, not "long:" anywhere in it.
+    expect(rulesBroken({ "docs/long.md": `A table too long: every code\n${long}` })).toEqual([
+      "CORE-15",
+    ]);
+    // A Rust file's unit tests do not count.
+    const rust = `${"fn f() {}\n".repeat(700)}#[cfg(test)]\nmod tests {\n${"fn t() {}\n".repeat(200)}}\n`;
+    expect(rulesBroken({ "crate/src/lib.rs": rust })).toEqual([]);
+    // A #[cfg(test)] on anything but a module leaves its lines counted, and a module's own lines
+    // are all that is left out.
+    const early = `#[cfg(test)]\nfn helper() {}\n${"fn f() {}\n".repeat(801)}`;
+    expect(rulesBroken({ "crate/src/lib.rs": early })).toEqual(["CORE-15"]);
+    const middle = `#[cfg(test)]\nmod early {\n}\n${"fn f() {}\n".repeat(801)}`;
+    expect(rulesBroken({ "crate/src/lib.rs": middle })).toEqual(["CORE-15"]);
+  });
+
+  it("leave out every test module of a Rust file, however it is written", () => {
+    const tests = (head: string, body: string): string =>
+      `${head}\n${repeated(200, "    #[test] fn t() { assert!(true); }")}${body}}\n`;
+    for (const module of [
+      // Two modules, the first not at the end.
+      `${tests("#[cfg(test)]\nmod a {", "")}${tests("#[cfg(test)]\nmod b {", "")}`,
+      // Braces in character literals, strings and comments, and a comment after the module.
+      `${tests("#[cfg(test)]\nmod tests {", "    assert_eq!('{', '{'); // A } in prose.\n    let _ = \"}\";\n")}// The end.\n`,
+      // A comment after the attribute, and a module public within a path.
+      tests("#[cfg(test)] // Unit tests.\n#[allow(dead_code)]\npub(in crate::a) mod t {", ""),
+    ])
+      expect(rulesBroken({ "crate/src/lib.rs": `${repeated(800, "fn f() {}")}${module}` })).toEqual(
+        [],
+      );
+  });
+
+  it("read Rust's strings, character literals and nested comments", () => {
+    const over = repeated(800, "fn f() {}");
+    // Lines inside a string that start like a comment are code.
+    expect(rulesBroken({ "a.rs": `const G: &str = "src/**\n/*.rs";\n${over}` })).toEqual([
+      "CORE-15",
+    ]);
+    expect(rulesBroken({ "a.rs": `const R: &str = r#"\n// "quoted"\n"#;\n${over}` })).toEqual([
+      "CORE-15",
+    ]);
+    // Lifetimes start no character literal: each of these lines counts.
+    expect(rulesBroken({ "a.rs": repeated(801, "fn f<'a>(x: &'a str) -> &'a str { x }") })).toEqual(
+      ["CORE-15"],
+    );
+    // The text after a nested comment's inner close is still comment.
+    const nested = `/* An outer /* inner */ comment\n${repeated(300, "still a comment")}*/\n${over}`;
+    expect(rulesBroken({ "a.rs": nested })).toEqual([]);
+    // A comment that opens after code on its line goes on over the lines after it.
+    const after = `fn g() {} /* Why:\n${repeated(300, "the reason")}*/\n${repeated(799, "fn f() {}")}`;
+    expect(rulesBroken({ "a.rs": after })).toEqual([]);
+  });
+
+  it("read the strings and blocks of Markdown, Python, TOML and shell", () => {
+    // A Markdown code block, and inline code, are text, whatever they hold.
+    const fenced = `\`\`\`html\n<!-- An example.\n\`\`\`\n${repeated(800, "A sentence.")}`;
+    expect(rulesBroken({ "docs/a.md": fenced })).toEqual(["CORE-15"]);
+    const inline = `Write \`<!--\` to open a comment.\n${repeated(800, "A sentence.")}`;
+    expect(rulesBroken({ "docs/a.md": inline })).toEqual(["CORE-15"]);
+    // A line of a Python string that starts with # is text.
+    const python = `TEXT = """\n${repeated(801, "# A heading of the text.")}"""\n`;
+    expect(rulesBroken({ "scripts/a.py": python })).toEqual(["CORE-15"]);
+    // A TOML literal string takes no escapes: 'C:\' ends where it seems to.
+    const toml = `path = 'C:\\'\n${repeated(300, "# Why.")}${repeated(799, "a = 1")}`;
+    expect(rulesBroken({ "a.toml": toml })).toEqual([]);
+    // A here-document's body is text; a comment of the script is not.
+    const shell = "#!/usr/bin/env bash\nset -euo pipefail\n";
+    const body = `${shell}cat <<'EOF'\n${repeated(800, "# A line of the text.")}EOF\n`;
+    expect(rulesBroken({ "scripts/a.sh": body })).toEqual(["CORE-15"]);
+    const commented = `${shell}${repeated(300, "# Why.")}${repeated(799, "echo")}`;
+    expect(rulesBroken({ "scripts/a.sh": commented })).toEqual([]);
+  });
+
+  it("name the first line of code over the limit", () => {
+    const text = `${repeated(300, "// Why.")}${repeated(801, "fn f() {}")}`;
+    expect(problemsOf({ "a.rs": text })).toEqual(["a.rs:1101 CORE-15"]);
+  });
+
+  it("count lines of code only: comment lines and blank lines are left out", () => {
+    const code = (count: number, line: string): string => `${line}\n`.repeat(count);
+    // 800 lines of code with comments and blank lines between them stay within the limit.
+    const rust = `${code(800, "fn f() {}")}${code(300, "// Why.")}/* A block\n${code(100, "of text")}*/\n${"\n".repeat(200)}`;
+    expect(rulesBroken({ "crate/src/lib.rs": rust })).toEqual([]);
+    expect(rulesBroken({ "crate/src/lib.rs": code(801, "fn f() {}") })).toEqual(["CORE-15"]);
+    // A line of code that ends in a comment counts once.
+    expect(rulesBroken({ "crate/src/lib.rs": code(801, "fn f() {} // why") })).toEqual(["CORE-15"]);
+    const python = `${code(800, "x = 1")}${code(300, "# Why.")}${"\n".repeat(100)}`;
+    expect(rulesBroken({ "scripts/a.py": python })).toEqual([]);
+    expect(rulesBroken({ "scripts/a.py": code(801, "x = 1") })).toEqual(["CORE-15"]);
+    const markdown = `${code(800, "A sentence.")}<!--\n${code(300, "a note")}-->\n${"\n".repeat(300)}`;
+    expect(rulesBroken({ "docs/a.md": markdown })).toEqual([]);
+    expect(rulesBroken({ "docs/a.md": code(801, "A sentence.") })).toEqual(["CORE-15"]);
+  });
+});
+
+describe("the shell scripts of the coding guide (TOOL-02)", () => {
+  it("refuse a shell script that does not stop on its first error", () => {
+    expect(rulesBroken({ "scripts/run.sh": "#!/usr/bin/env bash\nset -u\necho\n" })).toEqual([
+      "TOOL-02",
+    ]);
+    expect(
+      rulesBroken({ "scripts/run.sh": "#!/usr/bin/env bash\n# Runs it.\nset -euo pipefail\n" }),
+    ).toEqual([]);
+    // A script without the .sh ending, started through env -S, is a shell script too.
+    expect(rulesBroken({ "tools/run": "#!/usr/bin/env -S bash -e\nset -u\necho\n" })).toEqual([
+      "TOOL-02",
+    ]);
+  });
+
+  it("refuse an expansion outside quotes in a shell script, not one inside them", () => {
+    const script = (body: string): string => `#!/usr/bin/env bash\nset -euo pipefail\n${body}\n`;
+    for (const body of [
+      "rm -rf $1/build",
+      "cp ${source} out",
+      "echo $(date)",
+      'echo "a" $name',
+      // An expansion inside a command substitution is outside quotes again.
+      'echo "$(basename $file)"',
+      "echo `date`",
+      "echo $$",
+      "echo $'it\\'s' $x",
+      "cat <<< $x",
+      "x=$((1 + 2))",
+    ])
+      expect(rulesBroken({ "scripts/run.sh": script(body) })).toEqual(["TOOL-02"]);
+    for (const body of [
+      'rm -rf "$1/build"',
+      'cp "${source}" out',
+      'echo "$(date)"',
+      "echo '$literal'",
+      "echo price \\$5",
+      "# $comment",
+      'echo "done" # $note',
+      // Quotes inside a command substitution inside quotes.
+      'cd "$(dirname "$0")"',
+      'root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+      // A string over two lines, arithmetic, and a default value that expands.
+      'echo "first\n$second"',
+      'echo "$((1 + $count))"',
+      "(( count += $step ))",
+      'x="${a:-$b}"',
+      // The body of a here-document is text.
+      "cat <<EOF\nVersion: $version\nEOF",
+      "cat <<'EOF'\n$literal\nEOF",
+      "cat <<-EOF\n\t$x\n\tEOF",
+    ])
+      expect(rulesBroken({ "scripts/run.sh": script(body) })).toEqual([]);
+    // After a here-document, the script is code again: line 6 is its first line after the body.
+    expect(problemsOf({ "scripts/run.sh": script("cat <<EOF\n$x\nEOF\necho $after") })).toEqual([
+      "scripts/run.sh:6 TOOL-02",
+    ]);
+  });
+});
+
+describe("the TypeScript and markup rules of the coding guide", () => {
   it("refuse an error class without the Error suffix or a readonly code", () => {
     expect(rulesBroken({ "src/a.ts": "class Refused extends Error {}\n" })).toEqual(["TS-06"]);
     // A generic class is an error class too.
-    expect(rulesBroken({ "src/cli/a.ts": "class Failure<D> extends Error {}\n" })).toEqual([
-      "TS-06",
-    ]);
+    for (const parameters of [
+      "<D>",
+      "<D extends object>",
+      "<D extends Map<string, Array<number>>>",
+      "<D = {}>",
+      // The > of an arrow type closes no angle bracket.
+      "<F extends (x: number) => string>",
+    ])
+      expect(
+        rulesBroken({ "src/cli/a.ts": `class Failure${parameters} extends Error {}\n` }),
+      ).toEqual(["TS-06"]);
+    // An Error in a type parameter is no parent.
+    expect(rulesBroken({ "src/cli/a.ts": "export class Holder<E extends Error> {}\n" })).toEqual(
+      [],
+    );
     const coded = [
       'class RefusedError extends Error {\n  readonly code: "refused" = "refused";\n}',
       // A subclass carries its parent's code.
