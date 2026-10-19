@@ -5,6 +5,7 @@
 import { CardPreview as CardPreviewClass } from "../src/export/card-preview.js";
 import { MissingChecksumError as EncodedBackupMissingChecksum } from "../src/core/encoded-backup.js";
 import { readFileSync, readdirSync } from "node:fs";
+import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { describe, expect, it, vi } from "vitest";
 import { choiceOption } from "../src/cli/arguments.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
@@ -148,6 +149,22 @@ describe("S009: one look-up in the word table", () => {
       log.mockRestore();
     }
     expect(lines).toContain("unicode hex: 7684");
+  });
+
+  it("with colour, a lookup's facts are grey labels under the result's heading", async () => {
+    vi.stubEnv("CLICOLOR_FORCE", "1");
+    vi.stubEnv("NO_COLOR", "");
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((line: string) => lines.push(line));
+    try {
+      await runTable({ word: "abandon" });
+    } finally {
+      log.mockRestore();
+      vi.unstubAllEnvs();
+    }
+    const plain = lines.map((line) => line.replace(STYLE_CODES, ""));
+    expect(plain).toContain("  Unicode hex 7684");
+    expect(plain).not.toContain("unicode hex: 7684");
   });
 
   it("writes the whole table with its header", () => {

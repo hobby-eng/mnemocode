@@ -21,8 +21,14 @@ const ERRORS = new ErrorCatalog("cli.table-command", {
     "--table-format requires --all; --output requires --all or --recovery-guide.",
 });
 
+/** One row of the table: grey labels under the result's heading, or plain lines without colour. */
 function printRow(row: ReturnType<typeof WordTable.row>): void {
-  terminalResultHeader("Word mapping", []);
+  const facts: [string, string][] = [
+    ["Index", `${row.index}`],
+    ["English", row.english],
+    ["Unicode hex", row.unicodeHex],
+  ];
+  if (terminalResultHeader("Word mapping", facts)) return;
   console.log(`index:       ${row.index}`);
   console.log(`english:     ${row.english}`);
   console.log(`unicode hex: ${row.unicodeHex}`);
