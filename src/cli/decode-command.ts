@@ -433,8 +433,8 @@ export async function decodeWithQuestions(
           }
           backup = outcome.backup;
           const { codes } = read;
-          const { backup: found, foundDates: dates } = outcome;
-          foundCodes = () => reportFound(codes, found, dates);
+          const { backup: found, foundDates: dates, others } = outcome;
+          foundCodes = () => reportFound(codes, found, dates, others);
           if (outcome.dates !== undefined) {
             foundDates = outcome.dates;
             step = "decode";

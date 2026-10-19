@@ -169,6 +169,25 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     }
   });
 
+  it("finds one phrase that several sets of codes and dates give, and says so", async () => {
+    // The last code unread and the day of the last date forgotten: that date moves only the last
+    // words, so that other last codes with other days give the same phrase, which no wallet tells
+    // apart.
+    const known = ["01-01-2001", "01-01-2002", "01-01-2003"];
+    const encoded = encodeMnemonic(TEST_PHRASE, [...known, "09-12-2030"].map(parseDate));
+    const search = new MissingCodesSearch(
+      MissingCodes.read(marked(formatEncoded(encoded, "indexes"), [11]), "indexes", "seedshift"),
+      fingerprint,
+    );
+    const dates = DatesAnswer.parse([...known, "0?-12-2030"].join(" "), {
+      wordCount: 12,
+      patterns: true,
+    });
+    const found = await search.byWallet(wallet, dates).run();
+    expect(found.kind).toBe("found");
+    if (found.kind === "found") expect(found.others).toBeGreaterThan(0);
+  });
+
   it("lists every candidate with its phrase and fingerprint where they are few", async () => {
     const search = new MissingCodesSearch(
       MissingCodes.read(FEW, "indexes", "seedshift"),

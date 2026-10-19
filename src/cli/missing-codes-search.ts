@@ -36,7 +36,7 @@ import {
   terminalNotice,
   terminalStatus,
 } from "./terminal.js";
-import { counting } from "../core/search-plan.js";
+import { counted, counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
 import { defined } from "../core/defined.js";
@@ -93,10 +93,21 @@ function givenWay(
  * Says what the search filled in, the codes whole with those found, so that the written copy can
  * be corrected; the decode shows it again with its result.
  */
-export function reportFound(codes: MissingCodes, backup: EncodedBackup, foundDates?: string): void {
+export function reportFound(
+  codes: MissingCodes,
+  backup: EncodedBackup,
+  foundDates?: string,
+  others?: number,
+): void {
   terminalStatus(`${MissingCodesSearch.placesText(codes)} found:`, backup.text());
   if (foundDates !== undefined) terminalStatus("Dates found:", foundDates);
-  terminalHint(MISSING_CODES_TEXTS.correct);
+  // Other codes with other dates give the same phrase: those found need not be those written.
+  if (others !== undefined)
+    terminalNotice(
+      `${counted(others + 1, "set")} of codes and dates give this phrase; those found are one of them, so keep the dates you used.`,
+      "warning",
+    );
+  else terminalHint(MISSING_CODES_TEXTS.correct);
 }
 
 /**
@@ -318,7 +329,7 @@ async function outcomeOf(
 ): Promise<MissingOutcome | undefined | Cancelled> {
   if (result.kind === "found") {
     try {
-      reportFound(search.codes, result.backup, result.foundDates);
+      reportFound(search.codes, result.backup, result.foundDates, result.others);
       return result;
     } catch (error) {
       result.backup.wipe();
