@@ -223,6 +223,37 @@ const PARTS: Readonly<Record<string, Part>> = {
   },
   "src/core/candidates-self-test.ts": { uses: ["src/core/candidates.ts"] },
   "src/core/candidate-list-self-test.ts": { uses: ["src/core/candidate-list.ts"] },
+  "src/core/candidate-list-writer-self-test.ts": {
+    uses: [
+      "src/core/candidate-encryption.ts",
+      "src/core/candidate-list-self-test.ts",
+      "src/core/candidate-list-writer.ts",
+    ],
+  },
+  "src/core/missing-codes-search-self-test.ts": {
+    uses: [
+      "src/core/date-search.ts",
+      "src/core/missing-codes.ts",
+      "src/core/missing-codes-search.ts",
+    ],
+  },
+  "src/sskr/split-self-test.ts": {
+    uses: [
+      "src/sskr/known-answers.ts",
+      "src/sskr/share-platform.ts",
+      "src/sskr/share-set.ts",
+      "src/sskr/split.ts",
+    ],
+  },
+  "src/sskr/share-restore-self-test.ts": {
+    uses: [
+      "src/sskr/known-answers.ts",
+      "src/sskr/share-input.ts",
+      "src/sskr/share-platform.ts",
+      "src/sskr/share-restore.ts",
+      "src/sskr/transport.ts",
+    ],
+  },
   "src/core/candidate-encryption-self-test.ts": {
     uses: ["src/core/candidate-encryption.ts"],
   },
@@ -261,13 +292,17 @@ const PARTS: Readonly<Record<string, Part>> = {
       "src/core/backup-reading-self-test.ts",
       "src/core/candidate-encryption-self-test.ts",
       "src/core/candidate-list-self-test.ts",
+      "src/core/candidate-list-writer-self-test.ts",
       "src/core/candidates-self-test.ts",
       "src/core/date-search-self-test.ts",
       "src/core/master-fingerprint-self-test.ts",
+      "src/core/missing-codes-search-self-test.ts",
       "src/sskr/known-answers.ts",
       "src/sskr/repair-self-test.ts",
       "src/sskr/share-platform.ts",
+      "src/sskr/share-restore-self-test.ts",
       "src/sskr/share-unmasking-self-test.ts",
+      "src/sskr/split-self-test.ts",
     ],
     // The SHA-256 of the word lists.
     packages: ["@noble/hashes/sha2.js"],
@@ -294,6 +329,11 @@ const PARTS: Readonly<Record<string, Part>> = {
   // The self-test check of the card renderers, which a host adds to its self-test.
   "src/export/cards-self-test.ts": {
     uses: CARD_RENDERER_PARTS,
+    packages: PDF_PACKAGES,
+  },
+  // The check of the reader of card PDFs, which a host that paints card pages adds.
+  "src/export/card-drawing-self-test.ts": {
+    uses: ["src/export/card-drawing.ts", "src/export/cards-self-test.ts"],
     packages: PDF_PACKAGES,
   },
   // The words of the sheet name the share forms (ShareFormat) by their looks; the modes it takes

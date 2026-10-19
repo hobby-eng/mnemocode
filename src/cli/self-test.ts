@@ -18,6 +18,7 @@ import { WORD_HINTS_SELF_TEST } from "../core/word-hints-self-test.js";
 import { RE_ENCODING_SELF_TEST } from "../core/re-encoding-self-test.js";
 import { PNG_ADMISSION_SELF_TEST } from "../core/png-admission-self-test.js";
 import { cardExportCheck } from "../export/cards-self-test.js";
+import { cardDrawingCheck } from "../export/card-drawing-self-test.js";
 import { cardSetsSelfTest } from "../export/card-sets-self-test.js";
 import { heirSheetSelfTest } from "../export/heir-sheet-self-test.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
@@ -198,7 +199,13 @@ export async function runSelfTest(): Promise<void> {
       // runs without it (system-sandbox.ts).
       { name: "System sandbox", detail: sandboxReport(), run: () => undefined },
     ],
-    after: [TEXT_FILE_INPUT_CHECK, QR_CHECK, QR_BESIDE_CHECK, cardExportCheck(nodeCardRenderer)],
+    after: [
+      TEXT_FILE_INPUT_CHECK,
+      QR_CHECK,
+      QR_BESIDE_CHECK,
+      cardExportCheck(nodeCardRenderer),
+      cardDrawingCheck(nodeCardRenderer),
+    ],
   }).run();
   const rows = report.rows.map(
     (row) => [row.name, `${row.detail} (${row.milliseconds.toFixed(1)} ms)`] as const,

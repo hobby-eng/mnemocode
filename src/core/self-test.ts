@@ -31,6 +31,10 @@ import type { SharePlatform } from "../sskr/share-platform.js";
 import { checkSskrKnownAnswers, checkSskrTransportStartup } from "../sskr/known-answers.js";
 import { checkShareRepair, checkShareRepairStartup } from "../sskr/repair-self-test.js";
 import { checkShareUnmasking } from "../sskr/share-unmasking-self-test.js";
+import { checkShareRestore } from "../sskr/share-restore-self-test.js";
+import { checkShareSplit } from "../sskr/split-self-test.js";
+import { checkCandidateListWriter } from "./candidate-list-writer-self-test.js";
+import { checkMissingCodesSearch } from "./missing-codes-search-self-test.js";
 import { checkBackupCheck, checkBackupCheckStartup } from "./backup-check-self-test.js";
 import { checkBackupReading, checkBackupReadingStartup } from "./backup-reading-self-test.js";
 import { checkCandidateEncryption } from "./candidate-encryption-self-test.js";
@@ -444,15 +448,21 @@ function featureChecks(host: SelfTestHost): SelfTestCheck[] {
       run: () => checkBackupReading(fingerprint),
     },
     {
+      name: "Marked codes search",
+      detail: "encoded fingerprint, wallet with a date, list; refusal",
+      run: () => checkMissingCodesSearch(fingerprint),
+    },
+    {
       name: "Word search",
       detail: "several words, prefixes, choices, missing word; wallet",
       run: () => checkWordSearch(fingerprint),
     },
     {
       name: "Candidate lists",
-      detail: "MNCL bytes, Padmé, refusals; age files and scrypt",
+      detail: "MNCL bytes, Padmé, writer, refusals; age files and scrypt",
       run: async () => {
         checkCandidateListStartup();
+        await checkCandidateListWriter();
         await checkCandidateEncryption();
       },
     },
@@ -471,6 +481,19 @@ function featureChecks(host: SelfTestHost): SelfTestCheck[] {
       detail: withShares("whole dates, a forgotten digit, refusal", "marked shares"),
       run: () => checkShareUnmasking(fingerprint, platform),
     },
+    // The split and the restore need the host's SSKR library throughout.
+    ...(platform === undefined
+      ? []
+      : [
+          {
+            name: "Share split and restore",
+            detail: "published split, masked backup, marked restore; refusals",
+            run: async () => {
+              await checkShareSplit(platform);
+              await checkShareRestore(platform);
+            },
+          },
+        ]),
   ];
 }
 

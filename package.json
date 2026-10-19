@@ -37,6 +37,10 @@
       "types": "./dist/export/cards-self-test.d.ts",
       "import": "./dist/export/cards-self-test.js"
     },
+    "./export/card-drawing-self-test": {
+      "types": "./dist/export/card-drawing-self-test.d.ts",
+      "import": "./dist/export/card-drawing-self-test.js"
+    },
     "./core/master-fingerprint": {
       "types": "./dist/core/master-fingerprint.d.ts",
       "import": "./dist/core/master-fingerprint.js"
@@ -133,6 +137,14 @@
       "types": "./dist/core/candidate-list-self-test.d.ts",
       "import": "./dist/core/candidate-list-self-test.js"
     },
+    "./core/candidate-list-writer-self-test": {
+      "types": "./dist/core/candidate-list-writer-self-test.d.ts",
+      "import": "./dist/core/candidate-list-writer-self-test.js"
+    },
+    "./core/missing-codes-search-self-test": {
+      "types": "./dist/core/missing-codes-search-self-test.d.ts",
+      "import": "./dist/core/missing-codes-search-self-test.js"
+    },
     "./core/candidate-encryption": {
       "types": "./dist/core/candidate-encryption.d.ts",
       "import": "./dist/core/candidate-encryption.js"
@@ -200,6 +212,14 @@
     "./sskr/share-unmasking-self-test": {
       "types": "./dist/sskr/share-unmasking-self-test.d.ts",
       "import": "./dist/sskr/share-unmasking-self-test.js"
+    },
+    "./sskr/share-restore-self-test": {
+      "types": "./dist/sskr/share-restore-self-test.d.ts",
+      "import": "./dist/sskr/share-restore-self-test.js"
+    },
+    "./sskr/split-self-test": {
+      "types": "./dist/sskr/split-self-test.d.ts",
+      "import": "./dist/sskr/split-self-test.js"
     },
     "./export/platform": {
       "types": "./dist/export/platform.d.ts",

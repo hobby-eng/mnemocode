@@ -27,12 +27,16 @@ const LIBRARY_ROWS = [
   "BIP39 seed",
   "Dates",
   "Backup reading",
+  "Marked codes search",
   "Word search",
   "Candidate lists",
   "Backup check",
   "Share repair",
   "Share unmasking",
+  "Share split and restore",
 ];
+/** The rows that need the host's SSKR library throughout, left out without it. */
+const SHARE_ONLY_ROWS = new Set(["SSKR integrity", "Share split and restore"]);
 /** The features that the command line builds in, and their rows. */
 const FEATURES = [
   WALLET_EVIDENCE_SELF_TEST,
@@ -75,7 +79,7 @@ describe("The self-test as a library (core/self-test.ts)", () => {
       publicVectors,
     }).run();
     expect(report.rows.map((row) => row.name)).toEqual(
-      LIBRARY_ROWS.filter((name) => name !== "SSKR integrity"),
+      LIBRARY_ROWS.filter((name) => !SHARE_ONLY_ROWS.has(name)),
     );
     const detail = (name: string) => report.rows.find((row) => row.name === name)?.detail;
     expect(detail("BIP39 seed")).not.toContain("24 BIP39 vectors");
