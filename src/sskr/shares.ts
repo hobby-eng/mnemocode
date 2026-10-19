@@ -65,7 +65,8 @@ export async function restoreShareSet(records: readonly string[]): Promise<Repai
 
 /**
  * Assesses shares with elements marked with ? where unreadable, all together (joint-repair.ts).
- * The plan's search finds every phrase they can restore. `signal` stops the assessment, which can
+ * The search of a plan that can be searched finds every phrase they can restore; that of one which
+ * refused is refused (JointPlan.search). `signal` stops the assessment, which can
  * take a while for many marks; it then returns a plan with a `stopped` assessment. Cancellation
  * does not bypass the initial record-count and SSKR self-test checks.
  */

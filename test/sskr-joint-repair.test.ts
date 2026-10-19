@@ -143,7 +143,10 @@ describe("Joint repair of the shares of one set", () => {
       other[2]!,
     ];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
-    expect((await searchOnce(plan)).sets).toEqual([]);
+    expect(plan.assessment.verdict).toBe("no-fit");
+    await expect(searchOnce(plan)).rejects.toMatchObject({
+      code: "sskr.joint-repair.plan-not-searchable",
+    });
     // Without that share the same marks restore the phrase.
     const kept = (
       await searchOnce(await planJointRepair(typed.slice(0, 2), { platform: nodeSharePlatform }))
@@ -158,9 +161,10 @@ describe("Joint repair of the shares of one set", () => {
       other[0]!,
       markUnits(mine[1]!, "colors", [5]),
     ];
-    expect(await searchOnce(await planJointRepair(typed, { platform: nodeSharePlatform }))).toEqual(
-      { sets: [], stopped: false },
-    );
+    // A plan that refused is not searched as empty: its search says why (AUD-037-API003).
+    await expect(
+      searchOnce(await planJointRepair(typed, { platform: nodeSharePlatform })),
+    ).rejects.toMatchObject({ code: "sskr.joint-repair.plan-not-searchable" });
   });
 
   it("works for a 3-of-5 set and says how many more shares would settle it", async () => {
@@ -198,9 +202,10 @@ describe("Joint repair of the shares of one set", () => {
       markUnits(vector.shares[2]!, "indexes", [8]),
     ];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
-    const found = (await plan.search()).sets;
-    expect(found).toEqual([]);
-    expect(plan.assessment.verdict).toMatch(/no-fit|determined|search/u);
+    expect(plan.assessment.verdict).toBe("no-fit");
+    await expect(searchOnce(plan)).rejects.toMatchObject({
+      code: "sskr.joint-repair.plan-not-searchable",
+    });
   });
 });
 
@@ -248,7 +253,9 @@ describe("Joint repair of the shares of one set", () => {
     );
     expect(plan.assessment.combinations).toBeGreaterThan(2 ** 40);
     expect(plan.assessment.verdict).toBe("too-uncertain");
-    expect((await plan.search()).sets).toEqual([]);
+    await expect(searchOnce(plan)).rejects.toMatchObject({
+      code: "sskr.joint-repair.plan-not-searchable",
+    });
   });
 
   it("stops when the host asks", async () => {
@@ -373,7 +380,10 @@ describe("Joint repair with digits read in part", () => {
     );
     const planned = planJointRepair(typed, { platform: nodeSharePlatform, signal: stop.signal });
     stop.abort(new Error("stopped"));
-    // A stop is a result, not an error (CORE-22): the assessment plans nothing.
-    expect((await planned).assessment.verdict).toBe("stopped");
+    // A stop is a result, not an error (CORE-22): the assessment plans nothing, and its search is
+    // a stopped one (AUD-037-API003).
+    const plan = await planned;
+    expect(plan.assessment.verdict).toBe("stopped");
+    expect(await searchOnce(plan)).toEqual({ sets: [], stopped: true });
   });
 });

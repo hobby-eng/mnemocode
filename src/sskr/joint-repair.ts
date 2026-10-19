@@ -77,6 +77,7 @@ const ERRORS = new ErrorCatalog("sskr.joint-repair", {
   "plan-wiped": () => "This joint repair plan has been wiped.",
   "readings-refused": suppliedMessage,
   "plan-joint-repair-refused": suppliedMessage,
+  "plan-not-searchable": (reason: string) => `${reason} This plan cannot be searched.`,
   "share-repair-host-s-share-platform": {
     kind: "type",
     text: () => "A share repair needs the host's SharePlatform.",
@@ -137,7 +138,9 @@ export interface JointPlan {
   /**
    * Tries every open combination; resolves with every phrase that passes, possibly none, and
    * whether the host stopped the search. Refused with sskr.joint-repair.plan-wiped after wipe,
-   * including when the plan ends while a host confirmation or turn is awaited.
+   * including when the plan ends while a host confirmation or turn is awaited. A plan whose
+   * assessment the host stopped gives a stopped search; one that refused for another reason is
+   * refused with that reason (sskr.joint-repair.plan-not-searchable), never searched as empty.
    */
   readonly search: (options?: SearchOptions) => Promise<RepairSearch>;
   /** Wipes what the search keeps of the shares' secret; the plan searches no more after it. */
@@ -167,7 +170,10 @@ class OwnedJointPlan implements JointPlan, Disposable {
 
   readonly search = async (options?: SearchOptions): Promise<RepairSearch> => {
     this.#assertLive();
-    if (this.#platform === undefined) return NOTHING_SEARCHED;
+    if (this.#platform === undefined) {
+      if (this.assessment.verdict === "stopped") return STOPPED_SEARCH;
+      throw ERRORS.create("plan-not-searchable", [defined(this.assessment.reason)]);
+    }
     try {
       const result = await searchBranches(
         this.#branches,
@@ -291,8 +297,8 @@ function refusal(
   });
 }
 
-/** The search of a plan that refuses: nothing to try. */
-const NOTHING_SEARCHED: RepairSearch = { sets: [], stopped: false };
+/** The search of a plan whose assessment the host stopped: stopped before it began. */
+const STOPPED_SEARCH: RepairSearch = Object.freeze({ sets: [], stopped: true });
 
 /** Why an assessment that the host stopped plans nothing (verdict "stopped"). */
 const STOPPED_REASON = "The assessment was stopped.";
