@@ -1,4 +1,12 @@
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -52,14 +60,14 @@ describe("the temporary folders of exports", () => {
     fillingFolder(output, lstatSync(output));
     expect(removeLeftFolders()).toEqual([]);
     expect(existsSync(output)).toBe(false);
-    // A folder that took its name since is someone else's.
+    // A folder that took its name since is someone else's. The one made is moved away, not
+    // removed, so that the file system cannot give its identity to the new one.
     mkdirSync(output);
     const made = lstatSync(output);
-    rmSync(output, { recursive: true });
-    mkdirSync(join(root, "other"));
-    const other = join(root, "other");
-    fillingFolder(other, made);
+    renameSync(output, join(root, "moved"));
+    mkdirSync(output);
+    fillingFolder(output, made);
     removeLeftFolders();
-    expect(existsSync(other)).toBe(true);
+    expect(existsSync(output)).toBe(true);
   });
 });

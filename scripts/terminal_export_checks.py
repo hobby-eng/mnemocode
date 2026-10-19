@@ -10,7 +10,14 @@ import time
 from pathlib import Path
 
 import terminal_session as terminal
-from terminal_answers import CANCELLED, SEED_PHRASE, TEST_PHRASE
+from terminal_answers import (
+    CANCELLED,
+    CLEAR_PROMPT,
+    HIDDEN_RECORD,
+    SEED_PHRASE,
+    TEST_PHRASE,
+    WORD_NUMBERS,
+)
 
 # The stub: answers for its version, draws the first page asked for unless it has drawn one
 # before ("drawn"), and waits for any other until it is stopped.
@@ -152,3 +159,24 @@ def check_interrupt_without_terminal():
         assert temporary_folders(folder) == set(), "a staging folder was left beside the output"
         assert temporary_folders(*memory) == before, "a raster folder was left"
     print("Ctrl+C while a script's command draws card images: cancelled, no temporary folder left")
+
+
+def check_interrupt_at_clear_prompt():
+    """A SIGINT while the result waits for Enter to clear the private screen, sent as a terminal
+    sends Ctrl+C: the screen is left before "Cancelled.", with exit code 130."""
+    if terminal.WINDOWS:
+        return
+    session = terminal.Session(("decode", "--ask-secrets", "--mode", "direct"))
+    try:
+        session.wait_for(HIDDEN_RECORD)
+        session.type(WORD_NUMBERS + terminal.ENTER)
+        session.wait_for(CLEAR_PROMPT)
+        mark = len(session.output)
+        os.killpg(os.getpgid(session.pid), signal.SIGINT)
+        assert session.wait_for_exit() == CANCELLED
+        after = session.output[mark:]
+        leave = after.find(terminal.LEAVE_ALTERNATE_SCREEN)
+        assert -1 < leave < after.find("Cancelled."), f"the private screen stayed: {after!r}"
+    finally:
+        session.close()
+    print("SIGINT at the prompt after a result: the private screen is left, then cancelled")

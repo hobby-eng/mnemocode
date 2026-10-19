@@ -100,18 +100,26 @@ export async function withPrivateScreen<T>(
       for (const line of noticeLines(warning, "warning")) console.error(line);
     },
   );
-  try {
-    // Ctrl+C while the command works leaves the private screen before the command ends.
-    const result = await interruptible(body, () => process.stderr.write(LEAVE_ALTERNATE_SCREEN));
-    if (result === CANCELLED) return CANCELLED;
-    await flushed(process.stdout);
-    process.stderr.write("\n");
-    return (await waitForEnter(CLEAR_PROMPT)) === CANCELLED ? CANCELLED : result;
-  } finally {
-    PrivateSteps.close();
-    PrivatePage.close();
-    // A Windows console takes standard output asynchronously; the screen is left after it.
-    await flushed(process.stdout);
-    process.stderr.write(LEAVE_ALTERNATE_SCREEN);
-  }
+  let left = false;
+  const leave = (): void => {
+    if (!left) process.stderr.write(LEAVE_ALTERNATE_SCREEN);
+    left = true;
+  };
+  // A SIGINT at any time until the screen is left, also at the prompt after the result, leaves the
+  // private screen before the command ends.
+  return interruptible(async () => {
+    try {
+      const result = await body();
+      if (result === CANCELLED) return CANCELLED;
+      await flushed(process.stdout);
+      process.stderr.write("\n");
+      return (await waitForEnter(CLEAR_PROMPT)) === CANCELLED ? CANCELLED : result;
+    } finally {
+      PrivateSteps.close();
+      PrivatePage.close();
+      // A Windows console takes standard output asynchronously; the screen is left after it.
+      await flushed(process.stdout);
+      leave();
+    }
+  }, leave);
 }

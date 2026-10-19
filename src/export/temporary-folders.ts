@@ -14,7 +14,13 @@ const folders = new Set<string>();
  * with the identity it was made with: one that an exit at once leaves part filled goes too, while
  * it is still the one made.
  */
-const filling = new Map<string, Pick<Stats, "dev" | "ino">>();
+const filling = new Map<string, Identity>();
+
+/**
+ * What tells a folder from one made at its path after it was removed: its device and inode, which
+ * a file system such as ext4 gives again at once, and its birth time.
+ */
+type Identity = Pick<Stats, "dev" | "ino" | "birthtimeMs">;
 
 /**
  * Makes a new temporary folder whose name starts with `prefix`, a path (mkdtemp); rejects with the
@@ -43,8 +49,8 @@ export async function removeTemporaryFolder(
  * Notes that the output folder `path`, made as `made`, is being filled; returns what ends the note
  * once it is filled or removed.
  */
-export function fillingFolder(path: string, made: Pick<Stats, "dev" | "ino">): () => void {
-  filling.set(path, { dev: made.dev, ino: made.ino });
+export function fillingFolder(path: string, made: Identity): () => void {
+  filling.set(path, { dev: made.dev, ino: made.ino, birthtimeMs: made.birthtimeMs });
   return () => {
     filling.delete(path);
   };
@@ -66,8 +72,14 @@ export function removeLeftFolders(): string[] {
   };
   for (const folder of folders) remove(folder);
   for (const [folder, made] of filling) {
-    const now = lstatSync(folder, { throwIfNoEntry: false });
-    if (now?.dev === made.dev && now.ino === made.ino) remove(folder);
+    try {
+      const now = lstatSync(folder, { throwIfNoEntry: false });
+      const same =
+        now?.dev === made.dev && now.ino === made.ino && now.birthtimeMs === made.birthtimeMs;
+      if (same) remove(folder);
+    } catch {
+      left.push(folder);
+    }
   }
   folders.clear();
   filling.clear();

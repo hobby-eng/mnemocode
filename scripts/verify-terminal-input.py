@@ -62,6 +62,7 @@ from terminal_context_checks import (
 )
 from terminal_export_checks import (
     check_ctrl_c_during_image_export,
+    check_interrupt_at_clear_prompt,
     check_interrupt_without_terminal,
 )
 from terminal_result_checks import check_private_result_pages, check_share_pages
@@ -136,6 +137,7 @@ def main():
     check_ctrl_c()
     check_ctrl_c_during_image_export()
     check_interrupt_without_terminal()
+    check_interrupt_at_clear_prompt()
     check_date_search_ctrl_c()
     print("terminal input checks passed")
 
