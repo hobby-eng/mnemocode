@@ -210,17 +210,14 @@ async function splitChecked(
     );
   }
   // The optional original copy comes last, so it remains in view after long share blocks.
-  const show = async (): Promise<Cancelled | undefined> => {
-    if (
-      (await printShares(inForm(shares, format), undefined, Masking.of(mode).holds)) === CANCELLED
-    )
-      return CANCELLED;
+  const show = (): void => {
+    printShares(inForm(shares, format), undefined, Masking.of(mode).holds);
     // An English complete backup was already shown by the older --format-only form.
     if (maskedWords && !(originalCopy === undefined && representation === "english"))
       printMaskedWords(held, mode);
     if (originalCopy !== undefined) printOriginalCopy(original, originalCopy, representation);
   };
-  if ((await show()) === CANCELLED) return CANCELLED;
+  show();
   printFingerprints(mode, masterFingerprint(original), masterFingerprint(held));
   return offerShareCheck(original, mode, threshold, show, checkAnswer, dateValues);
 }

@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseArguments } from "../src/cli/arguments.js";
 import { runDecode } from "../src/cli/decode-command.js";
-import { PrivateSteps } from "../src/cli/private-steps.js";
+import { PrivatePage } from "../src/cli/private-page.js";
+import { closingRows } from "../src/cli/private-screen.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { serializeRecord } from "../src/record.js";
+import { PrivateTerminal } from "./helpers/private-terminal.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const keyboard = vi.hoisted(() => ({ bytes: [] as number[] }));
@@ -26,65 +28,47 @@ const RECORD = serializeRecord(
   "2027 10 24 2027 10 24 2027 10 24 2027 10 23",
 );
 const ARGS = ["--input", RECORD, "--date", "23-09-2026"];
-const stdout = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
-const rows = process.stderr.rows;
-const columns = process.stderr.columns;
-let frames: string[];
-let raw: string[];
+let terminal: PrivateTerminal;
 
 beforeEach(() => {
-  frames = [];
-  raw = [];
-  process.stderr.rows = 24;
-  process.stderr.columns = 80;
-  Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true });
-  PrivateSteps.open(
-    () => undefined,
-    () => undefined,
-  );
-  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-  vi.spyOn(console, "error").mockImplementation((line: unknown) => {
-    frames.push(String(line));
-  });
-  vi.spyOn(console, "log").mockImplementation((line: unknown) => {
-    raw.push(String(line));
-  });
+  terminal = new PrivateTerminal();
 });
-afterEach(() => {
-  PrivateSteps.close();
-  vi.restoreAllMocks();
-  process.stderr.rows = rows;
-  process.stderr.columns = columns;
-  if (stdout === undefined) Reflect.deleteProperty(process.stdout, "isTTY");
-  else Object.defineProperty(process.stdout, "isTTY", stdout);
-});
+afterEach(() => terminal.close());
+
+/** The rows of what the terminal drew, each run of blanks as one space. */
+function shown(): string[] {
+  return terminal.frames().map((frame) => frame.replace(/\s+/gu, " ").trim());
+}
 
 describe("finite private legacy-valid candidate results", () => {
   it("makes the first and last of 128 exact public candidates reachable before clearing", async () => {
     keyboard.bytes = Array.from(Buffer.from("\x1b[F\x1b[H\r"));
     await runDecode(parseArguments(ARGS));
-    const shown = frames.map((frame) => frame.replace(/\s+/gu, " ").trim());
-    expect(shown.some((frame) => frame.includes(TEST_PHRASE))).toBe(true);
-    expect(shown.some((frame) => frame.includes("abandon ".repeat(11) + "wrap"))).toBe(true);
-    expect(shown.at(-1)).toContain(TEST_PHRASE);
-    expect(shown.some((frame) => frame.includes("They do not reveal the phrase."))).toBe(true);
-    expect(raw).toEqual([]);
+    // The clear prompt comes under the candidates: they are read by pages first.
+    expect(await PrivatePage.settle(closingRows())).toBeUndefined();
+    expect(shown().some((frame) => frame.includes(TEST_PHRASE))).toBe(true);
+    expect(shown().some((frame) => frame.includes("abandon ".repeat(11) + "wrap"))).toBe(true);
+    expect(shown().at(-2)).toContain(TEST_PHRASE);
+    expect(shown().some((frame) => frame.includes("They do not reveal the phrase."))).toBe(true);
   });
 
   it("propagates cancellation instead of treating an unread result as done", async () => {
     keyboard.bytes = [0x1b];
-    expect(await runDecode(parseArguments(ARGS))).toBe(CANCELLED);
+    await runDecode(parseArguments(ARGS));
+    expect(await PrivatePage.settle(closingRows())).toBe(CANCELLED);
     expect(process.listenerCount("SIGWINCH")).toBe(0);
   });
 
   it("keeps redirected TSV complete and in its original order without consuming navigation", async () => {
+    const raw: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((line: unknown) => raw.push(String(line)));
     Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: false });
     keyboard.bytes = [];
     await runDecode(parseArguments(ARGS));
     expect(raw).toHaveLength(128);
     expect(raw[0]).toMatch(new RegExp(`^1\\t${TEST_PHRASE}\\t[0-9a-f]{8}$`, "u"));
     expect(raw[127]).toMatch(/^128\tabandon(?: abandon){10} wrap\t[0-9a-f]{8}$/u);
-    expect(frames.some((frame) => frame.includes("Home/End"))).toBe(false);
-    expect(frames.join(" ")).toContain("They do not reveal the phrase.");
+    expect(terminal.written).not.toContain("Home/End");
+    expect(terminal.written).toContain("They do not reveal the phrase.");
   });
 });

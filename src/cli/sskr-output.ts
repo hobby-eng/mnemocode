@@ -18,7 +18,6 @@ import {
   type Channel,
 } from "./terminal.js";
 import { PrivateSteps } from "./private-steps.js";
-import { STYLE_CODES } from "./terminal-style.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import { value, type ParsedArguments } from "./arguments.js";
@@ -49,7 +48,6 @@ import { shareKeepingNote, type ShareCardPackaging } from "../export/sskr-keepin
 import { refusalMessage } from "../core/refusal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
-import { PrivateResult } from "./private-result.js";
 
 const ERRORS = new ErrorCatalog("cli.sskr-output", {
   "share-formats-not-bip39-representations": (value0: string) =>
@@ -163,18 +161,16 @@ function printShareLines(lines: readonly ShareLine[]): void {
  * they hold where that is known (PHRASE_WORDS), so that a masked phrase is not taken for the
  * wallet's.
  */
-export async function printShares(
+export function printShares(
   shares: readonly WrittenShare[],
   total: number = shares.length,
   holds?: string,
-): Promise<Cancelled | undefined> {
-  const lines = shares.flatMap((share) =>
-    shareBlockLines(`SSKR share ${share.number} of ${total}`, share.ur, share.format, holds),
+): void {
+  printShareLines(
+    shares.flatMap((share) =>
+      shareBlockLines(`SSKR share ${share.number} of ${total}`, share.ur, share.format, holds),
+    ),
   );
-  // Measure what the fallback actually prints; styling has no terminal width. A compact summary
-  // omits the result facts and the separated-code view, so even three shares can overflow it.
-  using display = new PrivateResult(lines.map(([, line]) => line.replace(STYLE_CODES, "")));
-  return await display.show(() => printShareLines(lines));
 }
 
 // Saving, with a choice after a failure (save-retry.ts).

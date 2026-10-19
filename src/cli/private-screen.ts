@@ -13,6 +13,7 @@ import {
   LEAVE_ALTERNATE_SCREEN,
   noticeLines,
 } from "./terminal.js";
+import { PrivatePage } from "./private-page.js";
 import { PrivateSteps } from "./private-steps.js";
 import { factLine, headingLine } from "./terminal-style.js";
 import { protectionSummary } from "./protection.js";
@@ -87,6 +88,7 @@ export async function withPrivateScreen<T>(
   if (!privateScreenAvailable()) return body();
   // Written raw: NO_COLOR removes colours, not the screen switch.
   process.stderr.write(ENTER_ALTERNATE_SCREEN);
+  PrivatePage.open();
   PrivateSteps.open(
     () => {
       process.stderr.write(CLEAR_SCREEN);
@@ -109,6 +111,7 @@ export async function withPrivateScreen<T>(
     return (await waitForEnter(CLEAR_PROMPT)) === CANCELLED ? CANCELLED : result;
   } finally {
     PrivateSteps.close();
+    PrivatePage.close();
     process.off("SIGINT", interrupted);
     // A Windows console takes standard output asynchronously; the screen is left after it.
     await flushed(process.stdout);

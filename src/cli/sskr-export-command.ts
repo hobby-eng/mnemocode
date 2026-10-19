@@ -118,14 +118,11 @@ async function exportSet(
     terminalNotice(
       Masking.of(r.mode).masked ? PHRASE_WORDS.repairedMasked : PHRASE_WORDS.repairedUnknown,
     );
-    if (
-      (await printShares(
-        written.shown,
-        written.total,
-        Masking.of(r.mode).masked ? PHRASE_WORDS.masked : undefined,
-      )) === CANCELLED
-    )
-      return CANCELLED;
+    printShares(
+      written.shown,
+      written.total,
+      Masking.of(r.mode).masked ? PHRASE_WORDS.masked : undefined,
+    );
     return "exported";
   } finally {
     reformatted?.wipe();
@@ -175,12 +172,12 @@ async function repairEach(
  * Shows every set that fits, `sets` of `phrases`, with the fingerprint of the phrase it holds,
  * its shares named by `places`; none is saved.
  */
-async function showVariants(
+function showVariants(
   phrases: readonly RestoredPhrase[],
   sets: readonly RepairedSet[],
   places: readonly number[],
   given: ShareFormat | undefined,
-): Promise<Cancelled | undefined> {
+): void {
   // Each with the wallet's own fingerprint, of the phrase after the dates (ShareRestore.variants),
   // in the order of their sets, which say what a repair filled in.
   const variants = ShareRestore.variants(phrases, places, given, masterFingerprint);
@@ -194,17 +191,14 @@ async function showVariants(
     if (!terminalResultHeader(title, [[PHRASE_WORDS.originalFingerprint, fingerprint]]))
       console.log(`${title}, original fingerprint ${fingerprint}:`);
     reportRepairs(defined(sets[index]), places);
-    if (
-      (await printShares(
-        variant.shares.map((share) => ({
-          ur: share.record,
-          format: share.format,
-          number: share.number,
-        })),
-        Math.max(...places),
-      )) === CANCELLED
-    )
-      return CANCELLED;
+    printShares(
+      variant.shares.map((share) => ({
+        ur: share.record,
+        format: share.format,
+        number: share.number,
+      })),
+      Math.max(...places),
+    );
   }
 }
 
@@ -302,7 +296,7 @@ async function exportOnce(
   }
   const { sets, places, phrases } = decision.found;
   if (decision.kind === "variants") {
-    if ((await showVariants(phrases, sets, places, given)) === CANCELLED) return CANCELLED;
+    showVariants(phrases, sets, places, given);
     return undefined;
   }
   return settled(await exportSet(r, decision.set, places, given, checked, args));

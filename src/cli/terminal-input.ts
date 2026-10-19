@@ -456,16 +456,19 @@ export async function readKey(next: NextByte, moreWithin?: MoreWithin): Promise<
     }
     return { kind: "other" };
   }
-  if (sequence.kind !== "alt" && sequence.final === KEY.SEQUENCE_TILDE) {
+  if (sequence.kind === "alt") return { kind: "other" };
+  if (sequence.final === KEY.SEQUENCE_TILDE) {
     if (sequence.parameters === "5") return { kind: "page-up" };
     if (sequence.parameters === "6") return { kind: "page-down" };
   }
+  // Home and End however a terminal sends them: ESC [ H, ESC O H, or ESC [ 1 ~ as a VT220 and
+  // tmux do (editKeyOf), and End alike.
+  const edit = editKeyOf(sequence.introducer, sequence.parameters, sequence.final);
+  if (edit === "home" || edit === "end") return { kind: edit };
   // Only an arrow key without parameters counts.
-  if (sequence.kind === "alt" || sequence.parameters !== "") return { kind: "other" };
+  if (sequence.parameters !== "") return { kind: "other" };
   if (sequence.final === KEY.ARROW_UP) return { kind: "up" };
   if (sequence.final === KEY.ARROW_DOWN) return { kind: "down" };
-  if (sequence.final === KEY.HOME) return { kind: "home" };
-  if (sequence.final === KEY.END) return { kind: "end" };
   return { kind: "other" };
 }
 

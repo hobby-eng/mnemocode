@@ -51,7 +51,7 @@ from terminal_context_checks import (
     check_new_backup_heading_on_screen,
     check_question_reason_kept,
 )
-from terminal_result_checks import check_private_result_pages
+from terminal_result_checks import check_private_result_pages, check_share_pages_in_colour
 
 from terminal_menu_checks import (
     check_back_from_entry,
@@ -117,6 +117,7 @@ def main():
     check_file_or_text_input()
     check_restore_share_asked_again()
     check_private_result_pages()
+    check_share_pages_in_colour()
     check_candidate_passphrase_roles()
     check_ctrl_c()
     check_date_search_ctrl_c()

@@ -65,6 +65,11 @@ export class PrivateSteps {
     if (PrivateSteps.active) PrivateSteps.#context.push({ draw, lifetime });
   }
 
+  /** Whether a result is shown, which the questions after it are drawn under. */
+  static get showingResult(): boolean {
+    return PrivateSteps.#showingResult;
+  }
+
   /** A displayed result must remain readable until its owner explicitly opens another page. */
   static showResult(): void {
     if (!PrivateSteps.active) return;

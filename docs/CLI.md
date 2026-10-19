@@ -119,7 +119,7 @@ On the private screen, the fields for Shamir shares, forgotten words and encoded
 
 Control and text-direction characters in displayed paths are replaced with U+FFFD; the actual filesystem names are unchanged. A command preview containing such characters is omitted, with a warning.
 
-Long share sets, missing-code candidate lists and decoded Original Seedshift records with a replaced last word use private result pages. Use Up/Down or PageUp/PageDown to move, Home/End to reach the first or last page, and Enter when finished copying. Escape or Ctrl+C cancels. Output redirected to a file or pipe stays complete and has no page controls.
+On the private screen, a result that does not fit with the question or prompt under it, such as a long share set with its heading and notices, missing-code candidates or the phrases of an Original Seedshift record with a replaced last word, is shown whole by pages first. Use Up/Down or PageUp/PageDown to move, Home/End to reach the first or last page, and Enter when finished copying; the end of the result then stays above the question. Escape or Ctrl+C cancels. Output redirected to a file or pipe stays complete and has no page controls.
 
 `--mnemonic-file PATH` reads a phrase; `--input-file PATH` reads codes or a record. The path `-` reads standard input. With `--ask-secrets`, Decode and date recovery can read `--input-file` or `--qr-file` and then ask only for dates. Decode also accepts a file of Shamir shares, one per line, and passes every share to restoration.
 

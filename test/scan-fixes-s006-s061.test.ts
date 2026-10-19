@@ -290,7 +290,6 @@ describe("S022: every class that holds a secret shows only its kind", () => {
         "OpenedCandidateList",
         "PassphraseProtection",
         "PreparedWalletEvidence",
-        "PrivateResult",
         "ReEncoding",
         "ReadingSpace",
         "RestoredShares",

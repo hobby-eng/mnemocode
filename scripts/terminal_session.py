@@ -126,6 +126,18 @@ class Session:
                 time.sleep(0.01)
         raise AssertionError(f"{needle!r} did not appear in {self.output[start:]!r}")
 
+    def wait_for_any(self, needles, limit=30):
+        """Reads until one of `needles` appears after the text last waited for; returns it."""
+        end = time.monotonic() + limit
+        while time.monotonic() < end:
+            found = [(at, n) for n in needles if (at := self.output.find(n, self.seen)) >= 0]
+            if found:
+                at, needle = min(found)
+                self.seen = at + len(needle)
+                return needle
+            self.read_some()
+        raise AssertionError(f"none of {needles!r} appeared in {self.output[self.seen:]!r}")
+
     def type(self, text):
         if WINDOWS:
             self.process.write(text)
@@ -282,11 +294,7 @@ def assert_private_result_visible(session, markers, absent=(), once=()):
     """
     if WINDOWS:
         return
-    session.read_some(wait=0.05)
-    start = session.output.rfind(ENTER_ALTERNATE_SCREEN)
-    assert start >= 0, "the private screen was not opened"
-    text = session.output[start + len(ENTER_ALTERNATE_SCREEN) :]
-    frame = " ".join(" ".join(Screen(TERMINAL_COLUMNS, text, TERMINAL_ROWS).lines()).split())
+    frame = private_frame(session)
     for marker in markers:
         assert marker in frame, f"the current private frame lost {marker!r}"
     for marker in absent:
@@ -294,6 +302,15 @@ def assert_private_result_visible(session, markers, absent=(), once=()):
     for marker in once:
         count = frame.count(marker)
         assert count == 1, f"the current private frame shows {marker!r} {count} times"
+
+
+def private_frame(session):
+    """The current frame of the private screen, as one line with each run of blanks one space."""
+    session.read_some(wait=0.05)
+    start = session.output.rfind(ENTER_ALTERNATE_SCREEN)
+    assert start >= 0, "the private screen was not opened"
+    text = session.output[start + len(ENTER_ALTERNATE_SCREEN) :]
+    return " ".join(" ".join(Screen(TERMINAL_COLUMNS, text, TERMINAL_ROWS).lines()).split())
 
 
 def read_to_end(session):

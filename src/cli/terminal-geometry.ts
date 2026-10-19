@@ -136,7 +136,11 @@ const WIDE_RANGES: readonly (readonly [number, number])[] = [
 const NONSPACING_MARK = /[\p{Mn}\p{Me}]/u;
 const MAX_UNICODE_CODE_POINT = 0x10ffff;
 
-function codePointWidth(point: number): number {
+/**
+ * The columns that the code point `point` takes on a terminal: none for a nonspacing mark, two for
+ * a wide character, one for any other.
+ */
+export function codePointWidth(point: number): number {
   if (point <= MAX_UNICODE_CODE_POINT && NONSPACING_MARK.test(String.fromCodePoint(point)))
     return 0;
   return WIDE_RANGES.some(([first, last]) => point >= first && point <= last) ? 2 : 1;

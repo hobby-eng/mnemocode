@@ -206,7 +206,7 @@ export function backupCheckAnswer(args: ParsedArguments): BackupCheckAnswer {
 async function offerCheck(
   parts: CheckedParts,
   check: () => Promise<CheckEnd | Cancelled>,
-  show: () => void | Promise<Cancelled | undefined>,
+  show: () => void,
   answer: BackupCheckAnswer,
 ): Promise<Cancelled | undefined> {
   for (let given = answer; ; given = undefined) {
@@ -216,7 +216,7 @@ async function offerCheck(
     const end = await check();
     if (end !== "show") return end === "done" ? undefined : end;
     clearPrivateScreen();
-    if ((await show()) === CANCELLED) return CANCELLED;
+    show();
   }
 }
 
@@ -332,7 +332,7 @@ export async function offerShareCheck(
   original: string,
   mode: SplitMode,
   threshold: number,
-  show: () => void | Promise<Cancelled | undefined>,
+  show: () => void,
   answer: BackupCheckAnswer,
   dates?: readonly DateShiftDate[],
 ): Promise<Cancelled | undefined> {

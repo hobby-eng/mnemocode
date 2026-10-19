@@ -47,10 +47,12 @@ import {
 import { parseAddressCount, defaultAddressCount } from "../core/address-scan.js";
 import { FIRST_RECEIVING, type WalletPlace } from "./bitcoin-options.js";
 import { onPrivateScreen } from "./private-screen.js";
+import { PrivatePage } from "./private-page.js";
 import { PrivateSteps } from "./private-steps.js";
-import { FINGERPRINT_DISCLOSURE, terminalNotice } from "./terminal.js";
+import { FINGERPRINT_DISCLOSURE, noticeLines, terminalNotice } from "./terminal.js";
 import {
   choose,
+  rowsOf,
   writePrompt,
   type Choice,
   type Explanation,
@@ -215,7 +217,7 @@ export async function askSecretUntil<T>(
 ): Promise<T | Cancelled> {
   const read = (text: string): T | Promise<T> =>
     parse(options.textFile === undefined ? text : TextFileInput.read(text, options.textFile));
-  const answer = await askUntil(read, async () => {
+  const answer = await askUntil(prompt, read, async () => {
     const reading = await readAnswer(prompt, {
       echo: onPrivateScreen(),
       back: false,
@@ -260,16 +262,21 @@ function turnOfReading(reading: Reading, rules: TurnRules): Turn {
 }
 
 /**
- * Asks, by `turn`, until `parse` accepts an answer, each warning shown before the question comes
- * again: why the answer was refused, or why it was empty. Undefined when the person went back,
- * CANCELLED when they cancelled. The questions for a secret and for a visible value ask through it.
+ * Asks, by `turn`, the question of `prompt` until `parse` accepts an answer, each warning shown
+ * before the question comes again: why the answer was refused, or why it was empty. Undefined when
+ * the person went back, CANCELLED when they cancelled. The questions for a secret and for a visible
+ * value ask through it.
  */
 async function askUntil<T>(
+  prompt: string,
   parse: AnswerParser<T>,
   turn: () => Promise<Turn>,
 ): Promise<T | undefined | Cancelled> {
   assertTerminal();
   for (let warning: string | undefined; ;) {
+    const above = warning === undefined ? [] : noticeLines(warning, "warning");
+    if ((await PrivatePage.beforeQuestion(rowsOf(["", ...above, prompt]))) === CANCELLED)
+      return CANCELLED;
     if (warning !== undefined && PrivateSteps.active) PrivateSteps.remember(warning);
     const redrawn = PrivateSteps.begin();
     if (warning !== undefined && !redrawn) terminalNotice(warning, "warning");
@@ -301,7 +308,7 @@ export async function askValueUntil<T>(
   parse: AnswerParser<T>,
   options: ValueAskOptions = {},
 ): Promise<T | undefined | Cancelled> {
-  return askUntil(parse, async () => {
+  return askUntil(prompt, parse, async () => {
     const reading = await readAnswer(prompt, { echo: true, back: true });
     return turnOfReading(reading, { ...options, leave: "back" });
   });

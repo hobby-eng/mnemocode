@@ -19,7 +19,10 @@ import {
   type MissingCodesWay,
   type MissingCodesWaySearch,
   type MissingCodesFound,
+  type MissingCodesRow,
 } from "../core/missing-codes-search.js";
+import { onPrivateScreen } from "./private-screen.js";
+import { PrivateSteps } from "./private-steps.js";
 import type { MissingCodes } from "../core/missing-codes.js";
 import { askAfterFailure, askValueUntil, askWalletEvidence, WHAT_NOW } from "./ask.js";
 import { askDates } from "./date-search.js";
@@ -38,7 +41,6 @@ import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
 import { defined } from "../core/defined.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
-import { PrivateResult } from "./private-result.js";
 
 /** Seconds between two progress updates of a long search. */
 const PROGRESS_SECONDS = 2;
@@ -267,6 +269,33 @@ async function askWallet(
 }
 
 /** Every candidate with its phrase and fingerprint, for the person to compare. */
+/**
+ * The candidates of a listed search: on the private screen one after another, which the page shows
+ * by pages when they do not fit (PrivatePage), and elsewhere one row each, for a script.
+ */
+function showCandidates(rows: readonly MissingCodesRow[]): void {
+  if (onPrivateScreen() && process.stdout.isTTY === true) {
+    PrivateSteps.showResult();
+    for (const line of [
+      FINGERPRINT_DISCLOSURE,
+      "",
+      ...rows.flatMap(({ codes, phrase, fingerprint }, index) => [
+        `Candidate ${index + 1}`,
+        `Codes: ${codes}`,
+        `Phrase: ${phrase}`,
+        `Fingerprint: ${fingerprint}`,
+        "",
+      ]),
+    ])
+      console.log(line);
+    return;
+  }
+  rows.forEach(({ codes, phrase, fingerprint }, index) =>
+    console.log(`${index + 1}\t${codes}\t${phrase}\t${fingerprint}`),
+  );
+  console.error(FINGERPRINT_DISCLOSURE);
+}
+
 async function listed(search: MissingCodesSearch): Promise<MissingOutcome | Cancelled> {
   const dates = search.needsDates ? await askCodeDates(search, false) : undefined;
   if (dates === CANCELLED) return CANCELLED;
@@ -274,29 +303,7 @@ async function listed(search: MissingCodesSearch): Promise<MissingOutcome | Canc
   using way = search.listed(dateAnswer?.known ?? []);
   const result = await ran(way);
   if (result === CANCELLED) return CANCELLED;
-  if (result.kind === "list") {
-    const lines = [
-      FINGERPRINT_DISCLOSURE,
-      "",
-      ...result.rows.flatMap(({ codes, phrase, fingerprint }, index) => [
-        `Candidate ${index + 1}`,
-        `Codes: ${codes}`,
-        `Phrase: ${phrase}`,
-        `Fingerprint: ${fingerprint}`,
-        "",
-      ]),
-    ];
-    using display = new PrivateResult(lines);
-    if (
-      (await display.show(() => {
-        result.rows.forEach(({ codes, phrase, fingerprint }, index) =>
-          console.log(`${index + 1}\t${codes}\t${phrase}\t${fingerprint}`),
-        );
-        console.error(FINGERPRINT_DISCLOSURE);
-      })) === CANCELLED
-    )
-      return CANCELLED;
-  }
+  if (result.kind === "list") showCandidates(result.rows);
   terminalHint(MISSING_CODES_TEXTS.list);
   return { kind: "shown" };
 }

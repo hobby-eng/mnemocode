@@ -39,6 +39,7 @@ import type { WordHints } from "../core/word-hints.js";
 import { listInWords } from "../core/places.js";
 import { defined } from "../core/defined.js";
 import { PrivateSteps } from "./private-steps.js";
+import { PrivatePage } from "./private-page.js";
 
 /** Marker, number and the gaps before a label: "› 1  ". */
 const LABEL_INDENT = 5;
@@ -319,11 +320,22 @@ export async function choose<T>(
   // Keys pressed before the question showed, such as the rest of a paste, are dropped and wiped:
   // only keys pressed for it answer it.
   if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
-  PrivateSteps.begin();
   let selected = options.initial ?? 0;
   const hint = paint(STYLE.muted, keyHint(choices, options.quit ?? "goes back"));
   const explanation = explanationLines(options.explanation);
   const warning = warningLines(options.warning);
+  const rows = rowsOf([
+    "",
+    ...warning,
+    question,
+    ...explanation,
+    ...listLines(choices, 0),
+    "",
+    hint,
+    "",
+  ]);
+  if ((await PrivatePage.beforeQuestion(rows)) === CANCELLED) return CANCELLED;
+  PrivateSteps.begin();
   return withRawTerminal(async (next, moreWithin) => {
     const above = warning.map((line) => `${line}\n`).join("");
     process.stderr.write(`\n${above}${paint(STYLE.strong, question)}\n`);
@@ -485,9 +497,11 @@ async function askLineOnce(
   options: LineQuestion,
   warning: string | undefined,
 ): Promise<LineOutcome> {
-  PrivateSteps.begin();
   const promptWidth = displayWidth(shown);
   const warned = warningLines(warning);
+  if ((await PrivatePage.beforeQuestion(rowsOf(["", ...warned, shown]))) === CANCELLED)
+    return { kind: "cancelled" };
+  PrivateSteps.begin();
   return withRawTerminal(async (next, moreWithin) => {
     if ((await dropTypedAhead()) === CANCELLED) return { kind: "cancelled" };
     process.stderr.write(`\n${warned.map((line) => `${line}\n`).join("")}`);
@@ -594,6 +608,8 @@ export async function waitForEnter(
   message: string,
   options: EnterOptions = {},
 ): Promise<"enter" | "escape" | Cancelled> {
+  // The prompt stays under what the screen shows: a page that would scroll away is read first.
+  if ((await PrivatePage.settle(rowsOf([message]))) === CANCELLED) return CANCELLED;
   return withRawTerminal(async (next, moreWithin) => {
     if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
     writePrompt(message);

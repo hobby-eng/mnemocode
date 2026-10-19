@@ -60,7 +60,7 @@ import {
   transformMode,
 } from "./input.js";
 import { clearPrivateScreen, onPrivateScreen } from "./private-screen.js";
-import { PrivateResult } from "./private-result.js";
+import { PrivateSteps } from "./private-steps.js";
 import {
   type Channel,
   terminalColor,
@@ -120,7 +120,7 @@ async function decodeFromOptions(arguments_: ParsedArguments): Promise<Cancelled
   if (read === CANCELLED) return CANCELLED;
   using backup = read.backup;
   const enteredDates = read.dates;
-  if (backup.givesSeveral) return await showLegacyValidCandidates(backup.candidates(enteredDates));
+  if (backup.givesSeveral) showLegacyValidCandidates(backup.candidates(enteredDates));
   else {
     const result = backup.decode(enteredDates);
     showRecovered(result, backup.mode, backup.format);
@@ -169,38 +169,37 @@ function reportShorterPhrases(backup: EncodedBackup, dates: readonly DateShiftDa
   );
 }
 
-/** Every phrase that a record with a replaced last word may hold, each with its fingerprint. */
-async function showLegacyValidCandidates(
-  candidates: readonly DecodedResult[],
-): Promise<Cancelled | undefined> {
+/**
+ * Every phrase that a record with a replaced last word may hold, each with its fingerprint: on the
+ * private screen one candidate after another, which the page shows by pages when they do not fit
+ * (PrivatePage), and elsewhere one row each, for a script.
+ */
+function showLegacyValidCandidates(candidates: readonly DecodedResult[]): void {
   const summary = `Recovered ${candidates.length} checksum-valid candidates for ${PHRASE_WORDS.original}.`;
-  const plain = (): void => {
-    for (const [index, candidate] of candidates.entries()) {
-      console.log(
-        `${index + 1}\t${candidate.recoveredMnemonic}\t${masterFingerprint(candidate.recoveredMnemonic)}`,
-      );
-    }
-    console.error(
-      `${summary} The final column is the original BIP32 master fingerprint for an empty BIP39 passphrase. ${FINGERPRINT_DISCLOSURE}`,
-    );
-  };
-  if (!onPrivateScreen() || process.stdout.isTTY !== true) {
-    plain();
-    return undefined;
-  }
-  using display = new PrivateResult([
-    summary,
-    "Original BIP32 master fingerprints use an empty BIP39 passphrase.",
-    FINGERPRINT_DISCLOSURE,
-    "",
-    ...candidates.flatMap((candidate, index) => [
-      `Candidate ${index + 1} of ${candidates.length}`,
-      candidate.recoveredMnemonic,
-      `Fingerprint: ${masterFingerprint(candidate.recoveredMnemonic)}`,
+  if (onPrivateScreen() && process.stdout.isTTY === true) {
+    PrivateSteps.showResult();
+    for (const line of [
+      summary,
+      "Original BIP32 master fingerprints use an empty BIP39 passphrase.",
+      FINGERPRINT_DISCLOSURE,
       "",
-    ]),
-  ]);
-  return await display.show(plain);
+      ...candidates.flatMap((candidate, index) => [
+        `Candidate ${index + 1} of ${candidates.length}`,
+        candidate.recoveredMnemonic,
+        `Fingerprint: ${masterFingerprint(candidate.recoveredMnemonic)}`,
+        "",
+      ]),
+    ])
+      console.log(line);
+    return;
+  }
+  for (const [index, candidate] of candidates.entries())
+    console.log(
+      `${index + 1}\t${candidate.recoveredMnemonic}\t${masterFingerprint(candidate.recoveredMnemonic)}`,
+    );
+  console.error(
+    `${summary} The final column is the original BIP32 master fingerprint for an empty BIP39 passphrase. ${FINGERPRINT_DISCLOSURE}`,
+  );
 }
 
 /** The recovered seed phrase, its checksum and, when the checksum is valid, its fingerprint. */
@@ -300,9 +299,8 @@ const DECODE: DecodeUse = {
   searches: true,
   stop: { label: "Done", note: "keep this result", value: "done" },
   async several(backup, dates) {
-    return (await showLegacyValidCandidates(backup.candidates(dates))) === CANCELLED
-      ? CANCELLED
-      : "done";
+    showLegacyValidCandidates(backup.candidates(dates));
+    return "done";
   },
   decoded: async () => "done",
   show: (result, mode, format) => showRecovered(result, mode, format),
