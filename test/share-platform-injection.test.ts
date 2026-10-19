@@ -120,9 +120,15 @@ describe("the share parts with the host's platform", () => {
         )
         .trim()
         .split("\n");
-    const split = new ShareSplit({ combineShares, createShares }, (seed) => seed.fill(0));
+    const split = new ShareSplit({ combineShares, createShares }, (seed) => seed.fill(7));
     const records = await split.split(PHRASE, 2, 3);
     expect((await ShareSet.restore(records, { combineShares })).mnemonic).toBe(PHRASE);
+    // Randomness that leaves the seed unfilled makes no share (AUD-037-SEC003).
+    const unfilled = new ShareSplit({ combineShares, createShares }, () => undefined);
+    await expect(unfilled.split(PHRASE, 2, 3)).rejects.toHaveProperty(
+      "code",
+      "sskr.split.randomness-left-seed-unfilled",
+    );
   });
 
   it("plan, search and measure with the platform of a JointRepair", async () => {

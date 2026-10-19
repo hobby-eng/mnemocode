@@ -27,6 +27,8 @@ const ERRORS = new ErrorCatalog("sskr.split", {
     "SSKR engine returned shares of another split than asked.",
   "sskr-generated-shares-did-not-reconstruct-source-entropy": () =>
     "SSKR generated shares did not reconstruct the source entropy.",
+  "randomness-left-seed-unfilled": () =>
+    "The host's randomness left the seed of the split unfilled: no share is made, as any one would show the phrase.",
 });
 
 /** A split makes one group, of at most as many members as SSKR numbers (MAX_GROUP_MEMBERS). */
@@ -64,6 +66,11 @@ export class ShareSplit {
   readonly #platform: ShareSplitPlatform;
   readonly #fillRandom: (bytes: Uint8Array) => void;
 
+  /**
+   * Binds the host's SSKR library, `platform`, and `fillRandom`, which must fill the buffer it is
+   * given in place from a cryptographic source of randomness; what it returns is not read. A seed
+   * that it leaves all zero is refused (randomness-left-seed-unfilled).
+   */
   constructor(platform: ShareSplitPlatform, fillRandom: (bytes: Uint8Array) => void) {
     this.#platform = platform;
     this.#fillRandom = fillRandom;
@@ -91,6 +98,9 @@ export class ShareSplit {
     const seed = new Uint8Array(SEED_BYTES);
     try {
       this.#fillRandom(seed);
+      // A seed left as it was made, all zero, would make shares that each show the phrase.
+      if (seed.every((byte) => byte === 0))
+        throw ERRORS.create("randomness-left-seed-unfilled", []);
       const records = await this.#platform.createShares(entropy, threshold, count, seed);
       if (records.length !== count)
         throw ERRORS.create("sskr-engine-returned-unexpected-share-count", []);
