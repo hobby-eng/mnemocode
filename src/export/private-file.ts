@@ -1,19 +1,9 @@
-import {
-  chmod,
-  link,
-  lstat,
-  mkdir,
-  mkdtemp,
-  readdir,
-  rename,
-  rm,
-  rmdir,
-  writeFile,
-} from "node:fs/promises";
+import { chmod, link, lstat, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 import { errorCode } from "../core/refusal.js";
 import { ExportFileName } from "./file-name.js";
+import { makeTemporaryFolder, removeTemporaryFolder } from "./temporary-folders.js";
 
 const ERRORS = new ErrorCatalog("export.private-file", {
   "new-folder-path-empty-one-refused": () => "A new folder needs a path; an empty one is refused.",
@@ -82,18 +72,18 @@ async function withStagedFile(
   bytes: Uint8Array,
   publish: (temporary: string) => Promise<void>,
 ): Promise<void> {
-  const staging = await mkdtemp(join(dirname(destination), ".mnemocode-export-"));
+  const staging = await makeTemporaryFolder(join(dirname(destination), ".mnemocode-export-"));
   try {
     const temporary = join(staging, "document");
     await writeNewPrivateFile(temporary, bytes);
     await publish(temporary);
   } catch (error) {
     // A removal that fails is what the caller hears of, as the folder may hold a copy.
-    await rm(staging, { recursive: true, force: true });
+    await removeTemporaryFolder(staging);
     throw error;
   }
   try {
-    await rm(staging, { recursive: true, force: true });
+    await removeTemporaryFolder(staging);
   } catch (error) {
     throw new LeftStagingCopyError(destination, staging, error);
   }
@@ -167,7 +157,7 @@ export async function publishNewFolder<T>(
   write: (staging: string) => Promise<T>,
 ): Promise<T> {
   await mkdir(dirname(target), { recursive: true });
-  const staging = await mkdtemp(join(dirname(target), prefix));
+  const staging = await makeTemporaryFolder(join(dirname(target), prefix));
   let reservation: Awaited<ReturnType<typeof lstat>> | undefined;
   try {
     const result = await write(staging);
@@ -182,10 +172,11 @@ export async function publishNewFolder<T>(
     reservation = await lstat(target);
     for (const name of await readdir(staging))
       await rename(privateChildPath(staging, name), privateChildPath(target, name));
-    await rmdir(staging);
+    // Every file was moved: a staging folder that is not empty fails the export.
+    await removeTemporaryFolder(staging, { empty: true });
     return result;
   } catch (error) {
-    await rm(staging, { recursive: true, force: true });
+    await removeTemporaryFolder(staging);
     if (reservation !== undefined) {
       const current = await lstat(target);
       if (current.dev === reservation.dev && current.ino === reservation.ino)

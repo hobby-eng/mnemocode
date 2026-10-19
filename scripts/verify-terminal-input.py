@@ -46,7 +46,8 @@ It checks that
 - nothing typed or shown in Decode, Encode or Restore that is secret reaches the main screen,
   which stays in the scrollback;
 - Ctrl+C at a prompt for a secret leaves the private screen; in the menu it cancels that command
-  and the menu comes back, a typed command ends with exit code 130;
+  and the menu comes back, a typed command ends with exit code 130; Ctrl+C while card images are
+  drawn ends the command as cancelled, leaving no temporary folder of the export;
 - Escape or q in the menu ends it with exit code 0, and Ctrl+C there with 130.
 """
 
@@ -59,6 +60,7 @@ from terminal_context_checks import (
     check_new_backup_heading_on_screen,
     check_question_reason_kept,
 )
+from terminal_export_checks import check_ctrl_c_during_image_export
 from terminal_result_checks import check_private_result_pages, check_share_pages_in_colour
 
 from terminal_menu_checks import (
@@ -129,6 +131,7 @@ def main():
     check_share_pages_in_colour()
     check_candidate_passphrase_roles()
     check_ctrl_c()
+    check_ctrl_c_during_image_export()
     check_date_search_ctrl_c()
     print("terminal input checks passed")
 

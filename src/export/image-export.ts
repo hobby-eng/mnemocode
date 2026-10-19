@@ -1,12 +1,13 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { PDFDocument } from "pdf-lib";
 import { pageFileName } from "./card-codes.js";
 import { NewFolder, writeNewPrivateFile } from "./private-file.js";
+import { makeTemporaryFolder, removeTemporaryFolder } from "./temporary-folders.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import {
   coveredPixels,
@@ -148,7 +149,7 @@ export async function writeRenderedDocument(
   // A JavaScript host may pass any value: it is read as a person's answer is.
   const image = parseImageFormat(format);
   const program = await imageRenderer();
-  const temporary = await mkdtemp(join(rasterFolder(), "mnemocode-raster-"));
+  const temporary = await makeTemporaryFolder(join(rasterFolder(), "mnemocode-raster-"));
   try {
     const input = join(temporary, "document.pdf");
     await writeNewPrivateFile(input, bytes);
@@ -202,7 +203,7 @@ export async function writeRenderedDocument(
       throw ERRORS.create("image-destination-already-exists-nothing-will-overwritten", []);
     throw error;
   } finally {
-    await rm(temporary, { recursive: true, force: true });
+    await removeTemporaryFolder(temporary);
   }
 }
 
