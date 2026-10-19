@@ -32,6 +32,16 @@ const OPTION_INDENT = 2;
 const SHORT_FORM_WIDTH = 4;
 /** Indent of the explanation of an option in `--help`, as clap prints it. */
 const OPTION_TEXT_INDENT = 10;
+/** The two commands built in beside the others, with their lines of the overview. */
+const BUILT_INS = {
+  version: { summary: "Print the version", usage: "" },
+  help: { summary: "Print this help, or that of a command or topic", usage: "[<COMMAND|TOPIC>]" },
+} as const;
+
+function isBuiltIn(name: string): name is keyof typeof BUILT_INS {
+  return Object.hasOwn(BUILT_INS, name);
+}
+
 const RECOVERY_SAFETY =
   "Recovery material: a record, with its dates if it has any, restores the wallet; it is not encryption.";
 
@@ -147,7 +157,7 @@ function labelledColumns(rows: readonly (readonly [string, number, string])[]): 
 }
 
 function section(title: string, lines: readonly string[]): string {
-  return [heading(title), ...lines].join("\n");
+  return [...wrapText(title, HELP_WIDTH).map(heading), ...lines].join("\n");
 }
 
 function paragraphs(texts: readonly string[], width: number = HELP_WIDTH): string {
@@ -194,10 +204,7 @@ export function printUsage(): void {
   const commands: HelpRow[] = (Object.keys(commandHelp) as CommandName[])
     .filter((name) => COMMAND_FACTS[name].listed)
     .map((name) => [name, commandHelp[name].summary]);
-  commands.push(
-    ["version", "Print the version"],
-    ["help", "Print this help, or that of a command"],
-  );
+  commands.push(["version", BUILT_INS.version.summary], ["help", BUILT_INS.help.summary]);
   const topics: HelpRow[] = Object.entries(topicHelp).map(([name, topic]) => [
     `help ${name}`,
     topic.summary,
@@ -319,6 +326,15 @@ export function printTopicHelp(name: string): void {
  * is no command or topic of that name.
  */
 export function printNamedHelp(name: string): boolean {
+  if (isBuiltIn(name)) {
+    const builtIn = BUILT_INS[name];
+    console.log(
+      [builtIn.summary, usageLine(`mnemocode ${name}`, builtIn.usage), closingSafety()].join(
+        "\n\n",
+      ),
+    );
+    return true;
+  }
   if (isCommandName(name)) {
     printCommandHelp(name, true);
     return true;
@@ -332,5 +348,7 @@ export function printNamedHelp(name: string): boolean {
 
 /** The commands and topics, for an error about an unknown one. */
 export function helpNames(): string {
-  return [...Object.keys(commandHelp), ...Object.keys(topicHelp)].join(", ");
+  return [...Object.keys(commandHelp), ...Object.keys(BUILT_INS), ...Object.keys(topicHelp)].join(
+    ", ",
+  );
 }

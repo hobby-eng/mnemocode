@@ -88,11 +88,16 @@ export async function runCommandLine(argv: readonly string[]): Promise<CommandEn
   if (command === "help") {
     if (rest.length > 1) throw ERRORS.create("help-command-takes-one-command-topic-name", []);
     if (rest[0] === undefined) printUsage();
-    else if (!printNamedHelp(rest[0]))
+    // `help --help` is the help of help.
+    else if (!printNamedHelp(isFlagOf(HELP_FLAGS, rest[0]) ? command : rest[0]))
       throw ERRORS.create("there-no-command-topic-choose-one", [`${helpNames()}`]);
     return undefined;
   }
   if (isFlagOf(VERSION_FLAGS, command) || command === "version") {
+    if (command === "version" && rest.length === 1 && isFlagOf(HELP_FLAGS, rest[0])) {
+      printNamedHelp(command);
+      return undefined;
+    }
     if (rest.length > 0)
       throw ERRORS.create("version-command-does-not-accept-additional-arguments", []);
     console.log(`mnemocode ${MNEMOCODE_VERSION}`);

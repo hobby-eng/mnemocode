@@ -1,10 +1,12 @@
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { flagOf } from "../src/cli/arguments.js";
 import { commandOptions, type CommandName } from "../src/cli/command-options.js";
 import { commandHelp, topicHelp } from "../src/cli/help-pages.js";
+import { printCommandHelp, printNamedHelp } from "../src/cli/usage.js";
+import { runCommandLine } from "../src/cli/command-line.js";
 import { QUESTION_HOURS } from "../src/core/search-turns.js";
 import { DEFAULT_ADDRESS_COUNT } from "../src/core/address-scan.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
@@ -54,6 +56,50 @@ describe("help", () => {
       // AUD-005-UI002: the overview, including its safety line, fits the 80-column help width.
       for (const line of stdout.split("\n")) expect(line.length, line).toBeLessThanOrEqual(80);
     }
+  });
+
+  it("keeps every help page within 80 columns, the phrase of the examples aside", () => {
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((text: string) => {
+      lines.push(...text.split("\n"));
+    });
+    try {
+      for (const name of [...Object.keys(commandHelp), ...Object.keys(topicHelp)])
+        expect(printNamedHelp(name), name).toBe(true);
+      for (const name of Object.keys(commandHelp) as CommandName[]) printCommandHelp(name, false);
+    } finally {
+      log.mockRestore();
+    }
+    // AUD-037-UI008: a heading is wrapped like the rest; only the test phrase cannot be split.
+    for (const line of lines.filter((text) => !text.trimStart().startsWith("TEST_PHRASE=")))
+      expect(line.length, line).toBeLessThanOrEqual(80);
+  });
+
+  it("prints the help of version and of help", async () => {
+    const pages = new Map<string, string>();
+    for (const arguments_ of [
+      ["help", "version"],
+      ["version", "--help"],
+      ["version", "-h"],
+      ["help", "help"],
+      ["help", "--help"],
+      ["help", "-h"],
+    ]) {
+      const lines: string[] = [];
+      const log = vi.spyOn(console, "log").mockImplementation((text: string) => lines.push(text));
+      try {
+        await runCommandLine(arguments_);
+      } finally {
+        log.mockRestore();
+      }
+      pages.set(arguments_.join(" "), lines.join("\n"));
+    }
+    expect(pages.get("help version")).toContain("Usage: mnemocode version");
+    expect(pages.get("version --help")).toBe(pages.get("help version"));
+    expect(pages.get("version -h")).toBe(pages.get("help version"));
+    expect(pages.get("help help")).toContain("Usage: mnemocode help [<COMMAND|TOPIC>]");
+    expect(pages.get("help --help")).toBe(pages.get("help help"));
+    expect(pages.get("help -h")).toBe(pages.get("help help"));
   });
 
   it("prints the help without a command when there is no terminal for the menu", async () => {

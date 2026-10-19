@@ -224,8 +224,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       },
       {
         ...evidenceGroup,
-        heading:
-          "Wallet check, for dates or codes with ?, and for the shares when a share is typed here:",
+        heading: "Wallet check (for dates, codes with ?, and shares typed here):",
       },
     ],
     asks: [
@@ -316,8 +315,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         ],
       },
       {
-        heading:
-          "The new backup (without these, --ask-secrets asks it once the phrase is confirmed):",
+        heading: "The new backup (else --ask-secrets asks for it once the phrase is confirmed):",
         options: [encodeMode, dates, datesFile, encodeFormat, encodeLegacyValidLastWord],
       },
       ...encodeOutputGroups,
