@@ -238,6 +238,38 @@ describe("SSKR quick and feature-first-use checks", () => {
     ).rejects.toThrow("SSKR engine damaged value was accepted.");
   });
 
+  it("fails on an engine that accepts shares of a group the set cannot have (AUD-037-BLD007)", async () => {
+    // Two shares, whose real restore refuses: only the impossible group index is such a pair.
+    await expect(
+      checkSskrKnownAnswers({
+        ...nodeSharePlatform,
+        combineShares: async (records) => {
+          try {
+            return await nodeSharePlatform.combineShares(records);
+          } catch (error) {
+            if (records.length === 2) return new Uint8Array(16);
+            throw error;
+          }
+        },
+      }),
+    ).rejects.toThrow("SSKR engine impossible group index was accepted.");
+  });
+
+  it("fails on a host whose refusal is no refusal of the combination (AUD-037-BLD007)", async () => {
+    await expect(
+      checkSskrKnownAnswers({
+        ...nodeSharePlatform,
+        combineShares: async (records) => {
+          try {
+            return await nodeSharePlatform.combineShares(records);
+          } catch {
+            throw new Error("The host's SSKR library stopped.");
+          }
+        },
+      }),
+    ).rejects.toThrow("SSKR engine incomplete quorum was refused for another reason.");
+  });
+
   it("wipes creation inputs when the host throws before returning shares", async () => {
     const owned: Uint8Array[] = [];
     const failure = new Error("public create failure");

@@ -8,7 +8,11 @@
 //
 // Host-neutral: it imports only other host-neutral sskr modules (test/portable-modules.test.ts).
 
-import type { ShareCombiner, ShareSplitPlatform } from "./share-platform.js";
+import {
+  ShareCombineRefusalError,
+  type ShareCombiner,
+  type ShareSplitPlatform,
+} from "./share-platform.js";
 import {
   CHECKSUM_BYTES,
   colorsToShare,
@@ -22,7 +26,7 @@ import {
 } from "./transport.js";
 import { bytesOfHex, hexOfBytes } from "../core/bits.js";
 import { crc32 } from "./checksum.js";
-import { expectRefused, expectRefusedLater, expectSame } from "../core/self-test-check.js";
+import { expectRefused, expectRefusedLaterAs, expectSame } from "../core/self-test-check.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 import { SHARE_UNITS } from "./share-units.js";
@@ -235,13 +239,14 @@ export async function checkSskrKnownAnswers(platform: ShareSplitPlatform): Promi
     ["SSKR engine damaged value", [changedShareValue(), ...sskrVector.shares.slice(1)]],
     ["SSKR engine impossible group index", impossibleGroupQuorum()],
   ] as const)
-    await expectRefusedLater(
+    await expectRefusedLaterAs(
       async () => {
         const unexpected = await platform.combineShares(shares);
         unexpected.fill(0);
       },
-      // Hosts word engine errors differently; the successful official control ran above.
-      /.+/u,
+      // The engine's refusal of a combination by its code, as every host gives it, whatever its
+      // words: a decoding error or a failure of the host is another reason (AUD-037-BLD007).
+      (error) => ShareCombineRefusalError.is(error),
       name,
     );
 }

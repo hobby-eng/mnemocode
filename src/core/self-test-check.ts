@@ -115,5 +115,24 @@ export async function expectRefusedLater(
   assertRefusedFor(message, because, name);
 }
 
+/**
+ * The same as expectRefusedLater, for a refusal told by its kind rather than its words, which a
+ * host may choose: `refusal` says whether what `run` threw is the refusal that the case must give,
+ * so that a fault of another kind never passes for it (AUD-037-BLD007).
+ */
+export async function expectRefusedLaterAs(
+  run: () => Promise<unknown>,
+  refusal: (error: unknown) => boolean,
+  name: string,
+): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    if (!refusal(error)) throw ERRORS.create("was-refused-another-reason", [`${name}`]);
+    return;
+  }
+  throw ERRORS.create("was-accepted", [`${name}`]);
+}
+
 // Bytes as hexadecimal text and back (core/bits.ts), here too for the checks that use them.
 export { bytesOfHex, hexOfBytes } from "./bits.js";
