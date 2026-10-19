@@ -226,6 +226,17 @@ export type { PhraseFingerprint };
 const MAX_LISTED = 16;
 
 /** Why a list cannot tell codes with about `expected` candidates. */
+/**
+ * About how many rows a list of the candidates of `codes` has: one phrase for each set of codes,
+ * or as many as one set gives where its mode gives several (Masking.givesSeveral), so that a list
+ * is offered only where it can hold them (AUD-037-FUN002).
+ */
+function listedRows(codes: MissingCodes): number {
+  const masking = Masking.of(codes.mode);
+  if (!masking.givesSeveral) return codes.expected;
+  return codes.expected * masking.checksPerDecoding(codes.wordCount);
+}
+
 function tooManyToList(expected: number): string {
   return `A list holds at most ${MAX_LISTED} candidates; these codes have about ${counted(expected, "candidate")}.`;
 }
@@ -318,9 +329,17 @@ export class MissingCodesSearch {
     return `${MissingCodesSearch.placesText(codes)} cannot be read: ${counted(codes.combinations, "combination")}, about ${counted(codes.expected, "candidate")}.`;
   }
 
+  /**
+   * Whether `error` is the refusal of a listed search that found more candidates than a list
+   * holds, which its estimate allowed: another way tells them.
+   */
+  static isListOverflow(error: unknown): boolean {
+    return ERRORS.matches(error, ["list-overflow"]);
+  }
+
   /** Whether so many candidates are left that only a fingerprint or an address tells them. */
   get many(): boolean {
-    return this.#codes.expected > MAX_LISTED;
+    return listedRows(this.#codes) > MAX_LISTED;
   }
 
   /**
@@ -363,7 +382,7 @@ export class MissingCodesSearch {
   whyNot(way: MissingCodesWay): string | undefined {
     if (way === "encoded" && !this.#codes.checksummed)
       return "These codes keep no checksum, so their encoded fingerprint cannot tell them.";
-    if (way === "list" && this.many) return tooManyToList(this.#codes.expected);
+    if (way === "list" && this.many) return tooManyToList(listedRows(this.#codes));
     return undefined;
   }
 
@@ -702,8 +721,8 @@ class ListWay implements MissingCodesWaySearch {
     fingerprintOf: PhraseFingerprint,
     dates: readonly DateShiftDate[],
   ) {
-    if (codes.expected > MAX_LISTED)
-      throw ERRORS.create("operation-refused", [tooManyToList(codes.expected)]);
+    if (listedRows(codes) > MAX_LISTED)
+      throw ERRORS.create("operation-refused", [tooManyToList(listedRows(codes))]);
     this.#input = new CodeSearchInput(codes, dates);
     this.#fingerprintOf = fingerprintOf;
   }

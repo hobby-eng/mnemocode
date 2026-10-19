@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { searchMissingCodes } from "../src/cli/missing-codes-search.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
+import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { questionsOnPrivateScreen } from "./helpers/question-terminal.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
@@ -33,6 +34,31 @@ const ANSWERS = {
   encodedFingerprint: TEST_FINGERPRINT,
   list: false,
 };
+
+describe("A list of more candidates than it holds", () => {
+  it("is said, and the way is asked again (AUD-037-UI003)", async () => {
+    using codes = MissingCodes.read("abandon ".repeat(11) + "about|actual", "english", "direct");
+    const overflow = Object.assign(new Error("More than 16 candidates fit these codes."), {
+      code: "core.missing-codes-search.list-overflow",
+    });
+    vi.spyOn(MissingCodesSearch.prototype, "listed").mockReturnValue({
+      plan: async () => ({ ask: false, tell: false }) as never,
+      run: async () => {
+        throw overflow;
+      },
+      wipe: () => undefined,
+      [Symbol.dispose]: () => undefined,
+    });
+    const said: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      said.push(parts.join(" "));
+    });
+    const answers = { ...ANSWERS, encodedFingerprint: undefined, list: true };
+    expect(await searchMissingCodes(codes, answers)).toEqual({ kind: "again" });
+    expect(said.join("\n")).toContain("More than 16 candidates fit these codes.");
+    expect(harness.terminal.labels.at(-1)).toContain("List every candidate");
+  });
+});
 
 describe("The found backup lifetime through terminal reporting", () => {
   it.each(["report", "progress", "watch"] as const)(

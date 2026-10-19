@@ -3,7 +3,15 @@
 
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { encodeMnemonic, formatEncoded, parseDate, representMnemonic } from "../src/core.js";
+import {
+  encodeMnemonic,
+  encodeMnemonicLegacy,
+  formatEncoded,
+  legacyChecksumValidResult,
+  parseDate,
+  representMnemonic,
+} from "../src/core.js";
+import { defined } from "../src/core/defined.js";
 import { DatesAnswer } from "../src/core/date-search.js";
 import {
   foundAmongOthers,
@@ -168,6 +176,20 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
         message: "2 sets of codes and dates fit; the wallet tells which is yours.",
       });
     }
+  });
+
+  it("offers a list only where the phrases of every set of codes fit in it (AUD-037-FUN002)", () => {
+    // Each set of codes in the Original Seedshift with a valid last word gives a phrase for every
+    // value of the last word's entropy: 128 for 12 words, 8 for 24.
+    const offered = (phrase: string): boolean => {
+      const encoded = legacyChecksumValidResult(encodeMnemonicLegacy(phrase, [parseDate(DATE)]));
+      const codes = formatEncoded(encoded, "indexes").split(" ");
+      codes[3] = `${defined(codes[3]).slice(0, -1)}?`;
+      const read = MissingCodes.read(codes.join(" "), "indexes", "seedshift-legacy-valid");
+      return new MissingCodesSearch(read, fingerprint).fits("list");
+    };
+    expect(offered(TEST_PHRASE)).toBe(false);
+    expect(offered(`${"abandon ".repeat(23)}art`)).toBe(true);
   });
 
   it("finds one phrase that several sets of codes and dates give, and says so", async () => {

@@ -41,6 +41,7 @@ import { counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
 import { defined } from "../core/defined.js";
+import { describeError } from "../core/refusal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 
 /** Seconds between two progress updates of a long search. */
@@ -276,7 +277,6 @@ async function askWallet(
   return answer.kind === "wallet" ? answer.evidence : undefined;
 }
 
-/** Every candidate with its phrase and fingerprint, for the person to compare. */
 /**
  * The candidates of a listed search: on the private screen one after another, which the page shows
  * by pages when they do not fit (PrivatePage), and elsewhere one row each, for a script.
@@ -304,12 +304,23 @@ function showCandidates(rows: readonly MissingCodesRow[]): void {
   console.error(FINGERPRINT_DISCLOSURE);
 }
 
-async function listed(search: MissingCodesSearch): Promise<MissingOutcome | Cancelled> {
+/**
+ * Every candidate with its phrase and fingerprint, for the person to compare. More of them than a
+ * list holds, which the estimate allowed, are said, and the way is asked again (AUD-037-UI003).
+ */
+async function listed(search: MissingCodesSearch): Promise<MissingOutcome | undefined | Cancelled> {
   const dates = search.needsDates ? await askCodeDates(search, false) : undefined;
   if (dates === CANCELLED) return CANCELLED;
   using dateAnswer = dates;
   using way = search.listed(dateAnswer?.known ?? []);
-  const result = await ran(way);
+  let result: RanResult;
+  try {
+    result = await ran(way);
+  } catch (error) {
+    if (!MissingCodesSearch.isListOverflow(error)) throw error;
+    terminalNotice(describeError(error), "warning");
+    return undefined;
+  }
   if (result === CANCELLED) return CANCELLED;
   if (result.kind === "list") showCandidates(result.rows);
   terminalHint(MISSING_CODES_TEXTS.list);

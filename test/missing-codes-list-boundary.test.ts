@@ -40,17 +40,35 @@ describe("Actual candidate-list size after an underestimated search plan", () =>
   });
 
   it("also bounds multiple phrases decoded from one set of legacy valid-last-word codes", async () => {
+    // 24 words: each set gives 8 phrases, so that 3 sets, which the estimate takes for far fewer,
+    // give 24.
+    const prefix = "abandon ".repeat(23);
+    const endings = recoverLegacyValidLastWords(`${prefix}art`).map(({ word }) => word);
+    const codes = MissingCodes.read(
+      prefix + endings.slice(0, 3).join("|"),
+      "english",
+      "seedshift-legacy-valid",
+    );
+    const fingerprint = vi.fn(() => "00000000");
+    const search = new MissingCodesSearch(codes, fingerprint);
+    expect(search.fits("list")).toBe(true);
+    await expect(search.listed([parseDate("23-09-2026")]).run()).rejects.toMatchObject({
+      code: "core.missing-codes-search.list-overflow",
+    });
+    expect(fingerprint).toHaveBeenCalledTimes(MissingCodesSearch.MAX_LISTED);
+  });
+
+  it("offers no list where one set of codes gives more phrases than it holds (AUD-037-FUN002)", () => {
     const codes = MissingCodes.read(
       PREFIX + ENDINGS.slice(0, 2).join("|"),
       "english",
       "seedshift-legacy-valid",
     );
-    const fingerprint = vi.fn(() => "00000000");
-    const way = new MissingCodesSearch(codes, fingerprint).listed([parseDate("23-09-2026")]);
-    await expect(way.run()).rejects.toMatchObject({
-      code: "core.missing-codes-search.list-overflow",
-    });
-    expect(fingerprint).toHaveBeenCalledTimes(MissingCodesSearch.MAX_LISTED);
+    const search = new MissingCodesSearch(codes, () => "00000000");
+    expect(search.fits("list")).toBe(false);
+    expect(() => search.listed([parseDate("23-09-2026")])).toThrow(
+      expect.objectContaining({ code: "core.missing-codes-search.operation-refused" }),
+    );
   });
 
   it("returns stopped when the host cancels during a fingerprint before a list overflows", async () => {
