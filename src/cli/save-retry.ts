@@ -2,9 +2,9 @@
 // cards of shares, or a candidate list: every command saves through saveWithRetry. On the private
 // screen a failure, a full disk or a folder taken meanwhile, keeps the result: one line says why,
 // in plain words for the usual errors of a file system, and the person tries again, gives another
-// name, which is checked first and warned of when a cloud service copies its folder, or skips that
-// result and goes on with the others. Elsewhere the failure ends the command, as every failure
-// there does.
+// name, which is checked first and, once the result is saved there, warned of when a cloud service
+// copies its folder, or skips that result and goes on with the others. Elsewhere the failure ends
+// the command, as every failure there does.
 
 import { askAfterFailure, askValueUntil, droppedPath, WHAT_NOW } from "./ask.js";
 import { warnOfCloudCopy } from "./cloud-folders.js";
@@ -62,8 +62,7 @@ function otherFailure(error: unknown): string {
 
 /**
  * Another name for a result that could not be saved, checked before it is used; undefined when
- * the person goes back with Escape, CANCELLED at Ctrl+C. A name in a folder that a cloud service
- * copies is warned of, as the names given with the options are (command-line.ts).
+ * the person goes back with Escape, CANCELLED at Ctrl+C.
  */
 async function askOtherName(saving: Saving): Promise<string | undefined | Cancelled> {
   const path = await askValueUntil(
@@ -75,8 +74,6 @@ async function askOtherName(saving: Saving): Promise<string | undefined | Cancel
     },
     { what: saving.kind === "file" ? "the name of a new file" : "the name of a new folder" },
   );
-  if (path === CANCELLED) return CANCELLED;
-  warnOfCloudCopy(path);
   return path;
 }
 
@@ -105,8 +102,13 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined 
     if (write)
       try {
         await writeSaved(() => saving.write(path));
-        // A name chosen after a failure is not the numbered one that the options were given.
-        if (path !== saving.path) discardRenamedOutput(saving.path);
+        // A name chosen after a failure is not the numbered one that the options were given. Once
+        // saved there, it is warned of when a cloud service copies its folder, as the names given
+        // with the options are (command-line.ts).
+        if (path !== saving.path) {
+          discardRenamedOutput(saving.path);
+          warnOfCloudCopy(path);
+        }
         return path;
       } catch (error) {
         if (!onPrivateScreen()) throw error;

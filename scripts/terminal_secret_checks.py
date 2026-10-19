@@ -266,65 +266,68 @@ CARD_REFUSAL = "Company is too long to fit legibly on the card"
 
 
 def check_re_encode_answer_refused():
-    session = Session()
-    try:
-        session.wait_for(MENU_SHOWN)
-        at_re_encode_confirmation(session)
-        session.type("1")
-        # Shares in colors on A6 sheets of the IT design, with the long company name.
-        session.wait_for("Which form should the seed phrase take?")
-        session.type("3")
-        session.wait_for("Use Seedshift?")
-        session.type("2")
-        session.wait_for("Split it into Shamir shares?")
-        session.type("2")
-        session.wait_for("Where should the shares go?")
-        session.type("3")
-        session.wait_for("Which kind of file?")
-        session.type("1")
-        session.wait_for("How should the cards be laid out?")
-        session.type("1")
-        session.wait_for("How should the sheets be turned?")
-        session.type("1")
-        session.wait_for("PDF file name (Enter: mnemocode-share-cards.pdf):")
-        session.type(ENTER)
-        session.wait_for("Which card design?")
-        session.type("2")
-        session.wait_for("Add a QR code with the codes of the backup, without the extra cards?")
-        session.type("2")
-        session.wait_for("Type your own details for the cards?")
-        session.type("2")
-        session.wait_for("Name, in Latin letters (Enter: random):")
-        session.type(CARD_NAME + ENTER)
-        for detail in SHEET_DETAILS:
-            session.wait_for(f"{detail} (Enter: random):")
-            session.type((LONG_COMPANY if detail == "Company" else "") + ENTER)
-        session.wait_for("Also show the original seed phrase, before Seedshift?")
-        session.type("1")
-        session.wait_for("Instructions for your heirs?")
-        session.type("1")
-        # The refusal, then the same questions under the confirmed phrase: nothing is typed again.
-        session.wait_for("You recognised the seed phrase: it is confirmed.")
-        session.wait_for(CARD_REFUSAL)
-        session.wait_for("Which form should the seed phrase take?")
-        # The refusal stays on the screens of the questions asked again, after a chosen answer
-        # too, until the new backup is made.
-        assert_private_result_visible(session, (CARD_REFUSAL,))
-        session.type("3")
-        session.wait_for("Use Seedshift?")
-        assert_private_result_visible(session, (CARD_REFUSAL,))
-        # Escape goes back to the phrase, and Stop to the menu.
-        session.type(ESCAPE)
-        session.wait_for("Is this the seed phrase to re-encode?")
-        session.type("5")
-        session.wait_for(MENU_SHOWN)
-        assert "mnemocode:" not in session.output, session.output
-        session.type("q")
-        session.wait_for_exit()
-        assert_kept_private(session, (TEST_PHRASE, MASK_DATE, MASKED_WORD_NUMBERS))
-    finally:
-        session.close()
+    # The phrase confirmed by the wallet, whose notice has a warning of its own, and the PDF of the
+    # cards in a folder that a cloud service copies.
+    with tempfile.TemporaryDirectory() as folder:
+        (Path(folder) / "Dropbox").mkdir()
+        session = Session(folder=folder)
+        try:
+            session.wait_for(MENU_SHOWN)
+            at_re_encode_confirmation(session)
+            session.type("2")
+            answer_fingerprint(session)
+            session.wait_for("The fingerprint matches: the seed phrase is accepted, not proven.")
+            answer_refused_cards(session)
+            # The refusal, then the same questions under the confirmed phrase: nothing is typed
+            # again. The refusal stays on the screens of the questions asked again, after a chosen
+            # answer too, the wallet warning once, and the refused answers warn of no cloud folder.
+            session.wait_for(CARD_REFUSAL)
+            session.wait_for("Which form should the seed phrase take?")
+            kept = dict(once=(FINGERPRINT_FILTER,), absent=("Dropbox keeps a copy of",))
+            assert_private_result_visible(session, (CARD_REFUSAL,), **kept)
+            session.type("3")
+            session.wait_for("Use Seedshift?")
+            assert_private_result_visible(session, (CARD_REFUSAL,), **kept)
+            # Escape goes back to the phrase, and Stop to the menu.
+            session.type(ESCAPE)
+            session.wait_for("Is this the seed phrase to re-encode?")
+            session.type("5")
+            session.wait_for(MENU_SHOWN)
+            assert "mnemocode:" not in session.output, session.output
+            session.type("q")
+            session.wait_for_exit()
+            assert_kept_private(session, (TEST_PHRASE, MASK_DATE, MASKED_WORD_NUMBERS))
+        finally:
+            session.close()
     print("re-encode in the menu: a refused new backup is asked again under the confirmed phrase")
+
+
+def answer_refused_cards(session):
+    """Answers the new backup as shares in colors on A6 sheets of the IT design, in Dropbox, with
+    a company name too long for the cards, which Encode refuses once every answer is given."""
+    for question, key in (
+        ("Which form should the seed phrase take?", "3"),
+        ("Use Seedshift?", "2"),
+        ("Split it into Shamir shares?", "2"),
+        ("Where should the shares go?", "3"),
+        ("Which kind of file?", "1"),
+        ("How should the cards be laid out?", "1"),
+        ("How should the sheets be turned?", "1"),
+        ("PDF file name (Enter: mnemocode-share-cards.pdf):", "Dropbox/cards.pdf" + ENTER),
+        ("Which card design?", "2"),
+        ("Add a QR code with the codes of the backup, without the extra cards?", "2"),
+        ("Type your own details for the cards?", "2"),
+        ("Name, in Latin letters (Enter: random):", CARD_NAME + ENTER),
+    ):
+        session.wait_for(question)
+        session.type(key)
+    for detail in SHEET_DETAILS:
+        session.wait_for(f"{detail} (Enter: random):")
+        session.type((LONG_COMPANY if detail == "Company" else "") + ENTER)
+    session.wait_for("Also show the original seed phrase, before Seedshift?")
+    session.type("1")
+    session.wait_for("Instructions for your heirs?")
+    session.type("1")
 
 
 def check_re_encode_recognised():

@@ -441,8 +441,9 @@ async function askedNewBackup(
   if (encoding === undefined || encoding === CANCELLED) return encoding;
   const fresh = parseArguments(encoding.slice(1));
   await settleOutputPaths(fresh);
-  warnOfCloudCopies(fresh);
   const prepared = await prepareEncode(fresh);
+  // Only answers that are taken name files that will be saved: a refused one warns of none.
+  warnOfCloudCopies(fresh);
   dropUnneededAfterAnswers(fresh);
   return prepared;
 }

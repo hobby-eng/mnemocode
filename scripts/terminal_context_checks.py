@@ -6,14 +6,18 @@ from pathlib import Path
 
 import terminal_session as terminal
 from terminal_answers import (
+    CANCELLED,
     DECODE_ENTRY,
     FIRST_SHARE,
     HIDDEN_RECORD,
     MASK_DATE,
     MASKED_WORD_NUMBERS,
     MENU_SHOWN,
+    MISTYPED_DATE,
     RESTORE_ENTRY,
+    SEED_PHRASE,
     SHARES,
+    TEST_PHRASE,
     THIRD_SHARE,
 )
 
@@ -32,7 +36,7 @@ def frame_shows_at(arguments, prompt, answer, question, markers, colour):
         session.wait_for(question)
         terminal.assert_private_result_visible(session, markers)
         session.type(terminal.CTRL_C)
-        assert session.wait_for_exit() == 130
+        assert session.wait_for_exit() == CANCELLED
     finally:
         session.close()
 
@@ -119,7 +123,7 @@ def check_context_ends_at_escape():
         absent = ("Detected input format", "no MNC1 record header")
         terminal.assert_private_result_visible(session, (HIDDEN_RECORD.strip(),), absent=absent)
         session.type(terminal.CTRL_C)
-        assert session.wait_for_exit() == 130
+        assert session.wait_for_exit() == CANCELLED
     finally:
         session.close()
     print("question context left with Escape: the codes asked again without it")
@@ -149,8 +153,35 @@ def check_new_backup_heading_on_screen():
             session.wait_for("Use Seedshift?")
             terminal.assert_private_result_visible(session, ("New backup",))
             session.type(terminal.CTRL_C)
-            assert session.wait_for_exit() == 130
+            assert session.wait_for_exit() == CANCELLED
         finally:
             session.close()
         assert "New backup" not in written.read_text(), "the heading went to standard output"
     print("re-encode: the New backup heading on the private screen, not in standard output")
+
+
+def check_cloud_link_kept():
+    """A cloud warning given with the options stays with its link, once, on every step screen."""
+    cloud = "Dropbox keeps a copy of"
+    more = "More: https://github.com/hobby-eng/mnemocode#cloud-folders"
+    with tempfile.TemporaryDirectory() as folder:
+        (Path(folder) / "Dropbox").mkdir()
+        arguments = (
+            *("encode", "--ask-secrets", "--mode", "seedshift", "--format", "2"),
+            *("--output", "Dropbox/record.txt", "--backup-check", "no"),
+        )
+        session = terminal.Session(arguments, folder=folder)
+        try:
+            session.wait_for(SEED_PHRASE)
+            terminal.assert_private_result_visible(session, (), once=(cloud, more))
+            session.type(TEST_PHRASE + terminal.ENTER)
+            session.wait_for("Dates (")
+            terminal.assert_private_result_visible(session, (), once=(cloud, more))
+            session.type(MISTYPED_DATE + terminal.ENTER)
+            session.wait_for("Dates (")
+            terminal.assert_private_result_visible(session, (), once=(cloud, more))
+            session.type(terminal.CTRL_C)
+            assert session.wait_for_exit() == CANCELLED
+        finally:
+            session.close()
+    print("cloud warning given with the options: kept with its link on every step screen")

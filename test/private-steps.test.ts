@@ -1,5 +1,19 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PrivateSteps } from "../src/cli/private-steps.js";
+import { choose } from "../src/cli/terminal-choice.js";
+
+const keyboard = vi.hoisted(() => ({ bytes: [] as number[] }));
+vi.mock("../src/cli/terminal-input.js", async (original) => ({
+  ...(await original<typeof import("../src/cli/terminal-input.js")>()),
+  dropTypedAhead: async () => undefined,
+  withRawTerminal: async <T>(
+    body: (next: () => Promise<number | undefined>, more: () => Promise<boolean>) => Promise<T>,
+  ) =>
+    body(
+      async () => keyboard.bytes.shift(),
+      async () => keyboard.bytes.length > 0,
+    ),
+}));
 
 // The step screens of the private screen: what each step's screen draws again under its title.
 
@@ -13,7 +27,10 @@ function opened(): string[] {
   return drawn;
 }
 
-afterEach(() => PrivateSteps.close());
+afterEach(() => {
+  PrivateSteps.close();
+  vi.restoreAllMocks();
+});
 
 describe("the step screens of the private screen", () => {
   it("draw a kept context under the title until its question is answered", () => {
@@ -46,6 +63,20 @@ describe("the step screens of the private screen", () => {
     PrivateSteps.questionEnded();
     PrivateSteps.begin();
     expect(drawn.slice(-2)).toEqual(["title", "! These codes are refused."]);
+  });
+
+  it("end a question's context when its list is left with Escape", async () => {
+    const drawn = opened();
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    PrivateSteps.keep(() => drawn.push("why"));
+    keyboard.bytes = [0x1b];
+    const choices = [
+      { label: "Yes", value: true },
+      { label: "No", value: false },
+    ];
+    expect(await choose("Use Seedshift?", choices, { label: "Seedshift" })).toBeUndefined();
+    PrivateSteps.begin();
+    expect(drawn.slice(-2)).toEqual(["why", "title"]);
   });
 
   it("keep a page's context over every question until a new page", () => {
@@ -102,11 +133,11 @@ describe("the step screens of the private screen", () => {
 
   it("forget every context when the command ends", () => {
     const drawn = opened();
-    PrivateSteps.keep(() => drawn.push("Protection"), "command");
+    PrivateSteps.keep(() => drawn.push("swap warning"), "command");
     PrivateSteps.close();
     const next = opened();
     PrivateSteps.begin();
     expect(next).toEqual(["title"]);
-    expect(drawn).toEqual(["Protection"]);
+    expect(drawn).toEqual(["swap warning"]);
   });
 });

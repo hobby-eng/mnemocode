@@ -359,7 +359,9 @@ export function terminalMore(anchor: string): void {
 
 /**
  * A warning and the README section that explains it (terminalMore). On the private screen both
- * stay on every step screen of the command, as a warning alone does (PrivateSteps.remember).
+ * stay on every later step screen of the command, as a warning given before the first question
+ * does (PrivateSteps.remember); so it is given only about what holds for the rest of the command,
+ * such as a file that is saved.
  */
 export function terminalWarningWithMore(message: string, anchor: string): void {
   PrivateSteps.keep(() => {

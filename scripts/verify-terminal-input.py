@@ -32,7 +32,14 @@ It checks that
 - Decode asks again after an empty answer and after a mistyped date, keeping the codes, and finds
   a date with ? by the fingerprint of the test phrase;
 - the encoded fingerprint stays on the screen of the dates in Decode, recover-date and a restore
-  from shares, with and without colour, and a question keeps the line that says why it is asked;
+  from shares, with and without colour, also from the menu; a question keeps the line that says
+  why it is asked, and loses it when the question is left with Escape;
+- Re-encode keeps the heading and the notices of its confirmation on the screens of the new
+  backup, the wallet warning once, and a refusal above the questions asked again, also after a
+  chosen answer; the heading never goes to standard output, and a refused answer warns of no
+  cloud folder; a cloud warning given with the options stays with its link on every screen;
+- a result longer than the screen, a share set with its heading, notices and fingerprints in
+  colour too, is read whole by pages before the question or prompt under it, at 80x24 and 32x12;
 - Restore from Shamir shares asks again after Ctrl+D on an empty line, takes two shares pasted
   as two lines as one answer, asks again only for the share that cannot be read, and finds a date
   with ? by the fingerprint;
@@ -45,6 +52,7 @@ It checks that
 
 import sys
 from terminal_context_checks import (
+    check_cloud_link_kept,
     check_context_ends_at_escape,
     check_fingerprint_before_dates,
     check_fingerprint_before_dates_in_menu,
@@ -112,6 +120,7 @@ def main():
     check_fingerprint_before_dates_in_menu()
     check_question_reason_kept()
     check_context_ends_at_escape()
+    check_cloud_link_kept()
     check_new_backup_heading_on_screen()
     check_decode_share_lines()
     check_file_or_text_input()

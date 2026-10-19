@@ -1,7 +1,7 @@
 /**
  * How long a step's context stays on the private screen: until the next question ends, answered
- * or left with Escape; until the page ends (a result clears the screen); or until the command
- * ends.
+ * or left with Escape, or its codes are asked for again; until the page ends (a result clears the
+ * screen); or until the command ends.
  */
 export type StepContextLifetime = "question" | "page" | "command";
 
@@ -84,7 +84,10 @@ export class PrivateSteps {
     PrivateSteps.#keepOnly("command");
   }
 
-  /** Retains initial safety warnings and only the latest later warning, without a step history. */
+  /**
+   * Retains initial safety warnings and only the latest later warning, without a step history. A
+   * warning drawn as part of a kept context is the context's, and is not retained apart.
+   */
   static remember(warning: string): void {
     if (!PrivateSteps.active || PrivateSteps.#drawingContext) return;
     if (PrivateSteps.#begun) PrivateSteps.#warning = warning;
