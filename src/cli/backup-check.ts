@@ -312,6 +312,8 @@ async function askRestoredShares(check: ShareBackupCheck): Promise<RestoredShare
     try {
       return await check.restore(ownedKept);
     } catch (error) {
+      // Only shares that cannot be restored are typed again (AUD-037-API002).
+      if (!ShareBackupCheck.isRestoreRefusal(error)) throw error;
       problem = refusalMessage(error);
     }
   }

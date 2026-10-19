@@ -579,8 +579,17 @@ export class ShareBackupCheck implements BackupCheck {
   }
 
   /**
+   * Whether `error`, thrown by restore, says why the shares typed cannot be restored, after which
+   * they are typed again; any other failure is a fault that passes through (AUD-037-API002).
+   */
+  static isRestoreRefusal(error: unknown): boolean {
+    return ERRORS.matches(error, ["restore-refused", "restore-refused-2", "restore-refused-3"]);
+  }
+
+  /**
    * Restores the shares kept (ShareSet.combine); throws why they cannot be, after which they are
-   * all typed again. The set names each share by its place among those typed.
+   * all typed again (isRestoreRefusal), or a fault of the host, which passes through. The set names
+   * each share by its place among those typed.
    */
   async restore(kept: KeptShares): Promise<RestoredShares> {
     this.#secrets.assertLive();
@@ -600,6 +609,8 @@ export class ShareBackupCheck implements BackupCheck {
       set = await ShareSet.combine(texts, this.#platform, kept.places);
     } catch (error) {
       this.#secrets.assertLive();
+      // Only a refusal of the shares is said of them; a fault of the host passes through.
+      if (!ShareSet.isRefusal(error)) throw error;
       throw ERRORS.create("restore-refused-3", [refusalMessage(error)], { cause: error });
     }
     using ownedSet = set;
@@ -676,6 +687,7 @@ export class ShareBackupCheck implements BackupCheck {
       restored = await this.restore(kept);
     } catch (error) {
       this.#secrets.assertLive();
+      if (!ShareBackupCheck.isRestoreRefusal(error)) throw error;
       return resultOf(finding("shares", "unreadable", refusalMessage(error)), kept.notes);
     }
     using ownedRestored = restored;

@@ -12,10 +12,15 @@ import { englishWordlist as wordlist } from "../core/english-words.js";
 import { validatedEnglishWords } from "../core/words.js";
 import { Masking, type SplitMode } from "../core/masking.js";
 import type { DateShiftDate } from "../core/types.js";
-import { ONE_GROUP, SEED_BYTES, type ShareSplitPlatform } from "./share-platform.js";
+import {
+  ONE_GROUP,
+  SEED_BYTES,
+  ShareCombineRefusalError,
+  type ShareSplitPlatform,
+} from "./share-platform.js";
 import { Share } from "./transport.js";
 import { isRecordedQuorum, MAX_GROUP_MEMBERS, MIN_DIGEST_THRESHOLD } from "./share-layout.js";
-import { restoreCompleteShares } from "./complete-shares.js";
+import { isCompleteShareRefusal, restoreCompleteShares } from "./complete-shares.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("sskr.split", {
@@ -163,7 +168,13 @@ export class ShareSplit {
    */
   async #assertRestores(records: readonly string[], entropy: Uint8Array): Promise<void> {
     // The restore's own refusal names a share as typed, which a split has not: it is told as this.
-    const restored = await restoreCompleteShares(records, this.#platform).catch(() => undefined);
+    // A failure of the host is its own, never the shares' (AUD-037-API002).
+    const restored = await restoreCompleteShares(records, this.#platform).catch(
+      (error: unknown) => {
+        if (!isCompleteShareRefusal(error) && !ShareCombineRefusalError.is(error)) throw error;
+        return undefined;
+      },
+    );
     // The phrase as words, compared with the phrase of `entropy`: the restore wipes its entropy.
     if (restored?.mnemonic !== entropyToMnemonic(entropy, wordlist))
       throw ERRORS.create("sskr-generated-shares-did-not-reconstruct-source-entropy", []);

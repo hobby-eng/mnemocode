@@ -20,7 +20,12 @@ import { JointRepair, searchOnce } from "./joint-repair.js";
 import { type MarkedElement, type RepairedSet, type RepairedShares } from "./joint-results.js";
 import type { ReadRepairableShare } from "./repair.js";
 import { NO_PHRASE_FITS } from "./repair-report.js";
-import type { ShareCombiner, ShareRepairPlatform } from "./share-platform.js";
+import {
+  ShareCombineRefusalError,
+  type ShareCombiner,
+  type ShareRepairPlatform,
+} from "./share-platform.js";
+import { errorCode } from "../core/refusal.js";
 import {
   assertShareCount,
   assertShareFormat,
@@ -77,6 +82,21 @@ export const RESTORED_FORM: Readonly<Record<ShareFormat, EncodedFormat>> = MIRRO
 /** What is said of shares that keep no digest of the secret (ShareSet.digestChecked). */
 const NO_DIGEST_NOTE =
   "Each group of these shares restores from one share, so SSKR keeps no digest: the phrase is not checked, and a changed share would give another one.";
+
+/**
+ * The parts whose coded errors, thrown while shares are restored, refuse the shares given; their
+ * TypeErrors and the codes of SHARE_FAULTS are faults, not refusals (ShareSet.isRefusal).
+ */
+const SHARE_REFUSAL_PARTS = [
+  "sskr.share-set.",
+  "sskr.complete-shares.",
+  "sskr.transport.",
+  "sskr.joint-repair.",
+  "sskr.repair.",
+  "sskr.share-values.",
+];
+/** Coded errors of those parts that end an owner's lifetime rather than refuse the shares. */
+const SHARE_FAULTS = new Set(["sskr.joint-repair.plan-wiped"]);
 
 /** Digest checks that a combine makes on its own: well under a second. */
 const MAX_LIBRARY_TRIES = 2 ** 16;
@@ -154,6 +174,19 @@ export class ShareSet extends Redacted implements Disposable {
       unsettled: [],
       ...uncheckedField(unchecked),
     });
+  }
+
+  /**
+   * Whether `error`, thrown by restore or combine, refuses the shares given: a coded refusal of
+   * the share modules, or the engine's refusal of a combination (ShareCombineRefusalError). A
+   * failure of the host, of its engine or of MnemoCode is no refusal: a caller lets it pass
+   * through rather than ask for other shares (AUD-037-API002).
+   */
+  static isRefusal(error: unknown): boolean {
+    if (ShareCombineRefusalError.is(error)) return true;
+    const code = errorCode(error);
+    if (code === undefined || error instanceof TypeError || SHARE_FAULTS.has(code)) return false;
+    return SHARE_REFUSAL_PARTS.some((part) => code.startsWith(part));
   }
 
   /**
