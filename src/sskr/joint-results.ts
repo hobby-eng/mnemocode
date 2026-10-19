@@ -66,6 +66,12 @@ export interface RepairedSet extends RepairedShares {
    * than its threshold, in a set of several groups.
    */
   readonly unchecked?: readonly number[];
+  /**
+   * Present where no SSKR digest checked the secret: the groups that restored it each take one
+   * share, under a group threshold of 1, so that a changed share would restore another phrase
+   * unseen (AUD-037-API004). MnemoCode never writes such shares.
+   */
+  readonly digestUnchecked?: true;
 }
 
 /**

@@ -169,17 +169,21 @@ export class ShareUnmasking extends Redacted {
   async unmask(sets: readonly RepairedSet[], run: DateSearchRun = {}): Promise<Unmasked> {
     // Snapshot every input before the first host callback can change a later set or its phrase.
     // Read mnemonic once, even when a JavaScript host supplies an accessor for it.
-    const owned = Array.from(sets, ({ mnemonic, shares, unsettled, unchecked }) => ({
-      mnemonic,
-      shares: shares.map(({ ur, format, repaired, filled }) => ({
-        ur,
-        format,
-        repaired,
-        filled: filled.map(({ position, value }) => ({ position, value })),
-      })),
-      unsettled: unsettled.map(({ share, position }) => ({ share, position })),
-      ...(unchecked === undefined ? {} : { unchecked: [...unchecked] }),
-    }));
+    const owned = Array.from(
+      sets,
+      ({ mnemonic, shares, unsettled, unchecked, digestUnchecked }) => ({
+        mnemonic,
+        shares: shares.map(({ ur, format, repaired, filled }) => ({
+          ur,
+          format,
+          repaired,
+          filled: filled.map(({ position, value }) => ({ position, value })),
+        })),
+        unsettled: unsettled.map(({ share, position }) => ({ share, position })),
+        ...(unchecked === undefined ? {} : { unchecked: [...unchecked] }),
+        ...(digestUnchecked === true ? { digestUnchecked } : {}),
+      }),
+    );
     const phrases: UnmaskedPhrase[] = [];
     const listed: string[] = [];
     const mode = this.#mode;

@@ -131,7 +131,7 @@ The share library also checks the restored secret against a hash stored in the s
 
 Every supplied member of a complete group is checked for consistency, including members and groups beyond the recovery threshold. Members of an incomplete group cannot be checked against its polynomial: the CLI names them as not checked. The written-backup check warns instead of reporting that the whole backup was checked.
 
-For library callers, `combineSskrShares` returns a phrase only when no supplied shares or repaired elements remain unchecked and the hash checked the secret. `combineSskrShareSet` returns the phrase together with `unchecked` (share numbers counted from 1) and `unsettled` repair elements; callers using this partial-recovery API must report those limits. Both functions, and `restoreShareSet` for complete input, are exported from `mnemocode/sskr`. For complete shares they refuse a member given more than once, even as an exact copy; `sskr-combine` leaves such copies out before it calls them.
+For library callers, `combineSskrShares` returns a phrase only when no supplied shares or repaired elements remain unchecked and the hash checked the secret. `combineSskrShareSet` returns the phrase together with `unchecked` (share numbers counted from 1), `unsettled` repair elements and `digestUnchecked` where no hash checked the phrase; callers using this partial-recovery API must report those limits. Both functions, and `restoreShareSet` for complete input, are exported from `mnemocode/sskr`. For complete shares they refuse a member given more than once, even as an exact copy; `sskr-combine` leaves such copies out before it calls them.
 
 ### Damaged shares
 

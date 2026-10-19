@@ -35,8 +35,7 @@ import {
   MIRRORED_FORM,
 } from "./transport.js";
 import { copiesAmong, SetTopology, type PlacedShare, withoutCopies } from "./set-topology.js";
-import { restoreCompleteShares, uncheckedField } from "./complete-shares.js";
-import { MIN_DIGEST_THRESHOLD } from "./share-layout.js";
+import { digestField, restoreCompleteShares, uncheckedField } from "./complete-shares.js";
 import { Redacted } from "../core/redacted.js";
 import { counted } from "../core/search-plan.js";
 import { placeOf } from "../core/places.js";
@@ -81,7 +80,7 @@ export const RESTORED_FORM: Readonly<Record<ShareFormat, EncodedFormat>> = MIRRO
 
 /** What is said of shares that keep no digest of the secret (ShareSet.digestChecked). */
 const NO_DIGEST_NOTE =
-  "Each group of these shares restores from one share, so SSKR keeps no digest: the phrase is not checked, and a changed share would give another one.";
+  "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase.";
 
 /**
  * The parts whose coded errors, thrown while shares are restored, refuse the shares given; their
@@ -128,6 +127,7 @@ export class ShareSet extends Redacted implements Disposable {
   readonly #shares: ShareValues;
   readonly #unsettled: readonly MarkedElement[];
   readonly #unchecked: readonly number[] | undefined;
+  readonly #digestUnchecked: boolean;
   readonly #infos: readonly ShareInfo[];
 
   private constructor(set: RepairedSet) {
@@ -145,6 +145,7 @@ export class ShareSet extends Redacted implements Disposable {
       this.#mnemonic = mnemonic;
       this.#unsettled = copy.unsettled;
       this.#unchecked = copy.unchecked;
+      this.#digestUnchecked = copy.digestUnchecked === true;
     } catch (error) {
       mnemonic.wipe();
       throw error;
@@ -163,7 +164,7 @@ export class ShareSet extends Redacted implements Disposable {
   ): Promise<ShareSet> {
     assertShareCount(records.length);
     const shares = records.map(unrepairedShare);
-    const { mnemonic, unchecked } = await restoreCompleteShares(
+    const { mnemonic, unchecked, digestChecked } = await restoreCompleteShares(
       shares.map((share) => share.ur),
       platform,
       places,
@@ -173,6 +174,7 @@ export class ShareSet extends Redacted implements Disposable {
       shares,
       unsettled: [],
       ...uncheckedField(unchecked),
+      ...digestField(digestChecked),
     });
   }
 
@@ -285,24 +287,13 @@ export class ShareSet extends Redacted implements Disposable {
   }
 
   /**
-   * Whether SSKR's digest checked the secret: it keeps one where two or more groups restore it, or
-   * two or more members of a group whose shares are all here. Shares whose given groups each
-   * restore from one member, under a group threshold of 1, keep none, so that a changed share
-   * restores another phrase that nothing tells (AUD-037-API004). MnemoCode never writes them.
+   * Whether an SSKR digest checked the secret, as the restore found (RepairedSet.digestUnchecked):
+   * none does where the groups that restored it each take one share, under a group threshold of
+   * 1, so that a changed share restores another phrase that nothing tells (AUD-037-API004).
+   * MnemoCode never writes such shares.
    */
   get digestChecked(): boolean {
-    if (this.groupThreshold >= MIN_DIGEST_THRESHOLD) return true;
-    const members = new Map<number, Set<number>>();
-    for (const info of this.#infos)
-      members.set(
-        info.groupIndex,
-        new Set([...(members.get(info.groupIndex) ?? []), info.memberIndex]),
-      );
-    return this.#infos.some(
-      (info) =>
-        info.memberThreshold >= MIN_DIGEST_THRESHOLD &&
-        defined(members.get(info.groupIndex)).size >= info.memberThreshold,
-    );
+    return !this.#digestUnchecked;
   }
 
   /**
@@ -377,6 +368,7 @@ export class ShareSet extends Redacted implements Disposable {
       shares: this.shares,
       unsettled: this.#unsettled,
       ...(this.#unchecked === undefined ? {} : { unchecked: this.#unchecked }),
+      ...digestField(this.digestChecked),
     });
   }
 
@@ -442,6 +434,7 @@ function frozenSet(set: RepairedSet): RepairedSet {
             }),
           ),
         }),
+    ...(set.digestUnchecked === true ? { digestUnchecked: true as const } : {}),
   });
 }
 

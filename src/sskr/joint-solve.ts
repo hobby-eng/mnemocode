@@ -31,6 +31,7 @@ import {
 import {
   isCompleteShareRefusal,
   restoreCompleteShares,
+  digestField,
   uncheckedField,
 } from "./complete-shares.js";
 import { defined } from "../core/defined.js";
@@ -373,12 +374,13 @@ export class Branch implements Disposable {
         const restored = await restore(shares, guarded, assertLive);
         assertLive();
         if (restored === undefined) return undefined;
-        const { mnemonic, unchecked } = restored;
+        const { mnemonic, unchecked, digestChecked } = restored;
         return {
           mnemonic,
           shares,
           unsettled: this.unsettledElements(),
           ...uncheckedField(unchecked),
+          ...digestField(digestChecked),
         };
       }
       return undefined;
@@ -776,13 +778,20 @@ async function restore(
   shares: readonly ReadRepairableShare[],
   platform: ShareCombiner,
   assertLive: () => void,
-): Promise<{ readonly mnemonic: string; readonly unchecked: readonly number[] } | undefined> {
+): Promise<
+  | {
+      readonly mnemonic: string;
+      readonly unchecked: readonly number[];
+      readonly digestChecked: boolean;
+    }
+  | undefined
+> {
   // Each copy once, the first typed (withoutCopies): the places of the shares kept, in order.
   const kept = withoutCopies(shares.map((share, place) => ({ place, ur: share.ur }))).map(
     (share) => share.place,
   );
   try {
-    const { mnemonic, unchecked } = await restoreCompleteShares(
+    const { mnemonic, unchecked, digestChecked } = await restoreCompleteShares(
       kept.map((place) => defined(shares[place]).ur),
       platform,
       undefined,
@@ -790,7 +799,11 @@ async function restore(
     );
     assertLive();
     // The places among the shares read, counted from 0, of the shares kept that took no part.
-    return { mnemonic, unchecked: unchecked.map((index) => defined(kept[index])) };
+    return {
+      mnemonic,
+      unchecked: unchecked.map((index) => defined(kept[index])),
+      digestChecked,
+    };
   } catch (error) {
     assertLive();
     if (!isCompleteShareRefusal(error)) throw error;

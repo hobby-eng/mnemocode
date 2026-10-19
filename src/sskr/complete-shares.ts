@@ -143,6 +143,14 @@ export function uncheckedField(unchecked: readonly number[]): {
 }
 
 /**
+ * The `digestUnchecked` field of a restored set (RepairedSet.digestUnchecked): present only where
+ * no SSKR digest checked the secret that the shares restore (AUD-037-API004).
+ */
+export function digestField(digestChecked: boolean): { readonly digestUnchecked?: true } {
+  return digestChecked ? {} : { digestUnchecked: true };
+}
+
+/**
  * Restores the phrase from complete shares and checks that every share given agrees with it. The
  * SSKR library uses only the first `threshold` members of a group and the first groups that meet
  * the group threshold, so a surplus share would go unchecked, even a wrong one with a valid
@@ -161,7 +169,11 @@ export async function restoreCompleteShares(
   platform: ShareCombiner,
   places?: readonly number[],
   assertLive?: () => void,
-): Promise<{ readonly mnemonic: string; readonly unchecked: readonly number[] }> {
+): Promise<{
+  readonly mnemonic: string;
+  readonly unchecked: readonly number[];
+  readonly digestChecked: boolean;
+}> {
   assertLive?.();
   const shares = Share.readSet(records);
   let normalized: string[] = [];
@@ -236,7 +248,11 @@ export async function restoreCompleteShares(
           if (!memberFits) refuse(misfitMessage(placeOf(places, member + 1)));
         }
       }
-      return { mnemonic: entropyToMnemonic(entropy, wordlist), unchecked };
+      return {
+        mnemonic: entropyToMnemonic(entropy, wordlist),
+        unchecked,
+        digestChecked: reference.checked,
+      };
     } finally {
       entropy.fill(0);
     }

@@ -20,8 +20,8 @@ const SECRET_BYTE = 0x42;
 const SEED_BYTE = 0x07;
 const SECRET_BYTES = 16;
 const PHRASE = entropyToMnemonic(new Uint8Array(SECRET_BYTES).fill(SECRET_BYTE), wordlist);
-/** The refusal of a phrase that some part of the restore left unchecked (combineSskrShares). */
-const UNCHECKED = "sskr.shares.some-shares-repaired-elements-could-not-checked-use";
+/** The refusal of a phrase that no SSKR digest checked (combineSskrShares). */
+const UNCHECKED = "sskr.shares.no-digest-checked-phrase";
 
 /** The shares of PHRASE in `groups`, each [member threshold, member count], from the engine. */
 async function sharesOf(groupThreshold: number, groups: readonly number[][]): Promise<string[]> {

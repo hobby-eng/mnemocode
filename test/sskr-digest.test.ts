@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defined } from "../src/core/defined.js";
-import { combineSskrShares } from "../src/sskr/shares.js";
+import { combineSskrShares, combineSskrShareSet, restoreShareSet } from "../src/sskr/shares.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareSet } from "../src/sskr/share-set.js";
@@ -15,10 +15,13 @@ describe("a restore that no SSKR digest checks (AUD-037-API004)", () => {
     using alone = await ShareSet.restore([defined(one)], nodeSharePlatform);
     expect(alone.digestChecked).toBe(false);
     expect(alone.checked).toBe(false);
-    expect(alone.uncheckedNote()).toMatch(/SSKR keeps no digest: the phrase is not checked/u);
+    expect(alone.uncheckedNote()).toMatch(/^No SSKR digest checked this phrase/u);
     await expect(combineSskrShares([defined(one)])).rejects.toMatchObject({
-      code: "sskr.shares.some-shares-repaired-elements-could-not-checked-use",
+      code: "sskr.shares.no-digest-checked-phrase",
     });
+    // The plain results say so too, for a caller that reports their limits.
+    expect(await restoreShareSet([defined(one)])).toMatchObject({ digestUnchecked: true });
+    expect(await combineSskrShareSet([defined(one)])).toMatchObject({ digestUnchecked: true });
   });
 
   it("calls a restore that the digest checked checked", async () => {
@@ -27,5 +30,6 @@ describe("a restore that no SSKR digest checks (AUD-037-API004)", () => {
     expect(restored.digestChecked).toBe(true);
     expect(restored.checked).toBe(true);
     expect(restored.uncheckedNote()).toBeUndefined();
+    expect(await restoreShareSet(shares.slice(0, 2))).not.toHaveProperty("digestUnchecked");
   });
 });

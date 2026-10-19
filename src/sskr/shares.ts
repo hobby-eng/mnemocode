@@ -16,6 +16,8 @@ import { ErrorCatalog } from "../core/error-catalog.js";
 const ERRORS = new ErrorCatalog("sskr.shares", {
   "some-shares-repaired-elements-could-not-checked-use": () =>
     "Some shares or repaired elements could not be checked. Use combineSskrShareSet to inspect them, or restore on the command line.",
+  "no-digest-checked-phrase": () =>
+    "No SSKR digest checks the phrase of these shares: each group that restores it takes one share. Use combineSskrShareSet, whose result says so, or restore on the command line.",
 });
 
 export { MAX_SHARES };
@@ -82,7 +84,8 @@ export async function planShareRepair(
  * Restores the one phrase that `records` hold, in any form, with elements marked with ? where
  * unreadable. A repair that needs a long search, or that more than one phrase passes, is refused
  * here; the command line shows the assessment, asks, and lists every phrase. The result keeps any
- * unchecked shares and unsettled elements, so that a caller can report them honestly.
+ * unchecked shares and unsettled elements, and digestUnchecked where no SSKR digest checked the
+ * phrase, so that a caller can report them honestly.
  */
 export async function combineSskrShareSet(records: readonly string[]): Promise<RepairedSet> {
   await assertCheckedRecords(records);
@@ -91,13 +94,14 @@ export async function combineSskrShareSet(records: readonly string[]): Promise<R
 }
 
 /**
- * The phrase only, when every supplied share was checked. A string cannot disclose unchecked data:
- * callers that need partial recovery use combineSskrShareSet and report its metadata
- * (AUD-008-FUN001).
+ * The phrase only, when every supplied share was checked and an SSKR digest checked the phrase. A
+ * string cannot disclose unchecked data: callers that need partial recovery use
+ * combineSskrShareSet and report its metadata (AUD-008-FUN001, AUD-037-API004).
  */
 export async function combineSskrShares(records: readonly string[]): Promise<string> {
   await assertCheckedRecords(records);
   using restored = await ShareSet.combine(records, nodeSharePlatform);
+  if (!restored.digestChecked) throw ERRORS.create("no-digest-checked-phrase", []);
   if (!restored.checked)
     throw ERRORS.create("some-shares-repaired-elements-could-not-checked-use", []);
   return restored.mnemonic;
