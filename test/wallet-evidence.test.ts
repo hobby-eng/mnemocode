@@ -185,7 +185,8 @@ const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
   [
     "a WIF given as its value",
     located("wif", ` ${BIP84.firstReceivingWif}\n`, ["native-segwit"]),
-    { matched: true, kind: "wif", derived: BIP84.firstReceivingWif, path: "m/84'/0'/0'/0/0" },
+    // The public key of the WIF's key, never the private key (AUD-037-SEC009).
+    { matched: true, kind: "wif", derived: BIP84.firstReceivingPublicKey, path: "m/84'/0'/0'/0/0" },
   ],
   [
     "a nested SegWit address on testnet",

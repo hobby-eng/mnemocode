@@ -166,7 +166,10 @@ export type WalletEvidence =
   | BitcoinEvidence
   | (Omit<CoinAddressEvidence, "coin"> & { readonly kind: "coin-address"; readonly coin: CoinId });
 
-/** What a comparison with evidence says: a wallet match, with the kind and what was derived. */
+/**
+ * What a comparison with evidence says: a wallet match, with the kind and what was derived, which
+ * is never secret: an address, a public key or a fingerprint, also for a WIF.
+ */
 export interface EvidenceMatch extends CoinAddressMatch {
   readonly kind: WalletEvidence["kind"];
 }
@@ -632,7 +635,8 @@ class PublicKeyEvidence extends LocatedEvidence {
 /**
  * A WIF private key, given as its value. Its key is decoded into bytes at once and the text is not
  * kept (TS-07); the owner of the evidence wipes the key (WalletEvidenceCheck), as each derived key
- * it is compared with is wiped at once.
+ * it is compared with is wiped at once. A match gives the public key of that private key, never
+ * the private key: what is derived is shown, and a string cannot be wiped (AUD-037-SEC009).
  */
 class WifEvidence extends LocatedEvidence {
   readonly #key: Uint8Array;
@@ -642,14 +646,12 @@ class WifEvidence extends LocatedEvidence {
     this.#key = wifKey(evidence.value, this.network);
   }
 
-  protected derivedFrom(node: HDKey) {
+  protected derivedFrom(node: HDKey, publicKey: Uint8Array) {
     // A copy of the node's key, which node.wipePrivateData() does not reach.
     const derivedKey = node.privateKey;
     if (derivedKey === null) throw ERRORS.create("unable-derive-private-key-wif-comparison", []);
     try {
-      return equalBytes(derivedKey, this.#key)
-        ? WIF(networkParameters(this.network)).encode(derivedKey)
-        : undefined;
+      return equalBytes(derivedKey, this.#key) ? hexOfBytes(publicKey) : undefined;
     } finally {
       derivedKey.fill(0);
     }

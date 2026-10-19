@@ -9,6 +9,8 @@ import { TEST_PHRASE as PHRASE } from "./helpers/test-phrase.js";
 // BIP84's first receiving key and address for the public BIP39 test phrase.
 const WIF = "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d";
 const FIRST_ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
+// The public key of that WIF's key, which a match gives instead of the private key.
+const PUBLIC_KEY = "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c";
 const evidence = (): WalletEvidence => ({
   kind: "wif",
   value: WIF,
@@ -21,7 +23,11 @@ const pbkdf2 = (password: string, salt: string, rounds: number, bytes: number) =
 describe("A retained wallet comparison's lifetime", () => {
   it("ends the Node callback without changing its callable contract", () => {
     const check = walletCheckOf(evidence())!;
-    expect(check(PHRASE)).toMatchObject({ matched: true, derived: WIF, path: "m/84'/0'/0'/0/0" });
+    expect(check(PHRASE)).toMatchObject({
+      matched: true,
+      derived: PUBLIC_KEY,
+      path: "m/84'/0'/0'/0/0",
+    });
     check.wipe();
     check[Symbol.dispose]();
     expect(() => check(PHRASE)).toThrow("has been wiped");
@@ -33,7 +39,7 @@ describe("A retained wallet comparison's lifetime", () => {
     const source = evidence();
     using check = walletCheckOf(source)!;
     Object.assign(source, { value: "synthetic invalid replacement" });
-    expect(check(PHRASE)).toMatchObject({ matched: true, derived: WIF });
+    expect(check(PHRASE)).toMatchObject({ matched: true, derived: PUBLIC_KEY });
   });
 
   it("ends an escaped callback when its caller fails", () => {
@@ -54,8 +60,11 @@ describe("A retained wallet comparison's lifetime", () => {
     first.wipe();
     expect(() => first.match(PHRASE)).toThrow("has been wiped");
     await expect(first.matchAsync(PHRASE)).rejects.toThrow("has been wiped");
-    expect(other.match(PHRASE)).toMatchObject({ matched: true, derived: WIF });
-    await expect(other.matchAsync(PHRASE)).resolves.toMatchObject({ matched: true, derived: WIF });
+    expect(other.match(PHRASE)).toMatchObject({ matched: true, derived: PUBLIC_KEY });
+    await expect(other.matchAsync(PHRASE)).resolves.toMatchObject({
+      matched: true,
+      derived: PUBLIC_KEY,
+    });
   });
 
   it("refuses a comparison that settles after disposal and wipes its host seed", async () => {
