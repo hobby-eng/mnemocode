@@ -339,6 +339,8 @@ export async function choose<T>(
     const answer = (index: number): T => {
       erase();
       writeAnswer(options.label, defined(choices[index]).label);
+      // The lines kept for this question on the private screen go with its answer.
+      PrivateSteps.answered();
       return defined(choices[index]).value;
     };
     let drawn = draw();

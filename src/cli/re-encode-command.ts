@@ -57,6 +57,7 @@ import { forgetClaimedOutputs } from "./output-questions.js";
 import { CHECKSUM_INVALID, reportOriginalFingerprint } from "./fingerprint-report.js";
 import { settleOutputPaths } from "./output-paths.js";
 import { clearPrivateScreen, showProtection } from "./private-screen.js";
+import { PrivateSteps } from "./private-steps.js";
 import { dropUnneededAfterAnswers } from "./protection.js";
 import {
   asksNewBackup,
@@ -194,8 +195,10 @@ function showNotices(notices: Notices): void {
  */
 function newBackupScreen(notices: Notices): void {
   if (!clearPrivateScreen()) return;
-  terminalPart("New backup", true);
-  showNotices(notices);
+  PrivateSteps.keep(() => {
+    terminalPart("New backup", true);
+    showNotices(notices);
+  }, "page");
 }
 
 /** Makes a new backup of an old one's phrase; CANCELLED when the person cancelled or stopped. */

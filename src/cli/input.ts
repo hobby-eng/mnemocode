@@ -1,4 +1,5 @@
 import { terminalNotice } from "./terminal.js";
+import { PrivateSteps } from "./private-steps.js";
 import { askSecretUntil } from "./ask.js";
 import { choose } from "./terminal-choice.js";
 import { terminalAvailable } from "./terminal-input.js";
@@ -183,7 +184,7 @@ export async function detectedFormat(
           { label: "Format", quit },
         );
   if (format !== undefined && format !== CANCELLED)
-    terminalNotice(`Detected input format: ${format}.`);
+    PrivateSteps.keep(() => terminalNotice(`Detected input format: ${format}.`));
   return format;
 }
 

@@ -229,6 +229,10 @@ def check_re_encode_menu():
         session.wait_for(FINGERPRINT_FILTER)
         session.wait_for("The fingerprint matches: the seed phrase is accepted, not proven.")
         session.wait_for("Which form should the seed phrase take?")
+        # On the screen itself, not only written before the question cleared it (AUD-037-UI001).
+        assert_private_result_visible(
+            session, ("New backup", "The fingerprint matches: the seed phrase is accepted")
+        )
         session.type("2")
         session.wait_for("Use Seedshift?")
         session.type("2")

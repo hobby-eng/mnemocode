@@ -37,6 +37,7 @@ import {
 } from "./seedshift-choices.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import { terminalNotice } from "./terminal.js";
+import { PrivateSteps } from "./private-steps.js";
 import { choose, type Choice } from "./terminal-choice.js";
 import { refusal } from "./terminal-input.js";
 import { reportFingerprint, plainFingerprintLine } from "./fingerprint-report.js";
@@ -138,10 +139,14 @@ export function fromFile(args: ParsedArguments): boolean {
  */
 export function showEncodedFingerprint(fingerprint: string | undefined): void {
   if (fingerprint === undefined) return;
-  reportFingerprint(
-    PHRASE_WORDS.encodedFingerprint,
-    fingerprint,
-    plainFingerprintLine("encoded", fingerprint, true),
+  // Kept on the screen of the next question, the dates: it is shown so that a mistyped code is
+  // seen before any date is typed.
+  PrivateSteps.keep(() =>
+    reportFingerprint(
+      PHRASE_WORDS.encodedFingerprint,
+      fingerprint,
+      plainFingerprintLine("encoded", fingerprint, true),
+    ),
   );
 }
 
@@ -466,8 +471,10 @@ async function settledMode(
  */
 async function askedMode(seedshiftOnly: boolean): Promise<MaskingMode | undefined | Cancelled> {
   if (!seedshiftOnly)
-    terminalNotice(
-      "These codes have no MNC1 record header, so they do not say how they were made.",
+    PrivateSteps.keep(() =>
+      terminalNotice(
+        "These codes have no MNC1 record header, so they do not say how they were made.",
+      ),
     );
   return choose(
     seedshiftOnly ? WHICH_SEEDSHIFT_QUESTION : ENCODED_SEEDSHIFT_QUESTION,

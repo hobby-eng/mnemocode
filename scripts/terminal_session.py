@@ -39,14 +39,18 @@ ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN = "\x1b[?1049h", "\x1b[?1049l"
 class Session:
     """MnemoCode started in a pseudo-terminal; `output` collects everything it has written."""
 
-    def __init__(self, arguments=(), folder=None):
-        """Starts MnemoCode with `arguments` in `folder`, or in the current folder."""
+    def __init__(self, arguments=(), folder=None, colour=False):
+        """Starts MnemoCode with `arguments` in `folder`, or in the current folder; without
+        colour (NO_COLOR) unless `colour`, as a terminal shows it by default."""
         self.output = ""
         # Where the last text waited for ends; the next wait looks only after it.
         self.seen = 0
         self.exit_code = None
-        environment = dict(os.environ, NO_COLOR="1", TERM="xterm")
-        environment.pop("CLICOLOR_FORCE", None)
+        environment = dict(os.environ, TERM="xterm")
+        for name in ("NO_COLOR", "CLICOLOR", "CLICOLOR_FORCE"):
+            environment.pop(name, None)
+        if not colour:
+            environment["NO_COLOR"] = "1"
         command = [*COMMAND, *arguments]
         if WINDOWS:
             from winpty import PtyProcess
@@ -192,8 +196,9 @@ CONTROL_SEQUENCE = re.compile(r"\x1b\[([0-9;?]*)([@-~])")
 class Screen:
     """The rows that a terminal `columns` wide shows after `text`, for what the menu draws: text,
     which waits at the right edge before it wraps, carriage return, line feed, and the sequences
-    for cursor up, cursor down, cursor right, home and screen erasure. Rows scroll only when a
-    finite height is supplied. Any other escape sequence fails the check."""
+    for cursor up, cursor down, cursor right, home and screen erasure; colours and bold, which
+    change no cell, are skipped. Rows scroll only when a finite height is supplied. Any other
+    escape sequence fails the check."""
 
     def __init__(self, columns, text, height=None):
         self.columns = columns
@@ -243,6 +248,9 @@ class Screen:
             self.column += 1
 
     def control(self, parameters, final):
+        # Select graphic rendition (colours, bold) changes no cell or position: a check reads text.
+        if final == "m":
+            return
         count = int(parameters or "1")
         if final == "A":
             self.move(self.row - count, self.column)

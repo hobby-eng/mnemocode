@@ -52,8 +52,11 @@ export function onPrivateScreen(): boolean {
  */
 export function showProtection(): void {
   if (!PrivateSteps.active) return;
-  console.error(
-    `${factLine(process.stderr, "Protection", protectionSummary(), ANSWER_LABEL_WIDTH)}\n`,
+  // Kept on the screen of the first question that follows, which would otherwise clear it.
+  PrivateSteps.keep(() =>
+    console.error(
+      `${factLine(process.stderr, "Protection", protectionSummary(), ANSWER_LABEL_WIDTH)}\n`,
+    ),
   );
 }
 

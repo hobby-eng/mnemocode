@@ -31,6 +31,8 @@ It checks that
   the last word, and the dates are typed again, keeping the codes;
 - Decode asks again after an empty answer and after a mistyped date, keeping the codes, and finds
   a date with ? by the fingerprint of the test phrase;
+- the encoded fingerprint stays on the screen of the dates in Decode, recover-date and a restore
+  from shares, with and without colour, and a question keeps the line that says why it is asked;
 - Restore from Shamir shares asks again after Ctrl+D on an empty line, takes two shares pasted
   as two lines as one answer, asks again only for the share that cannot be read, and finds a date
   with ? by the fingerprint;
@@ -42,6 +44,7 @@ It checks that
 """
 
 import sys
+from terminal_context_checks import check_fingerprint_before_dates, check_question_reason_kept
 from terminal_result_checks import check_private_result_pages
 
 from terminal_menu_checks import (
@@ -99,6 +102,8 @@ def main():
     check_re_encode_recognised()
     check_re_encode_last_word_after_wrong_date()
     check_decode_dates_asked_again()
+    check_fingerprint_before_dates()
+    check_question_reason_kept()
     check_decode_share_lines()
     check_file_or_text_input()
     check_restore_share_asked_again()
