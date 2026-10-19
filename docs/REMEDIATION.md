@@ -31,7 +31,9 @@ group was split without changing its assertions or relaxing the line limit.
 
 The owner requested no additional agents. The main agent reviewed this delta;
 the concurrent audit's original reproduction is retained separately. No new
-independent review of the correction or full-suite replay is implied. Portable
+independent review of the correction is claimed. The initial correction
+checkpoint ran targeted checks; the later complete source matrix below verifies
+the resulting candidate separately. Portable
 library and native-engine bytes are unchanged. The corrected standalone Linux file now passes all nine empty-folder checks
 and the complete real pseudo-terminal suite. Its SHA-256 is
 `f3a35d61000a7231bad3e0edd974c03e63479e5fdffbba91ec47d6be3166c634`;
@@ -67,10 +69,63 @@ first-question Escape control. Both walks assert the complete agreed first-form
 list, so adding a form cannot silently escape their registration. These totals
 overlap the earlier run and are not added. `pnpm check` passes: strict types,
 type-aware lint, duplication, rule, privacy/package and Rust gates.
-The corrected full source-test matrix still needs to run after this checkpoint. No production, dependency, native-engine
-or portable-library input changes in this follow-up. The owner requested no
+The complete source matrix below subsequently verified this signed checkpoint.
+This follow-up leaves production, dependency, native-engine and portable-library
+inputs unchanged. The owner requested no
 additional agents; review is by the main agent, with no independent acceptance
 claimed.
+
+## Native acceptance completed (2026-10-19)
+
+The [complete CI run](https://github.com/hobby-eng/mnemocode/actions/runs/39291308933)
+passes on signed checkpoint `f8d9a933ba9bde8290da39d42fa3a380de78385a`.
+Every job builds and executes the program, runs its full self-test and source
+tests, and drives the real terminal, including private input and cancellation.
+These are actual completed results, not compilation alone.
+
+| System                    | Passed source tests | Existing conditional skips | Failed |
+| ------------------------- | ------------------- | -------------------------- | ------ |
+| Linux (Ubuntu 24.04, x64) | 3,000               | 0                          | 0      |
+| macOS 15 (arm64)          | 2,997               | 4                          | 0      |
+| Windows 2025 (x64)        | 2,973               | 26                         | 0      |
+
+The platform totals are not added as different tests. Nine extra registrations
+split existing menu products; that count does not represent nine new behaviors.
+macOS skips three Poppler-dependent cases and one Linux-only check. Windows
+skips one
+`pdftocairo`-dependent case and 25 POSIX/Linux-only cases covering filenames,
+permissions, job control, dump protection and shell/audit helpers. Their existing
+conditions are unchanged; skips are not passes. Linux executes every source
+case, plus the PDF/image/QR round trip, independent SSKR known answers and
+`pnpm audit --audit-level high`, which reports no known vulnerabilities.
+Native image conversion with `pdftocairo` was not executed on macOS or Windows.
+
+The separate [Executable run](https://github.com/hobby-eng/mnemocode/actions/runs/39288756606)
+passes on all three systems for `7facfccedd950a084df94933a230ca2f7a0f473a`.
+Each standalone file passes nine empty-folder checks and the real terminal
+suite. Subsequent test-support and status-document changes leave all production,
+dependency, native and build inputs unchanged. The local Linux file also matches
+the independently built Ubuntu file byte for byte. Exact SHA-256 values are:
+
+| Standalone file               | SHA-256                                                            |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `mnemocode-0.1.0-linux-x64`   | `f3a35d61000a7231bad3e0edd974c03e63479e5fdffbba91ec47d6be3166c634` |
+| `mnemocode-0.1.0-win-x64.exe` | `e97b73af761a5969c796cd7f6a51ef8476a6790c65592525b2839fa5e7261c71` |
+| `mnemocode-0.1.0-macos-arm64` | `e2f1224c30b0c296891d4334bc8f2b86eafd2300707d219c5cb5228d190a34f2` |
+
+The full package-path review contains 1,155 candidate entries and two untracked
+harnesses from the owner's separate concurrent audit. Those two files remain
+outside this signed checkpoint and are absent from a clean CI checkout. The
+local dry-run is not published or represented as a clean-source tarball. No
+local evidence, generated user exports or test directories are packed.
+
+The confirmed corrections and planned native/browser acceptance are now closed
+within the recorded scope. Historical failed runs and resource refusals remain
+separate evidence. Universal CORE compliance, globally optimal code and the
+absence of every defect remain unproved.
+Tagging, release publication, release signing, history rewriting and the
+owner-deferred G1/Rust-port work are separate from these checks and were not
+performed.
 
 ## Browser acceptance follow-up (2026-10-19)
 
