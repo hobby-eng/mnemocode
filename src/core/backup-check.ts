@@ -27,6 +27,7 @@ import { MIN_RECORDED_THRESHOLD } from "../sskr/share-layout.js";
 import { DatesAnswer } from "./date-search.js";
 import { formatDate } from "./dates.js";
 import { EncodedBackup } from "./encoded-backup.js";
+import { EncodedForm } from "./encoded-form.js";
 import { Masking, type SplitMode } from "./masking.js";
 import { placesInWords, placesNamed } from "./places.js";
 import { type DateShiftDate, type MaskingMode, type EncodedFormat } from "./types.js";
@@ -377,13 +378,16 @@ export class EncodedBackupCheck implements BackupCheck {
     const original = this.#codes.value;
     const conflict = modeConflictOf(codes.mode, this.#secrets.mode);
     if (conflict !== undefined) return finding("codes", "mode", conflict);
-    if (typed.length !== original.length)
+    // Counted and placed as typed: by the colours where the codes are colours.
+    const form = EncodedForm.of(this.#format);
+    const [written, result] = [form.elements(typed), form.elements(original)];
+    if (written.length !== result.length)
       return finding(
         "codes",
         "count",
-        `The backup has ${original.length} codes; these are ${typed.length}.`,
+        `The backup has ${result.length} ${form.unit}; these are ${written.length}.`,
       );
-    const places = typed.flatMap((index, place) => (index === original[place] ? [] : [place + 1]));
+    const places = written.flatMap((code, place) => (code === result[place] ? [] : [place + 1]));
     if (places.length === 0) return undefined;
     return finding(
       "codes",

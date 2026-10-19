@@ -53,6 +53,7 @@ import {
   representMnemonic,
   type DateShiftDate,
 } from "../src/core.js";
+import { EncodedForm } from "../src/core/encoded-form.js";
 import { serializeRecord } from "../src/record.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
@@ -146,6 +147,29 @@ describe("checking a written-down encoded seed phrase", () => {
     const three = check.compareCodes(check.readCodes(changedAt(written(original), [2, 7, 12])));
     expect(three).toMatchObject({ places: [2, 7, 12] });
     expect(three?.message).toBe("The codes at places 2, 7 and 12 differ from the result.");
+  });
+
+  it("names colours that differ, and counts them, as they were typed (AUD-037-FUN003)", () => {
+    const original = encoded([DATE], "colors");
+    const check = new EncodedBackupCheck(original);
+    const colors = EncodedForm.of("colors");
+    // Word 12 lies in colour 8 of 8, word 1 in colour 1.
+    const changed = original.codes.map((code, place) =>
+      place === 0 || place === 11 ? (code + 1) % 2048 : code,
+    );
+    expect(check.compareCodes(check.readCodes(colors.codes(changed)))).toMatchObject({
+      places: [1, 8],
+      message: "The codes at places 1 and 8 differ from the result.",
+    });
+    const longer = encodeMnemonic(`${"abandon ".repeat(14)}address`, [parseDate(DATE)]);
+    expect(check.compareCodes(check.readCodes(formatEncoded(longer, "colors")))).toMatchObject({
+      kind: "count",
+      message: "The backup has 8 codes; these are 10.",
+    });
+    const words = new EncodedBackupCheck(encoded([DATE], "english"));
+    expect(words.compareCodes(words.readCodes(formatEncoded(longer, "english")))?.message).toBe(
+      "The backup has 12 words; these are 15.",
+    );
   });
 
   it("names a wrong date by its place, whatever the order of the dates", async () => {

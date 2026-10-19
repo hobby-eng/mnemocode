@@ -283,6 +283,15 @@ export class EncodedForm {
     return this.#variant.leading(text, this.elementCount(words)) ?? text;
   }
 
+  /**
+   * The elements of the codes of `indexes`, one for each word, or one for each colour where the
+   * codes are colours: two equal only where they are the same, so that what differs between two
+   * phrases is named by the places of the elements a person typed (AUD-037-FUN003).
+   */
+  elements(indexes: readonly number[]): readonly string[] {
+    return this.#variant.elementUnit === "word" ? indexes.map(String) : indexesToColors(indexes);
+  }
+
   /** What the codes are called in a message about their count: "words", "word numbers", "codes". */
   get unit(): string {
     return this.#variant.unit;
