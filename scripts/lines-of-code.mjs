@@ -24,9 +24,16 @@ const RUST_WORD = /r#[\p{L}_][\p{L}\p{N}_]*|[\p{L}\p{N}_]+/uy;
 const TEST_ATTRIBUTE = ["#", "[", "cfg", "(", "test", ")", "]"];
 /**
  * A sticky match of a Markdown code fence that starts a line, and the rest of that line; indented
- * as far as a list item nested in others takes it.
+ * as far as a list item nested in others takes it. An indented code block that shows a fence is
+ * read as one, which can only count more lines.
  */
 const FENCE = /([ \t]*)(`{3,}|~{3,})([^\n]*)/uy;
+/** How far a closing fence may stand right of its opening one: less than an indented code block. */
+const FENCE_SHIFT = 4;
+/** A sticky match of the start of a Python or TOML string: its prefix letters and its quotes. */
+const HASH_STRING = /(?<![\w])([rRuUbBfF]{0,2})("""|'''|"|')/uy;
+/** A Python statement whose first string is its docstring (PEP 257). */
+const DOCUMENTED = /^\s*(?:async\s+def|def|class)\b/u;
 /** The marks that open and close an HTML comment in Markdown. */
 const COMMENT_OPEN = "<!--";
 const COMMENT_CLOSE = "-->";
@@ -37,11 +44,11 @@ const COMMENT_CLOSE = "-->";
  */
 const READERS = {
   ".md": markdownCode,
-  ".py": (text) => hashCommentCode(text, ['"', "'"], true),
+  ".py": (text) => hashCommentCode(text, { escaping: ['"', "'"], docstrings: true }),
   ".rs": rustCode,
   ".sh": (text) => readShell(text).code,
   // TOML's literal strings, '…', take no escapes.
-  ".toml": (text) => hashCommentCode(text, ['"'], false),
+  ".toml": (text) => hashCommentCode(text, { escaping: ['"'] }),
   ".txt": wholeLineCommentCode,
   ".yaml": wholeLineCommentCode,
   ".yml": wholeLineCommentCode,
@@ -62,44 +69,44 @@ export function linesOfCode(path, text) {
 /**
  * The lines of code of a language whose comments run from "#" to the end of the line, with strings
  * in single, double and tripled quotes that may span lines (Python, TOML); `escaping` lists the
- * quotes whose strings take backslash escapes. With `docstrings`, a string in tripled quotes that
- * starts a line at the top of the file or after a line that ends in ":" is a comment (PEP 257).
+ * quotes whose strings take backslash escapes. With `docstrings`, a docstring is a comment: read
+ * without a parser, a string in tripled quotes, with an r or a u before them or none, that starts
+ * the first statement of the file, or the first after a `def` or `class` statement (PEP 257).
  */
-function hashCommentCode(text, escaping, docstrings) {
+function hashCommentCode(text, { escaping, docstrings = false }) {
   const cursor = new SourceCursor(text);
-  // The last character of code read: a docstring follows none, or a ":".
-  let last = "";
+  // The statement before the one being read, by its first line; none at the top of the file.
+  let before;
+  let statement;
+  let brackets = 0;
   while (!cursor.done) {
     const character = cursor.peek();
+    const string = cursor.match(HASH_STRING);
+    const starts = brackets === 0 && !/[\s#]/u.test(character) && cursor.lineSoFar().trim() === "";
+    if (starts) [before, statement] = [statement, cursor.restOfLine()];
     if (character === "#") cursor.takeCommentLine();
-    else if (character === '"' || character === "'") {
-      const triple = character.repeat(3);
-      const closer = cursor.sees(triple) ? triple : character;
+    else if (string !== undefined) {
+      const [whole, prefix, quotes] = string;
       const docstring =
         docstrings &&
-        closer === triple &&
-        (last === "" || last === ":") &&
-        cursor.lineSoFar().trim() === "";
-      takeHashString(cursor, closer, escaping.includes(character), docstring);
-      last = character;
+        starts &&
+        quotes.length === 3 &&
+        /^[rRuU]?$/u.test(prefix) &&
+        (before === undefined || DOCUMENTED.test(before));
+      if (docstring) cursor.takeComment(whole.length);
+      else cursor.take(whole.length);
+      cursor.takeString(quotes, {
+        escapes: escaping.includes(quotes[0]),
+        endsAtLine: quotes.length === 1,
+        comment: docstring,
+      });
     } else {
-      if (!/\s/u.test(character)) last = character;
+      if ("([{".includes(character)) brackets += 1;
+      else if (")]}".includes(character)) brackets = Math.max(0, brackets - 1);
       cursor.take();
     }
   }
   return cursor.code;
-}
-
-/**
- * A string of hashCommentCode from its opening quotes to its `closer`; a string in single quotes
- * ends at its line, closed or not. A `comment` makes no line hold code.
- */
-function takeHashString(cursor, closer, escapes, comment) {
-  const move = (count) => (comment ? cursor.takeComment(count) : cursor.take(count));
-  move(closer.length);
-  while (!cursor.done && !cursor.sees(closer) && (closer.length > 1 || cursor.peek() !== "\n"))
-    move(escapes && cursor.peek() === "\\" ? 2 : 1);
-  if (cursor.sees(closer)) move(closer.length);
 }
 
 /**
@@ -123,13 +130,15 @@ function wholeLineCommentCode(text) {
 function markdownCode(text) {
   const cursor = new SourceCursor(text);
   let fence;
+  let fenceIndent = 0;
   let inComment = false;
   while (!cursor.done) {
     const fenceLine = cursor.match(FENCE);
     if (inComment) inComment = markdownProse(cursor, true);
     else if (fence !== undefined) {
-      const [, , marker, rest] = fenceLine ?? [];
-      if (marker?.[0] === fence[0] && marker.length >= fence.length && rest.trim() === "")
+      const [, indent = "", marker, rest] = fenceLine ?? [];
+      const closes = marker?.[0] === fence[0] && marker.length >= fence.length;
+      if (closes && rest.trim() === "" && width(indent) < fenceIndent + FENCE_SHIFT)
         fence = undefined;
       cursor.takeLine();
       cursor.take();
@@ -138,11 +147,17 @@ function markdownCode(text) {
       !(fenceLine[2][0] === "`" && fenceLine[3].includes("`"))
     ) {
       fence = fenceLine[2];
+      fenceIndent = width(fenceLine[1]);
       cursor.takeLine();
       cursor.take();
     } else inComment = markdownProse(cursor, false);
   }
   return cursor.code;
+}
+
+/** The columns of an indentation, a tab taking a list item's four. */
+function width(indent) {
+  return indent.replaceAll("\t", "    ").length;
 }
 
 /**
@@ -221,7 +236,7 @@ function rustToken(cursor) {
   }
   if (string !== undefined) {
     cursor.take(string[0].length);
-    cursor.takeQuoted('"');
+    cursor.takeString('"');
     return '""';
   }
   // A quote that starts no character literal starts a lifetime or a label, 'a.

@@ -156,6 +156,13 @@ describe("the length of a file in lines of code (CORE-15)", () => {
     expect(rulesBroken({ "docs/long.md": `A table too long: every code\n${long}` })).toEqual([
       "CORE-15",
     ]);
+    // A Rust attribute of the crate, #![…], is code, not a "#!" line before the comment.
+    const code = repeated(801, "fn f() {}");
+    for (const [first, second, broken] of [
+      ["#![forbid(unsafe_code)]", "// long: one table", ["CORE-15"]],
+      ["// long: one table", "#![forbid(unsafe_code)]", []],
+    ] as const)
+      expect(rulesBroken({ "a.rs": `${first}\n${second}\n${code}` })).toEqual(broken);
     // A Rust file's unit tests do not count.
     const rust = `${"fn f() {}\n".repeat(700)}#[cfg(test)]\nmod tests {\n${"fn t() {}\n".repeat(200)}}\n`;
     expect(rulesBroken({ "crate/src/lib.rs": rust })).toEqual([]);
@@ -228,6 +235,7 @@ describe("the lines of code of each language (CORE-15)", () => {
       'const C: &CStr = c"/*";',
       'const R: &str = r##"a "# /* b"##;',
       'let r#type = "/*";',
+      "let q = '\\''; let s = \"/*\";",
     ])
       expect(rulesBroken({ "a.rs": repeated(801, line) })).toEqual(["CORE-15"]);
     // A quote in a character literal opens no string.
@@ -242,10 +250,20 @@ describe("the lines of code of each language (CORE-15)", () => {
     const over = repeated(800, "A sentence.");
     // A code block, fenced with backticks or tildes, indented in a list or not, and inline code
     // are text, whatever they hold.
-    for (const fence of ["```html", "~~~", "      ```"])
-      expect(
-        rulesBroken({ "docs/a.md": `${fence}\n<!-- An example.\n${fence.trim()}\n${over}` }),
-      ).toEqual(["CORE-15"]);
+    for (const [open, close] of [
+      ["```html", "```"],
+      ["~~~", "~~~"],
+      ["      ```", "      ```"],
+    ])
+      expect(rulesBroken({ "docs/a.md": `${open}\n<!-- An example.\n${close}\n${over}` })).toEqual([
+        "CORE-15",
+      ]);
+    // A block ends at its closing fence: a comment after it is one.
+    const closed = `\`\`\`\ncode\n\`\`\`\n<!--\n${repeated(300, "a note")}-->\n${repeated(797, "A sentence.")}`;
+    expect(rulesBroken({ "docs/a.md": closed })).toEqual([]);
+    // A fence four columns right of the opening one is text of the block, and closes nothing.
+    const shifted = `\`\`\`markdown\n    \`\`\`\n<!-- Inside.\n${repeated(300, "inside")}-->\n\`\`\`\n${repeated(500, "A sentence.")}`;
+    expect(rulesBroken({ "docs/a.md": shifted })).toEqual(["CORE-15"]);
     const inline = `Write \`<!--\` to open a comment.\n${over}`;
     expect(rulesBroken({ "docs/a.md": inline })).toEqual(["CORE-15"]);
     // A shorter fence, or one with text after it, closes no block.
@@ -270,6 +288,19 @@ describe("the lines of code of each language (CORE-15)", () => {
     const notes = repeated(300, "    Why it is so.");
     const documented = `"""The module.\n${notes}"""\ndef f():\n    """What f does.\n${notes}    """\n${repeated(799, "x = 1")}`;
     expect(rulesBroken({ "scripts/a.py": documented })).toEqual([]);
+    expect(
+      rulesBroken({ "scripts/a.py": documented.replace('    """What', '    r"""What') }),
+    ).toEqual([]);
+    // An f-string, a string after the first statement of a function, and a string inside
+    // brackets are no docstrings.
+    const body = (string: string): string =>
+      `def f():\n${string}\n${notes}"""\n${repeated(500, "x = 1")}`;
+    for (const string of [
+      '    f"""Not a docstring.',
+      '    x = 1\n    """Not first.',
+      '    d = {\n        "key":\n        """A value.',
+    ])
+      expect(rulesBroken({ "scripts/a.py": body(string) })).toEqual(["CORE-15"]);
     // A TOML literal string takes no escapes: 'C:\' ends where it seems to.
     const toml = `path = 'C:\\'\n${repeated(300, "# Why.")}${repeated(799, "a = 1")}`;
     expect(rulesBroken({ "a.toml": toml })).toEqual([]);
@@ -333,6 +364,7 @@ describe("the shell scripts of the coding guide (TOOL-02)", () => {
       'echo "$((1 + $count))"',
       "(( count += $step ))",
       'for((i = 0; i < $n; i++)); do echo "$i"; done',
+      'while((i < $n)); do echo "$i"; break; done',
       'x="${a:-$b}"',
       // The body of a here-document is text.
       "cat <<EOF\nVersion: $version\nEOF",
@@ -348,6 +380,11 @@ describe("the shell scripts of the coding guide (TOOL-02)", () => {
           "scripts/run.sh": script(["cat <<EOF", "$x", "EOF", "echo $after"].join(end)),
         }),
       ).toEqual(["scripts/run.sh:6 TOOL-02"]);
+    // Parentheses that group a pattern open no arithmetic: the line after them is read too.
+    for (const test of ['[[ "$x" =~ ^((a|b)c)$ ]]', '[[ "$x" == @((a|b)c) ]]'])
+      expect(problemsOf({ "scripts/run.sh": script(`${test}\nrm -rf $dir`) })).toEqual([
+        "scripts/run.sh:4 TOOL-02",
+      ]);
     // A here-string is code, quoted or not: the line after it is read too.
     for (const here of ['grep -q x <<< "$text"', "grep -q x <<<'word'", "read -r a b <<< word"])
       expect(problemsOf({ "scripts/run.sh": script(`${here}\nrm -rf $dir`) })).toEqual([

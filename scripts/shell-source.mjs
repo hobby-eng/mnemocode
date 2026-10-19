@@ -12,6 +12,11 @@ import { SourceCursor } from "./source-cursor.mjs";
 const WORD_BREAK = /[\s;&|()<>]/u;
 /** What makes a `$` an expansion: a name, a digit or a special parameter; `${` and `$(` aside. */
 const PARAMETER = /[\p{L}_0-9@*#?!$-]/u;
+/**
+ * Where a command starts, as the line so far ends: at its start, after a control operator, or after
+ * a word that a command or a condition follows.
+ */
+const COMMAND_PLACE = /(?:^|[;&|({!]|\b(?:then|do|else|elif|if|while|until|for))\s*$/u;
 /** A here-document's operator and its delimiter: <<EOF, <<-'EOF', << "EOF", <<\EOF. */
 const HERE_DOCUMENT = /<<(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([\w.-]+))/uy;
 
@@ -80,12 +85,14 @@ class ShellReader {
     } else if (cursor.sees("$'")) {
       // $'…', a string whose backslashes escape, its own quote included.
       cursor.take(2);
-      cursor.takeQuoted("'");
+      cursor.takeString("'");
     } else if (character === '"' || cursor.sees('$"'))
       this.#open("double", cursor.sees("$") ? 2 : 1);
     else if (character === "$" || character === "`") this.#expansion(context, true);
-    // (( … )) is arithmetic wherever it stands, also in while((…)) and for((…)), as bash reads it.
-    else if (cursor.sees("((")) this.#open("arithmetic", 2);
+    // (( … )) is arithmetic where a command starts, also in while((…)) and for((…)); elsewhere, as
+    // in a pattern ^((a|b)c)$ of [[ =~ ]] or @((a|b)c), the parentheses group.
+    else if (cursor.sees("((") && COMMAND_PLACE.test(cursor.lineSoFar()))
+      this.#open("arithmetic", 2);
     else if (character === "(" || character === ")") this.#parenthesis(context);
     // A here-string, <<< word, is code; only << opens a here-document.
     else if (cursor.sees("<<<")) cursor.take(3);
@@ -154,7 +161,7 @@ class ShellReader {
       if (character === "\\") cursor.take(2);
       else if (character === "'" || character === '"') {
         cursor.take();
-        cursor.takeQuoted(character);
+        cursor.takeString(character);
       } else {
         if (character === "{") depth += 1;
         else if (character === "}") depth -= 1;

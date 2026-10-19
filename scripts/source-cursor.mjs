@@ -16,9 +16,9 @@ export class SourceCursor {
     this.#text = text;
   }
 
-  /** The numbers, from 1, of the lines that hold code so far. */
+  /** The numbers, from 1, of the lines that hold code so far, as a set of the caller's own. */
   get code() {
-    return this.#code;
+    return new Set(this.#code);
   }
 
   /** Whether the whole text has been read. */
@@ -85,12 +85,14 @@ export class SourceCursor {
   }
 
   /**
-   * Moves past the rest of a string as far as its closing `quote`, past a backslash and the
-   * character it escapes.
+   * Moves past the rest of a string as far as its `closer`: past a backslash and the character it
+   * escapes where it `escapes`, and only to the end of its line, closed or not, where it
+   * `endsAtLine`. A string that is a `comment`, such as a docstring, makes no line hold code.
    */
-  takeQuoted(quote) {
-    while (!this.done && this.peek() !== quote) this.take(this.peek() === "\\" ? 2 : 1);
-    this.take();
+  takeString(closer, { escapes = true, endsAtLine = false, comment = false } = {}) {
+    while (!this.done && !this.sees(closer) && !(endsAtLine && this.peek() === "\n"))
+      this.#move(escapes && this.peek() === "\\" ? 2 : 1, !comment);
+    if (this.sees(closer)) this.#move(closer.length, !comment);
   }
 
   #move(count, code) {
