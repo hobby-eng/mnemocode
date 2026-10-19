@@ -26,6 +26,21 @@ A text record may start with `MNC1:MODE:FORMAT:`. The text after the third colon
 is its payload. A plain list of codes or a share does not necessarily record the
 mode or the dates. A valid checksum cannot tell you which dates were used.
 
+For a backup on printed cards, keep the sheet for heirs, or a note of how many
+words the seed phrase has, with the cards: that number tells where the backup ends
+(see "Printed cards" below).
+
+## Printed cards
+
+Cards printed by MnemoCode end with codes that belong to nothing: exactly one on
+separate cards, and on a sheet at least one, then as many as fill its last row.
+They are not marked, and a color among them repeats the order tag of a real
+color. The backup is the first cards by their printed card number: one card per
+word for Word Unicode, and one per color for colors and Color Unicode, 8, 10, 12,
+14 or 16 of them for a 12-, 15-, 18-, 21- or 24-word phrase. The sheet for heirs,
+or the number of words you recorded, tells how many. Set aside every card after
+them before any step below.
+
 ## 1. Obtain the stored word numbers
 
 The dictionary printed by MnemoCode numbers words **1 through 2048**. Mathematical
@@ -36,7 +51,8 @@ and add 1 before looking a result up in the printed dictionary.
 - Traditional Chinese characters: look up each character's number in the full
   mapping. These are dictionary positions, not translations of the English words.
 - Word Unicode: split the text into four hexadecimal digits per code, such as
-  `7684`, and find each code in the mapping. Keep their order.
+  `7684`, and find each code in the mapping. Keep their order. On printed cards,
+  keep only the first codes, one per word (see "Printed cards").
 - Word numbers: use the decimal numbers directly; leading zeros change nothing.
 
 The example `abandon` / `的` / `7684` has printed number 1 and mathematical index 0. The last word `zoo` / `歇` / `6B47` has printed number 2048 and index 2047.
@@ -46,16 +62,17 @@ The example `abandon` / `的` / `7684` has printed number 1 and mathematical ind
 Use the printed hexadecimal codes, not the apparent colors of aged paper.
 These instructions describe colors of a **complete phrase**, not SSKR share colors.
 
-1. There must be 8, 10, 12, 14 or 16 real colors for a 12-, 15-, 18-, 21- or
-   24-word phrase respectively. Remove only cards explicitly identified as decoys;
-   do not guess which codes to discard.
+1. There must be 8, 10, 12, 14 or 16 colors for a 12-, 15-, 18-, 21- or 24-word
+   phrase respectively. On printed cards, keep the first ones by printed card
+   number and set aside the cards after them (see "Printed cards"); do not guess
+   which other codes to discard.
 2. Convert each six-digit `RRGGBB` hexadecimal code to a decimal integer. Write
    that integer with exactly eight decimal digits, adding leading zeros.
 3. The first two decimal digits are an order tag; the remaining six are payload.
    Sort by tag. For 8 colors, consecutive tags differ by 2; for all other supported
    counts, they differ by 1. New records begin with tag 0. Older accepted records
-   can have a common offset, but the spacing must still be correct. Duplicate or
-   missing tags mean the set is incomplete or wrong.
+   can have a common offset, but the spacing must still be correct. Among the
+   colors kept, a duplicate or missing tag means the set is incomplete or wrong.
 4. Join the six-digit payloads, preserving their leading zeros. Split the joined
    decimal string into four-digit groups. Each group is one printed word number
    from 0001 through 2048. Reject 0000 or a number above 2048.
