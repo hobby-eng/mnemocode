@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { readFile, readdir } from "node:fs/promises";
 import { accessSync, constants, statSync } from "node:fs";
-import { delimiter, isAbsolute, join } from "node:path";
+import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { PDFDocument } from "pdf-lib";
 import { pageFileName } from "./card-codes.js";
@@ -26,7 +26,7 @@ import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("export.image-export", {
   "png-jpeg-export-requires-local-poppler-pdftocairo-program": () =>
-    "PNG/JPEG export requires the local Poppler pdftocairo program. Install Poppler before using image export, or export PDF instead.",
+    "PNG/JPEG export requires the local Poppler pdftocairo program in a folder of PATH. Install Poppler before using image export, or export PDF instead.",
   "local-pdf-renderer-produced-no-images": () => "The local PDF renderer produced no images.",
   "image-destination-already-exists-nothing-will-overwritten": () =>
     "An image destination already exists; nothing will be overwritten.",
@@ -48,6 +48,11 @@ const PAGE_FILE = new RegExp(`^page-\\d+\\.(?:${IMAGE_FORMATS.join("|")})$`, "u"
 
 // Both come with Poppler. pdftocairo can leave the paper transparent, which pdftoppm cannot.
 const IMAGE_RENDERER = "pdftocairo";
+/**
+ * An absolute folder on Windows: a drive and a separator, or a network share. \tools without a
+ * drive follows the drive of the working folder.
+ */
+const WINDOWS_ABSOLUTE = /^(?:[A-Za-z]:[\\/]|\\\\)/u;
 /** How long the renderer may take to say its version: long enough for a slow first start. */
 const PROBE_TIMEOUT_MS = 10_000;
 /** How long the renderer may take to draw one page. */
@@ -75,20 +80,28 @@ function imageRenderer(): Promise<string> {
  * else put there, which would then receive the private PDF.
  */
 async function foundRenderer(): Promise<string> {
-  const names = process.platform === "win32" ? [`${IMAGE_RENDERER}.exe`] : [IMAGE_RENDERER];
-  // On Windows process.env gives Path under this name too.
-  const folders = (process.env["PATH"] ?? "").split(delimiter);
+  const windows = process.platform === "win32";
+  const name = windows ? `${IMAGE_RENDERER}.exe` : IMAGE_RENDERER;
+  // On Windows process.env gives Path under this name too, and an entry may be quoted.
+  const folders = (process.env["PATH"] ?? "")
+    .split(delimiter)
+    .map((folder) => (windows ? folder.replace(/^"(.*)"$/u, "$1") : folder));
   const program = folders
-    .filter((folder) => folder !== "" && isAbsolute(folder))
-    .flatMap((folder) => names.map((name) => join(folder, name)))
+    .filter((folder) => (windows ? WINDOWS_ABSOLUTE.test(folder) : isAbsolute(folder)))
+    .map((folder) => join(folder, name))
     .find(isRunnable);
-  const answers =
-    program !== undefined &&
-    (await execute(program, ["-v"], { timeout: PROBE_TIMEOUT_MS, maxBuffer: RENDERER_OUTPUT_BYTES })
-      .then(() => true)
-      .catch(() => false));
-  if (program === undefined || !answers)
-    throw ERRORS.create("png-jpeg-export-requires-local-poppler-pdftocairo-program", []);
+  const refused = ERRORS.create("png-jpeg-export-requires-local-poppler-pdftocairo-program", []);
+  if (program === undefined) throw refused;
+  try {
+    // In its own folder, where it finds the libraries that come with it, and no others.
+    await execute(program, ["-v"], {
+      cwd: dirname(program),
+      timeout: PROBE_TIMEOUT_MS,
+      maxBuffer: RENDERER_OUTPUT_BYTES,
+    });
+  } catch {
+    throw refused;
+  }
   return program;
 }
 

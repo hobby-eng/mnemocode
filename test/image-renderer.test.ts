@@ -16,12 +16,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // its absolute name, never one of the working folder or of a relative entry, which Windows would
 // search first. The stubs are shell scripts, so the cases run where a shell does.
 
-/** A stub of the renderer in `folder` that notes each run, its working folder and its arguments. */
+/**
+ * A stub of the renderer in `folder` that notes each run: the stub's own path, its working folder
+ * and its arguments.
+ */
 function stub(folder: string, log: string): void {
   mkdirSync(folder, { recursive: true });
   const file = join(folder, "pdftocairo");
-  writeFileSync(file, `#!/bin/sh\necho "$PWD $*" >> '${log}'\n`);
+  writeFileSync(file, `#!/bin/sh\necho "$0 $PWD $*" >> '${log}'\n`);
   chmodSync(file, 0o755);
+}
+
+/** Stubs in the working folder `work` and in its folder bin, and one in an absolute folder. */
+function stubs(work: string): string {
+  stub(work, log);
+  stub(join(work, "bin"), log);
+  stub(join(root, "poppler"), log);
+  return join(root, "poppler", "pdftocairo");
 }
 
 /** The image export module as a fresh import: it keeps the renderer it found. */
@@ -58,16 +69,18 @@ describe.skipIf(process.platform === "win32")("the image renderer", () => {
       NO_RENDERER,
     );
     expect(existsSync(log)).toBe(false);
-    // One in an absolute folder is found after them, and asked for its version.
-    stub(join(root, "poppler"), log);
+    // One in an absolute folder is found after them, and asked for its version in its folder.
+    const program = stubs(work);
     process.env["PATH"] = ["", ".", "bin", join(root, "poppler")].join(delimiter);
     await (await imageExport()).assertImageRenderer();
-    expect(readFileSync(log, "utf8")).toBe(`${work} -v\n`);
+    expect(readFileSync(log, "utf8")).toBe(`${program} ${join(root, "poppler")} -v\n`);
   });
 
   it("draws each page with the renderer found, in the private folder of the drawing", async () => {
-    stub(join(root, "poppler"), log);
-    process.env["PATH"] = join(root, "poppler");
+    const work = join(root, "work");
+    const program = stubs(work);
+    process.chdir(work);
+    process.env["PATH"] = ["", ".", "bin", join(root, "poppler")].join(delimiter);
     const document = await PDFDocument.create();
     document.addPage([200, 100]);
     const bytes = await document.save();
@@ -78,8 +91,9 @@ describe.skipIf(process.platform === "win32")("the image renderer", () => {
       "export.image-export.local-pdf-renderer-produced-no-images",
     );
     const [probe, page] = readFileSync(log, "utf8").trim().split("\n");
-    expect(probe).toMatch(/ -v$/u);
-    const [folder = "", ...arguments_] = (page ?? "").split(" ");
+    expect(probe).toMatch(new RegExp(`^${program} .* -v$`, "u"));
+    const [ran, folder = "", ...arguments_] = (page ?? "").split(" ");
+    expect(ran).toBe(program);
     expect(folder).toMatch(/mnemocode-raster-/u);
     expect(arguments_).toContain(join(folder, "document.pdf"));
     expect(existsSync(folder)).toBe(false);

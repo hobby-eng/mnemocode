@@ -25,7 +25,7 @@ GitHub also signs where each file of a release was built. On the computer you do
 gh attestation verify mnemocode-0.1.0-linux-x64 --repo hobby-eng/mnemocode
 ```
 
-The file holds Node.js, the program, artwork, fonts and the SSKR engine. Image export also needs Poppler's `pdftocairo`. To build the executable from a checkout, run `corepack pnpm build:executable`; it writes the file and license notices to `release/` and checks it from an empty folder.
+The file holds Node.js, the program, artwork, fonts and the SSKR engine. Image export also needs Poppler's `pdftocairo` in a folder of `PATH`. To build the executable from a checkout, run `corepack pnpm build:executable`; it writes the file and license notices to `release/` and checks it from an empty folder.
 
 ## Command help
 
@@ -150,7 +150,7 @@ Replace random identity fields with `--card-name`, `--card-role`, `--card-compan
 
 `--card-slogan`, `--card-subtitle`, `--card-footer` and `--card-reference-label` replace the text on the sheet. The value `-` hides a field. The default reference label is `Ref.`.
 
-Images need Poppler's `pdftocairo`; PDFs do not. A missing converter is reported before asking for a secret. Images use 300 dpi; PNG keeps text and QR codes sharp, while JPEG uses quality 90. Separate-card corners are transparent in PNG and white in JPEG.
+Images need Poppler's `pdftocairo` in a folder of `PATH`, given by its full path; PDFs do not. A missing converter is reported before asking for a secret. Images use 300 dpi; PNG keeps text and QR codes sharp, while JPEG uses quality 90. Separate-card corners are transparent in PNG and white in JPEG.
 
 [Card designs](card-designs.md) describes what is printed on a sheet.
 
