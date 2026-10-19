@@ -11,6 +11,28 @@ path is recorded as a coverage gap instead. Tests, source identity and review
 must support a `verified` state. Local verification and external host/platform acceptance are separate states;
 pending host acceptance remains visible even after a local variant is verified.
 
+## Test-gate follow-up (2026-10-19)
+
+The normal Vitest suite now discovers only `test/**/*.test.ts`. Before this
+correction, discovery included 209 maintained test files, one published audit
+runner probe and one ignored local diagnostic. Afterward the same 209 maintained
+files remain, with neither diagnostic included. Historical probes stay on disk
+and can be run explicitly; no maintained test, fixture or assertion was removed.
+Earlier suite totals retain their original discovery scopes and are not revised.
+
+`pnpm check:rust`, which is part of `pnpm check`, now also executes the Rust
+workspace's tests. The three workspace crates pass all 18 cases, including the
+vendored secret-lifetime regressions. Clippy and rustfmt remain in that command.
+The full `pnpm check` passes with the existing 3 GiB memory reserve. The formatting
+commit in `.git-blame-ignore-revs` now names the actual reachable commit
+`0dbf39d3b6b0fbb3c08a46a5b1414cc20871a470`.
+
+The main agent reviewed these changes under the owner's instruction to use no
+additional agents. They change test selection and gates. Production sources,
+native-engine files, dependency versions and executable-building code remain
+unchanged. The parallel AUD-037 remains separate;
+its unfinished candidate list is not represented as an accepted audit report.
+
 ## Latest private-output correction (2026-10-19)
 
 An additional pagination coverage gap was confirmed from the concurrent audit's

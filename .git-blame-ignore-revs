@@ -2,7 +2,7 @@
 # makes git blame skip them; GitHub reads this file by itself.
 
 # Prettier: the workspace style, double quotes and 100 columns
-9df8ee6561efbe7878235da20ce360c088286642
+0dbf39d3b6b0fbb3c08a46a5b1414cc20871a470
 
 # Comments within 100 columns
 163f7bb5cf97f1883ad2e78dc514105f10e0aee6
