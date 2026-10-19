@@ -190,6 +190,16 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     };
     expect(offered(TEST_PHRASE)).toBe(false);
     expect(offered(`${"abandon ".repeat(23)}art`)).toBe(true);
+    // Its texts count the sets of codes as candidates, and say the phrases they give.
+    const encoded = legacyChecksumValidResult(encodeMnemonicLegacy(TEST_PHRASE, [parseDate(DATE)]));
+    const codes = formatEncoded(encoded, "indexes").split(" ");
+    codes[3] = `${defined(codes[3]).slice(0, -1)}?`;
+    using read = MissingCodes.read(codes.join(" "), "indexes", "seedshift-legacy-valid");
+    const search = new MissingCodesSearch(read, fingerprint);
+    expect(search.unreadable).toMatch(/candidates?, which give about [\d,]+ phrases\.$/u);
+    expect(search.whyNot("list")).toMatch(
+      /^A list holds at most 16 phrases; these codes give about [\d,]+ phrases\.$/u,
+    );
   });
 
   it("finds one phrase that several sets of codes and dates give, and says so", async () => {

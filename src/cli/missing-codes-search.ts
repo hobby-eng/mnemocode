@@ -171,8 +171,10 @@ export async function searchMissingCodes(
   const search = new MissingCodesSearch(codes, masterFingerprint);
   terminalNotice(search.unreadable, "warning");
   if (search.many) terminalHint(MISSING_CODES_TEXTS.many);
+  // A list that held more than it can is not offered again for these codes (AUD-037-FUN002).
+  const closed = new Set<MissingCodesWay>();
   for (let given = givenWay(search, answers); ; given = undefined) {
-    const way = given ?? (await askWay(search));
+    const way = given ?? (await askWay(search, closed));
     if (way === undefined) return { kind: "again" };
     if (way === CANCELLED) return CANCELLED;
     const outcome =
@@ -181,17 +183,21 @@ export async function searchMissingCodes(
         : way === "wallet"
           ? await byWallet(search, answers, given === "wallet")
           : await listed(search);
-    if (outcome !== undefined) return outcome;
+    if (outcome === LIST_OVERFLOWED) closed.add("list");
+    else if (outcome !== undefined) return outcome;
   }
 }
 
-/** Asks how the right codes are told; undefined types the codes again. */
+/** Asks how the right codes are told, of the ways not `closed`; undefined types the codes again. */
 async function askWay(
   search: MissingCodesSearch,
+  closed: ReadonlySet<MissingCodesWay>,
 ): Promise<MissingCodesWay | undefined | Cancelled> {
   return choose(
     MISSING_CODES_TEXTS.question,
-    search.ways.map(({ way, label, note }) => ({ label, note, value: way })),
+    search.ways
+      .filter(({ way }) => !closed.has(way))
+      .map(({ way, label, note }) => ({ label, note, value: way })),
     { label: "Codes", quit: "types the codes again" },
   );
 }
@@ -301,11 +307,16 @@ function showCandidates(rows: readonly MissingCodesRow[]): void {
   console.error(FINGERPRINT_DISCLOSURE);
 }
 
+/** That a list held more candidates than it can: the way is asked again, without the list. */
+const LIST_OVERFLOWED = "list-overflowed";
+
 /**
  * Every candidate with its phrase and fingerprint, for the person to compare. More of them than a
  * list holds, which the estimate allowed, are said, and the way is asked again (AUD-037-UI003).
  */
-async function listed(search: MissingCodesSearch): Promise<MissingOutcome | undefined | Cancelled> {
+async function listed(
+  search: MissingCodesSearch,
+): Promise<MissingOutcome | typeof LIST_OVERFLOWED | Cancelled> {
   const dates = search.needsDates ? await askCodeDates(search, false) : undefined;
   if (dates === CANCELLED) return CANCELLED;
   using dateAnswer = dates;
@@ -316,7 +327,7 @@ async function listed(search: MissingCodesSearch): Promise<MissingOutcome | unde
   } catch (error) {
     if (!MissingCodesSearch.isListOverflow(error)) throw error;
     terminalNotice(describeError(error), "warning");
-    return undefined;
+    return LIST_OVERFLOWED;
   }
   if (result === CANCELLED) return CANCELLED;
   if (result.kind === "list") showCandidates(result.rows);

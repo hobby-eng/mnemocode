@@ -56,7 +56,9 @@ describe("A list of more candidates than it holds", () => {
     const answers = { ...ANSWERS, encodedFingerprint: undefined, list: true };
     expect(await searchMissingCodes(codes, answers)).toEqual({ kind: "again" });
     expect(said.join("\n")).toContain("More than 16 candidates fit these codes.");
-    expect(harness.terminal.labels.at(-1)).toContain("List every candidate");
+    // The way is asked again without the list, which would overflow again (AUD-037-FUN002).
+    expect(harness.terminal.labels.at(-1)).not.toContain("List every candidate");
+    expect(harness.terminal.labels.at(-1)).toContain("The wallet");
   });
 });
 

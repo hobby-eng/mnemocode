@@ -464,7 +464,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       terminal.choices = ["encoded"];
       await runDecode({ "ask-secrets": true, mode: "seedshift", "list-candidates": true });
       expect(seen.notices).toContain(
-        "--list-candidates: a list holds at most 16 candidates; these codes have about 128 candidates.",
+        "--list-candidates: a list holds at most 16 candidates; these codes give about 128 candidates.",
       );
     });
 

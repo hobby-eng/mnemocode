@@ -230,7 +230,6 @@ export type { PhraseFingerprint };
 /** Candidates few enough to be listed for the person to compare. */
 const MAX_LISTED = 16;
 
-/** Why a list cannot tell codes with about `expected` candidates. */
 /**
  * About how many rows a list of the candidates of `codes` has: one phrase for each set of codes,
  * or as many as one set gives where its mode gives several (Masking.givesSeveral), so that a list
@@ -242,8 +241,19 @@ function listedRows(codes: MissingCodes): number {
   return codes.expected * masking.checksPerDecoding(codes.wordCount);
 }
 
-function tooManyToList(expected: number): string {
-  return `A list holds at most ${MAX_LISTED} candidates; these codes have about ${counted(expected, "candidate")}.`;
+/**
+ * The rows of a list of `codes` in words: candidates, each a set of codes with its phrase, or the
+ * phrases where one set gives several. A candidate stays a set of codes in every text.
+ */
+function listedText(codes: MissingCodes): string {
+  const several = Masking.of(codes.mode).givesSeveral;
+  return counted(listedRows(codes), several ? "phrase" : "candidate");
+}
+
+/** Why a list cannot tell `codes`: it holds at most MAX_LISTED rows (listedText). */
+function tooManyToList(codes: MissingCodes): string {
+  const unit = Masking.of(codes.mode).givesSeveral ? "phrases" : "candidates";
+  return `A list holds at most ${MAX_LISTED} ${unit}; these codes give about ${listedText(codes)}.`;
 }
 
 /** The phrases that `backup` gives with `dates` and that pass their own checksum. */
@@ -341,7 +351,11 @@ export class MissingCodesSearch {
   /** What cannot be read, and how many candidates that leaves. */
   get unreadable(): string {
     const codes = this.#codes;
-    return `${MissingCodesSearch.placesText(codes)} cannot be read: ${counted(codes.combinations, "combination")}, about ${counted(codes.expected, "candidate")}.`;
+    // Where one set of codes gives several phrases, those too (AUD-037-FUN002).
+    const phrases = Masking.of(codes.mode).givesSeveral
+      ? `, which give about ${listedText(codes)}`
+      : "";
+    return `${MissingCodesSearch.placesText(codes)} cannot be read: ${counted(codes.combinations, "combination")}, about ${counted(codes.expected, "candidate")}${phrases}.`;
   }
 
   /**
@@ -397,7 +411,7 @@ export class MissingCodesSearch {
   whyNot(way: MissingCodesWay): string | undefined {
     if (way === "encoded" && !this.#codes.checksummed)
       return "These codes keep no checksum, so their encoded fingerprint cannot tell them.";
-    if (way === "list" && this.many) return tooManyToList(listedRows(this.#codes));
+    if (way === "list" && this.many) return tooManyToList(this.#codes);
     return undefined;
   }
 
@@ -741,14 +755,15 @@ class ListWay implements MissingCodesWaySearch {
     dates: readonly DateShiftDate[],
   ) {
     if (listedRows(codes) > MAX_LISTED)
-      throw ERRORS.create("operation-refused", [tooManyToList(listedRows(codes))]);
+      throw ERRORS.create("operation-refused", [tooManyToList(codes)]);
     this.#input = new CodeSearchInput(codes, dates);
     this.#fingerprintOf = fingerprintOf;
   }
 
   async plan(limit?: number): Promise<MissingCodesPlan> {
-    const expected = this.#input.codes.expected;
-    return SearchPlan.of(counted(expected, "candidate"), expected, 0, limit);
+    // Said as the list's rows; counted as the sets of codes that a limit of candidates counts.
+    const { codes } = this.#input;
+    return SearchPlan.of(listedText(codes), codes.expected, 0, limit);
   }
 
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
