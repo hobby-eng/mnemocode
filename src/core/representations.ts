@@ -7,7 +7,7 @@ import {
   type EncodedResult,
   type OutputFormat,
 } from "./types.js";
-import { wordNumberOf, isBip39WordCount } from "./bip39-sizes.js";
+import { assertPhraseIndexes, wordNumberOf, isBip39WordCount } from "./bip39-sizes.js";
 import { EncodedForm } from "./encoded-form.js";
 
 /**
@@ -59,7 +59,8 @@ export function detectInputFormats(value: string): Array<EncodedFormat> {
  */
 export function formatEncoded(result: EncodedResult, format: OutputFormat): string {
   if (format !== "json") return EncodedForm.of(format).write(result);
-  const indexes = result.shiftedIndexes;
+  const indexes = Array.from(result.shiftedIndexes);
+  assertPhraseIndexes(indexes);
   return JSON.stringify(
     {
       algorithm: "Seedshift-compatible date shift",

@@ -8,7 +8,11 @@ import {
   formatEncoded,
   legacyChecksumValidResult,
   parseDate,
+  representMnemonic,
 } from "../src/core.js";
+import { EncodedForm } from "../src/core/encoded-form.js";
+import { ENCODED_FORMATS } from "../src/core/types.js";
+import { matching } from "./helpers/matchers.js";
 import {
   ENCODED_MODE_NAMES,
   EncodedBackup,
@@ -45,6 +49,32 @@ const pageCheck = new WalletEvidenceCheck(
   (password, salt, rounds, bytes) => pbkdf2(sha512, password, salt, { c: rounds, dkLen: bytes }),
   [BITCOIN],
 );
+
+describe("writing codes", () => {
+  it("refuses indexes that are no phrase in every form (AUD-037-API008)", () => {
+    const phrase = Array.from({ length: 12 }, () => 0);
+    for (const format of ENCODED_FORMATS) {
+      const form = EncodedForm.of(format);
+      expect(form.read(form.codes(phrase))).toEqual(phrase);
+      for (const indexes of [
+        [...phrase.slice(1), 2048],
+        [...phrase.slice(1), -1],
+        [...phrase.slice(1), 1.5],
+        phrase.slice(1),
+      ])
+        expect(() => form.codes(indexes), format).toThrow(
+          expect.objectContaining({ code: matching(/^core\.bip39-sizes\./u) }),
+        );
+    }
+    const result = {
+      ...representMnemonic(TEST_PHRASE),
+      shiftedIndexes: [...phrase.slice(1), 2048],
+    };
+    expect(() => formatEncoded(result, "json")).toThrow(
+      expect.objectContaining({ code: "core.bip39-sizes.assert-word-indexes-refused" }),
+    );
+  });
+});
 
 describe("EncodedBackup", () => {
   it("reads the codes in every format that encode writes", () => {

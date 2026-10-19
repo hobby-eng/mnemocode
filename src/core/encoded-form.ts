@@ -6,7 +6,12 @@
 //
 // Host-neutral: it reaches only the core's words and colors.
 
-import { BIP39_WORD_COUNTS, wordNumberOf, type Bip39WordCount } from "./bip39-sizes.js";
+import {
+  assertPhraseIndexes,
+  BIP39_WORD_COUNTS,
+  wordNumberOf,
+  type Bip39WordCount,
+} from "./bip39-sizes.js";
 import {
   UNICODE_CODE_DIGITS,
   codeTokens,
@@ -244,10 +249,14 @@ export class EncodedForm {
 
   /**
    * Codes, by their BIP39 indexes, written in this form: every form is written from the indexes
-   * alone, so that no two forms of one result can disagree.
+   * alone, so that no two forms of one result can disagree. Indexes that are no phrase are refused
+   * in every form, as the colours refuse them (AUD-037-API008), never written as text that cannot
+   * be read back.
    */
   codes(indexes: readonly number[]): string {
-    return this.#variant.write(indexes);
+    const phrase = Array.from(indexes);
+    assertPhraseIndexes(phrase);
+    return this.#variant.write(phrase);
   }
 
   /**
