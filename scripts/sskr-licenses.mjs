@@ -29,8 +29,6 @@ const OUTPUT = join(root, "sskr-wasm", "LINKED_LICENSES.txt");
 const TARGET = "wasm32-unknown-unknown";
 /** The files of a crate that hold its license or its notices. */
 const LICENSE_FILE = /^(?:licen[cs]e|copying|notice)(?:[-.][\w.-]*)?$/iu;
-/** License files of a crate that name a license other than the one taken, MIT. */
-const NOT_TAKEN = /apache|zlib|bsd|unlicense/iu;
 /**
  * What a crate bundles under a license of its own, below its folder: secp256k1-sys compiles the C
  * library libsecp256k1, which is under MIT, while the crate itself is under CC0.
@@ -44,7 +42,7 @@ function linkedCrates() {
   const metadata = JSON.parse(
     execFileSync(
       "cargo",
-      ["metadata", "--offline", "--locked", "--format-version", "1", "--filter-platform", TARGET],
+      ["metadata", "--locked", "--format-version", "1", "--filter-platform", TARGET],
       { cwd: CRATE, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
     ),
   );
@@ -64,24 +62,47 @@ function linkedCrates() {
     }
   }
   reached.delete(metadata.resolve.root);
-  return [...reached]
-    .map((id) => packages.get(id))
-    .map((item) => ({
-      name: item.name,
-      version: item.version,
-      license: item.license ?? "",
-      folder: dirname(item.manifest_path),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
+  return (
+    [...reached]
+      .map((id) => packages.get(id))
+      .map((item) => ({
+        name: item.name,
+        version: item.version,
+        license: item.license ?? "",
+        folder: dirname(item.manifest_path),
+      }))
+      // Plain code-unit order, the same on every system, as the file is compared byte for byte.
+      .sort((a, b) => (`${a.name} ${a.version}` < `${b.name} ${b.version}` ? -1 : 1))
+  );
+}
+
+/**
+ * The licenses that `expression` offers to choose from: those of its group in parentheses, or all
+ * of it when it has none; with the text that offers them.
+ */
+function alternatives(expression) {
+  const offered = expression.match(/\(([^()]*)\)|^([^()]*)$/u);
+  const text = offered?.[1] === undefined ? (offered?.[2] ?? "") : `(${offered[1]})`;
+  return { text, choice: text.replace(/^\(|\)$/gu, "").split(/\s+OR\s+|\//u) };
 }
 
 /** The license taken of `expression`: MIT where it is one of several offered, else all of it. */
 function taken(expression) {
-  const alternatives = /\(([^()]*)\)|^([^()]*)$/u;
-  const offered = expression.match(alternatives);
-  const choice = (offered?.[1] ?? offered?.[2] ?? "").split(/\s+OR\s+|\//u);
-  if (!choice.includes("MIT") || choice.length === 1) return expression;
-  return expression.replace(offered?.[1] === undefined ? expression : `(${offered[1]})`, "MIT");
+  const { text, choice } = alternatives(expression);
+  return choice.includes("MIT") && choice.length > 1 ? expression.replace(text, "MIT") : expression;
+}
+
+/** The licenses offered beside MIT that are left out where MIT is taken. */
+function notTaken(expression) {
+  const { choice } = alternatives(expression);
+  return choice.includes("MIT") ? choice.filter((license) => license !== "MIT") : [];
+}
+
+/** Whether the license file `file` holds the text of one of `licenses`, by its name. */
+function names(file, licenses) {
+  return licenses.some((license) =>
+    file.toLowerCase().includes(license.split("-")[0].toLowerCase()),
+  );
 }
 
 /**
@@ -97,7 +118,7 @@ function licenseTexts(crate) {
     crate.license === "CC0-1.0"
       ? []
       : [...readdirSync(crate.folder).filter((file) => LICENSE_FILE.test(file)), ...reuse]
-          .filter((file) => taken(crate.license) === crate.license || !NOT_TAKEN.test(file))
+          .filter((file) => !names(file, notTaken(crate.license)))
           .sort();
   return [...own, ...(BUNDLED[crate.name]?.files ?? [])]
     .filter((file) => existsSync(join(crate.folder, file)))
