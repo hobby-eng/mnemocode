@@ -76,7 +76,7 @@ const JPEG_ALIAS = "jpeg";
 
 /**
  * The endings of the files that an export writes, without their point: a new folder never takes a
- * name with one, which would look like such a file (FILE_NAME_FOR_FOLDER, cli/output-paths.ts).
+ * name with one, which would look like such a file (assertFolderName, cli/output-paths.ts).
  */
 export const DOCUMENT_EXTENSIONS: readonly string[] = Object.freeze([
   ...DOCUMENT_FORMATS,
@@ -88,7 +88,10 @@ export function isImageFormat(value: unknown): value is ImageFormat {
   return (IMAGE_FORMATS as readonly unknown[]).includes(value);
 }
 
-/** `value` as an image format, jpeg as jpg; undefined gives the default, png. */
+/**
+ * `value` as an image format, jpeg as jpg; undefined gives the default, png. Refuses any other,
+ * naming those there are (image-format-one-accepted-as-alias).
+ */
 export function parseImageFormat(value: string | undefined): ImageFormat {
   if (value === undefined) return DEFAULT_IMAGE_FORMAT;
   if (value === JPEG_ALIAS) return "jpg";
@@ -100,7 +103,10 @@ export function parseImageFormat(value: string | undefined): ImageFormat {
   return value;
 }
 
-/** `value` as the format of the files of cards: none, or an empty one, gives the PDF. */
+/**
+ * `value` as the format of the files of cards: none, or an empty one, gives the PDF. Refuses any
+ * other, naming those there are (select-as-file-format).
+ */
 export function parseDocumentFormat(value: string | undefined): DocumentFormat {
   if (value === undefined || value === "" || value === "pdf") return DEFAULT_DOCUMENT_FORMAT;
   if (value === JPEG_ALIAS || isImageFormat(value)) return parseImageFormat(value);

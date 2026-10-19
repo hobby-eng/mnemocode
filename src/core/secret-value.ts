@@ -78,7 +78,10 @@ export class SecretValue<Value> extends Redacted implements Disposable {
     this.#decode = decode;
   }
 
-  /** Retains UTF-8 bytes, dropping the input string after construction. */
+  /**
+   * Retains UTF-8 bytes, dropping the input string after construction. Refuses a value that is not
+   * text (core.secret-value.text), as a JavaScript host may pass one.
+   */
   static text(text: string): SecretValue<string> {
     if (typeof text !== "string") throw ERRORS.create("text", []);
     return new SecretValue(ENCODER.encode(text), (bytes) => DECODER.decode(bytes));

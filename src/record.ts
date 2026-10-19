@@ -42,7 +42,11 @@ const recordPattern = new RegExp(
   "u",
 );
 
-/** Wraps a raw representation with enough public metadata to select its decoder later. */
+/**
+ * Wraps a raw representation with enough public metadata to select its decoder later. Refuses a
+ * mode or a format that is not MnemoCode's and an empty payload (record.unsupported-mode,
+ * record.unsupported-format, record.empty-payload).
+ */
 export function serializeRecord(mode: MaskingMode, format: EncodedFormat, payload: string): string {
   if (!isMaskingMode(mode)) throw ERRORS.create("unsupported-mode", []);
   if (!isEncodedFormat(format)) throw ERRORS.create("unsupported-format", []);
@@ -51,7 +55,11 @@ export function serializeRecord(mode: MaskingMode, format: EncodedFormat, payloa
   return `${RECORD_PREFIX}${MNEMOCODE_RECORD_VERSION}:${mode}:${format}:${normalized}`;
 }
 
-/** Reads a versioned record, or returns undefined for legacy raw representations. */
+/**
+ * Reads a versioned record, or returns undefined for legacy raw representations. Refuses a record
+ * header that is malformed, of an unsupported version or of an unknown format
+ * (record.malformed-header, record.unsupported-version, record.unsupported-format).
+ */
 export function parseRecord(value: string): MnemoCodeRecord | undefined {
   const normalized = value.trim();
   if (!normalized.startsWith(RECORD_PREFIX)) return undefined;

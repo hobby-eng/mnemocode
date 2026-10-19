@@ -462,7 +462,10 @@ export class ShareInput implements Disposable {
     this.#nextPlace = texts.length + 1;
   }
 
-  /** Takes `text` for the share at `place`, which keeps its place. */
+  /**
+   * Takes `text` for the share at `place`, which keeps its place. Refuses a place where no share
+   * was typed (no-share-was-typed-at-place).
+   */
   replace(place: number, text: string): void {
     if (!this.has(place)) throw ERRORS.create("no-share-was-typed-at-place", [`${place}`]);
     this.#shares = this.#shares.map((share) =>

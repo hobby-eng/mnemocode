@@ -729,7 +729,7 @@ function showRestoredParts(phrase: RestoredPhrase, mode: SplitMode, place: Resto
   const backup = restoredBackup(phrase, mode);
   if (backup !== undefined) {
     terminalPart(backup.label);
-    // Codes written joined apart and numbered, beside the joined text (printCodes); other forms
+    // Codes written joined apart, beside the joined text (printCodes); other forms
     // wrapped at their spaces, as the terminal would break a long line inside a word.
     if (EncodedForm.of(backup.form).apartCodes(backup.text) === undefined)
       for (const line of wrapText(backup.text)) console.log(line);

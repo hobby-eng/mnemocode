@@ -89,7 +89,7 @@ function ownedAnswer(given: object, read: Readonly<Record<keyof WalletMatch, unk
  * may answer anything, and a search that read undefined or { matched: "false" } as a match would
  * report a recovery that no wallet confirmed (AUD-014-API001): such an answer is refused, and only
  * matched === true counts. Every search asks the host's check through it; whether the search may
- * still publish what it found is asked when it does (search-turns.ts, assertStillRunning).
+ * still publish what it found is asked when it does (search-turns.ts, stillRunning).
  */
 export async function askWallet<M extends WalletMatch>(
   check: WalletCheck<M>,

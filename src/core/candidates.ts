@@ -167,7 +167,11 @@ export function parseUnknownWords(text: string): WordSearch {
   return { kind: "unknown-words", places };
 }
 
-/** Reads a phrase with one word missing at an unknown place: one word fewer than a valid length. */
+/**
+ * Reads a phrase with one word missing at an unknown place: one word fewer than a valid length.
+ * Refuses another count of words and a word that is not English BIP39, naming its place
+ * (enter-words-you-their-order, unknown-english-bip39-word-at-place).
+ */
 export function parseMissingWord(text: string): WordSearch {
   const written = englishTokens(text);
   if (!isBip39WordCount(written.length + 1))

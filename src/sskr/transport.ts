@@ -531,7 +531,10 @@ export function shareWordList(share: string): WordList | undefined {
   return SHARE_READERS.find((reader) => reader.looks(text))?.words;
 }
 
-/** A share in any form MnemoCode writes, as its UR, and the form it was written in. */
+/**
+ * A share in any form MnemoCode writes, as its UR, and the form it was written in. Refuses text
+ * that is no share, with the refusal of the first form it looks like, or not-sskr-share.
+ */
 export function readShare(value: string): { readonly ur: string; readonly format: ShareFormat } {
   const text = value.trim();
   let firstError: unknown;

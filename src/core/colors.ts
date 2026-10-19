@@ -137,7 +137,11 @@ export function indexesToColors(given: readonly number[]): string[] {
   return chunks.map((chunk, position) => rgbHex(Number(`${position * step}${chunk}`)));
 }
 
-/** The colors of a seed phrase, #RRGGBB codes or six digits each, apart or run together. */
+/**
+ * The colors of a seed phrase, #RRGGBB codes or six digits each, apart or run together. Refuses
+ * text that is not whole colors (parse-colors-refused), and a count of colors that no phrase
+ * has (enter-colors-standard-bip39-word-count).
+ */
 export function parseColors(value: string): string[] {
   const hashed = value.includes("#");
   const codes =
@@ -323,7 +327,11 @@ function colorsFromUnicodePoints(points: readonly number[]): string[] {
   );
 }
 
-/** Color Unicode of a seed phrase: 8 to 16 colors, two code points each. */
+/**
+ * Color Unicode of a seed phrase: 8 to 16 colors, two code points each. Refuses a count of code
+ * points that no phrase has, and code points that are no color of MnemoCode (codes-all and the
+ * refusals of colorOfUnicodePair).
+ */
 export function unicodeToColors(value: string): string[] {
   const points = colorUnicodePoints(value);
   if (!RGB_REFERENCE_COUNTS.includes(points.length / COLOR_UNICODE_POINTS_PER_COLOR))

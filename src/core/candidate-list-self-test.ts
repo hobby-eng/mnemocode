@@ -30,7 +30,7 @@ export const THREE_PHRASES_ENTROPY = [
   "ffffffffffffffffffffffffffffffff",
 ] as const;
 /**
- * The bytes, in hexadecimal, of the list that the startup check writes of THREE_PHRASES: the known
+ * The bytes, in hexadecimal, of the list that the startup check writes of THREE_PHRASES_ENTROPY: the known
  * answer that the writer must give and the reader take back.
  */
 export { THREE_PHRASES_LIST } from "./candidate-list-answers.js";

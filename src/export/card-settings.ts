@@ -95,7 +95,7 @@ export const SHEET_SIZES_TEXT = listInWords(
 
 /**
  * The size that `value` names; a sheet's when none is given (SHEET_PAGE_SIZE). Every export reads
- * a size through it.
+ * a size through it. Refuses a name of no size, naming those there are (page-size).
  */
 export function parsePageSize(value: string | undefined): CardPageSize {
   if (value === undefined) return SHEET_PAGE_SIZE;
@@ -183,7 +183,10 @@ export function assertSheetQr(card: { readonly kind: string } & CardSettings): v
     throw ERRORS.create("qr-code-printed-on-sheet-only-choose-size", [`${SHEET_SIZES_TEXT}`]);
 }
 
-/** The orientation that `value` names, or none; every export reads an orientation through it. */
+/**
+ * The orientation that `value` names, or none; every export reads an orientation through it.
+ * Refuses a name of no orientation, naming those there are (orientation).
+ */
 export function parseOrientation(value: string | undefined): CardOrientation | undefined {
   if (value === undefined) return undefined;
   const orientation = CARD_ORIENTATIONS.find((known) => known === value);

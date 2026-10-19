@@ -199,7 +199,7 @@ function basics({ mode }: HeirSheetFacts): HeirSheetSection[] {
     sections.push({
       heading: "Secret dates",
       paragraphs: [
-        // The example is the one of the README (How checksum-valid Seedshift works).
+        // The example is the public test phrase masked with the date of docs/CLI.md's examples.
         `The owner masked the words with secret dates, such as birthdays: their year, month and day shift the words along the BIP39 list (with 23-09-2026, "abandon" becomes "wool"). Use the owner's dates to undo the shift. ${defined(masking.wrongDateWarning)} The dates have nothing to do with today's date.`,
       ],
     });

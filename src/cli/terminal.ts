@@ -235,14 +235,7 @@ export function terminalPhrase(phrase: string, channel: Channel = "stdout"): boo
  * Codes written joined, such as Unicode codes, shown apart, separated by spaces and wrapped at
  * them, so that a person sees each code and which one to mark with ?; then `joined`, the text as
  * written, on one plain line, for copying (owner, 2026-10-13: both views, without numbers).
- * False without colour.
  */
-export function terminalCodes(codes: readonly string[], joined: string): boolean {
-  if (!terminalColor("stdout")) return false;
-  for (const line of joinedCodeLines(codes, joined)) console.log(line);
-  return true;
-}
-
 function joinedCodeLines(codes: readonly string[], joined: string): string[] {
   return [
     ...wrapText(codes.join(" ")).map((line) => terminalPaint("stdout", STYLE.strong, line)),
@@ -261,7 +254,7 @@ export function codeLines(text: string, format: EncodedFormat): string[] {
 
 /**
  * `text`, codes written in `format`, on standard output: on a terminal, where the form writes its
- * codes joined, apart beside the joined text (terminalCodes); as written otherwise,
+ * codes joined, apart beside the joined text (codeLines, joinedCodeLines); as written otherwise,
  * and always for a file or a pipe, which keep one plain line.
  */
 export function printCodes(text: string, format: EncodedFormat): void {
