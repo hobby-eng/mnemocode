@@ -223,7 +223,7 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
   },
   {
     name: "date of the Seedshift vector",
-    file: "dist/core/date-search-self-test.js",
+    file: "dist/core/self-test-vectors.js",
     from: 'const MASKED_DATE = "23-09-2026"',
     to: 'const MASKED_DATE = "24-09-2026"',
     module: "core/date-search-self-test.js",
