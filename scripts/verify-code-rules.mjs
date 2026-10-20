@@ -109,7 +109,8 @@ function repositoryFiles() {
 
 /**
  * The files Git lists for the repository, tracked and new; outside a Git work tree, such as a copy
- * of the scripts in a test, every file under the root.
+ * of the scripts in a test or a review snapshot, every file under the root that the root's
+ * .gitignore does not leave out (walk).
  */
 function listFiles() {
   if (isRepositoryTopLevel(root))
@@ -126,12 +127,52 @@ function listFiles() {
   return walk("");
 }
 
-/** Every file under `directory` of the root, by its path from the root. */
+/**
+ * The patterns of the root's .gitignore, read as Git reads the simple ones it holds: a line that
+ * starts with "#" is a comment, a "/" at the end matches folders alone, a pattern with another "/"
+ * is matched from the root and one without against the last name of a path, and "*" stands for any
+ * letters but "/".
+ */
+const IGNORED = (
+  existsSync(join(root, ".gitignore"))
+    ? readFileSync(join(root, ".gitignore"), "utf8").split("\n")
+    : []
+)
+  .map((line) => line.trim())
+  .filter((line) => line !== "" && !line.startsWith("#"))
+  .map((line) => {
+    const pattern = line.replace(/\/$/u, "");
+    const letters = pattern
+      .replace(/^\//u, "")
+      .split("*")
+      .map((part) => part.replace(/[.+?^${}()|[\]\\]/gu, "\\$&"));
+    return {
+      folders: line.endsWith("/"),
+      fromRoot: pattern.includes("/"),
+      matches: new RegExp(`^${letters.join("[^/]*")}$`, "u"),
+    };
+  });
+
+/** Whether the root's .gitignore leaves out `path`, a folder where `folder` is true. */
+function ignored(path, folder) {
+  return IGNORED.some(
+    (pattern) =>
+      (folder || !pattern.folders) &&
+      pattern.matches.test(pattern.fromRoot ? path : basename(path)),
+  );
+}
+
+/**
+ * Every file under `directory` of the root that the .gitignore does not leave out, by its path from
+ * the root. A link is left out: Git keeps where it points, which no rule here reads, and a link to
+ * a folder, such as a snapshot's node_modules, is no file.
+ */
 function walk(directory) {
   return readdirSync(join(root, directory), { withFileTypes: true }).flatMap((entry) => {
     const path = directory === "" ? entry.name : `${directory}/${entry.name}`;
-    if (entry.isDirectory()) return entry.name === ".git" ? [] : walk(path);
-    return [path];
+    if (entry.name === ".git" || ignored(path, entry.isDirectory())) return [];
+    if (entry.isDirectory()) return walk(path);
+    return entry.isFile() ? [path] : [];
   });
 }
 

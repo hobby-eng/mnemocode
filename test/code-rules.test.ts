@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -29,8 +29,14 @@ const GATE = [
 /** Whether Python 3 runs here, which the gate asks for its standard library (TOOL-03). */
 const PYTHON = spawnSync("python3", ["--version"]).status === 0;
 
-/** The gate run over BASE with `files` added (a null removes one): its exit code and its lines. */
-function codeRules(files: Readonly<Record<string, string | null>>): {
+/**
+ * The gate run over BASE with `files` added (a null removes one), after `prepare` has had the
+ * tree: its exit code and its lines.
+ */
+function codeRules(
+  files: Readonly<Record<string, string | null>>,
+  prepare?: (root: string) => void,
+): {
   readonly status: number | null;
   readonly problems: string;
 } {
@@ -43,6 +49,7 @@ function codeRules(files: Readonly<Record<string, string | null>>): {
       mkdirSync(dirname(join(root, path)), { recursive: true });
       writeFileSync(join(root, path), text);
     }
+    prepare?.(root);
     const run = spawnSync(process.execPath, [join(root, "scripts", "verify-code-rules.mjs")], {
       encoding: "utf8",
     });
@@ -52,9 +59,14 @@ function codeRules(files: Readonly<Record<string, string | null>>): {
   }
 }
 
-/** The problems that the gate prints for `files`, each as its path, line and rule. */
-function problemsOf(files: Readonly<Record<string, string | null>>): string[] {
-  return [...codeRules(files).problems.matchAll(/^(\S+:\d+ \S+) /gmu)].map((match) => match[1]!);
+/** The problems that the gate prints for `files` (codeRules), each as its path, line and rule. */
+function problemsOf(
+  files: Readonly<Record<string, string | null>>,
+  prepare?: (root: string) => void,
+): string[] {
+  return [...codeRules(files, prepare).problems.matchAll(/^(\S+:\d+ \S+) /gmu)].map(
+    (match) => match[1]!,
+  );
 }
 
 /** `count` copies of `line`, each with its line break. */
@@ -173,6 +185,29 @@ describe("the length of a file in lines of code (CORE-15)", () => {
     expect(rulesBroken({ "crate/src/lib.rs": early })).toEqual(["CORE-15"]);
     const middle = `#[cfg(test)]\nmod early {\n}\n${"fn f() {}\n".repeat(801)}`;
     expect(rulesBroken({ "crate/src/lib.rs": middle })).toEqual(["CORE-15"]);
+  });
+
+  it("leave out what the .gitignore leaves out and every link, outside a Git checkout", () => {
+    const long = "line\n".repeat(801);
+    const ignore = "# Built.\nnode_modules/\ndist/\nexport-*/\ndocs/*-evidence/\ndraft.md\n";
+    const files = {
+      ".gitignore": ignore,
+      "dist/cli.md": long,
+      "export-1/cards.md": long,
+      "docs/AUD-1-evidence/run.md": long,
+      "docs/a/draft.md": long,
+      "modules/a.md": long,
+    };
+    // A review snapshot links its node_modules to those of the checkout.
+    expect(
+      problemsOf(files, (root) => symlinkSync(join(root, "modules"), join(root, "node_modules"))),
+    ).toEqual(["modules/a.md:801 CORE-15"]);
+    expect(problemsOf({ ...files, ".gitignore": "dist\n" })).toEqual([
+      "docs/a/draft.md:801 CORE-15",
+      "docs/AUD-1-evidence/run.md:801 CORE-15",
+      "export-1/cards.md:801 CORE-15",
+      "modules/a.md:801 CORE-15",
+    ]);
   });
 
   it("leave out every test module of a Rust file, however it is written", () => {
