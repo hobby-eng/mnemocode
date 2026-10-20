@@ -29,7 +29,7 @@ const PLATFORM_SERVICES: Readonly<Record<keyof RenderPlatform, true>> = Object.f
   decodePng: true,
   encodePng: true,
   qrModules: true,
-});
+} satisfies Record<keyof RenderPlatform, true>);
 
 /**
  * What the card renderers draw with on one host. A class, because it owns the bundled artwork
@@ -54,6 +54,8 @@ export class CardRenderer implements CardDrawing {
    */
   constructor(platform: RenderPlatform) {
     for (const service of Object.keys(PLATFORM_SERVICES))
+      // `satisfies` made the compiler check that PLATFORM_SERVICES holds RenderPlatform's keys
+      // and no other.
       if (typeof platform?.[service as keyof RenderPlatform] !== "function")
         throw ERRORS.create("card-rendering-host-s-render-platform", []);
     // Each service is called on the platform, so that a host's methods keep their `this`, and

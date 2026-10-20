@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
+import { assertWalletEvidence, matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
 import {
   decodeIndexes,
   decodeIndexesLegacy,
@@ -72,20 +72,27 @@ describe("AUD-001 regression contracts", () => {
     ).toBe(true);
   });
 
+  const unsupportedFormat = { code: "core.encoded-form.unsupported-encoded-format" };
+
   it("AUD-001-API001: rejects an unknown input format at the JavaScript boundary", () => {
-    expect(() => parseInput(publicMnemonic, "misspelled" as EncodedFormat)).toThrow();
+    // A format that no type allows, fed on purpose as a JavaScript host could.
+    expect(() => parseInput(publicMnemonic, "misspelled" as EncodedFormat)).toThrow(
+      expect.objectContaining(unsupportedFormat),
+    );
   });
 
   it("AUD-001-API001: rejects an unknown output format at the JavaScript boundary", () => {
     expect(() =>
+      // A format that no type allows, fed on purpose as a JavaScript host could.
       formatEncoded(representMnemonic(publicMnemonic), "misspelled" as OutputFormat),
-    ).toThrow();
+    ).toThrow(expect.objectContaining(unsupportedFormat));
   });
 
   it("AUD-001-API001: cannot serialize an unreadable record format", () => {
     expect(() =>
+      // A format that no type allows, fed on purpose as a JavaScript host could.
       serializeRecord("direct", "misspelled" as EncodedFormat, publicMnemonic),
-    ).toThrow();
+    ).toThrow(expect.objectContaining({ code: "record.unsupported-format" }));
   });
 });
 
@@ -99,6 +106,16 @@ describe("AUD-004 regression contracts", () => {
         location: { network: "mainnet", account: 0, branch: 0, index: 0 },
       } as unknown as Parameters<typeof matchBitcoinEvidence>[1]),
     ).toThrow("Unsupported Bitcoin evidence kind.");
+  });
+
+  it("AUD-004-API001: rejects evidence that is no object as of an unknown kind", () => {
+    for (const evidence of ["abc", 7, true])
+      expect(() =>
+        // Evidence that no type allows, fed on purpose as a JavaScript host could.
+        assertWalletEvidence(evidence as never),
+      ).toThrow(
+        expect.objectContaining({ code: "core.wallet-evidence.unsupported-bitcoin-evidence-kind" }),
+      );
   });
 
   it("AUD-004-SEC001: bounds what is read, not what the file reports", async () => {
@@ -246,7 +263,7 @@ describe("AUD-004 regression contracts", () => {
       if (process.platform !== "win32") expect((await stat(target)).mode & 0o777).toBe(0o600);
       await expect(
         publishNewPrivateFile(target, new TextEncoder().encode("other\n")),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "EEXIST" });
       expect(await readFile(target, "utf8")).toBe("complete\n");
       // Nothing is left of the private staging folder.
       expect((await readdir(directory)).sort()).toEqual(["shares.txt"]);

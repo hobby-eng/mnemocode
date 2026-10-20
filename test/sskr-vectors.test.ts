@@ -47,12 +47,20 @@ describe("Published SSKR v1 vectors", () => {
               expect(await combineSskrShares([s[a]!, s[b]!, s[c]!, s[d]!, s[e]!])).toBe(original);
     expect(await combineSskrShares(vectors.official.bytewords)).toBe(original);
   });
+  /** The refusal of each invalid official quorum, by its indexes: too few shares, or one twice. */
+  const quorumRefusals: Readonly<Record<string, string>> = {
+    "[0,1]": "sskr.transport.not-enough-sskr-shares-meet-recorded-threshold",
+    "[0,1,3,4]": "sskr.transport.not-enough-sskr-shares-meet-recorded-threshold",
+    "[0,0,3,5,7]": "sskr.transport.member-given-twice",
+  };
   it.each(vectors.official.invalidQuorums)(
     "rejects an invalid official quorum %j",
     async (...indices: number[]) => {
+      const code = quorumRefusals[JSON.stringify(indices)];
+      expect(code, "a quorum of the vectors that this test names").toBeDefined();
       await expect(
         combineSskrShares(indices.map((i) => vectors.official.shares[i]!)),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code });
     },
   );
   it.each(vectors.deterministic as DeterministicVector[])(
@@ -96,8 +104,15 @@ describe("Published SSKR v1 vectors", () => {
   });
   it("rejects nonzero padding, unknown versions and invalid Bytewords; leaves out trailing colors", () => {
     const codes = vectors.official.firstShareColors as string[];
-    expect(() => colorsToShare([...codes.slice(0, -1), "#420001"].join(" "))).toThrow();
-    expect(() => colorsToShare(["#A21A55", ...codes.slice(1)].join(" "))).toThrow();
+    const refused = { code: "sskr.transport.mixed-share-refused" };
+    // The last color is the share's last byte, 67, and two bytes of padding.
+    expect(() => colorsToShare([...codes.slice(0, -1), "#670001"].join(" "))).toThrow(
+      expect.objectContaining(refused),
+    );
+    // The second color's middle byte is the version's, mixed: A1 becomes A0.
+    expect(() => colorsToShare([codes[0], "#42D0F0", ...codes.slice(2)].join(" "))).toThrow(
+      expect.objectContaining(refused),
+    );
     // A color after the share's own length, such as a decoy of its cards, belongs to no share.
     expect(colorsToShare([...codes, "#000000"].join(" "))).toBe(colorsToShare(codes.join(" ")));
     for (const input of ["ur:sskr/1-2/abcd", "ur:sskr/zz", "tuna unknown", "", "#A11A5"])
@@ -111,7 +126,9 @@ describe("Published SSKR v1 vectors", () => {
     const body = urToTransport(selected[0]!).slice(0, -CHECKSUM_BYTES);
     body[8]! ^= 1;
     selected[0] = transportToUr(recheck(body));
-    await expect(combineSskrShares(selected)).rejects.toThrow();
+    await expect(combineSskrShares(selected)).rejects.toMatchObject({
+      code: "sskr.complete-shares.no-secret",
+    });
   });
   it("supports the maximal 16-of-16 threshold and refuses 15 members", async () => {
     const engine = await sskrEngine();
@@ -139,7 +156,12 @@ describe("Published SSKR v1 vectors", () => {
         Uint8Array.of(2, MAX_SHARES + 1),
         new Uint8Array(SEED_BYTES),
       ),
-    ).toThrow();
+    ).toThrow(
+      expect.objectContaining({
+        code: "sskr.engine.group",
+        message: "SSKR member count is invalid",
+      }),
+    );
   });
   // G1-005: SEED_BYTES is a copy of the engine's seed length, kept in step here.
   it("takes a seed of SEED_BYTES and refuses one byte less or more", async () => {
@@ -158,17 +180,21 @@ describe("Published SSKR v1 vectors", () => {
   it("rejects metadata conflicts before native reconstruction", () => {
     const first = vectors.official.shares[0]!;
     const body = urToTransport(vectors.official.shares[1]!).slice(0, -CHECKSUM_BYTES);
-    for (const [offset, value] of [
-      [1, 0],
-      [3, 0],
-      [4, 2],
-    ]) {
+    const otherSet = "sskr.transport.shares-of-different-sets";
+    for (const [offset, value, code] of [
+      [1, 0, otherSet],
+      [3, 0, otherSet],
+      [4, 2, "sskr.transport.group-thresholds-conflict"],
+    ] as const) {
       const changed = body.slice();
-      changed[offset!] = value!;
+      changed[offset] = value;
       const altered = transportToUr(recheck(changed));
-      expect(() => validateShareSet([first, altered], false)).toThrow();
+      expect(() => validateShareSet([first, altered], false)).toThrow(
+        expect.objectContaining({ code }),
+      );
     }
-    expect(() => validateShareSet([])).toThrow();
-    expect(() => validateShareSet(Array(257).fill(first))).toThrow();
+    const count = { code: "sskr.transport.assert-share-count-refused" };
+    expect(() => validateShareSet([])).toThrow(expect.objectContaining(count));
+    expect(() => validateShareSet(Array(257).fill(first))).toThrow(expect.objectContaining(count));
   });
 });

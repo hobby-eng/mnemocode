@@ -24,8 +24,8 @@ import {
   PDFOperatorNames as Op,
   PDFRawStream,
   decodePDFRawStream,
+  type PDFObject,
   type PDFPage,
-  type PDFRef,
 } from "pdf-lib";
 import { ErrorCatalog } from "../core/error-catalog.js";
 import { wipedAfter } from "../core/bits.js";
@@ -236,8 +236,13 @@ class LetterFont {
     let letter = this.#letters.get(glyph);
     if (letter === undefined) {
       const source = this.#program.getGlyph(glyph);
-      const path = source.path as unknown as OutlinePath;
-      letter = { advance: source.advanceWidth, outline: path.commands.map(outlineSegment) };
+      const { path } = source;
+      if (!Array.isArray(Reflect.get(path, "commands")))
+        throw unsupported("a letter has no outline commands");
+      // Checked above that fontkit's Path has its list of commands, which its types leave out
+      // (OutlinePath); outlineSegment refuses a command that it does not know.
+      const { commands } = path as unknown as OutlinePath;
+      letter = { advance: source.advanceWidth, outline: commands.map(outlineSegment) };
       this.#letters.set(glyph, letter);
     }
     return letter;
@@ -356,7 +361,7 @@ class DocumentObjects {
     this.#document = document;
   }
 
-  font(reference: PDFRef | PDFDict): LetterFont {
+  font(reference: PDFObject): LetterFont {
     const key = reference.toString();
     let font = this.#fonts.get(key);
     if (font === undefined) {
@@ -366,7 +371,7 @@ class DocumentObjects {
     return font;
   }
 
-  image(reference: PDFRef | PDFDict): CardImage {
+  image(reference: PDFObject): CardImage {
     const key = reference.toString();
     let image = this.#images.get(key);
     if (image === undefined) {
@@ -392,16 +397,17 @@ class DocumentObjects {
     this.#fonts.clear();
   }
 
-  graphicsState(reference: PDFRef | PDFDict): GraphicsSettings {
+  graphicsState(reference: PDFObject): GraphicsSettings {
     return readGraphicsState(this.#document.context.lookup(reference, PDFDict));
   }
 
   /** The commands of a page's content, from one stream or several (ISO 32000-1, 7.7.3.3). */
-  content(contents: unknown): string {
-    const references = contents instanceof PDFArray ? contents.asArray() : [contents];
+  content(contents: PDFObject | undefined): string {
+    const references: readonly (PDFObject | undefined)[] =
+      contents instanceof PDFArray ? contents.asArray() : [contents];
     return references
       .map((reference) => {
-        const stream = this.#document.context.lookup(reference as PDFRef);
+        const stream = this.#document.context.lookup(reference);
         if (!(stream instanceof PDFRawStream)) throw unsupported("its page content cannot be read");
         // The streams of pdf-lib contain commands, numbers and names: one byte is one character.
         return wipedAfter(decoded(stream, "its page content"), (bytes) =>
@@ -434,12 +440,12 @@ class PageResources {
     return this.#objects.graphicsState(this.#named("ExtGState", name));
   }
 
-  #named(kind: string, name = ""): PDFRef | PDFDict {
+  #named(kind: string, name = ""): PDFObject {
     const reference = name.startsWith("/")
       ? this.#resources.lookupMaybe(PDFName.of(kind), PDFDict)?.get(PDFName.of(name.slice(1)))
       : undefined;
     if (reference === undefined) throw unsupported(`it names the unknown resource ${name}`);
-    return reference as PDFRef | PDFDict;
+    return reference;
   }
 }
 

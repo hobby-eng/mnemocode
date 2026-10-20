@@ -75,7 +75,11 @@ function operators(pdf: PDFDocument) {
 describe("material selection cards", () => {
   it("refuses a reference that is not six hexadecimal digits", () => {
     for (const invalid of ["123", "#1234567", "oops!!"])
-      expect(() => chooseMaterialSamples("vehicle", [invalid])).toThrow();
+      expect(() => chooseMaterialSamples("vehicle", [invalid])).toThrow(
+        expect.objectContaining({
+          code: "export.material-artwork.material-reference-contain-exactly-six-hexadecimal-digits",
+        }),
+      );
   });
 
   it.each(styles)("offers %s samples that all look different from each other", (style) => {

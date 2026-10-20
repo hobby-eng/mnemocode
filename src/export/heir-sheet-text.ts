@@ -354,8 +354,8 @@ export class HeirInstructions {
       ? undefined
       : `the secret ${dates === 1 ? "date" : "dates"} as day-month-year (23-09-2026)`;
     const route = this.#route;
-    // assertFacts refused shares of the Original Seedshift.
     const open =
+      // assertFacts checked that shares have a mode that makes shares (Masking.assertSplitMode).
       backup.kind === "shares"
         ? route.restore(mode as HeirShareMode, backup.threshold, typedDates)
         : route.decode(mode, backup.words, typedDates);

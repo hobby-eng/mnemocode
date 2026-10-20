@@ -425,8 +425,13 @@ export function isScannedEvidence(
   return isScannedKind(evidence.kind);
 }
 
+/** The kinds whose key sits at a place of an account: every kind but a master key's. */
+export type PlacedKind = {
+  [K in keyof typeof EVIDENCE_LEVELS]: (typeof EVIDENCE_LEVELS)[K] extends "master" ? never : K;
+}[keyof typeof EVIDENCE_LEVELS];
+
 /** Whether evidence of `kind` sits at a place of an account; a master key has none. */
-export function isPlacedKind(kind: string): boolean {
+export function isPlacedKind(kind: string): kind is PlacedKind {
   const level = evidenceLevel(kind);
   return level !== undefined && level !== "master";
 }
@@ -451,10 +456,13 @@ export const EVIDENCE_MATCHED_BY = Object.freeze({
  */
 function evidenceOf(evidence: WalletEvidence, coins: CoinList): Evidence {
   // A JavaScript caller or parsed configuration can pass any kind; an unknown one is an error, not
-  // a comparison that failed, which would read as evidence against the wallet.
+  // a comparison that failed, which would read as evidence against the wallet. Evidence that is no
+  // object, such as a string, has no kind either and is refused below; `in` would throw a TypeError.
   if (
     !isScannedKind(evidence.kind) &&
-    (evidence as { addresses?: unknown }).addresses !== undefined
+    typeof evidence === "object" &&
+    "addresses" in evidence &&
+    evidence.addresses !== undefined
   )
     throw ERRORS.create("only-address-address-another-coin-compressed-public-key", []);
   switch (evidence.kind) {

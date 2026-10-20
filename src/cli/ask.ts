@@ -382,7 +382,7 @@ export async function askOrCancel<T>(
           ...(options.explanation === undefined ? {} : { explanation: options.explanation }),
         });
   if (chosen === STOPPED) return CANCELLED;
-  return chosen as T | undefined | Cancelled;
+  return chosen;
 }
 
 /**

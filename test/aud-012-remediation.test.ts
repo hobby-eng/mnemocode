@@ -164,8 +164,18 @@ describe("AUD-012-FUN003: a tagged UR becomes Bytewords with one tag", () => {
 
 describe("AUD-012-API001: the places of a search are checked before they are counted", () => {
   it("refuses an empty, sparse or foreign place, and counts valid ones in order", () => {
-    for (const places of [[[]], [[1], []], [holes(1)], [[2048]], [[-1]], [[0.5]]])
-      expect(() => placeCombinations(places as number[][])).toThrow();
+    const empty = "core.candidates.every-place-search-at-least-one-word";
+    const index = "core.bip39-sizes.assert-word-indexes-refused";
+    const refused: [number[][], string][] = [
+      [[[]], empty],
+      [[[1], []], empty],
+      [[holes(1)], index],
+      [[[2048]], index],
+      [[[-1]], index],
+      [[[0.5]], index],
+    ];
+    for (const [places, code] of refused)
+      expect(() => placeCombinations(places)).toThrow(expect.objectContaining({ code }));
     const seen: number[][] = [];
     for (const words of placeCombinations([
       [1, 2],
@@ -618,8 +628,9 @@ describe("AUD-012-ARC004, ARC005: one hexadecimal form, one way to name a refuse
     })()!;
     expect(typed.message).toMatch(/^Date 2: /u);
     expect(structured.message).toBe(typed.message);
-    expect(structured.cause).toBeInstanceOf(Error);
-    expect(typed.cause).toBeInstanceOf(Error);
+    const dayRefused = { code: "core.dates.day-outside-selected-calendar-month" };
+    expect(structured.cause).toMatchObject(dayRefused);
+    expect(typed.cause).toMatchObject(dayRefused);
     // What is thrown that is no Error passes through unchanged.
     const throwing = new Proxy(
       {},

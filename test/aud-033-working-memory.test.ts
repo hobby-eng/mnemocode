@@ -104,7 +104,9 @@ describe("private artwork PNG ownership at the real embedding seam", () => {
         { ...backupCardContent(backup), pageSize: "business" },
         0,
       );
-      if (outcome === "rejected") await expect(pending).rejects.toBeDefined();
+      // pdf-lib's PNG reader refuses the three bytes with a string of its own.
+      if (outcome === "rejected")
+        await expect(pending).rejects.toBe("The input is not a PNG file!");
       else {
         const bytes = await pending;
         try {

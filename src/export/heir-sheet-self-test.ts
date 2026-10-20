@@ -145,6 +145,7 @@ function checkHeirTextStartup(): void {
     () =>
       instructions.text({
         ...COLORS,
+        // A count of words that no phrase has, fed on purpose, as a JavaScript host could pass it.
         backup: { kind: "encoded", format: "colors", words: 13 as Bip39WordCount },
       }),
     /Expected 12, 15, 18, 21 or 24/u,

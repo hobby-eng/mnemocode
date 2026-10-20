@@ -119,7 +119,9 @@ describe("AUD-028 text admission", () => {
       );
       expect(() =>
         resolveCardPresentation(() => 0, { slogan: `Public${separator}Example` }),
-      ).toThrow();
+      ).toThrow(
+        expect.objectContaining({ code: "export.card-settings.card-non-empty-text-on-one-line" }),
+      );
     },
   );
 

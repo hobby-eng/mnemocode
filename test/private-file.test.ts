@@ -54,7 +54,7 @@ describe("Private export publication", () => {
       await writeFile(join(destination, "marker"), "Keep this content.");
       await expect(
         publishNewPrivateFile(destination, Buffer.from("Public test output.")),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "EEXIST" });
       expect(await readFile(join(destination, "marker"), "utf8")).toBe("Keep this content.");
       expect(await readdir(directory)).toHaveLength(1);
     } finally {

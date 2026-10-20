@@ -184,6 +184,7 @@ class EarlierShifts {
       stands.push({ date: { year, month, day }, key });
     };
     for (const key of remaining.keys()) {
+      // Every key is shiftKeyOf's: a year, a month and a day, each a whole number, joined by "-".
       const [year, month, day] = key.split("-").map(Number) as [number, number, number];
       for (let other = year; other <= LAST_YEAR; other += BIP39_DICTIONARY_SIZE)
         add(other, month, day, key);

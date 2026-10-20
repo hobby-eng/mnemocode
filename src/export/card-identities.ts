@@ -1,10 +1,15 @@
 import { pickWith, type UniformChoice } from "./platform.js";
 import { validateProfile, type BusinessStyle, type CardProfile } from "./card-settings.js";
+import { BUSINESS_STYLES } from "./template-catalog.js";
+import { isOneOf } from "../core/one-of.js";
+
+/** The sectors of the invented employers, in the order that a random choice takes them. */
+const COMPANY_SECTORS = ["it", "architecture", "property", "consulting"] as const;
 
 /**
  * The sector of the invented employer on business cards, which the design suits (sectorForStyle).
  */
-export type CompanySector = "it" | "architecture" | "property" | "consulting";
+export type CompanySector = (typeof COMPANY_SECTORS)[number];
 
 /** Employer names are separate from the print studios used on collection sheets. */
 export const employers: Record<CompanySector, readonly string[]> = {
@@ -131,8 +136,6 @@ export const personNames = [
   "Amina Diallo",
 ] as const;
 
-const sectors = Object.keys(employers) as CompanySector[];
-
 /** The sector of the employer that suits a business style; the other styles take any. */
 const STYLE_SECTORS: Readonly<Partial<Record<BusinessStyle, CompanySector>>> = Object.freeze({
   architect: "architecture",
@@ -145,20 +148,20 @@ const STYLE_SECTORS: Readonly<Partial<Record<BusinessStyle, CompanySector>>> = O
  * style that suits any: it follows the style of a design, never its place in a list.
  */
 export function sectorForStyle(style: string | undefined): CompanySector | undefined {
-  return style !== undefined && Object.hasOwn(STYLE_SECTORS, style)
-    ? STYLE_SECTORS[style as BusinessStyle]
-    : undefined;
+  return isOneOf(BUSINESS_STYLES, style) ? STYLE_SECTORS[style] : undefined;
 }
 
 function knownSector(profile: CardProfile): CompanySector | undefined {
   const company = profile.company?.toLowerCase();
-  const byCompany = sectors.find((sector) =>
+  const byCompany = COMPANY_SECTORS.find((sector) =>
     employers[sector].some((name) => name.toLowerCase() === company),
   );
   if (byCompany) return byCompany;
   const role = profile.role?.toLowerCase();
   if (role === "senior devops" || role === "devops") return "it";
-  return sectors.find((sector) => sectorRoles[sector].some((name) => name.toLowerCase() === role));
+  return COMPANY_SECTORS.find((sector) =>
+    sectorRoles[sector].some((name) => name.toLowerCase() === role),
+  );
 }
 
 /**
@@ -213,7 +216,7 @@ export function createCardIdentity(
   sectorHint?: CompanySector,
 ): Required<CardProfile> {
   const profile = validateProfile(supplied);
-  const sector = knownSector(profile) ?? sectorHint ?? pickWith(sectors, choose);
+  const sector = knownSector(profile) ?? sectorHint ?? pickWith(COMPANY_SECTORS, choose);
   const company = profile.company ?? pickWith(employers[sector], choose);
   const domain = contactDomain(company);
   return {

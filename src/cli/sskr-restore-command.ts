@@ -721,11 +721,10 @@ function walletFact(phrase: RestoredPhrase, place: RestoredPlace): string | unde
  */
 function showRestoredParts(phrase: RestoredPhrase, mode: SplitMode, place: RestoredPlace): void {
   const wallet = walletFact(phrase, place);
-  terminalResultHeader(`Restored from shares${numberedOf(place)}`, [
-    ["Mode", mode],
-    ...(phrase.dates === undefined ? [] : ([["Dates", phrase.dates]] as [string, string][])),
-    ...(wallet === undefined ? [] : ([["Wallet", wallet]] as [string, string][])),
-  ]);
+  const facts: [string, string][] = [["Mode", mode]];
+  if (phrase.dates !== undefined) facts.push(["Dates", phrase.dates]);
+  if (wallet !== undefined) facts.push(["Wallet", wallet]);
+  terminalResultHeader(`Restored from shares${numberedOf(place)}`, facts);
   reportSet(phrase, place, true);
   const backup = restoredBackup(phrase, mode);
   if (backup !== undefined) {

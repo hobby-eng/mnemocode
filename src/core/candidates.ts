@@ -149,11 +149,12 @@ export function wordPlaceOf(written: string, position: number): WordPlace {
       throw ERRORS.create("no-bip39-word-starts-letters-at", [`${where}`]);
     return indexes;
   }
-  const words = written.split("|");
-  const indexes = words.map((word) => ENGLISH_INDEX.get(word));
-  if (indexes.some((index) => index === undefined))
-    throw ERRORS.create("unknown-english-bip39-word-at", [`${where}`]);
-  return [...new Set(indexes as number[])].sort((a, b) => a - b);
+  const indexes = written.split("|").map((word) => {
+    const found = ENGLISH_INDEX.get(word);
+    if (found === undefined) throw ERRORS.create("unknown-english-bip39-word-at", [`${where}`]);
+    return found;
+  });
+  return [...new Set(indexes)].sort((a, b) => a - b);
 }
 
 /** Reads a phrase with unknown words at known places; at least one place must be unknown. */
@@ -203,10 +204,7 @@ function isPlace(place: unknown): boolean {
     Array.isArray(place) &&
     place.length > 0 &&
     // Ascending and distinct, so that the order of docs/CANDIDATES.md holds.
-    everyElement(
-      place,
-      (index, at) => isWordIndex(index) && (at === 0 || (index as number) > place[at - 1]),
-    )
+    everyElement(place, (index, at) => isWordIndex(index) && (at === 0 || index > place[at - 1]))
   );
 }
 

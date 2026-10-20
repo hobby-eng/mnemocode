@@ -329,7 +329,10 @@ describe("AUD-011-ARC018, ARC037: one list of forms and modes, and their numbers
       ENCODED_FORMATS,
     );
     expect(inputFormat("colors-unicode")).toBe("colors-unicode");
-    for (const wrong of ["0", "6", "01", "json"]) expect(() => inputFormat(wrong)).toThrow();
+    for (const wrong of ["0", "6", "01", "json"])
+      expect(() => inputFormat(wrong)).toThrow(
+        expect.objectContaining({ code: "cli.input.representation-format-one-use-number-name" }),
+      );
   });
 
   it("names each form in the help by the number --format takes", () => {
@@ -591,7 +594,10 @@ describe("AUD-011-ARC073, ARC074, ARC079, ARC085, ARC086, ARC087: card rules wit
 
   it("picks with the choice given and refuses a choice out of range", () => {
     expect(pickWith(["a", "b"], () => 1)).toBe("b");
-    for (const wrong of [-1, 2, 0.5]) expect(() => pickWith(["a", "b"], () => wrong)).toThrow();
+    for (const wrong of [-1, 2, 0.5])
+      expect(() => pickWith(["a", "b"], () => wrong)).toThrow(
+        expect.objectContaining({ code: "export.platform.checked-choice-refused" }),
+      );
   });
 
   it("numbers elements in two digits and takes the QR code only when asked with true", () => {
@@ -714,9 +720,13 @@ describe("AUD-011-ARC049, ARC054: one rule for a whole number in a range, whatev
       const option = () => integerOption({ index: text }, "index", WORD_NUMBER_RANGE);
       const typed = () => typedWholeNumber(text, WORD_NUMBER_RANGE, refuse);
       const row = () => mappingRow(number);
-      for (const read of [option, typed, row])
+      for (const [read, code] of [
+        [option, "cli.arguments.base-10-integer-from"],
+        [typed, "core.typed-number.typed-whole-number-refused"],
+        [row, "core.words.wordlist-index-from"],
+      ] as const)
         if (accepted) expect(read()).not.toBe(undefined);
-        else expect(read).toThrow();
+        else expect(read).toThrow(expect.objectContaining({ code }));
     }
     expect(mappingRow(2048).english).toBe("zoo");
   });

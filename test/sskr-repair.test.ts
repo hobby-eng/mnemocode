@@ -293,7 +293,9 @@ describe("Unreadable digits inside a color or a Unicode code", () => {
       [4, 7, 9, 12, 15].map((place) => codes[place]),
     );
     // Five whole codes are more than six marks' worth of checks alone can settle without variants.
-    expect(() => readRepairableShare(wholeMarks("unicode", [4, 7, 9, 12, 15]))).toThrow();
+    expect(() => readRepairableShare(wholeMarks("unicode", [4, 7, 9, 12, 15]))).toThrow(
+      expect.objectContaining({ code: "sskr.repair.too-many-marks-for-form" }),
+    );
   });
 
   it("reads a lone ? joined to a code as a whole element, as before digit marks", () => {

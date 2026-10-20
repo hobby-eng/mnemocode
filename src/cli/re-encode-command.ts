@@ -92,6 +92,8 @@ interface SplitOptions {
  * --recognised, which answers the confirmation, to neither.
  */
 export function splitOptions(args: ParsedArguments): SplitOptions {
+  // Without a prototype, as parseArguments makes them (AUD-014-API010). An object without keys is
+  // a ParsedArguments, which Object.create cannot type.
   const old = Object.create(null) as ParsedArguments;
   const fresh = Object.create(null) as ParsedArguments;
   for (const [key, entry] of Object.entries(args)) {

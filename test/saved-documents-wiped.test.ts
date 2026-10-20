@@ -71,7 +71,7 @@ describe("a saved QR image of a backup", () => {
     const path = join(folder, "taken.png");
     await exportQrPayload("public payload", path);
     captured.published.length = 0;
-    await expect(exportQrPayload("public payload", path)).rejects.toThrow();
+    await expect(exportQrPayload("public payload", path)).rejects.toMatchObject({ code: "EEXIST" });
     expect(captured.published).toHaveLength(1);
     expect(wiped(captured.published[0]!)).toBe(true);
   });

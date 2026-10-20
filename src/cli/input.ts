@@ -238,9 +238,9 @@ export function transformMode(arguments_: ParsedArguments, embedded?: MaskingMod
   if (explicit !== undefined && !Masking.isMode(explicit)) {
     throw ERRORS.create("transformation-mode", [`${listInWords(MASKING_MODES, "or")}`]);
   }
-  const conflict = modeConflictOf(embedded, explicit as MaskingMode | undefined);
+  const conflict = modeConflictOf(embedded, explicit);
   if (conflict !== undefined) throw ERRORS.create("transform-mode-refused", [conflict]);
-  if (explicit !== undefined) return explicit as MaskingMode;
+  if (explicit !== undefined) return explicit;
   if (embedded !== undefined) return embedded;
   return values(arguments_, "date").length > 0 || value(arguments_, "dates-file") !== undefined
     ? "seedshift"

@@ -87,7 +87,9 @@ describe("a staging copy left after a complete save", () => {
     await writeSaved(() => publishNewPrivateFile(path, BYTES));
     expect(state.notices).toEqual([]);
     // The name is taken now: that is a failed save, which writeSaved passes on.
-    await expect(writeSaved(() => publishNewPrivateFile(path, BYTES))).rejects.toThrow();
+    await expect(writeSaved(() => publishNewPrivateFile(path, BYTES))).rejects.toMatchObject({
+      code: "EEXIST",
+    });
     expect(state.notices).toEqual([]);
   });
 });
@@ -114,7 +116,7 @@ describe("a QR code saved beside its sheet, whose staging copy is left (AUD-015-
 
   it("still fails a QR code that could not be written at all", async () => {
     const sheet = join(await newPath(), "missing-folder", "cards.pdf");
-    await expect(saveQrBeside(PAYLOAD, sheet)).rejects.toThrow();
+    await expect(saveQrBeside(PAYLOAD, sheet)).rejects.toMatchObject({ code: "ENOENT" });
     expect(state.notices).toEqual([]);
   });
 });

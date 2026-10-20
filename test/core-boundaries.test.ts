@@ -72,16 +72,22 @@ describe("Core independent entropy and calendar boundaries", () => {
       }
     },
   );
+  const DAY = "core.dates.day-outside-selected-calendar-month";
+  const MONTH = "core.dates.assert-calendar-date-refused-2";
+  const YEAR = "core.dates.assert-calendar-date-refused";
   it.each([
-    "29-02-1900",
-    "29-02-2100",
-    "31-04-2026",
-    "00-01-2026",
-    "01-00-2026",
-    "01-13-2026",
-    "01-01-0000",
-    "01-01-10000",
-  ])("rejects impossible date %s", (value) => expect(() => parseDate(value)).toThrow());
+    ["29-02-1900", DAY],
+    ["29-02-2100", DAY],
+    ["31-04-2026", DAY],
+    ["00-01-2026", DAY],
+    ["01-00-2026", MONTH],
+    ["01-13-2026", MONTH],
+    ["01-01-0000", YEAR],
+    // A fifth digit of the year is no DD-MM-YYYY.
+    ["01-01-10000", "core.dates.use-four-digit-year-example-23-09-2026"],
+  ])("rejects impossible date %s", (value, code) =>
+    expect(() => parseDate(value)).toThrow(expect.objectContaining({ code })),
+  );
   it.each(["29-02-2000", "29-02-2400", "01-01-0001", "31-12-9999"])(
     "retains valid boundary %s",
     (value) => expect(formatDate(parseDate(value))).toBe(value),
@@ -98,16 +104,18 @@ describe("Core independent entropy and calendar boundaries", () => {
       expect(deriveShifts(dates, count)).toHaveLength(count);
       expect(JSON.stringify(dates)).toBe(snapshot);
       expect(() => deriveShifts([...dates, dates[0]!], count)).toThrow(/at most/u);
-      expect(() => deriveShifts([], count)).toThrow();
+      expect(() => deriveShifts([], count)).toThrow(
+        expect.objectContaining({ code: "core.dates.no-date" }),
+      );
     },
   );
   it.each([
-    { year: NaN, month: 1, day: 1 },
-    { year: 2026.5, month: 1, day: 1 },
-    { year: 2026, month: 2, day: 29 },
-    { year: 2026, month: 1.5, day: 1 },
-  ])("validates structured API dates %j", (date) =>
-    expect(() => deriveShifts([date], 12)).toThrow(),
+    [{ year: NaN, month: 1, day: 1 }, YEAR],
+    [{ year: 2026.5, month: 1, day: 1 }, YEAR],
+    [{ year: 2026, month: 2, day: 29 }, DAY],
+    [{ year: 2026, month: 1.5, day: 1 }, MONTH],
+  ])("validates structured API dates %j", (date, code) =>
+    expect(() => deriveShifts([date], 12)).toThrow(expect.objectContaining({ code })),
   );
   it("pins both word lists and the known zero-entropy master fingerprint", () => {
     for (const [list, metadata] of [

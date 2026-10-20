@@ -70,11 +70,9 @@ export { FINGERPRINT_WARNING, fingerprintMatch, parseMasterFingerprint };
 
 /** Whether the host's PBKDF2 answered with a promise rather than with the bytes. */
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    typeof (value as { then?: unknown }).then === "function"
-  );
+  if ((typeof value !== "object" && typeof value !== "function") || value === null) return false;
+  const then: unknown = Reflect.get(value, "then");
+  return typeof then === "function";
 }
 
 /**

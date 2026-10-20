@@ -100,6 +100,7 @@ export function checkCandidateListStartup(): void {
   ] as const) {
     Object.setPrototypeOf(wider, prototype);
     expectRefused(
+      // The check feeds a wider array on purpose, as a JavaScript host could pass one.
       () => encodeCandidateList({ records: [{ entropy: wider as unknown as Uint8Array }] }),
       /one length/u,
       label,

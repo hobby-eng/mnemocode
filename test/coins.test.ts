@@ -337,28 +337,46 @@ describe("the comparison", () => {
     }, COINS);
     const first = { account: 0, branch: 0, index: 0 };
     const address = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
-    const refused: readonly [WalletEvidence, string][] = [
-      [coinAddress("solana", address, first), "Unknown coin; the coins are bitcoin,"],
+    // Each refusal's code: the kind of an AddressRefusalError, or a coded error's own.
+    const place = "core.coins.coin.assert-address-location-refused";
+    const refused: readonly [WalletEvidence, string, string][] = [
+      [
+        coinAddress("solana", address, first),
+        "Unknown coin; the coins are bitcoin,",
+        "core.coins.coin.unknown-coin-coins",
+      ],
       [
         coinAddress("litecoin", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA", first),
         "it is not an address of Litecoin",
+        "other",
       ],
-      [coinAddress("bitcoin", `${address.slice(0, -1)}v`, first), "checksum or format"],
-      [coinAddress("bitcoin", address, { ...first, index: -1 }), "index must be an integer"],
+      [
+        coinAddress("bitcoin", `${address.slice(0, -1)}v`, first),
+        "checksum or format",
+        "unreadable",
+      ],
+      [coinAddress("bitcoin", address, { ...first, index: -1 }), "index must be an integer", place],
       [
         coinAddress("dash", "XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf5", { ...first, branch: 2 ** 31 }),
         "branch must be an integer from 0 through 2147483647.",
+        place,
       ],
       [
         coinAddress("ethereum", ADDRESSES[16]![3], { ...first, account: 1.5 }),
         "account must be an integer from 0 through 2147483647.",
+        place,
       ],
-      [coinAddress("ethereum", address, first), "not an address of Ethereum"],
+      [coinAddress("ethereum", address, first), "not an address of Ethereum", "other"],
     ];
-    for (const [evidence, reason] of refused) {
+    for (const [evidence, reason, code] of refused) {
       expect(refusal(() => recording.match(ABANDON, evidence))).toContain(reason);
-      expect(() => assertWalletEvidence(evidence, COINS)).toThrow();
-      expect(() => assertBitcoinEvidence(evidence)).toThrow();
+      for (const check of [
+        () => assertWalletEvidence(evidence, COINS),
+        () => assertBitcoinEvidence(evidence),
+      ]) {
+        expect(check).toThrow(expect.objectContaining({ code }));
+        expect(check).toThrow(reason);
+      }
     }
     expect(calls).toEqual([]);
   });
@@ -533,7 +551,9 @@ describe("the case of an address", () => {
       const upper = lower.toUpperCase();
       expect(parseCoinAddress(coin, upper)).toBe(lower);
       const mixed = upper.slice(0, 14) + lower.slice(14);
-      expect(() => parseCoinAddress(coin, mixed), mixed).toThrow();
+      expect(() => parseCoinAddress(coin, mixed), mixed).toThrow(
+        expect.objectContaining({ name: "AddressRefusalError", code: "unreadable" }),
+      );
     }
   });
 

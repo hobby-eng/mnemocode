@@ -179,14 +179,16 @@ export const QR_BESIDE_CHECK: SelfTestCheck = {
 };
 
 export async function runSelfTest(): Promise<void> {
+  // Unknown until the self-test checks its shape (publicVectorsOf in core/self-test.ts).
+  const publicVectors: unknown = JSON.parse(
+    new TextDecoder().decode(await readBundledFile(PUBLIC_VECTORS_FILE)),
+  );
   // The library's SSKR check goes through nodeSharePlatform, whose engine is checked against
   // sskr-wasm/integrity.json as it loads (runtime.ts): hence "pinned WASM" in its line.
   const report = await new MnemoCodeSelfTest({
     fingerprint: (mnemonic) => masterFingerprint(mnemonic),
     pbkdf2: nodePbkdf2HmacSha512,
-    publicVectors: JSON.parse(
-      new TextDecoder().decode(await readBundledFile(PUBLIC_VECTORS_FILE)),
-    ) as unknown,
+    publicVectors,
     sharePlatform: nodeSharePlatform,
     shareLibrary: "pinned WASM",
     features: FEATURES,

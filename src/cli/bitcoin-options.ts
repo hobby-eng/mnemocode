@@ -203,16 +203,12 @@ export function walletEvidence(arguments_: ParsedArguments): WalletEvidence | un
     const placing = ACCOUNT_PLACE_OPTIONS.find((key) => value(arguments_, key) !== undefined);
     if (placing !== undefined)
       throw ERRORS.create("places-address-key-wif-master-key-no-place", [`${placing}`]);
-    return { kind, value: value_, network } as WalletEvidence;
+    return { kind, value: value_, network };
   }
   const location: DerivationLocation = { network, ...place };
-  return {
-    kind,
-    value: value_,
-    profiles: bitcoinProfilesFrom(arguments_),
-    location,
-    ...(isScannedKind(kind) ? { addresses } : {}),
-  } as WalletEvidence;
+  const profiles = bitcoinProfilesFrom(arguments_);
+  if (isScannedKind(kind)) return { kind, value: value_, profiles, location, addresses };
+  return { kind, value: value_, profiles, location };
 }
 
 export function bip39Passphrase(arguments_: ParsedArguments): string {

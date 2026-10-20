@@ -142,7 +142,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         expect(seen.notices).toContain(`Saved MnemoCode record: ${other}`);
         // The quotes of a dragged file name are not part of it.
         expect(await readFile(other, "utf8")).toBe(`MNC1:seedshift:indexes:${MASKED}\n`);
-        await expect(readFile(record, "utf8")).rejects.toThrow();
+        await expect(readFile(record, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
       } finally {
         await rm(directory, { recursive: true, force: true });
       }

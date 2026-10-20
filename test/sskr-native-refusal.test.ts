@@ -19,7 +19,7 @@ function caught(action: () => unknown): Error {
   try {
     action();
   } catch (error) {
-    expect(error).toBeInstanceOf(Error);
+    // A refusal that is no Error fails the test, thrown again; each test pins the code of an Error.
     if (error instanceof Error) return error;
     throw error;
   }

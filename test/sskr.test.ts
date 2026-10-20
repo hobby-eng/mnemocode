@@ -52,13 +52,23 @@ describe("Standalone SSKR", () => {
     const a = await splitSskrMnemonic(source, 2, 3);
     const b = await splitSskrMnemonic(source, 2, 3);
     await expect(combineSskrShares([a[0]!, a[0]!])).rejects.toThrow(/more than once/u);
-    await expect(combineSskrShares([a[0]!, b[1]!])).rejects.toThrow();
+    await expect(combineSskrShares([a[0]!, b[1]!])).rejects.toMatchObject({
+      code: "sskr.transport.shares-of-different-sets",
+    });
     const colors = shareToColors(a[0]!);
-    expect(() => colorsToShare(colors.slice(1).join(" "))).toThrow();
-    expect(() => colorsToShare([...colors].reverse().join(" "))).toThrow();
+    const notRecord = { code: "sskr.transport.mixed-share-refused" };
+    // Truncated: the last color left out.
+    expect(() => colorsToShare(colors.slice(0, -1).join(" "))).toThrow(
+      expect.objectContaining(notRecord),
+    );
+    expect(() => colorsToShare([...colors].reverse().join(" "))).toThrow(
+      expect.objectContaining(notRecord),
+    );
     const changed = [...colors];
     changed[2] = changed[2] === "#FFFFFF" ? "#000000" : "#FFFFFF";
-    expect(() => colorsToShare(changed.join(" "))).toThrow();
+    expect(() => colorsToShare(changed.join(" "))).toThrow(
+      expect.objectContaining({ code: "sskr.transport.sskr-transport-checksum-does-not-match" }),
+    );
     expect(() => validateShareSet(a.slice(0, 1), false)).not.toThrow();
   });
 

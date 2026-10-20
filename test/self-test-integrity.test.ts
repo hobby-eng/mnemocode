@@ -475,7 +475,8 @@ describe("Each self-test check can fail", () => {
       const result = await runCheck(directory, "core/word-hints.js", "Promise.resolve()");
       expect(result.code).toBe(97);
       expect(result.stderr).toContain("The declared virtual-build fault was not reached.");
-      expect(() => assertCatalogueRefusal(result)).toThrow();
+      // The helper's first expectation refuses the exit code of the unreached fault.
+      expect(() => assertCatalogueRefusal(result)).toThrow("expected 97 to be 1");
     });
   });
 

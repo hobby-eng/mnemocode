@@ -259,6 +259,7 @@ export class Masking {
 
   /** The one value of each mode. */
   static readonly #values: Readonly<Record<MaskingMode, Masking>> = Object.freeze(
+    // MODES is MASKING_MODES: the map gives an entry for every mode, so the record has every key.
     Object.fromEntries(MODES.map((mode) => [mode, new Masking(mode)])) as Record<
       MaskingMode,
       Masking

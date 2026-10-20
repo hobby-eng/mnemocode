@@ -604,6 +604,7 @@ export class DateSearch extends Redacted {
       perCombination: DateSearch.secondsPerCombination(
         this.#mode,
         this.#dates,
+        // The constructor checked the count of the indexes (assertWordCount).
         this.#indexes.value.length as Bip39WordCount,
         now,
       ),

@@ -34,7 +34,10 @@ export function wholeNumbersFrom(min: number): WholeRange {
 /** Whether `value` is a whole number in `range`. */
 export function inWholeRange(value: unknown, range: WholeRange): value is number {
   return (
-    Number.isSafeInteger(value) && (value as number) >= range.min && (value as number) <= range.max
+    typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= range.min &&
+    value <= range.max
   );
 }
 

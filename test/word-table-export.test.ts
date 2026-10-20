@@ -81,15 +81,22 @@ describe("numbered BIP39 exports", () => {
   );
 
   it("refuses file/format options on a single lookup and conflicting whole-table selectors", async () => {
-    for (const options of [
-      ["--word", "abandon", "--output", join(directory, "unused.txt")],
-      ["--index", "1", "--table-format", "english"],
-      ["--all", "--recovery-guide"],
-      ["--recovery-guide", "--table-format", "mapping"],
-      ["--word-lists-dir", join(directory, "pack"), "--all"],
-      ["--word-lists-dir", join(directory, "pack"), "--output", join(directory, "unused.txt")],
-    ])
-      await expect(runTable(parseArguments(options))).rejects.toThrow();
+    const needsAll = "cli.table-command.export-needs-all";
+    const oneLookup = "cli.table-command.choose-exactly-one-lookup-value-word-index-bip39";
+    for (const [options, code] of [
+      [["--word", "abandon", "--output", join(directory, "unused.txt")], needsAll],
+      [["--index", "1", "--table-format", "english"], needsAll],
+      [["--all", "--recovery-guide"], oneLookup],
+      [["--recovery-guide", "--table-format", "mapping"], needsAll],
+      [["--word-lists-dir", join(directory, "pack"), "--all"], oneLookup],
+      [
+        ["--word-lists-dir", join(directory, "pack"), "--output", join(directory, "unused.txt")],
+        needsAll,
+      ],
+    ] as const)
+      await expect(runTable(parseArguments(options)), options.join(" ")).rejects.toMatchObject({
+        code,
+      });
   });
 
   it("exports the complete canonical recovery guide as a standalone UTF-8 document", async () => {

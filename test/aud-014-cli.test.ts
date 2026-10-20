@@ -119,7 +119,7 @@ it("refuses invalid card settings through the real planner even when drawing is 
 describe("AUD-014-SEC002: a swap table that cannot be read is not taken for no swap", () => {
   it("reports an unreadable table as unknown, and keeps the known answers", async () => {
     const missing = await scratch();
-    expect(() => unencryptedSwap(missing)).toThrow();
+    expect(() => unencryptedSwap(missing)).toThrow(expect.objectContaining({ code: "ENOENT" }));
     expect(swapWarning(missing)).toBe(
       "Swap may write this memory to the disk unencrypted: MnemoCode cannot read /proc/swaps to tell",
     );

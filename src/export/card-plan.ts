@@ -42,6 +42,7 @@ export async function withPlannedDecoys<T extends ColorCards>(
   // Checked as every count of decoys is (assertDecoys), before the cards are used as they are.
   if (cards.decoys !== undefined) {
     ownCards(cards);
+    // The test above and ownCards checked that the count of decoys is defined and valid.
     if (!separate) return cards as WithDecoys<T>;
     if (cards.decoys > 0) return keptIndividualCards(cards);
   }

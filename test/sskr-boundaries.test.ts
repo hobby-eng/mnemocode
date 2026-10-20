@@ -83,13 +83,15 @@ describe("the raw SSKR engine refuses malformed group policies", () => {
     },
   );
 
+  // The engine's code and message for each policy: a member count and a member threshold share
+  // their code.
   it.each([
-    [0, [2, 3]],
-    [2, [2, 3]],
-    [1, [0, 3]],
-    [1, [2, 0]],
-    [1, [4, 3]],
-  ])("refuses group threshold %i with pairs %j", async (groupThreshold, pairs) => {
+    [0, [2, 3], "sskr.engine.specification", "SSKR group threshold is invalid"],
+    [2, [2, 3], "sskr.engine.specification", "SSKR group threshold is invalid"],
+    [1, [0, 3], "sskr.engine.generate", "SSKR Shamir error: invalid threshold"],
+    [1, [2, 0], "sskr.engine.group", "SSKR member count is invalid"],
+    [1, [4, 3], "sskr.engine.group", "SSKR member threshold is invalid"],
+  ])("refuses group threshold %i with pairs %j", async (groupThreshold, pairs, code, message) => {
     const engine = await sskrEngine();
     expect(() =>
       engine.create_sskr_shares(
@@ -98,6 +100,6 @@ describe("the raw SSKR engine refuses malformed group policies", () => {
         Uint8Array.from(pairs as number[]),
         new Uint8Array(SEED_BYTES),
       ),
-    ).toThrow();
+    ).toThrow(expect.objectContaining({ code, message }));
   });
 });

@@ -282,9 +282,15 @@ describe("decoys after a backup's codes", () => {
       15,
     );
     expect(() => assertColorCardContent(kept)).not.toThrow();
-    // Counting a decoy as a code of the backup, or a code as a decoy, is refused.
-    expect(() => assertColorCardContent({ ...kept, decoys: 2 })).toThrow();
-    expect(() => assertColorCardContent({ ...kept, decoys: 4 })).toThrow();
+    // Counting a decoy as a code of the backup, or a code as a decoy, is refused: 13 or 11 colors
+    // are no phrase's.
+    const noPhrase = { code: "core.colors.enter-colors-standard-bip39-word-count" };
+    expect(() => assertColorCardContent({ ...kept, decoys: 2 })).toThrow(
+      expect.objectContaining(noPhrase),
+    );
+    expect(() => assertColorCardContent({ ...kept, decoys: 4 })).toThrow(
+      expect.objectContaining(noPhrase),
+    );
   });
 
   it("are planned once for every file of an export, also for separate cards", async () => {
@@ -322,11 +328,16 @@ describe("the codes before the decoys, read back", () => {
     // Four decoys: sixteen codes, which no phrase has.
     const codes = `${EncodedForm.of("unicode").codes(backup.indexes)} 4E00 5E7E 7684 7684`;
     const rules = { seedshiftOnly: false, shareReader: "the restore" } as const;
-    expect(() => BackupReading.of(codes, rules).codes("unicode")).toThrow();
+    expect(() => BackupReading.of(codes, rules).codes("unicode")).toThrow(
+      expect.objectContaining({ code: "core.encoded-backup.encoded-seed-phrase" }),
+    );
     const reading = BackupReading.of(codes, { ...rules, words: 12 });
     expect(reading.formats()).toEqual(["unicode"]);
     expect(reading.codes("unicode").indexes).toEqual(backup.indexes);
-    expect(() => BackupReading.of(codes, { ...rules, words: 13 as never })).toThrow();
+    // 13 words, which no type allows, fed on purpose as a JavaScript host could.
+    expect(() => BackupReading.of(codes, { ...rules, words: 13 as never })).toThrow(
+      expect.objectContaining({ code: "core.bip39-sizes.expected-word-indexes" }),
+    );
   });
 
   it("are found where the decoys make a longer phrase whose checksum fails", () => {
@@ -347,9 +358,12 @@ describe("the codes of a share before its decoys", () => {
         format === "colors" ? "#123456 #ABCDEF" : format === "unicode" ? "7684 4E00" : "5 77";
       expect(readShare(`${text} ${decoys}`).ur, format).toBe(SHARE);
     }
-    // A share cut short is refused still.
-    const short = writeShare(SHARE, "unicode").split(" ").slice(0, -1).join(" ");
-    expect(() => readShare(short)).toThrow();
+    // A share cut short is refused still: in word numbers, which no other form reads, so that the
+    // refusal is the truncated share's (Unicode codes would get the colors' refusal first).
+    const short = writeShare(SHARE, "indexes").split(" ").slice(0, -1).join(" ");
+    expect(() => readShare(short)).toThrow(
+      expect.objectContaining({ code: "sskr.transport.mixed-share-refused" }),
+    );
     const indexes = writeShare(SHARE, "indexes")
       .split(" ")
       .map((number) => Number(number) - 1);

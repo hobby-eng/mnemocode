@@ -109,6 +109,8 @@ describe("SSKR shares written in the form of the seed phrase", () => {
       .split("\n");
     const numbers = writeShare(ur!, "indexes").split(" ");
     numbers[8] = numbers[8] === "1" ? "2" : "1";
-    expect(() => readShare(numbers.join(" "))).toThrow();
+    expect(() => readShare(numbers.join(" "))).toThrow(
+      expect.objectContaining({ code: "sskr.transport.sskr-transport-checksum-does-not-match" }),
+    );
   });
 });

@@ -32,12 +32,14 @@ export function checkWordTableStartup(): void {
     expectSame(rows.at(-1), last, "Numbered dictionary last word");
   }
   expectRefused(
+    // No format's name, fed on purpose as a JavaScript host could.
     () => WordTable.text("unknown" as never),
     /Word list format/u,
     "An unknown numbered dictionary format",
   );
   for (const selector of ["constructor", "__proto__", "missing"])
     expectRefused(
+      // No lookup's name, fed on purpose as a JavaScript host could, inherited names included.
       () => WordTable.lookup(selector as never, "1"),
       /Word table lookup/u,
       "An invalid word-table selector",

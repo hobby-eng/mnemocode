@@ -64,6 +64,7 @@ export const FIT_NO_FORM = "These codes fit no form of an encoded seed phrase";
 
 /** The modes by the names that the menu and the help use (Masking.name). */
 export const ENCODED_MODE_NAMES: Readonly<Record<MaskingMode, string>> = Object.freeze(
+  // Masking.MODES lists every mode, so the record has every key.
   Object.fromEntries(Masking.MODES.map((mode) => [mode, Masking.of(mode).name])) as Record<
     MaskingMode,
     string

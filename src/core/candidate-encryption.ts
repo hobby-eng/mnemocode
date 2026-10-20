@@ -570,21 +570,25 @@ const NOT_A_PROTECTION_CHOICE =
  */
 function checkedChoice(given: unknown): ListProtectionChoice {
   if (typeof given !== "object" || given === null) throw ERRORS.create("not-protection-choice", []);
-  const choice: object = { ...given };
-  const fields = choice as Readonly<Record<string, unknown>>;
-  const kind = Object.hasOwn(choice, "kind") ? fields["kind"] : undefined;
-  if (typeof kind !== "string" || !Object.hasOwn(CHOICE_FIELDS, kind))
-    throw ERRORS.create("not-protection-choice", []);
-  const wanted: readonly string[] = CHOICE_FIELDS[kind as ListProtectionChoice["kind"]];
+  const choice: Readonly<Record<string, unknown>> = { ...given };
+  const kind = Object.hasOwn(choice, "kind") ? choice["kind"] : undefined;
+  // Only an own kind of CHOICE_FIELDS: neither another value nor an inherited name such as
+  // "toString" is found among its entries.
+  const wanted: readonly string[] | undefined = Object.entries(CHOICE_FIELDS).find(
+    ([name]) => name === kind,
+  )?.[1];
+  if (wanted === undefined) throw ERRORS.create("not-protection-choice", []);
   // Own enumerable names, as many as the kind has and each one of them: no field is missing, and
   // none of another kind, such as a passphrase beside "none", comes along unread.
   const names = Object.keys(choice);
   if (
     names.length !== wanted.length + 1 ||
     !names.every((name) => name === "kind" || wanted.includes(name)) ||
-    !wanted.every((name) => typeof fields[name] === "string")
+    !wanted.every((name) => typeof choice[name] === "string")
   )
     throw ERRORS.create("not-protection-choice", []);
+  // The checks above proved the shape: an own kind of CHOICE_FIELDS with exactly its fields, each
+  // a string.
   return choice as ListProtectionChoice;
 }
 

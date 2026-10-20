@@ -438,9 +438,12 @@ function indexesToShare(value: string): string {
   const numbers = codeTokens(value);
   if (numbers.some(runTogetherNumbers)) throw ERRORS.create("word-numbers-run-together", []);
   const indexes = numbers.map(shareWordIndex);
-  if (numbers.length > MAX_COLOR_TEXT_LENGTH || indexes.some((index) => index === undefined))
+  if (
+    numbers.length > MAX_COLOR_TEXT_LENGTH ||
+    !indexes.every((index): index is number => index !== undefined)
+  )
     throw ERRORS.create("word-numbers-share-whole-numbers-from", [`${WORD_NUMBERS_THROUGH}`]);
-  return mixedToShare(WORD_FORM, indexes as number[]);
+  return mixedToShare(WORD_FORM, indexes);
 }
 
 function unicodeToShare(value: string): string {

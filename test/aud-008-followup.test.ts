@@ -293,24 +293,40 @@ describe("AUD-008 follow-up: a sparse word search is refused", () => {
     return place;
   };
 
+  // A hole in the written words is no BIP39 index; a hole in a place, or a place that is a hole,
+  // is no list of indexes.
+  const WRITTEN = "core.candidates.written-word-not-bip39-index";
+  const PLACES = "core.candidates.every-place-one-more-bip39-indexes-ascending-order";
+
   it.each([
     [
       "written words with a hole",
       { kind: "missing-word", written: withHoles(Array(11).fill(0), 4) },
+      WRITTEN,
     ],
-    ["written words that are all holes", { kind: "missing-word", written: holes(11) }],
+    ["written words that are all holes", { kind: "missing-word", written: holes(11) }, WRITTEN],
     [
       "a place with a hole after its last index",
       { kind: "unknown-words", places: [...known(11), trailingHole()] },
+      PLACES,
     ],
     [
       "a place with a hole between its indexes",
       { kind: "unknown-words", places: [...known(11), withHoles([1, 2, 3], 1)] },
+      PLACES,
     ],
-    ["places with a hole", { kind: "unknown-words", places: withHoles([...known(11), [0, 1]], 3) }],
-  ])("%s", (_, search) => {
-    expect(() => searchCombinations(search as WordSearch)).toThrow();
-    expect(() => searchCandidates(search as WordSearch).next()).toThrow();
+    [
+      "places with a hole",
+      { kind: "unknown-words", places: withHoles([...known(11), [0, 1]], 3) },
+      PLACES,
+    ],
+  ])("%s", (_, search, code) => {
+    expect(() => searchCombinations(search as WordSearch)).toThrow(
+      expect.objectContaining({ code }),
+    );
+    expect(() => searchCandidates(search as WordSearch).next()).toThrow(
+      expect.objectContaining({ code }),
+    );
   });
 
   it("keeps a dense search", () => {

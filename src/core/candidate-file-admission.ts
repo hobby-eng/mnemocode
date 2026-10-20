@@ -155,6 +155,7 @@ export class CandidateFileAdmission {
       .filter((line) => line.startsWith(STANZA_LINE_START))
       .map((line) => line.slice(STANZA_LINE_START.length).split(" "));
     const type = stanzas[0]?.[0];
+    // LOCK_STANZAS is a frozen literal, so Object.keys gives exactly its keys: the ListFileLocks.
     const lock = (Object.keys(LOCK_STANZAS) as ListFileLock[]).find(
       (kind) => LOCK_STANZAS[kind] === type,
     );

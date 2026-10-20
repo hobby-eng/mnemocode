@@ -76,13 +76,21 @@ describe("export-level card presentation", () => {
       referenceLabel: "",
     });
   });
-  it.each(["", " ", "Two\nlines", "Hidden\u200btext", "x".repeat(101)])(
-    "rejects invalid optional copy %j",
-    (value) => {
-      expect(() => resolveCardPresentation(() => 0, { slogan: value })).toThrow();
-    },
-  );
+  const notOneLine = "export.card-settings.card-non-empty-text-on-one-line";
+  it.each([
+    ["", notOneLine],
+    [" ", notOneLine],
+    ["Two\nlines", notOneLine],
+    ["Hidden\u200btext", notOneLine],
+    ["x".repeat(101), "export.card-settings.card-too-long-maximum-characters"],
+  ])("rejects invalid optional copy %j", (value, code) => {
+    expect(() => resolveCardPresentation(() => 0, { slogan: value })).toThrow(
+      expect.objectContaining({ code }),
+    );
+  });
   it.each([-1, 37, 0.5, NaN])("refuses an invalid injected random choice %s", (index) => {
-    expect(() => resolveCardPresentation(() => index, {})).toThrow();
+    expect(() => resolveCardPresentation(() => index, {})).toThrow(
+      expect.objectContaining({ code: "export.platform.checked-choice-refused" }),
+    );
   });
 });

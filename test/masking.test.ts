@@ -217,6 +217,8 @@ describe("Share", () => {
     expect(Share.read(SHARE).info).toMatchObject({ groupThreshold: 1, memberThreshold: 2 });
     expect(Share.reads(SHARE)).toBe(true);
     expect(Share.reads(TEST_PHRASE)).toBe(false);
-    expect(() => Share.read("ur:sskr/notashare")).toThrow();
+    expect(() => Share.read("ur:sskr/notashare")).toThrow(
+      expect.objectContaining({ code: "sskr.transport.expected-single-part-ur-sskr-record" }),
+    );
   });
 });

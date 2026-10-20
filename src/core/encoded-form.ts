@@ -228,6 +228,7 @@ const LIKELY_ORDER = Object.freeze([
 export class EncodedForm {
   static readonly #values = Object.freeze(
     Object.fromEntries(
+      // ENCODED_FORMATS.map gives an entry for every form, so the record has every key.
       ENCODED_FORMATS.map((format) => [format, new EncodedForm(format, VARIANTS[format])]),
     ) as Record<EncodedFormat, EncodedForm>,
   );

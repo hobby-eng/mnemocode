@@ -154,15 +154,15 @@ export function checkedCardPresentation(
 ): CardPresentation | undefined {
   // A null is no presentation, as it was when a host's presentation was taken with `??`.
   if (given === undefined || given === null) return undefined;
-  return Object.freeze(
-    Object.fromEntries(
-      COPY_FIELDS.map((field) => {
-        const value: unknown = given[field];
-        const { label } = COPY_TEXTS[field];
-        return [field, value === "" ? "" : cardText(value, label, '; give "" to hide its line.')];
-      }),
-    ),
-  ) as CardPresentation;
+  const checked = Object.fromEntries(
+    COPY_FIELDS.map((field) => {
+      const value: unknown = given[field];
+      const { label } = COPY_TEXTS[field];
+      return [field, value === "" ? "" : cardText(value, label, '; give "" to hide its line.')];
+    }),
+  );
+  // An entry for each of COPY_FIELDS, CardPresentation's keys: "" or a text that cardText checked.
+  return Object.freeze(checked) as CardPresentation;
 }
 
 /**
@@ -174,10 +174,12 @@ export function resolveCardPresentation(
   copy: CardCopyOverrides = {},
 ): CardPresentation {
   // In the order of COPY_FIELDS, which is the order of the random choices.
-  return Object.fromEntries(
+  const texts = Object.fromEntries(
     COPY_FIELDS.map((field) => {
       const { label, fallback } = COPY_TEXTS[field];
       return [field, copyValue(copy[field], () => fallback(choose), label)];
     }),
-  ) as CardPresentation;
+  );
+  // An entry for each of COPY_FIELDS, CardPresentation's keys: a text copyValue checked or chose.
+  return texts as CardPresentation;
 }

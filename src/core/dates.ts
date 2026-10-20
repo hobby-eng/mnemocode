@@ -81,11 +81,10 @@ function readDateParts<T>(
   if (parts.length !== WRITTEN_ORDER.length) return undefined;
   for (const order of DATE_ORDERS) {
     const read = order.map((name, index) => readPart(defined(parts[index]), widthOf(name)));
-    if (read.every((value) => value !== undefined))
-      return Object.fromEntries(order.map((name, index) => [name, defined(read[index])])) as Record<
-        DatePartName,
-        T
-      >;
+    if (read.every((value) => value !== undefined)) {
+      const part = (name: DatePartName): T => defined(read[order.indexOf(name)]);
+      return { year: part("year"), month: part("month"), day: part("day") };
+    }
   }
   return undefined;
 }

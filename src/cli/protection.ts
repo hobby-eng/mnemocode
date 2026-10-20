@@ -77,9 +77,10 @@ async function exitCodeOf(child: ReturnType<typeof spawn>): Promise<number> {
   const ignore = (): void => undefined;
   process.on("SIGINT", ignore);
   try {
-    const [code, signal] = (await once(child, "exit")) as [number | null, NodeJS.Signals | null];
-    if (code !== null) return code;
-    return exitCodeOfSignal(signal);
+    // Node.js sets exitCode and signalCode before it emits "exit"; once rejects on "error".
+    await once(child, "exit");
+    if (child.exitCode !== null) return child.exitCode;
+    return exitCodeOfSignal(child.signalCode);
   } finally {
     process.off("SIGINT", ignore);
   }

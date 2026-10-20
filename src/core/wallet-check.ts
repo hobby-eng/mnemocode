@@ -56,7 +56,9 @@ export const MALFORMED_WALLET_ANSWER =
  */
 function readOnce(answer: unknown): Readonly<Record<keyof WalletMatch, unknown>> | undefined {
   if (typeof answer !== "object" || answer === null) return undefined;
-  const { matched, path, warning } = answer as Readonly<Record<keyof WalletMatch, unknown>>;
+  // An object of any shape: each field may be missing or of any type, which askWallet checks.
+  const fields: Readonly<Partial<Record<keyof WalletMatch, unknown>>> = answer;
+  const { matched, path, warning } = fields;
   return { matched, path, warning };
 }
 
@@ -87,6 +89,7 @@ function ownedAnswer(given: object, read: Readonly<Record<keyof WalletMatch, unk
       if (field === undefined) continue;
       if ("value" in field) {
         const method: unknown = field.value;
+        // typeof proves method a function; typed so, bind keeps its type rather than giving any.
         if (typeof method === "function" && key !== "constructor")
           field.value = (method as (...values: unknown[]) => unknown).bind(given);
       } else {
@@ -98,6 +101,7 @@ function ownedAnswer(given: object, read: Readonly<Record<keyof WalletMatch, unk
       fields.set(key, field);
     }
   }
+  // Object.create types its result as any; it is always a new object, of `prototype` or of none.
   return Object.create(prototype, Object.fromEntries(fields)) as object;
 }
 
@@ -121,6 +125,8 @@ export async function askWallet<M extends WalletMatch>(
   // A JavaScript host's null or number would be printed as it is (AUD-037-SEC004).
   if (!isOptionalText(read.path)) throw ERRORS.create("malformed-wallet-path", []);
   if (!isOptionalText(read.warning)) throw ERRORS.create("malformed-wallet-warning", []);
+  // readOnce read fields, so given is an object, and the checks above hold them to WalletMatch;
+  // the fields that M adds are the host's own, kept as it gave them.
   return ownedAnswer(given as object, read) as M;
 }
 

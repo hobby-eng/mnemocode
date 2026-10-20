@@ -144,14 +144,15 @@ function checkForms(
  */
 export function checkRepresentationStartup(): void {
   let coercions = 0;
+  const selector = {
+    toString: () => {
+      coercions++;
+      return "coerced";
+    },
+  };
   expectRefused(
-    () =>
-      EncodedForm.of({
-        toString: () => {
-          coercions++;
-          return "coerced";
-        },
-      } as never),
+    // No form's name, fed on purpose as a JavaScript host could: refused without being made text.
+    () => EncodedForm.of(selector as never),
     /^Unsupported encoded format\.$/u,
     "A non-text representation selector",
   );
@@ -208,6 +209,7 @@ export function checkRepresentationStartup(): void {
     "Color Unicode beyond RGB",
   );
   expectRefused(
+    // No form's name, fed on purpose as a JavaScript host could.
     () => parseInput(defined(REPRESENTATION_ANSWERS[0]).forms.english, "unknown" as EncodedFormat),
     /Unsupported encoded format/u,
     "Unknown representation",
