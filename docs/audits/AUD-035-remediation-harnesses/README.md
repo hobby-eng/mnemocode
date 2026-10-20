@@ -93,7 +93,7 @@ uncommitted working tree above commit
 `261aaedaedeb17ac1e32cd31371c850f740d2ba5`, which stayed HEAD during the whole
 remediation. The first complete run after the corrections had the 647-input
 source fingerprint
-`314ca1bb9ba69896dac5e9167596554f1f08cbed84a5fd5c8cb9976f1ac61ff`. After the
+`314ca1bbb9ba69896dac5e9167596554f1f08cbed84a5fd5c8cb9976f1ac61ff`. After the
 minimum-quorum follow-up, the status reconciliation of 2026-10-19 matched all
 648 non-audit inputs to the accepted fingerprint
 `e14058722c713600607845159ba456feb8ddb39f93e1be70fcaa4c99c219c4b0`. The
