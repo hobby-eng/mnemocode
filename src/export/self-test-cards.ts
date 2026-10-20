@@ -1,6 +1,7 @@
 // What the self-tests of cards draw with and check: the details of the cards, all given so that
-// nothing is chosen at random, and the width of an A6 page. The self-test of every design
-// (cards-self-test.ts) and of share cards (sskr-render-self-test.ts) take them from here.
+// nothing is chosen at random, and the size of an A6 page. The self-test of every design
+// (cards-self-test.ts), of share cards (sskr-render-self-test.ts) and of the reader of card PDFs
+// (card-drawing-self-test.ts) take them from here.
 
 import type { CardPresentation, CardProfile } from "./card-settings.js";
 
@@ -29,5 +30,7 @@ export const SELF_TEST_CARD_DETAILS: {
 
 /** An A6 page in landscape is 148 mm wide; a PDF measures in points of 1/72 inch. */
 export const A6_WIDTH_POINTS = (148 * 72) / 25.4;
-/** How far a drawn page may be from it. */
+/** And 105 mm high. */
+export const A6_HEIGHT_POINTS = (105 * 72) / 25.4;
+/** How far the width or the height of a drawn page may be from them. */
 export const WIDTH_TOLERANCE_POINTS = 0.01;

@@ -258,7 +258,7 @@ For the full self-test, including PDF rendering:
 mnemocode self-test
 ```
 
-The full self-test includes the startup self-test plus every phrase length/format/mode combination, date sorting, the public test file, 24 English BIP39 seed vectors, wallet-assisted searches, encrypted candidate lists, joint share/date repair, every coin vector and actual heir-sheet/card/QR exports with all artwork and fonts. Each feature gets a refusal case too. Finished groups show their times, followed by an overall result.
+The full self-test includes the startup self-test plus every phrase length/format/mode combination, date sorting, the public test file, 24 English BIP39 seed vectors, wallet-assisted searches, the marked-code search, encrypted candidate lists and the candidate list writer, joint share/date repair, share split and restore, every coin vector, actual heir-sheet/card/QR exports with all artwork and fonts, and card pages read back as drawing steps. Each feature gets a refusal case too. Finished groups show their times, followed by an overall result.
 
 The public test data is in [`vectors/mnemocode-v1.json`](../vectors/mnemocode-v1.json). It contains only well-known test phrases.
 

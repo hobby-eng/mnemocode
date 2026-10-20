@@ -20,7 +20,7 @@ const TOO_LONG_PASSPHRASE = "x".repeat(MAX_PASSPHRASE_BYTES + 1);
 /** The published list written, a list of no candidate, and a passphrase refused. */
 export async function checkCandidateListWriter(): Promise<void> {
   using protection = protectionFor({ kind: "none" });
-  const writer = new CandidateListWriter(protection);
+  using writer = new CandidateListWriter(protection);
   const written = await writer.write(THREE_PHRASES_ENTROPY.map((entropy) => bytesOfHex(entropy)));
   expectSame(written.kind, "list", "Candidate list written");
   if (written.kind === "list") {
@@ -35,7 +35,8 @@ export async function checkCandidateListWriter(): Promise<void> {
   }
   expectSame((await writer.write([])).kind, "empty", "Candidate list of no candidate");
   expectRefused(
-    () => new CandidateListWriter(protection, TOO_LONG_PASSPHRASE),
+    // A writer that takes it after all is wiped at once.
+    () => new CandidateListWriter(protection, TOO_LONG_PASSPHRASE).wipe(),
     /longer than/u,
     "A BIP39 passphrase longer than a list stores",
   );
