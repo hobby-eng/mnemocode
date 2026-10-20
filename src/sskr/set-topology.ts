@@ -38,6 +38,16 @@ export const SET_CONFLICT_TEXTS: Readonly<
 });
 
 /**
+ * The code of each kind of conflict in a catalog of refusals (AUD-037-API009): one condition, one
+ * code, whose English text is the refusal of SET_CONFLICT_TEXTS.
+ */
+export const SET_CONFLICT_CODES = Object.freeze({
+  set: "shares-of-different-sets",
+  member: "member-given-twice",
+  threshold: "group-thresholds-conflict",
+} as const satisfies Record<SetConflict["kind"], string>);
+
+/**
  * The groups of shares of one set, by their indexes in the list given. A class, so that the
  * partition is made once and every question about the groups is answered from it.
  */

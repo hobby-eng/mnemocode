@@ -48,9 +48,11 @@ const ERRORS = new ErrorCatalog("core.backup-check", {
   "share-check-whole-threshold-at-least": (value0: string) =>
     `A share check needs a whole threshold of at least ${value0}.`,
   "shares-refused": suppliedMessage,
-  "restore-refused": suppliedMessage,
-  "restore-refused-2": suppliedMessage,
-  "restore-refused-3": suppliedMessage,
+  "too-few-shares": suppliedMessage,
+  "too-few-after-copies": (count: string, threshold: string) =>
+    `Once the copies are left out, ${count === "1" ? "one share is" : `${count} shares are`} left; type ${threshold} different shares.`,
+  "shares-not-restorable-together": suppliedMessage,
+  "shares-do-not-restore": suppliedMessage,
 });
 
 /** The part of a backup that a finding is about. */
@@ -610,7 +612,12 @@ export class ShareBackupCheck implements BackupCheck {
    * they are typed again; any other failure is a fault that passes through (AUD-037-API002).
    */
   static isRestoreRefusal(error: unknown): boolean {
-    return ERRORS.matches(error, ["restore-refused", "restore-refused-2", "restore-refused-3"]);
+    return ERRORS.matches(error, [
+      "too-few-shares",
+      "too-few-after-copies",
+      "shares-not-restorable-together",
+      "shares-do-not-restore",
+    ]);
   }
 
   /**
@@ -623,14 +630,12 @@ export class ShareBackupCheck implements BackupCheck {
     const texts = kept.texts;
     const count = texts.length;
     if (count < this.threshold)
-      throw ERRORS.create("restore-refused", [
-        kept.notes.length === 0
-          ? tooFewShares(count, this.threshold)
-          : `Once the copies are left out, ${count === 1 ? "one share is" : `${count} shares are`} left; type ${this.threshold} different shares.`,
-      ]);
+      throw kept.notes.length === 0
+        ? ERRORS.create("too-few-shares", [tooFewShares(count, this.threshold)])
+        : ERRORS.create("too-few-after-copies", [`${count}`, `${this.threshold}`]);
     // Shares of another set, or a repeated member, are named as sskr-combine names them.
     const problem = kept.setProblem;
-    if (problem !== undefined) throw ERRORS.create("restore-refused-2", [problem]);
+    if (problem !== undefined) throw ERRORS.create("shares-not-restorable-together", [problem]);
     let set: ShareSet;
     try {
       set = await ShareSet.combine(texts, this.#platform, kept.places);
@@ -638,7 +643,7 @@ export class ShareBackupCheck implements BackupCheck {
       this.#secrets.assertLive();
       // Only a refusal of the shares is said of them; a fault of the host passes through.
       if (!ShareSet.isRefusal(error)) throw error;
-      throw ERRORS.create("restore-refused-3", [refusalMessage(error)], { cause: error });
+      throw ERRORS.create("shares-do-not-restore", [refusalMessage(error)], { cause: error });
     }
     using ownedSet = set;
     this.#secrets.assertLive();

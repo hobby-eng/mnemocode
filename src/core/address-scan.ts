@@ -15,6 +15,7 @@ import { inWholeRange, typedWholeNumber, type WholeRange, integerRefusal } from 
 import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
 
 const ERRORS = new ErrorCatalog("core.address-scan", {
+  "first-index-refused": suppliedMessage,
   "address-count-refused": suppliedMessage,
   "addresses-compared-would-pass-index": (value0: string) =>
     `The addresses compared would pass index ${value0}.`,
@@ -82,7 +83,7 @@ export interface AddressRange {
  */
 export function addressCount(requested: number | undefined, first: number): number {
   if (!inWholeRange(first, NORMAL_INDEX_RANGE))
-    throw ERRORS.create("address-count-refused", [
+    throw ERRORS.create("first-index-refused", [
       integerRefusal("The first index", NORMAL_INDEX_RANGE),
     ]);
   if (requested === undefined) return 1;

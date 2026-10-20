@@ -7,14 +7,24 @@
 
 import { PHRASE_WORDS } from "../core/masking.js";
 import { Share } from "../sskr/transport.js";
-import { SET_CONFLICT_TEXTS, SetTopology, withoutCopies } from "../sskr/set-topology.js";
+import {
+  SET_CONFLICT_CODES,
+  SET_CONFLICT_TEXTS,
+  SetTopology,
+  withoutCopies,
+} from "../sskr/set-topology.js";
 import { counted } from "../core/search-plan.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("export.sskr-keeping-text", {
   "there-no-shares-keep": () => "There are no shares to keep.",
-  "shares-not-one-set": (conflict: string) => `${conflict} Only the shares of one set are kept.`,
+  "shares-of-different-sets": () =>
+    `${SET_CONFLICT_TEXTS.set.refusal} Only the shares of one set are kept.`,
+  "member-given-twice": () =>
+    `${SET_CONFLICT_TEXTS.member.refusal} Only the shares of one set are kept.`,
+  "group-thresholds-conflict": () =>
+    `${SET_CONFLICT_TEXTS.threshold.refusal} Only the shares of one set are kept.`,
   "packaging-unknown": (packagings: string) =>
     `Name how the shares were saved, as one of: ${packagings}.`,
 });
@@ -69,8 +79,7 @@ function quorum(records: readonly string[], masked: boolean): string {
     const kept = withoutCopies(shares.map((share, place) => ({ place, ur: share.ur })));
     const infos = kept.map(({ place }) => defined(shares[place]).info);
     const conflict = SetTopology.firstConflict(infos);
-    if (conflict !== undefined)
-      throw ERRORS.create("shares-not-one-set", [SET_CONFLICT_TEXTS[conflict.kind].refusal]);
+    if (conflict !== undefined) throw ERRORS.create(SET_CONFLICT_CODES[conflict.kind], []);
     const info = defined(infos[0]);
     if (info.groupCount > 1)
       return `These shares belong to ${info.groupCount} groups, each needing enough of its own ${goal}`;

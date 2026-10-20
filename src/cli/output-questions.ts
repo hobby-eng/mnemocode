@@ -15,12 +15,14 @@ import {
 } from "./output-paths.js";
 import { askLine } from "./terminal-choice.js";
 import type { Cancelled } from "./terminal-keys.js";
-import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.output-questions", {
   "another-file-task-name-folder-choose-another-one": () =>
     "Another file of this task has this name or this folder; choose another one.",
-  "typed-path-refused": suppliedMessage,
+  "dash-path-refused": () => "- is no file name here; type the name of a file.",
+  "blank-path-refused": () =>
+    "That name is blank; type a name, or press Enter alone for the one shown.",
   "name-starts-would-read-as-option-type-before": () =>
     "A name that starts with - would be read as an option; type ./ before it.",
   "there-no-such-file-check-name-folder": () =>
@@ -81,11 +83,7 @@ function typedPath(answer: string): string {
   const path = droppedPath(answer);
   // The command's rule for a name that is no path (isUnusableOutputPath), in the menu's words.
   if (isUnusableOutputPath(path))
-    throw ERRORS.create("typed-path-refused", [
-      path === "-"
-        ? "- is no file name here; type the name of a file."
-        : "That name is blank; type a name, or press Enter alone for the one shown.",
-    ]);
+    throw ERRORS.create(path === "-" ? "dash-path-refused" : "blank-path-refused", []);
   if (path.startsWith("-")) throw ERRORS.create("name-starts-would-read-as-option-type-before", []);
   return path;
 }

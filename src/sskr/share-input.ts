@@ -462,12 +462,17 @@ export class ShareInput implements Disposable {
     this.#nextPlace = texts.length + 1;
   }
 
+  /** Refuses a place where no share was typed (no-share-was-typed-at-place). */
+  assertTypedAt(place: number): void {
+    if (!this.has(place)) throw ERRORS.create("no-share-was-typed-at-place", [`${place}`]);
+  }
+
   /**
    * Takes `text` for the share at `place`, which keeps its place. Refuses a place where no share
-   * was typed (no-share-was-typed-at-place).
+   * was typed (assertTypedAt).
    */
   replace(place: number, text: string): void {
-    if (!this.has(place)) throw ERRORS.create("no-share-was-typed-at-place", [`${place}`]);
+    this.assertTypedAt(place);
     this.#shares = this.#shares.map((share) =>
       share.place === place ? Object.freeze({ place, text }) : share,
     );

@@ -50,6 +50,7 @@ const ERRORS = new ErrorCatalog("cli.sskr-export-command", {
   "no-share-settled": () => NO_SHARE_SETTLED,
   "repair-each-refused": suppliedMessage,
   "few-export-refused": suppliedMessage,
+  "export-decision-refused": suppliedMessage,
   "run-sskr-export-refused": suppliedMessage,
 });
 
@@ -285,7 +286,8 @@ async function exportOnce(
   )
     return "changed";
   const decision = ShareRestore.exportDecision(restored, r.evidence !== undefined);
-  if (decision.kind === "trouble") throw ERRORS.create("few-export-refused", [decision.message]);
+  if (decision.kind === "trouble")
+    throw ERRORS.create("export-decision-refused", [decision.message]);
   if (decision.kind === "each") {
     // Without the wallet check complete shares are only written again (rewritesOnly), above.
     // Fewer shares than the threshold restore no phrase; each is then repaired on its own.

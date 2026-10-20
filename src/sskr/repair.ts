@@ -40,7 +40,9 @@ export type { FilledElement, ReadRepairableShare } from "./repair-types.js";
 const ERRORS = new ErrorCatalog("sskr.repair", {
   "each-at-place": (value0: string) => `${value0}, each at its place.`,
   "repair-candidates-refused": suppliedMessage,
-  "shares-readings-refused": suppliedMessage,
+  "too-many-marks-for-form": () =>
+    "Too many elements are marked for this form: the checksum cannot tell them. Mark fewer, or use another share.",
+  "no-share-fits-marks": suppliedMessage,
   "free-bits-budget": () => `freeBits must be a whole number from 0 to ${MAX_LISTED_FREE_BITS}.`,
 });
 
@@ -298,14 +300,14 @@ export function sharesOfReadings(
     for (const share of outcome.shares) found.set(share.ur, share);
   }
   if (tooMany || found.size === 0)
-    throw ERRORS.create("shares-readings-refused", [
-      tooMany || cappedDecoys
-        ? "Too many elements are marked for this form: the checksum cannot tell them. Mark fewer, or use another share."
-        : withJoinedMarksHint(
+    throw tooMany || cappedDecoys
+      ? ERRORS.create("too-many-marks-for-form", [])
+      : ERRORS.create("no-share-fits-marks", [
+          withJoinedMarksHint(
             "No valid share fits the marked elements. Check their places and the other elements.",
             text,
           ),
-    ]);
+        ]);
   return [...found.values()];
 }
 

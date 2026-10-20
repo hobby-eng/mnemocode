@@ -50,6 +50,8 @@ import { inWholeRange, wholeNumbersFrom } from "../core/typed-number.js";
 const ERRORS = new ErrorCatalog("sskr.share-set", {
   "share-set-at-least-one-share": () => "A share set has at least one share.",
   "combine-refused": suppliedMessage,
+  "too-many-combinations-open": () =>
+    "Too many combinations are open: read more of the marked elements, or add a share.",
   "no-phrase-fits": () => NO_PHRASE_FITS,
   "more-than-one-phrase-fits-shares-read-more": () =>
     "More than one phrase fits these shares: read more of the marked elements, or add a share.",
@@ -211,10 +213,9 @@ export class ShareSet extends Redacted implements Disposable {
     if (assessment.reason !== undefined || assessment.combinations > MAX_LIBRARY_TRIES) {
       // A plan that is not searched is wiped here; searchOnce wipes the one that is.
       plan.wipe();
-      throw ERRORS.create("combine-refused", [
-        assessment.reason ??
-          "Too many combinations are open: read more of the marked elements, or add a share.",
-      ]);
+      throw assessment.reason === undefined
+        ? ERRORS.create("too-many-combinations-open", [])
+        : ERRORS.create("combine-refused", [assessment.reason]);
     }
     // Searched without a signal: nothing stops it.
     const { sets: found } = await searchOnce(plan);

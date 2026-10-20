@@ -37,11 +37,11 @@ describe("Keeping distinct SSKR members", () => {
 
   it("refuses shares of different sets and a packaging it does not name (AUD-037-API007)", () => {
     expect(() => shareKeepingNote([first, defined(sskrVector.shares[0])], "files", false)).toThrow(
-      expect.objectContaining({ code: "export.sskr-keeping-text.shares-not-one-set" }),
+      expect.objectContaining({ code: "export.sskr-keeping-text.shares-of-different-sets" }),
     );
     // Two different shares of one member are no copies: no quorum holds for them.
     expect(() => shareKeepingNote([first, wrongValue(first), second], "files", false)).toThrow(
-      expect.objectContaining({ code: "export.sskr-keeping-text.shares-not-one-set" }),
+      expect.objectContaining({ code: "export.sskr-keeping-text.member-given-twice" }),
     );
     for (const packaging of ["boxes", "toString"])
       expect(() => shareKeepingNote([first, second], packaging as never, false)).toThrow(

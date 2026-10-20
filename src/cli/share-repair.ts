@@ -69,7 +69,6 @@ import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.share-repair", {
-  "no-share-was-typed-at-place": (value0: string) => `No share was typed at place ${value0}.`,
   "mend-shares-refused": suppliedMessage,
   "search-share-repair-refused": suppliedMessage,
   "one-share-at-a-time": () => "Give one share here, or a text file containing just that share.",
@@ -324,7 +323,7 @@ export class TypedShares implements Disposable {
    * part that is no share, such as a heading pasted with the shares, does not have to be replaced.
    */
   async retype(place: number, warning?: string): Promise<Cancelled | undefined> {
-    if (!this.input.has(place)) throw ERRORS.create("no-share-was-typed-at-place", [`${place}`]);
+    this.input.assertTypedAt(place);
     for (let problem = warning; ;) {
       if (problem !== undefined) {
         terminalNotice(problem, "warning");

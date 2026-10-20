@@ -38,7 +38,7 @@ import {
   tagBytes,
 } from "./share-layout.js";
 import { checksumAt, CRC32_BYTES, crc32 } from "./checksum.js";
-import { SET_CONFLICT_TEXTS, SetTopology } from "./set-topology.js";
+import { SET_CONFLICT_CODES, SET_CONFLICT_TEXTS, SetTopology } from "./set-topology.js";
 import {
   COLOR_FORM,
   mixedTransport,
@@ -100,7 +100,9 @@ const ERRORS = new ErrorCatalog("sskr.transport", {
   "share-qr-does-not-match-printed-references": () =>
     "Share QR does not match the printed references.",
   "assert-share-count-refused": suppliedMessage,
-  "read-set-refused": suppliedMessage,
+  "shares-of-different-sets": () => SET_CONFLICT_TEXTS.set.refusal,
+  "member-given-twice": () => SET_CONFLICT_TEXTS.member.refusal,
+  "group-thresholds-conflict": () => SET_CONFLICT_TEXTS.threshold.refusal,
   "not-enough-sskr-shares-meet-recorded-threshold": () =>
     "Not enough SSKR shares to meet the recorded threshold.",
 });
@@ -640,8 +642,7 @@ export class Share extends Redacted {
       for (const record of records) shares.push(Share.read(record));
       const infos = shares.map((share) => share.info);
       const conflict = SetTopology.firstConflict(infos);
-      if (conflict !== undefined)
-        throw ERRORS.create("read-set-refused", [SET_CONFLICT_TEXTS[conflict.kind].refusal]);
+      if (conflict !== undefined) throw ERRORS.create(SET_CONFLICT_CODES[conflict.kind], []);
       if (requireQuorum && !new SetTopology(infos).enough)
         throw ERRORS.create("not-enough-sskr-shares-meet-recorded-threshold", []);
       return shares;

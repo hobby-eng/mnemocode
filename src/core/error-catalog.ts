@@ -16,7 +16,9 @@ export interface CodedFailure<Code extends string = string> extends Error {
 
 /**
  * The adapter for a refusal whose wording already belongs to a shared rule or to its host. A
- * catalog assigns its stable failure code without copying that rule's formatter or its text.
+ * catalog assigns its stable failure code without copying that rule's formatter or its text. The
+ * code stands for one condition, whatever the rule says of it: two conditions take two codes, so
+ * that a host can choose its own words from the code alone (AUD-037-API009).
  */
 export function suppliedMessage(message: string): string {
   return message;

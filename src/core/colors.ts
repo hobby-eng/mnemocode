@@ -16,14 +16,16 @@ import { inWholeRange } from "./typed-number.js";
 import { listInWords } from "./places.js";
 import { listPieces, textPieces } from "./pieces.js";
 import { defined } from "./defined.js";
-import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
+import { ErrorCatalog } from "./error-catalog.js";
 
 const ERRORS = new ErrorCatalog("core.colors", {
   "each-color-use-uppercase-rrggbb-form": () => "Each color must use uppercase #RRGGBB form.",
   "invalid-rgb-reference": () => "Invalid RGB reference.",
   "enter-colors-standard-bip39-word-count": (value0: string) =>
     `Enter ${value0} colors for a standard BIP39 word count.`,
-  "parse-colors-refused": suppliedMessage,
+  "hashed-colors-refused": () => "Colors must use #RRGGBB codes, separated or concatenated.",
+  "joined-colors-refused": () =>
+    "A continuous RGB stream must contain complete six-digit RRGGBB values.",
   "invalid-color-set": () => INVALID_COLOR_SET,
   "color-codes-do-not-contain-valid-bip39-word": () =>
     "The color codes do not contain valid BIP39 word positions.",
@@ -139,7 +141,8 @@ export function indexesToColors(given: readonly number[]): string[] {
 
 /**
  * The colors of a seed phrase, #RRGGBB codes or six digits each, apart or run together. Refuses
- * text that is not whole colors (parse-colors-refused), and a count of colors that no phrase
+ * text that is not whole colors (hashed-colors-refused, joined-colors-refused), and a count of
+ * colors that no phrase
  * has (enter-colors-standard-bip39-word-count).
  */
 export function parseColors(value: string): string[] {
@@ -149,11 +152,7 @@ export function parseColors(value: string): string[] {
       ? undefined
       : completeHexUnits(value, RGB_HEX_DIGITS);
   if (codes === undefined)
-    throw ERRORS.create("parse-colors-refused", [
-      hashed
-        ? "Colors must use #RRGGBB codes, separated or concatenated."
-        : "A continuous RGB stream must contain complete six-digit RRGGBB values.",
-    ]);
+    throw ERRORS.create(hashed ? "hashed-colors-refused" : "joined-colors-refused", []);
   const colors = codes.map((code) => `#${code}`);
   assertColorCount(colors.length);
   return colors;
