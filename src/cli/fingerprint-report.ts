@@ -54,6 +54,19 @@ export function reportFingerprint(label: string, value: string, plainLine: strin
   terminalHint(FINGERPRINT_DISCLOSURE);
 }
 
+/**
+ * Whether a recovered phrase's BIP39 checksum holds, then, where it does, its original fingerprint:
+ * on a terminal as a checked fact, otherwise as a plain line. Decode and re-encode report it so.
+ */
+export function reportChecksumAndFingerprint(mnemonic: string, checksumValid: boolean): void {
+  const value = checksumValid ? "valid" : CHECKSUM_INVALID;
+  if (terminalLayout("stderr")) {
+    console.error("");
+    terminalStatus("BIP39 checksum", value, checksumValid);
+  } else console.error(`BIP39 checksum: ${value}.`);
+  if (checksumValid) reportOriginalFingerprint(mnemonic);
+}
+
 /** The fingerprint of the original seed phrase `mnemonic`, as reportFingerprint shows it. */
 export function reportOriginalFingerprint(mnemonic: string): void {
   const fingerprint = masterFingerprint(mnemonic);

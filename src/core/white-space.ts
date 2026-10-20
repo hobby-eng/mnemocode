@@ -1,9 +1,18 @@
 // The rules of typed text that every reader shares: white space around what a person types or
 // pastes, removed the same way by every wallet check, whether it reads an address, a key, a WIF or
-// a fingerprint; the byte order mark that an editor may put at the start of a file; and the ASCII
-// case that the address formats define.
+// a fingerprint; the byte order mark that an editor may put at the start of a file; the ASCII
+// case that the address formats define; and whether text is well formed, as a passphrase must be.
 //
 // Host-neutral: it imports nothing (test/portable-modules.test.ts).
+
+/**
+ * Whether `text` is well-formed Unicode: no surrogate stands on its own, which no encoding of text
+ * holds and which UTF-8 would turn into another character. The one test of it (AUD-037-ARC002).
+ */
+export function isWellFormedText(text: string): boolean {
+  // With the u flag, a surrogate on its own is a code point of its own; a pair is not.
+  return !/\p{Cs}/u.test(text);
+}
 
 /** White space at either end of `text`, as people paste and type it. */
 const WHITE_SPACE_AT_ENDS = /^\p{White_Space}+|\p{White_Space}+$/gu;

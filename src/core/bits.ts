@@ -5,6 +5,9 @@ import { textPieces } from "./pieces.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog } from "./error-catalog.js";
 
+/** The largest value of a byte: the one bound of every byte that MnemoCode checks or scales. */
+export const BYTE_MAX = 0xff;
+
 const ERRORS = new ErrorCatalog("core.bits", {
   "entropy-contain-whole-number-bytes": () => "Entropy must contain a whole number of bytes.",
   "hexadecimal-text-two-digits-0-9-f-each": () =>

@@ -153,7 +153,7 @@ export async function publishNewPrivateFile(path: string, bytes: Uint8Array): Pr
     try {
       await link(temporary, destination);
     } catch (error) {
-      if (!NO_HARD_LINKS.has((error as NodeJS.ErrnoException).code ?? "")) throw error;
+      if (!NO_HARD_LINKS.has(errorCode(error) ?? "")) throw error;
       await writeNewPrivateFile(destination, new Uint8Array());
       try {
         await rename(temporary, destination);
@@ -171,7 +171,7 @@ export async function entryAt(path: string): Promise<"none" | "folder" | "other"
   try {
     return (await lstat(path)).isDirectory() ? "folder" : "other";
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "none";
+    if (errorCode(error) === "ENOENT") return "none";
     throw error;
   }
 }

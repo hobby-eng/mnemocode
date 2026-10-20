@@ -13,7 +13,7 @@
 // Host-neutral: it reaches only color-math.ts and business-tint.ts.
 
 import { ReferenceTint } from "./business-tint.js";
-import { channelsHex, oklab, rgbChannels, rgbOfHsv } from "./color-math.js";
+import { channelOfByte, channelsHex, oklab, rgbChannels, rgbOfHsv } from "./color-math.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
@@ -27,8 +27,6 @@ const HUE_STEP_DEGREES = 3;
 const DEGREES = 360;
 const CANDIDATE_SATURATIONS = Object.freeze([0.45, 0.72, 0.95]);
 const CANDIDATE_VALUES = Object.freeze([0.5, 0.75, 1]);
-/** The largest value of an eight-bit channel. */
-const CHANNEL_MAX = 255;
 
 type Lab = readonly [number, number, number];
 
@@ -40,8 +38,8 @@ interface Candidate {
 
 /** OKLab of eight-bit channels. */
 function labOfBytes(bytes: readonly [number, number, number]): Lab {
-  const [red, green, blue] = bytes.map((byte) => byte / CHANNEL_MAX) as [number, number, number];
-  return oklab(red, green, blue);
+  const [red, green, blue] = bytes;
+  return oklab(channelOfByte(red), channelOfByte(green), channelOfByte(blue));
 }
 
 /** The colour `hex` as the designs show it: in full, on vivid and on muted business cards. */
@@ -61,7 +59,7 @@ function candidates(): Candidate[] {
     for (const saturation of CANDIDATE_SATURATIONS)
       for (const value of CANDIDATE_VALUES) {
         const bytes = rgbOfHsv(degrees / DEGREES, saturation, value);
-        const hex = `#${channelsHex(bytes.map((byte) => byte / CHANNEL_MAX))}`;
+        const hex = `#${channelsHex(bytes.map(channelOfByte))}`;
         all.push({ hex, views: viewsOf(hex) });
       }
   return all;

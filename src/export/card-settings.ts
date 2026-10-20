@@ -119,10 +119,17 @@ const PAGE_DIMENSIONS: Readonly<Record<CardPageSize, readonly [number, number]>>
   business: [BUSINESS_CARD_MM.width, BUSINESS_CARD_MM.height],
 };
 
+/**
+ * A width and a height in millimetres in the words of the menu and the help, such as "148 x 105
+ * mm": the one way every size of a page or a sheet is named (AUD-037-ARC002).
+ */
+export function millimetreSizeLabel([width, height]: readonly [number, number]): string {
+  return `${width} x ${height} mm`;
+}
+
 /** A size in the words of the menu and the help, such as "148 x 105 mm", as it is printed. */
 export function pageSizeLabel(size: CardPageSize): string {
-  const [width, height] = PAGE_DIMENSIONS[size];
-  return `${width} x ${height} mm`;
+  return millimetreSizeLabel(PAGE_DIMENSIONS[size]);
 }
 
 /**

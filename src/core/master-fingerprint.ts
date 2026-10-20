@@ -23,6 +23,7 @@ import {
   type WalletMatch,
 } from "./wallet-check.js";
 import { ErrorCatalog } from "./error-catalog.js";
+import { isWellFormedText } from "./white-space.js";
 
 const ERRORS = new ErrorCatalog("core.master-fingerprint", {
   "expected-string": { kind: "type", text: () => "expected a string" },
@@ -83,8 +84,7 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
  */
 function nfkd(text: string): string {
   if (typeof text !== "string") throw ERRORS.create("expected-string", []);
-  // With the u flag, a surrogate on its own is a code point of its own; a pair is not.
-  if (/\p{Cs}/u.test(text)) throw ERRORS.create("expected-well-formed-unicode-string", []);
+  if (!isWellFormedText(text)) throw ERRORS.create("expected-well-formed-unicode-string", []);
   return text.normalize("NFKD");
 }
 

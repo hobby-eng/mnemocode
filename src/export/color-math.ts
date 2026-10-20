@@ -1,4 +1,4 @@
-import { bytesOfHex, hexOfBytes } from "../core/bits.js";
+import { BYTE_MAX, bytesOfHex, hexOfBytes } from "../core/bits.js";
 import { defined } from "../core/defined.js";
 
 /**
@@ -20,8 +20,10 @@ export function hsv(red: number, green: number, blue: number): [number, number, 
   return [hue / 6, max === 0 ? 0 : range / max, max];
 }
 
-/** The largest value of an eight-bit channel. */
-const BYTE_MAX = 255;
+/** The eight-bit channel `byte` as a channel from 0 to 1: the one division by BYTE_MAX. */
+export function channelOfByte(byte: number): number {
+  return byte / BYTE_MAX;
+}
 
 /**
  * Hue, saturation and value of the pixel whose red, green and blue bytes start at `offset` of
@@ -29,9 +31,9 @@ const BYTE_MAX = 255;
  */
 export function pixelHsv(data: ArrayLike<number>, offset: number): [number, number, number] {
   return hsv(
-    defined(data[offset]) / BYTE_MAX,
-    defined(data[offset + 1]) / BYTE_MAX,
-    defined(data[offset + 2]) / BYTE_MAX,
+    channelOfByte(defined(data[offset])),
+    channelOfByte(defined(data[offset + 1])),
+    channelOfByte(defined(data[offset + 2])),
   );
 }
 
@@ -68,7 +70,7 @@ export function rgbBytes(color: string): [number, number, number] {
 /** The same channels from 0 to 1, as PDF colors and the color spaces take them. */
 export function rgbChannels(color: string): [number, number, number] {
   const [red, green, blue] = rgbBytes(color);
-  return [red / BYTE_MAX, green / BYTE_MAX, blue / BYTE_MAX];
+  return [channelOfByte(red), channelOfByte(green), channelOfByte(blue)];
 }
 
 /**

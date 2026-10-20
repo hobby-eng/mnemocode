@@ -1,13 +1,13 @@
 import { ErrorCatalog } from "../core/error-catalog.js";
 import { Redacted } from "../core/redacted.js";
 import { defined } from "../core/defined.js";
+import { BYTE_MAX } from "../core/bits.js";
 
 const ERRORS = new ErrorCatalog("cli.input-bytes", {
-  byte: { kind: "type", text: () => "Terminal input needs whole bytes from 0 to 255." },
+  byte: { kind: "type", text: () => `Terminal input needs whole bytes from 0 to ${BYTE_MAX}.` },
 });
 // Fixed blocks avoid copying pending secret bytes when a long paste grows or a prefix retires.
 const SEGMENT_BYTES = 4096;
-const MAX_BYTE = 0xff;
 
 interface Segment {
   readonly bytes: Uint8Array;
@@ -21,7 +21,7 @@ function segment(at: number, next: Segment | undefined): Segment {
 }
 
 function assertByte(byte: number): void {
-  if (!Number.isInteger(byte) || byte < 0 || byte > MAX_BYTE) throw ERRORS.create("byte", []);
+  if (!Number.isInteger(byte) || byte < 0 || byte > BYTE_MAX) throw ERRORS.create("byte", []);
 }
 
 /**

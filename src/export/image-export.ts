@@ -21,6 +21,7 @@ import {
   type ImageFormat,
 } from "./document-formats.js";
 import { defined } from "../core/defined.js";
+import { errorCode } from "../core/refusal.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("export.image-export", {
@@ -204,7 +205,7 @@ export async function writeRenderedDocument(
     }
     return files.length;
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "EEXIST")
+    if (errorCode(error) === "EEXIST")
       throw ERRORS.create("image-destination-already-exists-nothing-will-overwritten", []);
     throw error;
   } finally {

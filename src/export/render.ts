@@ -20,6 +20,8 @@ import { SHEETS_ONLY, sheetsOnly } from "./template-catalog.js";
 import { defined } from "../core/defined.js";
 import { wipeAll } from "../core/bits.js";
 import { ExportFileName } from "./file-name.js";
+import { OwnedCardContent } from "./card-values.js";
+import { Redacted } from "../core/redacted.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("export.render", {
@@ -66,6 +68,43 @@ export async function plannedCardJob(drawing: CardDrawing, job: CardJob): Promis
   assertPageSettings(job.content);
   const separate = isCardPageSize(job.content.pageSize);
   return { ...job, content: await plannedContent(drawing, job.template, job.content, separate) };
+}
+
+/**
+ * The cards of one export planned once (plannedCardJob) for every file of it, each retry included,
+ * so that its PDF, its page images and its card files show the same cards: the library's owner of
+ * the cards of a backup, as ShareCardSet is of those of a share (AUD-037-ARC002). Its planned codes
+ * live in owned text until wipe or dispose (OwnedCardContent); each job is a fresh view.
+ */
+export class PlannedCards extends Redacted implements Disposable {
+  readonly #template: CardTemplate;
+  readonly #content: OwnedCardContent<CardContent>;
+
+  private constructor(template: CardTemplate, content: OwnedCardContent<CardContent>) {
+    super("PlannedCards");
+    this.#template = template;
+    this.#content = content;
+  }
+
+  /** The cards of `job`, planned with the services of `drawing`. */
+  static async plan(drawing: CardDrawing, job: CardJob): Promise<PlannedCards> {
+    const planned = await plannedCardJob(drawing, job);
+    return new PlannedCards(planned.template, new OwnedCardContent(planned.content));
+  }
+
+  /** The planned job, its codes fresh views; refused once wiped (core.secret-value.wiped). */
+  get job(): CardJob {
+    return { template: this.#template, content: this.#content.content };
+  }
+
+  /** Wipes the planned codes; a later job is refused. */
+  wipe(): void {
+    this.#content.wipe();
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
 }
 
 /**

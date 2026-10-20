@@ -10,7 +10,7 @@
 
 import { ErrorCatalog } from "../core/error-catalog.js";
 import { ByteArray } from "../core/byte-array.js";
-import { wipeAll } from "../core/bits.js";
+import { BYTE_MAX, wipeAll } from "../core/bits.js";
 import { isRecordedQuorum } from "./share-layout.js";
 
 const ERRORS = new ErrorCatalog("sskr.bridge", {
@@ -57,10 +57,7 @@ export interface SskrBridge {
  */
 export const UNSUPPORTED_ENCODING = "Unsupported SSKR share encoding.";
 /** Why a group threshold is refused before the glue narrows it to a byte. */
-export const UNSUPPORTED_GROUP_THRESHOLD =
-  "The SSKR group threshold must be a whole number from 0 to 255.";
-/** The largest value of the u8 that the glue passes a group threshold as. */
-const U8_MAX = 0xff;
+export const UNSUPPORTED_GROUP_THRESHOLD = `The SSKR group threshold must be a whole number from 0 to ${BYTE_MAX}.`;
 
 /**
  * The bridge with each narrowed argument checked before it is called. A class, so that a host
@@ -163,7 +160,13 @@ export class CheckedSskrBridge implements SskrBridge {
 
   /** Refuses a group threshold that the glue's u8 would not hold as it is. */
   static #assertGroupThreshold(threshold: unknown): void {
-    if (!Number.isInteger(threshold) || (threshold as number) < 0 || (threshold as number) > U8_MAX)
+    // The glue passes it as a u8, a byte.
+    if (
+      typeof threshold !== "number" ||
+      !Number.isInteger(threshold) ||
+      threshold < 0 ||
+      threshold > BYTE_MAX
+    )
       throw ERRORS.create("unsupported-group-threshold", []);
   }
 }

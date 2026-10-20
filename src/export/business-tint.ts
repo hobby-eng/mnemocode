@@ -7,7 +7,7 @@
 // Host-neutral: it reaches only color-math.ts and the type of a tint.
 
 import type { BusinessTint } from "./business-designs.js";
-import { hueAndSaturation, rgbBytes } from "./color-math.js";
+import { hueAndSaturation, rgbChannels } from "./color-math.js";
 
 /**
  * How strongly a design's coloured parts take the reference's colour: the factor of their
@@ -27,8 +27,6 @@ const TINTS: Readonly<
  * same hue and the cards of a set are told apart by brightness too (owner, 2026-10-13).
  */
 const BRIGHTNESS_FLOOR = 0.35;
-/** The largest value of an eight-bit channel. */
-const CHANNEL_MAX = 255;
 /**
  * A pixel of the artwork less saturated than this, or darker than NEUTRAL_PIXEL_VALUE, keeps its
  * colour: the black paper, the white lettering and icons, and the highlights stay neutral.
@@ -53,7 +51,7 @@ export type Hsv = readonly [hue: number, saturation: number, value: number];
  * for a colour with a full channel.
  */
 export function artworkBrightness(hex: string): number {
-  const peak = Math.max(...rgbBytes(hex)) / CHANNEL_MAX;
+  const peak = Math.max(...rgbChannels(hex));
   return BRIGHTNESS_FLOOR + (1 - BRIGHTNESS_FLOOR) * peak;
 }
 

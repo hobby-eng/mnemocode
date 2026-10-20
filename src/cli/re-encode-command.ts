@@ -54,7 +54,7 @@ import {
 import { prepareEncode, type PreparedEncode } from "./encode-command.js";
 import { askEncoding } from "./encode-questions.js";
 import { forgetClaimedOutputs } from "./output-questions.js";
-import { CHECKSUM_INVALID, reportOriginalFingerprint } from "./fingerprint-report.js";
+import { reportChecksumAndFingerprint } from "./fingerprint-report.js";
 import { settleOutputPaths } from "./output-paths.js";
 import { clearPrivateScreen, showProtection } from "./private-screen.js";
 import { PrivateSteps } from "./private-steps.js";
@@ -180,8 +180,7 @@ function showOldPhrase(result: DecodedResult, mode: MaskingMode, format: Encoded
 
 /** The old backup's checksum and fingerprint, on standard error, without the phrase. */
 function showOldFingerprint(result: DecodedResult): void {
-  terminalNotice(`BIP39 checksum: ${result.checksumValid ? "valid" : CHECKSUM_INVALID}.`);
-  if (result.checksumValid) reportOriginalFingerprint(result.recoveredMnemonic);
+  reportChecksumAndFingerprint(result.recoveredMnemonic, result.checksumValid);
 }
 
 function showNotices(notices: Notices): void {

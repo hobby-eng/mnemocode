@@ -14,11 +14,15 @@ import { counting } from "./search-plan.js";
 import { entropyToMnemonic } from "@scure/bip39";
 import { englishWordlist } from "./english-words.js";
 import { Redacted } from "./redacted.js";
+import { isWellFormedText } from "./white-space.js";
 import { equalBytes } from "./bits.js";
 import { assertCandidateFileSize } from "./candidate-file-refusal.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog } from "./error-catalog.js";
 import { ByteArray } from "./byte-array.js";
+
+/** The lengths of BIP39 entropy, as a refusal names them: "16 to 32". */
+const ENTROPY_BYTES_TEXT = `${defined(BIP39_ENTROPY_BYTES[0])} to ${defined(BIP39_ENTROPY_BYTES.at(-1))}`;
 
 const ERRORS = new ErrorCatalog("core.candidate-list", {
   "candidate-list-wiped": () => "This candidate list has been wiped.",
@@ -29,7 +33,7 @@ const ERRORS = new ErrorCatalog("core.candidate-list", {
   "candidate-list-holds-1-records": (value0: string) =>
     `A candidate list holds 1 to ${value0} records.`,
   "every-candidate-bip39-entropy-one-length-16-32": () =>
-    "Every candidate must be BIP39 entropy of one length, 16 to 32 bytes.",
+    `Every candidate must be BIP39 entropy of one length, ${ENTROPY_BYTES_TEXT} bytes.`,
   "candidate-list-cut-short": () => "The candidate list is cut short.",
   "passphrase-candidate-list-wrong-length": () =>
     "A passphrase in the candidate list has a wrong length.",
@@ -154,7 +158,7 @@ const encoder = new TextEncoder();
  * or one longer than MAX_PASSPHRASE_BYTES. Callers check a BIP39 passphrase before a long search.
  */
 export function assertListPassphrase(passphrase: string, what = "BIP39 passphrase"): void {
-  if (/\p{Cs}/u.test(passphrase)) throw ERRORS.create("not-valid-unicode-text", [`${what}`]);
+  if (!isWellFormedText(passphrase)) throw ERRORS.create("not-valid-unicode-text", [`${what}`]);
   if (utf8Length(passphrase) > MAX_PASSPHRASE_BYTES)
     throw ERRORS.create("longer-than-bytes", [`${what}`, `${MAX_PASSPHRASE_BYTES}`]);
 }

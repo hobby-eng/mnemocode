@@ -26,6 +26,7 @@ import {
 import { bitsOf, bitsOfIndexes, bitsToBytes, lastWordChecksumBits } from "./bits.js";
 import type { MappingRow, MissingWordCandidate } from "./types.js";
 import { defined } from "./defined.js";
+import { DECIMAL_DIGITS } from "./typed-number.js";
 import { ErrorCatalog } from "./error-catalog.js";
 import { WordTable, type WordTableLookup, type WordTableFormat } from "./word-table.js";
 
@@ -117,15 +118,13 @@ export function canonicalEnglishWords(mnemonic: string): string[] {
   return words;
 }
 
-/** A word number as written: decimal digits, leading zeros allowed, such as 7 or 0007. */
-const WORD_NUMBER = /^\d+$/u;
-
 /**
- * The word index, counted from 0, of a word number as written in `syntax`, counted from 1 as
+ * The word index, counted from 0, of a word number as written in `syntax`, decimal digits by
+ * default (DECIMAL_DIGITS), counted from 1 as
  * Seedshift does, for WORD_NUMBER_RANGE; undefined when it is none. Every reader of word numbers
  * (phrases, shares, the word table, marked codes) reads them through it.
  */
-export function wordIndexOf(token: string, syntax: RegExp = WORD_NUMBER): number | undefined {
+export function wordIndexOf(token: string, syntax?: RegExp): number | undefined {
   return WordTable.indexOfNumber(token, syntax);
 }
 
@@ -152,7 +151,7 @@ export function runTogetherNumbers(token: string): boolean {
 /** wordIndexOf for a word number of a phrase; throws why it is none, its digits or its range. */
 export function wordIndexOfNumber(token: string): number {
   if (runTogetherNumbers(token)) throw ERRORS.create("word-numbers-run-together", []);
-  if (!WORD_NUMBER.test(token))
+  if (!DECIMAL_DIGITS.test(token))
     throw ERRORS.create("indexes-decimal-integers-from", [`${WORD_NUMBERS_THROUGH}`]);
   const index = wordIndexOf(token);
   if (index === undefined)

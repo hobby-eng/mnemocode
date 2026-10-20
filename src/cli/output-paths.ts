@@ -9,6 +9,7 @@ import { printableText, terminalNotice } from "./terminal.js";
 import { FILE_INPUTS, FILE_OUTPUTS, FOLDER_OUTPUTS, SAVED_OPTIONS } from "./output-options.js";
 import { DOCUMENT_EXTENSIONS } from "../export/document-formats.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { errorCode } from "../core/refusal.js";
 
 const ERRORS = new ErrorCatalog("cli.output-paths", {
   "path-empty-paths-not-accepted-results-always-appear": (value0: string) =>
@@ -168,8 +169,7 @@ async function nearestExisting(
       return { real: await realpath(ancestor), missing: [...missing].reverse() };
     } catch (error) {
       const parent = dirname(ancestor);
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT" || parent === ancestor)
-        return undefined;
+      if (errorCode(error) !== "ENOENT" || parent === ancestor) return undefined;
       missing.push(basename(ancestor));
       ancestor = parent;
     }
@@ -267,7 +267,7 @@ export async function preflightFileDestination(
   try {
     existing = await lstat(path);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
+    const code = errorCode(error);
     // A name under a file, or a folder that cannot be looked into.
     if (code === "ENOTDIR") throw ERRORS.create("folder-file", [], { cause: error });
     if (code !== "ENOENT") throw ERRORS.create("folder-unwritable-file", [], { cause: error });

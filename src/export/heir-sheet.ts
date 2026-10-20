@@ -13,7 +13,7 @@ import { MM } from "./business-layout.js";
 import { clearDocumentMetadata } from "./document-metadata.js";
 import { documentWithFont } from "./pdf-documents.js";
 import type { AssetSource } from "./platform.js";
-import { pageDimensions } from "./card-settings.js";
+import { millimetreSizeLabel, pageDimensions } from "./card-settings.js";
 import { listInWords } from "../core/places.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
@@ -92,8 +92,7 @@ export const HEIR_SHEET_MM: Readonly<Record<HeirSheetSize, readonly [number, num
 
 /** A size of the sheet in the words of the menu and the help, such as "148 x 210 mm". */
 export function heirSheetSizeLabel(size: HeirSheetSize): string {
-  const [width, height] = HEIR_SHEET_MM[size];
-  return `${width} x ${height} mm`;
+  return millimetreSizeLabel(HEIR_SHEET_MM[size]);
 }
 
 /** A5 portrait, the size of a notebook. */

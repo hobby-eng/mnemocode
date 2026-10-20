@@ -4,7 +4,7 @@ import { wordlist as chinese } from "@scure/bip39/wordlists/traditional-chinese.
 import { englishTokens, englishWordlist } from "./english-words.js";
 import { hexCodePoint } from "./code-text.js";
 import { WORD_NUMBER_RANGE, WORD_NUMBERS_THROUGH } from "./bip39-sizes.js";
-import { inWholeRange, wholeNumberOf } from "./typed-number.js";
+import { DECIMAL_DIGITS, inWholeRange, wholeNumberOf } from "./typed-number.js";
 import type { MappingRow } from "./types.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
@@ -46,7 +46,6 @@ const LAYOUTS: Readonly<Record<WordTableFormat, readonly (keyof typeof COLUMNS)[
   unicode: ["index", "chinese", "unicode_hex"],
   mapping: ["index", "english", "chinese", "unicode_hex"],
 };
-const WORD_NUMBER = /^\d+$/u;
 // UTF-16 surrogate code points are code units, never Unicode scalar values.
 const SURROGATE_CODE_POINTS = { min: 0xd800, max: 0xdfff } as const;
 
@@ -117,7 +116,7 @@ export class WordTable {
   }
 
   /** A written word number as a zero-based BIP39 index; undefined for other text or numbers. */
-  static indexOfNumber(token: string, syntax: RegExp = WORD_NUMBER): number | undefined {
+  static indexOfNumber(token: string, syntax: RegExp = DECIMAL_DIGITS): number | undefined {
     const number = wholeNumberOf(token, syntax, WORD_NUMBER_RANGE);
     return number === undefined ? undefined : number - WORD_NUMBER_RANGE.min;
   }

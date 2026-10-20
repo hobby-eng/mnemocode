@@ -63,19 +63,13 @@ import { clearPrivateScreen, onPrivateScreen } from "./private-screen.js";
 import { PrivateSteps } from "./private-steps.js";
 import {
   type Channel,
-  terminalLayout,
   terminalLine,
   terminalResultHeader,
   terminalNotice,
-  terminalStatus,
   FINGERPRINT_DISCLOSURE,
 } from "./terminal.js";
 import type { Choice, Explanation } from "./terminal-choice.js";
-import {
-  CHECKSUM_INVALID,
-  reportOriginalFingerprint,
-  showOriginalPhrase,
-} from "./fingerprint-report.js";
+import { reportChecksumAndFingerprint, showOriginalPhrase } from "./fingerprint-report.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
 import { defined } from "../core/defined.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
@@ -233,15 +227,7 @@ function showRecoveredParts(result: DecodedResult, channel: Channel): void {
 /** The phrase on one line, then its checksum and fingerprint, for a file or a pipe. */
 function showRecoveredPlain(result: DecodedResult, channel: Channel): void {
   terminalLine(channel, result.recoveredMnemonic);
-  if (terminalLayout("stderr")) {
-    console.error("");
-    terminalStatus(
-      "BIP39 checksum",
-      result.checksumValid ? "valid" : CHECKSUM_INVALID,
-      result.checksumValid,
-    );
-  } else console.error(`BIP39 checksum: ${result.checksumValid ? "valid" : CHECKSUM_INVALID}.`);
-  if (result.checksumValid) reportOriginalFingerprint(result.recoveredMnemonic);
+  reportChecksumAndFingerprint(result.recoveredMnemonic, result.checksumValid);
 }
 
 // On the private screen.

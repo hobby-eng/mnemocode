@@ -50,7 +50,7 @@ import { withPlannedDecoys, type SheetShaper } from "./card-plan.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 import { Redacted } from "../core/redacted.js";
 import { defined } from "../core/defined.js";
-import { CardValues } from "./card-values.js";
+import { OwnedCardContent } from "./card-values.js";
 
 const ERRORS = new ErrorCatalog("export.sskr-render", {
   "unsupported-sskr-card-style": () => "Unsupported SSKR card style.",
@@ -107,18 +107,15 @@ type ResolvedOptions = Omit<SskrRenderOptions, "layout"> & { readonly layout: Ss
 interface Member {
   readonly share: ShareCardShare;
   readonly memberIndex: number;
-  readonly settings: Omit<SskrCardContent, "colors" | "labels" | "payload">;
-  readonly values: CardValues;
+  readonly owned: OwnedCardContent<SskrCardContent>;
 }
 
 function ownedMember(share: ShareCardShare, memberIndex: number, content: SskrCardContent): Member {
-  const { colors, labels, payload, ...settings } = content;
-  return { share, memberIndex, settings, values: new CardValues({ colors, labels, payload }) };
+  return { share, memberIndex, owned: new OwnedCardContent(content) };
 }
 
 function contentOf(member: Member): SskrCardContent {
-  const { colors, labels, payload } = member.values.view;
-  return { ...member.settings, colors, payload, ...(labels === undefined ? {} : { labels }) };
+  return member.owned.content;
 }
 
 /**
@@ -214,7 +211,7 @@ export class ShareCardSet extends Redacted implements Disposable {
       }
       return new ShareCardSet(drawing, options, design, members);
     } catch (error) {
-      for (const member of members) member.values.wipe();
+      for (const member of members) member.owned.values.wipe();
       throw error;
     } finally {
       for (const share of shares) share.wipe();
@@ -260,7 +257,7 @@ export class ShareCardSet extends Redacted implements Disposable {
       this.#assertLive();
       return new ShareCardSet(this.#drawing, options, this.#design, members);
     } catch (error) {
-      for (const member of members) member.values.wipe();
+      for (const member of members) member.owned.values.wipe();
       throw error;
     }
   }
@@ -288,12 +285,12 @@ export class ShareCardSet extends Redacted implements Disposable {
     this.#assertLive();
     if (this.#options.layout === "individual") return [];
     return this.#members
-      .filter((member) => member.settings.cardQr === true)
+      .filter((member) => member.owned.settings.cardQr === true)
       .map((member) =>
         Object.freeze({
           reference: member.share.reference,
           name: member.share.name,
-          payload: member.values.view.payload,
+          payload: member.owned.values.view.payload,
         }),
       );
   }
@@ -389,7 +386,7 @@ export class ShareCardSet extends Redacted implements Disposable {
         fragment,
         businessOffset,
       );
-      return member.values.checkedBytes(bytes);
+      return member.owned.values.checkedBytes(bytes);
     } catch (error) {
       this.#assertLive();
       throw error;
@@ -414,7 +411,7 @@ export class ShareCardSet extends Redacted implements Disposable {
     }
     try {
       const bytes = await joinedDocuments(documents());
-      return defined(this.#members[0]).values.checkedBytes(bytes);
+      return defined(this.#members[0]).owned.values.checkedBytes(bytes);
     } catch (error) {
       this.#assertLive();
       throw error;
@@ -422,12 +419,12 @@ export class ShareCardSet extends Redacted implements Disposable {
   }
 
   #assertLive(): void {
-    defined(this.#members[0]).values.assertLive();
+    defined(this.#members[0]).owned.values.assertLive();
   }
 
   /** Overwrites retained card values immediately; public layout and share metadata remain. */
   wipe(): void {
-    for (const member of this.#members) member.values.wipe();
+    for (const member of this.#members) member.owned.values.wipe();
   }
 
   /** Ends this plan after its borrowed renders/conversions have settled. */

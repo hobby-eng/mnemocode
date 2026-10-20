@@ -9,8 +9,11 @@ const ERRORS = new ErrorCatalog("core.typed-number", {
 //
 // Host-neutral and without packages (test/portable-modules.test.ts).
 
-/** Decimal digits only: no sign, point, exponent or white space inside; leading zeros allowed. */
-const DIGITS = /^\d+$/u;
+/**
+ * Decimal digits only: no sign, point, exponent or white space inside; leading zeros allowed. The
+ * one rule of a whole number as written, which a word number follows too (AUD-037-ARC002).
+ */
+export const DECIMAL_DIGITS = /^\d+$/u;
 
 /**
  * The whole numbers from `min` through `max`, both included: a rule of the library, such as how
@@ -71,7 +74,7 @@ export function typedWholeNumber(
   range: WholeRange,
   refusal = `Type a number from ${rangeText(range)}.`,
 ): number {
-  const number = wholeNumberOf(answer, DIGITS, range);
+  const number = wholeNumberOf(answer, DECIMAL_DIGITS, range);
   if (number === undefined) throw ERRORS.create("typed-whole-number-refused", [refusal]);
   return number;
 }

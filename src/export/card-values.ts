@@ -79,3 +79,44 @@ export class CardValues extends Redacted implements Disposable {
     this.wipe();
   }
 }
+
+/** The codes of a card as its content carries them: without labels where it has none. */
+type ContentCodes = Omit<CardValueView, "labels"> & { readonly labels?: readonly string[] };
+
+/**
+ * Card content whose codes are owned (CardValues): its settings as they are, and its colours,
+ * labels and payload in owned text, put back together on request. The one place that takes a
+ * card's content apart and builds it again, for the cards of a backup and of each share
+ * (AUD-037-ARC002).
+ */
+export class OwnedCardContent<Content extends CardValueView> implements Disposable {
+  /** The owned codes, which a renderer checks its late results against. */
+  readonly values: CardValues;
+  readonly #settings: Omit<Content, keyof CardValueView>;
+
+  constructor(content: Content) {
+    const { colors, labels, payload, ...settings } = content;
+    this.#settings = settings;
+    this.values = new CardValues({ colors, labels, payload });
+  }
+
+  /** The settings of the content, its public part, which hold no code. */
+  get settings(): Omit<Content, keyof CardValueView> {
+    return this.#settings;
+  }
+
+  /** The content again, with fresh views of its codes; refused once its codes are wiped. */
+  get content(): Omit<Content, keyof CardValueView> & ContentCodes {
+    const { colors, labels, payload } = this.values.view;
+    return { ...this.#settings, colors, payload, ...(labels === undefined ? {} : { labels }) };
+  }
+
+  /** Wipes the owned codes; the settings hold nothing secret. */
+  wipe(): void {
+    this.values.wipe();
+  }
+
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
+}
