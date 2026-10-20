@@ -53,7 +53,9 @@ export interface WordCompletion {
  * `line` is the text typed before the cursor; the hint and the completion are about its last word.
  */
 export interface WordHints {
+  /** The hint for the last word of `line` (WordHint); "nothing" where no word is being typed. */
   hint(line: string): WordHint;
+  /** What Tab adds to the last word of `line`; nothing where no word of the list begins with it. */
   completion(line: string): WordCompletion;
 }
 
@@ -62,7 +64,9 @@ const NO_COMPLETION: WordCompletion = Object.freeze({ letters: "", wordEnds: fal
 
 /** What a person reads a list's words as: "BIP39 word" and "BIP39 words". */
 export interface WordNames {
+  /** The name of one word, as a count of one and a warning use it: "BIP39 word". */
   readonly one: string;
+  /** The name of several, as a count of more than one uses it: "BIP39 words". */
   readonly many: string;
 }
 
@@ -205,6 +209,11 @@ export class LineWordHints implements WordHints {
   readonly #listOf: (part: string) => WordList | undefined;
   readonly #partOf: (line: string) => string;
 
+  /**
+   * `listOf` gives the list of the part being typed, or undefined where its form has no words;
+   * `partOf` takes that part of the line, the whole line by default. Both are the host's, kept as
+   * given; whatever they throw passes through the hint and the completion.
+   */
   constructor(
     listOf: (part: string) => WordList | undefined,
     partOf: (line: string) => string = (line) => line,

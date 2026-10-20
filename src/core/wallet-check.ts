@@ -24,6 +24,10 @@ const ERRORS = new ErrorCatalog("core.wallet-check", {
 
 /** What the host's wallet check says of one phrase. */
 export interface WalletMatch {
+  /**
+   * Whether the phrase is the wallet named: only true is a match, and an answer whose field is no
+   * boolean is refused (core.wallet-check.malformed-wallet-answer, askWallet).
+   */
   readonly matched: boolean;
   /** Where the wallet matched, such as m or m/84'/0'/0'/0/0. */
   readonly path?: string | undefined;

@@ -92,6 +92,7 @@ export type RestoreProgress = DateSearchProgress;
 
 /** How a host follows and stops a search. */
 export interface RestoreRun extends SearchRun {
+  /** Called now and then with the tries made, of all, and the phrases found and matched. */
   readonly onProgress?: ((progress: RestoreProgress) => void) | undefined;
 }
 
@@ -121,10 +122,15 @@ export type CompleteShares = Extract<SharesRead, { kind: "complete" }>;
 
 /** Shares with ? marks, assessed together: the plan of their search and its report. */
 export interface MarkedShares {
+  /** Tells marked shares from the other outcomes of a read. */
   readonly kind: "marked";
+  /** The plan of their search, owned here until ShareRestore.search or releaseRead wipes it. */
   readonly plan: JointPlan;
+  /** The report of the assessment, with this machine's pace and the places of the shares. */
   readonly report: RepairReport;
+  /** The place of each share among those typed, counted from 1, by its index in the plan. */
   readonly places: readonly number[];
+  /** The lines of the report (RepairReport.lines), said before any search. */
   readonly lines: readonly ReportLine[];
 }
 
@@ -148,16 +154,24 @@ export function wordCountOf(
 
 /**
  * How far a search goes without the person's yes: share combinations (--max-tries) and date
- * combinations for every phrase (--max-candidates); without them, as long as QUESTION_SECONDS.
+ * combinations (--max-candidates); without them, as long as QUESTION_SECONDS.
  */
 export interface SearchLimits {
+  /** Share combinations, digest checks, that a search of marked shares tries without a question. */
   readonly shares?: number | undefined;
+  /**
+   * Date combinations that a date search tries without a question: in all over the phrases
+   * searched (dateSearchDecision), and those of one phrase before a search of marked shares, which
+   * does not yet tell how many phrases it gives (RepairReport.needsQuestion).
+   */
   readonly dates?: number | undefined;
 }
 
 /** A search decision: its question when it waits for the person's yes, or its notice. */
 export interface SearchDecision {
+  /** What to ask before the search, such as "Search 3,650 date combinations, about 9 hours?". */
   readonly question?: string;
+  /** What the search tries and about how long it takes, when it starts without a question. */
   readonly notice?: string;
 }
 
@@ -203,7 +217,12 @@ export function searchDecision(
 export interface ShareRestoreRequest extends RestoreRun {
   /** How far a search goes without the person's yes. */
   readonly limits?: SearchLimits | undefined;
+  /**
+   * The shares as typed; the restore refuses with core.secret-value.wiped when they end while a
+   * host step is awaited.
+   */
   readonly input: ShareInput;
+  /** The mode that the phrase was split in: "direct", or "seedshift", which takes `dates`. */
   readonly mode: ShareMode;
   /** The dates of a Seedshift phrase, which may hold ?; none without Seedshift. */
   readonly dates?: DatesAnswer | undefined;
@@ -227,6 +246,7 @@ export interface RestoredPhrase extends UnmaskedPhrase {
 
 /** The seed phrases that the sets of a restore give, with their sets. */
 export interface PhrasesFound {
+  /** Tells phrases found from the other outcomes of a restore. */
   readonly kind: "phrases";
   /** The phrases kept: all of them, or the wallet's. */
   readonly phrases: readonly RestoredPhrase[];
@@ -263,8 +283,11 @@ export type ShareStop =
 
 /** Too few shares to restore a phrase: a repair then writes each share again on its own. */
 export interface FewShares {
+  /** Tells too few shares from the other outcomes of a restore. */
   readonly kind: "few";
+  /** Why the shares restore no phrase, such as how many the set needs, for the person. */
   readonly message: string;
+  /** The lines of the report, said before the message. */
   readonly lines: readonly ReportLine[];
 }
 
@@ -314,9 +337,11 @@ export type ShareExportDecision<Result extends PhrasesFound | { readonly kind: "
 
 /** A share written again, by its place among those typed. */
 export interface RepairedShare {
+  /** The share's place among those typed, counted from 1. */
   readonly number: number;
   /** The share in the form asked for, or in its own. */
   readonly text: string;
+  /** The form that `text` is written in. */
   readonly format: ShareFormat;
   /** The share as an SSKR UR record, which cards and share files take. */
   readonly record: string;
@@ -324,8 +349,11 @@ export interface RepairedShare {
 
 /** A set of shares that fits, with the original fingerprint of its phrase, after the dates. */
 export interface ShareVariant {
+  /** The host's fingerprintOf of the phrase; undefined for a share repaired alone, of no phrase. */
   readonly fingerprint: string | undefined;
+  /** The set's shares written again, each named by its place. */
   readonly shares: readonly RepairedShare[];
+  /** What the repair filled in, share by share, each guess marked. */
   readonly repairs: readonly ShareRepairs[];
 }
 
@@ -386,6 +414,10 @@ export class ShareRestore {
   readonly #platform: ShareRepairPlatform;
   readonly #repair: JointRepair;
 
+  /**
+   * Binds the host's platform; throws sskr.joint-repair.share-repair-host-s-share-platform (a
+   * TypeError) when it lacks hmacSha256 or combineShares.
+   */
   constructor(platform: ShareRepairPlatform) {
     this.#platform = platform;
     this.#repair = new JointRepair(platform);

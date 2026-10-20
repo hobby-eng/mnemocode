@@ -19,6 +19,12 @@ export class CardValues extends Redacted implements Disposable {
   readonly #colors: number;
   readonly #labels: number | undefined;
 
+  /**
+   * Copies the colors, labels and payload of `values` into owned UTF-16 code units; the caller
+   * keeps its arrays. Throws export.card-values.shape, a TypeError, unless `values` is an object
+   * whose colors are an array and whose labels are absent or an array, and core.secret-value.text
+   * unless each code and the payload is a string.
+   */
   constructor(values: CardValueView) {
     super("CardValues");
     if (values === null || typeof values !== "object" || Array.isArray(values))
@@ -94,6 +100,10 @@ export class OwnedCardContent<Content extends CardValueView> implements Disposab
   readonly values: CardValues;
   readonly #settings: Omit<Content, keyof CardValueView>;
 
+  /**
+   * Takes `content` apart: its settings as they are, its codes copied into owned bytes, refused as
+   * CardValues refuses them.
+   */
   constructor(content: Content) {
     const { colors, labels, payload, ...settings } = content;
     this.#settings = settings;
@@ -116,6 +126,7 @@ export class OwnedCardContent<Content extends CardValueView> implements Disposab
     this.values.wipe();
   }
 
+  /** Ends this owner's lifetime at the end of its `using` scope: wipes its codes. */
   [Symbol.dispose](): void {
     this.wipe();
   }

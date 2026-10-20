@@ -88,6 +88,12 @@ export class CardPreview {
   readonly #drawing: CardDrawing;
   readonly #colors: CardContent;
 
+  /**
+   * Masks the sample phrase of `options` and builds its cards, drawn later with `drawing`. Throws
+   * export.card-preview.preview-mnemonic-contain-words for a length that BIP39 lacks,
+   * export.card-preview.colour-cards-not-written-as for a form that colour cards do not print,
+   * and core.encoded-form.unsupported-encoded-format for a colorForm that names no form.
+   */
   constructor(drawing: CardDrawing, options: CardPreviewOptions = {}) {
     this.#drawing = drawing;
     const words = options.words ?? DEFAULT_SAMPLE_WORDS;

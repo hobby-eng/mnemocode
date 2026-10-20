@@ -67,13 +67,17 @@ export type KeyMatch = (node: HDKey, publicKey: Uint8Array) => string | undefine
 
 /** A key that matched, as shown, and where it is. */
 export interface FoundKey {
+  /** What the comparison (KeyMatch) returned for the key, such as the address in standard form. */
   readonly derived: string;
+  /** The key's BIP32 path, such as m/84'/0'/0'/0/5, with ' for a hardened step. */
   readonly path: string;
 }
 
 /** The addresses of a branch that are compared: `count` of them from index `first` on. */
 export interface AddressRange {
+  /** The index of the first address compared, from 0 through LAST_NORMAL_INDEX. */
   readonly first: number;
+  /** How many addresses in a row, from 1 through MAX_ADDRESS_COUNT; none past LAST_NORMAL_INDEX. */
   readonly count: number;
 }
 

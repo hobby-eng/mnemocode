@@ -261,6 +261,7 @@ export class AmbiguousMarksError extends Error {
   /** Stable code for marked Color Unicode input exceeding the bounded reading search. */
   readonly code: ShareRepairErrorCode = "ambiguous-marks";
 
+  /** Its message is always AMBIGUOUS_MARK_WIDTHS, which holds nothing of the share. */
   constructor() {
     super(AMBIGUOUS_MARK_WIDTHS);
     this.name = "AmbiguousMarksError";
@@ -554,10 +555,13 @@ const COLOR_UNICODE_CODE = (token: string): boolean =>
 
 /** A form written as codes apart, with what markProblem and markCount ask of it. */
 export interface CodeForm {
+  /** One code of the form as a refusal names it, in lower case, such as "color". */
   readonly name: string;
+  /** The codes of the form as a refusal names them, such as "Unicode codes". */
   readonly plural: string;
   /** The symbols of a code, where a ? may stand for one of them. */
   readonly digits?: number;
+  /** Whether `token` is one whole code of this form as written, with no ? in it. */
   readonly reads: (token: string) => boolean;
 }
 

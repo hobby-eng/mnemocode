@@ -33,6 +33,7 @@ export function nodeShareCards(
  * files and its format.
  */
 export interface SskrExportOptions extends SskrRenderOptions {
+  /** The new folder of the card files, as the person named it; empty when none was named. */
   readonly directory: string;
   /** The format of the card files: PDF by default (DEFAULT_DOCUMENT_FORMAT), or an image format. */
   readonly imageFormat?: DocumentFormat;

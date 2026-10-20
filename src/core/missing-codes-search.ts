@@ -60,8 +60,11 @@ export type MissingCodesWay = "encoded" | "wallet" | "list";
 
 /** A way offered for codes, with the words a host shows for it. */
 export interface MissingCodesWayChoice {
+  /** The way, which one method prepares: byEncodedFingerprint, byWallet or listed. */
   readonly way: MissingCodesWay;
+  /** The way's name in a list of choices, such as "The wallet". */
   readonly label: string;
+  /** What the way needs or does, shown beside its label, in lower case: "compare them yourself". */
   readonly note: string;
 }
 
@@ -86,8 +89,11 @@ export function foundAmongOthers(others: number): string {
 
 /** One candidate of a listed search: the codes, the phrase they give, and its fingerprint. */
 export interface MissingCodesRow {
+  /** The codes written in their form, as encode writes them (EncodedBackup.text). */
   readonly codes: string;
+  /** The seed phrase that they give with the dates, English words; its checksum is valid. */
   readonly phrase: string;
+  /** The host's master fingerprint of the phrase with an empty BIP39 passphrase, as it gave it. */
   readonly fingerprint: string;
 }
 
@@ -96,8 +102,14 @@ export interface MissingCodesRow {
  * the way needed no dates, which the host then asks as for complete codes.
  */
 export interface MissingCodesFound {
+  /** What the result is: one set of codes found. */
   readonly kind: "found";
+  /** The codes found, complete; the caller owns the backup and wipes it. */
   readonly backup: EncodedBackup;
+  /**
+   * The complete dates that the codes decode with, known or found; undefined where the way needed
+   * no dates (the encoded fingerprint), and empty where the codes were not masked.
+   */
   readonly dates?: readonly DateShiftDate[] | undefined;
   /** The dates as found by a search of their forgotten digits, as DD-MM-YYYY joined by spaces. */
   readonly foundDates?: string | undefined;
@@ -154,7 +166,19 @@ export interface MissingCodesRun extends SearchRun {
  * A found backup is transferred to the caller and survives disposal of this way.
  */
 export interface MissingCodesWaySearch extends Disposable {
+  /**
+   * The size of the search and about how long it takes here, timed on `now`, the host's clock
+   * (performance.now by default), except the list way, which takes no time to plan; asked for
+   * first when it tries more than `limit`, the person's own limit, or without one takes longer
+   * than QUESTION_SECONDS (SearchPlan). Refused after wipe (core.missing-codes-search.way-wiped);
+   * the host's failures pass through.
+   */
   plan(limit?: number, now?: MonotonicClock): Promise<MissingCodesPlan>;
+  /**
+   * The search, with the host's services in `run`: "stopped" where its signal aborts it. Refused
+   * after wipe (core.missing-codes-search.way-wiped), and where more rows fit than a list holds
+   * (list-overflow, MissingCodesSearch.isListOverflow); the host's failures pass through.
+   */
   run(run?: MissingCodesRun): Promise<MissingCodesResult>;
   /** Ends this prepared way, releases its inputs and refuses further planning/publication. */
   wipe(): void;
@@ -332,6 +356,11 @@ export class MissingCodesSearch {
   readonly #codes: MissingCodes;
   readonly #fingerprint: PhraseFingerprint;
 
+  /**
+   * Borrows `codes`, whose owner keeps it live while ways of it are prepared and run, and binds the
+   * host's `fingerprint`; refuses one that is no function
+   * (core.missing-codes-search.search-host-s-fingerprint-function, a TypeError).
+   */
   constructor(codes: MissingCodes, fingerprint: PhraseFingerprint) {
     if (typeof fingerprint !== "function")
       throw ERRORS.create("search-host-s-fingerprint-function", []);

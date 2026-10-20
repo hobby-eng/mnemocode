@@ -37,7 +37,12 @@ const ERRORS = new ErrorCatalog("export.render", {
 
 /** One card output: the design that draws it and the content it draws. */
 export interface CardJob {
+  /**
+   * The design that draws it; one of another kind than the content is refused
+   * (export.render.template-does-not-support).
+   */
   readonly template: CardTemplate;
+  /** The codes, the settings and the texts that the design draws; its decoys once planned. */
   readonly content: CardContent;
 }
 
@@ -102,6 +107,7 @@ export class PlannedCards extends Redacted implements Disposable {
     this.#content.wipe();
   }
 
+  /** Wipes the planned codes when the owning scope ends (wipe); a later job is refused. */
   [Symbol.dispose](): void {
     this.wipe();
   }

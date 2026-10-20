@@ -111,16 +111,23 @@ const WORDLIST_SHA256 = "187db04a869dd9bc7be80d21a86497d692c0db6abd3aa8cb6be5d61
 
 /** A check that passed, with the time it took. */
 export interface SelfTestRow {
+  /** The check's name (SelfTestCheck.name). */
   readonly name: string;
+  /** What the check covers (SelfTestCheck.detail). */
   readonly detail: string;
+  /** How long it ran, in milliseconds with fractions, as performance.now measures it. */
   readonly milliseconds: number;
 }
 
 /** What a self-test that passed reports. */
 export interface SelfTestReport {
+  /** A row for each check, in the order they ran: `before`, the library and features, `after`. */
   readonly rows: readonly SelfTestRow[];
+  /** How many vectors of the public vectors file were checked. */
   readonly publicVectors: number;
+  /** How many encodings were decoded back to their phrase: every length and form, three modes. */
   readonly roundTrips: number;
+  /** How long the whole self-test ran, in milliseconds with fractions. */
   readonly milliseconds: number;
 }
 
@@ -147,8 +154,9 @@ export interface SelfTestHost {
    * evidence or the coins: run after the library's, before `after`.
    */
   readonly features?: readonly SelfTestFeature[];
-  /** The host's own checks, run before the library's and after them. */
+  /** The host's own checks, run before the library's, such as the command line's protection. */
   readonly before?: readonly SelfTestCheck[];
+  /** The host's own checks, run after the library's and the features', last of all. */
   readonly after?: readonly SelfTestCheck[];
 }
 
@@ -498,6 +506,10 @@ function featureChecks(host: SelfTestHost): SelfTestCheck[] {
 export class MnemoCodeSelfTest {
   readonly #host: SelfTestHost;
 
+  /**
+   * Binds the services of `host`; refuses a host without a fingerprint function
+   * (core.self-test.self-test-host-s-fingerprint-function, a TypeError).
+   */
   constructor(host: SelfTestHost) {
     if (typeof host?.fingerprint !== "function")
       throw ERRORS.create("self-test-host-s-fingerprint-function", []);

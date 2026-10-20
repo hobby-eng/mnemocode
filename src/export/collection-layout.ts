@@ -31,8 +31,11 @@ const ERRORS = new ErrorCatalog("export.collection-layout", {
 
 /** Where one card of a sheet goes, and where its caption goes below it, in millimetres. */
 export interface StudyBox extends CardBox {
+  /** The top of the caption's first line, in millimetres from the top edge of the page. */
   readonly captionTop: number;
+  /** The width of the caption's column, in millimetres: its whole cell, at least the card's. */
   readonly captionWidth: number;
+  /** The left edge of the caption's column, in millimetres from the left edge of the page. */
   readonly captionX: number;
 }
 
@@ -41,17 +44,21 @@ export interface StudyBox extends CardBox {
  * its text and its heading. The frame and the layout read every per-size value from it.
  */
 export interface StudySheetMetrics {
-  /** The margin on each side, and the heights of the heading and of the footer, in millimetres. */
+  /** The margin on each side, in millimetres. */
   readonly margin: number;
+  /** The room of the heading at the top of the page, in millimetres, which no card enters. */
   readonly headingHeight: number;
+  /** The room of the footer at the bottom of the page, in millimetres, which no card enters. */
   readonly footer: number;
-  /** The size of the captions in points, and the height of one caption line in millimetres. */
+  /** The size of the captions, in points. */
   readonly fontSize: number;
+  /** The height of one caption line, in millimetres. */
   readonly lineHeight: number;
   /** The room between two cards, and between the cards and the QR code, in millimetres. */
   readonly gap: number;
-  /** The room that a caption adds below its lines, and its distance below the card. */
+  /** The room that a caption adds below its lines, in millimetres. */
   readonly captionPad: number;
+  /** The distance of a caption's first line below its card, in millimetres. */
   readonly captionOffset: number;
   /** The tops of the heading's lines and of the rule under it, from the top edge. */
   readonly rows: {
@@ -63,8 +70,9 @@ export interface StudySheetMetrics {
   };
   /** The size of the title, in points. */
   readonly titleSize: number;
-  /** The heading's two smaller lines and the footer, at these shares of the caption size. */
+  /** The size of the heading's two smaller lines, as a share of the caption size. */
   readonly headingScale: number;
+  /** The size of the footer line, as a share of the caption size. */
   readonly footerScale: number;
   /** The top of the footer line, from the bottom edge. */
   readonly footerBaseline: number;
@@ -77,10 +85,13 @@ export interface StudySheetMetrics {
  * place of its QR code, in millimetres.
  */
 export interface StudyLayout {
+  /** The width of the page in its orientation, in millimetres. */
   readonly width: number;
+  /** The height of the page in its orientation, in millimetres. */
   readonly height: number;
-  /** The cards in a row, and the rows. */
+  /** The cards in a full row, from 1 to MAX_COLUMNS. */
   readonly columns: number;
+  /** The rows of cards, from 1; the last one may hold fewer than `columns`. */
   readonly rows: number;
   /** The measures of the sheet's page size. */
   readonly metrics: StudySheetMetrics;
@@ -88,9 +99,14 @@ export interface StudyLayout {
   readonly header: number;
   /** A card-sized page: the heading sits beside the QR code, and there is no rule or slogan. */
   readonly compact: boolean;
+  /** The box of each card and its caption, in the order of the cards: `index` is its place. */
   readonly cards: readonly StudyBox[];
   /** The pitch of the cards, which a material's backdrop lays its pattern out by. */
   readonly grid: CardGrid;
+  /**
+   * The sheet's QR code: its top left corner, in millimetres from the top left of the page, and its
+   * side in millimetres, quiet zone included; absent where the sheet prints no QR code.
+   */
   readonly qr?: { readonly x: number; readonly y: number; readonly size: number };
 }
 
@@ -452,6 +468,7 @@ export function collectionSheetLayout(
 
 /** What the sheet of a design is planned from: its font, the shape of a card and the captions. */
 export interface SheetShape {
+  /** The font that the captions are measured in, as the sheet draws them. */
   readonly font: PDFFont;
   /** The shape of a card's box, width over height. */
   readonly aspect: number;
@@ -464,7 +481,9 @@ export interface SheetShape {
 
 /** How many cards a sheet holds, decoys included, and how it is turned (planCollectionSheet). */
 export interface SheetPlan {
+  /** The cards of the sheet, decoys included: more than the backup's own, in full rows. */
   readonly count: number;
+  /** How the sheet is turned: the orientation given, or the one whose plan won. */
   readonly orientation: CardOrientation;
 }
 

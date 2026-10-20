@@ -68,7 +68,9 @@ export type FindingKind = "unreadable" | "mode" | "count" | "places" | "other-ph
 
 /** A part of a backup that does not give the result. */
 export interface BackupFinding {
+  /** The part that does not give the result: the codes, the shares or the dates. */
   readonly part: BackupPart;
+  /** Why it does not, which gives the verdict of the whole check. */
   readonly kind: FindingKind;
   /**
    * Where in the part, counted from 1: the codes, shares or dates by their places among those
@@ -84,9 +86,11 @@ export type BackupVerdict = "restores" | "differs" | "unreadable" | "unchecked";
 
 /** What a whole check found: the verdict, its line, the finding behind it, and notes. */
 export interface BackupResult {
+  /** "restores" without a finding; otherwise the verdict of the finding's kind. */
   readonly verdict: BackupVerdict;
   /** RESTORES_MESSAGE, or the finding's line. */
   readonly message: string;
+  /** The finding behind the verdict; absent when the backup restores. */
   readonly finding?: BackupFinding;
   /** What was left out on the way, such as a copy of a share, one line each. */
   readonly notes: readonly string[];
@@ -196,11 +200,23 @@ function compareDateLists(
  * order of every check, and a host that asks part by part drives the same order through it.
  */
 export interface PartChecks<Written> {
+  /** Whether the backup has dates, which are compared after what was written down. */
   readonly dated: boolean;
+  /** The words of the seed phrase, which bound the number of dates. */
   readonly wordCount: number;
+  /**
+   * The complete dates of `line`, at most wordCount; throws why they cannot be read, naming dates
+   * by place (core.date-search and core.dates codes).
+   */
   readDates(line: string): readonly DateShiftDate[];
+  /** How what was written down differs from the result; undefined when it does not. */
   compare(written: Written): BackupFinding | undefined;
+  /** How `dates` differ from those of the result, with `written`; undefined when they do not. */
   compareDates(written: Written, dates: readonly DateShiftDate[]): BackupFinding | undefined;
+  /**
+   * What is left once the parts agree: whether `written` with `dates` restores the result, all of
+   * it checked; undefined when it does. `dates` is empty for a backup without dates.
+   */
   compareRestored(written: Written, dates: readonly DateShiftDate[]): BackupFinding | undefined;
 }
 
@@ -253,10 +269,13 @@ function checkWritten<Written>(
 export interface EncodedOriginal {
   /** The seed phrase, as the core writes it. */
   readonly mnemonic: string;
+  /** The form the codes were shown in, which codes typed again are read in without a record. */
   readonly format: EncodedFormat;
+  /** The mode of the result; one whose backup cannot be checked is refused (supports). */
   readonly mode: MaskingMode;
   /** The codes of the result as BIP39 indexes, 0 to 2047. */
   readonly codes: readonly number[];
+  /** The dates of the result, empty without Seedshift; compared in any order. */
   readonly dates: readonly DateShiftDate[];
 }
 
@@ -358,6 +377,12 @@ export class EncodedBackupCheck implements BackupCheck {
     return Masking.of(mode).capabilities.backupCheck;
   }
 
+  /**
+   * Snapshots `original` as wipeable bytes. Refuses a mode whose backup cannot be checked
+   * (core.backup-check.uncheckable), and what BackupCheckSecrets refuses: a mode that names none,
+   * a date the calendar does not have, a phrase that is not text, and codes that are not finite
+   * numbers (core.secret-value.numbers).
+   */
   constructor(original: EncodedOriginal) {
     const { mnemonic, format, mode, codes, dates } = original;
     if (!EncodedBackupCheck.supports(mode)) throw ERRORS.create("uncheckable", []);
@@ -375,10 +400,12 @@ export class EncodedBackupCheck implements BackupCheck {
     }
   }
 
+  /** Whether the backup has dates, typed again too: Seedshift's modes only. Readable after wipe. */
   get dated(): boolean {
     return this.#secrets.dated;
   }
 
+  /** The words of the seed phrase, which bound the number of dates; readable after wipe. */
   get wordCount(): number {
     return this.#secrets.wordCount;
   }
@@ -446,6 +473,10 @@ export class EncodedBackupCheck implements BackupCheck {
     );
   }
 
+  /**
+   * Checks a whole backup (BackupCheck.check): the codes, then the dates; a part that cannot be
+   * read is a finding, not a refusal. Refused once wiped (core.secret-value.wiped).
+   */
   async check(written: WrittenBackup): Promise<BackupResult> {
     return this.checkNow(written);
   }
@@ -495,6 +526,7 @@ export class EncodedBackupCheck implements BackupCheck {
 export interface ShareOriginal {
   /** The seed phrase, as the core writes it. */
   readonly mnemonic: string;
+  /** The mode the shares were made in; one that makes no shares is refused (split-modes-only). */
   readonly mode: SplitMode;
   /** The shares that restore it: as many are asked for. */
   readonly threshold: number;
@@ -565,10 +597,12 @@ export class ShareBackupCheck implements BackupCheck {
     }
   }
 
+  /** Whether the backup has dates, typed again too: Seedshift's modes only. Readable after wipe. */
   get dated(): boolean {
     return this.#secrets.dated;
   }
 
+  /** The words of the seed phrase, which bound the number of dates; readable after wipe. */
   get wordCount(): number {
     return this.#secrets.wordCount;
   }
@@ -698,6 +732,11 @@ export class ShareBackupCheck implements BackupCheck {
     );
   }
 
+  /**
+   * Checks a whole backup (BackupCheck.check): the shares, then the dates; shares that cannot be
+   * read or restored are a finding. Refused once wiped (core.secret-value.wiped); a fault of the
+   * host's ShareRepairPlatform passes through.
+   */
   async check(written: WrittenBackup): Promise<BackupResult> {
     this.#secrets.assertLive();
     let texts: string[];

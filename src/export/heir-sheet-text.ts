@@ -64,7 +64,17 @@ export type HeirBackup =
  * What the sheet for heirs says of a backup: its form, its mode and how many dates mask the phrase.
  */
 export interface HeirSheetFacts {
+  /**
+   * The backup that the sheet names. Refused by HeirInstructions.text: another kind
+   * (export.heir-sheet-text.sheet-heirs-made-encoded-backup-shamir-shares), a form or a count of
+   * words that does not exist, an impossible quorum, or codes that are no whole number from 1.
+   */
   readonly backup: HeirBackup;
+  /**
+   * How the seed phrase was masked; refused where no sheet can be made
+   * (core.masking.sheet-heirs-cannot-made-only-search-finds-seed), and for shares where no shares
+   * are made (core.masking.split-modes-only).
+   */
   readonly mode: HeirMode;
   /** How many dates mask the seed phrase; none in direct mode. */
   readonly dates: number;
@@ -298,6 +308,7 @@ const BASICS_TITLE = "The basics";
 export class HeirInstructions {
   readonly #route: HeirRoute;
 
+  /** Binds `route` for every sheet; its address is checked with each sheet's words (text). */
   constructor(route: HeirRoute) {
     this.#route = route;
   }

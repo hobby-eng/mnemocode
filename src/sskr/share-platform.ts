@@ -27,6 +27,7 @@ export class ShareCombineRefusalError extends Error {
   /** Stable native-compatible code, never an operational/initialization failure. */
   readonly code = COMBINATION_REFUSAL;
 
+  /** Its message is always the same and names no share; a host's combiner throws it. */
   constructor() {
     super("The SSKR shares do not restore a secret.");
   }

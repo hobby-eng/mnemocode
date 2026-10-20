@@ -68,10 +68,15 @@ export type CardPresentation = Readonly<Record<CopyField, string>>;
  * by the plan.
  */
 export interface CardSettings {
+  /** The size of the page; undefined: A6 for a sheet, the business size for separate cards. */
   readonly pageSize?: CardPageSize | undefined;
+  /** How the page is turned; undefined: a sheet's plan chooses, a separate card keeps its own. */
   readonly orientation?: CardOrientation | undefined;
+  /** The person's details; those left out are invented (createCardIdentity). */
   readonly profile?: CardProfile;
+  /** The texts of the design, given whole and each checked; chosen at random when undefined. */
   readonly presentation?: CardPresentation;
+  /** Whether a sheet prints the backup's QR code: only true asks; separate cards never do. */
   readonly cardQr?: boolean;
 }
 // The styles of the designs are the catalog's, which lists them once (template-catalog.ts).

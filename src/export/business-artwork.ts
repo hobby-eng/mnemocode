@@ -56,6 +56,10 @@ export class BusinessArtwork {
   readonly #codec: PngCodec;
   readonly #photographs: BundledAssetCache<RasterImage>;
 
+  /**
+   * Artwork that reads and decodes each photograph with `platform` on its first use, and encodes
+   * the recoloured PNG with it. It reads nothing yet.
+   */
   constructor(platform: AssetSource & PngCodec) {
     this.#codec = platform;
     this.#photographs = new BundledAssetCache(platform, (bytes) =>

@@ -14,6 +14,7 @@ export class InputTooLargeError extends Error {
   /** Stable code identifying an input that exceeds its admitted byte limit. */
   readonly code: ByteLimitErrorCode = "too-large";
 
+  /** `what` names the input at the start of a sentence; `limit` is in bytes, whole mebibytes. */
   constructor(what: string, limit: number) {
     super(`${what} exceeds the ${limitName(limit)} safety limit.`);
     this.name = "InputTooLargeError";

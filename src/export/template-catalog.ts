@@ -141,6 +141,7 @@ export class NoCardTemplateError extends Error {
   /** Requested CardKind, or undefined when no kind filter was given. */
   readonly kind: CardKind | undefined;
 
+  /** The refusal of cards of `kind`, or of any cards where `kind` is undefined. */
   constructor(kind: CardKind | undefined) {
     super(
       kind === undefined

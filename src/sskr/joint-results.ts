@@ -6,13 +6,17 @@ import { type ShareFormat } from "./transport.js";
 
 /** A marked element: its share and place, both counted from 1. */
 export interface MarkedElement {
+  /** The share, counted from 1 in the order the shares were given. */
   readonly share: number;
+  /** The element's place among all the elements of that share, counted from 1. */
   readonly position: number;
 }
 
 /** What one share is on its own. */
 export interface ShareAssessment {
+  /** Marked elements as typed (markCount): a lone ? or a code read in part counts once. */
   readonly marks: number;
+  /** The forms that some reading of the share fits, each once; empty when none fits. */
   readonly forms: readonly ShareFormat[];
   /** Bits still open when the share is solved alone, the fewest over its readings. */
   readonly openAlone: number;
@@ -20,13 +24,17 @@ export interface ShareAssessment {
 
 /** What reading one more element would leave open. */
 export interface ElementHelp extends MarkedElement {
+  /** Bits left open with this element read, in the way to read the shares with the most open. */
   readonly openBits: number;
 }
 
 /** What the shares are together, before any search. */
 export interface JointAssessment {
+  /** Each share on its own, in the order the shares were given. */
   readonly shares: readonly ShareAssessment[];
+  /** The secret's length in bytes, 16 to 32; absent on a refusal or where the ways disagree. */
   readonly secretBytes?: number;
+  /** The set's member threshold; absent on a refusal or where the ways to read disagree. */
   readonly threshold?: number;
   /** Ways to read the shares that fit every equation. */
   readonly branches: number;
@@ -48,11 +56,13 @@ export interface JointAssessment {
    * and nothing is planned (CORE-22); the others refuse, with `reason`.
    */
   readonly verdict: "determined" | "search" | "too-uncertain" | "no-fit" | "not-enough" | "stopped";
+  /** Why nothing is searched, in English for a person; present unless the verdict allows a search. */
   readonly reason?: string;
 }
 
 /** The shares of a set as written again, and what a repair left unsettled in them. */
 export interface RepairedShares {
+  /** Every share as repaired, in the order given; caller-owned snapshots that no wipe recalls. */
   readonly shares: readonly ReadRepairableShare[];
   /** Elements that the phrase does not depend on and nothing settles: their values are a guess. */
   readonly unsettled: readonly MarkedElement[];
@@ -60,6 +70,7 @@ export interface RepairedShares {
 
 /** A phrase that the shares restore, with every share as repaired. */
 export interface RepairedSet extends RepairedShares {
+  /** The BIP39 phrase that the shares restore, in English words; a secret string the caller owns. */
   readonly mnemonic: string;
   /**
    * Shares, counted from 1, that took no part and were not checked: members of a group with fewer
@@ -79,6 +90,8 @@ export interface RepairedSet extends RepairedShares {
  * the host stopped it (SearchRun.signal), when the sets are only those found before the stop.
  */
 export interface RepairSearch {
+  /** One set for each distinct phrase, in the order found; empty when none passed. */
   readonly sets: RepairedSet[];
+  /** The host stopped the search, so that `sets` holds only what was found before the stop. */
   readonly stopped: boolean;
 }

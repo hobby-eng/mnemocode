@@ -70,6 +70,11 @@ const ERRORS = new ErrorCatalog("export.sskr-render", {
  * the card settings.
  */
 export interface SskrRenderOptions extends CardSettings {
+  /**
+   * The design of the cards, by its style (TEMPLATE_CATALOG); a text that names no style is
+   * refused (export.sskr-render.unsupported-sskr-card-style), and a design printed on sheets only
+   * is refused for separate cards (export.template-catalog.sheets-only).
+   */
   readonly style: CardStyle;
   /** Omitted: decided by the page size. */
   readonly layout?: SskrCardLayout;

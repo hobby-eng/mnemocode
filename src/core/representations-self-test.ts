@@ -20,13 +20,17 @@ import { EncodedForm } from "./encoded-form.js";
 
 /** A known answer of the forms of codes: a phrase of `words` words written in every form. */
 export interface Answer {
+  /** How many words the phrase has: 12, 15, 18, 21 or 24, as BIP39 allows. */
   readonly words: number;
+  /** The codes of the phrase in each form, exactly as that form writes them. */
   readonly forms: Readonly<Record<EncodedFormat, string>>;
 }
 
 /** An answer with MnemoCode Seedshift: the phrase it masks and its dates, as typed. */
 export interface SeedshiftAnswer extends Answer {
+  /** The phrase that the codes mask, English words joined by single spaces. */
   readonly source: string;
+  /** The dates of the Seedshift, each written as DD-MM-YYYY (parseDate). */
   readonly dates: readonly string[];
 }
 

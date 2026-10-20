@@ -19,6 +19,7 @@ export class CandidateFileRefusedError extends Error {
   /** Stable failure category for admission, key mismatch or damaged authenticated contents. */
   readonly code: CandidateFileProblem;
 
+  /** A refusal for `code` with `message`, a whole sentence; `cause` is age's own error, if any. */
   constructor(code: CandidateFileProblem, message: string, cause?: unknown) {
     super(message, cause === undefined ? undefined : { cause });
     this.name = "CandidateFileRefusedError";

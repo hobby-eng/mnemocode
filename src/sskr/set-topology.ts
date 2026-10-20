@@ -9,11 +9,16 @@
 import type { ShareInfo } from "./share-layout.js";
 import { defined } from "../core/defined.js";
 
-/** Two shares that cannot both be right: `at`, and `with`, which came first. */
+/**
+ * Two shares that cannot both be right: `at`, and `with`, the reference share for "set" and the
+ * earlier share otherwise.
+ */
 export interface SetConflict {
   /** Another set than the reference; the same member twice; or a group with two thresholds. */
   readonly kind: "set" | "member" | "threshold";
+  /** The index of the share that conflicts, counted from 0 in the order given. */
   readonly at: number;
+  /** The index, from 0, of the share it conflicts with: the reference for "set", else earlier. */
   readonly with: number;
 }
 
@@ -139,7 +144,9 @@ export function surplusWindow<T>(base: readonly T[], member: T): T[] {
 
 /** A share given at a place, as the copy rule takes it: its UR and that place. */
 export interface PlacedShare {
+  /** The place that names the share, one to a share, such as where it was typed. */
   readonly place: number;
+  /** The share's UR as read, which a copy matches exactly however each was written. */
   readonly ur: string;
 }
 

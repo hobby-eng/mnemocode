@@ -93,6 +93,7 @@ export class TooManyForListError extends Error {
   /** Stable code for a candidate count beyond one list's capacity. */
   readonly code: CandidateListErrorCode = "too-many-for-list";
 
+  /** `advice` ends the message: how the search is narrowed, without a full stop of its own. */
   constructor(advice: string) {
     super(
       `More than ${counting(MAX_CANDIDATE_RECORDS)} candidates, more than one list holds: ${advice}.`,
@@ -122,6 +123,10 @@ export interface CandidateList {
    * it is written as none, so a writer passes the BIP39 passphrase as it is.
    */
   readonly passphrase?: string;
+  /**
+   * The candidates in their order, 1 to MAX_CANDIDATE_RECORDS of them, all with entropy of one
+   * BIP39 length (16 to 32 bytes); a list read back owns its records' entropy.
+   */
   readonly records: readonly CandidateRecord[];
 }
 
@@ -345,7 +350,9 @@ export type ListPassphrases = "none" | "list" | "records";
  * One candidate of an opened list: its seed phrase, and the BIP39 passphrase it is checked with.
  */
 export interface ListCandidate {
+  /** The seed phrase of the record's entropy, in English words separated by single spaces. */
   readonly phrase: string;
+  /** The record's own BIP39 passphrase, else the list's; "" for none. */
   readonly passphrase: string;
 }
 

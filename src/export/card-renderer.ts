@@ -19,8 +19,9 @@ const ERRORS = new ErrorCatalog("export.card-renderer", {
 });
 
 /**
- * Every service of a RenderPlatform: a record, so that the compiler refuses one left out. A host
- * written in JavaScript may pass an object without them, which the types alone do not stop.
+ * Every service of a RenderPlatform: a record, so that the compiler refuses one left out or one
+ * that is not a service. A host written in JavaScript may pass an object without them, which the
+ * types alone do not stop.
  */
 const PLATFORM_SERVICES: Readonly<Record<keyof RenderPlatform, true>> = Object.freeze({
   readAsset: true,
@@ -37,12 +38,20 @@ const PLATFORM_SERVICES: Readonly<Record<keyof RenderPlatform, true>> = Object.f
  * public artwork.
  */
 export class CardRenderer implements CardDrawing {
+  /** The platform's readAsset: the bytes of one bundled file of renderAssets. */
   readonly readAsset: (path: RenderAsset) => Promise<Uint8Array>;
+  /** The platform's randomInt, callable detached: a whole number from 0 to below the limit. */
   readonly randomInt: UniformChoice;
+  /** The platform's qrModules: the QR matrix of `payload` at QR_ERROR_CORRECTION_LEVEL. */
   readonly qrModules: (payload: string) => QrModules;
   /** Renderer-local cache of bundled public artwork, prepared with this renderer's platform. */
   readonly businessArtwork: BusinessArtwork;
 
+  /**
+   * A renderer that calls the services of `platform` on it; it reads no artwork yet. Throws
+   * export.card-renderer.card-rendering-host-s-render-platform, a TypeError, when `platform` is
+   * missing or one of its services is not a function, as a JavaScript host may pass.
+   */
   constructor(platform: RenderPlatform) {
     for (const service of Object.keys(PLATFORM_SERVICES))
       if (typeof platform?.[service as keyof RenderPlatform] !== "function")

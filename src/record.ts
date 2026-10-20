@@ -27,9 +27,13 @@ export type RecordFormat = EncodedFormat;
  * An MNC1 record as it is read: its version, its mode, its form of codes and the codes themselves.
  */
 export interface MnemoCodeRecord {
+  /** The record's version: 1, the only one read (MNEMOCODE_RECORD_VERSION). */
   readonly version: typeof MNEMOCODE_RECORD_VERSION;
+  /** The transformation mode that the codes were written in. */
   readonly mode: MaskingMode;
+  /** The form that the codes are written in, which reads them (EncodedForm). */
   readonly format: EncodedFormat;
+  /** The codes, everything after the header as it stands; never empty. */
   readonly payload: string;
 }
 

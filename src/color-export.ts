@@ -22,12 +22,25 @@ export const colorCardTemplates = templatesOfKind("colors");
  * themselves, the files to write, the design or designs, and the card settings.
  */
 export interface ColorExportOptions extends CardSettings {
+  /** The phrase's colors, one #RRGGBB code per card; refused unless they make a whole phrase. */
   readonly colors: readonly string[];
+  /**
+   * The QR code's text; undefined for the colors joined by spaces. Another text must hold the same
+   * colors, such as the phrase's Unicode codes (payloadHoldsColors).
+   */
   readonly qrPayload?: string;
+  /** Where the PDF of the cards is saved, as a new private file; undefined to draw no cards. */
   readonly pdfPath?: string;
+  /** Where the QR code is saved, as a new private PNG file; undefined to save none. */
   readonly qrPath?: string;
+  /** The title of the sheet, where a design shows one; undefined for the studio's name. */
   readonly title?: string;
+  /**
+   * The design, by its id or its number from 1 among the color designs; undefined for the first.
+   * Refused together with `templates`.
+   */
   readonly template?: ColorCardTemplateId;
+  /** The designs, each drawn in this order into the one PDF; an empty list is refused. */
   readonly templates?: readonly ColorCardTemplateId[];
 }
 

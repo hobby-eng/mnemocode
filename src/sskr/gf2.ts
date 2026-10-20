@@ -19,7 +19,9 @@ export function combination(vectors: readonly bigint[], choice: bigint): bigint 
 
 /** A vector with its companion, which records what the vector stands for. */
 export interface Reduced {
+  /** The bit vector, bit i its coordinate i; once reduced, zero when the pivots already span it. */
   readonly vector: bigint;
+  /** What the vector stands for, changed by the same XORs, such as the unknowns it combines. */
   readonly companion: bigint;
 }
 

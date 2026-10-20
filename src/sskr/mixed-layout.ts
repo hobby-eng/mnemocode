@@ -29,7 +29,9 @@ export type ZeroField = readonly [value: number, bits: number];
 
 /** Bytes packed from the units of a share, and the bits left over after the last whole byte. */
 export interface PackedUnits {
+  /** The whole bytes, each 0 to 255, the first unit's bits first. */
   readonly bytes: readonly number[];
+  /** The bits after the last whole byte, fewer than 8, which a well-formed share holds as zero. */
   readonly leftover: ZeroField;
 }
 
@@ -38,6 +40,7 @@ export interface PackedUnits {
  * so that the reader and the repair of a share in it never write them again.
  */
 export interface MixedForm {
+  /** The version byte after a share's checksum in this form: COLOR_VERSION or WORD_VERSION. */
   readonly version: number;
   /** The bits of one unit. */
   readonly unitBits: number;

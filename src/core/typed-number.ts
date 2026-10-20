@@ -20,7 +20,9 @@ export const DECIMAL_DIGITS = /^\d+$/u;
  * many addresses are compared, which each host reads in its own syntax (an option, an answer).
  */
 export interface WholeRange {
+  /** The least whole number of the range, itself included. */
   readonly min: number;
+  /** The greatest, itself included; Number.MAX_SAFE_INTEGER for a count (wholeNumbersFrom). */
   readonly max: number;
 }
 

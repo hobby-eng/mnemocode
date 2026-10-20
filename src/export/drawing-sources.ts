@@ -13,5 +13,9 @@ import type { AssetSource, QrSource, RandomSource } from "./platform.js";
  * called detached (RandomSource).
  */
 export interface CardDrawing extends AssetSource, RandomSource, QrSource {
+  /**
+   * The bundled business artwork, prepared with this drawing's own platform and kept as long as
+   * the drawing is (BusinessArtwork); it holds only public artwork.
+   */
   readonly businessArtwork: BusinessArtwork;
 }

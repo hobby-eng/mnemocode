@@ -71,7 +71,9 @@ export type ShareRepairErrorCode = "share-variants" | "ambiguous-marks";
  * share is well formed, and the SSKR payload, 5 metadata bytes and the share value.
  */
 export interface ShareStructure {
+  /** The bytes of the SSKR payload in this layout: 5 of metadata and the secret's. */
   readonly payloadLength: number;
+  /** The residual and the payload at every unit's value; the caller wipes the payload, a copy. */
   readonly evaluate: (values: readonly number[]) => {
     readonly residual: bigint;
     readonly payload: Uint8Array;
@@ -80,7 +82,12 @@ export interface ShareStructure {
 
 /** Symbolic Color Unicode constraints; prefix readings inspect only their own filled units. */
 export interface ReadingCodeConstraints {
+  /** Each color's Color Unicode codes as read, in order: a code, or ? where none could be read. */
   readonly pairs: readonly (readonly string[])[];
+  /**
+   * Whether only the pairs of the units filled so far are checked, and a code may hold ? digits;
+   * otherwise every pair is, each code whole or a lone ?.
+   */
   readonly prefix: boolean;
 }
 
@@ -89,7 +96,9 @@ export interface ReadingCodeConstraints {
  * for the reading owner to snapshot, never callbacks retaining the secret parser input.
  */
 export interface ReadingUnits {
+  /** The form the share is read in, which sets the bits of one unit (SHARE_UNITS). */
   readonly format: ShareFormat;
+  /** Each unit's value in order, below 2^unitBits; undefined where marked. Part of the secret. */
   readonly values: readonly (number | undefined)[];
   /** Codes read in full or in part, including broad patterns not expanded into candidates. */
   readonly codeConstraints?: ReadingCodeConstraints;
@@ -106,6 +115,7 @@ export interface ReadingUnits {
 
 /** The units of a share in one form, with every structure that their count allows. */
 export interface UnitModel extends ReadingUnits {
+  /** Every layout that the number of units allows; empty when none does. */
   readonly structures: readonly ShareStructure[];
 }
 
@@ -115,7 +125,9 @@ export interface UnitModel extends ReadingUnits {
  * Unicode code.
  */
 export interface ReadBits {
+  /** The bits that were read, in their places in the unit; zero where `mask` is clear. */
   readonly value: number;
+  /** The bits of the unit that were read, below 2^unitBits: four for each digit read, or all. */
   readonly mask: number;
 }
 

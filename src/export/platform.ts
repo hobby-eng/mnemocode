@@ -20,7 +20,9 @@ const ERRORS = new ErrorCatalog("export.platform", {
  * platform of its own.
  */
 export interface RasterImage {
+  /** The width in pixels, a whole number from 1 (createRasterImage). */
   readonly width: number;
+  /** The height in pixels, a whole number from 1 (createRasterImage). */
   readonly height: number;
   /** RGBA, eight bits per channel, rows from top to bottom. */
   readonly data: Uint8Array;
@@ -30,7 +32,9 @@ export interface RasterImage {
  * The modules of a QR code: the number on a side, and whether the one at a row and column is dark.
  */
 export interface QrModules {
+  /** The modules on a side, without the quiet zone: 21 for version 1, and 4 more each version. */
   readonly size: number;
+  /** Whether the module at `row` and `column`, each counted from 0 and below `size`, is dark. */
   readonly get: (row: number, column: number) => boolean;
 }
 
@@ -55,6 +59,10 @@ export interface RenderPlatform {
   readonly readAsset: (path: RenderAsset) => Promise<Uint8Array>;
   /** Uniform integer from 0 up to, but not including, the limit. */
   readonly randomInt: UniformChoice;
+  /**
+   * The PNG `bytes` as a new RGBA image that the caller owns; throws the host's own error for bytes
+   * that are no PNG, which BundledAssetCache reports as export.platform.cannot-load-card-artwork.
+   */
   readonly decodePng: (bytes: Uint8Array) => RasterImage;
   /**
    * Borrows the RGBA image synchronously, without retaining it. Returns owned PNG bytes; the
@@ -127,6 +135,7 @@ export class BundledAssetCache<T> {
   readonly #source: AssetSource;
   readonly #prepare: (bytes: Uint8Array) => T;
 
+  /** A cache of the files of `source`, each prepared by `prepare`; nothing is read before get. */
   constructor(source: AssetSource, prepare: (bytes: Uint8Array) => T) {
     this.#source = source;
     this.#prepare = prepare;

@@ -44,6 +44,7 @@ const RANDOM_REFUSAL = "The random source of the decoy cards gave a number out o
 export interface DecoyCards {
   /** A seed phrase's cards ("colors") or a share's ("sskr"). */
   readonly kind: "colors" | "sskr";
+  /** The colour of each card as # and six hexadecimal digits: the backup's own, then the decoys. */
   readonly colors: readonly string[];
   /** The codes printed in place of the colours, one per card, where the colours only decorate. */
   readonly labels?: readonly string[] | undefined;

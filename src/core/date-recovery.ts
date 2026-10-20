@@ -29,6 +29,7 @@ export interface DateCandidate {
   readonly dates: readonly DateShiftDate[];
   /** Every date that decodes the codes to `mnemonic`, the known ones too, sorted. */
   readonly allDates: readonly DateShiftDate[];
+  /** The seed phrase that the codes give with these dates, its BIP39 checksum valid. */
   readonly mnemonic: string;
 }
 

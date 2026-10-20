@@ -28,46 +28,65 @@ const ERRORS = new ErrorCatalog("export.heir-sheet", {
 
 /** A part of the back: a heading and its paragraphs. */
 export interface HeirSheetSection {
+  /** The heading of the part, printed in the heading size after a gap. */
   readonly heading: string;
+  /** Its paragraphs, in order, each wrapped at spaces to the width of the page. */
   readonly paragraphs: readonly string[];
 }
 
 /** The words of the sheet, in the order they are printed. */
 export interface HeirSheetText {
+  /** The title of the front, printed first, in the title size. */
   readonly title: string;
+  /** The line under the title that names the program that made the sheet (HeirRoute subtitle). */
   readonly subtitle: string;
+  /** The line that sends someone new to wallets to the basics on the back first. */
   readonly newcomer: string;
-  /** The heading of what the heirs need, and its items. */
+  /** The heading of what the heirs need. */
   readonly needsHeading: string;
+  /** What the heirs need, one item each, printed after a dash. */
   readonly needs: readonly string[];
-  /** The heading of the owner's hint, and the note under it. */
+  /** The heading of the owner's hint. */
   readonly hintHeading: string;
+  /** The note under the hint's heading, which says what to write by hand; ruled lines follow it. */
   readonly hintNote: string;
-  /** The title of the back, and its steps. */
+  /** The title of the back. */
   readonly stepsTitle: string;
+  /** The steps of the back, in order, each printed after its number, counted from 1. */
   readonly steps: readonly string[];
-  /** The heading of what to do when a step does not work, and that paragraph. */
+  /** The heading of what to do when a step does not work. */
   readonly troubleHeading: string;
+  /** The paragraph of what to do when a step does not work. */
   readonly trouble: string;
+  /** The warning never to type the backup into a website, in the heading size after the advice. */
   readonly warning: string;
   /** What the sheet is, for whoever keeps it; printed under the title. */
   readonly footer: string;
+  /** The title of the basics for someone new to wallets, after the steps on the back. */
   readonly basicsTitle: string;
+  /** The parts of the basics, in order. */
   readonly basics: readonly HeirSheetSection[];
 }
 
 /** A page size with the type sizes, in points, and the spacing that suit it. */
 export interface HeirSheetFormat {
+  /** The width of the page, in points, upright. */
   readonly width: number;
+  /** The height of the page, in points, upright. */
   readonly height: number;
+  /** The margin on every side of the page, in points. */
   readonly margin: number;
+  /** The type size of the titles of the front, the steps and the basics, in points. */
   readonly title: number;
+  /** The type size of the headings and of the warning, in points. */
   readonly heading: number;
+  /** The type size of the paragraphs and the items, in points. */
   readonly body: number;
+  /** The type size of the lines under the title and of the hint's note, in points. */
   readonly small: number;
-  /** Space before a heading. */
+  /** Space before a heading, in points. */
   readonly gap: number;
-  /** Distance of the ruled lines for the hint, wide enough for handwriting. */
+  /** Distance of the ruled lines for the hint, in points, wide enough for handwriting. */
   readonly ruling: number;
 }
 

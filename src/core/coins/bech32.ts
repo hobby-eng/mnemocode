@@ -48,6 +48,10 @@ export class Bech32Prefixes {
   readonly #mainnet: string;
   readonly #testnet: string | undefined;
 
+  /**
+   * The human-readable parts in small letters, without the separator, such as "bc" and "tb";
+   * `testnet` undefined where the coin's strings have no test network.
+   */
   constructor(mainnet: string, testnet?: string) {
     this.#mainnet = mainnet;
     this.#testnet = testnet;

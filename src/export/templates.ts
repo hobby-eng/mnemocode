@@ -32,7 +32,12 @@ export type { CardDrawing, CardKind };
  * description, and how it draws a sheet, a separate card and the plan of a sheet.
  */
 export interface CardTemplate {
+  /** Its id, such as business-it, by which a command names it; stable for recorded commands. */
   readonly id: string;
+  /**
+   * The kind of codes it draws; content of another kind is refused
+   * (export.render.template-does-not-support).
+   */
   readonly kind: CardKind;
   /**
    * How it draws (TEMPLATE_CATALOG); the employer on business cards follows it (sectorForStyle).
@@ -41,10 +46,16 @@ export interface CardTemplate {
   readonly style?: CardStyle;
   /** The family whose renderer draws it (TEMPLATE_CATALOG); none for a design a host made. */
   readonly family?: CardFamily;
+  /** Its name in the list of designs, such as "IT card collection". */
   readonly name: string;
+  /** What it draws and on which page sizes: a sentence beside its name in the list of designs. */
   readonly description: string;
   /** The same renderer is used for preview and ordinary export. */
   readonly render: (drawing: CardDrawing, content: CardContent) => Promise<Uint8Array>;
+  /**
+   * The PDF of the separate card `index` of `content`, counted from 0; absent for a design printed
+   * on sheets only (SHEETS_ONLY).
+   */
   readonly renderIndividual?: (
     drawing: CardDrawing,
     content: CardContent,

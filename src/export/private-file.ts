@@ -63,6 +63,7 @@ export class LeftStagingCopyError extends Error {
   /** Retained private staging folder requiring cleanup; it may still contain an extra copy. */
   readonly staging: string;
 
+  /** The file saved at `saved`, whose folder `staging` stayed: `cause` says why it stayed. */
   constructor(saved: string, staging: string, cause: unknown) {
     super(
       `Saved ${saved}, but its private staging folder ${staging}, which may still hold a copy of it, could not be removed: delete it.`,
@@ -85,6 +86,7 @@ export class FailedSaveLeftCopyError extends Error {
   /** The private staging folder left behind, which may hold a copy. */
   readonly staging: string;
 
+  /** The save that failed with `cause`, whose folder `staging` could not be removed afterwards. */
   constructor(staging: string, cause: unknown) {
     super(
       `The save failed (${describeError(cause).replace(/\.$/u, "")}), and its private staging folder ${staging}, which may hold a copy, could not be removed: delete it.`,

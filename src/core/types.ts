@@ -47,8 +47,11 @@ export function isMaskingMode(value: unknown): value is MaskingMode {
 
 /** A date of the calendar, as Seedshift takes it: year, month from 1 and day from 1. */
 export interface DateShiftDate {
+  /** The year, from 1 through 9999 (DATE_PARTS.year). */
   readonly year: number;
+  /** The month, counted from 1: 1 through 12. */
   readonly month: number;
+  /** The day of the month, counted from 1, no later than the last day of that month and year. */
   readonly day: number;
 }
 
@@ -57,11 +60,20 @@ export interface DateShiftDate {
  * Unicode codes, the dates and the shift of each word.
  */
 export interface EncodedResult {
+  /** The phrase encoded: its English words, in lower case, joined by single spaces. */
   readonly sourceMnemonic: string;
+  /** The BIP39 index of each code, from 0 through 2047, in word order: what every form writes. */
   readonly shiftedIndexes: readonly number[];
+  /** The English word of each shifted index, in the same order. */
   readonly shiftedEnglish: readonly string[];
+  /** The Unicode code of each shifted index, four uppercase hexadecimal digits, in that order. */
   readonly unicodeCodePoints: readonly string[];
+  /** The dates of the Seedshift in calendar order, earliest first; none without Seedshift. */
   readonly dates: readonly DateShiftDate[];
+  /**
+   * The shift of each word, in word order: the years, months and days of the dates in turn; each
+   * 0 without Seedshift.
+   */
   readonly shifts: readonly number[];
 }
 
@@ -70,17 +82,28 @@ export interface EncodedResult {
  * word and whether the phrase's checksum is valid.
  */
 export interface DecodedResult {
+  /** The phrase recovered: its English words, in lower case, joined by single spaces. */
   readonly recoveredMnemonic: string;
+  /** The BIP39 index of each word of it, from 0 through 2047, in word order. */
   readonly recoveredIndexes: readonly number[];
+  /** The dates it was decoded with, in calendar order, earliest first; none without Seedshift. */
   readonly dates: readonly DateShiftDate[];
+  /** The shift undone from each word, in word order; each 0 without Seedshift. */
   readonly shifts: readonly number[];
+  /**
+   * Whether the recovered phrase has a valid BIP39 checksum. False is a result, not a refusal: a
+   * host says so, and a search of the Original Seedshift filters by it.
+   */
   readonly checksumValid: boolean;
 }
 
 /** One row of the word table: a word number, its English word and its Unicode code. */
 export interface MappingRow {
+  /** The word number, counted from 1: 1 through 2048, one more than the BIP39 index. */
   readonly index: number;
+  /** The English BIP39 word of that number, in lower case. */
   readonly english: string;
+  /** The code point of its Traditional Chinese BIP39 word: four uppercase hexadecimal digits. */
   readonly unicodeHex: string;
 }
 
@@ -90,11 +113,20 @@ export interface MappingRow {
  * entropy of the legacy encoding (preservesLegacyEntropy).
  */
 export interface MissingWordCandidate {
+  /** The place of the word in the phrase, counted from 1: the phrase's length for a last word. */
   readonly position: number;
+  /** The English BIP39 word in that place, in lower case. */
   readonly word: string;
+  /** The word number of `word`, counted from 1: 1 through 2048. */
   readonly wordIndex: number;
+  /** The whole phrase with `word` in its place, English words joined by single spaces. */
   readonly mnemonic: string;
+  /** The checksum bits that the last word ends with, as 0 and 1 characters: 4 to 8 of them. */
   readonly checksumBits: string;
+  /**
+   * For a last word of the Original Seedshift (recoverLegacyValidLastWords): whether it keeps the
+   * entropy bits of the last word that was typed. Absent elsewhere.
+   */
   readonly preservesLegacyEntropy?: boolean;
 }
 
@@ -103,9 +135,16 @@ export interface MissingWordCandidate {
  * years, months and days that its digits allow.
  */
 export interface DatePattern {
+  /**
+   * The pattern in one canonical way, year first with each part's values sorted, such as
+   * 2025-??-05|15: patterns with one key must allow the same dates (KEY_CONFLICT).
+   */
   readonly key: string;
+  /** The years that it allows, from 1 through 9999, each once, in ascending order. */
   readonly years: readonly number[];
+  /** The months that it allows, counted from 1, each once, in ascending order. */
   readonly months: readonly number[];
+  /** The days of the month that it allows, counted from 1, each once, in ascending order. */
   readonly days: readonly number[];
 }
 

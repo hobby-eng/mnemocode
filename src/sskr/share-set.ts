@@ -109,7 +109,9 @@ const MAX_LIBRARY_TRIES = 2 ** 16;
 
 /** The backup that was split, in the form its shares were written in (ShareSet.backup). */
 export interface SetBackup {
+  /** The form of the first share, as the backup takes it (RESTORED_FORM). */
   readonly form: EncodedFormat;
+  /** The backup written in that form: secret, and never the same words as the phrase. */
   readonly text: string;
 }
 
@@ -118,8 +120,11 @@ export interface SetBackup {
  * threshold, and its shares, counted from 1 in the order given.
  */
 export interface ShareGroup {
+  /** The group's index in the set, counted from 0, 0 to 15. */
   readonly index: number;
+  /** The members that restore the group, 1 to 16. */
   readonly threshold: number;
+  /** The group's shares among those given, counted from 1, in the order given. */
   readonly members: readonly number[];
 }
 
@@ -393,8 +398,11 @@ export class ShareSet extends Redacted implements Disposable {
 
 /** A share as it is shown or written again: its UR, its form, and its place among those typed. */
 export interface WrittenShare {
+  /** The share as a UR, ur:sskr/ and its bytewords; it holds a part of the secret. */
   readonly ur: string;
+  /** The form that the share is written in. */
   readonly format: ShareFormat;
+  /** The share's place among those typed, or in a split's order, counted from 1. */
   readonly number: number;
 }
 

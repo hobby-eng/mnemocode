@@ -394,6 +394,7 @@ export interface DateMatch {
    * what a host decodes the codes with afterwards.
    */
   readonly allDates: readonly DateShiftDate[];
+  /** The seed phrase that the codes give with these dates, its BIP39 checksum valid. */
   readonly mnemonic: string;
   /** Where the wallet matched; absent without a wallet check, or a match without a path. */
   readonly evidence?: string | undefined;
@@ -456,7 +457,9 @@ export function secondsEach(pace: SearchPace, checks: number): number {
 export interface DateSearchOptions {
   /** The encoded seed phrase's BIP39 indexes, 0 to 2047. */
   readonly indexes: readonly number[];
+  /** The dates as typed (DatesAnswer.parse), ? for a forgotten digit; the search copies them. */
   readonly dates: DatesAnswer;
+  /** The Seedshift mode the codes were masked in; another mode is refused. */
   readonly mode: SeedshiftMode;
   /** Compares each checksum-valid phrase with the wallet; none keeps every such phrase. */
   readonly walletCheck?: WalletCheck | undefined;
@@ -502,6 +505,15 @@ export class DateSearch extends Redacted {
   readonly #maxShown: number;
   readonly #keep: number;
 
+  /**
+   * Checks `options` against each other and copies the indexes and dates. Refuses a count of
+   * indexes that no phrase has (core.bip39-sizes.expected-word-indexes), an index outside 0 to 2047
+   * (core.bip39-sizes.assert-word-indexes-refused), a mode that does not mask with dates, such as
+   * direct, or a value that names no mode (core.masking.unsupported-mode), dates that are not a
+   * DatesAnswer (core.date-search.dates-dates-answer) or more than the phrase takes
+   * (core.date-search.operation-refused), and a count that is not a whole number
+   * (core.search-turns.whole-number-more).
+   */
   constructor(options: DateSearchOptions) {
     super("DateSearch");
     // Copied first and the copy checked, as EncodedBackup.of checks codes: a hole or a code outside

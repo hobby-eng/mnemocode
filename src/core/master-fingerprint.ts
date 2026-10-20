@@ -126,6 +126,10 @@ export class Bip39Seed {
     if (typeof value !== "string") throw ERRORS.create("expected-string-passphrase", []);
   }
 
+  /**
+   * Binds the host's `pbkdf2`; refuses a value that is no function
+   * (core.master-fingerprint.wallet-check-host-s-pbkdf2-hmac-sha512-function, a TypeError).
+   */
   constructor(pbkdf2: Pbkdf2HmacSha512) {
     if (typeof pbkdf2 !== "function")
       throw ERRORS.create("wallet-check-host-s-pbkdf2-hmac-sha512-function", []);
@@ -209,6 +213,7 @@ export function fingerprintOfKey(root: HDKey): string {
 export class MasterFingerprintCheck {
   readonly #seed: Bip39Seed;
 
+  /** Binds the host's `pbkdf2`, refused as Bip39Seed refuses it when it is no function. */
   constructor(pbkdf2: Pbkdf2HmacSha512) {
     this.#seed = new Bip39Seed(pbkdf2);
   }

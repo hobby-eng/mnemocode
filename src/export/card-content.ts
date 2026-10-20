@@ -56,10 +56,15 @@ export function payloadHoldsColors(colors: readonly string[], payload: string): 
  * either printed on cards whose colors decorate them; and how many of the last cards are decoys.
  */
 export interface ColorCardContent {
+  /** A seed phrase's cards ("colors") or a share's ("sskr"), whose QR code is checked as such. */
   readonly kind: "colors" | "sskr";
+  /** The color of each card as # and six hexadecimal digits: the backup's own, then the decoys. */
   readonly colors: readonly string[];
+  /** The text of the QR code: the backup alone, without the decoys. */
   readonly payload: string;
+  /** The codes printed in place of the colors, one per color, where the colors only decorate. */
   readonly labels?: readonly string[] | undefined;
+  /** How many of the last cards are decoys: a whole number below the cards; none if undefined. */
   readonly decoys?: number | undefined;
 }
 

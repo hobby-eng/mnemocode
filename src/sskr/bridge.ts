@@ -74,6 +74,7 @@ export class CheckedSskrBridge implements SskrBridge {
   /** The codes of the bridge's encodings: the numbers of its enum, which also maps them back. */
   readonly #encodings: readonly number[];
 
+  /** Wraps a loaded bridge, kept private; the codes of its encodings are read once, here. */
   constructor(bridge: SskrBridge) {
     this.#bridge = bridge;
     this.#encodings = Object.freeze(
@@ -81,10 +82,18 @@ export class CheckedSskrBridge implements SskrBridge {
     );
   }
 
+  /** The wrapped bridge's own encoding enum, passed on as it is. */
   get ShareEncoding(): SskrBridge["ShareEncoding"] {
     return this.#bridge.ShareEncoding;
   }
 
+  /**
+   * The wrapped bridge's compact-UR shares, made from copies of the three arrays, which it wipes
+   * afterwards; the caller's arrays are left unchanged and stay the caller's to wipe. Before any
+   * copy it throws sskr.bridge.unsupported-group-threshold for a group
+   * threshold that is not a whole number from 0 to 255, and sskr.bridge.byte-array-required (a
+   * TypeError) for an input that is not an attached byte array; the bridge's own refusals pass on.
+   */
   create_sskr_shares(
     secret: Uint8Array,
     group_threshold: number,
@@ -94,6 +103,10 @@ export class CheckedSskrBridge implements SskrBridge {
     return this.#create(secret, group_threshold, group_specs, random_seed);
   }
 
+  /**
+   * create_sskr_shares in the chosen encoding; first throws sskr.bridge.unsupported-encoding for a
+   * code that is not one of ShareEncoding's numbers.
+   */
   create_sskr_shares_formatted(
     secret: Uint8Array,
     group_threshold: number,
@@ -105,11 +118,20 @@ export class CheckedSskrBridge implements SskrBridge {
     return this.#create(secret, group_threshold, group_specs, random_seed, encoding);
   }
 
+  /**
+   * The secret that the wrapped bridge restores from newline-separated compact-UR shares, in a
+   * fresh buffer that the caller owns and wipes. Throws sskr.bridge.share-text-required (a
+   * TypeError) for records that are not a string; the bridge's own refusals pass on.
+   */
   recover_sskr_shares(records: string): Uint8Array {
     CheckedSskrBridge.#assertRecords(records);
     return this.#bridge.recover_sskr_shares(records);
   }
 
+  /**
+   * recover_sskr_shares in the chosen encoding; first throws sskr.bridge.unsupported-encoding for a
+   * code that is not one of ShareEncoding's numbers.
+   */
   recover_sskr_shares_formatted(records: string, encoding: number): Uint8Array {
     this.#assertEncoding(encoding);
     CheckedSskrBridge.#assertRecords(records);

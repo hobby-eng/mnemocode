@@ -17,8 +17,14 @@ const ERRORS = new ErrorCatalog("core.self-test-check", {
 
 /** One check of a self-test: its name and what it covers, as the report shows them. */
 export interface SelfTestCheck {
+  /** The row's name in the report, such as "Word lists". */
   readonly name: string;
+  /** What the row covers, short enough for one line of the report beside its name. */
   readonly detail: string;
+  /**
+   * Runs the check: returns or resolves when it passes, and throws at the first difference, such
+   * as core.self-test-check.mismatch, or with the failure of a host service it uses.
+   */
   run(): void | Promise<void>;
 }
 
@@ -29,6 +35,7 @@ export interface SelfTestCheck {
 export interface SelfTestFeature {
   /** Synchronous known answers that need nothing from the host: milliseconds. */
   readonly startup: () => void;
+  /** The feature's row of the full self-test, which runs `startup` again with the slower checks. */
   readonly check: SelfTestCheck;
 }
 

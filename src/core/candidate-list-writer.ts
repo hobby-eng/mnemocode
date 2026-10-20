@@ -28,6 +28,7 @@ export interface CandidateListFile {
   readonly bytes: Uint8Array;
   /** How it is protected, in the words of its protection. */
   readonly description: string;
+  /** Whether the bytes are encrypted; false only when the person asked for a list in the open. */
   readonly encrypted: boolean;
   /** The records it holds. */
   readonly records: number;

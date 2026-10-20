@@ -501,6 +501,10 @@ export class MissingChecksumError extends Error {
   /** The transformation mode whose encoded checksum is missing. */
   readonly mode: MaskingMode;
 
+  /**
+   * The refusal of codes of `mode`, whose message names the mode as a person reads it; a mode that
+   * is none is refused (core.masking.unsupported-mode).
+   */
   constructor(mode: MaskingMode) {
     super(`These codes lack the BIP39 checksum that ${Masking.of(mode).name} gives them.`);
     this.name = "MissingChecksumError";

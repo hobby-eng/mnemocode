@@ -50,6 +50,7 @@ export function resolveSskrLayout(
  * not its colors, the share as its QR code holds it, and the card settings.
  */
 export interface SskrCardContent extends CardSettings {
+  /** Always "sskr": the cards of a share, which name its set (collectionReference). */
   readonly kind: "sskr";
   /**
    * The colors of the cards: the share itself in the color forms; otherwise one for each distinct
@@ -61,10 +62,17 @@ export interface SskrCardContent extends CardSettings {
    * in place of the colors' hex codes.
    */
   readonly labels?: readonly string[];
+  /** The share in its written form (Share.write), as its QR code holds it, without the decoys. */
   readonly payload: string;
   /** How many of the last cards are decoys (card-decoys.ts). */
   readonly decoys?: number;
+  /**
+   * The share's reference, such as 376C-1-2: the series that its sheets name, and on a separate
+   * card after its number.
+   */
   readonly collectionReference: string;
+  /** Whether its sheet carries a QR code of the whole share (the qr layout); none when absent. */
   readonly qrCard?: boolean;
+  /** The title that the frame of its sheet names; the studio's name when absent. */
   readonly title?: string;
 }

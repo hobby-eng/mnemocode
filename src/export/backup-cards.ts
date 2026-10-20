@@ -20,6 +20,7 @@ const ERRORS = new ErrorCatalog("export.backup-cards", {
 
 /** What cards are drawn from: codes in their form, such as an EncodedBackup. */
 export interface CardBackup {
+  /** The form the codes are written in; backupCardContent refuses one that no card prints. */
   readonly format: EncodedFormat;
   /** The codes as BIP39 indexes from 0 to 2047. */
   readonly indexes: readonly number[];

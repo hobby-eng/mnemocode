@@ -32,16 +32,23 @@ import { defined } from "../defined.js";
 
 /** Where the wallet of the public phrase has an address of a coin, with its BIP39 passphrase. */
 export interface CoinVector {
+  /** The coin whose address it is. */
   readonly coin: Coin;
+  /** The BIP39 passphrase of the wallet, "" for none. */
   readonly passphrase: string;
+  /** The address's full BIP32 path, such as m/44'/5'/0'/0/0; its last three steps place it. */
   readonly path: string;
+  /** The address in its standard form, as a match shows it. */
   readonly address: string;
 }
 
 /** An address that no wallet can match, and why it is refused. */
 export interface CoinRefusal {
+  /** The coin whose parse refuses the address. */
   readonly coin: Coin;
+  /** The text given as an address, public test data. */
   readonly address: string;
+  /** What the refusal's message must match: the reason it must be refused for. */
   readonly because: RegExp;
 }
 
@@ -49,6 +56,7 @@ export interface CoinRefusal {
 export interface CoinFamilyAnswers {
   /** The row of the full self-test, such as "Dash addresses". */
   readonly name: string;
+  /** The addresses of the public phrase, each found at its path; places count from 0. */
   readonly vectors: readonly CoinVector[];
   /** The places in `vectors` checked at every start; the full self-test checks them all. */
   readonly startup: readonly number[];
@@ -56,6 +64,7 @@ export interface CoinFamilyAnswers {
   readonly elsewhere: number;
   /** The place of a vector at index 1 of its branch: found among two from 0, not at 0 alone. */
   readonly scanned?: number;
+  /** The addresses that the family's parse refuses, checked in the full self-test only. */
   readonly refused: readonly CoinRefusal[];
 }
 

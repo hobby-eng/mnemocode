@@ -352,9 +352,13 @@ export function drawStudyCaption(
 
 /** What a collection sheet of color cards is made from: a seed phrase's colors, or a share's. */
 export interface CollectionContent {
+  /** A seed phrase's sheet ("colors") or a share's ("sskr"): which series the sheet names. */
   readonly kind: "colors" | "sskr";
+  /** The text of the sheet's QR code, printed only where `cardQr` or a share's `qrCard` asks. */
   readonly payload: string;
+  /** The title of the sheet; the studio's name where undefined. */
   readonly title?: string | undefined;
+  /** Whether the sheet prints the QR code of `payload`: only true asks for it. */
   readonly cardQr?: boolean | undefined;
   /** A share's: the reference of its set, which the sheet names as its series. */
   readonly collectionReference?: string;
@@ -425,16 +429,21 @@ export function separateCardIndex(
 
 /** What drawCollectionStudy draws a family's collection sheet from. */
 export interface CollectionStudy {
+  /** The document that the sheet is added to, as a new page. */
   readonly doc: PDFDocument;
+  /** The font of the frame and of the captions, which the captions are measured in. */
   readonly font: PDFFont;
   /** The host's QR matrices (CardDrawing), for the code of the sheet where it prints one. */
   readonly qr: QrSource;
   /** The page size and the orientation of the sheet. */
   readonly settings: CardSettings;
+  /** What the sheet is of: its title, its series and the text of its QR code. */
   readonly content: CollectionContent;
+  /** The texts of the frame: the studio name, the slogan, the subtitle and the footer. */
   readonly presentation: CardPresentation;
   /** The name of the person the sheet is prepared for. */
   readonly preparedFor: string;
+  /** The backdrop of the sheet and the colours of its frame, shadows and captions. */
   readonly theme: StudyTheme;
   /** The shape of a card's box, width over height. */
   readonly aspect: number;

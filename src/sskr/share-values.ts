@@ -30,6 +30,11 @@ export class ShareValues extends Redacted implements Disposable {
   readonly #layout: readonly ShareLayout[];
   readonly #texts: SecretValue<readonly string[]>;
 
+  /**
+   * Copies the texts of `shares`, which stay the caller's. Throws sskr.transport.share-format-one
+   * for an unknown form and sskr.share-values.shape (a TypeError) for any other wrong shape, such
+   * as a position that is not a whole number from 1.
+   */
   constructor(shares: readonly ReadRepairableShare[]) {
     super("ShareValues");
     if (!Array.isArray(shares)) throw ERRORS.create("shape", []);

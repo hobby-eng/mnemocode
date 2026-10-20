@@ -21,7 +21,9 @@ import { equalBytes } from "../bits.js";
 
 /** One version prefix of a coin's addresses, and what it names. */
 export interface Base58Version {
+  /** The bytes, each 0 to 255, that the decoded address starts with, such as [0x00] for 1…. */
   readonly prefix: readonly number[];
+  /** The type of the addresses of this version, which gives their commitment and path. */
   readonly type: AddressType;
   /** A Bitcoin test network address, on coin type 1. */
   readonly testnet: boolean;
@@ -43,6 +45,7 @@ export class Base58Coin extends Coin {
   readonly #versions: readonly Base58Version[];
   readonly #alphabet: BytesCoder;
 
+  /** Takes the coin's description; its versions are copied and frozen. */
   constructor(description: Base58CoinDescription) {
     super(description);
     this.#versions = Object.freeze(

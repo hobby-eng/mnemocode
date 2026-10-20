@@ -423,10 +423,12 @@ export class ScannerKeyProtection implements OwnedListProtection {
 
   // Getters, not readonly fields, which a caller could overwrite at run time: what the object says
   // of the file must stay what protect does.
+  /** Always true: the file is encrypted to the key. */
   get encrypted(): boolean {
     return true;
   }
 
+  /** "encrypted to the Scanner's key", as the line that reports a save says it. */
   get description(): string {
     return "encrypted to the Scanner's key";
   }
@@ -436,6 +438,12 @@ export class ScannerKeyProtection implements OwnedListProtection {
     return this.#recipient;
   }
 
+  /**
+   * The age file of `list`, borrowed and unchanged, to the key: fresh bytes that the caller wipes.
+   * Refuses a list over the size limit (CandidateFileRefusedError "unsupported"), a page without
+   * WebCrypto (core.candidate-encryption.no-webcrypto) and a cipher whose self-test failed
+   * (core.candidate-encryption.self-test-failed).
+   */
   protect(list: Uint8Array): Promise<Uint8Array> {
     return encryptCandidates(list, this.#recipient);
   }
@@ -464,14 +472,23 @@ export class PassphraseProtection extends Redacted implements OwnedListProtectio
   }
 
   // Getters, as in ScannerKeyProtection: they cannot be overwritten.
+  /** Always true: the file is encrypted under the passphrase. */
   get encrypted(): boolean {
     return true;
   }
 
+  /** "encrypted with the passphrase", as the line that reports a save says it. */
   get description(): string {
     return "encrypted with the passphrase";
   }
 
+  /**
+   * The age file of `list`, borrowed and unchanged, under the passphrase through scrypt at work
+   * factor 2^SCRYPT_LOG_N: fresh bytes that the caller wipes. Refuses a list over the size limit
+   * (CandidateFileRefusedError "unsupported"), a cipher whose self-test failed
+   * (core.candidate-encryption.self-test-failed), and a call once wiped
+   * (core.secret-value.wiped).
+   */
   async protect(list: Uint8Array): Promise<Uint8Array> {
     this.#passphrase.assertLive();
     const bytes = await withCipherHealth(
@@ -502,10 +519,12 @@ export class PassphraseProtection extends Redacted implements OwnedListProtectio
 /** A list written without encryption, only on the person's explicit request. */
 export class NoProtection implements OwnedListProtection {
   // Getters, as in ScannerKeyProtection: a list in the open must never be reported as encrypted.
+  /** Always false: the file holds the seed phrases in the open. */
   get encrypted(): boolean {
     return false;
   }
 
+  /** "NOT encrypted", in capitals, as the line that reports a save says it. */
   get description(): string {
     return "NOT encrypted";
   }

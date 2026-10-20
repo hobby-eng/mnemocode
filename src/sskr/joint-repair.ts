@@ -121,6 +121,7 @@ const TRIES_PER_PROGRESS = 16_384;
 
 /** How far a search of marked shares has come: digest checks made, of all, and phrases found. */
 export interface RepairProgress extends SearchProgress {
+  /** Digest checks of the whole search, summed over its branches (JointAssessment.combinations). */
   readonly total: number;
 }
 
@@ -135,6 +136,7 @@ export interface SearchOptions extends SearchRun {
  * wipe of what it keeps of the secret.
  */
 export interface JointPlan {
+  /** What the shares were assessed as; its verdict tells whether `search` searches. */
   readonly assessment: JointAssessment;
   /**
    * Tries every open combination; resolves with every phrase that passes, possibly none, and
@@ -751,6 +753,10 @@ function checkedPlatform(platform: ShareRepairPlatform | undefined): ShareRepair
 export class JointRepair {
   readonly #platform: ShareRepairPlatform;
 
+  /**
+   * Binds the host's platform; throws sskr.joint-repair.share-repair-host-s-share-platform (a
+   * TypeError) when it lacks hmacSha256 or combineShares.
+   */
   constructor(platform: ShareRepairPlatform) {
     this.#platform = checkedPlatform(platform);
   }

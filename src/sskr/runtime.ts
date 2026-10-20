@@ -51,6 +51,10 @@ export class SskrRuntime {
   readonly #read: typeof readBundledFile;
   #pending: Promise<SskrBridge> | undefined;
 
+  /**
+   * `read` reads a bundled file by its path, readBundledFile by default; throws
+   * sskr.runtime.bundle-reader (a TypeError) when it is not a function. Nothing is read yet.
+   */
   constructor(read: typeof readBundledFile = readBundledFile) {
     if (typeof read !== "function") throw ERRORS.create("bundle-reader", []);
     this.#read = read;

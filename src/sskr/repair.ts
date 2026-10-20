@@ -82,6 +82,7 @@ export class ShareVariantsError extends Error {
   /** Immutable one-based positions of the marked elements that leave several variants. */
   readonly places: readonly number[];
 
+  /** `count` shares, two or more, fit the elements at `places`; the message names only these. */
   constructor(
     /** Number of complete variants; this error retains only count and place metadata. */
     readonly count: number,

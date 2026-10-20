@@ -19,8 +19,9 @@
 // - CORE-23: source and tooling use coded errors, not direct native Error construction.
 // - TS-08: no `enum`.
 // - TS-05: no `private` keyword; private fields and methods are `#name`.
-// - TS-11: every exported declaration of a library module (src/ outside the command line) has a
-//   `/** … */` comment.
+// - TS-11: every exported declaration of a library module (src/ outside the command line), and
+//   every public member of an exported class or interface there, has a `/** … */` comment
+//   (CORE-20).
 // - TS-12: every lint exception names its rules and gives its reason after "--".
 // - WEB-01: no `on…=` handler in markup.
 //
@@ -607,6 +608,119 @@ function checkMarkup(path, text) {
     );
 }
 
+/** The words that may come before the name of a member; each may also be a name itself. */
+const MEMBER_MODIFIERS = new Set([
+  "abstract",
+  "accessor",
+  "async",
+  "declare",
+  "get",
+  "override",
+  "private",
+  "protected",
+  "public",
+  "readonly",
+  "set",
+  "static",
+]);
+/** The tokens after which a new member of a class or an interface starts. */
+const MEMBER_ENDS = new Set([";", "{", "}"]);
+/** The brackets that a member's parts nest in. */
+const OPENING = new Set(["(", "[", "{"]);
+const CLOSING = new Set([")", "]", "}"]);
+
+/**
+ * The index of the `{` that opens the body of the class or interface whose keyword is at `at`: the
+ * first one outside the parentheses, brackets and type arguments of its heritage.
+ */
+function bodyOpening(tokens, at) {
+  let depth = 0;
+  for (let index = at + 1; index < tokens.length; index += 1) {
+    const { key } = tokens[index];
+    if (key === "{" && depth === 0) return index;
+    if (key === "(" || key === "[" || key === "<") depth += 1;
+    else if (key === ")" || key === "]" || key === ">") depth -= 1;
+  }
+  return undefined;
+}
+
+/**
+ * The member that starts at `at` in a body: its name, and whether it is public. A modifier is read
+ * as one only before another name; `[` names a computed member, unless it opens an index signature.
+ */
+function memberAt(tokens, at) {
+  // A static block has no name, and nothing outside the class can call it.
+  if (tokens[at].key === "static" && tokens[at + 1]?.key === "{")
+    return { name: "", public: false };
+  let index = at;
+  const modifiers = new Set();
+  while (
+    MEMBER_MODIFIERS.has(tokens[index].key) &&
+    /^[\w#"'[*]/u.test(tokens[index + 1]?.key ?? "")
+  ) {
+    modifiers.add(tokens[index].key);
+    index += 1;
+  }
+  if (tokens[index].key === "*") index += 1;
+  const first = tokens[index];
+  const name =
+    first.key === "["
+      ? tokens
+          .slice(index, afterGroup(tokens, index))
+          .map((token) => token.key)
+          .join("")
+      : first.key;
+  const signature = first.key === "[" && tokens[index + 2]?.key === ":";
+  const hidden =
+    modifiers.has("private") || modifiers.has("protected") || name.startsWith("#") || signature;
+  return { name, public: !hidden };
+}
+
+/**
+ * TS-11: every public member of an exported class or interface of a library module has a doc
+ * comment: a field, a method, an accessor, a constructor; the overloads of a method share the
+ * comment of the first (CORE-20). A member starts the first line of a body and each line after one
+ * ends, as the formatter writes them; a line that goes on with a type or a value starts none.
+ */
+function checkMemberDocComments(path, tokens, comments) {
+  tokens.forEach((token, at) => {
+    if (token.key !== "export") return;
+    const keyword = tokens
+      .slice(at + 1, at + 4)
+      .findIndex((next) => next.key === "class" || next.key === "interface");
+    if (keyword === -1) return;
+    const open = bodyOpening(tokens, at + 1 + keyword);
+    if (open === undefined) return;
+    const close = afterGroup(tokens, open) - 1;
+    let depth = 0;
+    let previous = "{";
+    let lastName;
+    for (let index = open + 1; index < close; index += 1) {
+      const { key, line } = tokens[index];
+      const starts =
+        depth === 0 &&
+        MEMBER_ENDS.has(previous) &&
+        line > tokens[index - 1].line &&
+        /^[\w#"'[*(]/u.test(key);
+      if (starts) {
+        const member = memberAt(tokens, index);
+        const overload = member.name === lastName;
+        lastName = member.name;
+        if (member.public && !overload && !documented(tokens, comments, index))
+          report(
+            path,
+            line,
+            "TS-11",
+            "a public member of an exported class or interface of a library module has a /** … */ comment",
+          );
+      }
+      if (OPENING.has(key)) depth += 1;
+      else if (CLOSING.has(key)) depth -= 1;
+      if (depth === 0) previous = key;
+    }
+  });
+}
+
 /** Every check of one TypeScript or JavaScript file that the linter does not cover. */
 function checkScriptSource(path, text, classes) {
   const { tokens, comments } = tokensOf(text);
@@ -616,7 +730,10 @@ function checkScriptSource(path, text, classes) {
   checkKeywords(path, tokens);
   for (const known of classesOf(tokens)) classes.push({ ...known, path });
   const library = path.startsWith("src/") && !FRONT_END.some((front) => path.startsWith(front));
-  if (library && !path.endsWith(".d.ts")) checkDocComments(path, tokens, comments);
+  if (library && !path.endsWith(".d.ts")) {
+    checkDocComments(path, tokens, comments);
+    checkMemberDocComments(path, tokens, comments);
+  }
 }
 
 const files = repositoryFiles();

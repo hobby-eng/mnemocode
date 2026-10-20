@@ -37,6 +37,7 @@ export const DEFAULT_IMAGE_FORMAT: ImageFormat = defined(IMAGE_FORMATS[0]);
 export interface DocumentFormatFacts {
   /** Its name, as a list of answers shows it. */
   readonly name: string;
+  /** Its media type, such as "image/png", which a host gives the file it saves or offers. */
   readonly mimeType: string;
   /** What it is good for, beside its name in a list. */
   readonly note: string;

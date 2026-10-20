@@ -70,6 +70,10 @@ export class Joint {
   readonly #offsets: readonly number[];
   readonly #secretBytes: number;
 
+  /**
+   * Lays out the coordinates of `spaces`, one reading of each share in the order given, which it
+   * borrows; `secretBytes` is the length in bytes, 16 to 32, of the secret they are all of.
+   */
   constructor(spaces: readonly ReadingSpace[], secretBytes: number) {
     this.#spaces = [...spaces];
     this.#offsets = spaces.map((_, share) =>
@@ -619,6 +623,7 @@ function baseOf(members: readonly number[], threshold: number): number[] | undef
 
 /** What solving readings of the shares tells of the ways to read them, one or many solved. */
 export interface SolvedWays {
+  /** Each way to read the shares that fits; empty when none does. AssessmentSecrets wipes them. */
   readonly branches: Branch[];
   /**
    * Some reading fits as far as its shares go: the rows that they all share have a solution, and
@@ -653,6 +658,7 @@ interface JointSolution extends SolvedWays {
  * bound on the work of trying words (refined) that does not depend on the computer.
  */
 export interface WorkBudget {
+  /** The payload evaluations still allowed; solveJoint lowers it, never below 0. */
   left: number;
 }
 

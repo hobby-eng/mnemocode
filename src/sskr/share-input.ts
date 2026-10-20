@@ -79,7 +79,9 @@ export const SHARE_WORD_HINTS: WordHints = new LineWordHints(
 
 /** A share as typed, and its place among the shares typed, by which every message names it. */
 export interface TypedShare {
+  /** Where the share was typed, counted from 1; kept when others are left out, so places skip. */
   readonly place: number;
+  /** The share as typed, ? marks included: it holds a part of the secret. */
   readonly text: string;
 }
 
@@ -98,15 +100,19 @@ export type ShareTrouble =
 
 /** A share typed again as it was typed before: it is left out, and used once. */
 export interface ShareCopy {
+  /** The place of the copy, which is left out. */
   readonly place: number;
   /** The place of the share it copies. */
   readonly of: number;
+  /** The note for the person, which names both places and none of the share's text. */
   readonly message: string;
 }
 
 /** The shares' first problem, as every outcome of shares tells it. */
 export interface SharesTrouble {
+  /** Tells this outcome from the others of shares. */
   readonly kind: "trouble";
+  /** The first problem found, which names shares by their places. */
   readonly trouble: ShareTrouble;
 }
 

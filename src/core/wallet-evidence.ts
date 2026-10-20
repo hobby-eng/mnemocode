@@ -123,6 +123,10 @@ export function isFirstReceiving(location: AddressLocation): boolean {
 
 /** A place of an address on a network: its account, branch and index. */
 export interface DerivationLocation extends AddressLocation {
+  /**
+   * The network, one of BITCOIN_NETWORKS: it sets the version bytes of the keys, the form of the
+   * addresses and WIF keys, and the coin type of the paths.
+   */
   readonly network: BitcoinNetworkName;
 }
 
@@ -172,6 +176,7 @@ export type WalletEvidence =
  * is never secret: an address, a public key or a fingerprint, also for a WIF.
  */
 export interface EvidenceMatch extends CoinAddressMatch {
+  /** The kind of the evidence given, which says what `derived` is (EVIDENCE_MATCHED_BY). */
   readonly kind: WalletEvidence["kind"];
 }
 

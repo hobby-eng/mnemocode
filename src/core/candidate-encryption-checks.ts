@@ -93,6 +93,7 @@ function changedLastByte(hex: string): Uint8Array {
 export class CandidateEncryptionChecks {
   readonly #operations: CandidateCipherOperations;
 
+  /** The raw operations that quick checks: those behind the first-use gate would wait for it. */
   constructor(operations: CandidateCipherOperations) {
     this.#operations = operations;
   }

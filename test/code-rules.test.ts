@@ -501,6 +501,72 @@ describe("the TypeScript and markup rules of the coding guide", () => {
     expect(rulesBroken({ "src/core/a.ts": `// The most marks.\n${bare}` })).toEqual(["TS-11"]);
   });
 
+  it("refuse a public member of an exported class or interface without a doc comment", () => {
+    const source = [
+      "/** A count. */",
+      "export class Counter {",
+      "  /** The count so far. */",
+      "  readonly total: number;",
+      "  #hidden = 0;",
+      "  static {",
+      "    Counter.prototype.toString = () => '';",
+      "  }",
+      "  /** Takes `total`. */",
+      "  constructor(total: number) {",
+      "    this.total = total;",
+      "  }",
+      "  /** One more, or `step` more. */",
+      "  add(): number;",
+      "  add(step: number): number;",
+      "  add(step = 1): number {",
+      "    return this.total + step + this.#hidden;",
+      "  }",
+      "  /** Whether it is zero. */",
+      "  get zero(): boolean {",
+      "    return this.total === 0;",
+      "  }",
+      "  /** Ends it. */",
+      "  [Symbol.dispose](): void {}",
+      "  /** Its kind. */",
+      "  readonly kind:",
+      '    | "small"',
+      '    | "large" = "small";',
+      "  /** Counts later. */",
+      "  readonly later = async (): Promise<number> => {",
+      "    return this.total;",
+      "  };",
+      "}",
+      "/** What a count says. */",
+      "export interface Said {",
+      "  /** The words. */",
+      "  readonly words: {",
+      "    readonly first: string;",
+      "  };",
+      "  [name: string]: unknown;",
+      "}",
+      "/** Made once. */",
+      "export class Once {",
+      "  private constructor() {}",
+      "}",
+    ].join("\n");
+    expect(problemsOf({ "src/core/a.ts": source })).toEqual([]);
+    const bare = source
+      .split("\n")
+      .filter((line) => !/^ {2}\/\*\*/u.test(line))
+      .join("\n");
+    expect(problemsOf({ "src/core/a.ts": bare })).toEqual([
+      "src/core/a.ts:3 TS-11",
+      "src/core/a.ts:8 TS-11",
+      "src/core/a.ts:11 TS-11",
+      "src/core/a.ts:16 TS-11",
+      "src/core/a.ts:19 TS-11",
+      "src/core/a.ts:20 TS-11",
+      "src/core/a.ts:23 TS-11",
+      "src/core/a.ts:29 TS-11",
+    ]);
+    expect(problemsOf({ "src/cli/a.ts": bare })).toEqual([]);
+  });
+
   it("refuse a lint exception without its rule and reason, and a handler in markup", () => {
     const bare = "// oxlint-disable-next-line max-lines-per-function\nfunction f() {}\n";
     expect(rulesBroken({ "src/cli/a.ts": bare })).toEqual(["TS-12"]);

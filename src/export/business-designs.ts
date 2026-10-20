@@ -24,13 +24,24 @@ export const businessStyles: readonly PhysicalBusinessStyle[] = Object.freeze(
 
 /** One detail of the person on a card, with its place and sizes. */
 export interface BusinessField {
+  /** The detail's name, capitalized (profileFieldLabel), which a refusal to fit it names. */
   label: string;
+  /** The text the card prints: the person's detail. */
   value: string;
+  /** The left edge of the line, as a share of the card width from 0 to 1. */
   x: number;
+  /** The top of the line box, as a share of the card height from 0 to 1, from the top. */
   y: number;
+  /** The room for the line, as a share of the card width; a longer value shrinks to fit it. */
   width: number;
+  /** The size of the text in points on a card, from which a long value shrinks. */
   preferred: number;
+  /** The least size in points on a card; a value that needs less is refused as too long. */
   minimum: number;
+  /**
+   * In dark ink, on a light part of the artwork (BusinessDesign darkFieldInk); white when false or
+   * absent.
+   */
   dark?: boolean;
 }
 
@@ -67,12 +78,14 @@ export interface ReferenceLine {
 export interface BusinessDesign {
   /** The hue of the photograph's coloured parts, from 0 to 1, which a reference's hue replaces. */
   readonly hueOrigin: number;
+  /** How strongly its photograph takes a reference's colour when it is recoloured. */
   readonly tint: BusinessTint;
   /**
    * The ink of the dark fields: always the dark ink, or chosen against the reference's colour where
    * those fields lie on it (the curves design).
    */
   readonly darkFieldInk: "fixed" | "contrast";
+  /** Where and how a separate card prints its reference line; a sheet prints none. */
   readonly reference: ReferenceLine;
   /** The theme of a sheet of its cards alone: the IT design's dark artwork has its own. */
   readonly studyTheme: BusinessStudyTheme;

@@ -11,7 +11,9 @@ import { readRenderAsset, type AssetSource } from "./platform.js";
 
 /** One document of an export: its PDF, and the name of its file without the extension. */
 export interface NamedDocument {
+  /** The name of its file without the extension, such as collection-376C-1-2. */
   readonly name: string;
+  /** The bytes of the PDF, which the caller owns and wipes once it is saved: it shows the codes. */
   readonly bytes: Uint8Array;
 }
 

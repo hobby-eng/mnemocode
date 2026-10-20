@@ -5,14 +5,19 @@ export { MM } from "./page-units.js";
 
 /** A rectangle in millimetres, measured from the top left of the page. */
 export interface MmRect {
+  /** The left edge, in millimetres from the left edge of the page. */
   x: number;
+  /** The top edge, in millimetres from the top edge of the page. */
   y: number;
+  /** The width, in millimetres. */
   width: number;
+  /** The height, in millimetres. */
   height: number;
 }
 
 /** Coordinates in millimetres, measured from the top left, of card `index`. */
 export interface CardBox extends MmRect {
+  /** The card's place among the cards of the content, counted from 0. */
   index: number;
 }
 
@@ -34,10 +39,15 @@ export function centredRunStart(span: number, count: number, size: number, gap: 
 
 /** Where a separate card lies on its page, in millimetres from the top left (separateCardPage). */
 export interface SeparateCardPage {
+  /** The width of the page, in millimetres, in the orientation asked for. */
   readonly width: number;
+  /** The height of the page, in millimetres, in the orientation asked for. */
   readonly height: number;
+  /** The left edge of the drawn card, in millimetres from the left edge of the page. */
   readonly x: number;
+  /** The top edge of the drawn card, in millimetres from the top edge of the page. */
   readonly top: number;
+  /** The factor the card is drawn at: 1, or less where the page is smaller than the card. */
   readonly scale: number;
 }
 

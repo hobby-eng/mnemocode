@@ -21,9 +21,16 @@ type Color = ReturnType<typeof rgb>;
  * middle, which made the samples look shifted (owner, 2026-10-13).
  */
 export interface CardGrid {
+  /** The middle of the gap before the first column, in millimetres from the left of the page. */
   readonly left: number;
+  /** The middle of the gap above the first row, in millimetres from the top of the page. */
   readonly top: number;
+  /**
+   * How far one column is from the next, in millimetres: the width of a cell (a card's caption
+   * column, at least the card's width) and the gap.
+   */
   readonly columnPitch: number;
+  /** How far one row is from the next, in millimetres: a card with its captions and the gap. */
   readonly rowPitch: number;
 }
 

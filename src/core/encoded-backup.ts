@@ -327,6 +327,8 @@ export class EncodedBackup extends Redacted {
 
 /** A phrase of fewer words that the first codes of a backup give (EncodedBackup.shorterPhrases). */
 export interface ShorterPhrase {
+  /** Its length in words, a BIP39 length below the backup's, whose first so many words give it. */
   readonly words: Bip39WordCount;
+  /** The phrase that those words decode to with the dates; its BIP39 checksum is valid. */
   readonly result: DecodedResult;
 }

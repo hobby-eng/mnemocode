@@ -16,6 +16,7 @@ const ERRORS = new ErrorCatalog("export.card-codes", {
 
 /** The colors of the cards, and the codes they print when those are not the colors. */
 export interface PrintedCodes {
+  /** The color of each card as # and six hexadecimal digits, in the order of the cards. */
   readonly colors: readonly string[];
   /** The codes printed in place of the colors' hex codes, one per color, in the same order. */
   readonly labels?: readonly string[] | undefined;

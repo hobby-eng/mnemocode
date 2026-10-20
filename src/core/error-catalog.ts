@@ -11,6 +11,7 @@ type MessageOf<Value> = Value extends Message
 
 /** A failure with a stable module code; it keeps the ordinary Error message and cause contract. */
 export interface CodedFailure<Code extends string = string> extends Error {
+  /** The stable code, the catalog's namespace and its code, such as core.dates.no-date. */
   readonly code: Code;
 }
 

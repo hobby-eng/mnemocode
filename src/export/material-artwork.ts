@@ -19,8 +19,17 @@ export type { MaterialStyle };
 
 /** RGB entries describe the artwork, never the encoded reference. */
 export interface MaterialFinish {
+  /** The name of the finish, such as "Smoked walnut": the label of its untinted sample. */
   readonly name: string;
+  /**
+   * Its colour on the photograph, as six hexadecimal digits without "#": the look of its untinted
+   * sample, and the lightness by which a catalogue colour chooses the finish it tints.
+   */
   readonly color: string;
+  /**
+   * The part of the material's photograph that its sample shows: left, top, width and height, each
+   * a fraction of the photograph from 0 to 1, with y downwards from the top.
+   */
   readonly crop: readonly [number, number, number, number];
   /**
    * The surface word of a tinted sample's label, such as "glaze" in "Sage glaze". Only a finish
@@ -35,13 +44,19 @@ export interface MaterialFinish {
   /** Shown only under a tint, because as photographed it looks too much like another finish. */
   readonly onlyTinted?: boolean;
 }
-/** A colour of a material's catalogue: its name and its #RRGGBB code. */
+/** A colour of a material's catalogue: its name and its code, six hexadecimal digits without #. */
 export interface CatalogueColour {
+  /** The name of the colour, such as "Signal red", which a tinted sample's label carries. */
   readonly name: string;
+  /** The colour as six hexadecimal digits without "#", which the tint lays over a photograph. */
   readonly color: string;
 }
 /** The colours a material really comes in, and how they are laid over its photographs. */
 export interface MaterialCatalogue {
+  /**
+   * The colours, each a sample of its own, laid over the finish with a surface whose lightness is
+   * nearest its own (materialSamples).
+   */
   readonly colours: readonly CatalogueColour[];
   /** How much of a reference's colourfulness counts when its sample is chosen. */
   readonly chromaScale: number;
@@ -55,16 +70,33 @@ export interface MaterialCatalogue {
   readonly outline: readonly (readonly number[])[];
 }
 /**
- * The artwork of a material design: the title and backdrop of its study, whether it is dark, its
- * background colour, its finishes and its catalogue of colours.
+ * The artwork of a material design: the backdrop of its study, its finishes and its catalogue of
+ * colours. Its title, darkness and background colour are kept as data that nothing draws.
  */
 export interface MaterialArtwork {
+  /**
+   * A title in capitals, such as "KITCHEN / MATERIAL SELECTION", kept as data: no renderer draws
+   * it, and a sheet's title is the content's title or the studio's name.
+   */
   readonly title: string;
   /** The page of the design study: a backdrop from the material's own world. */
   readonly studyTheme: StudyTheme;
+  /**
+   * Whether the design counts as dark, as the enclosure and the tile do, kept as data: no renderer
+   * reads it, and a sheet's colours come from its study theme.
+   */
   readonly dark: boolean;
+  /**
+   * A background colour as red, green and blue, each from 0 to 1, kept as data: no renderer draws
+   * it, and a sheet's background comes from its study theme.
+   */
   readonly background: readonly [number, number, number];
+  /**
+   * The finishes cropped from its one photograph, in order. They are cropped alike, so the crop of
+   * the first gives every sample's box its shape.
+   */
   readonly finishes: readonly MaterialFinish[];
+  /** The colours the material really comes in, and how they are laid over its finishes. */
   readonly catalogue: MaterialCatalogue;
 }
 /**
@@ -489,9 +521,14 @@ function lab(hex: string): [number, number, number] {
  * it if any, its label and how it looks.
  */
 export interface MaterialSample {
+  /** The finish whose part of the photograph the sample shows, one of its material's finishes. */
   readonly finish: MaterialFinish;
   /** The catalogue colour laid over the photograph; none for a finish as photographed. */
   readonly tint?: string;
+  /**
+   * Its name, printed under its code on a sheet larger than a card: the finish's name, or the
+   * catalogue colour's with the finish's surface, such as "Satin signal red".
+   */
   readonly label: string;
   /** How the sample looks: the photograph's colour under its tint. */
   readonly look: string;

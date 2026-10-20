@@ -40,6 +40,7 @@ export type ShareMode = SplitMode;
 
 /** What a restore of shares is unmasked with. */
 export interface UnmaskingOptions {
+  /** The mode that the phrase was split in: "direct", or "seedshift", which takes `dates`. */
   readonly mode: ShareMode;
   /** Seedshift dates, possibly with ?; borrowed and kept live until this unmasking's work ends. */
   readonly dates?: DatesAnswer | undefined;
@@ -53,7 +54,9 @@ export interface UnmaskingOptions {
 
 /** A seed phrase that a set gives. */
 export interface UnmaskedPhrase {
+  /** The set of shares that gave the phrase. */
   readonly set: RepairedSet;
+  /** The seed phrase: the set's own in direct mode, or what the dates unmask; a secret string. */
   readonly mnemonic: string;
   /** The dates that a date search found for it, DD-MM-YYYY, sorted and joined by spaces. */
   readonly dates?: string | undefined;
@@ -104,6 +107,12 @@ export class ShareUnmasking extends Redacted {
   readonly #maxShown: number | undefined;
   readonly #keep: number | undefined;
 
+  /**
+   * Borrows the dates. Throws core.masking.split-modes-only for a mode that is not a split mode,
+   * sskr.share-unmasking.seedshift-phrase-unmasked-dates-dates-answer (a TypeError) for Seedshift
+   * without a DatesAnswer, and core.masking.assert-takes-dates-refused for dates for a mode that
+   * takes none.
+   */
   constructor(options: UnmaskingOptions) {
     super("ShareUnmasking");
     Masking.assertSplitMode(options.mode);

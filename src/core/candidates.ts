@@ -411,6 +411,7 @@ export class MatchTally {
  * checksum holds, and those that the wallet matched.
  */
 export interface WordSearchProgress extends SearchProgress {
+  /** The candidates so far that the wallet check matched; 0 without a wallet check. */
   readonly matched: number;
 }
 
@@ -430,7 +431,9 @@ export interface WordSearchRun<M extends WalletMatch = WalletMatch> extends Sear
 
 /** A caller-owned candidate kept to be shown; the caller wipes it after display. */
 export interface ShownCandidate<M extends WalletMatch = WalletMatch> {
+  /** The candidate, numbered from 1 in the order found; the caller wipes it. */
   readonly candidate: WordCandidate;
+  /** What the wallet check said of it; absent without a wallet check. */
   readonly match?: M;
 }
 

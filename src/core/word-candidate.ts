@@ -56,6 +56,11 @@ export class WordCandidate extends Redacted implements Disposable {
   readonly #number: number;
   readonly #words: SecretValue<CandidateWords>;
 
+  /**
+   * Candidate `number`, counted from 1, with a copy of `words`, a phrase's BIP39 indexes; refuses
+   * another number (core.candidates.candidate-s-number-counts-from-1, a RangeError) and words that
+   * are no phrase's count of indexes from 0 through 2047 (core.candidates.candidate-bip39-indexes).
+   */
   constructor(number: number, words: CandidateWords) {
     super("WordCandidate");
     if (!inWholeRange(number, CANDIDATE_NUMBERS))

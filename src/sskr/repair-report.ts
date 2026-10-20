@@ -57,7 +57,9 @@ export interface RepairedElement {
 
 /** What a repair filled in in one share, the share named by its place among those typed. */
 export interface ShareRepairs {
+  /** The share's place among those typed, counted from 1 (placeOf). */
   readonly share: number;
+  /** Each element filled in where a ? stood, in their order on the share. */
   readonly elements: readonly RepairedElement[];
 }
 
@@ -70,7 +72,9 @@ export const REPAIR_NOTES = Object.freeze({
 
 /** A date search after the share search, for each phrase it finds: its size and its pace. */
 export interface DateWork {
+  /** The date combinations that the search of one phrase tries. */
   readonly combinations: number;
+  /** Seconds that one combination takes on this machine, with its wallet checks if any. */
   readonly secondsEach: number;
 }
 

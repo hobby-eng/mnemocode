@@ -134,11 +134,18 @@ export const SHARE_LENGTHS: ReadonlySet<number> = new Set(
  * length of its secret in bytes.
  */
 export interface ShareInfo {
+  /** The set's identifier, 0 to 65535, the same on every share of one split. */
   readonly identifier: number;
+  /** The groups that a restore needs, 1 to 16, never more than groupCount. */
   readonly groupThreshold: number;
+  /** The groups of the set, 1 to 16. */
   readonly groupCount: number;
+  /** The share's group, counted from 0, below groupCount. */
   readonly groupIndex: number;
+  /** The members of the share's group that a restore needs, 1 to 16. */
   readonly memberThreshold: number;
+  /** The share's member in its group, counted from 0, 0 to 15. */
   readonly memberIndex: number;
+  /** The secret's length in bytes: 16, 20, 24, 28 or 32 (SHARE_LENGTHS). */
   readonly secretLength: number;
 }

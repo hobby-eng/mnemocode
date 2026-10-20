@@ -25,14 +25,22 @@ import { Bip39Seed, type Pbkdf2HmacSha512 } from "./master-fingerprint.js";
 
 /** An address of `coin` at `location`, or among `addresses` of them from there (one by default). */
 export interface CoinAddressEvidence {
+  /** The coin itself, a Coin of core/coins/ such as CoinList.byId gives, not its name. */
   readonly coin: Coin;
+  /** The address as typed; the coin's parse trims it and refuses one that no single key gives. */
   readonly value: string;
+  /** Where the first address compared sits; each number from 0 through LAST_NORMAL_INDEX. */
   readonly location: AddressLocation;
+  /**
+   * How many addresses in a row are compared from the location's index on, from 1 through
+   * MAX_ADDRESS_COUNT; undefined for one.
+   */
   readonly addresses?: number | undefined;
 }
 
 /** Whether the wallet has the address, and where: the address in its standard form and its path. */
 export interface CoinAddressMatch extends WalletMatch {
+  /** The address in its standard form when the wallet has it; absent otherwise. */
   readonly derived?: string;
 }
 
@@ -49,6 +57,13 @@ export class CoinAddressComparison {
   readonly #branchPaths: readonly string[];
   readonly #range: AddressRange;
 
+  /**
+   * Reads and places `evidence` once. Refuses an address that no wallet can have
+   * (AddressRefusalError), a place that no path has
+   * (core.coins.coin.assert-address-location-refused) and a number of addresses out of range
+   * (core.address-scan.address-count-refused, or
+   * core.address-scan.addresses-compared-would-pass-index past the last index).
+   */
   constructor(evidence: CoinAddressEvidence) {
     const location = checkedAddressLocation(evidence.location);
     this.#address = evidence.coin.parse(evidence.value);
@@ -80,6 +95,11 @@ export class CoinAddressComparison {
 export class CoinAddressCheck {
   readonly #seed: Bip39Seed;
 
+  /**
+   * Binds the host's PBKDF2: match needs one that answers at once, matchAsync takes either.
+   * Refuses one that is no function
+   * (core.master-fingerprint.wallet-check-host-s-pbkdf2-hmac-sha512-function, a TypeError).
+   */
   constructor(pbkdf2: Pbkdf2HmacSha512) {
     this.#seed = new Bip39Seed(pbkdf2);
   }

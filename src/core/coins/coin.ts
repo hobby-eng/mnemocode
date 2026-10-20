@@ -47,13 +47,20 @@ export type CoinId =
 
 /** Where in a wallet an address sits: the account, the branch (DIP17's key class) and the index. */
 export interface AddressLocation {
+  /** The account, from 0 through 2^31 - 1; the path hardens it (account'). */
   readonly account: number;
+  /**
+   * The branch, from 0 through 2^31 - 1: 0 for receiving and 1 for change on BIP44's paths, the
+   * key class on DIP17's, which hardens it.
+   */
   readonly branch: number;
+  /** The address's index in its branch, from 0 through 2^31 - 1; never hardened. */
   readonly index: number;
 }
 
 /** What a person and a host know a coin by. */
 export interface CoinDescription {
+  /** The coin's identifier, such as "bitcoin-cash", by which CoinList.byId finds it. */
   readonly id: CoinId;
   /** The name a person knows it by, such as "Bitcoin Cash". */
   readonly name: string;
@@ -111,6 +118,10 @@ export class AddressRefusalError extends Error {
   /** Stable category identifying the refused address form or unreadable input. */
   readonly code: AddressRefusalKind;
 
+  /**
+   * A refusal for `reason`, the end of the sentence "The address cannot be used for the check:",
+   * of the kind `code`, "other" by default.
+   */
   constructor(reason: string, code: AddressRefusalKind = "other") {
     super(`The address cannot be used for the check: ${reason}.`);
     this.name = "AddressRefusalError";
@@ -146,6 +157,10 @@ export abstract class Coin implements CoinDescription {
   readonly #commitments: Readonly<Partial<Record<AddressType, KeyCommitment>>>;
   readonly #purposes: Readonly<Partial<Record<AddressType, number>>>;
 
+  /**
+   * Takes the family's description of the coin and its rules; the coin types and rules are copied
+   * and frozen, so that a later change of `description` does not reach the coin.
+   */
   constructor(description: CoinDescription & CoinRules) {
     this.#id = description.id;
     this.#name = description.name;
@@ -322,6 +337,10 @@ export class CoinAddress {
   readonly text: string;
   readonly #commitment: Uint8Array;
 
+  /**
+   * Made only by Coin.address, after the coin's parse has read `text`; `commitment`, 20 or 32
+   * bytes, is copied and stays inside.
+   */
   constructor(
     coin: Coin,
     type: AddressType,

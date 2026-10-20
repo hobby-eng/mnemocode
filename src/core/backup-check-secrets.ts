@@ -16,6 +16,12 @@ export class BackupCheckSecrets<Mode extends MaskingMode> implements Disposable 
   readonly #mode: Mode;
   readonly #wordCount: number;
 
+  /**
+   * Snapshots `mnemonic` and `dates` (undefined: the reference has none) as wipeable bytes;
+   * `wordCount` is the number of the reference's codes, its phrase's words when undefined. Refuses
+   * a mode that names none (core.masking.unsupported-mode), a date that the calendar does not have
+   * (core.dates codes) and a phrase that is not text (core.secret-value.text).
+   */
   constructor(
     mnemonic: string,
     dates: readonly DateShiftDate[] | undefined,

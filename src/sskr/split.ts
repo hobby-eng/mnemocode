@@ -47,12 +47,15 @@ export const MIN_THRESHOLD = MIN_DIGEST_THRESHOLD;
 
 /** A seed phrase to split into shares, with the mode that masks it first and that mode's dates. */
 export interface BackupSplitRequest {
+  /** The seed phrase, valid English BIP39 words; a secret string the caller owns. */
   readonly mnemonic: string;
   /** A mode in which shares are made (Masking.isSplitMode); another is refused. */
   readonly mode: SplitMode;
   /** The Seedshift dates; none without Seedshift. */
   readonly dates: readonly DateShiftDate[];
+  /** The shares that restore the phrase, from MIN_THRESHOLD to `count`. */
   readonly threshold: number;
+  /** The shares to make, at most MAX_SHARES; a wrong quorum is refused (validateThreshold). */
   readonly count: number;
 }
 
