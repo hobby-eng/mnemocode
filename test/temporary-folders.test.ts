@@ -58,7 +58,8 @@ describe("the temporary folders of exports", () => {
     const made = lstatSync(root);
     // On some systems a birth time is the change time, which filling the folder changes.
     const filled = {
-      ...made,
+      dev: made.dev,
+      ino: made.ino,
       birthtimeMs: made.birthtimeMs + 1000,
       ctimeMs: made.ctimeMs + 1000,
       mtimeMs: made.mtimeMs + 1000,
