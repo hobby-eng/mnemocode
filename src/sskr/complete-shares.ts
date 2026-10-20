@@ -41,6 +41,11 @@ export function isCompleteShareRefusal(error: unknown): boolean {
   return ERRORS.matches(error, ["no-secret", "operation-refused"]);
 }
 
+/** A restore whose shares hold a secret of a length that no BIP39 phrase has. */
+export function isNoPhraseSecret(error: unknown): boolean {
+  return ERRORS.matches(error, ["recovered-sskr-secret-not-bip39-entropy"]);
+}
+
 /** A group: the indexes of its shares in the input, counted from 0. */
 type Group = readonly number[];
 

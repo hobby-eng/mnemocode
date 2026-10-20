@@ -33,6 +33,18 @@ describe("a failure of the host's combiner", () => {
     await expect(split(new ShareCombineRefusalError())).rejects.toMatchObject({
       code: "sskr.split.sskr-generated-shares-did-not-reconstruct-source-entropy",
     });
+    // A combiner that gives back another secret did not reconstruct it, whatever its length.
+    for (const length of [15, 17]) {
+      const wrong = {
+        ...nodeSharePlatform,
+        combineShares: async () => new Uint8Array(length).fill(1),
+      };
+      await expect(
+        new ShareSplit(wrong, (seed) => seed.fill(7)).split(TEST_PHRASE, 2, 3),
+      ).rejects.toMatchObject({
+        code: "sskr.split.sskr-generated-shares-did-not-reconstruct-source-entropy",
+      });
+    }
   });
 
   it("passes through the check of written shares, while a refusal is a finding", async () => {

@@ -20,7 +20,11 @@ import {
 } from "./share-platform.js";
 import { Share } from "./transport.js";
 import { isRecordedQuorum, MAX_GROUP_MEMBERS, MIN_DIGEST_THRESHOLD } from "./share-layout.js";
-import { isCompleteShareRefusal, restoreCompleteShares } from "./complete-shares.js";
+import {
+  isCompleteShareRefusal,
+  isNoPhraseSecret,
+  restoreCompleteShares,
+} from "./complete-shares.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("sskr.split", {
@@ -167,11 +171,16 @@ export class ShareSplit {
    * first, so that a wrong surplus share is refused too, not only one of the first `threshold`.
    */
   async #assertRestores(records: readonly string[], entropy: Uint8Array): Promise<void> {
-    // The restore's own refusal names a share as typed, which a split has not: it is told as this.
-    // A failure of the host is its own, never the shares' (AUD-037-API002).
+    // The restore's own refusal names a share as typed, which a split has not: it is told as this,
+    // as is a secret of another length than the phrase's. A failure of the host is its own, never
+    // the shares' (AUD-037-API002).
     const restored = await restoreCompleteShares(records, this.#platform).catch(
       (error: unknown) => {
-        if (!isCompleteShareRefusal(error) && !ShareCombineRefusalError.is(error)) throw error;
+        const refusal =
+          isCompleteShareRefusal(error) ||
+          isNoPhraseSecret(error) ||
+          ShareCombineRefusalError.is(error);
+        if (!refusal) throw error;
         return undefined;
       },
     );
