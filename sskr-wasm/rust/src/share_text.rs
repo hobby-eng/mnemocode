@@ -120,11 +120,12 @@ fn bytewords_length(count: usize, minimal: bool) -> usize {
 
 /// `cbor` and its CRC-32 as Bytewords after `prefix`: in `minimal` the first and last letters of
 /// each word, run together, otherwise the words apart. Written into one string made at its full
-/// size, with no list of the words, whose freed memory would name the bytes.
-fn bytewords_text(prefix: &str, cbor: &[u8], minimal: bool) -> String {
+/// size, with no list of the words, whose freed memory would name the bytes, and wiped when it is
+/// dropped (RUST-13).
+fn bytewords_text(prefix: &str, cbor: &[u8], minimal: bool) -> Zeroizing<String> {
     let checksum = crc32(cbor).to_be_bytes();
     let length = prefix.len() + bytewords_length(cbor.len() + CHECKSUM_BYTES, minimal);
-    let mut text = String::with_capacity(length);
+    let mut text = Zeroizing::new(String::with_capacity(length));
     text.push_str(prefix);
     for (place, byte) in cbor.iter().chain(checksum.iter()).enumerate() {
         let word = BYTEWORDS[usize::from(*byte)];
@@ -141,12 +142,12 @@ fn bytewords_text(prefix: &str, cbor: &[u8], minimal: bool) -> String {
 }
 
 /// The compact UR of the share `payload`: its untagged CBOR in minimal Bytewords.
-pub(crate) fn compact_ur(payload: &[u8]) -> String {
+pub(crate) fn compact_ur(payload: &[u8]) -> Zeroizing<String> {
     bytewords_text(UR_PREFIX, &share_cbor(payload, false), true)
 }
 
 /// The standard Bytewords of the share `payload`: its tagged CBOR, words apart.
-pub(crate) fn standard_bytewords(payload: &[u8]) -> String {
+pub(crate) fn standard_bytewords(payload: &[u8]) -> Zeroizing<String> {
     bytewords_text("", &share_cbor(payload, true), false)
 }
 
@@ -241,7 +242,7 @@ pub(crate) fn read_compact_ur(record: &str) -> Result<Zeroizing<Vec<u8>>, Refusa
 
 /// The standard Bytewords of the share `payload` without its tag, as earlier backups wrote it.
 #[cfg(test)]
-pub(crate) fn untagged_standard_bytewords(payload: &[u8]) -> String {
+pub(crate) fn untagged_standard_bytewords(payload: &[u8]) -> Zeroizing<String> {
     bytewords_text("", &share_cbor(payload, false), false)
 }
 
@@ -305,7 +306,7 @@ mod tests {
     /// The published BCR-2020-011 share, whose CBOR is the head 0x55 and 21 bytes.
     const SHARE: &str = "ur:sskr/gogrrsbyadaefmnlbnctaaecvoqdfnjpbzecstfgaxtifpsskbfw";
 
-    /// The 21 bytes of SHARE, read with bc-ur, as an expected value made apart from this module.
+    /// The 21 bytes of SHARE, read with bc-ur, as a known answer made apart from this module.
     fn published_payload() -> Vec<u8> {
         let body = SHARE.strip_prefix("ur:sskr/").unwrap_or_default();
         let cbor = bytewords::decode(body, Style::Minimal).unwrap_or_default();
@@ -338,12 +339,12 @@ mod tests {
         let mut cbor = vec![0x55];
         cbor.extend_from_slice(&payload);
         let record = compact_ur(&payload);
-        assert_eq!(record, SHARE);
+        assert_eq!(record.as_str(), SHARE);
         assert_eq!(record.capacity(), record.len());
         let mut tagged = vec![0xd9, 0x9d, 0x75];
         tagged.extend_from_slice(&cbor);
         let words = standard_bytewords(&payload);
-        assert_eq!(words, written(&tagged, false));
+        assert_eq!(*words, written(&tagged, false));
         assert_eq!(words.capacity(), words.len());
     }
 

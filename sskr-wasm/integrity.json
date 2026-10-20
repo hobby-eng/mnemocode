@@ -5,10 +5,10 @@
   "rust/rust-toolchain.toml": "58036485dea1e5bb8ccb7ca06d881ac7ea052a17e3c5b879a70259292c036797",
   "generated/recovery_sskr_wasm_bg.wasm.d.ts": "1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04",
   "generated/recovery_sskr_wasm.d.ts": "4fe377e3834fbd460e5aeaa668cd16c343c50bd50606cf9390a2491797bdb2ac",
-  "generated/recovery_sskr_wasm_bg.wasm": "8eeebcccd164d974ac32facf68a7b3ace9d6c863e573dce17fde8bbea066150f",
+  "generated/recovery_sskr_wasm_bg.wasm": "01a347e9c231fcb7058c2e8ba9f55e26c1405f1d133d084021e7e929c1db9bd9",
   "generated/recovery_sskr_wasm.js": "e1b79a3c40e92704034b8bb72c4f8dff54746c53219d93eb01f952909f6c0f2c",
-  "rust/src/lib.rs": "5030feaa3eeb9ad7e129159e8b882ed4200b4962511a5469c88d5f97323f07dd",
-  "rust/src/refusal.rs": "e360e6ae6e0bbb272aea03965686ca8efe1bf817bbb25b2b1c4d28744e3d8060",
+  "rust/src/lib.rs": "91cc350d3a1a11a66378faddf3faa78596567ce082b33bb647f54b1e5da8d710",
+  "rust/src/refusal.rs": "225db70a0b9c2737d9a25a3114cb59a0bb33d6342fdcfac029e606cbd60bca37",
   "rust/vendor/sskr-0.12.0/Cargo.toml": "d3208e6da5126544ae50a4f657e178d6662c87a7f18cdcbe61c0e75b968cdeb7",
   "rust/vendor/sskr-0.12.0/LICENSE.md": "d2c043c3d4bfc59d9898cc60366d4a8d26a677d152148859477dd02be24d2acc",
   "rust/vendor/sskr-0.12.0/UPSTREAM.json": "fce50977fe242f6357787e318cc0582e8cccf8fed586e9046c3d1dc9c990044b",
@@ -20,7 +20,7 @@
   "rust/vendor/sskr-0.12.0/src/share.rs": "4615fd979e15998397e209ddb08c3209f43ed08a4d284c0fa19a397be913b01a",
   "rust/vendor/sskr-0.12.0/src/spec.rs": "bdeb4fab24e8c833ec0436064898fc828d1e2ae384be7374518a96c24b94634c",
   "../Dockerfile.sskr": "4c7b34897a3d66becdf026914b9b0f1ef43301f06ec494495fe42db13ad93c77",
-  "../scripts/build-sskr-wasm.mjs": "ba4b490e6a4fe4140b46e359c86912e97e520cbd4d0254618c3f5c1b98e93b99",
+  "../scripts/build-sskr-wasm.mjs": "56b75e3d8312603df26defcb196faa64fdac05f22698791b04023b64478f4d78",
   "rust/vendor/bc-shamir-0.13.0/Cargo.toml": "d4b81944f361426ae6ab38407390b766352cde931ae99e060acc395d7d81137d",
   "rust/vendor/bc-shamir-0.13.0/LICENSE.md": "d2c043c3d4bfc59d9898cc60366d4a8d26a677d152148859477dd02be24d2acc",
   "rust/vendor/bc-shamir-0.13.0/UPSTREAM.json": "996ebde76d57cd133df132911f4e244be0f8e97ee213228fa13b4e207daa61fb",
@@ -31,5 +31,5 @@
   "rust/vendor/bc-shamir-0.13.0/src/lib.rs": "8da1461a0526add4864754a5a342d1a4b8f1371f0ce7baf84c54fba0ea064b1a",
   "rust/vendor/bc-shamir-0.13.0/src/recovery_secret.rs": "bdc3e1c0d72ffb6411c6720e4cf163d508e77a0decc728cab273f3bee27aa0b9",
   "rust/vendor/bc-shamir-0.13.0/src/shamir.rs": "a3c0327301038028c1523466ec432ca9493c0fdde1cacde9625893e062681de6",
-  "rust/src/share_text.rs": "53d64477167bb335d7c40ec8c0bdafc4984102994503a70c6959212c6b0cb30b"
+  "rust/src/share_text.rs": "b01f84b5982f1b1ae6ea50c0982a56dcb614a04fccf64bc0dcae6ef11ca913e8"
 }

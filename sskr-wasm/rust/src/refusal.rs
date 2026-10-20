@@ -91,6 +91,7 @@ extern "C" {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::error::Error;
 
     #[test]
     fn preserves_messages_and_distinguishes_owned_codes() {
@@ -103,12 +104,6 @@ mod tests {
             Refusal::Specification("test".into()).code()
         );
     }
-}
-
-#[cfg(test)]
-mod decode_tests {
-    use super::Refusal;
-    use std::error::Error;
 
     #[test]
     fn decode_has_only_a_stable_safe_message_code_and_debug_value() {

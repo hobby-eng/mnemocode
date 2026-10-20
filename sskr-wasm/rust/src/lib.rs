@@ -115,7 +115,7 @@ impl TryFrom<u8> for ShareEncoding {
 /// again because any host may call it directly.
 const NO_SHARES: &str = "Enter at least one SSKR share.";
 
-fn encode_share(share: &UrShare, encoding: ShareEncoding) -> String {
+fn encode_share(share: &UrShare, encoding: ShareEncoding) -> Zeroizing<String> {
     match encoding {
         ShareEncoding::CompactUr => share_text::compact_ur(&share.0),
         ShareEncoding::Bytewords => share_text::standard_bytewords(&share.0),
@@ -165,14 +165,27 @@ fn split(
         .flatten()
         .map(UrShare)
         .collect();
-    let mut records: Vec<String> = shares
+    let records: Vec<Zeroizing<String>> = shares
         .iter()
         .map(|share| encode_share(share, encoding))
         .collect();
-    let joined = records.join("\n");
-    // The joined text goes to the host; its parts are wiped here.
-    records.iter_mut().for_each(Zeroize::zeroize);
-    Ok(joined)
+    Ok(joined_lines(&records))
+}
+
+/// `records` one per line, in one string made at its full size at once, so that no smaller copy
+/// of a share is left behind; the string goes to the host, whose glue wipes it here once it holds
+/// its copy, and the records are wiped when they are dropped.
+fn joined_lines(records: &[Zeroizing<String>]) -> String {
+    let breaks = records.len().saturating_sub(1);
+    let length = records.iter().map(|record| record.len()).sum::<usize>() + breaks;
+    let mut joined = String::with_capacity(length);
+    for (place, record) in records.iter().enumerate() {
+        if place > 0 {
+            joined.push('\n');
+        }
+        joined.push_str(record);
+    }
+    joined
 }
 
 /// The secret of the shares `records`, one per line, written in `encoding`.
@@ -215,12 +228,15 @@ pub fn create_sskr_shares(
 /// are wiped, also when the split is refused.
 #[wasm_bindgen]
 pub fn create_sskr_shares_formatted(
-    mut secret: Vec<u8>,
+    secret: Vec<u8>,
     group_threshold: u8,
     group_specs: Vec<u8>,
-    mut random_seed: Vec<u8>,
+    random_seed: Vec<u8>,
     encoding: u8,
 ) -> Result<String, JsValue> {
+    // Both under a wiping owner before anything can fail, without a copy.
+    let secret = Zeroizing::new(secret);
+    let random_seed = Zeroizing::new(random_seed);
     let result = split(
         &secret,
         group_threshold,
@@ -228,8 +244,8 @@ pub fn create_sskr_shares_formatted(
         &random_seed,
         encoding,
     );
-    secret.zeroize();
-    random_seed.zeroize();
+    drop(secret);
+    drop(random_seed);
     scrub_stack();
     result.map_err(Refusal::thrown)
 }
@@ -243,12 +259,11 @@ pub fn recover_sskr_shares(records: String) -> Result<Vec<u8>, JsValue> {
 /// The secret of the shares `records`, one per line, in the encoding numbered `encoding`
 /// (ShareEncoding). The records are wiped, also when they are refused.
 #[wasm_bindgen]
-pub fn recover_sskr_shares_formatted(
-    mut records: String,
-    encoding: u8,
-) -> Result<Vec<u8>, JsValue> {
+pub fn recover_sskr_shares_formatted(records: String, encoding: u8) -> Result<Vec<u8>, JsValue> {
+    // Under a wiping owner before anything can fail, without a copy.
+    let records = Zeroizing::new(records);
     let result = combine(&records, encoding);
-    records.zeroize();
+    drop(records);
     scrub_stack();
     result.map_err(Refusal::thrown)
 }
@@ -386,11 +401,16 @@ mod tests {
             secret,
         );
     }
-}
 
-#[cfg(test)]
-mod decode_tests {
-    use super::*;
+    #[test]
+    fn writes_the_text_of_a_share_into_an_owner_that_wipes_it_on_drop() {
+        // Fails to build where the text is held by a type that does not wipe it (RUST-13).
+        fn wiped_on_drop<T: zeroize::ZeroizeOnDrop>(_: &T) {}
+        let share = UrShare(vec![0x42; 21]);
+        for encoding in [ShareEncoding::CompactUr, ShareEncoding::Bytewords] {
+            wiped_on_drop(&encode_share(&share, encoding));
+        }
+    }
 
     // Published BCR-2020-011 share and its independently retained Bytewords, unchanged.
     const SHARE: &str = "ur:sskr/gogrrsbyadaefmnlbnctaaecvoqdfnjpbzecstfgaxtifpsskbfw";
@@ -403,8 +423,14 @@ mod decode_tests {
                 .unwrap()
                 .to_vec(),
         );
-        assert_eq!(encode_share(&share, ShareEncoding::CompactUr), SHARE);
-        assert_eq!(encode_share(&share, ShareEncoding::Bytewords), WORDS);
+        assert_eq!(
+            encode_share(&share, ShareEncoding::CompactUr).as_str(),
+            SHARE
+        );
+        assert_eq!(
+            encode_share(&share, ShareEncoding::Bytewords).as_str(),
+            WORDS
+        );
         assert_eq!(
             decode_share(WORDS, ShareEncoding::Bytewords)
                 .unwrap()
