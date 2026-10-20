@@ -36,6 +36,7 @@ import {
   restoreCompleteShares,
   digestField,
   uncheckedField,
+  type CompleteRestore,
 } from "./complete-shares.js";
 import { defined } from "../core/defined.js";
 import {
@@ -321,7 +322,7 @@ export class Branch implements Disposable {
   }
 
   /** Elements that a hidden direction changes. */
-  unsettledElements(): MarkedElement[] {
+  #unsettledElements(): MarkedElement[] {
     const { joint } = this.#parts;
     const { hidden } = this.#directions();
     return joint.spaces.flatMap((space, share) => {
@@ -399,7 +400,7 @@ export class Branch implements Disposable {
         return {
           mnemonic,
           shares,
-          unsettled: this.unsettledElements(),
+          unsettled: this.#unsettledElements(),
           ...uncheckedField(unchecked),
           ...digestField(digestChecked),
         };
@@ -811,14 +812,7 @@ async function restore(
   shares: readonly ReadRepairableShare[],
   platform: ShareCombiner,
   assertLive: () => void,
-): Promise<
-  | {
-      readonly mnemonic: string;
-      readonly unchecked: readonly number[];
-      readonly digestChecked: boolean;
-    }
-  | undefined
-> {
+): Promise<CompleteRestore | undefined> {
   // Each copy once, the first typed (withoutCopies): the places of the shares kept, in order.
   const kept = withoutCopies(shares.map((share, place) => ({ place, ur: share.ur }))).map(
     (share) => share.place,

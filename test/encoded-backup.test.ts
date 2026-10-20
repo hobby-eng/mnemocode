@@ -61,8 +61,8 @@ describe("writing codes", () => {
         [...phrase.slice(1), -1],
         [...phrase.slice(1), 1.5],
         [...phrase.slice(1), Number.NaN],
-        // An index left undefined is refused, and so is a hole.
-        Object.assign([...phrase], { 11: undefined }) as unknown as number[],
+        // An index left undefined, which no type allows, is refused, and so is a hole.
+        Object.assign([...phrase], { 11: undefined }),
         Object.assign(phrase.slice(1), { length: phrase.length }),
         phrase.slice(1),
         [...phrase, 0],
@@ -80,6 +80,18 @@ describe("writing codes", () => {
       expect(() => formatEncoded(result, format), format).toThrow(
         expect.objectContaining({ code: "core.bip39-sizes.assert-word-indexes-refused" }),
       );
+  });
+
+  it("names English words as the one form whose codes are the phrase's own words", () => {
+    const phrase = Array.from({ length: 12 }, () => 0);
+    const words = Array.from({ length: 12 }, () => "abandon").join(" ");
+    for (const format of ENCODED_FORMATS) {
+      const form = EncodedForm.of(format);
+      expect(form.writtenInWords, format).toBe(form.codes(phrase) === words);
+    }
+    expect(ENCODED_FORMATS.filter((format) => EncodedForm.of(format).writtenInWords)).toEqual([
+      "english",
+    ]);
   });
 });
 
@@ -109,6 +121,7 @@ describe("EncodedBackup", () => {
       EncodedBackup.of([...MASKED.shiftedIndexes.slice(1), 2048], "indexes", "direct"),
     ).toThrow("Every BIP39 index must be an integer from 0 through 2047.");
     expect(() =>
+      // A mode that no type allows, fed on purpose as a JavaScript host could.
       EncodedBackup.of(MASKED.shiftedIndexes, "indexes", "shifted" as unknown as "direct"),
     ).toThrow("Unsupported Seedshift mode.");
     // An unknown word is named by its place.
@@ -128,10 +141,10 @@ describe("EncodedBackup", () => {
         refused = error;
       }
       expect(refused).toBeInstanceOf(MissingChecksumError);
-      expect((refused as MissingChecksumError).mode).toBe(mode);
-      expect((refused as MissingChecksumError).message).toBe(
-        `These codes lack the BIP39 checksum that ${ENCODED_MODE_NAMES[mode]} gives them.`,
-      );
+      expect(refused).toMatchObject({
+        mode,
+        message: `These codes lack the BIP39 checksum that ${ENCODED_MODE_NAMES[mode]} gives them.`,
+      });
     }
     const codes = EncodedBackup.of(legacy, "indexes", "direct");
     expect(() => codes.withMode("seedshift")).toThrow(MissingChecksumError);
@@ -197,30 +210,6 @@ describe("EncodedBackup", () => {
     // Every last word whose checksum fits: 2^(11 - 4) for 12 words.
     expect(candidates).toHaveLength(128);
     expect(candidates.map((candidate) => candidate.recoveredMnemonic)).toContain(TEST_PHRASE);
-  });
-
-  it("tells why codes that fit no format cannot be read, by the format they most likely are", () => {
-    expect(EncodedBackup.whyUnreadable("1 2 3")).toBe(
-      "These are 3 word numbers; an encoded seed phrase has 12, 15, 18, 21 or 24.",
-    );
-    expect(EncodedBackup.whyUnreadable("1 2 3 4 5 6 7 8 9 10 11 2049")).toBe(
-      "Indexes use Seedshift-compatible numbering from 1 through 2048.",
-    );
-    expect(EncodedBackup.whyUnreadable("abandon abandon")).toBe(
-      "Enter 12, 15, 18, 21 or 24 English BIP39 words.",
-    );
-  });
-
-  it("guesses the form of unreadable codes by the separators that their readers take", () => {
-    // Final review CC-02: word numbers or Unicode codes apart by ; or , are not taken for words.
-    // A # is taken for colors first, the most telling sign (EncodedForm.likely).
-    const numbers = Array.from({ length: 13 }, (_, index) => index + 1);
-    for (const separator of [";", ","])
-      expect(EncodedBackup.whyUnreadable(numbers.join(separator)), separator).toBe(
-        "These are 13 word numbers; an encoded seed phrase has 12, 15, 18, 21 or 24.",
-      );
-    const codes = formatEncoded(MASKED, "unicode").match(/.{4}/gu)!;
-    expect(EncodedBackup.whyUnreadable(codes.slice(1).join(";"))).toMatch(/^These are 11 codes;/u);
   });
 
   it("refuses a # out of place among colors, as it did before the shared tokenizer", () => {

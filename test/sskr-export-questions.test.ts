@@ -9,13 +9,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
-import { runSskrExport, runSskrSplit } from "../src/cli/sskr-command.js";
+import { runSskrExport } from "../src/cli/sskr-export-command.js";
+import { runSskrSplit } from "../src/cli/sskr-split-command.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
-import { unrepairedShare } from "../src/sskr/repair.js";
 import { ShareRestore, variantsMessage } from "../src/sskr/share-restore.js";
-import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
+import { testPhraseSet } from "./helpers/shares.js";
 import {
   marked,
   OTHER_SET_SHARE,
@@ -37,14 +37,9 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
   harness.replacedTerminalChoice(await importOriginal()),
 );
-vi.mock("../src/export/private-file.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/export/private-file.js")>();
-  return {
-    ...actual,
-    publishNewPrivateFile: async (path: string, bytes: Uint8Array) =>
-      harness.failingSave(() => actual.publishNewPrivateFile(path, bytes)),
-  };
-});
+vi.mock("node:fs/promises", async (importOriginal) =>
+  harness.replacedFiles(await importOriginal()),
+);
 
 /** The first share as word numbers, with the words at 5, 9 and 13 unreadable: 4 shares fit. */
 function ambiguous(): string {
@@ -108,8 +103,7 @@ describe("shares on the private screen", () => {
     it("shows each set that fits with its fingerprint when no wallet tells them apart", async () => {
       // A second set beside the one the search finds: public shares of the test phrase. No two
       // sets of real shares pass both the CRC-32 and the digest, so the step is given a second.
-      const others = (await splitSskrMnemonic(TEST_PHRASE, 2, 3)).slice(0, 2);
-      const other = { mnemonic: TEST_PHRASE, shares: others.map(unrepairedShare), unsettled: [] };
+      const other = await testPhraseSet();
       const phrases = ShareRestore.phrases.bind(ShareRestore);
       vi.spyOn(ShareRestore, "phrases").mockImplementation(async (...args) => {
         const found = await phrases(...args);
@@ -127,7 +121,8 @@ describe("shares on the private screen", () => {
       );
       expect(seen.out).toContain(`Variant 2 of 2, original fingerprint ${TEST_FINGERPRINT}:`);
       const shown = seen.out.join("\n");
-      for (const share of [SHARES[0], SHARES[1], ...others]) expect(shown).toContain(share);
+      for (const share of [SHARES[0], SHARES[1], ...other.shares.map(({ ur }) => ur)])
+        expect(shown).toContain(share);
     });
   });
 });

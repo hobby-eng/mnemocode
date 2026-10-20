@@ -14,6 +14,7 @@ import {
   resultHeaderLines,
   terminalLine,
   terminalNotice,
+  terminalSaved,
   terminalWork,
   type Channel,
 } from "./terminal.js";
@@ -21,7 +22,7 @@ import { PrivateSteps } from "./private-steps.js";
 import { publishNewPrivateFile } from "../export/private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import { value, type ParsedArguments } from "./arguments.js";
-import { businessOptions, businessOptionNames } from "./business-options.js";
+import { businessOptions, BUSINESS_OPTION_NAMES } from "./business-options.js";
 import {
   writeShare,
   type ShareFormat,
@@ -54,11 +55,11 @@ const ERRORS = new ErrorCatalog("cli.sskr-output", {
     `${value0} These are share formats, not BIP39 representations.`,
 });
 
-export const sskrExportOptions = [
+export const SSKR_EXPORT_OPTIONS = [
   "cards-dir",
   "card-layout",
   "template",
-  ...businessOptionNames,
+  ...BUSINESS_OPTION_NAMES,
 ] as const;
 
 /** The card settings of the commands of shares, with the format of the card files settled. */
@@ -70,7 +71,7 @@ export function exportOptions(
 ): ShareCardOptions | undefined {
   const { sheets, cards } = assertCardOutput(
     args,
-    sskrExportOptions.filter((key) => key !== "cards-dir"),
+    SSKR_EXPORT_OPTIONS.filter((key) => key !== "cards-dir"),
   );
   if (!sheets && !cards) return undefined;
   // Before any secret is asked, as the cards would refuse it later.
@@ -198,7 +199,7 @@ export async function saveShares(
   }
   // Each share in its form, as the terminal shows it.
   const lines = shown.map((share) => writeShare(share.ur, share.format));
-  const output = await saveOutput(args, "output", "The file of the shares", (path) =>
+  const output = await saveOutput(args, "output", { what: "The file of the shares" }, (path) =>
     // The shares in the open: their bytes are wiped once this attempt has saved or failed.
     wipedAfterAsync(new TextEncoder().encode(lines.join("\n") + "\n"), (bytes) =>
       publishNewPrivateFile(path, bytes),
@@ -206,10 +207,7 @@ export async function saveShares(
   );
   if (output === CANCELLED) return CANCELLED;
   if (output !== undefined) {
-    terminalNotice(
-      `Saved SSKR records: ${printableText(output)} (one complete share per line).`,
-      "success",
-    );
+    terminalSaved(`Saved SSKR records: ${printableText(output)} (one complete share per line).`);
     keep("file");
   }
   return undefined;
@@ -231,16 +229,15 @@ async function saveShareCards(
   const directory = await saveOutput(
     args,
     "cards-dir",
-    "The folder of share cards",
+    { what: "The folder of share cards" },
     async (path) => {
       cards = await exportSskrCards(set, path, options.imageFormat);
     },
   );
   if (directory === CANCELLED) return CANCELLED;
   if (directory !== undefined) {
-    terminalNotice(
+    terminalSaved(
       `Saved ${cards} ${options.imageFormat.toUpperCase()} files to: ${printableText(directory)}`,
-      "success",
     );
     if ((await saveShareQrsInside(set, directory)) === CANCELLED) return CANCELLED;
     keep(
@@ -251,12 +248,12 @@ async function saveShareCards(
           : "files",
     );
   }
-  const pdf = await saveOutput(args, "pdf", "The PDF of the shares", (path) =>
+  const pdf = await saveOutput(args, "pdf", { what: "The PDF of the shares" }, (path) =>
     exportSskrPdf(set, path),
   );
   if (pdf === CANCELLED) return CANCELLED;
   if (pdf !== undefined) {
-    terminalNotice(`Saved SSKR collection PDF: ${printableText(pdf)}`, "success");
+    terminalSaved(`Saved SSKR collection PDF: ${printableText(pdf)}`);
     keep("file");
     if (
       (await saveShareQrs(set, (code) => saveQrBeside(code.payload, pdf, `-${code.reference}`))) ===
@@ -268,7 +265,7 @@ async function saveShareCards(
   const images = await saveOutput(
     args,
     "images-dir",
-    "The folder of share images",
+    { what: "The folder of share images" },
     async (path) => {
       pages = await exportSskrImages(set, path, imageFormat(args));
     },
@@ -298,8 +295,7 @@ async function saveShareQrs(
     if (path !== undefined) saved += 1;
   }
   if (saved > 0)
-    terminalNotice(
+    terminalSaved(
       `Saved the QR codes of the share sheets as images beside them: ${saved} PNG ${saved === 1 ? "file" : "files"}.`,
-      "success",
     );
 }

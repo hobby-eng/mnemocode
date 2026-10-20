@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screenRows } from "../src/cli/screen-rows.js";
+import { isControl, screenRows } from "../src/cli/screen-rows.js";
 
 // What a terminal shows after what MnemoCode writes on the private screen (screen-rows.ts), the
 // model that the private page reads its record with.
@@ -37,5 +37,18 @@ describe("the rows that a terminal shows", () => {
   it("passes over a screen switch, and tabs and marks take their columns", () => {
     expect(screenRows("\x1b[?1049h\x1b[?25lab\tc\n", 40).rows[0]).toBe("ab      c");
     expect(screenRows("éx\n", 40).rows[0]).toBe("éx");
+  });
+
+  it("draws no C0 control and no DEL, and every character from the space to the tilde", () => {
+    const boundaries = [0x00, 0x1f, 0x20, 0x7e, 0x7f, 0x80];
+    expect(boundaries.map((unit) => [unit, isControl(unit)])).toEqual([
+      [0x00, true],
+      [0x1f, true],
+      [0x20, false],
+      [0x7e, false],
+      [0x7f, true],
+      [0x80, false],
+    ]);
+    expect(screenRows("a\x1fb\x7fc ~\n", 40).rows[0]).toBe("abc ~");
   });
 });

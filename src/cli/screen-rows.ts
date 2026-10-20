@@ -6,6 +6,7 @@
 // such as the switch to the alternate screen, are passed over.
 
 import { codePointWidth, TAB_STOP, wrapsBefore } from "./terminal-geometry.js";
+import { KEY } from "./terminal-keys.js";
 import { SGR_RESET } from "./terminal-style.js";
 
 /** One cell of the screen: what is drawn in it, and the colour codes it is drawn with. */
@@ -27,6 +28,15 @@ export interface ScreenRows {
 const CONTROL_SEQUENCE = /\x1b\[([0-9;?]*)([@-~])/uy;
 /** An empty cell, as an erase leaves it. */
 const BLANK: Cell = { text: " ", style: "" };
+
+/**
+ * Whether `unit`, a code point or a UTF-8 byte, is a control that a terminal does not draw: a C0
+ * control, below the space, or DEL. Below 0x80 a byte and a code point are the same, so the
+ * screen's characters and the bytes of a typed answer are told apart by this one rule.
+ */
+export function isControl(unit: number): boolean {
+  return unit < KEY.SPACE || unit === KEY.DELETE;
+}
 
 /** The page that `stream` draws on a terminal `columns` wide, from its top left. */
 export function screenRows(stream: string, columns: number): ScreenRows {
@@ -87,7 +97,7 @@ class Screen {
         this.#columns - 1,
         (Math.floor(this.#column / TAB_STOP) + 1) * TAB_STOP,
       );
-    else if (point >= 0x20 && point !== 0x7f) this.#draw(text, codePointWidth(point));
+    else if (!isControl(point)) this.#draw(text, codePointWidth(point));
   }
 
   /** Draws `text` at the cursor, `width` columns wide, on the next row when it does not fit. */

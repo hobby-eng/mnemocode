@@ -10,7 +10,8 @@ The license texts of every crate that the WebAssembly links, with their copyrigh
 [LINKED_LICENSES.txt](LINKED_LICENSES.txt), written from the crates' own sources by
 `scripts/sskr-licenses.mjs` and checked by `pnpm check:rust`.
 
-The bridge source is included in `rust/src/lib.rs`, with its manifest and lockfile.
+The bridge source is included in `rust/src/` (`lib.rs`, `share_text.rs`, `refusal.rs`), with its
+manifest and lockfile.
 The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
 `integrity.json` pins the source, manifests and generated JS/WASM files.
 

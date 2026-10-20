@@ -6,9 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderCards, exportCards } from "../src/export/pdf.js";
 import type { CardContent } from "../src/export/backup-cards.js";
-import { cardTemplates, selectTemplate, type CardTemplate } from "../src/export/templates.js";
+import { CARD_TEMPLATES, selectTemplate, type CardTemplate } from "../src/export/templates.js";
 import { parseArguments, values } from "../src/cli/arguments.js";
-import { commandOptions } from "../src/cli/command-options.js";
+import { COMMAND_OPTIONS } from "../src/cli/command-options.js";
 import { indexesToColors } from "../src/core.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
 import { createCardIdentity } from "../src/export/card-identities.js";
@@ -42,10 +42,10 @@ const fixedIdentity = {
 
 describe("export infrastructure", () => {
   it("ships thirteen templates, separate cards in the business card designs only", () => {
-    expect(cardTemplates).toHaveLength(13);
-    expect(new Set(cardTemplates.map((t) => t.id)).size).toBe(13);
+    expect(CARD_TEMPLATES).toHaveLength(13);
+    expect(new Set(CARD_TEMPLATES.map((t) => t.id)).size).toBe(13);
     // A material design is printed on sheets only (drawsSeparateCards).
-    for (const template of cardTemplates)
+    for (const template of CARD_TEMPLATES)
       expect(typeof template.renderIndividual, template.id).toBe(
         template.family === "business" ? "function" : "undefined",
       );
@@ -201,7 +201,8 @@ describe("export infrastructure", () => {
       ).getPageCount(),
     ).toBe(4);
     await expect(
-      // A JavaScript host may pass a design of another kind than its content.
+      // A design of another kind than its content, which no type allows, fed on purpose as a
+      // JavaScript host could.
       renderCards(nodeCardRenderer, [
         { template: { ...template, kind: "unicode" as never }, content },
       ]),
@@ -213,6 +214,6 @@ describe("export infrastructure", () => {
     expect(values(args, "date")).toEqual(["23-09-2026", "08-08-1988"]);
     // The labels of dated Unicode cards went with those cards (owner, 2026-10-09): no command
     // takes them.
-    expect(Object.values(commandOptions).flat()).not.toContain("event");
+    expect(Object.values(COMMAND_OPTIONS).flat()).not.toContain("event");
   });
 });

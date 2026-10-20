@@ -5,10 +5,11 @@ import { splitSskrMnemonic, combineSskrShares } from "../src/sskr/shares.js";
 import {
   colorsToShare,
   normalizeShare,
+  Share,
   shareToColors,
   validateShareSet,
 } from "../src/sskr/transport.js";
-import { sskrVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR, SSKR_VECTOR } from "../src/sskr/known-answers.js";
 import { encodeMnemonic, decodeInput, parseDate } from "../src/core.js";
 
 describe("Standalone SSKR", () => {
@@ -36,23 +37,26 @@ describe("Standalone SSKR", () => {
 
   it("recovers the independent official grouped vector", async () => {
     const expected = entropyToMnemonic(
-      Uint8Array.from(sskrVector.entropy.match(/../gu)!, (byte) => parseInt(byte, 16)),
+      Uint8Array.from(SSKR_VECTOR.entropy.match(/../gu)!, (byte) => parseInt(byte, 16)),
       wordlist,
     );
-    expect(await combineSskrShares(sskrVector.shares)).toBe(expected);
+    expect(await combineSskrShares(SSKR_VECTOR.shares)).toBe(expected);
     expect(
       normalizeShare(
         "tuna next keep gyro gear runs body acid able film nail barn cost aqua epic veto quad fern jump buzz epic slot frog apex taxi grim fern twin leaf",
       ),
-    ).toBe(sskrVector.shares[0]);
+    ).toBe(SSKR_VECTOR.shares[0]);
   });
 
   it("rejects duplicate, mixed, corrupted, truncated and reordered records", async () => {
     const source = entropyToMnemonic(new Uint8Array(16), wordlist);
     const a = await splitSskrMnemonic(source, 2, 3);
-    const b = await splitSskrMnemonic(source, 2, 3);
     await expect(combineSskrShares([a[0]!, a[0]!])).rejects.toThrow(/more than once/u);
-    await expect(combineSskrShares([a[0]!, b[1]!])).rejects.toMatchObject({
+    // Two published sets with distinct identifiers: two random splits share one by chance, once
+    // in 65,536 (CORE-32).
+    const [one, other] = [SSKR_VECTOR.shares[0]!, SSKR_SET_VECTOR.shares[1]!];
+    expect(Share.read(one).info.identifier).not.toBe(Share.read(other).info.identifier);
+    await expect(combineSskrShares([one, other])).rejects.toMatchObject({
       code: "sskr.transport.shares-of-different-sets",
     });
     const colors = shareToColors(a[0]!);

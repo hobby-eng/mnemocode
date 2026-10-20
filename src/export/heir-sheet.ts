@@ -303,7 +303,10 @@ export const HEIR_SHEET_FORMATS: Readonly<Record<HeirSheetSize, HeirSheetFormat>
   a6: A6,
 });
 
-/** The layout of the size that `value` names, the default one without it; refused otherwise. */
+/**
+ * The layout of the size that `value` names, the default one without it; refuses a name of no
+ * size, naming those there are (export.heir-sheet.size-instructions-heirs).
+ */
 export function parseHeirSheetSize(value: string | undefined): HeirSheetFormat {
   const size = HEIR_SHEET_SIZES.find((known) => known === (value ?? DEFAULT_HEIR_SHEET_SIZE));
   if (size === undefined)
@@ -313,7 +316,10 @@ export function parseHeirSheetSize(value: string | undefined): HeirSheetFormat {
 
 /**
  * Draws the sheet for heirs of `text` in `format`, A5 unless another is given, as a PDF of two
- * pages, its front and its back, without metadata.
+ * pages, its front and its back, without metadata. Refuses words that leave the front no room for
+ * a hint (export.heir-sheet.instructions-heirs-leave-no-room-hint-on-front) or do not fit on the
+ * back (export.heir-sheet.steps-basics-heirs-do-not-fit-on-back); a failure of `assets` to read
+ * the font passes on.
  */
 export async function renderHeirSheet(
   assets: AssetSource,

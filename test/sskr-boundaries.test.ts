@@ -1,7 +1,7 @@
 // CRC-valid fixtures reach the share-width rule, rather than failing an unrelated checksum.
 import { describe, expect, it } from "vitest";
 import { restoreCompleteShares } from "../src/sskr/complete-shares.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { shareInfo } from "../src/sskr/transport.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { sskrEngine } from "../src/sskr/runtime.js";
@@ -40,7 +40,7 @@ describe("SSKR's BIP39 entropy-width boundary", () => {
     async (size) => {
       const returned = new Uint8Array(size).fill(0xa5);
       await expect(
-        restoreCompleteShares(sskrSetVector.shares.slice(0, 2), {
+        restoreCompleteShares(SSKR_SET_VECTOR.shares.slice(0, 2), {
           ...nodeSharePlatform,
           combineShares: async () => returned,
         }),
@@ -96,8 +96,8 @@ describe("the raw SSKR engine refuses malformed group policies", () => {
     expect(() =>
       engine.create_sskr_shares(
         new Uint8Array(16),
-        groupThreshold as number,
-        Uint8Array.from(pairs as number[]),
+        groupThreshold,
+        Uint8Array.from(pairs),
         new Uint8Array(SEED_BYTES),
       ),
     ).toThrow(expect.objectContaining({ code, message }));

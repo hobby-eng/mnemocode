@@ -34,7 +34,7 @@ export type BusinessStyle = (typeof BUSINESS_STYLES)[number];
 export type PhysicalBusinessStyle = Exclude<BusinessStyle, "mixed">;
 
 /** Approved finishes, each with its image, in their order (material-artwork.ts draws them). */
-export const MATERIAL_STYLES = Object.freeze([
+const MATERIAL_STYLES = Object.freeze([
   "vehicle",
   "enclosure",
   "tile",
@@ -50,9 +50,24 @@ export type CardStyle = BusinessStyle | MaterialStyle;
 export type CardFamily = CatalogEntry["family"];
 
 /** One installed design, in the family whose renderer draws it. */
-export type CatalogEntry = { readonly id: string; readonly kind: CardKind } & (
-  | { readonly family: "business"; readonly style: BusinessStyle }
-  | { readonly family: "material"; readonly style: MaterialStyle }
+export type CatalogEntry = {
+  /** The design's id, its family and its style, such as "business-it": how a command names it. */
+  readonly id: string;
+  /** The kind of cards that the design draws. */
+  readonly kind: CardKind;
+} & (
+  | {
+      /** A business card design, drawn as separate cards as well as on sheets. */
+      readonly family: "business";
+      /** Its style among the business designs (BUSINESS_STYLES). */
+      readonly style: BusinessStyle;
+    }
+  | {
+      /** A material design, a collection of samples that only its sheet shows. */
+      readonly family: "material";
+      /** Its material (MATERIAL_STYLES). */
+      readonly style: MaterialStyle;
+    }
 );
 
 /** The designs, in the order that the list of designs shows and numbers them, from 1. */
@@ -96,7 +111,10 @@ export function sheetsOnly(design: string): string {
 /** Why a design is not drawn as separate cards. */
 export const SHEETS_ONLY = sheetsOnly("This design");
 
-/** Refuses separate cards of `entry` where it is drawn on sheets only (SHEETS_ONLY). */
+/**
+ * Refuses separate cards of `entry` where it is drawn on sheets only (SHEETS_ONLY;
+ * export.template-catalog.sheets-only).
+ */
 export function assertSeparateCards(entry: CatalogEntry): void {
   if (!drawsSeparateCards(entry)) throw ERRORS.create("sheets-only", []);
 }
@@ -153,7 +171,11 @@ export class NoCardTemplateError extends Error {
   }
 }
 
-/** The design that `idOrNumber` names (findTemplate); refuses a kind without designs, or no fit. */
+/**
+ * The design that `idOrNumber` names (findTemplate). Refuses a kind without designs, a
+ * NoCardTemplateError (no-card-template), and a name that fits none of its designs
+ * (export.template-catalog.card-template-unknown-incompatible-list-available-preview-templates).
+ */
 export function resolveTemplateId(idOrNumber?: string, kind?: CardKind): CatalogEntry {
   if (findTemplate(undefined, kind) === undefined) throw new NoCardTemplateError(kind);
   const found = findTemplate(idOrNumber, kind);

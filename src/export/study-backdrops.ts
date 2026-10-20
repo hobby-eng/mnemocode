@@ -47,12 +47,32 @@ const mix = (a: Color, b: Color, t: number): Color =>
   );
 
 /**
+ * The large primes that the spatial hash of Teschner et al., "Optimized Spatial Hashing for
+ * Collision Detection of Deformable Objects" (2003), multiplies the coordinates by, one per axis:
+ * they spread neighbouring items far apart.
+ */
+const HASH_PRIME_COLUMN = 73856093;
+const HASH_PRIME_ROW = 19349663;
+/**
+ * Added to the column and the row before they are hashed: without them, an item in column 0 or
+ * row 0 would take its shade from the other axis alone, and the item in both would always take
+ * the shade -1. Other values would do as well, but would shade every backdrop differently.
+ */
+const HASH_OFFSET_COLUMN = 101;
+const HASH_OFFSET_ROW = 211;
+/** The steps of a shade between 0 and 1: a shade runs from -1 to 1 in steps of 1 / SHADE_STEPS. */
+const SHADE_STEPS = 1000;
+
+/**
  * A fixed shade from -1 to 1 for the item in column i and row j of a pattern, so that panels,
  * tiles and planks vary a little, the same way on every page.
  */
 function shade(i: number, j: number): number {
-  const hash = (Math.imul(i + 101, 73856093) ^ Math.imul(j + 211, 19349663)) >>> 0;
-  return (hash % 2001) / 1000 - 1;
+  const hash =
+    (Math.imul(i + HASH_OFFSET_COLUMN, HASH_PRIME_COLUMN) ^
+      Math.imul(j + HASH_OFFSET_ROW, HASH_PRIME_ROW)) >>>
+    0;
+  return (hash % (2 * SHADE_STEPS + 1)) / SHADE_STEPS - 1;
 }
 
 /** A polygon given in millimetres from the top left corner of the page. */

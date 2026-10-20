@@ -2,7 +2,7 @@ import { coinById, type WalletEvidence } from "../bitcoin-evidence.js";
 import { defined } from "../core/defined.js";
 import {
   COPY_FIELDS,
-  profileFields,
+  PROFILE_FIELDS,
   type CopyField,
   type ProfileField,
 } from "../export/card-settings.js";
@@ -22,7 +22,7 @@ export function profileOption(field: ProfileField): string {
 }
 
 const OPTION_LABELS: Readonly<Record<string, string>> = {
-  ...Object.fromEntries(profileFields.map((field) => [profileOption(field), `card ${field}`])),
+  ...Object.fromEntries(PROFILE_FIELDS.map((field) => [profileOption(field), `card ${field}`])),
   ...Object.fromEntries(
     COPY_FIELDS.map((field) => {
       const key = COPY_OPTIONS[field];

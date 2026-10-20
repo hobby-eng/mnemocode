@@ -2,15 +2,15 @@
 // S001 to S015 and the steps of ShareRestore (S002, S123, S139) here, the others in the files
 // scan-fixes-*.test.ts. Public test data only: the BIP39 test phrase and the public SSKR vectors.
 
-import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseArguments } from "../src/cli/arguments.js";
 import { runDecode } from "../src/cli/decode-command.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { Masking, SPLIT_MODES_ONLY } from "../src/core/masking.js";
-import { publicShare } from "./helpers/vectors.js";
+import { publicShare, sskrVectors } from "./helpers/vectors.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import type { MoreWithin, NextByte } from "../src/cli/terminal-keys.js";
 
 // The BIP39 library as it is, with the turning of a phrase into entropy watched: S005's case keeps
 // the entropy of each phrase to see that it is wiped. Every other call works as without the spy.
@@ -72,7 +72,12 @@ describe("S003: codes given with the options are read as typed ones are", () => 
     const codes = "not codes at all";
     await expect(
       runRecoverDate(parseArguments(["--input", codes, "--date", "2?-09-2026"])),
-    ).rejects.toThrow(EncodedBackup.whyUnreadable(codes));
+    ).rejects.toThrow(
+      expect.objectContaining({
+        code: "core.words.enter-english-bip39-words",
+        message: "Enter 12, 15, 18, 21 or 24 English BIP39 words.",
+      }),
+    );
   });
 });
 
@@ -111,12 +116,41 @@ describe("S005: the candidate list is written by one library writer", () => {
     const first = "legal winner thank year wave sausage worth useful legal winner thank yellow";
     await expect(
       new CandidateListWriter(new NoProtection()).writePhrases([first, "not a phrase"]),
-    ).rejects.toThrow("Invalid mnemonic");
+    ).rejects.toHaveProperty("code", "core.bip39-sizes.expected-word-indexes");
     const made = turned.mock.results[0];
-    expect(made?.type).toBe("return");
-    const entropy = made!.value as Uint8Array;
+    if (made?.type !== "return")
+      throw new Error("The first phrase must have been turned into entropy.");
+    const entropy = made.value;
     expect(entropy).toHaveLength(16);
     expect(entropy.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("refuses a phrase that is none by the code of its condition, never naming a word", async () => {
+    const { CandidateListWriter } = await import("../src/core/candidate-list-writer.js");
+    const { NoProtection } = await import("../src/core/candidate-encryption.js");
+    const valid = "legal winner thank year wave sausage worth useful legal winner thank yellow";
+    // What writing `phrase` ends with: its refusal, or "written", which no refusal below matches.
+    const refusal = (phrase: string): Promise<unknown> =>
+      new CandidateListWriter(new NoProtection()).writePhrases([phrase]).then(
+        () => "written",
+        (error: unknown) => error,
+      );
+    // @scure/bip39's own error names the word it does not know: neither it nor its text is kept.
+    const unknown = await refusal(valid.replace("wave", "wavx"));
+    expect(unknown).toMatchObject({
+      code: "core.english-words.word-not-english-bip39-list",
+      message: "A word is not in the English BIP39 list.",
+    });
+    expect(unknown).not.toHaveProperty("cause");
+    const checksum = await refusal(valid.replace("yellow", "year"));
+    expect(checksum).toMatchObject({
+      code: "core.candidate-list-writer.phrase-fails-bip39-checksum",
+      message: "A candidate's phrase fails its BIP39 checksum.",
+    });
+    expect(checksum).not.toHaveProperty("cause");
+    // Two spaces leave an empty word, as the library splits a phrase.
+    const spaced = await refusal(valid.replace(" ", "  "));
+    expect(spaced).toHaveProperty("code", "core.bip39-sizes.expected-word-indexes");
   });
 });
 
@@ -151,18 +185,28 @@ describe("S015: a list question drops what was typed before it", () => {
   it("drops typed-ahead keys before it reads an answer", async () => {
     const events: string[] = [];
     vi.resetModules();
-    vi.doMock("../src/cli/terminal-input.js", async (importOriginal) => ({
-      ...(await importOriginal<typeof import("../src/cli/terminal-input.js")>()),
-      dropTypedAhead: async () => {
-        events.push("drop");
-      },
-      withRawTerminal: async <T>(body: (next: () => Promise<number | undefined>) => Promise<T>) => {
-        events.push("read");
-        // Escape: the question goes back.
-        const keys = [0x1b];
-        return body(async () => keys.shift());
-      },
-    }));
+    vi.doMock("../src/cli/terminal-input.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../src/cli/terminal-input.js")>();
+      class WatchedKeys extends actual.TerminalKeys {
+        static override async dropTypedAhead(): Promise<undefined> {
+          events.push("drop");
+          return undefined;
+        }
+
+        static override async withRawMode<T>(
+          body: (next: NextByte, moreWithin: MoreWithin) => Promise<T>,
+        ): Promise<T> {
+          events.push("read");
+          // Escape alone, as nothing follows it: the question goes back.
+          const keys = [0x1b];
+          return body(
+            async () => keys.shift(),
+            async () => false,
+          );
+        }
+      }
+      return { ...actual, TerminalKeys: WatchedKeys };
+    });
     const { choose } = await import("../src/cli/terminal-choice.js");
     await choose("Which?", [{ label: "One", value: 1 }], { label: "Next" });
     expect(events.slice(0, 2)).toEqual(["drop", "read"]);
@@ -170,10 +214,8 @@ describe("S015: a list question drops what was typed before it", () => {
 });
 
 describe("S002, S123: ShareRestore holds the steps of a restore and a repair", () => {
-  const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-    deterministic: { entropy: string; shares: string[] }[];
-  };
-  const [first, second] = vectors.deterministic[0]!.shares as [string, string];
+  const { shares } = sskrVectors().deterministic[0]!;
+  const [first, second] = [shares[0]!, shares[1]!];
 
   async function restoreOf(texts: readonly string[], confirmed: boolean, limits = {}) {
     const { ShareInput } = await import("../src/sskr/share-input.js");
@@ -234,10 +276,9 @@ describe("S002, S123: ShareRestore holds the steps of a restore and a repair", (
   });
 });
 
-const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-  deterministic: { entropy: string; shares: string[] }[];
-};
-const [first, second] = vectors.deterministic[0]!.shares as [string, string];
+const vectors = sskrVectors();
+const { shares } = vectors.deterministic[0]!;
+const [first, second] = [shares[0]!, shares[1]!];
 // Shares 1 and 3 of a 2-of-3 split of "abandon ... about" masked with Seedshift and 23-09-2026
 // (scripts/verify-terminal-input.py), and that masked phrase.
 const MASKED_SHARES = [

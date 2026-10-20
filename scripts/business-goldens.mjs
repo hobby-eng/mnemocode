@@ -1,6 +1,6 @@
 /** Manual public-data rendering check; not part of normal CLI startup or CI. */
 // Usage: node scripts/business-goldens.mjs [module root] [destination]; compare two destinations
-// with scripts/compare-business-goldens.py.
+// with scripts/compare-business-goldens.mjs.
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { rgbBytes, rgbChannels } from "../src/export/color-math.js";
-import { validCharacters } from "../src/cli/utf8.js";
+import { ValidCharacters } from "../src/cli/utf8.js";
 
 describe("private conversion byte scratch lifetime (AUD-029-SEC001)", () => {
   it("keeps RGB results while retiring the actual intermediate byte allocations", () => {
@@ -19,16 +19,14 @@ describe("private conversion byte scratch lifetime (AUD-029-SEC001)", () => {
     }
   });
 
-  it("retires decoded bytes when an incomplete color cannot supply all channels", () => {
+  it("refuses an incomplete color before any of its bytes is decoded", () => {
     const convert = vi.spyOn(Uint8Array, "from");
     try {
       expect(() => rgbBytes("#12")).toThrow(
-        expect.objectContaining({ code: "core.defined.missing-value" }),
+        expect.objectContaining({ code: "core.colors.invalid-rgb-reference" }),
       );
-      expect(convert.mock.results).toHaveLength(1);
-      const result = convert.mock.results[0]!;
-      expect(result.type).toBe("return");
-      if (result.type === "return") expect([...result.value]).toEqual([0]);
+      // Read as a color first (rgbReferenceDigits), it leaves no decoded byte to retire.
+      expect(convert).not.toHaveBeenCalled();
     } finally {
       for (const row of convert.mock.results) if (row.type === "return") row.value.fill(0);
       convert.mockRestore();
@@ -44,7 +42,7 @@ describe("private conversion byte scratch lifetime (AUD-029-SEC001)", () => {
       const convert = vi.spyOn(Uint8Array, "from");
       try {
         let place = 0;
-        const reader = validCharacters(async () => bytes[place++]);
+        const reader = new ValidCharacters(async () => bytes[place++]);
         const output: number[] = [];
         for (let byte = await reader.next(); byte !== undefined; byte = await reader.next())
           output.push(byte);

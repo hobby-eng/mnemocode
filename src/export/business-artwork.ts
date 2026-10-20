@@ -7,7 +7,7 @@ import {
   type PngCodec,
   type RasterImage,
 } from "./platform.js";
-import { businessDesigns, type PhysicalBusinessStyle } from "./business-designs.js";
+import { BUSINESS_DESIGNS, type PhysicalBusinessStyle } from "./business-designs.js";
 import { pixelHsv, rgbOfHsv } from "./color-math.js";
 import { ReferenceTint } from "./business-tint.js";
 import { rgbReferenceDigits } from "../core/colors.js";
@@ -69,12 +69,16 @@ export class BusinessArtwork {
 
   /**
    * The artwork of `style` for the reference `hex`, as PNG bytes. Decorative hue, saturation and
-   * brightness follow the reference approximately. The printed HEX remains exact.
+   * brightness follow the reference approximately. The printed HEX remains exact. Refuses a `hex`
+   * that is no RGB reference (core.colors.invalid-rgb-reference), as rgbReferenceDigits does,
+   * before any photograph is read; a photograph that cannot be read or decoded is refused
+   * (export.platform.cannot-load-card-artwork), and a failure of the platform to encode the PNG
+   * passes on.
    */
   async recoloured(style: PhysicalBusinessStyle, hex: string): Promise<Uint8Array> {
     rgbReferenceDigits(hex);
     const base = await this.#photographs.get(`images/business-${style}-v1.png`);
-    const { hueOrigin, tint } = businessDesigns[style];
+    const { hueOrigin, tint } = BUSINESS_DESIGNS[style];
     const reference = new ReferenceTint(hex);
     const out = createRasterImage(base.width, base.height);
     try {

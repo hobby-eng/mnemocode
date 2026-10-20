@@ -55,7 +55,15 @@ async function assertCheckedRecords(records: readonly string[]): Promise<void> {
   await assertSskrSelfTest();
 }
 
-/** The phrase of complete shares, each as read, in the shape of a repair. */
+/**
+ * The phrase of complete shares, each as read, in the shape of a repair; every share given is
+ * checked against the phrase (ShareSet.restore). Refuses a count of shares outside 1 to a whole
+ * set (sskr.transport.assert-share-count-refused); a failed SSKR self-test, before any share is
+ * read; shares that Share.readSet refuses, such as a text that is no share, shares of different
+ * sets or too few for the recorded threshold
+ * (sskr.transport.not-enough-sskr-shares-meet-recorded-threshold); and shares that restore no
+ * phrase or disagree with it, named by their place (sskr.complete-shares).
+ */
 export async function restoreShareSet(records: readonly string[]): Promise<RepairedSet> {
   await assertCheckedRecords(records);
   using set = await ShareSet.restore(records, nodeSharePlatform);
@@ -78,7 +86,13 @@ export async function combineSskrShareSet(records: readonly string[]): Promise<R
 /**
  * The phrase only, when every supplied share was checked and an SSKR digest checked the phrase. A
  * string cannot disclose unchecked data: callers that need partial recovery use
- * combineSskrShareSet and report its metadata (AUD-008-FUN001, AUD-037-API004).
+ * combineSskrShareSet and report its metadata (AUD-008-FUN001, AUD-037-API004). Throws where no
+ * SSKR digest checked the phrase (sskr.shares.no-digest-checked-phrase) and where a share or a
+ * repaired element could not be checked
+ * (sskr.shares.some-shares-repaired-elements-could-not-checked-use); before that, refuses what
+ * combineSskrShareSet refuses, such as a count of shares outside 1 to a whole set, a failed SSKR
+ * self-test, a share that does not read, and a repair that needs a long search or that more than
+ * one phrase passes (ShareSet.combine).
  */
 export async function combineSskrShares(records: readonly string[]): Promise<string> {
   await assertCheckedRecords(records);

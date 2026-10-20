@@ -6,110 +6,58 @@
 // the three ways to protect a list behind one interface, chosen once. It also holds the rule for
 // the passphrase of a list (parseListPassphrase), so that every host accepts the same ones.
 //
-// From the host it needs crypto.getRandomValues and, for X25519 only, WebCrypto (crypto.subtle),
-// which a browser offers only on a secure page; without it the X25519 operations refuse at once
-// with one line, while the passphrase operations work, since age takes scrypt and its ciphers from
-// @noble. It reads and writes no file and asks nothing; its only package import is age-encryption,
-// and its shared admission policy is host-neutral too.
+// The age operations themselves are candidate-cipher.ts's; this module runs them only after their
+// self-test passed (candidate-encryption-checks.ts), once per kind of lock and again where a host
+// asks. From the host it needs what they need: crypto.getRandomValues and, for X25519 only,
+// WebCrypto (crypto.subtle), without which the X25519 operations refuse at once with one line,
+// while the passphrase operations work. It reads and writes no file and asks nothing; it imports
+// no package itself, and its shared admission policy is host-neutral too.
 
-import { Decrypter, Encrypter, generateX25519Identity, identityToRecipient } from "age-encryption";
 import { Redacted } from "./redacted.js";
-import { SecretValue } from "./secret-value.js";
+import { bytesWhileLive, SecretValue } from "./secret-value.js";
 import { withoutByteOrderMark } from "./white-space.js";
-import { describeError } from "./refusal.js";
 import { listInWords } from "./places.js";
+import { CandidateFileAdmission, type ListFileLock } from "./candidate-file-admission.js";
 import {
-  CandidateFileAdmission,
-  SCRYPT_LOG_N,
-  type ListFileLock,
-} from "./candidate-file-admission.js";
-import { CandidateFileRefusedError } from "./candidate-file-refusal.js";
-import { ErrorCatalog } from "./error-catalog.js";
+  CandidateCipher,
+  type CandidateFileKey,
+  type SessionIdentity,
+} from "./candidate-cipher.js";
+import { ERRORS } from "./candidate-encryption-errors.js";
 import { CandidateEncryptionChecks } from "./candidate-encryption-checks.js";
-import type {
-  CandidateCipherOperations,
-  CandidateFileKey,
-  SessionIdentity,
-} from "./candidate-encryption-types.js";
 
-/** Existing public session identity shape, shared with its known-answer verifier. */
-export type { SessionIdentity } from "./candidate-encryption-types.js";
-
-const ERRORS = new ErrorCatalog("core.candidate-encryption", {
-  "no-webcrypto": () => NO_WEBCRYPTO,
-  "key-one-age-key-62-characters-starts-age1": () =>
-    "The key must be one age key of 62 characters that starts with age1, as the Scanner shows it.",
-  "use-at-least-characters-passphrase-all-protects-seed": (value0: string) =>
-    `Use at least ${value0} characters for the passphrase: it is all that protects these seed phrases.`,
-  "passphrase-candidates-empty": () => "The passphrase for the candidates is empty.",
-  "not-protection-choice": { kind: "type", text: () => NOT_A_PROTECTION_CHOICE },
-  "self-test-failed": () => "Candidate encryption is unavailable because its self-test failed.",
-  "unsupported-lock": () => "Candidate encryption needs either a Scanner key or a passphrase.",
-});
+/**
+ * For other hosts: the owner of the Scanner's one-time key, which createSessionIdentity makes and
+ * decryptCandidates takes as `{ identity }`; SessionIdentity.fromText takes a published test key.
+ */
+export { SessionIdentity } from "./candidate-cipher.js";
 
 // Keep the existing import paths valid for hosts that already use this module.
 export { CandidateFileRefusedError, type CandidateFileProblem } from "./candidate-file-refusal.js";
 export { SCRYPT_LOG_N, type ListFileLock } from "./candidate-file-admission.js";
 
-/** An X25519 recipient: "age1", then 58 Bech32 characters (age-encryption.org/v1). */
-const X25519_RECIPIENT = /^age1[02-9ac-hj-np-z]{58}$/u;
-/** Shorter list passphrases are refused: the passphrase is all that protects the seed phrases. */
-export const MIN_LIST_PASSPHRASE_LENGTH = 12;
-const NO_WEBCRYPTO =
-  "An age key (X25519) needs WebCrypto (crypto.subtle), which is missing here: a browser offers it only on a secure page, opened as a file, from localhost or over https.";
-/** Bound age's temporary reads: its nonce reader concatenates the input chunks it receives. */
-const ENCRYPTED_READ_CHUNK_BYTES = 64 * 1024;
-
 /**
- * Refuses X25519 where WebCrypto is missing, as on a page served over plain http from another
- * computer. age-encryption falls back to @noble only when `crypto` is missing altogether or
- * rejects X25519 as not supported; without crypto.subtle it would fail deep inside with a bare
- * TypeError ("Cannot read properties of undefined") that tells a person nothing.
+ * The fewest characters, counted as Unicode code points (not UTF-16 units), that a list passphrase
+ * may have; parseListPassphrase refuses a shorter one, since the passphrase is all that protects
+ * the seed phrases.
  */
-function requireWebCryptoX25519(): void {
-  if (typeof globalThis.crypto?.subtle?.importKey !== "function")
-    throw ERRORS.create("no-webcrypto", []);
-}
-
-/** Makes a one-time X25519 key; X25519 explicitly, whatever age-encryption's default becomes. */
-async function createSessionIdentityUnchecked(): Promise<SessionIdentity> {
-  requireWebCryptoX25519();
-  const identity = await generateX25519Identity();
-  return { identity, recipient: await identityToRecipient(identity) };
-}
+export const MIN_LIST_PASSPHRASE_LENGTH = 12;
 
 /**
- * The recipient as typed, pasted or read from a file: one age1… key, in any case. Its Bech32
- * checksum is checked here too, so that a typing error shows before any search.
+ * The recipient as typed, pasted or read from a file: one age1… key, in any case, its Bech32
+ * checksum checked, so that a typing error shows before any search. Refuses any other text
+ * (core.candidate-encryption.key-one-age-key-62-characters-starts-age1). The cipher's rule,
+ * retained under the original public function name.
  */
 export function parseRecipient(text: string): string {
-  const recipient = text.trim().toLowerCase();
-  const refused = ERRORS.create("key-one-age-key-62-characters-starts-age1", []);
-  if (!X25519_RECIPIENT.test(recipient)) throw refused;
-  try {
-    // Decodes the Bech32 text and checks its checksum and length, without encrypting anything.
-    new Encrypter().addRecipient(recipient);
-  } catch {
-    throw refused;
-  }
-  return recipient;
-}
-
-/** Encrypts a list to the Scanner's one-time key. */
-async function encryptCandidatesUnchecked(
-  plain: Uint8Array,
-  recipient: string,
-): Promise<Uint8Array> {
-  CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
-  requireWebCryptoX25519();
-  const encrypter = new Encrypter();
-  encrypter.addRecipient(parseRecipient(recipient));
-  return encrypter.encrypt(plain);
+  return CandidateCipher.parseRecipient(text);
 }
 
 /**
  * The passphrase of a list as docs/CANDIDATES.md defines it: the text as entered, without white
- * space at its ends; from a file also without a byte order mark. A short one is refused.
+ * space at its ends; from a file also without a byte order mark. One shorter than
+ * MIN_LIST_PASSPHRASE_LENGTH characters is refused
+ * (core.candidate-encryption.use-at-least-characters-passphrase-all-protects-seed).
  */
 export function parseListPassphrase(text: string): string {
   const passphrase = withoutByteOrderMark(text).trim();
@@ -122,98 +70,33 @@ export function parseListPassphrase(text: string): string {
 }
 
 /**
- * Encrypts a list under a passphrase, at the fixed scrypt work factor. The passphrase is used as
- * given: a host reads it with parseListPassphrase first.
- */
-async function encryptCandidatesWithPassphraseUnchecked(
-  plain: Uint8Array,
-  passphrase: string,
-): Promise<Uint8Array> {
-  CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
-  if (passphrase === "") throw ERRORS.create("passphrase-candidates-empty", []);
-  const encrypter = new Encrypter();
-  encrypter.setPassphrase(passphrase);
-  encrypter.setScryptWorkFactor(SCRYPT_LOG_N);
-  return encrypter.encrypt(plain);
-}
-
-/**
  * How a host chooses to protect a list: to the Scanner's key, under a passphrase, or not at all.
  */
 export type ListProtectionChoice =
-  | { readonly kind: "key"; readonly recipient: string }
-  | { readonly kind: "passphrase"; readonly passphrase: string }
-  | { readonly kind: "none" };
+  | {
+      /** To the Scanner's key (ScannerKeyProtection). */
+      readonly kind: "key";
+      /** The Scanner's one-time key, age1…, as typed, pasted or read (parseRecipient). */
+      readonly recipient: string;
+    }
+  | {
+      /** Under a passphrase (PassphraseProtection). */
+      readonly kind: "passphrase";
+      /** The passphrase as typed or read from a file (parseListPassphrase). */
+      readonly passphrase: string;
+    }
+  | {
+      /** Not at all, only on the person's explicit request (NoProtection). */
+      readonly kind: "none";
+    };
 
-/** The shared admission policy, retained under the original public function name. */
+/**
+ * The shared admission policy, retained under the original public function name: how `file` is
+ * locked. Refuses, as CandidateFileRefusedError, what CandidateFileAdmission.lock refuses
+ * (core.candidate-file-refusal.not-age-file and the others it names).
+ */
 export function listFileLock(file: Uint8Array): ListFileLock {
   return CandidateFileAdmission.lock(file);
-}
-
-/**
- * Decrypts a candidate file with the session identity or with a passphrase, after checking that
- * its header has exactly one stanza, of the kind that key opens (listFileLock). The whole file is
- * authenticated before it is returned.
- */
-async function decryptCandidatesUnchecked(
-  file: Uint8Array,
-  key: CandidateFileKey,
-): Promise<Uint8Array> {
-  const given: ListFileLock = "identity" in key ? "key" : "passphrase";
-  CandidateFileAdmission.assertLock(file, given);
-  if (given === "key") requireWebCryptoX25519();
-  const decrypter = new Decrypter();
-  if ("identity" in key) {
-    try {
-      decrypter.addIdentity(key.identity);
-    } catch {
-      // The decoder includes a malformed private identity in its error. Neither that diagnostic
-      // nor its cause may reach a host's UI, inspection or logging.
-      throw new CandidateFileRefusedError("key", "This Scanner key is not a valid age identity.");
-    }
-  } else decrypter.addPassphrase(key.passphrase);
-  // Given bytes, age reads its output through a fetch Response, and a browser replaces any error
-  // inside it with its own ("Failed to fetch", "The operation was aborted"): given a stream, it
-  // returns the stream unread, and its own error, such as "invalid tag", reaches every host.
-  let stream: ReadableStream<Uint8Array>;
-  try {
-    // The header: a key that opens no stanza fails here, and so does a stanza changed on its way,
-    // which age cannot tell apart from a wrong key.
-    stream = await decrypter.decrypt(streamOf(file));
-  } catch (error) {
-    const what = given === "key" ? "This Scanner key" : "This passphrase";
-    throw new CandidateFileRefusedError(
-      "key",
-      `${what} does not open the candidate file, or its header is damaged (${describeError(error)}).`,
-      error,
-    );
-  }
-  try {
-    return await CandidateFileAdmission.readPlaintext(stream);
-  } catch (error) {
-    if (error instanceof CandidateFileRefusedError) throw error;
-    // The contents: every chunk carries its own tag, so a changed or cut file fails here.
-    throw new CandidateFileRefusedError(
-      "damaged",
-      `The candidate file is damaged (${describeError(error)}).`,
-      error,
-    );
-  }
-}
-
-/**
- * Borrowed ciphertext views: age never needs a temporary copy of the entire file to read a nonce.
- */
-function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
-  let offset = 0;
-  return new ReadableStream({
-    pull(controller) {
-      const end = Math.min(bytes.byteLength, offset + ENCRYPTED_READ_CHUNK_BYTES);
-      if (end > offset) controller.enqueue(bytes.subarray(offset, end));
-      offset = end;
-      if (offset === bytes.byteLength) controller.close();
-    },
-  });
 }
 
 /** One asynchronous feature check, shared by concurrent calls and retried after a failed check. */
@@ -251,13 +134,8 @@ class CipherHealth {
   }
 }
 
-const RAW_OPERATIONS: CandidateCipherOperations = {
-  createSessionIdentity: createSessionIdentityUnchecked,
-  encryptCandidates: encryptCandidatesUnchecked,
-  decryptCandidates: decryptCandidatesUnchecked,
-};
 const SYMMETRIC_HEALTH = new CipherHealth(() => CandidateEncryptionChecks.symmetric());
-const KEY_HEALTH = new CipherHealth(() => new CandidateEncryptionChecks(RAW_OPERATIONS).quick());
+const KEY_HEALTH = new CipherHealth(() => CandidateEncryptionChecks.quick());
 
 interface CipherState {
   readonly symmetric: Promise<void>;
@@ -282,8 +160,8 @@ function currentCipher(state: CipherState): boolean {
 }
 
 async function cipherState(kind: ListFileLock): Promise<CipherState> {
-  if (kind !== "key" && kind !== "passphrase") throw ERRORS.create("unsupported-lock", []);
-  if (kind === "key") requireWebCryptoX25519();
+  if (!CandidateFileAdmission.isLock(kind)) throw ERRORS.create("unsupported-lock", []);
+  if (kind === "key") CandidateCipher.requireX25519();
   try {
     for (;;) {
       const symmetric = SYMMETRIC_HEALTH.ready();
@@ -332,6 +210,8 @@ async function withCipherHealth<Value>(
  * Fast lazy integrity gate before a host enables candidate encryption controls. Passphrase
  * operations need only the symmetric check; key operations additionally require WebCrypto and
  * X25519 known answers. Successful checks are cached; failures leave the feature unavailable.
+ * Refuses a `kind` that is no lock (core.candidate-encryption.unsupported-lock), "key" where
+ * WebCrypto is missing (no-webcrypto), and a failed check (self-test-failed).
  */
 export async function assertCandidateEncryptionReady(kind: ListFileLock): Promise<void> {
   for (;;) {
@@ -340,7 +220,12 @@ export async function assertCandidateEncryptionReady(kind: ListFileLock): Promis
   }
 }
 
-/** Reruns all fast known answers explicitly, without scrypt or the first-use cache. */
+/**
+ * Reruns all fast known answers explicitly, without scrypt or the first-use cache. Fails as the
+ * first failed check fails (CandidateEncryptionChecks.symmetric and quick:
+ * core.self-test-check.mismatch and the others they name); the feature stays unavailable until a
+ * later check passes.
+ */
 export async function checkCandidateEncryptionQuick(): Promise<void> {
   // Publish both barriers synchronously: new operations cannot reuse an earlier successful run.
   const symmetric = SYMMETRIC_HEALTH.refresh();
@@ -348,48 +233,81 @@ export async function checkCandidateEncryptionQuick(): Promise<void> {
   await Promise.all([symmetric, key]);
 }
 
-/** Generates a session identity only after the fast key feature checks pass. */
+/**
+ * Generates a session identity only after the fast key feature checks pass: the owner of its
+ * private key, which the host keeps for the session and then wipes (SessionIdentity). Refuses where
+ * WebCrypto is missing (core.candidate-encryption.no-webcrypto) and where a check failed
+ * (self-test-failed).
+ */
 export async function createSessionIdentity(): Promise<SessionIdentity> {
-  return withCipherHealth("key", createSessionIdentityUnchecked);
+  return withCipherHealth("key", () => CandidateCipher.createSessionIdentity());
 }
 
-/** Encrypts borrowed plaintext to a validated Scanner key after the fast key integrity gate. */
+/**
+ * Encrypts borrowed plaintext to a validated Scanner key after the fast key integrity gate.
+ * Refuses a plaintext over the size limit (core.candidate-file-refusal.plaintext-list-too-large),
+ * a `recipient` that is no age key
+ * (core.candidate-encryption.key-one-age-key-62-characters-starts-age1), a page without WebCrypto
+ * (no-webcrypto) and a failed check (self-test-failed).
+ */
 export async function encryptCandidates(plain: Uint8Array, recipient: string): Promise<Uint8Array> {
   CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
   const checked = parseRecipient(recipient);
   return withCipherHealth(
     "key",
-    () => encryptCandidatesUnchecked(plain, checked),
+    () => CandidateCipher.encrypt(plain, checked),
     (bytes) => bytes.fill(0),
   );
 }
 
-/** Encrypts borrowed plaintext with fixed-cost scrypt after the fast symmetric integrity gate. */
+/**
+ * Encrypts borrowed plaintext with fixed-cost scrypt after the fast symmetric integrity gate.
+ * Refuses a plaintext over the size limit (core.candidate-file-refusal.plaintext-list-too-large),
+ * an empty passphrase (core.candidate-encryption.passphrase-candidates-empty) and a failed check
+ * (self-test-failed).
+ */
 export async function encryptCandidatesWithPassphrase(
   plain: Uint8Array,
   passphrase: string,
 ): Promise<Uint8Array> {
   CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
-  if (passphrase === "") throw ERRORS.create("passphrase-candidates-empty", []);
+  CandidateCipher.assertPassphrase(passphrase);
   return withCipherHealth(
     "passphrase",
-    () => encryptCandidatesWithPassphraseUnchecked(plain, passphrase),
+    () => CandidateCipher.encryptWithPassphrase(plain, passphrase),
     (bytes) => bytes.fill(0),
   );
 }
 
-/** Authenticates borrowed file bytes after admission and the appropriate fast feature gate. */
+/**
+ * Authenticates borrowed file bytes after admission and the appropriate fast feature gate, with
+ * `key`: `{ identity }`, the live session identity, or `{ passphrase }`. The plaintext is fresh
+ * bytes that the caller wipes, returned only while the session identity is live. Refuses, as
+ * CandidateFileRefusedError, a file that is not one for `key`
+ * (CandidateFileAdmission.assertLock: core.candidate-file-refusal.recipient-of-another-key and the
+ * others it names) and what CandidateCipher.decrypt refuses (scanner-key-does-not-open,
+ * passphrase-does-not-open, contents-damaged, plaintext-list-too-large); an identity that is no
+ * SessionIdentity (core.candidate-encryption.not-session-identity), and one wiped before the
+ * plaintext is returned (core.secret-value.wiped, the plaintext overwritten); and, for an
+ * identity, a page without WebCrypto (core.candidate-encryption.no-webcrypto), and a failed check
+ * (self-test-failed).
+ */
 export async function decryptCandidates(
   file: Uint8Array,
   key: CandidateFileKey,
 ): Promise<Uint8Array> {
-  const kind = "identity" in key ? "key" : "passphrase";
+  // Read once: a host's object may answer differently when it is read again (AUD-015).
+  const owned: CandidateFileKey =
+    "identity" in key ? { identity: key.identity } : { passphrase: key.passphrase };
+  const kind = "identity" in owned ? "key" : "passphrase";
   CandidateFileAdmission.assertLock(file, kind);
-  return withCipherHealth(
+  const plain = await withCipherHealth(
     kind,
-    () => decryptCandidatesUnchecked(file, key),
+    () => CandidateCipher.decrypt(file, owned),
     (bytes) => bytes.fill(0),
   );
+  // The session may end while the gate rechecks its cipher: its list is then not handed out.
+  return "identity" in owned ? bytesWhileLive(plain, () => owned.identity.assertLive()) : plain;
 }
 
 /**
@@ -416,7 +334,10 @@ export interface OwnedListProtection extends ListProtection, Disposable {
 export class ScannerKeyProtection implements OwnedListProtection {
   readonly #recipient: string;
 
-  /** Takes the key as typed, pasted or read from a file, and refuses one that is not an age key. */
+  /**
+   * Takes the key as typed, pasted or read from a file, and refuses one that is not an age key
+   * (core.candidate-encryption.key-one-age-key-62-characters-starts-age1, parseRecipient).
+   */
   constructor(key: string) {
     this.#recipient = parseRecipient(key);
   }
@@ -440,9 +361,9 @@ export class ScannerKeyProtection implements OwnedListProtection {
 
   /**
    * The age file of `list`, borrowed and unchanged, to the key: fresh bytes that the caller wipes.
-   * Refuses a list over the size limit (CandidateFileRefusedError "unsupported"), a page without
-   * WebCrypto (core.candidate-encryption.no-webcrypto) and a cipher whose self-test failed
-   * (core.candidate-encryption.self-test-failed).
+   * Refuses a list over the size limit (core.candidate-file-refusal.plaintext-list-too-large), a
+   * page without WebCrypto (core.candidate-encryption.no-webcrypto) and a cipher whose self-test
+   * failed (core.candidate-encryption.self-test-failed).
    */
   protect(list: Uint8Array): Promise<Uint8Array> {
     return encryptCandidates(list, this.#recipient);
@@ -465,7 +386,11 @@ export class ScannerKeyProtection implements OwnedListProtection {
 export class PassphraseProtection extends Redacted implements OwnedListProtection {
   readonly #passphrase: SecretValue<string>;
 
-  /** Takes the passphrase as typed or read from a file (parseListPassphrase). */
+  /**
+   * Takes the passphrase as typed or read from a file, refused when it is too short
+   * (parseListPassphrase,
+   * core.candidate-encryption.use-at-least-characters-passphrase-all-protects-seed).
+   */
   constructor(text: string) {
     super("PassphraseProtection");
     this.#passphrase = SecretValue.text(parseListPassphrase(text));
@@ -485,7 +410,7 @@ export class PassphraseProtection extends Redacted implements OwnedListProtectio
   /**
    * The age file of `list`, borrowed and unchanged, under the passphrase through scrypt at work
    * factor 2^SCRYPT_LOG_N: fresh bytes that the caller wipes. Refuses a list over the size limit
-   * (CandidateFileRefusedError "unsupported"), a cipher whose self-test failed
+   * (core.candidate-file-refusal.plaintext-list-too-large), a cipher whose self-test failed
    * (core.candidate-encryption.self-test-failed), and a call once wiped
    * (core.secret-value.wiped).
    */
@@ -493,16 +418,10 @@ export class PassphraseProtection extends Redacted implements OwnedListProtectio
     this.#passphrase.assertLive();
     const bytes = await withCipherHealth(
       "passphrase",
-      () => encryptCandidatesWithPassphraseUnchecked(list, this.#passphrase.value),
+      () => CandidateCipher.encryptWithPassphrase(list, this.#passphrase.value),
       (held) => held.fill(0),
     );
-    try {
-      this.#passphrase.assertLive();
-      return bytes;
-    } catch (error) {
-      bytes.fill(0);
-      throw error;
-    }
+    return bytesWhileLive(bytes, () => this.#passphrase.assertLive());
   }
 
   /** Erases retained passphrase bytes after all protect calls have settled. */
@@ -529,7 +448,10 @@ export class NoProtection implements OwnedListProtection {
     return "NOT encrypted";
   }
 
-  /** The list itself, the same bytes. */
+  /**
+   * The list itself, the same bytes. Refuses a list over the size limit
+   * (core.candidate-file-refusal.plaintext-list-too-large).
+   */
   protect(list: Uint8Array): Promise<Uint8Array> {
     CandidateFileAdmission.assertSize(list.byteLength, "plaintext");
     return Promise.resolve(list);
@@ -556,10 +478,8 @@ const CHOICE_SHAPES = Object.entries(CHOICE_FIELDS).map(
   ([kind, fields]) => `{ kind: "${kind}"${fields.map((field) => `, ${field}`).join("")} }`,
 );
 
-/** Why a choice is refused that is not one of ListProtectionChoice; it repeats nothing given. */
-const NOT_A_PROTECTION_CHOICE =
-  `The protection of a candidate list must be ${listInWords(CHOICE_SHAPES, "or")}, ` +
-  "each field a text and no other field.";
+/** The choices, as the refusal of anything else names them; it repeats nothing given. */
+const PROTECTION_CHOICES = listInWords(CHOICE_SHAPES, "or");
 
 /**
  * `choice` as ListProtectionChoice, or a TypeError: a JavaScript or parsed host may pass a kind
@@ -569,7 +489,8 @@ const NOT_A_PROTECTION_CHOICE =
  * returned: a host's object may answer differently when it is read again (AUD-015).
  */
 function checkedChoice(given: unknown): ListProtectionChoice {
-  if (typeof given !== "object" || given === null) throw ERRORS.create("not-protection-choice", []);
+  if (typeof given !== "object" || given === null)
+    throw ERRORS.create("not-protection-choice", [PROTECTION_CHOICES]);
   const choice: Readonly<Record<string, unknown>> = { ...given };
   const kind = Object.hasOwn(choice, "kind") ? choice["kind"] : undefined;
   // Only an own kind of CHOICE_FIELDS: neither another value nor an inherited name such as
@@ -577,7 +498,7 @@ function checkedChoice(given: unknown): ListProtectionChoice {
   const wanted: readonly string[] | undefined = Object.entries(CHOICE_FIELDS).find(
     ([name]) => name === kind,
   )?.[1];
-  if (wanted === undefined) throw ERRORS.create("not-protection-choice", []);
+  if (wanted === undefined) throw ERRORS.create("not-protection-choice", [PROTECTION_CHOICES]);
   // Own enumerable names, as many as the kind has and each one of them: no field is missing, and
   // none of another kind, such as a passphrase beside "none", comes along unread.
   const names = Object.keys(choice);
@@ -586,7 +507,7 @@ function checkedChoice(given: unknown): ListProtectionChoice {
     !names.every((name) => name === "kind" || wanted.includes(name)) ||
     !wanted.every((name) => typeof choice[name] === "string")
   )
-    throw ERRORS.create("not-protection-choice", []);
+    throw ERRORS.create("not-protection-choice", [PROTECTION_CHOICES]);
   // The checks above proved the shape: an own kind of CHOICE_FIELDS with exactly its fields, each
   // a string.
   return choice as ListProtectionChoice;
@@ -594,7 +515,10 @@ function checkedChoice(given: unknown): ListProtectionChoice {
 
 /**
  * The protection that a host's `choice` names (ListProtectionChoice); a list in the open only for
- * an explicit `{ kind: "none" }`, and anything else that is not one of the three is refused.
+ * an explicit `{ kind: "none" }`. Anything else that is not one of the three is refused as a
+ * TypeError (core.candidate-encryption.not-protection-choice), and so is what the protection's
+ * constructor refuses: a key that is no age key (key-one-age-key-62-characters-starts-age1) or a
+ * passphrase too short (use-at-least-characters-passphrase-all-protects-seed).
  */
 export function protectionFor(choice: ListProtectionChoice): OwnedListProtection {
   const checked = checkedChoice(choice);

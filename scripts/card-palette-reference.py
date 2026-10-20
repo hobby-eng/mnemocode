@@ -1,20 +1,39 @@
 #!/usr/bin/env python3
-"""Independent reference of src/export/card-palette.ts and src/export/business-tint.ts.
+"""Independent reference of the card palette and the business tints.
 
-Written apart from the TypeScript, from the rule as the owner approved it (2026-10-13): candidate
-colours every 3 degrees of hue with three saturations and three values, each seen in full and as a
-typical pixel of the vivid and the muted business designs, compared in OKLab in whole millionths,
-the farthest first. It first reproduces the OKLab of sRGB red that CSS Color 4 publishes, then
-prints the first colours of a set, which test/card-sets.test.ts and the self-test of card sets
-(src/export/card-sets-self-test.ts) compare with. Public data only; standard library only.
+It is written apart from src/export/card-palette.ts and
+src/export/business-tint.ts, from the rule as the owner approved it
+(2026-10-13): candidate colours every 3 degrees of hue with three
+saturations and three values, each seen in full and as a typical pixel
+of the vivid and the muted business designs, compared in OKLab in whole
+millionths, the farthest first. It first reproduces the OKLab of sRGB
+red that CSS Color 4 publishes, then prints the first colours of a set,
+which test/card-sets.test.ts and the self-test of card sets
+(src/export/card-sets-self-test.ts) compare with. Public data only;
+standard library only.
 
     python3 scripts/card-palette-reference.py [count]
+
+The count is how many colours to print: 8 when it is left out, and at
+most one for each candidate.
 """
 
 import math
 import sys
 
 STEPS = 1_000_000
+# The candidates of the rule: a hue every 3 degrees, each with three
+# saturations and three values.
+HUE_DEGREES = range(0, 360, 3)
+SATURATIONS = (0.45, 0.72, 0.95)
+VALUES = (0.5, 0.75, 1)
+# The most colours a palette has, one for each candidate:
+# src/export/card-palette.ts refuses more
+# (cards-print-codes-at-most-colours), and here every colour after them
+# would repeat the first.
+CANDIDATE_COUNT = len(HUE_DEGREES) * len(SATURATIONS) * len(VALUES)
+# The colours printed when no count is given.
+DEFAULT_COUNT = 8
 
 
 def js_round(x):
@@ -28,13 +47,15 @@ def linear(c):
 
 def oklab(r, g, b):
     r, g, b = linear(r), linear(g), linear(b)
-    l = math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
-    m = math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
-    s = math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+    # The long, medium and short cone responses, named l_, m_ and s_
+    # as in Ottosson's OKLab code.
+    l_ = math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+    m_ = math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+    s_ = math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
     return (
-        0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-        1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-        0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+        0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
+        1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
+        0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_,
     )
 
 
@@ -92,20 +113,30 @@ def typical(hexcode, tint):
 
 def views(hexcode):
     full = tuple(b / 255 for b in bytes.fromhex(hexcode))
-    return [oklab(*full)] + [oklab(*(b / 255 for b in typical(hexcode, t))) for t in ("vivid", "muted")]
+    typicals = (typical(hexcode, tint) for tint in ("vivid", "muted"))
+    seen = [oklab(*(b / 255 for b in rgb)) for rgb in typicals]
+    return [oklab(*full)] + seen
 
 
 def distance(a, b):
-    return min(js_round(math.sqrt(sum((x - y) * (x - y) for x, y in zip(p, q))) * STEPS) for p, q in zip(a, b))
+    return min(
+        js_round(
+            math.sqrt(sum((x - y) * (x - y) for x, y in zip(p, q))) * STEPS
+        )
+        for p, q in zip(a, b)
+    )
 
 
 def palette(count):
     candidates = []
-    for degrees in range(0, 360, 3):
-        for s in (0.45, 0.72, 0.95):
-            for v in (0.5, 0.75, 1):
+    for degrees in HUE_DEGREES:
+        for s in SATURATIONS:
+            for v in VALUES:
                 rgb = bytes_of_hsv(degrees / 360, s, v)
-                hexcode = "".join(f"{js_round(min(1, max(0, b / 255)) * 255):02X}" for b in rgb)
+                hexcode = "".join(
+                    f"{js_round(min(1, max(0, b / 255)) * 255):02X}"
+                    for b in rgb
+                )
                 candidates.append((hexcode, views(hexcode)))
     nearest = [math.inf] * len(candidates)
     order = []
@@ -118,13 +149,35 @@ def palette(count):
                 if nearest[index] > nearest[chosen]:
                     chosen = index
         order.append("#" + candidates[chosen][0])
+        chosen_look = candidates[chosen][1]
         for index, (_, look) in enumerate(candidates):
-            nearest[index] = min(nearest[index], distance(look, candidates[chosen][1]))
+            nearest[index] = min(nearest[index], distance(look, chosen_look))
     return order
 
 
-# CSS Color 4 publishes sRGB red as oklab(0.628 0.225 0.126), to three decimals.
+def count_of(arguments):
+    """How many colours `arguments` ask for; DEFAULT_COUNT for none.
+
+    Anything but one whole number from 1 to CANDIDATE_COUNT ends the
+    script with one line that names the limit, before any colour is
+    worked out.
+    """
+    if not arguments:
+        return DEFAULT_COUNT
+    try:
+        count = int(arguments[0]) if len(arguments) == 1 else 0
+    except ValueError:
+        count = 0
+    if not 1 <= count <= CANDIDATE_COUNT:
+        sys.exit(
+            "Give one whole number of colours, from 1 to "
+            f"{CANDIDATE_COUNT}."
+        )
+    return count
+
+
+# CSS Color 4 publishes sRGB red as oklab(0.628 0.225 0.126), to three
+# decimals.
 red = oklab(1, 0, 0)
 assert [round(x, 3) for x in red] == [0.628, 0.225, 0.126], red
-count = int(sys.argv[1]) if len(sys.argv) > 1 else 8
-print(" ".join(palette(count)))
+print(" ".join(palette(count_of(sys.argv[1:]))))

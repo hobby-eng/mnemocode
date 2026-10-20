@@ -1,12 +1,14 @@
 import {
   type BitcoinNetworkName,
   type BitcoinProfile,
-  bitcoinProfiles,
+  BITCOIN_PROFILES,
   checkedBitcoinProfiles,
   coinById,
   defaultAddressCount,
   type DerivationLocation,
   isBitcoinNetwork,
+  isBitcoinProfile,
+  isPlacedEvidence,
   isPlacedKind,
   isScannedKind,
   type WalletEvidence,
@@ -91,15 +93,15 @@ export const WALLET_EVIDENCE_OPTIONS = [
 
 function bitcoinProfilesFrom(arguments_: ParsedArguments): readonly BitcoinProfile[] {
   const requested = value(arguments_, "bitcoin-profile") ?? "auto";
-  if (requested === "auto") return bitcoinProfiles;
-  // The list is checked by the evidence's own rule; the refusal names the option's syntax.
-  try {
-    return checkedBitcoinProfiles(requested.split(",").map((item) => item.trim()));
-  } catch {
+  if (requested === "auto") return BITCOIN_PROFILES;
+  const names = requested.split(",").map((item) => item.trim());
+  // A name that is no profile, an empty one included, is refused in the option's syntax; the
+  // evidence's own rule then refuses a profile named twice, in its own code.
+  if (!names.every(isBitcoinProfile))
     throw ERRORS.create("bitcoin-address-profile-auto-comma-separated-list", [
-      `${bitcoinProfiles.join(", ")}`,
+      `${BITCOIN_PROFILES.join(", ")}`,
     ]);
-  }
+  return checkedBitcoinProfiles(names);
 }
 
 function bitcoinNetwork(arguments_: ParsedArguments): BitcoinNetworkName {
@@ -153,7 +155,7 @@ export function walletEvidenceArguments(evidence: WalletEvidence): string[] {
       if (location[name] !== FIRST_RECEIVING_LOCATION[name])
         options.push(`--${name}`, String(location[name]));
   }
-  if ("profiles" in evidence && evidence.profiles.length !== bitcoinProfiles.length)
+  if ("profiles" in evidence && evidence.profiles.length !== BITCOIN_PROFILES.length)
     options.push("--bitcoin-profile", evidence.profiles.join(","));
   if ("addresses" in evidence && evidence.addresses !== undefined)
     options.push("--scan-gap", String(evidence.addresses));
@@ -242,7 +244,7 @@ export interface WalletPlace {
  */
 export const FIRST_RECEIVING: WalletPlace = {
   location: FIRST_RECEIVING_LOCATION,
-  profiles: bitcoinProfiles,
+  profiles: BITCOIN_PROFILES,
 };
 
 /**
@@ -261,7 +263,8 @@ export function walletPlaceOf(
   const counted = (place: WalletPlace, count: number | undefined): WalletPlace =>
     count === undefined ? place : { ...place, addresses: count };
   if (given === undefined) return counted(FIRST_RECEIVING, addresses);
-  if (given.kind === "master-fingerprint" || given.kind === "master-xpub")
+  // The master key's evidence has no place in an account (isPlacedEvidence), only its network.
+  if (!isPlacedEvidence(given))
     return counted(
       { ...FIRST_RECEIVING, location: { ...FIRST_RECEIVING.location, network: given.network } },
       addresses,
@@ -302,7 +305,13 @@ export function assertWalletPlaceUsed(
 export interface GivenWallet {
   readonly evidence: WalletEvidence | undefined;
   readonly place: WalletPlace;
+  /** The wallet's BIP39 passphrase, "" for none. */
   readonly passphrase: string;
+  /**
+   * Whether a BIP39 passphrase was given: what a question says about it, which needs no copy of
+   * the passphrase itself (CORE-49). An empty passphrase is the same as none in BIP39.
+   */
+  readonly withPassphrase: boolean;
 }
 
 /**
@@ -315,9 +324,11 @@ export function givenWallet(arguments_: ParsedArguments): GivenWallet {
   const evidence = walletEvidence(arguments_);
   if (evidence !== undefined) assertWalletEvidence(evidence);
   assertWalletPlaceUsed(arguments_, evidence);
+  const passphrase = bip39Passphrase(arguments_);
   return {
     evidence,
     place: walletPlaceOf(evidence, arguments_),
-    passphrase: bip39Passphrase(arguments_),
+    passphrase,
+    withPassphrase: passphrase !== "",
   };
 }

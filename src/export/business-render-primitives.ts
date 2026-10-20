@@ -24,7 +24,7 @@ const ERRORS = new ErrorCatalog("export.business-render-primitives", {
 });
 
 /** The dark ink of the business designs' text. */
-export const ink = rgb(0.12, 0.13, 0.14);
+export const INK = rgb(0.12, 0.13, 0.14);
 const CORNER_RADIUS_HEIGHT_RATIO = 0.055;
 // A cubic Bezier approximation of one quarter of a circle: 4 * (sqrt(2) - 1) / 3.
 // Keep the historical rounded coefficient to preserve the approved clipping boundary.
@@ -34,8 +34,10 @@ const MIN_MEASURED_WIDTH = 0.001;
 
 /**
  * The size, at most `preferred`, at which `text` fits `width` points; refused, naming `label`, when
- * the font lacks one of its characters or it would be smaller than `minimum`. Every family of
- * cards sizes its text through it, each with its own sizes and scale.
+ * the font lacks one of its characters
+ * (export.business-render-primitives.contains-character-not-supported-by-card-font) or it would be
+ * smaller than `minimum` (export.business-render-primitives.too-long-fit-legibly-on-card-shorten).
+ * Every family of cards sizes its text through it, each with its own sizes and scale.
  */
 export function fit(
   font: PDFFont,
@@ -64,7 +66,7 @@ export function fit(
  * size; keeping top + size keeps the approved typography rather than switching to the font's
  * ascent. Every family of cards places its text through it.
  */
-export function baselineOf(page: PDFPage, top: number, size: number): number {
+function baselineOf(page: PDFPage, top: number, size: number): number {
   return pdfPoint(page, 0, top).y - size;
 }
 
@@ -97,7 +99,7 @@ export function text(
   x: number,
   top: number,
   size: number,
-  color = ink,
+  color = INK,
 ) {
   page.drawText(value, {
     x: x * MM,
@@ -121,7 +123,7 @@ export function centredText(
   preferred: number,
   minimum: number,
   label: string,
-  color = ink,
+  color = INK,
 ): void {
   const size = fit(font, value, preferred, minimum, box.width * MM, label);
   const left = box.left + (box.width - font.widthOfTextAtSize(value, size) / MM) / 2;

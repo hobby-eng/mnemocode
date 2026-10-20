@@ -23,7 +23,7 @@ import { askWallet, type WalletCheck, type WalletMatch } from "../core/wallet-ch
 import type { RepairedSet } from "./joint-results.js";
 import type { DateWork } from "./repair-report.js";
 import { Redacted } from "../core/redacted.js";
-import { BIP39_WORD_COUNTS } from "../core/bip39-sizes.js";
+import { BIP39_WORD_COUNTS, LONGEST_WORD_COUNT } from "../core/bip39-sizes.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 import type { MonotonicClock } from "../core/search-turns.js";
@@ -77,14 +77,23 @@ function warningField(warning: string | undefined): { readonly warning?: string 
 /** What the sets give: the phrases kept, and every one for a list; or why the dates do not fit. */
 export type Unmasked =
   | {
+      /** Tells the phrases the sets give from the other outcomes of an unmasking. */
       readonly kind: "phrases";
+      /** The phrases kept: all of them, or those the wallet matched, possibly none. */
       readonly phrases: readonly UnmaskedPhrase[];
       /** Every phrase for a candidate list, also the matches of a search beyond those shown. */
       readonly listed: readonly string[];
     }
-  | { readonly kind: "dates"; readonly message: string }
-  /** The host stopped the date search (DateSearchRun.signal): no phrase is told (CORE-22). */
-  | { readonly kind: "stopped" };
+  | {
+      /** The dates are more than a set's phrase takes. */
+      readonly kind: "dates";
+      /** Why the phrase cannot take the dates, for the person. */
+      readonly message: string;
+    }
+  | {
+      /** The host stopped the date search (DateSearchRun.signal): no phrase is told (CORE-22). */
+      readonly kind: "stopped";
+    };
 
 /**
  * A phrase length for the wallet checks of one date combination: MnemoCode Seedshift gives one
@@ -92,8 +101,6 @@ export type Unmasked =
  * before the shares say how many words their phrase has.
  */
 const ANY_WORD_COUNT = BIP39_WORD_COUNTS[0];
-/** The longest phrase, which the decoding of the dates is timed with (secondsPerCombination). */
-const LONGEST_PHRASE = defined(BIP39_WORD_COUNTS.at(-1));
 
 /**
  * How the sets of one restore are turned into seed phrases. A class, so that a host builds it once
@@ -157,8 +164,9 @@ export class ShareUnmasking extends Redacted {
     const mode = this.#mode;
     if (!this.searches || !Masking.isMaskedMode(mode)) return undefined;
     const dates = defined(this.#dates);
-    // The shares do not say yet how long their phrase is; every count of dates fits 24 words.
-    const perCombination = DateSearch.secondsPerCombination(mode, dates, LONGEST_PHRASE, now);
+    // The shares do not say yet how long their phrase is: the decoding of the dates is timed with
+    // the longest phrase, which every count of dates fits.
+    const perCombination = DateSearch.secondsPerCombination(mode, dates, LONGEST_WORD_COUNT, now);
     if (this.#walletCheck === undefined)
       return { combinations: dates.combinations, secondsEach: perCombination };
     const pace = {

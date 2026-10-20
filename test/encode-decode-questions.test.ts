@@ -40,14 +40,9 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
   harness.replacedTerminalChoice(await importOriginal()),
 );
-vi.mock("../src/cli/encode-export.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/cli/encode-export.js")>();
-  return {
-    ...actual,
-    saveEncodeResult: async (...save: Parameters<typeof actual.saveEncodeResult>) =>
-      harness.failingSave(() => actual.saveEncodeResult(...save)),
-  };
-});
+vi.mock("node:fs/promises", async (importOriginal) =>
+  harness.replacedFiles(await importOriginal()),
+);
 
 /**
  * The fingerprint of MASKED read as a phrase itself, as encode shows it ("Encoded fingerprint").
@@ -228,7 +223,8 @@ describe("encode, decode and the backup check on the private screen", () => {
           DatesAnswer.parse(line, { wordCount: 12, patterns: false });
           return "accepted";
         } catch (error) {
-          return (error as Error).message;
+          if (!(error instanceof Error)) throw error;
+          return error.message;
         }
       });
       expect(searched).not.toContain("accepted");
@@ -355,10 +351,12 @@ describe("encode, decode and the backup check on the private screen", () => {
         await runDecode({ "ask-secrets": true, mode: "seedshift", "qr-file": first! });
         expect(terminal.questions).toEqual(["The next share?"]);
         expect(terminal.labels[0]).toEqual(["Read another QR code image", "Type the shares"]);
-        expect(seen.notices).toContain(
+        // Each share wrapped beside its mark at the width of running text (CORE-36).
+        const shown = seen.notices.map((notice) => notice.replace(/\n +/gu, " "));
+        expect(shown).toContain(
           `✓ Share 1, from its QR code: ${writeShare(shares[0]!, "indexes")}`,
         );
-        expect(seen.notices).toContain(
+        expect(shown).toContain(
           `✓ Share 2, from its QR code: ${writeShare(shares[1]!, "indexes")}`,
         );
         expect(seen.out.at(-1)).toBe(TEST_PHRASE);
@@ -712,11 +710,11 @@ describe("encode, decode and the backup check on the private screen", () => {
       const shownAt = vi
         .mocked(console.error)
         .mock.calls.findIndex((line) => line.join(" ") === fingerprintLine);
-      const askedAt = vi.mocked(process.stderr).write.mock.calls.findIndex(([chunk]) =>
-        Buffer.from(chunk as Uint8Array)
-          .toString("utf8")
-          .includes(DECODE_DATES_PROMPT),
-      );
+      const askedAt = vi
+        .mocked(process.stderr)
+        .write.mock.calls.findIndex(([chunk]) =>
+          Buffer.from(chunk).toString("utf8").includes(DECODE_DATES_PROMPT),
+        );
       expect(vi.mocked(console.error).mock.invocationCallOrder[shownAt]).toBeLessThan(
         vi.mocked(process.stderr).write.mock.invocationCallOrder[askedAt]!,
       );

@@ -21,6 +21,7 @@ import {
   assertBitcoinEvidence,
 } from "../src/bitcoin-evidence.js";
 import { locationOf } from "../src/core/coins/coin-self-test.js";
+import { matching } from "./helpers/matchers.js";
 
 /** The public BIP39 test phrase of BIP84, BIP86 and many wallets. */
 const ABANDON = "abandon ".repeat(11) + "about";
@@ -119,11 +120,11 @@ const ADDRESSES: readonly (readonly [CoinId, string, string, string])[] = [
 ];
 
 function coinAddress(
-  coin: string,
+  coin: CoinId,
   value: string,
   location: AddressLocation,
 ): Extract<WalletEvidence, { kind: "coin-address" }> {
-  return { kind: "coin-address", coin: coin as CoinId, value, location };
+  return { kind: "coin-address", coin, value, location };
 }
 
 /** The message of what `run` throws. */
@@ -131,7 +132,8 @@ function refusal(run: () => unknown): string {
   try {
     run();
   } catch (error) {
-    return (error as Error).message;
+    if (!(error instanceof Error)) throw error;
+    return error.message;
   }
   throw new Error("Nothing was refused.");
 }
@@ -167,6 +169,7 @@ describe("the coins that a host offers (a host of one coin family)", () => {
   });
 
   it("refuses a list that holds no coin or a coin twice", () => {
+    // An object that is no coin, fed on purpose as a JavaScript host could.
     expect(() => new WalletEvidenceCheck(nodePbkdf2, [{ id: "ethereum" } as never])).toThrow(
       TypeError,
     );
@@ -319,9 +322,10 @@ describe("the comparison", () => {
       expect(now.match(ABANDON, each).matched).toBe(true);
       expect((await later.matchAsync(ABANDON, each)).matched).toBe(true);
     }
-    const nodes = [...roots.mock.results, ...children.mock.results].map(
-      ({ value }) => value as HDKey,
-    );
+    const nodes = [...roots.mock.results, ...children.mock.results].map((result) => {
+      if (result.type !== "return") throw new Error("Expected every derivation to return a key.");
+      return result.value;
+    });
     // Each comparison twice: a root and 2 × 5 steps, then a root and 6 steps.
     expect(nodes).toHaveLength(2 * (1 + 10 + 1 + 6));
     for (const node of nodes) expect(node.privateKey).toBeNull();
@@ -337,23 +341,24 @@ describe("the comparison", () => {
     }, COINS);
     const first = { account: 0, branch: 0, index: 0 };
     const address = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
-    // Each refusal's code: the kind of an AddressRefusalError, or a coded error's own.
+    // Each refusal's code: one for each condition.
     const place = "core.coins.coin.assert-address-location-refused";
     const refused: readonly [WalletEvidence, string, string][] = [
       [
-        coinAddress("solana", address, first),
+        // A coin that no type allows, fed on purpose as a JavaScript host could.
+        coinAddress("solana" as CoinId, address, first),
         "Unknown coin; the coins are bitcoin,",
         "core.coins.coin.unknown-coin-coins",
       ],
       [
         coinAddress("litecoin", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA", first),
         "it is not an address of Litecoin",
-        "other",
+        "core.coins.coin.address-not-this-coin",
       ],
       [
         coinAddress("bitcoin", `${address.slice(0, -1)}v`, first),
         "checksum or format",
-        "unreadable",
+        "core.coins.coin.address-damaged",
       ],
       [coinAddress("bitcoin", address, { ...first, index: -1 }), "index must be an integer", place],
       [
@@ -366,7 +371,11 @@ describe("the comparison", () => {
         "account must be an integer from 0 through 2147483647.",
         place,
       ],
-      [coinAddress("ethereum", address, first), "not an address of Ethereum", "other"],
+      [
+        coinAddress("ethereum", address, first),
+        "not an address of Ethereum",
+        "core.coins.coin.address-not-this-coin",
+      ],
     ];
     for (const [evidence, reason, code] of refused) {
       expect(refusal(() => recording.match(ABANDON, evidence))).toContain(reason);
@@ -441,7 +450,7 @@ describe("addresses out of reach", () => {
     const longer = bech32m.encode("dash", [...groups, 0]);
     const padded = bech32m.encode("dash", [...groups.slice(0, -1), groups.at(-1)! | 1]);
     for (const malformed of [longer, padded]) {
-      expect(bech32m.decode(malformed as `${string}1${string}`).prefix).toBe("dash");
+      expect(bech32m.decode(malformed).prefix).toBe("dash");
       for (const input of [malformed, malformed.toUpperCase()])
         expect(refusal(() => parseCoinAddress("dash", input))).toContain("checksum or format");
     }
@@ -482,7 +491,7 @@ describe("addresses out of reach", () => {
       ["injective", "inj1npvwllfr9dqr8erajqqr6s0vxnk2ak55qhk6md7"],
       ["injective", "inj1npvwllfr9dqr8erajqqr6s0vxnk2ak55p2qwwsv"],
     ] as const) {
-      expect(bech32.decode(text as `${string}1${string}`).words).toHaveLength(33);
+      expect(bech32.decode(text).words).toHaveLength(33);
       for (const input of [text, text.toUpperCase()])
         expect(refusal(() => parseCoinAddress(coin, input))).toContain("it has the wrong length");
     }
@@ -551,8 +560,10 @@ describe("the case of an address", () => {
       const upper = lower.toUpperCase();
       expect(parseCoinAddress(coin, upper)).toBe(lower);
       const mixed = upper.slice(0, 14) + lower.slice(14);
+      // Bech32 cannot read it at all; CashAddr names its rule of one case.
+      const code = coin === "bitcoin-cash" ? "address-mixed-case" : "address-damaged";
       expect(() => parseCoinAddress(coin, mixed), mixed).toThrow(
-        expect.objectContaining({ name: "AddressRefusalError", code: "unreadable" }),
+        expect.objectContaining({ code: `core.coins.coin.${code}` }),
       );
     }
   });
@@ -613,6 +624,55 @@ describe("parseCoinAddress", () => {
     expect(refusal(() => parseCoinAddress("litecoin", ADDRESSES[0]![3]))).toBe(
       "The address cannot be used for the check: it is not an address of Litecoin (L…, M…, 3… or ltc1q…).",
     );
+  });
+
+  it("gives each condition of a refused address its own code (TS-06, CORE-23)", () => {
+    const refused: readonly (readonly [CoinId, string, string])[] = [
+      // A changed checksum character.
+      ["bitcoin", "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv", "core.coins.coin.address-damaged"],
+      [
+        "bitcoin-cash",
+        "bitcoincash:Qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6",
+        "core.coins.coin.address-mixed-case",
+      ],
+      [
+        "cosmos",
+        bech32.encode("cosmos", bech32.toWords(new Uint8Array(21).fill(7))),
+        "core.coins.coin.address-wrong-length",
+      ],
+      ["litecoin", ADDRESSES[0]![3], "core.coins.coin.address-not-this-coin"],
+      // P2WSH, a script's.
+      [
+        "bitcoin",
+        "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3",
+        "core.coins.coin.address-not-single-key",
+      ],
+      [
+        "zcash",
+        "zs1z7rejlpsa98s2rrrfkwmaxu53e4ue0ulcrw0h4x5g8jl04tak0d3mm47vdtahatqrlkngh9slya",
+        "core.coins.coin.address-shielded",
+      ],
+      // 39 digits, one short.
+      [
+        "ethereum",
+        "0x9858EfFD232B4033E47d90003D41EC34EcaEda9",
+        "core.coins.ethereum.address-not-hex-account",
+      ],
+      // One capital made small.
+      [
+        "ethereum",
+        "0x9858efFD232B4033E47d90003D41EC34EcaEda94",
+        "core.coins.ethereum.address-wrong-eip55-checksum",
+      ],
+    ];
+    for (const [coin, text, code] of refused)
+      expect(() => parseCoinAddress(coin, text), `${coin} ${text}`).toThrow(
+        expect.objectContaining({
+          code,
+          message: matching(/^The address cannot be used for the check: .+\.$/u),
+        }),
+      );
+    expect(new Set(refused.map(([, , code]) => code)).size).toBe(refused.length);
   });
 });
 
@@ -698,8 +758,8 @@ describe("an address of another coin (AUD-010-API003)", () => {
     (address.startsWith("0x") && (coin === "ethereum" || coin === "ethereum-classic"));
 
   it("is refused by every other coin as not its own, never as damaged", () => {
-    for (const [owner, addresses] of Object.entries(SAMPLES) as [CoinId, readonly string[]][])
-      for (const address of addresses) {
+    for (const { id: owner } of COINS)
+      for (const address of SAMPLES[owner]) {
         expect(coinById(owner).parse(address).text.toLowerCase()).toBe(address.toLowerCase());
         for (const coin of COINS) {
           if (coin.id === owner || SHARED(address, coin.id)) continue;

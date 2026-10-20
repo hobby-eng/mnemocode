@@ -39,7 +39,7 @@ interface GlueContext {
 
 afterEach(() => vi.restoreAllMocks());
 
-/** Execute the shipped offline glue against a deterministic allocation/free boundary. */
+/** Execute the shipped offline glue against a deterministic fake of its allocation and free seam. */
 function fixture(
   entry: string,
   mode: "success" | "decode-failure" | "copy-failure" | "fill-failure",
@@ -47,7 +47,7 @@ function fixture(
   const buffer = new ArrayBuffer(8192);
   const events: string[] = [];
   const freed: Uint8Array[] = [];
-  const failure = new Error("Synthetic glue boundary failure.");
+  const failure = new Error("Synthetic glue allocator failure.");
   let next = 1024;
   const returned = (frame: number) => {
     new Uint8Array(buffer, POINTER, bytes.length).set(bytes);

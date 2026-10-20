@@ -93,7 +93,10 @@ export class WordTable {
     },
   };
 
-  /** A Unicode scalar value as four or more uppercase hexadecimal digits; refuses other text. */
+  /**
+   * A Unicode scalar value as four or more uppercase hexadecimal digits; refuses other text
+   * (core.words.selected-mapped-bip39-character-not-one-unicode-scalar).
+   */
   static unicodeHex(symbol: string): string {
     const point = typeof symbol === "string" ? symbol.codePointAt(0) : undefined;
     if (
@@ -121,7 +124,10 @@ export class WordTable {
     return number === undefined ? undefined : number - WORD_NUMBER_RANGE.min;
   }
 
-  /** A row by its word number, from 1 through 2,048; refuses a number outside that range. */
+  /**
+   * A row by its word number, from 1 through 2,048; refuses a number outside that range
+   * (core.words.wordlist-index-from).
+   */
   static row(index: number): MappingRow {
     if (!inWholeRange(index, WORD_NUMBER_RANGE))
       throw ERRORS.create("wordlist-index-from", [WORD_NUMBERS_THROUGH]);
@@ -133,7 +139,10 @@ export class WordTable {
     return WordTable.#rows.map((row) => ({ ...row }));
   }
 
-  /** A row named by a typed word, number or Unicode code; refuses a selector or text that fits none. */
+  /**
+   * A row named by a typed word, number or Unicode code; refuses a selector that names no lookup
+   * (core.words.word-table-lookup) and text that fits no row (word-table-row-refused).
+   */
   static lookup(lookup: WordTableLookup, text: string): MappingRow {
     if (typeof lookup !== "string" || !Object.hasOwn(WordTable.#lookups, lookup))
       throw ERRORS.create("word-table-lookup", []);
@@ -143,7 +152,10 @@ export class WordTable {
     return WordTable.row(index + WORD_NUMBER_RANGE.min);
   }
 
-  /** Every word as numbered TSV with a header; the legacy mapping by default, unknown formats refused. */
+  /**
+   * Every word as numbered TSV with a header; the legacy mapping by default, unknown formats
+   * refused (core.words.word-table-format).
+   */
   static text(format?: WordTableFormat): string {
     if (format !== undefined && !WORD_TABLE_FORMATS.includes(format))
       throw ERRORS.create("word-table-format", []);

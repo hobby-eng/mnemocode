@@ -20,7 +20,7 @@ import {
   selfTestFeature,
   type SelfTestFeature,
 } from "../core/self-test-check.js";
-import { sskrVector } from "../sskr/known-answers.js";
+import { SSKR_VECTOR } from "../sskr/known-answers.js";
 import { assertShareQr, Share, shareFormatHasCards, SHARE_FORMATS } from "../sskr/transport.js";
 import {
   ShareCardSet,
@@ -45,7 +45,7 @@ const ERRORS = new ErrorCatalog("export.sskr-render-self-test", {
 
 /** The first two shares of the official vector: members 1 and 2 of its first group. */
 const SHARES = [
-  sskrVector.shares[0],
+  SSKR_VECTOR.shares[0],
   "ur:sskr/gogrrsbyadadbnluotnykpaootdaweatrotlmsttrobsghbnurrh",
 ];
 /**
@@ -60,6 +60,8 @@ const FORMS_WITH_CARDS = "unicode colors colors-unicode";
  * index 0 has the Unicode code 7684 (core/words.ts), and the color of 0 is #000000.
  */
 const FIXED_DECOYS = (): number => 0;
+/** The Unicode code of the word of index 0, which every fixed decoy beside Unicode codes is. */
+const FIXED_DECOY_CODE = "7684";
 /**
  * The details of the cards, given, so that nothing is chosen at random; a material design, which
  * tints its samples in the PDF without recoloring a photograph (cards-self-test.ts draws every
@@ -90,13 +92,13 @@ function checkShareCardsStartup(): void {
     const colors = shareCardFace(defined(shares[0]), "colors");
     expectSame(
       colors.payload,
-      sskrVector.firstShareColors.join(" "),
+      SSKR_VECTOR.firstShareColors.join(" "),
       "Share card QR code in colors",
     );
     expectSame(colors.labels, undefined, "Share cards in colors print their colors");
     const codes = shareCardFace(defined(shares[0]), "unicode");
-    expectSame(codes.payload, sskrVector.firstShareUnicode, "Share card QR code in Unicode codes");
-    expectSame(codes.labels?.join(" "), sskrVector.firstShareUnicode, "Share card Unicode codes");
+    expectSame(codes.payload, SSKR_VECTOR.firstShareUnicode, "Share card QR code in Unicode codes");
+    expectSame(codes.labels?.join(" "), SSKR_VECTOR.firstShareUnicode, "Share card Unicode codes");
     // One color for each distinct code, and the same color for the same code.
     const distinct = new Set(codes.labels).size;
     expectSame(new Set(codes.colors).size, distinct, "Colors of the Unicode codes");
@@ -119,14 +121,17 @@ function checkShareCardsStartup(): void {
  * The actual self-test plans and their known answers, without rendering a PDF: decoys, retained
  * individual cards, refused layouts and QR payloads. Returns the public test plan that the full
  * self-test renders, so a host can also check planning independently of PDF drawing. The caller
- * disposes that returned plan; every other temporary plan is disposed here.
+ * disposes that returned plan; every other temporary plan is disposed here. Fails at the first
+ * difference (core.self-test-check.mismatch, was-accepted, was-refused-another-reason), at cards
+ * without a decoy (export.sskr-render-self-test.share-cards-no-decoy), and with the refusal of a
+ * plan it must make, or the failure of a service of `drawing`.
  */
 export async function shareCardPlanSelfTest(drawing: CardDrawing): Promise<ShareCardSet> {
   checkShareCardsStartup();
   const cards = await ShareCardSet.create(drawing, SHARES, OPTIONS, FIXED_DECOYS);
   try {
     const printed = cards.printedCodes(0);
-    const own = sskrVector.firstShareColors.map((color) => color.slice(1));
+    const own = SSKR_VECTOR.firstShareColors.map((color) => color.slice(1));
     expectSame(cards.ownCodes(0), own.length, "Own codes of a share's cards");
     expectSame(printed.slice(0, own.length).join(" "), own.join(" "), "Codes of a share's cards");
     if (printed.length <= own.length) throw ERRORS.create("share-cards-no-decoy", []);
@@ -137,10 +142,14 @@ export async function shareCardPlanSelfTest(drawing: CardDrawing): Promise<Share
       { ...OPTIONS, shareFormat: "unicode" },
       FIXED_DECOYS,
     );
-    expectSame(unicode.printedCodes(0).at(-1), "7684", "Decoy of a share's Unicode codes");
+    expectSame(
+      unicode.printedCodes(0).at(-1),
+      FIXED_DECOY_CODE,
+      "Decoy of a share's Unicode codes",
+    );
     expectSame(
       qrCodesOf(unicode).split("; ")[0],
-      `4BBF-1-1: ${sskrVector.firstShareUnicode}`,
+      `4BBF-1-1: ${SSKR_VECTOR.firstShareUnicode}`,
       "Share card QR code without decoys",
     );
     // Separate cards are drawn in the business card designs only (drawsSeparateCards).
@@ -157,20 +166,18 @@ export async function shareCardPlanSelfTest(drawing: CardDrawing): Promise<Share
       { ...OPTIONS, style: "it", layout: "collection", shareFormat: "unicode" },
       FIXED_DECOYS,
     );
+    // The vector's own codes and the fixed decoy, never the plan's own counts, which would move
+    // with a wrong plan.
+    const ownUnicode = SSKR_VECTOR.firstShareUnicode.split(" ").length;
+    expectSame(business.ownCodes(0), ownUnicode, "Own Unicode codes of a share's cards");
     using retained = business.forIndividualCards();
     expectSame(
       retained.printedCodes(0).join(" "),
-      business
-        .printedCodes(0)
-        .slice(0, business.ownCodes(0) + 1)
-        .join(" "),
+      `${SSKR_VECTOR.firstShareUnicode} ${FIXED_DECOY_CODE}`,
       "Retained share codes and first decoy",
     );
-    expectSame(
-      defined(retained.shares[0]).documents,
-      business.ownCodes(0) + 1,
-      "Retained share cards",
-    );
+    // Each own code and the one decoy of separate cards on a card of its own.
+    expectSame(defined(retained.shares[0]).documents, ownUnicode + 1, "Retained share cards");
     expectSame(retained.qrCodes.length, 0, "QR codes of retained individual cards");
     expectRefused(
       () => retained.forIndividualCards({ pageSize: "a4" }),
@@ -193,9 +200,9 @@ export async function shareCardPlanSelfTest(drawing: CardDrawing): Promise<Share
       "Share cards in word numbers",
     );
     const [first] = cards.qrCodes;
-    assertShareQr(sskrVector.firstShareColors, defined(first).payload);
+    assertShareQr(SSKR_VECTOR.firstShareColors, defined(first).payload);
     expectRefused(
-      () => assertShareQr(sskrVector.firstShareColors, defined(cards.qrCodes[1]).payload),
+      () => assertShareQr(SSKR_VECTOR.firstShareColors, defined(cards.qrCodes[1]).payload),
       /does not match/u,
       "A QR code of another share",
     );
@@ -205,7 +212,7 @@ export async function shareCardPlanSelfTest(drawing: CardDrawing): Promise<Share
         assertShareQr(
           [],
           defined(unicode.qrCodes[1]).payload,
-          sskrVector.firstShareUnicode.split(" "),
+          SSKR_VECTOR.firstShareUnicode.split(" "),
         ),
       /does not match/u,
       "A QR code of another share beside Unicode codes",

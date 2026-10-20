@@ -131,10 +131,8 @@ describe("AUD-016-API001 (AUD-017): host result operations retain their original
   });
 
   it("accepts a null-prototype result without adding inherited fields", async () => {
-    const given = Object.assign(Object.create(null) as { matched: boolean; derived: string }, {
-      matched: true,
-      derived: DERIVED,
-    });
+    const given = { matched: true, derived: DERIVED };
+    Reflect.setPrototypeOf(given, null);
     const answer = await askWallet(() => given, "public fixture");
     expect(Object.getPrototypeOf(answer)).toBeNull();
     expect(answer.derived).toBe(DERIVED);

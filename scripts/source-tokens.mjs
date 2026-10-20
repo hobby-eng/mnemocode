@@ -1,9 +1,10 @@
 // The tokens of TypeScript and JavaScript source, read with a small tokenizer of its own, so that
 // the checks that read code need no package: the copy check (verify-no-copies.mjs), the code
-// rules (verify-code-rules.mjs) and the check of dead exports (verify-dead-exports.mjs). Not a full parser of TypeScript, but the same code always gives
-// the same tokens, and strings, templates, regular expressions and comments are told apart from
-// code. afterGroup finds a closing bracket in these tokens and in any others with a `key`, such as
-// the Rust tokens of lines-of-code.mjs.
+// rules (verify-code-rules.mjs) and the check of dead exports (verify-dead-exports.mjs). Not a
+// full parser of TypeScript, but the same code always gives the same tokens, and strings,
+// templates, regular expressions and comments are told apart from code. afterGroup finds a closing
+// bracket in these tokens and in any others with a `key`, such as the Rust tokens of
+// lines-of-code.mjs, and MEMBER_MODIFIERS names the words that may stand before a member's name.
 
 /** After these tokens a slash starts a regular expression, not a division. */
 const BEFORE_REGEX = new Set([
@@ -106,6 +107,23 @@ export function tokensOf(text) {
   }
   return { tokens, comments };
 }
+
+/**
+ * The modifiers that TypeScript allows before the name of a class or type member, each of which may
+ * also be a name itself. The code rules read a member's name after them, and the check of dead
+ * exports tells a key or a type member from a use of an export by them.
+ */
+export const MEMBER_MODIFIERS = Object.freeze([
+  "public",
+  "protected",
+  "private",
+  "readonly",
+  "static",
+  "declare",
+  "abstract",
+  "override",
+  "accessor",
+]);
 
 /** The bracket that closes each opening one. */
 const CLOSING = { "(": ")", "[": "]", "{": "}" };

@@ -14,7 +14,7 @@ import { pickWith, type UniformChoice } from "./platform.js";
 import { type CardPresentation, cardText, COPY_FIELDS, type CopyField } from "./card-settings.js";
 
 /** The names of the invented print studios that a collection sheet names as its maker. */
-export const studioNames = [
+export const STUDIO_NAMES = [
   "Alder & Vale",
   "Luma Ridge Studio",
   "Stillform Atelier",
@@ -55,7 +55,7 @@ export const studioNames = [
 ] as const;
 
 /** The slogans that a card design may print, one chosen at random unless given. */
-export const cardSlogans = [
+export const CARD_SLOGANS = [
   "Print, done properly.",
   "Small studio. Careful work.",
   "Considered design for everyday business.",
@@ -88,7 +88,7 @@ export const cardSlogans = [
 ] as const;
 
 /** The footers of a collection sheet, one chosen at random unless given. */
-export const cardFooters = [
+export const CARD_FOOTERS = [
   "PROOF SHEET",
   "CLIENT REVIEW",
   "SAMPLE SET",
@@ -98,7 +98,7 @@ export const cardFooters = [
 ] as const;
 
 /** The subtitles of a collection sheet, one chosen at random unless given. */
-export const cardSubtitles = [
+export const CARD_SUBTITLES = [
   "Colour options for review.",
   "Proof set, first round.",
   "Finishes and colourways.",
@@ -116,10 +116,10 @@ const COPY_TEXTS: Readonly<
     { readonly label: string; readonly fallback: (choose: UniformChoice) => string }
   >
 > = {
-  studioName: { label: "studio name", fallback: (choose) => pickWith(studioNames, choose) },
-  slogan: { label: "slogan", fallback: (choose) => pickWith(cardSlogans, choose) },
-  subtitle: { label: "subtitle", fallback: (choose) => pickWith(cardSubtitles, choose) },
-  footer: { label: "footer", fallback: (choose) => pickWith(cardFooters, choose) },
+  studioName: { label: "studio name", fallback: (choose) => pickWith(STUDIO_NAMES, choose) },
+  slogan: { label: "slogan", fallback: (choose) => pickWith(CARD_SLOGANS, choose) },
+  subtitle: { label: "subtitle", fallback: (choose) => pickWith(CARD_SUBTITLES, choose) },
+  footer: { label: "footer", fallback: (choose) => pickWith(CARD_FOOTERS, choose) },
   referenceLabel: { label: "reference label", fallback: () => "Ref." },
 };
 
@@ -146,7 +146,9 @@ function copyValue(value: string | undefined, fallback: () => string, label: str
 /**
  * A presentation that a host gives whole, as one settled already: each text checked by the rule
  * of card text (cardText), and "" where its line is hidden. A text that is missing or breaks the
- * rule is refused before anything is drawn, as a given profile is (AUD-037-API006). None is given
+ * rule is refused before anything is drawn, as a given profile is (AUD-037-API006): one that is no
+ * text on one line (export.card-settings.card-non-empty-text-on-one-line) or is longer than
+ * MAX_CARD_TEXT_LENGTH (export.card-settings.card-too-long-maximum-characters). None is given
  * where `given` is undefined, or null from a JavaScript host: then it returns undefined.
  */
 export function checkedCardPresentation(
@@ -167,7 +169,11 @@ export function checkedCardPresentation(
 
 /**
  * The texts of a design: those of `copy`, checked, and the rest chosen with `choose`. An export
- * settles them once (ExportDetails, export-details.ts); independent of all mnemonic data.
+ * settles them once (ExportDetails, export-details.ts); independent of all mnemonic data. Refuses a
+ * text of `copy` that is no text on one line
+ * (export.card-settings.card-non-empty-text-on-one-line) or is longer than MAX_CARD_TEXT_LENGTH
+ * (export.card-settings.card-too-long-maximum-characters), and a choice of `choose` that is no
+ * whole number below its limit (export.platform.checked-choice-refused).
  */
 export function resolveCardPresentation(
   choose: UniformChoice,

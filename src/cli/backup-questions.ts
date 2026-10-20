@@ -23,6 +23,7 @@ import {
 import {
   encodedInput,
   givenInputFormat,
+  givenMode,
   detectedFormat,
   phraseWords,
   SHARE_READER,
@@ -447,9 +448,7 @@ async function settledMode(
   question: BackupQuestion,
   source: BackupSource,
 ): Promise<MaskingMode | "ask" | undefined | Cancelled> {
-  // Both callers check --mode with transformMode before the first question: decodeWithQuestions
-  // and recover-date's settingsOf.
-  const given = value(question.args, "mode") as MaskingMode | undefined;
+  const given = givenMode(question.args);
   const conflict = reading.modeConflict(given);
   if (conflict !== undefined) {
     const named = defined(reading.mode());

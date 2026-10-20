@@ -6,6 +6,7 @@
 // this module imports no module that a test replaces.
 
 import type * as ChildProcess from "node:child_process";
+import type { Choice, ChooseOptions, LineQuestion } from "../../src/cli/terminal-choice.js";
 import type { MoreWithin, NextByte } from "../../src/cli/terminal-keys.js";
 
 type ImageExport = typeof import("../../src/export/image-export.js");
@@ -15,21 +16,36 @@ type TerminalChoice = typeof import("../../src/cli/terminal-choice.js");
 type TerminalInput = typeof import("../../src/cli/terminal-input.js");
 
 /** What the tests type, what the questions asked, and what the menu's commands give. */
-export const terminal = {
-  keysFor: (): string | Buffer => {
+interface KeyedTerminal {
+  /** The keys typed at the question asked now. */
+  keysFor: () => string | Buffer;
+  /** Called once a question is drawn, when it reads its first key. */
+  onFirstKey: () => void;
+  asked: Question[];
+  /** What each command run by the menu gives: its exit code, or an error that stops its start. */
+  exit: () => Promise<number>;
+  /** Whether the core self-test fails at the start of the menu. */
+  selfTestFails: boolean;
+  /** Whether this process cannot be protected (assertProtected) at the start of the menu. */
+  protectionFails: boolean;
+  /** Whether standard input and standard error are taken for a terminal (terminalAvailable). */
+  atTerminal: boolean;
+  /** The programs that the menu ran with spawnSync, and when, among the commands it ran. */
+  events: string[];
+}
+
+/** What the tests type, what the questions asked, and what the menu's commands give. */
+export const terminal: KeyedTerminal = {
+  keysFor: () => {
     throw new Error("no keys were given for this question");
   },
-  /** Called once a question is drawn, when it reads its first key. */
-  onFirstKey: (): void => undefined,
-  asked: [] as Question[],
-  /** What each command run by the menu gives: its exit code, or an error that stops its start. */
-  exit: async (): Promise<number> => 130,
-  /** Whether the core self-test fails at the start of the menu. */
+  onFirstKey: () => undefined,
+  asked: [],
+  exit: async () => 130,
   selfTestFails: false,
-  /** Whether standard input and standard error are taken for a terminal (terminalAvailable). */
+  protectionFails: false,
   atTerminal: false,
-  /** The programs that the menu ran with spawnSync, and when, among the commands it ran. */
-  events: [] as string[],
+  events: [],
 };
 
 /** A question as it was asked. */
@@ -45,9 +61,10 @@ export interface Question {
 
 /** The terminal's input, which reads the keys of `terminal.keysFor`. */
 export function replacedTerminalInput(actual: TerminalInput): TerminalInput {
-  return {
-    ...actual,
-    withRawTerminal: async <T>(body: (next: NextByte, moreWithin: MoreWithin) => Promise<T>) => {
+  class KeyedKeys extends actual.TerminalKeys {
+    static override async withRawMode<T>(
+      body: (next: NextByte, moreWithin: MoreWithin) => Promise<T>,
+    ): Promise<T> {
       const keys = terminal.keysFor();
       const bytes = typeof keys === "string" ? Buffer.from(keys, "utf8") : keys;
       let read = 0;
@@ -58,22 +75,32 @@ export function replacedTerminalInput(actual: TerminalInput): TerminalInput {
       };
       // A final Escape is Escape alone: no byte follows it.
       return body(next, async () => read < bytes.length);
-    },
+    }
+
     // Nothing is typed ahead here: every question gets the keys given for it.
-    dropTypedAhead: async () => undefined,
+    static override async dropTypedAhead(): Promise<undefined> {
+      return undefined;
+    }
+  }
+  return {
+    ...actual,
+    TerminalKeys: KeyedKeys,
     // Not the test runner's own standard input, which may or may not be a terminal.
     terminalAvailable: () => terminal.atTerminal,
   };
 }
 
-/** stty, which the menu runs around each command at a terminal, only records what it was asked. */
-export function replacedChildProcess(actual: typeof ChildProcess): typeof ChildProcess {
+/**
+ * stty, which the menu runs around each command at a terminal, only records what it was asked. Its
+ * spawnSync gives the status and the output that the menu reads, and runs no program.
+ */
+export function replacedChildProcess(actual: typeof ChildProcess) {
   return {
     ...actual,
-    spawnSync: ((program: string, args: readonly string[]) => {
+    spawnSync: (program: string, args: readonly string[]) => {
       terminal.events.push(`${program} ${args.join(" ")}`);
       return { status: 0, stdout: args[0] === "-g" ? "saved-modes\n" : "" };
-    }) as typeof ChildProcess.spawnSync,
+    },
   };
 }
 
@@ -81,13 +108,12 @@ export function replacedChildProcess(actual: typeof ChildProcess): typeof ChildP
 export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
   return {
     ...actual,
-    choose: ((...args: Parameters<typeof actual.choose>) => {
-      const labels = args[1].map((choice) => choice.label);
-      terminal.asked.push({ kind: "choose", question: args[0], labels, warning: args[2].warning });
-      return actual.choose(...args);
-    }) as typeof actual.choose,
-    askLine: ((...args: Parameters<typeof actual.askLine>) => {
-      const [question, , options] = args;
+    choose: <T>(question: string, choices: readonly Choice<T>[], options: ChooseOptions) => {
+      const labels = choices.map((choice) => choice.label);
+      terminal.asked.push({ kind: "choose", question, labels, warning: options.warning });
+      return actual.choose(question, choices, options);
+    },
+    askLine: (question: string, label: string, options?: LineQuestion) => {
       terminal.asked.push({
         kind: "line",
         question,
@@ -95,17 +121,22 @@ export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
         optional: options?.optional,
         warning: options?.warning,
       });
-      return actual.askLine(...args);
-    }) as typeof actual.askLine,
+      return actual.askLine(question, label, options);
+    },
   };
 }
 
-/** The protection of a command, which runs none: each ends as `terminal.exit` says. */
+/**
+ * The protection of a command, which runs none: each ends as `terminal.exit` says. The process
+ * is protected unless `terminal.protectionFails` says so.
+ */
 export function replacedProtection(actual: Protection): Protection {
   return {
     ...actual,
     dropForMenu: () => undefined,
-    assertProtected: () => undefined,
+    assertProtected: () => {
+      if (terminal.protectionFails) throw new Error("Core dumps could not be switched off.");
+    },
     runInOwnProcess: () => terminal.exit(),
   };
 }

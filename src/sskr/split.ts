@@ -103,6 +103,16 @@ export class ShareSplit {
   /**
    * The `count` shares of `mnemonic`, `threshold` of them needed, as UR records in member order.
    * The first `threshold` are restored before they are returned, and must give the phrase back.
+   * Refuses a threshold and a count that SSKR does not take
+   * (sskr.split.split-threshold-from-number-shares-at-most-shares, validateThreshold); a phrase
+   * that is not valid English BIP39 words (validatedEnglishWords: core.words); a seed that the
+   * host's randomness left all zero (sskr.split.randomness-left-seed-unfilled); shares from the
+   * host's SSKR library that are not the ones asked for
+   * (sskr.split.sskr-engine-returned-unexpected-share-count,
+   * sskr-engine-returned-shares-another-split-than-asked, or a refusal of Share.readSet); and
+   * shares that do not give the phrase back
+   * (sskr.split.sskr-generated-shares-did-not-reconstruct-source-entropy). A failure of the host's
+   * library passes on as it is.
    */
   async split(mnemonic: string, threshold: number, count: number): Promise<string[]> {
     ShareSplit.validateThreshold(threshold, count);

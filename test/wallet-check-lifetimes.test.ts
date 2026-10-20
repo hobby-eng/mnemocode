@@ -54,9 +54,9 @@ describe("A retained wallet comparison's lifetime", () => {
   });
 
   it("keeps the host-neutral prepared comparison independent of another owner", async () => {
-    const service = new WalletEvidenceCheck(pbkdf2, [BITCOIN]);
-    using first = service.prepare(evidence());
-    using other = service.prepare(evidence());
+    const check = new WalletEvidenceCheck(pbkdf2, [BITCOIN]);
+    using first = check.prepare(evidence());
+    using other = check.prepare(evidence());
     first.wipe();
     expect(() => first.match(PHRASE)).toThrow("has been wiped");
     await expect(first.matchAsync(PHRASE)).rejects.toThrow("has been wiped");
@@ -77,7 +77,7 @@ describe("A retained wallet comparison's lifetime", () => {
       entered = resolve;
     });
     let returned: Uint8Array | undefined;
-    const service = new WalletEvidenceCheck(
+    const check = new WalletEvidenceCheck(
       async (...parameters) => {
         entered!();
         await ready;
@@ -86,7 +86,7 @@ describe("A retained wallet comparison's lifetime", () => {
       },
       [BITCOIN],
     );
-    using owner = service.prepare(evidence());
+    using owner = check.prepare(evidence());
     const pending = owner.matchAsync(PHRASE);
     try {
       await started;

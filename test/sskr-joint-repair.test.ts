@@ -1,18 +1,18 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { planJointRepair, searchOnce } from "../src/sskr/joint-repair.js";
-import { sskrLongVector, sskrSetVector, sskrVector } from "../src/sskr/known-answers.js";
+import { SSKR_LONG_VECTOR, SSKR_SET_VECTOR, SSKR_VECTOR } from "../src/sskr/known-answers.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
-import type { ShareFormat } from "../src/sskr/transport.js";
-import { joinUnits, markUnits, shareUnits } from "./helpers/shares.js";
+import { Share, type ShareFormat } from "../src/sskr/transport.js";
+import { matching } from "./helpers/matchers.js";
+import { joinUnits, markDigits, markUnits, shareUnits } from "./helpers/shares.js";
+import { sskrVectors } from "./helpers/vectors.js";
+import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-) as { deterministic: { name: string; entropy: string; shares: string[] }[] };
+const vectors = sskrVectors();
 const publicMnemonic = "abandon ".repeat(11) + "about";
 
 function mnemonicOf(vector: { entropy: string }): string {
@@ -28,22 +28,26 @@ async function twinSets(): Promise<[string[], string[]]> {
 }
 
 describe("Joint repair of the shares of one set", () => {
-  it("restores 2-of-3 shares that each miss two elements, in every form", async () => {
-    for (const vector of vectors.deterministic) {
-      for (const format of ["ur", "words", "indexes", "unicode", "colors"] as const) {
-        const typed = vector.shares.map((share, index) =>
-          markUnits(share, format, [2 + index, 7 + index]),
-        );
-        const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
-        expect(plan.assessment.verdict, `${vector.name} ${format}`).toBe("determined");
-        const found = (await plan.search()).sets;
-        expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
-        expect(found[0]!.shares.map((share) => share.ur)).toEqual(vector.shares);
-        expect(found[0]!.shares.every((share) => share.format === format)).toBe(true);
-        expect(found[0]!.unsettled).toEqual([]);
+  it(
+    "restores 2-of-3 shares that each miss two elements, in every form",
+    async () => {
+      for (const vector of vectors.deterministic) {
+        for (const format of ["ur", "words", "indexes", "unicode", "colors"] as const) {
+          const typed = vector.shares.map((share, index) =>
+            markUnits(share, format, [2 + index, 7 + index]),
+          );
+          const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
+          expect(plan.assessment.verdict, `${vector.name} ${format}`).toBe("determined");
+          const found = (await plan.search()).sets;
+          expect(found.map((set) => set.mnemonic)).toEqual([mnemonicOf(vector)]);
+          expect(found[0]!.shares.map((share) => share.ur)).toEqual(vector.shares);
+          expect(found[0]!.shares.every((share) => share.format === format)).toBe(true);
+          expect(found[0]!.unsettled).toEqual([]);
+        }
       }
-    }
-  }, 120_000);
+    },
+    LONG_TEST_TIME_LIMIT_MS,
+  );
 
   it("settles six word numbers on each of three shares, which no share settles alone", async () => {
     const vector = vectors.deterministic[0]!;
@@ -221,7 +225,7 @@ describe("Joint repair of the shares of one set", () => {
     // Its search says why, and the plan searches no more after it (AUD-037-API003).
     await expect(searchOnce(one)).rejects.toMatchObject({
       code: "sskr.joint-repair.plan-not-searchable",
-      message: expect.stringMatching(/threshold/u) as unknown,
+      message: matching(/threshold/u),
     });
     await expect(one.search()).rejects.toMatchObject({ code: "sskr.joint-repair.plan-wiped" });
     const twice = await planJointRepair(
@@ -239,9 +243,14 @@ describe("Joint repair of the shares of one set", () => {
   });
 
   it("refuses shares of another set as not fitting, not as too few", async () => {
-    // Two splits of one phrase have different identifiers; the vectors all share one.
-    const first = await splitSskrMnemonic(publicMnemonic, 2, 3);
-    const second = await splitSskrMnemonic(publicMnemonic, 2, 3);
+    // The identifier of a set comes from the random bytes of its split: two random splits share
+    // one in 65,536 runs, and the vectors all share one. These two fixed fillings give two, which
+    // is checked first, so that the test never passes on two splits that look like one set.
+    const splitOf = (byte: number) =>
+      new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(byte)).split(publicMnemonic, 2, 3);
+    const first = await splitOf(1);
+    const second = await splitOf(2);
+    expect(Share.read(first[0]!).info.identifier).not.toBe(Share.read(second[0]!).info.identifier);
     const plan = await planJointRepair([markUnits(first[0]!, "ur", [12]), first[1]!, second[2]!], {
       platform: nodeSharePlatform,
     });
@@ -253,7 +262,7 @@ describe("Joint repair of the shares of one set", () => {
   it("names each condition of shares that do not fit by a code of its own", async () => {
     const assessed = async (typed: readonly string[]) =>
       (await planJointRepair(typed, { platform: nodeSharePlatform })).assessment;
-    const [first, second] = sskrSetVector.shares;
+    const [first, second] = SSKR_SET_VECTOR.shares;
     // A share that no reading fits, by its place.
     expect(await assessed(["not a share at all", markUnits(second, "colors", [5])])).toMatchObject({
       verdict: "no-fit",
@@ -261,12 +270,12 @@ describe("Joint repair of the shares of one set", () => {
       unfit: 1,
     });
     // Shares of the official vector, a set of several groups.
-    const [grouped, otherGrouped] = sskrVector.shares;
+    const [grouped, otherGrouped] = SSKR_VECTOR.shares;
     const several = await assessed([markUnits(grouped, "colors", [5]), otherGrouped]);
     expect(several).toMatchObject({ verdict: "no-fit", noFit: "several-groups" });
     expect(several.reason).toMatch(/several groups/u);
     // A share of a phrase of 24 words beside one of 12: not of one set.
-    const lengths = await assessed([markUnits(first, "colors", [5]), sskrLongVector.shares[1]]);
+    const lengths = await assessed([markUnits(first, "colors", [5]), SSKR_LONG_VECTOR.shares[1]]);
     expect(lengths).toMatchObject({ verdict: "no-fit", noFit: "shares-do-not-fit" });
     expect(lengths.reason).toMatch(/different lengths/u);
     // Only a share that no reading fits is named.
@@ -315,29 +324,21 @@ describe("Joint repair of the shares of one set", () => {
 
 const vector = vectors.deterministic[0]!;
 
-/** `share` in `format` with ? at the digits `digits` of each element at `places`. */
-function markDigits(
+/** `share` in `format` with ? at the same `digits` of each element at `places` (markDigits). */
+function markSameDigits(
   share: string,
   format: ShareFormat,
   places: readonly number[],
   digits: readonly number[],
 ): string {
-  const parts = shareUnits(share, format);
-  for (const place of places) {
-    const part = parts[place]!;
-    const prefix = part.startsWith("#") ? "#" : "";
-    const symbols = Array.from(part.slice(prefix.length));
-    for (const digit of digits) symbols[digit] = "?";
-    parts[place] = prefix + symbols.join("");
-  }
-  return joinUnits(parts, format);
+  return markDigits(share, format, Object.fromEntries(places.map((place) => [place, digits])));
 }
 
 describe("Joint repair with digits read in part", () => {
   it("settles colors missing digits on both shares, where whole colors need a long search", async () => {
     const typed = [
-      markDigits(vector.shares[0]!, "colors", [4, 5, 6], [4, 5]),
-      markDigits(vector.shares[1]!, "colors", [6, 7], [3, 4, 5]),
+      markSameDigits(vector.shares[0]!, "colors", [4, 5, 6], [4, 5]),
+      markSameDigits(vector.shares[1]!, "colors", [6, 7], [3, 4, 5]),
     ];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
     expect(plan.assessment.openBits).toBe(0);
@@ -356,8 +357,8 @@ describe("Joint repair with digits read in part", () => {
 
   it("settles Unicode codes missing a digit each by the words that fit them", async () => {
     const typed = [
-      markDigits(vector.shares[0]!, "unicode", [4, 7, 9, 12, 15], [3]),
-      markDigits(vector.shares[1]!, "unicode", [5, 8, 10, 13], [2]),
+      markSameDigits(vector.shares[0]!, "unicode", [4, 7, 9, 12, 15], [3]),
+      markSameDigits(vector.shares[1]!, "unicode", [5, 8, 10, 13], [2]),
     ];
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
     expect(plan.assessment.verdict).toBe("determined");
@@ -368,40 +369,44 @@ describe("Joint repair with digits read in part", () => {
     ]);
   });
 
-  it("tries words only within a bound, so that even many partly read codes are assessed in seconds", async () => {
-    // Three missing digits of six codes on each share: about 200 words fit each code.
-    const typed = vector.shares
-      .slice(0, 2)
-      .map((share) => markDigits(share, "unicode", [3, 5, 7, 9, 11, 13], [1, 2, 3]));
-    const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
-    expect(plan.assessment.verdict).not.toBe("no-fit");
-    // The first sixteen codes of all three shares of a 24-word set, each missing its last digit,
-    // took minutes when every word was tried (AUD review of the digit marks).
-    const long = vectors.deterministic[4]!;
-    // Measured as the processor time of this process, which the load of the machine leaves as it
-    // is, where the time on the clock grows with every other test that runs beside it.
-    const started = process.cpuUsage();
-    const many = await planJointRepair(
-      long.shares.map((share) =>
-        markDigits(
-          share,
-          "unicode",
-          Array.from({ length: 16 }, (_, i) => i + 1),
-          [3],
+  it(
+    "tries words only within a bound, so that even many partly read codes are assessed in seconds",
+    async () => {
+      // Three missing digits of six codes on each share: about 200 words fit each code.
+      const typed = vector.shares
+        .slice(0, 2)
+        .map((share) => markSameDigits(share, "unicode", [3, 5, 7, 9, 11, 13], [1, 2, 3]));
+      const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
+      expect(plan.assessment.verdict).not.toBe("no-fit");
+      // The first sixteen codes of all three shares of a 24-word set, each missing its last digit,
+      // took minutes when every word was tried (AUD review of the digit marks).
+      const long = vectors.deterministic[4]!;
+      // Measured as the processor time of this process, which the load of the machine leaves as it
+      // is, where the time on the clock grows with every other test that runs beside it.
+      const started = process.cpuUsage();
+      const many = await planJointRepair(
+        long.shares.map((share) =>
+          markSameDigits(
+            share,
+            "unicode",
+            Array.from({ length: 16 }, (_, i) => i + 1),
+            [3],
+          ),
         ),
-      ),
-      { platform: nodeSharePlatform },
-    );
-    const used = process.cpuUsage(started);
-    expect((used.user + used.system) / 1000).toBeLessThan(15_000);
-    expect(many.assessment.verdict).not.toBe("no-fit");
-  }, 120_000);
+        { platform: nodeSharePlatform },
+      );
+      const used = process.cpuUsage(started);
+      expect((used.user + used.system) / 1000).toBeLessThan(15_000);
+      expect(many.assessment.verdict).not.toBe("no-fit");
+    },
+    LONG_TEST_TIME_LIMIT_MS,
+  );
 
   it("says that shares are too few, not that they do not fit, with partly read codes", async () => {
     const shares = await splitSskrMnemonic(mnemonicOf(vector), 3, 6);
     const typed = shares
       .slice(0, 2)
-      .map((share) => markDigits(share, "unicode", [12, 14, 16, 18], [3]));
+      .map((share) => markSameDigits(share, "unicode", [12, 14, 16, 18], [3]));
     const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
     expect(plan.assessment.verdict).toBe("not-enough");
     expect(plan.assessment.reason).toBe(
@@ -412,7 +417,7 @@ describe("Joint repair with digits read in part", () => {
   it("hears a stop between the shares and between the choices of member numbers", async () => {
     const stop = new AbortController();
     const typed = vector.shares.map((share) =>
-      markDigits(
+      markSameDigits(
         share,
         "unicode",
         Array.from({ length: 12 }, (_, i) => i + 1),

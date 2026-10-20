@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   decodeIndexes,
@@ -19,6 +18,7 @@ import { Masking } from "../src/core/masking.js";
 import { parseRecord, serializeRecord } from "../src/record.js";
 import { Share, writeShare } from "../src/sskr/transport.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { publicShare } from "./helpers/vectors.js";
 
 // The parts that read and write an encoded seed phrase, each on its own, as another host such as
 // the Deriver uses them: the Seedshift modes (Masking), the codes in every form with their record
@@ -30,11 +30,7 @@ const LEGACY = encodeMnemonicLegacy(TEST_PHRASE, [DATE]);
 /**
  * The first share of the first published SSKR vector, 2 of 3 in one group (vectors/sskr-v1.json).
  */
-const SHARE = (
-  JSON.parse(readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8")) as {
-    deterministic: { shares: string[] }[];
-  }
-).deterministic[0]!.shares[0]!;
+const SHARE = publicShare();
 
 describe("Masking", () => {
   it("is one value per mode, with every rule that tells the modes apart", () => {
@@ -64,6 +60,7 @@ describe("Masking", () => {
   it("names the same modes as the MNC1 record, whose format has its own list of them", () => {
     for (const mode of Masking.MODES)
       expect(parseRecord(serializeRecord(mode, "indexes", "1 2"))?.mode).toBe(mode);
+    // A mode that no type allows, fed on purpose as a JavaScript host could.
     expect(() => serializeRecord("shifted" as never, "indexes", "1 2")).toThrow(
       "Unsupported MnemoCode record mode.",
     );
@@ -72,6 +69,7 @@ describe("Masking", () => {
   it("refuses a value that names no mode", () => {
     for (const value of ["shifted", "toString", "", undefined, 1])
       expect(Masking.isMode(value)).toBe(false);
+    // A mode that no type allows, fed on purpose as a JavaScript host could.
     expect(() => Masking.of("toString" as never)).toThrow("Unsupported Seedshift mode.");
   });
 
@@ -129,6 +127,7 @@ describe("EncodedBackup writes its codes back", () => {
         payload: formatEncoded(MASKED, format),
       });
     }
+    // A form that no type allows, fed on purpose as a JavaScript host could.
     expect(() => EncodedBackup.of(MASKED.shiftedIndexes, "json" as never, "direct")).toThrow(
       expect.objectContaining({
         code: "core.encoded-form.unsupported-encoded-format",

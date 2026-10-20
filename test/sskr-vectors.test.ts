@@ -16,19 +16,9 @@ import {
 import { MAX_SHARES } from "../src/sskr/split.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { recheck } from "./helpers/share-transport.js";
-import { sskrVectors } from "./helpers/vectors.js";
+import { hexBytes, sskrVectors } from "./helpers/vectors.js";
 const vectors = sskrVectors();
-const bytes = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
-/** A deterministic regression fixture of vectors/sskr-v1.json. */
-interface DeterministicVector {
-  readonly name: string;
-  readonly entropy: string;
-  readonly testOnlySeed: string;
-  readonly groupThreshold: number;
-  readonly shares: readonly string[];
-  readonly colors: readonly (readonly string[])[];
-}
-const original = entropyToMnemonic(bytes(vectors.official.entropy), wordlist);
+const original = entropyToMnemonic(hexBytes(vectors.official.entropy), wordlist);
 describe("Published SSKR v1 vectors", () => {
   it("matches independently computed transport bytes and RGB codes in both directions", () => {
     const v = vectors.official;
@@ -38,7 +28,7 @@ describe("Published SSKR v1 vectors", () => {
     expect(normalizeShare(v.shares[0]!.toUpperCase())).toBe(v.shares[0]!);
   });
   it("recovers all 30 minimal official grouped quorums and tagged Bytewords", async () => {
-    const s = vectors.official.shares as string[];
+    const s = vectors.official.shares;
     for (let a = 0; a < 3; a++)
       for (let b = a + 1; b < 3; b++)
         for (let c = 3; c < 8; c++)
@@ -63,30 +53,27 @@ describe("Published SSKR v1 vectors", () => {
       ).rejects.toMatchObject({ code });
     },
   );
-  it.each(vectors.deterministic as DeterministicVector[])(
-    "locks exact creation and every pair: $name",
-    async (v) => {
-      const engine = await sskrEngine();
-      const actual = engine
-        .create_sskr_shares(
-          bytes(v.entropy),
-          v.groupThreshold,
-          Uint8Array.of(2, 3),
-          bytes(v.testOnlySeed),
-        )
-        .trim()
-        .split("\n");
-      expect(actual).toEqual(v.shares);
-      expect(actual.map(shareToColors)).toEqual(v.colors);
-      const expected = entropyToMnemonic(bytes(v.entropy), wordlist);
-      for (const [a, b] of [
-        [0, 1],
-        [0, 2],
-        [1, 2],
-      ] as const)
-        expect(await combineSskrShares([actual[a]!, actual[b]!])).toBe(expected);
-    },
-  );
+  it.each(vectors.deterministic)("locks exact creation and every pair: $name", async (v) => {
+    const engine = await sskrEngine();
+    const actual = engine
+      .create_sskr_shares(
+        hexBytes(v.entropy),
+        v.groupThreshold,
+        Uint8Array.of(2, 3),
+        hexBytes(v.testOnlySeed),
+      )
+      .trim()
+      .split("\n");
+    expect(actual).toEqual(v.shares);
+    expect(actual.map(shareToColors)).toEqual(v.colors);
+    const expected = entropyToMnemonic(hexBytes(v.entropy), wordlist);
+    for (const [a, b] of [
+      [0, 1],
+      [0, 2],
+      [1, 2],
+    ] as const)
+      expect(await combineSskrShares([actual[a]!, actual[b]!])).toBe(expected);
+  });
   it("rejects bad CBOR metadata even with an intact CRC", () => {
     const body = urToTransport(vectors.official.shares[0]!).slice(0, -CHECKSUM_BYTES);
     // The first byte is the CBOR header of the byte string; the others are the share's metadata.
@@ -106,7 +93,7 @@ describe("Published SSKR v1 vectors", () => {
     expect(() => shareInfo(recheck(badTag))).toThrow(/tag/u);
   });
   it("rejects nonzero padding, unknown versions and invalid Bytewords; leaves out trailing colors", () => {
-    const codes = vectors.official.firstShareColors as string[];
+    const codes = vectors.official.firstShareColors;
     const refused = { code: "sskr.transport.mixed-share-refused" };
     // The last color is the share's last byte, 67, and two bytes of padding.
     expect(() => colorsToShare([...codes.slice(0, -1), "#670001"].join(" "))).toThrow(

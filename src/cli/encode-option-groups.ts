@@ -5,7 +5,7 @@
 // sskr-split-command.ts). A module of its own, which imports no command module: the commands and
 // their list of options all read it.
 
-import { businessOptionNames } from "./business-options.js";
+import { BUSINESS_OPTION_NAMES } from "./business-options.js";
 import { DRAWING_OPTIONS } from "./output-options.js";
 
 /** What Encode takes in both modes: the phrase and the dates, the outputs and the card design. */
@@ -26,7 +26,7 @@ export const ENCODE_SHARED_OPTIONS = Object.freeze([
   "cards-dir",
   "template",
   ...DRAWING_OPTIONS,
-  ...businessOptionNames,
+  ...BUSINESS_OPTION_NAMES,
 ] as const);
 
 /** What only a plain backup takes: the terminal cards, its QR code, its card texts, a last word. */

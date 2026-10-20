@@ -3,18 +3,14 @@
 // (.gitignore), so they are never among them. The privacy check reads these files
 // (verify-audit-privacy.mjs), and the package check finds each of them in the npm package
 // (verify-audit-package.mjs).
-import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { trackedOrNewFiles } from "./git-top-level.mjs";
 
-export const AUDIT_ROOT = "docs/audits";
+const AUDIT_ROOT = "docs/audits";
 
-/** The published audit files, as paths from the repository root. */
+/**
+ * The published audit files, as paths from the folder the check runs in, the repository root: a
+ * tracked file deleted in the working tree is published no more (trackedOrNewFiles).
+ */
 export function publishedAuditFiles() {
-  const listed = execFileSync(
-    "git",
-    ["ls-files", "--cached", "--others", "--exclude-standard", "-z", AUDIT_ROOT],
-    { encoding: "utf8" },
-  );
-  // A tracked file deleted in the working tree is published no more.
-  return [...new Set(listed.split("\0"))].filter((path) => path !== "" && existsSync(path));
+  return trackedOrNewFiles(".", [AUDIT_ROOT]);
 }

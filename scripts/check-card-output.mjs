@@ -18,7 +18,7 @@ await mkdir(destination, { recursive: true });
 // This checkout's build, which the command below runs too.
 const root = fileURLToPath(new URL("..", import.meta.url));
 const renderer = await loadCardRenderer(root);
-const { cardTemplates, drawing, selectTemplate, writeShare, renderBusinessCards } = renderer;
+const { CARD_TEMPLATES, drawing, selectTemplate, writeShare, renderBusinessCards } = renderer;
 const presentation = {
   studioName: "Orven Studio",
   slogan: "Details, deliberately.",
@@ -45,7 +45,7 @@ const cases = [
   ],
   ["business-sskr", () => renderBusinessCards("it", share, 0), share.payload],
   ["material-full", () => selectTemplate("material-kitchen").render(drawing, base), base.payload],
-  ...cardTemplates.map((template) => [
+  ...CARD_TEMPLATES.map((template) => [
     template.id + "-study",
     () => template.render(drawing, { ...base, pageSize: "business", orientation: "landscape" }),
     base.payload,

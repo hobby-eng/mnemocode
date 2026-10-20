@@ -1,6 +1,6 @@
 /** Bit order is most significant bit first, matching BIP39 entropy serialization. */
 
-import { BIP39_INDEX_BITS, BITS_PER_BYTE, checksumBits } from "./bip39-sizes.js";
+import { assertWordIndex, BIP39_INDEX_BITS, BITS_PER_BYTE, checksumBits } from "./bip39-sizes.js";
 import { textPieces } from "./pieces.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog } from "./error-catalog.js";
@@ -12,6 +12,11 @@ const ERRORS = new ErrorCatalog("core.bits", {
   "entropy-contain-whole-number-bytes": () => "Entropy must contain a whole number of bytes.",
   "hexadecimal-text-two-digits-0-9-f-each": () =>
     "Hexadecimal text has two digits, 0-9 or a-f, for each byte.",
+  "word-indexes-fill-bytes": {
+    kind: "range",
+    text: () =>
+      `Word indexes must fill the bytes they are packed into, with fewer than ${BIP39_INDEX_BITS} bits over.`,
+  },
 });
 
 // Defined in bip39-sizes.ts, which this module imports and which may not import it back.
@@ -38,6 +43,49 @@ export function bitsOf(value: number, width: number): string {
 /** BIP39 indexes as their 11 bits each, in order: the bits of a phrase, checksum included. */
 export function bitsOfIndexes(indexes: readonly number[]): string {
   return indexes.map((index) => bitsOf(index, BIP39_INDEX_BITS)).join("");
+}
+
+/** A value and how many bits it takes, such as the bits after the last whole byte of a packing. */
+export type BitField = readonly [value: number, bits: number];
+
+/**
+ * Packs `indexes`, BIP39 word indexes of 11 bits each, into `target`, eight bits to a byte, the
+ * first bit highest, and returns the bits after its last byte: the checksum when `target` takes a
+ * phrase's entropy (entropyOfWords), the zero filling of a share in word numbers
+ * (wordIndexesToBytes). The one packer of words into bytes. A deliberate copy of bitsOfIndexes and
+ * bitsToBytes, in a number rather than a string, because the word search packs every combination
+ * it tries; test/word-packing.test.ts keeps the two in step.
+ *
+ * `target` belongs to the caller, who wipes it; a refusal wipes what was written of it. Refuses a
+ * value that is no word index, checked as it is read (core.bip39-sizes.assert-word-indexes-refused),
+ * and a `target` that the words do not fill or that leaves 11 bits or more after it
+ * (core.bits.word-indexes-fill-bytes, a RangeError): the bits left over are kept in a number.
+ */
+export function packWordIndexes(indexes: readonly number[], target: Uint8Array): BitField {
+  const count = indexes.length;
+  const over = count * BIP39_INDEX_BITS - target.length * BITS_PER_BYTE;
+  if (over < 0 || over >= BIP39_INDEX_BITS) throw ERRORS.create("word-indexes-fill-bytes", []);
+  let buffer = 0;
+  let bits = 0;
+  let filled = 0;
+  try {
+    for (let place = 0; place < count; place += 1) {
+      const index = indexes[place];
+      assertWordIndex(index);
+      buffer = (buffer << BIP39_INDEX_BITS) | index;
+      bits += BIP39_INDEX_BITS;
+      // Only the last index can find `target` full: the bits over are fewer than one index has.
+      while (bits >= BITS_PER_BYTE && filled < target.length) {
+        bits -= BITS_PER_BYTE;
+        target[filled++] = (buffer >>> bits) & BYTE_MAX;
+      }
+      buffer &= (1 << bits) - 1;
+    }
+  } catch (error) {
+    target.fill(0);
+    throw error;
+  }
+  return [buffer, bits];
 }
 
 /**
@@ -93,7 +141,8 @@ export function bytesToBits(bytes: Uint8Array): string {
 
 /**
  * The bytes of `bits`, eight to a byte, the most significant first; refuses a count that is not a
- * whole number of bytes or a character other than 0 and 1.
+ * whole number of bytes or a character other than 0 and 1
+ * (core.bits.entropy-contain-whole-number-bytes).
  */
 export function bitsToBytes(bits: string): Uint8Array {
   if (bits.length % BITS_PER_BYTE !== 0 || !/^[01]+$/u.test(bits))
@@ -114,8 +163,9 @@ export const HEX_DIGITS_PER_BYTE = 2;
 
 /**
  * The bytes of hexadecimal text, two digits each, in either case: the inverse of hexOfBytes.
- * Refuses text of an odd length or with another character; what the bytes mean, a key or a
- * color, its caller checks.
+ * Refuses text of an odd length or with another character
+ * (core.bits.hexadecimal-text-two-digits-0-9-f-each); what the bytes mean, a key or a color, its
+ * caller checks.
  */
 export function bytesOfHex(text: string): Uint8Array {
   if (text.length % HEX_DIGITS_PER_BYTE !== 0 || !/^[0-9a-f]*$/iu.test(text))

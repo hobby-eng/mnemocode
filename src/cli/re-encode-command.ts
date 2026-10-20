@@ -15,6 +15,7 @@
 
 import {
   assertAskedNotGiven,
+  emptyArguments,
   OLD_DATES_KEY,
   parseArguments,
   value,
@@ -27,13 +28,8 @@ import { WordList } from "../core/word-hints.js";
 import type { DateShiftDate, DecodedResult, EncodedFormat, MaskingMode } from "../core/types.js";
 import { Masking } from "../core/masking.js";
 import type { EncodedBackup } from "../core/encoded-backup.js";
-import {
-  askAfterFailure,
-  askOrCancel,
-  askSecretUntil,
-  askWalletEvidence,
-  WHAT_NOW,
-} from "./ask.js";
+import { askAfterFailure, askOrCancel, askSecretUntil, WHAT_NOW } from "./ask.js";
+import { askWalletEvidence } from "./wallet-question.js";
 import { warnOfCloudCopies } from "./cloud-folders.js";
 import { givenWallet, type GivenWallet } from "./bitcoin-options.js";
 import { backupChoice, datesAgainChoice } from "./date-search.js";
@@ -56,7 +52,7 @@ import type { PreparedEncode } from "./encode-types.js";
 import { askEncoding } from "./encode-questions.js";
 import { forgetClaimedOutputs } from "./output-questions.js";
 import { reportChecksumAndFingerprint } from "./fingerprint-report.js";
-import { settleOutputPaths } from "./output-paths.js";
+import { RenamedOutputs } from "./output-paths.js";
 import { clearPrivateScreen, showProtection } from "./private-screen.js";
 import { PrivateSteps } from "./private-steps.js";
 import { dropUnneededAfterAnswers } from "./protection.js";
@@ -66,7 +62,13 @@ import {
   OLD_BACKUP_OPTIONS,
   RECOGNISED_OPTION,
 } from "./re-encode-options.js";
-import { readmeLink, terminalNotice, terminalPart, type NoticeKind } from "./terminal.js";
+import {
+  readmeLink,
+  terminalLastingWarning,
+  terminalNotice,
+  terminalPart,
+  type NoticeKind,
+} from "./terminal.js";
 import { waitForEnter, type Choice, type Explanation } from "./terminal-choice.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { defined } from "../core/defined.js";
@@ -92,10 +94,8 @@ interface SplitOptions {
  * --recognised, which answers the confirmation, to neither.
  */
 export function splitOptions(args: ParsedArguments): SplitOptions {
-  // Without a prototype, as parseArguments makes them (AUD-014-API010). An object without keys is
-  // a ParsedArguments, which Object.create cannot type.
-  const old = Object.create(null) as ParsedArguments;
-  const fresh = Object.create(null) as ParsedArguments;
+  const old = emptyArguments();
+  const fresh = emptyArguments();
   for (const [key, entry] of Object.entries(args)) {
     if (key === RECOGNISED_OPTION) continue;
     if (key === "ask-secrets") {
@@ -186,8 +186,14 @@ function showOldFingerprint(result: DecodedResult): void {
   reportChecksumAndFingerprint(result.recoveredMnemonic, result.checksumValid);
 }
 
+/**
+ * Shows `notices`; a warning among them, such as that a fingerprint is only a filter, still holds
+ * once the command has ended (terminalLastingWarning).
+ */
 function showNotices(notices: Notices): void {
-  for (const { text, kind } of notices) terminalNotice(text, kind);
+  for (const { text, kind } of notices)
+    if (kind === "warning") terminalLastingWarning(text);
+    else terminalNotice(text, kind);
 }
 
 /**
@@ -231,7 +237,7 @@ export async function runReEncode(args: ParsedArguments): Promise<Cancelled | un
   // The rights that the answers do not need were given up after the questions: what holds now.
   if (encode === undefined) showProtection();
   if ((await confirmed.encode(reEncoding.confirmedPhrase())) === CANCELLED) return CANCELLED;
-  terminalNotice(RE_ENCODING_WORDS.oldBackupStillOpens, "warning");
+  terminalLastingWarning(RE_ENCODING_WORDS.oldBackupStillOpens);
   return undefined;
 }
 
@@ -442,7 +448,7 @@ async function askedNewBackup(
   const encoding = await askEncoding();
   if (encoding === undefined || encoding === CANCELLED) return encoding;
   const fresh = parseArguments(encoding.slice(1));
-  await settleOutputPaths(fresh);
+  await RenamedOutputs.settle(fresh);
   const prepared = await prepareEncode(fresh);
   dropUnneededAfterAnswers(fresh);
   // Only answers that are taken name files that will be saved: a refused one warns of none. The
@@ -518,7 +524,7 @@ async function confirmation(
     const answer = await askWalletEvidence({
       optional: false,
       place: given.place,
-      explanation: { lines: [comparedPassphrase("Re-encode", given.passphrase)] },
+      explanation: { lines: [comparedPassphrase("Re-encode", given.withPassphrase)] },
     });
     if (answer === CANCELLED) return CANCELLED;
     if (answer.kind !== "wallet") continue;

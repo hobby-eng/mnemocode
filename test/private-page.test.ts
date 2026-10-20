@@ -5,7 +5,7 @@ import { CLEAR_SCREEN } from "../src/cli/terminal.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { Masking } from "../src/core/masking.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { SHARE_FORMATS } from "../src/sskr/transport.js";
 import { PrivateTerminal } from "./helpers/private-terminal.js";
 import { Screen } from "./helpers/terminal-screen.js";
@@ -13,24 +13,13 @@ import { Screen } from "./helpers/terminal-screen.js";
 // The page of the private screen (private-page.ts): what was written since the screen was last
 // cleared, shown by pages before a question or an Enter prompt when it does not fit with them.
 
-const keyboard = vi.hoisted(() => ({ bytes: [] as number[] }));
-vi.mock("../src/cli/terminal-input.js", async (original) => ({
-  ...(await original<typeof import("../src/cli/terminal-input.js")>()),
-  dropTypedAhead: async () => undefined,
-  withRawTerminal: async <T>(
-    body: (next: () => Promise<number | undefined>, more: () => Promise<boolean>) => Promise<T>,
-  ) =>
-    body(
-      async () => keyboard.bytes.shift(),
-      async () => keyboard.bytes.length > 0,
-    ),
-}));
+const typing = await vi.hoisted(async () => import("./helpers/typed-keys.js"));
+vi.mock("../src/cli/terminal-input.js", async (original) =>
+  typing.replacedTerminalInput(await original()),
+);
+const { type } = typing;
 
 let terminal: PrivateTerminal;
-
-function type(keys: string): void {
-  keyboard.bytes = Array.from(Buffer.from(keys));
-}
 
 /** The rows that `frame` takes on the terminal, as a screen of its own reads them. */
 function rowsOf(frame: string): string[] {
@@ -240,7 +229,7 @@ describe("shares on the private screen", () => {
   it.each(SHARE_FORMATS)("keeps every one of 16 shares in %s reachable", async (form) => {
     process.stderr.rows = 12;
     process.stderr.write(CLEAR_SCREEN);
-    const shares = Array.from({ length: 16 }, (_, at) => sskrSetVector.shares[at % 3]!);
+    const shares = Array.from({ length: 16 }, (_, at) => SSKR_SET_VECTOR.shares[at % 3]!);
     printShares(inForm(shares, form));
     type("\x1b[6~".repeat(200) + "\r");
     await PrivatePage.keepReadable(2);
@@ -256,7 +245,7 @@ describe("shares on the private screen", () => {
       try {
         process.stderr.write(CLEAR_SCREEN);
         console.log("MnemoCode · SSKR export");
-        printShares(inForm(sskrSetVector.shares, form), 3, Masking.of("direct").holds);
+        printShares(inForm(SSKR_SET_VECTOR.shares, form), 3, Masking.of("direct").holds);
         console.log("Original fingerprint 73c5da0a");
         type("\x1b[6~".repeat(20) + "\r");
         await PrivatePage.keepReadable(8);
@@ -277,8 +266,8 @@ describe("shares on the private screen", () => {
     vi.spyOn(console, "log").mockImplementation((line: unknown) => output.push(String(line)));
     vi.spyOn(console, "error").mockImplementation((line: unknown) => errors.push(String(line)));
     Object.defineProperty(process.stdout, "isTTY", { value: false, configurable: true });
-    printShares(inForm(sskrSetVector.shares, "ur"), 3, Masking.of("direct").holds);
-    for (const share of sskrSetVector.shares) expect(output).toContain(share);
+    printShares(inForm(SSKR_SET_VECTOR.shares, "ur"), 3, Masking.of("direct").holds);
+    for (const share of SSKR_SET_VECTOR.shares) expect(output).toContain(share);
     for (let number = 1; number <= 3; number += 1)
       expect(errors.join("\n")).toContain(`SSKR share ${number} of 3`);
     expect(output.join("\n")).not.toContain("\x1b");

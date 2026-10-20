@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { format } from "node:util";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, vi } from "vitest";
-import { askLine, startRecord } from "../../src/cli/terminal-choice.js";
+import { AnswerRecord, askLine } from "../../src/cli/terminal-choice.js";
 import { displayWidth } from "../../src/cli/terminal-geometry.js";
 import { terminal } from "./keyed-terminal.js";
 import type { Cancelled } from "../../src/cli/terminal-keys.js";
@@ -141,16 +141,19 @@ const UNLIMITED_ROWS = 100_000;
  */
 export function watchScreen(columns: number, reported: Reported = { columns }): Screen {
   stopWatching();
-  (process.stderr as { columns?: number | undefined }).columns = reported.columns;
-  (process.stderr as { rows?: number }).rows = reported.height ?? UNLIMITED_ROWS;
+  // No columns where the terminal does not say them.
+  Object.assign(process.stderr, {
+    columns: reported.columns,
+    rows: reported.height ?? UNLIMITED_ROWS,
+  });
   const screen = new Screen(columns, reported.height);
   // Replaced by hand, not with vi.spyOn: a spy keeps every call it sees, and the walk through every
   // path of the menu below writes so much that the kept calls took gigabytes of memory.
-  process.stderr.write = ((chunk: string | Uint8Array) => {
+  process.stderr.write = (chunk: string | Uint8Array) => {
     // Decoded at once: readLine wipes its buffer when it returns.
     screen.write(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
     return true;
-  }) as typeof process.stderr.write;
+  };
   console.error = (...parts: unknown[]) => {
     screen.write(`${format(...parts)}\n`);
   };
@@ -168,7 +171,7 @@ export function stopWatching(): void {
   console.error = originalError;
 }
 
-/** A line of the record of answers as writeAnswer writes it, without colours. */
+/** A line of the record of answers as AnswerRecord.write writes it, without colours. */
 export function answerLine(label: string, answer: string): string {
   return `  ${label.padEnd(11)} ${answer}\n`;
 }
@@ -197,10 +200,11 @@ export function keyedQuestions(): void {
     terminal.onFirstKey = () => undefined;
     terminal.exit = async () => 130;
     terminal.selfTestFails = false;
+    terminal.protectionFails = false;
     terminal.atTerminal = false;
     terminal.events = [];
     // Each test's record of answers starts on its own screen.
-    startRecord();
+    AnswerRecord.start();
   });
   afterEach(() => {
     stopWatching();

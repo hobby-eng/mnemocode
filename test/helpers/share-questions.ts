@@ -9,8 +9,16 @@ import { sskrVectors } from "./vectors.js";
 
 const vectors = sskrVectors();
 
+/** The shares of `set` as the three of a 2-of-3 set; any other count fails. */
+function threeShares(set: readonly string[]): [string, string, string] {
+  const [first, second, third, ...more] = set;
+  if (first === undefined || second === undefined || third === undefined || more.length > 0)
+    throw new Error(`The vector has ${set.length} shares, not the 3 of a 2-of-3 set.`);
+  return [first, second, third];
+}
+
 /** A 2-of-3 set of a 12-word phrase. */
-export const SHARES = vectors.deterministic[0]!.shares as [string, string, string];
+export const SHARES = threeShares(vectors.deterministic[0]!.shares);
 
 /** The phrase that SHARES restore. */
 export const PHRASE = entropyToMnemonic(

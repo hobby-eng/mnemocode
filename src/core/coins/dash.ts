@@ -10,15 +10,7 @@ import { HASH160_BYTES, type AddressType } from "./address-types.js";
 import { Base58Coin } from "./base58.js";
 import { BECH32_GROUP_BITS, bech32Groups, decodeBech32, Bech32Prefixes } from "./bech32.js";
 import { BITS_PER_BYTE } from "../bits.js";
-import {
-  asciiLowercase,
-  invalidAddress,
-  startsWithAny,
-  WRONG_LENGTH,
-  type AddressLocation,
-  type CoinAddress,
-  unreadableAddress,
-} from "./coin.js";
+import { asciiLowercase, startsWithAny, type AddressLocation, type CoinAddress } from "./coin.js";
 import { defined } from "../defined.js";
 
 /** DIP18's human-readable parts on the main and the test network. */
@@ -68,15 +60,15 @@ class DashCoin extends Base58Coin {
 
   #readPlatform(text: string): CoinAddress {
     const decoded = decodeBech32(text, bech32m);
-    if (!decoded) throw unreadableAddress();
+    if (!decoded) throw this.damaged();
     const testnet = PLATFORM.testnetOf(decoded.prefix);
     if (testnet === undefined) throw this.notOurs();
     const [type, ...hash] = bytesOf(decoded.words);
     if (type === PLATFORM_P2PKH) {
-      if (hash.length !== HASH160_BYTES) throw invalidAddress(WRONG_LENGTH);
+      if (hash.length !== HASH160_BYTES) throw this.wrongLength();
       const last = defined(decoded.words[decoded.words.length - 1]);
       if (decoded.words.length !== PAYMENT_GROUPS || (last & PADDING_MASK) !== 0)
-        throw unreadableAddress();
+        throw this.damaged();
       return this.address("dash-platform", Uint8Array.from(hash), asciiLowercase(text), testnet);
     }
     if (type === PLATFORM_ORCHARD) throw this.shielded("a Dash Core X… or Platform dash1k…");

@@ -8,15 +8,7 @@
 import { base58, type BytesCoder } from "@scure/base";
 import { HASH160_BYTES, type AddressType } from "./address-types.js";
 import { checkedData } from "./base58-check.js";
-import {
-  Coin,
-  invalidAddress,
-  WRONG_LENGTH,
-  type CoinAddress,
-  type CoinDescription,
-  type CoinRules,
-  unreadableAddress,
-} from "./coin.js";
+import { Coin, type CoinAddress, type CoinDescription, type CoinRules } from "./coin.js";
 import { equalBytes } from "../bits.js";
 
 /** One version prefix of a coin's addresses, and what it names. */
@@ -63,14 +55,14 @@ export class Base58Coin extends Coin {
   /** `text` as a Base58Check address of one of the coin's versions. */
   protected readBase58(text: string): CoinAddress {
     const data = checkedData(text, this.#alphabet);
-    if (data === undefined) throw unreadableAddress();
+    if (data === undefined) throw this.damaged();
     const version = this.#versions.find(({ prefix }) =>
       equalBytes(data.subarray(0, prefix.length), prefix),
     );
     if (version === undefined) throw this.notOurs();
     const hash = data.subarray(version.prefix.length);
     // Every Base58Check address commits to 20 bytes: a HASH160, or Tron's Keccak account.
-    if (hash.length !== HASH160_BYTES) throw invalidAddress(WRONG_LENGTH);
+    if (hash.length !== HASH160_BYTES) throw this.wrongLength();
     // Base58 writes given bytes in one way only, so the address as typed is its standard form.
     return this.address(version.type, hash, text, version.testnet);
   }

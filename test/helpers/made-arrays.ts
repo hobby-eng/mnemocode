@@ -17,12 +17,14 @@ export function madeArrays(read: () => unknown): MadeArrays {
       arrays.push(this);
     }
   }
-  globalThis.Uint8Array = Captured as typeof Uint8Array;
+  // Set by Reflect: the subclass takes the same arguments, but its constructor has one signature
+  // where Uint8ArrayConstructor declares one for each form of them.
+  Reflect.set(globalThis, "Uint8Array", Captured);
   try {
     read();
     return { arrays };
   } catch (error) {
-    return { arrays, refusal: (error as Error).message };
+    return { arrays, refusal: error instanceof Error ? error.message : String(error) };
   } finally {
     globalThis.Uint8Array = Original;
   }

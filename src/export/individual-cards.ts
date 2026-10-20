@@ -23,7 +23,19 @@ export function claimCardFolder(directory: string): Promise<NewFolder> {
   return NewFolder.claim(directory, CARD_FOLDER_TAKEN);
 }
 
-/** Stages every file before publishing the folder. No manifest contains the full payload. */
+/**
+ * Saves each card of `content`, drawn with `template`, as its own file or files in the new folder
+ * `directory`, in `format`: the PDF of the card, or the image of each of its pages. Returns how
+ * many files it wrote. Every card is drawn before anything is written, and every file is staged
+ * before the folder is published under its name (NewFolder.publish); no manifest contains the full
+ * payload, and the bytes of the cards are wiped once written, also after a failure. Refuses,
+ * before any file is touched, what assertIndividualCards refuses, a card name that
+ * privateChildPath refuses (export.file-name.invalid-component), and a folder that exists already
+ * (CARD_FOLDER_TAKEN, export.private-file.absent-path-refused) or is blank
+ * (export.private-file.new-folder-path-empty-one-refused), as claimCardFolder refuses it. Then
+ * what renderIndividualCards and writeRenderedDocument refuse passes on, and so do the other
+ * failures of NewFolder.publish.
+ */
 export async function exportIndividualCards(
   template: CardTemplate,
   content: CardContent,

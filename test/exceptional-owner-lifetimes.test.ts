@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ShareRestore } from "../src/sskr/share-restore.js";
 import { ShareInput } from "../src/sskr/share-input.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { TypedAnswer } from "../src/cli/typed-answer.js";
 import { WordList } from "../src/core/word-hints.js";
 
@@ -11,7 +11,7 @@ describe("Exceptional secret-owner cleanup", () => {
     "ends the real marked plan when host limits refuse: %s",
     async (refuses) => {
       using input = new ShareInput({ decodeEntry: "The public fixture decoder" });
-      input.add([sskrSetVector.colors[0]!.replace("#37B8CA", "?"), sskrSetVector.colors[1]!]);
+      input.add([SSKR_SET_VECTOR.colors[0]!.replace("#37B8CA", "?"), SSKR_SET_VECTOR.colors[1]!]);
       const entered = input.texts();
       const restore = new ShareRestore(nodeSharePlatform);
       // Observation only: the original public read operation and its real plan run unchanged.
@@ -35,7 +35,7 @@ describe("Exceptional secret-owner cleanup", () => {
         else
           await expect(pending).resolves.toMatchObject({
             kind: "phrases",
-            phrases: [{ mnemonic: sskrSetVector.phrase }],
+            phrases: [{ mnemonic: SSKR_SET_VECTOR.phrase }],
           });
         expect(input.texts()).toEqual(entered);
         expect(reads).toBeGreaterThan(0);
@@ -57,7 +57,7 @@ describe("Exceptional secret-owner cleanup", () => {
             restore.restore({ input, mode: "direct", confirmed: true }),
           ).resolves.toMatchObject({
             kind: "phrases",
-            phrases: [{ mnemonic: sskrSetVector.phrase }],
+            phrases: [{ mnemonic: SSKR_SET_VECTOR.phrase }],
           });
           expect(input.texts()).toEqual(entered);
           const observedRetry = read.mock.results[1];

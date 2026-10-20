@@ -1,22 +1,14 @@
 // Questions at the terminal: a list chosen with the arrow keys or a number, a typed answer and a
 // pause for Enter, drawn on standard error in the style of `mhfe`'s menu (src/bin/mhfe/menu.rs).
 // They need a terminal on standard input and standard error (terminalAvailable). An answered
-// question leaves one line in a record of answers, which eraseAnswersSince takes away again when
-// the person goes back, or draws the screen anew when the terminal has scrolled part of it out of
-// reach. A typed answer that cannot be used is explained in one warning line and asked for again
-// (askLine); only Escape goes back.
+// question leaves one line in a record of answers (AnswerRecord), which AnswerRecord.eraseSince
+// takes away again when the person goes back, or draws the screen anew when the terminal has
+// scrolled part of it out of reach. A typed answer that cannot be used is explained in one warning
+// line and asked for again (askLine); only Escape goes back.
 
-import {
-  refusedLine,
-  dropTypedAhead,
-  readKey,
-  readLine,
-  withRawTerminal,
-  refusal,
-  ESCAPE_ALIASES,
-  NOT_UTF8,
-} from "./terminal-input.js";
-import { CANCELLED, type Cancelled, type NextByte } from "./terminal-keys.js";
+import { ESCAPE_ALIASES, readLine, refusal, TerminalKeys } from "./terminal-input.js";
+import { CANCELLED, KEY, type Cancelled, type NextByte } from "./terminal-keys.js";
+import { NOT_UTF8 } from "./typed-answer.js";
 import {
   answerEndRow,
   displayWidth,
@@ -33,16 +25,21 @@ import {
   cursorUp,
   ERASE_BELOW,
 } from "./terminal.js";
-import { factLine, STYLE_CODES } from "./terminal-style.js";
-import { isContinuation, validCharacters } from "./utf8.js";
+import { besideMark, factLine, STYLE_CODES } from "./terminal-style.js";
+import { isContinuation, ValidCharacters } from "./utf8.js";
 import type { WordHints } from "../core/word-hints.js";
 import { listInWords } from "../core/places.js";
 import { defined } from "../core/defined.js";
 import { PrivateSteps } from "./private-steps.js";
 import { PrivatePage } from "./private-page.js";
+import { isControl } from "./screen-rows.js";
 
 /** Marker, number and the gaps before a label: "› 1  ". */
 const LABEL_INDENT = 5;
+/** The spaces between a label, padded to the longest one, and its grey note. */
+const NOTE_GAP = "  ";
+/** The entries that the digit of their place chooses: 1 to 9, the digit keys after 0. */
+const DIGIT_PLACES = KEY.DIGIT_9 - KEY.DIGIT_0;
 
 export interface Choice<T> {
   readonly label: string;
@@ -86,7 +83,22 @@ export function listQuestionRows<T>(
   choices: readonly Choice<T>[],
   quit = "goes back",
 ): number {
-  return rowsOf(["", question, ...listLines(choices, 0), "", keyHint(choices, quit), ""]);
+  return rowsOf([
+    "",
+    shownQuestion(question),
+    ...listLines(choices, 0),
+    "",
+    keyHint(choices, quit),
+    "",
+  ]);
+}
+
+/**
+ * A question as choose draws it: in bold, wrapped to TEXT_WIDTH (CORE-36), such as a question that
+ * names two modes, its lines joined by line breaks. A question that fits stays as it is.
+ */
+function shownQuestion(question: string): string {
+  return besideMark("", 0, question, (line) => paint(STYLE.strong, line)).join("\n");
 }
 
 /**
@@ -95,7 +107,7 @@ export function listQuestionRows<T>(
  */
 export function notesRoom<T>(choices: readonly Choice<T>[]): number {
   const labelWidth = Math.max(...choices.map((choice) => Array.from(choice.label).length));
-  return TEXT_WIDTH - LABEL_INDENT - labelWidth - 2;
+  return TEXT_WIDTH - LABEL_INDENT - labelWidth - NOTE_GAP.length;
 }
 
 /** `text` cut to `room` characters with "…" at the end, so that it cannot wrap the line. */
@@ -107,7 +119,7 @@ export function shortened(text: string, room: number): string {
 
 function digitOf<T>(choice: Choice<T>, index: number): number | undefined {
   if (choice.digit === null) return undefined;
-  return choice.digit ?? (index < 9 ? index + 1 : undefined);
+  return choice.digit ?? (index < DIGIT_PLACES ? index + 1 : undefined);
 }
 
 /** The lines of a list, without colours when the terminal has none; the chosen entry has a cyan
@@ -128,11 +140,11 @@ export function listLines<T>(choices: readonly Choice<T>[], selected: number): s
       // Padded by hand: the width of a painted label would count its colour codes.
       const padding = " ".repeat(labelWidth - Array.from(choice.label).length);
       lines.push(
-        `${marker} ${number}  ${label}${padding}  ${paint(STYLE.muted, shortened(choice.note, noteRoom))}`,
+        `${marker} ${number}  ${label}${padding}${NOTE_GAP}${paint(STYLE.muted, shortened(choice.note, noteRoom))}`,
       );
     }
     if (choice.example !== undefined) {
-      const indent = " ".repeat(LABEL_INDENT + labelWidth + 2);
+      const indent = " ".repeat(LABEL_INDENT + labelWidth + NOTE_GAP.length);
       lines.push(`${indent}${paint(STYLE.muted, shortened(choice.example, noteRoom))}`);
     }
   });
@@ -172,17 +184,24 @@ const TEXT_INDENT = "  ";
 const LINK_INDENT = "    ";
 
 /**
- * Text shown between a question and its entries: short `lines` in the normal colour, each at most
- * TEXT_WIDTH minus its indent, and links to read `more`, grey under "More:".
+ * Text shown between a question and its entries: short `lines` in the normal colour, and links to
+ * read `more`, grey under "More:".
  */
 export interface Explanation {
   readonly lines: readonly string[];
   readonly more?: readonly string[] | undefined;
 }
 
+/**
+ * The lines of `explanation` as a question shows them: each line indented and wrapped beside its
+ * indent to TEXT_WIDTH (CORE-36), a line that fits as it is, then the links under "More:" and a
+ * blank line; none without an explanation.
+ */
 export function explanationLines(explanation: Explanation | undefined): string[] {
   if (explanation === undefined) return [];
-  const lines = explanation.lines.map((line) => (line === "" ? "" : `${TEXT_INDENT}${line}`));
+  const lines = explanation.lines.flatMap((line) =>
+    line === "" ? [""] : besideMark(TEXT_INDENT, TEXT_INDENT.length, line),
+  );
   if (explanation.more !== undefined)
     lines.push(
       "",
@@ -198,14 +217,6 @@ interface AnswerLine {
   readonly answer: string;
 }
 
-/**
- * The lines of the record of answers that choose and askLine wrote since startRecord, in order,
- * so that eraseAnswersSince can count their rows at the width the terminal has then, as a list is
- * counted anew at each redraw, and draw them again. A question erases itself once it is answered
- * or left, so only these lines stay on the screen between the questions of the menu.
- */
-const answerLines: AnswerLine[] = [];
-
 /** A line of the record as it shows: a grey label and the answer in cyan, indented as the facts of
  * a result (terminalResultHeader) and the summary lines of `mhfe`. */
 function shownAnswer(line: AnswerLine): string {
@@ -218,70 +229,95 @@ function recordRows(lines: readonly AnswerLine[]): number {
 }
 
 /**
- * How far down the record of answers and the questions below it have reached since the record
- * started: the most rows from its first row down to the cursor's, which is counted too. Where
- * that is more than the terminal has, the terminal scrolled, and the rows that went over its top
- * edge are in its scrollback, out of reach of any cursor move.
+ * The record of answers: one line for each question that choose and askLine asked since it
+ * started, the question's label and the answer given, so that the questions asked so far read as
+ * a short summary. A question erases itself once it is answered or left, so only these lines stay
+ * on the screen between the questions of the menu. The lines are kept in order, so that
+ * eraseSince can count their rows at the width the terminal has then, as a list is counted anew
+ * at each redraw, and draw them again. One record for the process, whose questions are asked one
+ * at a time.
  */
-let reached = 1;
+export class AnswerRecord {
+  static readonly #lines: AnswerLine[] = [];
 
-/** Notes that the screen shows `below` rows under the record of answers, the cursor's included. */
-function reach(below: number): void {
-  reached = Math.max(reached, recordRows(answerLines) + below);
-}
+  /**
+   * How far down the record and the questions below it have reached since the record started:
+   * the most rows from its first row down to the cursor's, which is counted too. Where that is
+   * more than the terminal has, the terminal scrolled, and the rows that went over its top edge
+   * are in its scrollback, out of reach of any cursor move.
+   */
+  static #reached = 1;
 
-/** Draws again what stands above the record of answers when the screen is drawn anew. */
-let drawHeading: () => void = () => undefined;
+  /** Draws again what stands above the record when the screen is drawn anew. */
+  static #drawHeading: () => void = () => undefined;
 
-/**
- * Starts the record of answers on the row of the cursor, below what the screen shows already, such
- * as the heading of the menu or the output of a command. `heading` writes that heading again, for
- * when the screen must be drawn anew (eraseAnswersSince); it stays for the records after this one.
- */
-export function startRecord(heading?: () => void): void {
-  answerLines.length = 0;
-  reached = 1;
-  if (heading !== undefined) drawHeading = heading;
-}
-
-/** Writes one line of the record of answers. */
-function writeAnswer(label: string, answer: string): void {
-  const line = { label, answer };
-  process.stderr.write(`${shownAnswer(line)}\n`);
-  answerLines.push(line);
-  reach(1);
-}
-
-/** A place in the record of answers, for eraseAnswersSince: the lines written before it. */
-export function answerMark(): number {
-  return answerLines.length;
-}
-
-/**
- * Erases the lines of the record of answers written since `mark`, so that the screen shows the
- * record as it was there and the next line goes where the first of them was. Nothing but answers
- * and questions may have been written since `mark`: any other line would not be counted.
- *
- * The record may have started on the terminal's last row, so the first line to erase is still on
- * the screen only when no more rows than the terminal has were drawn from it down. Otherwise the
- * screen is cleared and drawn again from its top: the heading and the lines of the record that
- * stay. What scrolled away stays in the scrollback, where no program can take it back.
- */
-export function eraseAnswersSince(mark: number): void {
-  const kept = answerLines.slice(0, mark);
-  const erased = answerLines.splice(mark);
-  if (recordRows(kept) >= reached - terminalRows()) {
-    redrawFrom(recordRows(erased));
-    return;
+  /**
+   * Starts the record on the row of the cursor, below what the screen shows already, such as the
+   * heading of the menu or the output of a command. `heading` writes that heading again, for when
+   * the screen must be drawn anew (eraseSince); it stays for the records after this one.
+   */
+  static start(heading?: () => void): void {
+    AnswerRecord.#lines.length = 0;
+    AnswerRecord.#reached = 1;
+    if (heading !== undefined) AnswerRecord.#drawHeading = heading;
   }
-  process.stderr.write(CLEAR_SCREEN);
-  drawHeading();
-  for (const line of kept) process.stderr.write(`${shownAnswer(line)}\n`);
-  // Counted from the record's own row again, as if it had started on the last row.
-  reached = recordRows(kept) + 1;
+
+  /** A place in the record, for eraseSince: the lines written before it. */
+  static mark(): number {
+    return AnswerRecord.#lines.length;
+  }
+
+  /**
+   * Writes one line of the record: the `label` of a question that choose or askLine asked, and
+   * the `answer` given.
+   */
+  static write(label: string, answer: string): void {
+    const line = { label, answer };
+    process.stderr.write(`${shownAnswer(line)}\n`);
+    AnswerRecord.#lines.push(line);
+    AnswerRecord.reach(1);
+  }
+
+  /**
+   * Notes that the screen shows `below` rows under the record, the cursor's included, as choose
+   * and askLine draw a question there.
+   */
+  static reach(below: number): void {
+    AnswerRecord.#reached = Math.max(
+      AnswerRecord.#reached,
+      recordRows(AnswerRecord.#lines) + below,
+    );
+  }
+
+  /**
+   * Erases the lines of the record written since `mark`, so that the screen shows the record as
+   * it was there and the next line goes where the first of them was. Nothing but answers and
+   * questions may have been written since `mark`: any other line would not be counted.
+   *
+   * The record may have started on the terminal's last row, so the first line to erase is still on
+   * the screen only when no more rows than the terminal has were drawn from it down. Otherwise the
+   * screen is cleared and drawn again from its top: the heading and the lines of the record that
+   * stay. What scrolled away stays in the scrollback, where no program can take it back.
+   */
+  static eraseSince(mark: number): void {
+    const kept = AnswerRecord.#lines.slice(0, mark);
+    const erased = AnswerRecord.#lines.splice(mark);
+    if (recordRows(kept) >= AnswerRecord.#reached - terminalRows()) {
+      redrawFrom(recordRows(erased));
+      return;
+    }
+    process.stderr.write(CLEAR_SCREEN);
+    AnswerRecord.#drawHeading();
+    for (const line of kept) process.stderr.write(`${shownAnswer(line)}\n`);
+    // Counted from the record's own row again, as if it had started on the last row.
+    AnswerRecord.#reached = recordRows(kept) + 1;
+  }
 }
 
-/** The rows of the blank line and the question that start every question, erased with its list. */
+/**
+ * The rows of the blank line and the question that start every question, erased with its list;
+ * `question` as it is drawn (shownQuestion).
+ */
 function questionRows(question: string): number {
   return 1 + rowsOf([question]);
 }
@@ -307,10 +343,11 @@ export interface ChooseOptions {
 /**
  * Asks `question` and lets the person choose an entry with the arrow keys and Enter, or at once
  * with its digit. Returns the value of the entry, undefined for Escape, which `quit` describes
- * ("goes back", "quits"), or CANCELLED for Ctrl+C, also when it was typed ahead. The question stands apart, after a blank line, with a `warning` above it,
- * such as why it is asked again, and its `explanation` below; once it is answered, the question and
- * its list are replaced by one line of the record of answers, its `label` and the chosen entry, so
- * that the questions asked so far read as a short summary.
+ * ("goes back", "quits"), or CANCELLED for Ctrl+C, also when it was typed ahead. The question
+ * stands apart, after a blank line, wrapped to TEXT_WIDTH, with a `warning` above it, such as why
+ * it is asked again, and its `explanation` below; once it is answered, the question and its list
+ * are replaced by one line of the record of answers, its `label` and the chosen entry, so that
+ * the questions asked so far read as a short summary.
  */
 export async function choose<T>(
   question: string,
@@ -319,15 +356,16 @@ export async function choose<T>(
 ): Promise<T | undefined | Cancelled> {
   // Keys pressed before the question showed, such as the rest of a paste, are dropped and wiped:
   // only keys pressed for it answer it.
-  if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
+  if ((await TerminalKeys.dropTypedAhead()) === CANCELLED) return CANCELLED;
   let selected = options.initial ?? 0;
   const hint = paint(STYLE.muted, keyHint(choices, options.quit ?? "goes back"));
   const explanation = explanationLines(options.explanation);
   const warning = warningLines(options.warning);
+  const asked = shownQuestion(question);
   const rows = rowsOf([
     "",
     ...warning,
-    question,
+    asked,
     ...explanation,
     ...listLines(choices, 0),
     "",
@@ -336,28 +374,28 @@ export async function choose<T>(
   ]);
   if ((await PrivatePage.beforeQuestion(rows)) === CANCELLED) return CANCELLED;
   PrivateSteps.begin();
-  return withRawTerminal(async (next, moreWithin) => {
+  return TerminalKeys.withRawMode(async (next, moreWithin) => {
     const above = warning.map((line) => `${line}\n`).join("");
-    process.stderr.write(`\n${above}${paint(STYLE.strong, question)}\n`);
+    process.stderr.write(`\n${above}${asked}\n`);
     const draw = (): string[] => {
       const lines = [...explanation, ...listLines(choices, selected), "", hint];
       process.stderr.write(`${lines.join("\n")}\n`);
       // Down to the row under the hint, where the cursor waits.
-      reach(rowsOf(warning) + questionRows(question) + rowsOf(lines) + 1);
+      AnswerRecord.reach(rowsOf(warning) + questionRows(asked) + rowsOf(lines) + 1);
       return lines;
     };
     // Everything from the blank line that starts the question down to the cursor.
-    const erase = (): void => redrawFrom(rowsOf(drawn) + rowsOf(warning) + questionRows(question));
+    const erase = (): void => redrawFrom(rowsOf(drawn) + rowsOf(warning) + questionRows(asked));
     const answer = (index: number): T => {
       erase();
-      writeAnswer(options.label, defined(choices[index]).label);
+      AnswerRecord.write(options.label, defined(choices[index]).label);
       // The lines kept for this question on the private screen go with its answer.
       PrivateSteps.questionEnded();
       return defined(choices[index]).value;
     };
     let drawn = draw();
     for (;;) {
-      const key = await readKey(next, moreWithin);
+      const key = await TerminalKeys.readKey(next, moreWithin);
       if (key.kind === "cancel") return CANCELLED;
       if (key.kind === "back") {
         erase();
@@ -455,18 +493,19 @@ type LineOutcome =
 
 /** The bytes that start a character on the screen: not a control byte, not a UTF-8 continuation. */
 function startsCharacter(byte: number): boolean {
-  return byte >= 0x20 && byte !== 0x7f && !isContinuation(byte);
+  return !isControl(byte) && !isContinuation(byte);
 }
 
 /**
  * Asks for a visible answer, such as a file name, until it can be used (the menu's questions; a
  * command's ask through ask.ts, whose question stays on the screen): Enter alone takes the
  * `fallback`, or leaves out an `optional` answer (""), and asks again with a hint where there is
- * neither; an answer that is not UTF-8 (validCharacters) or that readLine refuses as too long, or
+ * neither; an answer that is not UTF-8 (ValidCharacters) or that readLine refuses as too long, or
  * that `check` refuses, is explained in one warning line above the same question. Returns
- * undefined at Escape or when the input ends (Ctrl+D), which goes back, and CANCELLED at Ctrl+C. Only keys pressed after the
- * question shows answer it (dropTypedAhead). As with choose, the question goes once it is answered
- * or left, and the answer becomes a line of the record of answers under `label`.
+ * undefined at Escape or when the input ends (Ctrl+D), which goes back, and CANCELLED at Ctrl+C.
+ * Only keys pressed after the question shows answer it (TerminalKeys.dropTypedAhead). As with
+ * choose, the question goes once it is answered or left, and the answer becomes a line of the
+ * record of answers under `label`.
  */
 export async function askLine(
   question: string,
@@ -502,18 +541,18 @@ async function askLineOnce(
   if ((await PrivatePage.beforeQuestion(rowsOf(["", ...warned, shown]))) === CANCELLED)
     return { kind: "cancelled" };
   PrivateSteps.begin();
-  return withRawTerminal(async (next, moreWithin) => {
-    if ((await dropTypedAhead()) === CANCELLED) return { kind: "cancelled" };
+  return TerminalKeys.withRawMode(async (next, moreWithin) => {
+    if ((await TerminalKeys.dropTypedAhead()) === CANCELLED) return { kind: "cancelled" };
     process.stderr.write(`\n${warned.map((line) => `${line}\n`).join("")}`);
     writePrompt(shown);
     // The row of the cursor below the first row of the prompt: after the prompt, where Ctrl+D
     // leaves it, until the answer says otherwise.
     let endRow = answerEndRow(promptWidth, "");
     // Down to the cursor's row, and up from it to the blank line that starts the question.
-    const reachDown = (): void => reach(1 + rowsOf(warned) + endRow + 1);
+    const reachDown = (): void => AnswerRecord.reach(1 + rowsOf(warned) + endRow + 1);
     const erase = (): void => redrawFrom(1 + rowsOf(warned) + endRow);
     reachDown();
-    const reader = validCharacters(next);
+    const reader = new ValidCharacters(next);
     // Counted for an answer longer than readLine takes, refused halfway: its rows can then only be
     // estimated. No person types that much, so it was pasted, without corrections.
     let characters = 0;
@@ -535,7 +574,7 @@ async function askLineOnce(
         ...(options.hints === undefined ? {} : { hints: options.hints }),
       });
     } catch (error) {
-      const reason = await refusedLine(error, next, moreWithin);
+      const reason = await TerminalKeys.refusedLine(error, next, moreWithin);
       if (reason === CANCELLED) return { kind: "cancelled" };
       endRow = Math.floor((promptWidth + characters) / terminalColumns());
       reachDown();
@@ -560,20 +599,23 @@ async function settledAnswer(
 ): Promise<LineOutcome> {
   const entered = enteredAnswer(typed, { ...options, leave: "back" });
   if (entered.kind === "left-out") {
-    writeAnswer(label, defined(options.optional));
+    AnswerRecord.write(label, defined(options.optional));
     return { kind: "answer", answer: "" };
   }
   if (entered.kind === "refused") return entered;
   try {
     const accepted = options.check === undefined ? entered.text : await options.check(entered.text);
-    writeAnswer(label, accepted);
+    AnswerRecord.write(label, accepted);
     return { kind: "answer", answer: accepted };
   } catch (error) {
     return { kind: "refused", reason: refusal(error) };
   }
 }
 
-/** `next` for one key that readKey reads, with ESCAPE_ALIASES left out where the key starts. */
+/**
+ * `next` for one key that TerminalKeys.readKey reads, with ESCAPE_ALIASES left out where the key
+ * starts.
+ */
 function withoutEscapeAliases(next: NextByte): NextByte {
   let started = false;
   return async () => {
@@ -600,9 +642,9 @@ export interface EnterOptions {
 
 /**
  * Waits for Enter after `message`: "enter", "escape" when the person presses Escape instead, or
- * CANCELLED at Ctrl+C. Only keys pressed after the message shows count (dropTypedAhead): a second
- * Enter, pressed while a result was being worked out, would otherwise clear the screen with the
- * result before it was read.
+ * CANCELLED at Ctrl+C. Only keys pressed after the message shows count
+ * (TerminalKeys.dropTypedAhead): a second Enter, pressed while a result was being worked out,
+ * would otherwise clear the screen with the result before it was read.
  */
 export async function waitForEnter(
   message: string,
@@ -610,12 +652,12 @@ export async function waitForEnter(
 ): Promise<"enter" | "escape" | Cancelled> {
   // The prompt stays under what the screen shows: a page that would scroll away is read first.
   if ((await PrivatePage.keepReadable(rowsOf([message]))) === CANCELLED) return CANCELLED;
-  return withRawTerminal(async (next, moreWithin) => {
-    if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
+  return TerminalKeys.withRawMode(async (next, moreWithin) => {
+    if ((await TerminalKeys.dropTypedAhead()) === CANCELLED) return CANCELLED;
     writePrompt(message);
     for (;;) {
       const keyBytes = options.onlyEscapeLeaves === true ? withoutEscapeAliases(next) : next;
-      const key = await readKey(keyBytes, moreWithin);
+      const key = await TerminalKeys.readKey(keyBytes, moreWithin);
       if (key.kind === "cancel") {
         process.stderr.write("\n");
         return CANCELLED;

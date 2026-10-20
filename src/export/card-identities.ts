@@ -12,7 +12,7 @@ const COMPANY_SECTORS = ["it", "architecture", "property", "consulting"] as cons
 export type CompanySector = (typeof COMPANY_SECTORS)[number];
 
 /** Employer names are separate from the print studios used on collection sheets. */
-export const employers: Record<CompanySector, readonly string[]> = {
+export const EMPLOYERS: Record<CompanySector, readonly string[]> = {
   it: [
     "Norvale Systems",
     "Elmbridge Digital",
@@ -44,7 +44,7 @@ export const employers: Record<CompanySector, readonly string[]> = {
 };
 
 /** The roles that an employer of any sector may give the person on the cards. */
-export const commonRoles = [
+export const COMMON_ROLES = [
   "Sales Manager",
   "Sales Consultant",
   "Account Manager",
@@ -58,7 +58,7 @@ export const commonRoles = [
 ] as const;
 
 /** The roles that only an employer of each sector gives. */
-export const sectorRoles: Record<CompanySector, readonly string[]> = {
+export const SECTOR_ROLES: Record<CompanySector, readonly string[]> = {
   it: [
     "Software Engineer",
     "Solutions Architect",
@@ -73,7 +73,7 @@ export const sectorRoles: Record<CompanySector, readonly string[]> = {
 };
 
 /** Whole names stay together; no random cross-cultural first/surname combinations. */
-export const personNames = [
+export const PERSON_NAMES = [
   "Alex Morgan",
   "James Carter",
   "Daniel Brooks",
@@ -154,13 +154,13 @@ export function sectorForStyle(style: string | undefined): CompanySector | undef
 function knownSector(profile: CardProfile): CompanySector | undefined {
   const company = profile.company?.toLowerCase();
   const byCompany = COMPANY_SECTORS.find((sector) =>
-    employers[sector].some((name) => name.toLowerCase() === company),
+    EMPLOYERS[sector].some((name) => name.toLowerCase() === company),
   );
   if (byCompany) return byCompany;
   const role = profile.role?.toLowerCase();
   if (role === "senior devops" || role === "devops") return "it";
   return COMPANY_SECTORS.find((sector) =>
-    sectorRoles[sector].some((name) => name.toLowerCase() === role),
+    SECTOR_ROLES[sector].some((name) => name.toLowerCase() === role),
   );
 }
 
@@ -208,7 +208,9 @@ const DEFAULT_LOCATION = "International";
 
 /**
  * The person on the cards: `supplied`, with the rest chosen with `choose`, the host's uniform
- * choice. Selection is independent of secret data; explicit values always win.
+ * choice. Selection is independent of secret data; explicit values always win. Refuses what
+ * validateProfile refuses of `supplied`, and a choice of `choose` that is no whole number below
+ * its limit (export.platform.checked-choice-refused).
  */
 export function createCardIdentity(
   choose: UniformChoice,
@@ -217,12 +219,12 @@ export function createCardIdentity(
 ): Required<CardProfile> {
   const profile = validateProfile(supplied);
   const sector = knownSector(profile) ?? sectorHint ?? pickWith(COMPANY_SECTORS, choose);
-  const company = profile.company ?? pickWith(employers[sector], choose);
+  const company = profile.company ?? pickWith(EMPLOYERS[sector], choose);
   const domain = contactDomain(company);
   return {
-    name: profile.name ?? pickWith(personNames, choose),
+    name: profile.name ?? pickWith(PERSON_NAMES, choose),
     company,
-    role: profile.role ?? pickWith([...sectorRoles[sector], ...commonRoles], choose),
+    role: profile.role ?? pickWith([...SECTOR_ROLES[sector], ...COMMON_ROLES], choose),
     email: profile.email ?? `contact@${domain}`,
     website: profile.website ?? domain,
     phone: profile.phone ?? INVENTED_PHONE,

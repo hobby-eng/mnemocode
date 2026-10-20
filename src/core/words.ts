@@ -63,7 +63,9 @@ export { BIP39_DICTIONARY_SIZE, BIP39_INDEX_BITS };
 
 /**
  * The English words of `mnemonic`, in their canonical form; refuses a count of words that BIP39
- * does not have, a word that is not in its list and a failed checksum.
+ * does not have and a word that is not in its list (canonicalEnglishWords:
+ * core.words.enter-english-bip39-words, unknown-english-bip39-word-at-position), and a failed
+ * checksum (words-fail-bip39-checksum-check-each-word-their).
  */
 export function validatedEnglishWords(mnemonic: string): string[] {
   const words = canonicalEnglishWords(mnemonic);
@@ -94,7 +96,8 @@ export function unicodeCodesOfIndexes(indexes: readonly number[]): string[] {
 
 /**
  * The English words of `mnemonic`, lower case and NFKD as BIP39 takes them; refuses a count of
- * words that BIP39 does not have and a word that is not in its list.
+ * words that BIP39 does not have (core.words.enter-english-bip39-words) and a word that is not in
+ * its list, naming its position (unknown-english-bip39-word-at-position).
  */
 export function canonicalEnglishWords(mnemonic: string): string[] {
   const words = englishTokens(mnemonic);
@@ -139,7 +142,12 @@ export function runTogetherNumbers(token: string): boolean {
   );
 }
 
-/** wordIndexOf for a word number of a phrase; throws why it is none, its digits or its range. */
+/**
+ * wordIndexOf for a word number of a phrase; throws why it is none: word numbers run together
+ * (core.words.word-numbers-run-together), other characters than decimal digits
+ * (indexes-decimal-integers-from) or a number outside the word numbers
+ * (indexes-use-seedshift-compatible-numbering-from).
+ */
 export function wordIndexOfNumber(token: string): number {
   if (runTogetherNumbers(token)) throw ERRORS.create("word-numbers-run-together", []);
   if (!DECIMAL_DIGITS.test(token))
@@ -154,7 +162,9 @@ export function wordIndexOfNumber(token: string): number {
 
 /**
  * The word indexes of Unicode codes, four hexadecimal digits each, written apart or joined: the
- * one reader of codes for phrases and shares. A refusal names the place, never the code.
+ * one reader of codes for phrases and shares. A refusal names the place, never the code: of text
+ * that is not whole codes (core.words.unicode-codes-four-hexadecimal-digits-each-separated-by), and
+ * of a code that is no word's (unicode-code-not-bip39-word).
  */
 export function unicodeIndexesOf(text: string): number[] {
   const codes = completeHexUnits(text, UNICODE_CODE_DIGITS);
@@ -172,13 +182,17 @@ export { assertWordCount };
 
 /**
  * The Unicode code of `symbol`, one Unicode scalar value, as four or more hexadecimal digits in
- * capitals.
+ * capitals; refuses other text (WordTable.unicodeHex,
+ * core.words.selected-mapped-bip39-character-not-one-unicode-scalar).
  */
 export function unicodeHex(symbol: string): string {
   return WordTable.unicodeHex(symbol);
 }
 
-/** The row of the word table for word number `index`, from 1 through 2,048. */
+/**
+ * The row of the word table for word number `index`, from 1 through 2,048; refuses another number
+ * (WordTable.row, core.words.wordlist-index-from).
+ */
 export function mappingRow(index: number): MappingRow {
   return WordTable.row(index);
 }
@@ -188,12 +202,18 @@ export function allMappingRows(): MappingRow[] {
   return WordTable.rows();
 }
 
-/** Compatibility lookup; new hosts import WordTable from core/word-table. */
+/**
+ * Compatibility lookup; new hosts import WordTable from core/word-table. Refuses what
+ * WordTable.lookup refuses (core.words.word-table-lookup, word-table-row-refused).
+ */
 export function wordTableRow(lookup: WordTableLookup, text: string): MappingRow {
   return WordTable.lookup(lookup, text);
 }
 
-/** Compatibility text export; new hosts import WordTable from core/word-table. */
+/**
+ * Compatibility text export; new hosts import WordTable from core/word-table. Refuses an unknown
+ * format (WordTable.text, core.words.word-table-format).
+ */
 export function wordTableText(format?: WordTableFormat): string {
   return WordTable.text(format);
 }
@@ -244,7 +264,9 @@ export function validLastWordIndexes(prefix: readonly number[]): number[] {
  * Enumerates checksum-valid replacement containers for an old exact-legacy
  * shifted phrase. The supplied final word may have an invalid BIP39 checksum;
  * it is retained only to identify the one replacement that preserves its
- * entropy-bearing high bits.
+ * entropy-bearing high bits. Refuses a ? among the words
+ * (core.words.mode-exact-old-final-word-stands-no-word) and what canonicalEnglishWords refuses
+ * (enter-english-bip39-words, unknown-english-bip39-word-at-position).
  */
 export function recoverLegacyValidLastWords(value: string): MissingWordCandidate[] {
   // A ? typed out of habit would otherwise be refused as a word that is no BIP39 word.

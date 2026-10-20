@@ -42,7 +42,10 @@ const LATEST_DAY_FORGOTTEN =
   "01-01-2001 01-01-2002 01-01-2003 01-01-2004 01-01-2005 01-01-2006 01-01-2007 0?-12-2030";
 /**
  * The public 24-word phrase masked with MnemoCode Seedshift and those dates, the latest
- * 09-12-2030, as word numbers counted from 1; the search below must give the phrase back.
+ * 09-12-2030, as word numbers counted from 1; the search below must give the phrase back. No
+ * published vector holds them: they were computed independently, by an encoder in Python with only
+ * hashlib and the published BIP39 English list, written from docs/SEEDSHIFT_CONSTRUCTION.md, which
+ * first reproduces the published vector checksum-valid-seedshift-24 (vectors/mnemocode-v1.json).
  */
 const LATEST_DAY_MASKED = [
   2002, 2, 2, 2003, 2, 2, 2004, 2, 2, 2005, 2, 2, 2006, 2, 2, 2007, 2, 2, 2008, 2, 2, 2031, 13, 304,

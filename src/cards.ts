@@ -7,14 +7,14 @@
 export { CardRenderer } from "./export/card-renderer.js";
 export {
   createRasterImage,
-  renderAssets,
+  RENDER_ASSETS,
   type QrModules,
   type RasterImage,
   type RenderAsset,
   type RenderPlatform,
 } from "./export/platform.js";
 export {
-  cardTemplates,
+  CARD_TEMPLATES,
   selectTemplate,
   templatesOfKind,
   type CardDrawing,
@@ -22,7 +22,7 @@ export {
   type CardTemplate,
 } from "./export/templates.js";
 export type { CardContent } from "./export/backup-cards.js";
-export { createCardSession, type CardSession } from "./export/card-session.js";
+export { CardSession, createCardSession } from "./export/card-session.js";
 export {
   DEFAULT_SHARE_TEMPLATE_ID,
   DEFAULT_TEMPLATE_ID,
@@ -47,7 +47,7 @@ export {
   pageSizeLabel,
   parseOrientation,
   parsePageSize,
-  profileFields,
+  PROFILE_FIELDS,
   SHEET_PAGE_SIZE,
   validateProfile,
   type CardOrientation,

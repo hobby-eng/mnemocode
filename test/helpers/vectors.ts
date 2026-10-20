@@ -1,7 +1,9 @@
-// The public test vectors of vectors/, typed as the tests read them. Each call reads the file
-// anew, so that a test may change what it gets. Public test data only.
+// The public test vectors of vectors/, typed as the tests read them. Each call gives a copy of its
+// own, so that a test may change what it gets. Public test data only.
 
-import { readFileSync } from "node:fs";
+import candidatesFile from "../../vectors/candidates-v1.json" with { type: "json" };
+import mnemocodeFile from "../../vectors/mnemocode-v1.json" with { type: "json" };
+import sskrFile from "../../vectors/sskr-v1.json" with { type: "json" };
 
 /** A group of an SSKR split: how many of its shares restore it, of how many. */
 export interface SskrGroup {
@@ -55,8 +57,9 @@ export interface MnemocodeVector {
   unicode: string;
   colors: string;
   colorsUnicode: string;
-  sourceFingerprint: string;
-  encodedFingerprint: string;
+  /** The fingerprints of the phrase and of its encoded form, which only the direct vector has. */
+  sourceFingerprint?: string;
+  encodedFingerprint?: string;
 }
 
 /** vectors/mnemocode-v1.json: the word lists and the vectors of every format. */
@@ -89,28 +92,33 @@ export interface CandidateVectors {
   };
 }
 
-/** The vector file `name` of vectors/. */
-function vectorFile(name: string): unknown {
-  const text = readFileSync(new URL(`../../vectors/${name}`, import.meta.url), "utf8");
-  return JSON.parse(text);
-}
+// The compiler checks each file against its type here: a field that a file lacks, or that has
+// another type, is an error of the tests' type check.
+const SSKR: SskrVectors = sskrFile;
+const MNEMOCODE: MnemocodeVectors = mnemocodeFile;
+const CANDIDATES: CandidateVectors = candidatesFile;
 
 /** vectors/sskr-v1.json. */
 export function sskrVectors(): SskrVectors {
-  // The repository's own file: a field it lacks fails the test that reads it.
-  return vectorFile("sskr-v1.json") as SskrVectors;
+  return structuredClone(SSKR);
 }
 
 /** vectors/mnemocode-v1.json. */
 export function mnemocodeVectors(): MnemocodeVectors {
-  // The repository's own file: a field it lacks fails the test that reads it.
-  return vectorFile("mnemocode-v1.json") as MnemocodeVectors;
+  return structuredClone(MNEMOCODE);
 }
 
 /** vectors/candidates-v1.json. */
 export function candidateVectors(): CandidateVectors {
-  // The repository's own file: a field it lacks fails the test that reads it.
-  return vectorFile("candidates-v1.json") as CandidateVectors;
+  return structuredClone(CANDIDATES);
+}
+
+/**
+ * The bytes that `hex`, the hexadecimal text of a vector, stands for, decoded by Node.js apart
+ * from the program's own decoder.
+ */
+export function hexBytes(hex: string): Uint8Array {
+  return Uint8Array.from(Buffer.from(hex, "hex"));
 }
 
 /** The first share of the first deterministic split: a public share for a test that needs one. */

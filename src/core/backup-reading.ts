@@ -40,7 +40,10 @@ const ERRORS = new ErrorCatalog("core.backup-reading", {
     "Date recovery is available only for records created with Seedshift.",
   "shamir-share-not-encoded-seed-phrase-reads": (value0: string) =>
     `This is a Shamir share, not an encoded seed phrase: ${value0} reads it.`,
-  "formats-refused": suppliedMessage,
+  // Codes that the form their characters most likely are reads, yet fit no form as a whole.
+  "codes-fit-no-form": () => `${FIT_NO_FORM}.`,
+  // Marked codes that fit no form, with JOINED_MARKS_HINT where they are run together.
+  "marked-codes-fit-no-form": suppliedMessage,
 });
 
 /** What a host reads a backup for. */
@@ -100,8 +103,11 @@ export class BackupReading extends Redacted implements Disposable {
 
   /**
    * Reads the record header of `text`, if it has one, and refuses at once what no answer to a
-   * later question can mend: a header that cannot be read, a record without Seedshift where only
-   * Seedshift will do, and a Shamir share where an encoded seed phrase was asked for.
+   * later question can mend: a header that cannot be read (parseRecord: record.malformed-header and
+   * the others it names), a record without Seedshift where only Seedshift will do
+   * (core.backup-reading.date-recovery-available-only-records-created-seedshift), and a Shamir
+   * share where an encoded seed phrase was asked for (shamir-share-not-encoded-seed-phrase-reads);
+   * and rules whose `words` no phrase has (core.bip39-sizes.expected-word-indexes).
    */
   static of(text: string, rules: ReadingRules): BackupReading {
     if (rules.words !== undefined) assertWordCount(rules.words);
@@ -212,28 +218,36 @@ export class BackupReading extends Redacted implements Disposable {
 
   /**
    * The forms that the codes may be in: the record's, or `given`, or every form that they fit,
-   * of which the host asks for one when there are several. Throws why the codes fit no form, as
-   * the form that their characters most likely are names it.
+   * of which the host asks for one when there are several. Codes that fit no form are refused as
+   * the form that their characters most likely are (EncodedForm.likely) refuses them, with that
+   * refusal's own code (EncodedBackup.read, such as core.encoded-backup.encoded-seed-phrase for
+   * their count, or a code of core.words), naming places or the count only; codes that this form
+   * reads, but that fit no form as a whole, are refused as such
+   * (core.backup-reading.codes-fit-no-form).
    */
   formats(given?: EncodedFormat): EncodedFormat[] {
-    return this.#formatsOf(given, detectInputFormats, () =>
-      EncodedBackup.whyUnreadable(this.#likelyPayload),
-    );
+    return this.#formatsOf(given, detectInputFormats, () => {
+      const likely = this.#likelyPayload;
+      // Throws the reason of that form, which the person reads, by its own code.
+      EncodedBackup.read(likely, EncodedForm.likely(likely), "direct").wipe();
+      return ERRORS.create("codes-fit-no-form", []);
+    });
   }
 
   /**
-   * The named form (#namedFormat), or every form that `detect` finds the codes to fit; throws
-   * `none()` when they fit none. Complete and marked codes differ only in these two.
+   * The named form (#namedFormat), or every form that `detect` finds the codes to fit; when they
+   * fit none, the refusal that `none` throws or gives is thrown. Complete and marked codes differ
+   * only in these two.
    */
   #formatsOf(
     given: EncodedFormat | undefined,
     detect: (payload: string) => EncodedFormat[],
-    none: () => string,
+    none: () => Error,
   ): EncodedFormat[] {
     const named = this.#namedFormat(given);
     if (named !== undefined) return [named];
     const fitting = this.#fitting(detect);
-    if (fitting.length === 0) throw ERRORS.create("formats-refused", [none()]);
+    if (fitting.length === 0) throw none();
     return fitting;
   }
 
@@ -253,7 +267,7 @@ export class BackupReading extends Redacted implements Disposable {
    */
   static isCodes(text: string): boolean {
     const forms = MissingCodes.marked(text) ? MissingCodes.formats(text) : detectInputFormats(text);
-    return forms.some((format) => format !== "english");
+    return forms.some((format) => !EncodedForm.of(format).writtenInWords);
   }
 
   /** Whether the codes mark some that cannot be read (MissingCodes.marked), to be searched. */
@@ -270,17 +284,20 @@ export class BackupReading extends Redacted implements Disposable {
 
   /**
    * The forms that the marked codes may be in: the record's, or `given`, or every form that they
-   * fit (MissingCodes.formats). Throws when they fit none.
+   * fit (MissingCodes.formats). Marked codes that fit no form are refused, with JOINED_MARKS_HINT
+   * where they are run together (core.backup-reading.marked-codes-fit-no-form).
    */
   markedFormats(given?: EncodedFormat): EncodedFormat[] {
     return this.#formatsOf(
       given,
       (payload) => MissingCodes.formats(payload),
       () =>
-        withJoinedMarksHint(
-          `${FIT_NO_FORM}: mark each code that cannot be read with ?, in its place.`,
-          this.#payload,
-        ),
+        ERRORS.create("marked-codes-fit-no-form", [
+          withJoinedMarksHint(
+            `${FIT_NO_FORM}: mark each code that cannot be read with ?, in its place.`,
+            this.#payload,
+          ),
+        ]),
     );
   }
 

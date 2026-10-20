@@ -1,8 +1,6 @@
 // Public age/BIP39 fixtures and kilobyte-sized synthetic PNGs. No exhaustion workload.
 import { inspect } from "node:util";
-import { readFileSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 import { PNG } from "pngjs";
@@ -18,15 +16,20 @@ import {
   decryptCandidates,
   CandidateFileRefusedError,
   createSessionIdentity,
+  SessionIdentity,
 } from "../src/core/candidate-encryption.js";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
+import { candidateVectors } from "./helpers/vectors.js";
+import { testFolder } from "./helpers/test-folders.js";
 
-const captured = vi.hoisted(() => ({
-  limits: [] as (number | undefined)[],
-  compressed: [] as Uint8Array[],
-  inflated: [] as Uint8Array[],
-}));
+const captured = vi.hoisted(
+  (): { limits: (number | undefined)[]; compressed: Uint8Array[]; inflated: Uint8Array[] } => ({
+    limits: [],
+    compressed: [],
+    inflated: [],
+  }),
+);
 vi.mock("node:zlib", async (original) => {
   const actual = await original<typeof import("node:zlib")>();
   return {
@@ -41,18 +44,15 @@ vi.mock("node:zlib", async (original) => {
   };
 });
 
-const folders: string[] = [];
-afterEach(async () => {
+afterEach(() => {
   vi.restoreAllMocks();
   captured.limits.length = 0;
   captured.compressed.length = 0;
   captured.inflated.length = 0;
-  for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true });
 });
 
 async function pathOf(bytes?: Uint8Array): Promise<string> {
-  const folder = await mkdtemp(join(tmpdir(), "mnemocode-aud021-png-"));
-  folders.push(folder);
+  const folder = await testFolder("mnemocode-aud021-png-");
   const path = join(folder, "public.png");
   if (bytes !== undefined) await writeFile(path, bytes);
   return path;
@@ -263,33 +263,30 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
   });
 });
 
-const vectors = JSON.parse(readFileSync("vectors/candidates-v1.json", "utf8")) as {
-  age: { identity: string; plaintext: string; open: { name: string; file: string }[] };
-};
+const vectors = candidateVectors();
 const KEY_FILE = vectors.age.open.find((item) => !item.name.includes("passphrase"))!;
 describe("AUD-021-SEC003: age identity failures disclose no private input", () => {
   it.each([
     `${vectors.age.identity.slice(0, -1)}${vectors.age.identity.endsWith("A") ? "Q" : "A"}`,
     `bad-prefix-${vectors.age.identity}`,
   ])("sanitizes malformed identity diagnostics and causes %#", async (identity) => {
-    const error = await decryptCandidates(Buffer.from(KEY_FILE.file, "hex"), { identity }).catch(
-      (error: unknown) => error,
-    );
+    const error = await SessionIdentity.fromText(identity).catch((error: unknown) => error);
     expect(error).toBeInstanceOf(CandidateFileRefusedError);
+    if (!(error instanceof CandidateFileRefusedError)) throw error;
     expect(error).toMatchObject({
-      code: "key",
+      code: "core.candidate-file-refusal.identity-invalid",
+      problem: "key",
       message: "This Scanner key is not a valid age identity.",
     });
-    expect((error as Error).cause).toBeUndefined();
+    expect(error.cause).toBeUndefined();
     const displayed = [String(error), inspect(error), JSON.stringify(error)].join(" ");
     expect(displayed).not.toContain(identity);
     expect(displayed).not.toContain(vectors.age.identity.slice(0, -6));
   });
 
   it("still opens the published candidate file with its valid identity", async () => {
-    const plain = await decryptCandidates(Buffer.from(KEY_FILE.file, "hex"), {
-      identity: vectors.age.identity,
-    });
+    using identity = await SessionIdentity.fromText(vectors.age.identity);
+    const plain = await decryptCandidates(Buffer.from(KEY_FILE.file, "hex"), { identity });
     try {
       expect(Buffer.from(plain).toString("hex")).toBe(vectors.age.plaintext);
     } finally {
@@ -298,9 +295,12 @@ describe("AUD-021-SEC003: age identity failures disclose no private input", () =
   });
 
   it("retains wrong-key refusal for a valid synthetic identity", async () => {
-    const other = await createSessionIdentity();
+    using other = await createSessionIdentity();
     await expect(
-      decryptCandidates(Buffer.from(KEY_FILE.file, "hex"), { identity: other.identity }),
-    ).rejects.toMatchObject({ code: "key" });
+      decryptCandidates(Buffer.from(KEY_FILE.file, "hex"), { identity: other }),
+    ).rejects.toMatchObject({
+      code: "core.candidate-file-refusal.scanner-key-does-not-open",
+      problem: "key",
+    });
   });
 });

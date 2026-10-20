@@ -6,6 +6,13 @@ import { MM } from "../src/export/business-layout.js";
 import { pageOperators } from "./helpers/pdf-content.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
+
+/**
+ * The limit of the test that draws a sheet for each share on A6 and a page for each card in every
+ * card size: four times TEST_TIME_LIMIT_MS.
+ */
+const SHEETS_TIME_LIMIT_MS = 4 * TEST_TIME_LIMIT_MS;
 
 const colors = indexesToColors(Array.from({ length: 12 }, (_, index) => index * 7));
 const content: CardContent = { kind: "colors", colors, payload: colors.join(" ") };
@@ -14,7 +21,7 @@ async function pages(template: string, settings: Partial<CardContent>) {
   const bytes = await renderCards(nodeCardRenderer, [
     {
       template: selectTemplate(template, "colors"),
-      content: { ...content, ...settings } as CardContent,
+      content: { ...content, ...settings },
     },
   ]);
   const document = await PDFDocument.load(bytes);
@@ -27,6 +34,7 @@ async function pages(template: string, settings: Partial<CardContent>) {
 describe("page size decides between a sheet and separate cards", () => {
   it("names only the business size as a card size", () => {
     expect(
+      // "wallet", which no type allows, fed on purpose as a JavaScript host could.
       [undefined, "a6", "a5", "a4", "wallet", "business"].map((size) =>
         isCardPageSize(size as never),
       ),
@@ -59,6 +67,7 @@ describe("page size decides between a sheet and separate cards", () => {
     await expect(pages("material-tile", { pageSize: "business" })).rejects.toThrow(
       "printed on sheets only",
     );
+    // A page size that no type allows, fed on purpose as a JavaScript host could.
     await expect(pages("business-it", { pageSize: "wallet" as never })).rejects.toThrow(
       "a6, a5, a4 or business",
     );
@@ -125,7 +134,7 @@ describe("page size decides the layout of Shamir share cards", () => {
 
   it(
     "prints one sheet per share on A6 and one page per card for a card size",
-    { timeout: 240_000 },
+    { timeout: SHEETS_TIME_LIMIT_MS },
     async () => {
       const { splitSskrMnemonic } = await import("../src/sskr/shares.js");
       const { ShareCardSet } = await import("../src/export/sskr-render.js");

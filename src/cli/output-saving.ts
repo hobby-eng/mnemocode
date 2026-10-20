@@ -15,7 +15,7 @@ import {
   preflightFolderDestination,
   validateOutputPaths,
 } from "./output-paths.js";
-import { saveWithRetry } from "./save-retry.js";
+import { saveWithRetry, type ResultName } from "./save-retry.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { isOneOf } from "../core/one-of.js";
 
@@ -47,7 +47,7 @@ function isFolderOutput(key: SavedOutput): key is FolderOutput {
 /**
  * Refuses, before any secret is read, an output that cannot be saved: an image setting without
  * its folder, a folder that exists, a file whose folder cannot be written, a sheet setting without
- * its sheet. A file name taken already was numbered before this (settleOutputPaths), so a file
+ * its sheet. A file name taken already was numbered before this (RenamedOutputs.settle), so a file
  * that exists is only refused when it is a folder.
  */
 export async function preflightOutputs(args: ParsedArguments): Promise<void> {
@@ -83,24 +83,25 @@ export async function checkOutputName(
 
 /**
  * Saves the output that the option `key` names, which is on the screen already, with saveWithRetry:
- * a failure keeps it and offers to try again, another name or to skip it. `write` saves it at a
- * path. A name used instead of the one given is kept in `args`, so that the next new name is
- * checked against it. Undefined when the option is not given or the output was skipped.
+ * a failure keeps it and offers to try again, another name or to skip it, which the messages say of
+ * it by `name`. `write` saves it at a path. A name used instead of the one given is kept in `args`,
+ * so that the next new name is checked against it. Undefined when the option is not given or the
+ * output was skipped.
  */
 export async function saveOutput(
   args: ParsedArguments,
   key: SavedOutput,
-  what: string,
+  name: ResultName,
   write: (path: string) => Promise<void>,
 ): Promise<string | undefined | Cancelled> {
   const path = value(args, key);
   if (path === undefined) return undefined;
   const saved = await saveWithRetry({
-    what,
+    ...name,
     kind: isFolderOutput(key) ? "folder" : "file",
     path,
     write,
-    checkName: (name) => checkOutputName(args, key, name),
+    checkName: (other) => checkOutputName(args, key, other),
   });
   if (saved !== undefined && saved !== CANCELLED) args[key] = saved;
   return saved;
@@ -111,7 +112,7 @@ export async function saveHeirSheetOutput(
   args: ParsedArguments,
   facts: HeirSheetFacts,
 ): Promise<Cancelled | undefined> {
-  const saved = await saveOutput(args, "heir-sheet", "The sheet for heirs", (path) =>
+  const saved = await saveOutput(args, "heir-sheet", { what: "The sheet for heirs" }, (path) =>
     saveHeirSheet({ ...args, "heir-sheet": path }, facts),
   );
   return saved === CANCELLED ? CANCELLED : undefined;

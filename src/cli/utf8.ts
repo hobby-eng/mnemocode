@@ -77,47 +77,51 @@ function isValidCharacter(bytes: readonly number[]): boolean {
 /** The next byte typed, or undefined at the end of the input (terminal-input.ts NextByte). */
 type ByteSource = () => Promise<number | undefined>;
 
-/** A reader that passes on only valid UTF-8 (validCharacters). */
-export interface CharacterReader {
-  readonly next: ByteSource;
-  /** Whether a byte was left out. */
-  readonly leftOut: () => boolean;
-}
-
 /**
- * Reads `next` and passes on the control bytes and whole characters of valid UTF-8 only, each
- * character once all of its bytes have come; any other byte, such as é from a terminal set to
- * Latin-1, is left out and noted. The line reader would show such a byte, which each terminal
- * draws in its own way, and refuse the answer only at its end, when the rows that it took could
- * no longer be counted. Left out, the answer read is the answer shown, and the question refuses it
- * at Enter (NOT_UTF8).
+ * A reader of `next` that passes on the control bytes and whole characters of valid UTF-8 only,
+ * each character once all of its bytes have come; any other byte, such as é from a terminal set to
+ * Latin-1, is left out and noted (leftOut). The line reader would show such a byte, which each
+ * terminal draws in its own way, and refuse the answer only at its end, when the rows that it took
+ * could no longer be counted. Left out, the answer read is the answer shown, and the question
+ * refuses it at Enter (NOT_UTF8).
  */
-export function validCharacters(next: ByteSource): CharacterReader {
-  let leftOut = false;
-  // The rest of a character whose first byte was passed on.
-  const rest: number[] = [];
-  const read: ByteSource = async () => {
-    if (rest.length > 0) return rest.shift();
-    let byte = await next();
+export class ValidCharacters {
+  readonly #next: ByteSource;
+  /** The rest of a character whose first byte was passed on, given before any byte is read. */
+  readonly #rest: number[] = [];
+  #leftOut = false;
+
+  constructor(next: ByteSource) {
+    this.#next = next;
+  }
+
+  /** The next byte of a valid character or a control byte, or undefined at the end of the input. */
+  async next(): Promise<number | undefined> {
+    if (this.#rest.length > 0) return this.#rest.shift();
+    let byte = await this.#next();
     for (;;) {
       if (byte === undefined) return undefined;
       const length = characterLength(byte);
       if (length === 1) return byte;
       const character = [byte];
       while (character.length < length) {
-        byte = await next();
+        byte = await this.#next();
         if (byte === undefined || !isContinuation(byte)) break;
         character.push(byte);
       }
       const whole = length > 0 && character.length === length;
       if (whole && isValidCharacter(character)) {
-        rest.push(...character.slice(1));
+        this.#rest.push(...character.slice(1));
         return character[0];
       }
-      leftOut = true;
+      this.#leftOut = true;
       // A byte that cut a character short starts what comes next; after the rest, read on.
-      if (length === 0 || whole) byte = await next();
+      if (length === 0 || whole) byte = await this.#next();
     }
-  };
-  return { next: read, leftOut: () => leftOut };
+  }
+
+  /** Whether a byte was left out since the reader was made. */
+  leftOut(): boolean {
+    return this.#leftOut;
+  }
 }

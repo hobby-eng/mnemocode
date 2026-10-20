@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PROTECTION_FLAGS } from "../src/cli/protection.js";
+import { UNREACHED_FAULT_EXIT } from "./helpers/unreached-fault.js";
+import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
 const execute = promisify(execFile);
 const publicMnemonic = "abandon ".repeat(11) + "about";
@@ -133,7 +135,7 @@ describe("Self-test integrity under child-only faults", () => {
       assertCatalogueRefusal(result);
       expect(await readFile(resolve("vectors/mnemocode-v1.json"), "utf8")).toBe(original);
     });
-  }, 20_000);
+  });
 });
 
 /**
@@ -384,8 +386,8 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "an age file at another scrypt work factor",
     file: "dist/core/candidate-file-admission.js",
-    from: 'if (lock === "passphrase" && defined(stanzas[0])[2] !== String(SCRYPT_LOG_N))',
-    to: "if (false)",
+    from: "defined(stanzas[0])[STANZA_FIELD.workFactor] !== String(SCRYPT_LOG_N)",
+    to: "false",
     module: "core/candidate-encryption-self-test.js",
     run: "m.checkCandidateEncryptionQuick()",
     fails: /scrypt work factor 16 was accepted/u,
@@ -438,7 +440,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "an Ethereum address with a wrong EIP-55 checksum",
     file: "dist/core/coins/ethereum.js",
-    from: 'throw invalidAddress("its EIP-55 checksum, the mix of capital and small letters, is wrong")',
+    from: 'throw ERRORS.create("address-wrong-eip55-checksum", [])',
     to: "void 0",
     module: "core/coins-self-test.js",
     run: "m.COIN_ADDRESS_SELF_TEST.check.run()",
@@ -473,21 +475,27 @@ describe("Each self-test check can fail", () => {
         "throw new Error('unused');",
       );
       const result = await runCheck(directory, "core/word-hints.js", "Promise.resolve()");
-      expect(result.code).toBe(97);
+      expect(result.code).toBe(UNREACHED_FAULT_EXIT);
       expect(result.stderr).toContain("The declared virtual-build fault was not reached.");
       // The helper's first expectation refuses the exit code of the unreached fault.
-      expect(() => assertCatalogueRefusal(result)).toThrow("expected 97 to be 1");
+      expect(() => assertCatalogueRefusal(result)).toThrow(
+        `expected ${UNREACHED_FAULT_EXIT} to be 1`,
+      );
     });
   });
 
-  it("passes on the build as it is", async () => {
-    await withVirtualBuild(async (directory) => {
-      for (const { module, run } of [...DAMAGED_ANSWERS, ...LOST_REFUSALS]) {
-        const result = await runCheck(directory, module, run);
-        expect(result, `${module}: ${run}`).toEqual({ code: 0, stderr: "" });
-      }
-    });
-  }, 180_000);
+  it(
+    "passes on the build as it is",
+    async () => {
+      await withVirtualBuild(async (directory) => {
+        for (const { module, run } of [...DAMAGED_ANSWERS, ...LOST_REFUSALS]) {
+          const result = await runCheck(directory, module, run);
+          expect(result, `${module}: ${run}`).toEqual({ code: 0, stderr: "" });
+        }
+      });
+    },
+    LONGEST_TEST_TIME_LIMIT_MS,
+  );
 
   for (const damaged of [...DAMAGED_ANSWERS, ...LOST_REFUSALS])
     it(`fails with ${damaged.name}`, async () => {

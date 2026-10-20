@@ -58,8 +58,6 @@ function reEncodingAt(date: DateShiftDate): ReEncoding {
   return ReEncoding.of(backup, [date]);
 }
 
-const NOT_CONFIRMED_REFUSAL = new RegExp(NOT_CONFIRMED.slice(0, 40), "u");
-
 /**
  * The quick known answers: the phrase held back until the person confirms it, then encoded again; a
  * wrong date's valid phrase; and a failing checksum refused.
@@ -67,11 +65,7 @@ const NOT_CONFIRMED_REFUSAL = new RegExp(NOT_CONFIRMED.slice(0, 40), "u");
 function checkReEncodingStartup(): void {
   using reEncoding = reEncodingAt(RIGHT_DATE);
   expectSame(reEncoding.phrase, PUBLIC_MNEMONIC, "Re-encoded phrase");
-  expectRefused(
-    () => reEncoding.confirmedPhrase(),
-    NOT_CONFIRMED_REFUSAL,
-    "Phrase before confirmation",
-  );
+  expectRefused(() => reEncoding.confirmedPhrase(), NOT_CONFIRMED, "Phrase before confirmation");
   reEncoding.confirmByPerson();
   expectSame(
     Reflect.set(reEncoding.result, "recoveredMnemonic", "changed public test phrase"),
@@ -93,7 +87,7 @@ function checkReEncodingStartup(): void {
       using unexpected = ReEncoding.of(legacy, [WRONG_DATE]);
       return unexpected.phrase;
     },
-    new RegExp(CHECKSUM_FAILS.slice(0, 40), "u"),
+    CHECKSUM_FAILS,
     "Original Seedshift with a wrong date",
   );
   // Made with a valid last word, it gives a phrase for each possible last word: the original one,
@@ -112,7 +106,7 @@ function checkReEncodingStartup(): void {
       using unexpected = ReEncoding.of(several, [RIGHT_DATE]);
       return unexpected.phrase;
     },
-    new RegExp(LAST_WORD_NEEDED.slice(0, 40), "u"),
+    LAST_WORD_NEEDED,
     "Valid last word without the original one",
   );
   using selected = ReEncoding.of(several, [RIGHT_DATE], "about");
@@ -130,11 +124,7 @@ async function checkReEncoding(): Promise<void> {
   checkReEncodingStartup();
   using reEncoding = reEncodingAt(RIGHT_DATE);
   expectSame((await reEncoding.confirmByWallet(OTHER_WALLET)).matched, false, "Other wallet");
-  expectRefused(
-    () => reEncoding.confirmedPhrase(),
-    NOT_CONFIRMED_REFUSAL,
-    "Phrase of another wallet",
-  );
+  expectRefused(() => reEncoding.confirmedPhrase(), NOT_CONFIRMED, "Phrase of another wallet");
   expectSame((await reEncoding.confirmByWallet(PUBLIC_WALLET)).matched, true, "Its wallet");
   expectSame(reEncoding.confirmation?.by, "wallet", "Confirmation by the wallet");
   expectSame(warningOf(reEncoding), undefined, "Warning of an address");

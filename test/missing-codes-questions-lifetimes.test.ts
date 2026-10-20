@@ -3,6 +3,7 @@ import { searchMissingCodes } from "../src/cli/missing-codes-search.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
+import { recoverLegacyValidLastWords } from "../src/core/words.js";
 import { questionsOnPrivateScreen } from "./helpers/question-terminal.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
@@ -12,16 +13,19 @@ vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOr
 vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
   harness.replacedPrivateScreen(await importOriginal()),
 );
-vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
-  ...harness.replacedTerminalInput(await importOriginal()),
-  withCtrlCWatch: async <Value>(
-    search: (signal: AbortSignal) => Promise<Value>,
-  ): Promise<Value> => {
-    const result = await search(new AbortController().signal);
-    if (watchEdge.failure !== undefined) throw watchEdge.failure;
-    return result;
-  },
-}));
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
+  const input = harness.replacedTerminalInput(await importOriginal());
+  class FailingWatch extends input.CtrlCWatch {
+    static override async during<Value>(
+      search: (signal: AbortSignal) => Promise<Value>,
+    ): Promise<Value> {
+      const result = await search(new AbortController().signal);
+      if (watchEdge.failure !== undefined) throw watchEdge.failure;
+      return result;
+    }
+  }
+  return { ...input, CtrlCWatch: FailingWatch };
+});
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
   harness.replacedTerminalChoice(await importOriginal()),
 );
@@ -37,25 +41,22 @@ const ANSWERS = {
 
 describe("A list of more candidates than it holds", () => {
   it("is said, and the way is asked again (AUD-037-UI003)", async () => {
-    using codes = MissingCodes.read("abandon ".repeat(11) + "about|actual", "english", "direct");
-    const overflow = Object.assign(new Error("More than 16 candidates fit these codes."), {
-      code: "core.missing-codes-search.list-overflow",
-    });
-    vi.spyOn(MissingCodesSearch.prototype, "listed").mockReturnValue({
-      plan: async () => ({ ask: false, tell: false }) as never,
-      run: async () => {
-        throw overflow;
-      },
-      wipe: () => undefined,
-      [Symbol.dispose]: () => undefined,
-    });
+    // One more valid last word than a list holds: the estimate, about one candidate, offers the
+    // list, and the real search finds every one of them.
+    const endings = recoverLegacyValidLastWords(TEST_PHRASE)
+      .slice(0, MissingCodesSearch.MAX_LISTED + 1)
+      .map(({ word }) => word);
+    using codes = MissingCodes.read("abandon ".repeat(11) + endings.join("|"), "english", "direct");
+    expect(new MissingCodesSearch(codes, () => "00000000").fits("list")).toBe(true);
     const said: string[] = [];
     vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
       said.push(parts.join(" "));
     });
     const answers = { ...ANSWERS, encodedFingerprint: undefined, list: true };
     expect(await searchMissingCodes(codes, answers)).toEqual({ kind: "again" });
-    expect(said.join("\n")).toContain("More than 16 candidates fit these codes.");
+    expect(said.join("\n")).toContain(
+      "More than 16 candidates fit these codes and dates. Narrow the codes or use a wallet check instead of listing them.",
+    );
     // The way is asked again without the list, which would overflow again (AUD-037-FUN002).
     expect(harness.terminal.labels.at(-1)).not.toContain("List every candidate");
     expect(harness.terminal.labels.at(-1)).toContain("The wallet");

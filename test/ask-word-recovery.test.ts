@@ -21,6 +21,7 @@ import {
   windowOf,
 } from "./helpers/question-terminal.js";
 import { TEST_FINGERPRINT } from "./helpers/test-phrase.js";
+import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -33,14 +34,9 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
   harness.replacedTerminalChoice(await importOriginal()),
 );
-vi.mock("../src/export/private-file.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/export/private-file.js")>();
-  return {
-    ...actual,
-    publishNewPrivateFile: async (path: string, bytes: Uint8Array) =>
-      harness.failingSave(() => actual.publishNewPrivateFile(path, bytes)),
-  };
-});
+vi.mock("node:fs/promises", async (importOriginal) =>
+  harness.replacedFiles(await importOriginal()),
+);
 
 const ELEVEN = "abandon ".repeat(11);
 /** The test phrase with its last word forgotten: 128 checksum-valid candidates. */
@@ -207,6 +203,35 @@ describe("recover-word on the private screen", () => {
     terminal.answers = [`${LAST_FORGOTTEN}\r`];
     await recover({});
     expect(seen.out).toHaveLength(129);
+  });
+
+  it("heads the table with the forgotten places, or with a missing word at any position", async () => {
+    // The heading's facts are printed only on a terminal (terminalLayout).
+    streamsAsTerminal();
+    terminal.stdoutTerminal = true;
+    windowOf(300, 80);
+    const shown = async (answer: string, options: Record<string, string | boolean> = {}) => {
+      seen.out = [];
+      terminal.answers = [`${answer}\r`];
+      await recover(options);
+      return seen.out.join("\n");
+    };
+
+    const last = await shown(LAST_FORGOTTEN);
+    expect(last).toMatch(/Position\D*12\n/u);
+    expect(last).toContain("candidate\tword\tword-index\tchecksum-bits\tmnemonic");
+    const two = await shown(`ab* ${"abandon ".repeat(10)}abo*`);
+    expect(two).toMatch(/Positions\D*1, 12\n/u);
+    expect(two).toContain("candidate\twords\tmnemonic");
+    expect(two).toContain(`1\t1:abandon 12:about\t${ELEVEN}about`);
+    // 1,497 candidates do not fit in the window: the rows that match the wallet are listed.
+    const missing = await shown(`${"abandon ".repeat(10)}about`, {
+      "missing-word": true,
+      "master-fingerprint": TEST_FINGERPRINT,
+    });
+    expect(missing).toMatch(/Missing word\W*at any position\n/u);
+    expect(missing).toContain("candidate\tposition\tword\tword-index\tevidence\tmnemonic");
+    expect(missing).toContain(`1\t1\tabandon\t1\tmatched at m\t${ELEVEN}about`);
   });
 
   it("lets the wallet change when none of the candidates matched it", async () => {

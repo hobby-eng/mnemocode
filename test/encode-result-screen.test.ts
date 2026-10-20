@@ -5,6 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runEncode } from "../src/cli/encode-command.js";
+import { runSskrExport } from "../src/cli/sskr-export-command.js";
+import { writeShare } from "../src/sskr/transport.js";
+import { SHARES, SHARES_PROMPT } from "./helpers/share-questions.js";
 import { askValueUntil } from "../src/cli/ask.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 import { CLEAR_SCREEN, terminalResultHeader, terminalWork } from "../src/cli/terminal.js";
@@ -212,11 +215,31 @@ describe("Encode result stays on the private screen through follow-up questions"
     ).toBeUndefined();
     expect(atCheck).toContain("Check the backup now?");
     expect(atCheck).toContain(mode === "direct" ? "1 1 1 1 1 1 1 1 1 1 1 4" : MASKED);
+    // The result is a step of its own (CORE-39): the secret prompts, and the dates typed at one,
+    // were cleared away before it.
+    expect(atCheck).not.toContain("Seed phrase (English BIP39 words):");
+    expect(atCheck).not.toContain("Dates (");
+    expect(atCheck).not.toContain(DATE);
     if (shares)
       for (const number of [1, 2, 3]) expect(atCheck).toContain(`SSKR share ${number} of 3`);
     expect(screen.lines().join("\n")).toContain(
       mode === "direct" ? "1 1 1 1 1 1 1 1 1 1 1 4" : MASKED,
     );
+  });
+
+  it("shows the shares that sskr-export writes again on a screen of their own", async () => {
+    const screen = watchScreen(400);
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      screen.write(format(...parts) + "\n");
+    });
+    const answers = [`${SHARES[0]};${SHARES[1]}\r`];
+    terminal.keysFor = () => answers.shift()!;
+    await runSskrExport({ "ask-secrets": true, format: "indexes" });
+    const visible = screen.lines().join("\n");
+    expect(visible).toContain(writeShare(SHARES[1], "indexes"));
+    // The result is a step of its own (CORE-39): the prompt and the shares typed at it are gone.
+    expect(visible).not.toContain(SHARES_PROMPT);
+    expect(visible).not.toContain(SHARES[0]);
   });
 
   it("clears the result only after Yes, before reading the written backup", async () => {

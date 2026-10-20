@@ -11,7 +11,7 @@
 // Host-neutral: it imports only core modules, the share modules and their known answers.
 
 import type { ShareRepairPlatform } from "../sskr/share-platform.js";
-import { sskrSetVector } from "../sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../sskr/known-answers.js";
 import { EncodedBackupCheck, ShareBackupCheck, type BackupResult } from "./backup-check.js";
 import { parseDate } from "./dates.js";
 import { expectSame } from "./self-test-check.js";
@@ -68,12 +68,12 @@ export function checkBackupCheckStartup(): void {
  */
 async function checkShareBackup(platform: ShareRepairPlatform): Promise<void> {
   using check = new ShareBackupCheck(
-    { mnemonic: sskrSetVector.phrase, mode: "direct", threshold: 2 },
+    { mnemonic: SSKR_SET_VECTOR.phrase, mode: "direct", threshold: 2 },
     platform,
     { decodeEntry: DECODE_ENTRY },
   );
-  const [first, , third] = sskrSetVector.shares;
-  const [firstColors, secondColors] = sskrSetVector.colors;
+  const [first, , third] = SSKR_SET_VECTOR.shares;
+  const [firstColors, secondColors] = SSKR_SET_VECTOR.colors;
   const cases: readonly (readonly [string, string, string])[] = [
     [`${first}; ${third}`, "restores", "Share check of the set"],
     [`${firstColors.replace("#0CF800", "?")}; ${secondColors}`, "restores", "Marked share check"],

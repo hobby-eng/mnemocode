@@ -1,10 +1,11 @@
-import { mkdtemp, rm, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { questionsOnPrivateScreen, terminal } from "./helpers/question-terminal.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
+/** How many links of a QR image to its name fail yet, as on a full disk. */
 const faults = vi.hoisted(() => ({ qrFailures: 0 }));
 vi.mock("node:tty", async (original) => harness.replacedTty(await original()));
 vi.mock("../src/cli/private-screen.js", async (original) =>
@@ -16,45 +17,41 @@ vi.mock("../src/cli/terminal-input.js", async (original) =>
 vi.mock("../src/cli/terminal-choice.js", async (original) =>
   harness.replacedTerminalChoice(await original()),
 );
-vi.mock("../src/export/qr-image.js", async (original) => ({
-  ...(await original<typeof import("../src/export/qr-image.js")>()),
-  exportQrPayload: async () => {
-    if (faults.qrFailures-- > 0)
-      throw Object.assign(Error("Synthetic save failure"), { code: "ENOSPC" });
-  },
-}));
-vi.mock("../src/cli/encode-export.js", async (original) => {
-  const actual = await original<typeof import("../src/cli/encode-export.js")>();
+// The files are the program's edge: the link that gives a finished QR image its name fails while
+// a case asks it to. Every rendering, save and other link is the real one.
+vi.mock("node:fs/promises", async (original) => {
+  const real = await original<typeof import("node:fs/promises")>();
   return {
-    ...actual,
-    saveEncodeResult: async (...args: Parameters<typeof actual.saveEncodeResult>) => {
-      if (typeof args[0].pdf === "string") {
-        const { publishNewPrivateFile } = await import("../src/export/private-file.js");
-        await publishNewPrivateFile(args[0].pdf, Uint8Array.of(1, 2, 3));
-      } else await actual.saveEncodeResult(...args);
+    ...real,
+    link: async (existing: string, destination: string) => {
+      if (destination.endsWith("-qr.png") && faults.qrFailures-- > 0)
+        throw Object.assign(new Error("Synthetic save failure"), { code: "ENOSPC" });
+      return real.link(existing, destination);
     },
   };
 });
 
 import { runEncode } from "../src/cli/encode-command.js";
 import { optionLabel, evidenceLabel } from "../src/cli/option-copy.js";
+import { FIRST_RECEIVING_LOCATION, type WalletEvidence } from "../src/core/wallet-evidence.js";
 import { runTable } from "../src/cli/table-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
+import { testFolder } from "./helpers/test-folders.js";
+
+/** The first bytes of every PDF file (ISO 32000-1, 7.5.2). */
+const PDF_SIGNATURE = "%PDF-";
 
 questionsOnPrivateScreen();
-const folders: string[] = [];
-afterEach(async () => {
+afterEach(() => {
   faults.qrFailures = 0;
   PrivateSteps.close();
-  for (const path of folders.splice(0)) await rm(path, { recursive: true, force: true });
 });
 
 it.each(["again", "skip", CANCELLED])(
   "keeps the saved primary file when an automatic QR fails (%s)",
   async (choice) => {
-    const folder = await mkdtemp(join(tmpdir(), "mnemocode-aud026-cli-"));
-    folders.push(folder);
+    const folder = await testFolder("mnemocode-aud026-cli-");
     terminal.answers = ["abandon ".repeat(11) + "about\r"];
     terminal.choices = [choice];
     faults.qrFailures = 1;
@@ -65,15 +62,22 @@ it.each(["again", "skip", CANCELLED])(
       pdf: join(folder, "sheet.pdf"),
       "card-qr": true,
     });
-    expect((await stat(join(folder, "sheet.pdf"))).size).toBe(3);
+    const pdf = await readFile(join(folder, "sheet.pdf"));
+    expect(pdf.subarray(0, PDF_SIGNATURE.length).toString("latin1")).toBe(PDF_SIGNATURE);
     expect(terminal.questions).toContain("What now?");
+    expect(existsSync(join(folder, "sheet-qr.png"))).toBe(choice === "again");
     expect(result).toBe(choice === CANCELLED ? CANCELLED : undefined);
   },
 );
 
 it("keeps the labels of supported wallet evidence and redacts unknown keys", () => {
-  for (const kind of ["address", "master-xpub", "account-xpub"] as const)
-    expect(evidenceLabel({ kind } as never)).not.toBe("unknown option");
+  const location = FIRST_RECEIVING_LOCATION;
+  const evidences: readonly WalletEvidence[] = [
+    { kind: "address", value: "public fixture", profiles: ["native-segwit"], location },
+    { kind: "master-xpub", value: "public fixture", network: "mainnet" },
+    { kind: "account-xpub", value: "public fixture", profiles: ["native-segwit"], location },
+  ];
+  for (const evidence of evidences) expect(evidenceLabel(evidence)).not.toBe("unknown option");
   for (const key of ["account", "branch", "index"])
     expect(optionLabel(key)).not.toBe("unknown option");
   for (const key of ["constructor", "__proto__", "private-looking input"])

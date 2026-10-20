@@ -76,22 +76,57 @@ export function paint(stream: ColorStream, code: string, text: string): string {
 export const TEXT_WIDTH = 78;
 /** A notice's mark ("✓" or "!") and the space after it, before each of its lines. */
 const NOTICE_MARK_WIDTH = 2;
-/** The width of a notice's text beside its mark: running text less the mark. */
-export const NOTICE_TEXT_WIDTH = TEXT_WIDTH - NOTICE_MARK_WIDTH;
+/** The mark of an error on a terminal, as in `mhfe`. */
+const ERROR_MARK = "✗ Error:";
+/** An error's mark and the space after it: the indent of the error's other lines. */
+const ERROR_MARK_WIDTH = ERROR_MARK.length + 1;
+/** The indent of a fact's label. */
+const FACT_INDENT = 2;
+/** The space between the column of a fact's label and its value. */
+const FACT_GAP = 1;
 
-/** Breaks `text` into lines of at most `width` characters at spaces. */
+/** The characters of `text` that a terminal shows: its colour codes (STYLE_CODES) take no room. */
+function shownLength(text: string): number {
+  return text.replace(STYLE_CODES, "").length;
+}
+
+/**
+ * Breaks `text` into lines of at most `width` characters at spaces; colour codes take no room,
+ * and a word longer than `width` keeps a line of its own.
+ */
 export function wrapText(text: string, width: number = TEXT_WIDTH): string[] {
   const lines: string[] = [];
   let line = "";
+  let length = 0;
   for (const word of text.split(" ").filter((part) => part !== "")) {
-    if (line !== "" && line.length + 1 + word.length > width) {
+    const size = shownLength(word);
+    if (line !== "" && length + 1 + size > width) {
       lines.push(line);
       line = "";
     }
+    length = line === "" ? size : length + 1 + size;
     line = line === "" ? word : `${line} ${word}`;
   }
   if (line !== "") lines.push(line);
   return lines;
+}
+
+/**
+ * `text` wrapped to TEXT_WIDTH beside `mark`, which is `indent` characters wide with its space:
+ * the mark before the first line, as many spaces before the others, each line in `style`. A text
+ * that fits stays as it is, its spaces included, and a text without words still gets its mark.
+ */
+export function besideMark(
+  mark: string,
+  indent: number,
+  text: string,
+  style: (line: string) => string = (line) => line,
+): string[] {
+  const width = TEXT_WIDTH - indent;
+  const lines = shownLength(text) <= width ? [text] : wrapText(text, width);
+  return (lines.length > 0 ? lines : [""]).map(
+    (line, index) => `${index === 0 ? mark : " ".repeat(indent)}${style(line)}`,
+  );
 }
 
 /** The narrowest label column of a result, so that short labels line up as in `mhfe`. */
@@ -103,9 +138,16 @@ export function headingLine(stream: ColorStream, title: string): string {
   return `${paint(stream, STYLE.heading, "MnemoCode")} ${dot} ${paint(stream, STYLE.strong, title)}`;
 }
 
-/** A fact under a heading: its grey label in a column `width` wide, then its value. */
+/**
+ * A fact under a heading: its grey label in a column `width` wide, then its value, wrapped to
+ * TEXT_WIDTH under its own column as in `mhfe`; several lines are joined by line breaks.
+ */
 export function factLine(stream: ColorStream, label: string, value: string, width: number): string {
-  return `  ${paint(stream, STYLE.muted, label.padEnd(width))} ${value}`;
+  const grey = paint(stream, STYLE.muted, label.padEnd(width));
+  const mark = `${" ".repeat(FACT_INDENT)}${grey}${" ".repeat(FACT_GAP)}`;
+  // A label longer than its column pushes the value on.
+  const indent = FACT_INDENT + Math.max(width, label.length) + FACT_GAP;
+  return besideMark(mark, indent, value).join("\n");
 }
 
 /**
@@ -134,12 +176,20 @@ const NOTICE_MARKS = {
 } as const;
 
 /**
+ * Running text as `stream` shows it: on a terminal wrapped to TEXT_WIDTH, without colour; for a
+ * file, a pipe or TERM=dumb as it is, on one line, as a script reads it.
+ */
+export function runningLines(stream: ColorStream, text: string): string[] {
+  return streamCanRedraw(stream) ? wrapText(text) : [text];
+}
+
+/**
  * Advice that can be read and passed over: on a terminal wrapped, and grey where it gets colour;
- * for a file, a pipe or TERM=dumb as it is.
+ * for a file, a pipe or TERM=dumb as it is (runningLines).
  */
 export function hintLines(stream: ColorStream, message: string): string[] {
-  if (!streamCanRedraw(stream)) return [message];
-  return wrapText(message).map((line) => paint(stream, STYLE.muted, line));
+  const lines = runningLines(stream, message);
+  return streamCanRedraw(stream) ? lines.map((line) => paint(stream, STYLE.muted, line)) : lines;
 }
 
 /**
@@ -153,10 +203,8 @@ export function markedLines(
   kind: Exclude<NoticeKind, "info">,
 ): string[] {
   const { mark, code } = NOTICE_MARKS[kind];
-  return wrapText(message, NOTICE_TEXT_WIDTH).map((line, index) => {
-    const text = kind === "warning" ? paint(stream, code, line) : line;
-    return `${index === 0 ? paint(stream, code, mark) : " "} ${text}`;
-  });
+  const style = (line: string): string => (kind === "warning" ? paint(stream, code, line) : line);
+  return besideMark(`${paint(stream, code, mark)} `, NOTICE_MARK_WIDTH, message, style);
 }
 
 /**
@@ -169,18 +217,27 @@ export function noticeLines(stream: ColorStream, message: string, kind: NoticeKi
   return kind === "info" ? hintLines(stream, message) : markedLines(stream, message, kind);
 }
 
-/** A checked fact after a green ✓ (or a yellow ! when `good` is false), its value in bold. */
+/**
+ * A checked fact after a green ✓ (or a yellow ! when `good` is false), its value in bold, wrapped
+ * beside the mark to TEXT_WIDTH; several lines are joined by line breaks.
+ */
 export function statusLine(stream: ColorStream, label: string, value: string, good = true): string {
-  const mark = good ? paint(stream, STYLE.good, "✓") : paint(stream, STYLE.warning, "!");
-  return `${mark} ${label} ${paint(stream, STYLE.strong, value)}`;
+  const { mark, code } = NOTICE_MARKS[good ? "success" : "warning"];
+  // Each word of the value in bold, so that no line carries the bold over to the next.
+  const bold = value
+    .split(" ")
+    .map((word) => (word === "" ? "" : paint(stream, STYLE.strong, word)));
+  const text = `${label} ${bold.join(" ")}`;
+  return besideMark(`${paint(stream, code, mark)} `, NOTICE_MARK_WIDTH, text).join("\n");
 }
 
 /**
- * An error after "✗ Error:" on a terminal, red where it gets colour, or after "`program`:" for a
- * file, a pipe or TERM=dumb.
+ * An error after "✗ Error:" on a terminal, red where it gets colour, wrapped beside the mark to
+ * TEXT_WIDTH as in `mhfe`, its lines joined by line breaks; or after "`program`:", on one line,
+ * for a file, a pipe or TERM=dumb.
  */
 export function failureLine(stream: ColorStream, program: string, message: string): string {
   const text = printableText(message);
   if (!streamCanRedraw(stream)) return `${program}: ${text}`;
-  return `${paint(stream, STYLE.bad, "✗ Error:")} ${text}`;
+  return besideMark(`${paint(stream, STYLE.bad, ERROR_MARK)} `, ERROR_MARK_WIDTH, text).join("\n");
 }

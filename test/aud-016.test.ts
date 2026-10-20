@@ -52,7 +52,7 @@ describe("AUD-016-API001: a wallet answer is read field by field, whatever its k
       value: "m",
       enumerable: false,
     });
-    const result = await dateSearch(() => answer as WalletMatch).run();
+    const result = await dateSearch(() => answer).run();
     expect(result.shown[0]?.evidence).toBe("m");
   });
 
@@ -68,9 +68,7 @@ describe("AUD-016-API001: a wallet answer is read field by field, whatever its k
       mnemonic === PHRASE ? new AddressAnswer() : { matched: false };
     const result = await search.run({ walletCheck: byPhrase });
     const shown = result.shown.find((entry) => entry.match?.matched === true);
-    expect((shown?.match as { readonly derived?: string } | undefined)?.derived).toBe(
-      "bc1qpublicfixture",
-    );
+    expect(shown?.match).toMatchObject({ derived: "bc1qpublicfixture" });
   });
 
   it("still refuses an answer whose matched is no boolean, and reads it once", async () => {
@@ -79,6 +77,7 @@ describe("AUD-016-API001: a wallet answer is read field by field, whatever its k
         return "true";
       }
     }
+    // An answer that no type allows, fed on purpose as a JavaScript host could.
     await expect(dateSearch(() => new Wrong() as WalletMatch).run()).rejects.toThrow(
       MALFORMED_WALLET_ANSWER,
     );

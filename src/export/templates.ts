@@ -72,7 +72,7 @@ export interface CardTemplate {
   ) => Promise<SheetShape>;
 }
 
-const businessNames: Record<BusinessStyle, string> = {
+const BUSINESS_NAMES: Record<BusinessStyle, string> = {
   architect: "Architecture",
   it: "IT",
   estate: "Property consultant",
@@ -89,7 +89,8 @@ const businessNames: Record<BusinessStyle, string> = {
  * (assertSeparateCards). `businessOffset` starts the mixed business style at another of its
  * designs, as the QR cards of shares do by member; the other families have no such choice. The
  * templates below and the share cards (sskr-render.ts) both draw through it, so that a design is
- * drawn the same way from either.
+ * drawn the same way from either. Refuses a `fragment` of a design printed on sheets only
+ * (export.template-catalog.sheets-only); what the family's renderer refuses passes on.
  */
 export async function renderCatalogDesign(
   entry: CatalogEntry,
@@ -107,7 +108,10 @@ export async function renderCatalogDesign(
   }
 }
 
-/** The shape of a sheet of `pageSize` for `content` in the design `entry`, by its family. */
+/**
+ * The shape of a sheet of `pageSize` for `content` in the design `entry`, by its family; what the
+ * family refuses passes on (businessSheetShape, materialSheetShape).
+ */
 export function catalogSheetShape(
   entry: CatalogEntry,
   drawing: CardDrawing,
@@ -128,7 +132,7 @@ function wordsOf(entry: CatalogEntry): Pick<CardTemplate, "name" | "description"
     case "business": {
       const { style } = entry;
       return {
-        name: `${businessNames[style]} card collection`,
+        name: `${BUSINESS_NAMES[style]} card collection`,
         description:
           style === "mixed"
             ? `One identity across all designs; ${SHEET_SIZES_TEXT} sheets or individual cards.`
@@ -166,13 +170,13 @@ function templateOf(entry: CatalogEntry): CardTemplate {
 }
 
 /** Every installed design with its renderer, in the order of the catalog. */
-export const cardTemplates: readonly CardTemplate[] = Object.freeze(
+export const CARD_TEMPLATES: readonly CardTemplate[] = Object.freeze(
   TEMPLATE_CATALOG.map((entry) => Object.freeze(templateOf(entry))),
 );
 
 /** The installed designs that draw cards of `kind`, in the order of the catalog. */
 export function templatesOfKind(kind: CardKind): readonly CardTemplate[] {
-  return cardTemplates.filter((template) => template.kind === kind);
+  return CARD_TEMPLATES.filter((template) => template.kind === kind);
 }
 
 /** The number that names `template` among the designs of its kind, from 1 (findTemplate). */
@@ -180,8 +184,11 @@ export function templateNumber(template: CardTemplate): number {
   return templatesOfKind(template.kind).indexOf(template) + 1;
 }
 
-/** The design that `id`, its id or its number, names among those of `kind` (resolveTemplateId). */
+/**
+ * The design that `id`, its id or its number, names among those of `kind`; refused as
+ * resolveTemplateId refuses a kind without designs or a name of none.
+ */
 export function selectTemplate(id?: string, kind?: CardKind): CardTemplate {
   const { id: found } = resolveTemplateId(id, kind);
-  return defined(cardTemplates.find((template) => template.id === found));
+  return defined(CARD_TEMPLATES.find((template) => template.id === found));
 }

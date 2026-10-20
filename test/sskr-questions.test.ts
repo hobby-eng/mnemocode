@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParsedArguments } from "../src/cli/arguments.js";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
-import { runSskrCombine } from "../src/cli/sskr-command.js";
+import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { JointRepair } from "../src/sskr/joint-repair.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";

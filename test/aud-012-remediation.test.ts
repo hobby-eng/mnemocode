@@ -49,6 +49,7 @@ import { failureLine, resultLines, statusLine } from "../src/cli/terminal-style.
 import { assertColorCardContent } from "../src/export/card-content.js";
 import { pageDimensions } from "../src/export/card-settings.js";
 import type { DatePattern } from "../src/core/types.js";
+import type { CardTemplate } from "../src/export/templates.js";
 import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
@@ -65,9 +66,15 @@ import { indexesToColors } from "../src/core/colors.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import { holes } from "./helpers/holes.js";
+import { refusalOf } from "./helpers/refusals.js";
 
 /** BIP39's public test phrase, "abandon" eleven times and "about". */
 const PUBLIC_PHRASE = "abandon ".repeat(11) + "about";
+/**
+ * The most the search of two dates over the public phrase may take: it finds the phrase in well
+ * under a second, and a search stopped at this limit fails the test with its own result.
+ */
+const SEARCH_TIME_LIMIT_MS = 10_000;
 
 describe("AUD-012-FUN001: codes and dates found together decode to the wallet that matched", () => {
   const known = parseDate("01-01-2025");
@@ -87,7 +94,7 @@ describe("AUD-012-FUN001: codes and dates found together decode to the wallet th
       });
       const result = await new MissingCodesSearch(codes, () => "00000000")
         .byWallet(check, answer)
-        .run({ signal: AbortSignal.timeout(10_000) });
+        .run({ signal: AbortSignal.timeout(SEARCH_TIME_LIMIT_MS) });
       expect(result.kind).toBe("found");
       if (result.kind !== "found") return;
       expect(result.dates!.map(formatDate)).toEqual(["01-01-2025", "23-09-2026"]);
@@ -202,7 +209,8 @@ describe("AUD-012-API002: a repair bounds its shares before it reads any", () =>
       {
         get(target, key, receiver) {
           if (typeof key === "string" && /^\d+$/u.test(key)) read.push(Number(key));
-          return Reflect.get(target, key, receiver) as unknown;
+          const value: unknown = Reflect.get(target, key, receiver);
+          return value;
         },
       },
     );
@@ -230,7 +238,7 @@ describe("AUD-012-SEC001: a refused encoding leaves no share in the engine's mem
       ),
     ).toThrow("Unsupported SSKR share encoding.");
     const memory = Buffer.from(wasm.memory.buffer);
-    for (const share of vector.shares as string[]) {
+    for (const share of vector.shares) {
       // The share's metadata and secret, after its one-byte CBOR head, without its checksum.
       const payload = Buffer.from(urToTransport(share).subarray(1, -CHECKSUM_BYTES));
       expect(memory.indexOf(payload)).toBe(-1);
@@ -422,6 +430,7 @@ describe("AUD-012-FUN006, FUN007: card settings refuse what they cannot print", 
       pageDimensions("a6", "portrait")[0],
     );
     for (const wrong of ["sideways", null, 90]) {
+      // Orientations that no type allows, fed on purpose as a JavaScript host could.
       expect(() => pageDimensions("business", wrong as never)).toThrow(/Orientation must/u);
       expect(() => pageDimensions("a6", wrong as never)).toThrow(/Orientation must/u);
     }
@@ -430,13 +439,21 @@ describe("AUD-012-FUN006, FUN007: card settings refuse what they cannot print", 
   it("refuses a page setting before any template draws", async () => {
     const { renderCards } = await import("../src/export/render.js");
     const render = vi.fn();
-    const template = { id: "synthetic", kind: "colors", render, renderIndividual: render };
+    const template: CardTemplate = {
+      id: "synthetic",
+      kind: "colors",
+      name: "Synthetic",
+      description: "A synthetic design.",
+      render,
+      renderIndividual: render,
+    };
     const colors = indexesToColors(Array.from({ length: 12 }, () => 0));
     const content = { kind: "colors", colors, payload: colors.join(" ") } as const;
     for (const settings of [{ orientation: "sideways" }, { pageSize: "a3" }])
       await expect(
         renderCards(nodeCardRenderer, [
-          { template: template as never, content: { ...content, ...settings } as never },
+          // Settings that no type allows, fed on purpose as a JavaScript host could.
+          { template, content: { ...content, ...settings } as never },
         ]),
       ).rejects.toThrow(/must be/u);
     expect(render).not.toHaveBeenCalled();
@@ -450,6 +467,7 @@ describe("AUD-012-FUN006, FUN007: card settings refuse what they cannot print", 
       profile: { name: "Public fixture" },
     };
     await expect(
+      // A share format that no type allows, fed on purpose as a JavaScript host could.
       ShareCardSet.create(nodeCardRenderer, [PUBLIC_SHARE], options as never, () => 0),
     ).rejects.toThrow(/The share format must be one of: /u);
   });
@@ -489,6 +507,7 @@ describe("AUD-012-API004, API005: date patterns are checked together and owned",
 describe("AUD-012-API006, API007: shared lists cannot be changed or holed", () => {
   it("freezes the BIP39 word counts", () => {
     expect(Object.isFrozen(BIP39_WORD_COUNTS)).toBe(true);
+    // A readonly array changed on purpose, as JavaScript can: the frozen array refuses it.
     expect(() => (BIP39_WORD_COUNTS as unknown as number[]).pop()).toThrow(TypeError);
   });
 
@@ -558,8 +577,13 @@ describe("AUD-011-ARC007, ARC022: one owner for checksum bits and for a path's p
   });
 
   it("describes each Bitcoin address type with the purpose of its paths", () => {
-    const purposes = { p2pkh: 44, "p2sh-p2wpkh": 49, p2wpkh: 84, p2tr: 86 } as const;
-    for (const [type, purpose] of Object.entries(purposes) as [keyof typeof purposes, number][]) {
+    const purposes = [
+      ["p2pkh", 44],
+      ["p2sh-p2wpkh", 49],
+      ["p2wpkh", 84],
+      ["p2tr", 86],
+    ] as const;
+    for (const [type, purpose] of purposes) {
       // The network is the address's to name (CoinAddress.description, S145).
       expect(BITCOIN.describe(type)).toMatch(new RegExp(`^[^,]*\\(BIP${purpose}\\)$`, "u"));
       expect(BITCOIN.accountPathOf(type, 0, 0)).toBe(`m/${purpose}'/0'/0'`);
@@ -572,7 +596,9 @@ describe("AUD-012-SEC003: a candidate list wipes the copies of secrets that it o
   const entropy = new Uint8Array(16);
   /** Whether every array that `spy` returned is all zero. */
   const wiped = (spy: { mock: { results: { value: unknown }[] } }) =>
-    spy.mock.results.every(({ value }) => (value as Uint8Array).every((byte) => byte === 0));
+    spy.mock.results.every(
+      ({ value }) => value instanceof Uint8Array && value.every((byte) => byte === 0),
+    );
 
   it("measures a passphrase without a copy, and wipes the copies it writes", () => {
     const encode = vi.spyOn(TextEncoder.prototype, "encode");
@@ -599,7 +625,9 @@ describe("AUD-012-SEC003: a candidate list wipes the copies of secrets that it o
     bytes[11]! ^= 1;
     const from = vi.spyOn(Uint8Array, "from");
     expect(() => decodeCandidateList(bytes)).toThrow("its CRC-32 does not match");
-    const copies = from.mock.results.filter(({ value }) => (value as Uint8Array).length === 16);
+    const copies = from.mock.results.filter(
+      ({ value }) => value instanceof Uint8Array && value.length === 16,
+    );
     expect(copies.length).toBe(1);
     expect(wiped({ mock: { results: copies } })).toBe(true);
   });
@@ -612,20 +640,12 @@ describe("AUD-012-ARC004, ARC005: one hexadecimal form, one way to name a refuse
   });
 
   it("names a refused date by its place, typed or structured, and keeps the cause", () => {
-    const typed = (() => {
-      try {
-        DatesAnswer.parse("01-01-2026 31-02-2026", { wordCount: 12, patterns: false });
-      } catch (error) {
-        return error as Error;
-      }
-    })()!;
-    const structured = (() => {
-      try {
-        DatesAnswer.of([parseDate("01-01-2026"), { year: 2026, month: 2, day: 31 }]);
-      } catch (error) {
-        return error as Error;
-      }
-    })()!;
+    const typed = refusalOf(() =>
+      DatesAnswer.parse("01-01-2026 31-02-2026", { wordCount: 12, patterns: false }),
+    );
+    const structured = refusalOf(() =>
+      DatesAnswer.of([parseDate("01-01-2026"), { year: 2026, month: 2, day: 31 }]),
+    );
     expect(typed.message).toMatch(/^Date 2: /u);
     expect(structured.message).toBe(typed.message);
     const dayRefused = { code: "core.dates.day-outside-selected-calendar-month" };
@@ -642,6 +662,7 @@ describe("AUD-012-ARC004, ARC005: one hexadecimal form, one way to name a refuse
     );
     let thrown: unknown;
     try {
+      // A date that throws what is no Error when read, fed on purpose as a JavaScript host could.
       DatesAnswer.of([throwing as never]);
     } catch (error) {
       thrown = error;

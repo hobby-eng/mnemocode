@@ -10,6 +10,7 @@
 // Needs from the host: nothing.
 
 import { BIP39_DICTIONARY_SIZE, BIP39_INDEX_BITS, BITS_PER_BYTE } from "../core/bip39-sizes.js";
+import { BYTE_MAX, packWordIndexes, wipedAfter, type BitField } from "../core/bits.js";
 import { CRC32_BYTES, shareMask } from "./checksum.js";
 import { defined } from "../core/defined.js";
 
@@ -21,11 +22,9 @@ export const RGB_BYTES = 3;
 export const COLOR_VERSION = 0xa1;
 /** Shares written as BIP39 word numbers or Unicode codes: MnemoCode's own form, like colors. */
 export const WORD_VERSION = 0xa2;
-/** The largest value of one byte. */
-const BYTE_MASK = 2 ** BITS_PER_BYTE - 1;
 
 /** Bits that a well-formed share holds as zero: their value, and how many bits they are. */
-export type ZeroField = readonly [value: number, bits: number];
+export type ZeroField = BitField;
 
 /** Bytes packed from the units of a share, and the bits left over after the last whole byte. */
 export interface PackedUnits {
@@ -75,33 +74,28 @@ function bytesToWordIndexes(bytes: readonly number[]): number[] {
 /**
  * Bytes from 11-bit word indexes, the first bit highest, and the bits left over after the last
  * whole byte: their value, which a share's zero filling makes 0, and how many they are. The
- * reader of shares and the repair of marked ones both pack words through it.
+ * reader of shares and the repair of marked ones both pack words through it, and it packs them
+ * with core's one packer (packWordIndexes). Refuses a value that is no word index
+ * (core.bip39-sizes.assert-word-indexes-refused).
  */
 export function wordIndexesToBytes(indexes: readonly number[]): {
   readonly bytes: number[];
   readonly leftover: number;
   readonly leftoverBits: number;
 } {
-  const bytes: number[] = [];
-  let buffer = 0;
-  let bits = 0;
-  for (const index of indexes) {
-    buffer = (buffer << BIP39_INDEX_BITS) | index;
-    bits += BIP39_INDEX_BITS;
-    while (bits >= BITS_PER_BYTE) {
-      bits -= BITS_PER_BYTE;
-      bytes.push((buffer >>> bits) & BYTE_MASK);
-    }
-    buffer &= (1 << bits) - 1;
-  }
-  return { bytes, leftover: buffer, leftoverBits: bits };
+  const wholeBytes = Math.floor((indexes.length * BIP39_INDEX_BITS) / BITS_PER_BYTE);
+  // The share's bytes are copied out, and the packing's own array wiped.
+  return wipedAfter(new Uint8Array(wholeBytes), (packed) => {
+    const [leftover, leftoverBits] = packWordIndexes(indexes, packed);
+    return { bytes: Array.from(packed), leftover, leftoverBits };
+  });
 }
 
 /** The bytes of one color, red first. */
 function colorBytes(color: number): number[] {
   return Array.from(
     { length: RGB_BYTES },
-    (_, index) => (color >>> (BITS_PER_BYTE * (RGB_BYTES - 1 - index))) & BYTE_MASK,
+    (_, index) => (color >>> (BITS_PER_BYTE * (RGB_BYTES - 1 - index))) & BYTE_MAX,
   );
 }
 

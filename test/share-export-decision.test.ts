@@ -3,7 +3,7 @@ import { ShareRestore, WALLET_CHECK_NEEDS_THRESHOLD } from "../src/sskr/share-re
 import { NO_PHRASE_FITS } from "../src/sskr/repair-report.js";
 import { ShareSet } from "../src/sskr/share-set.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 
 describe("The shared SSKR export decision", () => {
   it("repairs each share without a quorum and refuses a wallet check of those shares", () => {
@@ -16,7 +16,7 @@ describe("The shared SSKR export decision", () => {
   });
 
   it("exports one restored set and gives no set to save when several fit", async () => {
-    const set = (await ShareSet.restore(sskrSetVector.shares, nodeSharePlatform)).toRepairedSet();
+    const set = (await ShareSet.restore(SSKR_SET_VECTOR.shares, nodeSharePlatform)).toRepairedSet();
     const found = {
       kind: "phrases",
       sets: [set],

@@ -1,5 +1,6 @@
 import { masterFingerprint } from "../bitcoin-evidence.js";
 import { EncodedBackup } from "../core/encoded-backup.js";
+import { EncodedForm } from "../core/encoded-form.js";
 import {
   printCodes,
   terminalLayout,
@@ -12,6 +13,7 @@ import {
   FINGERPRINT_DISCLOSURE,
 } from "./terminal.js";
 import { encodedOutputLabel } from "./input.js";
+import { runningLines } from "./terminal-style.js";
 import type { EncodeOutcome } from "./encode-types.js";
 import { Masking, PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
 import type { EncodedFormat } from "../core/types.js";
@@ -62,16 +64,17 @@ export function printOriginalCopy(
   form: OriginalCopyForm,
   format: EncodedFormat | undefined,
 ): void {
-  // English codes are already words: a request for both shows that phrase only once.
-  if (form !== "codes" || format === "english") {
+  const codes = form === "words" ? undefined : EncodedForm.of(defined(format));
+  // Codes in words are the phrase itself (writtenInWords): a request for both shows it only once.
+  if (form !== "codes" || codes?.writtenInWords === true) {
     if (
       !terminalResultHeader("Original seed phrase", [["Content", "Wallet phrase before Seedshift"]])
     )
       console.log("Original seed phrase (before Seedshift):");
     if (!terminalPhrase(mnemonic)) console.log(mnemonic);
   }
-  if (form !== "words" && format !== "english") {
-    using backup = EncodedBackup.encode(mnemonic, [], defined(format), "direct").backup;
+  if (codes !== undefined && !codes.writtenInWords) {
+    using backup = EncodedBackup.encode(mnemonic, [], codes.format, "direct").backup;
     printEncodedBackup(backup, "Original seed phrase in codes");
   }
   terminalNotice("This is the original wallet backup: no shares or dates are needed.", "warning");
@@ -125,13 +128,18 @@ export function printEncodedBackup(backup: EncodedBackup, title = "Encoded resul
   printCodes(backup.text(), backup.format);
 }
 
+/** `sentence` on standard error, wrapped on a terminal (runningLines). */
+function printSentence(sentence: string): void {
+  for (const line of runningLines(process.stderr, sentence)) console.error(line);
+}
+
 /** Reporting is separate from transformation and file side effects. */
 export function printEncodeResult(outcome: EncodeOutcome, showMaskedWords = false): void {
   const { mode, encoding } = outcome;
   const { backup, result, base, validLastWord } = encoding;
   printEncodedBackup(backup);
-  // English already prints these words as the chosen representation.
-  if (showMaskedWords && backup.format !== "english")
+  // Codes in words already print these words (writtenInWords).
+  if (showMaskedWords && !EncodedForm.of(backup.format).writtenInWords)
     printMaskedWords(result.shiftedEnglish.join(" "), backup.mode);
   // By the rule that decode and sskr-combine show it by (EncodedBackup.fingerprint): only codes
   // that are a valid BIP39 phrase have one, which the Original Seedshift's are only by chance.
@@ -143,25 +151,25 @@ export function printEncodeResult(outcome: EncodeOutcome, showMaskedWords = fals
 
   if (Masking.of(mode).withValidLastWord !== undefined) {
     if (!encoding.lastWordChanged) {
-      console.error(
+      printSentence(
         "Legacy shifted phrase already has a valid BIP39 checksum; no final-word replacement is needed.",
       );
     } else if (!encoding.replaced) {
-      console.error(
+      printSentence(
         `Optional checksum-valid final word: ${defined(validLastWord).shiftedEnglish.at(-1)}`,
       );
-      console.error(
+      printSentence(
         `Optional checksum-valid legacy phrase: ${defined(validLastWord).shiftedEnglish.join(" ")}`,
       );
-      console.error(
+      printSentence(
         "That word replaces the shifted last word; --legacy-valid-last-word records it.",
       );
       terminalMore("transformation-modes");
     } else {
-      console.error(
+      printSentence(
         `Replaced legacy final word ${base.shiftedEnglish.at(-1)} with checksum-valid word ${result.shiftedEnglish.at(-1)}.`,
       );
-      console.error("The shifted last word is not stored; decoding lists the candidates.");
+      printSentence("The shifted last word is not stored; decoding lists the candidates.");
       terminalMore("transformation-modes");
     }
   }

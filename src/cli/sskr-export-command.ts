@@ -1,5 +1,7 @@
 // sskr-export: shares read back, repaired where marked, and written again in another form or as
-// cards, as sskr-split writes them (sskr-output.ts).
+// cards, as sskr-split writes them (sskr-output.ts). From the command line a share that cannot be
+// used ends the command; with --ask-secrets, on the private screen, it is named and typed again, or
+// left out (share-repair.ts).
 
 import {
   NO_SHARE_SETTLED,
@@ -14,7 +16,8 @@ import {
   terminalNotice,
   terminalResultHeader,
 } from "./terminal.js";
-import { reportRenamedOutputs } from "./output-paths.js";
+import { RenamedOutputs } from "./output-paths.js";
+import { clearPrivateScreen } from "./private-screen.js";
 import { assertSingleValues, value, type ParsedArguments } from "./arguments.js";
 import { Masking, PHRASE_WORDS } from "../core/masking.js";
 import { masterFingerprint } from "../bitcoin-evidence.js";
@@ -86,6 +89,9 @@ async function exportSet(
   checked: ShareCardOptions | undefined,
   args: ParsedArguments,
 ): Promise<"exported" | "changed" | Cancelled> {
+  // The result is a step of its own: the questions and the search are cleared away (CORE-39),
+  // before the repairs it reports.
+  clearPrivateScreen();
   reportRepairs(set, places);
   const checkedExport = ShareInput.checkedExport(set, places, given);
   using initialExport = checkedExport.written;
@@ -112,7 +118,7 @@ async function exportSet(
       checked === undefined ? undefined : { ...checked, shareFormat: defined(saved[0]).format };
     if ((await saveShares(saved, args, options, Masking.of(r.mode).masked)) === CANCELLED)
       return CANCELLED;
-    reportRenamedOutputs();
+    RenamedOutputs.report();
     if (written.copiesNote !== undefined) terminalNotice(written.copiesNote);
     // The shares come back as they were split: a page and this screen name what they hold, so
     // that a masked phrase is not taken for the wallet's.

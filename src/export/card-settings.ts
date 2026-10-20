@@ -7,8 +7,6 @@ const ERRORS = new ErrorCatalog("export.card-settings", {
   "page-size": (value0: string) => `Page size must be ${value0}.`,
   "separate-cards-business-size-choose-business-size-leave": () =>
     "Separate cards have the business size. Choose the business size, or leave the size out.",
-  "qr-code-printed-on-sheet-only-choose-size": (value0: string) =>
-    `A QR code is printed on a sheet only. Choose the ${value0} size for a QR code; separate cards never carry one.`,
   orientation: (value0: string) => `Orientation must be ${value0}.`,
   "card-non-empty-text-on-one-line": (value0: string, value1: string) =>
     `Card ${value0} must be non-empty text on one line${value1}`,
@@ -29,7 +27,7 @@ export const CARD_ORIENTATIONS = Object.freeze(["portrait", "landscape"] as cons
 /** An orientation of a sheet of cards (CARD_ORIENTATIONS). */
 export type CardOrientation = (typeof CARD_ORIENTATIONS)[number];
 /** The details of the person on the cards, in the order a host asks for them. */
-export const profileFields = [
+export const PROFILE_FIELDS = [
   "name",
   "role",
   "company",
@@ -38,8 +36,8 @@ export const profileFields = [
   "website",
   "location",
 ] as const;
-/** A detail of the person on the cards (profileFields). */
-export type ProfileField = (typeof profileFields)[number];
+/** A detail of the person on the cards (PROFILE_FIELDS). */
+export type ProfileField = (typeof PROFILE_FIELDS)[number];
 /** How a detail of the person is named to the person and in a refusal: its field, capitalized. */
 export function profileFieldLabel(field: ProfileField): string {
   return capitalized(field);
@@ -100,7 +98,8 @@ export const SHEET_SIZES_TEXT = listInWords(
 
 /**
  * The size that `value` names; a sheet's when none is given (SHEET_PAGE_SIZE). Every export reads
- * a size through it. Refuses a name of no size, naming those there are (page-size).
+ * a size through it. Refuses a name of no size, naming those there are
+ * (export.card-settings.page-size).
  */
 export function parsePageSize(value: string | undefined): CardPageSize {
   if (value === undefined) return SHEET_PAGE_SIZE;
@@ -139,8 +138,9 @@ export function pageSizeLabel(size: CardPageSize): string {
 
 /**
  * The width and height of a page of `size` in `orientation`, in millimetres, both checked by
- * their parsers (parsePageSize, parseOrientation): every card family lays its pages out with it,
- * so that none takes a size or an orientation that another refuses (AUD-012-FUN006).
+ * their parsers (parsePageSize, parseOrientation; export.card-settings.page-size,
+ * export.card-settings.orientation): every card family lays its pages out with it, so that none
+ * takes a size or an orientation that another refuses (AUD-012-FUN006).
  */
 export function pageDimensions(size: string, orientation?: string): [number, number] {
   const [width, height] = PAGE_DIMENSIONS[parsePageSize(size)];
@@ -151,8 +151,9 @@ export function pageDimensions(size: string, orientation?: string): [number, num
 }
 
 /**
- * Refuses a page size or an orientation that no card family prints, before any template draws:
- * the families check them again where they lay their pages out (pageDimensions).
+ * Refuses a page size or an orientation that no card family prints (export.card-settings.page-size,
+ * export.card-settings.orientation), before any template draws: the families check them again
+ * where they lay their pages out (pageDimensions).
  */
 export function assertPageSettings(settings: Pick<CardSettings, "pageSize" | "orientation">): void {
   if (settings.pageSize !== undefined) parsePageSize(settings.pageSize);
@@ -167,13 +168,19 @@ export function isCardPageSize(size: CardPageSize | undefined): size is typeof S
   return size === SEPARATE_CARD_SIZE;
 }
 
-/** The size that `value` names, or without one the size of a `separate` card or of a sheet. */
+/**
+ * The size that `value` names, or without one the size of a `separate` card or of a sheet; refuses
+ * a name of no size (export.card-settings.page-size).
+ */
 export function resolvePageSize(value: string | undefined, separate: boolean): CardPageSize {
   if (value === undefined) return separate ? SEPARATE_CARD_SIZE : SHEET_PAGE_SIZE;
   return parsePageSize(value);
 }
 
-/** Refuses a size given for separate cards other than theirs: they have the business size. */
+/**
+ * Refuses a size given for separate cards other than theirs: they have the business size
+ * (export.card-settings.separate-cards-business-size-choose-business-size-leave).
+ */
 export function assertSeparateCardSize(size: CardPageSize | undefined): void {
   if (size !== undefined && !isCardPageSize(size))
     throw ERRORS.create("separate-cards-business-size-choose-business-size-leave", []);
@@ -186,18 +193,8 @@ export function assertSeparateCardSize(size: CardPageSize | undefined): void {
 export const SHEET_QR_HOLDS = "the codes of the backup, without the extra cards";
 
 /**
- * Refuses a QR code on colour cards of the business size, which are separate cards: a QR code is
- * printed on a sheet only. Share cards have their own rule (sskr-content.ts). Fast, it draws
- * nothing: the renderers check it, and a host before it asks for a secret.
- */
-export function assertSheetQr(card: { readonly kind: string } & CardSettings): void {
-  if (card.kind === "colors" && isCardPageSize(card.pageSize) && card.cardQr === true)
-    throw ERRORS.create("qr-code-printed-on-sheet-only-choose-size", [`${SHEET_SIZES_TEXT}`]);
-}
-
-/**
  * The orientation that `value` names, or none; every export reads an orientation through it.
- * Refuses a name of no orientation, naming those there are (orientation).
+ * Refuses a name of no orientation, naming those there are (export.card-settings.orientation).
  */
 export function parseOrientation(value: string | undefined): CardOrientation | undefined {
   if (value === undefined) return undefined;
@@ -212,9 +209,11 @@ export const MAX_CARD_TEXT_LENGTH = 100;
 
 /**
  * A text of a card as it is drawn, in NFC and trimmed: refused unless it is text on one line
- * without control characters, and no longer than MAX_CARD_TEXT_LENGTH once drawn. The refusal of
- * a blank one says "Card <label> must be non-empty text on one line" and then `blankEnding`, the
- * caller's own rule. A text that it returned, given again, is returned the same.
+ * without control characters (export.card-settings.card-non-empty-text-on-one-line), and no
+ * longer than MAX_CARD_TEXT_LENGTH once drawn
+ * (export.card-settings.card-too-long-maximum-characters). The refusal of a blank one says "Card
+ * <label> must be non-empty text on one line" and then `blankEnding`, the caller's own rule. A
+ * text that it returned, given again, is returned the same.
  */
 export function cardText(text: unknown, label: string, blankEnding: string): string {
   // Measured as drawn: NFC may make a text longer, such as U+0344 two code points, or shorter,
@@ -232,13 +231,29 @@ export function cardText(text: unknown, label: string, blankEnding: string): str
   return drawn;
 }
 
+/** What the refusal of a blank title adds: the rule of a title, which may be left out. */
+const BLANK_TITLE = "; leave it out to print the studio name.";
+
+/**
+ * The title of a sheet as it is drawn in place of the studio name, where a design shows one: a
+ * text of a card (cardText), refused as one with the rule of a title
+ * (export.card-settings.card-non-empty-text-on-one-line,
+ * export.card-settings.card-too-long-maximum-characters). Every way a title reaches the cards
+ * checks it so: the cards of a backup, of shares, and the content a host draws itself.
+ */
+export function cardTitle(title: unknown): string {
+  return cardText(title, "title", BLANK_TITLE);
+}
+
 /**
  * The details of the person, each trimmed and in NFC; refuses a detail that is empty, on more than
- * one line, too long or holds a control character, and a name not in Latin letters.
+ * one line or holds a control character (export.card-settings.card-non-empty-text-on-one-line),
+ * one that is too long (export.card-settings.card-too-long-maximum-characters), and a name not in
+ * Latin letters (export.card-settings.card-name-use-latin-letters-only-spaces-apostrophes).
  */
 export function validateProfile(profile: CardProfile = {}): CardProfile {
   const result: Record<string, string> = {};
-  for (const field of profileFields) {
+  for (const field of PROFILE_FIELDS) {
     const text = profile[field];
     if (text === undefined) continue;
     const normalized = cardText(text, field, ", without control characters.");

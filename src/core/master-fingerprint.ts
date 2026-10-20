@@ -119,7 +119,10 @@ function checkedSeed(seed: unknown): Uint8Array {
 export class Bip39Seed {
   readonly #pbkdf2: Pbkdf2HmacSha512;
 
-  /** Refuses a non-text passphrase before it is retained or interpolated; no normalization. */
+  /**
+   * Refuses a non-text passphrase before it is retained or interpolated, as a TypeError
+   * (core.master-fingerprint.expected-string-passphrase); no normalization.
+   */
   static assertPassphraseType(value: unknown): asserts value is string {
     if (typeof value !== "string") throw ERRORS.create("expected-string-passphrase", []);
   }
@@ -134,7 +137,14 @@ export class Bip39Seed {
     this.#pbkdf2 = pbkdf2;
   }
 
-  /** The seed from a PBKDF2 that answers at once; refused when it answers later. */
+  /**
+   * The seed from a PBKDF2 that answers at once; refused when it answers later, as a TypeError
+   * (core.master-fingerprint.host-s-pbkdf2-answers-later-use-match-async). Refuses a phrase or a
+   * passphrase that is not well-formed text (expected-string, expected-well-formed-unicode-string,
+   * expected-string-passphrase), a phrase of a word count that BIP39 does not have
+   * (invalid-mnemonic), and an answer that is not a seed's 64 bytes (host-s-pbkdf2-gave-no-bytes,
+   * host-s-pbkdf2-gave-bytes-not); what the host's PBKDF2 throws passes on.
+   */
   now(mnemonic: string, passphrase: string): Uint8Array {
     const { phrase, salt } = seedInput(mnemonic, passphrase);
     const seed = this.#pbkdf2(phrase, salt, SEED_ROUNDS, SEED_BYTES);
@@ -151,7 +161,11 @@ export class Bip39Seed {
     return checkedSeed(seed);
   }
 
-  /** The seed, as @scure/bip39 mnemonicToSeed gives it, from a PBKDF2 that may answer later. */
+  /**
+   * The seed, as @scure/bip39 mnemonicToSeed gives it, from a PBKDF2 that may answer later. Refuses
+   * what `now` refuses of the phrase, the passphrase and the answer
+   * (core.master-fingerprint.invalid-mnemonic and the others it names).
+   */
   async later(mnemonic: string, passphrase: string): Promise<Uint8Array> {
     const { phrase, salt } = seedInput(mnemonic, passphrase);
     return checkedSeed(await this.#pbkdf2(phrase, salt, SEED_ROUNDS, SEED_BYTES));
@@ -160,6 +174,8 @@ export class Bip39Seed {
    * What `use` makes of the master key of the wallet of `mnemonic`, from a PBKDF2 that answers at
    * once: the seed and the key are wiped once `use` returns, so `use` must not keep the key or
    * answer later. `versions` are the root's version bytes; BIP32's default ones by default.
+   * Refuses what `now` refuses (core.master-fingerprint.host-s-pbkdf2-answers-later-use-match-async
+   * and the others it names); what `use` throws passes on.
    */
   withRoot<T>(
     mnemonic: string,
@@ -170,7 +186,10 @@ export class Bip39Seed {
     return useRoot(this.now(mnemonic, passphrase), use, versions);
   }
 
-  /** The same as withRoot, with a PBKDF2 that may answer later. */
+  /**
+   * The same as withRoot, with a PBKDF2 that may answer later: refuses what `later` refuses
+   * (core.master-fingerprint.invalid-mnemonic and the others it names).
+   */
   async withRootLater<T>(
     mnemonic: string,
     passphrase: string,

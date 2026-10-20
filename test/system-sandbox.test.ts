@@ -8,7 +8,7 @@ import {
   type SeccompArchitecture,
 } from "../src/cli/sandbox-linux.js";
 import { macSandboxProfile } from "../src/cli/sandbox-macos.js";
-import { SandboxRecord, switchOffCoreDumps } from "../src/cli/sandbox-record.js";
+import { SandboxRecord, switchOffCoreDumps, zeroCoreDumpLimit } from "../src/cli/sandbox-record.js";
 
 const execute = promisify(execFile);
 
@@ -135,6 +135,22 @@ describe("the record of a sandbox", () => {
       }),
     ).toEqual({ state: "failed", reason: "setrlimit refused RLIMIT_CORE 0" });
   });
+
+  it("sets both core dump limits to 0 through setrlimit, and says when the system refuses", () => {
+    const calls: [number, Buffer][] = [];
+    zeroCoreDumpLimit((resource, limit) => {
+      calls.push([resource, Buffer.from(limit)]);
+      return 0;
+    });
+    // RLIMIT_CORE is 4 on Linux and macOS (sys/resource.h); struct rlimit is two 64-bit zeros.
+    expect(calls).toEqual([[4, Buffer.alloc(16)]]);
+    expect(() => zeroCoreDumpLimit(() => -1)).toThrow(
+      expect.objectContaining({
+        code: "cli.sandbox-record.setrlimit-refused-rlimit-core-0",
+        message: "setrlimit refused RLIMIT_CORE 0",
+      }),
+    );
+  });
 });
 
 describe("the sandbox of this system, in a protected process", () => {
@@ -160,7 +176,13 @@ describe("the sandbox of this system, in a protected process", () => {
       "-e",
       script,
     ]);
-    return JSON.parse(stdout) as { summary: string; report: string; ffi: boolean };
+    const run: unknown = JSON.parse(stdout);
+    const field = (name: string): unknown =>
+      typeof run === "object" && run !== null ? Reflect.get(run, name) : undefined;
+    const [summary, report, ffi] = [field("summary"), field("report"), field("ffi")];
+    if (typeof summary !== "string" || typeof report !== "string" || typeof ffi !== "boolean")
+      throw new Error("The protected process printed no summary, report and FFI permission.");
+    return { summary, report, ffi };
   }
 
   it("enforces what the system offers, and gives up FFI after it", async () => {

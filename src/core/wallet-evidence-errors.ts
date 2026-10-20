@@ -15,6 +15,8 @@ export const ERRORS = new ErrorCatalog("core.wallet-evidence", {
   "at-least-one-bitcoin-address-profile-selected": () =>
     "At least one Bitcoin address profile must be selected.",
   "unknown-bitcoin-address-profile": () => "Unknown Bitcoin address profile.",
+  "bitcoin-address-profile-given-twice": () =>
+    "Each Bitcoin address profile may be named only once.",
   "compressed-public-key-exactly-bytes-encoded-as-hexadecimal": (value0: string, value1: string) =>
     `A compressed public key must be exactly ${value0} bytes encoded as ${value1} hexadecimal characters.`,
   "compressed-public-key-start-02-03": () => "A compressed public key must start with 02 or 03.",

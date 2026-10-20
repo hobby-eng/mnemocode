@@ -19,13 +19,19 @@ const FIRST_RECEIVING: Readonly<Record<Exclude<CoinId, "bitcoin">, string>> = {
   zcash: "t1XVXWCvpMgBvUaed4XDqWtgQgJSu1Ghz7F",
 };
 
+/** Whether `id` names a coin besides Bitcoin, one that FIRST_RECEIVING gives an address of. */
+function isOtherCoin(id: CoinId): id is Exclude<CoinId, "bitcoin"> {
+  return id !== "bitcoin";
+}
+
 /**
  * The answers to the menu's address question of each coin besides Bitcoin, by its prompt, such
  * as "Address (Dash, one of the first receiving ones)".
  */
 export const COIN_ADDRESS_ANSWERS: Readonly<Record<string, string>> = Object.fromEntries(
-  COINS.filter((coin) => coin.id !== "bitcoin").map((coin) => [
-    `Address (${coin.name}, one of the first receiving ones)`,
-    FIRST_RECEIVING[coin.id as Exclude<CoinId, "bitcoin">],
-  ]),
+  COINS.flatMap(({ id, name }) =>
+    isOtherCoin(id)
+      ? [[`Address (${name}, one of the first receiving ones)`, FIRST_RECEIVING[id]]]
+      : [],
+  ),
 );

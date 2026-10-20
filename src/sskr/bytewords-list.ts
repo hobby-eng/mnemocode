@@ -2,7 +2,7 @@ import { defined } from "../core/defined.js";
 // Blockchain Commons Bytewords (BCR-2020-012); extracted from pinned bc-ur WASM.
 // Copyright Blockchain Commons; BSD-2-Clause-Patent. See sskr-wasm/NOTICE.md.
 /** The 256 Bytewords, each standing for the byte of its place in the list. */
-export const bytewords = [
+export const BYTEWORDS = [
   "able",
   "acid",
   "also",
@@ -261,16 +261,21 @@ export const bytewords = [
   "zoom",
 ] as const;
 
-/** The letters of every Byteword (BCR-2020-012). */
-const BYTEWORD_LETTERS = 4;
+/** The letters of every Byteword (BCR-2020-012); a test checks each word of the list against it. */
+export const BYTEWORD_LETTERS = 4;
 
 /** The minimal form of each Byteword, its first and last letters, by byte: a UR writes these. */
 export const MINIMAL_BYTEWORDS: readonly string[] = Object.freeze(
-  bytewords.map((word) => defined(word[0]) + defined(word[BYTEWORD_LETTERS - 1])),
+  BYTEWORDS.map((word) => defined(word[0]) + defined(word[BYTEWORD_LETTERS - 1])),
 );
+/**
+ * The letters of a minimal Byteword, the first and last of a Byteword (BCR-2020-012), as a UR
+ * writes each byte: those of the first, as of every one.
+ */
+export const MINIMAL_BYTEWORD_LETTERS = defined(MINIMAL_BYTEWORDS[0]).length;
 /** The byte of each Byteword, and of each minimal form. */
 export const BYTEWORD_VALUES: ReadonlyMap<string, number> = new Map(
-  bytewords.map((word, value) => [word, value]),
+  BYTEWORDS.map((word, value) => [word, value]),
 );
 /** The byte that each minimal Byteword, the first and last letters of a Byteword, stands for. */
 export const MINIMAL_BYTEWORD_VALUES: ReadonlyMap<string, number> = new Map(

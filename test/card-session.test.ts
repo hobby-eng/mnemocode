@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCardSession } from "../src/cards.js";
+import { CardSession, createCardSession } from "../src/cards.js";
 import type { UniformChoice } from "../src/export/platform.js";
 
 const FIRST_CHOICE: UniformChoice = () => 0;
@@ -7,7 +7,7 @@ const REPEATED_EXPORTS = 20;
 
 describe("card session", () => {
   it("gives the same invented details for every export of one session", () => {
-    const session = createCardSession(FIRST_CHOICE);
+    const session = new CardSession(FIRST_CHOICE);
     const first = session.settingsFor("business-it");
     for (let attempt = 0; attempt < REPEATED_EXPORTS; attempt += 1)
       expect(session.settingsFor("business-it")).toEqual(first);
@@ -26,7 +26,7 @@ describe("card session", () => {
       choices += 1;
       return last ? upperExclusive - 1 : 0;
     };
-    const first = createCardSession(choose);
+    const first = new CardSession(choose);
     const original = first.settingsFor("business-it");
     expect(original.profile).toMatchObject({
       name: "Alex Morgan",
@@ -37,7 +37,7 @@ describe("card session", () => {
     last = true;
     expect(first.settingsFor("business-it")).toEqual(original);
     const before = choices;
-    const fresh = createCardSession(choose).settingsFor("business-it");
+    const fresh = new CardSession(choose).settingsFor("business-it");
     expect(choices).toBeGreaterThan(before);
     expect(fresh.profile).toMatchObject({
       name: "Amina Diallo",
@@ -49,7 +49,7 @@ describe("card session", () => {
   });
 
   it("prints what the user supplies and keeps the rest", () => {
-    const session = createCardSession(FIRST_CHOICE);
+    const session = new CardSession(FIRST_CHOICE);
     const invented = session.settingsFor("business-it");
     const own = session.settingsFor(
       "business-it",
@@ -66,5 +66,9 @@ describe("card session", () => {
     // Supplying details does not disturb what the session remembers.
     expect(session.settingsFor("business-it")).toEqual(invented);
     expect(() => session.settingsFor("business-it", { name: "1234" })).toThrow("Latin letters");
+  });
+
+  it("is made by the package entry's factory too", () => {
+    expect(createCardSession(FIRST_CHOICE)).toBeInstanceOf(CardSession);
   });
 });

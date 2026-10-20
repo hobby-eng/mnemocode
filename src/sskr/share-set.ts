@@ -13,7 +13,7 @@
 
 import { formatEncoded } from "../core/representations.js";
 import { representMnemonic } from "../core/seedshift.js";
-import { wordCountOfEntropy, WORD_NUMBERS_SPAN } from "../core/bip39-sizes.js";
+import { wordCountOfEntropy } from "../core/bip39-sizes.js";
 import { fingerprintOfValidPhrase } from "../core/english-words.js";
 import type { EncodedFormat } from "../core/types.js";
 import { JointRepair, searchOnce } from "./joint-repair.js";
@@ -37,6 +37,7 @@ import {
   Share,
   type ShareFormat,
   MIRRORED_FORM,
+  SHARE_FORMAT_NAMES,
 } from "./transport.js";
 import type { ShareInfo } from "./share-layout.js";
 import { copiesAmong, SetTopology, type PlacedShare, withoutCopies } from "./set-topology.js";
@@ -85,15 +86,9 @@ const ERRORS = new ErrorCatalog("sskr.share-set", {
 // The copy rule belongs to set-topology.ts; here too for the modules that take it with a set.
 export { copiesAmong, type PlacedShare };
 
-/** The share forms as a person reads their names (ShareFormat, transport.ts). */
-export const SHARE_FORMAT_NAMES: Readonly<Record<ShareFormat, string>> = {
-  ur: "Compact UR",
-  words: "Bytewords",
-  indexes: `BIP39 word numbers (${WORD_NUMBERS_SPAN})`,
-  unicode: "Unicode codes",
-  colors: "RGB hexadecimal codes (ordered)",
-  "colors-unicode": "Colors as Unicode codes",
-};
+// The names of the share forms belong to the forms (transport.ts); here too for the modules and
+// hosts that take them with a set.
+export { SHARE_FORMAT_NAMES };
 
 /** The form in which a restored backup is shown: the one its shares look like (transport.ts). */
 export const RESTORED_FORM: Readonly<Record<ShareFormat, EncodedFormat>> = MIRRORED_FORM;
@@ -246,12 +241,23 @@ export class ShareSet extends Redacted implements Disposable {
     return new ShareSet(defined(found[0]));
   }
 
-  /** A phrase that a search of marked shares found (JointPlan.search), as a share set. */
+  /**
+   * A restored set as a share set: one that a search of marked shares found (JointPlan.search), or
+   * one that combineSskrShareSet or toRepairedSet gave. Every share is read again. Refuses a set
+   * without shares (sskr.share-set.share-set-at-least-one-share), a share whose UR does not read
+   * (Share.read's refusals, sskr.transport), a share of no RepairedSet shape
+   * (sskr.share-values.shape, a TypeError), a phrase that is no text (core.secret-value.text, a
+   * TypeError), and an unsettled or unchecked position that is not a whole number from 1
+   * (sskr.share-set.repair-position, a TypeError).
+   */
   static of(set: RepairedSet): ShareSet {
     return new ShareSet(set);
   }
 
-  /** Words of the phrase whose secret has `secretBytes`, as the shares and an assessment tell. */
+  /**
+   * Words of the phrase whose secret has `secretBytes` bytes, as the shares and an assessment tell.
+   * Refuses a length that no BIP39 phrase has (sskr.share-set.share-s-secret-no-bip39-length).
+   */
   static wordCountOf(secretBytes: number): number {
     const words = wordCountOfEntropy(secretBytes);
     if (words === undefined) throw ERRORS.create("share-s-secret-no-bip39-length", []);
@@ -529,7 +535,9 @@ export class ShareExport extends Redacted implements Disposable {
 
   /**
    * The shares of `set`, repaired or not, named by `places`, by their index in the set; each in
-   * `format`, or without it in the form it was written in.
+   * `format`, or without it in the form it was written in. Refuses a `format` that names no form
+   * (sskr.transport.share-format-one), and fewer places than shares or a place that is not a whole
+   * number from 1 (sskr.share-set.each-share-place-among-typed-whole-number-from).
    */
   static of(set: RepairedShares, places: readonly number[], format?: ShareFormat): ShareExport {
     // Refused here, where it is bound to the shares, not once a share is written (AUD-001-API001).
@@ -583,7 +591,7 @@ export class ShareExport extends Redacted implements Disposable {
   }
 
   /** The shares shown, by place, as a check that they belong to one set takes them. */
-  get members(): readonly { readonly place: number; readonly ur: string }[] {
+  get members(): readonly PlacedShare[] {
     return this.shown.map((share) => ({ place: share.number, ur: share.ur }));
   }
 

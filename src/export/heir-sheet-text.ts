@@ -12,7 +12,12 @@
 // (src/cli/heir-sheet.ts), a page through its tabs.
 // Does not: lay out the sheet (export/heir-sheet.ts renders these words in A5 or A6) or save it.
 
-import { assertWordCount, WORD_NUMBERS, type Bip39WordCount } from "../core/bip39-sizes.js";
+import {
+  assertWordCount,
+  WORD_COUNT_RANGE_TEXT,
+  WORD_NUMBERS,
+  type Bip39WordCount,
+} from "../core/bip39-sizes.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { Masking, type HeirSheetMode, type SplitMode } from "../core/masking.js";
 import {
@@ -50,11 +55,25 @@ export type HeirShareMode = Extract<HeirSheetMode, SplitMode>;
  * backup, as printed cards end with decoys that belong to nothing (owner, 2026-10-13).
  */
 export type HeirBackup =
-  | { readonly kind: "encoded"; readonly format: EncodedFormat; readonly words: Bip39WordCount }
   | {
+      /** The seed phrase in one encoded form. */
+      readonly kind: "encoded";
+      /** The form that the codes are written in. */
+      readonly format: EncodedFormat;
+      /** How many words the seed phrase has: a length that BIP39 has. */
+      readonly words: Bip39WordCount;
+    }
+  | {
+      /** Shamir shares of the seed phrase. */
       readonly kind: "shares";
+      /** The form that the shares are written in. */
       readonly format: ShareFormat;
+      /**
+       * How many of the shares restore the seed phrase: a whole number from MIN_RECORDED_THRESHOLD
+       * to `count`.
+       */
       readonly threshold: number;
+      /** How many shares were made: a whole number, at most MAX_GROUP_MEMBERS, a group's most. */
       readonly count: number;
       /** The codes of one share on its cards, before the decoys; where its form has cards. */
       readonly codes?: number;
@@ -165,13 +184,26 @@ function printedCodesLine(backup: HeirBackup): string[] {
   return [`${words} On printed cards its backup is the first ${codes} codes; ${DECOYS_AFTER}.`];
 }
 
-function needs({ backup, mode, dates }: HeirSheetFacts): string[] {
+/**
+ * Whether the backup is the seed phrase itself, which needs no program at all: codes that are its
+ * English words (EncodedForm writtenInWords), not masked.
+ */
+function isPhraseItself({ backup, mode }: HeirSheetFacts): boolean {
+  return (
+    backup.kind === "encoded" &&
+    EncodedForm.of(backup.format).writtenInWords &&
+    !Masking.of(mode).masked
+  );
+}
+
+function needs(facts: HeirSheetFacts): string[] {
+  const { backup, mode, dates } = facts;
   const lines =
     backup.kind === "shares"
       ? [
           `Any ${backup.threshold} of the ${backup.count} Shamir shares, written as ${SHARE_LOOKS[backup.format]}.`,
         ]
-      : !Masking.of(mode).masked && backup.format === "english"
+      : isPhraseItself(facts)
         ? [`The seed phrase itself: ${backup.words} English words, not masked.`]
         : [`The backup: ${ENCODED_LOOKS[backup.format]}.`, ...printedCodesLine(backup)];
   if (backup.kind === "shares") lines.push(...printedCodesLine(backup));
@@ -201,7 +233,7 @@ function basics({ mode }: HeirSheetFacts): HeirSheetSection[] {
     {
       heading: "Seed phrase",
       paragraphs: [
-        "Cryptocurrency is recorded on a public ledger, not at a bank. Whoever knows the seed phrase of a wallet, 12 to 24 English words from the BIP39 list, can spend what it holds; any BIP39 wallet program opens it.",
+        `Cryptocurrency is recorded on a public ledger, not at a bank. Whoever knows the seed phrase of a wallet, ${WORD_COUNT_RANGE_TEXT} English words from the BIP39 list, can spend what it holds; any BIP39 wallet program opens it.`,
       ],
     },
   ];
@@ -313,7 +345,22 @@ export class HeirInstructions {
     this.#route = route;
   }
 
-  /** The words of the sheet for `facts`, ready for renderHeirSheet (export/heir-sheet.ts). */
+  /**
+   * The words of the sheet for `facts`, ready for renderHeirSheet (export/heir-sheet.ts). Refuses
+   * facts that would print a wrong sheet: a mode for which no sheet is made
+   * (core.masking.sheet-heirs-cannot-made-only-search-finds-seed); shares in a mode that makes none
+   * (core.masking.split-modes-only); a backup of another kind
+   * (export.heir-sheet-text.sheet-heirs-made-encoded-backup-shamir-shares); a form that does not
+   * exist (core.encoded-form.unsupported-encoded-format, sskr.transport.share-format-one); a count
+   * of words that no phrase has (core.bip39-sizes.expected-word-indexes); an impossible quorum
+   * (export.heir-sheet-text.sheet-heirs-threshold-from-number-shares-at-most); codes that are no
+   * whole number from 1 (export.heir-sheet-text.sheet-heirs-whole-number-codes-each-share); dates
+   * that are no whole number from 0 (export.heir-sheet-text.sheet-heirs-whole-number-dates), given
+   * where the mode takes none (core.masking.assert-takes-dates-refused) or missing where it needs
+   * them (core.masking.assert-date-count-refused). Refuses words of the route that would print its
+   * address twice, or another address
+   * (export.heir-sheet-text.sheet-heirs-may-print-route-s-address-once).
+   */
   text(facts: HeirSheetFacts): HeirSheetText {
     assertFacts(facts);
     const text: HeirSheetText = {
@@ -345,21 +392,19 @@ export class HeirInstructions {
     return text;
   }
 
-  #steps({ backup, mode, dates }: HeirSheetFacts): string[] {
-    // The seed phrase itself needs no program at all.
-    if (backup.kind === "encoded" && backup.format === "english" && !Masking.of(mode).masked)
-      return [OPEN_WALLET];
+  #steps(facts: HeirSheetFacts): string[] {
+    const { backup, mode, dates } = facts;
+    if (isPhraseItself(facts)) return [OPEN_WALLET];
     // As the programs ask for them: day-month-year, as datesPrompt and the share prompt do.
     const typedDates = !Masking.of(mode).masked
       ? undefined
       : `the secret ${dates === 1 ? "date" : "dates"} as day-month-year (23-09-2026)`;
     const route = this.#route;
-    const open =
-      // assertFacts checked that shares have a mode that makes shares (Masking.assertSplitMode).
-      backup.kind === "shares"
-        ? route.restore(mode as HeirShareMode, backup.threshold, typedDates)
-        : route.decode(mode, backup.words, typedDates);
-    return [...route.start, ...open, OPEN_WALLET];
+    if (backup.kind === "encoded")
+      return [...route.start, ...route.decode(mode, backup.words, typedDates), OPEN_WALLET];
+    // assertFacts refused shares in a mode that makes none; the same check narrows the mode here.
+    Masking.assertSplitMode(mode);
+    return [...route.start, ...route.restore(mode, backup.threshold, typedDates), OPEN_WALLET];
   }
 
   #trouble({ backup, mode }: HeirSheetFacts): string {

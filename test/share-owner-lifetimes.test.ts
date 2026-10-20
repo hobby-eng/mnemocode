@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ShareInput } from "../src/sskr/share-input.js";
 import { ShareExport, ShareSet } from "../src/sskr/share-set.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import type { RepairedSet } from "../src/sskr/joint-results.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SecretValue } from "../src/core/secret-value.js";
@@ -9,8 +9,8 @@ import { endLifetimeIfPresent as endIfPresent } from "./helpers/owner-lifetime.j
 
 function publicSet(): RepairedSet {
   return {
-    mnemonic: sskrSetVector.phrase,
-    shares: sskrSetVector.shares.slice(0, 2).map((ur) => ({
+    mnemonic: SSKR_SET_VECTOR.phrase,
+    shares: SSKR_SET_VECTOR.shares.slice(0, 2).map((ur) => ({
       ur,
       format: "ur",
       repaired: true,
@@ -37,7 +37,7 @@ describe("Owned SSKR input, restored sets and exports", () => {
       expect(() => set.shares).toThrow("has been wiped");
       expect(() => set.toRepairedSet()).toThrow("has been wiped");
       expect(before).toEqual(given);
-      expect(given.shares[0]!.ur).toBe(sskrSetVector.shares[0]);
+      expect(given.shares[0]!.ur).toBe(SSKR_SET_VECTOR.shares[0]);
     } finally {
       endIfPresent(set);
     }
@@ -53,9 +53,9 @@ describe("Owned SSKR input, restored sets and exports", () => {
       expect(() => written.shown).toThrow("has been wiped");
       expect(() => written.saved).toThrow("has been wiped");
       expect(() => written.inForm("ur")).toThrow("has been wiped");
-      expect(copy.saved.map(({ ur }) => ur)).toEqual(sskrSetVector.shares.slice(0, 2));
+      expect(copy.saved.map(({ ur }) => ur)).toEqual(SSKR_SET_VECTOR.shares.slice(0, 2));
       expect(before.map(({ number }) => number)).toEqual([1, 3]);
-      expect(set.shares[0]!.ur).toBe(sskrSetVector.shares[0]);
+      expect(set.shares[0]!.ur).toBe(SSKR_SET_VECTOR.shares[0]);
     } finally {
       endIfPresent(written);
       endIfPresent(copy);
@@ -68,22 +68,23 @@ describe("Owned SSKR input, restored sets and exports", () => {
     const made = vi.spyOn(SecretValue, "utf16Texts");
     const input = new ShareInput({ decodeEntry: "The Decode tab" });
     try {
-      input.add([sskrSetVector.shares[0], sskrSetVector.shares[1]]);
+      input.add([SSKR_SET_VECTOR.shares[0], SSKR_SET_VECTOR.shares[1]]);
       const before = input.list;
       const retained = made.mock.results.filter(
         (owner, index) =>
-          owner.type === "return" && made.mock.calls[index]?.[0].includes(sskrSetVector.shares[0]),
+          owner.type === "return" &&
+          made.mock.calls[index]?.[0].includes(SSKR_SET_VECTOR.shares[0]),
       );
       expect(retained.length).toBeGreaterThan(0);
-      input.replace(1, sskrSetVector.shares[2]);
+      input.replace(1, SSKR_SET_VECTOR.shares[2]);
       for (const owner of retained)
         if (owner.type === "return") expect(() => owner.value.value).toThrow("has been wiped");
       input.leaveOut(1);
       expect(input.places()).toEqual([2]);
       endIfPresent(input);
       expect(() => input.texts()).toThrow("has been wiped");
-      expect(() => input.add([sskrSetVector.shares[0]])).toThrow("has been wiped");
-      expect(before.map(({ text }) => text)).toEqual(sskrSetVector.shares.slice(0, 2));
+      expect(() => input.add([SSKR_SET_VECTOR.shares[0]])).toThrow("has been wiped");
+      expect(before.map(({ text }) => text)).toEqual(SSKR_SET_VECTOR.shares.slice(0, 2));
     } finally {
       endIfPresent(input);
     }
@@ -91,7 +92,7 @@ describe("Owned SSKR input, restored sets and exports", () => {
 
   it("refuses a restored set returned after its input owner was disposed", async () => {
     const input = new ShareInput({ decodeEntry: "The Decode tab" });
-    input.add(sskrSetVector.shares.slice(0, 2));
+    input.add(SSKR_SET_VECTOR.shares.slice(0, 2));
     let finish: (() => void) | undefined;
     let waiting = true;
     const pending = input.restoreComplete({

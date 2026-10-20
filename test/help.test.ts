@@ -1,13 +1,10 @@
-import { execFile } from "node:child_process";
-import { join } from "node:path";
-import { promisify } from "node:util";
 import { describe, expect, it, vi } from "vitest";
 import { flagOf } from "../src/cli/arguments.js";
-import { commandOptions, type CommandName } from "../src/cli/command-options.js";
-import { commandHelp, topicHelp } from "../src/cli/help-pages.js";
+import { COMMAND_OPTIONS, isCommandName } from "../src/cli/command-options.js";
+import { COMMAND_HELP, TOPIC_HELP } from "../src/cli/help-pages.js";
 import { printCommandHelp, printNamedHelp } from "../src/cli/usage.js";
 import { runCommandLine } from "../src/cli/command-line.js";
-import { STYLE_CODES } from "../src/cli/terminal-style.js";
+import { STYLE, STYLE_CODES } from "../src/cli/terminal-style.js";
 import { QUESTION_HOURS } from "../src/core/search-turns.js";
 import { DEFAULT_ADDRESS_COUNT } from "../src/core/address-scan.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
@@ -19,40 +16,45 @@ import { MASKING_MODES } from "../src/core/types.js";
 import { MAX_SEARCH_COMBINATIONS, MAX_SHOWN_CANDIDATES } from "../src/core/candidates.js";
 import { counting } from "../src/core/search-plan.js";
 import {
-  bitcoinProfiles,
+  BITCOIN_PROFILES,
   BITCOIN_NETWORKS,
   extendedPublicKeyPrefixes,
 } from "../src/core/wallet-evidence.js";
 import { containing } from "./helpers/matchers.js";
-
-const execFileAsync = promisify(execFile);
-const cli = join(process.cwd(), "dist", "mnemocode.js");
-
-async function run(arguments_: readonly string[]) {
-  return execFileAsync(process.execPath, [cli, ...arguments_], {
-    env: { ...process.env, NO_COLOR: "1" },
-  });
-}
+import { runBuiltCli as run } from "./helpers/built-cli.js";
 
 describe("help", () => {
   it("documents exactly the options each command accepts", () => {
-    for (const name of Object.keys(commandOptions) as CommandName[]) {
-      const documented = commandHelp[name].groups.flatMap((group) =>
+    for (const name of Object.keys(COMMAND_OPTIONS).filter(isCommandName)) {
+      const documented = COMMAND_HELP[name].groups.flatMap((group) =>
         group.options.map((option) => option.flag),
       );
       // Each parser key as it is typed, "--dates" for "date" (flagOf).
-      const accepted = commandOptions[name].map((key) => flagOf(key));
+      const accepted = COMMAND_OPTIONS[name].map((key) => flagOf(key));
       expect([...new Set(documented)].sort(), name).toEqual([...accepted].sort());
     }
+  });
+
+  it("says which mode sskr-split takes without --mode, and that a share's decoy card is not needed", () => {
+    const mode = COMMAND_HELP["sskr-split"].groups
+      .flatMap((group) => group.options)
+      .find((option) => option.flag === "--mode");
+    expect(mode?.summary).toBe("direct or seedshift; see mnemocode help modes");
+    expect(mode?.details).toEqual([
+      "Without --mode, MnemoCode uses seedshift when --dates-file is given and direct otherwise.",
+    ]);
+    expect(COMMAND_HELP["sskr-combine"].notes?.[0]).toBe(
+      "Every real card of one share is needed, in numbered order, to rebuild that share; its last card is a decoy and may be left out.",
+    );
   });
 
   it("lists every command and topic in the overview", async () => {
     for (const argument of [[], ["--help"], ["-h"], ["help"]]) {
       const { stdout } = await run(argument);
       expect(stdout).toContain("MnemoCode 0.1.0");
-      for (const name of Object.keys(commandOptions).filter((item) => item !== "sskr-split"))
+      for (const name of Object.keys(COMMAND_OPTIONS).filter((item) => item !== "sskr-split"))
         expect(stdout).toContain(`  ${name}`);
-      for (const topic of Object.keys(topicHelp)) expect(stdout).toContain(`help ${topic}`);
+      for (const topic of Object.keys(TOPIC_HELP)) expect(stdout).toContain(`help ${topic}`);
       expect(stdout).toContain("Recovery material:");
       // AUD-005-UI002: the overview, including its safety line, fits the 80-column help width.
       for (const line of stdout.split("\n")) expect(line.length, line).toBeLessThanOrEqual(80);
@@ -65,9 +67,10 @@ describe("help", () => {
       lines.push(...text.split("\n"));
     });
     try {
-      for (const name of [...Object.keys(commandHelp), ...Object.keys(topicHelp)])
+      for (const name of [...Object.keys(COMMAND_HELP), ...Object.keys(TOPIC_HELP)])
         expect(printNamedHelp(name), name).toBe(true);
-      for (const name of Object.keys(commandHelp) as CommandName[]) printCommandHelp(name, false);
+      for (const name of Object.keys(COMMAND_HELP).filter(isCommandName))
+        printCommandHelp(name, false);
     } finally {
       log.mockRestore();
     }
@@ -149,6 +152,61 @@ describe("help", () => {
   });
 });
 
+describe("help notes and the cards they describe", () => {
+  it("prints a topic's notes grey, after its examples and before the safety line", () => {
+    vi.stubEnv("CLICOLOR_FORCE", "1");
+    vi.stubEnv("NO_COLOR", "");
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((text: string) => {
+      lines.push(...text.split("\n"));
+    });
+    try {
+      printNamedHelp("formats");
+    } finally {
+      log.mockRestore();
+      vi.unstubAllEnvs();
+    }
+    const plain = lines.map((line) => line.replace(STYLE_CODES, ""));
+    const note = plain.findIndex((line) => line.startsWith("Every format is a representation"));
+    expect(note).toBeGreaterThan(plain.indexOf("Examples:"));
+    expect(plain).not.toContain("Notes:");
+    // Grey, as a command's notes are (CORE-35, CORE-37).
+    expect(lines[note]?.startsWith(`\x1b[${STYLE.muted}m`)).toBe(true);
+  });
+
+  it("says on every page that only the real cards are needed, and that each share file holds one share", () => {
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((text: string) => {
+      lines.push(...text.split("\n"));
+    });
+    try {
+      for (const name of [...Object.keys(COMMAND_HELP), ...Object.keys(TOPIC_HELP)])
+        printNamedHelp(name);
+    } finally {
+      log.mockRestore();
+    }
+    // Separate cards end with a decoy (INDIVIDUAL_DECOYS), which no restore needs.
+    const text = lines.join(" ").replace(/\s+/gu, " ");
+    expect(text).not.toMatch(/every card (of a share )?is needed/iu);
+    expect(text).toContain(
+      "every real card is needed, and each reveals a part of the encoded phrase",
+    );
+    expect(text).toContain("Every real card is needed to recover the phrase");
+    // The commands of shares save one share in each file or folder of --cards-dir.
+    for (const command of ["sskr-split", "sskr-export"] as const) {
+      const options = COMMAND_HELP[command].groups.flatMap((group) => group.options);
+      const option = (flag: string) => options.find((each) => each.flag === flag);
+      expect(option("--cards-dir")?.details, command).toEqual([
+        "Each file or folder holds one share: keep them in different places. A taken name is numbered, never replaced.",
+      ]);
+      expect(option("--card-qr")?.summary, command).toBe(
+        "Add a QR code of its own share to each collection sheet",
+      );
+      expect(option("--image-format")?.details?.[0], command).not.toContain("one PDF per card;");
+    }
+  });
+});
+
 describe("links to the README", () => {
   it("point only to headings that the README has", async () => {
     const { readFile, readdir } = await import("node:fs/promises");
@@ -178,7 +236,7 @@ describe("links to the README", () => {
 
 describe("S051: the numbers of the help come from the constants that own them", () => {
   it("says the limits and defaults as the library holds them", () => {
-    const text = JSON.stringify({ commandHelp, topicHelp });
+    const text = JSON.stringify([COMMAND_HELP, TOPIC_HELP]);
     for (const value of [
       `up to ${QUESTION_HOURS} hours`,
       `default ${DEFAULT_ADDRESS_COUNT}`,
@@ -196,11 +254,11 @@ describe("S051: the numbers of the help come from the constants that own them", 
 
 describe("S052: the help names every coin, mode and profile of the library", () => {
   it("leaves none of them out", () => {
-    const text = JSON.stringify({ commandHelp, topicHelp });
+    const text = JSON.stringify([COMMAND_HELP, TOPIC_HELP]);
     for (const name of [
       ...COINS.map((coin) => coin.name),
       ...MASKING_MODES,
-      ...bitcoinProfiles,
+      ...BITCOIN_PROFILES,
       ...BITCOIN_NETWORKS.flatMap(extendedPublicKeyPrefixes),
     ])
       expect(text, name).toContain(name);

@@ -4,7 +4,8 @@
 // test/menu-terminal.test.ts has the start menu.
 
 import { describe, expect, it, vi } from "vitest";
-import { answerMark, askLine, eraseAnswersSince } from "../src/cli/terminal-choice.js";
+import { AnswerRecord, askLine, choose } from "../src/cli/terminal-choice.js";
+import { TEXT_WIDTH } from "../src/cli/terminal-style.js";
 import { displayWidth } from "../src/cli/terminal-geometry.js";
 import { terminal } from "./helpers/keyed-terminal.js";
 import {
@@ -109,10 +110,10 @@ describe("a typed answer leaves only its line in the record of answers", () => {
         // The line of the record wraps alike, and is counted alike when it is taken away.
         const screen = watchScreen(columns);
         screen.write(BEFORE);
-        const mark = answerMark();
+        const mark = AnswerRecord.mark();
         terminal.keysFor = () => `${typed}${ENTER}`;
         await askLine("Word", "Word");
-        eraseAnswersSince(mark);
+        AnswerRecord.eraseSince(mark);
         expectScreen(screen, screenOf(columns, BEFORE));
       }
     },
@@ -123,7 +124,11 @@ describe("a typed answer leaves only its line in the record of answers", () => {
     async (reported: Reported) => {
       const typed = `${LONG_ANSWER} ${LONG_ANSWER} ${LONG_ANSWER}`;
       const result = await answer(`${typed}${ENTER}`, 80, {}, reported);
-      expectScreen(result.screen, screenOf(80, BEFORE + answerLine("Word", typed)));
+      // The record wraps a long answer under its column at the width of running text (CORE-36).
+      const record =
+        "  Word        abandon ability able about above absent abandon ability able\n" +
+        "              about above absent abandon ability able about above absent\n";
+      expectScreen(result.screen, screenOf(80, BEFORE + record));
       const left = await answer(`${typed}${ESCAPE}`, 80, {}, reported);
       expectScreen(left.screen, screenOf(80, BEFORE));
     },
@@ -219,5 +224,39 @@ describe("a typed answer leaves only its line in the record of answers", () => {
     const result = await answer([keys, `abandon${ENTER}`], 20);
     expect(result.answer).toBe("abandon");
     expectScreen(result.screen, screenOf(20, BEFORE + answerLine("Word", "abandon")));
+  });
+});
+
+describe("a list question wraps its running text at TEXT_WIDTH (CORE-36)", () => {
+  it("wraps a question and an explanation line longer than 78 columns, and goes without a trace", async () => {
+    const screen = watchScreen(80);
+    screen.write(BEFORE);
+    let shown: string[] = [];
+    terminal.onFirstKey = () => {
+      shown = screen.lines();
+    };
+    terminal.keysFor = () => ENTER;
+    // Public texts of the program: a question that names two modes, 104 characters, and an
+    // explanation line of 79 characters, 81 columns with its indent.
+    const question =
+      "The record was made with the Original Seedshift, not with the Original Seedshift " +
+      "with a valid last word.";
+    const line = "A valid checksum proves nothing: with MnemoCode Seedshift every date gives one.";
+    const chosen = await choose(question, [{ label: "Use the record's mode", value: 1 }], {
+      label: "Mode",
+      explanation: { lines: [line, "A line that fits stays as it is."] },
+    });
+    expect(chosen).toBe(1);
+    expect(shown.slice(0, 7)).toEqual([
+      "before",
+      "",
+      "The record was made with the Original Seedshift, not with the Original",
+      "Seedshift with a valid last word.",
+      "  A valid checksum proves nothing: with MnemoCode Seedshift every date gives",
+      "  one.",
+      "  A line that fits stays as it is.",
+    ]);
+    for (const row of shown) expect(row.length, row).toBeLessThanOrEqual(TEXT_WIDTH);
+    expectScreen(screen, screenOf(80, BEFORE + answerLine("Mode", "Use the record's mode")));
   });
 });

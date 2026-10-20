@@ -68,8 +68,13 @@ export function payloadLayouts(
  * threshold and count less one. The high nibble of the member's byte is reserved and zero.
  */
 export const SHARE_METADATA_BYTES = 5;
-/** The byte of the metadata that holds the group threshold and the group count, a nibble each. */
-export const GROUP_BYTE = 2;
+/** The bytes of the set's identifier, big-endian: the first ones of the metadata. */
+export const IDENTIFIER_BYTES = 2;
+/**
+ * The byte of the metadata that holds the group threshold and the group count, a nibble each: the
+ * first after the identifier.
+ */
+export const GROUP_BYTE = IDENTIFIER_BYTES;
 /** The byte of the metadata that holds the group index and the member threshold, a nibble each. */
 export const MEMBER_THRESHOLD_BYTE = 3;
 /** The byte of the metadata that holds the member index in its low nibble. */

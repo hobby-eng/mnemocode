@@ -29,14 +29,8 @@ import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { WordList } from "../core/word-hints.js";
 import { walletCheckOf, type WalletEvidence, type EvidenceMatch } from "../bitcoin-evidence.js";
 import { type ParsedArguments, assertAskedNotGiven } from "./arguments.js";
-import {
-  askAfterFailure,
-  askSecretUntil,
-  askWalletEvidence,
-  changeWalletAnswer,
-  checkWalletAnswer,
-  WHAT_NOW,
-} from "./ask.js";
+import { askAfterFailure, askSecretUntil, WHAT_NOW } from "./ask.js";
+import { askWalletEvidence, changeWalletAnswer, checkWalletAnswer } from "./wallet-question.js";
 import { type WalletPlace, givenWallet } from "./bitcoin-options.js";
 import { textInput, PHRASE_SECRET_OPTIONS } from "./input.js";
 import { linesFitPrivateScreen } from "./screen-fit.js";
@@ -52,11 +46,13 @@ import {
 import type { Choice } from "./terminal-choice.js";
 import { evidenceLabel } from "./option-copy.js";
 import { CandidatesFile } from "./candidates-file.js";
-import { withCtrlCWatch, nodeTurn } from "./terminal-input.js";
+import { CtrlCWatch, nodeTurn } from "./terminal-input.js";
 import { wordNumberOf } from "../core/bip39-sizes.js";
 import { counting } from "../core/search-plan.js";
 import { rowsOf, listQuestionRows } from "./terminal-choice.js";
 import { closingRows } from "./private-screen.js";
+import { PrivateSteps } from "./private-steps.js";
+import { PrivateSummary } from "./private-summary.js";
 import { defined } from "../core/defined.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -70,23 +66,32 @@ const ERRORS = new ErrorCatalog("cli.recover-word-command", {
     "--legacy-valid-last-word lists replacements, not wallets: no candidate list.",
 });
 
-/** The table's columns for the candidates of `search`, and a row maker. */
+/**
+ * The table of the candidates of `search`: the fact of its heading that names the places searched,
+ * its columns and a row maker. The search says where its words are, so that this table has no case
+ * for each kind of search (CORE-06): at its unknown places, or, where it has none, at a place that
+ * each candidate has on its own (placesOf), as a missing word has.
+ */
 function tableOf(search: WordCandidateSearch): {
+  readonly place: [string, string];
   readonly heading: readonly string[];
   readonly row: (candidate: WordCandidate) => readonly string[];
 } {
   const word = (index: number) => [defined(englishWordlist[index]), String(wordNumberOf(index))];
-  if (search.kind === "missing-word")
+  const unknown = search.unknownPlaces;
+  if (unknown.length === 0)
     return {
+      place: ["Missing word", "at any position"],
       heading: ["position", "word", "word-index"],
       row: (candidate) => {
         const place = defined(search.placesOf(candidate)[0]);
         return [String(place + 1), ...word(defined(candidate.words[place]))];
       },
     };
-  const unknown = search.unknownPlaces;
+  const positions = unknown.map((place) => place + 1).join(", ");
   if (unknown.length === 1)
     return {
+      place: ["Position", positions],
       heading: ["word", "word-index", "checksum-bits"],
       row: (candidate) => [
         ...word(defined(candidate.words[defined(unknown[0])])),
@@ -94,6 +99,7 @@ function tableOf(search: WordCandidateSearch): {
       ],
     };
   return {
+    place: ["Positions", positions],
     heading: ["words"],
     row: (candidate) => [
       unknown
@@ -206,13 +212,11 @@ function tableFor(phrase: PhraseSearch): Table {
     };
   }
   const { search } = phrase;
-  const headerRows: [string, string][] = [];
-  if (search.kind === "unknown-words") {
-    const unknown = search.unknownPlaces.map((place) => place + 1);
-    headerRows.push([unknown.length === 1 ? "Position" : "Positions", unknown.join(", ")]);
-  } else headerRows.push(["Missing word", "at any position"]);
-  headerRows.push(["Combinations", counting(search.combinations)]);
-  return { heading: tableOf(search).heading, headerRows };
+  const words = tableOf(search);
+  return {
+    heading: words.heading,
+    headerRows: [words.place, ["Combinations", counting(search.combinations)]],
+  };
 }
 
 /** Where the candidates go and what they are compared with. */
@@ -282,11 +286,14 @@ async function collect(phrase: PhraseSearch, context: SearchContext): Promise<Fo
   }
   const { search } = phrase;
   const table = tableOf(search);
+  // The search is a step of its own: its screen shows the title and the search, no longer the
+  // words typed (CORE-39).
+  PrivateSteps.begin();
   const progress = new ProgressLine(SEARCH_PROGRESS_SECONDS);
   let result: WordSearchResult<EvidenceMatch> | undefined;
   try {
     try {
-      await withCtrlCWatch(async (signal) => {
+      await CtrlCWatch.during(async (signal) => {
         result = await search.run({
           walletCheck,
           keep: context.target === undefined ? 0 : MAX_CANDIDATE_RECORDS,
@@ -480,9 +487,16 @@ function tooManyNotice(count: number): string {
   );
 }
 
-/** A line after the table: a notice of its kind, or a link to a README section (terminalMore). */
+/**
+ * A line after the table: a notice of its kind, or a link to a README section (terminalMore). A
+ * warning that still holds once the command has ended is `lasting` (terminalLastingWarning).
+ */
 type Note =
-  | { readonly text: string; readonly kind: "info" | "success" | "warning" }
+  | {
+      readonly text: string;
+      readonly kind: "info" | "success" | "warning";
+      readonly lasting?: boolean;
+    }
   | { readonly more: string };
 
 /** The notes after the table: what a valid checksum proves, or what the wallet check found. */
@@ -502,7 +516,11 @@ function notesAfterTable(
   ];
   if (evidence === undefined)
     notes.push(
-      { text: "A valid checksum does not prove the wallet: compare an address.", kind: "warning" },
+      {
+        text: "A valid checksum does not prove the wallet: compare an address.",
+        kind: "warning",
+        lasting: true,
+      },
       { more: "exact-local-recovery-checks" },
     );
   else {
@@ -510,18 +528,22 @@ function notesAfterTable(
       text: `Matched ${found.matched} of ${counting(found.count)} candidates against the requested ${evidenceLabel(evidence)} locally.`,
       kind: found.matched === 0 ? "warning" : "success",
     });
-    if (found.warning !== undefined) notes.push({ text: found.warning, kind: "warning" });
+    if (found.warning !== undefined)
+      notes.push({ text: found.warning, kind: "warning", lasting: true });
   }
   if (legacy && evidence !== undefined)
     notes.push({
       text: "Evidence was compared with the replacements, not with the original legacy phrases.",
       kind: "warning",
+      lasting: true,
     });
   return notes;
 }
 
 function printNote(note: Note): void {
   for (const line of noteLines(note)) console.error(line);
+  if ("text" in note && note.kind === "warning" && note.lasting === true)
+    PrivateSummary.add({ kind: "warning", text: note.text });
 }
 
 /** The lines of `note`, as terminalNotice and terminalMore write them. */

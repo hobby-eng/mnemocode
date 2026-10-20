@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { referencePlacement } from "../src/export/business-cards.js";
@@ -6,11 +5,10 @@ import { ownShareCards, ShareCardSet } from "../src/export/sskr-render.js";
 import { readShare, shareToColors, writeShare } from "../src/sskr/transport.js";
 // The tests pass the Node.js card renderer, which supplies the fonts and the random choices.
 import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 // Public test vectors only: SSKR shares of a public test entropy, made with a test-only seed.
-const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-  readonly deterministic: readonly { readonly shares: readonly string[] }[];
-};
+const vectors = sskrVectors();
 const SHARES = vectors.deterministic[0]!.shares;
 
 describe("cards of a share set, for any host", () => {
@@ -130,6 +128,7 @@ describe("cards of a share set, for any host", () => {
   });
 
   it("checks the layout, the style and the shares before anything is rendered", async () => {
+    // A layout and a style that no card has, given on purpose as a JavaScript host could.
     await expect(
       ShareCardSet.create(nodeCardRenderer, SHARES, { style: "it", layout: "bad" as never }),
     ).rejects.toThrow("The card layout must be one of: qr, collection, individual.");

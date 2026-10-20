@@ -2,9 +2,17 @@
 // Public fixtures only; no card/PDF renderer or full vector replay is used in this file.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const fault = vi.hoisted(() => ({
-  write: undefined as string | undefined,
-  read: undefined as string | undefined,
+/** The faults the replaced modules make: the formats written or read wrongly, and the others. */
+interface Faults {
+  write: string | undefined;
+  read: string | undefined;
+  acceptZero: boolean;
+  shiftWrite: boolean;
+  shiftRead: boolean;
+}
+const fault = vi.hoisted((): Faults => ({
+  write: undefined,
+  read: undefined,
   acceptZero: false,
   shiftWrite: false,
   shiftRead: false,
@@ -58,8 +66,8 @@ import { bytesOfHex } from "../src/core/bits.js";
 import {
   checkSskrKnownAnswers,
   checkSskrTransportStartup,
-  sskrLongVector,
-  sskrVector,
+  SSKR_LONG_VECTOR,
+  SSKR_VECTOR,
 } from "../src/sskr/known-answers.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { mnemocodeVectors, sskrVectors, type MnemocodeVector } from "./helpers/vectors.js";
@@ -77,7 +85,7 @@ afterEach(() => {
  * sskr.engine.decode, as every host's engine gives one.
  */
 async function engineDecodeRefusal(): Promise<unknown> {
-  const other = sskrVector.shares[0].replace("ur:sskr/", "ur:other/");
+  const other = SSKR_VECTOR.shares[0].replace("ur:sskr/", "ur:other/");
   const refusal = await nodeSharePlatform.combineShares([other]).then(
     (restored) => restored.fill(0),
     (error: unknown) => error,
@@ -172,7 +180,7 @@ describe("SSKR quick and feature-first-use checks", () => {
   });
 
   it("fails on a wrong recovery and wipes the host's returned bytes", async () => {
-    const wrong = bytesOfHex(sskrVector.entropy);
+    const wrong = bytesOfHex(SSKR_VECTOR.entropy);
     wrong[0]! ^= 1;
     await expect(
       checkSskrKnownAnswers({
@@ -185,18 +193,20 @@ describe("SSKR quick and feature-first-use checks", () => {
 
   it("keeps its 32-byte answer equal to the published 24-word set", () => {
     const vector = sskrVectors().deterministic.find((item) => item.name === "bip39-256-2-of-3")!;
-    expect(sskrLongVector.entropy).toBe(vector.entropy);
-    expect(sskrLongVector.shares).toEqual(vector.shares.slice(0, 2));
+    expect(SSKR_LONG_VECTOR.entropy).toBe(vector.entropy);
+    expect(SSKR_LONG_VECTOR.shares).toEqual(vector.shares.slice(0, 2));
   });
 
   it("fails on a wrong 32-byte recovery after a right 16-byte one, and wipes it", async () => {
-    const wrong = bytesOfHex(sskrLongVector.entropy);
+    const wrong = bytesOfHex(SSKR_LONG_VECTOR.entropy);
     wrong[31]! ^= 1;
     await expect(
       checkSskrKnownAnswers({
         ...nodeSharePlatform,
         combineShares: async (shares) =>
-          shares[0] === sskrLongVector.shares[0] ? wrong : nodeSharePlatform.combineShares(shares),
+          shares[0] === SSKR_LONG_VECTOR.shares[0]
+            ? wrong
+            : nodeSharePlatform.combineShares(shares),
       }),
     ).rejects.toThrow("SSKR 32-byte recovery self-test failed");
     expect(wrong.every((byte) => byte === 0)).toBe(true);
@@ -212,9 +222,29 @@ describe("SSKR quick and feature-first-use checks", () => {
           return ["wrong public fixture"];
         },
       }),
-    ).rejects.toThrow("SSKR creation known answer mismatch.");
+    ).rejects.toThrow("SSKR creation share count mismatch.");
     expect(owned).toHaveLength(2);
     expect(owned.every((array) => array.every((byte) => byte === 0))).toBe(true);
+  });
+
+  it("fails on a creation whose shares restore another secret", async () => {
+    await expect(
+      checkSskrKnownAnswers({
+        ...nodeSharePlatform,
+        createShares: (secret, threshold, count, seed) =>
+          nodeSharePlatform.createShares(secret.fill(7), threshold, count, seed),
+      }),
+    ).rejects.toThrow("SSKR creation self-test failed. No secret was processed.");
+  });
+
+  it("fails on a creation that takes a seed of its own, not the one it is given", async () => {
+    await expect(
+      checkSskrKnownAnswers({
+        ...nodeSharePlatform,
+        createShares: (secret, threshold, count, seed) =>
+          nodeSharePlatform.createShares(secret, threshold, count, seed.fill(1)),
+      }),
+    ).rejects.toThrow("SSKR creation with another seed mismatch.");
   });
 });
 
@@ -223,8 +253,8 @@ describe("SSKR quick and feature-first-use checks", () => {
  * number of records among the calls that the real engine refuses: the vectors' restores are not.
  */
 const REFUSED_COMBINATIONS = [
-  ["SSKR engine incomplete quorum", sskrVector.shares.length - 1],
-  ["SSKR engine damaged value", sskrVector.shares.length],
+  ["SSKR engine incomplete quorum", SSKR_VECTOR.shares.length - 1],
+  ["SSKR engine damaged value", SSKR_VECTOR.shares.length],
   ["SSKR engine impossible group index", 2],
 ] as const;
 
@@ -235,8 +265,8 @@ describe("SSKR quick and feature-first-use checks", () => {
       checkSskrKnownAnswers({
         ...nodeSharePlatform,
         combineShares: async (records) => {
-          if (records.length === sskrVector.shares.length - 1) {
-            const bytes = bytesOfHex(sskrVector.entropy);
+          if (records.length === SSKR_VECTOR.shares.length - 1) {
+            const bytes = bytesOfHex(SSKR_VECTOR.entropy);
             accepted.push(bytes);
             return bytes;
           }
@@ -253,9 +283,9 @@ describe("SSKR quick and feature-first-use checks", () => {
       checkSskrKnownAnswers({
         ...nodeSharePlatform,
         combineShares: async (records) => {
-          const exact = records.every((record, index) => record === sskrVector.shares[index]);
-          return records.length === sskrVector.shares.length && !exact
-            ? bytesOfHex(sskrVector.entropy)
+          const exact = records.every((record, index) => record === SSKR_VECTOR.shares[index]);
+          return records.length === SSKR_VECTOR.shares.length && !exact
+            ? bytesOfHex(SSKR_VECTOR.entropy)
             : nodeSharePlatform.combineShares(records);
         },
       }),

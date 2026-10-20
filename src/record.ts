@@ -41,7 +41,7 @@ export interface MnemoCodeRecord {
 // A header whose mode is none of the modes is malformed too, before its version is read.
 /** What every record starts with, before its version. */
 const RECORD_PREFIX = "MNC";
-const recordPattern = new RegExp(
+const RECORD_PATTERN = new RegExp(
   `^${RECORD_PREFIX}([1-9][0-9]*):([a-z-]+):([a-z-]+):([\\s\\S]+)$`,
   "u",
 );
@@ -67,7 +67,7 @@ export function serializeRecord(mode: MaskingMode, format: EncodedFormat, payloa
 export function parseRecord(value: string): MnemoCodeRecord | undefined {
   const normalized = value.trim();
   if (!normalized.startsWith(RECORD_PREFIX)) return undefined;
-  const match = recordPattern.exec(normalized);
+  const match = RECORD_PATTERN.exec(normalized);
   if (match === null || !isMaskingMode(match[2])) throw ERRORS.create("malformed-header", []);
   const version = Number(match[1]);
   // The pattern admits only versions from 1 up, so any other than this one is newer.

@@ -1,8 +1,9 @@
 // The raw keys of the terminal that the questions act on, the readers of the bytes typed, how long
-// the rest of a key's sequence or of a paste may take, the person's cancel, and the refusal of an
-// answer that a question cannot use.
+// the rest of a key's sequence or of a paste may take, and the person's cancel. A leaf without
+// imports, written in TypeScript that Node runs by stripping its types, so that a maintainer script
+// takes CANCELLED as the command line does (scripts/sign-release.mjs).
 
-/** Raw terminal bytes that this module acts on. */
+/** Raw terminal bytes that the questions act on: keys, and the final bytes of key sequences. */
 export const KEY = {
   CTRL_A: 0x01,
   CTRL_C: 0x03,
@@ -21,9 +22,14 @@ export const KEY = {
   SPACE: 0x20,
   DIGIT_0: 0x30,
   DIGIT_9: 0x39,
-  /** The final bytes of the escape sequences of the up and down arrows (ESC [ A, ESC [ B). */
+  /**
+   * The final bytes of the escape sequences of the arrows, after CSI (ESC [) or SS3 (ESC O): up A,
+   * down B, right C, left D (xterm's ctlseqs, "PC-Style Function Keys").
+   */
   ARROW_UP: 0x41,
   ARROW_DOWN: 0x42,
+  ARROW_RIGHT: 0x43,
+  ARROW_LEFT: 0x44,
   HOME: 0x48,
   END: 0x46,
   SEQUENCE_TILDE: 0x7e,
@@ -42,22 +48,6 @@ export const CANCELLED: unique symbol = Symbol("cancelled");
 
 /** The type of CANCELLED, which a step that the person may cancel returns besides its answer. */
 export type Cancelled = typeof CANCELLED;
-
-/** The codes of the errors of terminal input: an answer that a question cannot use. */
-export type TerminalInputErrorCode = "unusable-answer";
-
-/**
- * Thrown by readLine for an answer that no question can use: longer than its limit, or not UTF-8
- * text. The message says why without repeating the answer.
- */
-export class UnusableAnswerError extends Error {
-  readonly code: TerminalInputErrorCode = "unusable-answer";
-
-  constructor(message: string) {
-    super(message);
-    this.name = "UnusableAnswerError";
-  }
-}
 
 /** The next byte typed, or undefined at the end of the input. */
 export type NextByte = () => Promise<number | undefined>;

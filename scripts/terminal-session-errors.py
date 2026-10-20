@@ -1,4 +1,7 @@
-"""Public PTY-helper regressions with synthetic OS boundaries; no process or PTY is started."""
+"""Public PTY-helper regressions with OS calls faked at their seams.
+
+No process or PTY runs.
+"""
 
 import errno
 import unittest
@@ -12,7 +15,7 @@ from terminal_result_checks import assert_closed_descriptor
 @unittest.skipIf(terminal.WINDOWS, "POSIX descriptor and PTY errors only.")
 class TerminalErrorTests(unittest.TestCase):
     def session(self, stack):
-        """Uses the public constructor with every process/descriptor effect replaced."""
+        """A session of the public constructor, its OS effects faked."""
         for name, answer in (
             ("pty.fork", (123, 7)),
             ("fcntl.ioctl", 0),
@@ -40,24 +43,23 @@ class TerminalErrorTests(unittest.TestCase):
         for code in {errno.EIO, errno.EAGAIN, errno.EWOULDBLOCK}:
             with self.subTest(errno=code), ExitStack() as stack:
                 session = self.session(stack)
-                stack.enter_context(
-                    patch("os.read", side_effect=OSError(code, "Expected race."))
-                )
+                race = OSError(code, "Expected race.")
+                stack.enter_context(patch("os.read", side_effect=race))
                 session.read_some(wait=0)
                 self.assertEqual(session.output, "")
 
     def test_read_keeps_normal_bytes_and_empty_eof(self):
         with ExitStack() as stack:
             session = self.session(stack)
-            stack.enter_context(
-                patch("os.read", side_effect=[b"public terminal fragment", b""])
-            )
+            reads = [b"public terminal fragment", b""]
+            stack.enter_context(patch("os.read", side_effect=reads))
             session.read_some(wait=0)
             session.read_some(wait=0)
             self.assertEqual(session.output, "public terminal fragment")
 
     def test_descriptor_check_accepts_only_bad_descriptor_as_closure(self):
-        with patch("os.fstat", side_effect=OSError(errno.EBADF, "Closed descriptor.")):
+        closed = OSError(errno.EBADF, "Closed descriptor.")
+        with patch("os.fstat", side_effect=closed):
             assert_closed_descriptor(7)
         for code in (errno.EPERM, errno.EIO, errno.EINVAL):
             with self.subTest(errno=code):

@@ -2,7 +2,7 @@
 // (`mhfe --help` is the model): cyan headings and options, grey values and notes, two columns
 // of a command and what it does. The text itself is in help-pages.ts.
 
-import { cardTemplates, templateNumber } from "../export/templates.js";
+import { CARD_TEMPLATES, templateNumber } from "../export/templates.js";
 import { MNEMOCODE_VERSION } from "../version.js";
 import {
   type CommandName,
@@ -13,7 +13,7 @@ import {
   VERSION_FLAGS,
 } from "./command-options.js";
 import { TEST_PHRASE, TEST_PHRASE_VARIABLE } from "./help-options.js";
-import { commandHelp, topicHelp } from "./help-pages.js";
+import { COMMAND_HELP, TOPIC_HELP } from "./help-pages.js";
 import type { HelpOption, HelpRow, TopicHelp } from "./help-types.js";
 import { STYLE, terminalPaint, wrapText } from "./terminal.js";
 import { defined } from "../core/defined.js";
@@ -201,13 +201,12 @@ const LONG_HELP_OPTION: HelpOption = {
 
 /** `mnemocode`, `mnemocode --help` and `mnemocode help`. */
 export function printUsage(): void {
-  // commandHelp is a Record<CommandName, CommandHelp> literal, and SHARE_COMMAND_HELP, which it
-  // spreads, a Record of three of them, so Object.keys gives exactly the CommandNames.
-  const commands: HelpRow[] = (Object.keys(commandHelp) as CommandName[])
+  const commands: HelpRow[] = Object.keys(COMMAND_HELP)
+    .filter(isCommandName)
     .filter((name) => COMMAND_FACTS[name].listed)
-    .map((name) => [name, commandHelp[name].summary]);
+    .map((name) => [name, COMMAND_HELP[name].summary]);
   commands.push(["version", BUILT_INS.version.summary], ["help", BUILT_INS.help.summary]);
-  const topics: HelpRow[] = Object.entries(topicHelp).map(([name, topic]) => [
+  const topics: HelpRow[] = Object.entries(TOPIC_HELP).map(([name, topic]) => [
     `help ${name}`,
     topic.summary,
   ]);
@@ -256,7 +255,7 @@ export function printUsage(): void {
 
 /** `mnemocode <command> -h` (`detailed` false) and `--help` or `help <command>` (true). */
 export function printCommandHelp(name: CommandName, detailed: boolean): void {
-  const page = commandHelp[name];
+  const page = COMMAND_HELP[name];
   const blocks: string[] = [page.summary];
   if (detailed && page.about.length > 0) blocks.push(paragraphs(page.about));
   blocks.push(usageLine(`mnemocode ${name}`, page.usage));
@@ -300,9 +299,9 @@ function optionLines(options: readonly HelpOption[], detailed: boolean): string[
 
 /** The installed designs by the numbers that --template takes, with their ids and names. */
 function templateRows(): string[] {
-  const numberWidth = String(cardTemplates.length).length;
-  const idWidth = Math.max(...cardTemplates.map((template) => template.id.length));
-  return cardTemplates.map(
+  const numberWidth = String(CARD_TEMPLATES.length).length;
+  const idWidth = Math.max(...CARD_TEMPLATES.map((template) => template.id.length));
+  return CARD_TEMPLATES.map(
     (template) =>
       `  ${paint(STYLE.accent, String(templateNumber(template)).padStart(numberWidth))}  ${template.id.padEnd(idWidth)}  ${paint(STYLE.muted, template.name)}`,
   );
@@ -310,7 +309,7 @@ function templateRows(): string[] {
 
 /** `mnemocode help <topic>`. */
 export function printTopicHelp(name: string): void {
-  const topic: TopicHelp = defined(topicHelp[name]);
+  const topic: TopicHelp = defined(TOPIC_HELP[name]);
   const blocks: string[] = [topic.summary];
   for (const part of topic.sections) {
     const lines: string[] = [];
@@ -319,6 +318,7 @@ export function printTopicHelp(name: string): void {
     blocks.push(section(part.heading, lines));
   }
   if (topic.examples !== undefined) blocks.push(examples(topic.examples));
+  if (topic.notes !== undefined) blocks.push(notes(topic.notes));
   blocks.push(closingSafety());
   console.log(blocks.join("\n\n"));
 }
@@ -341,7 +341,7 @@ export function printNamedHelp(name: string): boolean {
     printCommandHelp(name, true);
     return true;
   }
-  if (Object.hasOwn(topicHelp, name)) {
+  if (Object.hasOwn(TOPIC_HELP, name)) {
     printTopicHelp(name);
     return true;
   }
@@ -350,7 +350,7 @@ export function printNamedHelp(name: string): boolean {
 
 /** The commands and topics, for an error about an unknown one. */
 export function helpNames(): string {
-  return [...Object.keys(commandHelp), ...Object.keys(BUILT_INS), ...Object.keys(topicHelp)].join(
+  return [...Object.keys(COMMAND_HELP), ...Object.keys(BUILT_INS), ...Object.keys(TOPIC_HELP)].join(
     ", ",
   );
 }

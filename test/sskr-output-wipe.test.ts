@@ -6,7 +6,7 @@ import {
   recover_sskr_shares_formatted,
   ShareEncoding,
 } from "../sskr-wasm/generated/recovery_sskr_wasm.js";
-import { sskrLongVector } from "../src/sskr/known-answers.js";
+import { SSKR_LONG_VECTOR } from "../src/sskr/known-answers.js";
 import { bytesOfHex } from "../src/core/bits.js";
 import { writeShare } from "../src/sskr/transport.js";
 
@@ -14,7 +14,7 @@ const module = await readFile(
   new URL("../sskr-wasm/generated/recovery_sskr_wasm_bg.wasm", import.meta.url),
 );
 const wasm = initSync({ module });
-const expected = bytesOfHex(sskrLongVector.entropy);
+const expected = bytesOfHex(SSKR_LONG_VECTOR.entropy);
 afterEach(() => vi.restoreAllMocks());
 
 /** Read the retained return frame before another engine operation reuses it. */
@@ -33,8 +33,8 @@ function outputTail(): Uint8Array {
 }
 
 describe("SSKR recovered output ownership", () => {
-  const compact = sskrLongVector.shares.join("\n");
-  const words = sskrLongVector.shares.map((share) => writeShare(share, "words")).join("\n");
+  const compact = SSKR_LONG_VECTOR.shares.join("\n");
+  const words = SSKR_LONG_VECTOR.shares.map((share) => writeShare(share, "words")).join("\n");
   it.each([
     ["compact", () => recover_sskr_shares(compact)],
     ["formatted compact", () => recover_sskr_shares_formatted(compact, ShareEncoding.CompactUr)],

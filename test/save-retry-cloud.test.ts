@@ -5,22 +5,15 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { saveWithRetry } from "../src/cli/save-retry.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 
-const keyboard = vi.hoisted(() => ({ bytes: [] as number[] }));
 vi.mock("node:tty", async (original) => ({
   ...(await original<typeof import("node:tty")>()),
   isatty: (descriptor: number) => descriptor === 0 || descriptor === 2,
 }));
-vi.mock("../src/cli/terminal-input.js", async (original) => ({
-  ...(await original<typeof import("../src/cli/terminal-input.js")>()),
-  dropTypedAhead: async () => undefined,
-  withRawTerminal: async <T>(
-    body: (next: () => Promise<number | undefined>, more: () => Promise<boolean>) => Promise<T>,
-  ) =>
-    body(
-      async () => keyboard.bytes.shift(),
-      async () => keyboard.bytes.length > 0,
-    ),
-}));
+const typing = await vi.hoisted(async () => import("./helpers/typed-keys.js"));
+vi.mock("../src/cli/terminal-input.js", async (original) =>
+  typing.replacedTerminalInput(await original()),
+);
+const { keyboard } = typing;
 
 let output: string[];
 const typed = (text: string): number[] => [...Buffer.from(text, "utf8")];

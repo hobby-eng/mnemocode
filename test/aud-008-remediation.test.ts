@@ -1,7 +1,6 @@
 // Regression tests for the findings of AUD-008 (docs/audits/AUD-008-2026-10-06.md), each named by
 // its finding ID. Public test vectors and synthetic data only.
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -27,18 +26,14 @@ import {
   urToTransport,
   writeShare,
 } from "../src/sskr/transport.js";
-import { bytewords } from "../src/sskr/bytewords-list.js";
+import { BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { joinUnits } from "./helpers/shares.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 const publicMnemonic = "abandon ".repeat(11) + "about";
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-) as {
-  deterministic: { entropy: string; shares: string[] }[];
-  official: { entropy: string; shares: string[] };
-};
+const vectors = sskrVectors();
 const location = { network: "mainnet" as const, account: 0, branch: 0, index: 0 };
 
 /** `body` followed by its CRC32, as a share's transport bytes end. */
@@ -75,8 +70,12 @@ describe("AUD-008-API002: key evidence that no wallet can match is refused", () 
   }
   const order = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
   const scalar = (value: bigint) => Buffer.from(value.toString(16).padStart(64, "0"), "hex");
-  const evidence = (kind: "compressed-public-key" | "wif", value: string): BitcoinEvidence =>
-    ({ kind, value, profiles: ["native-segwit"], location }) as BitcoinEvidence;
+  const evidence = (kind: "compressed-public-key" | "wif", value: string): BitcoinEvidence => ({
+    kind,
+    value,
+    profiles: ["native-segwit"],
+    location,
+  });
 
   it("refuses an x at or above p, and a point off the curve", () => {
     expect(() =>
@@ -115,10 +114,9 @@ describe("AUD-008-API002: key evidence that no wallet can match is refused", () 
 });
 
 describe("AUD-008-API003: a word search that could not end is refused", () => {
-  const known = (count: number) => Array.from({ length: count }, () => [0] as readonly number[]);
-  // Each search breaks the shape of a WordSearch on purpose, as a JavaScript host may: the cast
-  // hands it to the check that refuses it. One code for every place that holds no BIP39 indexes
-  // in ascending order.
+  const known = (count: number) => Array.from({ length: count }, (): readonly number[] => [0]);
+  // Each search breaks the shape of a WordSearch on purpose, as a JavaScript host may. One code
+  // for every place that holds no BIP39 indexes in ascending order.
   const places = "every-place-one-more-bip39-indexes-ascending-order";
   it.each([
     ["an empty place", { kind: "unknown-words", places: [...known(11), []] }, places],
@@ -138,6 +136,7 @@ describe("AUD-008-API003: a word search that could not end is refused", () => {
     ],
   ])("%s", (_, search, code) => {
     const refusal = { code: `core.candidates.${code}` };
+    // The cast hands each broken search, on purpose, to the check that refuses it.
     expect(() => searchCombinations(search as WordSearch)).toThrow(
       expect.objectContaining(refusal),
     );
@@ -151,6 +150,7 @@ describe("AUD-008-API004: an unknown Seedshift mode is refused", () => {
   const encoded = encodeMnemonic(publicMnemonic, [parseDate("23-09-2026")]);
   const patterns = [parseDatePattern("?3-09-2026")];
   it.each(["seedshift-typo", "direct", undefined, null])("%s", (mode) => {
+    // A mode that no type allows, fed on purpose as a JavaScript host could.
     expect(() => [
       ...dateRecoveryCandidates(encoded.shiftedIndexes, [], patterns, mode as never),
     ]).toThrow(/Seedshift mode/u);
@@ -165,6 +165,7 @@ describe("AUD-008-API004: an unknown Seedshift mode is refused", () => {
 
 describe("AUD-008-API005: a BIP39 passphrase must be text", () => {
   it.each([null, 123, false, [], {}])("refuses %j", (passphrase) => {
+    // A passphrase that no type allows, fed on purpose as a JavaScript host could.
     expect(() => masterFingerprint(publicMnemonic, passphrase as never)).toThrow(
       expect.objectContaining({
         name: "TypeError",
@@ -187,7 +188,8 @@ describe("AUD-008-FUN001: every share given must agree with the restored secret"
   const wrong = altered(vector.shares[2]!, (body) => void (body[8]! ^= 1));
 
   it("refuses a wrong surplus share in every order, and names it", async () => {
-    const [a, b] = vector.shares as [string, string];
+    const a = vector.shares[0]!;
+    const b = vector.shares[1]!;
     for (const order of [
       [a, b, wrong],
       [b, a, wrong],
@@ -249,7 +251,7 @@ describe("AUD-008-API006: every share layout that is read whole is also repaired
       withCrc(Uint8Array.from([...tag, ...urToTransport(share).slice(0, -CHECKSUM_BYTES)])),
     );
   // Bytewords of the untagged bytes, as earlier tools wrote them.
-  const untaggedWords = [...urToTransport(share)].map((byte) => bytewords[byte]).join(" ");
+  const untaggedWords = [...urToTransport(share)].map((byte) => BYTEWORDS[byte]).join(" ");
   const layouts: [string, string][] = [
     ["untagged Bytewords", untaggedWords],
     ["UR with the tag 40309", tagged([0xd9, 0x9d, 0x75])],
@@ -297,7 +299,7 @@ describe("AUD-008-UI001: a redraw counts the rows a long line wraps onto", () =>
       width(120);
       expect(rowsOf(["x".repeat(78)])).toBe(1);
     } finally {
-      if (before === undefined) delete (process.stderr as { columns?: number }).columns;
+      if (before === undefined) Reflect.deleteProperty(process.stderr, "columns");
       else Object.defineProperty(process.stderr, "columns", before);
     }
   });

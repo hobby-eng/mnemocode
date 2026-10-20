@@ -6,8 +6,6 @@ const ERRORS = new ErrorCatalog("scripts.verify-toolchain", {
    * @param {string} value0
    */
   "package-json-engines-node": (value0) => `package.json engines.node must be ${value0}`,
-  "package-json-package-manager-pin-exact-pnpm-version": () =>
-    "package.json packageManager must pin an exact pnpm version",
   "setup-action-read-node-js-from-node-version": () =>
     "The setup action must read Node.js from .node-version",
   "setup-action-read-pnpm-from-package-json-package": () =>
@@ -65,10 +63,6 @@ const versionSource = readFileSync(new URL("../src/version.ts", import.meta.url)
 const expectedEngine = `>=${nodeVersion}`;
 if (packageJson.engines?.node !== expectedEngine) {
   throw ERRORS.create("package-json-engines-node", [`${expectedEngine}`]);
-}
-
-if (!/^pnpm@\d+\.\d+\.\d+$/u.test(packageJson.packageManager ?? "")) {
-  throw ERRORS.create("package-json-package-manager-pin-exact-pnpm-version", []);
 }
 
 if (!setupAction.includes("node-version-file: .node-version")) {

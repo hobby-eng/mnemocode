@@ -27,10 +27,9 @@
 // io_uring, /dev/null opened for writing, a program started at a path where none can be.
 
 import {
-  noLimit,
-  RLIMIT_CORE,
   SandboxRecord,
   switchOffCoreDumps,
+  zeroCoreDumpLimit,
   type CoreDumps,
   type Found,
   type NodeFfi,
@@ -41,7 +40,6 @@ import {
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.sandbox-linux", {
-  "setrlimit-refused-rlimit-core-0": () => "setrlimit refused RLIMIT_CORE 0",
   "prctl-refused": () => "prctl refused",
   "process-still-dumpable": () => "the process is still dumpable",
   "refused-so-neither-seccomp-nor-landlock-can-used": () =>
@@ -260,8 +258,7 @@ export class LinuxSandbox implements SystemSandbox {
     const libc = this.#libc;
     if (libc === undefined) return;
     this.#coreDumps = switchOffCoreDumps(() => {
-      if (libc.call.setrlimit(RLIMIT_CORE, noLimit()) !== 0)
-        throw ERRORS.create("setrlimit-refused-rlimit-core-0", []);
+      zeroCoreDumpLimit(libc.call.setrlimit);
       if (libc.call.prctl(PR_SET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0)
         throw ERRORS.create("prctl-refused", []);
       if (libc.call.prctl(PR_GET_DUMPABLE, 0n, 0n, 0n, 0n) !== 0)

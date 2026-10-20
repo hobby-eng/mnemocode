@@ -1,4 +1,5 @@
 import { BYTE_MAX, bytesOfHex, hexOfBytes } from "../core/bits.js";
+import { rgbReferenceDigits } from "../core/colors.js";
 import { defined } from "../core/defined.js";
 
 /**
@@ -41,7 +42,8 @@ export function pixelHsv(data: ArrayLike<number>, offset: number): [number, numb
  * The hue and saturation, each from 0 to 1, of a color written #RRGGBB or RRGGBB. Neither depends
  * on the scale of the channels, so they are worked out from the bytes as they are. The bytes are
  * kept, not rgbChannels: from channels from 0 to 1 the values differ in the last bit for many
- * colors, which could move pixels of the approved business artwork.
+ * colors, which could move pixels of the approved business artwork. Refuses what rgbBytes refuses
+ * (core.colors.invalid-rgb-reference).
  */
 export function hueAndSaturation(color: string): [number, number] {
   const [hue, saturation] = hsv(...rgbBytes(color));
@@ -54,11 +56,12 @@ function toByte(channel: number): number {
 }
 
 /**
- * The red, green and blue bytes, 0 to 255, of a color written #RRGGBB or RRGGBB. Every card, its
- * artwork and the terminal's color cards read a color's channels through it.
+ * The red, green and blue bytes, 0 to 255, of a color written #RRGGBB or RRGGBB, in either case.
+ * Every card, its artwork and the terminal's color cards read a color's channels through it.
+ * Refuses any other text, as rgbReferenceDigits does (core.colors.invalid-rgb-reference).
  */
 export function rgbBytes(color: string): [number, number, number] {
-  const bytes = bytesOfHex(color.startsWith("#") ? color.slice(1) : color);
+  const bytes = bytesOfHex(rgbReferenceDigits(color));
   try {
     const [red, green, blue] = bytes;
     return [defined(red), defined(green), defined(blue)];
@@ -67,7 +70,10 @@ export function rgbBytes(color: string): [number, number, number] {
   }
 }
 
-/** The same channels from 0 to 1, as PDF colors and the color spaces take them. */
+/**
+ * The same channels from 0 to 1, as PDF colors and the color spaces take them. Refuses what
+ * rgbBytes refuses (core.colors.invalid-rgb-reference).
+ */
 export function rgbChannels(color: string): [number, number, number] {
   const [red, green, blue] = rgbBytes(color);
   return [channelOfByte(red), channelOfByte(green), channelOfByte(blue)];
@@ -90,7 +96,8 @@ const REC709_LUMA = Object.freeze([0.2126, 0.7152, 0.0722] as const);
  * The Rec. 709 luma of a color's bytes divided by its brightest channel (at least 1): how light
  * its hue is whatever its own brightness. The curves design keeps only the hue and saturation of a
  * reference, so it chooses the ink on that colour by this. Not the PDF blend luminosity of
- * material-artwork.ts, which is another rule.
+ * material-artwork.ts, which is another rule. Refuses what rgbBytes refuses
+ * (core.colors.invalid-rgb-reference).
  */
 export function peakRelativeLuma(color: string): number {
   const channels = rgbBytes(color);

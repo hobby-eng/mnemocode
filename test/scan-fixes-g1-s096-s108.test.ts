@@ -21,12 +21,7 @@ import {
   pdfRect,
 } from "../src/export/business-render-primitives.js";
 import { referencePlacement } from "../src/export/business-cards.js";
-import {
-  PDFDocument as ScanPdfDocument,
-  StandardFonts,
-  type PDFImage,
-  type PDFPage,
-} from "pdf-lib";
+import { PDFDocument as ScanPdfDocument, StandardFonts, type PDFPage } from "pdf-lib";
 import { zeroEntropyPhrase } from "../src/core/english-words.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { shareToColors } from "../src/sskr/transport.js";
@@ -48,7 +43,7 @@ import {
   CARD_ORIENTATIONS,
   isCardPageSize,
   profileFieldLabel,
-  profileFields,
+  PROFILE_FIELDS,
 } from "../src/export/card-settings.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import {
@@ -60,9 +55,9 @@ import {
 } from "../src/core/dates.js";
 import { bytesOfHex } from "../src/core/bits.js";
 import {
-  businessDesigns,
+  BUSINESS_DESIGNS,
   businessFields,
-  businessStyles,
+  PHYSICAL_BUSINESS_STYLES,
   REFERENCE_MARGIN,
   studyThemeOf,
 } from "../src/export/business-designs.js";
@@ -85,7 +80,7 @@ import { renderBusinessCards } from "../src/export/business-cards.js";
 import { MAX_DECOYS } from "../src/export/card-decoys.js";
 import { separateCardPage } from "../src/export/business-layout.js";
 import { renderMaterialCard } from "../src/export/material-cards.js";
-import { materialArtwork } from "../src/export/material-artwork.js";
+import { MATERIAL_ARTWORK } from "../src/export/material-artwork.js";
 import { CARD_FOLDER_TAKEN, claimCardFolder } from "../src/export/individual-cards.js";
 import { heirSheetText } from "../src/cli/heir-sheet.js";
 import {
@@ -105,13 +100,17 @@ import {
   NoProtection,
   CandidateFileRefusedError,
   decryptCandidates,
+  type SessionIdentity,
 } from "../src/core/candidate-encryption.js";
 import { OpenedCandidateList } from "../src/core/candidate-list.js";
 import { SSKR_ENGINE_FOLDER, SSKR_BRIDGE } from "../src/bundled-file-paths.js";
 import { CardRenderer } from "../src/export/card-renderer.js";
 import { A6, renderHeirSheet } from "../src/export/heir-sheet.js";
 import type { RenderAsset, RenderPlatform } from "../src/export/platform.js";
-import { publicShare } from "./helpers/vectors.js";
+import { publicShare, sskrVectors } from "./helpers/vectors.js";
+import { matching } from "./helpers/matchers.js";
+// The public lists of candidates and the age files that hold them, typed as their JSON gives them.
+import candidateFile from "../vectors/candidates-v1.json" with { type: "json" };
 
 /** The first share of the public SSKR vectors (vectors/sskr-v1.json). */
 const PUBLIC_SHARE = publicShare();
@@ -183,10 +182,7 @@ describe("G1-016 and G1-017: one source of the files of cards and of drawing the
 
 describe("G1-022: a set of share cards says the layout it resolved to", () => {
   it("gives separate cards for the business size, a sheet for A6, and QR cards when asked", async () => {
-    const { deterministic } = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-      deterministic: { shares: string[] }[];
-    };
-    const shares = deterministic[0]!.shares;
+    const shares = sskrVectors().deterministic[0]!.shares;
     expect(
       (await ShareCardSet.create(nodeCardRenderer, shares, { style: "it", pageSize: "business" }))
         .layout,
@@ -201,9 +197,7 @@ describe("G1-022: a set of share cards says the layout it resolved to", () => {
 });
 
 describe("G1-026: one reader of how a list file is protected", () => {
-  const { age } = JSON.parse(readFileSync("vectors/candidates-v1.json", "utf8")) as {
-    age: { refuse: { name: string; file: string }[] };
-  };
+  const { age } = candidateFile;
 
   it("tells the key of a list file and refuses any other header before a key is asked", async () => {
     const recipient = (await createSessionIdentity()).recipient;
@@ -220,14 +214,14 @@ describe("G1-026: one reader of how a list file is protected", () => {
 });
 
 describe("G1-027: one owner of an opened candidate list", () => {
-  const { lists } = JSON.parse(readFileSync("vectors/candidates-v1.json", "utf8")) as {
-    lists: {
-      name: string;
-      passphrase?: string;
-      records: { phrase: string; passphrase?: string }[];
-      bytes: string;
-    }[];
-  };
+  /** A list of the vectors: its candidates, a passphrase for all of them or not, and its bytes. */
+  interface ListVector {
+    readonly name: string;
+    readonly passphrase?: string;
+    readonly records: readonly { readonly phrase: string; readonly passphrase?: string }[];
+    readonly bytes: string;
+  }
+  const lists: readonly ListVector[] = candidateFile.lists;
 
   it("gives each candidate its phrase and the passphrase that the format's rule names", () => {
     for (const list of lists) {
@@ -267,22 +261,28 @@ describe("G1-027: one owner of an opened candidate list", () => {
 
 describe("G1-028: a candidate file is refused with why", () => {
   it("tells a damaged file from a key that does not open it", async () => {
-    const session = await createSessionIdentity();
-    const other = await createSessionIdentity();
+    using session = await createSessionIdentity();
+    using other = await createSessionIdentity();
     const file = await encryptCandidates(Uint8Array.of(1, 2, 3), session.recipient);
-    const refusal = async (key: { identity: string }, bytes: Uint8Array) =>
+    const refusal = async (key: { identity: SessionIdentity }, bytes: Uint8Array) =>
       decryptCandidates(bytes, key).then(
         () => undefined,
         (error: unknown) => error,
       );
-    const wrongKey = await refusal({ identity: other.identity }, file);
+    const wrongKey = await refusal({ identity: other }, file);
     expect(wrongKey).toBeInstanceOf(CandidateFileRefusedError);
-    expect((wrongKey as CandidateFileRefusedError).code).toBe("key");
+    expect(wrongKey).toMatchObject({
+      code: "core.candidate-file-refusal.scanner-key-does-not-open",
+      problem: "key",
+    });
     const changed = Uint8Array.from(file);
     changed[changed.length - 1]! ^= 1;
-    const damaged = await refusal({ identity: session.identity }, changed);
-    expect((damaged as CandidateFileRefusedError).code).toBe("damaged");
-    expect((damaged as Error).message).toMatch(/invalid tag/u);
+    const damaged = await refusal({ identity: session }, changed);
+    expect(damaged).toMatchObject({
+      code: "core.candidate-file-refusal.contents-damaged",
+      problem: "damaged",
+      message: matching(/invalid tag/u),
+    });
   });
 });
 
@@ -347,13 +347,13 @@ describe("S103: one descriptor per business design", () => {
   };
 
   it("describes every design completely, with no design left to a fall-through", () => {
-    expect(Object.keys(businessDesigns)).toEqual([...businessStyles]);
-    for (const style of businessStyles) {
+    expect(Object.keys(BUSINESS_DESIGNS)).toEqual([...PHYSICAL_BUSINESS_STYLES]);
+    for (const style of PHYSICAL_BUSINESS_STYLES) {
       const fields = businessFields(style, profile);
+      // Each detail, by the name of its label in lower case.
+      const details: Readonly<Record<string, string>> = profile;
       for (const field of fields) {
-        expect(field.value, `${style} ${field.label}`).toBe(
-          profile[field.label.toLowerCase() as keyof typeof profile],
-        );
+        expect(field.value, `${style} ${field.label}`).toBe(details[field.label.toLowerCase()]);
         expect(field.minimum).toBe(field.label === "Name" ? 6 : 4);
       }
       expect(fields.map((field) => field.label)).toEqual(
@@ -361,7 +361,7 @@ describe("S103: one descriptor per business design", () => {
       );
     }
     // A detail is named by profileFieldLabel alone, which the menu's questions name it by too.
-    expect(profileFields.map(profileFieldLabel)).toEqual([
+    expect(PROFILE_FIELDS.map(profileFieldLabel)).toEqual([
       "Name",
       "Role",
       "Company",
@@ -370,9 +370,9 @@ describe("S103: one descriptor per business design", () => {
       "Website",
       "Location",
     ]);
-    for (const style of businessStyles)
+    for (const style of PHYSICAL_BUSINESS_STYLES)
       for (const field of businessFields(style, profile))
-        expect(profileFields.map(profileFieldLabel)).toContain(field.label);
+        expect(PROFILE_FIELDS.map(profileFieldLabel)).toContain(field.label);
     // The last design was the fall-through of an if-chain; it has its own entry now.
     expect(businessFields("facets", profile).map((field) => field.label)).toEqual([
       "Company",
@@ -385,24 +385,24 @@ describe("S103: one descriptor per business design", () => {
   });
 
   it("keeps the approved differences between the designs", () => {
-    const where = <K extends keyof (typeof businessDesigns)["it"]>(key: K, value: unknown) =>
-      businessStyles.filter((style) => businessDesigns[style][key] === value);
+    const where = <K extends keyof (typeof BUSINESS_DESIGNS)["it"]>(key: K, value: unknown) =>
+      PHYSICAL_BUSINESS_STYLES.filter((style) => BUSINESS_DESIGNS[style][key] === value);
     expect(where("tint", "muted")).toEqual(["architect", "it"]);
     expect(where("darkFieldInk", "contrast")).toEqual(["curves"]);
     expect(where("studyTheme", "noir")).toEqual(["it"]);
     expect(studyThemeOf("it")).toBe("noir");
     expect(studyThemeOf("mixed")).toBe("cool");
     expect(
-      businessStyles.filter((style) => businessDesigns[style].reference.tone === "dark"),
+      PHYSICAL_BUSINESS_STYLES.filter((style) => BUSINESS_DESIGNS[style].reference.tone === "dark"),
     ).toEqual(["contact", "facets"]);
-    expect(businessDesigns.it.reference).toMatchObject({ end: 55.5, align: "end" });
+    expect(BUSINESS_DESIGNS.it.reference).toMatchObject({ end: 55.5, align: "end" });
   });
 
   it("freezes the descriptors all the way down, so no importer can change a layout", () => {
-    expect(Object.isFrozen(businessDesigns.it)).toBe(true);
-    expect(Object.isFrozen(businessDesigns.it.reference)).toBe(true);
-    expect(Object.isFrozen(businessDesigns.facets.fields)).toBe(true);
-    expect(Object.isFrozen(businessDesigns.curves.fields[0])).toBe(true);
+    expect(Object.isFrozen(BUSINESS_DESIGNS.it)).toBe(true);
+    expect(Object.isFrozen(BUSINESS_DESIGNS.it.reference)).toBe(true);
+    expect(Object.isFrozen(BUSINESS_DESIGNS.facets.fields)).toBe(true);
+    expect(Object.isFrozen(BUSINESS_DESIGNS.curves.fields[0])).toBe(true);
   });
 
   it("places the reference line as its design says", async () => {
@@ -414,25 +414,29 @@ describe("S103: one descriptor per business design", () => {
 });
 
 describe("S104: one conversion to PDF points and one centring of text and of runs", () => {
-  /** A page that records what is drawn on it. */
-  function recordingPage(heightMm: number) {
-    const drawn: { text: unknown[]; images: unknown[]; operators: string[] } = {
-      text: [],
-      images: [],
-      operators: [],
+  /** Any deflate level: the image is embedded, never drawn. */
+  const ANY_DEFLATE_LEVEL = 6;
+
+  /**
+   * A square page of a new document, `heightMm` high, which records what is drawn on it instead of
+   * drawing it: the options of its text and of its images, and its operators as PDF writes them.
+   */
+  async function recordingPage(heightMm: number) {
+    const document = await ScanPdfDocument.create();
+    const page = document.addPage([heightMm * LAYOUT_MM, heightMm * LAYOUT_MM]);
+    const text = vi.spyOn(page, "drawText").mockImplementation(() => undefined);
+    const images = vi.spyOn(page, "drawImage").mockImplementation(() => undefined);
+    const operators = vi.spyOn(page, "pushOperators").mockImplementation(() => undefined);
+    const drawn = {
+      text: () => text.mock.calls.map(([, options]) => options),
+      images: () => images.mock.calls.map(([, options]) => options),
+      operators: () => operators.mock.calls.flat().map(String),
     };
-    const page = {
-      getHeight: () => heightMm * LAYOUT_MM,
-      drawText: (value: string, options: object) => drawn.text.push({ value, ...options }),
-      drawImage: (_image: unknown, options: object) => drawn.images.push(options),
-      pushOperators: (...operators: { toString(): string }[]) =>
-        drawn.operators.push(...operators.map(String)),
-    } as unknown as PDFPage;
-    return { page, drawn };
+    return { document, page, drawn };
   }
 
-  it("turns millimetres from the top left into points from the bottom left", () => {
-    const { page } = recordingPage(50);
+  it("turns millimetres from the top left into points from the bottom left", async () => {
+    const { page } = await recordingPage(50);
     expect(pdfRect(page, { x: 10, y: 5, width: 20, height: 15 })).toEqual({
       x: 10 * LAYOUT_MM,
       y: 50 * LAYOUT_MM - 20 * LAYOUT_MM,
@@ -450,36 +454,43 @@ describe("S104: one conversion to PDF points and one centring of text and of run
 
   it("centres a line in its box at the size that fits, and refuses one too long", async () => {
     const font = await (await ScanPdfDocument.create()).embedFont(StandardFonts.Helvetica);
-    const { page, drawn } = recordingPage(50);
+    const { page, drawn } = await recordingPage(50);
     centredText(page, font, "CENTRED", { left: 10, top: 5, width: 40 }, 9, 4, "Line");
-    const [placed] = drawn.text as { x: number; size: number }[];
-    expect(placed!.size).toBe(9);
-    const middle = placed!.x + font.widthOfTextAtSize("CENTRED", 9) / 2;
+    const [placed] = drawn.text();
+    expect(placed?.size).toBe(9);
+    const middle = placed!.x! + font.widthOfTextAtSize("CENTRED", 9) / 2;
     expect(middle / LAYOUT_MM).toBeCloseTo(30, 9);
     expect(() =>
       centredText(page, font, "CENTRED", { left: 10, top: 5, width: 2 }, 9, 4, "Line"),
     ).toThrow("Line is too long");
   });
 
-  it("draws a card's artwork inside its rounded clip, in the card's box", () => {
-    const { page, drawn } = recordingPage(50);
+  it("draws a card's artwork inside its rounded clip, in the card's box", async () => {
+    const { document, page, drawn } = await recordingPage(50);
     const box = { x: 5, y: 5, width: 40, height: 20 };
-    drawClippedArtwork(page, {} as PDFImage, box);
-    expect(drawn.images).toEqual([pdfRect(page, box)]);
-    expect(drawn.operators[0]).toBe("q");
-    expect(drawn.operators.at(-1)).toBe("Q");
+    const png = nodeRenderPlatform.encodePng(createRasterImage(1, 1), ANY_DEFLATE_LEVEL);
+    drawClippedArtwork(page, await document.embedPng(png), box);
+    expect(drawn.images()).toEqual([pdfRect(page, box)]);
+    expect(drawn.operators()[0]).toBe("q");
+    expect(drawn.operators().at(-1)).toBe("Q");
   });
 
   it("measures a caption at the least size its sheet prints it", async () => {
     const font = await (await ScanPdfDocument.create()).embedFont(StandardFonts.Helvetica);
     const lines = ["01  A3F09C"];
-    const { page } = recordingPage(105);
+    const { page } = await recordingPage(105);
+    // A sheet's layout and its card's box, at the caption's size and in the column measured here.
+    const sheet = collectionSheetLayout({ pageSize: "a6" }, 1, 1, lines.length);
+    const layout: StudyLayout = {
+      ...sheet,
+      metrics: { ...sheet.metrics, fontSize: 6, lineHeight: 3 },
+    };
     const caption = (captionWidth: number) => () =>
       drawStudyCaption(
         page,
         font,
-        { metrics: { fontSize: 6, lineHeight: 3 } } as StudyLayout,
-        { captionX: 5, captionTop: 50, captionWidth } as StudyBox,
+        layout,
+        { ...sheet.cards[0]!, captionX: 5, captionTop: 50, captionWidth },
         lines,
       );
     // A column as narrow as studyCaptionWidth allows still prints its caption.
@@ -660,6 +671,7 @@ describe("S098, S099: a separate card is one card centred on its page", () => {
       top: 80,
       scale: 1,
     });
+    // A page size that no card has, given on purpose as a JavaScript host could.
     expect(() => separateCardPage({ pageSize: "wallet" as never }, width, height)).toThrow(
       "Page size must be",
     );
@@ -668,12 +680,12 @@ describe("S098, S099: a separate card is one card centred on its page", () => {
 
 describe("S146 follow-up: finish rows state their photograph once; one new-folder rule", () => {
   it("measures each crop on its material's photograph", () => {
-    const [ivory] = materialArtwork.kitchen.finishes;
+    const [ivory] = MATERIAL_ARTWORK.kitchen.finishes;
     expect(ivory!.crop).toEqual([49 / 1580, 186 / 996, 346 / 1580, 250 / 996]);
     expect(ivory!.outlineFit).toBeUndefined();
-    const [charcoal] = materialArtwork.vehicle.finishes;
+    const [charcoal] = MATERIAL_ARTWORK.vehicle.finishes;
     expect(charcoal).toMatchObject({ surface: "matte", outlineFit: [1.005, -0.002, -0.002] });
-    const sand = materialArtwork.tile.finishes.find((finish) => finish.name === "Fluted sand");
+    const sand = MATERIAL_ARTWORK.tile.finishes.find((finish) => finish.name === "Fluted sand");
     expect(sand).toMatchObject({ surface: "fluted tile", onlyTinted: true });
   });
 

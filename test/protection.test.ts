@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { parseArguments } from "../src/cli/arguments.js";
 import { cloudServiceOf } from "../src/cli/cloud-folders.js";
 import { neededPermissions, PROTECTION_FLAGS } from "../src/cli/protection.js";
-import { unencryptedSwap } from "../src/cli/swap-check.js";
+import { swapWarning, unencryptedSwap } from "../src/cli/swap-check.js";
 import { COMMAND_FACTS, type CommandName } from "../src/cli/command-options.js";
 
 const execute = promisify(execFile);
@@ -80,6 +80,33 @@ describe("swap check", () => {
         );
       },
       (root) => expect(unencryptedSwap(root)).toEqual(["/dev/sda2", "/dev/dm-2", "/swap file"]),
+    );
+  });
+
+  it.each([
+    ["empty", ""],
+    ["without its first line", "/dev/sda2 partition 8 0 -2\n"],
+    ["with a line cut short after its path", `${SWAPS_HEADER}/dev/sda2\n`],
+    ["with a line cut short after its type", `${SWAPS_HEADER}/dev/sda2 partition\n`],
+    ["with a line that names no area", `${SWAPS_HEADER}%%%\n`],
+    ["with a type that Linux does not write", `${SWAPS_HEADER}/dev/sda2 disk 8 0 -2\n`],
+    ["with an escape of two digits", `${SWAPS_HEADER}/swap\\04file file 8 0 -2\n`],
+    ["with an escape beyond ASCII", `${SWAPS_HEADER}/swap\\777file file 8 0 -2\n`],
+  ])("warns that swap is unknown for a table %s, as for one it cannot read", async (_, table) => {
+    await withFakeSystem(
+      async (root) => {
+        // A plain partition, which a table that left its line out would leave out of the warning.
+        await blockDevice(root, "sda2");
+        await writeFile(join(root, "proc", "swaps"), table);
+      },
+      (root) => {
+        expect(() => unencryptedSwap(root)).toThrow(
+          expect.objectContaining({ code: "cli.swap-check.swap-table-unreadable" }),
+        );
+        expect(swapWarning(root)).toBe(
+          "Swap may write this memory to the disk unencrypted: MnemoCode cannot read /proc/swaps to tell",
+        );
+      },
     );
   });
 });

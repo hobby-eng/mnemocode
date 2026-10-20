@@ -3,8 +3,7 @@
 // a backup's codes, and the codes before the decoys read back, for a phrase and for a share.
 // Public test data only: the published BIP39 phrases, the SSKR test vectors and synthetic codes.
 
-import { execFileSync, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { BackupReading } from "../src/core/backup-reading.js";
@@ -45,25 +44,55 @@ import {
   writeShare,
 } from "../src/sskr/transport.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 /** The Unicode codes of "abandon" and "about" (core/words.ts). */
 const ABANDON = UNICODE_CODES[0]!;
 const ABOUT = UNICODE_CODES[3]!;
-const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-  readonly deterministic: readonly { readonly shares: readonly string[] }[];
-};
+const vectors = sskrVectors();
 const SHARE = vectors.deterministic[0]!.shares[0]!;
+/** Whether python3 runs here, which the independent reference of the card colours needs. */
+const PYTHON = spawnSync("python3", ["--version"]).error === undefined;
+
+/** Runs the independent reference of the card colours with `argv`, and waits for it. */
+function paletteReference(...argv: string[]) {
+  return spawnSync("python3", ["scripts/card-palette-reference.py", ...argv], {
+    encoding: "utf8",
+    timeout: TEST_TIME_LIMIT_MS,
+  });
+}
 
 describe("the colors of cards that print codes", () => {
-  it("are those of the independent reference, the same for every set", () => {
-    const python = spawnSync("python3", ["--version"]);
-    if (python.error !== undefined) return;
-    const reference = execFileSync("python3", ["scripts/card-palette-reference.py", "64"], {
-      encoding: "utf8",
-    }).trim();
+  it.skipIf(!PYTHON)("are those of the independent reference, the same for every set", () => {
+    const reference = paletteReference("64");
+    expect(reference.status, reference.stderr).toBe(0);
     const codes = Array.from({ length: 64 }, (_, index) => `code ${index}`);
-    expect(codeColors(codes).join(" ")).toBe(reference);
+    expect(codeColors(codes).join(" ")).toBe(reference.stdout.trim());
   });
+
+  it.skipIf(!PYTHON)("have a reference of 1080 distinct colours, one for each candidate", () => {
+    const reference = paletteReference("1080");
+    expect(reference.status, reference.stderr).toBe(0);
+    const colors = reference.stdout.trim().split(" ");
+    expect(colors).toHaveLength(1080);
+    expect(new Set(colors).size).toBe(1080);
+  });
+
+  it.skipIf(!PYTHON).each([
+    ["1081", ["1081"]],
+    ["0", ["0"]],
+    ["abc", ["abc"]],
+    ["8 9", ["8", "9"]],
+  ])(
+    "have a reference that refuses the count %j, which is no whole number from 1 to 1080",
+    (_, argv) => {
+      const reference = paletteReference(...argv);
+      expect(reference.status).toBe(1);
+      expect(reference.stdout).toBe("");
+      expect(reference.stderr).toBe("Give one whole number of colours, from 1 to 1080.\n");
+    },
+  );
 
   it("give one color to each distinct code, in the order they first appear", () => {
     expect(codeColors(["B", "A", "B", "C"])).toEqual([
@@ -380,6 +409,7 @@ describe("the codes of a share before its decoys", () => {
     expect(() => assertShareFormatHasCards("words")).toThrow(
       "Shares written as words have no cards",
     );
+    // A format that no type allows, fed on purpose as a JavaScript host could.
     expect(() => shareFormatHasCards("nothing" as never)).toThrow(
       "The share format must be one of",
     );

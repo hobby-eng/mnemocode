@@ -8,7 +8,10 @@ const FIRST_PRINTABLE_CHARACTER = 0x20;
 
 /** Shared filename admission for filesystem exports and browser downloads; never coerces input. */
 export class ExportFileName {
-  /** Returns one safe component; refuses traversal, separators, controls and Windows special names. */
+  /**
+   * Returns one safe component; refuses traversal, separators, controls and Windows special names
+   * (export.file-name.invalid-component).
+   */
   static checked(name: unknown): string {
     if (
       typeof name !== "string" ||

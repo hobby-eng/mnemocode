@@ -19,9 +19,9 @@
 // - CORE-23: source and tooling use coded errors, not direct native Error construction.
 // - TS-08: no `enum`.
 // - TS-05: no `private` keyword; private fields and methods are `#name`.
-// - TS-11: every exported declaration of a library module (src/ outside the command line), and
-//   every public member of an exported class or interface there, has a `/** … */` comment
-//   (CORE-20).
+// - TS-11: every exported declaration of a library module (src/ outside the command line), every
+//   public member of an exported class or interface there, and every member of the object types
+//   that an exported type alias there is made of, has a `/** … */` comment (CORE-20).
 // - TS-12: every lint exception names its rules and gives its reason after "--".
 // - WEB-01: no `on…=` handler in markup.
 //
@@ -31,14 +31,14 @@
 //
 //   node scripts/verify-code-rules.mjs
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { linesOfCode } from "./lines-of-code.mjs";
 import { isShellScript, readShell } from "./shell-source.mjs";
-import { afterGroup, tokensOf } from "./source-tokens.mjs";
-import { isRepositoryTopLevel } from "./git-top-level.mjs";
+import { afterGroup, MEMBER_MODIFIERS, tokensOf } from "./source-tokens.mjs";
+import { isRepositoryTopLevel, trackedOrNewFiles } from "./git-top-level.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 /** CORE-15: the most lines of code a file may have. */
@@ -74,6 +74,8 @@ const BUILT_IN_ERRORS = new Set([
   "TypeError",
   "URIError",
 ]);
+/** A name in JavaScript: a letter, `_` or `$`, then letters, digits, `_` and `$`. */
+const IDENTIFIER = /^[\p{L}_$][\p{L}\p{N}_$]*$/u;
 /** An exact version: digits, dots and an optional pre-release, no range (CORE-25). */
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 /** The keywords after `export` that start a declaration, which needs a doc comment (TS-11). */
@@ -98,34 +100,22 @@ function report(path, line, rule, message) {
 
 /**
  * Every file of the repository that Git does not ignore, by its path from the root (LEFT_OUT
- * aside).
+ * aside), each once.
  */
 function repositoryFiles() {
   return listFiles()
     .map((path) => path.split("\\").join("/"))
     .filter((path) => !LEFT_OUT.some((folder) => path.startsWith(folder)))
-    .filter((path) => existsSync(join(root, path)))
     .sort();
 }
 
 /**
- * The files Git lists for the repository, tracked and new; outside a Git work tree, such as a copy
- * of the scripts in a test or a review snapshot, every file under the root that the root's
- * .gitignore does not leave out (walk).
+ * The files that exist in the repository, tracked or new (git-top-level.mjs); outside a Git work
+ * tree, such as a copy of the scripts in a test or a review snapshot, every file under the root
+ * that the root's .gitignore does not leave out (walk).
  */
 function listFiles() {
-  if (isRepositoryTopLevel(root))
-    return execFileSync(
-      "git",
-      ["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-      {
-        encoding: "utf8",
-        maxBuffer: 64 * 1024 * 1024,
-      },
-    )
-      .split("\0")
-      .filter(Boolean);
-  return walk("");
+  return isRepositoryTopLevel(root) ? trackedOrNewFiles(root) : walk("");
 }
 
 /**
@@ -463,7 +453,7 @@ function classesOf(tokens) {
   tokens.forEach((token, at) => {
     if (token.key !== "class" || tokens[at - 1]?.key === ".") return;
     const name = tokens[at + 1]?.key;
-    if (name === undefined || !/^[\p{L}_$][\p{L}\p{N}_$]*$/u.test(name)) return;
+    if (name === undefined || !IDENTIFIER.test(name)) return;
     // The parent follows the type parameters: class Failure<D extends object> extends Error.
     let open = afterAngles(tokens, at + 2);
     const parent = tokens[open]?.key === "extends" ? tokens[open + 1]?.key : undefined;
@@ -608,22 +598,12 @@ function checkMarkup(path, text) {
     );
 }
 
-/** The words that may come before the name of a member; each may also be a name itself. */
-const MEMBER_MODIFIERS = new Set([
-  "abstract",
-  "accessor",
-  "async",
-  "declare",
-  "get",
-  "override",
-  "private",
-  "protected",
-  "public",
-  "readonly",
-  "set",
-  "static",
-]);
-/** The tokens after which a new member of a class or an interface starts. */
+/**
+ * The words that may come before the name of a member: its modifiers, and the keywords that make
+ * it a method or an accessor (`async`, `get`, `set`); each may also be a name itself.
+ */
+const MEMBER_PREFIXES = new Set([...MEMBER_MODIFIERS, "async", "get", "set"]);
+/** The tokens after which a new member of a class, an interface or an object type starts. */
 const MEMBER_ENDS = new Set([";", "{", "}"]);
 /** The brackets that a member's parts nest in. */
 const OPENING = new Set(["(", "[", "{"]);
@@ -646,7 +626,8 @@ function bodyOpening(tokens, at) {
 
 /**
  * The member that starts at `at` in a body: its name, and whether it is public. A modifier is read
- * as one only before another name; `[` names a computed member, unless it opens an index signature.
+ * as one only before another name; `[` names a computed member, unless it opens an index signature
+ * ([key: string]) or the keys of a mapped type ([K in Keys]), which name no member.
  */
 function memberAt(tokens, at) {
   // A static block has no name, and nothing outside the class can call it.
@@ -655,7 +636,7 @@ function memberAt(tokens, at) {
   let index = at;
   const modifiers = new Set();
   while (
-    MEMBER_MODIFIERS.has(tokens[index].key) &&
+    MEMBER_PREFIXES.has(tokens[index].key) &&
     /^[\w#"'[*]/u.test(tokens[index + 1]?.key ?? "")
   ) {
     modifiers.add(tokens[index].key);
@@ -670,54 +651,101 @@ function memberAt(tokens, at) {
           .map((token) => token.key)
           .join("")
       : first.key;
-  const signature = first.key === "[" && tokens[index + 2]?.key === ":";
+  const signature = first.key === "[" && [":", "in"].includes(tokens[index + 2]?.key);
   const hidden =
     modifiers.has("private") || modifiers.has("protected") || name.startsWith("#") || signature;
   return { name, public: !hidden };
 }
 
 /**
- * TS-11: every public member of an exported class or interface of a library module has a doc
- * comment: a field, a method, an accessor, a constructor; the overloads of a method share the
- * comment of the first (CORE-20). A member starts the first line of a body and each line after one
- * ends, as the formatter writes them; a line that goes on with a type or a value starts none.
+ * The `{` of each object type that the type from `from` is made of, up to its `;` or to `to`: the
+ * type itself, or the arms of its unions and intersections, grouped in parentheses or not. A
+ * literal that belongs to another part is left out: one in a member's type (as in an interface), in
+ * a tuple, in angle brackets (type arguments and parameters), after the `extends` of a conditional
+ * type (patterns, such as Extract<T, { kind: "few" }>), and in a function type's parameters or
+ * result, which belong to its signature.
+ */
+function objectTypesOf(tokens, from, to) {
+  const opens = [];
+  let pattern = false;
+  let index = from;
+  while (index < to && tokens[index].key !== ";") {
+    const { key } = tokens[index];
+    let next = index + 1;
+    if (key === "<") next = afterAngles(tokens, index);
+    else if (OPENING.has(key)) next = afterGroup(tokens, index);
+    // A function type's parameters: the rest of this part is the function's result.
+    if (key === "(" && tokens[next]?.key === "=" && tokens[next + 1]?.key === ">") break;
+    if (key === "(" && !pattern) opens.push(...objectTypesOf(tokens, index + 1, next - 1));
+    if (key === "{" && !pattern) opens.push(index);
+    // The type after `extends` runs to the `?` of its conditional type.
+    if (key === "extends") pattern = true;
+    else if (key === "?") pattern = false;
+    index = next;
+  }
+  return opens;
+}
+
+/**
+ * The `{` of each body whose members the export at `at` makes public: a class's or an
+ * interface's, or each object type of a type alias (objectTypesOf); none for another export.
+ */
+function exportedBodies(tokens, at) {
+  const keyword = tokens
+    .slice(at + 1, at + 4)
+    .findIndex((next) => next.key === "class" || next.key === "interface");
+  if (keyword !== -1) {
+    const open = bodyOpening(tokens, at + 1 + keyword);
+    return open === undefined ? [] : [open];
+  }
+  // export type Name<…> = …, declared or not; export type { … } and export type * re-export.
+  const type = tokens[at + 1]?.key === "declare" ? at + 2 : at + 1;
+  if (tokens[type]?.key !== "type" || !IDENTIFIER.test(tokens[type + 1]?.key ?? "")) return [];
+  const equals = afterAngles(tokens, type + 2);
+  return tokens[equals]?.key === "=" ? objectTypesOf(tokens, equals + 1, tokens.length) : [];
+}
+
+/**
+ * TS-11: every public member of the body that opens at `open` has a doc comment: a field, a
+ * method, an accessor, a constructor; the overloads of a method share the comment of the first
+ * (CORE-20). A member starts the body and after each `;` that ends one, and on the line after a
+ * `}` that ends one, as the formatter writes them: on the line of a `}` a type goes on ({ … }[]),
+ * and a line that goes on with a type or a value starts none.
+ */
+function checkMembers(path, tokens, comments, open) {
+  const close = afterGroup(tokens, open) - 1;
+  let depth = 0;
+  let previous = "{";
+  let lastName;
+  for (let index = open + 1; index < close; index += 1) {
+    const { key, line } = tokens[index];
+    const ended = previous === "}" ? line > tokens[index - 1].line : MEMBER_ENDS.has(previous);
+    if (depth === 0 && ended && /^[\w#"'[*(]/u.test(key)) {
+      const member = memberAt(tokens, index);
+      const overload = member.name === lastName;
+      lastName = member.name;
+      if (member.public && !overload && !documented(tokens, comments, index))
+        report(
+          path,
+          line,
+          "TS-11",
+          "a public member of an exported class, interface or object type of a library module has a /** … */ comment",
+        );
+    }
+    if (OPENING.has(key)) depth += 1;
+    else if (CLOSING.has(key)) depth -= 1;
+    if (depth === 0) previous = key;
+  }
+}
+
+/**
+ * TS-11: every public member of an exported class or interface of a library module, and of each
+ * object type that an exported type alias there is made of, has a doc comment (checkMembers).
  */
 function checkMemberDocComments(path, tokens, comments) {
   tokens.forEach((token, at) => {
     if (token.key !== "export") return;
-    const keyword = tokens
-      .slice(at + 1, at + 4)
-      .findIndex((next) => next.key === "class" || next.key === "interface");
-    if (keyword === -1) return;
-    const open = bodyOpening(tokens, at + 1 + keyword);
-    if (open === undefined) return;
-    const close = afterGroup(tokens, open) - 1;
-    let depth = 0;
-    let previous = "{";
-    let lastName;
-    for (let index = open + 1; index < close; index += 1) {
-      const { key, line } = tokens[index];
-      const starts =
-        depth === 0 &&
-        MEMBER_ENDS.has(previous) &&
-        line > tokens[index - 1].line &&
-        /^[\w#"'[*(]/u.test(key);
-      if (starts) {
-        const member = memberAt(tokens, index);
-        const overload = member.name === lastName;
-        lastName = member.name;
-        if (member.public && !overload && !documented(tokens, comments, index))
-          report(
-            path,
-            line,
-            "TS-11",
-            "a public member of an exported class or interface of a library module has a /** … */ comment",
-          );
-      }
-      if (OPENING.has(key)) depth += 1;
-      else if (CLOSING.has(key)) depth -= 1;
-      if (depth === 0) previous = key;
-    }
+    for (const open of exportedBodies(tokens, at)) checkMembers(path, tokens, comments, open);
   });
 }
 

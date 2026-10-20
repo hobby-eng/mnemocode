@@ -7,6 +7,7 @@ import { backupCheckAnswer, offerEncodedCheck, offerShareCheck } from "../src/cl
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { runEncode } from "../src/cli/encode-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
+import { errorCode } from "../src/core/refusal.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { ShareCombineRefusalError } from "../src/sskr/share-platform.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
@@ -192,6 +193,26 @@ describe("encode, decode and the backup check on the private screen", () => {
         "The backup restores this seed phrase.",
       ]);
       expect(promptsShown("Share 2 as written down:")).toHaveLength(2);
+    });
+
+    it("refuses a share typed again by the code of its condition (CORE-23)", async () => {
+      const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
+      terminal.answers = [
+        `${shares[0]};not a share\r`,
+        "still none\r",
+        `${TEST_PHRASE}\r`,
+        `${shares[2]}\r`,
+        `${DATE}\r`,
+      ];
+      terminal.choices = ["yes"];
+      await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
+        parseDate(DATE),
+      ]);
+      expect(seen.refusals.map(errorCode)).toEqual([
+        "sskr.share-input.share-unreadable",
+        "sskr.share-input.seed-phrase-in-words",
+      ]);
+      expect(seen.notices).toContain("The backup restores this seed phrase.");
     });
 
     it("keeps an abbreviation at the start of a share's problem", async () => {

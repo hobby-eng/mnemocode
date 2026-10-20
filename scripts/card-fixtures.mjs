@@ -1,6 +1,8 @@
 // The public fixtures of the manual card-output scripts, business-goldens.mjs and
 // check-card-output.mjs: the build they render with, the cards they draw and how they read a
-// card's QR code back. Public test data only; not part of the program, its startup or its tests.
+// card's QR code back; and how a page of a card PDF is drawn as an image, for the QR code and for
+// the comparison of two builds (compare-business-goldens.mjs). Public test data only; not part of
+// the program, its startup or its tests.
 
 import { execFileSync } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
@@ -103,11 +105,12 @@ export const REVIEW_TEXTS = Object.freeze({
 export const QR_DPI = 200;
 
 /**
- * The text of the QR code on page `page` (from 1) of the PDF at `pdfPath`, or undefined when it
- * has none; the page image is written to `prefix`.png. Read without inverting the image: a card
- * prints its code dark on light, as test/card-qr.test.ts reads it too.
+ * Page `page` (from 1) of the PDF at `pdfPath`, drawn by Poppler's pdftoppm at `dpi` dots per inch
+ * into `prefix`.png and read back: its `width` and `height` in pixels and its pixels in `data`,
+ * four bytes each (red, green, blue and alpha, which is 255 throughout: pdftoppm draws an opaque
+ * page). A failure of pdftoppm, such as a page the PDF lacks, is thrown as execFileSync throws it.
  */
-export async function qrOfPdfPage(pdfPath, page, prefix) {
+export async function pdfPageImage(pdfPath, page, dpi, prefix) {
   execFileSync(
     "pdftoppm",
     [
@@ -117,14 +120,23 @@ export async function qrOfPdfPage(pdfPath, page, prefix) {
       String(page),
       "-singlefile",
       "-r",
-      String(QR_DPI),
+      String(dpi),
       "-png",
       pdfPath,
       prefix,
     ],
     { stdio: "pipe" },
   );
-  const png = PNG.sync.read(await readFile(`${prefix}.png`));
+  return PNG.sync.read(await readFile(`${prefix}.png`));
+}
+
+/**
+ * The text of the QR code on page `page` (from 1) of the PDF at `pdfPath`, or undefined when it
+ * has none; the page image is written to `prefix`.png. Read without inverting the image: a card
+ * prints its code dark on light, as test/card-qr.test.ts reads it too.
+ */
+export async function qrOfPdfPage(pdfPath, page, prefix) {
+  const png = await pdfPageImage(pdfPath, page, QR_DPI, prefix);
   return jsQR(new Uint8ClampedArray(png.data), png.width, png.height, {
     inversionAttempts: "dontInvert",
   })?.data;

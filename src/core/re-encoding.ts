@@ -48,10 +48,16 @@ export type { MatchedBy };
  * before it says the phrase is accepted, not proven (AUD-020-SEC001).
  */
 export type ReEncodingConfirmation =
-  | { readonly by: "person" }
   | {
+      /** By the person, who recognises the phrase or its fingerprint (confirmByPerson). */
+      readonly by: "person";
+    }
+  | {
+      /** By the wallet, whose check matched the phrase (confirmByWallet). */
       readonly by: "wallet";
+      /** Where the wallet matched (WalletMatch.path); undefined where its check named no path. */
       readonly path: string | undefined;
+      /** What the wallet check said of the match (WalletMatch.warning); undefined for nothing. */
       readonly warning: string | undefined;
     };
 
@@ -138,9 +144,12 @@ export class ReEncoding extends Redacted {
 
   /**
    * The phrase that `backup` and its complete `dates` give, as Decode decodes it; refused where it
-   * fails its checksum (CHECKSUM_FAILS). A backup that gives several phrases, one for each possible
-   * last word (EncodedBackup.givesSeveral), takes the original `lastWord` that picks one, which no
-   * other backup takes (LAST_WORD_NOT_TAKEN), so that a mistaken mode is said, not ignored.
+   * fails its checksum (CHECKSUM_FAILS, core.re-encoding.checksum-fails). A backup that gives
+   * several phrases, one for each possible last word (EncodedBackup.givesSeveral), takes the
+   * original `lastWord` that picks one, refused without it (last-word-needed) or where none ends
+   * with it (no-such-last-word); no other backup takes one (LAST_WORD_NOT_TAKEN,
+   * last-word-not-taken), so that a mistaken mode is said, not ignored. What the backup's decoding
+   * refuses of the dates passes on.
    */
   static of(backup: EncodedBackup, dates: readonly DateShiftDate[], lastWord?: string): ReEncoding {
     if (backup.givesSeveral) return ReEncoding.#withLastWord(backup.candidates(dates), lastWord);
@@ -221,7 +230,7 @@ export class ReEncoding extends Redacted {
    * The line that says how the phrase was confirmed, `by` naming what the host compared it with:
    * the person's recognition; a match whose check gave a warning, such as a fingerprint's, only as
    * accepted, not proven (AUD-020-SEC001); otherwise where the wallet matched. Refused until it is
-   * confirmed (NOT_CONFIRMED).
+   * confirmed (NOT_CONFIRMED, core.re-encoding.not-confirmed).
    */
   confirmationLine(by: MatchedBy): string {
     const confirmation = this.#confirmation;
@@ -234,7 +243,10 @@ export class ReEncoding extends Redacted {
     return `${capitalized(by)} found at ${confirmation.path}: the wallet matches, the seed phrase is confirmed.`;
   }
 
-  /** The phrase to encode again; refused until it is confirmed (NOT_CONFIRMED). */
+  /**
+   * The phrase to encode again; refused until it is confirmed (NOT_CONFIRMED,
+   * core.re-encoding.not-confirmed).
+   */
   confirmedPhrase(): string {
     this.#indexes.assertLive();
     if (this.#confirmation === undefined) throw ERRORS.create("not-confirmed", []);

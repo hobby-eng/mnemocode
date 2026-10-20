@@ -50,20 +50,16 @@ describe.skipIf(process.platform === "win32")("Historical recorder path metadata
           ],
           { encoding: "utf8" },
         );
-        const record = JSON.parse(
+        const record: unknown = JSON.parse(
           await readFile(join(recordFolder, "harmless.command.json"), "utf8"),
-        ) as {
-          cwd: string;
-          exitCode: number;
-        };
+        );
         expect(child.error).toBeUndefined();
         expect(child.status).toBe(code);
         expect(child.stdout.split("\n")[0]).toBe(root);
         expect((await readFile(join(recordFolder, "harmless.log"), "utf8")).trim()).toBe(
           invocation + "\ntwo words with spaces",
         );
-        expect(record.cwd).toBe(invocation);
-        expect(record.exitCode).toBe(code);
+        expect(record).toMatchObject({ cwd: invocation, exitCode: code });
       } finally {
         await rm(folder, { recursive: true, force: true });
       }

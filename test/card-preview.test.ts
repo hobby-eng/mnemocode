@@ -5,17 +5,22 @@ import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-nod
 import { CardPreview } from "../src/export/card-preview.js";
 import { CardRenderer } from "../src/export/card-renderer.js";
 import { phraseOfRandomEntropy } from "../src/core/english-words.js";
+import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
 describe("Sample cards as a library (export/card-preview.ts)", () => {
-  it("draws one design, or every design in one PDF, from a sample phrase", async () => {
-    // One design with the longest phrase; every design with the default, which draws half the
-    // cards: every design at 24 words took a minute alone and ran out of time in the full suite.
-    const longest = new CardPreview(nodeCardRenderer, { words: 24 });
-    const one = await PDFDocument.load(await longest.render());
-    expect(one.getPageCount()).toBe(1);
-    const all = await PDFDocument.load(await new CardPreview(nodeCardRenderer).renderAll());
-    expect(all.getPageCount()).toBe(CardPreview.templates.length);
-  }, 120_000);
+  it(
+    "draws one design, or every design in one PDF, from a sample phrase",
+    async () => {
+      // One design with the longest phrase; every design with the default, which draws half the
+      // cards: every design at 24 words took a minute alone and ran out of time in the full suite.
+      const longest = new CardPreview(nodeCardRenderer, { words: 24 });
+      const one = await PDFDocument.load(await longest.render());
+      expect(one.getPageCount()).toBe(1);
+      const all = await PDFDocument.load(await new CardPreview(nodeCardRenderer).renderAll());
+      expect(all.getPageCount()).toBe(CardPreview.templates.length);
+    },
+    LONG_TEST_TIME_LIMIT_MS,
+  );
 
   it("draws a sample phrase of its own for each preview with the host's randomInt, a byte at a time", () => {
     const colorsOf = (preview: CardPreview): unknown => {

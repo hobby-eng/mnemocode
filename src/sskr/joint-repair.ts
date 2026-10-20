@@ -777,9 +777,6 @@ export class JointRepair {
     this.#platform = checkedPlatform(platform);
   }
 
-  /** Marked elements on one share that a repair takes (MAX_JOINT_MARKED_ELEMENTS). */
-  static readonly MAX_MARKED_ELEMENTS = MAX_JOINT_MARKED_ELEMENTS;
-
   /**
    * Assesses `records`, the shares as typed with ? for each unreadable element, and returns the
    * plan whose search finds every phrase they can restore, or refuses as its verdict says

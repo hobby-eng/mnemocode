@@ -7,16 +7,9 @@ import {
   encryptCandidates,
   PassphraseProtection,
 } from "../src/core/candidate-encryption.js";
+import { deferred } from "./helpers/deferred.js";
 
 const FAILED = "core.candidate-encryption.self-test-failed";
-
-function deferred(): { readonly promise: Promise<void>; readonly release: () => void } {
-  let release!: () => void;
-  const promise = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  return { promise, release };
-}
 
 function holdSymmetricChecks(failures: readonly boolean[]) {
   const gates = failures.map((fails) => ({ entered: deferred(), held: deferred(), fails }));
@@ -189,10 +182,11 @@ it.each(["older-first", "newer-first"] as const)(
   },
 );
 
-it("retires delayed decrypted plaintext after a transient failed explicit self-test", async () => {
-  const pair = await createSessionIdentity();
-  const plain = Uint8Array.of(21, 22, 23);
-  const file = await encryptCandidates(plain, pair.recipient);
+/**
+ * Every byte array with the contents of `plain` that is filled from now on, and a decryption whose
+ * plaintext, `plain`, is held back after its first chunk until `held` is released.
+ */
+function holdPlaintext(plain: Uint8Array) {
   const entered = deferred();
   const held = deferred();
   const retired: Uint8Array[] = [];
@@ -216,7 +210,15 @@ it("retires delayed decrypted plaintext after a transient failed explicit self-t
       { size: () => plain.length },
     ),
   );
-  const decrypted = decryptCandidates(file, { identity: pair.identity });
+  return { entered, held, retired };
+}
+
+it("retires delayed decrypted plaintext after a transient failed explicit self-test", async () => {
+  const pair = await createSessionIdentity();
+  const plain = Uint8Array.of(21, 22, 23);
+  const file = await encryptCandidates(plain, pair.recipient);
+  const { entered, held, retired } = holdPlaintext(plain);
+  const decrypted = decryptCandidates(file, { identity: pair });
   await entered.promise;
   vi.spyOn(Decrypter.prototype, "addIdentity").mockImplementationOnce(() => {
     throw new Error("Synthetic plaintext self-test failure.");
@@ -278,3 +280,30 @@ it.each([
     }
   },
 );
+
+it("retires decrypted plaintext when its session identity ends during the decryption", async () => {
+  const pair = await createSessionIdentity();
+  const plain = Uint8Array.of(41, 42, 43);
+  const file = await encryptCandidates(plain, pair.recipient);
+  const { entered, held, retired } = holdPlaintext(plain);
+  const decrypted = decryptCandidates(file, { identity: pair });
+  await entered.promise;
+  try {
+    pair.wipe();
+    const refused = expect(decrypted).rejects.toHaveProperty("code", "core.secret-value.wiped");
+    held.release();
+    await refused;
+    expect(retired.length).toBeGreaterThan(0);
+    expect(retired.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
+    expect([...plain]).toEqual([41, 42, 43]);
+    // The ended session opens nothing more.
+    await expect(decryptCandidates(file, { identity: pair })).rejects.toHaveProperty(
+      "code",
+      "core.secret-value.wiped",
+    );
+  } finally {
+    held.release();
+    plain.fill(0);
+    file.fill(0);
+  }
+});

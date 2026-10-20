@@ -21,7 +21,12 @@
 
 import { parseRecord } from "../record.js";
 import type { ShareRepairPlatform } from "../sskr/share-platform.js";
-import { ShareInput, SHARE_SEPARATOR } from "../sskr/share-input.js";
+import {
+  ShareInput,
+  SHARE_SEPARATOR,
+  type SetTrouble,
+  type ShareTrouble,
+} from "../sskr/share-input.js";
 import { ShareSet } from "../sskr/share-set.js";
 import { MIN_RECORDED_THRESHOLD } from "../sskr/share-layout.js";
 import { DatesAnswer } from "./date-search.js";
@@ -43,6 +48,20 @@ import { SecretValue } from "./secret-value.js";
 // Keep the established host entry points while the two value owners live beside this module.
 export { KeptShares, RestoredShares };
 
+/**
+ * What sskr-combine says of complete shares before it tries, one code for each condition of
+ * SetTrouble (sskr/share-input.ts), in its words. The compiler holds the keys to SetTrouble's
+ * codes, every one and no other, and the catalog and isRestoreRefusal take them from here.
+ */
+const SET_TROUBLES = Object.freeze({
+  "share-of-another-set": suppliedMessage,
+  "shares-of-different-sets": suppliedMessage,
+  "member-given-twice": suppliedMessage,
+  "group-thresholds-conflict": suppliedMessage,
+  "too-few-for-threshold": suppliedMessage,
+  "too-few-groups": suppliedMessage,
+} satisfies Readonly<Record<SetTrouble["code"], typeof suppliedMessage>>);
+
 // shares-do-not-restore is one condition, a refusal of ShareSet.combine, whose own coded refusal is
 // its cause: the code of that cause tells which (ShareBackupCheck.restore, AUD-037-API009).
 const ERRORS = new ErrorCatalog("core.backup-check", {
@@ -53,9 +72,26 @@ const ERRORS = new ErrorCatalog("core.backup-check", {
   "too-few-shares": suppliedMessage,
   "too-few-after-copies": (count: string, threshold: string) =>
     `Once the copies are left out, ${count === "1" ? "one share is" : `${count} shares are`} left; type ${threshold} different shares.`,
-  "shares-not-restorable-together": suppliedMessage,
+  ...SET_TROUBLES,
   "shares-do-not-restore": suppliedMessage,
 });
+
+/** Whether `code` names a condition of SetTrouble: a key of SET_TROUBLES. */
+function isSetTroubleCode(code: string): code is SetTrouble["code"] {
+  return Object.hasOwn(SET_TROUBLES, code);
+}
+
+/**
+ * The refusals of ShareBackupCheck.restore, after which the shares are typed again
+ * (isRestoreRefusal): too few shares, each condition of SetTrouble, and a refusal of
+ * ShareSet.combine.
+ */
+const RESTORE_REFUSALS = Object.freeze([
+  "too-few-shares",
+  "too-few-after-copies",
+  ...Object.keys(SET_TROUBLES).filter(isSetTroubleCode),
+  "shares-do-not-restore",
+] as const);
 
 /** The part of a backup that a finding is about. */
 export type BackupPart = "codes" | "shares" | "dates";
@@ -302,7 +338,9 @@ export class WrittenCodes extends Redacted implements Disposable {
 
   /**
    * Reads the codes of a backup as written down, in `format` with `mode`, unless a record names
-   * its own form and mode. Throws why they cannot be read, naming places and counts only.
+   * its own form and mode. Throws why they cannot be read, naming places and counts only: a record
+   * that parseRecord refuses (record.malformed-header, record.unsupported-version,
+   * record.unsupported-format), and codes that EncodedBackup.read refuses.
    */
   static read(typed: string, format: EncodedFormat, mode: MaskingMode): WrittenCodes {
     const record = parseRecord(typed);
@@ -419,7 +457,7 @@ export class EncodedBackupCheck implements BackupCheck {
   }
 
   /** Reads the dates as written down; throws why they cannot be read, naming dates by place. */
-  readDates(line: string): readonly DateShiftDate[] {
+  #readDates(line: string): readonly DateShiftDate[] {
     this.#secrets.assertLive();
     return readDates(line, this.wordCount);
   }
@@ -466,7 +504,10 @@ export class EncodedBackupCheck implements BackupCheck {
    * Whether the codes and the dates, each of the result, restore its seed phrase. Only a fault of
    * MnemoCode gives a finding here; it names the codes, which are then typed again.
    */
-  compareRestored(codes: WrittenCodes, dates: readonly DateShiftDate[]): BackupFinding | undefined {
+  #compareRestored(
+    codes: WrittenCodes,
+    dates: readonly DateShiftDate[],
+  ): BackupFinding | undefined {
     if (codes.restores(this.#secrets.mnemonic, this.dated ? dates : [])) return undefined;
     return finding(
       "codes",
@@ -503,10 +544,10 @@ export class EncodedBackupCheck implements BackupCheck {
     return {
       dated: this.dated,
       wordCount: this.wordCount,
-      readDates: (line) => this.readDates(line),
+      readDates: (line) => this.#readDates(line),
       compare: (codes) => this.compareCodes(codes),
       compareDates: (_codes, dates) => this.compareDates(dates),
-      compareRestored: (codes, dates) => this.compareRestored(codes, dates),
+      compareRestored: (codes, dates) => this.#compareRestored(codes, dates),
     };
   }
 
@@ -562,7 +603,11 @@ export class ShareBackupCheck implements BackupCheck {
 
   /**
    * `decodeEntry` names the host's reader of an encoded seed phrase, which a phrase typed in place
-   * of the shares is sent to (ShareInput).
+   * of the shares is sent to (ShareInput). Refuses a mode in which no shares are made
+   * (core.masking.split-modes-only), a threshold that is not a whole number of at least
+   * MIN_RECORDED_THRESHOLD (core.backup-check.share-check-whole-threshold-at-least), what
+   * BackupCheckSecrets refuses of the phrase and the dates, and a `decodeEntry` that names nothing
+   * (sskr.share-input.share-input-name-host-s-reader-seed-phrase).
    */
   constructor(
     original: ShareOriginal,
@@ -617,7 +662,9 @@ export class ShareBackupCheck implements BackupCheck {
   /**
    * The shares of one answer, as the restore reads them (ShareInput.sharesOfAnswer): separated by
    * ; or line breaks, a share wrapped over lines joined again, a seed phrase refused as one; at
-   * least the threshold. Throws when too few.
+   * least the threshold. Refuses what sharesOfAnswer refuses (its sskr.share-input and
+   * sskr.transport codes), fewer shares than the threshold (core.backup-check.shares-refused), and
+   * any call after wipe (core.secret-value.wiped).
    */
   sharesOf(answer: string): string[] {
     this.#secrets.assertLive();
@@ -630,15 +677,17 @@ export class ShareBackupCheck implements BackupCheck {
   /**
    * Why the share at `place` cannot be read, or undefined when it can, as the restore says it
    * (ShareInput.readProblem): a share with ? for an unreadable element is read with the others, by
-   * the restore, once its marks are few enough.
+   * the restore, once its marks are few enough. The trouble's code names the condition and its
+   * message names the share by its place; ShareInput.refusalOf makes it the refusal of a share
+   * typed again. Refused once wiped (core.secret-value.wiped).
    */
-  shareProblem(place: number, text: string): string | undefined {
+  shareProblem(place: number, text: string): ShareTrouble | undefined {
     this.#secrets.assertLive();
     return this.#input.readProblem(place, text);
   }
 
   /** Reads the dates as written down; throws why they cannot be read, naming dates by place. */
-  readDates(line: string): readonly DateShiftDate[] {
+  #readDates(line: string): readonly DateShiftDate[] {
     this.#secrets.assertLive();
     return readDates(line, this.wordCount);
   }
@@ -650,25 +699,22 @@ export class ShareBackupCheck implements BackupCheck {
    * code (restore).
    */
   static isRestoreRefusal(error: unknown): boolean {
-    return ERRORS.matches(error, [
-      "too-few-shares",
-      "too-few-after-copies",
-      "shares-not-restorable-together",
-      "shares-do-not-restore",
-    ]);
+    return ERRORS.matches(error, RESTORE_REFUSALS);
   }
 
   /**
    * Restores the shares kept (ShareSet.combine); throws why they cannot be, after which they are
    * all typed again (isRestoreRefusal), or a fault of the host, which passes through. The set names
    * each share by its place among those typed. Its refusals, all core.backup-check: too-few-shares,
-   * fewer shares than the threshold; too-few-after-copies, as few once copies are left out;
-   * shares-not-restorable-together, what sskr-combine says of the complete shares before it tries
-   * (ShareInput.completeSetProblem): shares of different sets, a member given twice, a group given
-   * different thresholds, or, where no marked share may complete them, too few for the quorum that
-   * they record, each in its own words; and shares-do-not-restore, a refusal of ShareSet.combine
-   * (ShareSet.isRefusal) in its own words, which is kept as the error's `cause`, whose code tells
-   * its condition, such as sskr.complete-shares.no-secret or sskr.share-set.several-groups.
+   * fewer shares than the threshold; too-few-after-copies, as few once copies are left out; what
+   * sskr-combine says of the complete shares before it tries (ShareInput.completeSetProblem), each
+   * in its own words and by the code of its condition (SetTrouble): share-of-another-set, one share
+   * of another set than most; shares-of-different-sets, member-given-twice and
+   * group-thresholds-conflict, shares of which nothing tells the wrong one; too-few-for-threshold
+   * and too-few-groups, where no marked share may complete them, too few for the quorum that they
+   * record; and shares-do-not-restore, a refusal of ShareSet.combine (ShareSet.isRefusal) in its
+   * own words, which is kept as the error's `cause`, whose code tells its condition, such as
+   * sskr.complete-shares.no-secret or sskr.share-set.several-groups.
    */
   async restore(kept: KeptShares): Promise<RestoredShares> {
     this.#secrets.assertLive();
@@ -681,7 +727,7 @@ export class ShareBackupCheck implements BackupCheck {
     // Shares that do not belong together, or are too few for their set, are named as sskr-combine
     // names them.
     const problem = kept.setProblem;
-    if (problem !== undefined) throw ERRORS.create("shares-not-restorable-together", [problem]);
+    if (problem !== undefined) throw ERRORS.create(problem.code, [problem.message]);
     let set: ShareSet;
     try {
       set = await ShareSet.combine(texts, this.#platform, kept.places);
@@ -697,7 +743,7 @@ export class ShareBackupCheck implements BackupCheck {
   }
 
   /** Whether shares that can be restored hold the phrase of the result, when it is known. */
-  compareShares(restored: RestoredShares): BackupFinding | undefined {
+  #compareShares(restored: RestoredShares): BackupFinding | undefined {
     this.#secrets.assertLive();
     if (this.#held === undefined || restored.holds(this.#held.value)) return undefined;
     return finding(
@@ -711,7 +757,7 @@ export class ShareBackupCheck implements BackupCheck {
    * How the dates typed with shares that can be restored differ from those of the result: with
    * the dates of the result, each date is compared; without them, the seed phrase they restore.
    */
-  compareDates(
+  #compareDates(
     restored: RestoredShares,
     dates: readonly DateShiftDate[],
   ): BackupFinding | undefined {
@@ -733,7 +779,7 @@ export class ShareBackupCheck implements BackupCheck {
   }
 
   /** Whether the shares left a part unchecked: a group not complete, or a repair not settled. */
-  compareChecked(restored: RestoredShares): BackupFinding | undefined {
+  #compareChecked(restored: RestoredShares): BackupFinding | undefined {
     this.#secrets.assertLive();
     if (restored.unchecked.length === 0) return undefined;
     return finding(
@@ -761,7 +807,7 @@ export class ShareBackupCheck implements BackupCheck {
     for (const [index, text] of texts.entries()) {
       const problem = this.shareProblem(index + 1, text);
       if (problem !== undefined)
-        return resultOf(finding("shares", "unreadable", problem, [index + 1]));
+        return resultOf(finding("shares", "unreadable", problem.message, [index + 1]));
     }
     using kept = KeptShares.of(texts);
     texts.fill("");
@@ -784,10 +830,10 @@ export class ShareBackupCheck implements BackupCheck {
     return {
       dated: this.dated,
       wordCount: this.wordCount,
-      readDates: (line) => this.readDates(line),
-      compare: (restored) => this.compareShares(restored),
-      compareDates: (restored, dates) => this.compareDates(restored, dates),
-      compareRestored: (restored) => this.compareChecked(restored),
+      readDates: (line) => this.#readDates(line),
+      compare: (restored) => this.#compareShares(restored),
+      compareDates: (restored, dates) => this.#compareDates(restored, dates),
+      compareRestored: (restored) => this.#compareChecked(restored),
     };
   }
 

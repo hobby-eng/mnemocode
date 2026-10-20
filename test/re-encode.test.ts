@@ -1,8 +1,7 @@
-import { execFile } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { inspect, promisify } from "node:util";
+import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import { parseDate } from "../src/core.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
@@ -17,7 +16,7 @@ import {
 import { RE_ENCODING_SELF_TEST } from "../src/core/re-encoding-self-test.js";
 import { MALFORMED_WALLET_ANSWER } from "../src/core/wallet-check.js";
 import { parseArguments } from "../src/cli/arguments.js";
-import { commandOptions } from "../src/cli/command-options.js";
+import { COMMAND_OPTIONS } from "../src/cli/command-options.js";
 import { comparedPassphrase } from "../src/cli/decode-command.js";
 import { OLD_BACKUP_REFUSAL, splitOptions } from "../src/cli/re-encode-command.js";
 import {
@@ -28,10 +27,7 @@ import {
 } from "../src/cli/re-encode-options.js";
 import { containing } from "./helpers/matchers.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
-import { PublicCliFiles } from "./helpers/public-cli-files.js";
-
-const execFileAsync = promisify(execFile);
-const cli = join(process.cwd(), "dist", "mnemocode.js");
+import { runBuiltCli } from "./helpers/built-cli.js";
 
 // Public test data only: the BIP39 test phrase, masked with MnemoCode Seedshift and 23-09-2026
 // (vectors/mnemocode-v1.json), and its fingerprint and first native SegWit address.
@@ -46,13 +42,9 @@ function masked(): EncodedBackup {
   return EncodedBackup.read(MASKED_WORDS, "english", "seedshift");
 }
 
+/** Runs the built CLI's `command`, re-encode unless a test names another, with `arguments_`. */
 async function run(arguments_: readonly string[], command = "re-encode") {
-  using material = new PublicCliFiles([command, ...arguments_]);
-  return await execFileAsync(process.execPath, [cli, ...material.arguments], {
-    cwd: process.cwd(),
-    env: { ...process.env, NO_COLOR: "1" },
-    maxBuffer: 1024 * 1024,
-  });
+  return await runBuiltCli([command, ...arguments_]);
 }
 
 /** The old backup as typed text, masked with its date, for the command line. */
@@ -73,7 +65,8 @@ describe("ReEncoding", () => {
     const reEncoding = ReEncoding.of(masked(), [RIGHT]);
     expect((await reEncoding.confirmByWallet(() => ({ matched: false }))).matched).toBe(false);
     expect(() => reEncoding.confirmedPhrase()).toThrow(NOT_CONFIRMED);
-    // A host's answer that is no WalletMatch confirms nothing (AUD-014-API001).
+    // A host's answer that is no WalletMatch, given on purpose as a JavaScript host could, confirms
+    // nothing (AUD-014-API001).
     await expect(reEncoding.confirmByWallet(() => ({ matched: "true" }) as never)).rejects.toThrow(
       MALFORMED_WALLET_ANSWER,
     );
@@ -157,6 +150,8 @@ describe("re-encode options", () => {
       "--recognised",
     ]);
     const { old, fresh } = splitOptions(args);
+    // Without a prototype, as parseArguments makes them (AUD-014-API010).
+    expect([Object.getPrototypeOf(old), Object.getPrototypeOf(fresh)]).toEqual([null, null]);
     expect({ ...old }).toEqual({
       "ask-secrets": true,
       "input-file": "old.txt",
@@ -186,23 +181,24 @@ describe("re-encode options", () => {
   });
 
   it("says which BIP39 passphrase the wallet is compared with, as Decode does", () => {
-    expect(comparedPassphrase("Re-encode", "")).toBe(
+    expect(comparedPassphrase("Re-encode", false)).toBe(
       "Re-encode compares it without a BIP39 passphrase.",
     );
-    expect(comparedPassphrase("Re-encode", "TREZOR")).toBe(
+    expect(comparedPassphrase("Re-encode", true)).toBe(
       "Re-encode compares it with the BIP39 passphrase of --bip39-passphrase-file.",
     );
   });
 
   it("takes every option of Encode but the phrase's, and those of the old backup", () => {
-    const options: readonly string[] = commandOptions["re-encode"];
-    for (const key of commandOptions.encode)
+    const options: readonly string[] = COMMAND_OPTIONS["re-encode"];
+    const encodeOptions: readonly string[] = COMMAND_OPTIONS.encode;
+    for (const key of encodeOptions)
       expect(options.includes(key), key).toBe(key !== "mnemonic" && key !== "mnemonic-file");
     for (const key of [...Object.keys(OLD_BACKUP_OPTIONS), RECOGNISED_OPTION, LAST_WORD_OPTION])
       expect(options, key).toContain(key);
     // No option of the old backup is also one of the new backup's.
     for (const key of Object.keys(OLD_BACKUP_OPTIONS))
-      expect(commandOptions.encode as readonly string[], key).not.toContain(key);
+      expect(encodeOptions, key).not.toContain(key);
   });
 });
 

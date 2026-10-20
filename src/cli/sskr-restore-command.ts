@@ -17,11 +17,13 @@ import {
   matchWarnings,
 } from "../sskr/share-restore.js";
 import { clearPrivateScreen } from "./private-screen.js";
+import { PrivateSteps } from "./private-steps.js";
 import {
   FINGERPRINT_NOTE,
   printCodes,
   terminalLayout,
   terminalFingerprint,
+  terminalLastingWarning,
   terminalNotice,
   terminalPart,
   terminalResultHeader,
@@ -48,6 +50,7 @@ import { assertSskrSelfTest } from "../sskr/self-test.js";
 import type { RepairedSet } from "../sskr/joint-results.js";
 import { NO_PHRASE_FITS, type DateWork } from "../sskr/repair-report.js";
 import { ShareSet } from "../sskr/share-set.js";
+import type { ShareTrouble } from "../sskr/share-input.js";
 import { ShareUnmasking } from "../sskr/share-unmasking.js";
 import { type WalletPlace, givenWallet } from "./bitcoin-options.js";
 import {
@@ -63,7 +66,8 @@ import {
 import { evidenceLabel } from "./option-copy.js";
 import { CandidatesFile } from "./candidates-file.js";
 import { LIST_KEEP } from "../core/candidate-list.js";
-import { askWalletEvidence, changeWalletAnswer, askOrCancel, WHAT_NOW } from "./ask.js";
+import { askOrCancel, WHAT_NOW } from "./ask.js";
+import { askWalletEvidence, changeWalletAnswer } from "./wallet-question.js";
 import {
   askDates,
   dateSearchRun,
@@ -77,7 +81,7 @@ import { showEncodedFingerprint } from "./backup-questions.js";
 import { choose, waitForEnter } from "./terminal-choice.js";
 import { askToSearch } from "./search-consent.js";
 import { SHARE_SEEDSHIFT_CHOICES, SHARE_SEEDSHIFT_QUESTION } from "./seedshift-choices.js";
-import { withCtrlCWatch } from "./terminal-input.js";
+import { CtrlCWatch } from "./terminal-input.js";
 import { SHARE_SOURCE_OPTIONS } from "./share-options.js";
 import { reportOriginalFingerprint, showOriginalPhrase } from "./fingerprint-report.js";
 import { isMasterKeyPath } from "../core/wallet-check.js";
@@ -93,7 +97,7 @@ const ERRORS = new ErrorCatalog("cli.sskr-restore-command", {
   "too-few-shares-restore-phrase": () => "Too few shares to restore the phrase.",
 });
 
-export const sskrInputOptions = [...SHARE_SOURCE_OPTIONS, "ask-secrets"] as const;
+export const SSKR_INPUT_OPTIONS = [...SHARE_SOURCE_OPTIONS, "ask-secrets"] as const;
 
 /**
  * The shares: asked on the private screen with --ask-secrets, or read from the options; CANCELLED
@@ -188,13 +192,16 @@ type Restoring =
   /** Too few shares, which the caller deals with (RestoreRules.few). */
   | { readonly kind: "few" };
 
+/** Too few shares to restore a phrase, by the code of the condition (ShareTrouble). */
+type FewTrouble = Extract<ShareTrouble, { readonly kind: "few" }>;
+
 /** How restorePhrases deals with what differs between restoring and exporting shares. */
 interface RestoreRules {
   /**
-   * After too few shares, explained by `message`: "again" when more shares were added, "few" to
-   * stop restoring and give the shares back to the caller, CANCELLED when the person cancelled.
+   * After too few shares, as `trouble` says: "again" when more shares were added, "few" to stop
+   * restoring and give the shares back to the caller, CANCELLED when the person cancelled.
    */
-  readonly few: (message: string) => Promise<"again" | "few" | Cancelled>;
+  readonly few: (trouble: FewTrouble) => Promise<"again" | "few" | Cancelled>;
   /** Whether several phrases, without a wallet, ask for one to tell the right set (sskr-export). */
   readonly one: boolean;
 }
@@ -214,22 +221,25 @@ async function askShareDates(
   return askDates({ wordCount: words, patterns: true });
 }
 
+/** A date search that is made, with the notice of its time to show over its progress, if any. */
+interface DateSearchStart {
+  readonly notice: string | undefined;
+}
+
 /**
- * Whether the date search of `phrases` phrases is made (dateSearchDecision): at once, with its
- * notice, or when the person chooses it (askToSearch); "no" types the dates again. Dates with ?
- * are typed on the private screen only.
+ * Whether the date search of `phrases` phrases is made (dateSearchDecision): at once, its notice
+ * to be shown when it runs, or when the person chooses it (askToSearch), whose question said its
+ * time; "no" types the dates again. Dates with ? are typed on the private screen only.
  */
 async function askDateSearch(
   work: DateWork,
   phrases: number,
   limits: SearchLimits,
-): Promise<"yes" | "no" | Cancelled> {
+): Promise<DateSearchStart | "no" | Cancelled> {
   const decision = dateSearchDecision(work, phrases, limits);
-  if (decision.question === undefined) {
-    if (decision.notice !== undefined) terminalNotice(decision.notice);
-    return "yes";
-  }
-  return askToSearch(decision.question, DATES_AGAIN);
+  if (decision.question === undefined) return { notice: decision.notice };
+  const start = await askToSearch(decision.question, DATES_AGAIN);
+  return start === "yes" ? { notice: undefined } : start;
 }
 
 /**
@@ -258,18 +268,24 @@ async function dateWork(r: Recovery): Promise<DateWork | undefined> {
 /**
  * The phrases of `sets` whose wallet matches the one given, if any (ShareRestore.phrases): the
  * set's own phrase, or the phrase that the dates unmask, searched where a date holds ? while
- * Ctrl+C is read as a key; or why the dates do not fit, or why none is the wallet's.
+ * Ctrl+C is read as a key, on a step screen of its own with `notice` first, if any; or why the
+ * dates do not fit, or why none is the wallet's.
  */
 async function unmasked(
   r: Recovery,
   sets: readonly RepairedSet[],
   places: readonly number[],
+  notice?: string,
 ): Promise<RestoredPhrases> {
   using walletCheck = walletCheckOf(r.evidence, r.passphrase);
   const unmasking = unmaskingOf(r, walletCheck);
   if (!unmasking.searches) return await ShareRestore.phrases(unmasking, sets, places);
+  // The search is a step of its own: its screen shows the title and the search, no longer the
+  // question answered before it (CORE-39).
+  PrivateSteps.begin();
+  if (notice !== undefined) terminalNotice(notice);
   return await withDateProgress((progress) =>
-    withCtrlCWatch((signal) =>
+    CtrlCWatch.during((signal) =>
       ShareRestore.phrases(
         unmasking,
         sets,
@@ -403,7 +419,7 @@ export async function restorePhrases(
         if (outcome.kind === "trouble") {
           const mended =
             outcome.trouble.kind === "few"
-              ? await rules.few(outcome.trouble.message)
+              ? await rules.few(outcome.trouble)
               : await mendShares(r.shares, outcome.trouble, r.interactive);
           if (mended === CANCELLED) return CANCELLED;
           if (mended === "few") return { kind: "few" };
@@ -414,7 +430,7 @@ export async function restorePhrases(
         if (outcome.kind === "complete") {
           assessed(undefined);
           sets = [outcome.set];
-          if (outcome.unchecked !== undefined) terminalNotice(outcome.unchecked, "warning");
+          if (outcome.unchecked !== undefined) terminalLastingWarning(outcome.unchecked);
           showEncoded();
         } else {
           assessed(outcome);
@@ -433,6 +449,8 @@ export async function restorePhrases(
       } else if (step === "wallet") {
         step = await walletForSearch(r);
       } else {
+        // The time of a date search that the repair search below counted is said by that search.
+        let notice: string | undefined;
         if (sets === undefined) {
           const found = await searchShareRepair(defined(repair), r.limits, await dateWork(r));
           if (found === CANCELLED) return CANCELLED;
@@ -455,13 +473,16 @@ export async function restorePhrases(
         } else {
           const work = await dateWork(r);
           const start =
-            work === undefined ? "yes" : await askDateSearch(work, sets.length, r.limits);
-          if (start !== "yes") {
+            work === undefined
+              ? { notice: undefined }
+              : await askDateSearch(work, sets.length, r.limits);
+          if (start === "no" || start === CANCELLED) {
             step = start === "no" ? "dates" : start;
             continue;
           }
+          notice = start.notice;
         }
-        const result = await unmasked(r, sets, places);
+        const result = await unmasked(r, sets, places, notice);
         // The person stopped the date search with Ctrl+C.
         if (result.kind === "stopped") return CANCELLED;
         if (result.kind === "dates" || result.kind === "mismatch") {
@@ -589,8 +610,7 @@ export async function runSskrCombine(
   try {
     if ((await target?.prepare(r.passphrase)) === CANCELLED) return CANCELLED;
     const restored = await restorePhrases(r, {
-      few: async (message) =>
-        (await mendShares(r.shares, { kind: "few", message }, r.interactive)) ?? "again",
+      few: async (trouble) => (await mendShares(r.shares, trouble, r.interactive)) ?? "again",
       one: false,
     });
     if (restored === CANCELLED) return CANCELLED;
@@ -670,7 +690,7 @@ function reportSet(phrase: RestoredPhrase, place: RestoredPlace, spaced: boolean
   const unchecked = restored?.uncheckedNote(place.places);
   const repaired = phrase.repairs.length > 0;
   if (spaced && (unchecked !== undefined || repaired)) console.error("");
-  if (unchecked !== undefined) terminalNotice(unchecked, "warning");
+  if (unchecked !== undefined) terminalLastingWarning(unchecked);
   reportRepairs(phrase.set, place.places);
 }
 
@@ -704,7 +724,7 @@ function numberedOf(place: RestoredPlace): string {
  * that it matched alike (sskr-export). Nothing without a wallet, whose check says nothing.
  */
 export function reportWalletWarnings(phrases: readonly RestoredPhrase[]): void {
-  for (const warning of matchWarnings(phrases)) terminalNotice(warning, "warning");
+  for (const warning of matchWarnings(phrases)) terminalLastingWarning(warning);
 }
 
 /** "matches the address at m/84'/0'/0'/0/3", for the wallet fact. */

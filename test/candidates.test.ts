@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { webcrypto } from "node:crypto";
 import { inspect } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -34,59 +33,36 @@ import {
   parseRecipient,
   PassphraseProtection,
   ScannerKeyProtection,
+  SessionIdentity,
 } from "../src/core/candidate-encryption.js";
 import { crc32 } from "../src/sskr/checksum.js";
 import { Decrypter } from "age-encryption";
+import vectors from "../vectors/candidates-v1.json" with { type: "json" };
+import { hexBytes } from "./helpers/vectors.js";
 
-interface Sample {
-  readonly number: number;
-  readonly phrase: string;
-  readonly entropy: string;
-}
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/candidates-v1.json", import.meta.url), "utf8"),
-) as {
-  searches: {
-    name: string;
-    kind: WordSearch["kind"];
-    text: string;
-    combinations: number;
-    count: number;
-    candidates: Sample[];
-    contains?: Sample;
-    all?: string[];
-  }[];
-  lists: {
-    name: string;
-    passphrase?: string;
-    records: { entropy: string; passphrase?: string }[];
-    bytes: string;
-  }[];
-  invalidLists: { name: string; refusal: string; bytes: string }[];
-  padme: { length: number; padded: number }[];
-  age: {
-    identity: string;
-    hybridIdentity: string;
-    recipient: string;
-    passphrase: string;
-    plaintext: string;
-    open: { name: string; file: string }[];
-    refuse: { name: string; file: string }[];
-  };
-};
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString("hex");
-const fromHex = (text: string) => Uint8Array.from(Buffer.from(text, "hex"));
+/** The kind of search that a vector names, refused when it names none. */
+function searchKind(kind: string): WordSearch["kind"] {
+  if (kind === "unknown-words" || kind === "missing-word") return kind;
+  throw new Error(`The vectors name an unknown kind of search: ${kind}.`);
+}
 const parse = (kind: WordSearch["kind"], text: string) =>
   kind === "unknown-words" ? parseUnknownWords(text) : parseMissingWord(text);
+/** The first candidate of `search`, which the test expects to find one. */
+function firstCandidate(search: WordCandidateSearch): WordCandidate {
+  const next = search.candidates().next();
+  if (next.done === true) throw new Error("Expected a candidate.");
+  return next.value;
+}
 const ELEVEN = "abandon ".repeat(11);
 /** A public passphrase for the tests of list encryption. */
 const LIST_PASSPHRASE = "public candidate test passphrase";
 
 describe("Candidate searches", () => {
   it.each(vectors.searches.map((search) => [search.name, search] as const))(
-    "%s: the count and every numbered candidate of the vectors",
+    "%s: counts the combinations and yields the vectors' numbered candidates, valid and once each",
     (_, search) => {
-      const parsed = parse(search.kind, search.text);
+      const parsed = parse(searchKind(search.kind), search.text);
       expect(searchCombinations(parsed)).toBe(search.combinations);
       const phrases: string[] = [];
       for (const words of searchCandidates(parsed)) phrases.push(phraseOfWords(words));
@@ -145,7 +121,7 @@ describe("WordCandidateSearch", () => {
   it.each(vectors.searches.map((search) => [search.name, search] as const))(
     "%s: tells the count before the search, and numbers the candidates of the vectors",
     (_, search) => {
-      const parsed = WordCandidateSearch.parse(search.text, search.kind);
+      const parsed = WordCandidateSearch.parse(search.text, searchKind(search.kind));
       expect(parsed.combinations).toBe(search.combinations);
       // Exact when the last place may hold any word; otherwise one in 2^(words / 3) on average.
       const expected = parsed.expected;
@@ -171,7 +147,7 @@ describe("WordCandidateSearch", () => {
   it("tells the places it searched, and each candidate's entropy and checksum bits", () => {
     const last = WordCandidateSearch.parse(`${ELEVEN}?`, "unknown-words");
     expect(last.unknownPlaces).toEqual([11]);
-    const first = last.candidates().next().value as WordCandidate;
+    const first = firstCandidate(last);
     expect(first.phrase).toBe(`${ELEVEN}about`);
     expect(first.checksumBits).toBe("0011");
     expect(last.placesOf(first)).toEqual([11]);
@@ -182,7 +158,7 @@ describe("WordCandidateSearch", () => {
     const missing = WordCandidateSearch.parse(`${"abandon ".repeat(10)}about`, "missing-word");
     expect(missing.wordCount).toBe(12);
     expect(missing.unknownPlaces).toEqual([]);
-    const inserted = missing.candidates().next().value as WordCandidate;
+    const inserted = firstCandidate(missing);
     expect(inserted.phrase).toBe(`${ELEVEN}about`);
     expect(missing.placesOf(inserted)).toEqual([0]);
   });
@@ -194,6 +170,7 @@ describe("WordCandidateSearch", () => {
     expect(() =>
       WordCandidateSearch.parse(`? ? ${"abandon ".repeat(9)}?`, "unknown-words"),
     ).toThrow(`This search has more than 16,777,216 combinations: ${NARROW_WORD_SEARCH}.`);
+    // A kind that no type allows, fed on purpose as a JavaScript host could.
     expect(() => WordCandidateSearch.parse(ELEVEN, "unknown" as WordSearch["kind"])).toThrow(
       /Unknown kind/u,
     );
@@ -220,7 +197,7 @@ describe("WordCandidateSearch", () => {
       `legal winner thank year ? sausage worth useful legal winner thank yellow`,
       "unknown-words",
     );
-    const candidate = search.candidates().next().value as WordCandidate;
+    const candidate = firstCandidate(search);
     for (const [value, marker] of [
       [search, "[WordCandidateSearch: redacted]"],
       [candidate, "[WordCandidate: redacted]"],
@@ -260,19 +237,19 @@ describe("Candidate lists", () => {
     (_, vector) => {
       const list: CandidateList = {
         ...(vector.passphrase === undefined ? {} : { passphrase: vector.passphrase }),
-        records: vector.records.map((record) => ({
-          entropy: fromHex(record.entropy),
+        records: vector.records.map((record: { entropy: string; passphrase?: string }) => ({
+          entropy: hexBytes(record.entropy),
           ...(record.passphrase === undefined ? {} : { passphrase: record.passphrase }),
         })),
       };
       expect(hex(encodeCandidateList(list))).toBe(vector.bytes);
-      expect(decodeCandidateList(fromHex(vector.bytes))).toEqual(list);
+      expect(decodeCandidateList(hexBytes(vector.bytes))).toEqual(list);
     },
   );
 
   it.each(vectors.invalidLists.map((list) => [list.name, list] as const))(
     "refuse a list with %s, for that reason",
-    (_, list) => expect(() => decodeCandidateList(fromHex(list.bytes))).toThrow(list.refusal),
+    (_, list) => expect(() => decodeCandidateList(hexBytes(list.bytes))).toThrow(list.refusal),
   );
 
   it("tell a search with more candidates than a list holds by its own type", () => {
@@ -300,7 +277,7 @@ describe("Candidate lists", () => {
   });
 });
 
-const plain = fromHex(vectors.age.plaintext);
+const plain = hexBytes(vectors.age.plaintext);
 
 /** Puts back the globals that a test of file encryption stubs. */
 function unstubGlobalsAfterEach(): void {
@@ -315,37 +292,40 @@ describe("Candidate file encryption", () => {
   it.each(vectors.age.open.map((file) => [file.name, file.file] as const))(
     "opens the file %s",
     async (name, file) => {
+      using identity = await SessionIdentity.fromText(vectors.age.identity);
       const key = name.includes("passphrase")
         ? { passphrase: vectors.age.passphrase }
-        : { identity: vectors.age.identity };
-      expect(await decryptCandidates(fromHex(file), key)).toEqual(plain);
+        : { identity };
+      expect(await decryptCandidates(hexBytes(file), key)).toEqual(plain);
     },
   );
 
   it.each(vectors.age.refuse.map((file) => [file.name, file.file] as const))(
     "refuses a file with %s",
     async (name, file) => {
-      const key = name.includes("scrypt")
-        ? { passphrase: vectors.age.passphrase }
-        : { identity: vectors.age.identity };
-      await expect(decryptCandidates(fromHex(file), key)).rejects.toThrow(
+      using identity = await SessionIdentity.fromText(vectors.age.identity);
+      const key = name.includes("scrypt") ? { passphrase: vectors.age.passphrase } : { identity };
+      await expect(decryptCandidates(hexBytes(file), key)).rejects.toThrow(
         /exactly one|work factor/u,
       );
     },
   );
 
-  it("refuses a post-quantum file even with the key that opens it", async () => {
-    const file = fromHex(vectors.age.refuse.find((f) => f.name.includes("post-quantum"))!.file);
+  it("refuses a post-quantum file, and its key as a session identity", async () => {
+    const file = hexBytes(vectors.age.refuse.find((f) => f.name.includes("post-quantum"))!.file);
     const decrypter = new Decrypter();
     decrypter.addIdentity(vectors.age.hybridIdentity);
     expect(await decrypter.decrypt(file)).toEqual(plain);
-    await expect(decryptCandidates(file, { identity: vectors.age.hybridIdentity })).rejects.toThrow(
-      /exactly one X25519/u,
+    using identity = await SessionIdentity.fromText(vectors.age.identity);
+    await expect(decryptCandidates(file, { identity })).rejects.toThrow(/exactly one X25519/u);
+    // The key that opens it is no X25519 key, which is all that a session identity holds.
+    await expect(SessionIdentity.fromText(vectors.age.hybridIdentity)).rejects.toThrow(
+      expect.objectContaining({ code: "core.candidate-file-refusal.identity-invalid" }),
     );
   });
 
   it("refuses a damaged file with age's own reason, also where Response hides it (AUD-010-API001)", async () => {
-    const session = await createSessionIdentity();
+    using session = await SessionIdentity.fromText(vectors.age.identity);
     const file = await encryptCandidates(plain, session.recipient);
     file[file.length - 1]! ^= 1;
     // A browser's Response replaces an error inside its stream with its own, as Chromium does.
@@ -359,26 +339,67 @@ describe("Candidate file encryption", () => {
       }
     }
     vi.stubGlobal("Response", BrowserResponse);
-    await expect(decryptCandidates(file, { identity: session.identity })).rejects.toThrow(
-      /invalid tag/u,
-    );
+    await expect(decryptCandidates(file, { identity: session })).rejects.toThrow(/invalid tag/u);
     // age itself, given bytes, loses the reason there.
     const decrypter = new Decrypter();
-    decrypter.addIdentity(session.identity);
+    decrypter.addIdentity(vectors.age.identity);
     await expect(decrypter.decrypt(file)).rejects.toThrow("Failed to fetch");
   });
 
   it("makes one-time X25519 keys, and takes a recipient in any case", async () => {
-    const session = await createSessionIdentity();
+    using session = await createSessionIdentity();
     expect(session.recipient).toMatch(/^age1[02-9ac-hj-np-z]{58}$/u);
-    expect(session.identity).toMatch(/^AGE-SECRET-KEY-1/u);
     const file = await encryptCandidates(plain, `  ${session.recipient.toUpperCase()}\n`);
-    expect(await decryptCandidates(file, { identity: session.identity })).toEqual(plain);
+    expect(await decryptCandidates(file, { identity: session })).toEqual(plain);
     expect(() => parseRecipient(`${session.recipient} ${session.recipient}`)).toThrow(/62/u);
     expect(() => parseRecipient("age1pq1qqqq")).toThrow(/62/u);
     // One wrong character breaks the Bech32 checksum.
     const typo = session.recipient.slice(0, -1) + (session.recipient.endsWith("q") ? "p" : "q");
     expect(() => parseRecipient(typo)).toThrow(/62/u);
+  });
+
+  it("keeps the session's private key in an owner that shows none of it and ends it on wipe", async () => {
+    const session = await SessionIdentity.fromText(vectors.age.identity);
+    expect(session.recipient).toBe(vectors.age.recipient);
+    const file = await encryptCandidates(plain, session.recipient);
+    for (const shown of [
+      String(session),
+      JSON.stringify({ session }),
+      inspect(session, { showHidden: true, getters: true }),
+    ])
+      expect(shown).not.toContain(vectors.age.identity.slice(16, 40));
+    expect(JSON.stringify({ session })).toBe('{"session":"[SessionIdentity: redacted]"}');
+    session.wipe();
+    session[Symbol.dispose]();
+    // Its public recipient stays; its key opens nothing more.
+    expect(session.recipient).toBe(vectors.age.recipient);
+    await expect(decryptCandidates(file, { identity: session })).rejects.toThrow(
+      expect.objectContaining({ code: "core.secret-value.wiped" }),
+    );
+  });
+
+  it("refuses a key's text where a session identity belongs, without repeating it", async () => {
+    const file = hexBytes(vectors.age.open.find((f) => f.name.includes("session"))!.file);
+    // Fed on purpose as a JavaScript host of the earlier interface could: the key's own text.
+    const text = { identity: vectors.age.identity } as unknown as { identity: SessionIdentity };
+    const refusal: unknown = await decryptCandidates(file, text).catch((error: unknown) => error);
+    expect(refusal).toMatchObject({
+      name: "TypeError",
+      code: "core.candidate-encryption.not-session-identity",
+    });
+    expect(String(refusal)).not.toContain(vectors.age.identity.slice(16, 40));
+    const changed = vectors.age.identity.endsWith("A") ? "Q" : "A";
+    for (const malformed of [
+      `${vectors.age.identity.slice(0, -1)}${changed}`,
+      "AGE-SECRET-KEY-1",
+      "",
+    ])
+      await expect(SessionIdentity.fromText(malformed)).rejects.toThrow(
+        expect.objectContaining({
+          code: "core.candidate-file-refusal.identity-invalid",
+          message: "This Scanner key is not a valid age identity.",
+        }),
+      );
   });
 });
 
@@ -397,14 +418,14 @@ describe("Candidate file encryption", () => {
   });
 
   it("protects a list in the three ways behind one interface", async () => {
-    const session = await createSessionIdentity();
+    using session = await createSessionIdentity();
     const key = new ScannerKeyProtection(` ${session.recipient.toUpperCase()}\n`);
     expect([key.encrypted, key.description, key.recipient]).toEqual([
       true,
       "encrypted to the Scanner's key",
       session.recipient,
     ]);
-    expect(await decryptCandidates(await key.protect(plain), session)).toEqual(plain);
+    expect(await decryptCandidates(await key.protect(plain), { identity: session })).toEqual(plain);
     expect(() => new ScannerKeyProtection("age1xyz")).toThrow(/62 characters/u);
     expect(() => new PassphraseProtection("too short")).toThrow(/at least 12/u);
     const passphrase = new PassphraseProtection(`\uFEFF${LIST_PASSPHRASE}\n`);
@@ -425,7 +446,7 @@ describe("Candidate file encryption", () => {
   });
 
   it("refuses an age key in one line where WebCrypto is missing; a passphrase still works", async () => {
-    const session = await createSessionIdentity();
+    using session = await createSessionIdentity();
     const file = await encryptCandidates(plain, session.recipient);
     // A browser page served over plain http has crypto.getRandomValues but no crypto.subtle.
     vi.stubGlobal("crypto", { getRandomValues: webcrypto.getRandomValues.bind(webcrypto) });
@@ -436,7 +457,8 @@ describe("Candidate file encryption", () => {
     await expect(new ScannerKeyProtection(session.recipient).protect(plain)).rejects.toThrow(
       missing,
     );
-    await expect(decryptCandidates(file, session)).rejects.toThrow(missing);
+    await expect(decryptCandidates(file, { identity: session })).rejects.toThrow(missing);
+    await expect(SessionIdentity.fromText(vectors.age.identity)).rejects.toThrow(missing);
     const locked = await new PassphraseProtection(LIST_PASSPHRASE).protect(plain);
     expect(await decryptCandidates(locked, { passphrase: LIST_PASSPHRASE })).toEqual(plain);
   });

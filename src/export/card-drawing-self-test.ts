@@ -16,7 +16,7 @@ import { expectRefusedLater, expectSame, type SelfTestCheck } from "../core/self
 import { CardPdfReader, type DrawingStep } from "./card-drawing.js";
 import { selfTestCardPdf } from "./cards-self-test.js";
 import { A6_HEIGHT_POINTS, A6_WIDTH_POINTS, WIDTH_TOLERANCE_POINTS } from "./self-test-cards.js";
-import { cardTemplates, type CardDrawing } from "./templates.js";
+import { CARD_TEMPLATES, type CardDrawing } from "./templates.js";
 
 const ERRORS = new ErrorCatalog("export.card-drawing-self-test", {
   "drawing-steps-mismatch": (value0: string) => `${value0} drawing steps mismatch.`,
@@ -82,7 +82,7 @@ async function checkCardDrawing(drawing: CardDrawing): Promise<void> {
     );
   }
   // One design of each family: the business cards and each material's own artwork.
-  const families = new Map(cardTemplates.map((template) => [template.family, template]));
+  const families = new Map(CARD_TEMPLATES.map((template) => [template.family, template]));
   for (const template of families.values()) {
     using reader = await CardPdfReader.load(await selfTestCardPdf(drawing, template));
     const pages = reader.pages();

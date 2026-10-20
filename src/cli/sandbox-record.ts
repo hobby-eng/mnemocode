@@ -4,6 +4,11 @@
 // each imports this alone.
 
 import { describeError } from "../core/refusal.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.sandbox-record", {
+  "setrlimit-refused-rlimit-core-0": () => "setrlimit refused RLIMIT_CORE 0",
+});
 
 /** The node:ffi module, which every sandbox calls the system through. */
 export type NodeFfi = typeof import("node:ffi");
@@ -119,10 +124,18 @@ export class SandboxRecord {
 }
 
 /** RLIMIT_CORE, 4 on Linux and macOS (sys/resource.h), which both switch off with setrlimit. */
-export const RLIMIT_CORE = 4;
+const RLIMIT_CORE = 4;
 /** A struct rlimit with both limits 0: the soft and the hard limit, two 64-bit values. */
-export function noLimit(): Buffer {
-  return Buffer.alloc(16);
+const NO_LIMIT_BYTES = 16;
+
+/**
+ * The first step of switching core dumps off on Linux and on macOS (switchOffCoreDumps): their
+ * soft and hard size limits set to 0 through `setrlimit`, the C library's on Linux and libSystem's
+ * on macOS as node:ffi calls it, or the refusal of it thrown.
+ */
+export function zeroCoreDumpLimit(setrlimit: (resource: number, limit: Buffer) => number): void {
+  if (setrlimit(RLIMIT_CORE, Buffer.alloc(NO_LIMIT_BYTES)) !== 0)
+    throw ERRORS.create("setrlimit-refused-rlimit-core-0", []);
 }
 
 /** Core dumps switched off by `step`, which throws why it cannot; their state for coreDumps(). */

@@ -62,11 +62,26 @@ export function assertPrivateFileSources(args: ParsedArguments): void {
   if (sources.length > 1) throw ERRORS.create("multiple-standard-input-sources", []);
 }
 
+/**
+ * Options without any yet, and without a prototype: every typed name is an own key of its own,
+ * "--__proto__" too, which on an ordinary object would set the prototype and be lost before the
+ * unknown option is refused, and no name finds one that every object inherits, such as
+ * "constructor" (AUD-014-API010). Every ParsedArguments that the command line makes starts here.
+ */
+export function emptyArguments(): ParsedArguments {
+  const empty: ParsedArguments = {};
+  Object.setPrototypeOf(empty, null);
+  return empty;
+}
+
+/**
+ * The options of a command, `items` being what follows its name: "--name value" once or more,
+ * "--name" alone for an on-or-off option, and "--dates" with every value up to the next option.
+ * Refuses an unnamed value, a missing value, and a value given to an on-or-off option; which
+ * options a command takes is checked later (assertAllowedArguments).
+ */
 export function parseArguments(items: readonly string[]): ParsedArguments {
-  // No prototype: every typed name is an own key of its own, "--__proto__" too, which on an
-  // ordinary object would set the prototype and be lost before the unknown option is refused, and
-  // no name finds one that every object inherits, such as "constructor" (AUD-014-API010).
-  const parsed: ParsedArguments = Object.create(null) as ParsedArguments;
+  const parsed = emptyArguments();
   const booleanOptions = new Set([
     "card-qr",
     "sskr",

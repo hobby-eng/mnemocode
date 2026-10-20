@@ -52,10 +52,9 @@ export const MALFORMED_WALLET_ANSWER =
 
 /**
  * The fields of a WalletMatch that a search reads, each read once from the host's `answer`, own or
- * inherited, as a class's getter is; undefined when the answer is no object.
+ * inherited, as a class's getter is.
  */
-function readOnce(answer: unknown): Readonly<Record<keyof WalletMatch, unknown>> | undefined {
-  if (typeof answer !== "object" || answer === null) return undefined;
+function readOnce(answer: object): Readonly<Record<keyof WalletMatch, unknown>> {
   // An object of any shape: each field may be missing or of any type, which askWallet checks.
   const fields: Readonly<Partial<Record<keyof WalletMatch, unknown>>> = answer;
   const { matched, path, warning } = fields;
@@ -66,6 +65,18 @@ function readOnce(answer: unknown): Readonly<Record<keyof WalletMatch, unknown>>
 function isOptionalText(value: unknown): boolean {
   return value === undefined || typeof value === "string";
 }
+
+/** Whether `value` is a function: typed so, bind keeps its type rather than giving any. */
+function isFunction(value: unknown): value is (...values: unknown[]) => unknown {
+  return typeof value === "function";
+}
+
+/**
+ * Object.create, declared by what it returns: always a new object, of the prototype given or of
+ * none. The standard library types its result as any.
+ */
+const createObject: (prototype: object | null, fields: PropertyDescriptorMap) => object =
+  Object.create;
 
 /**
  * Checked fields are fixed data; the host's extra accessors/methods keep their original receiver.
@@ -89,9 +100,7 @@ function ownedAnswer(given: object, read: Readonly<Record<keyof WalletMatch, unk
       if (field === undefined) continue;
       if ("value" in field) {
         const method: unknown = field.value;
-        // typeof proves method a function; typed so, bind keeps its type rather than giving any.
-        if (typeof method === "function" && key !== "constructor")
-          field.value = (method as (...values: unknown[]) => unknown).bind(given);
+        if (isFunction(method) && key !== "constructor") field.value = method.bind(given);
       } else {
         // Reading other getters here could throw or perform work the caller never requested.
         // Bound accessors remain lazy and can read the original class's private fields.
@@ -101,16 +110,17 @@ function ownedAnswer(given: object, read: Readonly<Record<keyof WalletMatch, unk
       fields.set(key, field);
     }
   }
-  // Object.create types its result as any; it is always a new object, of `prototype` or of none.
-  return Object.create(prototype, Object.fromEntries(fields)) as object;
+  return createObject(prototype, Object.fromEntries(fields));
 }
 
 /**
  * What the host's `check` says of `mnemonic`, held to the WalletMatch contract. A JavaScript host
  * may answer anything, and a search that read undefined or { matched: "false" } as a match would
  * report a recovery that no wallet confirmed (AUD-014-API001): such an answer is refused, and only
- * matched === true counts. A path or a warning other than text is refused too, each by its own
- * code: a host shows them as they are. Every search asks the host's check through it; whether the
+ * matched === true counts. A path or a warning other than text is refused too, since a host shows
+ * them as they are. Each is refused as a TypeError with its own code
+ * (core.wallet-check.malformed-wallet-answer, malformed-wallet-path, malformed-wallet-warning);
+ * what `check` throws passes on. Every search asks the host's check through it; whether the
  * search may still publish what it found is asked when it does (search-turns.ts, stillRunning).
  */
 export async function askWallet<M extends WalletMatch>(
@@ -118,16 +128,19 @@ export async function askWallet<M extends WalletMatch>(
   mnemonic: string,
 ): Promise<M> {
   const given: unknown = await check(mnemonic);
+  // An answer that is no object has no matched field, and is refused as one without it.
+  if (typeof given !== "object" || given === null)
+    throw ERRORS.create("malformed-wallet-answer", []);
   // The fields a search reads are read once and kept as checked (AUD-015). Extra data remains
   // owned data, while getters/methods keep the host's receiver and private brand (AUD-016-API001).
   const read = readOnce(given);
-  if (typeof read?.matched !== "boolean") throw ERRORS.create("malformed-wallet-answer", []);
+  if (typeof read.matched !== "boolean") throw ERRORS.create("malformed-wallet-answer", []);
   // A JavaScript host's null or number would be printed as it is (AUD-037-SEC004).
   if (!isOptionalText(read.path)) throw ERRORS.create("malformed-wallet-path", []);
   if (!isOptionalText(read.warning)) throw ERRORS.create("malformed-wallet-warning", []);
-  // readOnce read fields, so given is an object, and the checks above hold them to WalletMatch;
-  // the fields that M adds are the host's own, kept as it gave them.
-  return ownedAnswer(given as object, read) as M;
+  // The checks above hold the fields that a search reads to WalletMatch; the fields that M adds
+  // are the host's own, kept as it gave them.
+  return ownedAnswer(given, read) as M;
 }
 
 /**
@@ -159,8 +172,9 @@ export const FINGERPRINT_WARNING =
   "A master fingerprint is only 32 bits and is a filter, not proof of recovery.";
 
 /**
- * A master fingerprint as typed, in lower case; refused unless it is eight hexadecimal characters.
- * A host checks an answer with it at once: no secret is needed.
+ * A master fingerprint as typed, in lower case; refused unless it is eight hexadecimal characters
+ * (core.wallet-check.master-fingerprint-eight-hexadecimal-characters). A host checks an answer with
+ * it at once: no secret is needed.
  */
 export function parseMasterFingerprint(value: string): string {
   const fingerprint = trimWhiteSpace(value).toLowerCase();

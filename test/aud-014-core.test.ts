@@ -31,6 +31,8 @@ const MASKED = encodeMnemonic(PHRASE, [DATE]).shiftedIndexes;
 
 /** What a faulty JavaScript host's wallet check may answer, typed as a WalletCheck would be. */
 function answering(answer: unknown): WalletCheck {
+  // Some answers below are of no type that a WalletCheck allows, fed on purpose: the search must
+  // refuse them.
   return () => answer as WalletMatch;
 }
 
@@ -145,10 +147,12 @@ describe("AUD-014-API006: MissingCodes refuses a mode that names none when it is
   const marked = `${"abandon ".repeat(11)}?`;
 
   it("refuses an unknown mode in read and in withMode", () => {
+    // A mode that no type allows, fed on purpose as a JavaScript host could.
     expect(() => MissingCodes.read(marked, "english", "unknown" as MaskingMode)).toThrow(
       "Unsupported Seedshift mode.",
     );
     const codes = MissingCodes.read(marked, "english", "direct");
+    // The same mode, fed on purpose again.
     expect(() => codes.withMode("unknown" as MaskingMode)).toThrow("Unsupported Seedshift mode.");
   });
 
@@ -163,18 +167,16 @@ describe("AUD-014-API007: JSON writes every form from the indexes", () => {
   it("writes the same words and Unicode codes as the text forms, whatever is stored", () => {
     const raw = representMnemonic(PHRASE);
     const stale = { ...raw, shiftedEnglish: ["zoo"], unicodeCodePoints: ["0000"] };
-    const json = JSON.parse(formatEncoded(stale, "json")) as {
-      english: string[];
-      unicodeCodePoints: string;
-    };
-    expect(json.english.join(" ")).toBe(formatEncoded(stale, "english"));
-    expect(json.english).toHaveLength(12);
-    expect(json.unicodeCodePoints).toBe(formatEncoded(stale, "unicode"));
+    const json: unknown = JSON.parse(formatEncoded(stale, "json"));
+    const english = formatEncoded(stale, "english").split(" ");
+    expect(english).toHaveLength(12);
+    expect(json).toMatchObject({ english, unicodeCodePoints: formatEncoded(stale, "unicode") });
   });
 
   it("keeps the JSON of a healthy result, its fields and its dates", () => {
     const result = encodeMnemonic(PHRASE, [DATE]);
-    const json = JSON.parse(formatEncoded(result, "json")) as Record<string, unknown>;
+    const json: unknown = JSON.parse(formatEncoded(result, "json"));
+    if (typeof json !== "object" || json === null) throw new Error("Expected a JSON object.");
     expect(Object.keys(json)).toEqual([
       "algorithm",
       "dates",
@@ -183,10 +185,12 @@ describe("AUD-014-API007: JSON writes every form from the indexes", () => {
       "indexes",
       "unicodeCodePoints",
     ]);
-    expect(json.english).toEqual(result.shiftedEnglish);
-    expect(json.unicodeCodePoints).toBe(result.unicodeCodePoints.join(""));
-    expect(json.dates).toEqual(["23-09-2026"]);
-    expect(json.shifts).toEqual(result.shifts);
+    expect(json).toMatchObject({
+      english: result.shiftedEnglish,
+      unicodeCodePoints: result.unicodeCodePoints.join(""),
+      dates: ["23-09-2026"],
+      shifts: result.shifts,
+    });
   });
 });
 

@@ -29,6 +29,9 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
 vi.mock("../src/export/image-export.js", async (importOriginal) =>
   harness.replacedImageExport(await importOriginal()),
 );
+vi.mock("../src/cli/cards-fit.js", async (importOriginal) =>
+  harness.replacedCardsFit(await importOriginal()),
+);
 
 answeredByScript();
 

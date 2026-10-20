@@ -1,5 +1,4 @@
 import { MENU_ENTRY_NAMES } from "../src/cli/menu-entries.js";
-import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,20 +9,10 @@ import { A5, A6, renderHeirSheet } from "../src/export/heir-sheet.js";
 import { HeirInstructions, type HeirRoute } from "../src/export/heir-sheet-text.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
-import { PublicCliFiles } from "./helpers/public-cli-files.js";
+import { runBuiltCliSync as cli } from "./helpers/built-cli.js";
 
 // The public dates of the examples.
 const DATES = ["23-09-2026", "08-08-1988"];
-
-function cli(args: string[]) {
-  using material = new PublicCliFiles(args);
-  const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...material.arguments], {
-    encoding: "utf8",
-    env: { ...process.env, NO_COLOR: "1" },
-  });
-  if (result.error) throw result.error;
-  return result;
-}
 
 /** The most dates MnemoCode takes: one for every three words of a 24-word phrase. */
 const MOST_DATES = 8;
@@ -227,7 +216,8 @@ describe("instructions for heirs", () => {
     expect(() => instructions.text({ ...facts, mode: "seedshift-legacy" })).toThrow(
       "Shares are made without Seedshift or with MnemoCode Seedshift.",
     );
-    // A mode for which no sheet is made, refused at run time too.
+    // A mode for which no sheet is made, which no type allows here, fed on purpose as a JavaScript
+    // host could: refused at run time too.
     expect(() =>
       instructions.text({
         ...facts,

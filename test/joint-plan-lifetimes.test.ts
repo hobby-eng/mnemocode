@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 
 describe("The lifetime of an assessed joint repair", () => {
   it("refuses a later search through the original bound method after disposal", async () => {
-    const plan = await planJointRepair(sskrSetVector.shares.slice(0, 2), {
+    const plan = await planJointRepair(SSKR_SET_VECTOR.shares.slice(0, 2), {
       platform: nodeSharePlatform,
     });
     try {
@@ -20,7 +20,7 @@ describe("The lifetime of an assessed joint repair", () => {
   });
 
   it("ends a refused plan too, rather than returning an ordinary empty result afterwards", async () => {
-    const plan = await planJointRepair(sskrSetVector.shares.slice(0, 1), {
+    const plan = await planJointRepair(SSKR_SET_VECTOR.shares.slice(0, 1), {
       platform: nodeSharePlatform,
     });
     try {
@@ -35,7 +35,7 @@ describe("The lifetime of an assessed joint repair", () => {
   it("publishes no confirmation that settles after the plan was disposed", async () => {
     let finish: (() => void) | undefined;
     let waiting = true;
-    const plan = await planJointRepair(sskrSetVector.shares.slice(0, 2), {
+    const plan = await planJointRepair(SSKR_SET_VECTOR.shares.slice(0, 2), {
       platform: {
         ...nodeSharePlatform,
         combineShares: async (shares) => {
@@ -62,7 +62,7 @@ describe("The lifetime of an assessed joint repair", () => {
   });
 
   it("keeps a caller's previously transferred result usable after the plan ends", async () => {
-    const plan = await planJointRepair(sskrSetVector.shares.slice(0, 2), {
+    const plan = await planJointRepair(SSKR_SET_VECTOR.shares.slice(0, 2), {
       platform: nodeSharePlatform,
     });
     try {
@@ -73,7 +73,9 @@ describe("The lifetime of an assessed joint repair", () => {
       expect(result.sets[0]!.mnemonic).toBe(
         "abandon amount liar amount expire adjust cage candy arch gather drum buyer",
       );
-      expect(result.sets[0]!.shares.map(({ ur }) => ur)).toEqual(sskrSetVector.shares.slice(0, 2));
+      expect(result.sets[0]!.shares.map(({ ur }) => ur)).toEqual(
+        SSKR_SET_VECTOR.shares.slice(0, 2),
+      );
     } finally {
       plan.wipe();
     }

@@ -10,7 +10,7 @@ import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { SELF_TEST_CARD_DETAILS } from "../src/export/self-test-cards.js";
 import { validateProfile } from "../src/export/card-settings.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
-import { sskrVector } from "../src/sskr/known-answers.js";
+import { SSKR_VECTOR } from "../src/sskr/known-answers.js";
 import { privateChildPath, publishNewFolder } from "../src/export/private-file.js";
 import type { CardContent } from "../src/export/backup-cards.js";
 import type { CardTemplate } from "../src/export/templates.js";
@@ -99,7 +99,8 @@ describe("AUD-026 export ownership and admission without PDF painting", () => {
     await expect(
       ShareCardSet.create(
         nodeCardRenderer,
-        [sskrVector.shares[0]!],
+        [SSKR_VECTOR.shares[0]!],
+        // A null format, which no type allows, fed on purpose as a JavaScript host could.
         { style: "it", shareFormat: null as never, ...SELF_TEST_CARD_DETAILS },
         () => {
           throw Error("Randomness must not run");

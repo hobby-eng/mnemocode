@@ -11,7 +11,7 @@ import { PDFDocument } from "pdf-lib";
 import { indexesToColors } from "../core/colors.js";
 import { representMnemonic } from "../core/seedshift.js";
 import type { SelfTestCheck } from "../core/self-test-check.js";
-import { cardTemplates, type CardDrawing, type CardTemplate } from "./templates.js";
+import { CARD_TEMPLATES, type CardDrawing, type CardTemplate } from "./templates.js";
 import {
   A6_WIDTH_POINTS,
   SELF_TEST_CARD_DETAILS,
@@ -27,7 +27,8 @@ const ERRORS = new ErrorCatalog("export.cards-self-test", {
 
 /**
  * The PDF of `template` drawn with `drawing` from the public test phrase, on one A6 page: local
- * images, the embedded font, individual-card QR suppression and the production PDF renderer.
+ * images, the embedded font, individual-card QR suppression and the production PDF renderer. A
+ * refusal of `template` passes on, such as one of a host's design that cannot draw the phrase.
  */
 export async function selfTestCardPdf(
   drawing: CardDrawing,
@@ -48,7 +49,7 @@ export async function selfTestCardPdf(
 async function checkCardExports(drawing: CardDrawing): Promise<void> {
   // Mixed covers the seven business artworks. Each material has its own artwork path;
   // exercise each without repeating business styles.
-  for (const template of cardTemplates.filter(
+  for (const template of CARD_TEMPLATES.filter(
     (item) => item.style === "mixed" || item.family !== "business",
   )) {
     const bytes = await selfTestCardPdf(drawing, template);

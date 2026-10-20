@@ -1,6 +1,3 @@
-import { execFile } from "node:child_process";
-import { join } from "node:path";
-import { promisify } from "node:util";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { describe, expect, it } from "vitest";
@@ -16,21 +13,12 @@ import {
   parseDate,
   parseDatePattern,
 } from "../src/core.js";
-import { containing } from "./helpers/matchers.js";
-import { PublicCliFiles } from "./helpers/public-cli-files.js";
+import { matching } from "./helpers/matchers.js";
+import { runBuiltCli as run } from "./helpers/built-cli.js";
+import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
-const execFileAsync = promisify(execFile);
-const cli = join(process.cwd(), "dist", "mnemocode.js");
 const publicMnemonic =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-
-async function run(arguments_: readonly string[]) {
-  using material = new PublicCliFiles(arguments_);
-  return await execFileAsync(process.execPath, [cli, ...material.arguments], {
-    cwd: process.cwd(),
-    maxBuffer: 1024 * 1024,
-  });
-}
 
 describe("date recovery patterns", () => {
   it("supports partial digits and several forgotten components", () => {
@@ -51,6 +39,20 @@ describe("date recovery patterns", () => {
     const pattern = parseDatePattern("?3-09-2026");
     expect(datePatternCombinationCount([pattern, pattern])).toBe(6);
     expect([...datePatternCombinations([pattern, pattern])]).toHaveLength(6);
+  });
+
+  it("stops counting past stopAfter, and refuses one that is no whole number of 0 or more with its code", () => {
+    const patterns = [parseDatePattern("?3-09-2026")];
+    expect(datePatternCombinationCount(patterns, 2)).toBe(3);
+    expect(datePatternCombinationCount(patterns, 0)).toBe(1);
+    for (const stopAfter of [1.5, -1, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53])
+      expect(() => datePatternCombinationCount(patterns, stopAfter)).toThrow(
+        expect.objectContaining({
+          name: "RangeError",
+          code: "core.search-turns.whole-number-more",
+          message: "stopAfter must be a whole number of 0 or more.",
+        }),
+      );
   });
 
   it("finds the forgotten digits in the core, once per combination, without the command line", () => {
@@ -89,58 +91,62 @@ describe("date recovery patterns", () => {
 });
 
 describe("date recovery patterns", () => {
-  it("finds no phrase twice and the right one once, in every mode, length and forgotten part", () => {
-    const phrases = {
-      12: publicMnemonic,
-      24: entropyToMnemonic(
-        Uint8Array.from({ length: 32 }, (_, index) => index),
-        wordlist,
-      ),
-    };
-    // A whole year, a day and a month, a whole day and month, a forgotten digit of each part, and
-    // two patterns that both fit the same date, which two orders of the dates give.
-    const cases: readonly {
-      readonly known: readonly string[];
-      readonly patterns: readonly string[];
-    }[] = [
-      { known: ["10-01-2010"], patterns: ["15-10-?"] },
-      { known: ["10-01-2010"], patterns: ["?-?-2025"] },
-      { known: [], patterns: ["1?-01|10-2010|2025", "?0|?5-01|10-2010|2025"] },
-      { known: ["15-10-2025"], patterns: ["?0-0?-2010"] },
-      { known: ["15-10-2025"], patterns: ["10-01-20?0"] },
-    ];
-    const right = ["10-01-2010", "15-10-2025"];
-    for (const words of [12, 24] as const)
-      for (const mode of ["seedshift", "seedshift-legacy", "seedshift-legacy-valid"] as const) {
-        const masking = Masking.of(mode);
-        const encoded = masking.encode(phrases[words], right.map(parseDate));
-        // The legacy record with a replaced last word gives 128 phrases for each date: its whole
-        // year, ten thousand dates, is left to the other modes, which share the same search.
-        for (const { known, patterns } of cases.filter(
-          (each) => mode !== "seedshift-legacy-valid" || !each.patterns.includes("15-10-?"),
-        )) {
-          const label = `${words} words, ${mode}, ${[...known, ...patterns].join(" ")}`;
-          const found = [
-            ...dateRecoveryCandidates(
-              encoded.shiftedIndexes,
-              known.map(parseDate),
-              patterns.map(parseDatePattern),
-              mode,
-            ),
-          ].flat();
-          const mnemonics = found.map((candidate) => candidate.mnemonic);
-          expect(new Set(mnemonics).size, label).toBe(mnemonics.length);
-          const matches = found.filter((candidate) => candidate.mnemonic === phrases[words]);
-          expect(matches.length, label).toBe(1);
-          expect(
-            [...known.map(parseDate), ...matches[0]!.dates]
-              .map(formatDate)
-              .sort((left, right) => left.slice(6).localeCompare(right.slice(6))),
-            label,
-          ).toEqual(right);
+  it(
+    "finds no phrase twice and the right one once, in every mode, length and forgotten part",
+    () => {
+      const phrases = {
+        12: publicMnemonic,
+        24: entropyToMnemonic(
+          Uint8Array.from({ length: 32 }, (_, index) => index),
+          wordlist,
+        ),
+      };
+      // A whole year, a day and a month, a whole day and month, a forgotten digit of each part, and
+      // two patterns that both fit the same date, which two orders of the dates give.
+      const cases: readonly {
+        readonly known: readonly string[];
+        readonly patterns: readonly string[];
+      }[] = [
+        { known: ["10-01-2010"], patterns: ["15-10-?"] },
+        { known: ["10-01-2010"], patterns: ["?-?-2025"] },
+        { known: [], patterns: ["1?-01|10-2010|2025", "?0|?5-01|10-2010|2025"] },
+        { known: ["15-10-2025"], patterns: ["?0-0?-2010"] },
+        { known: ["15-10-2025"], patterns: ["10-01-20?0"] },
+      ];
+      const right = ["10-01-2010", "15-10-2025"];
+      for (const words of [12, 24] as const)
+        for (const mode of ["seedshift", "seedshift-legacy", "seedshift-legacy-valid"] as const) {
+          const masking = Masking.of(mode);
+          const encoded = masking.encode(phrases[words], right.map(parseDate));
+          // The legacy record with a replaced last word gives 128 phrases for each date: its whole
+          // year, ten thousand dates, is left to the other modes, which share the same search.
+          for (const { known, patterns } of cases.filter(
+            (each) => mode !== "seedshift-legacy-valid" || !each.patterns.includes("15-10-?"),
+          )) {
+            const label = `${words} words, ${mode}, ${[...known, ...patterns].join(" ")}`;
+            const found = [
+              ...dateRecoveryCandidates(
+                encoded.shiftedIndexes,
+                known.map(parseDate),
+                patterns.map(parseDatePattern),
+                mode,
+              ),
+            ].flat();
+            const mnemonics = found.map((candidate) => candidate.mnemonic);
+            expect(new Set(mnemonics).size, label).toBe(mnemonics.length);
+            const matches = found.filter((candidate) => candidate.mnemonic === phrases[words]);
+            expect(matches.length, label).toBe(1);
+            expect(
+              [...known.map(parseDate), ...matches[0]!.dates]
+                .map(formatDate)
+                .sort((left, right) => left.slice(6).localeCompare(right.slice(6))),
+              label,
+            ).toEqual(right);
+          }
         }
-      }
-  }, 180_000);
+    },
+    LONGEST_TEST_TIME_LIMIT_MS,
+  );
 
   it("recovers several incomplete dates with per-digit wildcards", async () => {
     const encoded = await run([
@@ -200,7 +206,9 @@ describe("date recovery patterns", () => {
         "1000",
       ]),
     ).rejects.toMatchObject({
-      stderr: containing("Increase the candidate search limit to at least 3,652,059"),
+      stderr: matching(
+        /The search tries 3,652,059 date combinations, about .+\. Allow it with --max-candidates 3652059\./u,
+      ),
     });
   });
 });

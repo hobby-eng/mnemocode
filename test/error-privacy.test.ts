@@ -5,6 +5,7 @@ import { daysInMonth } from "../src/core/dates.js";
 import { runCommandLine } from "../src/cli/command-line.js";
 import { parseArguments, assertAllowedArguments } from "../src/cli/arguments.js";
 import { optionLabel } from "../src/cli/option-copy.js";
+import { refusalOf } from "./helpers/refusals.js";
 
 const PUBLIC_PHRASE = "abandon ".repeat(11) + "about";
 
@@ -15,23 +16,14 @@ function callUntyped(fn: unknown, parameters: readonly unknown[]): unknown {
   return result;
 }
 
-/** The original refusal, validated without a type assertion. */
-function refused(action: () => unknown): Error {
-  try {
-    action();
-  } catch (error) {
-    if (error instanceof Error) return error;
-    throw error;
-  }
-  throw new Error("The synthetic invalid request was accepted.");
-}
-
 describe("secret-safe selector refusals", () => {
   it.each([
     [PUBLIC_PHRASE, "indexes"],
     ["direct", PUBLIC_PHRASE],
   ])("conceals an invalid record mode or format", (mode, format) => {
-    const error = refused(() => callUntyped(serializeRecord, [mode, format, "synthetic-payload"]));
+    const error = refusalOf(() =>
+      callUntyped(serializeRecord, [mode, format, "synthetic-payload"]),
+    );
     expect(error.message).not.toContain(PUBLIC_PHRASE);
     expect(error).toMatchObject({
       code: mode === "direct" ? "record.unsupported-format" : "record.unsupported-mode",
@@ -46,7 +38,7 @@ describe("secret-safe selector refusals", () => {
         return PUBLIC_PHRASE;
       },
     };
-    const error = refused(() =>
+    const error = refusalOf(() =>
       callUntyped(serializeRecord, [selector, "indexes", "synthetic-payload"]),
     );
     expect(error.message).toBe("Unsupported MnemoCode record mode.");
@@ -54,7 +46,7 @@ describe("secret-safe selector refusals", () => {
   });
 
   it("conceals text passed where a month number was expected", () => {
-    const error = refused(() => callUntyped(daysInMonth, [2026, PUBLIC_PHRASE]));
+    const error = refusalOf(() => callUntyped(daysInMonth, [2026, PUBLIC_PHRASE]));
     expect(error.message).toBe("There is no such calendar month.");
   });
 
@@ -70,7 +62,7 @@ describe("secret-safe selector refusals", () => {
       () => parseArguments([`--${PUBLIC_PHRASE}`]),
       () => assertAllowedArguments(parseArguments([`--${PUBLIC_PHRASE}`, "x"]), "table", ["word"]),
     ]) {
-      const error = refused(action);
+      const error = refusalOf(action);
       expect(error.message).not.toContain(PUBLIC_PHRASE);
       expect(error.message).toContain("unknown option");
     }

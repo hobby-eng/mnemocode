@@ -2,22 +2,17 @@
 // family of cards checks its content here before it draws, and the palette export checks its QR
 // code with the same rule.
 
-import { assertPhraseIndexes } from "../core/bip39-sizes.js";
-import { colorsToIndexes, isRgbReference, unicodeToColors } from "../core/colors.js";
-import { EncodedForm } from "../core/encoded-form.js";
-import { assertShareQr } from "../sskr/transport.js";
 import { ownCards } from "./card-decoys.js";
+import { cardTitle } from "./card-settings.js";
+import { contentKindRules, type ContentKind } from "./content-kinds.js";
 // Types only, which leave no import behind: the card families import this module.
 import type { SskrCardContent } from "./sskr-content.js";
 import type { CardContent } from "./backup-cards.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("export.card-content", {
-  "cards-draw-color-references": () => "These cards draw color references.",
   "cards-print-codes-print-one-code-each-color": () =>
     "Cards that print codes print one code for each color, in order.",
-  "collection-qr-does-not-match-printed-references": () =>
-    "Collection QR does not match the printed references.",
 });
 
 /** The refusal of cards without any reference, which every family that checks gives. */
@@ -28,27 +23,15 @@ export type ColorCards = CardContent | SskrCardContent;
 
 /**
  * Refuses content that colour cards cannot draw: content of another kind, which a JavaScript host
- * may pass, or colours that the QR code does not hold (assertColorCardContent). Every family of
- * colour cards checks so.
+ * may pass, as contentKindRules refuses it (export.content-kinds.cards-draw-color-references), or
+ * what assertColorCardContent refuses, such as colours that the QR code does not hold. Every family
+ * of colour cards checks so.
  */
 export function assertColorCards(
   content: CardContent | SskrCardContent,
 ): asserts content is ColorCards {
-  if (content.kind !== "colors" && content.kind !== "sskr")
-    throw ERRORS.create("cards-draw-color-references", []);
+  contentKindRules(content.kind);
   assertColorCardContent(content);
-}
-
-/**
- * Whether `payload`, the text of a QR code, holds `colors`: written as the colors themselves, or as
- * Color Unicode codes that decode to them. Other colors are other references, not Color Unicode
- * to be refused as such; any other text is read as Color Unicode, which refuses what it is not.
- */
-export function payloadHoldsColors(colors: readonly string[], payload: string): boolean {
-  const written = colors.join(" ");
-  if (payload === written) return true;
-  if (payload.trim().split(/\s+/u).every(isRgbReference)) return false;
-  return unicodeToColors(payload).join(" ") === written;
 }
 
 /**
@@ -57,7 +40,7 @@ export function payloadHoldsColors(colors: readonly string[], payload: string): 
  */
 export interface ColorCardContent {
   /** A seed phrase's cards ("colors") or a share's ("sskr"), whose QR code is checked as such. */
-  readonly kind: "colors" | "sskr";
+  readonly kind: ContentKind;
   /** The color of each card as # and six hexadecimal digits: the backup's own, then the decoys. */
   readonly colors: readonly string[];
   /** The text of the QR code: the backup alone, without the decoys. */
@@ -66,6 +49,11 @@ export interface ColorCardContent {
   readonly labels?: readonly string[] | undefined;
   /** How many of the last cards are decoys: a whole number below the cards; none if undefined. */
   readonly decoys?: number | undefined;
+  /**
+   * The title of the sheet in place of the studio name, a text of a card (cardTitle); the studio's
+   * name where undefined.
+   */
+  readonly title?: string | undefined;
 }
 
 /**
@@ -83,40 +71,26 @@ function assertLabelsPerColor(content: ColorCardContent): void {
     throw ERRORS.create("cards-print-codes-print-one-code-each-color", []);
 }
 
-/** The form whose codes a seed phrase's cards print in place of its colors. */
-const PRINTED_PHRASE_FORM = EncodedForm.of("unicode");
-
 /**
- * Refuses Unicode codes of a seed phrase that are not the phrase its QR code holds: codes of the
- * words of a whole phrase, and the same codes in `payload`.
- */
-function assertPhraseCodes(codes: readonly string[], payload: string): void {
-  const indexes = PRINTED_PHRASE_FORM.read(codes.join(" "));
-  assertPhraseIndexes(indexes);
-  if (PRINTED_PHRASE_FORM.read(payload).join(" ") !== indexes.join(" "))
-    throw ERRORS.create("collection-qr-does-not-match-printed-references", []);
-}
-
-/**
- * Refuses content whose QR code holds another backup than the cards print before their decoys:
- * for a share, the share of its colors or codes (assertShareQr); for a seed phrase, colors that are
- * a phrase's, or the Unicode codes of a phrase, held by the QR code (payloadHoldsColors,
- * assertPhraseCodes). The decoys after them are refused only for their count (assertDecoys).
+ * Refuses content whose QR code holds another backup than the cards print before their decoys, as
+ * the rules of its kind refuse it (ContentKindRules assertQr): for a share, the share of its colors
+ * or codes, as assertShareQr refuses it; for a seed phrase, colors that are a phrase's
+ * (colorsToIndexes), or the Unicode codes of a phrase (EncodedForm read, assertPhraseIndexes),
+ * held by the QR code (export.content-kinds.collection-qr-does-not-match-printed-references); and
+ * a kind of none (export.content-kinds.cards-draw-color-references). Refuses labels that are
+ * not one code for each color
+ * (export.card-content.cards-print-codes-print-one-code-each-color), and the decoys after the
+ * codes only for their count (export.card-decoys.decoy-cards-whole-number-fewer-than-cards). A
+ * title is refused as the title of a sheet (cardTitle), so that a host that builds the content
+ * itself cannot draw one that the cards of a backup would refuse.
  */
 export function assertColorCardContent(content: ColorCardContent): void {
+  if (content.title !== undefined) cardTitle(content.title);
   assertLabelsPerColor(content);
   const own = ownCards(content);
-  const colors = content.colors.slice(0, own);
-  const labels = content.labels?.slice(0, own);
-  if (content.kind === "sskr") {
-    assertShareQr(colors, content.payload, labels);
-    return;
-  }
-  if (labels !== undefined) {
-    assertPhraseCodes(labels, content.payload);
-    return;
-  }
-  colorsToIndexes(colors);
-  if (!payloadHoldsColors(colors, content.payload))
-    throw ERRORS.create("collection-qr-does-not-match-printed-references", []);
+  contentKindRules(content.kind).assertQr(
+    content.colors.slice(0, own),
+    content.payload,
+    content.labels?.slice(0, own),
+  );
 }

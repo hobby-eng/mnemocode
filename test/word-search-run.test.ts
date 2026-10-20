@@ -4,6 +4,7 @@
 // only.
 import { describe, expect, it, vi } from "vitest";
 import { MAX_SHOWN_CANDIDATES, WordCandidateSearch } from "../src/core/candidates.js";
+import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
 const ELEVEN = "abandon ".repeat(11);
 const TEST_PHRASE = `${ELEVEN}about`;
@@ -41,23 +42,27 @@ describe("WordCandidateSearch.run", () => {
     expect(found.entropies[match.candidate.number - 1]).toEqual(match.candidate.entropy());
   });
 
-  it("shows the first MAX_SHOWN_CANDIDATES and every later one that matched", async () => {
-    // The candidates with "zoo" first, the last word of the list, come last: 128 of them.
-    const found = await FIRST_AND_LAST.run({
-      walletCheck: (mnemonic) => ({ matched: mnemonic.startsWith("zoo ") }),
-    });
-    expect(found.count).toBe(262_144);
-    expect(found.matched).toBe(128);
-    const first = found.shown.slice(0, MAX_SHOWN_CANDIDATES);
-    expect(first.map(({ candidate }) => candidate.number)).toEqual(
-      Array.from({ length: MAX_SHOWN_CANDIDATES }, (_, index) => index + 1),
-    );
-    const later = found.shown.slice(MAX_SHOWN_CANDIDATES);
-    expect(later.map(({ candidate }) => candidate.number)).toEqual(
-      Array.from({ length: 128 }, (_, index) => 262_144 - 127 + index),
-    );
-    expect(later.every(({ match }) => match?.matched === true)).toBe(true);
-  }, 120_000);
+  it(
+    "shows the first MAX_SHOWN_CANDIDATES and every later one that matched",
+    async () => {
+      // The candidates with "zoo" first, the last word of the list, come last: 128 of them.
+      const found = await FIRST_AND_LAST.run({
+        walletCheck: (mnemonic) => ({ matched: mnemonic.startsWith("zoo ") }),
+      });
+      expect(found.count).toBe(262_144);
+      expect(found.matched).toBe(128);
+      const first = found.shown.slice(0, MAX_SHOWN_CANDIDATES);
+      expect(first.map(({ candidate }) => candidate.number)).toEqual(
+        Array.from({ length: MAX_SHOWN_CANDIDATES }, (_, index) => index + 1),
+      );
+      const later = found.shown.slice(MAX_SHOWN_CANDIDATES);
+      expect(later.map(({ candidate }) => candidate.number)).toEqual(
+        Array.from({ length: 128 }, (_, index) => 262_144 - 127 + index),
+      );
+      expect(later.every(({ match }) => match?.matched === true)).toBe(true);
+    },
+    LONG_TEST_TIME_LIMIT_MS,
+  );
 
   it("says when the list is full: a host stops there, or goes on without the list", async () => {
     const full = new Error("More than one list holds.");

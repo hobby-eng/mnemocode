@@ -1,5 +1,6 @@
-"""The checks of scripts/verify-terminal-input.py for the menu, typed answers and their editing,
-the card questions of Encode and Ctrl+C."""
+"""The checks of scripts/verify-terminal-input.py for the menu, typed
+answers and their editing, the card questions of Encode and Ctrl+C.
+"""
 
 import shlex
 import tempfile
@@ -49,23 +50,35 @@ from terminal_answers import (
 
 
 def check_decode_menu():
+    """Decode in the menu: the answer is shown and edited on the private
+    screen, which is left after the result; Escape ends the menu with 0.
+    """
     session = Session()
     try:
         prompt_end = at_hidden_record_prompt(session)
-        # Typed, deleted with Ctrl+U, retyped with a wrong last number fixed by Backspace.
+        # Typed, deleted with Ctrl+U, retyped with a wrong last number
+        # fixed by Backspace.
         session.type("xyz" + CTRL_U + WRONG_LAST + BACKSPACE + "4" + ENTER)
         session.wait_for(TEST_PHRASE)
-        # On the private screen the answer is shown as it is typed, so that it can be checked.
-        assert WRONG_LAST in session.output[prompt_end:], "the typed answer was not shown"
+        # On the private screen the answer is shown as it is typed, so
+        # that it can be checked.
+        assert (
+            WRONG_LAST in session.output[prompt_end:]
+        ), "the typed answer was not shown"
         if not WINDOWS:
-            # The pseudo-console redraws the screen itself and need not pass these sequences on.
+            # The pseudo-console redraws the screen itself and need not
+            # pass these sequences on.
             before_prompt = session.output[: prompt_end - len(HIDDEN_RECORD)]
-            assert ENTER_ALTERNATE_SCREEN in before_prompt, "no alternate screen for the result"
+            assert (
+                ENTER_ALTERNATE_SCREEN in before_prompt
+            ), "no alternate screen for the result"
         session.wait_for(CLEAR_PROMPT)
         session.type(ENTER)
         session.wait_for("The screen with the result was cleared.")
         if not WINDOWS:
-            assert LEAVE_ALTERNATE_SCREEN in session.output[prompt_end:], "the screen was not left"
+            assert (
+                LEAVE_ALTERNATE_SCREEN in session.output[prompt_end:]
+            ), "the screen was not left"
         session.wait_for(MENU_SHOWN)
         session.type(ESCAPE)
         code = session.wait_for_exit()
@@ -73,23 +86,33 @@ def check_decode_menu():
         assert_kept_private(session, (WRONG_LAST, WORD_NUMBERS, TEST_PHRASE))
     finally:
         session.close()
-    print("decode in the menu: answer shown and edited on the private screen, Esc exits with 0")
+    print(
+        "decode in the menu: answer shown and edited on the private screen, "
+        "Esc exits with 0"
+    )
 
 
 def check_back_from_entry():
-    # Quitting at once shows the screen that going back from an entry must leave.
+    """Escape at a question of an entry goes back to the menu and leaves
+    the screen as it was before the entry was chosen.
+    """
+    # Quitting at once shows the screen that going back from an entry
+    # must leave.
     session = Session()
     try:
         session.wait_for(MENU_SHOWN)
         session.type(ESCAPE)
-        assert session.wait_for_exit() == 0, "Escape in the menu did not end it with 0"
+        assert (
+            session.wait_for_exit() == 0
+        ), "Escape in the menu did not end it with 0"
         untouched = None if WINDOWS else screen_at_exit(session)
     finally:
         session.close()
     session = Session()
     try:
         session.wait_for(MENU_SHOWN)
-        # Look up, a word: a typed question, left with Escape after a few letters.
+        # Look up, a word: a typed question, left with Escape after a
+        # few letters.
         session.type(TABLE_ENTRY)
         session.wait_for("What do you want to look up?")
         session.type("1")
@@ -99,21 +122,31 @@ def check_back_from_entry():
         session.type(ESCAPE)
         code = session.wait_for_exit()
         assert code == 0, f"Escape after going back gave exit code {code}"
-        # The pseudo-console redraws the screen itself: its output is not what the tool wrote.
+        # The pseudo-console redraws the screen itself: its output is
+        # not what the tool wrote.
         if not WINDOWS:
             shown = screen_at_exit(session)
-            assert shown == untouched, f"going back left {shown!r} instead of {untouched!r}"
+            assert (
+                shown == untouched
+            ), f"going back left {shown!r} instead of {untouched!r}"
     finally:
         session.close()
-    print("Escape at a question of an entry: back to the menu, the screen as before the entry")
+    print(
+        "Escape at a question of an entry: back to the menu, the screen as "
+        "before the entry"
+    )
 
 
 def check_cursor_editing():
+    """An answer is edited at the cursor with Home, Delete and End."""
     session = Session(("decode", "--ask-secrets", "--mode", "direct"))
     try:
         session.wait_for(HIDDEN_RECORD)
-        # A wrong first number, put right at the start of the line: Home, Delete, the right one.
-        session.type("9" + WORD_NUMBERS[1:] + HOME + DELETE + "1" + END + ENTER)
+        # A wrong first number, put right at the start of the line:
+        # Home, Delete, the right one.
+        session.type(
+            "9" + WORD_NUMBERS[1:] + HOME + DELETE + "1" + END + ENTER
+        )
         session.wait_for(TEST_PHRASE)
         session.wait_for(CLEAR_PROMPT)
         session.type(ENTER)
@@ -125,6 +158,9 @@ def check_cursor_editing():
 
 
 def check_word_hints():
+    """Word hints in the menu: the words show below the line, Tab
+    completes, and the hints are gone after Enter.
+    """
     session = Session()
     try:
         session.wait_for(MENU_SHOWN)
@@ -132,11 +168,13 @@ def check_word_hints():
         session.wait_for("What do you want to look up?")
         session.type("1")
         session.wait_for("Word: ")
-        # Two letters list the words that begin with them, below the line (src/cli/typed-hints.ts).
+        # Two letters list the words that begin with them, below the
+        # line (src/cli/typed-hints.ts).
         session.type("ab")
         session.wait_for("abstract")
-        # Tab completes "abou" to the one word left, and Enter looks it up. A Tab that more keys
-        # follow at once is part of a paste, where it separates as a space does: Enter waits.
+        # Tab completes "abou" to the one word left, and Enter looks it
+        # up. A Tab that more keys follow at once is part of a paste,
+        # where it separates as a space does: Enter waits.
         session.type("ou")
         session.wait_for("ou")
         session.type("\t")
@@ -150,17 +188,25 @@ def check_word_hints():
         session.type(ESCAPE)
         code = session.wait_for_exit()
         assert code == 0, f"Escape after the lookup gave exit code {code}"
-        # The pseudo-console redraws the screen itself: its output is not what the tool wrote.
+        # The pseudo-console redraws the screen itself: its output is
+        # not what the tool wrote.
         if not WINDOWS:
             shown = screen_at_exit(session)
-            assert not any("absurd" in line for line in shown), f"a hint stayed in {shown!r}"
+            assert (
+                not any("absurd" in line for line in shown)
+            ), f"a hint stayed in {shown!r}"
     finally:
         session.close()
-    print("word hints in the menu: words below the line, Tab completes, gone after Enter")
+    print(
+        "word hints in the menu: words below the line, Tab completes, gone "
+        "after Enter"
+    )
 
 
 def check_lookup_repeat():
-    """Enter repeats the same lookup kind; Escape returns to the menu instead of quitting."""
+    """Enter repeats the same lookup kind; Escape returns to the menu
+    instead of quitting.
+    """
     for choice, question, first, second, first_word, second_word in (
         ("1", "Word: ", "abandon", "about", "abandon", "about"),
         ("2", "Word number: ", "55", "56", "almost", "alone"),
@@ -187,12 +233,18 @@ def check_lookup_repeat():
             assert session.wait_for_exit() == 0
         finally:
             session.close()
-    print("word/number/Unicode lookups repeat at Enter and return to the menu at Escape")
+    print(
+        "word/number/Unicode lookups repeat at Enter and return to the menu "
+        "at Escape"
+    )
 
 
 def check_table_exports():
-    """The actual menu saves every full dictionary and its bundled standalone recovery guide."""
-    with tempfile.TemporaryDirectory(prefix="mnemocode-dictionaries-") as folder:
+    """The actual menu saves every full dictionary and its bundled
+    standalone recovery guide.
+    """
+    prefix = "mnemocode-dictionaries-"
+    with tempfile.TemporaryDirectory(prefix=prefix) as folder:
         for choice, name, header in (
             ("1", "english", "index\tenglish"),
             ("2", "chinese", "index\tchinese"),
@@ -210,7 +262,10 @@ def check_table_exports():
                 session.type("5")
                 session.wait_for("What should be exported?")
                 session.type(choice)
-                session.wait_for("Name of the new folder" if name == "set" else "Text file name")
+                session.wait_for(
+                    "Name of the new folder" if name == "set"
+                    else "Text file name"
+                )
                 session.type(str(path) + ENTER)
                 session.wait_for("Saved ")
                 session.wait_for("Press Enter to return to the menu")
@@ -220,12 +275,17 @@ def check_table_exports():
                 session.close()
             if name == "set":
                 assert sorted(child.name for child in path.iterdir()) == [
-                    "bip39-chinese.txt", "bip39-english.txt", "bip39-mapping.txt",
-                    "bip39-unicode.txt", "manual-recovery.md",
+                    "bip39-chinese.txt", "bip39-english.txt",
+                    "bip39-mapping.txt", "bip39-unicode.txt",
+                    "manual-recovery.md",
                 ]
-                mapping = path.joinpath("bip39-mapping.txt").read_text(encoding="utf-8")
+                mapping = path.joinpath("bip39-mapping.txt").read_text(
+                    encoding="utf-8"
+                )
                 assert mapping.splitlines()[-1].startswith("2048\tzoo\t")
-                guide = path.joinpath("manual-recovery.md").read_text(encoding="utf-8")
+                guide = path.joinpath("manual-recovery.md").read_text(
+                    encoding="utf-8"
+                )
                 assert "t = (u - s_last) mod M" in guide
                 continue
             text = path.read_text(encoding="utf-8")
@@ -238,10 +298,16 @@ def check_table_exports():
                 assert len(lines) == 2049
                 assert lines[1].startswith("1\t")
                 assert lines[-1].startswith("2048\t")
-    print("menu export: all four complete numbered dictionaries and standalone guide")
+    print(
+        "menu export: all four complete numbered dictionaries and standalone "
+        "guide"
+    )
 
 
 def check_share_word_hints():
+    """Bytewords hints in the menu: the words show below a share, also
+    for bytewords run together.
+    """
     session = Session()
     try:
         session.wait_for(MENU_SHOWN)
@@ -249,7 +315,8 @@ def check_share_word_hints():
         session.wait_for("Was Seedshift used before it was split?")
         session.type("1")
         session.wait_for(SHARES)
-        # Bytewords are hinted as their reader takes them: apart, or four letters at a time.
+        # Bytewords are hinted as their reader takes them: apart, or
+        # four letters at a time.
         session.type("tu")
         session.wait_for("tuna")
         session.type("na ac")
@@ -264,10 +331,15 @@ def check_share_word_hints():
         assert code == 0, f"Escape after the shares gave exit code {code}"
     finally:
         session.close()
-    print("Bytewords hints in the menu: words below a share, also run together")
+    print(
+        "Bytewords hints in the menu: words below a share, also run together"
+    )
 
 
 def check_marked_codes_entry():
+    """The Find entry: a code of an encoded seed phrase, typed with ?,
+    is searched by decode.
+    """
     session = Session()
     try:
         session.wait_for(MENU_SHOWN)
@@ -288,10 +360,14 @@ def check_marked_codes_entry():
         assert code == 0, f"Escape after the codes gave exit code {code}"
     finally:
         session.close()
-    print("recover entry: a code of an encoded seed phrase, typed with ?, is searched by decode")
+    print(
+        "recover entry: a code of an encoded seed phrase, typed with ?, is "
+        "searched by decode"
+    )
 
 
 def check_long_line():
+    """An answer longer than 4095 bytes arrives whole."""
     session = Session()
     try:
         at_hidden_record_prompt(session)
@@ -305,18 +381,26 @@ def check_long_line():
         assert_kept_private(session, (WORD_NUMBERS, TEST_PHRASE))
     finally:
         session.close()
-    print(f"an answer of {len(LONG_PADDING) + len(WORD_NUMBERS)} bytes arrived whole")
+    print(
+        f"an answer of {len(LONG_PADDING) + len(WORD_NUMBERS)} bytes arrived "
+        "whole"
+    )
 
 
 def check_lines_pasted_as_one_answer():
+    """Encode in the menu: a phrase pasted one word per line is one
+    answer, and the backup typed again passes the check.
+    """
     session = Session()
     try:
         session.wait_for(MENU_SHOWN)
         session.type(ENCODE_ENTRY)
         session.wait_for("Which form should the seed phrase take?")
-        # Each form is chosen by its place in the list, its --format number: 2 for word numbers.
+        # Each form is chosen by its place in the list, its --format
+        # number: 2 for word numbers.
         session.type("2")
-        # Word numbers are always masked: the menu asks only which Seedshift.
+        # Word numbers are always masked: the menu asks only which
+        # Seedshift.
         session.wait_for("Which Seedshift?")
         session.type("1")
         session.wait_for("Split it into Shamir shares?")
@@ -328,12 +412,14 @@ def check_lines_pasted_as_one_answer():
         session.wait_for("Instructions for your heirs?")
         session.type("1")
         session.wait_for(SEED_PHRASE)
-        # The phrase pasted one word per line, as copied from a list: one answer, so that the
-        # next question, for the dates, waits for its own.
+        # The phrase pasted one word per line, as copied from a list:
+        # one answer, so that the next question, for the dates, waits
+        # for its own.
         session.type(ENTER.join(TEST_PHRASE.split()) + ENTER)
         session.wait_for("Dates (")
         session.type(MASK_DATE + ENTER)
-        # The check of the backup: typed again from paper, with the date, it restores the phrase.
+        # The check of the backup: typed again from paper, with the
+        # date, it restores the phrase.
         session.wait_for("Check the backup now?")
         session.type("1")
         session.wait_for("Your backup, as written down:")
@@ -342,23 +428,32 @@ def check_lines_pasted_as_one_answer():
         session.type(MASK_DATE + ENTER)
         session.wait_for("The backup restores this seed phrase.")
         session.wait_for(CLEAR_PROMPT)
-        assert "Error" not in session.output and "mnemocode:" not in session.output, session.output
+        output = session.output
+        assert "Error" not in output and "mnemocode:" not in output, output
         session.type(ENTER)
         session.wait_for(MENU_SHOWN)
         session.type("q")
         session.wait_for_exit()
-        assert_kept_private(session, (TEST_PHRASE, MASK_DATE, MASKED_WORD_NUMBERS))
+        assert_kept_private(
+            session, (TEST_PHRASE, MASK_DATE, MASKED_WORD_NUMBERS)
+        )
     finally:
         session.close()
-    print("encode in the menu: a phrase pasted one word per line is one answer, backup checked")
+    print(
+        "encode in the menu: a phrase pasted one word per line is one answer, "
+        "backup checked"
+    )
 
 
 def at_card_files(session):
-    """Chooses Encode in the menu shown, in colors, neither masked nor split, as printable cards,
-    up to the first question of how they are saved: the kind of file, then their layout."""
+    """Chooses Encode in the menu shown, in colors, neither masked nor
+    split, as printable cards, up to the first question of how they are
+    saved: the kind of file, then their layout.
+    """
     session.type(ENCODE_ENTRY)
     session.wait_for("Which form should the seed phrase take?")
-    # Each form is chosen by its place in the list, its --format number: 5 for colors.
+    # Each form is chosen by its place in the list, its --format number:
+    # 5 for colors.
     session.type("5")
     session.wait_for("Use Seedshift?")
     session.type("2")
@@ -371,8 +466,9 @@ def at_card_files(session):
 
 
 def first_design(session):
-    """Chooses the first card design, asked once the files are named, and returns its name, which
-    the list shows after it, on POSIX."""
+    """Chooses the first card design, asked once the files are named,
+    and returns its name, which the list shows after it, on POSIX.
+    """
     session.wait_for("Which card design?")
     design = line_starting(session, "› 1  ").split()[-1]
     session.type("1")
@@ -380,10 +476,12 @@ def first_design(session):
 
 
 def shown_command(session):
-    """Answers No to the sheet for heirs and returns the words of the command that the menu shows
-    and runs, on POSIX; the pseudo-console of Windows may wrap it, and there None is returned. The
-    command is then cancelled at its first question, so that it saves nothing, and the menu comes
-    back."""
+    """Answers No to the sheet for heirs and returns the words of the
+    command that the menu shows and runs, on POSIX; the pseudo-console
+    of Windows may wrap it, and there None is returned. The command is
+    then cancelled at its first question, so that it saves nothing, and
+    the menu comes back.
+    """
     session.wait_for("Instructions for your heirs?")
     session.type("1")
     session.wait_for("The same as:")
@@ -395,24 +493,34 @@ def shown_command(session):
 
 
 def check_card_questions():
-    # In an empty folder, where the file and folder names that the menu offers are free. A Windows
-    # process that has just ended may still hold the folder; its removal then passes over it.
+    """The card questions of Encode in the menu: how the cards are
+    saved, a QR code on sheets only, and a wrong detail asked again,
+    each answer in the command that the menu runs.
+    """
+    # In an empty folder, where the file and folder names that the menu
+    # offers are free. A Windows process that has just ended may still
+    # hold the folder; its removal then passes over it.
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
         session = Session(folder=folder)
         try:
             session.wait_for(MENU_SHOWN)
             at_card_files(session)
-            # One PDF of A6 sheets, under the name offered, then the design.
+            # One PDF of A6 sheets, under the name offered, then the
+            # design.
             session.type("1")
             session.wait_for("How should the cards be laid out?")
             session.type("1")
-            # Landscape, the first answer, which names its orientation in the command.
+            # Landscape, the first answer, which names its orientation
+            # in the command.
             session.wait_for("How should the sheets be turned?")
             session.type("1")
             session.wait_for("PDF file name (Enter: mnemocode-cards.pdf):")
             session.type(ENTER)
             design = first_design(session)
-            session.wait_for("Add a QR code with the codes of the backup, without the extra cards?")
+            session.wait_for(
+                "Add a QR code with the codes of the backup, without the "
+                "extra cards?"
+            )
             session.type("1")
             session.wait_for("Type your own details for the cards?")
             session.type("2")
@@ -426,27 +534,41 @@ def check_card_questions():
                 session.wait_for(f"{detail} (Enter: random):")
                 session.type(ENTER)
             command = shown_command(session)
-            # Colors are format 5, with the design chosen. A6 is the page size that the commands
-            # take when none is given, so none is named; nor is a detail left random with Enter.
-            cards = ["mnemocode", "encode", "--ask-secrets", "--format", "5", "--mode", "direct"]
+            # Colors are format 5, with the design chosen. A6 is the
+            # page size that the commands take when none is given, so
+            # none is named; nor is a detail left random with Enter.
+            cards = [
+                "mnemocode", "encode", "--ask-secrets", "--format", "5",
+                "--mode", "direct",
+            ]
             cards += ["--template", design]
-            sheets = [*cards, "--pdf", "mnemocode-cards.pdf", "--orientation", "landscape"]
+            sheets = [
+                *cards, "--pdf", "mnemocode-cards.pdf",
+                "--orientation", "landscape",
+            ]
             sheets += ["--card-qr", "--card-name", CARD_NAME]
             if not WINDOWS:
                 assert command == sheets, f"the menu ran {command!r}"
 
-            # Separate business cards, PDF files in a new folder: no QR code is asked for.
+            # Separate business cards, PDF files in a new folder: no QR
+            # code is asked for.
             at_card_files(session)
             asked = session.seen
             session.type("1")
             session.wait_for("How should the cards be laid out?")
             # A6, A5, A4, then separate business cards.
             session.type("4")
-            session.wait_for("Name of the new folder (Enter: mnemocode-cards):")
+            session.wait_for(
+                "Name of the new folder (Enter: mnemocode-cards):"
+            )
             session.type(ENTER)
-            assert first_design(session) == design or WINDOWS, "another first design"
+            assert (
+                first_design(session) == design or WINDOWS
+            ), "another first design"
             session.wait_for("Type your own details for the cards?")
-            assert "Add a QR code" not in session.output[asked:], "separate cards got a QR code"
+            assert (
+                "Add a QR code" not in session.output[asked:]
+            ), "separate cards got a QR code"
             session.type("1")
             command = shown_command(session)
             separate = [*cards, "--cards-dir", "mnemocode-cards"]
@@ -454,24 +576,37 @@ def check_card_questions():
                 assert command == separate, f"the menu ran {command!r}"
             session.type(ESCAPE)
             code = session.wait_for_exit()
-            assert code == 0, f"Escape after the card questions gave exit code {code}"
+            assert (
+                code == 0
+            ), f"Escape after the card questions gave exit code {code}"
         finally:
             session.close()
-    print("card questions in the menu: saving, a QR code on sheets only, details asked again")
+    print(
+        "card questions in the menu: saving, a QR code on sheets only, "
+        "details asked again"
+    )
 
 
 def check_ctrl_c():
-    # In the menu, Ctrl+C at a prompt cancels that command alone: the menu comes back.
+    """Ctrl+C at a prompt goes back to the menu there, and ends a typed
+    command with the exit code of a cancelled one.
+    """
+    # In the menu, Ctrl+C at a prompt cancels that command alone: the
+    # menu comes back.
     session = Session()
     try:
         prompt_end = at_hidden_record_prompt(session)
         session.type("abc" + CTRL_C)
         session.wait_for(MENU_SHOWN)
         if not WINDOWS:
-            assert LEAVE_ALTERNATE_SCREEN in session.output[prompt_end:], "the screen was not left"
+            assert (
+                LEAVE_ALTERNATE_SCREEN in session.output[prompt_end:]
+            ), "the screen was not left"
         session.type(ESCAPE)
         code = session.wait_for_exit()
-        assert code == 0, f"Escape after a cancelled command gave exit code {code}"
+        assert (
+            code == 0
+        ), f"Escape after a cancelled command gave exit code {code}"
     finally:
         session.close()
     # A typed command ends at Ctrl+C with exit code 130.
@@ -482,15 +617,23 @@ def check_ctrl_c():
         code = session.wait_for_exit()
         assert code == CANCELLED, f"Ctrl+C gave exit code {code}"
         if not WINDOWS:
-            assert LEAVE_ALTERNATE_SCREEN in session.output[prompt_end:], "the screen was not left"
+            assert (
+                LEAVE_ALTERNATE_SCREEN in session.output[prompt_end:]
+            ), "the screen was not left"
     finally:
         session.close()
-    print(f"Ctrl+C at a prompt: back to the menu there, exit code {CANCELLED} for a typed command")
+    print(
+        f"Ctrl+C at a prompt: back to the menu there, exit code {CANCELLED} "
+        "for a typed command"
+    )
 
 
 def check_date_search_ctrl_c():
-    # A date search of hours must stop at Ctrl+C and leave the private screen (AUD-008-API001).
-    with tempfile.TemporaryDirectory(prefix="mnemocode-public-date-stop-") as folder:
+    """Ctrl+C stops a date search and leaves the private screen."""
+    # A date search of hours must stop at Ctrl+C and leave the private
+    # screen (AUD-008-API001).
+    prefix = "mnemocode-public-date-stop-"
+    with tempfile.TemporaryDirectory(prefix=prefix) as folder:
         words = Path(folder) / "public-record.txt"
         dates = Path(folder) / "public-patterns.txt"
         words.write_text(TEST_PHRASE, encoding="utf-8")
@@ -505,15 +648,23 @@ def check_date_search_ctrl_c():
             session.wait_for("Checked 1/9999 date combinations")
             session.type(CTRL_C)
             code = session.wait_for_exit(limit=SEARCH_STOP_LIMIT)
-            assert code == CANCELLED, f"Ctrl+C during the date search gave exit code {code}"
+            assert (
+                code == CANCELLED
+            ), f"Ctrl+C during the date search gave exit code {code}"
             if not WINDOWS:
-                assert LEAVE_ALTERNATE_SCREEN in session.output, "the private screen was not left"
+                assert (
+                    LEAVE_ALTERNATE_SCREEN in session.output
+                ), "the private screen was not left"
         finally:
             session.close()
-    print(f"Ctrl+C during a date search: the private screen left, exit code {CANCELLED}")
+    print(
+        "Ctrl+C during a date search: the private screen left, exit code "
+        f"{CANCELLED}"
+    )
 
 
 def check_menu_ctrl_c():
+    """Ctrl+C in the menu ends it with the exit code of a cancel."""
     session = Session()
     try:
         session.wait_for(MENU_SHOWN)

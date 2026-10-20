@@ -72,7 +72,7 @@ export function integerRefusal(
 
 /**
  * A typed whole number in `range`; otherwise refused with `refusal`, by default one that names the
- * range: "Type a number from 0 through 2147483647."
+ * range: "Type a number from 0 through 2147483647." (core.typed-number.typed-whole-number-refused).
  */
 export function typedWholeNumber(
   answer: string,

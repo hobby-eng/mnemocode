@@ -1,15 +1,34 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Key } from "../src/cli/terminal-input.js";
+import type { MoreWithin, NextByte } from "../src/cli/terminal-keys.js";
 
-const input = vi.hoisted(() => ({ widths: [] as number[], keys: [] as string[] }));
-vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/terminal-input.js")>()),
-  withRawTerminal: async (operation: (next: unknown, more: unknown) => Promise<unknown>) =>
-    operation(undefined, undefined),
-  readKey: async () => {
-    process.stderr.columns = input.widths.shift()!;
-    return { kind: input.keys.shift()! };
-  },
+/** A key that is no digit, as the tests queue them by kind. */
+type KindOfKey = Exclude<Key, { kind: "digit" }>["kind"];
+
+const input = vi.hoisted((): { widths: number[]; keys: KindOfKey[] } => ({
+  widths: [],
+  keys: [],
 }));
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/cli/terminal-input.js")>();
+  class ResizedKeys extends actual.TerminalKeys {
+    // readKey below answers without reading the terminal.
+    static override async withRawMode<T>(
+      operation: (next: NextByte, more: MoreWithin) => Promise<T>,
+    ): Promise<T> {
+      return operation(
+        async () => undefined,
+        async () => false,
+      );
+    }
+
+    static override async readKey(): Promise<Key> {
+      process.stderr.columns = input.widths.shift()!;
+      return { kind: input.keys.shift()! };
+    }
+  }
+  return { ...actual, TerminalKeys: ResizedKeys };
+});
 import { choose, rowsOf } from "../src/cli/terminal-choice.js";
 
 describe("AUD-008-UI001: resizing before a menu key", () => {

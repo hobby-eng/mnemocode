@@ -149,7 +149,15 @@ export class PngAdmission {
     );
   }
 
-  /** Validates the whole chunk stream; a second IHDR can never replace admitted dimensions. */
+  /**
+   * Validates the whole chunk stream of `bytes`; a second IHDR can never replace admitted
+   * dimensions. Refuses a file over MAX_PNG_BYTES (InputTooLargeError), one cut short
+   * (core.png-admission.incomplete-png), one that is no PNG (not-png), a first chunk that is no
+   * IHDR or not of its length (no-leading-ihdr, invalid-ihdr-length), dimensions of zero or over
+   * the limits (qr-png-dimensions-non-zero, qr-png-dimensions-exceed-px-megapixel-safety-limit),
+   * samples of more than MAX_PNG_SAMPLE_BITS bits (wide-samples), and any other chunk stream that
+   * PNG does not allow (invalid-png-input).
+   */
   static read(bytes: Uint8Array): PngAdmission {
     if (bytes.byteLength > MAX_PNG_BYTES)
       throw new InputTooLargeError("QR PNG input", MAX_PNG_BYTES);

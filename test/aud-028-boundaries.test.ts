@@ -5,32 +5,25 @@ import { wordTableRow } from "../src/core/words.js";
 import { validateProfile } from "../src/export/card-settings.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
 import { ShareUnmasking } from "../src/sskr/share-unmasking.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import type { RepairedSet } from "../src/sskr/joint-results.js";
 import { droppedPath } from "../src/cli/text-file.js";
 import { typedLine } from "../src/cli/shell-command.js";
+import { deferred } from "./helpers/deferred.js";
 
 const OTHER_PHRASE = "legal winner thank year wave sausage worth useful legal winner thank yellow";
 const publicSet = (): RepairedSet => ({
-  mnemonic: sskrSetVector.phrase,
+  mnemonic: SSKR_SET_VECTOR.phrase,
   shares: [],
   unsettled: [],
 });
 
-function deferred(): { promise: Promise<void>; resolve: () => void } {
-  let resolve!: () => void;
-  const promise = new Promise<void>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-}
-
 describe("AUD-028 restored phrase ownership", () => {
   it("checks and publishes the same input revision across a wallet await", async () => {
     const entered = deferred();
-    const release = deferred();
+    const held = deferred();
     const detail = {
-      ur: sskrSetVector.shares[0],
+      ur: SSKR_SET_VECTOR.shares[0],
       format: "ur" as const,
       repaired: true,
       filled: [{ position: 1, value: "public repair" }],
@@ -43,9 +36,9 @@ describe("AUD-028 restored phrase ownership", () => {
       mode: "direct",
       walletCheck: async (phrase) => {
         checked.push(phrase);
-        entered.resolve();
-        await release.promise;
-        return { matched: phrase === sskrSetVector.phrase };
+        entered.release();
+        await held.promise;
+        return { matched: phrase === SSKR_SET_VECTOR.phrase };
       },
     }).unmask(sets);
     await entered.promise;
@@ -54,9 +47,9 @@ describe("AUD-028 restored phrase ownership", () => {
     mark.position = 99;
     mutable.unchecked[0] = 99;
     sets[1] = { ...mutable, mnemonic: OTHER_PHRASE };
-    release.resolve();
+    held.release();
     const result = await pending;
-    expect(checked).toEqual([sskrSetVector.phrase, sskrSetVector.phrase]);
+    expect(checked).toEqual([SSKR_SET_VECTOR.phrase, SSKR_SET_VECTOR.phrase]);
     expect(result.kind).toBe("phrases");
     if (result.kind !== "phrases") return;
     expect(result.listed).toEqual(checked);
@@ -75,12 +68,12 @@ describe("AUD-028 restored phrase ownership", () => {
     const set = {
       ...publicSet(),
       get mnemonic() {
-        return reads++ === 0 ? sskrSetVector.phrase : OTHER_PHRASE;
+        return reads++ === 0 ? SSKR_SET_VECTOR.phrase : OTHER_PHRASE;
       },
     };
     const result = await new ShareUnmasking({ mode: "direct" }).unmask([set]);
     expect(reads).toBe(1);
-    expect(result.kind === "phrases" && result.listed).toEqual([sskrSetVector.phrase]);
+    expect(result.kind === "phrases" && result.listed).toEqual([SSKR_SET_VECTOR.phrase]);
     expect(
       await new ShareUnmasking({ mode: "direct", walletCheck: () => ({ matched: false }) }).unmask([
         publicSet(),

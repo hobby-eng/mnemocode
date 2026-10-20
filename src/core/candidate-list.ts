@@ -77,10 +77,21 @@ export function candidateListHolds(count: number): boolean {
 
 /** BIP39 entropy: 16 to 32 bytes for 12 to 24 words. */
 const ENTROPY_LENGTHS: ReadonlySet<number> = new Set(BIP39_ENTROPY_BYTES);
-/** Magic, version, flags, entropy length and the 4-byte count. */
-const HEADER_BYTES = 11;
-const LENGTH_BYTES = 2;
+// The header of a list (docs/CANDIDATES.md, "The list"): the magic, then one byte each for the
+// version, the flags and the entropy length, then the record count.
+/** Where the version byte is, after the magic. */
+const VERSION_AT = MAGIC.length;
+/** Where the flags byte is, after the version. */
+const FLAGS_AT = VERSION_AT + 1;
+/** Where the entropy length byte is, after the flags. */
+const ENTROPY_LENGTH_AT = FLAGS_AT + 1;
+/** Where the record count is, after the entropy length. */
+const COUNT_AT = ENTROPY_LENGTH_AT + 1;
+/** The record count's bytes. */
 const COUNT_BYTES = 4;
+/** The header's bytes: up to the end of the record count. */
+const HEADER_BYTES = COUNT_AT + COUNT_BYTES;
+const LENGTH_BYTES = 2;
 const CRC_BYTES = CRC32_BYTES;
 
 /**
@@ -133,6 +144,7 @@ export interface CandidateList {
 /**
  * The padded length of `length` bytes (Padmé: Nikitin et al., PETS 2019): with E the bit length of
  * the length less one and S that of E, the low E − S bits are rounded up; at most about 12 % more.
+ * Refuses a length that is no whole number of 2 or more (core.candidate-list.padm-length-2-more).
  */
 export function padmeLength(length: number): number {
   if (!Number.isSafeInteger(length) || length < 2) throw ERRORS.create("padm-length-2-more", []);
@@ -159,8 +171,9 @@ export const MAX_CANDIDATE_LIST_BYTES = padmeLength(
 const encoder = new TextEncoder();
 
 /**
- * Refuses a passphrase that no list can hold: one with a lone surrogate, which UTF-8 cannot carry,
- * or one longer than MAX_PASSPHRASE_BYTES. Callers check a BIP39 passphrase before a long search.
+ * Refuses a passphrase that no list can hold, naming it as `what`: one with a lone surrogate, which
+ * UTF-8 cannot carry (core.candidate-list.not-valid-unicode-text), or one longer than
+ * MAX_PASSPHRASE_BYTES (longer-than-bytes). Callers check a BIP39 passphrase before a long search.
  */
 export function assertListPassphrase(passphrase: string, what = "BIP39 passphrase"): void {
   if (!isWellFormedText(passphrase)) throw ERRORS.create("not-valid-unicode-text", [`${what}`]);
@@ -191,7 +204,12 @@ function passphraseBytes(passphrase: string | undefined, what: string): Uint8Arr
   return encoder.encode(passphrase);
 }
 
-/** Writes a list; every record must have the same entropy length. */
+/**
+ * Writes a list; every record must have the same entropy length. Refuses no record or more than
+ * MAX_CANDIDATE_RECORDS (core.candidate-list.candidate-list-holds-1-records), entropy that is not
+ * one BIP39 length in every record (every-candidate-bip39-entropy-one-length-16-32), and a
+ * passphrase that no list can hold (assertListPassphrase).
+ */
 export function encodeCandidateList(list: CandidateList): Uint8Array {
   // Array.from turns holes into undefined, which is refused below: some(), map() and forEach()
   // would skip them, and the header would count records that the list does not hold.
@@ -251,10 +269,11 @@ function listBytes(
   const parts: Uint8Array[] = [];
   const header = new Uint8Array(HEADER_BYTES);
   header.set(MAGIC);
-  header[4] = VERSION;
-  header[5] = (global ? GLOBAL_PASSPHRASE_FLAG : 0) | (perRecord ? RECORD_PASSPHRASE_FLAG : 0);
-  header[6] = entropyLength;
-  new DataView(header.buffer).setUint32(HEADER_BYTES - COUNT_BYTES, count);
+  header[VERSION_AT] = VERSION;
+  header[FLAGS_AT] =
+    (global ? GLOBAL_PASSPHRASE_FLAG : 0) | (perRecord ? RECORD_PASSPHRASE_FLAG : 0);
+  header[ENTROPY_LENGTH_AT] = entropyLength;
+  new DataView(header.buffer).setUint32(COUNT_AT, count);
   parts.push(header);
   const field = (bytes: Uint8Array) => {
     const length = new Uint8Array(LENGTH_BYTES);
@@ -277,7 +296,17 @@ function listBytes(
   return output;
 }
 
-/** Reads a list, refusing it as a whole when anything in it is out of place. */
+/**
+ * Reads a list, refusing it as a whole when anything in it is out of place: a size that
+ * OpenedCandidateList.assertSize refuses (core.candidate-file-refusal.plaintext-list-too-large),
+ * and, all core.candidate-list, bytes that end too soon (candidate-list-cut-short), another magic
+ * (not-mnemo-code-candidate-list), version (candidate-list-version-not-supported), flags
+ * (candidate-list-unknown-flags), entropy length (candidate-list-wrong-entropy-length) or record
+ * count (candidate-list-wrong-record-count), a passphrase of a wrong length
+ * (passphrase-candidate-list-wrong-length) or not UTF-8
+ * (passphrase-candidate-list-not-valid-utf-8-text), a CRC-32 that does not match
+ * (candidate-list-damaged-crc-32-does-not-match) and wrong padding (candidate-list-wrong-padding).
+ */
 export function decodeCandidateList(bytes: Uint8Array): CandidateList {
   OpenedCandidateList.assertSize(bytes.byteLength);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -311,7 +340,8 @@ export function decodeCandidateList(bytes: Uint8Array): CandidateList {
   };
   const magic = take(MAGIC.length);
   if (!equalBytes(magic, MAGIC)) throw ERRORS.create("not-mnemo-code-candidate-list", []);
-  const [version, flags, entropyLength] = take(3);
+  // The one-byte fields between the magic and the count, in their order.
+  const [version, flags, entropyLength] = take(COUNT_AT - VERSION_AT);
   if (version !== VERSION)
     throw ERRORS.create("candidate-list-version-not-supported", [`${version}`]);
   if ((defined(flags) & ~(GLOBAL_PASSPHRASE_FLAG | RECORD_PASSPHRASE_FLAG)) !== 0)
@@ -362,9 +392,14 @@ export interface ListCandidate {
  * them: each candidate's phrase and its BIP39 passphrase. Its text shows no record.
  */
 export class OpenedCandidateList extends Redacted {
-  /** The same admission rule for a plaintext file, encryption input, or decrypted output. */
+  /**
+   * The same admission rule for a plaintext file, encryption input, or decrypted output: refuses,
+   * as CandidateFileRefusedError "unsupported", a `size` in bytes that is no whole number of 0 or
+   * more (core.candidate-file-refusal.size-not-whole) or over MAX_CANDIDATE_LIST_BYTES
+   * (plaintext-list-too-large).
+   */
   static assertSize(size: number): void {
-    assertCandidateFileSize(size, MAX_CANDIDATE_LIST_BYTES, "plaintext candidate list");
+    assertCandidateFileSize(size, MAX_CANDIDATE_LIST_BYTES, "plaintext-list-too-large");
   }
 
   #records: readonly { readonly entropy: Uint8Array; readonly passphrase?: Uint8Array }[];
@@ -389,7 +424,11 @@ export class OpenedCandidateList extends Redacted {
         : "list";
   }
 
-  /** The list in `plain`, its decrypted bytes, which are wiped once read, also when refused. */
+  /**
+   * The list in `plain`, its decrypted bytes, which are wiped once read, also when refused.
+   * Refuses what decodeCandidateList refuses (core.candidate-list.candidate-list-cut-short and the
+   * others it names).
+   */
   static fromBytes(plain: Uint8Array): OpenedCandidateList {
     try {
       return new OpenedCandidateList(decodeCandidateList(plain));
@@ -408,7 +447,10 @@ export class OpenedCandidateList extends Redacted {
     return this.#passphrases;
   }
 
-  /** The candidates in the order of the list, candidate N as N; made fresh each time. */
+  /**
+   * The candidates in the order of the list, candidate N as N; made fresh each time. Refused once
+   * the list is wiped (core.candidate-list.candidate-list-wiped).
+   */
   candidates(): ListCandidate[] {
     if (this.#wiped) throw ERRORS.create("candidate-list-wiped", []);
     const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });

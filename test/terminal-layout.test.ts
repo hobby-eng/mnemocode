@@ -43,8 +43,7 @@ function watchTerminalOfEachTest(): void {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
     for (const [name, descriptor] of saved) {
-      if (descriptor === undefined)
-        delete (process.stderr as unknown as { [key: string]: unknown })[name];
+      if (descriptor === undefined) Reflect.deleteProperty(process.stderr, name);
       else Object.defineProperty(process.stderr, name, descriptor);
     }
     saved.clear();

@@ -9,12 +9,13 @@
 // From the host it needs what candidate-encryption.ts needs: crypto.getRandomValues and WebCrypto.
 // It holds public test keys and data, no secret.
 //
-// Host-neutral: raw operations are supplied by the feature, so checks cannot recursively enter
-// its public first-use gates. Symmetric checks do not require WebCrypto or run scrypt.
+// Host-neutral: it calls the ungated operations of candidate-cipher.ts, so that a check never
+// enters the first-use gate that waits for it. Symmetric checks do not require WebCrypto or run
+// scrypt.
 
 import { Decrypter, Encrypter, Stanza } from "age-encryption";
-import { CandidateFileRefusedError, type CandidateFileProblem } from "./candidate-file-refusal.js";
-import type { CandidateCipherOperations } from "./candidate-encryption-types.js";
+import { CandidateFileRefusedError, type CandidateFileRefusal } from "./candidate-file-refusal.js";
+import { CandidateCipher, SessionIdentity } from "./candidate-cipher.js";
 import { THREE_PHRASES_LIST } from "./candidate-list-answers.js";
 import {
   bytesOfHex,
@@ -38,12 +39,12 @@ const SYMMETRIC_FILE_KEY_HEX = "73c254c76d932ab4cf7054d1407fb603";
 const SELF_TEST_RECIPIENT = "mnemocode.invalid/self-test";
 
 /**
- * `open` refused as a CandidateFileRefusedError with `problem` and a message that `because`
- * matches; a refusal of another class or problem is another reason.
+ * `open` refused as a CandidateFileRefusedError of the condition `refusal` with a message that
+ * `because` matches; a refusal of another class or condition is another reason.
  */
 function expectFileRefused(
   open: () => Promise<unknown>,
-  problem: CandidateFileProblem,
+  refusal: CandidateFileRefusal,
   because: RegExp,
   name: string,
 ): Promise<void> {
@@ -52,7 +53,7 @@ function expectFileRefused(
       try {
         await open();
       } catch (error) {
-        if (error instanceof CandidateFileRefusedError && error.code === problem) throw error;
+        if (CandidateFileRefusedError.isRefusal(error, [refusal])) throw error;
         throw ERRORS.create("refused-another-reason", []);
       }
     },
@@ -89,18 +90,17 @@ function changedLastByte(hex: string): Uint8Array {
   return bytes;
 }
 
-/** Fast cipher integrity checks, with raw operations to avoid reentering their first-use gate. */
+/**
+ * Fast cipher integrity checks, of the ungated operations (CandidateCipher): those behind the
+ * first-use gate would wait for these checks. A class of static methods, as CandidateCipher is.
+ */
 export class CandidateEncryptionChecks {
-  readonly #operations: CandidateCipherOperations;
-
-  /** The raw operations that quick checks: those behind the first-use gate would wait for it. */
-  constructor(operations: CandidateCipherOperations) {
-    this.#operations = operations;
-  }
-
   /**
    * Authenticates the published payload with its independently recovered file key, then checks
-   * forward encryption and a changed tag. No X25519, WebCrypto or scrypt is required.
+   * forward encryption and a changed tag. No X25519, WebCrypto or scrypt is required. Fails at the
+   * first difference (core.self-test-check.mismatch, was-accepted), where the encryption handed
+   * over no file key to open its file with (core.candidate-encryption-self-test.missing-file-key),
+   * and with age-encryption's own error where it cannot open the published payload.
    */
   static async symmetric(): Promise<void> {
     // Python cryptography/OpenSSL first reproduces RFC 7748, then independently checks this age
@@ -157,9 +157,13 @@ export class CandidateEncryptionChecks {
     }
   }
 
-  /** X25519 known answers and admission/refusal cases; no scrypt work is performed. */
-  async quick(): Promise<void> {
-    const { createSessionIdentity, decryptCandidates, encryptCandidates } = this.#operations;
+  /**
+   * X25519 known answers and admission/refusal cases; no scrypt work is performed. Fails at the
+   * first difference (core.self-test-check.mismatch, was-accepted, was-refused-another-reason,
+   * the last also where WebCrypto is missing), and with the cipher's own refusal of a published
+   * file that it must open.
+   */
+  static async quick(): Promise<void> {
     // Independent Python arithmetic: maximum MNCL v1 bytes plus the age v1 STREAM framing.
     const admission = CandidateFileAdmission.parameters();
     expectSame(admission.headerBytes, 65_536, "Maximum age header prefix bytes");
@@ -174,12 +178,13 @@ export class CandidateEncryptionChecks {
       /supported limit/u,
       "An oversized encrypted candidate file",
     );
-    const identity = { identity: TEST_IDENTITY };
+    using testKey = await SessionIdentity.fromText(TEST_IDENTITY);
+    const identity = { identity: testKey };
     const malformed = `${TEST_IDENTITY.slice(0, -1)}A`;
     await expectFileRefused(
       async () => {
         try {
-          await decryptCandidates(bytesOfHex(TO_THE_SESSION_KEY), { identity: malformed });
+          (await SessionIdentity.fromText(malformed)).wipe();
         } catch (error) {
           if (
             !(error instanceof Error) ||
@@ -190,46 +195,57 @@ export class CandidateEncryptionChecks {
           throw error;
         }
       },
-      "key",
+      "identity-invalid",
       /not a valid age identity/u,
       "A malformed Scanner identity",
     );
     expectSame(
-      hexOfBytes(await decryptCandidates(bytesOfHex(TO_THE_SESSION_KEY), identity)),
+      hexOfBytes(await CandidateCipher.decrypt(bytesOfHex(TO_THE_SESSION_KEY), identity)),
       THREE_PHRASES_LIST,
       "Candidate file to the session key",
     );
     await expectFileRefused(
-      () => decryptCandidates(bytesOfHex(TO_TWO_KEYS), identity),
-      "unsupported",
+      () => CandidateCipher.decrypt(bytesOfHex(TO_TWO_KEYS), identity),
+      "several-recipients",
       /exactly one X25519 recipient/u,
       "A candidate file to two keys",
     );
     await expectFileRefused(
-      () => decryptCandidates(bytesOfHex(SCRYPT_WORK_FACTOR_16), { passphrase: TEST_PASSPHRASE }),
-      "unsupported",
+      () =>
+        CandidateCipher.decrypt(bytesOfHex(SCRYPT_WORK_FACTOR_16), { passphrase: TEST_PASSPHRASE }),
+      "scrypt-work-factor-unsupported",
       /scrypt work factor 18/u,
       "A candidate file at the scrypt work factor 16",
     );
     // The words of age-encryption 0.3.1: the Poly1305 tag of the changed chunk does not fit.
     await expectFileRefused(
-      () => decryptCandidates(changedLastByte(TO_THE_SESSION_KEY), identity),
-      "damaged",
+      () => CandidateCipher.decrypt(changedLastByte(TO_THE_SESSION_KEY), identity),
+      "contents-damaged",
       /invalid tag/u,
       "A candidate file changed by a byte",
     );
-    const session = await createSessionIdentity();
-    const encrypted = await encryptCandidates(bytesOfHex(THREE_PHRASES_LIST), session.recipient);
+    using session = await CandidateCipher.createSessionIdentity();
+    const encrypted = await CandidateCipher.encrypt(
+      bytesOfHex(THREE_PHRASES_LIST),
+      session.recipient,
+    );
     expectSame(
-      hexOfBytes(await decryptCandidates(encrypted, { identity: session.identity })),
+      hexOfBytes(await CandidateCipher.decrypt(encrypted, { identity: session })),
       THREE_PHRASES_LIST,
       "Candidate file encrypted to a one-time key",
     );
     await expectFileRefused(
-      () => decryptCandidates(encrypted, identity),
-      "key",
+      () => CandidateCipher.decrypt(encrypted, identity),
+      "scanner-key-does-not-open",
       /no identity matched/u,
       "A candidate file opened with another key",
+    );
+    // An ended session's key opens nothing more: its owner refuses before age is given it.
+    session.wipe();
+    await expectRefusedLater(
+      () => CandidateCipher.decrypt(encrypted, { identity: session }),
+      /has been wiped/u,
+      "A candidate file opened with an ended session key",
     );
   }
 }

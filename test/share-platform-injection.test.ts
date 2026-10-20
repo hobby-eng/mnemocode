@@ -5,7 +5,6 @@
 // check (ShareUnmasking).
 // Published SSKR vectors and the public test phrase only.
 import { createHmac } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { describe, expect, it, vi } from "vitest";
@@ -26,13 +25,11 @@ import { ShareSet } from "../src/sskr/share-set.js";
 import { ShareUnmasking } from "../src/sskr/share-unmasking.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-) as { deterministic: { entropy: string; shares: string[] }[] };
-const VECTOR = vectors.deterministic[0]!;
+const VECTOR = sskrVectors().deterministic[0]!;
 const PHRASE = entropyToMnemonic(Uint8Array.from(Buffer.from(VECTOR.entropy, "hex")), wordlist);
-const [FIRST, SECOND] = VECTOR.shares as [string, string, string];
+const [FIRST, SECOND] = [VECTOR.shares[0]!, VECTOR.shares[1]!];
 const DATE = parseDate("23-09-2026");
 
 /** The host's own platform, which counts its calls: node:crypto's HMAC and the bundled SSKR. */
@@ -68,7 +65,8 @@ describe("the share parts with the host's platform", () => {
       "SEED_BYTES",
       "ShareCombineRefusalError",
     ]);
-    // A host in JavaScript may leave it out; the plan refuses before any share is read.
+    // A host in JavaScript may leave it out, as these options do on purpose; the plan refuses
+    // before any share is read.
     await expect(planJointRepair([FIRST, marked(5)], {} as PlanOptions)).rejects.toThrow(
       "A share repair needs the host's SharePlatform.",
     );
@@ -147,6 +145,7 @@ describe("the share parts with the host's platform", () => {
     let milliseconds = 0;
     const rate = repair.triesPerSecond(() => (milliseconds += 2_000));
     expect(rate).toBe((platform.calls.hmac - beforeMeasure) / 2);
+    // A platform without its functions, given on purpose as a JavaScript host could.
     expect(() => new JointRepair({} as ShareRepairPlatform)).toThrow(TypeError);
   });
 });
@@ -218,6 +217,7 @@ describe("ShareUnmasking", () => {
       kind: "dates",
       message: "12-word phrases support at most 4 dates.",
     });
+    // A mode that shares are not made with, given on purpose as a JavaScript host could.
     expect(() => new ShareUnmasking({ mode: "seedshift-legacy" as never })).toThrow(
       "Shares are made without Seedshift or with MnemoCode Seedshift.",
     );

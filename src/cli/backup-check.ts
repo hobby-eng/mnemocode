@@ -35,20 +35,19 @@ import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { clearPrivateScreen, onPrivateScreen } from "./private-screen.js";
 import { choose } from "./terminal-choice.js";
 import { terminalNotice } from "./terminal.js";
-import { SHARE_SEPARATOR, SHARE_WORD_HINTS } from "../sskr/share-input.js";
+import { SHARE_SEPARATOR, SHARE_WORD_HINTS, ShareInput } from "../sskr/share-input.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { SHARE_ANSWER_HINT } from "./share-repair.js";
 import { refusalMessage } from "../core/refusal.js";
 import { defined } from "../core/defined.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
-import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.backup-check", {
   "backup-check-answers-question-ask-secrets-after-result": () =>
     "--backup-check answers a question of --ask-secrets, after the result.",
   "backup-check-nothing-check-record-replaced-last-word": () =>
     "--backup-check has nothing to check: a record with a replaced last word cannot be checked.",
-  "operation-refused": suppliedMessage,
 });
 
 /** A seed phrase typed in place of the shares is sent to the menu's entry that decodes it. */
@@ -246,12 +245,13 @@ async function askShares(
       (share, index) => check.shareProblem(index + 1, share) !== undefined,
     );
     if (place < 0) return shares;
-    terminalNotice(defined(check.shareProblem(place + 1, defined(shares[place]))), "warning");
+    const unreadable = defined(check.shareProblem(place + 1, defined(shares[place])));
+    terminalNotice(unreadable.message, "warning");
     const share = await askSecretUntil(
       `Share ${place + 1} as written down:`,
       (answer) => {
-        const reason = check.shareProblem(place + 1, answer);
-        if (reason !== undefined) throw ERRORS.create("operation-refused", [reason]);
+        const trouble = check.shareProblem(place + 1, answer);
+        if (trouble !== undefined) throw ShareInput.refusalOf(trouble);
         return answer;
       },
       { what: `share ${place + 1}`, hints: SHARE_WORD_HINTS },

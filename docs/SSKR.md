@@ -26,7 +26,7 @@ The shares are always shown in the terminal. `--output NEW_FILE` also saves them
 | `--show-original words\|codes\|both` | Also shows the original wallet phrase, before Seedshift: English words, codes in `--format`, or both |
 | `--show-masked-words`                | Also shows the English words after Seedshift; the original dates are still needed                    |
 
-`sskr-split` is `encode --sskr` under another name. In `sskr-split` and `sskr-export`, `--format` selects the share format. A text file saved with `--output` holds the shares in that format, one per line.
+`sskr-split` splits a phrase as `encode --sskr` does, with two differences. Its `--format` selects the share format, as `--share-format` does there, so it cannot also show the complete backup; `sskr-export` reads `--format` the same way. The display options `--show-original` and `--show-masked-words` are not available; use `encode --sskr` for them. A text file saved with `--output` holds the shares in the share format, one per line.
 
 The menu offers these display choices separately. The original copy restores the wallet without shares or dates: keep it apart from the shares. Neither display choice adds words or an original copy to exported share files. With `--show-original`, `--format` selects the original copy's codes instead of also showing a complete masked backup.
 

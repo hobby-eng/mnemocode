@@ -10,7 +10,7 @@
 //
 // Host-neutral: it imports only other core modules, and through them the share forms.
 
-import { sskrVector } from "../sskr/known-answers.js";
+import { SSKR_VECTOR } from "../sskr/known-answers.js";
 import { ShareInput } from "../sskr/share-input.js";
 import { BackupReading } from "./backup-reading.js";
 import { EncodedBackup } from "./encoded-backup.js";
@@ -64,8 +64,8 @@ const MARKED_COLOR: MarkedCase = {
   right: 2_627,
 };
 /** The first share of the official BCR-2020-011 grouped vector (sskr/known-answers.ts). */
-const SHARE_COLORS = sskrVector.firstShareColors.join(" ");
-const SHARE_NUMBERS = sskrVector.firstShareNumbers;
+const SHARE_COLORS = SSKR_VECTOR.firstShareColors.join(" ");
+const SHARE_NUMBERS = SSKR_VECTOR.firstShareNumbers;
 const SHARE_READER = "the share reader";
 
 /** The masked phrase's word numbers, counted from 1, as BIP39 indexes from 0. */
@@ -158,12 +158,12 @@ export function checkBackupReadingStartup(): void {
     "A word number of 2049",
   );
   expectSame(BackupReading.shareKind(SHARE_COLORS), "share", "A share in place of the codes");
-  const shareLines = [sskrVector.shares[0], sskrVector.shares[2]].join("\n");
+  const shareLines = [SSKR_VECTOR.shares[0], SSKR_VECTOR.shares[2]].join("\n");
   expectSame(BackupReading.shareKind(shareLines), "share", "Several shares in place of the codes");
   const parts = ShareInput.partsOfText(shareLines);
   expectSame(parts.length, 2, "Every share line is kept");
-  expectSame(parts[0], sskrVector.shares[0], "First share line");
-  expectSame(parts[1], sskrVector.shares[2], "Third member at the second place");
+  expectSame(parts[0], SSKR_VECTOR.shares[0], "First share line");
+  expectSame(parts[1], SSKR_VECTOR.shares[2], "Third member at the second place");
   expectSame(
     BackupReading.shareKind("not-a-share\nalso-not-a-share"),
     undefined,

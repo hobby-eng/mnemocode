@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import * as raw from "../sskr-wasm/generated/recovery_sskr_wasm.js";
 import { CheckedSskrBridge } from "../src/sskr/bridge.js";
 import { JointRepair } from "../src/sskr/joint-repair.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareRestore } from "../src/sskr/share-restore.js";
 import { ShareInput } from "../src/sskr/share-input.js";
@@ -11,14 +11,14 @@ import { writeShare } from "../src/sskr/transport.js";
 
 describe("AUD-026 SSKR preprocessing and final cancellation", () => {
   it("assesses broad partial Color Unicode without expanding its Cartesian product", async () => {
-    const codes = writeShare(sskrSetVector.shares[0]!, "colors-unicode")
+    const codes = writeShare(SSKR_SET_VECTOR.shares[0]!, "colors-unicode")
       .replaceAll(" ", "")
       .match(/.{4}/gu)!;
     codes[8] = "E???";
     codes[9] = "E???";
     const plan = await new JointRepair(nodeSharePlatform).plan([
       codes.join(" "),
-      sskrSetVector.shares[1]!,
+      SSKR_SET_VECTOR.shares[1]!,
     ]);
     try {
       expect(plan.assessment.verdict).toBe("determined");
@@ -37,10 +37,10 @@ describe("AUD-026 SSKR preprocessing and final cancellation", () => {
   it.each([false, true])(
     "observes cancellation in the last progress callback (%s)",
     async (abort) => {
-      const colors = writeShare(sskrSetVector.shares[1]!, "colors").trim().split(/\s+/u);
+      const colors = writeShare(SSKR_SET_VECTOR.shares[1]!, "colors").trim().split(/\s+/u);
       colors[5] = "?";
       const input = new ShareInput({ decodeEntry: "Decode" });
-      input.add([sskrSetVector.shares[0]!, colors.join(" ")]);
+      input.add([SSKR_SET_VECTOR.shares[0]!, colors.join(" ")]);
       const restore = new ShareRestore(nodeSharePlatform);
       const marked = await restore.read(input);
       expect(marked.kind).toBe("marked");
@@ -95,6 +95,7 @@ describe("AUD-026 SSKR bridge admission and coded refusals", () => {
       bridge.create_sskr_shares(
         secret,
         1,
+        // A null field, which no type allows, fed on purpose as a JavaScript host could.
         field === "groups" ? (null as never) : Uint8Array.of(2, 3),
         field === "seed" ? (null as never) : new Uint8Array(32),
       ),
@@ -129,6 +130,7 @@ describe("AUD-026 SSKR bridge admission and coded refusals", () => {
       bridge.create_sskr_shares(secret, 1, Uint8Array.of(2, 3), seed).split("\n"),
     ).toHaveLength(3);
     expect(seed.every((byte) => byte === 5)).toBe(true);
+    // A missing encoding, which no type allows, fed on purpose as a JavaScript host could.
     expect(() =>
       bridge.create_sskr_shares_formatted(secret, 1, Uint8Array.of(2, 3), seed, undefined as never),
     ).toThrow("Unsupported SSKR share encoding.");

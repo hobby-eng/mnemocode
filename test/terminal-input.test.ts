@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { dropTypedAhead, readKey, readLine, type Key } from "../src/cli/terminal-input.js";
+import { readLine, TerminalKeys, type Key } from "../src/cli/terminal-input.js";
 import {
   CANCELLED,
   type Cancelled,
@@ -33,7 +33,7 @@ async function keys(text: string): Promise<string[]> {
   const next = typed(text);
   const read: string[] = [];
   for (;;) {
-    const key = await readKey(next);
+    const key = await TerminalKeys.readKey(next);
     read.push(key.kind === "digit" ? `digit ${key.digit}` : key.kind);
     if (key.kind === "back" || key.kind === "cancel") return read;
   }
@@ -57,13 +57,13 @@ describe("terminal keys", () => {
     const bytes = [0x1b];
     const next: NextByte = async () => bytes.shift();
     const moreWithin = async () => bytes.length > 0;
-    expect(await readKey(next, moreWithin)).toEqual({ kind: "back" });
+    expect(await TerminalKeys.readKey(next, moreWithin)).toEqual({ kind: "back" });
     bytes.push(0x1b, 0x5b, 0x41);
-    expect(await readKey(next, moreWithin)).toEqual({ kind: "up" });
+    expect(await TerminalKeys.readKey(next, moreWithin)).toEqual({ kind: "up" });
   });
 
   it("reads Ctrl+C as a cancellation key", async () => {
-    expect(await readKey(typed("\x03"))).toEqual({ kind: "cancel" });
+    expect(await TerminalKeys.readKey(typed("\x03"))).toEqual({ kind: "cancel" });
   });
 
   it("reads an escape sequence with parameters to its end, so that Ctrl+Up is no digit 5", async () => {
@@ -103,7 +103,7 @@ describe("terminal keys", () => {
     // The rest of a key's sequence comes at once: typed later, the digit is a key.
     const paused = arriving("\x1b[1", "2", "\r");
     const read: Key[] = [];
-    do read.push(await readKey(paused.next, paused.moreWithin));
+    do read.push(await TerminalKeys.readKey(paused.next, paused.moreWithin));
     while (read.at(-1)!.kind !== "back");
     expect(read).toEqual([
       { kind: "other" },
@@ -115,17 +115,17 @@ describe("terminal keys", () => {
     // Alt+Enter is Enter; Escape pressed twice quickly goes back.
     expect(await keys("\x1b\r")).toEqual(["other", "enter", "back"]);
     const twice = arriving("\x1b\x1b");
-    expect(await readKey(twice.next, twice.moreWithin)).toEqual({ kind: "other" });
-    expect(await readKey(twice.next, twice.moreWithin)).toEqual({ kind: "back" });
+    expect(await TerminalKeys.readKey(twice.next, twice.moreWithin)).toEqual({ kind: "other" });
+    expect(await TerminalKeys.readKey(twice.next, twice.moreWithin)).toEqual({ kind: "back" });
   });
 
   it("drops the keys given back with what was typed ahead, and cancels at a Ctrl+C among them", async () => {
-    expect(await readKey(typed("\x1b[1\r"))).toEqual({ kind: "other" });
-    await dropTypedAhead();
-    expect(await readKey(typed(""))).toEqual({ kind: "back" });
-    expect(await readKey(typed("\x1b[1\x03"))).toEqual({ kind: "other" });
-    expect(await dropTypedAhead()).toBe(CANCELLED);
-    expect(await readKey(typed(""))).toEqual({ kind: "back" });
+    expect(await TerminalKeys.readKey(typed("\x1b[1\r"))).toEqual({ kind: "other" });
+    await TerminalKeys.dropTypedAhead();
+    expect(await TerminalKeys.readKey(typed(""))).toEqual({ kind: "back" });
+    expect(await TerminalKeys.readKey(typed("\x1b[1\x03"))).toEqual({ kind: "other" });
+    expect(await TerminalKeys.dropTypedAhead()).toBe(CANCELLED);
+    expect(await TerminalKeys.readKey(typed(""))).toEqual({ kind: "back" });
   });
 });
 
@@ -160,21 +160,25 @@ describe("hidden line", () => {
     expect(await readLine(typed("secret\x03"), { echo: false })).toBe(CANCELLED);
   });
 
-  it("refuses an answer longer than its limit and text that is not UTF-8", async () => {
-    await expect(readLine(typed("12345\r"), { echo: false, limit: 4 })).rejects.toThrow(
-      "longer than 4 bytes",
-    );
+  it("refuses an answer longer than its limit and text that is not UTF-8, each by its code", async () => {
+    await expect(readLine(typed("12345\r"), { echo: false, limit: 4 })).rejects.toMatchObject({
+      code: "answer-too-long",
+      message: "An answer is longer than 4 bytes; no valid answer is that long.",
+    });
     const invalid: NextByte = (() => {
       const bytes = [0xff, 0x0d];
       return async () => bytes.shift();
     })();
-    await expect(readLine(invalid, { echo: false })).rejects.toThrow("not valid UTF-8");
+    await expect(readLine(invalid, { echo: false })).rejects.toMatchObject({
+      code: "answer-not-utf8",
+      message: "The answer is not valid UTF-8 text.",
+    });
   });
 
   it("shows a visible answer as it is typed, without control keys and escape sequences", async () => {
     const shown: string[] = [];
     vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      shown.push(Buffer.from(chunk as Uint8Array).toString("utf8"));
+      shown.push(Buffer.from(chunk).toString("utf8"));
       return true;
     });
     // Up is no editing key; Ctrl+A goes to the start, where x goes in and Backspace takes it out.

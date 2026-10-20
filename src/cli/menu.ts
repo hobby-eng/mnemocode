@@ -12,10 +12,10 @@
 // and the menu writes nothing (dropForMenu); the command checks everything again, since a file
 // may change in between.
 
-import type { SplitMode } from "../core/masking.js";
+import { Masking, type SplitMode } from "../core/masking.js";
 import { UNICODE_CODE_HINT, WordTable, type WordTableLookup } from "../core/word-table.js";
 import { parseRecipient } from "../core/candidate-encryption.js";
-import { askWalletEvidence, type WalletValueAsker } from "./ask.js";
+import { askWalletEvidence, type WalletValueAsker } from "./wallet-question.js";
 import { MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
 import { MAX_PNG_BYTES } from "../core/png-admission.js";
 import { BIP39_WORD_COUNTS, WORD_NUMBERS, type Bip39WordCount } from "../core/bip39-sizes.js";
@@ -38,12 +38,10 @@ import { CANCELLED_EXIT_CODE, privateScreenAvailable } from "./private-screen.js
 import { assertProtected, dropForMenu } from "./protection.js";
 import { assertCoreSelfTest } from "./self-test.js";
 import {
-  answerMark,
+  AnswerRecord,
   askLine,
   choose,
-  eraseAnswersSince,
   notesRoom,
-  startRecord,
   waitForEnter,
   type Explanation,
 } from "./terminal-choice.js";
@@ -244,7 +242,7 @@ function askEncodedMode(): Promise<Mode | undefined | Cancelled> {
   return choose(
     ENCODED_SEEDSHIFT_QUESTION,
     ENCODED_SEEDSHIFT_CHOICES.map((choice) =>
-      choice.value === "direct" ? choice : { ...choice, note: "the dates are asked next" },
+      Masking.of(choice.value).masked ? { ...choice, note: "the dates are asked next" } : choice,
     ),
     { label: "Seedshift", explanation: SEEDSHIFT_EXPLANATION },
   );
@@ -311,13 +309,19 @@ function askSharesMasked(): Promise<SplitMode | undefined | Cancelled> {
   });
 }
 
+/**
+ * The --mode of sskr-combine and sskr-export for shares of a phrase masked with `mode` before
+ * splitting, and none for shares of an unmasked phrase, as those commands read it.
+ */
+function sharesModeOption(mode: SplitMode): string[] {
+  return Masking.of(mode).masked ? ["--mode", mode] : [];
+}
+
 /** Entry 5: the seed phrase rebuilt from typed Shamir shares. */
 async function restoreAction(): Promise<Action> {
   const mode = await askSharesMasked();
   if (mode === undefined || mode === CANCELLED) return mode;
-  return {
-    run: ["sskr-combine", "--ask-secrets", ...(mode === "seedshift" ? ["--mode", mode] : [])],
-  };
+  return { run: ["sskr-combine", "--ask-secrets", ...sharesModeOption(mode)] };
 }
 
 /** Entry 6: a forgotten word, a forgotten digit of a date, or an unreadable code of a share. */
@@ -457,12 +461,7 @@ async function shareRepairAction(): Promise<Action> {
   const mode = await askSharesMasked();
   if (mode === undefined || mode === CANCELLED) return mode;
   return {
-    run: [
-      "sskr-export",
-      "--ask-secrets",
-      ...(mode === "direct" ? [] : ["--mode", mode]),
-      ...wallet,
-    ],
+    run: ["sskr-export", "--ask-secrets", ...sharesModeOption(mode), ...wallet],
   };
 }
 
@@ -641,6 +640,11 @@ interface Entry {
    * The command asks for a seed phrase or a share, which needs a protected, self-tested process.
    */
   readonly asksSecrets?: boolean;
+  /**
+   * The entry runs no feature (Run the self-test, the help, Quit): it stays offered after a failed
+   * self-test, which closes every other entry (CORE-27).
+   */
+  readonly runsNoFeature?: boolean;
 }
 
 export const MENU_ENTRIES: readonly Entry[] = [
@@ -652,42 +656,83 @@ export const MENU_ENTRIES: readonly Entry[] = [
   { ...MENU_ENTRY_NAMES.recover, action: askedAfresh(recoverAction), asksSecrets: true },
   { ...MENU_ENTRY_NAMES.preview, action: askedAfresh(previewAction) },
   { ...MENU_ENTRY_NAMES.table, action: askedAfresh(tableAction) },
-  { ...MENU_ENTRY_NAMES.selfTest, action: async () => ({ run: ["self-test"] }) },
-  { ...MENU_ENTRY_NAMES.help, action: async () => "help" },
-  { ...MENU_ENTRY_NAMES.quit, action: async () => "quit" },
+  {
+    ...MENU_ENTRY_NAMES.selfTest,
+    action: async () => ({ run: ["self-test"] }),
+    runsNoFeature: true,
+  },
+  { ...MENU_ENTRY_NAMES.help, action: async () => "help", runsNoFeature: true },
+  { ...MENU_ENTRY_NAMES.quit, action: async () => "quit", runsNoFeature: true },
 ];
 
 const paint = (code: string, text: string): string => terminalPaint("stderr", code, text);
-
-/**
- * Why no command may ask for a secret here, or undefined: this process could not switch off core
- * dumps, or the core self-test failed (assertProtected, assertCoreSelfTest). Each command that
- * takes a secret checks both again before it asks anything and would stop at once, so the menu
- * checks them before its first question and does not offer such commands then.
- */
-function secretsRefusal(): string | undefined {
-  try {
-    assertProtected();
-    assertCoreSelfTest();
-    return undefined;
-  } catch (error) {
-    return describeError(error);
-  }
-}
 
 /** Said once when the entries that ask for a secret are no longer offered. */
 const SECRET_ENTRIES_LEFT_OUT =
   "The entries that ask for a seed phrase or a share are not offered.";
 
-/** The menu's heading; `refusal` says why no entry that asks for a secret is offered. */
-function writeHeading(refusal: string | undefined): void {
+/** Said once when a failed self-test closes every entry that runs a feature. */
+const FEATURE_ENTRIES_LEFT_OUT =
+  "Only the self-test, the help and Quit are offered: the other entries stay closed after a failed self-test.";
+
+/** Entries that the menu no longer offers, and why. */
+interface Closure {
+  /** "features" after a failed self-test, "secrets" where only the protection failed. */
+  readonly kind: "features" | "secrets";
+  /** Why the entries are closed, such as the failure of the self-test. */
+  readonly reason: string;
+  /** Whether `entry` is still offered. */
+  readonly offers: (entry: Entry) => boolean;
+}
+
+/**
+ * What a failed self-test closes: every entry that runs a feature, since the known answers of the
+ * features failed (CORE-27). `reason` says why.
+ */
+function featuresClosed(reason: string): Closure {
+  return { kind: "features", reason, offers: (entry) => entry.runsNoFeature === true };
+}
+
+/**
+ * The entries closed at the start, or undefined when every entry is offered: after a failed core
+ * self-test (assertCoreSelfTest), whose known answers are those of every feature, all but the
+ * entries that run none; where only this process could not switch off core dumps
+ * (assertProtected), the entries that ask for a secret, while the public ones work without it.
+ * Each command checks both again before it starts and would stop at once, so the menu checks them
+ * before its first question.
+ */
+function closedAtStart(): Closure | undefined {
+  try {
+    assertCoreSelfTest();
+  } catch (error) {
+    return featuresClosed(describeError(error));
+  }
+  try {
+    assertProtected();
+    return undefined;
+  } catch (error) {
+    return {
+      kind: "secrets",
+      reason: describeError(error),
+      offers: (entry) => entry.asksSecrets !== true,
+    };
+  }
+}
+
+/** What the notice says of the entries that `closure` closes. */
+function leftOut(closure: Closure): string {
+  return closure.kind === "features" ? FEATURE_ENTRIES_LEFT_OUT : SECRET_ENTRIES_LEFT_OUT;
+}
+
+/** The menu's heading; `closure` says which entries are no longer offered, and why. */
+function writeHeading(closure: Closure | undefined): void {
   console.error(`\n${headingLine(process.stderr, "Offline seed phrase encoding")}\n`);
   console.error("Encodes a BIP39 seed phrase as numbers, codes or colors, all offline.");
   terminalMore("menu");
   console.error(paint(STYLE.muted, "Work on a trusted computer without a network connection."));
-  if (refusal !== undefined) {
-    terminalFailure(refusal);
-    terminalNotice(SECRET_ENTRIES_LEFT_OUT, "warning");
+  if (closure !== undefined) {
+    terminalFailure(closure.reason);
+    terminalNotice(leftOut(closure), "warning");
   }
   // The record of answers starts after a blank line; each question adds its own above it.
   console.error("");
@@ -701,16 +746,15 @@ export async function runMenu(): Promise<Cancelled | undefined> {
   // Each command runs in a process of its own, which gives up what it does not need; the menu
   // itself saves nothing.
   dropForMenu();
-  let refusal = secretsRefusal();
-  writeHeading(refusal);
+  let closure = closedAtStart();
+  writeHeading(closure);
   // Drawn again, as it is then, where going back draws the whole screen anew.
-  startRecord(() => writeHeading(refusal));
+  AnswerRecord.start(() => writeHeading(closure));
   let selected: Entry = defined(MENU_ENTRIES[0]);
   let again: (() => Promise<Action>) | undefined;
   for (;;) {
-    const entries =
-      refusal === undefined ? MENU_ENTRIES : MENU_ENTRIES.filter((item) => !item.asksSecrets);
-    const before = answerMark();
+    const entries = closure === undefined ? MENU_ENTRIES : MENU_ENTRIES.filter(closure.offers);
+    const before = AnswerRecord.mark();
     const entry =
       again === undefined
         ? await choose(
@@ -727,11 +771,11 @@ export async function runMenu(): Promise<Cancelled | undefined> {
     if (action === "quit") return undefined;
     if (action === undefined) {
       // Back: the task and the answers given for it leave the record before the list returns.
-      eraseAnswersSince(before);
+      AnswerRecord.eraseSince(before);
       continue;
     }
     // What follows is written below the record, which starts again under it for the next task.
-    startRecord();
+    AnswerRecord.start();
     if (action === "help") {
       printUsage();
     } else {
@@ -752,20 +796,19 @@ export async function runMenu(): Promise<Cancelled | undefined> {
       if (code === CANCELLED) return CANCELLED;
       if (code === undefined || code === CANCELLED_EXIT_CODE) continue;
       if (code === 0) again = action.again;
-      // A copy that fails its own check is not trusted with a secret either.
-      if (action.run[0] === "self-test" && code !== 0 && refusal === undefined) {
-        refusal = "The self-test failed.";
-        terminalNotice(`${refusal} ${SECRET_ENTRIES_LEFT_OUT}`, "warning");
+      // A copy that fails its own check is not trusted with its features either (CORE-27).
+      if (action.run[0] === "self-test" && code !== 0 && closure?.kind !== "features") {
+        closure = featuresClosed("The self-test failed.");
+        terminalNotice(`${closure.reason} ${leftOut(closure)}`, "warning");
       }
-      // After the private screen the person has already read the result and pressed Enter.
+      // After the private screen the person has already read the result and pressed Enter, and
+      // the command has left its summary on the main screen (private-screen.ts).
       if (
         code === 0 &&
         PRIVATE_SCREEN_COMMANDS.has(defined(action.run[0])) &&
         privateScreenAvailable()
-      ) {
-        console.error(paint(STYLE.muted, "The screen with the result was cleared."));
+      )
         continue;
-      }
     }
     console.error("");
     // Repeated lookups keep their input kind; Escape there returns to the main menu.

@@ -107,6 +107,11 @@ interface Variant {
   /** Whether its codes are colours: the terminal shows them as coloured cards. */
   readonly colors: boolean;
   /**
+   * Whether its codes are the English words of the phrase they are written from: such codes need
+   * no second copy in words beside them.
+   */
+  readonly phraseWords: boolean;
+  /**
    * Whether a seed phrase in it is always masked: English words are the phrase itself, and anyone
    * with the BIP39 list reads word numbers, so unmasked they would protect nothing.
    */
@@ -128,6 +133,7 @@ const VARIANTS = Object.freeze({
     leading: (text, count) => englishTokens(text).slice(0, count).join(" "),
     cardKind: undefined,
     colors: false,
+    phraseWords: true,
     alwaysMasked: true,
   },
   indexes: {
@@ -141,6 +147,7 @@ const VARIANTS = Object.freeze({
     leading: (text, count) => codeTokens(text).slice(0, count).join(" "),
     cardKind: undefined,
     colors: false,
+    phraseWords: false,
     alwaysMasked: true,
   },
   unicode: {
@@ -156,6 +163,7 @@ const VARIANTS = Object.freeze({
     cardKind: "colors",
     cardCodes: unicodeCodesOfIndexes,
     colors: false,
+    phraseWords: false,
     alwaysMasked: false,
   },
   "colors-unicode": {
@@ -188,6 +196,7 @@ const VARIANTS = Object.freeze({
     },
     cardKind: "colors",
     colors: true,
+    phraseWords: false,
     alwaysMasked: false,
   },
   colors: {
@@ -205,6 +214,7 @@ const VARIANTS = Object.freeze({
         .join(" "),
     cardKind: "colors",
     colors: true,
+    phraseWords: false,
     alwaysMasked: false,
   },
 } satisfies Readonly<Record<EncodedFormat, Variant>>);
@@ -226,11 +236,9 @@ const LIKELY_ORDER = Object.freeze([
  * over its name: the values are made once, one for each form, and never change.
  */
 export class EncodedForm {
-  static readonly #values = Object.freeze(
-    Object.fromEntries(
-      // ENCODED_FORMATS.map gives an entry for every form, so the record has every key.
-      ENCODED_FORMATS.map((format) => [format, new EncodedForm(format, VARIANTS[format])]),
-    ) as Record<EncodedFormat, EncodedForm>,
+  /** The one value of each form, made from ENCODED_FORMATS: every form. */
+  static readonly #values: ReadonlyMap<EncodedFormat, EncodedForm> = new Map(
+    ENCODED_FORMATS.map((format) => [format, new EncodedForm(format, VARIANTS[format])]),
   );
 
   readonly #format: EncodedFormat;
@@ -243,11 +251,12 @@ export class EncodedForm {
 
   /**
    * The form named `format`; refuses a value that names none, as a record, an option or a host
-   * may pass anything. The one refusal of such a value: every other module asks it.
+   * may pass anything (core.encoded-form.unsupported-encoded-format). The one refusal of such a
+   * value: every other module asks it.
    */
   static of(format: EncodedFormat): EncodedForm {
     if (!isEncodedFormat(format)) throw ERRORS.create("unsupported-encoded-format", []);
-    return EncodedForm.#values[format];
+    return defined(EncodedForm.#values.get(format));
   }
 
   /**
@@ -268,7 +277,13 @@ export class EncodedForm {
     return this.#format;
   }
 
-  /** The BIP39 indexes of `text`, codes in this form; throws why they cannot be read. */
+  /**
+   * The BIP39 indexes of `text`, codes in this form; throws why they cannot be read, as the reader
+   * of the form refuses them: words as canonicalEnglishWords and indexesOfWords (core.words,
+   * core.english-words), word numbers as wordIndexOfNumber and Unicode codes as unicodeIndexesOf
+   * (core.words), colours and their Unicode codes as parseColors, unicodeToColors and
+   * colorsToIndexes (core.colors).
+   */
   read(text: string): number[] {
     return this.#variant.read(text);
   }
@@ -345,16 +360,12 @@ export class EncodedForm {
     return this.#variant.unit;
   }
 
-  /** The digits of each code where the codes are written joined, or undefined. */
-  get joinedWidth(): number | undefined {
-    return this.#variant.joinedWidth;
-  }
-
   /**
-   * The codes of `text`, codes of this form, one by one, where the form writes them joined
-   * (joinedWidth): a screen shows them apart beside the joined text, so that a person sees where
-   * each code ends and which one to mark with ? (owner, 2026-10-13). Undefined for a form whose
-   * text has its codes apart already.
+   * The codes of `text`, codes of this form, one by one, where the form writes them joined (its
+   * variant's joinedWidth digits each): a screen shows them apart beside the joined text, so that a
+   * person sees where each code ends and which one to mark with ? (owner, 2026-10-13). Undefined
+   * for a form whose text has its codes apart already. Joined text that, without its spacing, is
+   * no whole number of codes is refused (core.pieces.length-no-whole-number-pieces).
    */
   apartCodes(text: string): string[] | undefined {
     const width = this.#variant.joinedWidth;
@@ -377,6 +388,15 @@ export class EncodedForm {
   /** Whether its codes are colours: the terminal shows them as coloured cards. */
   get writtenInColors(): boolean {
     return this.#variant.colors;
+  }
+
+  /**
+   * Whether its codes are the English words of the phrase they are written from, as English words
+   * are: the codes of a seed phrase are that phrase, and the codes of a masked one are its masked
+   * words, so that neither needs a second copy in words beside it.
+   */
+  get writtenInWords(): boolean {
+    return this.#variant.phraseWords;
   }
 
   /** Whether front ends should require masking for directly readable words or indexes. */

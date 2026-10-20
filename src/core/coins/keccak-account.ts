@@ -9,7 +9,7 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { HEX_ACCOUNT_BYTES } from "./address-sizes.js";
 
 /** The last 20 bytes of Keccak-256 of the 64 bytes of the uncompressed key, without its 04 byte. */
-export function keccakAccount(publicKey: Uint8Array): Uint8Array {
+function keccakAccount(publicKey: Uint8Array): Uint8Array {
   const uncompressed = secp256k1.Point.fromBytes(publicKey).toBytes(false);
   return keccak_256(uncompressed.subarray(1)).subarray(-HEX_ACCOUNT_BYTES);
 }

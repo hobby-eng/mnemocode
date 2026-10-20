@@ -433,7 +433,9 @@ export class MissingCodes extends Redacted implements Disposable {
    * Checks every candidate with the host's check, letting its event loop run now and then, and
    * keeps the first maxFound that pass, as EncodedBackups of this form and mode. Returned backups
    * belong to the caller, including stopped partial results. A failed run wipes its kept backups;
-   * the codes must stay live until the run ends.
+   * the codes must stay live until the run ends, and a run of wiped codes is refused
+   * (core.secret-value.wiped). Refuses a `maxFound` that is no whole number of 1 or more
+   * (core.search-turns.whole-number-more); what the host's check throws passes on.
    */
   async run(run: CodesCheckRun): Promise<CodesCheckResult> {
     this.#values.assertLive();

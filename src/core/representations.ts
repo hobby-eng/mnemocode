@@ -31,7 +31,13 @@ export function resultFromIndexes(
   };
 }
 
-/** The BIP39 indexes of codes written in `format` (EncodedForm.read). */
+/**
+ * The BIP39 indexes of codes written in `format`. Refuses a `format` that names no form
+ * (EncodedForm.of: core.encoded-form.unsupported-encoded-format) and codes that do not read in it,
+ * as the reader of the form refuses them (EncodedForm.read: core.words, core.english-words and
+ * core.colors codes, such as core.words.enter-english-bip39-words or
+ * core.words.indexes-decimal-integers-from).
+ */
 export function parseInput(value: string, format: EncodedFormat): number[] {
   return EncodedForm.of(format).read(value);
 }

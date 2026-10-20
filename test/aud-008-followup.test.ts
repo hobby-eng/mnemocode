@@ -1,7 +1,6 @@
 // Follow-up regression tests for AUD-008 (docs/audits/AUD-008-2026-10-06.md): the reference of a
 // share set, which a digest must check and which must restore, sparse word searches, and the
 // refusal of a share that cannot be read. Public test data and synthetic secrets only.
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -14,6 +13,7 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { markUnits, wrongValue } from "./helpers/shares.js";
 import { holes, withHoles } from "./helpers/holes.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 /** Synthetic entropy and engine randomness, as the task of this follow-up names them. */
 const SECRET_BYTE = 0x42;
@@ -73,7 +73,8 @@ async function followAdvice(
     try {
       return { phrase: (await restoreShareSet(left)).mnemonic, followed };
     } catch (error) {
-      const named = namedShares((error as Error).message);
+      if (!(error instanceof Error)) throw error;
+      const named = namedShares(error.message);
       if (named.length === 0) return { followed };
       left = left.filter((_, at) => !named.includes(at + 1));
     }
@@ -273,10 +274,7 @@ describe("AUD-008 follow-up: the reference is checked by a digest, and restores"
   });
 
   it("keeps every published vector restoring", async () => {
-    const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-      deterministic: { entropy: string; shares: string[] }[];
-      official: { entropy: string; shares: string[] };
-    };
+    const vectors = sskrVectors();
     for (const vector of [...vectors.deterministic, vectors.official])
       expect(await combineSskrShares(vector.shares)).toBe(
         entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist),
@@ -285,7 +283,7 @@ describe("AUD-008 follow-up: the reference is checked by a digest, and restores"
 });
 
 describe("AUD-008 follow-up: a sparse word search is refused", () => {
-  const known = (count: number) => Array.from({ length: count }, () => [0] as number[]);
+  const known = (count: number) => Array.from({ length: count }, () => [0]);
   /** A place of one word whose length counts a hole after its last element. */
   const trailingHole = () => {
     const place = [5];
@@ -321,6 +319,7 @@ describe("AUD-008 follow-up: a sparse word search is refused", () => {
       PLACES,
     ],
   ])("%s", (_, search, code) => {
+    // Each search breaks the shape of a WordSearch on purpose, as a JavaScript host could.
     expect(() => searchCombinations(search as WordSearch)).toThrow(
       expect.objectContaining({ code }),
     );
@@ -339,16 +338,13 @@ describe("AUD-008 follow-up: a sparse word search is refused", () => {
 
 describe("AUD-008 follow-up: the refusal of a share that cannot be read", () => {
   it("says what is wrong and what to check, without repeating the share", async () => {
-    const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-      deterministic: { shares: string[] }[];
-    };
-    const [first, second] = vectors.deterministic[0]!.shares as [string, string];
-    const words = writeShare(first, "indexes").split(" ");
+    const [first, second] = sskrVectors().deterministic[0]!.shares;
+    const words = writeShare(first!, "indexes").split(" ");
     // One element marked, and the one after it changed: no value of the mark fits the checksum.
     words[5] = "?";
     words[6] = words[6] === "1" ? "2" : "1";
     const typed = words.join(" ");
-    const plan = await planJointRepair([typed, second], { platform: nodeSharePlatform });
+    const plan = await planJointRepair([typed, second!], { platform: nodeSharePlatform });
     expect(plan.assessment.verdict).toBe("no-fit");
     expect(plan.assessment.reason).toBe(
       "Share 1 cannot be read as a share: check the elements marked with ?, and the others.",
@@ -358,14 +354,11 @@ describe("AUD-008 follow-up: the refusal of a share that cannot be read", () => 
   });
 
   it("names no marks for a share that has none", async () => {
-    const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-      deterministic: { shares: string[] }[];
-    };
-    const [first, second] = vectors.deterministic[0]!.shares as [string, string];
-    const words = writeShare(first, "indexes").split(" ");
+    const [first, second] = sskrVectors().deterministic[0]!.shares;
+    const words = writeShare(first!, "indexes").split(" ");
     // A typing error that the checksum finds, beside a share with one element marked.
     words[6] = words[6] === "1" ? "2" : "1";
-    const marked = markUnits(second, "indexes", [5]);
+    const marked = markUnits(second!, "indexes", [5]);
     for (const typed of [words.join(" "), "not a share at all"]) {
       const plan = await planJointRepair([typed, marked], {
         platform: nodeSharePlatform,

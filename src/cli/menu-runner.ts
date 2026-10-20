@@ -7,7 +7,7 @@ import { privateScreenAvailable } from "./private-screen.js";
 import { CANCELLED_EXIT_CODE, signalNameOf, stoppedBySignal } from "./exit-codes.js";
 import { runInOwnProcess } from "./protection.js";
 import { choose } from "./terminal-choice.js";
-import { dropTypedAhead, terminalAvailable } from "./terminal-input.js";
+import { TerminalKeys, terminalAvailable } from "./terminal-input.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { LEAVE_ALTERNATE_SCREEN } from "./terminal.js";
 import { WHAT_NOW } from "./ask.js";
@@ -57,12 +57,12 @@ export async function runCommand(run: readonly string[]): Promise<number | undef
       const code = await withEchoOff(async () => {
         // What was typed or pasted with the last answer goes to no process: a command reads only
         // the keys pressed for its own questions.
-        if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
+        if ((await TerminalKeys.dropTypedAhead()) === CANCELLED) return CANCELLED;
         const exit = await runInOwnProcess(run);
         // What was typed while the command ran but not read by it, such as the rest of a paste
         // after it had failed, answers no question of the menu. A Ctrl+C among it was meant for
         // the command, which has ended: it cancels nothing here.
-        await dropTypedAhead();
+        await TerminalKeys.dropTypedAhead();
         return exit;
       });
       if (code === CANCELLED) return CANCELLED;

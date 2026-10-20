@@ -10,7 +10,7 @@ import { CardRenderer } from "../src/export/card-renderer.js";
 import { plannedCardJob, separateCardJob } from "../src/export/render.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import { selectTemplate } from "../src/export/templates.js";
-import { sskrVector } from "../src/sskr/known-answers.js";
+import { SSKR_VECTOR } from "../src/sskr/known-answers.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
 
 const refuseDrawing = (): never => {
@@ -25,6 +25,14 @@ const drawing = new CardRenderer({
   encodePng: refuseDrawing,
   qrModules: refuseDrawing,
 });
+
+/**
+ * How many codes a share of SSKR_VECTOR has in each form that has cards, from the vector's
+ * independent values: 21 Unicode codes (firstShareUnicode), and ten colours (firstShareColors),
+ * one card each whether the cards print the colours or their Color Unicode codes. Every share of
+ * the vector is as long as the first.
+ */
+const OWN_SHARE_CODES = { unicode: 21, colors: 10, "colors-unicode": 10 } as const;
 
 describe("converting a retained share sheet to individual cards", () => {
   // Only font metrics and bundled image dimensions may be read while the sheet is planned.
@@ -44,7 +52,7 @@ describe("converting a retained share sheet to individual cards", () => {
   it.each(["unicode", "colors", "colors-unicode"] as const)(
     "keeps each %s share's codes and first decoy without drawing or choosing again",
     async (shareFormat) => {
-      const sheet = await ShareCardSet.create(host, [...sskrVector.shares], {
+      const sheet = await ShareCardSet.create(host, [...SSKR_VECTOR.shares], {
         style: "it",
         layout: "collection",
         shareFormat,
@@ -59,7 +67,8 @@ describe("converting a retained share sheet to individual cards", () => {
       expect(cards.layout).toBe("individual");
       expect(cards.qrCodes).toEqual([]);
       for (const [at, metadata] of cards.shares.entries()) {
-        const own = sheet.ownCodes(at);
+        const own = OWN_SHARE_CODES[shareFormat];
+        expect(sheet.ownCodes(at)).toBe(own);
         expect(cards.ownCodes(at)).toBe(own);
         expect(cards.printedCodes(at)).toEqual(before[at]!.slice(0, own + 1));
         expect(metadata).toEqual({
@@ -79,10 +88,11 @@ describe("converting a retained share sheet to individual cards", () => {
       expect(random).not.toHaveBeenCalled();
       expect(readAsset).not.toHaveBeenCalled();
       expect(() => cards.forIndividualCards({ pageSize: "a4" })).toThrow("business");
+      // Settings that no type allows, fed on purpose as an untyped browser host could: they must
+      // be refused, not defaulted.
       expect(() => cards.forIndividualCards({ orientation: "diagonal" as never })).toThrow(
         "Orientation must be portrait or landscape.",
       );
-      // Invalid values that an untyped browser host can pass must be refused, not defaulted.
       for (const settings of [null, [], true])
         expect(() => cards.forIndividualCards(settings as never)).toThrow("must be an object");
       expect(() => cards.forIndividualCards({ pageSize: null as never })).toThrow("Page size");
@@ -90,7 +100,7 @@ describe("converting a retained share sheet to individual cards", () => {
   );
 
   it("refuses to turn a whole-share QR card into individual fragments", async () => {
-    const qr = await ShareCardSet.create(host, [sskrVector.shares[0]!], {
+    const qr = await ShareCardSet.create(host, [SSKR_VECTOR.shares[0]!], {
       style: "it",
       layout: "qr",
     });
@@ -102,7 +112,7 @@ describe("converting a retained share sheet to individual cards", () => {
   });
 
   it("refuses a material sheet whose design has no separate cards", async () => {
-    const sheet = await ShareCardSet.create(host, [sskrVector.shares[0]!], { style: "switch" });
+    const sheet = await ShareCardSet.create(host, [SSKR_VECTOR.shares[0]!], { style: "switch" });
     random.mockClear();
     readAsset.mockClear();
     expect(() => sheet.forIndividualCards()).toThrow("sheets only");
@@ -173,13 +183,15 @@ describe("individual card counts", () => {
   it.each(["unicode", "colors", "colors-unicode"] as const)(
     "adds one decoy per separate Shamir share in %s",
     async (shareFormat) => {
-      const set = await ShareCardSet.create(drawing, [sskrVector.shares[0]!], {
+      const set = await ShareCardSet.create(drawing, [SSKR_VECTOR.shares[0]!], {
         style: "it",
         layout: "individual",
         shareFormat,
       });
-      expect(set.shares[0]!.documents).toBe(set.ownCodes(0) + 1);
-      expect(set.printedCodes(0)).toHaveLength(set.ownCodes(0) + 1);
+      const own = OWN_SHARE_CODES[shareFormat];
+      expect(set.ownCodes(0)).toBe(own);
+      expect(set.shares[0]!.documents).toBe(own + 1);
+      expect(set.printedCodes(0)).toHaveLength(own + 1);
       expect(set.qrCodes).toEqual([]);
     },
   );

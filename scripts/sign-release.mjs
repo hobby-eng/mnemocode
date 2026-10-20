@@ -8,7 +8,7 @@
 //   node scripts/sign-release.mjs v<version> [--publish] [--dry-run]
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 // The palette and colour rule of the command line; Node strips the types of this leaf module.
@@ -25,9 +25,10 @@ import { CANCELLED_EXIT_CODE, CANCELLED_MESSAGE } from "../src/cli/exit-codes.ts
 import { CANCELLED } from "../src/cli/terminal-keys.ts";
 import { typedLine } from "../src/cli/shell-command.ts";
 import { describeError } from "../src/core/refusal.ts";
+import { InputTooLargeError, MEBIBYTE } from "../src/core/byte-units.ts";
 // SHA256SUMS joins the checksum files of build-executable.mjs; their lines and names come from
 // here.
-import { CHECKSUM_LINE, releaseFilePrefix } from "./executable-files.mjs";
+import { CHECKSUM_LINE, RELEASE_FILES_MAX, releaseFilePrefix } from "./executable-files.mjs";
 import { SIGNING_KEY } from "./release-key.mjs";
 import { ErrorCatalog, suppliedMessage } from "../src/core/error-catalog.ts";
 
@@ -67,6 +68,14 @@ const ERRORS = new ErrorCatalog("scripts.sign-release", {
    */
   "drafts-on-git-hub-delete-all-but-one": (value0, value1) =>
     `${value0} has ${value1} drafts on GitHub; delete all but the one to sign, then retry.`,
+  "list-of-releases-malformed": () =>
+    `A line of GitHub's list of releases is not "<draft> <page> <files> <largest size>".`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "draft-holds-too-many-files": (value0, value1) =>
+    `The draft holds ${value0} files, more than the ${value1} of a release and its signature.`,
   /**
    * @param {string} value0
    */
@@ -80,6 +89,18 @@ const ERRORS = new ErrorCatalog("scripts.sign-release", {
    * @param {string} value0
    */
   "lists-no-file": (value0) => `${value0} lists no file.`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   * @param {string} value2
+   */
+  "lists-too-many-files": (value0, value1, value2) =>
+    `${value0} lists ${value1} files, more than the ${value2} of a release.`,
+  /**
+   * @param {string} value0
+   * @param {string} value1
+   */
+  "lists-file-twice": (value0, value1) => `${value0} lists ${value1} twice.`,
   /**
    * @param {string} value0
    * @param {string} value1
@@ -143,6 +164,29 @@ const PUBLIC_KEY = "RELEASE-SIGNING-KEY.asc";
  */
 const TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 
+/**
+ * The most a command may write while its output is kept: 1 MiB. The most any step writes is the
+ * list of the tag's releases, a line each, or the report of an attestation, a few kilobytes.
+ */
+const OUTPUT_BYTES = MEBIBYTE;
+/**
+ * The most files the draft may hold: those of a release, SHA256SUMS, and the signature and the
+ * public key that an earlier, unfinished run uploaded.
+ */
+const DRAFT_FILES_MAX = RELEASE_FILES_MAX + [CHECKSUMS, SIGNATURE, PUBLIC_KEY].length;
+/**
+ * The largest file the draft may hold: 512 MiB. The largest file of a release is an executable,
+ * Node.js with the program inside, of about 160 MB.
+ */
+const DRAFT_FILE_BYTES = 512 * MEBIBYTE;
+/**
+ * The most SHA256SUMS may take before it is read: 1 MiB. It has a line of about a hundred bytes
+ * for each file of the release.
+ */
+const CHECKSUMS_BYTES = MEBIBYTE;
+/** A line of the list of releases as COMMANDS.releases asks GitHub for it. */
+const RELEASE_LINE = /^(true|false) (\S+) (\d+) (\d+)$/u;
+
 /** A checked fact after a green ✓, with its value in bold. */
 function passed(label, value) {
   console.error(statusLine(process.stderr, label, value));
@@ -177,8 +221,9 @@ const COMMANDS = {
   // Only a listing: it shows that the key is there, without reading it.
   secretKey: () => ["gpg", ["--batch", "--list-secret-keys", SIGNING_KEY]],
   checksumTool: () => ["sha256sum", ["--version"]],
-  // Every release of the tag, drafts included, as "<draft> <page>" lines. GitHub does not tie a
-  // draft to its tag, so one tag can have two drafts, and gh would then pick one on its own.
+  // Every release of the tag, drafts included, as "<draft> <page> <files> <largest size>" lines,
+  // the size in bytes. GitHub does not tie a draft to its tag, so one tag can have two drafts, and
+  // gh would then pick one on its own. The files and their size are what the download fetches.
   releases: (tag) => [
     "gh",
     [
@@ -187,7 +232,8 @@ const COMMANDS = {
       `repos/${REPOSITORY}/releases`,
       "--jq",
       `.[] | select(.tag_name == ${JSON.stringify(tag)}) | ` +
-        `[(.draft | tostring), .html_url] | join(" ")`,
+        `[(.draft | tostring), .html_url, (.assets | length | tostring), ` +
+        `([.assets[].size] | max // 0 | tostring)] | join(" ")`,
     ],
   ],
   download: (tag, folder) => [
@@ -250,9 +296,35 @@ function lastLine(text) {
 }
 
 /**
+ * Keeps what `child` writes to its pipes, at most OUTPUT_BYTES in all. A child that writes more is
+ * stopped, since no step writes that much. The function returned gives the text kept so far and
+ * whether the child went past the limit.
+ */
+function keepOutput(child) {
+  const kept = { stdout: [], stderr: [] };
+  let bytes = 0;
+  let overflowed = false;
+  for (const stream of ["stdout", "stderr"]) {
+    child[stream]?.on("data", (chunk) => {
+      bytes += chunk.length;
+      if (bytes <= OUTPUT_BYTES) kept[stream].push(chunk);
+      else if (!overflowed) {
+        overflowed = true;
+        child.kill();
+      }
+    });
+  }
+  return () => ({
+    stdout: Buffer.concat(kept.stdout).toString("utf8"),
+    stderr: Buffer.concat(kept.stderr).toString("utf8"),
+    overflowed,
+  });
+}
+
+/**
  * Runs a command and waits for it. With `terminal` it shares the terminal, where GnuPG asks for the
- * passphrase; otherwise its output is kept back and returned. A program that is not installed, or
- * a Ctrl+C, stops the script here.
+ * passphrase; otherwise its output is kept back, up to OUTPUT_BYTES, and returned. A program that
+ * is not installed, one that writes more than that, or a Ctrl+C, stops the script here.
  */
 async function run(step, { cwd = root, terminal = false } = {}) {
   await nextTurn();
@@ -263,11 +335,9 @@ async function run(step, { cwd = root, terminal = false } = {}) {
       cwd,
       stdio: terminal ? "inherit" : ["ignore", "pipe", "pipe"],
     });
-    const output = { stdout: "", stderr: "" };
-    child.stdout?.setEncoding("utf8").on("data", (text) => (output.stdout += text));
-    child.stderr?.setEncoding("utf8").on("data", (text) => (output.stderr += text));
-    child.on("error", (error) => resolve({ ...output, error }));
-    child.on("close", (status, signal) => resolve({ ...output, status, signal }));
+    const output = keepOutput(child);
+    child.on("error", (error) => resolve({ ...output(), error }));
+    child.on("close", (status, signal) => resolve({ ...output(), status, signal }));
   });
   // A program that catches Ctrl+C may end before Node's listener has run.
   await nextTurn();
@@ -275,6 +345,7 @@ async function run(step, { cwd = root, terminal = false } = {}) {
   if (result.error?.code === "ENOENT") {
     throw ERRORS.create("not-installed", [`${command}`, `${INSTALL_HINTS[command]}`]);
   }
+  if (result.overflowed) throw new InputTooLargeError(`The output of ${command}`, OUTPUT_BYTES);
   if (result.error !== undefined) throw result.error;
   return result;
 }
@@ -417,9 +488,19 @@ async function checkTools() {
   if (!checksums) throw ERRORS.create("sha256sum-version-failed", []);
 }
 
+/** A line of the list of releases (RELEASE_LINE) as its facts; any other line is refused. */
+function releaseOf(line) {
+  const fields = RELEASE_LINE.exec(line);
+  if (fields === null) throw ERRORS.create("list-of-releases-malformed", []);
+  const [, draft, page, files, largest] = fields;
+  return { draft: draft === "true", page, files: Number(files), largest: Number(largest) };
+}
+
 /**
  * The address of the draft's page. The tag must have exactly one release, a draft: a published
- * release is not signed again, and of two drafts gh would download one on its own.
+ * release is not signed again, and of two drafts gh would download one on its own. The draft may
+ * hold no more files, and none larger, than DRAFT_FILES_MAX and DRAFT_FILE_BYTES allow, since the
+ * download fetches every one.
  */
 async function checkDraft(tag) {
   const output = await runQuietly(`Reading the releases of ${REPOSITORY}`, COMMANDS.releases(tag));
@@ -427,17 +508,24 @@ async function checkDraft(tag) {
   const releases = output
     .split("\n")
     .filter((line) => line !== "")
-    .map((line) => line.split(" "));
+    .map(releaseOf);
   if (releases.length === 0) {
     throw ERRORS.create("git-hub-no-release-tag-s-workflow-creates", [`${tag}`]);
   }
-  if (releases.some(([draft]) => draft !== "true")) {
+  if (releases.some(({ draft }) => !draft)) {
     throw ERRORS.create("published-already-only-draft-signed", [`${tag}`]);
   }
   if (releases.length > 1) {
     throw ERRORS.create("drafts-on-git-hub-delete-all-but-one", [`${tag}`, `${releases.length}`]);
   }
-  return releases[0][1];
+  const [{ page, files, largest }] = releases;
+  if (files > DRAFT_FILES_MAX) {
+    throw ERRORS.create("draft-holds-too-many-files", [`${files}`, `${DRAFT_FILES_MAX}`]);
+  }
+  if (largest > DRAFT_FILE_BYTES) {
+    throw new InputTooLargeError("A file of the draft", DRAFT_FILE_BYTES);
+  }
+  return page;
 }
 
 /** The download goes into a new folder, so that no file of an earlier run is signed by mistake. */
@@ -455,16 +543,29 @@ function makeFolder(folder) {
 }
 
 /**
- * The files that SHA256SUMS lists. The folder must hold exactly these and SHA256SUMS, apart from
- * a signature and a public key that an earlier, unfinished run uploaded and this run replaces.
+ * The files that SHA256SUMS lists, each once and at most RELEASE_FILES_MAX of them, since each
+ * costs an attestation check. The folder must hold exactly these and SHA256SUMS, apart from a
+ * signature and a public key that an earlier, unfinished run uploaded and this run replaces.
  */
 function listedFiles(folderPath, version) {
   const present = readdirSync(folderPath);
   if (!present.includes(CHECKSUMS)) throw ERRORS.create("draft-no", [`${CHECKSUMS}`]);
-  const lines = readFileSync(join(folderPath, CHECKSUMS), "utf8").split("\n");
+  const checksumsPath = join(folderPath, CHECKSUMS);
+  if (statSync(checksumsPath).size > CHECKSUMS_BYTES) {
+    throw new InputTooLargeError(CHECKSUMS, CHECKSUMS_BYTES);
+  }
+  const lines = readFileSync(checksumsPath, "utf8").split("\n");
   if (lines.at(-1) === "") lines.pop();
   if (lines.length === 0) throw ERRORS.create("lists-no-file", [`${CHECKSUMS}`]);
-  const files = lines.map((line, index) => {
+  if (lines.length > RELEASE_FILES_MAX) {
+    throw ERRORS.create("lists-too-many-files", [
+      `${CHECKSUMS}`,
+      `${lines.length}`,
+      `${RELEASE_FILES_MAX}`,
+    ]);
+  }
+  const files = [];
+  for (const [index, line] of lines.entries()) {
     const name = CHECKSUM_LINE.exec(line)?.[1];
     if (name === undefined) {
       throw ERRORS.create("line-not-sha-256-file", [`${CHECKSUMS}`, `${index + 1}`]);
@@ -472,8 +573,9 @@ function listedFiles(folderPath, version) {
     if (!name.startsWith(releaseFilePrefix(version))) {
       throw ERRORS.create("lists-which-no-file-version", [`${CHECKSUMS}`, `${name}`, `${version}`]);
     }
-    return name;
-  });
+    if (files.includes(name)) throw ERRORS.create("lists-file-twice", [`${CHECKSUMS}`, `${name}`]);
+    files.push(name);
+  }
   for (const name of present) {
     if (name === CHECKSUMS || files.includes(name)) continue;
     if (name === SIGNATURE || name === PUBLIC_KEY) {

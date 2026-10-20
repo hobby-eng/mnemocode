@@ -11,12 +11,9 @@ import { bech32Groups, decodeBech32, Bech32Prefixes } from "./bech32.js";
 import {
   asciiLowercase,
   Coin,
-  invalidAddress,
-  WRONG_LENGTH,
   type CoinAddress,
   type CoinDescription,
   type CoinRules,
-  unreadableAddress,
 } from "./coin.js";
 import { KECCAK_RULES } from "./keccak-account.js";
 
@@ -44,11 +41,11 @@ class Bech32AccountCoin extends Coin {
   protected read(text: string): CoinAddress {
     // Bech32, never Bech32m: the same data with the other checksum is no account.
     const decoded = decodeBech32(text, bech32);
-    if (!decoded) throw unreadableAddress();
+    if (!decoded) throw this.damaged();
     // Its own prefix only: a Cosmos SDK account has no test-network form of its own here.
     if (this.#prefixes.testnetOf(decoded.prefix) === undefined) throw this.notOurs();
     // Counted in groups, so that an extra group under a valid checksum is refused for its length.
-    if (decoded.words.length !== ACCOUNT_GROUPS) throw invalidAddress(WRONG_LENGTH);
+    if (decoded.words.length !== ACCOUNT_GROUPS) throw this.wrongLength();
     return this.address(this.#type, bech32.fromWords(decoded.words), asciiLowercase(text));
   }
 }

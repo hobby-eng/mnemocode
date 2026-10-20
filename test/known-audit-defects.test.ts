@@ -99,6 +99,7 @@ describe("AUD-001 regression contracts", () => {
 describe("AUD-004 regression contracts", () => {
   it("AUD-004-API001: rejects an unknown evidence kind instead of reporting a non-match", () => {
     expect(() =>
+      // A kind that no type allows, fed on purpose as a JavaScript host could.
       matchBitcoinEvidence(publicMnemonic, {
         kind: "address-typo",
         value: "irrelevant",

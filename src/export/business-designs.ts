@@ -1,4 +1,4 @@
-// What sets each business design apart, in one descriptor per design (businessDesigns): the hue
+// What sets each business design apart, in one descriptor per design (BUSINESS_DESIGNS): the hue
 // of its photograph, how strongly its artwork takes a reference's colour, the ink of its text, its
 // reference line, the theme of its sheet and where it prints the person's details. The renderer
 // and the artwork ask the descriptor instead of testing a design's name, so a new design's
@@ -18,7 +18,7 @@ import { defined } from "../core/defined.js";
 
 export type { PhysicalBusinessStyle };
 /** The business designs with artwork of their own, in the catalog's order: "mixed" draws them. */
-export const businessStyles: readonly PhysicalBusinessStyle[] = Object.freeze(
+export const PHYSICAL_BUSINESS_STYLES: readonly PhysicalBusinessStyle[] = Object.freeze(
   BUSINESS_STYLES.filter((style): style is PhysicalBusinessStyle => style !== "mixed"),
 );
 
@@ -145,7 +145,7 @@ function design(entry: BusinessDesign): BusinessDesign {
  * The design of each business style that has artwork of its own: the hue of its photograph, its
  * tint and the ink of its fields.
  */
-export const businessDesigns: Readonly<Record<PhysicalBusinessStyle, BusinessDesign>> =
+export const BUSINESS_DESIGNS: Readonly<Record<PhysicalBusinessStyle, BusinessDesign>> =
   Object.freeze({
     architect: design({
       hueOrigin: 0.56,
@@ -262,12 +262,14 @@ export const businessDesigns: Readonly<Record<PhysicalBusinessStyle, BusinessDes
 
 /** The design that card `index` of `style` shows: "mixed" takes the designs in turn. */
 export function physicalStyle(style: BusinessStyle, index: number): PhysicalBusinessStyle {
-  return style === "mixed" ? defined(businessStyles[index % businessStyles.length]) : style;
+  return style === "mixed"
+    ? defined(PHYSICAL_BUSINESS_STYLES[index % PHYSICAL_BUSINESS_STYLES.length])
+    : style;
 }
 
 /** The theme of a sheet of `style`: the design's own, or the mixed sheet's. */
 export function studyThemeOf(style: BusinessStyle): BusinessStudyTheme {
-  return style === "mixed" ? MIXED_STUDY_THEME : businessDesigns[style].studyTheme;
+  return style === "mixed" ? MIXED_STUDY_THEME : BUSINESS_DESIGNS[style].studyTheme;
 }
 
 /** The person's details as `style` prints them; a refusal names each by profileFieldLabel. */
@@ -275,7 +277,7 @@ export function businessFields(
   style: PhysicalBusinessStyle,
   profile: Required<CardProfile>,
 ): BusinessField[] {
-  return businessDesigns[style].fields.map(({ field, x, y, width, preferred, dark }) => ({
+  return BUSINESS_DESIGNS[style].fields.map(({ field, x, y, width, preferred, dark }) => ({
     label: profileFieldLabel(field),
     value: profile[field],
     x,

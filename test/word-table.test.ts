@@ -9,6 +9,7 @@ describe("The independent BIP39 word table", () => {
           code: "core.words.selected-mapped-bip39-character-not-one-unicode-scalar",
         }),
       );
+    // Values that are no text, given on purpose as a JavaScript host could.
     for (const value of [null, 1, ["a"], { length: 1, 0: "a" }])
       expect(() => WordTable.unicodeHex(value as never)).toThrow(
         expect.objectContaining({

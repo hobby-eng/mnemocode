@@ -3,30 +3,30 @@
 // data only: the phrases "abandon x11 about" and "abandon x23 art", and the repository's SSKR
 // vectors.
 
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { WrittenCodes } from "../src/core/backup-check.js";
 import { BackupReading } from "../src/core/backup-reading.js";
 import { JOINED_MARKS_HINT } from "../src/core/code-text.js";
 import { colorsToUnicode } from "../src/core/colors.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
+import type { EncodedFormat } from "../src/core/types.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { WORD_NUMBERS_RUN_TOGETHER } from "../src/core/words.js";
-import { bytewords } from "../src/sskr/bytewords-list.js";
+import { BYTEWORD_LETTERS, BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
-import { BYTEWORD_LETTERS, bytewordUnits } from "../src/sskr/share-units.js";
+import { bytewordUnits } from "../src/sskr/share-units.js";
 import { readShare, writeShare } from "../src/sskr/transport.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 const PHRASES = [
   [...Array<number>(11).fill(0), 3],
   [...Array<number>(23).fill(0), 102],
 ] as const;
 const RULES = { seedshiftOnly: false, shareReader: "sskr-combine" } as const;
-const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-  readonly deterministic: readonly { readonly shares: readonly string[] }[];
-};
-const [FIRST, SECOND] = vectors.deterministic[0]!.shares as [string, string];
+const SHARES = sskrVectors().deterministic[0]!.shares;
+const FIRST = SHARES[0]!;
+const SECOND = SHARES[1]!;
 
 /** The codes of `indexes` in `format`, one element each: a code, a color or a code point. */
 function unitsOf(format: "unicode" | "colors" | "colors-unicode", indexes: readonly number[]) {
@@ -50,11 +50,11 @@ function writings(units: readonly string[]): Record<string, string> {
 }
 
 /** The indexes that Decode and the check of a written copy read from `text` in `format`. */
-function readBoth(text: string, format: string): [string, string] {
+function readBoth(text: string, format: EncodedFormat): [string, string] {
   const reading = BackupReading.of(text, RULES);
   expect(reading.formats()).toContain(format);
-  const decoded = reading.codes(format as never).indexes.join(",");
-  const checked = WrittenCodes.read(text, format as never, "direct").indexes.join(",");
+  const decoded = reading.codes(format).indexes.join(",");
+  const checked = WrittenCodes.read(text, format, "direct").indexes.join(",");
   return [decoded, checked];
 }
 
@@ -149,7 +149,7 @@ describe("shares, apart or run together", () => {
   });
 
   it("reads Bytewords apart, run together, with dashes or commas, and cut by a line break", () => {
-    expect(bytewords.every((word) => word.length === BYTEWORD_LETTERS)).toBe(true);
+    expect(BYTEWORDS.every((word) => word.length === BYTEWORD_LETTERS)).toBe(true);
     const words = writeShare(FIRST, "words").split(" ");
     for (const [way, written] of Object.entries({
       ...writings(words),

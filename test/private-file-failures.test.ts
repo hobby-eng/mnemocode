@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FailedSaveLeftCopyError,
@@ -10,22 +10,25 @@ import {
 
 // A save that fails and whose private staging folder cannot be removed either (AUD-037-SEC007):
 // the failure is kept as the cause, and the folder is named, as it may hold a copy. A folder
-// published whose reservation is gone when the save fails keeps that failure too.
-
-const removal = vi.hoisted(() => ({ fails: false, reservationGone: false }));
-vi.mock("../src/export/temporary-folders.js", async (original) => {
-  const actual = await original<typeof import("../src/export/temporary-folders.js")>();
+// published whose reservation is gone when the save fails keeps that failure too. The faults are
+// the file system's, the program's edge: a removal that fails, as of a folder that another
+// program holds open, and a reserved folder that another process removes before the files are
+// moved in.
+const faults = vi.hoisted(() => ({ removalFails: false, reservationGone: false }));
+vi.mock("node:fs/promises", async (original) => {
+  const actual = await original<typeof import("node:fs/promises")>();
   return {
     ...actual,
-    removeTemporaryFolder: async (folder: string, options?: { readonly empty?: boolean }) => {
-      if (removal.fails)
+    rm: async (...removal: Parameters<typeof actual.rm>) => {
+      if (faults.removalFails)
         throw Object.assign(new Error("Synthetic removal fault."), { code: "EBUSY" });
-      return actual.removeTemporaryFolder(folder, options);
+      return actual.rm(...removal);
     },
-    // The folder is noted as filled right after it is reserved: another process removes it then.
-    fillingFolder: (path: string, made: Parameters<typeof actual.fillingFolder>[1]) => {
-      if (removal.reservationGone) rmSync(path, { recursive: true });
-      return actual.fillingFolder(path, made);
+    rename: async (...move: Parameters<typeof actual.rename>) => {
+      const [, destination] = move;
+      if (faults.reservationGone && typeof destination === "string")
+        rmSync(dirname(destination), { recursive: true });
+      return actual.rename(...move);
     },
   };
 });
@@ -33,11 +36,11 @@ vi.mock("../src/export/temporary-folders.js", async (original) => {
 let root: string;
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "mnemocode-save-failure-"));
-  removal.fails = true;
+  faults.removalFails = true;
 });
 afterEach(() => {
-  removal.fails = false;
-  removal.reservationGone = false;
+  faults.removalFails = false;
+  faults.reservationGone = false;
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -72,8 +75,8 @@ describe("a failed save whose staging folder stays", () => {
 
 describe("a failed folder publish whose reservation is gone", () => {
   it("keeps why the files could not be moved in", async () => {
-    removal.fails = false;
-    removal.reservationGone = true;
+    faults.removalFails = false;
+    faults.reservationGone = true;
     const write = async (staging: string) =>
       writeFileSync(join(staging, "01-card.png"), "public fixture");
     const failure = await publishNewFolder(

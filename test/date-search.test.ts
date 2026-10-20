@@ -2,17 +2,35 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { CandidatesFile } from "../src/cli/candidates-file.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { encodeMnemonic, encodeMnemonicLegacy, parseDate } from "../src/core.js";
 import { reportDateMatches, searchDates } from "../src/cli/date-search.js";
 import {
   DatesAnswer,
-  DateSearch,
   HARD_MAX_COMBINATIONS,
   type DateSearchResult,
 } from "../src/core/date-search.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
+import { PrivateSteps } from "../src/cli/private-steps.js";
+import { TEXT_WIDTH } from "../src/cli/terminal.js";
+import { streamsAsTerminal } from "./helpers/terminal-streams.js";
+import { refusalOf } from "./helpers/refusals.js";
+
+// The clock of the searches is the test's own where a test spies on performance.now: then the
+// host's PBKDF2, which each wallet check of a fingerprint runs once, moves it on by
+// `clock.perCheck` milliseconds, as on a computer where one check takes that long.
+const clock = vi.hoisted(() => ({ now: 0, perCheck: 0 }));
+vi.mock("node:crypto", async (original) => {
+  const actual = await original<typeof import("node:crypto")>();
+  return {
+    ...actual,
+    pbkdf2Sync: (...derive: Parameters<typeof actual.pbkdf2Sync>) => {
+      clock.now += clock.perCheck;
+      return actual.pbkdf2Sync(...derive);
+    },
+  };
+});
 
 /** The result of a search that was made and not stopped. */
 function made(result: DateSearchResult | undefined | Cancelled): DateSearchResult {
@@ -55,16 +73,11 @@ describe("dates of one answer", () => {
   ])(
     "refuses %j (patterns %s) in one line that names the date by its place",
     (line, patterns, message) => {
-      let thrown: Error | undefined;
-      try {
-        DatesAnswer.parse(line, { wordCount: 12, patterns });
-      } catch (error) {
-        thrown = error as Error;
-      }
-      expect(thrown?.message).toContain(message);
+      const thrown = refusalOf(() => DatesAnswer.parse(line, { wordCount: 12, patterns }));
+      expect(thrown.message).toContain(message);
       // The line never repeats a date as typed.
       for (const date of line.split(/[\s,;]+/u).filter(Boolean))
-        expect(thrown!.message).not.toContain(date);
+        expect(thrown.message).not.toContain(date);
     },
   );
 
@@ -157,8 +170,13 @@ describe("the date search", () => {
       limits: { maxResults: 100 },
       report: { progressEvery: 1000 },
     };
-    // A wallet check of 5,000 seconds: ten of them take longer than twelve hours.
-    vi.spyOn(DateSearch, "secondsPerCheck").mockResolvedValue(5_000);
+    // A wallet check of 5,000 seconds on this computer's clock, which nothing else moves on: ten
+    // of them take longer than twelve hours.
+    clock.perCheck = 5_000_000;
+    onTestFinished(() => {
+      clock.perCheck = 0;
+    });
+    vi.spyOn(performance, "now").mockImplementation(() => clock.now);
     await expect(searchDates(search)).rejects.toThrow(
       "The search tries 10 date combinations, about 14 hours. Allow it with --max-candidates 10.",
     );
@@ -190,6 +208,62 @@ describe("the date search", () => {
     expect(lines).toEqual([
       "out None of the 10 checksum-valid candidates matched the requested master fingerprint.",
       "out No candidate with a valid BIP39 checksum was found.",
+    ]);
+  });
+
+  it("wraps that sentence at the text width on a terminal, and keeps it on one line elsewhere", () => {
+    const evidence = {
+      kind: "master-xpub",
+      value: "xpub-public-fixture",
+      network: "mainnet",
+    } as const;
+    const empty = {
+      combinations: 10,
+      checksumValid: 10,
+      matchCount: 0,
+      shown: [],
+      kept: [],
+      checked: 10,
+      stopped: false,
+    };
+    const sentence =
+      "None of the 10 checksum-valid candidates matched the requested master extended public key.";
+    reportDateMatches(empty, { mode: "seedshift", evidence, maxResults: 100 });
+    expect(lines).toEqual([`out ${sentence}`]);
+    lines = [];
+    vi.stubEnv("TERM", "xterm");
+    streamsAsTerminal();
+    reportDateMatches(empty, { mode: "seedshift", evidence, maxResults: 100 });
+    const wrapped = lines.slice(lines.findIndex((line) => line.startsWith("out None of")));
+    expect(wrapped.length).toBeGreaterThan(1);
+    for (const line of wrapped) expect(line.length - "out ".length).toBeLessThanOrEqual(TEXT_WIDTH);
+    // Broken at spaces only: no word, nor the wallet's label, is cut inside.
+    expect(wrapped.map((line) => line.slice("out ".length)).join(" ")).toBe(sentence);
+  });
+
+  it("opens a step screen of its own before it says the size of the search", async () => {
+    const encoded = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]);
+    PrivateSteps.open(
+      () => lines.push("step screen"),
+      () => undefined,
+    );
+    try {
+      await searchDates({
+        indexes: encoded.shiftedIndexes,
+        dates: DatesAnswer.parse("2?-09-2026", { wordCount: 12, patterns: true }),
+        mode: "seedshift",
+        passphrase: "",
+        limits: { maxResults: 100 },
+        report: { progressEvery: 1000 },
+      });
+    } finally {
+      PrivateSteps.close();
+    }
+    // The dates typed before are no longer on the screen while the search runs (CORE-39).
+    expect(lines).toEqual([
+      "step screen",
+      "err Recovery search contains 10 date combinations.",
+      "err Checked 10/10 date combinations; found 10 matches.",
     ]);
   });
 });

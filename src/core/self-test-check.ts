@@ -75,7 +75,10 @@ export function combinedFeature(
   });
 }
 
-/** Throws, naming what was compared, unless `actual` is exactly `expected`. */
+/**
+ * Throws, naming what was compared, unless `actual` is exactly `expected`
+ * (core.self-test-check.mismatch).
+ */
 export function expectSame(actual: unknown, expected: unknown, name: string): void {
   if (actual !== expected) throw ERRORS.create("mismatch", [`${name}`]);
 }
@@ -91,26 +94,43 @@ function refusalOf(run: () => unknown): string | undefined {
 }
 
 /**
- * Throws, naming the case, unless `message`, what the case threw, is a refusal that `because`
- * matches; undefined means that the case was accepted.
+ * Whether `message` says `because`: a pattern that it matches, or text that is the whole message,
+ * word for word, for a refusal whose message is a fixed text of its module.
  */
-function assertRefusedFor(message: string | undefined, because: RegExp, name: string): void {
-  if (message === undefined) throw ERRORS.create("was-accepted", [`${name}`]);
-  if (!because.test(message)) throw ERRORS.create("was-refused-another-reason", [`${name}`]);
+function says(message: string, because: RegExp | string): boolean {
+  return typeof because === "string" ? message === because : because.test(message);
 }
 
 /**
- * Throws, naming the case, unless `run` refuses it with a message that `because` matches: a case
- * the feature must refuse, for the reason it must refuse it.
+ * Throws, naming the case, unless `message`, what the case threw, is a refusal that says `because`;
+ * undefined means that the case was accepted.
  */
-export function expectRefused(run: () => unknown, because: RegExp, name: string): void {
+function assertRefusedFor(
+  message: string | undefined,
+  because: RegExp | string,
+  name: string,
+): void {
+  if (message === undefined) throw ERRORS.create("was-accepted", [`${name}`]);
+  if (!says(message, because)) throw ERRORS.create("was-refused-another-reason", [`${name}`]);
+}
+
+/**
+ * Throws, naming the case, unless `run` refuses it with a message that says `because`, a pattern
+ * that the message matches or text that is the whole message: a case the feature must refuse, for
+ * the reason it must refuse it. Fails where `run` throws nothing (core.self-test-check.was-accepted)
+ * or a message that does not say `because` (was-refused-another-reason).
+ */
+export function expectRefused(run: () => unknown, because: RegExp | string, name: string): void {
   assertRefusedFor(refusalOf(run), because, name);
 }
 
-/** The same as expectRefused, for an operation that answers later. */
+/**
+ * The same as expectRefused, for an operation that answers later, with the same failures
+ * (core.self-test-check.was-accepted, was-refused-another-reason).
+ */
 export async function expectRefusedLater(
   run: () => Promise<unknown>,
-  because: RegExp,
+  because: RegExp | string,
   name: string,
 ): Promise<void> {
   let message: string | undefined;
@@ -125,7 +145,8 @@ export async function expectRefusedLater(
 /**
  * The same as expectRefusedLater, for a refusal told by its kind rather than its words, which a
  * host may choose: `refusal` says whether what `run` threw is the refusal that the case must give,
- * so that a fault of another kind never passes for it (AUD-037-BLD007).
+ * so that a fault of another kind never passes for it (AUD-037-BLD007). Fails where `run` throws
+ * something else (core.self-test-check.was-refused-another-reason) or nothing (was-accepted).
  */
 export async function expectRefusedLaterAs(
   run: () => Promise<unknown>,

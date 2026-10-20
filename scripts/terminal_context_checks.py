@@ -1,6 +1,8 @@
-"""What a step of the private screen shows beside its question, on the real terminal: the encoded
-fingerprint before the dates are typed, and why a question is asked (AUD-037-UI001). Each check
-reads the current frame, not the history of what was written. Public fixtures only."""
+"""What a step of the private screen shows beside its question, on the
+real terminal: the encoded fingerprint before the dates are typed, and
+why a question is asked (AUD-037-UI001). Each check reads the current
+frame, not the history of what was written. Public fixtures only.
+"""
 import tempfile
 from pathlib import Path
 
@@ -21,14 +23,17 @@ from terminal_answers import (
     THIRD_SHARE,
 )
 
-# The encoded fingerprint of the test phrase masked with the README's date, as Encode shows it,
-# and the sentence that comes with every fingerprint; its label differs with colour.
+# The encoded fingerprint of the test phrase masked with the README's
+# date, as Encode shows it, and the sentence that comes with every
+# fingerprint; its label differs with colour.
 ENCODED_FINGERPRINT = "0d05289e"
 FINGERPRINT_NOTE = "They do not reveal the phrase."
 
 
 def frame_shows_at(arguments, prompt, answer, question, markers, colour):
-    """Runs `arguments`, answers `prompt` with `answer` and checks the frame of `question`."""
+    """Runs `arguments`, answers `prompt` with `answer` and checks the
+    frame of `question`.
+    """
     session = terminal.Session(arguments, colour=colour)
     try:
         session.wait_for(prompt)
@@ -42,25 +47,44 @@ def frame_shows_at(arguments, prompt, answer, question, markers, colour):
 
 
 def check_fingerprint_before_dates():
-    """Decode, recover-date and sskr-combine keep the encoded fingerprint on the Dates screen."""
+    """Decode, recover-date and sskr-combine keep the encoded
+    fingerprint on the Dates screen.
+    """
     markers = (ENCODED_FINGERPRINT, FINGERPRINT_NOTE)
     shares = f"{FIRST_SHARE}; {THIRD_SHARE}"
     codes = "Encoded seed phrase"
     cases = (
-        # Each question is found by its first word, Dates: with colour, it is bold apart from the
-        # rest of the question.
-        (("decode", "--ask-secrets", "--mode", "seedshift"), codes, MASKED_WORD_NUMBERS),
-        (("recover-date", "--ask-secrets", "--mode", "seedshift"), codes, MASKED_WORD_NUMBERS),
-        (("sskr-combine", "--ask-secrets", "--mode", "seedshift"), "Shamir shares", shares),
+        # Each question is found by its first word, Dates: with colour,
+        # it is bold apart from the rest of the question.
+        (
+            ("decode", "--ask-secrets", "--mode", "seedshift"),
+            codes,
+            MASKED_WORD_NUMBERS,
+        ),
+        (
+            ("recover-date", "--ask-secrets", "--mode", "seedshift"),
+            codes,
+            MASKED_WORD_NUMBERS,
+        ),
+        (
+            ("sskr-combine", "--ask-secrets", "--mode", "seedshift"),
+            "Shamir shares",
+            shares,
+        ),
     )
     for colour in (False, True):
         for arguments, prompt, answer in cases:
             frame_shows_at(arguments, prompt, answer, "Dates", markers, colour)
-    print("encoded fingerprint on the Dates screen: decode, recover-date, sskr-combine")
+    print(
+        "encoded fingerprint on the Dates screen: decode, recover-date, "
+        "sskr-combine"
+    )
 
 
 def check_fingerprint_before_dates_in_menu():
-    """The menu's Decode and Restore keep the encoded fingerprint on the Dates screen too."""
+    """The menu's Decode and Restore keep the encoded fingerprint on the
+    Dates screen too.
+    """
     shares = f"{FIRST_SHARE}; {THIRD_SHARE}"
     cases = (
         (
@@ -73,7 +97,12 @@ def check_fingerprint_before_dates_in_menu():
             HIDDEN_RECORD,
             MASKED_WORD_NUMBERS,
         ),
-        (RESTORE_ENTRY, (("Was Seedshift used before it was split?", "2"),), SHARES, shares),
+        (
+            RESTORE_ENTRY,
+            (("Was Seedshift used before it was split?", "2"),),
+            SHARES,
+            shares,
+        ),
     )
     for entry, steps, prompt, answer in cases:
         session = terminal.Session()
@@ -94,11 +123,16 @@ def check_fingerprint_before_dates_in_menu():
             session.wait_for_exit()
         finally:
             session.close()
-    print("encoded fingerprint on the Dates screen: the menu's Decode and Restore")
+    print(
+        "encoded fingerprint on the Dates screen: the menu's Decode and "
+        "Restore"
+    )
 
 
 def check_question_reason_kept():
-    """Decode keeps the reason of its Seedshift question on that question's screen."""
+    """Decode keeps the reason of its Seedshift question on that
+    question's screen.
+    """
     frame_shows_at(
         ("decode", "--ask-secrets"),
         "Encoded seed phrase",
@@ -111,8 +145,10 @@ def check_question_reason_kept():
 
 
 def check_context_ends_at_escape():
-    """Escape at the Seedshift question asks for the codes again without what was kept for them:
-    their format and why the question was asked describe codes not typed yet."""
+    """Escape at the Seedshift question asks for the codes again without
+    what was kept for them: their format and why the question was asked
+    describe codes not typed yet.
+    """
     session = terminal.Session(("decode", "--ask-secrets"))
     try:
         session.wait_for(HIDDEN_RECORD)
@@ -121,17 +157,23 @@ def check_context_ends_at_escape():
         session.type(terminal.ESCAPE)
         session.wait_for(HIDDEN_RECORD)
         absent = ("Detected input format", "no MNC1 record header")
-        terminal.assert_private_result_visible(session, (HIDDEN_RECORD.strip(),), absent=absent)
+        terminal.assert_private_result_visible(
+            session, (HIDDEN_RECORD.strip(),), absent=absent
+        )
         session.type(terminal.CTRL_C)
         assert session.wait_for_exit() == CANCELLED
     finally:
         session.close()
-    print("question context left with Escape: the codes asked again without it")
+    print(
+        "question context left with Escape: the codes asked again without it"
+    )
 
 
 def check_new_backup_heading_on_screen():
-    """Re-encode's "New backup" heading is drawn on the private screen with each question, also
-    when standard output goes to a file, which never gets it (POSIX only)."""
+    """Re-encode's "New backup" heading is drawn on the private screen
+    with each question, also when standard output goes to a file, which
+    never gets it (POSIX only).
+    """
     if terminal.WINDOWS:
         return
     with tempfile.TemporaryDirectory() as folder:
@@ -157,32 +199,44 @@ def check_new_backup_heading_on_screen():
             assert session.wait_for_exit() == CANCELLED
         finally:
             session.close()
-        assert "New backup" not in written.read_text(), "the heading went to standard output"
-    print("re-encode: the New backup heading on the private screen, not in standard output")
+        assert (
+            "New backup" not in written.read_text()
+        ), "the heading went to standard output"
+    print(
+        "re-encode: the New backup heading on the private screen, not in "
+        "standard output"
+    )
 
 
 def check_cloud_link_kept():
-    """A cloud warning given with the options stays with its link, once, on every step screen."""
+    """A cloud warning given with the options stays with its link, once,
+    on every step screen.
+    """
     cloud = "Dropbox keeps a copy of"
     more = "More: https://github.com/hobby-eng/mnemocode#cloud-folders"
     with tempfile.TemporaryDirectory() as folder:
         (Path(folder) / "Dropbox").mkdir()
         arguments = (
-            *("encode", "--ask-secrets", "--mode", "seedshift", "--format", "2"),
+            *("encode", "--ask-secrets", "--mode", "seedshift"),
+            *("--format", "2"),
             *("--output", "Dropbox/record.txt", "--backup-check", "no"),
         )
         session = terminal.Session(arguments, folder=folder)
+        once = (cloud, more)
         try:
             session.wait_for(SEED_PHRASE)
-            terminal.assert_private_result_visible(session, (), once=(cloud, more))
+            terminal.assert_private_result_visible(session, (), once=once)
             session.type(TEST_PHRASE + terminal.ENTER)
             session.wait_for("Dates (")
-            terminal.assert_private_result_visible(session, (), once=(cloud, more))
+            terminal.assert_private_result_visible(session, (), once=once)
             session.type(MISTYPED_DATE + terminal.ENTER)
             session.wait_for("Dates (")
-            terminal.assert_private_result_visible(session, (), once=(cloud, more))
+            terminal.assert_private_result_visible(session, (), once=once)
             session.type(terminal.CTRL_C)
             assert session.wait_for_exit() == CANCELLED
         finally:
             session.close()
-    print("cloud warning given with the options: kept with its link on every step screen")
+    print(
+        "cloud warning given with the options: kept with its link on every "
+        "step screen"
+    )

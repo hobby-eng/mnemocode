@@ -2,12 +2,13 @@
 // bounded reader hands over and the pixels that pngjs decodes are captured through the real
 // modules; the image itself is written by the real QR exporter. Public test data only.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ files: [] as Uint8Array[], pixels: [] as Uint8Array[] }));
+const captured = vi.hoisted((): { files: Uint8Array[]; pixels: Uint8Array[] } => ({
+  files: [],
+  pixels: [],
+}));
 
 vi.mock("../src/cli/bounded-read.js", async (original) => {
   const actual = await original<typeof import("../src/cli/bounded-read.js")>();
@@ -28,31 +29,28 @@ vi.mock("pngjs", async (original) => {
     return image;
   };
   // An object made on pngjs's PNG, which it differs from in its reader.
-  const PNG = Object.assign(Object.create(actual.PNG) as typeof actual.PNG, {
-    sync: { ...actual.PNG.sync, read },
-  });
+  const PNG = { sync: { ...actual.PNG.sync, read } };
+  Reflect.setPrototypeOf(PNG, actual.PNG);
   return { ...actual, PNG, default: { ...actual, PNG } };
 });
 
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { readBoundedTextFile } from "../src/cli/text-file.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
+import { testPath } from "./helpers/test-folders.js";
 
 /** The all-zero-entropy phrase "abandon … about" as a record of word numbers. */
 const PUBLIC_RECORD = `MNC1:direct:indexes:${"1 ".repeat(11)}4`;
-const folders: string[] = [];
 const wiped = (bytes: Uint8Array) => bytes.every((byte) => byte === 0);
 
-afterEach(async () => {
+afterEach(() => {
   captured.files.length = 0;
   captured.pixels.length = 0;
-  for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true });
 });
 
+/** A new path in a folder of its own, which the test removes. */
 async function newPath(name: string): Promise<string> {
-  const folder = await mkdtemp(join(tmpdir(), "mnemocode-aud018-"));
-  folders.push(folder);
-  return join(folder, name);
+  return testPath("mnemocode-aud018-", name);
 }
 
 /** Every captured buffer held something, and holds nothing now. */

@@ -2,7 +2,7 @@
 
 This repository is part of the `bip_tools` workspace. If a workspace `AGENTS.md` exists one directory above this repository, read and follow it first. Its core rules: edit only this checkout in place, never create another copy or worktree, never delete project directories, use the toolchains it names, use only public test data, do not commit or push without an explicit request, and write everything in English only (code, comments, commits, documentation).
 
-MnemoCode is a standalone offline program: it never depends on the other workspace projects (no import, no build step, no run-time link). They are named only where a reader needs them: comments name mhfe as the model of the terminal style, and the documents and help name MHFE as a separate program for encrypted long-term storage and as the source of the coin list, and the multi-chain wallet tools as a host of the library.
+MnemoCode is a standalone offline program: it never depends on the other workspace projects (no import, no build step, no run-time link). They are named only where a reader needs them: comments name mhfe as the model of the terminal style and the multi-chain wallet tools as the other home of the Markdown list check that `scripts/verify-markdown.mjs` copies, and the documents and help name MHFE as a separate program for encrypted long-term storage and as the source of the coin list, and the multi-chain wallet tools as a host of the library.
 
 ## Commands
 

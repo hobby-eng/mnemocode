@@ -99,7 +99,13 @@ function quorum(records: readonly string[], masked: boolean): string {
 /**
  * How the shares saved as `packaging` are kept: how many restore what (Seedshift `masked` the
  * phrase before the split, or not), and where each share is; one sentence or two. `records` are
- * the shares of one set, any of them repeated; others, or a packaging not named, are refused.
+ * the shares of one set, any of them repeated. Refuses no share at all
+ * (export.sskr-keeping-text.there-no-shares-keep), a packaging not named
+ * (export.sskr-keeping-text.packaging-unknown), a record that is no share, as Share.read refuses
+ * it, and shares of no one set: of different sets
+ * (export.sskr-keeping-text.shares-of-different-sets), two different shares of one member
+ * (export.sskr-keeping-text.member-given-twice), or a group with two thresholds
+ * (export.sskr-keeping-text.group-thresholds-conflict).
  */
 export function shareKeepingNote(
   records: readonly string[],

@@ -87,13 +87,13 @@ import { COIN_OF_ID, COINS, coinById } from "../src/core/coins.js";
 import { flagPair, HELP_FLAGS, isFlagOf, VERSION_FLAGS } from "../src/cli/command-options.js";
 import { NoCardTemplateError } from "../src/export/template-catalog.js";
 import {
-  cardTemplates,
+  CARD_TEMPLATES,
   selectTemplate,
   templateNumber,
   templatesOfKind,
 } from "../src/export/templates.js";
-import { colorCardTemplates } from "../src/color-export.js";
-import { employers, sectorForStyle } from "../src/export/card-identities.js";
+import { COLOR_CARD_TEMPLATES } from "../src/color-export.js";
+import { EMPLOYERS, sectorForStyle } from "../src/export/card-identities.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
 import { ExportDetails } from "../src/export/export-details.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
@@ -109,10 +109,12 @@ import {
 } from "../src/export/heir-sheet.js";
 import { preparedForLine } from "../src/export/collection-sheet.js";
 import { MAX_SHEET_CARDS } from "../src/export/collection-layout.js";
-import { cardCopyOptions } from "../src/cli/business-options.js";
+import { CARD_COPY_OPTIONS } from "../src/cli/business-options.js";
 import { heirSheetText } from "../src/cli/heir-sheet.js";
 import { shareKeepingNote } from "../src/export/sskr-keeping-text.js";
 import { POINTS_PER_INCH } from "../src/export/document-formats.js";
+import { publicShare, sskrVectors } from "./helpers/vectors.js";
+import { scriptExports } from "./helpers/script-exports.js";
 
 describe("S100: the default page sizes are named once", () => {
   it("resolves a sheet's and a separate card's size and refuses a sheet size for separate cards", () => {
@@ -143,10 +145,7 @@ describe("S101: the sizes of cards and paper are named once", () => {
 
 describe("S107 and S109: the sheet capacity and the separate cards have one owner each", () => {
   it("fits the cards of the longest share and its decoys on one sheet in every form with cards", async () => {
-    const { deterministic } = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-      deterministic: { shares: string[] }[];
-    };
-    const longest = deterministic.at(-1)!.shares;
+    const longest = sskrVectors().deterministic.at(-1)!.shares;
     for (const shareFormat of ["unicode", "colors", "colors-unicode"] as const) {
       const cards = await ShareCardSet.create(nodeCardRenderer, longest, {
         style: "architect",
@@ -179,7 +178,7 @@ describe("S112: the texts of a card and the person's details have one list each"
     expect(picks).toHaveLength(3);
     expect(presentation.slogan).toBe("Own");
     expect(presentation.referenceLabel).toBe("Ref.");
-    expect(cardCopyOptions).toEqual([
+    expect(CARD_COPY_OPTIONS).toEqual([
       "studio-name",
       "card-slogan",
       "card-subtitle",
@@ -219,7 +218,7 @@ describe("S111: the invented details of an export have one owner", () => {
     expect(details.presentation).not.toBe(settings.presentation);
     expect(details.profile.name).toBe("John Smith");
     expect(sectorForStyle("it")).toBe("it");
-    expect(employers.it).toContain(details.profile.company);
+    expect(EMPLOYERS.it).toContain(details.profile.company);
     // A page of the export, which carries the settled details, prints them unchanged.
     const page = { ...settings, profile: details.profile, presentation: details.presentation };
     expect(ExportDetails.of(nodeRenderPlatform.randomInt, page, "mixed").profile).toEqual(
@@ -315,10 +314,7 @@ describe("S117: one writer of private files and folders", () => {
 });
 
 describe("S118: one note on how saved shares are kept", () => {
-  const { deterministic } = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-    deterministic: { shares: string[] }[];
-  };
-  const set = deterministic[0]!.shares;
+  const set = sskrVectors().deterministic[0]!.shares;
 
   it("says how many shares restore what, read from the shares, and where each one is", () => {
     expect(shareKeepingNote(set, "file", false)).toBe(
@@ -339,10 +335,7 @@ describe("S118: one note on how saved shares are kept", () => {
 
 describe("S121: one builder of an unrepaired share and one test of a mark", () => {
   it("reads a complete share as a repair gives it back and tells a marked one", () => {
-    const { deterministic } = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-      deterministic: { shares: string[] }[];
-    };
-    const share = deterministic[0]!.shares[0]!;
+    const share = publicShare();
     expect(unrepairedShare(share)).toMatchObject({ ur: share, repaired: false, filled: [] });
     expect([isMarked(share), isMarked("1 ? 3")]).toEqual([false, true]);
   });
@@ -380,7 +373,14 @@ describe("S126: one module names the files of a release", () => {
   }
 
   it("writes the checksum lines that the signing script reads, under one prefix", async () => {
-    const script = new URL("../scripts/executable-files.mjs", import.meta.url).href;
+    const loaded = await scriptExports<ExecutableFiles>("scripts/executable-files.mjs", {
+      CHECKSUM_LINE: "object",
+      checksumLine: "function",
+      checksumsName: "function",
+      executableName: "function",
+      noticesName: "function",
+      releaseFilePrefix: "function",
+    });
     const {
       CHECKSUM_LINE,
       checksumLine,
@@ -388,7 +388,7 @@ describe("S126: one module names the files of a release", () => {
       executableName,
       noticesName,
       releaseFilePrefix,
-    } = (await import(script)) as ExecutableFiles;
+    } = loaded;
     const name = executableName("1.2.3");
     expect(name.startsWith(releaseFilePrefix("1.2.3"))).toBe(true);
     expect(checksumsName(name)).toBe(`${name}.sha256`);
@@ -453,9 +453,9 @@ describe("S129: limits derived from their sources", () => {
 describe("S130: one list of the designs of a kind", () => {
   it("gives the designs of each kind from the installed list", () => {
     expect(templatesOfKind("colors")).toEqual(
-      cardTemplates.filter((template) => template.kind === "colors"),
+      CARD_TEMPLATES.filter((template) => template.kind === "colors"),
     );
-    expect(colorCardTemplates).toEqual(templatesOfKind("colors"));
+    expect(COLOR_CARD_TEMPLATES).toEqual(templatesOfKind("colors"));
   });
 });
 
@@ -688,18 +688,22 @@ describe("S147: the command line's small rules have one place", () => {
     expect(flagPair(VERSION_FLAGS)).toBe("-V, --version");
     expect(isFlagOf(HELP_FLAGS, "-h")).toBe(true);
     expect(isFlagOf(HELP_FLAGS, "--version")).toBe(false);
-    for (const template of cardTemplates)
+    for (const template of CARD_TEMPLATES)
       expect(selectTemplate(String(templateNumber(template)), template.kind)).toBe(template);
   });
 });
 
 describe("S148: the release key has one source", () => {
   it("is the one the signing script uses and the documents show", async () => {
-    const script = new URL("../scripts/release-key.mjs", import.meta.url).href;
-    const { SIGNING_KEY, KEY_DOCUMENTS } = (await import(script)) as {
+    /** The part of scripts/release-key.mjs that this test uses; the script has no types. */
+    interface ReleaseKey {
       readonly SIGNING_KEY: string;
       readonly KEY_DOCUMENTS: readonly string[];
-    };
+    }
+    const { SIGNING_KEY, KEY_DOCUMENTS } = await scriptExports<ReleaseKey>(
+      "scripts/release-key.mjs",
+      { SIGNING_KEY: "string", KEY_DOCUMENTS: "object" },
+    );
     for (const path of KEY_DOCUMENTS) expect(readFileSync(path, "utf8")).toContain(SIGNING_KEY);
     const signing = readFileSync("scripts/sign-release.mjs", "utf8");
     expect(signing).toContain('import { SIGNING_KEY } from "./release-key.mjs";');

@@ -71,6 +71,7 @@ import { isFingerprintText, type PhraseFingerprint } from "./wallet-check.js";
 import { ErrorCatalog } from "./error-catalog.js";
 import { MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC } from "./self-test-vectors.js";
 import { isOneOf } from "./one-of.js";
+import { MILLISECONDS_PER_SECOND, startTimer, type MonotonicClock } from "./search-turns.js";
 
 const ERRORS = new ErrorCatalog("core.self-test", {
   "checksum-valid-seedshift-produced-invalid-bip39-checksum": () =>
@@ -115,7 +116,7 @@ export interface SelfTestRow {
   readonly name: string;
   /** What the check covers (SelfTestCheck.detail). */
   readonly detail: string;
-  /** How long it ran, in milliseconds with fractions, as performance.now measures it. */
+  /** How long it ran, in milliseconds with fractions, by the host's clock (SelfTestHost.now). */
   readonly milliseconds: number;
 }
 
@@ -127,7 +128,7 @@ export interface SelfTestReport {
   readonly publicVectors: number;
   /** How many encodings were decoded back to their phrase: every length and form, three modes. */
   readonly roundTrips: number;
-  /** How long the whole self-test ran, in milliseconds with fractions. */
+  /** How long the whole self-test ran, in milliseconds with fractions, by the host's clock. */
   readonly milliseconds: number;
 }
 
@@ -158,6 +159,11 @@ export interface SelfTestHost {
   readonly before?: readonly SelfTestCheck[];
   /** The host's own checks, run after the library's and the features', last of all. */
   readonly after?: readonly SelfTestCheck[];
+  /**
+   * The host's monotonic clock, in milliseconds, that times each check and the whole self-test;
+   * performance.now by default.
+   */
+  readonly now?: MonotonicClock | undefined;
 }
 
 /** SHA-256 of a word list joined by line feeds, as hexadecimal. */
@@ -530,7 +536,7 @@ export class MnemoCodeSelfTest {
   /** Every check in order, the host's around the library's; throws at the first that fails. */
   async run(): Promise<SelfTestReport> {
     const host = this.#host;
-    const started = performance.now();
+    const elapsed = startTimer(host.now);
     const rows: SelfTestRow[] = [];
     let publicVectors = 0;
     let roundTrips = 0;
@@ -547,7 +553,7 @@ export class MnemoCodeSelfTest {
         name: "SSKR integrity",
         detail: [
           host.shareLibrary,
-          "official and 32-byte recovery, exact creation, transport and refusals",
+          "official and 32-byte recovery, created shares restored, transport and refusals",
         ]
           .filter(Boolean)
           .join(", "),
@@ -573,19 +579,19 @@ export class MnemoCodeSelfTest {
       ...(host.features ?? []).map((feature) => feature.check),
     );
     for (const check of [...(host.before ?? []), ...library, ...(host.after ?? [])]) {
-      const checkStarted = performance.now();
+      const checkElapsed = startTimer(host.now);
       await check.run();
       rows.push({
         name: check.name,
         detail: check.detail,
-        milliseconds: performance.now() - checkStarted,
+        milliseconds: checkElapsed() * MILLISECONDS_PER_SECOND,
       });
     }
     return Object.freeze({
       rows: Object.freeze(rows),
       publicVectors,
       roundTrips,
-      milliseconds: performance.now() - started,
+      milliseconds: elapsed() * MILLISECONDS_PER_SECOND,
     });
   }
 }

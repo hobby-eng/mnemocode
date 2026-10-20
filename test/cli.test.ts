@@ -1,30 +1,17 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { promisify } from "node:util";
 import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { describe, expect, it } from "vitest";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { containing, matching } from "./helpers/matchers.js";
-import { PublicCliFiles } from "./helpers/public-cli-files.js";
+import { runBuiltCli as run } from "./helpers/built-cli.js";
 
 /** The limit of the one test that starts the command line fifteen times. */
 const FIFTEEN_STARTS_TIME_LIMIT_MS = 300_000;
 
-const execFileAsync = promisify(execFile);
-const cli = join(process.cwd(), "dist", "mnemocode.js");
 const mnemonic =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-
-async function run(arguments_: readonly string[], environment?: NodeJS.ProcessEnv) {
-  using material = new PublicCliFiles(arguments_);
-  return await execFileAsync(process.execPath, [cli, ...material.arguments], {
-    cwd: process.cwd(),
-    env: environment ?? process.env,
-    maxBuffer: 1024 * 1024,
-  });
-}
 
 describe("CLI records", () => {
   it("reports the package version through both CLI forms", async () => {

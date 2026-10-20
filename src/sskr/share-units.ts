@@ -8,8 +8,9 @@
 // Needs from the host: nothing.
 
 import {
+  BYTEWORD_LETTERS,
   BYTEWORD_VALUES,
-  bytewords,
+  BYTEWORDS,
   MINIMAL_BYTEWORD_VALUES,
   MINIMAL_BYTEWORDS,
 } from "./bytewords-list.js";
@@ -20,7 +21,11 @@ import { BITS_PER_BYTE, WORD_NUMBER_DIGITS, wordNumberOf } from "../core/bip39-s
 import { ELEMENT_SPACING } from "../core/code-text.js";
 import { defined } from "../core/defined.js";
 
-/** The forms that a share is written in, the standard UR first as the default. */
+/**
+ * The forms that a share is written in, the standard UR first as the default. Each form is one
+ * variant in SHARE_UNITS below, one in SHARE_FORMS (transport.ts) and one in REPAIR_FORMS
+ * (repair-models.ts), and the compiler asks for each.
+ */
 export const SHARE_FORMATS = Object.freeze([
   "ur",
   "words",
@@ -46,8 +51,6 @@ export const UR_SSKR_START = new RegExp(`^${UR_SSKR_PREFIX}`, "iu");
  * form (core/code-text.ts), or the dashes of other tools.
  */
 export const BYTEWORD_SEPARATORS = new RegExp(`[${ELEMENT_SPACING}-]+`, "u");
-/** The letters of every Byteword (BCR-2020-012): four, the first word's; a test checks the rest. */
-export const BYTEWORD_LETTERS = defined(bytewords[0]).length;
 /** A Byteword or a ? for a whole one, in Bytewords run together. */
 const BYTEWORD_OR_MARK = new RegExp(`[a-z]{${BYTEWORD_LETTERS}}|\\?`, "gu");
 
@@ -168,7 +171,7 @@ export const SHARE_UNITS: Readonly<Record<ShareFormat, ShareUnits>> = Object.fre
     UR_SSKR_PREFIX,
   ),
   words: unitsOf(
-    { valueOf: (word) => BYTEWORD_VALUES.get(word), unitText: (byte) => defined(bytewords[byte]) },
+    { valueOf: (word) => BYTEWORD_VALUES.get(word), unitText: (byte) => defined(BYTEWORDS[byte]) },
     " ",
   ),
   indexes: unitsOf(

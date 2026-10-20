@@ -41,7 +41,10 @@ export function pageFileName(
   return `${base}${suffix}.${extension}`;
 }
 
-/** Refuses a card `index` that is not one of the `count` cards, counted from 0. */
+/**
+ * Refuses a card `index` that is not one of the `count` cards, counted from 0
+ * (export.card-codes.there-no-card-cards-1).
+ */
 export function assertCardIndex(index: number, count: number): void {
   if (!Number.isInteger(index) || index < 0 || index >= count)
     throw ERRORS.create("there-no-card-cards-1", [`${index + 1}`, `${count}`]);

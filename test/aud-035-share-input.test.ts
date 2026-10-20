@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { ShareInput } from "../src/sskr/share-input.js";
 import { ShareCombineRefusalError } from "../src/sskr/share-platform.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { wrongValue } from "./helpers/shares.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
-const SHARES = sskrSetVector.shares;
+const SHARES = SSKR_SET_VECTOR.shares;
 
 describe("complete input diagnosis keeps host failures distinct (AUD-033-API003)", () => {
   it.each(["selective", "total", "omission"] as const)(

@@ -19,7 +19,7 @@ chmod +x mnemocode-0.1.0-linux-x64
 
 `gpg --verify` must say "Good signature" for a key with that fingerprint. Its warning that the key is not certified with a trusted signature only means that you have not certified the key yourself. [Releasing](RELEASING.md) describes how a release is built and signed.
 
-GitHub also signs where each file of a release was built. On the computer you downloaded it with, the [GitHub CLI](https://cli.github.com/) checks that the file was built from this repository by its release workflow, and was not replaced afterwards:
+GitHub also signs where each file of a release was built. On the computer you downloaded it with, the [GitHub CLI](https://cli.github.com/) checks that the file was built by a GitHub Actions workflow of this repository, and was not replaced afterwards:
 
 ```bash
 gh attestation verify mnemocode-0.1.0-linux-x64 --repo hobby-eng/mnemocode
@@ -135,18 +135,18 @@ Text input may be up to 1 MiB. A QR image may be up to 16 MiB, 4096 pixels on ei
 
 ## Card options
 
-| Option                         | Result                                                      |
-| ------------------------------ | ----------------------------------------------------------- |
-| `--template ID`                | The design, by name or number                               |
-| `--pdf PATH`                   | The whole collection as one PDF                             |
-| `--cards-dir NEW_FOLDER`       | [One file per card](../README.md#individual-business-cards) |
-| `--images-dir NEW_FOLDER`      | The collection pages as PNG images                          |
-| `--image-format png\|jpg`      | The image format for `--images-dir` and `--cards-dir`       |
-| `--page-size`, `--orientation` | See [Page sizes](../README.md#page-sizes)                   |
-| `--card-qr`                    | One QR code on the collection sheet                         |
-| `--title TEXT`                 | The collection title; by default it is the studio name      |
-| `--cards`                      | Color cards in the terminal                                 |
-| `--qr PATH`                    | A separate QR code as a PNG image                           |
+| Option                         | Result                                                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `--template ID`                | The design, by name or number                                                                         |
+| `--pdf PATH`                   | The whole collection as one PDF                                                                       |
+| `--cards-dir NEW_FOLDER`       | [One file per card](../README.md#individual-business-cards); for shares, one file or folder per share |
+| `--images-dir NEW_FOLDER`      | The collection pages as PNG images                                                                    |
+| `--image-format png\|jpg`      | The image format for `--images-dir` and `--cards-dir`                                                 |
+| `--page-size`, `--orientation` | See [Page sizes](../README.md#page-sizes)                                                             |
+| `--card-qr`                    | One QR code on the collection sheet                                                                   |
+| `--title TEXT`                 | The collection title; by default it is the studio name                                                |
+| `--cards`                      | Color cards in the terminal                                                                           |
+| `--qr PATH`                    | A separate QR code as a PNG image                                                                     |
 
 Replace random identity fields with `--card-name`, `--card-role`, `--card-company`, `--card-email`, `--card-phone`, `--card-website` and `--card-location`. Names accept Latin letters, spaces, apostrophes and hyphens. Characters missing from the font and text that does not fit are refused. `--studio-name` names the collection studio; material sheets print `--card-name` as the recipient. [Identity defaults](card-identities.md) describes the generated values.
 
@@ -163,7 +163,7 @@ Images need Poppler's `pdftocairo` in a folder of `PATH`, given by its full path
 | `a4`           | 210 × 297 mm |
 | `business`     | 90 × 50 mm   |
 
-`--orientation portrait|landscape` fixes the orientation. Otherwise the sheet is turned to fit at least three rows where possible, with the largest cards. `--cards-dir` accepts business size or no size, only business card designs, and cannot be combined with `preview --all`. A collection saved by the same command must be outside that folder. Individual filenames contain the card number and printed code, such as `01-ABCDEF.pdf` or `01-7684.pdf`.
+`--orientation portrait|landscape` fixes the orientation. Otherwise the sheet is turned to fit at least three rows where possible, with the largest cards. `--cards-dir` cannot be combined with `preview --all`. For the cards of a backup it accepts business size or no size, and only business card designs. For shares it saves one file or folder per share at any page size: a sheet size gives one collection sheet per share, as [Share cards](SSKR.md#share-cards) describes. A collection saved by the same command must be outside that folder. Individual filenames contain the card number and printed code, such as `01-ABCDEF.pdf` or `01-7684.pdf`.
 
 For shares, QR PNG copies are named after each share's reference, including inside a share-card folder. A sheet QR contains only the real codes; the random padding cards are excluded.
 
@@ -227,7 +227,7 @@ mnemocode recover-date --mode seedshift \
 | `--wif-file PATH`                 | A private key in WIF form, read from a protected local file                                                                 |
 | `--bip39-passphrase-file PATH`    | The BIP39 passphrase, if the wallet uses one. The file is secret                                                            |
 
-`--index` selects the first address compared and `--scan-gap N` the number of addresses, up to 1000. `--bitcoin-profile auto` tries BIP44, BIP49, BIP84 and BIP86. Extended public keys accept the standard and SLIP-132 versions named in the example.
+`--index` selects the first address compared and `--scan-gap N` the number of addresses, up to 1000. `--bitcoin-profile auto` tries BIP44, BIP49, BIP84 and BIP86; a list such as `native-segwit,taproot` names each type once. Extended public keys accept the standard and SLIP-132 versions named in the example.
 
 The other coins use standard single-key paths: Bitcoin Cash (`bitcoin-cash`, `bitcoincash:q…` or `1…`), Cosmos (`cosmos`, `cosmos1…`), Dash (`dash`, `X…` or Platform `dash1k…`; testnet Platform `tdash1k…`), Dogecoin (`dogecoin`, `D…`), EVM networks (`ethereum`, `0x…`), Ethereum Classic (`ethereum-classic`), Injective (`injective`, `inj1…`), Litecoin (`litecoin`, `L…`, `M…`, `3…` or `ltc1q…`), Tron (`tron`, `T…`), XRP (`xrp`, `r…`) and Zcash (`zcash`, transparent `t1…`). Zcash shielded addresses cannot be checked. Bitcoin Cash and Ethereum Classic try both their own coin type and that of their parent chain. The address determines type and network; `--network` and `--bitcoin-profile` apply to Bitcoin only.
 
@@ -250,7 +250,9 @@ CRITICAL: MnemoCode core self-test failed.
 No mnemonic data was processed.
 ```
 
-Before it splits or combines shares, MnemoCode also restores an official grouped set and a set holding the 32-byte secret of a 24-word phrase, creates an exact deterministic test set, and checks that the engine refuses an incomplete quorum and a damaged share value even when its transport checksum is correct. The fixed creation seed is public test data and is never used for a person's shares.
+In the menu, a failed self-test leaves only Run the self-test, the help and Quit; the other entries stay closed.
+
+Before it splits or combines shares, MnemoCode also restores an official grouped set and a set holding the 32-byte secret of a 24-word phrase, creates a test set from a fixed seed and restores it from every two of its shares, makes sure that another seed gives other shares, and checks that the engine refuses an incomplete quorum and a damaged share value even when its transport checksum is correct. The fixed creation seeds are public test data and are never used for a person's shares.
 
 For the full self-test, including PDF rendering:
 

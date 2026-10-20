@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseArguments } from "../src/cli/arguments.js";
 import { CandidatesFile } from "../src/cli/candidates-file.js";
 import { runDecode } from "../src/cli/decode-command.js";
+import { withPrivateScreen } from "../src/cli/private-screen.js";
 import { phraseAndDates } from "../src/cli/input.js";
 import { runSskrSplit } from "../src/cli/sskr-split-command.js";
 import { recoverySettings } from "../src/cli/sskr-restore-command.js";
@@ -25,17 +26,21 @@ import { DATE_COUNT_WORDS, Masking, PHRASE_WORDS } from "../src/core/masking.js"
 import { SearchPlan } from "../src/core/search-plan.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/terminal-input.js")>()),
-  // No terminal: codes that fit several forms end the command instead of asking.
-  terminalAvailable: () => false,
-}));
+// No terminal, unless a test types at one: codes that fit several forms end the command instead of
+// asking.
+const typing = await vi.hoisted(async () => import("./helpers/typed-keys.js"));
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
+  typing.replacedTerminalInput(await importOriginal()),
+);
+const { keyboard } = typing;
+const CTRL_C = 0x03;
 
 /** Codes that are both word numbers and Unicode text (test/cli.test.ts). */
 const AMBIGUOUS = "76 84 57 28 90 19 59 27 62 11 89 81 66 42 75 28 50 11 52 30 57 30 62 10";
 
 let directory: string;
 beforeEach(async () => {
+  Object.assign(keyboard, { terminal: false, bytes: [], answers: [] });
   directory = await mkdtemp(join(tmpdir(), "mnemocode-final-cli-"));
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -58,15 +63,21 @@ describe("CC-01: a saved candidate list leaves no copy of the entropies", () => 
     expect(entropy.every((byte) => byte === 0)).toBe(true);
   });
 
-  it("wipes transferred entropies when output preparation is cancelled", async () => {
+  it("wipes transferred entropies when the passphrase question of the list is cancelled", async () => {
     using target = await CandidatesFile.of({
       "candidates-file": join(directory, "cancelled.mncl"),
-      "plaintext-candidates": true,
+      "ask-secrets": true,
     });
-    vi.spyOn(target!, "prepare").mockResolvedValueOnce(CANCELLED);
+    // Ctrl+C at the passphrase question on the private screen, the one question of the output.
+    keyboard.terminal = true;
+    keyboard.bytes = [CTRL_C];
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const entropy = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
-    expect(await target!.saveEntropies([entropy])).toBe(CANCELLED);
+    expect(await withPrivateScreen(() => target!.saveEntropies([entropy]))).toBe(CANCELLED);
     expect(entropy.every((byte) => byte === 0)).toBe(true);
+    await expect(readFile(join(directory, "cancelled.mncl"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("closes its owned writer when the command's output scope ends", async () => {

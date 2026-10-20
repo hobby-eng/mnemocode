@@ -16,6 +16,7 @@ import {
 import { askLine } from "./terminal-choice.js";
 import type { Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { errorCode } from "../core/refusal.js";
 
 const ERRORS = new ErrorCatalog("cli.output-questions", {
   "another-file-task-name-folder-choose-another-one": () =>
@@ -27,6 +28,8 @@ const ERRORS = new ErrorCatalog("cli.output-questions", {
     "A name that starts with - would be read as an option; type ./ before it.",
   "there-no-such-file-check-name-folder": () =>
     "There is no such file; check its name and its folder.",
+  "file-cannot-be-looked-at": () =>
+    "MnemoCode cannot look at that file; check that it may read the file and its folders.",
   "folder-type-name-file": () => "That is a folder; type the name of a file in it.",
   "no-ordinary-file-type-name-file": () => "That is no ordinary file; type the name of the file.",
   "mnemo-code-may-not-read-file": () => "MnemoCode may not read that file.",
@@ -115,17 +118,28 @@ async function newFolder(answer: string): Promise<string> {
 }
 
 /**
+ * The failures of a look at a path that say nothing is there: no such name (ENOENT), or a name
+ * under a file (ENOTDIR). Any other failure, such as a folder that may not be searched (EACCES),
+ * leaves it unknown whether the file is there (CORE-22).
+ */
+const NOTHING_THERE = new Set(["ENOENT", "ENOTDIR"]);
+
+/**
  * A file to read, checked without reading it: it exists, is a file and may be read, and it is no
  * larger than the command reads (`limit`). What is in it only the command can tell, after it has
- * read the file.
+ * read the file. A path that cannot be looked at is refused as such, with the file system's error
+ * as its cause, never as a file that is not there.
  */
 export async function inputFile(answer: string, limit: number): Promise<string> {
   const path = typedPath(answer);
   let info: Stats;
   try {
     info = await stat(path);
-  } catch {
-    throw ERRORS.create("there-no-such-file-check-name-folder", []);
+  } catch (error) {
+    const code = errorCode(error);
+    if (code !== undefined && NOTHING_THERE.has(code))
+      throw ERRORS.create("there-no-such-file-check-name-folder", [], { cause: error });
+    throw ERRORS.create("file-cannot-be-looked-at", [], { cause: error });
   }
   if (info.isDirectory()) throw ERRORS.create("folder-type-name-file", []);
   if (!info.isFile()) throw ERRORS.create("no-ordinary-file-type-name-file", []);

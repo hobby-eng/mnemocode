@@ -140,7 +140,7 @@ function surfaced(surface: string, scale: number, x: number, y: number): FinishD
 const colours = (entries: Record<string, string>): CatalogueColour[] =>
   Object.entries(entries).map(([name, color]) => ({ name, color }));
 /** The artwork of each material design. */
-export const materialArtwork: Record<MaterialStyle, MaterialArtwork> = {
+export const MATERIAL_ARTWORK: Record<MaterialStyle, MaterialArtwork> = {
   kitchen: {
     title: "KITCHEN / MATERIAL SELECTION",
     studyTheme: "parquet",
@@ -547,9 +547,11 @@ const CHROMA_CAP = 45;
 const MATCH_LIGHTNESS_WEIGHT = 0.5;
 
 /**
- * How a photograph of colour `base` looks under a tint, as the PDF "Color" blend mode paints it
- * (ISO 32000-1, 11.3.5.3): the tint's hue and saturation at the photograph's luminosity, mixed
- * with the photograph by TINT_OPACITY.
+ * How a photograph of colour `base` looks under the colour `tint`, as the PDF "Color" blend mode
+ * paints it (ISO 32000-1, 11.3.5.3): the tint's hue and saturation at the photograph's luminosity,
+ * mixed with the photograph by TINT_OPACITY. Both colours are written #RRGGBB or RRGGBB; the look
+ * is six upper-case hexadecimal digits without "#" (channelsHex). Refuses any other text for
+ * either colour, as rgbBytes refuses it (core.colors.invalid-rgb-reference).
  */
 export function tintedLook(base: string, tint: string): string {
   const luminosity = ([r, g, b]: number[]) =>
@@ -576,7 +578,7 @@ export function tintedLook(base: string, tint: string): string {
  * light, shading and texture.
  */
 export function materialSamples(style: MaterialStyle): MaterialSample[] {
-  const { finishes, catalogue } = materialArtwork[style];
+  const { finishes, catalogue } = MATERIAL_ARTWORK[style];
   const photographed = finishes
     .filter((finish) => !finish.onlyTinted)
     .map((finish) => ({ finish, label: finish.name, look: finish.color }));
@@ -603,7 +605,10 @@ export function materialSamples(style: MaterialStyle): MaterialSample[] {
  * never look alike while each keeps the direction of its colour as far as the catalogue allows.
  * The same references get the same samples in any order and letter case, and a repeated reference
  * keeps its sample. Its neighbours take part in the choice, so in another collection a reference
- * may get another sample.
+ * may get another sample. Refuses a reference that is no colour of six hexadecimal digits
+ * (export.material-artwork.material-reference-contain-exactly-six-hexadecimal-digits), and more
+ * distinct references than the material has samples
+ * (export.material-artwork.material-offers-only-distinct-samples).
  */
 export function chooseMaterialSamples(
   style: MaterialStyle,
@@ -611,7 +616,7 @@ export function chooseMaterialSamples(
 ): MaterialSample[] {
   if (!references.every(isRgbReference))
     throw ERRORS.create("material-reference-contain-exactly-six-hexadecimal-digits", []);
-  const { chromaScale } = materialArtwork[style].catalogue;
+  const { chromaScale } = MATERIAL_ARTWORK[style].catalogue;
   const samples = materialSamples(style);
   const codes = [...new Set(references.map(rgbReferenceDigits))];
   if (codes.length > samples.length)

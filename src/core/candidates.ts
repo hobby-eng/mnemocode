@@ -113,8 +113,21 @@ export type WordPlace = readonly number[];
 
 /** A search: unknown words at known places, or one word missing at an unknown place. */
 export type WordSearch =
-  | { readonly kind: "unknown-words"; readonly places: readonly WordPlace[] }
-  | { readonly kind: "missing-word"; readonly written: readonly number[] };
+  | {
+      /** Unknown words at known places (parseUnknownWords). */
+      readonly kind: "unknown-words";
+      /** The places of the phrase in order, one a word (12, 15, 18, 21 or 24), with their words. */
+      readonly places: readonly WordPlace[];
+    }
+  | {
+      /** One word missing at an unknown place (parseMissingWord). */
+      readonly kind: "missing-word";
+      /**
+       * The words there are, in order, as indexes in the BIP39 English list: one fewer than a
+       * phrase has.
+       */
+      readonly written: readonly number[];
+    };
 
 /** How many candidates a search finds: exactly, where the checksum tells it, or about. */
 export interface ExpectedCandidates {
@@ -134,7 +147,9 @@ export const EVERY_WORD: WordPlace = Object.freeze(
 
 /**
  * The words that one written place allows: a word, ?, a prefix with *, or words joined by |; the
- * place is counted from 1 and named only by its number in a refusal.
+ * place is counted from 1 and named only by its number in a refusal: of a prefix that no word
+ * starts with (core.candidates.no-bip39-word-starts-letters-at), and of a word that is not English
+ * BIP39 (unknown-english-bip39-word-at).
  */
 export function wordPlaceOf(written: string, position: number): WordPlace {
   const where = `place ${position}`;
@@ -157,7 +172,12 @@ export function wordPlaceOf(written: string, position: number): WordPlace {
   return [...new Set(indexes)].sort((a, b) => a - b);
 }
 
-/** Reads a phrase with unknown words at known places; at least one place must be unknown. */
+/**
+ * Reads a phrase with unknown words at known places; at least one place must be unknown. Refuses
+ * another count of places (core.candidates.enter-places-words-prefix-b), a phrase with no place
+ * marked (mark-each-forgotten-word-prefix-b) and a place that no word fits, named by its number
+ * (wordPlaceOf: no-bip39-word-starts-letters-at, unknown-english-bip39-word-at).
+ */
 export function parseUnknownWords(text: string): WordSearch {
   const written = englishTokens(text);
   if (!isBip39WordCount(written.length))
@@ -170,8 +190,8 @@ export function parseUnknownWords(text: string): WordSearch {
 
 /**
  * Reads a phrase with one word missing at an unknown place: one word fewer than a valid length.
- * Refuses another count of words and a word that is not English BIP39, naming its place
- * (enter-words-you-their-order, unknown-english-bip39-word-at-place).
+ * Refuses another count of words (core.candidates.enter-words-you-their-order) and a word that is
+ * not English BIP39, naming its place (unknown-english-bip39-word-at-place).
  */
 export function parseMissingWord(text: string): WordSearch {
   const written = englishTokens(text);
@@ -212,33 +232,23 @@ function isPlace(place: unknown): boolean {
 const UNKNOWN_SEARCH_KIND = "Unknown kind of word search.";
 
 /**
- * Refuses a search that the parsers above could not have made: another host may build its own,
- * and an empty place, for one, would never end (AUD-008-API003).
+ * The combinations a search checks: the work it takes, which MAX_SEARCH_COMBINATIONS bounds.
+ * Refuses a search that the parsers above could not have made (checkedSearch), all
+ * core.candidates: a missing word with another count of words
+ * (missing-word-search-one-word-fewer-than-valid) or a word that is no BIP39 index
+ * (written-word-not-bip39-index), another kind (unknown-search-kind), another count of places
+ * (word-search-places), and a place without words or with indexes that are not BIP39 ones in
+ * ascending order (every-place-one-more-bip39-indexes-ascending-order).
  */
-function assertSearch(search: WordSearch): void {
-  if (search.kind === "missing-word") {
-    if (!Array.isArray(search.written) || !isBip39WordCount(search.written.length + 1))
-      throw ERRORS.create("missing-word-search-one-word-fewer-than-valid", []);
-    if (!areWordIndexes(search.written)) throw ERRORS.create("written-word-not-bip39-index", []);
-    return;
-  }
-  if (search.kind !== "unknown-words") throw ERRORS.create("unknown-search-kind", []);
-  if (!Array.isArray(search.places) || !isBip39WordCount(search.places.length))
-    throw ERRORS.create("word-search-places", [`${WORD_COUNTS_TEXT}`]);
-  if (!everyElement(search.places, isPlace))
-    throw ERRORS.create("every-place-one-more-bip39-indexes-ascending-order", []);
-}
-
-/** The combinations a search checks: the work it takes, which MAX_SEARCH_COMBINATIONS bounds. */
 export function searchCombinations(search: WordSearch): number {
-  assertSearch(search);
-  if (search.kind === "missing-word") return (search.written.length + 1) * BIP39_DICTIONARY_SIZE;
-  return search.places.reduce((product, place) => product * place.length, 1);
+  const { kind, lists } = checkedSearch(search);
+  return kind.combinations(lists);
 }
 
 /**
- * Refuses a search of more combinations than MAX_SEARCH_COMBINATIONS, with `narrow`, what makes it
- * smaller in the words of its search: the word search and the search of marked codes say it so.
+ * Refuses a search of more combinations than MAX_SEARCH_COMBINATIONS
+ * (core.candidates.search-more-than-combinations), with `narrow`, what makes it smaller in the
+ * words of its search: the word search and the search of marked codes say it so.
  */
 export function assertSearchable(combinations: number, narrow: string = NARROW_WORD_SEARCH): void {
   if (combinations > MAX_SEARCH_COMBINATIONS)
@@ -257,15 +267,18 @@ export function unknownPlacesOf(places: readonly WordPlace[]): number[] {
  * How many candidates a search finds, told before it runs. When the last place may hold any word,
  * exactly one in 2^(words / 3) of its words passes the checksum for each combination of the other
  * places, so the count is exact; otherwise a combination passes once in 2^(words / 3) on average.
+ * Refuses what searchCombinations refuses (core.candidates.unknown-search-kind and the others it
+ * names).
  */
 export function expectedCandidates(search: WordSearch): ExpectedCandidates {
-  const combinations = searchCombinations(search);
-  const wordCount =
-    search.kind === "unknown-words" ? search.places.length : search.written.length + 1;
-  const passing = combinations * checksumPassShare(wordCount);
-  const exact =
-    search.kind === "unknown-words" &&
-    defined(search.places.at(-1)).length === BIP39_DICTIONARY_SIZE;
+  const { kind, lists } = checkedSearch(search);
+  return expectedOf(kind, lists);
+}
+
+/** expectedCandidates of the word lists of a search of `kind`, already checked. */
+function expectedOf(kind: SearchKind, lists: WordLists): ExpectedCandidates {
+  const passing = kind.combinations(lists) * checksumPassShare(kind.wordCount(lists));
+  const exact = kind.exact(lists);
   // At least one: the right phrase is always among the candidates, and the time of a search is
   // planned by this count.
   return { count: exact ? passing : Math.max(1, Math.round(passing)), exact };
@@ -274,7 +287,9 @@ export function expectedCandidates(search: WordSearch): ExpectedCandidates {
 /**
  * Whether `words`, a phrase of BIP39 word indexes, ends with the checksum of its entropy. A host
  * may pass anything at run time, so the indexes are checked first (assertPhraseIndexes): an index
- * out of range is no phrase at all, not one of a valid or wrong checksum.
+ * out of range is no phrase at all, not one of a valid or wrong checksum. Refuses another count of
+ * words (core.bip39-sizes.expected-word-indexes) and a value that is no word index
+ * (assert-word-indexes-refused).
  */
 export function checksumValid(words: CandidateWords): boolean {
   // One copy, checked and computed alike: a host's list may answer differently when read again.
@@ -300,7 +315,9 @@ function checksumFits(words: CandidateWords): boolean {
  * changing fastest, as a mixed-radix counter. The word search and the search of marked codes both
  * count through it. It yields one array, changed in place for the next combination: a caller that
  * keeps a combination copies it. The places are checked first: each holds at least one word, so
- * that the counter ends (AUD-012-API001).
+ * that the counter ends (AUD-012-API001); a place without one is refused
+ * (core.candidates.every-place-search-at-least-one-word), and so is a word that is no BIP39 index
+ * (core.bip39-sizes.assert-word-indexes-refused).
  */
 export function placeCombinations(places: readonly WordPlace[]): Generator<readonly number[]> {
   // Copied first, then checked: Array.from turns holes into undefined, which is refused.
@@ -366,16 +383,148 @@ export function insertedPlace(written: readonly number[], words: CandidateWords)
 }
 
 /**
+ * The word lists of a search, as SecretValue.numberLists holds them: the places of unknown words,
+ * or the written words of a missing-word search as one list.
+ */
+type WordLists = readonly (readonly number[])[];
+
+/**
+ * What differs between the kinds of word search, held by each kind (SEARCH_KINDS): every rule of
+ * the search asks the kind, so that a new kind is one more variant there and nothing else. Each
+ * works on the search's word lists (WordLists), checked by assertLists.
+ */
+interface SearchKind {
+  /** Reads the phrase as typed, as parseUnknownWords and parseMissingWord read it. */
+  readonly parse: (text: string) => WordSearch;
+  /**
+   * The word lists of `search`, a search of this kind that a host may have made itself, borrowed;
+   * refused where it has no list of the field of this kind, as assertLists refuses them.
+   */
+  readonly listsOf: (search: WordSearch) => WordLists;
+  /**
+   * Refuses lists that the parsers could not have made: another host may build its own search,
+   * and an empty place, for one, would never end (AUD-008-API003).
+   */
+  readonly assertLists: (lists: WordLists) => void;
+  /** The words of every candidate: 12, 15, 18, 21 or 24. */
+  readonly wordCount: (lists: WordLists) => number;
+  /** The combinations that the search checks. */
+  readonly combinations: (lists: WordLists) => number;
+  /** Whether expectedCandidates is exact: the last place may hold any word. */
+  readonly exact: (lists: WordLists) => boolean;
+  /** Every combination, in the order of docs/CANDIDATES.md; a yielded array may be reused. */
+  readonly combinationsOf: (lists: WordLists) => Generator<readonly number[]>;
+  /** The places, from 0, that may hold more than one word; none where each candidate has its own. */
+  readonly unknownPlaces: (lists: WordLists) => number[];
+  /**
+   * The places, from 0, whose words the search chose in `words`, a candidate of it, where each
+   * candidate has places of its own; absent where they are the unknown places of every candidate.
+   */
+  readonly placesOf?: (lists: WordLists, words: CandidateWords) => number[];
+}
+
+/** The one list of the written words of a missing-word search. */
+function writtenOf(lists: WordLists): readonly number[] {
+  return defined(lists[0]);
+}
+
+/**
+ * Whether a field of a host's search holds a list at all, before its elements are checked; not a
+ * type guard, so that the field keeps its declared type.
+ */
+function isList(value: unknown): boolean {
+  return Array.isArray(value);
+}
+
+/** Each kind of word search, its rules with it. */
+const SEARCH_KINDS = Object.freeze({
+  "unknown-words": {
+    parse: parseUnknownWords,
+    listsOf: (search) => {
+      if (!("places" in search) || !isList(search.places))
+        throw ERRORS.create("word-search-places", [`${WORD_COUNTS_TEXT}`]);
+      return search.places;
+    },
+    assertLists: (places) => {
+      if (!isBip39WordCount(places.length))
+        throw ERRORS.create("word-search-places", [`${WORD_COUNTS_TEXT}`]);
+      if (!everyElement(places, isPlace))
+        throw ERRORS.create("every-place-one-more-bip39-indexes-ascending-order", []);
+    },
+    wordCount: (places) => places.length,
+    combinations: (places) => places.reduce((product, place) => product * place.length, 1),
+    // Exactly one in 2^(words / 3) of the last place's words passes for each other combination.
+    exact: (places) => defined(places.at(-1)).length === BIP39_DICTIONARY_SIZE,
+    combinationsOf,
+    unknownPlaces: unknownPlacesOf,
+  },
+  "missing-word": {
+    parse: parseMissingWord,
+    listsOf: (search) => {
+      if (!("written" in search) || !isList(search.written))
+        throw ERRORS.create("missing-word-search-one-word-fewer-than-valid", []);
+      return [search.written];
+    },
+    assertLists: (lists) => {
+      const written = lists[0];
+      if (lists.length !== 1 || written === undefined || !isBip39WordCount(written.length + 1))
+        throw ERRORS.create("missing-word-search-one-word-fewer-than-valid", []);
+      if (!areWordIndexes(written)) throw ERRORS.create("written-word-not-bip39-index", []);
+    },
+    wordCount: (lists) => writtenOf(lists).length + 1,
+    combinations: (lists) => (writtenOf(lists).length + 1) * BIP39_DICTIONARY_SIZE,
+    // The inserted word is the last only at the last place: a combination passes on average.
+    exact: () => false,
+    combinationsOf: (lists) => missingWordCombinations(writtenOf(lists)),
+    unknownPlaces: () => [],
+    placesOf: (lists, words) => [insertedPlace(writtenOf(lists), words)],
+  },
+} satisfies Readonly<Record<WordSearch["kind"], SearchKind>>);
+
+/** Whether `kind` names a kind of word search; a JavaScript host may pass any value. */
+function isSearchKind(kind: unknown): kind is WordSearch["kind"] {
+  return typeof kind === "string" && Object.hasOwn(SEARCH_KINDS, kind);
+}
+
+/** The rules of `kind`; refuses a kind that a host made up (core.candidates.unknown-search-kind). */
+function searchKindOf(kind: unknown): SearchKind {
+  if (!isSearchKind(kind)) throw ERRORS.create("unknown-search-kind", []);
+  return SEARCH_KINDS[kind];
+}
+
+/**
+ * The kind of `search` with its word lists, borrowed, refused unless the parsers above could have
+ * made them: a kind that a host made up (core.candidates.unknown-search-kind), and what the kind's
+ * assertLists refuses.
+ */
+function checkedSearch(search: WordSearch): {
+  readonly name: WordSearch["kind"];
+  readonly kind: SearchKind;
+  readonly lists: WordLists;
+} {
+  const name = search.kind;
+  const kind = searchKindOf(name);
+  const lists = kind.listsOf(search);
+  kind.assertLists(lists);
+  return { name, kind, lists };
+}
+
+/**
  * The candidates of a search, in the order of docs/CANDIDATES.md: the combinations whose checksum
- * is valid. A yielded array may be reused for the next one; copy it to keep it.
+ * is valid. A yielded array may be reused for the next one; copy it to keep it. Asked for its
+ * first candidate, it refuses what searchCombinations refuses (core.candidates.unknown-search-kind
+ * and the others it names) and a search of more combinations than MAX_SEARCH_COMBINATIONS
+ * (search-more-than-combinations).
  */
 export function* searchCandidates(search: WordSearch): Generator<CandidateWords> {
-  assertSearchable(searchCombinations(search));
-  const combinations =
-    search.kind === "unknown-words"
-      ? combinationsOf(search.places)
-      : missingWordCombinations(search.written);
-  for (const words of combinations) if (checksumFits(words)) yield words;
+  const { kind, lists } = checkedSearch(search);
+  assertSearchable(kind.combinations(lists));
+  yield* candidatesOf(kind, lists);
+}
+
+/** The combinations of a search of `kind` whose checksum is valid, its word lists checked. */
+function* candidatesOf(kind: SearchKind, lists: WordLists): Generator<CandidateWords> {
+  for (const words of kind.combinationsOf(lists)) if (checksumFits(words)) yield words;
 }
 
 /**
@@ -457,15 +606,9 @@ export interface WordSearchResult<M extends WalletMatch = WalletMatch> {
   readonly stopped: boolean;
 }
 
-/** A private working copy; it is scrubbed when its iterator ends or its owner is wiped. */
-type WorkingSearch =
-  | { readonly kind: "unknown-words"; readonly places: number[][] }
-  | { readonly kind: "missing-word"; readonly written: number[] };
-
-function wipeWorkingSearch(search: WorkingSearch): void {
-  if (search.kind === "unknown-words") {
-    for (const place of search.places) place.fill(0);
-  } else search.written.fill(0);
+/** Scrubs a private working copy of word lists, when its iterator ends or its owner is wiped. */
+function wipeLists(lists: number[][]): void {
+  for (const list of lists) list.fill(0);
 }
 
 /**
@@ -479,9 +622,11 @@ function wipeWorkingSearch(search: WorkingSearch): void {
  * transferred to their caller and remain independently live.
  */
 export class WordCandidateSearch extends Redacted implements Disposable {
-  readonly #values: SecretValue<readonly WordPlace[]>;
+  readonly #values: SecretValue<WordLists>;
   readonly #active = new Set<() => void>();
   readonly #kind: WordSearch["kind"];
+  /** The rules of the search's kind (SEARCH_KINDS). */
+  readonly #rules: SearchKind;
   readonly #wordCount: number;
   readonly #combinations: number;
   /** The places, counting from 0, that may hold more than one word. */
@@ -489,39 +634,41 @@ export class WordCandidateSearch extends Redacted implements Disposable {
 
   private constructor(search: WordSearch) {
     super("WordCandidateSearch");
-    assertSearch(search);
-    // A copy, so that the caller's arrays cannot change the search once it is checked.
-    const copy: WorkingSearch =
-      search.kind === "unknown-words"
-        ? { kind: search.kind, places: search.places.map((place) => [...place]) }
-        : { kind: search.kind, written: [...search.written] };
+    const { name, kind, lists } = checkedSearch(search);
+    // A copy, so that the caller's arrays cannot change the search once it is checked; the copy
+    // is checked again, as it is what the search holds.
+    const copy = lists.map((list) => [...list]);
     try {
-      const combinations = searchCombinations(copy);
+      kind.assertLists(copy);
+      const combinations = kind.combinations(copy);
       assertSearchable(combinations);
-      this.#values = SecretValue.numberLists(
-        copy.kind === "unknown-words" ? copy.places : [copy.written],
-      );
-      this.#kind = copy.kind;
-      this.#wordCount =
-        copy.kind === "unknown-words" ? copy.places.length : copy.written.length + 1;
+      this.#values = SecretValue.numberLists(copy);
+      this.#kind = name;
+      this.#rules = kind;
+      this.#wordCount = kind.wordCount(copy);
       this.#combinations = combinations;
-      this.#unknownPlaces = copy.kind === "unknown-words" ? unknownPlacesOf(copy.places) : [];
+      this.#unknownPlaces = kind.unknownPlaces(copy);
     } finally {
-      wipeWorkingSearch(copy);
+      wipeLists(copy);
     }
   }
 
   /**
    * Reads the phrase as typed. For "unknown-words" each place is a word, ?, a prefix with * or
    * words joined by |; for "missing-word" it is the words there are, one fewer than a phrase has.
+   * Refuses what parseUnknownWords or parseMissingWord refuses, another kind
+   * (core.candidates.unknown-search-kind), and a search of more than MAX_SEARCH_COMBINATIONS
+   * combinations (search-more-than-combinations).
    */
   static parse(text: string, kind: WordSearch["kind"]): WordCandidateSearch {
-    if (kind === "unknown-words") return new WordCandidateSearch(parseUnknownWords(text));
-    if (kind === "missing-word") return new WordCandidateSearch(parseMissingWord(text));
-    throw ERRORS.create("unknown-search-kind", []);
+    return new WordCandidateSearch(searchKindOf(kind).parse(text));
   }
 
-  /** Takes a search that a host made itself, after the same checks as a parsed one. */
+  /**
+   * Takes a search that a host made itself, after the same checks as a parsed one: refuses what
+   * searchCombinations refuses (core.candidates.unknown-search-kind and the others it names) and a
+   * search of more combinations than MAX_SEARCH_COMBINATIONS (search-more-than-combinations).
+   */
   static of(search: WordSearch): WordCandidateSearch {
     return new WordCandidateSearch(search);
   }
@@ -543,7 +690,7 @@ export class WordCandidateSearch extends Redacted implements Disposable {
 
   /** How many candidates the search finds (expectedCandidates). */
   get expected(): ExpectedCandidates {
-    return expectedCandidates(this.#snapshot());
+    return expectedOf(this.#rules, this.#values.value);
   }
 
   /**
@@ -560,33 +707,25 @@ export class WordCandidateSearch extends Redacted implements Disposable {
    */
   placesOf(candidate: WordCandidate): number[] {
     this.#values.assertLive();
-    if (this.#kind === "unknown-words") return [...this.#unknownPlaces];
-    return [insertedPlace(defined(this.#values.value[0]), candidate.words)];
-  }
-
-  #snapshot(): WordSearch {
-    const values = this.#values.value;
-    return this.#kind === "unknown-words"
-      ? { kind: this.#kind, places: values }
-      : { kind: this.#kind, written: defined(values[0]) };
+    const placesOf = this.#rules.placesOf;
+    // The unknown places are kept apart, so that a candidate's need no decoding of the search.
+    if (placesOf === undefined) return [...this.#unknownPlaces];
+    return placesOf(this.#values.value, candidate.words);
   }
 
   /**
    * The candidates in the order of docs/CANDIDATES.md, numbered from 1. A host takes as many at a
    * time as suits it, as a page does that lets its event loop run between batches, and stops when
    * it wants. Each candidate transfers to the caller, who wipes it. Disposal clears this
-   * iterator's working state and refuses its next read, without wiping transferred candidates.
+   * iterator's working state and refuses its next read (core.secret-value.wiped), without wiping
+   * transferred candidates.
    */
   *candidates(): Generator<WordCandidate> {
-    const values = this.#values.value.map((place) => [...place]);
-    const search: WorkingSearch =
-      this.#kind === "unknown-words"
-        ? { kind: this.#kind, places: values }
-        : { kind: this.#kind, written: defined(values[0]) };
-    const source = searchCandidates(search);
+    const lists = this.#values.value.map((list) => [...list]);
+    const source = candidatesOf(this.#rules, lists);
     const close = (): void => {
       source.return(undefined);
-      wipeWorkingSearch(search);
+      wipeLists(lists);
     };
     this.#active.add(close);
     try {
@@ -611,7 +750,11 @@ export class WordCandidateSearch extends Redacted implements Disposable {
    * search; otherwise the entropies kept are wiped and the search goes on without them. The
    * entropies are wiped too when the search is stopped or fails. Unshown candidates are wiped
    * immediately; failures/disposal wipe all unpublished candidates. Successful and stopped
-   * results transfer their shown candidates to the caller, who wipes them after use.
+   * results transfer their shown candidates to the caller, who wipes them after use. Refuses a
+   * `maxShown` or `keep` that is no whole number of 0 or more (core.search-turns.whole-number-more)
+   * and an answer of the wallet check that breaks the WalletMatch contract (askWallet:
+   * core.wallet-check.malformed-wallet-answer and the others it names); what walletCheck or
+   * onListFull throws passes on.
    */
   async run<M extends WalletMatch = WalletMatch>(
     run: WordSearchRun<M> = {},

@@ -1,28 +1,32 @@
 // One refusal condition, one code (AUD-037-API009): a host chooses its own words from the code
 // alone, so that two conditions never share one. Public test data only.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { walletEvidence } from "../src/cli/bitcoin-options.js";
 import { inputFile } from "../src/cli/output-questions.js";
 import { runSskrExport } from "../src/cli/sskr-export-command.js";
+import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { addressCount } from "../src/core/address-scan.js";
 import { KeptShares, ShareBackupCheck } from "../src/core/backup-check.js";
 import { parseColors } from "../src/core/colors.js";
 import { defined } from "../src/core/defined.js";
 import { errorCode } from "../src/core/refusal.js";
+import { checkedBitcoinProfiles } from "../src/core/wallet-evidence.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { isCompleteShareRefusal } from "../src/sskr/complete-shares.js";
-import { sskrSetVector, sskrVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR, SSKR_VECTOR } from "../src/sskr/known-answers.js";
 import { readRepairableShare } from "../src/sskr/repair.js";
 import { sskrEngine } from "../src/sskr/runtime.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
+import { ShareInput } from "../src/sskr/share-input.js";
 import { ShareSet } from "../src/sskr/share-set.js";
 import { Share } from "../src/sskr/transport.js";
 import { joinUnits, markUnits, shareUnits, VALUE_BYTE, wrongValue } from "./helpers/shares.js";
-import { TEST_FINGERPRINT } from "./helpers/test-phrase.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The code of what `run` throws. */
 function codeOf(run: () => unknown): string | undefined {
@@ -83,14 +87,48 @@ describe("the codes of refusals", () => {
     expect(codeOf(() => addressCount(0, 0))).toBe("core.address-scan.address-count-refused");
   });
 
+  it("tell a Bitcoin profile named twice from a name that is no profile, in the library and on the command line", () => {
+    expect(codeOf(() => checkedBitcoinProfiles(["native-segwit", "native-segwit"]))).toBe(
+      "core.wallet-evidence.bitcoin-address-profile-given-twice",
+    );
+    expect(codeOf(() => checkedBitcoinProfiles(["native-segwit", "bip84"]))).toBe(
+      "core.wallet-evidence.unknown-bitcoin-address-profile",
+    );
+    const given = (profiles: string) =>
+      codeOf(() =>
+        walletEvidence({
+          "bitcoin-address": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+          "bitcoin-profile": profiles,
+        }),
+      );
+    expect(given("native-segwit, taproot,native-segwit")).toBe(
+      "core.wallet-evidence.bitcoin-address-profile-given-twice",
+    );
+    for (const syntax of ["bip84", "", "native-segwit,,taproot"])
+      expect(given(syntax)).toBe(
+        "cli.bitcoin-options.bitcoin-address-profile-auto-comma-separated-list",
+      );
+  });
+
+  it("tell a seed phrase in words from an encoded one where shares are typed", () => {
+    using input = new ShareInput({ decodeEntry: "The Decode tab" });
+    expect(codeOf(() => input.sharesOfAnswer(TEST_PHRASE))).toBe(
+      "sskr.share-input.seed-phrase-in-words",
+    );
+    // Codes whose BIP39 checksum holds, as an encoded phrase's do: 1 for "abandon", 4 at the end.
+    expect(codeOf(() => input.sharesOfAnswer("1 1 1 1 1 1 1 1 1 1 1 4"))).toBe(
+      "sskr.share-input.encoded-seed-phrase",
+    );
+  });
+
   it("tell colours with # from colours run together", () => {
     expect(codeOf(() => parseColors("#12345 #000000"))).toBe("core.colors.hashed-colors-refused");
     expect(codeOf(() => parseColors("12345"))).toBe("core.colors.joined-colors-refused");
   });
 
   it("give each kind of set conflict its own code", () => {
-    const [first, second] = sskrSetVector.shares;
-    expect(codeOf(() => Share.readSet([first, sskrVector.shares[0]], false))).toBe(
+    const [first, second] = SSKR_SET_VECTOR.shares;
+    expect(codeOf(() => Share.readSet([first, SSKR_VECTOR.shares[0]], false))).toBe(
       "sskr.transport.shares-of-different-sets",
     );
     expect(codeOf(() => Share.readSet([first, wrongValue(first), second], false))).toBe(
@@ -110,7 +148,7 @@ describe("the codes of refusals", () => {
   });
 
   it("tell too few shares, a share that cannot be read, shares of several groups, shares that do not fit and too much open in a combine", async () => {
-    const [first, second] = sskrSetVector.shares;
+    const [first, second] = SSKR_SET_VECTOR.shares;
     const marked = (share: string, places: readonly number[]) => markUnits(share, "colors", places);
     const combined = (records: readonly string[]) => ShareSet.combine(records, nodeSharePlatform);
     const refused = (code: string) => ({ code: `sskr.share-set.${code}` });
@@ -125,7 +163,7 @@ describe("the codes of refusals", () => {
       refused("share-unreadable"),
     );
     // Two shares of the official vector, a set of several groups, which no joint repair takes.
-    const [grouped, otherGrouped] = sskrVector.shares;
+    const [grouped, otherGrouped] = SSKR_VECTOR.shares;
     await expect(combined([marked(grouped, [5]), otherGrouped])).rejects.toMatchObject({
       ...refused("several-groups"),
       message:
@@ -163,7 +201,7 @@ describe("the codes of refusals", () => {
       [1, 1],
       [2, 3],
     ]);
-    const [first, second, third] = sskrSetVector.shares;
+    const [first, second, third] = SSKR_SET_VECTOR.shares;
     // One group of 1 of 2: each share restores alone, and no digest tells which is wrong.
     const [one, two] = await nodeSharePlatform.createShares(
       new Uint8Array(16),
@@ -201,15 +239,15 @@ describe("the codes of refusals", () => {
 
 describe("the codes of refusals, with their kind and wording", () => {
   it("tell each reason why kept shares do not restore, each one to ask the shares again for, and a refused restore by the code of its cause", async () => {
-    const [first, second] = sskrSetVector.shares;
-    const [grouped, otherGrouped] = sskrVector.shares;
+    const [first, second] = SSKR_SET_VECTOR.shares;
+    const [grouped, otherGrouped] = SSKR_VECTOR.shares;
     // Splits from one seed share their identifier: a 2-of-3 and a 3-of-3 split are one set whose
     // group then has two thresholds.
     const [ofTwo] = await groupShares(1, [[2, 3]]);
     const [, ofThree] = await groupShares(1, [[3, 3]]);
     const twoOfFive = (await groupShares(1, [[3, 5]])).slice(0, 2);
     using check = new ShareBackupCheck(
-      { mnemonic: sskrSetVector.phrase, mode: "direct", threshold: 2 },
+      { mnemonic: SSKR_SET_VECTOR.phrase, mode: "direct", threshold: 2 },
       nodeSharePlatform,
       { decodeEntry: "The Decode tab" },
     );
@@ -221,34 +259,41 @@ describe("the codes of refusals, with their kind and wording", () => {
         "Once the copies are left out, one share is left; type 2 different shares.",
         undefined,
       ],
-      // What sskr-combine says of complete shares before it tries, each condition in its words.
+      // What sskr-combine says of complete shares before it tries, each condition in its words
+      // and by its own code.
+      [
+        [first, second, grouped],
+        "share-of-another-set",
+        "Share 3 is of another set than share 1.",
+        undefined,
+      ],
       [
         [first, grouped],
-        "shares-not-restorable-together",
+        "shares-of-different-sets",
         "Shares 1 and 2 are of different sets, and nothing tells which is right.",
         undefined,
       ],
       [
         [first, wrongValue(first)],
-        "shares-not-restorable-together",
+        "member-given-twice",
         "Shares 1 and 2 are the same member of the set but differ, and nothing tells which is right.",
         undefined,
       ],
       [
         [defined(ofTwo), defined(ofThree)],
-        "shares-not-restorable-together",
+        "group-thresholds-conflict",
         "Shares 1 and 2 give their group different thresholds, and nothing tells which is right.",
         undefined,
       ],
       [
         twoOfFive,
-        "shares-not-restorable-together",
+        "too-few-for-threshold",
         "These 2 shares are not enough: this set needs 3.",
         undefined,
       ],
       [
         [grouped, otherGrouped],
-        "shares-not-restorable-together",
+        "too-few-groups",
         "These shares are not enough: this set needs 2 of its 2 groups, each with as many shares as its threshold.",
         undefined,
       ],
@@ -274,11 +319,20 @@ describe("the codes of refusals, with their kind and wording", () => {
       // A refusal of the shares typed, after which they are asked again: no fault of the host.
       expect(ShareBackupCheck.isRestoreRefusal(failure)).toBe(true);
     }
+    // Another refusal of the same check, before any restore, and a fault are no such refusal.
+    const answer = await failureOf(() => check.sharesOf(first));
+    expectRefusal(
+      answer,
+      "core.backup-check.shares-refused",
+      "This is one share; type 2, separated by ;.",
+    );
+    expect(ShareBackupCheck.isRestoreRefusal(answer)).toBe(false);
+    expect(ShareBackupCheck.isRestoreRefusal(new Error("too-few-shares"))).toBe(false);
   });
 
   it("give a marked share that no share fits a code of its own", async () => {
     // An element changed beside the marked one: no value of the mark makes the CRC-32 hold.
-    const units = shareUnits(sskrSetVector.shares[0], "ur");
+    const units = shareUnits(SSKR_SET_VECTOR.shares[0], "ur");
     const [one, other] = MINIMAL_BYTEWORDS;
     units[VALUE_BYTE] = units[VALUE_BYTE] === one ? other! : one!;
     units[VALUE_BYTE + 1] = "?";
@@ -288,14 +342,73 @@ describe("the codes of refusals, with their kind and wording", () => {
       "No valid share fits the marked elements. Check their places and the other elements.",
     );
   });
+});
 
-  it("refuse a wallet check with fewer shares than the threshold off the private screen", async () => {
+describe("the codes of refusals off the private screen, with their kind and wording", () => {
+  it("tell a share that cannot be read, a seed phrase typed for a share, one of another set, too few shares and shares that conflict", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const directory = await mkdtemp(join(tmpdir(), "mnemocode-refusal-codes-"));
+    try {
+      const [first, second] = SSKR_SET_VECTOR.shares;
+      // A share of another split of a secret of the same length: its identifier differs.
+      const [, other] = await nodeSharePlatform.createShares(
+        new Uint8Array(16),
+        2,
+        3,
+        new Uint8Array(SEED_BYTES).fill(7),
+      );
+      const cases = [
+        [
+          [first, "not a share at all"],
+          "share-unreadable",
+          "Share 2 cannot be read: unknown SSKR Byteword.",
+        ],
+        [
+          [
+            first,
+            "abandon ability able about above absent absorb abstract absurd abuse access accident",
+          ],
+          "seed-phrase-in-words",
+          "Share 2 is a seed phrase in words, not a Shamir share: Decode numbers, codes or colors back into a seed phrase reads a masked one.",
+        ],
+        [[first, second, other], "share-of-another-set", "Share 3 is of another set than share 1."],
+        [[first], "too-few-for-threshold", "One share is not enough: this set needs 2."],
+        [
+          [first, second, wrongValue(defined(second))],
+          "member-given-twice",
+          "Shares 2 and 3 are the same member of the set but differ, and nothing tells which is right.",
+        ],
+      ] as const;
+      const path = join(directory, "shares.txt");
+      for (const [shares, code, message] of cases) {
+        await writeFile(path, `${shares.join("\n")}\n`);
+        const combined = await failureOf(() => runSskrCombine({ "share-file": path }));
+        expectRefusal(combined, `sskr.share-input.${code}`, message);
+        // A share that cannot be read keeps the reader's own refusal as its cause.
+        if (code === "share-unreadable")
+          expect(errorCode(causeOf(combined))).toMatch(/^sskr\.transport\./u);
+        // An export, which needs no quorum, refuses the others so too.
+        if (code !== "too-few-for-threshold")
+          expectRefusal(
+            await failureOf(() => runSskrExport({ "share-file": path })),
+            `sskr.share-input.${code}`,
+            message,
+          );
+      }
+    } finally {
+      vi.restoreAllMocks();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("refuse a wallet check with fewer shares than the threshold", async () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-refusal-codes-"));
     try {
       const path = join(directory, "share.txt");
-      await writeFile(path, `${sskrSetVector.shares[0]}\n`);
+      await writeFile(path, `${SSKR_SET_VECTOR.shares[0]}\n`);
       expectRefusal(
         await failureOf(() =>
           runSskrExport({ "share-file": path, "master-fingerprint": TEST_FINGERPRINT }),
@@ -308,4 +421,35 @@ describe("the codes of refusals, with their kind and wording", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+});
+
+describe("the codes of refusals where the menu asks for a file", () => {
+  it.skipIf(process.getuid?.() === 0)(
+    "tell a file that is not there from one that cannot be looked at, where the menu asks for one",
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), "mnemocode-input-file-"));
+      const closed = join(directory, "closed");
+      try {
+        await writeFile(join(directory, "record.txt"), "synthetic");
+        const absent = { code: "cli.output-questions.there-no-such-file-check-name-folder" };
+        await expect(inputFile(join(directory, "missing.txt"), 1)).rejects.toMatchObject(absent);
+        // A name under a file: nothing can be there.
+        await expect(inputFile(join(directory, "record.txt", "x"), 1)).rejects.toMatchObject(
+          absent,
+        );
+        // A file in a folder that may not be searched may be there or not: unknown, not "none".
+        await mkdir(closed);
+        await writeFile(join(closed, "record.txt"), "synthetic");
+        await chmod(closed, 0);
+        const refused: unknown = await inputFile(join(closed, "record.txt"), 1).catch(
+          (error: unknown) => error,
+        );
+        expect(errorCode(refused)).toBe("cli.output-questions.file-cannot-be-looked-at");
+        expect(errorCode(refused instanceof Error ? refused.cause : undefined)).toBe("EACCES");
+      } finally {
+        await chmod(closed, 0o700).catch(() => undefined);
+        await rm(directory, { recursive: true, force: true });
+      }
+    },
+  );
 });

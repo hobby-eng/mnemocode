@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as engine from "../sskr-wasm/generated/recovery_sskr_wasm.js";
 import { bytesOfHex } from "../src/core/bits.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { writeShare } from "../src/sskr/transport.js";
 
 const wasm = engine.initSync({
@@ -10,8 +10,8 @@ const wasm = engine.initSync({
     new URL("../sskr-wasm/generated/recovery_sskr_wasm_bg.wasm", import.meta.url),
   ),
 });
-const compact = sskrSetVector.shares.join("\n");
-const words = sskrSetVector.shares.map((share) => writeShare(share, "words")).join("\n");
+const compact = SSKR_SET_VECTOR.shares.join("\n");
+const words = SSKR_SET_VECTOR.shares.map((share) => writeShare(share, "words")).join("\n");
 const cases = [
   ["compact", undefined, compact],
   ["formatted compact", engine.ShareEncoding.CompactUr, compact],
@@ -20,8 +20,8 @@ const cases = [
 afterEach(() => vi.restoreAllMocks());
 
 function create(encoding: number | undefined): string {
-  const secret = bytesOfHex(sskrSetVector.entropy);
-  const seed = bytesOfHex(sskrSetVector.testOnlySeed);
+  const secret = bytesOfHex(SSKR_SET_VECTOR.entropy);
+  const seed = bytesOfHex(SSKR_SET_VECTOR.testOnlySeed);
   try {
     return encoding === undefined
       ? engine.create_sskr_shares(secret, 1, Uint8Array.of(2, 3), seed)
@@ -72,8 +72,8 @@ describe.each(cases)("SSKR %s creation output", (_name, encoding, expected) => {
 });
 
 it("leaves the next allocation usable after a native creation refusal", () => {
-  const secret = bytesOfHex(sskrSetVector.entropy);
-  const seed = bytesOfHex(sskrSetVector.testOnlySeed);
+  const secret = bytesOfHex(SSKR_SET_VECTOR.entropy);
+  const seed = bytesOfHex(SSKR_SET_VECTOR.testOnlySeed);
   try {
     expect(() =>
       engine.create_sskr_shares_formatted(secret, 1, Uint8Array.of(2, 3), seed, 2),

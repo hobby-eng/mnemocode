@@ -65,15 +65,15 @@ node scripts/sign-release.mjs v0.1.0
 
 `--dry-run` prints every command in order and runs none of them. A real run:
 
-1. Checks that the tools and the secret key are there and that `v0.1.0` has exactly one release on GitHub, a draft.
+1. Checks that the tools and the secret key are there and that `v0.1.0` has exactly one release on GitHub, a draft of at most nine files (the six, `SHA256SUMS` and the signature and public key of an earlier, unfinished run), none larger than 512 MiB.
 2. Downloads the draft into `release-signing-v0.1.0/`, a new folder that Git ignores.
-3. Checks that the folder holds exactly the files that `SHA256SUMS` lists, runs `sha256sum --check --strict SHA256SUMS`, and `gh attestation verify` for each file.
+3. Checks that `SHA256SUMS` takes at most 1 MiB and lists at most six files, each once, and that the folder holds exactly those files; then runs `sha256sum --check --strict SHA256SUMS`, and `gh attestation verify` for each file.
 4. Signs with `gpg --local-user 28FC51B1DB80DF2101128CB30EDD4814591DD095 --armor --detach-sign`, which writes `SHA256SUMS.asc`. GnuPG asks for the passphrase itself; the script never reads or copies the private key.
 5. Checks the signature with `gpg --verify` and that the release key made it.
 6. Exports the public key as `RELEASE-SIGNING-KEY.asc`.
 7. Uploads `SHA256SUMS.asc` and `RELEASE-SIGNING-KEY.asc` to the draft, replacing those of an earlier, unfinished run.
 
-A failure stops the script with one line that says why, Ctrl+C with "Cancelled.", and nothing is uploaded before every check has passed. To run it again, move the folder away first. The key is valid until 2028-10-04; extend it before then and publish the extended public key on GitHub.
+A failure stops the script with one line that says why, as does a command that writes more than 1 MiB of output, Ctrl+C with "Cancelled.", and nothing is uploaded before every check has passed. To run it again, move the folder away first. The key is valid until 2028-10-04; extend it before then and publish the extended public key on GitHub.
 
 ## Publish
 
@@ -97,4 +97,4 @@ sha256sum --check --ignore-missing SHA256SUMS
 gh attestation verify mnemocode-0.1.0-linux-x64 --repo hobby-eng/mnemocode
 ```
 
-`gpg --show-keys` must show the fingerprint above, and `gpg --verify` must say "Good signature". Compare the fingerprint with a source you trust, such as the key GitHub shows for the maintainer at https://github.com/hobby-eng.gpg: a key that comes with the download proves nothing by itself. `--ignore-missing` lets the check pass when only some files were downloaded. The signature shows which key signed `SHA256SUMS`; the attestation shows that a file was built from this repository by its release workflow.
+`gpg --show-keys` must show the fingerprint above, and `gpg --verify` must say "Good signature". Compare the fingerprint with a source you trust, such as the key GitHub shows for the maintainer at https://github.com/hobby-eng.gpg: a key that comes with the download proves nothing by itself. `--ignore-missing` lets the check pass when only some files were downloaded. The signature shows which key signed `SHA256SUMS`; `gh attestation verify` shows that a file was built by a GitHub Actions workflow of this repository and was not changed since.

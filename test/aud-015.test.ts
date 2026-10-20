@@ -7,7 +7,7 @@ import { allWiped, madeArrays } from "./helpers/made-arrays.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
 import { checksumValid, WordCandidateSearch } from "../src/core/candidates.js";
 import { DatesAnswer, DateSearch, type WalletCheck } from "../src/core/date-search.js";
-import { protectionFor } from "../src/core/candidate-encryption.js";
+import { protectionFor, type ListProtectionChoice } from "../src/core/candidate-encryption.js";
 import { zeroEntropyPhrase } from "../src/core/english-words.js";
 import { Masking } from "../src/core/masking.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
@@ -20,6 +20,7 @@ import {
   SECONDS_PER_MINUTE,
 } from "../src/core/search-turns.js";
 import { ENCODED_FORMATS } from "../src/core/types.js";
+import type { WalletMatch } from "../src/core/wallet-check.js";
 import { assertAllowedArguments, parseArguments } from "../src/cli/arguments.js";
 import { optionLabel } from "../src/cli/option-copy.js";
 import { crc32 } from "../src/sskr/checksum.js";
@@ -207,6 +208,7 @@ describe("AUD-015-SEC001: the share readers wipe the bytes they only borrow", ()
 
 describe("AUD-001-API001: the share form that mirrors a form of codes refuses one that names none", () => {
   it.each(["typo", null, 5])("refuses %s", (form) => {
+    // A form that no type allows, fed on purpose as a JavaScript host could.
     expect(() => shareFormatMirroring(form as never)).toThrow("Unsupported encoded format");
   });
 
@@ -260,8 +262,13 @@ describe("AUD-015 observations: a host's object is read once, then its copy is u
   }
 
   it("keeps the protection of the kind that was checked", () => {
-    const choice = changing({ passphrase: "public test passphrase" }, "kind", "passphrase", "none");
-    expect(protectionFor(choice as never).constructor.name).toBe("PassphraseProtection");
+    const choice = changing<ListProtectionChoice, string>(
+      { passphrase: "public test passphrase", kind: "passphrase" },
+      "kind",
+      "passphrase",
+      "none",
+    );
+    expect(protectionFor(choice).constructor.name).toBe("PassphraseProtection");
   });
 
   it("counts a wallet answer as the one that was checked", async () => {
@@ -270,7 +277,7 @@ describe("AUD-015 observations: a host's object is read once, then its copy is u
       dates: DatesAnswer.of([DATE]),
       mode: "seedshift",
       keep: 1,
-      walletCheck: () => changing({}, "matched", false, true) as never,
+      walletCheck: () => changing<WalletMatch, boolean>({ matched: false }, "matched", false, true),
     });
     expect((await search.run()).matchCount).toBe(0);
   });

@@ -16,6 +16,7 @@ import {
 import { checksumAt, crc32 } from "./checksum.js";
 import { BitFields } from "./gf2.js";
 import { CHECKSUM_BYTES, MAX_TRANSPORT_BYTES, type ShareFormat } from "./transport.js";
+import { MINIMAL_BYTEWORD_LETTERS } from "./bytewords-list.js";
 import {
   fillingFields,
   headerFields,
@@ -43,10 +44,13 @@ export const WHOLE_CODE = new RegExp(`^[0-9A-F]{${CODE_DIGITS}}$`, "u");
 /** The code points of Color Unicode text, each as its hexadecimal digits. */
 export const CODE_POINT_TEXT = new RegExp(`.{${CODE_DIGITS}}`, "gu");
 
-/** A pair of letters of a UR as written, in lower case. */
-const UR_PAIR = /[a-z]{2}/;
+/** A pair of letters of a UR as written, a minimal Byteword, in lower case. */
+const UR_PAIR = new RegExp(`[a-z]{${MINIMAL_BYTEWORD_LETTERS}}`, "u");
 
-/** The longest text of one share that a repair reads (exceedsMarks). */
+/**
+ * The longest text of one share that a repair reads, in UTF-16 code units once trimmed
+ * (exceedsMarks).
+ */
 export const MAX_REPAIR_TEXT_LENGTH = 2048;
 
 /** The most units of a share: each holds at least one byte of the transport. */
@@ -66,6 +70,15 @@ export function isMarked(text: string): boolean {
 export type ShareRepairErrorCode = "share-variants" | "ambiguous-marks";
 
 /**
+ * A share evaluated in one layout: its residual bits, zero exactly when it is well formed there,
+ * and its SSKR payload, a copy that the caller wipes.
+ */
+interface LayoutEvaluation {
+  readonly residual: bigint;
+  readonly payload: Uint8Array;
+}
+
+/**
  * One way the bytes of a share can be laid out (its secret length, CBOR header and tag), as
  * functions of its unit values, both affine over GF(2): the residual bits, zero exactly when the
  * share is well formed, and the SSKR payload, 5 metadata bytes and the share value.
@@ -74,10 +87,7 @@ export interface ShareStructure {
   /** The bytes of the SSKR payload in this layout: 5 of metadata and the secret's. */
   readonly payloadLength: number;
   /** The residual and the payload at every unit's value; the caller wipes the payload, a copy. */
-  readonly evaluate: (values: readonly number[]) => {
-    readonly residual: bigint;
-    readonly payload: Uint8Array;
-  };
+  readonly evaluate: (values: readonly number[]) => LayoutEvaluation;
 }
 
 /** Symbolic Color Unicode constraints; prefix readings inspect only their own filled units. */
@@ -191,7 +201,7 @@ function layoutResidual(
   recorded: number,
   layout: CborLayout,
   fields: readonly ZeroField[] = [],
-): { readonly residual: bigint; readonly payload: Uint8Array } {
+): LayoutEvaluation {
   try {
     return {
       residual: BitFields.of([

@@ -5,13 +5,25 @@ import { drawCollectionQr, MIN_MODULE_MM, qrSizeForModuleMm } from "../src/expor
 import { MM } from "../src/export/business-layout.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
 
-// jsQR's CommonJS wrapper is typed as a module under NodeNext; src/cli/qr-input.ts reads it so too.
-const jsQR = jsQRModule as unknown as (
+/** jsQR's scanner (jsqr/dist/index.d.ts): the parts of its options and result read here. */
+type Scanner = (
   data: Uint8ClampedArray,
   width: number,
   height: number,
   options?: { inversionAttempts?: "dontInvert" },
 ) => { data: string } | null;
+
+/**
+ * Whether `loaded` is jsQR's scanner. The compilers type the default import of jsQR's CommonJS
+ * wrapper differently under NodeNext, tsc as the module and the linter's as the scanner; at run
+ * time it is the scanner, which src/cli/qr-input.ts checks the same way.
+ */
+function isScanner(loaded: unknown): loaded is Scanner {
+  return typeof loaded === "function";
+}
+
+const jsQR: unknown = jsQRModule;
+if (!isScanner(jsQR)) throw new Error("jsQR's default export is no function.");
 
 describe("Printable card QR", () => {
   it.each([

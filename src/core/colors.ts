@@ -83,7 +83,10 @@ export function isRgbReference(reference: string): boolean {
   return RGB_REFERENCE.test(reference);
 }
 
-/** The six hexadecimal digits of a color in capitals, without #; refuses another text. */
+/**
+ * The six hexadecimal digits of a color in capitals, without #; refuses another text
+ * (core.colors.invalid-rgb-reference).
+ */
 export function rgbReferenceDigits(reference: string): string {
   if (!isRgbReference(reference)) throw ERRORS.create("invalid-rgb-reference", []);
   return reference.replace(/^#/u, "").toUpperCase();
@@ -122,7 +125,11 @@ function wordPositionsOf(digits: string): string[] {
   return textPieces(digits, WORD_NUMBER_DIGITS);
 }
 
-/** CSS RGB packing of BIP39 indexes. The 12- and 24-word cases are BIP39Colors-compatible. */
+/**
+ * CSS RGB packing of BIP39 indexes. The 12- and 24-word cases are BIP39Colors-compatible. Refuses
+ * indexes that are no phrase (assertPhraseIndexes: core.bip39-sizes.expected-word-indexes,
+ * assert-word-indexes-refused).
+ */
 export function indexesToColors(given: readonly number[]): string[] {
   // Array.from turns holes into undefined, which is refused; some() would skip them, and map and
   // join would then leave them out of the colors without a word.
@@ -141,9 +148,8 @@ export function indexesToColors(given: readonly number[]): string[] {
 
 /**
  * The colors of a seed phrase, #RRGGBB codes or six digits each, apart or run together. Refuses
- * text that is not whole colors (hashed-colors-refused, joined-colors-refused), and a count of
- * colors that no phrase
- * has (enter-colors-standard-bip39-word-count).
+ * text that is not whole colors (core.colors.hashed-colors-refused, joined-colors-refused), and a
+ * count of colors that no phrase has (enter-colors-standard-bip39-word-count).
  */
 export function parseColors(value: string): string[] {
   const hashed = value.includes("#");
@@ -161,7 +167,8 @@ export function parseColors(value: string): string[] {
 /**
  * The place of each of `given` colors among them as given, counted from 0, in the order of their
  * tags, which colorsToIndexes reads them in: colors may be typed in any order, and a color that
- * differs is named by the place it was typed at (AUD-037-FUN003).
+ * differs is named by the place it was typed at (AUD-037-FUN003). Refuses a color not in uppercase
+ * #RRGGBB form (core.colors.each-color-use-uppercase-rrggbb-form).
  */
 export function typedPlacesOfColors(given: readonly string[]): number[] {
   return Array.from(given, (color, place) => ({ tag: tagAndPayload(color).tag, place }))
@@ -171,7 +178,9 @@ export function typedPlacesOfColors(given: readonly string[]): number[] {
 
 /**
  * The word numbers that `given` colors stand for, from 0; refuses a count of colors that no phrase
- * has and a color that is no word's.
+ * has (core.colors.enter-colors-standard-bip39-word-count), a color not in uppercase #RRGGBB form
+ * (each-color-use-uppercase-rrggbb-form), order tags that are not those of one set
+ * (invalid-color-set) and a color that is no word's (color-codes-do-not-contain-valid-bip39-word).
  */
 export function colorsToIndexes(given: readonly string[]): number[] {
   // Array.from, so that a hole is a color that is refused rather than one that map skips.
@@ -201,7 +210,10 @@ export function colorsToIndexes(given: readonly string[]): number[] {
  * the tags read fit more than one start, as when the lowest or the highest color cannot be read,
  * colors typed in the order of their tags, as a record prints them, tell the start by their
  * places; colors typed in another order give a placement for each start, the lowest first
- * (AUD-037-FUN004).
+ * (AUD-037-FUN004). Refuses a count of colors that no phrase has
+ * (core.colors.enter-colors-standard-bip39-word-count), a color not in uppercase #RRGGBB form
+ * (each-color-use-uppercase-rrggbb-form), two colors of one tag (invalid-color-set), and colors
+ * read whose tags leave no place for the others (colors-can-read-do-not-tell-where-others).
  */
 export function wordPositionPlacements(colors: readonly (string | undefined)[]): string[][] {
   const given = Array.from(colors);
@@ -288,7 +300,11 @@ export const COLOR_UNICODE_SYMBOL_CLASS = [
   .map((point) => `\\u{${point.toString(16)}}`)
   .join("-");
 
-/** The #RRGGBB color of two code points of color Unicode; refuses what writes no color. */
+/**
+ * The #RRGGBB color of two code points of color Unicode; refuses what writes no color: a code point
+ * outside Color Unicode (core.colors.color-unicode-uses-only-mnemo-code-private-use) and a value
+ * above #FFFFFF (color-unicode-contains-value-outside-rrggbb-range).
+ */
 export function colorOfUnicodePair(high: number, low: number): string {
   assertColorUnicodePoints([high, low]);
   const color = (high - COLOR_UNICODE_BASE) * COLOR_UNICODE_WIDTH + low - COLOR_UNICODE_BASE;
@@ -297,7 +313,10 @@ export function colorOfUnicodePair(high: number, low: number): string {
   return rgbHex(color);
 }
 
-/** Portable text form: two four-digit Private Use code points per CSS RGB color. */
+/**
+ * Portable text form: two four-digit Private Use code points per CSS RGB color. Refuses a color not
+ * in uppercase #RRGGBB form (core.colors.each-color-use-uppercase-rrggbb-form).
+ */
 export function colorsToUnicode(colors: readonly string[]): string {
   // Array.from, so that a hole is a color that is refused rather than one left out of the text.
   return Array.from(colors)
@@ -339,8 +358,8 @@ function colorsFromUnicodePoints(points: readonly number[]): string[] {
 
 /**
  * Color Unicode of a seed phrase: 8 to 16 colors, two code points each. Refuses a count of code
- * points that no phrase has, and code points that are no color of MnemoCode (codes-all and the
- * refusals of colorOfUnicodePair).
+ * points that no phrase has (core.colors.codes-all), and code points that are no color of
+ * MnemoCode (the refusals of colorOfUnicodePair).
  */
 export function unicodeToColors(value: string): string[] {
   const points = colorUnicodePoints(value);
@@ -355,7 +374,11 @@ export function unicodeToColors(value: string): string[] {
   return colorsFromUnicodePoints(points);
 }
 
-/** Color Unicode of any length, such as a share written as colors (src/sskr/transport.ts). */
+/**
+ * Color Unicode of any length, such as a share written as colors (src/sskr/transport.ts). Refuses
+ * code points that do not pair up into colors (core.colors.color-unicode-pairs), and code points
+ * that are no color of MnemoCode (the refusals of colorOfUnicodePair).
+ */
 export function unicodeToColorCodes(value: string): string[] {
   return colorsFromUnicodePoints(colorUnicodePoints(value));
 }

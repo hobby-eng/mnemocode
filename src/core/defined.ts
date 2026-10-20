@@ -12,11 +12,11 @@ const ERRORS = new ErrorCatalog("core.defined", {
 });
 
 /** What a value that the code holds to be there but is not says: a fault of MnemoCode. */
-export const MISSING_VALUE =
-  "MnemoCode expected a value that is not there: this is a fault of MnemoCode.";
+const MISSING_VALUE = "MnemoCode expected a value that is not there: this is a fault of MnemoCode.";
 
 /**
- * `value`, which the code holds to be there; throws MISSING_VALUE where it is undefined or null.
+ * `value`, which the code holds to be there; throws MISSING_VALUE where it is undefined or null
+ * (core.defined.missing-value).
  */
 export function defined<T>(value: T | undefined | null): T {
   if (value === undefined || value === null) throw ERRORS.create("missing-value", []);

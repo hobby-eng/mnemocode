@@ -29,7 +29,7 @@ describe("Temporary key-sequence owners", () => {
       });
       if (writerFails) await expect(pending).rejects.toBe(fault);
       else if (limit === 1)
-        await expect(pending).rejects.toMatchObject({ code: "unusable-answer" });
+        await expect(pending).rejects.toMatchObject({ code: "answer-too-long" });
       else await expect(pending).resolves.toBe("a[1 ");
       expect(reader).toHaveBeenCalledTimes(1);
       const observed = reader.mock.results[0];

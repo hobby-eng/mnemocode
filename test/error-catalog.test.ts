@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ErrorCatalog, suppliedMessage } from "../src/core/error-catalog.js";
 import { errorCode } from "../src/core/refusal.js";
+import { scriptExports } from "./helpers/script-exports.js";
 
 const catalog = new ErrorCatalog("fixture", {
   missing: () => "An input is required.",
@@ -146,20 +147,14 @@ describe("cross-runtime error identification", () => {
 
 describe("executable failure preservation", () => {
   it("keeps every cause of a failed executable publication and rollback", async () => {
-    const path = new URL("../scripts/executable-build-errors.mjs", import.meta.url).href;
-    const module: unknown = await import(path);
-    if (module === null || typeof module !== "object" || !("PublicationRollbackError" in module))
-      throw new Error("The executable failure module has no constructor.");
-    if (typeof module.PublicationRollbackError !== "function")
-      throw new Error("The executable failure constructor has the wrong shape.");
+    const { PublicationRollbackError } = await scriptExports<{
+      PublicationRollbackError: new (causes: readonly Error[], staging: string) => unknown;
+    }>("scripts/executable-build-errors.mjs", { PublicationRollbackError: "function" });
     const causes = [
       new Error("Synthetic publication failure."),
       new Error("Synthetic rollback failure."),
     ];
-    const error: unknown = Reflect.construct(module.PublicationRollbackError, [
-      causes,
-      "synthetic-staging",
-    ]);
+    const error = new PublicationRollbackError(causes, "synthetic-staging");
     expect(error).toBeInstanceOf(AggregateError);
     expect(error).toMatchObject({
       code: "scripts.build-executable.publication-and-rollback-failed",

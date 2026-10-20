@@ -13,7 +13,8 @@ import { validateCardOptions } from "../../src/cli/card-options.js";
 import { imageFormat } from "../../src/cli/image-options.js";
 import { MENU_ENTRIES } from "../../src/cli/menu.js";
 import { MENU_ENTRY_NAMES as ENTRY, type MenuEntryName } from "../../src/cli/menu-entries.js";
-import { resolveSskrLayout } from "../../src/export/sskr-content.js";
+import { encodeFormat } from "../../src/cli/input.js";
+import { parseSskrLayout, resolveSskrLayout } from "../../src/export/sskr-content.js";
 import { COIN_ADDRESS_ANSWERS } from "./coin-addresses.js";
 import { script } from "./menu-script.js";
 
@@ -87,6 +88,7 @@ export function answeredByScript(): void {
     script.typed = {};
     script.lines = [];
     script.noImages = false;
+    script.fitCards = false;
   });
 }
 
@@ -115,9 +117,6 @@ export async function everyPath(
   return runs;
 }
 
-/** The --format numbers as the encoded forms that validateCardOptions takes. */
-const FORM_OF_NUMBER = { "3": "unicode", "4": "colors-unicode", "5": "colors" } as const;
-
 /**
  * Checks the options of a command line for cards as the commands check them before asking for a
  * secret: the details and the page size, the image format, and for a single copy the card options
@@ -131,12 +130,8 @@ export function assertCardOptions(
   const settings = businessOptions(parsed);
   if (parsed["image-format"] !== undefined) imageFormat(parsed);
   if (parsed.sskr === true)
-    resolveSskrLayout(value(parsed, "card-layout") as never, settings.pageSize);
-  else
-    validateCardOptions(
-      parsed,
-      FORM_OF_NUMBER[value(parsed, "format") as keyof typeof FORM_OF_NUMBER],
-    );
+    resolveSskrLayout(parseSskrLayout(value(parsed, "card-layout")), settings.pageSize);
+  else validateCardOptions(parsed, encodeFormat(value(parsed, "format")));
 }
 
 /** The command line that `answers` give in `entry`, with `typed` for its typed questions. */

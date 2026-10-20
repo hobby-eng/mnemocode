@@ -4,6 +4,7 @@
 
 import { spawnSync } from "node:child_process";
 import { expect } from "vitest";
+import { RUN_OUTPUT_BYTES, TEST_TIME_LIMIT_MS } from "./limits.js";
 
 /** The license notices of an executable of MnemoCode 0.1.0 with no npm package bundled. */
 export function executableNotices(): string {
@@ -15,7 +16,7 @@ export function executableNotices(): string {
       'import { executableNotices } from "./scripts/executable-notices.mjs";' +
         'process.stdout.write(executableNotices({ root: process.cwd(), name: "mnemocode", version: "0.1.0", metafile: { inputs: {} } }));',
     ],
-    { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+    { encoding: "utf8", maxBuffer: RUN_OUTPUT_BYTES, timeout: TEST_TIME_LIMIT_MS },
   );
   expect(run.status, run.stderr).toBe(0);
   return run.stdout;

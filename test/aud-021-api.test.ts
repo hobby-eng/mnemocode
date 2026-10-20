@@ -1,8 +1,8 @@
 // AUD-021-API001/API002 regression acceptance, unlike the baseline defect-presence harness.
 // Public BIP39/MnemoCode vectors and synthetic malformed inputs only.
 import { Buffer } from "node:buffer";
+import { types } from "node:util";
 import { runInNewContext } from "node:vm";
-import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { BIP39_ENTROPY_BYTES } from "../src/core/bip39-sizes.js";
 import {
@@ -16,16 +16,8 @@ import { NOT_CONFIRMED, ReEncoding } from "../src/core/re-encoding.js";
 import type { DecodedResult } from "../src/core/types.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
 import { holes } from "./helpers/holes.js";
+import vectors from "../vectors/candidates-v1.json" with { type: "json" };
 
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/candidates-v1.json", import.meta.url), "utf8"),
-) as {
-  lists: {
-    name: string;
-    records: { entropy: string; phrase: string }[];
-    bytes: string;
-  }[];
-};
 const PUBLIC_LIST = vectors.lists.find((list) => list.name === "three phrases")!;
 const ENTROPY_BYTES = BIP39_ENTROPY_BYTES[0]!;
 const PHRASE = PUBLIC_LIST.records[0]!.phrase;
@@ -58,7 +50,8 @@ function refuseResultMutation(result: DecodedResult): void {
 
 describe("AUD-021-API001: candidate entropy is byte data", () => {
   it("accepts genuine bytes from another realm and ignores a shadowed type tag", () => {
-    const entropy = runInNewContext(`new Uint8Array(${ENTROPY_BYTES}).fill(1)`) as Uint8Array;
+    const entropy: unknown = runInNewContext(`new Uint8Array(${ENTROPY_BYTES}).fill(1)`);
+    if (!types.isUint8Array(entropy)) throw new Error("Expected a Uint8Array of another realm.");
     expect(entropy instanceof Uint8Array).toBe(false);
     Object.defineProperty(entropy, Symbol.toStringTag, { value: "Uint16Array" });
     const encoded = encodeCandidateList({ records: [{ entropy }] });
@@ -91,6 +84,7 @@ describe("AUD-021-API001: candidate entropy is byte data", () => {
     const record = {
       get entropy(): Uint8Array {
         reads += 1;
+        // Bytes of a wrong type on a second read, fed on purpose: the record is read once.
         return reads === 1
           ? source
           : (new Uint16Array(ENTROPY_BYTES).fill(256) as unknown as Uint8Array);
@@ -190,7 +184,7 @@ describe("AUD-021-API001: candidate entropy is byte data", () => {
           throw new Error("Passphrase construction must follow entropy admission.");
         },
       };
-      // A JavaScript caller is not restricted by the CandidateList TypeScript contract.
+      // Entropy that no type allows, fed on purpose as a JavaScript host could.
       expect(() => encodeCandidateList(list as unknown as CandidateList)).toThrow(/one length/u);
     }
     expect([...valid]).toEqual(Array.from({ length: ENTROPY_BYTES }, () => 1));
@@ -209,6 +203,7 @@ describe("AUD-021-API001: candidate entropy is byte data", () => {
       ],
     ],
   ] as const)("refuses %s as a whole", (_, records) => {
+    // Records that no type allows, fed on purpose as a JavaScript host could.
     expect(() => encodeCandidateList({ records } as unknown as CandidateList)).toThrow(
       /one length/u,
     );

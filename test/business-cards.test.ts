@@ -15,6 +15,7 @@ import { validateCardOptions } from "../src/cli/card-options.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
 import { cardExportCheck } from "../src/export/cards-self-test.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
 const colors = indexesToColors(
   representMnemonic(entropyToMnemonic(new Uint8Array(32), wordlist)).shiftedIndexes,
@@ -54,46 +55,50 @@ describe("business card collections", () => {
     ).toThrow("Page size");
   });
 
-  it("renders both designs with real fonts/artwork, custom fields and both raw QR formats", async () => {
-    for (const [id, size, payload] of [
-      ["business-architect", "a6", colors.join(" ")],
-      ["business-it", "a4", colorsToUnicode(colors)],
-    ] as const) {
-      const bytes = await renderCards(nodeCardRenderer, [
-        {
-          template: selectTemplate(id),
-          content: {
-            kind: "colors",
-            colors,
-            payload,
-            pageSize: size,
-            // Given, as the sizes are checked below; without it a sheet is turned the way its
-            // cards are largest.
-            orientation: size === "a6" ? "landscape" : "portrait",
-            cardQr: true,
-            presentation: resolveCardPresentation(() => 0, {}),
-            profile: {
-              name: "Alex Morgan",
-              email: "me@example.com",
-              company: "VECTOR SYSTEMS",
-              role: "IT SOLUTIONS DIRECTOR",
-              website: "vector.example",
-              phone: "+1 202 555 0148",
-              location: "International",
+  it(
+    "renders both designs with real fonts/artwork, custom fields and both raw QR formats",
+    async () => {
+      for (const [id, size, payload] of [
+        ["business-architect", "a6", colors.join(" ")],
+        ["business-it", "a4", colorsToUnicode(colors)],
+      ] as const) {
+        const bytes = await renderCards(nodeCardRenderer, [
+          {
+            template: selectTemplate(id),
+            content: {
+              kind: "colors",
+              colors,
+              payload,
+              pageSize: size,
+              // Given, as the sizes are checked below; without it a sheet is turned the way its
+              // cards are largest.
+              orientation: size === "a6" ? "landscape" : "portrait",
+              cardQr: true,
+              presentation: resolveCardPresentation(() => 0, {}),
+              profile: {
+                name: "Alex Morgan",
+                email: "me@example.com",
+                company: "VECTOR SYSTEMS",
+                role: "IT SOLUTIONS DIRECTOR",
+                website: "vector.example",
+                phone: "+1 202 555 0148",
+                location: "International",
+              },
             },
           },
-        },
-      ]);
-      const pdf = await PDFDocument.load(bytes);
-      expect(pdf.getPageCount()).toBe(1);
-      for (const page of pdf.getPages()) {
-        expect(page.getWidth()).toBeCloseTo((size === "a6" ? 148 : 210) * MM, 3);
-        expect(page.getHeight()).toBeCloseTo((size === "a6" ? 105 : 297) * MM, 3);
+        ]);
+        const pdf = await PDFDocument.load(bytes);
+        expect(pdf.getPageCount()).toBe(1);
+        for (const page of pdf.getPages()) {
+          expect(page.getWidth()).toBeCloseTo((size === "a6" ? 148 : 210) * MM, 3);
+          expect(page.getHeight()).toBeCloseTo((size === "a6" ? 105 : 297) * MM, 3);
+        }
+        expect(pdf.getTitle() ?? "").toBe("");
+        expect((pageOperators(pdf, 0).match(/\nf\n/gu) ?? []).length).toBeGreaterThan(100);
       }
-      expect(pdf.getTitle() ?? "").toBe("");
-      expect((pageOperators(pdf, 0).match(/\nf\n/gu) ?? []).length).toBeGreaterThan(100);
-    }
-  }, 180_000);
+    },
+    LONGEST_TEST_TIME_LIMIT_MS,
+  );
 });
 
 describe("business card collections", () => {
@@ -104,7 +109,7 @@ describe("business card collections", () => {
     await expect(
       template.render(nodeCardRenderer, { ...content, payload: colors.slice(1).join(" ") }),
     ).rejects.toMatchObject({
-      code: "export.card-content.collection-qr-does-not-match-printed-references",
+      code: "export.content-kinds.collection-qr-does-not-match-printed-references",
     });
     // Text that is no colors is read as Color Unicode, which refuses it as such.
     await expect(

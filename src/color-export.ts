@@ -15,7 +15,7 @@ const ERRORS = new ErrorCatalog("color-export", {
 /** The id of a design of color cards, as the catalog names it (templates.ts). */
 export type ColorCardTemplateId = string;
 /** The designs that draw color cards, in the order of the catalog. */
-export const colorCardTemplates = templatesOfKind("colors");
+export const COLOR_CARD_TEMPLATES = templatesOfKind("colors");
 
 /**
  * What exportColorPalette draws and saves: the colors, the QR code's text if it is not the colors
@@ -26,7 +26,8 @@ export interface ColorExportOptions extends CardSettings {
   readonly colors: readonly string[];
   /**
    * The QR code's text; undefined for the colors joined by spaces. Another text must hold the same
-   * colors, such as the phrase's Unicode codes (payloadHoldsColors).
+   * colors, such as the phrase's Color Unicode codes, as the rules of a seed phrase's cards check
+   * it (ContentKindRules assertQr, content-kinds.ts).
    */
   readonly qrPayload?: string;
   /** Where the PDF of the cards is saved, as a new private file; undefined to draw no cards. */
@@ -46,8 +47,12 @@ export interface ColorExportOptions extends CardSettings {
 
 /**
  * Draws the color cards of `options` into its PDF and saves its QR code image, each where a path is
- * given; refuses colors that the cards cannot print or a QR text that holds others, and a design
- * given both alone and in a list.
+ * given. Refuses colors that the cards cannot print or a QR text that holds others, as
+ * assertColorCardContent refuses them (its export.card-content, export.card-decoys and
+ * export.content-kinds codes), and a design given both alone and in a list
+ * (color-export.select-one-template-template-collection-not-both). A design that names none is
+ * refused as selectTemplate refuses it, cards as renderCards refuses them, and a file that exists
+ * already as exportCards and exportQrPayload refuse it.
  */
 export async function exportColorPalette(options: ColorExportOptions): Promise<void> {
   const payload = options.qrPayload ?? options.colors.join(" ");

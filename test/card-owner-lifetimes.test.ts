@@ -5,11 +5,12 @@ import { CardRenderer } from "../src/export/card-renderer.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import { EncodeCardExport } from "../src/cli/encode-export.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
-import { sskrVector } from "../src/sskr/known-answers.js";
+import { SSKR_VECTOR } from "../src/sskr/known-answers.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 import { CardValues } from "../src/export/card-values.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
 import type { CardDrawing } from "../src/export/templates.js";
+import { deferred } from "./helpers/deferred.js";
 
 const WIPED = { code: "core.secret-value.wiped" };
 const noDrawing = (): never => {
@@ -30,29 +31,21 @@ function disposeIfPresent(owner: object): void {
   if (typeof dispose === "function") Reflect.apply(dispose, owner, []);
 }
 
-function gate() {
-  let open = (): void => undefined;
-  const waiting = new Promise<void>((resolve) => {
-    open = resolve;
-  });
-  return { waiting, open };
-}
-
 function heldFont() {
-  const entered = gate();
-  const release = gate();
+  const entered = deferred();
+  const held = deferred();
   let reads = 0;
   const host = new CardRenderer({
     ...nodeRenderPlatform,
     randomInt: () => 0,
     readAsset: async (path) => {
       reads += 1;
-      entered.open();
-      await release.waiting;
+      entered.release();
+      await held.promise;
       return nodeRenderPlatform.readAsset(path);
     },
   });
-  return { host, entered, release, reads: () => reads };
+  return { host, entered, held, reads: () => reads };
 }
 
 describe("card result owners", () => {
@@ -70,10 +63,10 @@ describe("card result owners", () => {
   });
 
   it("keeps the public share codes and one decoy while its plan is live", async () => {
-    const cards = await ShareCardSet.create(drawing, [sskrVector.shares[0]!], OPTIONS);
+    const cards = await ShareCardSet.create(drawing, [SSKR_VECTOR.shares[0]!], OPTIONS);
     try {
       expect(cards.printedCodes(0)).toEqual([
-        ...sskrVector.firstShareColors.map((color) => color.slice(1)),
+        ...SSKR_VECTOR.firstShareColors.map((color) => color.slice(1)),
         "000000",
       ]);
       expect(cards.shares[0]?.reference).toBe("4BBF-1-1");
@@ -102,7 +95,7 @@ describe("card result owners", () => {
   });
 
   it("ends a share plan idempotently and refuses every later secret operation", async () => {
-    const cards = await ShareCardSet.create(drawing, [sskrVector.shares[0]!], OPTIONS);
+    const cards = await ShareCardSet.create(drawing, [SSKR_VECTOR.shares[0]!], OPTIONS);
     try {
       const metadata = cards.shares;
       cards.wipe();
@@ -120,7 +113,7 @@ describe("card result owners", () => {
   });
 
   it("gives a converted share plan a lifetime independent of its parent", async () => {
-    const parent = await ShareCardSet.create(drawing, [sskrVector.shares[0]!], OPTIONS);
+    const parent = await ShareCardSet.create(drawing, [SSKR_VECTOR.shares[0]!], OPTIONS);
     const child = parent.forIndividualCards();
     try {
       const codes = child.printedCodes(0);
@@ -176,10 +169,10 @@ describe("Card planning and publication", () => {
       const first = cards.job();
       const second = cards.job();
       const completed = Promise.allSettled([first, second]);
-      await Promise.race([font.entered.waiting, completed]);
+      await Promise.race([font.entered.promise, completed]);
       expect(font.reads()).toBe(1);
       cards.wipe();
-      font.release.open();
+      font.held.release();
       const results = await completed;
       for (const result of results) {
         expect(result.status).toBe("rejected");
@@ -188,7 +181,7 @@ describe("Card planning and publication", () => {
       await expect(cards.job()).rejects.toMatchObject(WIPED);
       expect(backup.text()).not.toBe("");
     } finally {
-      font.release.open();
+      font.held.release();
       disposeIfPresent(cards);
     }
   });
@@ -233,10 +226,10 @@ describe("Card planning and publication", () => {
     options.title = "Changed after admission";
     const pending = Promise.all([cards.job(), cards.job()]);
     try {
-      await Promise.race([font.entered.waiting, pending]);
+      await Promise.race([font.entered.promise, pending]);
       expect(font.reads()).toBe(1);
     } finally {
-      font.release.open();
+      font.held.release();
     }
     const [first, second] = await pending;
     expect(first.content).toEqual(second.content);
@@ -249,14 +242,14 @@ describe("Card planning and publication", () => {
 
   it("refuses a share render that finishes after its owner was wiped", async () => {
     const font = heldFont();
-    using cards = await ShareCardSet.create(font.host, [sskrVector.shares[0]!], OPTIONS);
+    using cards = await ShareCardSet.create(font.host, [SSKR_VECTOR.shares[0]!], OPTIONS);
     const pending = cards.renderShare(0);
     const completed = Promise.allSettled([pending]);
     try {
-      await Promise.race([font.entered.waiting, completed]);
+      await Promise.race([font.entered.promise, completed]);
       cards.wipe();
     } finally {
-      font.release.open();
+      font.held.release();
     }
     const [result] = await completed;
     expect(result?.status).toBe("rejected");

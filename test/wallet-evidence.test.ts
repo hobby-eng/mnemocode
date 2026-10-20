@@ -1,7 +1,7 @@
 // The host-neutral wallet check of src/core/wallet-evidence.ts, built as a browser page builds it:
 // with a PBKDF2 function of its own. Published test vectors of the public test phrase only.
 import { pbkdf2Sync } from "node:crypto";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, type MockResult } from "vitest";
 import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
 import { sha512 } from "@noble/hashes/sha2.js";
 import { HDKey, type Versions } from "@scure/bip32";
@@ -9,9 +9,11 @@ import {
   DEFAULT_ADDRESS_COUNT,
   defaultAddressCount,
   EVIDENCE_MATCHED_BY,
+  isPlacedEvidence,
+  isTestNetwork,
   MAX_ADDRESS_COUNT,
   WalletEvidenceCheck,
-  bitcoinProfiles,
+  BITCOIN_PROFILES,
   parseBitcoinAddress,
   parseMasterFingerprint,
   type BitcoinEvidence,
@@ -297,6 +299,7 @@ describe("the host's PBKDF2", () => {
     expect(() => check.fingerprint("abandon about")).toThrow(/Invalid mnemonic/u);
     expect(() => check.fingerprint(publicMnemonic, "\ud800")).toThrow(/well-formed/u);
     expect(() => check.fingerprint(`${publicMnemonic}\udc00`)).toThrow(/well-formed/u);
+    // Passphrases and a phrase that are no text, given on purpose as a JavaScript host could.
     for (const passphrase of [null, 123, false, [], {}])
       expect(() => check.fingerprint(publicMnemonic, passphrase as never)).toThrow(
         expect.objectContaining({
@@ -358,8 +361,8 @@ describe("the host's PBKDF2", () => {
         evidenceCode("unsupported-extended-key-prefix-supported-public-forms-include"),
       ],
       [
-        // A kind that no evidence has, as a JavaScript host may pass: assertBitcoinEvidence's
-        // check of the kind is what this case tests.
+        // A kind that no evidence has, given on purpose as a JavaScript host could:
+        // assertBitcoinEvidence's check of the kind is what this case tests.
         { kind: "address-typo", value: "x" } as unknown as BitcoinEvidence,
         evidenceCode("unsupported-bitcoin-evidence-kind"),
       ],
@@ -380,6 +383,8 @@ describe("the host's PBKDF2", () => {
     const check = new WalletEvidenceCheck(() => short, [BITCOIN]);
     expect(() => check.fingerprint(publicMnemonic)).toThrow("gave 32 bytes, not 64");
     expect(short.every((byte) => byte === 0)).toBe(true);
+    // A host function that gives text and then none at all, given on purpose as a JavaScript host
+    // could.
     const text = new WalletEvidenceCheck((() => "seed") as unknown as Pbkdf2HmacSha512, [BITCOIN]);
     expect(() => text.fingerprint(publicMnemonic)).toThrow(
       expect.objectContaining({
@@ -490,6 +495,11 @@ describe("the validators, which need no phrase", () => {
     );
   });
 
+  it("tell testnet as the test network and mainnet as none (CORE-14)", () => {
+    expect(isTestNetwork("testnet")).toBe(true);
+    expect(isTestNetwork("mainnet")).toBe(false);
+  });
+
   it("accept every kind that a wallet can match", () => {
     expect(() =>
       assertBitcoinEvidence({ kind: "master-xpub", value: BIP84.rootZpub, network: "mainnet" }),
@@ -525,14 +535,52 @@ describe("what a line about a match names, for each kind of evidence", () => {
   });
 });
 
+describe("evidence of a key at a place of an account", () => {
+  const coinAddress: WalletEvidence = {
+    kind: "coin-address",
+    coin: "bitcoin",
+    value: BIP84.firstReceiving,
+    location: { account: 0, branch: 0, index: 0 },
+  };
+  const every: readonly WalletEvidence[] = [...cases.map(([, evidence]) => evidence), coinAddress];
+  const kindsOf = (evidence: readonly WalletEvidence[]) =>
+    [...new Set(evidence.map(({ kind }) => kind))].sort();
+
+  it("is every kind but the master key's, each with its location", () => {
+    const placed = every.filter(isPlacedEvidence);
+    expect(kindsOf(placed)).toEqual([
+      "account-xpub",
+      "address",
+      "coin-address",
+      "compressed-public-key",
+      "wif",
+    ]);
+    for (const evidence of placed) expect(evidence.location).toHaveProperty("index");
+    expect(kindsOf(every.filter((evidence) => !isPlacedEvidence(evidence)))).toEqual([
+      "master-fingerprint",
+      "master-xpub",
+    ]);
+  });
+
+  it("is not evidence of a kind that has no level, such as an inherited name", () => {
+    // A kind that no evidence has, fed on purpose with the wrong type: it names no place.
+    expect(isPlacedEvidence({ ...coinAddress, kind: "toString" } as never)).toBe(false);
+  });
+});
+
 describe("several addresses in a row, from the location's index on", () => {
   /** BIP-0084, "Test vectors": account 0, second receiving address, m/84'/0'/0'/0/1. */
   const SECOND_RECEIVING = "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g";
-  const second = (addresses: number | undefined, location: DerivationLocation = mainnet) =>
-    ({
-      ...located("address", SECOND_RECEIVING, bitcoinProfiles, location),
-      ...(addresses === undefined ? {} : { addresses }),
-    }) as BitcoinEvidence;
+  const second = (
+    addresses: number | undefined,
+    location: DerivationLocation = mainnet,
+  ): BitcoinEvidence => ({
+    kind: "address",
+    value: SECOND_RECEIVING,
+    profiles: BITCOIN_PROFILES,
+    location,
+    ...(addresses === undefined ? {} : { addresses }),
+  });
 
   it("finds an address among them, at its own path, and only there", () => {
     expect(browserCheck.match(publicMnemonic, second(undefined)).matched).toBe(false);
@@ -553,16 +601,23 @@ describe("several addresses in a row, from the location's index on", () => {
 
   it("compares a public key and a WIF the same way", () => {
     const later = { ...mainnet, index: 0 };
-    for (const evidence of [
-      located("compressed-public-key", BIP84.firstReceivingPublicKey, ["native-segwit"], later),
-      located("wif", BIP84.firstReceivingWif, ["native-segwit"], later),
-    ]) {
-      const wide = { ...evidence, addresses: 5 } as BitcoinEvidence;
-      expect(browserCheck.match(publicMnemonic, wide).path).toBe("m/84'/0'/0'/0/0");
-    }
+    const profiles: readonly BitcoinProfile[] = ["native-segwit"];
+    const wide: readonly BitcoinEvidence[] = [
+      {
+        kind: "compressed-public-key",
+        value: BIP84.firstReceivingPublicKey,
+        profiles,
+        location: later,
+        addresses: 5,
+      },
+      { kind: "wif", value: BIP84.firstReceivingWif, profiles, location: later, addresses: 5 },
+    ];
+    for (const evidence of wide)
+      expect(browserCheck.match(publicMnemonic, evidence).path).toBe("m/84'/0'/0'/0/0");
   });
 
   it("refuses a count on evidence that names no address, and trims as the coin checks do", () => {
+    // Counts on kinds that take none, given on purpose as a JavaScript host could.
     for (const evidence of [
       { kind: "master-fingerprint", value: "73c5da0a", network: "mainnet", addresses: 0 },
       { kind: "master-xpub", value: BIP84.rootZpub, network: "mainnet", addresses: 2 },
@@ -596,6 +651,14 @@ describe("several addresses in a row, from the location's index on", () => {
 describe("the keys that a comparison derives", () => {
   afterEach(() => vi.restoreAllMocks());
 
+  /** The keys that the derivations of `results` returned; none of them may have failed. */
+  function returnedKeys(results: readonly MockResult<HDKey>[]): HDKey[] {
+    return results.map((result) => {
+      if (result.type !== "return") throw new Error("A derivation gave no key.");
+      return result.value;
+    });
+  }
+
   it("hold no private key when it returns, on the way to the key it compares too", async () => {
     const roots = vi.spyOn(HDKey, "fromMasterSeed");
     const children = vi.spyOn(HDKey.prototype, "deriveChild");
@@ -605,17 +668,15 @@ describe("the keys that a comparison derives", () => {
     );
     // The Taproot ones are found in the last of the four profiles, after the other three paths.
     const evidence = [
-      located("address", BIP86.firstReceiving, bitcoinProfiles),
-      located("account-xpub", BIP86.accountXpub, bitcoinProfiles),
+      located("address", BIP86.firstReceiving, BITCOIN_PROFILES),
+      located("account-xpub", BIP86.accountXpub, BITCOIN_PROFILES),
       located("wif", BIP84.firstReceivingWif, ["native-segwit"]),
     ];
     for (const each of evidence) {
       expect(browserCheck.match(publicMnemonic, each).matched).toBe(true);
       expect((await later.matchAsync(publicMnemonic, each)).matched).toBe(true);
     }
-    const nodes = [...roots.mock.results, ...children.mock.results].map(
-      ({ value }) => value as HDKey,
-    );
+    const nodes = returnedKeys([...roots.mock.results, ...children.mock.results]);
     // Each comparison twice: a root and 4 × 5 steps, a root and 4 × 3, a root and 5.
     expect(nodes).toHaveLength(2 * (1 + 20 + 1 + 12 + 1 + 5));
     for (const node of nodes) expect(node.privateKey).toBeNull();
@@ -624,14 +685,15 @@ describe("the keys that a comparison derives", () => {
   it("hold no private key either when several addresses in a row are compared", () => {
     const roots = vi.spyOn(HDKey, "fromMasterSeed");
     const children = vi.spyOn(HDKey.prototype, "deriveChild");
-    const evidence = {
-      ...located("wif", BIP84.firstReceivingWif, ["legacy"]),
+    const evidence: BitcoinEvidence = {
+      kind: "wif",
+      value: BIP84.firstReceivingWif,
+      profiles: ["legacy"],
+      location: mainnet,
       addresses: 3,
-    } as BitcoinEvidence;
+    };
     expect(browserCheck.match(publicMnemonic, evidence).matched).toBe(false);
-    const nodes = [...roots.mock.results, ...children.mock.results].map(
-      ({ value }) => value as HDKey,
-    );
+    const nodes = returnedKeys([...roots.mock.results, ...children.mock.results]);
     // A root, 4 steps down to the branch, and 3 addresses below it.
     expect(nodes).toHaveLength(1 + 4 + 3);
     for (const node of nodes) expect(node.privateKey).toBeNull();

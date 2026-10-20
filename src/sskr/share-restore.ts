@@ -38,11 +38,11 @@ import {
   type ReportLine,
   type ShareRepairs,
 } from "./repair-report.js";
-import { ShareInput, type SharesTrouble } from "./share-input.js";
+import { ShareInput, type CompleteOutcome, type SharesTrouble } from "./share-input.js";
 import type { ShareRepairPlatform } from "./share-platform.js";
 import { ShareSet, type SetBackup } from "./share-set.js";
 import { ShareUnmasking, type ShareMode, type UnmaskedPhrase } from "./share-unmasking.js";
-import { writeShare, type ShareFormat } from "./transport.js";
+import { writeShare, type ReadShare, type ShareFormat } from "./transport.js";
 import type { SearchRun, MonotonicClock } from "../core/search-turns.js";
 import { defined } from "../core/defined.js";
 
@@ -108,20 +108,23 @@ export type SharesRead =
       /** The notes of copies left out, or the report of marked shares, said with the trouble. */
       readonly lines: readonly ReportLine[];
     })
-  | {
-      readonly kind: "complete";
-      readonly set: RepairedSet;
-      readonly secretBytes: number;
-      /** The places of the set's shares among those typed, copies left out. */
-      readonly places: readonly number[];
+  /** Complete shares, restored, as ShareInput.restoreComplete gives them. */
+  | (Extract<CompleteOutcome, { readonly kind: "complete" }> & {
       /** The notes of copies left out. */
       readonly lines: readonly ReportLine[];
-      /** The warning that a share took no part in the check of the set, if one did not. */
+      /**
+       * The warning that a share took no part in the check of the set, or that no digest checked
+       * its phrase (ShareSet.uncheckedNote); absent when every share took part and a digest did.
+       */
       readonly unchecked?: string | undefined;
-    }
+    })
   | MarkedShares
-  /** The host stopped the assessment of marked shares (CORE-22): nothing is planned. */
-  | { readonly kind: "stopped"; readonly lines: readonly ReportLine[] };
+  | {
+      /** The host stopped the assessment of marked shares (CORE-22): nothing is planned. */
+      readonly kind: "stopped";
+      /** No line: the assessment told nothing before it stopped. */
+      readonly lines: readonly ReportLine[];
+    };
 
 /** Complete shares, restored. */
 export type CompleteShares = Extract<SharesRead, { kind: "complete" }>;
@@ -265,27 +268,50 @@ export interface PhrasesFound {
 /** What the sets of a restore give as seed phrases (ShareRestore.phrases). */
 export type RestoredPhrases =
   | PhrasesFound
-  /** The dates are more than a set's phrase takes. */
-  | { readonly kind: "dates"; readonly message: string }
-  /** No phrase is the wallet's (ShareSet.walletMismatch). */
-  | { readonly kind: "mismatch"; readonly message: string }
-  /** The host stopped the date search: no phrase is told (CORE-22). */
-  | { readonly kind: "stopped" };
+  | {
+      /** The dates are more than a set's phrase takes. */
+      readonly kind: "dates";
+      /** Why the phrase cannot take the dates, for the person. */
+      readonly message: string;
+    }
+  | {
+      /** No phrase is the wallet's. */
+      readonly kind: "mismatch";
+      /** Why the phrases are not the wallet given, for the person (ShareSet.walletMismatch). */
+      readonly message: string;
+    }
+  | {
+      /** The host stopped the date search: no phrase is told (CORE-22). */
+      readonly kind: "stopped";
+    };
 
 /** A restore or a repair that ends without a result: a trouble to say, or a question first. */
 export type ShareStop =
   | {
+      /** Tells a trouble that ends the restore or the repair from its other outcomes. */
       readonly kind: "trouble";
+      /** The trouble, for the person, which names any share by its place. */
       readonly message: string;
+      /** The lines of the report, said before the message. */
       readonly lines: readonly ReportLine[];
     }
   | {
+      /**
+       * Tells a search that waits for the person's yes: the host asks, and on a yes runs the
+       * restore or the repair again, confirmed (ShareRestoreRequest.confirmed).
+       */
       readonly kind: "question";
+      /** What to ask, such as "Search 3,650 date combinations, about 9 hours?". */
       readonly question: string;
+      /** The lines of the report, said before the question. */
       readonly lines: readonly ReportLine[];
     }
-  /** The host stopped the assessment or a search (CORE-22): nothing is told. */
-  | { readonly kind: "stopped"; readonly lines: readonly ReportLine[] };
+  | {
+      /** The host stopped the assessment or a search (CORE-22): nothing is told. */
+      readonly kind: "stopped";
+      /** The lines of the report said before the stop, if any. */
+      readonly lines: readonly ReportLine[];
+    };
 
 /** Too few shares to restore a phrase: a repair then writes each share again on its own. */
 export interface FewShares {
@@ -308,10 +334,27 @@ interface FoundSets {
 
 /** What a search of marked shares finds (ShareRestore.search): its sets, or why there are none. */
 export type SearchedSets =
-  | { readonly kind: "sets"; readonly sets: RepairedSet[]; readonly notes: readonly string[] }
-  | { readonly kind: "none"; readonly message: string }
-  /** The host stopped the search (RestoreRun.signal): no set is told (CORE-22). */
-  | { readonly kind: "stopped" };
+  | {
+      /** Tells the sets found from a search that found none. */
+      readonly kind: "sets";
+      /** Every distinct set that fits, its phrase a secret string the caller owns. */
+      readonly sets: RepairedSet[];
+      /**
+       * The warning of each set in which a share took no part in its check, or whose phrase no
+       * digest checked (ShareSet.uncheckedNote).
+       */
+      readonly notes: readonly string[];
+    }
+  | {
+      /** No phrase fits the shares. */
+      readonly kind: "none";
+      /** Why, for the person (NO_PHRASE_FITS). */
+      readonly message: string;
+    }
+  | {
+      /** The host stopped the search (RestoreRun.signal): no set is told (CORE-22). */
+      readonly kind: "stopped";
+    };
 
 /**
  * What a restore of shares ends with: stopped, too few shares, or the phrases found, each with its
@@ -321,8 +364,15 @@ export type ShareRestoreOutcome =
   | ShareStop
   | FewShares
   | (PhrasesFound & {
+      /** The place of each share among those typed, counted from 1, by its index in a set. */
       readonly places: readonly number[];
+      /** The lines of the report, said before the phrases. */
       readonly lines: readonly ReportLine[];
+      /**
+       * The notes said with the phrases: the warnings of shares that took no part in a check, the
+       * notice of a search that ran without a question, and that several sets fit when no wallet
+       * tells them apart.
+       */
       readonly notes: readonly string[];
     });
 
@@ -332,14 +382,32 @@ export type ShareRestoreOutcome =
  * export one set. A wallet cannot check fewer shares than the threshold.
  */
 export type ShareExportDecision<Result extends PhrasesFound | { readonly kind: "few" }> =
-  | { readonly kind: "each"; readonly few: Extract<Result, { readonly kind: "few" }> }
-  | { readonly kind: "variants"; readonly found: Extract<Result, PhrasesFound> }
   | {
-      readonly kind: "set";
+      /** Too few shares to restore a phrase: each share is repaired and written on its own. */
+      readonly kind: "each";
+      /** The restore's outcome, which says why the shares are too few. */
+      readonly few: Extract<Result, { readonly kind: "few" }>;
+    }
+  | {
+      /** Several sets fit: each is shown with its fingerprint, and none is written. */
+      readonly kind: "variants";
+      /** The restore's outcome, with every set found. */
       readonly found: Extract<Result, PhrasesFound>;
+    }
+  | {
+      /** One set fits: its shares are written again. */
+      readonly kind: "set";
+      /** The restore's outcome, with the one set found. */
+      readonly found: Extract<Result, PhrasesFound>;
+      /** The set to write again. */
       readonly set: RepairedSet;
     }
-  | { readonly kind: "trouble"; readonly message: string };
+  | {
+      /** Nothing is written: no set fits, or a wallet was given with fewer shares than needed. */
+      readonly kind: "trouble";
+      /** Why, for the person. */
+      readonly message: string;
+    };
 
 /** A share written again, by its place among those typed. */
 export interface RepairedShare {
@@ -424,7 +492,7 @@ function setsOf(phrases: readonly { readonly set: RepairedSet }[]): RepairedSet[
 
 /** A share of `set` at `place`, written in `form` or its own. */
 function repairedShare(
-  share: { readonly ur: string; readonly format: ShareFormat },
+  share: ReadShare,
   number: number,
   form: ShareFormat | undefined,
 ): RepairedShare {

@@ -79,11 +79,23 @@ const CASES = LAYOUTS.flatMap((layout) =>
 const GLUE = new URL("../sskr-wasm/generated/recovery_sskr_wasm.js", import.meta.url).href;
 let engines = 0;
 
+/** Whether `loaded` exports each name of the glue, as a value of the same kind. */
+function isGlue(loaded: unknown): loaded is Glue {
+  return (
+    typeof loaded === "object" &&
+    loaded !== null &&
+    Object.entries(recordMaker).every(
+      ([name, value]) => typeof Reflect.get(loaded, name) === typeof value,
+    )
+  );
+}
+
 /** A new instance of the engine, whose memory no other case has touched. */
 async function freshEngine(): Promise<{ glue: Glue; memory: () => Uint8Array }> {
   engines += 1;
   // A module of its own for each engine: the glue keeps the instance it made.
-  const glue = (await import(/* @vite-ignore */ `${GLUE}?engine=${engines}`)) as Glue;
+  const glue: unknown = await import(/* @vite-ignore */ `${GLUE}?engine=${engines}`);
+  if (!isGlue(glue)) throw new Error("A fresh import of the glue lacks what the glue exports.");
   const { memory } = glue.initSync({ module: MODULE });
   // The memory may grow during a call, which replaces its buffer.
   return { glue, memory: () => new Uint8Array(memory.buffer) };

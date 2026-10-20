@@ -5,7 +5,7 @@ import {
   MIN_SHEET_ROWS,
   SHEET_PLAN_TEXT,
 } from "../src/export/collection-layout.js";
-import { cardTemplates } from "../src/export/templates.js";
+import { CARD_TEMPLATES } from "../src/export/templates.js";
 import { indexesToColors } from "../src/core.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
 import { renderSskrPdf } from "../src/export/sskr-render.js";
@@ -91,7 +91,7 @@ describe("single-page design studies", () => {
     },
   );
 
-  it.each(cardTemplates.map((template) => [template.id, template] as const))(
+  it.each(CARD_TEMPLATES.map((template) => [template.id, template] as const))(
     "%s renders one business-size proposal with one complete QR and all exact references",
     async (_id, template) => {
       const qrSpy = vi.spyOn(qr, "drawCollectionQr");
@@ -129,7 +129,7 @@ describe("single-page design studies", () => {
 describe("single-page design studies", () => {
   it("keeps the same studio on three SSKR study pages, with one own-member QR per page", async () => {
     const vector = sskrVectors();
-    const shares = vector.deterministic[0]!.shares as string[];
+    const shares = vector.deterministic[0]!.shares;
     const qrSpy = vi.spyOn(qr, "drawCollectionQr");
     const textSpy = vi.spyOn(PDFPage.prototype, "drawText");
     const { renderer, payloads, matrices } = recordingQr();
@@ -168,7 +168,7 @@ describe("single-page design studies", () => {
   it.each(SHEETS)(
     "%s keeps artwork and QR together on a %s sheet, %s",
     async (id, pageSize, orientation) => {
-      const template = cardTemplates.find((item) => item.id === id)!;
+      const template = CARD_TEMPLATES.find((item) => item.id === id)!;
       const document = await PDFDocument.load(
         await template.render(nodeCardRenderer, {
           kind: "colors",
@@ -187,7 +187,7 @@ describe("single-page design studies", () => {
   it("puts business cards and enclosures on the dark sheet, other materials on their own backdrop", async () => {
     // The first thing drawn on a sheet is its background, a rectangle over the whole page.
     const background = async (id: string) => {
-      const template = cardTemplates.find((item) => item.id === id)!;
+      const template = CARD_TEMPLATES.find((item) => item.id === id)!;
       const document = await PDFDocument.load(
         await template.render(nodeCardRenderer, {
           kind: "colors",

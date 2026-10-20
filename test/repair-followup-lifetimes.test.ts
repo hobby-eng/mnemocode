@@ -1,26 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BackupReading } from "../src/core/backup-reading.js";
 import { planJointRepair } from "../src/sskr/joint-repair.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { MarkedReading } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { Share } from "../src/sskr/transport.js";
+import { deferred } from "./helpers/deferred.js";
 
 // Public bip39-128-2-of-3 vector: no generated or private recovery material.
-const ONE_MARK = sskrSetVector.colors[0].replace("#37B8CA", "?");
+const ONE_MARK = SSKR_SET_VECTOR.colors[0].replace("#37B8CA", "?");
 const PUBLIC_ENTROPY_BYTES = 16;
 const WIPED_CODE = "core.secret-value.wiped";
 const PLAN_WIPED_CODE = "sskr.joint-repair.plan-wiped";
 
-function deferred(): { promise: Promise<void>; release: () => void } {
-  let release!: () => void;
-  const promise = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  return { promise, release };
-}
-
-async function pausedConfirmation(records: readonly string[] = sskrSetVector.shares) {
+async function pausedConfirmation(records: readonly string[] = SSKR_SET_VECTOR.shares) {
   const entered = deferred();
   const gate = deferred();
   // No implementation replacement: retain the real factory's actual owner results only.
@@ -147,7 +140,7 @@ describe("AUD-029-SEC001: recovery follow-up lifetimes", () => {
   });
 
   it("wipes real mutable entropy returned by the host after the plan has ended", async () => {
-    const run = await pausedConfirmation(sskrSetVector.shares.slice(0, 2));
+    const run = await pausedConfirmation(SSKR_SET_VECTOR.shares.slice(0, 2));
     try {
       await run.waitForFirst();
       run.plan.wipe();
@@ -177,7 +170,7 @@ describe("AUD-029-SEC001: recovery follow-up lifetimes", () => {
       expect(result.sets[0]!.mnemonic).toBe(
         "abandon amount liar amount expire adjust cage candy arch gather drum buyer",
       );
-      expect(result.sets[0]!.shares.map(({ ur }) => ur)).toEqual(sskrSetVector.shares);
+      expect(result.sets[0]!.shares.map(({ ur }) => ur)).toEqual(SSKR_SET_VECTOR.shares);
     } finally {
       await run.close();
     }

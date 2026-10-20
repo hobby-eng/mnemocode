@@ -31,8 +31,23 @@ const ASSET_FILES = ["fonts/DejaVuSans-NOTICE", "maps/NOTICE", "images/NOTICE"].
   (file) => `${ASSETS_FOLDER}${file}`,
 );
 
+/**
+ * The rule above and below each notice's title: 78 columns, so that it fits on an 80-column
+ * terminal.
+ */
+const NOTICE_RULE = "=".repeat(78);
+
+/**
+ * `title` between two rules, without a line break before or after them. sskr-licenses.mjs heads the
+ * crates of LINKED_LICENSES.txt, which is embedded among these notices, with it too, so that the
+ * two line up.
+ */
+export function ruledTitle(title) {
+  return `${NOTICE_RULE}\n${title}\n${NOTICE_RULE}`;
+}
+
 function heading(title) {
-  return `\n${"=".repeat(78)}\n${title}\n${"=".repeat(78)}\n`;
+  return `\n${ruledTitle(title)}\n`;
 }
 
 /**

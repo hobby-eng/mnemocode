@@ -12,6 +12,7 @@ describe("A secret value's active working state", () => {
     expect(() => value.value).toThrow("has been wiped");
     expect(before).toEqual([0n, -1n, 9007199254740993n, 340282366920938463463374607431768211455n]);
     expect(copy.value).toEqual(before);
+    // A number where a bigint belongs, given on purpose as a JavaScript host could.
     expect(() => SecretValue.bigints([1 as never])).toThrow("needs bigint values");
     const sparse: bigint[] = [];
     sparse.length = 1;

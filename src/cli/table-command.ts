@@ -1,4 +1,4 @@
-import { printableText, terminalNotice, terminalResultHeader } from "./terminal.js";
+import { printableText, terminalResultHeader, terminalSaved } from "./terminal.js";
 import { WordTable, WORD_TABLE_FORMATS } from "../core/word-table.js";
 import { WORD_NUMBER_RANGE } from "../core/bip39-sizes.js";
 import { choiceOption, integerOption, type ParsedArguments, value } from "./arguments.js";
@@ -34,6 +34,19 @@ function printRow(row: ReturnType<typeof WordTable.row>): void {
   console.log(`unicode hex: ${row.unicodeHex}`);
 }
 
+/**
+ * The heading of the whole table on a terminal (CORE-36), with its rows and its columns read from
+ * the table's own text. A file or a pipe gets the plain table alone: terminalResultHeader prints
+ * nothing there.
+ */
+function wordTableHeading(text: string): void {
+  const [columns = "", ...rows] = text.trimEnd().split("\n");
+  terminalResultHeader("Word table", [
+    ["Rows", `${rows.length}`],
+    ["Columns", columns.split("\t").join(", ")],
+  ]);
+}
+
 /** Publishes all public dictionaries and the canonical guide together, never over an old set. */
 async function saveFullSet(directory: string): Promise<void> {
   const guide = await readBundledFile(MANUAL_RECOVERY_FILE);
@@ -48,7 +61,7 @@ async function saveFullSet(directory: string): Promise<void> {
       await writeNewPrivateFile(privateChildPath(staging, "manual-recovery.md"), guide);
     });
   });
-  terminalNotice(`Saved full word-list and recovery set: ${printableText(directory)}`, "success");
+  terminalSaved(`Saved full word-list and recovery set: ${printableText(directory)}`);
 }
 
 export async function runTable(arguments_: ParsedArguments): Promise<void> {
@@ -80,12 +93,14 @@ export async function runTable(arguments_: ParsedArguments): Promise<void> {
     const text = guide
       ? new TextDecoder().decode(await readBundledFile(MANUAL_RECOVERY_FILE))
       : WordTable.text(format);
-    if (output === undefined) process.stdout.write(text);
-    else {
+    if (output === undefined) {
+      // The recovery guide is a document with a heading of its own.
+      if (!guide) wordTableHeading(text);
+      process.stdout.write(text);
+    } else {
       await writeSaved(() => publishNewPrivateFile(output, Buffer.from(text, "utf8")));
-      terminalNotice(
+      terminalSaved(
         `Saved ${guide ? "manual recovery instructions" : "numbered BIP39 word list"}: ${printableText(output)}`,
-        "success",
       );
     }
     return;

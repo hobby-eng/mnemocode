@@ -30,7 +30,9 @@ export function nestedSegwitHash(publicKey: Uint8Array): Uint8Array {
 /**
  * BIP86: the key-path-only Taproot output key Q = P + t·G, where P is the key with an even Y and t
  * the BIP340 tagged hash "TapTweak" of its x (BIP341). Public values only, so the faster scalar
- * multiplication that is not constant-time is fine.
+ * multiplication that is not constant-time is fine. Refuses a key for which BIP341 gives no output
+ * key, about one in 2^128 (core.coins.taproot.bip341-gives-no-taproot-output-key-key); a
+ * `publicKey` that is no point of the curve fails with @noble/curves' own error.
  */
 export function taprootOutputKey(publicKey: Uint8Array): Uint8Array {
   const { Point } = secp256k1;

@@ -3,15 +3,15 @@
 // its heading, notices and fingerprints, would lose the rows that scrolled over its top edge. The
 // page is therefore recorded as it is written, and before a question or an Enter prompt is drawn
 // under it, a page that does not fit with them is shown again whole, by pages, with the colours it
-// was written in (settle). Then its end stays on the screen above what comes next. Output that
-// goes to a file or a pipe is written there as before and is not part of the page.
+// was written in (keepReadable). Then its end stays on the screen above what comes next. Output
+// that goes to a file or a pipe is written there as before and is not part of the page.
 
 import { PrivateSteps } from "./private-steps.js";
 import { Redacted } from "../core/redacted.js";
 import { screenRows, type ScreenRows } from "./screen-rows.js";
 import { CLEAR_SCREEN, flushed } from "./terminal.js";
 import { rowsOfText, TAB_STOP, terminalColumns, terminalRows } from "./terminal-geometry.js";
-import { dropTypedAhead, readKey, withRawTerminal } from "./terminal-input.js";
+import { TerminalKeys } from "./terminal-input.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { paint, STYLE, STYLE_CODES } from "./terminal-style.js";
 
@@ -173,7 +173,7 @@ export class PrivatePage {
     process.stderr.write(`${CLEAR_SCREEN}${above.map((row) => `${row}\n`).join("")}`);
     record.markSeen(above.length);
     // Keys typed with the one that ended the pages answer nothing under them.
-    return (await dropTypedAhead()) === CANCELLED ? CANCELLED : undefined;
+    return (await TerminalKeys.dropTypedAhead()) === CANCELLED ? CANCELLED : undefined;
   }
 
   /**
@@ -208,8 +208,8 @@ function recordWrites(stream: NodeJS.WriteStream, add: (chunk: unknown) => void)
  * the terminal is resized, the rows are read again at its new width.
  */
 async function showPages(rows: () => readonly string[]): Promise<Cancelled | undefined> {
-  return withRawTerminal(async (next, moreWithin) => {
-    if ((await dropTypedAhead()) === CANCELLED) return CANCELLED;
+  return TerminalKeys.withRawMode(async (next, moreWithin) => {
+    if ((await TerminalKeys.dropTypedAhead()) === CANCELLED) return CANCELLED;
     let page = 0;
     let pages = 1;
     const draw = (): void => {
@@ -227,7 +227,7 @@ async function showPages(rows: () => readonly string[]): Promise<Cancelled | und
     try {
       draw();
       for (;;) {
-        const key = await readKey(next, moreWithin);
+        const key = await TerminalKeys.readKey(next, moreWithin);
         if (key.kind === "cancel") return CANCELLED;
         if (key.kind === "enter" || key.kind === "back") return undefined;
         const before = page;

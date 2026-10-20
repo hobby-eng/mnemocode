@@ -2,15 +2,15 @@ import { readFileSync } from "node:fs";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { businessFields, businessStyles } from "../src/export/business-designs.js";
+import { businessFields, PHYSICAL_BUSINESS_STYLES } from "../src/export/business-designs.js";
 import { MM } from "../src/export/business-layout.js";
 import { fit } from "../src/export/business-render-primitives.js";
 import {
-  commonRoles,
+  COMMON_ROLES,
   createCardIdentity,
-  employers,
-  personNames,
-  sectorRoles,
+  EMPLOYERS,
+  PERSON_NAMES,
+  SECTOR_ROLES,
   type CompanySector,
 } from "../src/export/card-identities.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
@@ -25,17 +25,18 @@ describe("invented card details", () => {
     const font = await document.embedFont(
       readFileSync(new URL("../assets/fonts/DejaVuSans-UI.ttf", import.meta.url)),
     );
-    const name = longest(personNames);
-    for (const sector of Object.keys(employers) as CompanySector[]) {
-      const role = longest([...sectorRoles[sector], ...commonRoles]);
-      for (const company of employers[sector]) {
+    const name = longest(PERSON_NAMES);
+    const isSector = (key: string): key is CompanySector => Object.hasOwn(EMPLOYERS, key);
+    for (const sector of Object.keys(EMPLOYERS).filter(isSector)) {
+      const role = longest([...SECTOR_ROLES[sector], ...COMMON_ROLES]);
+      for (const company of EMPLOYERS[sector]) {
         const profile = createCardIdentity(
           nodeRenderPlatform.randomInt,
           { name, company, role },
           sector,
         );
         // The mixed template shows every design, so every employer meets every design.
-        for (const style of businessStyles)
+        for (const style of PHYSICAL_BUSINESS_STYLES)
           for (const field of businessFields(style, profile))
             expect(
               () =>

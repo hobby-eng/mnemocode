@@ -231,7 +231,15 @@ function triedReadings(reading: MarkedReading, freeBits: number): MarkedReading[
  * Every share that `value` can be, in any form, with up to MAX_MARKED_ELEMENTS elements marked with
  * ? where they are unreadable; at most 2^freeBits of them. Every candidate passes the ordinary
  * reader, so its checksum and its SSKR metadata are checked as for any share. `freeBits` must be
- * a whole number from 0 to MAX_LISTED_FREE_BITS; an unsupported budget is refused before reading.
+ * a whole number from 0 to MAX_LISTED_FREE_BITS; an unsupported budget is refused before reading
+ * (sskr.repair.free-bits-budget). Text without a ? is read as readShare reads it, with its
+ * refusals. Marked text is refused with more than MAX_MARKED_ELEMENTS marks or more than
+ * MAX_REPAIR_TEXT_LENGTH characters (sskr.repair.each-at-place); with a ? among the digits of a
+ * code that takes only a lone ?, or a code read in part with too few symbols
+ * (sskr.repair.repair-candidates-refused); with Color Unicode marks that fit too many ways
+ * (AmbiguousMarksError, code ambiguous-marks); with marks that leave more than 2^freeBits
+ * solutions (sskr.repair.too-many-marks-for-form); and where no share fits the marks
+ * (sskr.repair.no-share-fits-marks).
  */
 export function repairCandidates(
   value: string,
@@ -313,7 +321,18 @@ export function sharesOfReadings(
   return [...found.values()];
 }
 
-/** One caller-owned share, or a metadata-only ShareVariantsError; use repairCandidates for variants. */
+/**
+ * The one share that `value` can be, owned by the caller, with its marked elements filled in as
+ * repairCandidates fills them at its default budget (LISTED_FREE_BITS). Throws ShareVariantsError
+ * (code share-variants), which holds only the count and the places, when several shares fit the
+ * marks; use repairCandidates for the variants themselves. Otherwise refuses what repairCandidates
+ * refuses: unmarked text as readShare does; marked text with too many marks or too long
+ * (sskr.repair.each-at-place), with a ? where a code takes only a lone ? or a code read in part
+ * too short (sskr.repair.repair-candidates-refused), with Color Unicode marks that fit too many
+ * ways (AmbiguousMarksError), with marks that leave too many solutions
+ * (sskr.repair.too-many-marks-for-form), or where no share fits the marks
+ * (sskr.repair.no-share-fits-marks).
+ */
 export function readRepairableShare(value: string): ReadRepairableShare {
   const candidates = repairCandidates(value);
   if (candidates.length > 1)

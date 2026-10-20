@@ -185,6 +185,16 @@ export function digestField(digestChecked: boolean): { readonly digestUnchecked?
   return digestChecked ? {} : { digestUnchecked: true };
 }
 
+/** The phrase that complete shares restore, with what checked it (restoreCompleteShares). */
+export interface CompleteRestore {
+  /** The phrase, in English words. */
+  readonly mnemonic: string;
+  /** The indexes, counted from 0, of the shares that took no part in the check. */
+  readonly unchecked: readonly number[];
+  /** Whether an SSKR digest checked the phrase. */
+  readonly digestChecked: boolean;
+}
+
 /**
  * Restores the phrase from complete shares and checks that every share given agrees with it. The
  * SSKR library uses only the first `threshold` members of a group and the first groups that meet
@@ -204,11 +214,7 @@ export async function restoreCompleteShares(
   platform: ShareCombiner,
   places?: readonly number[],
   assertLive?: () => void,
-): Promise<{
-  readonly mnemonic: string;
-  readonly unchecked: readonly number[];
-  readonly digestChecked: boolean;
-}> {
+): Promise<CompleteRestore> {
   assertLive?.();
   const shares = Share.readSet(records);
   let normalized: string[] = [];

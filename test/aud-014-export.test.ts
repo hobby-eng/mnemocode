@@ -2,7 +2,6 @@
 // facts of a sheet for heirs (AUD-014-API012), and the shared operations of recommendations 20 to
 // 22, whose public messages must stay as they were. Public test data only.
 
-import { readFileSync } from "node:fs";
 import { PDFDocument, PDFName } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { indexesToColors } from "../src/core.js";
@@ -14,8 +13,9 @@ import { checkedChoice, pickWith } from "../src/export/platform.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
 import { renderIndividualCards } from "../src/export/render.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
-import { cardTemplates, type CardTemplate } from "../src/export/templates.js";
+import { CARD_TEMPLATES, type CardTemplate } from "../src/export/templates.js";
 import type { CardContent } from "../src/export/backup-cards.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 /** The public phrase of BIP39's first vector as colors: eleven zeros and a checksum word. */
 const colors = indexesToColors([...Array.from({ length: 11 }, () => 0), 3]);
@@ -45,7 +45,7 @@ const sentinel = new Error("audit stopped before rendering");
 
 /** A stock design with its drawing replaced, as a host may make one. */
 function hostTemplate(): { template: CardTemplate; calls: () => number } {
-  const base = cardTemplates.find(
+  const base = CARD_TEMPLATES.find(
     (template) => template.kind === "colors" && template.renderIndividual,
   )!;
   let calls = 0;
@@ -81,7 +81,7 @@ describe("AUD-014-API003: a card design made by a host", () => {
         indexes.push(index);
         return new Uint8Array([index]);
       },
-    } as CardTemplate;
+    };
     const cards = await renderIndividualCards(countingRenderer().renderer, template, content);
     // One card for each code, then the decoys that the design's sheet plans.
     expect(indexes.slice(0, colors.length)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
@@ -95,6 +95,8 @@ describe("AUD-014-API003: a card design made by a host", () => {
 });
 
 describe("AUD-014-API012: the facts of a sheet for heirs", () => {
+  // Some backups below are of no type that the facts allow, fed on purpose as a JavaScript host
+  // could.
   const facts = (backup: unknown): HeirSheetFacts =>
     ({ backup, mode: "direct", dates: 0 }) as HeirSheetFacts;
 
@@ -220,8 +222,5 @@ describe("AUD-014 recommendation 22: point and RGB commands read as before", () 
 
 /** SSKR shares of a public test entropy, made with a test-only seed (vectors/sskr-v1.json). */
 function sskrFixture(): readonly string[] {
-  const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-    readonly deterministic: readonly { readonly shares: readonly string[] }[];
-  };
-  return vectors.deterministic[0]!.shares;
+  return sskrVectors().deterministic[0]!.shares;
 }

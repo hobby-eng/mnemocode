@@ -21,6 +21,7 @@ describe("what a backup can be made of", () => {
       backupCheck: false,
       heirSheet: false,
     });
+    // A mode that no type allows, fed on purpose as a JavaScript host could.
     expect(() => capabilities("toString" as never)).toThrow("Unsupported Seedshift mode.");
   });
 
@@ -28,6 +29,7 @@ describe("what a backup can be made of", () => {
     expect(shareFormatOf("english")).toBe("words");
     for (const form of ["indexes", "unicode", "colors", "colors-unicode"] as const)
       expect(shareFormatOf(form)).toBe(form);
+    // A form that no type allows, fed on purpose as a JavaScript host could.
     expect(() => shareFormatOf("json" as never)).toThrow(
       expect.objectContaining({ code: "core.encoded-form.unsupported-encoded-format" }),
     );

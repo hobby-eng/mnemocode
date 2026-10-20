@@ -1,20 +1,25 @@
 // Saving a result that is on the screen already, such as Encode's record or PDF, the files and
 // cards of shares, or a candidate list: every command saves through saveWithRetry. On the private
 // screen a failure, a full disk or a folder taken meanwhile, keeps the result: one line says why,
-// in plain words for the usual errors of a file system, and the person tries again, gives another
+// in plain words for the usual errors of a file system, another names each file or folder that the
+// failed save left behind to delete (leftBehind), and the person tries again, gives another
 // name, which is checked first and, once the result is saved there, warned of when a cloud service
 // copies its folder, or skips that result and goes on with the others. Elsewhere the failure ends
 // the command, as every failure there does.
 
 import { askAfterFailure, askValueUntil, droppedPath, WHAT_NOW } from "./ask.js";
 import { warnOfCloudCopy } from "./cloud-folders.js";
-import { discardRenamedOutput } from "./output-paths.js";
+import { RenamedOutputs } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
-import { printableText, terminalNotice } from "./terminal.js";
+import { printableText, terminalLastingWarning, terminalNotice } from "./terminal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { lowerFirst } from "../core/prose.js";
 import { describeError, errorCode } from "../core/refusal.js";
-import { FailedSaveLeftCopyError, LeftStagingCopyError } from "../export/private-file.js";
+import {
+  FailedSaveLeftCopyError,
+  FailedSaveLeftReservationError,
+  LeftStagingCopyError,
+} from "../export/private-file.js";
 
 /** Plain words for the errors of a file system that a save may meet (errno names). */
 const SAVE_FAILURES: Readonly<Record<string, string>> = {
@@ -29,10 +34,16 @@ const SAVE_FAILURES: Readonly<Record<string, string>> = {
   EIO: "the disk reported an error",
 };
 
-/** A result to be saved, and how. */
-export interface Saving {
+/** A result as a sentence names it, and whether that name takes "was" or "were". */
+export interface ResultName {
   /** What it is, at the start of a sentence: "The record", "The PDF", "The card files". */
   readonly what: string;
+  /** Whether `what` names more than one thing, as "The card files" does; one when left out. */
+  readonly plural?: boolean;
+}
+
+/** A result to be saved, and how. */
+export interface Saving extends ResultName {
   /** Whether it is saved as one file or as a new folder of files. */
   readonly kind: "file" | "folder";
   /** Where the options say it goes. */
@@ -61,6 +72,33 @@ function otherFailure(error: unknown): string {
 }
 
 /**
+ * What a failed save left behind for the person to delete, one line each, and the failure that
+ * made the save fail: the reservation of the final name (FailedSaveLeftReservationError), an empty
+ * file or a new folder that may hold some of the files, and the private staging folder, which may
+ * hold a copy (FailedSaveLeftCopyError).
+ */
+function leftBehind(saving: Saving, error: unknown): { failure: unknown; notices: string[] } {
+  const notices: string[] = [];
+  let failure = error;
+  if (failure instanceof FailedSaveLeftReservationError) {
+    const reservation = printableText(failure.reservation);
+    notices.push(
+      saving.kind === "file"
+        ? `The empty file ${reservation}, made to reserve its name, could not be removed: delete it.`
+        : `The new folder ${reservation}, which may hold some of its files, could not be removed: delete it.`,
+    );
+    failure = failure.cause;
+  }
+  if (failure instanceof FailedSaveLeftCopyError) {
+    notices.push(
+      `Its private staging folder ${printableText(failure.staging)}, which may hold a copy, could not be removed: delete it.`,
+    );
+    failure = failure.cause;
+  }
+  return { failure, notices };
+}
+
+/**
  * Another name for a result that could not be saved, checked before it is used; undefined when
  * the person goes back with Escape, CANCELLED at Ctrl+C.
  */
@@ -86,7 +124,7 @@ export async function writeSaved(write: () => Promise<unknown>): Promise<void> {
     await write();
   } catch (error) {
     if (!(error instanceof LeftStagingCopyError)) throw error;
-    terminalNotice(printableText(error.message), "warning");
+    terminalLastingWarning(printableText(error.message));
   }
 }
 
@@ -105,20 +143,17 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined 
         // saved there, it is warned of when a cloud service copies its folder, as the names given
         // with the options are (command-line.ts).
         if (path !== saving.path) {
-          discardRenamedOutput(saving.path);
+          RenamedOutputs.discard(saving.path);
           warnOfCloudCopy(path);
         }
         return path;
       } catch (error) {
         if (!onPrivateScreen()) throw error;
-        // A failed save that left its staging folder: why it failed, then the folder to delete.
-        const left = error instanceof FailedSaveLeftCopyError ? error : undefined;
-        terminalNotice(saveFailure(saving.what, path, left?.cause ?? error), "warning");
-        if (left !== undefined)
-          terminalNotice(
-            `Its private staging folder ${printableText(left.staging)}, which may hold a copy, could not be removed: delete it.`,
-            "warning",
-          );
+        // Why it failed, which another try may mend, then what it left behind to delete, which
+        // holds after the command.
+        const { failure, notices } = leftBehind(saving, error);
+        terminalNotice(saveFailure(saving.what, path, failure), "warning");
+        for (const notice of notices) terminalLastingWarning(notice);
       }
     const next = await askAfterFailure(
       WHAT_NOW,
@@ -131,8 +166,10 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined 
     );
     if (next === CANCELLED) return CANCELLED;
     if (next === "skip") {
-      discardRenamedOutput(saving.path);
-      terminalNotice(`${saving.what} was not saved.`, "warning");
+      RenamedOutputs.discard(saving.path);
+      terminalLastingWarning(
+        `${saving.what} ${saving.plural === true ? "were" : "was"} not saved.`,
+      );
       return undefined;
     }
     write = true;

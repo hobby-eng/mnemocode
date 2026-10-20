@@ -58,8 +58,8 @@ export class CoinAddressComparison {
   readonly #range: AddressRange;
 
   /**
-   * Reads and places `evidence` once. Refuses an address that no wallet can have
-   * (AddressRefusalError), a place that no path has
+   * Reads and places `evidence` once. Refuses an address that no wallet can have (the codes of
+   * Coin.parse, such as core.coins.coin.address-damaged), a place that no path has
    * (core.coins.coin.assert-address-location-refused) and a number of addresses out of range
    * (core.address-scan.address-count-refused, or
    * core.address-scan.addresses-compared-would-pass-index past the last index).

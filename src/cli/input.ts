@@ -30,7 +30,7 @@ import {
 } from "./arguments.js";
 import { formatNumber, formatLegend } from "./format-numbers.js";
 import {
-  BIP39_WORD_COUNTS,
+  WORD_COUNT_RANGE,
   WORD_COUNTS_TEXT,
   WORD_NUMBERS_SPAN,
   isBip39WordCount,
@@ -66,11 +66,7 @@ const ERRORS = new ErrorCatalog("cli.input", {
  */
 export function phraseWords(args: ParsedArguments): Bip39WordCount | undefined {
   if (value(args, "words") === undefined) return undefined;
-  const words = integerOption(args, "words", {
-    min: BIP39_WORD_COUNTS[0],
-    max: defined(BIP39_WORD_COUNTS.at(-1)),
-    label: "mnemonic word count",
-  });
+  const words = integerOption(args, "words", WORD_COUNT_RANGE);
   if (!isBip39WordCount(words)) throw ERRORS.create("mnemonic-word-count", [`${WORD_COUNTS_TEXT}`]);
   return words;
 }
@@ -233,11 +229,21 @@ export function encodeFormat(value_: string | undefined): EncodedFormat {
   return value_ === undefined ? "english" : inputFormat(value_);
 }
 
-export function transformMode(arguments_: ParsedArguments, embedded?: MaskingMode): MaskingMode {
+/** The mode that --mode names, undefined without --mode; refused where it names no mode. */
+export function givenMode(arguments_: ParsedArguments): MaskingMode | undefined {
   const explicit = value(arguments_, "mode");
-  if (explicit !== undefined && !Masking.isMode(explicit)) {
+  if (explicit !== undefined && !Masking.isMode(explicit))
     throw ERRORS.create("transformation-mode", [`${listInWords(MASKING_MODES, "or")}`]);
-  }
+  return explicit;
+}
+
+/**
+ * The mode of the codes: --mode (givenMode), else `embedded`, the one their record names, else
+ * seedshift where dates are given and direct without; refuses a --mode that names no mode or
+ * differs from `embedded`.
+ */
+export function transformMode(arguments_: ParsedArguments, embedded?: MaskingMode): MaskingMode {
+  const explicit = givenMode(arguments_);
   const conflict = modeConflictOf(embedded, explicit);
   if (conflict !== undefined) throw ERRORS.create("transform-mode-refused", [conflict]);
   if (explicit !== undefined) return explicit;

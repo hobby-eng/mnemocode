@@ -2,7 +2,6 @@
 // code and some for a whole color (AUD-014-FUN002), and the bound of everyPick checked before it
 // expands (AUD-014 recommendation 16). Public vectors only (vectors/sskr-v1.json).
 
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -11,12 +10,12 @@ import { AMBIGUOUS_MARK_WIDTHS, AmbiguousMarksError } from "../src/sskr/repair-m
 import { planJointRepair, searchOnce } from "../src/sskr/joint-repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { shareUnits } from "./helpers/shares.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-) as { deterministic: { entropy: string; shares: string[] }[] };
-const vector = vectors.deterministic[0]!;
-const [first, second, third] = vector.shares as [string, string, string];
+const vector = sskrVectors().deterministic[0]!;
+const first = vector.shares[0]!;
+const second = vector.shares[1]!;
+const third = vector.shares[2]!;
 const mnemonic = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
 
 /**
@@ -88,7 +87,7 @@ describe("AUD-014 recommendation 16: everyPick checks its bound before it expand
     class CountingList extends Array<number> {
       override map<U>(make: (value: number, index: number, array: number[]) => U): U[] {
         expanded += 1;
-        return Array.prototype.map.call(this, make as never) as U[];
+        return super.map(make);
       }
     }
     const last = CountingList.from([7, 8, 9]);

@@ -16,7 +16,7 @@ import {
 } from "../core/date-search.js";
 import type { EncodedBackup } from "../core/encoded-backup.js";
 import { integerOption, type ParsedArguments, value } from "./arguments.js";
-import { askWalletEvidence } from "./ask.js";
+import { askWalletEvidence } from "./wallet-question.js";
 import { type WalletPlace, givenWallet } from "./bitcoin-options.js";
 import { CandidatesFile } from "./candidates-file.js";
 import {
@@ -47,7 +47,6 @@ import {
 } from "./input.js";
 import { terminalNotice } from "./terminal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
-import { counting } from "../core/search-plan.js";
 import type { MaskingMode } from "../core/types.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -58,11 +57,6 @@ const ERRORS = new ErrorCatalog("cli.recover-date-command", {
   "seedshift-mode-only": () => SEEDSHIFT_MODE_ONLY,
   "provide-dates-including-at-least-one-pattern-containing": () =>
     "Provide dates, including at least one pattern containing ? digits.",
-  "date-patterns-produce-combinations-increase-candidate-search-limit": (
-    value0: string,
-    value1: string,
-  ) =>
-    `The date patterns produce ${value0} combinations. Increase the candidate search limit to at least ${value1} to continue.`,
 });
 
 /**
@@ -170,14 +164,6 @@ async function recoverFromOptions(
     patterns: true,
   });
   requireIncompleteDate(dates);
-  const { combinations } = dates;
-  if (settings.maxCandidates !== undefined && combinations > settings.maxCandidates) {
-    const formatted = counting(combinations);
-    throw ERRORS.create("date-patterns-produce-combinations-increase-candidate-search-limit", [
-      `${formatted}`,
-      `${formatted}`,
-    ]);
-  }
   if ((await settings.target?.prepare(settings.passphrase)) === CANCELLED) return CANCELLED;
   const result = await search(indexes, dates, mode, settings.evidence, settings);
   if (result === CANCELLED) return CANCELLED;

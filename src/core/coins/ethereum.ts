@@ -2,15 +2,28 @@
 // key, written "0x" and 40 hexadecimal digits with the EIP-55 checksum. A module of its own, so
 // that a host of Ethereum alone takes no other coin of these accounts (evm.ts reuses its reader).
 //
-// Host-neutral: it imports only coin.ts, keccak-account.ts, other-forms.ts, @scure/base and
-// @noble/hashes (test/portable-modules.test.ts).
+// Host-neutral: it imports only coin.ts, keccak-account.ts, other-forms.ts, the guard of a value
+// that must be there (defined.ts), the catalog of its error codes (error-catalog.ts), @scure/base
+// and @noble/hashes (test/portable-modules.test.ts).
 
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hex, utf8 } from "@scure/base";
-import { Coin, invalidAddress, type CoinAddress } from "./coin.js";
+import { addressRefusal, Coin, type CoinAddress } from "./coin.js";
 import { KECCAK_RULES } from "./keccak-account.js";
 import { hexAccountDigits, isHexAccount, HEX_ACCOUNT_DIGITS } from "./other-forms.js";
 import { defined } from "../defined.js";
+import { ErrorCatalog } from "../error-catalog.js";
+
+/**
+ * The refusals of an account that only this form has; the others are every coin's
+ * (core.coins.coin). Their words stay here, so that a host without Ethereum carries none of them.
+ */
+const ERRORS = new ErrorCatalog("core.coins.ethereum", {
+  "address-not-hex-account": () =>
+    addressRefusal(`it is not ${HEX_ACCOUNT_DIGITS} hexadecimal digits after 0x`),
+  "address-wrong-eip55-checksum": () =>
+    addressRefusal("its EIP-55 checksum, the mix of capital and small letters, is wrong"),
+});
 
 /** EIP-55: a letter is a capital where the matching digit of the hash is 8 or more. */
 const EIP55_CAPITAL_FROM = 8;
@@ -23,12 +36,11 @@ export class HexCoin extends Coin {
   protected read(text: string): CoinAddress {
     const digits = hexAccountDigits(text);
     if (digits === undefined) throw this.notOurs();
-    if (!isHexAccount(digits))
-      throw invalidAddress(`it is not ${HEX_ACCOUNT_DIGITS} hexadecimal digits after 0x`);
+    if (!isHexAccount(digits)) throw ERRORS.create("address-not-hex-account", []);
     const account = hex.decode(digits.toLowerCase());
     const checksummed = eip55(account);
     if (/[a-f]/u.test(digits) && /[A-F]/u.test(digits) && digits !== checksummed)
-      throw invalidAddress("its EIP-55 checksum, the mix of capital and small letters, is wrong");
+      throw ERRORS.create("address-wrong-eip55-checksum", []);
     return this.address("keccak", account, `0x${checksummed}`);
   }
 }

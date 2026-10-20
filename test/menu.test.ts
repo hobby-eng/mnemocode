@@ -7,7 +7,7 @@ import { BIP39_WORD_COUNTS } from "../src/core/bip39-sizes.js";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { assertAllowedArguments, parseArguments } from "../src/cli/arguments.js";
-import { commandOptions, isCommandName } from "../src/cli/command-options.js";
+import { COMMAND_OPTIONS, isCommandName } from "../src/cli/command-options.js";
 import { ANSWER_LABEL_WIDTH } from "../src/cli/terminal-choice.js";
 import { TEXT_WIDTH } from "../src/cli/terminal.js";
 import { HEIR_MENU } from "../src/cli/heir-sheet.js";
@@ -43,8 +43,17 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
 vi.mock("../src/export/image-export.js", async (importOriginal) =>
   harness.replacedImageExport(await importOriginal()),
 );
+vi.mock("../src/cli/cards-fit.js", async (importOriginal) =>
+  harness.replacedCardsFit(await importOriginal()),
+);
 
 answeredByScript();
+
+/** The options that `command` accepts; the test fails on a name that is no command. */
+function optionsOf(command: string): readonly string[] {
+  if (!isCommandName(command)) throw new Error(`No command is named ${command}.`);
+  return COMMAND_OPTIONS[command];
+}
 
 describe("start menu", () => {
   it("offers the agreed entries, 1 to 9, 0 for help, and Quit without a digit", () => {
@@ -82,7 +91,7 @@ describe("start menu", () => {
         const [command, ...rest] = run;
         expect(isCommandName(command!), typedCommand(run)).toBe(true);
         const parsed = parseArguments(rest);
-        assertAllowedArguments(parsed, command!, commandOptions[command as never]);
+        assertAllowedArguments(parsed, command!, optionsOf(command!));
         assertCardOptions(command!, parsed);
         // A secret never goes on the command line: a command that takes one asks for it.
         const secret = [
@@ -542,6 +551,57 @@ describe("start menu", () => {
         "Label before each code",
       ]);
     });
+  });
+
+  it("asks the card details again, keeping every other answer, when the cards cannot print them", async () => {
+    script.fitCards = true;
+    // 84 Latin letters and spaces: a name the details take, too long for its line on the card.
+    const long =
+      "Maximilian Alexander Konstantin Wolfgang Bartholomew Fitzgerald Montgomery Vanderbi";
+    const run = (await runOf(ENTRY.encode, [...SINGLE, 0, 0, 2, 0, 0, 1, 1], {
+      "Name, in Latin letters": [long, "Ann Lee"],
+    }))!;
+    const details = "Type your own details for the cards?";
+    expect(
+      script.asked.filter((asked) => asked.question === details).map((asked) => asked.warning),
+    ).toEqual([
+      undefined,
+      "The line with the subtitle and the name is too long to fit legibly on the card; shorten it.",
+    ]);
+    // Every answer before the details is kept: only the details were asked again.
+    const others = script.asked
+      .filter((asked) => asked.question !== details)
+      .map((asked) => asked.question);
+    expect(new Set(others).size).toBe(others.length);
+    expect(run.slice(0, run.indexOf("--card-name"))).toEqual([
+      "encode",
+      "--ask-secrets",
+      "--format",
+      "5",
+      "--mode",
+      "direct",
+      "--template",
+      "business-architect",
+      "--pdf",
+      "mnemocode-cards.pdf",
+      "--card-qr",
+    ]);
+    expect(run[run.indexOf("--card-name") + 1]).toBe("Ann Lee");
+    expect(run).not.toContain(long);
+  });
+
+  it("asks the details of share cards again when the cards cannot print them", async () => {
+    script.fitCards = true;
+    const long =
+      "Maximilian Alexander Konstantin Wolfgang Bartholomew Fitzgerald Montgomery Vanderbi";
+    const run = (await runOf(ENTRY.encode, [...SHARES, 0, 0, 2, 0, 0, 1, 1], {
+      "Name, in Latin letters": [long, "Ann Lee"],
+    }))!;
+    const details = "Type your own details for the cards?";
+    expect(
+      script.asked.filter((asked) => asked.question === details).map((asked) => asked.warning),
+    ).toEqual([undefined, expect.stringContaining("too long to fit legibly on the card")]);
+    expect(run[run.indexOf("--card-name") + 1]).toBe("Ann Lee");
   });
 
   it("finds a code of an encoded seed phrase as Decode does, from the Find entry", async () => {

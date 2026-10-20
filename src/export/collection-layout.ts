@@ -378,7 +378,13 @@ function largestGrid(
  * largest cards, in this order of preference: of the column counts whose rows are all full and
  * that have at least MIN_SHEET_ROWS rows (any number on a card-sized page, hasEnoughRows); else of
  * those whose rows are all full, since a sheet whose last row is short looks unfinished (owner,
- * 2026-10-13); and only where no such count fits, of any.
+ * 2026-10-13); and only where no such count fits, of any. Refuses more than MAX_SHEET_CARDS cards
+ * (export.collection-layout.sheet-holds-at-most-cards); a count that is no whole number from 1, an
+ * aspect that is not above 0 or fewer caption lines than one
+ * (export.collection-layout.invalid-design-study-layout); a page size or an orientation of none
+ * (export.card-settings.page-size, export.card-settings.orientation); a QR code that does not fit
+ * the page (export.collection-layout.qr-cannot-fit-on-design-study-choose-larger); and cards that
+ * no grid fits legibly (export.collection-layout.no-room).
  */
 export function collectionSheetLayout(
   settings: CardSettings,
@@ -499,7 +505,10 @@ function ownOrientation(size: CardPageSize): CardOrientation {
  * MIN_SHEET_ROWS rows where they fit, and the largest cards (owner, 2026-10-13). The orientation
  * is the one given, or the one whose plan wins by the same rules: enough rows first, then the
  * larger cards, the page's own on a tie; on a tie of sizes, more cards, which fill more of the
- * page. `code` is the QR code it prints.
+ * page. `code` is the QR code it prints. Refuses a page size or an orientation of none
+ * (export.card-settings.page-size, export.card-settings.orientation); where no count of cards
+ * fits, it throws the first refusal of a layout (collectionSheetLayout) or of `shape` captions,
+ * and export.collection-layout.no-room where there was none.
  */
 export function planCollectionSheet(
   settings: Pick<CardSettings, "pageSize" | "orientation">,

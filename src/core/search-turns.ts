@@ -175,7 +175,11 @@ export function stillRunning(run: SearchRun): boolean {
   return run.signal?.aborted !== true;
 }
 
-/** A count that a run keeps, such as the matches it shows: a whole number of 0 or more. */
+/**
+ * A count that a run keeps, such as the matches it shows: `fallback` when `count` is undefined;
+ * refused, as a RangeError naming `name` (core.search-turns.whole-number-more), unless it is a
+ * whole number of `minimum` or more.
+ */
 export function keptCount(
   count: number | undefined,
   fallback: number,

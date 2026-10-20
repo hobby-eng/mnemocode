@@ -7,13 +7,7 @@
 import { bech32, bech32m } from "@scure/base";
 import { HASH160_BYTES, type AddressType } from "./address-types.js";
 import { Base58Coin, type Base58CoinDescription } from "./base58.js";
-import {
-  asciiLowercase,
-  startsWithAny,
-  type CoinAddress,
-  type CoinRules,
-  unreadableAddress,
-} from "./coin.js";
+import { asciiLowercase, startsWithAny, type CoinAddress, type CoinRules } from "./coin.js";
 import { nestedSegwitHash, taprootOutputKey, X_ONLY_KEY_BYTES } from "./taproot.js";
 import { Bech32Prefixes, BECH32_SEPARATOR } from "./bech32.js";
 import { BITCOIN_P2PKH_VERSION, BITCOIN_P2SH_VERSION } from "./bitcoin-versions.js";
@@ -84,7 +78,7 @@ class SegwitCoin extends Base58Coin {
 
   #readSegwit(text: string): CoinAddress {
     const decoded = decodeSegwit(text);
-    if (decoded === undefined) throw unreadableAddress();
+    if (decoded === undefined) throw this.damaged();
     const { prefix, version, program } = decoded;
     // BIP173 allows an address all in capitals, as in QR codes; the decoder refused mixed case.
     const testnet = this.#segwit.prefixes.testnetOf(prefix);

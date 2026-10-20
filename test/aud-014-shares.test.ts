@@ -36,22 +36,14 @@ import {
   writeShare,
   type ShareFormat,
 } from "../src/sskr/transport.js";
+import { hexBytes, sskrVectors } from "./helpers/vectors.js";
 
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-) as {
-  deterministic: {
-    entropy: string;
-    testOnlySeed: string;
-    shares: string[];
-    colors: string[][];
-  }[];
-};
-const VECTOR = vectors.deterministic[0]!;
-const bytes = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
+const VECTOR = sskrVectors().deterministic[0]!;
 /** A 2-of-3 set of a 12-word phrase (bip39-128-2-of-3). */
-const [FIRST, SECOND, THIRD] = VECTOR.shares as [string, string, string];
-const PHRASE = entropyToMnemonic(bytes(VECTOR.entropy), wordlist);
+const FIRST = VECTOR.shares[0]!;
+const SECOND = VECTOR.shares[1]!;
+const THIRD = VECTOR.shares[2]!;
+const PHRASE = entropyToMnemonic(hexBytes(VECTOR.entropy), wordlist);
 const TEXTS = { decodeEntry: "The Decode tab" };
 /** The message of an empty input, from the one rule of the share count (transport.ts). */
 const NO_SHARES = shareCountProblem(0)!;
@@ -165,12 +157,12 @@ describe("AUD-014-API009: an empty input is a trouble, before anything is restor
     for (const input of [empty, cleared]) {
       expect(await restore.read(input)).toEqual({
         kind: "trouble",
-        trouble: { kind: "few", message: NO_SHARES },
+        trouble: { kind: "few", code: "share-count-refused", message: NO_SHARES },
         lines: [],
       });
       expect(input.rewritten()).toEqual({
         kind: "trouble",
-        trouble: { kind: "few", message: NO_SHARES },
+        trouble: { kind: "few", code: "share-count-refused", message: NO_SHARES },
       });
     }
     expect(platform.combined).toBe(0);
@@ -181,6 +173,7 @@ describe("AUD-014-API008: the bridge's narrowed arguments are checked first", ()
   /** A secret that records whether the glue began to copy it: it reads the length first. */
   function watchedSecret(): { secret: Uint8Array; read: () => boolean } {
     let touched = false;
+    // An object that is no Uint8Array, fed on purpose: the glue must refuse before it reads it.
     const secret = {
       get length() {
         touched = true;
@@ -201,10 +194,12 @@ describe("AUD-014-API008: the bridge's narrowed arguments are checked first", ()
           1,
           Uint8Array.of(2, 3),
           new Uint8Array(SEED_BYTES),
+          // Encodings that no type allows, fed on purpose as a JavaScript host could.
           encoding as number,
         ),
       ).toThrow(UNSUPPORTED_ENCODING);
       expect(read()).toBe(false);
+      // The same encodings, fed on purpose to the reading side.
       expect(() => engine.recover_sskr_shares_formatted(FIRST, encoding as number)).toThrow(
         UNSUPPORTED_ENCODING,
       );
@@ -223,10 +218,10 @@ describe("AUD-014-API008: the bridge's narrowed arguments are checked first", ()
     const split = (encoding: number) =>
       engine
         .create_sskr_shares_formatted(
-          bytes(VECTOR.entropy),
+          hexBytes(VECTOR.entropy),
           1,
           Uint8Array.of(2, 3),
-          bytes(VECTOR.testOnlySeed),
+          hexBytes(VECTOR.testOnlySeed),
           encoding,
         )
         .trim()
@@ -245,10 +240,10 @@ describe("AUD-014-API008: the bridge's narrowed arguments are checked first", ()
     rawBridge.initSync({ module: readFileSync("sskr-wasm/generated/recovery_sskr_wasm_bg.wasm") });
     expect(() =>
       rawBridge.create_sskr_shares_formatted(
-        bytes(VECTOR.entropy),
+        hexBytes(VECTOR.entropy),
         1,
         Uint8Array.of(2, 3),
-        bytes(VECTOR.testOnlySeed),
+        hexBytes(VECTOR.testOnlySeed),
         2,
       ),
     ).toThrow(UNSUPPORTED_ENCODING);
@@ -286,6 +281,7 @@ describe("AUD-001-API001: a share writer refuses a format that is none", () => {
     const set = { shares: [unrepairedShare(FIRST)], unsettled: [] };
     const exported = ShareExport.of(set, [1]);
     for (const format of ["typo", "UR", "", null, 0, 1]) {
+      // A form that no type allows, fed on purpose as a JavaScript host could.
       const wrong = format as ShareFormat;
       expect(() => share.write(wrong)).toThrow(REFUSAL);
       expect(() => writeShare(FIRST, wrong)).toThrow(REFUSAL);
@@ -373,7 +369,7 @@ describe("Recommendation 18: a split is bound to what was asked", () => {
     };
   }
   const split = (platform: SharePlatform, threshold = 2, count = 3) =>
-    new ShareSplit(platform, (seed) => seed.set(bytes(VECTOR.testOnlySeed))).split(
+    new ShareSplit(platform, (seed) => seed.set(hexBytes(VECTOR.testOnlySeed))).split(
       PHRASE,
       threshold,
       count,
@@ -385,7 +381,7 @@ describe("Recommendation 18: a split is bound to what was asked", () => {
 
   it("refuses shares of another threshold, or out of member order", async () => {
     const otherThreshold = platformMaking((_, secret) =>
-      nodeSharePlatform.createShares(secret, 3, 3, bytes(VECTOR.testOnlySeed)),
+      nodeSharePlatform.createShares(secret, 3, 3, hexBytes(VECTOR.testOnlySeed)),
     );
     await expect(split(otherThreshold)).rejects.toThrow(
       "SSKR engine returned shares of another split than asked.",
@@ -405,7 +401,7 @@ describe("Recommendation 18: a split is bound to what was asked", () => {
         other,
         2,
         3,
-        bytes(VECTOR.testOnlySeed),
+        hexBytes(VECTOR.testOnlySeed),
       );
       return [shares[0]!, shares[1]!, third!];
     });

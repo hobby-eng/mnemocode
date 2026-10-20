@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Build the distributable DejaVu Sans subset that cards and sheets print their text with.
+r"""Build the DejaVu Sans subset that cards and sheets print with.
 
-It needs fontTools, installed with
-    python3 -m pip install --require-hashes -r scripts/build-ui-font-requirements.txt
+The subset is distributed with MnemoCode. It needs fontTools:
+
+    python3 -m pip install --require-hashes \
+        -r scripts/build-ui-font-requirements.txt
 """
 
 from pathlib import Path
@@ -19,13 +21,17 @@ OUTPUT_DIR = ROOT / "assets/fonts"
 UI_OUTPUT_FONT = OUTPUT_DIR / "DejaVuSans-UI.ttf"
 UI_OUTPUT_NOTICE = OUTPUT_DIR / "DejaVuSans-NOTICE"
 SOURCE_DIGESTS = {
-    UI_SOURCE_FONT: "b4c632e3cdf9acc7f28758fb5a323c8524d7fc6660d46904d9b6cbe2809c419c",
-    UI_SOURCE_NOTICE: "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9",
+    UI_SOURCE_FONT: (
+        "b4c632e3cdf9acc7f28758fb5a323c8524d7fc6660d46904d9b6cbe2809c419c"
+    ),
+    UI_SOURCE_NOTICE: (
+        "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9"
+    ),
 }
 
 
 class FontSourceError(RuntimeError):
-    """The installed upstream font does not match the reproducible build input."""
+    """The installed upstream font is not the build's pinned input."""
 
     code = "font-source-integrity"
 
@@ -33,13 +39,21 @@ class FontSourceError(RuntimeError):
 def main() -> None:
     for path, digest in SOURCE_DIGESTS.items():
         if sha256(path.read_bytes()).hexdigest() != digest:
-            raise FontSourceError("The DejaVu source font or license has changed.")
+            raise FontSourceError(
+                "The DejaVu source font or license has changed."
+            )
     options = subset.Options()
     options.name_IDs = [0, 1, 2, 3, 4, 5, 6]
     options.name_languages = [0x409]
-    # Keep Latin diacritics used by international names, combining marks and
-    # typography punctuation, as well as the existing Cyrillic coverage.
-    ui_ranges = [(0x20, 0x250), (0x300, 0x370), (0x400, 0x530), (0x2000, 0x2070)]
+    # Keep Latin diacritics used by international names, combining marks
+    # and typography punctuation, as well as the existing Cyrillic
+    # coverage.
+    ui_ranges = [
+        (0x20, 0x250),
+        (0x300, 0x370),
+        (0x400, 0x530),
+        (0x2000, 0x2070),
+    ]
     ui_glyphs = "".join(
         chr(codepoint)
         for start, end in ui_ranges
@@ -51,7 +65,8 @@ def main() -> None:
     ui_subsetter.populate(text=ui_glyphs)
     ui_subsetter.subset(ui_font)
     ui_font.save(str(UI_OUTPUT_FONT))
-    UI_OUTPUT_NOTICE.write_text(UI_SOURCE_NOTICE.read_text(encoding="utf-8"), encoding="utf-8")
+    notice = UI_SOURCE_NOTICE.read_text(encoding="utf-8")
+    UI_OUTPUT_NOTICE.write_text(notice, encoding="utf-8")
     print(f"Saved {UI_OUTPUT_FONT} ({UI_OUTPUT_FONT.stat().st_size} bytes)")
 
 

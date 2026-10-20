@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PDFDict, PDFDocument, PDFName, PDFPage, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 import { indexesToColors } from "../src/core.js";
 import {
-  materialArtwork,
+  MATERIAL_ARTWORK,
   materialSamples,
   chooseMaterialSamples,
   tintedLook,
@@ -11,7 +11,7 @@ import {
 import { renderMaterialCard } from "../src/export/material-cards.js";
 import type { CardPageSize } from "../src/export/card-settings.js";
 import { renderIndividualCards } from "../src/export/render.js";
-import { cardTemplates, renderCatalogDesign } from "../src/export/templates.js";
+import { CARD_TEMPLATES, renderCatalogDesign } from "../src/export/templates.js";
 import { drawsSeparateCards, findTemplate, SHEETS_ONLY } from "../src/export/template-catalog.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
@@ -36,13 +36,12 @@ const MIN_LOOK_DIFFERENCE = 10;
 /** CIE Lab (D65) of a colour, computed here independently of the module under test. */
 function lab(hex: string): [number, number, number] {
   const digits = hex.replace(/^#/u, "");
-  const [r, g, b] = [0, 2, 4]
-    .map((i) => parseInt(digits.slice(i, i + 2), 16) / 255)
-    .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)) as [
-    number,
-    number,
-    number,
-  ];
+  /** The channel whose two digits start at `i`, as linear light (the sRGB transfer undone). */
+  const linear = (i: number) => {
+    const v = parseInt(digits.slice(i, i + 2), 16) / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  const [r, g, b] = [linear(0), linear(2), linear(4)];
   const f = (v: number) => (v > 216 / 24389 ? Math.cbrt(v) : ((24389 / 27) * v + 16) / 116);
   const x = f((0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047);
   const y = f(0.2126729 * r + 0.7151522 * g + 0.072175 * b);
@@ -92,7 +91,7 @@ describe("material selection cards", () => {
           MIN_LOOK_DIFFERENCE,
         );
     for (const sample of samples) {
-      expect(materialArtwork[style].finishes).toContain(sample.finish);
+      expect(MATERIAL_ARTWORK[style].finishes).toContain(sample.finish);
       if (sample.tint !== undefined) {
         expect(sample.finish.surface).toBeDefined();
         expect(sample.look).toBe(tintedLook(sample.finish.color, sample.tint));
@@ -158,7 +157,7 @@ describe("material selection cards", () => {
     // The box of the enclosure runs off its photograph.
     const tolerance = 0.02;
     for (const style of styles.filter((style) => style !== "enclosure")) {
-      const { finishes, catalogue } = materialArtwork[style];
+      const { finishes, catalogue } = MATERIAL_ARTWORK[style];
       const [ring] = catalogue.outline;
       for (const { name, outlineFit } of finishes.filter((finish) => finish.surface)) {
         const [scale, dx, dy] = outlineFit ?? [1, 0, 0];
@@ -248,7 +247,7 @@ describe("material selection cards", () => {
   });
 
   it("prints a sheet of A6 where no page size is given, as every other design does", async () => {
-    for (const template of cardTemplates.filter((item) => item.family === "material")) {
+    for (const template of CARD_TEMPLATES.filter((item) => item.family === "material")) {
       const pdf = await PDFDocument.load(await template.render(nodeCardRenderer, content));
       const [page] = pdf.getPages();
       expect((page!.getWidth() * 25.4) / 72, template.id).toBeCloseTo(148, 3);
@@ -257,7 +256,7 @@ describe("material selection cards", () => {
   });
 
   it("draws no separate cards: a material design is printed on sheets only", async () => {
-    for (const template of cardTemplates.filter((item) => item.family === "material")) {
+    for (const template of CARD_TEMPLATES.filter((item) => item.family === "material")) {
       expect(template.renderIndividual, template.id).toBeUndefined();
       await expect(renderIndividualCards(nodeCardRenderer, template, content)).rejects.toThrow(
         SHEETS_ONLY,

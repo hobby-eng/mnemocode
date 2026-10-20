@@ -49,6 +49,15 @@ const LONGEST_MONTH = DATE_PARTS.day.max;
  * only in part (Masking.effectiveShifts). So each shift is tried once, with the earliest dates
  * that give it. Whether an earlier combination gave it is worked out from the combination itself
  * (EarlierShifts), never kept: a search of two billion combinations needs no memory for it.
+ *
+ * A generator: its refusals come on the first next(), not at the call. It refuses a mode that does
+ * not mask with dates (Masking.assertMaskedMode: core.masking.unsupported-mode), a count of
+ * indexes that no phrase has (core.bip39-sizes.expected-word-indexes), patterns that
+ * ownedPatterns refuses (core.dates.date-pattern-cannot-match-valid, key-conflict and the others
+ * it names), known dates that ownedDates refuses (core.dates.date-year-month-day and the others it
+ * names), and what Masking#undo refuses for the codes and a combination's dates
+ * (core.bip39-sizes.assert-word-indexes-refused, missing-checksum, core.dates.derive-shifts-refused
+ * and the other refusals of deriveShifts).
  */
 export function* dateRecoveryCandidates(
   indexes: readonly number[],
@@ -81,6 +90,19 @@ export function* dateRecoveryCandidates(
 /** A date with what tells it apart in the shifts: its year modulo 2,048, its month and its day. */
 function shiftKeyOf(date: DateShiftDate): string {
   return `${date.year % BIP39_DICTIONARY_SIZE}-${date.month}-${date.day}`;
+}
+
+/**
+ * What every other last date shares with the last date of a combination where the day of the last
+ * date moves only the last word, and only in part.
+ */
+interface LastDayStands {
+  /** The year modulo 2,048. */
+  readonly year: number;
+  /** The month, counted from 1. */
+  readonly month: number;
+  /** The remainder of the day modulo the last word's shift modulus. */
+  readonly day: number;
 }
 
 /** A value that may stand in a pattern's place, with the date of the combination it stands for. */
@@ -137,12 +159,15 @@ class EarlierShifts {
   gaveShiftsOf(guessed: readonly DateShiftDate[]): boolean {
     const shifts = this.#shiftsOf(guessed);
     const remaining = new Map<string, number>();
+    // A date of each shift key, in the order the keys came: where the stands of a key start.
+    const keyed = new Map<string, DateShiftDate>();
     for (const date of guessed) {
       const key = shiftKeyOf(date);
       remaining.set(key, (remaining.get(key) ?? 0) + 1);
+      keyed.set(key, date);
     }
     const lastDay = this.#lastDayStands(sortDates([...this.#known, ...guessed]));
-    const stands = this.#patterns.map((_, index) => this.#standsFor(index, remaining, lastDay));
+    const stands = this.#patterns.map((_, index) => this.#standsFor(index, keyed, lastDay));
     return this.#search(guessed, shifts, stands, remaining, [], false, false);
   }
 
@@ -156,9 +181,7 @@ class EarlierShifts {
    * Where the day of the last date moves only the last word, and only in part: the year, the
    * month and the remainder of the day that every other last date must share with it.
    */
-  #lastDayStands(
-    all: readonly DateShiftDate[],
-  ): { readonly year: number; readonly month: number; readonly day: number } | undefined {
+  #lastDayStands(all: readonly DateShiftDate[]): LastDayStands | undefined {
     if (this.#lastModulus > LONGEST_MONTH) return undefined;
     // With fewer dates the shifts repeat, and the day of the last date moves other words too.
     if (all.length !== maximumDates(this.#wordCount)) return undefined;
@@ -170,11 +193,14 @@ class EarlierShifts {
     };
   }
 
-  /** The dates that may stand in the place of pattern `index`, earliest first. */
+  /**
+   * The dates that may stand in the place of pattern `index`, earliest first: those of each shift
+   * key of `keyed`, a date of the key for each, and those of `lastDay`.
+   */
   #standsFor(
     index: number,
-    remaining: ReadonlyMap<string, number>,
-    lastDay: { readonly year: number; readonly month: number; readonly day: number } | undefined,
+    keyed: ReadonlyMap<string, DateShiftDate>,
+    lastDay: LastDayStands | undefined,
   ): Stand[] {
     const allowed = defined(this.#allowed[index]);
     const stands: Stand[] = [];
@@ -183,12 +209,14 @@ class EarlierShifts {
       if (day > daysInMonth(year, month)) return;
       stands.push({ date: { year, month, day }, key });
     };
-    for (const key of remaining.keys()) {
-      // Every key is shiftKeyOf's: a year, a month and a day, each a whole number, joined by "-".
-      const [year, month, day] = key.split("-").map(Number) as [number, number, number];
-      for (let other = year; other <= LAST_YEAR; other += BIP39_DICTIONARY_SIZE)
+    for (const [key, { year, month, day }] of keyed)
+      // Every year with the key's remainder modulo 2,048, from the remainder itself up.
+      for (
+        let other = year % BIP39_DICTIONARY_SIZE;
+        other <= LAST_YEAR;
+        other += BIP39_DICTIONARY_SIZE
+      )
         add(other, month, day, key);
-    }
     if (lastDay !== undefined)
       for (let year = lastDay.year; year <= LAST_YEAR; year += BIP39_DICTIONARY_SIZE)
         for (const day of allowed.days)

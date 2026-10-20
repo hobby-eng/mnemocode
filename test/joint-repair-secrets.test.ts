@@ -1,7 +1,6 @@
 // AUD-012-SEC004: the assessment of shares wipes every array that holds a share's part of the
 // secret, except those that the plan's search keeps. Public SSKR vectors only.
 
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -9,19 +8,17 @@ import { planJointRepair, searchOnce } from "../src/sskr/joint-repair.js";
 import { ReadingSpace } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 /** Every reading that the assessment solves, and what runs after each is solved. */
-const solved = {
-  spaces: [] as ReadingSpace[],
-  after: undefined as (() => void) | undefined,
+const solved: { spaces: ReadingSpace[]; after: (() => void) | undefined } = {
+  spaces: [],
+  after: undefined,
 };
 /** The solver itself, which the spy below watches: every reading is solved through it. */
 const solve = ReadingSpace.solve.bind(ReadingSpace);
 
-const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-  deterministic: { entropy: string; shares: string[] }[];
-};
-const vector = vectors.deterministic[0]!;
+const vector = sskrVectors().deterministic[0]!;
 
 /** The share in words with the words at `places` marked with ?. */
 function marked(share: string, places: readonly number[]): string {

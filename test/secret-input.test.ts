@@ -14,18 +14,26 @@ vi.mock("../src/cli/private-screen.js", async (importOriginal) => ({
 }));
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/cli/terminal-input.js")>();
-  return {
-    ...actual,
-    terminalAvailable: () => terminal.available,
-    withRawTerminal: async <T>(body: (next: () => Promise<number | undefined>) => Promise<T>) => {
+  class CountedKeys extends actual.TerminalKeys {
+    static override async withRawMode<T>(
+      body: (next: NextByte, moreWithin: MoreWithin) => Promise<T>,
+    ): Promise<T> {
       terminal.switched += 1;
-      return body(async () => {
+      const next: NextByte = async () => {
         if (terminal.answers === "") return undefined;
         const byte = terminal.answers.charCodeAt(0);
         terminal.answers = terminal.answers.slice(1);
         return byte;
-      });
-    },
+      };
+      // Nothing more comes within any wait, as from a terminal that is never pasted into: each
+      // line break ends an answer, and the next answer waits in `answers` for the next question.
+      return body(next, async () => false);
+    }
+  }
+  return {
+    ...actual,
+    terminalAvailable: () => terminal.available,
+    TerminalKeys: CountedKeys,
   };
 });
 
@@ -41,7 +49,7 @@ import { datesPrompt } from "../src/cli/input.js";
 
 /** The answer as typed: the secret questions take a reading of it, here none. */
 const typed = (answer: string) => answer;
-import { CANCELLED } from "../src/cli/terminal-keys.js";
+import { CANCELLED, type MoreWithin, type NextByte } from "../src/cli/terminal-keys.js";
 
 const TEST_PHRASE =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";

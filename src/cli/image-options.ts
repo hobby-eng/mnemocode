@@ -6,7 +6,7 @@ import {
   type DocumentFormat,
 } from "../export/image-export.js";
 import { value, type ParsedArguments } from "./arguments.js";
-import { printableText, terminalNotice } from "./terminal.js";
+import { printableText, terminalSaved } from "./terminal.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.image-options", {
@@ -57,8 +57,7 @@ export function savedPagesNotice(
   what?: string,
 ): void {
   const kind = what === undefined ? "" : `${what} `;
-  terminalNotice(
+  terminalSaved(
     `Saved ${count} ${imageFormat(args).toUpperCase()} ${kind}pages to: ${printableText(directory)}`,
-    "success",
   );
 }

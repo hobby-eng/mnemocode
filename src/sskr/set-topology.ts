@@ -150,16 +150,22 @@ export interface PlacedShare {
   readonly ur: string;
 }
 
+/** A share that copies an earlier one (copiesAmong). */
+export interface PlacedCopy {
+  /** The place of the copy, which is left out. */
+  readonly place: number;
+  /** The place of the share it copies. */
+  readonly of: number;
+}
+
 /**
  * The shares of `shares` that copy an earlier one exactly, the same UR however each was written,
  * each with the place of the first: a copy adds nothing to a restore and is used, or saved, once.
  * The one rule for copies, which the shares as typed (share-input.ts), the backup check and an
  * export (ShareExport) apply.
  */
-export function copiesAmong(
-  shares: readonly PlacedShare[],
-): { readonly place: number; readonly of: number }[] {
-  const copies: { readonly place: number; readonly of: number }[] = [];
+export function copiesAmong(shares: readonly PlacedShare[]): PlacedCopy[] {
+  const copies: PlacedCopy[] = [];
   for (const [index, share] of shares.entries()) {
     const first = shares.slice(0, index).find((other) => other.ur === share.ur);
     if (first !== undefined) copies.push({ place: share.place, of: first.place });

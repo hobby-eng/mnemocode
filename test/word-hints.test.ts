@@ -4,7 +4,7 @@ import { englishWordlist } from "../src/core/english-words.js";
 import { LIST_FROM_LETTERS, WordList, type WordHints } from "../src/core/word-hints.js";
 import { WORD_HINTS_SELF_TEST } from "../src/core/word-hints-self-test.js";
 import { SHARE_WORD_HINTS } from "../src/sskr/share-input.js";
-import { bytewords } from "../src/sskr/bytewords-list.js";
+import { BYTEWORDS } from "../src/sskr/bytewords-list.js";
 
 /** The words that `line` lists, or the kind of hint it gives instead. */
 function listed(hints: WordHints, line: string): readonly string[] | string {
@@ -77,7 +77,7 @@ describe("hints below a word being typed, as in mhfe", () => {
         englishWordlist.filter((word) => word.startsWith(prefix)),
       );
     const byteword = (line: string): readonly string[] | string => listed(SHARE_WORD_HINTS, line);
-    expect(byteword("ta")).toEqual(bytewords.filter((word) => word.startsWith("ta")));
+    expect(byteword("ta")).toEqual(BYTEWORDS.filter((word) => word.startsWith("ta")));
   });
 
   it("names a count of one in the singular", () => {

@@ -16,7 +16,7 @@ export const ELEMENT_SPACING = "\\s,;";
  * list of several shares is split at its semicolons before each is read (sskr/share-input.ts), so
  * that a semicolon inside one share's text separates elements only.
  */
-export const ELEMENT_SEPARATORS = new RegExp(`[${ELEMENT_SPACING}#]+`, "u");
+const ELEMENT_SEPARATORS = new RegExp(`[${ELEMENT_SPACING}#]+`, "u");
 
 /** The hexadecimal digits of the Unicode code of a word (core/words.ts, UNICODE_CODES). */
 export const UNICODE_CODE_DIGITS = 4;
@@ -68,7 +68,7 @@ export const JOINED_MARKS_HINT =
   "In codes run together, a ? stands for a whole code; to mark one digit, write the codes apart, as the screen shows them.";
 
 /** Whether `text` is hexadecimal codes run together with a ? among them (JOINED_MARKS_HINT). */
-export function joinedWithMarks(text: string): boolean {
+function joinedWithMarks(text: string): boolean {
   const tokens = codeTokens(text);
   return (
     tokens.length === 1 &&

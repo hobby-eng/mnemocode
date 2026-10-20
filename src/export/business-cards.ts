@@ -1,7 +1,7 @@
 import { ExportDetails } from "./export-details.js";
-import { fit, text, ink, drawClippedArtwork } from "./business-render-primitives.js";
+import { fit, text, INK, drawClippedArtwork } from "./business-render-primitives.js";
 import {
-  businessDesigns,
+  BUSINESS_DESIGNS,
   businessFields,
   physicalStyle,
   REFERENCE_MARGIN,
@@ -15,7 +15,7 @@ import type { CardContent } from "./backup-cards.js";
 import type { CardDrawing } from "./drawing-sources.js";
 import type { SskrCardContent } from "./sskr-content.js";
 import { MM, separateCardPage, type CardBox } from "./business-layout.js";
-import { drawCollectionStudy, separateCardIndex } from "./collection-sheet.js";
+import { collectionSeries, drawCollectionStudy, separateCardIndex } from "./collection-sheet.js";
 import { type SheetShape } from "./collection-layout.js";
 import {
   parsePageSize,
@@ -26,6 +26,7 @@ import {
 } from "./card-settings.js";
 import { numberedCode } from "./card-codes.js";
 import { assertColorCards, type ColorCards } from "./card-content.js";
+import { contentKindRules } from "./content-kinds.js";
 import { peakRelativeLuma } from "./color-math.js";
 import { artworkBrightness } from "./business-tint.js";
 import { documentWithFont } from "./pdf-documents.js";
@@ -43,10 +44,10 @@ const REFERENCE_MINIMUM_SIZE = 4.2;
  */
 const LIGHT_REFERENCE_LUMA = 0.48;
 
-const white = rgb(1, 1, 1);
+const WHITE = rgb(1, 1, 1);
 /** The colours of the reference line's tones. */
 const REFERENCE_INKS: Readonly<Record<ReferenceLine["tone"], ReturnType<typeof rgb>>> = {
-  dark: ink,
+  dark: INK,
   light: rgb(0.84, 0.86, 0.88),
 };
 
@@ -96,11 +97,11 @@ export async function renderBusinessCards(
   clearDocumentMetadata(doc);
   const designOf = (index: number) => physicalStyle(style, index + styleOffset);
   const fieldColor = (dark: boolean | undefined, index: number) => {
-    if (!dark) return white;
-    if (businessDesigns[designOf(index)].darkFieldInk === "fixed") return ink;
+    if (!dark) return WHITE;
+    if (BUSINESS_DESIGNS[designOf(index)].darkFieldInk === "fixed") return INK;
     const color = defined(content.colors[index]);
     const lightness = peakRelativeLuma(color) * artworkBrightness(color);
-    return lightness > LIGHT_REFERENCE_LUMA ? ink : white;
+    return lightness > LIGHT_REFERENCE_LUMA ? INK : WHITE;
   };
   const fieldsFor = (index: number) => buildFields(designOf(index), profile, font);
   // Scoped to one PDF: shared images never retain user data across exports.
@@ -155,7 +156,6 @@ function buildFields(
 
 async function renderSingle(context: RenderContext, individualIndex: number): Promise<void> {
   const { doc, font, content, designOf, presentation } = context;
-  const share = content.kind === "sskr";
   // This document contains only this reference: no collection QR or hidden full payload.
   const page = doc.addPage([CARD.width * MM, CARD.height * MM]);
   await drawCardFace(context, page, {
@@ -165,10 +165,11 @@ async function renderSingle(context: RenderContext, individualIndex: number): Pr
     height: CARD.height,
     index: individualIndex,
   });
-  // Every separate card shows its number; a share's also the share it belongs to.
-  const reference = share
-    ? `${numberedCode(content, individualIndex)}  |  ${content.collectionReference}`
-    : numberedCode(content, individualIndex);
+  // Every separate card shows its number, and as the rules of its kind say, its series.
+  const reference = contentKindRules(content.kind).separateReference(
+    numberedCode(content, individualIndex),
+    collectionSeries(content),
+  );
   const referenceText = `${presentation.referenceLabel} ${reference}`.trim();
   const design = designOf(individualIndex);
   const placement = referencePlacement(font, referenceText, design);
@@ -179,22 +180,27 @@ async function renderSingle(context: RenderContext, individualIndex: number): Pr
     placement.x,
     REFERENCE_TOP,
     placement.size,
-    REFERENCE_INKS[businessDesigns[design].reference.tone],
+    REFERENCE_INKS[BUSINESS_DESIGNS[design].reference.tone],
   );
   resizeSinglePage(page, content);
 }
 
 /**
  * Where the reference line of a separate card of `design` starts, in millimetres, and its size in
- * points (businessDesigns reference). A line that ends early, as the IT design's does clear of its
- * artwork, shrinks to the room between the margin and that end instead of running off the card.
+ * points (BUSINESS_DESIGNS reference). A line that ends early, as the IT design's does clear of its
+ * artwork, shrinks to the room between the margin and that end instead of running off the card,
+ * down to REFERENCE_MINIMUM_SIZE points. Refused, naming the Reference, as fit refuses it: a
+ * `line` with a character that `font` lacks
+ * (export.business-render-primitives.contains-character-not-supported-by-card-font), and one that
+ * would be smaller than REFERENCE_MINIMUM_SIZE in that room
+ * (export.business-render-primitives.too-long-fit-legibly-on-card-shorten).
  */
 export function referencePlacement(
   font: PDFFont,
   line: string,
   design: PhysicalBusinessStyle,
 ): { readonly x: number; readonly size: number } {
-  const { end, align, preferredSize } = businessDesigns[design].reference;
+  const { end, align, preferredSize } = BUSINESS_DESIGNS[design].reference;
   const size = fit(
     font,
     line,

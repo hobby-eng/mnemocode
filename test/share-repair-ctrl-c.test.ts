@@ -1,26 +1,34 @@
 // Ctrl+C during the assessment of shares marked with ? (share-repair.ts, assessShares): it is
 // read as a key, as during the search, so that it stops the tool where a Windows pseudo-console
 // sends no SIGINT. Public test vectors only (vectors/sskr-v1.json, synthetic entropy).
-import { EventEmitter } from "node:events";
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Standard input and standard error are a terminal, and a Keyboard stands for the one on standard
 // input, which records the raw modes asked for in `rawModes`. A question (askSecretUntil) records
 // the raw modes until then and gives the next of `answers` that its check takes. The assessment
 // (planJointRepair) records the signal it is given, the raw modes until then and how it ended, and
-// runs `atAssessment` first; without `passSignal` it is made without the signal, and so never
-// checks it.
-const terminal = vi.hoisted(() => ({
-  rawModes: [] as boolean[],
-  answers: [] as string[],
-  modesAtQuestions: [] as boolean[][],
-  modesAtAssessments: [] as boolean[][],
-  signals: [] as (AbortSignal | undefined)[],
-  assessmentErrors: [] as unknown[],
-  assessmentVerdicts: [] as string[],
-  atAssessment: undefined as (() => void) | undefined,
-  passSignal: true,
+// runs `atAssessment` first and `afterAssessment` once it has ended, before its caller goes on.
+interface Terminal {
+  rawModes: boolean[];
+  answers: string[];
+  modesAtQuestions: boolean[][];
+  modesAtAssessments: boolean[][];
+  signals: (AbortSignal | undefined)[];
+  assessmentErrors: unknown[];
+  assessmentVerdicts: string[];
+  atAssessment: (() => void) | undefined;
+  afterAssessment: (() => void) | undefined;
+}
+const terminal = vi.hoisted((): Terminal => ({
+  rawModes: [],
+  answers: [],
+  modesAtQuestions: [],
+  modesAtAssessments: [],
+  signals: [],
+  assessmentErrors: [],
+  assessmentVerdicts: [],
+  atAssessment: undefined,
+  afterAssessment: undefined,
 }));
 vi.mock("node:tty", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:tty")>()),
@@ -43,9 +51,12 @@ vi.mock("../src/sskr/joint-repair.js", async (importOriginal) => {
       terminal.signals.push(options.signal);
       terminal.modesAtAssessments.push([...terminal.rawModes]);
       terminal.atAssessment?.();
-      const plan = super.plan(records, terminal.passSignal ? options : {});
+      const plan = super.plan(records, options);
       plan.then(
-        (made) => terminal.assessmentVerdicts.push(made.assessment.verdict),
+        (made) => {
+          terminal.assessmentVerdicts.push(made.assessment.verdict);
+          terminal.afterAssessment?.();
+        },
         (error: unknown) => terminal.assessmentErrors.push(error),
       );
       return plan;
@@ -54,10 +65,17 @@ vi.mock("../src/sskr/joint-repair.js", async (importOriginal) => {
   return { ...original, JointRepair };
 });
 
-import { runSskrCombine, runSskrExport } from "../src/cli/sskr-command.js";
+import { runSskrExport } from "../src/cli/sskr-export-command.js";
+import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { sskrVectors } from "./helpers/vectors.js";
+import {
+  expectTerminalGivenBack,
+  Keyboard,
+  keyboardAsStandardInput,
+} from "./helpers/terminal-streams.js";
 
 // Windows deliberately keeps raw mode between reads so that ConPTY cannot lose Ctrl+C.
 // Pausing and removing listeners still ends the watch; Unix also restores line mode immediately.
@@ -75,46 +93,12 @@ const TEST_DATE = "23-09-2026";
 const SETTLED_MARK = [5];
 const OPEN_MARKS = [5, 7];
 
-/** Standard input as a terminal: what is typed arrives as chunks of bytes, as in raw mode. */
-class Keyboard extends EventEmitter {
-  readonly isTTY = true;
-  flowing = false;
-
-  setRawMode(raw: boolean): this {
-    terminal.rawModes.push(raw);
-    return this;
-  }
-
-  resume(): this {
-    this.flowing = true;
-    return this;
-  }
-
-  pause(): this {
-    this.flowing = false;
-    return this;
-  }
-
-  type(text: string): void {
-    this.emit("data", Buffer.from(text, "utf8"));
-  }
-}
-
-let keys = new Keyboard();
+let keys = new Keyboard(terminal);
 
 /** Expects an idle terminal with no listeners, retaining raw mode only on Windows. */
-function expectTerminalGivenBack(): void {
-  expect(terminal.rawModes.at(-1)).toBe(process.platform === "win32");
-  expect(keys.flowing).toBe(false);
-  expect(keys.listenerCount("data")).toBe(0);
-}
-
 /** Two shares of a 2-of-3 set, the second in colours with the elements at `marks` unreadable. */
 function markedShares(marks: readonly number[]): [string, string] {
-  const vectors = JSON.parse(
-    readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-  ) as { deterministic: { shares: string[] }[] };
-  const [first, second] = vectors.deterministic[0]!.shares;
+  const [first, second] = sskrVectors().deterministic[0]!.shares;
   const parts = writeShare(second!, "colors").split(" ");
   for (const place of marks) parts[place] = "?";
   return [first!, parts.join(" ")];
@@ -122,7 +106,7 @@ function markedShares(marks: readonly number[]): [string, string] {
 
 describe("Ctrl+C during the assessment of marked shares", () => {
   beforeEach(() => {
-    keys = new Keyboard();
+    keys = new Keyboard(terminal);
     terminal.rawModes = [];
     terminal.answers = [];
     terminal.modesAtQuestions = [];
@@ -131,9 +115,8 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     terminal.assessmentErrors = [];
     terminal.assessmentVerdicts = [];
     terminal.atAssessment = undefined;
-    terminal.passSignal = true;
-    vi.spyOn(process, "stdin", "get").mockReturnValue(keys as unknown as typeof process.stdin);
-    vi.stubEnv("TERM", "xterm");
+    terminal.afterAssessment = undefined;
+    keyboardAsStandardInput(keys);
     // The assessment, progress and results are not looked at here.
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -159,20 +142,23 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     expect(terminal.assessmentErrors).toEqual([]);
     expect(terminal.assessmentVerdicts).toEqual(["stopped"]);
     expect(terminal.rawModes).toEqual(RAW_SESSION);
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
     // Nothing is shown or saved.
     expect(console.log).not.toHaveBeenCalled();
   });
 
   it("stops after the assessment when Ctrl+C came after its last check of the signal", async () => {
-    // As at the assessment's last turn: the assessment never sees the signal aborted.
-    terminal.atAssessment = () => keys.type(CTRL_C);
-    terminal.passSignal = false;
+    // Typed once the assessment has ended, while it is still watched: it never sees the signal.
+    terminal.afterAssessment = () => keys.type(CTRL_C);
     expect(await runSskrCombine({ share: markedShares(SETTLED_MARK) })).toBe(CANCELLED);
     // The assessment ended without hearing it; the check after it did.
+    expect(terminal.signals).toHaveLength(1);
+    expect(terminal.signals[0]?.aborted).toBe(true);
+    expect(terminal.assessmentVerdicts).toHaveLength(1);
+    expect(terminal.assessmentVerdicts).not.toContain("stopped");
     expect(terminal.assessmentErrors).toEqual([]);
     expect(terminal.rawModes).toEqual(RAW_SESSION);
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
     expect(console.log).not.toHaveBeenCalled();
   });
 
@@ -185,7 +171,7 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     );
     expect(terminal.modesAtAssessments).toEqual([RAW_ENTRY]);
     expect(terminal.rawModes).toEqual(RAW_SESSION);
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
   });
 
   it("refuses too many marks before the assessment, without watching", async () => {
@@ -207,7 +193,7 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     expect(terminal.signals[0]?.aborted).toBe(false);
     // Then the search is watched on its own (share-repair.ts).
     expect(terminal.rawModes).toEqual([...RAW_SESSION, ...RAW_SESSION]);
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
     expect(console.log).toHaveBeenCalled();
   });
 });

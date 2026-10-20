@@ -1,20 +1,25 @@
-import { EventEmitter } from "node:events";
 import { ShareInput } from "../src/sskr/share-input.js";
 import { ShareRestore } from "../src/sskr/share-restore.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Standard input and standard error are a terminal while `terminal.present` is set, and a Keyboard
 // stands for the one on standard input, which records the raw modes asked for in `rawModes` and
 // refuses raw mode while `refusesRawMode` is set. A question on the private screen is answered
 // with Yes and records the raw modes until then.
-const terminal = vi.hoisted(() => ({
+interface Terminal {
+  present: boolean;
+  privateScreen: boolean;
+  refusesRawMode: boolean;
+  rawModes: boolean[];
+  modesAtQuestions: boolean[][];
+}
+const terminal = vi.hoisted((): Terminal => ({
   present: true,
   privateScreen: false,
   refusesRawMode: false,
-  rawModes: [] as boolean[],
-  modesAtQuestions: [] as boolean[][],
+  rawModes: [],
+  modesAtQuestions: [],
 }));
 vi.mock("node:tty", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:tty")>()),
@@ -35,9 +40,15 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
 import { searchShareRepair } from "../src/cli/share-repair.js";
-import { watchForCtrlC, withCtrlCWatch } from "../src/cli/terminal-input.js";
+import { CtrlCWatch } from "../src/cli/terminal-input.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { sskrVectors } from "./helpers/vectors.js";
+import {
+  expectTerminalGivenBack,
+  Keyboard,
+  keyboardAsStandardInput,
+} from "./helpers/terminal-streams.js";
 
 const TEST_PHRASE =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -50,53 +61,17 @@ const CTRL_C = "\x03";
 const CTRL_BACKSLASH = "\x1c";
 const CTRL_Z = "\x1a";
 
-/** Standard input as a terminal: what is typed arrives as chunks of bytes, as in raw mode. */
-class Keyboard extends EventEmitter {
-  readonly isTTY = true;
-  flowing = false;
-
-  setRawMode(raw: boolean): this {
-    if (raw && terminal.refusesRawMode) throw new Error("setRawMode EIO");
-    terminal.rawModes.push(raw);
-    return this;
-  }
-
-  resume(): this {
-    this.flowing = true;
-    return this;
-  }
-
-  pause(): this {
-    this.flowing = false;
-    return this;
-  }
-
-  /** Delivers `text` as one chunk, and returns the chunk. */
-  type(text: string): Buffer {
-    const chunk = Buffer.from(text, "utf8");
-    this.emit("data", chunk);
-    return chunk;
-  }
-}
-
-let keys = new Keyboard();
+let keys = new Keyboard(terminal);
 
 /** Expects an idle terminal with no listeners, retaining raw mode only on Windows. */
-function expectTerminalGivenBack(): void {
-  expect(terminal.rawModes.at(-1)).toBe(process.platform === "win32");
-  expect(keys.flowing).toBe(false);
-  expect(keys.listenerCount("data")).toBe(0);
-}
-
 beforeEach(() => {
-  keys = new Keyboard();
+  keys = new Keyboard(terminal);
   terminal.present = true;
   terminal.privateScreen = false;
   terminal.refusesRawMode = false;
   terminal.rawModes = [];
   terminal.modesAtQuestions = [];
-  vi.spyOn(process, "stdin", "get").mockReturnValue(keys as unknown as typeof process.stdin);
-  vi.stubEnv("TERM", "xterm");
+  keyboardAsStandardInput(keys);
   // Progress and notices are not looked at here.
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -108,7 +83,7 @@ afterEach(() => {
 
 describe("Ctrl+C during a long search", () => {
   it("is read as a key in raw mode; other keys are dropped unseen and wiped", async () => {
-    const watch = watchForCtrlC();
+    const watch = new CtrlCWatch();
     expect(terminal.rawModes).toEqual(RAW_ENTRY);
     expect(keys.flowing).toBe(true);
     const typed = keys.type("abandon\r");
@@ -118,18 +93,18 @@ describe("Ctrl+C during a long search", () => {
     expect(watch.signal.aborted).toBe(true);
     expect(watch.signal.reason).toBe(CANCELLED);
     await watch.stop();
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
     // A second stop changes nothing.
     await watch.stop();
     expect(terminal.rawModes).toEqual(RAW_SESSION);
   });
 
   it("takes Ctrl+\\ for Ctrl+C, so that no SIGQUIT ends the tool on the private screen", async () => {
-    const watch = watchForCtrlC();
+    const watch = new CtrlCWatch();
     keys.type(CTRL_BACKSLASH);
     expect(watch.signal.reason).toBe(CANCELLED);
     await watch.stop();
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
   });
 
   // Windows has no job control: Ctrl+Z is dropped there, as a test of this file shows, never sent.
@@ -142,7 +117,7 @@ describe("Ctrl+C during a long search", () => {
         kills.push([pid, signal, [...terminal.rawModes]]);
         return true;
       });
-      const watch = watchForCtrlC();
+      const watch = new CtrlCWatch();
       keys.type(CTRL_Z);
       expect(kills).toEqual([[0, "SIGTSTP", [true, false]]]);
       expect(terminal.rawModes).toEqual([true, false, true]);
@@ -150,14 +125,14 @@ describe("Ctrl+C during a long search", () => {
       keys.type(CTRL_C);
       expect(watch.signal.reason).toBe(CANCELLED);
       await watch.stop();
-      expectTerminalGivenBack();
+      expectTerminalGivenBack(keys);
     },
   );
 
   it("drops Ctrl+Z on Windows, which has no job control", async () => {
     const kill = vi.spyOn(process, "kill").mockImplementation(() => true);
     vi.spyOn(process, "platform", "get").mockReturnValue("win32");
-    const watch = watchForCtrlC();
+    const watch = new CtrlCWatch();
     keys.type(CTRL_Z);
     expect(kill).not.toHaveBeenCalled();
     // Raw mode is taken again at once (takeRawMode), as another process may have left it.
@@ -178,24 +153,24 @@ describe("Ctrl+C during a long search", () => {
         terminal.refusesRawMode = true;
         return true;
       });
-      const watch = watchForCtrlC();
+      const watch = new CtrlCWatch();
       keys.type(CTRL_Z);
       expect(() => watch.signal.throwIfAborted()).toThrow("setRawMode EIO");
       await watch.stop();
-      expectTerminalGivenBack();
+      expectTerminalGivenBack(keys);
     },
   );
 
   it("stops watching when the search watched ends or fails", async () => {
-    await expect(withCtrlCWatch(async (signal) => signal.aborted)).resolves.toBe(false);
-    expectTerminalGivenBack();
+    await expect(CtrlCWatch.during(async (signal) => signal.aborted)).resolves.toBe(false);
+    expectTerminalGivenBack(keys);
     const failure = new Error("search failed");
     await expect(
-      withCtrlCWatch(async () => {
+      CtrlCWatch.during(async () => {
         throw failure;
       }),
     ).rejects.toBe(failure);
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
     expect(terminal.rawModes).toEqual([...RAW_SESSION, ...RAW_SESSION]);
   });
 });
@@ -206,7 +181,7 @@ describe("Ctrl+C during a long search", () => {
     ["a dumb terminal", () => vi.stubEnv("TERM", "dumb")],
   ])("leaves standard input alone with %s, where Ctrl+C stays a signal", async (_, setUp) => {
     setUp();
-    const watch = watchForCtrlC();
+    const watch = new CtrlCWatch();
     expect(watch.signal.aborted).toBe(false);
     await watch.stop();
     expect(terminal.rawModes).toEqual([]);
@@ -225,7 +200,7 @@ describe("Ctrl+C during a long search", () => {
     setTimeout(() => keys.type(CTRL_C), 10);
     expect(await search).toBe(CANCELLED);
     expect(terminal.rawModes).toEqual(RAW_SESSION);
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
   });
 
   it("stops a search for forgotten words at its next turn", async () => {
@@ -234,14 +209,11 @@ describe("Ctrl+C during a long search", () => {
     setTimeout(() => keys.type(CTRL_C), 10);
     expect(await search).toBe(CANCELLED);
     expect(terminal.rawModes).toEqual(RAW_SESSION);
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
   });
 
   it("stops a share repair at its next turn, watching only after the question", async () => {
-    const vectors = JSON.parse(
-      readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-    ) as { deterministic: { shares: string[] }[] };
-    const [first, second] = vectors.deterministic[0]!.shares;
+    const [first, second] = sskrVectors().deterministic[0]!.shares;
     // Two unreadable colours: 65,536 combinations, several turns of the search.
     const parts = writeShare(second!, "colors").split(" ");
     for (const place of [5, 7]) parts[place] = "?";
@@ -266,6 +238,6 @@ describe("Ctrl+C during a long search", () => {
     // mode only after it.
     expect(terminal.modesAtQuestions).toEqual([[]]);
     expect(terminal.rawModes).toEqual(RAW_SESSION);
-    expectTerminalGivenBack();
+    expectTerminalGivenBack(keys);
   });
 });

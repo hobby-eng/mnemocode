@@ -92,7 +92,7 @@ describe("Core independent entropy and calendar boundaries", () => {
     "retains valid boundary %s",
     (value) => expect(formatDate(parseDate(value))).toBe(value),
   );
-  it.each([12, 15, 18, 21, 24] as Bip39WordCount[])(
+  it.each<Bip39WordCount>([12, 15, 18, 21, 24])(
     "enforces date limit for %i words and does not mutate order",
     (count) => {
       const dates = Array.from({ length: maximumDates(count) }, (_, i) => ({

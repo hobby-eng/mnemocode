@@ -11,7 +11,8 @@ describe("Errors identify the position without echoing unrecognized input", () =
           parseDate("23-09-2026"),
         ]);
       } catch (error) {
-        message = (error as Error).message;
+        if (!(error instanceof Error)) throw error;
+        message = error.message;
       }
       expect(message).toContain("position 3");
       expect(message).not.toContain(token);
@@ -25,7 +26,8 @@ describe("Errors identify the position without echoing unrecognized input", () =
     try {
       parseInput("DEAD", "unicode");
     } catch (error) {
-      expect((error as Error).message).not.toContain("DEAD");
+      if (!(error instanceof Error)) throw error;
+      expect(error.message).not.toContain("DEAD");
     }
   });
 });

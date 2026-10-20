@@ -27,13 +27,13 @@ import { MAX_SHOWN_MATCHES } from "../src/core/date-search.js";
 import { ShareInput, SHARE_SEPARATOR } from "../src/sskr/share-input.js";
 import { parseDate } from "../src/core.js";
 import { DEFAULT_DOCUMENT_FORMAT } from "../src/export/image-export.js";
-import { assertSheetQr } from "../src/export/card-settings.js";
+import { assertSheetQr } from "../src/export/content-kinds.js";
 import { MatchTally } from "../src/core/candidates.js";
 import { coinById } from "../src/core/coins.js";
 import { bech32m } from "@scure/base";
 import {
   FIRST_RECEIVING_LOCATION,
-  bitcoinProfiles,
+  BITCOIN_PROFILES,
   type WalletEvidence,
 } from "../src/core/wallet-evidence.js";
 import {
@@ -44,10 +44,11 @@ import {
 } from "../src/cli/bitcoin-options.js";
 import { Bech32Prefixes } from "../src/core/coins/bech32.js";
 import { maxResultsOf } from "../src/cli/date-search.js";
-import { changeWalletAnswer, checkWalletAnswer, WHAT_NOW } from "../src/cli/ask.js";
+import { WHAT_NOW } from "../src/cli/ask.js";
+import { changeWalletAnswer, checkWalletAnswer } from "../src/cli/wallet-question.js";
 import { FILE_INPUTS, FILE_OUTPUTS, FOLDER_OUTPUTS } from "../src/cli/output-options.js";
 import {
-  commandOptions,
+  COMMAND_OPTIONS,
   COMMAND_FACTS,
   PRIVATE_SCREEN_COMMANDS,
 } from "../src/cli/command-options.js";
@@ -66,9 +67,9 @@ import {
   BUSINESS_STYLES,
   designOfStyle,
 } from "../src/export/template-catalog.js";
-import { cardTemplates, selectTemplate } from "../src/export/templates.js";
+import { CARD_TEMPLATES, selectTemplate } from "../src/export/templates.js";
 import { sectorForStyle } from "../src/export/card-identities.js";
-import { businessStyles } from "../src/export/business-designs.js";
+import { PHYSICAL_BUSINESS_STYLES } from "../src/export/business-designs.js";
 import { designTexts } from "../src/export/card-copy.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
@@ -91,7 +92,7 @@ import {
   cursorUp,
   cursorRight,
 } from "../src/cli/terminal.js";
-import { NOT_UTF8 } from "../src/cli/terminal-input.js";
+import { NOT_UTF8 } from "../src/cli/typed-answer.js";
 import {
   isUnusableOutputPath,
   validateOutputPaths,
@@ -99,10 +100,11 @@ import {
   preflightFolderDestination,
 } from "../src/cli/output-paths.js";
 import { entryAt, absentPath } from "../src/export/private-file.js";
-import { validCharacters, characterLength, isContinuation } from "../src/cli/utf8.js";
+import { ValidCharacters, characterLength, isContinuation } from "../src/cli/utf8.js";
 import { characterSize } from "../src/cli/terminal-geometry.js";
 import { assertColorCards } from "../src/export/card-content.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { sskrVectors } from "./helpers/vectors.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 describe("S059: the menu's wallet answer is the command line that gives the same evidence", () => {
@@ -113,7 +115,7 @@ describe("S059: the menu's wallet answer is the command line that gives the same
       {
         kind: "address",
         value: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
-        profiles: bitcoinProfiles,
+        profiles: BITCOIN_PROFILES,
         location: first,
         addresses: 20,
       },
@@ -189,7 +191,25 @@ describe("S069: one reader of the wallet options", () => {
     });
     expect(wallet.place.location).toEqual(FIRST_RECEIVING_LOCATION);
     expect(wallet.passphrase).toBe("");
+    expect(wallet.withPassphrase).toBe(false);
     expect(maxResultsOf({})).toBe(MAX_SHOWN_MATCHES);
+  });
+
+  it("says whether a BIP39 passphrase was given, so that a question needs no copy of it", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mnemocode-passphrase-"));
+    try {
+      // TREZOR: the public passphrase of the BIP39 test vectors.
+      const path = join(directory, "passphrase.txt");
+      await writeFile(path, "TREZOR\n");
+      const wallet = givenWallet({
+        "master-fingerprint": "73c5da0a",
+        "bip39-passphrase-file": path,
+      });
+      expect(wallet.passphrase).toBe("TREZOR");
+      expect(wallet.withPassphrase).toBe(true);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -201,7 +221,7 @@ describe("S068: one question after a date search, one wording of each wallet ans
         const source = readFileSync(join("src", file), "utf8");
         return /"(?:Change the wallet|Check them against the wallet)"/u.test(source);
       });
-    expect(typedIn).toEqual([join("cli", "ask.ts")]);
+    expect(typedIn).toEqual([join("cli", "wallet-question.ts")]);
     expect(changeWalletAnswer("wallet")).toEqual({
       label: "Change the wallet",
       note: "the fingerprint or the address",
@@ -213,7 +233,7 @@ describe("S068: one question after a date search, one wording of each wallet ans
 
 describe("S071: every option list is typed once", () => {
   it("lists every option that names a file or a folder as exactly one input or output", () => {
-    const options = new Set(Object.values(commandOptions).flat());
+    const options = new Set(Object.values(COMMAND_OPTIONS).flat());
     const lists: readonly (readonly string[])[] = [FILE_INPUTS, FILE_OUTPUTS, FOLDER_OUTPUTS];
     for (const key of options) {
       const named = /\b(?:file|folder)\b/u.test(optionLabel(key));
@@ -253,10 +273,8 @@ describe("S071: every option list is typed once", () => {
 });
 
 describe("S072: a share file reads as a typed answer does", () => {
-  const { deterministic } = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-    deterministic: { shares: string[] }[];
-  };
-  const [first, second, third] = deterministic[0]!.shares as [string, string, string];
+  const { shares } = sskrVectors().deterministic[0]!;
+  const [first, second, third] = [shares[0]!, shares[1]!, shares[2]!];
 
   it("splits at ;, joins a wrapped share and refuses a seed phrase one word per line", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-share-file-"));
@@ -267,7 +285,7 @@ describe("S072: a share file reads as a typed answer does", () => {
       const cut = Math.floor(third.length / 2);
       await writeFile(wrapped, `${third.slice(0, cut)}\n${third.slice(cut)}\n`);
       const read = await TypedShares.given({ "share-file": [joined, wrapped] });
-      expect(read.texts()).toEqual([first, second, third]);
+      expect(read.list.map((share) => share.text)).toEqual([first, second, third]);
       const phrase = join(directory, "phrase.txt");
       await writeFile(phrase, `${"abandon\n".repeat(11)}about\n`);
       await expect(TypedShares.given({ "share-file": phrase })).rejects.toThrow(
@@ -322,6 +340,7 @@ describe("S075: one library split of a backup", () => {
     await expect(
       split.splitBackup({
         mnemonic: phrase,
+        // A mode that splitBackup does not take, given on purpose as a JavaScript host could.
         mode: "seedshift-legacy" as never,
         dates: dated,
         threshold: 2,
@@ -402,7 +421,7 @@ describe("S079: one catalog of designs and one reader of their numbers", () => {
       "material-switch",
       "material-kitchen",
     ]);
-    expect(cardTemplates.map((template) => template.id)).toEqual(
+    expect(CARD_TEMPLATES.map((template) => template.id)).toEqual(
       TEMPLATE_CATALOG.map((entry) => entry.id),
     );
     TEMPLATE_CATALOG.forEach((entry, index) => {
@@ -430,11 +449,12 @@ describe("S079: one catalog of designs and one reader of their numbers", () => {
 
 describe("S080: one list of the styles of the designs", () => {
   it("derives the business styles, the texts of a design and the share card styles from it", async () => {
-    expect(businessStyles).toEqual(BUSINESS_STYLES.filter((style) => style !== "mixed"));
+    expect(PHYSICAL_BUSINESS_STYLES).toEqual(BUSINESS_STYLES.filter((style) => style !== "mixed"));
     expect(designTexts(false)).toEqual(["referenceLabel"]);
     expect(designTexts(true)).toEqual(["studioName", "slogan", "subtitle", "footer"]);
     for (const entry of TEMPLATE_CATALOG) expect(designOfStyle(entry.style)).toBe(entry);
     expect(designOfStyle("business-it")).toBeUndefined();
+    // A style that no design has, given on purpose as a JavaScript host could.
     await expect(
       ShareCardSet.create(nodeCardRenderer, [], { style: "nowhere" as never }),
     ).rejects.toThrow("Unsupported SSKR card style.");
@@ -463,10 +483,10 @@ describe("S083: each option of Encode belongs to one of its modes", () => {
     const groups = [ENCODE_SHARED_OPTIONS, ENCODE_PLAIN_ONLY_OPTIONS, ENCODE_SSKR_ONLY_OPTIONS];
     const listed: string[] = groups.flat();
     expect(new Set(listed).size).toBe(listed.length);
-    expect([...listed, "sskr"].sort()).toEqual([...commandOptions.encode].sort());
+    expect([...listed, "sskr"].sort()).toEqual([...COMMAND_OPTIONS.encode].sort());
     // sskr-split names the form of the shares --format; every other option of it is SSKR's too.
     const sskr = new Set<string>([...ENCODE_SHARED_OPTIONS, ...ENCODE_SSKR_ONLY_OPTIONS]);
-    for (const key of commandOptions["sskr-split"])
+    for (const key of COMMAND_OPTIONS["sskr-split"])
       expect([key, sskr.has(key)]).toEqual([key, true]);
   });
 });
@@ -612,7 +632,7 @@ describe("S091: the facts of each command in one table", () => {
     );
     const unlisted = Object.entries(COMMAND_FACTS).filter(([, facts]) => !facts.listed);
     expect(unlisted.map(([name]) => name)).toEqual(["sskr-split"]);
-    expect(Object.keys(COMMAND_FACTS).sort()).toEqual(Object.keys(commandOptions).sort());
+    expect(Object.keys(COMMAND_FACTS).sort()).toEqual(Object.keys(COMMAND_OPTIONS).sort());
   });
 });
 
@@ -632,7 +652,7 @@ describe("S093: one owner of the UTF-8 rules", () => {
   it("passes on whole valid characters only and steps over any byte", async () => {
     const bytes = [0xc0, 0x41, 0xff, 0x80, 0x42, 0xe2, 0x82, 0xac];
     const source = async (): Promise<number | undefined> => bytes.shift();
-    const reader = validCharacters(source);
+    const reader = new ValidCharacters(source);
     const read: number[] = [];
     for (let byte = await reader.next(); byte !== undefined; byte = await reader.next())
       read.push(byte);
@@ -647,7 +667,7 @@ describe("S093: one owner of the UTF-8 rules", () => {
 describe("S095: one gate of colour cards and one check of a card's number", () => {
   it("refuses a dated Unicode card and a card that is not there alike for every family", () => {
     expect(() =>
-      // A JavaScript host may pass content of another kind.
+      // Content of another kind, given on purpose as a JavaScript host could.
       assertColorCards({ kind: "unicode", payload: "" } as never),
     ).toThrow("These cards draw color references");
     expect(() => assertCardIndex(3, 3)).toThrow("There is no card 4: the cards are 1 to 3.");

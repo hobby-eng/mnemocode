@@ -13,6 +13,7 @@ import { parseDate } from "../src/core/dates.js";
 import { checkWordTableStartup } from "../src/core/word-table-self-test.js";
 import { runTable } from "../src/cli/table-command.js";
 import { parseArguments } from "../src/cli/arguments.js";
+import { TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
 let directory: string;
 beforeEach(async () => {
@@ -76,6 +77,7 @@ describe("numbered BIP39 exports", () => {
   it.each(["", "unknown", "constructor", "__proto__"])(
     "refuses unsupported export format %j",
     (format) => {
+      // A format that the word list does not have, given on purpose as a JavaScript host could.
       expect(() => wordTableText(format as never)).toThrow("Word list format must be");
     },
   );
@@ -113,7 +115,7 @@ describe("the guide's standalone Python arithmetic", () => {
     return execFileSync("python3", ["-c", code], {
       input,
       encoding: "utf8",
-      timeout: 5000,
+      timeout: TEST_TIME_LIMIT_MS,
       stdio: "pipe",
     }).replaceAll("\r\n", "\n");
   }

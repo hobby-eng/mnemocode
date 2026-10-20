@@ -6,7 +6,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { Encrypter, generateHybridIdentity, identityToRecipient } from "age-encryption";
+import {
+  Encrypter,
+  generateHybridIdentity,
+  generateX25519Identity,
+  identityToRecipient,
+} from "age-encryption";
 import {
   parseMissingWord,
   parseUnknownWords,
@@ -24,7 +29,6 @@ import {
 import { CRC32_BYTES, crc32 } from "../dist/sskr/checksum.js";
 import { BIP39_ENTROPY_BYTES } from "../dist/core/bip39-sizes.js";
 import {
-  createSessionIdentity,
   encryptCandidates,
   encryptCandidatesWithPassphrase,
   SCRYPT_LOG_N,
@@ -38,7 +42,12 @@ const entropy = (phrase) => entropyOfWords(phrase.split(" ").map((word) => wordl
 
 /**
  * The places and sizes of the list's fields that the invalid lists change, in bytes, as
- * docs/CANDIDATES.md, "The list", gives them.
+ * docs/CANDIDATES.md, "The list", gives them: 4 bytes of magic, then a byte each of version, flags
+ * and entropy length, then a 4-byte count. A deliberate copy of the layout in
+ * src/core/candidate-list.ts, which keeps its places to itself: a vector restates the
+ * specification rather than the code it checks (CORE-28), so that a field the code moves fails
+ * the replay instead of moving the vector with it. test/candidates.test.ts keeps the two in step:
+ * it replays every invalid list and expects the refusal that the vector names.
  */
 const LIST = Object.freeze({
   MAGIC_AT: 0,
@@ -320,12 +329,14 @@ const padme = [
 async function ageVectors(previous) {
   if (previous !== undefined && !process.argv.includes("--new-age-files")) return previous;
   const plain = fromHex(lists[0].bytes);
-  const { identity, recipient } = await createSessionIdentity();
+  // The key's text goes into the vectors, so age makes it here: a SessionIdentity from
+  // createSessionIdentity never gives its private key away.
+  const identity = await generateX25519Identity();
+  const recipient = await identityToRecipient(identity);
   const passphrase = "public candidate test passphrase";
-  const other = await createSessionIdentity();
   const twoKeys = new Encrypter();
   twoKeys.addRecipient(recipient);
-  twoKeys.addRecipient(other.recipient);
+  twoKeys.addRecipient(await identityToRecipient(await generateX25519Identity()));
   const weak = new Encrypter();
   weak.setPassphrase(passphrase);
   weak.setScryptWorkFactor(SCRYPT_LOG_N - 2);
@@ -355,10 +366,13 @@ async function ageVectors(previous) {
   };
 }
 
+// Only a missing file means no earlier vectors: a damaged or unreadable one stops the script, so
+// that its age files are never replaced without --new-age-files.
 let previous;
 try {
   previous = JSON.parse(readFileSync(PATH, "utf8")).age;
-} catch {
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
   previous = undefined;
 }
 const vectors = {

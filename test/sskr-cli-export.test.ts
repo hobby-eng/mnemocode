@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,17 +11,9 @@ import { type ShareFormat } from "../src/sskr/transport.js";
 import { markUnits } from "./helpers/shares.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
-import { PublicCliFiles } from "./helpers/public-cli-files.js";
+import { runBuiltCliSync as cli } from "./helpers/built-cli.js";
+import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
-function cli(args: string[]) {
-  using material = new PublicCliFiles(args);
-  const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...material.arguments], {
-    encoding: "utf8",
-    env: { ...process.env, NO_COLOR: "1" },
-  });
-  if (result.error) throw result.error;
-  return result;
-}
 describe("integrated SSKR CLI", () => {
   it("repairs marked shares in every form before CLI recovery, without exposing the damaged text", () => {
     const vector = sskrVectors().deterministic[0]!;
@@ -122,72 +113,76 @@ describe("integrated SSKR CLI", () => {
 });
 
 describe("integrated SSKR CLI", () => {
-  it("saves the QR code of the sheets as images beside the PDF, which restore and decode read", () => {
-    const directory = mkdtempSync(join(tmpdir(), "mnemocode-sheet-qr-"));
-    try {
-      const pdf = join(directory, "cards.pdf");
-      const single = cli([
-        "encode",
-        "--mnemonic",
-        TEST_PHRASE,
-        "--format",
-        "colors",
-        "--pdf",
-        pdf,
-        "--card-qr",
-      ]);
-      expect(single.status, single.stderr).toBe(0);
-      expect(single.stderr).toContain(
-        `Saved the QR code of the sheet as an image: ${join(directory, "cards-qr.png")}`,
-      );
-      const decoded = cli([
-        "decode",
-        "--mode",
-        "direct",
-        "--qr-file",
-        join(directory, "cards-qr.png"),
-      ]);
-      expect(decoded.status, decoded.stderr).toBe(0);
-      expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
-      // The shares: one image for each, named after its reference.
-      const shares = join(directory, "shares.pdf");
-      const split = cli([
-        "encode",
-        "--sskr",
-        "--mnemonic",
-        TEST_PHRASE,
-        "--threshold",
-        "2",
-        "--shares",
-        "3",
-        "--share-format",
-        "colors",
-        "--pdf",
-        shares,
-        "--card-qr",
-      ]);
-      expect(split.status, split.stderr).toBe(0);
-      expect(split.stderr).toContain(
-        "Saved the QR codes of the share sheets as images beside them: 3 PNG files.",
-      );
-      const images = readdirSync(directory)
-        .filter((name) => /^shares-.+-qr\.png$/u.test(name))
-        .sort();
-      expect(images).toHaveLength(3);
-      const restored = cli([
-        "sskr-combine",
-        "--share-qr",
-        join(directory, images[0]!),
-        "--share-qr",
-        join(directory, images[2]!),
-      ]);
-      expect(restored.status, restored.stderr).toBe(0);
-      // The backup in the form of the shares comes first, then the seed phrase.
-      expect(restored.stdout.trim().split("\n").at(-1)).toBe(TEST_PHRASE);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
-  }, 120_000);
+  it(
+    "saves the QR code of the sheets as images beside the PDF, which restore and decode read",
+    () => {
+      const directory = mkdtempSync(join(tmpdir(), "mnemocode-sheet-qr-"));
+      try {
+        const pdf = join(directory, "cards.pdf");
+        const single = cli([
+          "encode",
+          "--mnemonic",
+          TEST_PHRASE,
+          "--format",
+          "colors",
+          "--pdf",
+          pdf,
+          "--card-qr",
+        ]);
+        expect(single.status, single.stderr).toBe(0);
+        expect(single.stderr).toContain(
+          `Saved the QR code of the sheet as an image: ${join(directory, "cards-qr.png")}`,
+        );
+        const decoded = cli([
+          "decode",
+          "--mode",
+          "direct",
+          "--qr-file",
+          join(directory, "cards-qr.png"),
+        ]);
+        expect(decoded.status, decoded.stderr).toBe(0);
+        expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
+        // The shares: one image for each, named after its reference.
+        const shares = join(directory, "shares.pdf");
+        const split = cli([
+          "encode",
+          "--sskr",
+          "--mnemonic",
+          TEST_PHRASE,
+          "--threshold",
+          "2",
+          "--shares",
+          "3",
+          "--share-format",
+          "colors",
+          "--pdf",
+          shares,
+          "--card-qr",
+        ]);
+        expect(split.status, split.stderr).toBe(0);
+        expect(split.stderr).toContain(
+          "Saved the QR codes of the share sheets as images beside them: 3 PNG files.",
+        );
+        const images = readdirSync(directory)
+          .filter((name) => /^shares-.+-qr\.png$/u.test(name))
+          .sort();
+        expect(images).toHaveLength(3);
+        const restored = cli([
+          "sskr-combine",
+          "--share-qr",
+          join(directory, images[0]!),
+          "--share-qr",
+          join(directory, images[2]!),
+        ]);
+        expect(restored.status, restored.stderr).toBe(0);
+        // The backup in the form of the shares comes first, then the seed phrase.
+        expect(restored.stdout.trim().split("\n").at(-1)).toBe(TEST_PHRASE);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    },
+    LONG_TEST_TIME_LIMIT_MS,
+  );
 
   it("rejects unsupported and orphan options before secret input", () => {
     for (const extras of [

@@ -4,7 +4,7 @@ import { DEFAULT_TEMPLATE_ID, findTemplate } from "../export/template-catalog.js
 import {
   parsePageSize,
   parseOrientation,
-  profileFields,
+  PROFILE_FIELDS,
   validateProfile,
   type CardSettings,
   COPY_FIELDS,
@@ -12,14 +12,14 @@ import {
 import { assertTextValues, value, type ParsedArguments } from "./arguments.js";
 import { COPY_OPTIONS, profileOption } from "./option-copy.js";
 export { COPY_OPTIONS, profileOption } from "./option-copy.js";
-export const cardCopyOptions = COPY_FIELDS.map((field) => COPY_OPTIONS[field]);
+export const CARD_COPY_OPTIONS = COPY_FIELDS.map((field) => COPY_OPTIONS[field]);
 
 /** The card options whose text the person writes: the person's details and the design's texts. */
 export const TYPED_CARD_TEXT_OPTIONS = Object.freeze([
-  ...profileFields.map(profileOption),
-  ...cardCopyOptions,
+  ...PROFILE_FIELDS.map(profileOption),
+  ...CARD_COPY_OPTIONS,
 ]);
-export const businessOptionNames = [
+export const BUSINESS_OPTION_NAMES = [
   "page-size",
   "orientation",
   ...TYPED_CARD_TEXT_OPTIONS,
@@ -32,11 +32,11 @@ export function businessOptions(
 ): CardSettings {
   assertTextValues(
     args,
-    businessOptionNames.filter((name) => name !== "card-qr"),
+    BUSINESS_OPTION_NAMES.filter((name) => name !== "card-qr"),
   );
   const profile = validateProfile(
     Object.fromEntries(
-      profileFields.flatMap((field) => {
+      PROFILE_FIELDS.flatMap((field) => {
         const text = value(args, profileOption(field));
         return text === undefined ? [] : [[field, text]];
       }),

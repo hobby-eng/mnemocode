@@ -2,12 +2,11 @@
 // memory once it is written or refused (wipedAfterAsync), never while it is still being written.
 // The bytes handed to the real publisher are captured. Public test data only.
 
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const captured = vi.hoisted(() => ({ published: [] as Uint8Array[] }));
+const captured = vi.hoisted((): { published: Uint8Array[] } => ({ published: [] }));
 
 vi.mock("../src/export/private-file.js", async (original) => {
   const actual = await original<typeof import("../src/export/private-file.js")>();
@@ -22,13 +21,12 @@ vi.mock("../src/export/private-file.js", async (original) => {
 
 import { wipedAfterAsync } from "../src/core/bits.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
+import { testFolder } from "./helpers/test-folders.js";
 
 const wiped = (bytes: Uint8Array) => bytes.every((byte) => byte === 0);
-const folders: string[] = [];
 
-afterEach(async () => {
+afterEach(() => {
   captured.published.length = 0;
-  for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true });
 });
 
 describe("wipedAfterAsync", () => {
@@ -55,8 +53,7 @@ describe("wipedAfterAsync", () => {
 
 describe("a saved QR image of a backup", () => {
   it("is written complete, and the bytes that were written are wiped afterwards", async () => {
-    const folder = await mkdtemp(join(tmpdir(), "mnemocode-saved-wiped-"));
-    folders.push(folder);
+    const folder = await testFolder("mnemocode-saved-wiped-");
     const path = join(folder, "record-qr.png");
     await exportQrPayload(`MNC1:direct:indexes:${"1 ".repeat(11)}4`, path);
     expect((await readFile(path)).length).toBeGreaterThan(0);
@@ -66,8 +63,7 @@ describe("a saved QR image of a backup", () => {
   });
 
   it("is wiped too when the name is taken and nothing is written", async () => {
-    const folder = await mkdtemp(join(tmpdir(), "mnemocode-saved-wiped-"));
-    folders.push(folder);
+    const folder = await testFolder("mnemocode-saved-wiped-");
     const path = join(folder, "taken.png");
     await exportQrPayload("public payload", path);
     captured.published.length = 0;

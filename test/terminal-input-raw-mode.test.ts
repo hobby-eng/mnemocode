@@ -12,7 +12,8 @@ vi.mock("node:tty", async (importOriginal) => ({
   isatty: () => true,
 }));
 
-import { dropTypedAhead, withCtrlCWatch } from "../src/cli/terminal-input.js";
+import { CtrlCWatch, TerminalKeys } from "../src/cli/terminal-input.js";
+import { keyboardAsStandardInput } from "./helpers/terminal-streams.js";
 
 /** Standard input as a terminal: its console's mode, and the line-mode reads that leaving started. */
 class Keyboard extends EventEmitter {
@@ -48,18 +49,15 @@ class Keyboard extends EventEmitter {
 let keys = new Keyboard();
 
 /** The listeners of the process's "exit" that `body` adds. */
-async function exitListenersAddedBy(body: () => Promise<unknown>): Promise<(() => void)[]> {
+async function exitListenersAddedBy(body: () => Promise<unknown>): Promise<NodeJS.ExitListener[]> {
   const before = process.listeners("exit");
   await body();
-  return process
-    .listeners("exit")
-    .filter((listener) => !before.includes(listener)) as (() => void)[];
+  return process.listeners("exit").filter((listener) => !before.includes(listener));
 }
 
 beforeEach(() => {
   keys = new Keyboard();
-  vi.spyOn(process, "stdin", "get").mockReturnValue(keys as unknown as typeof process.stdin);
-  vi.stubEnv("TERM", "xterm");
+  keyboardAsStandardInput(keys);
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -72,13 +70,13 @@ describe("leaving raw mode on Linux and macOS", () => {
   });
 
   it("waits until the terminal is no longer read, after a question", async () => {
-    await dropTypedAhead();
+    await TerminalKeys.dropTypedAhead();
     expect(keys.raw).toBe(false);
     expect(keys.lineReads).toBe(0);
   });
 
   it("waits until the terminal is no longer read, after a long search", async () => {
-    await withCtrlCWatch(async () => undefined);
+    await CtrlCWatch.during(async () => undefined);
     expect(keys.raw).toBe(false);
     expect(keys.lineReads).toBe(0);
   });
@@ -90,22 +88,23 @@ describe("raw mode on Windows (AUD-024)", () => {
   });
 
   it("stays on between questions, so that Ctrl+C is a key, and is left when the process ends", async () => {
-    const added = await exitListenersAddedBy(() => dropTypedAhead());
+    const added = await exitListenersAddedBy(() => TerminalKeys.dropTypedAhead());
     expect(keys.raw).toBe(true);
     expect(keys.lineReads).toBe(0);
     expect(added).toHaveLength(1);
     const [restore] = added;
     process.off("exit", restore!);
-    restore!();
+    // As Node.js calls it at the end of the process, with the exit code.
+    restore!(0);
     expect(keys.raw).toBe(false);
   });
 
   it("is taken again at a question after a command of the menu gave the console its line mode", async () => {
-    await dropTypedAhead();
+    await TerminalKeys.dropTypedAhead();
     // Another process at the same console, which libuv here does not see.
     keys.raw = false;
-    await withCtrlCWatch(async () => expect(keys.raw).toBe(true));
-    await dropTypedAhead();
+    await CtrlCWatch.during(async () => expect(keys.raw).toBe(true));
+    await TerminalKeys.dropTypedAhead();
     expect(keys.raw).toBe(true);
   });
 });

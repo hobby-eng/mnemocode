@@ -26,6 +26,7 @@ import { compactCode } from "../core/code-text.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import type { EncodedFormat } from "../core/types.js";
 import { PrivateSteps } from "./private-steps.js";
+import { PrivateSummary } from "./private-summary.js";
 
 // The palette, under the name every module of the command line takes it by.
 export { STYLE, printableText };
@@ -84,7 +85,7 @@ export function terminalLine(channel: Channel, line: string): void {
 }
 
 /** Whether `channel` gets colour (streamGetsColor, the rule of every bip_tools tool). */
-export function terminalColor(channel: Channel): boolean {
+function terminalColor(channel: Channel): boolean {
   return streamGetsColor(process[channel]);
 }
 
@@ -150,7 +151,7 @@ export function terminalWork(message: string): void {
 }
 
 /** The lines of terminalHint (hintLines of terminal-style.ts, on standard error). */
-export function hintLines(message: string): string[] {
+function hintLines(message: string): string[] {
   return styledHintLines(process.stderr, message);
 }
 
@@ -158,6 +159,27 @@ export function hintLines(message: string): string[] {
 export function terminalNotice(message: string, kind: NoticeKind = "info"): void {
   if (kind === "warning") PrivateSteps.remember(message);
   for (const line of noticeLines(message, kind)) console.error(line);
+}
+
+/**
+ * A result saved, after a green ✓: where it went and how many files, such as "Saved PDF:
+ * cards.pdf", never what it holds. After a private screen the line stays in the summary that is
+ * left on the main screen (PrivateSummary).
+ */
+export function terminalSaved(message: string): void {
+  PrivateSummary.add({ kind: "success", text: message });
+  terminalNotice(message, "success");
+}
+
+/**
+ * A warning that still holds once the command has ended, such as a file left behind to delete or
+ * a fingerprint that is only a filter. After a private screen it stays in the summary that is left
+ * on the main screen (PrivateSummary), so it never holds a secret. A warning about an answer that
+ * is then asked again is a terminalNotice.
+ */
+export function terminalLastingWarning(message: string): void {
+  PrivateSummary.add({ kind: "warning", text: message });
+  terminalNotice(message, "warning");
 }
 
 /** The lines of terminalNotice (noticeLines of terminal-style.ts, on standard error). */
@@ -365,10 +387,12 @@ export function terminalMore(anchor: string): void {
 /**
  * A warning and the README section that explains it (terminalMore). On the private screen both
  * stay on every later step screen of the command, as a warning given before the first question
- * does (PrivateSteps.remember); so it is given only about what holds for the rest of the command,
- * such as a file that is saved.
+ * does (PrivateSteps.remember), and then in the summary left on the main screen (PrivateSummary);
+ * so it is given only about what holds for the rest of the command, such as a file that is saved,
+ * and never holds a secret.
  */
 export function terminalWarningWithMore(message: string, anchor: string): void {
+  PrivateSummary.add({ kind: "warning", text: message, more: anchor });
   PrivateSteps.keep(() => {
     terminalNotice(message, "warning");
     terminalMore(anchor);

@@ -8,7 +8,7 @@ import {
   COMPRESSED_KEY_BYTES,
   extendedPublicKeyPrefixes,
   bitcoinProfilePurpose,
-  bitcoinProfiles,
+  BITCOIN_PROFILES,
 } from "../core/wallet-evidence.js";
 import { MAX_TEXT_INPUT_BYTES } from "./bounded-read.js";
 import { limitName } from "../core/byte-units.js";
@@ -27,7 +27,13 @@ import {
   CARD_FORMAT_NUMBERS,
   FORMAT_NUMBER_RANGE,
 } from "./format-numbers.js";
-import { WORD_NUMBERS, BIP39_WORD_COUNTS, WORD_COUNTS_TEXT } from "../core/bip39-sizes.js";
+import {
+  WORD_NUMBERS,
+  BIP39_WORD_COUNTS,
+  LONGEST_WORD_COUNT,
+  WORD_COUNT_RANGE_TEXT,
+  WORD_COUNTS_TEXT,
+} from "../core/bip39-sizes.js";
 import { listInWords } from "../core/places.js";
 import { zeroEntropyPhrase } from "../core/english-words.js";
 import {
@@ -88,7 +94,7 @@ export const FORMAT_DESCRIPTIONS: Readonly<Record<EncodedFormat, string>> = {
   unicode:
     "Four-digit Unicode codes of the words of the Traditional Chinese BIP39 list; only the codes are written, spaced or joined",
   "colors-unicode": `The color codes of format ${formatNumber("colors")}, each written as two four-digit Private Use codes; all five lengths; plain text that needs no special font`,
-  colors: `Color codes such as #01AB63: ${COLOR_COUNTS_TEXT} codes for ${BIP39_WORD_COUNTS[0]} to ${defined(BIP39_WORD_COUNTS.at(-1))} words, BIP39Colors-compatible for 12 and 24 words; MnemoCode also supports 15, 18 and 21. Separated or joined, in any order, but every code is needed`,
+  colors: `Color codes such as #01AB63: ${COLOR_COUNTS_TEXT} codes for ${WORD_COUNT_RANGE_TEXT} words, BIP39Colors-compatible for 12 and 24 words; MnemoCode also supports 15, 18 and 21. Separated or joined, in any order, but every code is needed`,
 };
 
 /** The public BIP39 test phrase of the examples, set once above them as a shell variable. */
@@ -99,37 +105,37 @@ export const TEST_FINGERPRINT = PUBLIC_FINGERPRINT;
 
 // Options that several commands share.
 
-export const askSecrets: HelpOption = {
+export const ASK_SECRETS: HelpOption = {
   flag: "--ask-secrets",
   summary: "Ask for the secrets on a private screen",
   details: [
-    "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that nothing stays in the scrollback. This works on Linux, macOS and Windows alike.",
+    "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that no secret stays in the scrollback: only a summary stays, of what was saved and where and of the warnings. This works on Linux, macOS and Windows alike.",
     "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While a secret is typed, Escape does nothing, so that a slip loses nothing; at a visible value, such as a fingerprint, an address or a file name, it goes back to the question before and drops what was typed there; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
     "Standard input must be the terminal; without one, or in a terminal that says TERM=dumb, the command stops at once. Output sent to a file goes there as before.",
     "Raw phrase, record, share, date and final-word arguments are refused, including public fixtures. Use the private screen or the corresponding file/stdin option.",
   ],
 };
 
-export const mnemonicText: HelpOption = {
+export const MNEMONIC_TEXT: HelpOption = {
   flag: "--mnemonic",
   value: "TEXT",
   summary: "Refused material argument; use --mnemonic-file or --ask-secrets",
 };
 
-export const mnemonicFile: HelpOption = {
+export const MNEMONIC_FILE: HelpOption = {
   flag: "--mnemonic-file",
   value: "PATH",
   summary: "Read the phrase from a file; - reads standard input",
   details: [`Text input may be up to ${limitName(MAX_TEXT_INPUT_BYTES)}.`],
 };
 
-export const dates: HelpOption = {
+export const DATES: HelpOption = {
   flag: "--dates",
   value: "DATE ...",
   summary: "Refused material argument; use --dates-file or --ask-secrets",
 };
 
-export const datesFile: HelpOption = {
+export const DATES_FILE: HelpOption = {
   flag: "--dates-file",
   value: "PATH",
   summary: "Read dates from a local UTF-8 file; - reads standard input",
@@ -142,7 +148,7 @@ export const datesFile: HelpOption = {
 };
 
 /** Re-encode's original final word: the raw form is recognized only to explain its refusal. */
-export const lastWordInputs: readonly HelpOption[] = [
+export const LAST_WORD_INPUTS: readonly HelpOption[] = [
   {
     flag: "--last-word",
     value: "WORD",
@@ -158,13 +164,13 @@ export const lastWordInputs: readonly HelpOption[] = [
   },
 ];
 
-export const encodedText: HelpOption = {
+export const ENCODED_TEXT: HelpOption = {
   flag: "--input",
   value: "TEXT",
   summary: "Refused material argument; use --input-file, --qr-file or --ask-secrets",
 };
 
-export const encodedFile: HelpOption = {
+export const ENCODED_FILE: HelpOption = {
   flag: "--input-file",
   value: "PATH",
   summary: "Read the encoded record from a file; - reads standard input",
@@ -184,9 +190,9 @@ export function encodedQrOf(modeFlag: string): HelpOption {
     ],
   };
 }
-export const encodedQr = encodedQrOf("--mode");
+export const ENCODED_QR = encodedQrOf("--mode");
 
-export const decodeMode: HelpOption = {
+export const DECODE_MODE: HelpOption = {
   flag: "--mode",
   value: "MODE",
   summary: listInWords(MASKING_MODES, "or"),
@@ -206,21 +212,21 @@ export function recordFormatOf(flag: string, summary: string): HelpOption {
     ],
   };
 }
-export const decodeFormat = recordFormatOf(
+export const DECODE_FORMAT = recordFormatOf(
   "--format",
   `The record format, ${FORMAT_NUMBER_RANGE} or its name; usually found automatically`,
 );
 
-export const phraseWords: HelpOption = {
+export const PHRASE_WORDS_OPTION: HelpOption = {
   flag: "--words",
   value: BIP39_WORD_COUNTS.join("|"),
   summary: "The words of the seed phrase: read only the codes of so many words",
   details: [
-    `Printed cards end with a few random codes that belong to nothing. The sheet for heirs states the number of words; with it, only the codes of so many words from the start are read, and the cards after them may be typed or left out. In colors, ${BIP39_WORD_COUNTS[0]} words are ${RGB_REFERENCE_COUNTS[0]} codes and ${defined(BIP39_WORD_COUNTS.at(-1))} words ${defined(RGB_REFERENCE_COUNTS.at(-1))}.`,
+    `Printed cards end with a few random codes that belong to nothing. The sheet for heirs states the number of words; with it, only the codes of so many words from the start are read, and the cards after them may be typed or left out. In colors, ${BIP39_WORD_COUNTS[0]} words are ${RGB_REFERENCE_COUNTS[0]} codes and ${LONGEST_WORD_COUNT} words ${defined(RGB_REFERENCE_COUNTS.at(-1))}.`,
   ],
 };
 
-export const maxCandidates: HelpOption = {
+export const MAX_CANDIDATES: HelpOption = {
   flag: "--max-candidates",
   value: "N",
   summary: "Most combinations a search of dates tries without asking",
@@ -229,7 +235,7 @@ export const maxCandidates: HelpOption = {
   ],
 };
 
-export const backupCheck: HelpOption = {
+export const BACKUP_CHECK: HelpOption = {
   flag: "--backup-check",
   value: "yes|no",
   summary: "Answer whether to check the written-down backup on the private screen",
@@ -238,39 +244,39 @@ export const backupCheck: HelpOption = {
   ],
 };
 
-export const legacyValidLastWord: HelpOption = {
+export const LEGACY_VALID_LAST_WORD: HelpOption = {
   flag: "--legacy-valid-last-word",
   summary: "In seedshift-legacy mode, end with a last word that passes the checksum",
 };
 
-export const template: HelpOption = {
+export const TEMPLATE: HelpOption = {
   flag: "--template",
   value: "ID",
   summary: "The card design, by name or number; mnemocode preview --list lists them",
 };
 
-export const title: HelpOption = {
+export const TITLE: HelpOption = {
   flag: "--title",
   value: "TEXT",
   summary: "Collection title; default the studio name",
 };
-export const pdf: HelpOption = {
+export const PDF: HelpOption = {
   flag: "--pdf",
   value: "PATH",
   summary: "Save the cards as one PDF",
   details: ["The file is written into a folder that already exists."],
 };
 
-export const cardsDir: HelpOption = {
+export const CARDS_DIR: HelpOption = {
   flag: "--cards-dir",
   value: "NEW_FOLDER",
   summary: "Save one file per card in a new folder",
   details: [
-    "Files are named after their number and the code they print, such as 01-ABCDEF.pdf, or 01-7684.pdf in Unicode codes; each holds only its own code. Use it with --page-size business or without a page size. The folder must not exist yet: it is created only when every card is ready.",
+    "Files are named after their number and the code they print, such as 01-ABCDEF.pdf, or 01-7684.pdf in Unicode codes; each holds only its own code. Use it with --page-size business or without a page size. A taken name is numbered, as cards-1, never replaced; the folder is created only when every card is ready.",
   ],
 };
 
-export const imagesDir: HelpOption = {
+export const IMAGES_DIR: HelpOption = {
   flag: "--images-dir",
   value: "NEW_FOLDER",
   summary: "Save the pages as images in a new folder",
@@ -279,16 +285,36 @@ export const imagesDir: HelpOption = {
   ],
 };
 
-export const imageFormat: HelpOption = {
+/** What --image-format says of the image files themselves, for every command that saves cards. */
+const IMAGE_FILES = `jpeg is accepted for jpg. PNG keeps text and QR codes sharp; JPEG uses quality ${JPEG_QUALITY}. The rounded corners of a separate card are transparent in PNG and white in JPEG.`;
+
+export const IMAGE_FORMAT: HelpOption = {
   flag: "--image-format",
   value: IMAGE_FORMATS.join("|"),
   summary: "Image format for page images and separate cards when requested",
   details: [
-    `--images-dir defaults to PNG. --cards-dir defaults to one PDF per card; --image-format selects images instead. jpeg is accepted for jpg. PNG keeps text and QR codes sharp; JPEG uses quality ${JPEG_QUALITY}. The rounded corners of a separate card are transparent in PNG and white in JPEG.`,
+    `--images-dir defaults to PNG. --cards-dir defaults to one PDF per card; --image-format selects images instead. ${IMAGE_FILES}`,
   ],
 };
 
-export const pageSize: HelpOption = {
+/** --image-format of the commands of shares, whose --cards-dir holds one share in each file or folder. */
+export const SHARE_IMAGE_FORMAT: HelpOption = {
+  ...IMAGE_FORMAT,
+  details: [
+    `--images-dir defaults to PNG. --cards-dir defaults to PDF: one file per share sheet, or, with --card-layout individual, one per card in the folder of each share; --image-format selects images instead. ${IMAGE_FILES}`,
+  ],
+};
+
+/** --cards-dir of the commands of shares: each file or folder in it holds one share. */
+export const SHARE_CARDS_DIR: HelpOption = {
+  ...CARDS_DIR,
+  summary: "Save each share as its own file or folder in a new folder",
+  details: [
+    "Each file or folder holds one share: keep them in different places. A taken name is numbered, never replaced.",
+  ],
+};
+
+export const PAGE_SIZE: HelpOption = {
   flag: "--page-size",
   value: CARD_PAGE_SIZES.join("|"),
   summary: "a6 (default), a5 or a4 for one sheet, business for separate cards",
@@ -297,13 +323,13 @@ export const pageSize: HelpOption = {
   ],
 };
 
-export const orientation: HelpOption = {
+export const ORIENTATION: HelpOption = {
   flag: "--orientation",
   value: CARD_ORIENTATIONS.join("|"),
   summary: "Page orientation; works with every page size",
 };
 
-export const cardQr: HelpOption = {
+export const CARD_QR: HelpOption = {
   flag: "--card-qr",
   summary: "Add one QR code with the whole encoded phrase to a collection sheet",
   details: [
@@ -312,7 +338,16 @@ export const cardQr: HelpOption = {
   ],
 };
 
-const identityOptions: readonly HelpOption[] = [
+/** --card-qr of the commands of shares: each sheet's QR code holds its own share alone. */
+export const SHARE_CARD_QR: HelpOption = {
+  ...CARD_QR,
+  summary: "Add a QR code of its own share to each collection sheet",
+  details: [
+    "Each QR code holds only its own share: word numbers, Unicode codes or colors, according to the chosen form.",
+  ],
+};
+
+const IDENTITY_OPTIONS: readonly HelpOption[] = [
   {
     flag: "--card-name",
     value: "TEXT",
@@ -367,34 +402,41 @@ const identityOptions: readonly HelpOption[] = [
   },
 ];
 
-export const identityGroup: HelpGroup = {
+export const IDENTITY_GROUP: HelpGroup = {
   heading: "Details on the cards (a decoy, random unless given; not needed for recovery):",
-  options: identityOptions,
+  options: IDENTITY_OPTIONS,
 };
 
-export const cardLayout: HelpOption = {
+/**
+ * Which separate cards of a share rebuild it: the real ones, in numbered order, without the decoy
+ * that ends them. The layout's help and the notes of sskr-combine say it in these words.
+ */
+export const SHARE_CARDS_NEEDED =
+  "Every real card of one share is needed, in numbered order, to rebuild that share; its last card is a decoy and may be left out.";
+
+export const CARD_LAYOUT: HelpOption = {
   flag: "--card-layout",
   value: SSKR_CARD_LAYOUTS.join("|"),
   summary: "How each share is printed; follows the page size if omitted",
   details: [
-    "qr: one document with a QR code per share, in any page size. collection: one sheet per share (a6, a5 or a4); --card-qr adds a QR code. individual: numbered business cards without a QR code; every card of a share is needed to rebuild that share.",
+    `qr: one document with a QR code per share, in any page size. collection: one sheet per share (a6, a5 or a4); --card-qr adds a QR code. individual: numbered business cards without a QR code. ${SHARE_CARDS_NEEDED}`,
     "Cards print shares written in colors or in Unicode codes, one code to a card, with a few decoys after them: a share in colors as its colors, a share in Unicode codes as its codes on cards whose colors only decorate them. Shares in word numbers, Bytewords or ur:sskr have no cards.",
   ],
 };
 
-export const threshold: HelpOption = {
+export const THRESHOLD: HelpOption = {
   flag: "--threshold",
   value: "N",
   summary: `Shares needed to restore the phrase, at least ${MIN_THRESHOLD}`,
 };
 
-export const shares: HelpOption = {
+export const SHARES: HelpOption = {
   flag: "--shares",
   value: "M",
   summary: `Shares to make, N to ${MAX_SHARES}`,
 };
 
-export const evidenceGroup: HelpGroup = {
+export const EVIDENCE_GROUP: HelpGroup = {
   heading: "Recovery checks (one of them finds the wallet among the candidates):",
   options: [
     {
@@ -464,7 +506,7 @@ export const evidenceGroup: HelpGroup = {
       value: "NAME",
       summary: "auto (default), or a comma-separated list of address types",
       details: [
-        `The types are ${listInWords(bitcoinProfiles.map((profile) => `${profile} (BIP${bitcoinProfilePurpose(profile)})`))}, such as native-segwit,taproot. auto tries all ${numberWord(bitcoinProfiles.length)} at the selected place.`,
+        `The types are ${listInWords(BITCOIN_PROFILES.map((profile) => `${profile} (BIP${bitcoinProfilePurpose(profile)})`))}, such as native-segwit,taproot, each named once. auto tries all ${numberWord(BITCOIN_PROFILES.length)} at the selected place.`,
       ],
     },
     { flag: "--account", value: "N", summary: "Account number; default 0" },
@@ -481,7 +523,7 @@ export const evidenceGroup: HelpGroup = {
   ],
 };
 
-export const maxTries: HelpOption = {
+export const MAX_TRIES: HelpOption = {
   flag: "--max-tries",
   value: "N",
   summary: "Combinations a share repair may try without asking",
@@ -500,7 +542,7 @@ export const LIST_PASSPHRASE_ASK: HelpRow = [
   "twice, for a candidate list, unless an option chooses how the list is protected",
 ];
 
-export const candidateListGroup: HelpGroup = {
+export const CANDIDATE_LIST_GROUP: HelpGroup = {
   heading: "Candidate list for the Discovery Scanner (docs/CANDIDATES.md):",
   options: [
     {
@@ -536,12 +578,12 @@ export const candidateListGroup: HelpGroup = {
   ],
 };
 
-export const shareWalletCheck: HelpGroup = {
-  ...evidenceGroup,
+export const SHARE_WALLET_CHECK: HelpGroup = {
+  ...EVIDENCE_GROUP,
   heading: "Wallet check (one of them keeps only the matching phrases):",
 };
 
-export const shareInputs: readonly HelpOption[] = [
+export const SHARE_INPUTS: readonly HelpOption[] = [
   {
     flag: "--share",
     value: "TEXT",
@@ -562,12 +604,12 @@ export const shareInputs: readonly HelpOption[] = [
     details: ["A PDF cannot be read; save the QR code as a PNG image first."],
   },
   {
-    ...askSecrets,
+    ...ASK_SECRETS,
     summary: `Type the shares on the private screen, separated by ${SHARE_SEPARATOR}`,
   },
 ];
 
-export const heirSheet: HelpOption = {
+export const HEIR_SHEET: HelpOption = {
   flag: "--heir-sheet",
   value: "PATH",
   summary: "Also save one sheet that tells heirs how to restore the backup",
@@ -576,7 +618,7 @@ export const heirSheet: HelpOption = {
   ],
 };
 
-export const heirSheetSize: HelpOption = {
+export const HEIR_SHEET_SIZE: HelpOption = {
   flag: "--heir-sheet-size",
   value: HEIR_SHEET_SIZES.join("|"),
   summary: `The size of that sheet; default ${DEFAULT_HEIR_SHEET_SIZE}`,
@@ -587,7 +629,7 @@ export const heirSheetSize: HelpOption = {
 
 // The options of Encode's new backup, which re-encode takes too.
 
-export const encodeMode: HelpOption = {
+export const ENCODE_MODE: HelpOption = {
   flag: "--mode",
   value: "MODE",
   summary: `${listInWords(ENCODE_MODES, "or")}; see mnemocode help modes`,
@@ -596,7 +638,7 @@ export const encodeMode: HelpOption = {
   ],
 };
 
-export const encodeFormat: HelpOption = {
+export const ENCODE_FORMAT: HelpOption = {
   flag: "--format",
   value: "FORMAT",
   summary: `The form of the result, ${FORMAT_NUMBER_RANGE} or its name; default ${formatNumber("english")} (english)`,
@@ -605,15 +647,15 @@ export const encodeFormat: HelpOption = {
   ],
 };
 
-export const encodeLegacyValidLastWord: HelpOption = {
-  ...legacyValidLastWord,
+export const ENCODE_LEGACY_VALID_LAST_WORD: HelpOption = {
+  ...LEGACY_VALID_LAST_WORD,
   details: [
     "A legacy result usually fails the BIP39 checksum. With this option only the checksum bits of the last word are calculated again, as with the same option of the original Seedshift; the record becomes seedshift-legacy-valid. Its decoding lists every possible last word.",
   ],
 };
 
 /** Where Encode's result goes, its cards and its shares: re-encode's new backup too. */
-export const encodeOutputGroups: readonly HelpGroup[] = [
+export const ENCODE_OUTPUT_GROUPS: readonly HelpGroup[] = [
   {
     heading: "Where the result goes (it always appears in the terminal):",
     options: [
@@ -637,9 +679,9 @@ export const encodeOutputGroups: readonly HelpGroup[] = [
           "The QR code holds only the encoded data in the selected format: no header, mode, dates or fingerprints. decode --qr-file reads it back.",
         ],
       },
-      heirSheet,
-      heirSheetSize,
-      backupCheck,
+      HEIR_SHEET,
+      HEIR_SHEET_SIZE,
+      BACKUP_CHECK,
       {
         flag: "--show-masked-words",
         summary: "Also show the English words after Seedshift, beside the codes or shares",
@@ -652,18 +694,18 @@ export const encodeOutputGroups: readonly HelpGroup[] = [
   {
     heading: `Cards (formats ${CARD_FORMAT_NUMBERS}):`,
     options: [
-      template,
-      pdf,
-      cardsDir,
-      imagesDir,
-      imageFormat,
-      pageSize,
-      orientation,
-      cardQr,
-      title,
+      TEMPLATE,
+      PDF,
+      CARDS_DIR,
+      IMAGES_DIR,
+      IMAGE_FORMAT,
+      PAGE_SIZE,
+      ORIENTATION,
+      CARD_QR,
+      TITLE,
     ],
   },
-  identityGroup,
+  IDENTITY_GROUP,
   {
     heading: "Shamir shares (see mnemocode help sskr-combine to restore):",
     options: [
@@ -672,10 +714,11 @@ export const encodeOutputGroups: readonly HelpGroup[] = [
         summary: "Split the result into Shamir shares (SSKR) as the last step",
         details: [
           "The shares use the Blockchain Commons SSKR format. Fewer shares than --threshold cannot restore the phrase, but each share still shows the set identifier, the thresholds and the length of the phrase; keep every share private. A BIP39 passphrase, the mode and the dates are not stored in the shares. The legacy modes cannot be used with shares.",
+          "The card options then print the shares as sskr-split does: each file or folder in --cards-dir holds one share, and --card-qr gives each collection sheet a QR code of its own share.",
         ],
       },
-      threshold,
-      shares,
+      THRESHOLD,
+      SHARES,
       {
         flag: "--show-original",
         value: ORIGINAL_COPY_FORMS.join("|"),
@@ -692,7 +735,7 @@ export const encodeOutputGroups: readonly HelpGroup[] = [
           `ur (the default) is the standard short form, ur:sskr/...; words writes the same share in standard Bytewords, one English word per byte. Other SSKR programs read both. indexes, unicode, colors and colors-unicode write a share with the signs of --format ${formatNumber("indexes")}, ${formatNumber("unicode")}, ${formatNumber("colors")} and ${formatNumber("colors-unicode")}, so that it looks like that form; sskr-combine then shows the restored backup in that form again. Only MnemoCode reads these. A saved text file holds the shares in the same form.`,
         ],
       },
-      cardLayout,
+      CARD_LAYOUT,
     ],
   },
 ];

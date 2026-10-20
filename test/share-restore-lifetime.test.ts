@@ -5,14 +5,14 @@
 import { describe, expect, it } from "vitest";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { DatesAnswer } from "../src/core/date-search.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { ShareInput } from "../src/sskr/share-input.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareRestore } from "../src/sskr/share-restore.js";
 import { writeShare } from "../src/sskr/transport.js";
 
 const WIPED = { code: "core.secret-value.wiped" };
-const [FIRST, SECOND] = sskrSetVector.shares;
+const [FIRST, SECOND] = SSKR_SET_VECTOR.shares;
 
 /** The input of the vector's first two shares, the second with colour 6 marked when `marked`. */
 function inputOf(marked: boolean): ShareInput {

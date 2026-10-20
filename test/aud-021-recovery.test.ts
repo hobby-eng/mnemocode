@@ -1,5 +1,4 @@
 // AUD-021-FUN001/FUN002: public interoperability fixtures and synthetic card decoys only.
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -11,10 +10,10 @@ import { hexUnits, joinedHexUnits, UNICODE_CODE_DIGITS } from "../src/core/code-
 import { colorsToUnicode, COLOR_UNICODE_POINTS_PER_COLOR } from "../src/core/colors.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
-import type { MaskingMode } from "../src/core/types.js";
+import { isMaskingMode } from "../src/core/types.js";
 import { wordIndexOfNumber } from "../src/core/words.js";
 import { planJointRepair } from "../src/sskr/joint-repair.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { mixShare, SHARE_HEADER_BYTES } from "../src/sskr/mixed-layout.js";
 import {
   MarkedReading,
@@ -31,15 +30,15 @@ import { SHARE_UNITS } from "../src/sskr/share-units.js";
 import { CHECKSUM_BYTES, Share, urToTransport, type ShareFormat } from "../src/sskr/transport.js";
 import { joinUnits, shareUnits } from "./helpers/shares.js";
 import { recheck } from "./helpers/share-transport.js";
+import { mnemocodeVectors, sskrVectors } from "./helpers/vectors.js";
 
-const backupVectors = JSON.parse(
-  readFileSync(new URL("../vectors/mnemocode-v1.json", import.meta.url), "utf8"),
-) as {
-  vectors: { mode: MaskingMode; english: string; indexes: string; colorsUnicode: string }[];
+const backupVectors = {
+  vectors: mnemocodeVectors().vectors.map((vector) => {
+    if (!isMaskingMode(vector.mode)) throw new Error("A vector names an unknown Seedshift mode.");
+    return { ...vector, mode: vector.mode };
+  }),
 };
-const shareVectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-) as { deterministic: { name: string; entropy: string; shares: string[] }[] };
+const shareVectors = sskrVectors();
 
 const COLOR_VIEWS = ["joined hex", "apart hex", "joined symbols", "apart symbols"] as const;
 type ColorView = (typeof COLOR_VIEWS)[number];
@@ -146,9 +145,9 @@ function shareText(ur: string, format: ShareFormat, marks: readonly number[]): s
 
 describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, readings that do not fit", () => {
   it("refuses an unresolved capped reading beside a solved reading in either order", () => {
-    const marked = `${sskrSetVector.colors[0].replace("#1F9121", "?")} #000000`;
+    const marked = `${SSKR_SET_VECTOR.colors[0].replace("#1F9121", "?")} #000000`;
     const share = readRepairableShare(marked);
-    expect(share.ur).toBe(sskrSetVector.shares[0]);
+    expect(share.ur).toBe(SSKR_SET_VECTOR.shares[0]);
     // The dispatcher's rule: a reading of the whole text that stopped at the cap does not let a
     // solved reading claim to be the only share, since its remaining filters were not applied.
     const solved = { withDecoys: false, tooMany: false, shares: [share] };
@@ -165,10 +164,10 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, readings that d
     expect(() => sharesOfReadings([], marked)).toThrow(/No valid share/u);
   });
   it("repairs the audit's public color fixture and reports only its genuine mark", () => {
-    const complete = sskrSetVector.colors[0];
+    const complete = SSKR_SET_VECTOR.colors[0];
     const marked = complete.replace("#1F9121", "?");
     const expected = {
-      ur: sskrSetVector.shares[0],
+      ur: SSKR_SET_VECTOR.shares[0],
       format: "colors",
       repaired: true,
       filled: [{ position: 6, value: "#1F9121" }],
@@ -208,7 +207,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, readings that d
   }
 
   it("repairs joined RGB and word Unicode and every Color Unicode spelling", () => {
-    const ur = sskrSetVector.shares[0];
+    const ur = SSKR_SET_VECTOR.shares[0];
     for (const format of ["colors", "unicode"] as const)
       expect(readRepairableShare(shareText(ur, format, [5]).replaceAll(" ", "")).ur).toBe(ur);
     const text = shareText(ur, "colors-unicode", [5]);
@@ -223,7 +222,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, readings that d
 
 describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, digits known in part", () => {
   it("keeps partial digit constraints when cropping a share prefix", () => {
-    const ur = sskrSetVector.shares[0];
+    const ur = SSKR_SET_VECTOR.shares[0];
     for (const format of ["colors", "unicode", "colors-unicode"] as const) {
       const units = shareUnits(ur, format);
       const at = Math.floor(units.length / 2);
@@ -240,14 +239,16 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, digits known in
     "restores %s with another intact share and a trailing decoy",
     async (format) => {
       const plan = await planJointRepair(
-        [shareText(sskrSetVector.shares[0], format, [5]), sskrSetVector.shares[1]],
+        [shareText(SSKR_SET_VECTOR.shares[0], format, [5]), SSKR_SET_VECTOR.shares[1]],
         { platform: nodeSharePlatform },
       );
       try {
         expect(plan.assessment.verdict).toBe("determined");
         const found = (await plan.search()).sets;
-        expect(found.map((set) => set.mnemonic)).toEqual([sskrSetVector.phrase]);
-        expect(found[0]!.shares.map((share) => share.ur)).toEqual(sskrSetVector.shares.slice(0, 2));
+        expect(found.map((set) => set.mnemonic)).toEqual([SSKR_SET_VECTOR.phrase]);
+        expect(found[0]!.shares.map((share) => share.ur)).toEqual(
+          SSKR_SET_VECTOR.shares.slice(0, 2),
+        );
         expect(found[0]!.shares[0]!.filled).toHaveLength(1);
       } finally {
         plan.wipe();
@@ -256,7 +257,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, digits known in
   );
 
   it("preserves checksum and padding refusal and rejects malformed decoy text", () => {
-    const ur = sskrSetVector.shares[0];
+    const ur = SSKR_SET_VECTOR.shares[0];
     for (const format of MIXED_FORMATS) {
       const marked = shareText(ur, format, [5]);
       for (const bad of ["not-a-code", "ZZZZ", "#12345"])
@@ -284,7 +285,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, digits known in
   });
 
   it("keeps the mark bound and ambiguous width refusal", () => {
-    const units = shareUnits(sskrSetVector.shares[0], "colors");
+    const units = shareUnits(SSKR_SET_VECTOR.shares[0], "colors");
     const tooMany = units.map((unit, index) => (index <= MAX_MARKED_ELEMENTS ? "?" : unit));
     expect(() => readRepairableShare([...tooMany, "#000000"].join(" "))).toThrow(
       new RegExp(`at most ${MAX_MARKED_ELEMENTS}`, "u"),
@@ -295,7 +296,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, digits known in
 
 describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, several valid shares", () => {
   it("lists multiple valid shares instead of silently choosing a prefix repair", () => {
-    const ur = sskrSetVector.shares[0];
+    const ur = SSKR_SET_VECTOR.shares[0];
     // One whole color and three hex digits: 36 unknown bits leave four beyond the CRC-32.
     const marked = shareText(ur, "colors", [4]).replace("#1F9121", "#1F9???");
     const candidates = repairCandidates(marked);
@@ -305,7 +306,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, several valid s
   });
 
   it("rejects invalid metadata even when its transport checksum was recomputed", () => {
-    const ur = sskrSetVector.shares[0];
+    const ur = SSKR_SET_VECTOR.shares[0];
     const transport = urToTransport(ur);
     const payloadStart =
       transport.length - CHECKSUM_BYTES - SHARE_METADATA_BYTES - Share.read(ur).info.secretLength;
@@ -326,7 +327,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, several valid s
   });
 
   it("rejects invalid standard-form suffixes without card cropping", () => {
-    const ur = sskrSetVector.shares[0];
+    const ur = SSKR_SET_VECTOR.shares[0];
     const words = shareUnits(ur, "words");
     words[5] = "?";
     expect(() => readRepairableShare([...words, "zzzz"].join(" "))).toThrow(/No valid share/u);

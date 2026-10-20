@@ -43,23 +43,20 @@ import type { SeedshiftMode } from "../core/date-recovery.js";
 import { PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
 import { walletCheckOf, type WalletEvidence } from "../bitcoin-evidence.js";
 import { integerOption, type ParsedArguments } from "./arguments.js";
-import {
-  askAfterFailure,
-  askSecretUntil,
-  askWalletEvidence,
-  changeWalletAnswer,
-  checkWalletAnswer,
-  WHAT_NOW,
-} from "./ask.js";
+import { askAfterFailure, askSecretUntil, WHAT_NOW } from "./ask.js";
+import { askWalletEvidence, changeWalletAnswer, checkWalletAnswer } from "./wallet-question.js";
 import type { CandidatesFile } from "./candidates-file.js";
 import { datesPrompt, mostDates } from "./input.js";
 import { evidenceLabel } from "./option-copy.js";
 import { onPrivateScreen, closingRows } from "./private-screen.js";
+import { PrivateSteps } from "./private-steps.js";
+import { PrivateSummary } from "./private-summary.js";
 import { linesFitPrivateScreen } from "./screen-fit.js";
 import {
   ProgressLine,
   terminalNotice,
   terminalResultHeader,
+  wrapText,
   readmeLink,
   resultHeaderLines,
   noticeLines,
@@ -67,7 +64,7 @@ import {
 } from "./terminal.js";
 import { type Choice, type Explanation, rowsOf } from "./terminal-choice.js";
 import { askToSearch, type SearchRefusal, allowedBy } from "./search-consent.js";
-import { withCtrlCWatch, nodeTurn } from "./terminal-input.js";
+import { CtrlCWatch, nodeTurn } from "./terminal-input.js";
 import { counted } from "../core/search-plan.js";
 import { DATE_FORMAT_TEXT } from "../core/dates.js";
 import { numberWord } from "../core/prose.js";
@@ -120,7 +117,7 @@ export function recoveryDatesPrompt(wordCount: number | undefined): string {
 }
 
 /** The question for dates: with ? where `patterns` allows it, otherwise as Encode asks. */
-export function datesQuestion(rules: DatesRules): string {
+function datesQuestion(rules: DatesRules): string {
   return rules.patterns
     ? `Dates (${mostDates(rules.wordCount)}${DATE_FORMAT_TEXT}, ? for what is forgotten, separated by spaces):`
     : datesPrompt(rules.wordCount);
@@ -245,11 +242,14 @@ export async function searchDates(
     const start = await askToSearch(plan.question(), DATES_AGAIN);
     if (start !== "yes") return start === "no" ? undefined : start;
   }
-  // The size is said once, and then the time where it is told (SearchPlan.tell).
+  // The search is a step of its own: its screen shows the title and the search, no longer the
+  // dates typed (CORE-39). The size is said once, and then the time where it is told
+  // (SearchPlan.tell).
+  PrivateSteps.begin();
   terminalNotice(`Recovery search contains ${plan.size}.`);
   if (plan.tell) terminalNotice(plan.timeNotice());
   const result = await withDateProgress((progress) =>
-    withCtrlCWatch((signal) =>
+    CtrlCWatch.during((signal) =>
       search.run(dateSearchRun(signal, request.report.progressEvery, progress)),
     ),
   );
@@ -286,14 +286,15 @@ export interface MatchesReport {
  * wallet that none of the checksum-valid candidates matched, it says so.
  */
 export function reportDateMatches(result: DateSearchResult, report: MatchesReport): void {
-  terminalResultHeader(MATCHES_TITLE, matchFacts(result, report));
+  const layout = terminalResultHeader(MATCHES_TITLE, matchFacts(result, report));
   if (result.matchCount === 0) {
     const { checksumValid: valid } = result;
-    console.log(
+    const sentence =
       report.evidence !== undefined && valid > 0
         ? `None of the ${counted(valid, "checksum-valid candidate")} matched the requested ${evidenceLabel(report.evidence)}.`
-        : "No candidate with a valid BIP39 checksum was found.",
-    );
+        : "No candidate with a valid BIP39 checksum was found.";
+    // Running text wraps at a terminal (CORE-36); a file or a pipe keeps it on one line.
+    for (const line of layout ? wrapText(sentence) : [sentence]) console.log(line);
     return;
   }
   for (const match of result.shown) console.log(matchLine(match));
@@ -326,7 +327,7 @@ function matchLine(match: DateMatch): string {
  * as it is printed: the heading and its facts (reportDateMatches), the notes (dateMatchNotes),
  * and what closes the private screen.
  */
-export function matchesFitScreen(result: DateSearchResult, report: MatchesReport): boolean {
+function matchesFitScreen(result: DateSearchResult, report: MatchesReport): boolean {
   const beside =
     rowsOf(resultHeaderLines(MATCHES_TITLE, matchFacts(result, report))) +
     rowsOf(dateMatchNoteLines(report.evidence, result.warning)) +
@@ -341,6 +342,9 @@ export function matchesFitScreen(result: DateSearchResult, report: MatchesReport
  */
 export function dateMatchNotes(evidence: WalletEvidence | undefined, warning?: string): void {
   for (const line of dateMatchNoteLines(evidence, warning)) console.error(line);
+  // The check's warning still holds once the command has ended (terminalLastingWarning).
+  if (evidence !== undefined && warning !== undefined)
+    PrivateSummary.add({ kind: "warning", text: warning });
 }
 
 /** The lines of dateMatchNotes. */

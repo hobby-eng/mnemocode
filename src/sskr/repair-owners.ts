@@ -106,7 +106,7 @@ export class MarkedReading extends Redacted implements Disposable {
   }
 
   /** Refuses work after disposal; metadata and earlier caller views are not recalled. */
-  assertLive(): void {
+  #assertLive(): void {
     this.#values.assertLive();
   }
 
@@ -139,7 +139,7 @@ export class MarkedReading extends Redacted implements Disposable {
 
   /** A fresh snapshot of partial unit bits, if present; refused after disposal. */
   get readBits(): readonly (ReadBits | undefined)[] | undefined {
-    this.assertLive();
+    this.#assertLive();
     if (!this.#hasReadBits) return undefined;
     return Object.freeze(
       this.#readBits.value.map((bits) =>
@@ -152,7 +152,7 @@ export class MarkedReading extends Redacted implements Disposable {
 
   /** Fresh candidate lists for partial units, if present; refused after disposal. */
   get candidates(): readonly (readonly number[] | undefined)[] | undefined {
-    this.assertLive();
+    this.#assertLive();
     if (!this.#hasCandidates) return undefined;
     // A separate presence flag preserves an admitted empty list as distinct from no constraint.
     return Object.freeze(
@@ -263,7 +263,7 @@ export class MarkedReading extends Redacted implements Disposable {
 
   /** A caller-owned share snapshot if values fit the reading and ordinary reader, else undefined. */
   solvedShare(values: readonly number[]): ReadRepairableShare | undefined {
-    this.assertLive();
+    this.#assertLive();
     if (!this.#fits(values)) return undefined;
     const units = SHARE_UNITS[this.#format];
     let read;
@@ -281,7 +281,7 @@ export class MarkedReading extends Redacted implements Disposable {
   }
 
   #constraints(): ReadingCodeConstraints | undefined {
-    this.assertLive();
+    this.#assertLive();
     if (this.#codePrefix === undefined) return undefined;
     const codes = this.#codes.value;
     let start = 0;
@@ -365,7 +365,6 @@ export class MarkedReading extends Redacted implements Disposable {
  */
 export class ReadingSpace extends Redacted implements Disposable {
   readonly #reading: MarkedReading;
-  readonly #rank: number;
   readonly #coordinates: SecretValue<readonly bigint[]>;
   readonly #payload: Uint8Array;
   readonly #payloadDeltas: readonly Uint8Array[];
@@ -373,7 +372,6 @@ export class ReadingSpace extends Redacted implements Disposable {
   private constructor(
     reading: MarkedReading,
     solved: {
-      readonly rank: number;
       readonly particular: bigint;
       readonly free: readonly bigint[];
     },
@@ -384,7 +382,6 @@ export class ReadingSpace extends Redacted implements Disposable {
     const deltas = Object.freeze([...payloadDeltas]);
     this.#coordinates = SecretValue.bigints([solved.particular, ...solved.free]);
     this.#reading = reading;
-    this.#rank = solved.rank;
     this.#payload = payload;
     this.#payloadDeltas = deltas;
   }
@@ -460,24 +457,19 @@ export class ReadingSpace extends Redacted implements Disposable {
   }
 
   /** Refuses secret reads after this space is disposed. */
-  assertLive(): void {
+  #assertLive(): void {
     this.#coordinates.assertLive();
   }
 
   /** Borrowed child reading, valid until this space ends; copy it for an independent lifetime. */
   get reading(): MarkedReading {
-    this.assertLive();
+    this.#assertLive();
     return this.#reading;
   }
 
   /** The number of marked bits; layout metadata remains readable after disposal. */
   get unknownBits(): number {
     return this.#reading.unknownBits;
-  }
-
-  /** The rank of the equations; layout metadata remains readable after disposal. */
-  get rank(): number {
-    return this.#rank;
   }
 
   /** One exact affine solution; refused after disposal. */
@@ -502,7 +494,7 @@ export class ReadingSpace extends Redacted implements Disposable {
 
   /** Caller-owned unit values for exact marked bits; refused after disposal. */
   valuesAt(bits: bigint): number[] {
-    this.assertLive();
+    this.#assertLive();
     return this.#reading.valuesAt(bits);
   }
 
@@ -513,7 +505,7 @@ export class ReadingSpace extends Redacted implements Disposable {
 
   /** New caller-owned payload bytes for basis choice `own`; wipe them after use. */
   payloadAt(own: bigint): Uint8Array {
-    this.assertLive();
+    this.#assertLive();
     const payload = Uint8Array.from(this.#payload);
     this.#payloadDeltas.forEach((delta, j) => {
       if ((own >> BigInt(j)) & 1n) xorInto(payload, delta);
@@ -523,7 +515,7 @@ export class ReadingSpace extends Redacted implements Disposable {
 
   /** A fixed payload byte, or undefined if a solution changes it; refused after disposal. */
   fixedPayloadByte(index: number): number | undefined {
-    this.assertLive();
+    this.#assertLive();
     return this.#payloadDeltas.every((delta) => delta[index] === 0)
       ? this.#payload[index]
       : undefined;

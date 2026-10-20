@@ -1,8 +1,7 @@
-import { spawnSync } from "node:child_process";
 import { expect, it, vi } from "vitest";
 import { serializeRecord } from "../src/record.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
-import { PublicCliFiles } from "./helpers/public-cli-files.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
+import { runBuiltCliSync } from "./helpers/built-cli.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 import { terminalFingerprint } from "../src/cli/terminal.js";
 
@@ -23,19 +22,12 @@ it.each([
   ["legacy decoding", ["decode", "--input", LEGACY, "--date", "23-09-2026"]],
   [
     "share restoration",
-    ["sskr-combine", ...sskrSetVector.shares.slice(0, 2).flatMap((share) => ["--share", share])],
+    ["sskr-combine", ...SSKR_SET_VECTOR.shares.slice(0, 2).flatMap((share) => ["--share", share])],
   ],
 ] as const)(
   "explains the fingerprints after %s without adding a column to the result",
   (_, args) => {
-    using material = new PublicCliFiles(args);
-    const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...material.arguments], {
-      encoding: "utf8",
-      env: { ...process.env, NO_COLOR: "1" },
-      timeout: 10_000,
-      maxBuffer: 256 * 1024,
-    });
-    if (result.error) throw result.error;
+    const result = runBuiltCliSync(args);
     expect(result.status, result.stderr).toBe(0);
     expect(result.signal).toBeNull();
     expect(result.stderr).toContain("They do not reveal the phrase.");

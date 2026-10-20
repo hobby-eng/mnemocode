@@ -13,6 +13,7 @@ import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { format } from "prettier";
 import { ErrorCatalog } from "../src/core/error-catalog.ts";
+import { afterFailure } from "../src/core/refusal.ts";
 
 const ERRORS = new ErrorCatalog("scripts.build-sskr-wasm", {
   /**
@@ -180,6 +181,7 @@ function integrityPaths(files) {
 }
 
 const output = mkdtempSync(join(tmpdir(), "mnemocode-sskr-"));
+const removeOutput = () => rmSync(output, { recursive: true, force: true });
 try {
   const files = await build(output);
   if (checkOnly) {
@@ -215,6 +217,8 @@ try {
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     console.log("Wrote sskr-wasm/generated and sskr-wasm/integrity.json.");
   }
-} finally {
-  rmSync(output, { recursive: true, force: true });
+} catch (error) {
+  // A folder that cannot be removed is named beside the failure, never in its place (CORE-22).
+  throw await afterFailure(error, removeOutput);
 }
+removeOutput();

@@ -8,10 +8,10 @@ import { assertCardIndex } from "./card-codes.js";
 import { drawCollectionQr } from "./card-qr.js";
 import type { QrModules, QrSource } from "./platform.js";
 import { type CardSettings, type CardPresentation } from "./card-settings.js";
+import { contentKindRules, type ContentKind } from "./content-kinds.js";
 import { graticule, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from "./world-map.js";
 import { WORLD_MAP_LAND } from "./world-map-data.js";
 import { drawMaterialBackdrop, type MaterialBackdrop } from "./study-backdrops.js";
-import { defined } from "../core/defined.js";
 import {
   COLLECTION_QR_MODULE_MM,
   collectionSheetLayout,
@@ -30,11 +30,19 @@ const ERRORS = new ErrorCatalog("export.collection-sheet", {
 
 type Color = ReturnType<typeof rgb>;
 
+/** The colours of the grey world map behind the cards. */
+interface MapColors {
+  /** The fill of the land. */
+  readonly land: Color;
+  /** The line of the coasts. */
+  readonly coast: Color;
+}
+
 /** Colours of one sheet. */
 interface SheetPalette {
   readonly background: Color;
   /** The grey world map behind the cards, or the backdrop of a material. */
-  readonly backdrop: { readonly land: Color; readonly coast: Color } | MaterialBackdrop;
+  readonly backdrop: MapColors | MaterialBackdrop;
   /** The plate behind the QR code and its border. */
   readonly plate: Color;
   readonly plateBorder: Color;
@@ -141,7 +149,7 @@ const GRATICULE = graticule(GRATICULE_STEP_DEGREES);
 /** Draws the grey world map, as wide as the page allows and centred a little below the middle. */
 function drawWorldMap(
   page: PDFPage,
-  colours: { readonly land: Color; readonly coast: Color },
+  colours: MapColors,
   width: number,
   height: number,
   margin: number,
@@ -275,12 +283,7 @@ function drawSheetQr(
   if (!layout.qr) throw ERRORS.create("missing-design-study-qr-area", []);
   const { x, y, size } = layout.qr;
   page.drawRectangle({
-    ...pdfRect(page, {
-      x: x - QR_PLATE_MARGIN,
-      y: y - QR_PLATE_MARGIN,
-      width: size + 2 * QR_PLATE_MARGIN,
-      height: size + 2 * QR_PLATE_MARGIN,
-    }),
+    ...pdfRect(page, outset({ x, y, width: size, height: size }, QR_PLATE_MARGIN)),
     color: palette.plate,
     borderColor: palette.plateBorder,
     borderWidth: 0.4,
@@ -300,6 +303,19 @@ function drawSheetQr(
   );
 }
 
+/** `box` grown by `margin` millimetres on every side. */
+function outset(box: MmRect, margin: number): MmRect {
+  return {
+    x: box.x - margin,
+    y: box.y - margin,
+    width: box.width + 2 * margin,
+    height: box.height + 2 * margin,
+  };
+}
+
+/** The width of the thin edge that shows round a card's picture on a sheet, in millimetres. */
+const CARD_EDGE_MM = 0.3;
+
 /** The shadow and the thin edge round a card's picture in `box` on a sheet. */
 function drawStudyShadow(page: PDFPage, box: MmRect, theme: StudyTheme): void {
   const palette = PALETTES[theme];
@@ -310,19 +326,20 @@ function drawStudyShadow(page: PDFPage, box: MmRect, theme: StudyTheme): void {
     opacity: palette.shadowOpacity,
   });
   page.drawRectangle({
-    ...pdfRect(page, {
-      x: box.x - 0.3,
-      y: box.y - 0.3,
-      width: box.width + 0.6,
-      height: box.height + 0.6,
-    }),
+    ...pdfRect(page, outset(box, CARD_EDGE_MM)),
     color: palette.cardEdge,
     opacity: 0.88,
   });
 }
 
 /**
- * Draws the caption `lines` of the card in `box` of `layout` on `page`, in the colors of `theme`.
+ * Draws the caption `lines` of the card in `box` of `layout` on `page`, in the colors of `theme`:
+ * each line centred in the caption column, at the layout's caption size or smaller where it must
+ * be, down to MINIMUM_FONT points. Refused, naming "Study reference", as centredText and fit refuse
+ * it: a line with a character that `font` lacks
+ * (export.business-render-primitives.contains-character-not-supported-by-card-font), and one that
+ * does not fit `box.captionWidth` at MINIMUM_FONT
+ * (export.business-render-primitives.too-long-fit-legibly-on-card-shorten).
  */
 export function drawStudyCaption(
   page: PDFPage,
@@ -353,7 +370,7 @@ export function drawStudyCaption(
 /** What a collection sheet of color cards is made from: a seed phrase's colors, or a share's. */
 export interface CollectionContent {
   /** A seed phrase's sheet ("colors") or a share's ("sskr"): which series the sheet names. */
-  readonly kind: "colors" | "sskr";
+  readonly kind: ContentKind;
   /** The text of the sheet's QR code, printed only where `cardQr` or a share's `qrCard` asks. */
   readonly payload: string;
   /** The title of the sheet; the studio's name where undefined. */
@@ -367,16 +384,14 @@ export interface CollectionContent {
 }
 
 /**
- * The series of the cards and sheets of a seed phrase's colors, which has no set to name: every
- * family prints it alike (owner, 2026-10-09).
+ * The series that a card or sheet of `content` names, as the rules of its kind give it
+ * (ContentKindRules series): a share's set, or a seed phrase's one. Refuses a kind of none
+ * (export.content-kinds.cards-draw-color-references).
  */
-const PHRASE_SERIES = "01";
-
-/** The series that a card or sheet of `content` names: a share's set, or a seed phrase's one. */
 export function collectionSeries(
   content: Pick<CollectionContent, "kind" | "collectionReference">,
 ): string {
-  return content.kind === "sskr" ? defined(content.collectionReference) : PHRASE_SERIES;
+  return contentKindRules(content.kind).series(content.collectionReference);
 }
 
 /** The line that names the person a set of cards is prepared for. */
@@ -399,9 +414,12 @@ function collectionFrame(
   };
 }
 
-/** Whether the sheet holds a share's whole-share QR code, which only `qrCard: true` asks for. */
+/**
+ * Whether the sheet holds a QR code of the whole backup, a share's whole-share QR code, which only
+ * `qrCard: true` asks for, where the rules of its kind allow one (ContentKindRules wholeBackupQr).
+ */
 function wholeShareQr(content: CollectionContent): boolean {
-  return content.kind === "sskr" && content.qrCard === true;
+  return contentKindRules(content.kind).wholeBackupQr && content.qrCard === true;
 }
 
 /**
@@ -458,7 +476,15 @@ export interface CollectionStudy {
 /**
  * Draws the collection sheet of `study` on a new page: the frame (addCollectionPage), then for each
  * card its shadow, the family's painting and its caption. Every family of cards draws its sheet
- * with it; it returns the layout it drew.
+ * with it; it returns the layout it drew. Refuses, before the page is added, what
+ * collectionSheetLayout refuses for `study.settings`, the number of captions, `study.aspect` and
+ * the sheet's QR code, such as more cards than a sheet holds
+ * (export.collection-layout.sheet-holds-at-most-cards), a page size or an orientation of none
+ * (export.card-settings.page-size, export.card-settings.orientation) and cards that no grid fits
+ * legibly (export.collection-layout.no-room). Then a text of the frame or a caption that does not
+ * print is refused as fit refuses it, naming the text, as drawStudyCaption names a caption
+ * (export.business-render-primitives.contains-character-not-supported-by-card-font,
+ * too-long-fit-legibly-on-card-shorten); a failure of `study.qr` or `study.paint` passes on.
  */
 export async function drawCollectionStudy(study: CollectionStudy): Promise<StudyLayout> {
   const { doc, font, content, captions, theme } = study;

@@ -63,6 +63,21 @@ function decodedCodeUnits(view: DataView, start: number, length: number): string
 }
 
 /**
+ * `bytes`, a result made with a secret, returned while `assertLive` passes; once the secret's owner
+ * has ended its lifetime, as across an await, they are overwritten and its refusal is thrown (such
+ * as core.secret-value.wiped), so that no result outlives the secret that made it.
+ */
+export function bytesWhileLive(bytes: Uint8Array, assertLive: () => void): Uint8Array {
+  try {
+    assertLive();
+    return bytes;
+  } catch (error) {
+    bytes.fill(0);
+    throw error;
+  }
+}
+
+/**
  * One retained secret in owned Uint8Array storage, with fresh text/array views on request.
  * Factories snapshot their input. wipe/dispose are idempotent; every later read/copy is refused
  * with core.secret-value.wiped. A decoded view belongs to the caller and cannot be recalled.
@@ -87,7 +102,11 @@ export class SecretValue<Value> extends Redacted implements Disposable {
     return new SecretValue(ENCODER.encode(text), (bytes) => DECODER.decode(bytes));
   }
 
-  /** Retains finite numbers in binary64 bytes; numeric meaning is checked by the domain owner. */
+  /**
+   * Retains finite numbers in binary64 bytes; numeric meaning is checked by the domain owner.
+   * Refuses a value that is not an array of finite numbers (core.secret-value.numbers), as a
+   * JavaScript host may pass one.
+   */
   static numbers(values: readonly number[]): SecretValue<readonly number[]> {
     const bytes = encodedNumbers(values);
     return new SecretValue(bytes, (storage) =>
@@ -95,7 +114,10 @@ export class SecretValue<Value> extends Redacted implements Disposable {
     );
   }
 
-  /** Retains arbitrary signed integers without a lossy conversion through Number. */
+  /**
+   * Retains arbitrary signed integers without a lossy conversion through Number. Refuses a value
+   * that is not an array of bigints (core.secret-value.bigints), as a JavaScript host may pass one.
+   */
   static bigints(values: readonly bigint[]): SecretValue<readonly bigint[]> {
     if (!Array.isArray(values)) throw ERRORS.create("bigints", []);
     const copy = Array.from<bigint>(values);
@@ -109,7 +131,10 @@ export class SecretValue<Value> extends Redacted implements Disposable {
     );
   }
 
-  /** Retains independent numeric lists; only their lengths are kept outside the byte storage. */
+  /**
+   * Retains independent numeric lists; only their lengths are kept outside the byte storage.
+   * Refuses a value that is not an array of arrays of finite numbers (core.secret-value.numbers).
+   */
   static numberLists(
     values: readonly (readonly number[])[],
   ): SecretValue<readonly (readonly number[])[]> {
@@ -141,7 +166,10 @@ export class SecretValue<Value> extends Redacted implements Disposable {
     }
   }
 
-  /** Retains UTF-8 text items; only item lengths are kept outside the byte storage. */
+  /**
+   * Retains UTF-8 text items; only item lengths are kept outside the byte storage. Refuses a value
+   * that is not an array of text (core.secret-value.text).
+   */
   static texts(values: readonly string[]): SecretValue<readonly string[]> {
     if (!Array.isArray(values)) throw ERRORS.create("text", []);
     const encoded: Uint8Array[] = [];
@@ -172,7 +200,10 @@ export class SecretValue<Value> extends Redacted implements Disposable {
     }
   }
 
-  /** Retains opaque JS strings losslessly as UTF-16 code units, including lone surrogates. */
+  /**
+   * Retains opaque JS strings losslessly as UTF-16 code units, including lone surrogates. Refuses
+   * a value that is not an array of text (core.secret-value.text).
+   */
   static utf16Texts(values: readonly string[]): SecretValue<readonly string[]> {
     if (!Array.isArray(values)) throw ERRORS.create("text", []);
     const texts = Array.from<string>(values);
@@ -202,18 +233,27 @@ export class SecretValue<Value> extends Redacted implements Disposable {
     });
   }
 
-  /** Refuses a read or publication after the owner ended the lifetime, including across an await. */
+  /**
+   * Refuses a read or publication after the owner ended the lifetime, including across an await
+   * (core.secret-value.wiped).
+   */
   assertLive(): void {
     if (this.#wiped) throw ERRORS.create("wiped", []);
   }
 
-  /** A freshly decoded view; the owner retains only bytes after this call returns. */
+  /**
+   * A freshly decoded view; the owner retains only bytes after this call returns. Refused after
+   * wipe (assertLive).
+   */
   get value(): Value {
     this.assertLive();
     return this.#decode(this.#bytes);
   }
 
-  /** A separate owner with its own byte copy and the same decoding contract. */
+  /**
+   * A separate owner with its own byte copy and the same decoding contract. Refused after wipe
+   * (assertLive).
+   */
   copy(): SecretValue<Value> {
     this.assertLive();
     return new SecretValue(Uint8Array.from(this.#bytes), this.#decode);
@@ -227,7 +267,9 @@ export class SecretValue<Value> extends Redacted implements Disposable {
 
   /**
    * Ends this value and its active local work. Clears the registry before calling its closures,
-   * so reentrant disposal is harmless; every closure runs even if another one fails.
+   * so reentrant disposal is harmless; every closure runs even if another one fails. One failure
+   * is thrown again as it is; several are refused together (core.secret-value.cleanup), with the
+   * failures as the cause.
    */
   wipeAndClose(active: Set<() => void>): void {
     this.wipe();

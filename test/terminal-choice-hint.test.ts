@@ -1,13 +1,31 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Key } from "../src/cli/terminal-input.js";
+import type { MoreWithin, NextByte } from "../src/cli/terminal-keys.js";
+
+/** A key that is no digit, as the tests queue them by kind. */
+type KindOfKey = Exclude<Key, { kind: "digit" }>["kind"];
 
 // The keys of a list are read from this queue; the terminal itself is not touched.
-const input = vi.hoisted(() => ({ keys: [] as string[] }));
-vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/terminal-input.js")>()),
-  withRawTerminal: async (operation: (next: unknown, more: unknown) => Promise<unknown>) =>
-    operation(undefined, undefined),
-  readKey: async () => ({ kind: input.keys.shift()! }),
-}));
+const input = vi.hoisted((): { keys: KindOfKey[] } => ({ keys: [] }));
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/cli/terminal-input.js")>();
+  class ListedKeys extends actual.TerminalKeys {
+    // readKey below answers without reading the terminal.
+    static override async withRawMode<T>(
+      operation: (next: NextByte, more: MoreWithin) => Promise<T>,
+    ): Promise<T> {
+      return operation(
+        async () => undefined,
+        async () => false,
+      );
+    }
+
+    static override async readKey(): Promise<Key> {
+      return { kind: input.keys.shift()! };
+    }
+  }
+  return { ...actual, TerminalKeys: ListedKeys };
+});
 import { choose } from "../src/cli/terminal-choice.js";
 
 /** The hint below a list of entries with `digits`, as it is written to the screen. */

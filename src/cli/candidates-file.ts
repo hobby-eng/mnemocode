@@ -27,9 +27,14 @@ import { askSecretUntil } from "./ask.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { wipeAll } from "../core/bits.js";
 import { readBoundedTextFile } from "./text-file.js";
-import { discardRenamedOutput, preflightFileDestination } from "./output-paths.js";
+import { RenamedOutputs, preflightFileDestination } from "./output-paths.js";
 import { onPrivateScreen } from "./private-screen.js";
-import { printableText, terminalNotice } from "./terminal.js";
+import {
+  printableText,
+  terminalLastingWarning,
+  terminalNotice,
+  terminalSaved,
+} from "./terminal.js";
 import { saveOutput } from "./output-saving.js";
 import { counted } from "../core/search-plan.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -172,8 +177,8 @@ export class CandidatesFile {
    * so, and the numbered name it was given is not reported.
    */
   discard(): void {
-    discardRenamedOutput(this.#path);
-    terminalNotice("No list was saved; no file was written.", "warning");
+    RenamedOutputs.discard(this.#path);
+    terminalLastingWarning("No list was saved; no file was written.");
   }
 
   /**
@@ -209,8 +214,8 @@ export class CandidatesFile {
   async #save(made: Promise<ListOutcome>): Promise<Cancelled | undefined> {
     const outcome = await made;
     if (outcome.kind === "empty") {
-      discardRenamedOutput(this.#path);
-      terminalNotice(NO_CANDIDATE_TO_SAVE, "warning");
+      RenamedOutputs.discard(this.#path);
+      terminalLastingWarning(NO_CANDIDATE_TO_SAVE);
       return undefined;
     }
     // The searches refuse a list before this; here only a fault of MnemoCode would be refused.
@@ -220,8 +225,11 @@ export class CandidatesFile {
     // and the candidates stay on the screen (save-retry.ts).
     let saved: string | undefined | Cancelled;
     try {
-      saved = await saveOutput(this.#args, "candidates-file", "The candidate list", (path) =>
-        publishNewPrivateFile(path, list.bytes),
+      saved = await saveOutput(
+        this.#args,
+        "candidates-file",
+        { what: "The candidate list" },
+        (path) => publishNewPrivateFile(path, list.bytes),
       );
     } finally {
       // A list without encryption holds every candidate's entropy in the open; it is wiped once
@@ -229,15 +237,13 @@ export class CandidatesFile {
       list.bytes.fill(0);
     }
     if (saved === undefined || saved === CANCELLED) return saved;
-    terminalNotice(
+    terminalSaved(
       `Saved ${counted(list.records, "candidate phrase")}, ${list.description}: ${printableText(saved)} (record N is candidate N).`,
-      "success",
     );
-    terminalNotice(
+    terminalLastingWarning(
       list.encrypted
         ? "Delete the file once the wallet is found."
         : "This file holds real seed phrases in the open: keep it offline, and delete it once the wallet is found.",
-      "warning",
     );
     return undefined;
   }

@@ -45,10 +45,11 @@ import {
 } from "./ask.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
 import { onPrivateScreen } from "./private-screen.js";
+import { PrivateSteps } from "./private-steps.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import { choose, type Choice } from "./terminal-choice.js";
 import { allowedBy, askToSearch, type SearchAllowance } from "./search-consent.js";
-import { withCtrlCWatch, nodeTurn } from "./terminal-input.js";
+import { CtrlCWatch, nodeTurn } from "./terminal-input.js";
 import {
   printableText,
   ProgressLine,
@@ -69,7 +70,6 @@ import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.share-repair", {
-  "mend-shares-refused": suppliedMessage,
   "search-share-repair-refused": suppliedMessage,
   "one-share-at-a-time": () => "Give one share here, or a text file containing just that share.",
 });
@@ -201,23 +201,14 @@ export class TypedShares implements Disposable {
     this.wipe();
   }
 
+  /** The shares kept, each with the place it was typed at, in the order typed. */
   get list(): readonly TypedShare[] {
     return this.input.list;
   }
 
-  /** The texts, in the order typed, as the share functions take them. */
-  texts(): string[] {
-    return this.input.texts();
-  }
-
-  /** The place of each share, by its index in texts(). */
+  /** The place of each share, in the order typed, as the share functions take their texts. */
   places(): number[] {
     return this.input.places();
-  }
-
-  /** Whether an element of a share is marked with ? as unreadable. */
-  get marked(): boolean {
-    return this.input.marked;
   }
 
   /**
@@ -342,7 +333,7 @@ export class TypedShares implements Disposable {
         },
       );
       if (text === CANCELLED) return CANCELLED;
-      problem = this.input.readProblem(place, text);
+      problem = this.input.readProblem(place, text)?.message;
       if (problem === undefined) {
         this.input.replace(place, text);
         return undefined;
@@ -363,12 +354,12 @@ export class TypedShares implements Disposable {
       ] as const,
       { escape: "types it again" },
     );
-    if (choice === "out") this.leaveOut(place);
+    if (choice === "out") this.#leaveOut(place);
     return choice;
   }
 
   /** Leaves out the share at `place`; the others keep their places. */
-  leaveOut(place: number): void {
+  #leaveOut(place: number): void {
     this.input.leaveOut(place);
   }
 
@@ -399,7 +390,7 @@ export class TypedShares implements Disposable {
     const place = await this.#chosenPlace();
     if (place === undefined) return "back";
     if (place === CANCELLED) return CANCELLED;
-    this.leaveOut(place);
+    this.#leaveOut(place);
     return "changed";
   }
 
@@ -409,7 +400,7 @@ export class TypedShares implements Disposable {
    */
   async #retypeUnreadable(): Promise<Cancelled | undefined> {
     for (const share of this.list) {
-      const problem = this.input.readProblem(share.place, share.text);
+      const problem = this.input.readProblem(share.place, share.text)?.message;
       if (problem !== undefined && (await this.retype(share.place, problem)) === CANCELLED)
         return CANCELLED;
     }
@@ -432,7 +423,7 @@ export async function assessShares(
   shares: TypedShares,
 ): Promise<Exclude<SharesRead, { kind: "stopped" }> | Cancelled> {
   const { input } = shares;
-  const read = await SHARE_RESTORE.read(input, withCtrlCWatch, nodeTurn);
+  const read = await SHARE_RESTORE.read(input, CtrlCWatch.during, nodeTurn);
   try {
     printLines(read.lines);
     // The person stopped the assessment with Ctrl+C.
@@ -498,15 +489,15 @@ export async function askShareFix(
 
 /**
  * Mends a problem of the shares on the private screen, as ShareTrouble describes, after one
- * warning line; elsewhere the problem ends the command. "few" asks for more shares. CANCELLED
- * when the command is cancelled.
+ * warning line; elsewhere the problem ends the command, refused with the code of its condition
+ * (ShareInput.refusalOf). "few" asks for more shares. CANCELLED when the command is cancelled.
  */
 export async function mendShares(
   shares: TypedShares,
   trouble: ShareTrouble,
   interactive: boolean,
 ): Promise<Cancelled | undefined> {
-  if (!interactive) throw ERRORS.create("mend-shares-refused", [trouble.message]);
+  if (!interactive) throw ShareInput.refusalOf(trouble);
   if (trouble.kind === "unreadable") return shares.retype(trouble.place, trouble.message);
   terminalNotice(trouble.message, "warning");
   if (trouble.kind === "few") return shares.askMore();
@@ -557,12 +548,17 @@ export async function searchShareRepair(
       quit: "changes the shares",
     });
     if (start !== "yes") return start === "no" ? undefined : start;
-  } else if (decision.notice !== undefined) terminalNotice(decision.notice);
+  }
+  // The search is a step of its own: its screen shows the title and the search, no longer the
+  // shares typed or the question answered before it (CORE-39). A question said its time already.
+  PrivateSteps.begin();
+  if (decision.question === undefined && decision.notice !== undefined)
+    terminalNotice(decision.notice);
   const progress = new ProgressLine(SEARCH_PROGRESS_SECONDS);
   // Watched only now, after the question, which reads its own keys: Ctrl+C stops the search at
   // its next turn, which then ends as stopped.
   try {
-    const found = await withCtrlCWatch((signal) =>
+    const found = await CtrlCWatch.during((signal) =>
       SHARE_RESTORE.search(marked, {
         signal,
         turn: nodeTurn,

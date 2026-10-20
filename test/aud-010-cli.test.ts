@@ -4,7 +4,8 @@
 import { describe, expect, it } from "vitest";
 import { scanGapOf, walletEvidence } from "../src/cli/bitcoin-options.js";
 import { parseArguments } from "../src/cli/arguments.js";
-import { runSskrCombine, runSskrExport } from "../src/cli/sskr-command.js";
+import { runSskrExport } from "../src/cli/sskr-export-command.js";
+import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { runTable } from "../src/cli/table-command.js";
 
 const BIP84_ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";

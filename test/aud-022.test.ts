@@ -1,13 +1,13 @@
 // Regressions of the AUD-022 findings. Public test data only: the BIP39 test phrase, the published
 // vectors and synthetic bytes.
-import { execFile } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { PDFDocument } from "pdf-lib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderCards, separateCardJob, type CardJob } from "../src/export/render.js";
+import { selectTemplate } from "../src/export/templates.js";
+import { indexesToColors } from "../src/core/colors.js";
 import { CardPreview } from "../src/export/card-preview.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
@@ -29,13 +29,11 @@ import { repairCandidates } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { writeShare, type ShareFormat } from "../src/sskr/transport.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
-import { PublicCliFiles } from "./helpers/public-cli-files.js";
+import { runBuiltCli } from "./helpers/built-cli.js";
+import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
-const SHARE_SETS = (
-  JSON.parse(readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8")) as {
-    deterministic: { name: string; shares: string[] }[];
-  }
-).deterministic;
+const SHARE_SETS = sskrVectors().deterministic;
 
 /** The elements of `ur` as `format` writes them: Color Unicode as its four-digit codes. */
 function shareElements(ur: string, format: ShareFormat): string[] {
@@ -69,7 +67,8 @@ describe("AUD-022-ARC002: PNG admission has quick known answers that can fail", 
     const read = PngAdmission.read.bind(PngAdmission);
     vi.spyOn(PngAdmission, "read").mockImplementation((bytes) => {
       const admitted = read(bytes);
-      // An object made on the admitted result, which it differs from in one field.
+      // An object made on the admitted result, which it differs from in one field: no
+      // PngAdmission, fed on purpose so that the self-test refuses its budget.
       return Object.create(admitted, {
         filteredBytes: { value: admitted.filteredBytes + 1 },
       }) as typeof admitted;
@@ -189,46 +188,47 @@ describe("AUD-022-ARC001: the library words how a phrase was confirmed", () => {
 
 describe("AUD-022-FUN002: separate cards keep their own page", () => {
   it("drops a sheet plan's orientation and keeps the person's", () => {
-    const job = {
-      template: {},
-      content: { kind: "colors", orientation: "portrait" },
-    } as unknown as CardJob;
+    const colors = indexesToColors([...Array.from({ length: 11 }, () => 0), 3]);
+    const job: CardJob = {
+      template: selectTemplate("business-it"),
+      content: { kind: "colors", colors, payload: colors.join(" "), orientation: "portrait" },
+    };
     expect(separateCardJob(job, undefined).content).not.toHaveProperty("orientation");
     expect(separateCardJob(job, "landscape").content).toMatchObject({ orientation: "landscape" });
   });
 
-  it("saves 90 x 50 mm cards with encode --cards-dir for a 24-word phrase", async () => {
-    const folder = mkdtempSync(join(tmpdir(), "mnemocode-aud022-"));
-    try {
-      const phrase = `${"abandon ".repeat(23)}art`;
-      using material = new PublicCliFiles([
-        "encode",
-        "--mnemonic",
-        phrase,
-        "--mode",
-        "direct",
-        "--format",
-        "5",
-        "--template",
-        "business-it",
-        "--cards-dir",
-        join(folder, "cards"),
-      ]);
-      await promisify(execFile)(process.execPath, [
-        join(process.cwd(), "dist", "mnemocode.js"),
-        ...material.arguments,
-      ]);
-      const files = readdirSync(join(folder, "cards"));
-      expect(files.length).toBeGreaterThan(16);
-      const document = await PDFDocument.load(readFileSync(join(folder, "cards", files[0]!)));
-      const { width, height } = document.getPage(0).getSize();
-      // 90 x 50 mm in points.
-      expect(Math.round(width)).toBe(255);
-      expect(Math.round(height)).toBe(142);
-    } finally {
-      rmSync(folder, { recursive: true, force: true });
-    }
-  }, 120_000);
+  it(
+    "saves 90 x 50 mm cards with encode --cards-dir for a 24-word phrase",
+    async () => {
+      const folder = mkdtempSync(join(tmpdir(), "mnemocode-aud022-"));
+      try {
+        const phrase = `${"abandon ".repeat(23)}art`;
+        await runBuiltCli([
+          "encode",
+          "--mnemonic",
+          phrase,
+          "--mode",
+          "direct",
+          "--format",
+          "5",
+          "--template",
+          "business-it",
+          "--cards-dir",
+          join(folder, "cards"),
+        ]);
+        const files = readdirSync(join(folder, "cards"));
+        expect(files.length).toBeGreaterThan(16);
+        const document = await PDFDocument.load(readFileSync(join(folder, "cards", files[0]!)));
+        const { width, height } = document.getPage(0).getSize();
+        // 90 x 50 mm in points.
+        expect(Math.round(width)).toBe(255);
+        expect(Math.round(height)).toBe(142);
+      } finally {
+        rmSync(folder, { recursive: true, force: true });
+      }
+    },
+    LONG_TEST_TIME_LIMIT_MS,
+  );
 });
 
 describe("AUD-022-FUN004: card refusals come before any secret is asked", () => {
@@ -263,7 +263,7 @@ describe("AUD-022-FUN004: card refusals come before any secret is asked", () => 
         "never.pdf",
       ]),
     ).rejects.toThrow("too long to fit");
-  }, 60_000);
+  });
 
   it("refuses a material with too few samples for the longest share", async () => {
     await expect(
@@ -277,7 +277,7 @@ describe("AUD-022-FUN004: card refusals come before any secret is asked", () => 
         "never.pdf",
       ]),
     ).rejects.toThrow("distinct samples");
-  }, 60_000);
+  });
 
   it("refuses a material design at the business size, which makes separate cards", async () => {
     await expect(
@@ -310,7 +310,7 @@ describe("AUD-022-FUN004: card refusals come before any secret is asked", () => 
     await expect(
       ShareCardSet.assertPrintable(nodeCardRenderer, { style, shareFormat: "colors" }),
     ).resolves.toBeUndefined();
-  }, 60_000);
+  });
 
   it("prepares share cards that fit", async () => {
     await expect(
@@ -324,7 +324,7 @@ describe("AUD-022-FUN004: card refusals come before any secret is asked", () => 
         "never.pdf",
       ]),
     ).resolves.toBeTypeOf("function");
-  }, 60_000);
+  });
 });
 
 describe("AUD-022-FUN001: one share below its threshold with its first elements marked", () => {
@@ -336,43 +336,49 @@ describe("AUD-022-FUN001: one share below its threshold with its first elements 
   const apartBy = (elements: readonly string[], separator: string) =>
     elements.join(separator).replace(/#{2,}/gu, "#");
 
-  it("asks for more shares, and its repairs hold the share, in every form, length and separator", async () => {
-    for (const set of SHARE_SETS)
-      for (const ur of set.shares)
-        for (const format of FORMATS)
-          for (const marks of [1, 2, 3]) {
-            const elements = shareElements(ur, format).map((unit, at) => (at < marks ? "?" : unit));
-            const text = shareText(elements, format);
-            const label = `${set.name} ${format} ${marks}`;
-            // One reading that does not fit, such as a decoy prefix, no longer blames the set.
-            expect(await jointVerdict(text), label).toBe("not-enough");
-            // Three marked colors of 128 bits are refused: the checksum cannot tell them.
-            if (format === "colors" && marks === 3 && set.name.includes("-128-")) continue;
-            const found = repairCandidates(text).map((share) => share.ur);
-            expect(found, label).toContain(ur);
-            // Up to two marks, and three in Unicode codes and word numbers from 160 bits on, leave
-            // one share; three marks in colors hold the checksum and the header, and some bits
-            // stay open. Unicode codes of 128 bits also read as 15 colors run together.
-            const open =
-              marks === 3 &&
-              (format === "colors" ||
-                format === "colors-unicode" ||
-                (format === "unicode" && set.name.includes("-128-")));
-            if (!open) expect(found, label).toEqual([ur]);
-            // Commas, semicolons and # write the elements apart as spaces do, so they read the
-            // same; Color Unicode codes run together have no separator.
-            if (format === "colors-unicode") continue;
-            for (const separator of OTHER_SEPARATORS) {
-              const apart = apartBy(elements, separator);
-              const name = `${label} "${separator}"`;
-              expect(
-                repairCandidates(apart).map((share) => share.ur),
-                name,
-              ).toEqual(found);
-              expect(await jointVerdict(apart), name).toBe("not-enough");
+  it(
+    "asks for more shares, and its repairs hold the share, in every form, length and separator",
+    async () => {
+      for (const set of SHARE_SETS)
+        for (const ur of set.shares)
+          for (const format of FORMATS)
+            for (const marks of [1, 2, 3]) {
+              const elements = shareElements(ur, format).map((unit, at) =>
+                at < marks ? "?" : unit,
+              );
+              const text = shareText(elements, format);
+              const label = `${set.name} ${format} ${marks}`;
+              // One reading that does not fit, such as a decoy prefix, no longer blames the set.
+              expect(await jointVerdict(text), label).toBe("not-enough");
+              // Three marked colors of 128 bits are refused: the checksum cannot tell them.
+              if (format === "colors" && marks === 3 && set.name.includes("-128-")) continue;
+              const found = repairCandidates(text).map((share) => share.ur);
+              expect(found, label).toContain(ur);
+              // Up to two marks, and three in Unicode codes and word numbers from 160 bits on, leave
+              // one share; three marks in colors hold the checksum and the header, and some bits
+              // stay open. Unicode codes of 128 bits also read as 15 colors run together.
+              const open =
+                marks === 3 &&
+                (format === "colors" ||
+                  format === "colors-unicode" ||
+                  (format === "unicode" && set.name.includes("-128-")));
+              if (!open) expect(found, label).toEqual([ur]);
+              // Commas, semicolons and # write the elements apart as spaces do, so they read the
+              // same; Color Unicode codes run together have no separator.
+              if (format === "colors-unicode") continue;
+              for (const separator of OTHER_SEPARATORS) {
+                const apart = apartBy(elements, separator);
+                const name = `${label} "${separator}"`;
+                expect(
+                  repairCandidates(apart).map((share) => share.ur),
+                  name,
+                ).toEqual(found);
+                expect(await jointVerdict(apart), name).toBe("not-enough");
+              }
             }
-          }
-  }, 120_000);
+    },
+    LONG_TEST_TIME_LIMIT_MS,
+  );
 });
 
 describe("AUD-022-FUN003: a decoy card marked with ? after a share whose header is read", () => {

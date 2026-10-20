@@ -109,6 +109,8 @@ describe("bundled artwork", () => {
   });
 
   it("refuses a renderer without the host's platform", () => {
+    // No platform, then one without its QR modules: wrong types fed on purpose, as a JavaScript
+    // host could.
     expect(() => new CardRenderer(undefined as unknown as RenderPlatform)).toThrow(
       "Card rendering needs the host's RenderPlatform.",
     );

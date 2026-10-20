@@ -55,7 +55,7 @@ export type UniformChoice = (upperExclusive: number) => number;
  * QR codes.
  */
 export interface RenderPlatform {
-  /** Returns one bundled file named in `renderAssets`. */
+  /** Returns one bundled file named in `RENDER_ASSETS`. */
   readonly readAsset: (path: RenderAsset) => Promise<Uint8Array>;
   /** Uniform integer from 0 up to, but not including, the limit. */
   readonly randomInt: UniformChoice;
@@ -94,7 +94,7 @@ export type PngCodec = Pick<RenderPlatform, "decodePng" | "encodePng">;
  * deliberate allowlist, written out rather than derived from the designs so that this module
  * imports no renderer; test/render-platform.test.ts keeps it in step with the files.
  */
-export const renderAssets = [
+export const RENDER_ASSETS = [
   "fonts/DejaVuSans-UI.ttf",
   "images/business-architect-v1.png",
   "images/business-contact-v1.png",
@@ -109,15 +109,18 @@ export const renderAssets = [
   "images/material-tile.jpg",
   "images/material-vehicle.jpg",
 ] as const;
-/** A bundled file that a renderer may ask for (renderAssets). */
-export type RenderAsset = (typeof renderAssets)[number];
+/** A bundled file that a renderer may ask for (RENDER_ASSETS). */
+export type RenderAsset = (typeof RENDER_ASSETS)[number];
 
 /** Whether `path` is a bundled file that a renderer may ask for. */
 export function isRenderAsset(path: string): path is RenderAsset {
-  return isOneOf(renderAssets, path);
+  return isOneOf(RENDER_ASSETS, path);
 }
 
-/** The bundled file `path` from `source`, refused when it is none of renderAssets. */
+/**
+ * The bundled file `path` from `source`, refused when it is none of RENDER_ASSETS
+ * (export.platform.unknown-card-asset).
+ */
 export function readRenderAsset(source: AssetSource, path: string): Promise<Uint8Array> {
   if (!isRenderAsset(path)) throw ERRORS.create("unknown-card-asset", []);
   return source.readAsset(path);
@@ -141,7 +144,11 @@ export class BundledAssetCache<T> {
     this.#prepare = prepare;
   }
 
-  /** The file `path`, prepared; read once, and again after a failure. */
+  /**
+   * The file `path`, prepared; read once, and again after a failure. A read or a preparation that
+   * fails is refused with the file's name and the failure's text
+   * (export.platform.cannot-load-card-artwork).
+   */
   get(path: RenderAsset): Promise<T> {
     let entry = this.#entries.get(path);
     if (entry === undefined) {
@@ -168,7 +175,7 @@ export function pixelOffset(image: RasterImage, x: number, y: number): number {
 
 /**
  * A new image of `width` by `height` pixels, all transparent black; refuses a size that is not a
- * positive whole number of pixels.
+ * positive whole number of pixels (export.platform.image-dimensions-positive-integers).
  */
 export function createRasterImage(width: number, height: number): RasterImage {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1)
@@ -177,9 +184,10 @@ export function createRasterImage(width: number, height: number): RasterImage {
 }
 
 /**
- * The whole number below `limit` that `choose` gives, refused with `refusal` when it is none: a
- * host's source may give anything. Every random choice of the cards is checked through it, one
- * call of `choose` each, so that the order of the choices stays as it is made.
+ * The whole number below `limit` that `choose` gives, refused with `refusal` when it is none
+ * (export.platform.checked-choice-refused): a host's source may give anything. Every random choice
+ * of the cards is checked through it, one call of `choose` each, so that the order of the choices
+ * stays as it is made.
  */
 export function checkedChoice(choose: UniformChoice, limit: number, refusal: string): number {
   const index = choose(limit);
@@ -190,8 +198,9 @@ export function checkedChoice(choose: UniformChoice, limit: number, refusal: str
 
 /**
  * The element of `values` at the index that `choose` gives; refused when the index is not one of
- * them, so that a faulty choice never prints `undefined` on a card. The made-up identity and the
- * copy of a card are picked through it, one choice each, in the order they are made.
+ * them (export.platform.checked-choice-refused), so that a faulty choice never prints `undefined`
+ * on a card. The made-up identity and the copy of a card are picked through it, one choice each,
+ * in the order they are made.
  */
 export function pickWith<T>(values: readonly T[], choose: UniformChoice): T {
   return defined(

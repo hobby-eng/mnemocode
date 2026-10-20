@@ -1,27 +1,38 @@
 // AUD-014: the findings and recommendations of the command line, each with the public case that
 // showed it and a well-formed control. Public test data only: the BIP39 test phrase of the
-// vectors, synthetic file names and opaque public bytes in place of a rendered PDF.
+// vectors, synthetic file names, and opaque public bytes where the publisher of files is tested
+// alone.
 
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-/** What the stubbed renderer does before it hands back its bytes, such as a late collision. */
-const render = vi.hoisted(() => ({ before: undefined as (() => Promise<void>) | undefined }));
-/** The bytes the stubbed renderer gives: opaque public bytes, never a PDF. */
+/**
+ * What happens at the files' edge just before a finished export is linked to its name, such as
+ * another program taking that name: a late collision.
+ */
+const files = vi.hoisted(
+  (): { beforeLink: ((destination: string) => Promise<void>) | undefined } => ({
+    beforeLink: undefined,
+  }),
+);
+/** Opaque public bytes for the publisher of files, tested alone: never a PDF. */
 const RENDERED = "public generated-document fixture";
 
-// Only the expensive seams are stubbed: rendering, and the check that pdftocairo runs. Every
-// publication, claim and preflight is the real one.
-vi.mock("../src/export/render.js", async (original) => ({
-  ...(await original<typeof import("../src/export/render.js")>()),
-  renderCards: vi.fn(async () => {
-    await render.before?.();
-    return new TextEncoder().encode(RENDERED);
-  }),
-}));
+// The files are the program's edge: a link runs as it is, after what a case puts before it.
+vi.mock("node:fs/promises", async (original) => {
+  const real = await original<typeof import("node:fs/promises")>();
+  return {
+    ...real,
+    link: async (existing: string, destination: string) => {
+      await files.beforeLink?.(destination);
+      return real.link(existing, destination);
+    },
+  };
+});
+// The check that the external program pdftocairo runs is the other edge that is stubbed. Every
+// rendering, publication, claim and preflight is the real one.
 vi.mock("../src/export/image-export.js", async (original) => ({
   ...(await original<typeof import("../src/export/image-export.js")>()),
   assertImageRenderer: vi.fn(async () => undefined),
@@ -32,10 +43,9 @@ import { cloudServiceOf } from "../src/cli/cloud-folders.js";
 import { runCommandLine } from "../src/cli/command-line.js";
 import { runEncode } from "../src/cli/encode-command.js";
 import {
-  discardRenamedOutput,
   firstFreeName,
   preflightFileDestination,
-  settleOutputPaths,
+  RenamedOutputs,
 } from "../src/cli/output-paths.js";
 import { preflightOutputs } from "../src/cli/output-saving.js";
 import { runPreview } from "../src/cli/preview-command.js";
@@ -47,21 +57,18 @@ import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { selectTemplate } from "../src/export/templates.js";
 import { NewFolder, publishNewPrivateFile } from "../src/export/private-file.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
-
-const folders: string[] = [];
+import { TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
+import { testFolder } from "./helpers/test-folders.js";
 
 /** A new empty folder for one case, removed after it. */
-async function scratch(): Promise<string> {
-  const folder = await mkdtemp(join(tmpdir(), "mnemocode-aud014-cli-"));
-  folders.push(folder);
-  return folder;
+function scratch(): Promise<string> {
+  return testFolder("mnemocode-aud014-cli-");
 }
 
-afterEach(async () => {
-  render.before = undefined;
+afterEach(() => {
+  files.beforeLink = undefined;
   vi.restoreAllMocks();
   vi.mocked(assertImageRenderer).mockClear();
-  for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true });
 });
 
 /**
@@ -86,7 +93,7 @@ function protectedRun(argv: readonly string[], reads?: readonly string[]) {
       "src/mnemocode.ts",
       ...argv,
     ],
-    { encoding: "utf8", timeout: 60_000, env: { ...process.env, NO_COLOR: "1" } },
+    { encoding: "utf8", timeout: TEST_TIME_LIMIT_MS, env: { ...process.env, NO_COLOR: "1" } },
   );
 }
 
@@ -100,7 +107,7 @@ function swappedCase(path: string): string {
 /** The heading of /proc/swaps; the areas follow, one per line. */
 const SWAPS_HEADER = "Filename\tType\tSize\tUsed\tPriority\n";
 
-it("refuses invalid card settings through the real planner even when drawing is replaced", async () => {
+it("refuses invalid card settings through the real planner", async () => {
   const operation: unknown = Reflect.apply(plannedCardJob, undefined, [
     nodeCardRenderer,
     {
@@ -166,6 +173,7 @@ describe("AUD-014-API010: a valued --__proto__ is an ordinary unknown option", (
     const parsed = parseArguments(["--__proto__", "synthetic-value"]);
     expect(Object.keys(parsed)).toEqual(["__proto__"]);
     expect(parsed["__proto__"]).toBe("synthetic-value");
+    expect(Object.getPrototypeOf(parsed)).toBeNull();
     expect(Object.getPrototypeOf({})).toBe(Object.prototype);
     // No name is found among those that every object inherits.
     expect(parseArguments(["--word", "abandon"])["constructor"]).toBeUndefined();
@@ -206,9 +214,9 @@ describe("AUD-014-API011: numbering keeps a literal trailing backslash on POSIX"
       const folder = join(root, "public-pages\\");
       await mkdir(folder);
       const args: Record<string, string> = { "images-dir": folder };
-      await settleOutputPaths(args);
+      await RenamedOutputs.settle(args);
       expect(args["images-dir"]).toBe(`${folder}-1`);
-      discardRenamedOutput(args["images-dir"]!);
+      RenamedOutputs.discard(args["images-dir"]!);
       // A backslash in a folder name does not split it into a cloud folder.
       expect(
         cloudServiceOf("/home/test/notes\\Dropbox/cards.pdf", {}, "/home/test"),
@@ -221,9 +229,9 @@ describe("AUD-014-API011: numbering keeps a literal trailing backslash on POSIX"
     const folder = join(root, "public-pages");
     await mkdir(folder);
     const args: Record<string, string> = { "images-dir": `${folder}/` };
-    await settleOutputPaths(args);
+    await RenamedOutputs.settle(args);
     expect(args["images-dir"]).toBe(`${folder}-1`);
-    discardRenamedOutput(args["images-dir"]!);
+    RenamedOutputs.discard(args["images-dir"]!);
     expect(await firstFreeName(join(root, "absent.pdf"))).toBe(join(root, "absent.pdf"));
     expect(cloudServiceOf("/home/test/Dropbox/cards.pdf", {}, "/home/test")).toBe("Dropbox");
   });
@@ -233,11 +241,16 @@ describe("AUD-014-FUN003: a PDF is never saved over a name taken after the prefl
   /** The content of the file that took the name while the PDF was rendered. */
   const LATE = "public file created during rendering";
 
-  // These publisher controls need no fake card job; the CLI case below keeps real planning.
+  /** Takes `name` with the late file when the export is about to link its PDF there. */
+  async function lateFile(destination: string, name: string): Promise<void> {
+    if (destination === name) await writeFile(name, LATE);
+  }
+
+  // These controls test the publisher alone; the CLI case below renders real cards.
   it("refuses the name taken after the real preflight, keeping that file", async () => {
     const folder = await scratch();
     const path = join(folder, "public-output.bin");
-    await settleOutputPaths({ pdf: path });
+    await RenamedOutputs.settle({ pdf: path });
     await preflightFileDestination(path, false);
     await writeFile(path, LATE);
     await expect(
@@ -259,11 +272,11 @@ describe("AUD-014-FUN003: a PDF is never saved over a name taken after the prefl
   it("refuses it in Preview and in Encode, whose PDFs go the same way", async () => {
     const folder = await scratch();
     const preview = join(folder, "preview.pdf");
-    render.before = () => writeFile(preview, LATE);
+    files.beforeLink = (destination) => lateFile(destination, preview);
     await expect(runPreview({ pdf: preview })).rejects.toMatchObject({ code: "EEXIST" });
     expect(await readFile(preview, "utf8")).toBe(LATE);
     const encoded = join(folder, "encoded.pdf");
-    render.before = () => writeFile(encoded, LATE);
+    files.beforeLink = (destination) => lateFile(destination, encoded);
     await expect(
       runEncode({
         mnemonic: TEST_PHRASE,
@@ -303,7 +316,7 @@ describe("AUD-014 recommendation 27: the release script reports through describe
   it("loads its shared modules and reports a refusal in one line", () => {
     const run = spawnSync(process.execPath, ["scripts/sign-release.mjs", "--bogus"], {
       encoding: "utf8",
-      timeout: 30_000,
+      timeout: TEST_TIME_LIMIT_MS,
       env: { ...process.env, NO_COLOR: "1" },
     });
     expect(run.status).toBe(1);

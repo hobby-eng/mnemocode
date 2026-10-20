@@ -1,7 +1,7 @@
 # SSKR bridge
 
-MnemoCode's SSKR engine is the Rust source in `rust/src/lib.rs` and
-`rust/src/share_text.rs`. `Dockerfile.sskr` (`pnpm build:sskr`) builds it into the
+MnemoCode's SSKR engine is the Rust source in `rust/src/` (`lib.rs`,
+`share_text.rs`, `refusal.rs`). `Dockerfile.sskr` (`pnpm build:sskr`) builds it into the
 JavaScript/WASM adapter in `generated/`. The bridge was written for
 multi-chain-wallet-tools and taken from its revision `a0dad9e`; it is kept and
 built here now. Bridge package: `recovery-sskr-wasm` 0.1.9. The retained bridge

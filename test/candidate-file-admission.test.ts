@@ -8,6 +8,7 @@ import {
   encryptCandidatesWithPassphrase,
   listFileLock,
   NoProtection,
+  SessionIdentity,
 } from "../src/core/candidate-encryption.js";
 import {
   decodeCandidateList,
@@ -16,15 +17,16 @@ import {
 } from "../src/core/candidate-list.js";
 import { checkCandidateListStartup } from "../src/core/candidate-list-self-test.js";
 import { checkCandidateEncryptionQuick } from "../src/core/candidate-encryption-self-test.js";
-import { candidateVectors } from "./helpers/vectors.js";
+import { candidateVectors, hexBytes } from "./helpers/vectors.js";
 import { containing } from "./helpers/matchers.js";
 
 // Public fixtures independently opened with Python (vectors/candidates-v1.json).
 const vectors = candidateVectors();
-const bytesOf = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
-const ageFiles = vectors.age.open as { name: string; file: string }[];
-const keyFile = () => bytesOf(ageFiles.find((file) => !file.name.includes("passphrase"))!.file);
+const ageFiles = vectors.age.open;
+const keyFile = () => hexBytes(ageFiles.find((file) => !file.name.includes("passphrase"))!.file);
 const parameters = CandidateFileAdmission.parameters();
+/** The session identity of the public test key, for every test of this file. */
+const VECTOR_KEY = await SessionIdentity.fromText(vectors.age.identity);
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -72,7 +74,8 @@ describe("Candidate file admission", () => {
     async (size) => {
       const read = vi.fn();
       await expect(CandidateFileAdmission.inspect(size, read)).rejects.toMatchObject({
-        code: "unsupported",
+        code: "core.candidate-file-refusal.size-not-whole",
+        problem: "unsupported",
       });
       expect(read).not.toHaveBeenCalled();
     },
@@ -89,7 +92,7 @@ describe("Candidate file admission", () => {
   it.each(ageFiles)(
     "admits the small $name header without deriving a key",
     async ({ name, file }) => {
-      const bytes = bytesOf(file);
+      const bytes = hexBytes(file);
       const prefix = bytes.slice();
       const read = vi.fn(async () => prefix);
       const decrypt = vi.spyOn(Decrypter.prototype, "decrypt");
@@ -118,7 +121,10 @@ describe("Candidate file admission", () => {
     const prefix = new Uint8Array(file.byteLength + difference).fill(1);
     await expect(
       CandidateFileAdmission.inspect(file.byteLength, async () => prefix),
-    ).rejects.toMatchObject({ code: "damaged" });
+    ).rejects.toMatchObject({
+      code: "core.candidate-file-refusal.header-read-short",
+      problem: "damaged",
+    });
     expect(prefix.every((byte) => byte === 0)).toBe(true);
   });
 
@@ -144,15 +150,59 @@ describe("Candidate file admission", () => {
     expect(prefix.every((byte) => byte === 0)).toBe(true);
   });
 
-  it.each(vectors.age.refuse as { name: string; file: string }[])(
+  it.each(vectors.age.refuse)(
     "refuses the unsupported $name header without a key operation",
     async ({ file }) => {
-      const bytes = bytesOf(file);
+      const bytes = hexBytes(file);
       await expect(
         CandidateFileAdmission.inspect(bytes.byteLength, async () => bytes.slice()),
-      ).rejects.toMatchObject({ code: "unsupported" });
+      ).rejects.toMatchObject({ problem: "unsupported" });
     },
   );
+
+  it("gives each refused header its own code, also where two refusals share their words", () => {
+    const refusalOf = (run: () => unknown) => {
+      try {
+        run();
+      } catch (error) {
+        return error;
+      }
+      return undefined;
+    };
+    const codes = new Map([
+      ["the session key and a second key", "several-recipients"],
+      ["a post-quantum recipient", "recipient-unsupported"],
+      ["the scrypt work factor 16", "scrypt-work-factor-unsupported"],
+    ]);
+    for (const { name, file } of vectors.age.refuse)
+      expect([name, refusalOf(() => listFileLock(hexBytes(file)))]).toMatchObject([
+        name,
+        { code: `core.candidate-file-refusal.${codes.get(name)}`, problem: "unsupported" },
+      ]);
+    // A file to one key, given a passphrase: worded as the file to two keys is, coded apart.
+    const otherKey = refusalOf(() => CandidateFileAdmission.assertLock(keyFile(), "passphrase"));
+    expect(otherKey).toMatchObject({
+      code: "core.candidate-file-refusal.recipient-of-another-key",
+      problem: "unsupported",
+      message: "The candidate file must have exactly one scrypt recipient.",
+    });
+    expect(CandidateFileRefusedError.isRefusal(otherKey, ["recipient-of-another-key"])).toBe(true);
+    expect(CandidateFileRefusedError.isRefusal(otherKey, ["several-recipients"])).toBe(false);
+  });
+
+  it("gives a host that reads a file itself the refusal of a file changed while it was read", () => {
+    const changed = CandidateFileRefusedError.create("file-changed-while-read", []);
+    expect(changed).toBeInstanceOf(CandidateFileRefusedError);
+    expect(changed).toMatchObject({
+      name: "CandidateFileRefusedError",
+      code: "core.candidate-file-refusal.file-changed-while-read",
+      problem: "damaged",
+      message: "The candidate file changed or ended while it was being read.",
+    });
+    // The same code on another kind of error is no refusal of a candidate file.
+    const imitation = Object.assign(new Error(changed.message), { code: changed.code });
+    expect(CandidateFileRefusedError.isRefusal(imitation, ["file-changed-while-read"])).toBe(false);
+  });
 
   it.each(["stanza", "body", "MAC"])("refuses malformed %s before decryption", (part) => {
     const header = new TextDecoder("latin1").decode(keyFile()).split("\n").slice(0, 4);
@@ -165,8 +215,8 @@ describe("Candidate file admission", () => {
   });
 
   it("opens the independent X25519 fixture unchanged", async () => {
-    expect(await decryptCandidates(keyFile(), { identity: vectors.age.identity })).toEqual(
-      bytesOf(vectors.age.plaintext),
+    expect(await decryptCandidates(keyFile(), { identity: VECTOR_KEY })).toEqual(
+      hexBytes(vectors.age.plaintext),
     );
   });
 
@@ -175,12 +225,11 @@ describe("Candidate file admission", () => {
     async (length) => {
       const plain = new Uint8Array(length).fill(73);
       const encrypted = await encryptCandidates(plain, vectors.age.recipient);
-      expect(await decryptCandidates(encrypted, { identity: vectors.age.identity })).toEqual(plain);
+      expect(await decryptCandidates(encrypted, { identity: VECTOR_KEY })).toEqual(plain);
       encrypted[encrypted.length - 1]! ^= 1;
-      await expect(
-        decryptCandidates(encrypted, { identity: vectors.age.identity }),
-      ).rejects.toMatchObject({
-        code: "damaged",
+      await expect(decryptCandidates(encrypted, { identity: VECTOR_KEY })).rejects.toMatchObject({
+        code: "core.candidate-file-refusal.contents-damaged",
+        problem: "damaged",
       });
     },
   );
@@ -191,24 +240,34 @@ describe("Candidate file admission", () => {
     const bytes = announcedBytes(Uint8Array.of(1), parameters.plaintextBytes + 1);
     const encrypt = vi.spyOn(Encrypter.prototype, "encrypt");
     await expect(encryptCandidates(bytes, "invalid key")).rejects.toMatchObject({
-      code: "unsupported",
+      code: "core.candidate-file-refusal.plaintext-list-too-large",
+      problem: "unsupported",
     });
     await expect(
       encryptCandidatesWithPassphrase(bytes, "public test passphrase"),
     ).rejects.toMatchObject({
-      code: "unsupported",
+      code: "core.candidate-file-refusal.plaintext-list-too-large",
+      problem: "unsupported",
     });
     expect(() => new NoProtection().protect(bytes)).toThrow(CandidateFileRefusedError);
+    expect(encrypt).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty passphrase before any scrypt work", async () => {
+    const encrypt = vi.spyOn(Encrypter.prototype, "encrypt");
+    await expect(encryptCandidatesWithPassphrase(Uint8Array.of(1), "")).rejects.toMatchObject({
+      code: "core.candidate-encryption.passphrase-candidates-empty",
+      message: "The passphrase for the candidates is empty.",
+    });
     expect(encrypt).not.toHaveBeenCalled();
   });
 
   it("checks oversized buffered files before asking age to decrypt", async () => {
     const bytes = announcedBytes(keyFile(), parameters.encryptedBytes + 1);
     const decrypt = vi.spyOn(Decrypter.prototype, "decrypt");
-    await expect(
-      decryptCandidates(bytes, { identity: vectors.age.identity }),
-    ).rejects.toMatchObject({
-      code: "unsupported",
+    await expect(decryptCandidates(bytes, { identity: VECTOR_KEY })).rejects.toMatchObject({
+      code: "core.candidate-file-refusal.encrypted-file-too-large",
+      problem: "unsupported",
     });
     expect(decrypt).not.toHaveBeenCalled();
   });
@@ -233,9 +292,7 @@ describe("Candidate file admission", () => {
         { size: (size: number) => size },
       );
     });
-    expect(await decryptCandidates(bytes, { identity: vectors.age.identity })).toEqual(
-      new Uint8Array(),
-    );
+    expect(await decryptCandidates(bytes, { identity: VECTOR_KEY })).toEqual(new Uint8Array());
     expect(chunks.map((chunk) => chunk.byteLength)).toEqual([65_536, 9]);
     expect(chunks.every((chunk) => chunk.buffer === bytes.buffer)).toBe(true);
     expect(chunks[0]).toEqual(bytes.subarray(0, 65_536));
@@ -282,7 +339,8 @@ describe("Candidate file admission", () => {
       cancel,
     });
     await expect(CandidateFileAdmission.readPlaintext(stream)).rejects.toMatchObject({
-      code: "unsupported",
+      code: "core.candidate-file-refusal.plaintext-list-too-large",
+      problem: "unsupported",
       message: containing(`limit of ${parameters.plaintextBytes} bytes`),
     });
     expect(cancel).toHaveBeenCalledOnce();
@@ -316,10 +374,9 @@ describe("Candidate file admission", () => {
     vi.spyOn(Decrypter.prototype, "decrypt").mockResolvedValue(
       Object.assign(stream, { size: (size: number) => size }),
     );
-    await expect(
-      decryptCandidates(keyFile(), { identity: vectors.age.identity }),
-    ).rejects.toMatchObject({
-      code: "unsupported",
+    await expect(decryptCandidates(keyFile(), { identity: VECTOR_KEY })).rejects.toMatchObject({
+      code: "core.candidate-file-refusal.plaintext-list-too-large",
+      problem: "unsupported",
     });
     expect([...chunk]).toEqual([0]);
     expect(stream.locked).toBe(false);

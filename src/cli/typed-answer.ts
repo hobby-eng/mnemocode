@@ -1,6 +1,7 @@
 // An answer as readLine edits it (terminal-input.ts): its bytes in a buffer that is wiped, the
 // cursor, and for a visible answer what the terminal shows (ShownLine), which wraps a long answer
-// onto further rows, and the hint for the word being typed below it.
+// onto further rows, and the hint for the word being typed below it; and the refusal of an answer
+// that a question cannot use (UnusableAnswerError).
 
 import {
   characterSize,
@@ -8,13 +9,46 @@ import {
   placedAfter,
   terminalColumns,
 } from "./terminal-geometry.js";
-import { isContinuation, STRICT_UTF8 } from "./utf8.js";
+import { isContinuation, notUtf8Text, STRICT_UTF8 } from "./utf8.js";
 import { cursorDown, cursorUp, cursorRight, ERASE_BELOW } from "./terminal.js";
 import type { WordHint, WordHints } from "../core/word-hints.js";
 import { hintRows } from "./typed-hints.js";
 import { defined } from "../core/defined.js";
-import { KEY, UnusableAnswerError } from "./terminal-keys.js";
+import { KEY } from "./terminal-keys.js";
 import { type EditKey } from "./key-sequences.js";
+
+/** Why an answer is refused that holds bytes of no UTF-8 character. */
+export const NOT_UTF8 = notUtf8Text("The answer");
+
+/**
+ * The codes of the errors of terminal input, one for each reason that a question cannot use an
+ * answer: longer than its limit, or not UTF-8 text.
+ */
+export type TerminalInputErrorCode = "answer-too-long" | "answer-not-utf8";
+
+/**
+ * Thrown for an answer that no question can use, as it is typed (insert) or read (text). The
+ * message is built here from the code, and says why without repeating the answer.
+ */
+export class UnusableAnswerError extends Error {
+  /** Stable code of the reason: answer-too-long or answer-not-utf8. */
+  readonly code: TerminalInputErrorCode;
+
+  /** The refusal for `reason`; `limit` is the longest answer the question reads, in bytes. */
+  constructor(
+    reason:
+      | { readonly code: "answer-too-long"; readonly limit: number }
+      | { readonly code: "answer-not-utf8" },
+  ) {
+    super(
+      reason.code === "answer-too-long"
+        ? `An answer is longer than ${reason.limit} bytes; no valid answer is that long.`
+        : NOT_UTF8,
+    );
+    this.code = reason.code;
+    this.name = "UnusableAnswerError";
+  }
+}
 
 /**
  * The words that a hint is given: the word being typed and three before it, enough to tell the
@@ -78,9 +112,7 @@ export class TypedAnswer {
 
   insert(byte: number): void {
     if (this.#length === this.#limit)
-      throw new UnusableAnswerError(
-        `An answer is longer than ${this.#limit} bytes; no valid answer is that long.`,
-      );
+      throw new UnusableAnswerError({ code: "answer-too-long", limit: this.#limit });
     this.#line.copyWithin(this.#cursor + 1, this.#cursor, this.#length);
     this.#line[this.#cursor++] = byte;
     this.#length += 1;
@@ -90,7 +122,7 @@ export class TypedAnswer {
       this.#shown.update(this.#length, this.#cursor, this.#cursor === this.#length);
   }
 
-  remove(from: number, to: number): void {
+  #remove(from: number, to: number): void {
     this.#line.copyWithin(from, to, this.#length);
     this.#length -= to - from;
     this.#line.fill(0, this.#length, this.#length + (to - from));
@@ -99,7 +131,7 @@ export class TypedAnswer {
     this.#shown?.update(this.#length, this.#cursor);
   }
 
-  moveTo(position: number): void {
+  #moveTo(position: number): void {
     this.#cursor = position;
     this.#hintDue = this.#hints !== undefined;
     this.#shown?.update(this.#length, this.#cursor);
@@ -107,7 +139,7 @@ export class TypedAnswer {
 
   /** As End would; nothing is drawn when the cursor is there already. */
   moveToEnd(): void {
-    if (this.#cursor !== this.#length) this.moveTo(this.#length);
+    if (this.#cursor !== this.#length) this.#moveTo(this.#length);
     this.#shown?.settleMarks();
   }
 
@@ -115,14 +147,14 @@ export class TypedAnswer {
   edit(key: EditKey): void {
     const line = this.#line;
     const [cursor, length] = [this.#cursor, this.#length];
-    if (key === "left" && cursor > 0) this.moveTo(previousCharacter(line, cursor));
-    else if (key === "right" && cursor < length) this.moveTo(nextCharacter(line, cursor, length));
-    else if (key === "word-left") this.moveTo(previousWord(line, cursor));
-    else if (key === "word-right") this.moveTo(nextWord(line, cursor, length));
-    else if (key === "home") this.moveTo(0);
-    else if (key === "end") this.moveTo(length);
+    if (key === "left" && cursor > 0) this.#moveTo(previousCharacter(line, cursor));
+    else if (key === "right" && cursor < length) this.#moveTo(nextCharacter(line, cursor, length));
+    else if (key === "word-left") this.#moveTo(previousWord(line, cursor));
+    else if (key === "word-right") this.#moveTo(nextWord(line, cursor, length));
+    else if (key === "home") this.#moveTo(0);
+    else if (key === "end") this.#moveTo(length);
     else if (key === "delete" && cursor < length)
-      this.remove(cursor, nextCharacter(line, cursor, length));
+      this.#remove(cursor, nextCharacter(line, cursor, length));
   }
 
   /** Edits with a control key that deletes or moves: whether `byte` was one. */
@@ -130,15 +162,15 @@ export class TypedAnswer {
     const line = this.#line;
     const [cursor, length] = [this.#cursor, this.#length];
     if (byte === KEY.BACKSPACE || byte === KEY.DELETE) {
-      if (cursor > 0) this.remove(previousCharacter(line, cursor), cursor);
+      if (cursor > 0) this.#remove(previousCharacter(line, cursor), cursor);
     } else if (byte === KEY.CTRL_U) {
-      if (cursor > 0) this.remove(0, cursor);
-    } else if (byte === KEY.CTRL_A) this.moveTo(0);
-    else if (byte === KEY.CTRL_E) this.moveTo(length);
+      if (cursor > 0) this.#remove(0, cursor);
+    } else if (byte === KEY.CTRL_A) this.#moveTo(0);
+    else if (byte === KEY.CTRL_E) this.#moveTo(length);
     else if (byte === KEY.CTRL_K) {
-      if (cursor < length) this.remove(cursor, length);
+      if (cursor < length) this.#remove(cursor, length);
     } else if (byte === KEY.CTRL_W) {
-      if (cursor > 0) this.remove(previousWord(line, cursor), cursor);
+      if (cursor > 0) this.#remove(previousWord(line, cursor), cursor);
     } else return false;
     return true;
   }
@@ -171,7 +203,7 @@ export class TypedAnswer {
     for (let at = 0; at < letters.length; at += 1) this.insert(letters.charCodeAt(at));
     if (!wordEnds) return;
     if (this.#cursor < this.#length && this.#line[this.#cursor] === KEY.SPACE)
-      this.moveTo(this.#cursor + 1);
+      this.#moveTo(this.#cursor + 1);
     else this.insert(KEY.SPACE);
   }
 
@@ -188,9 +220,16 @@ export class TypedAnswer {
     this.#hintDue = false;
   }
 
-  /** The answer as text; a TypeError when it holds bytes of no UTF-8 character. */
+  /** The answer as text; refused (answer-not-utf8) when it holds bytes of no UTF-8 character. */
   text(): string {
-    return STRICT_UTF8.decode(this.#line.subarray(0, this.#length));
+    try {
+      return STRICT_UTF8.decode(this.#line.subarray(0, this.#length));
+    } catch (error) {
+      // The decoder refuses bytes that are not UTF-8 with a TypeError of its own; any other
+      // failure is passed on as it is.
+      if (error instanceof TypeError) throw new UnusableAnswerError({ code: "answer-not-utf8" });
+      throw error;
+    }
   }
 
   /** Clears the hint and wipes the answer. */

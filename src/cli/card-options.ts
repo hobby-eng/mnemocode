@@ -1,4 +1,4 @@
-import { businessOptionNames, businessOptions } from "./business-options.js";
+import { BUSINESS_OPTION_NAMES, businessOptions } from "./business-options.js";
 import { selectTemplate, type CardTemplate } from "../export/templates.js";
 import { NoCardTemplateError } from "../export/template-catalog.js";
 import { type CardKind, type EncodedFormat } from "../core/types.js";
@@ -6,7 +6,7 @@ import { type CardKind, type EncodedFormat } from "../core/types.js";
 import { value, type ParsedArguments } from "./arguments.js";
 import { CARD_FORMAT_NUMBERS, noCardTemplateMessage } from "./format-numbers.js";
 import { EncodedForm } from "../core/encoded-form.js";
-import { assertIndividualTemplate } from "../export/render.js";
+import { assertIndividualTemplate, type CardOutputs } from "../export/render.js";
 import { isCardPageSize, parsePageSize } from "../export/card-settings.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 
@@ -18,12 +18,6 @@ const ERRORS = new ErrorCatalog("cli.card-options", {
   "card-export-requires-format": (value0: string) => `Card export requires format ${value0}.`,
   "card-template-refused": suppliedMessage,
 });
-
-/** The card outputs that the options name: sheets (a PDF or page images), and separate cards. */
-export interface CardOutputs {
-  readonly sheets: boolean;
-  readonly cards: boolean;
-}
 
 /** Which card outputs the options name. */
 export function cardOutputs(args: ParsedArguments): CardOutputs {
@@ -49,7 +43,7 @@ export function assertCardOutput(args: ParsedArguments, settings: readonly strin
 }
 
 /** Encode's card settings, which a card output must use (assertCardOutput). */
-export const ENCODE_CARD_SETTINGS = ["template", "title", ...businessOptionNames] as const;
+export const ENCODE_CARD_SETTINGS = ["template", "title", ...BUSINESS_OPTION_NAMES] as const;
 
 /** Refuses card options that cannot draw cards of codes in `format`, before a secret is asked. */
 export function validateCardOptions(args: ParsedArguments, format: EncodedFormat): void {

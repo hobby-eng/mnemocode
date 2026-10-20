@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import {
   PDFArray,
   PDFDocument,
@@ -34,8 +33,9 @@ import { renderIndividualCards } from "../src/export/render.js";
 import { SSKR_CARD_LAYOUTS } from "../src/export/sskr-content.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import type { CardStyle } from "../src/export/template-catalog.js";
-import { cardTemplates, type CardTemplate } from "../src/export/templates.js";
+import { CARD_TEMPLATES, type CardTemplate } from "../src/export/templates.js";
 import { SHARE_FORMATS, shareFormatHasCards } from "../src/sskr/transport.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 // The reader of card PDFs that a host without Poppler, such as a browser page, paints cards with
 // (export/card-drawing.ts). Every renderer family draws public sample cards through the Node.js
@@ -45,10 +45,7 @@ import { SHARE_FORMATS, shareFormatHasCards } from "../src/sskr/transport.js";
 // renderers). Synthetic and public test data only: the random sample phrase of CardPreview, masked
 // with public dates, and the public SSKR vectors.
 
-const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-  readonly deterministic: readonly { readonly shares: readonly string[] }[];
-};
-const SHARES = vectors.deterministic[0]!.shares;
+const SHARES: readonly string[] = sskrVectors().deterministic[0]!.shares;
 /**
  * The limit of each test here, above the one of vitest.config.ts: each renders and reads the cards
  * of every design or family, which takes minutes on a loaded machine or a hosted CI runner.
@@ -59,9 +56,9 @@ const steps = (page: CardPageDrawing, kind: DrawingStep["do"]) =>
   page.steps.filter((step) => step.do === kind);
 
 /** The first installed design of every family, in the order of the catalog. */
-const FAMILY_DESIGNS: readonly CardTemplate[] = cardTemplates.filter(
+const FAMILY_DESIGNS: readonly CardTemplate[] = CARD_TEMPLATES.filter(
   (template, index) =>
-    cardTemplates.findIndex((other) => other.family === template.family) === index,
+    CARD_TEMPLATES.findIndex((other) => other.family === template.family) === index,
 );
 
 function styleOf(template: CardTemplate): CardStyle {
@@ -91,7 +88,7 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
     async () => {
       const pdf = await new CardPreview(nodeCardRenderer).renderAll();
       const reader = await CardPdfReader.load(pdf);
-      expect(reader.pageCount).toBe(cardTemplates.length);
+      expect(reader.pageCount).toBe(CARD_TEMPLATES.length);
       await expectCardPages(pdf, "every design");
     },
     DRAWING_TIME_LIMIT_MS,

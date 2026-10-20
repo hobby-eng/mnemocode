@@ -11,16 +11,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParsedArguments } from "../src/cli/arguments.js";
-import { runSskrCombine } from "../src/cli/sskr-command.js";
+import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { runSskrExport } from "../src/cli/sskr-export-command.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
-import { unrepairedShare } from "../src/sskr/repair.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { ShareRestore, variantsMessage } from "../src/sskr/share-restore.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
-import { markUnits } from "./helpers/shares.js";
+import { markUnits, testPhraseSet } from "./helpers/shares.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
@@ -34,27 +33,25 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
   harness.replacedTerminalChoice(await importOriginal()),
 );
-const collision = vi.hoisted(() => ({ on: false }));
-vi.mock("../src/bitcoin-evidence.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/bitcoin-evidence.js")>();
+// The host's PBKDF2, the seed function of the wallet check (src/bitcoin-evidence.ts): where
+// `collision.phrase` is set, it gives every phrase the seed of that one, so that a fingerprint of
+// that phrase matches every phrase, as a fingerprint of 32 bits lets several phrases match. The
+// check itself runs as it is, with what it says of each match.
+const collision = vi.hoisted((): { phrase: string | undefined } => ({ phrase: undefined }));
+vi.mock("node:crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:crypto")>();
   return {
     ...actual,
-    // With `collision.on`, a wallet that every phrase matches, as a fingerprint of 32 bits lets
-    // several phrases do; each match keeps what the real check says of it.
-    walletCheckOf: (...given: Parameters<typeof actual.walletCheckOf>) => {
-      const check = actual.walletCheckOf(...given);
-      if (!collision.on || check === undefined) return check;
-      return Object.assign((mnemonic: string) => ({ ...check(mnemonic), matched: true }), {
-        wipe: check.wipe,
-        [Symbol.dispose]: check.wipe,
-      });
+    pbkdf2Sync: (...derive: Parameters<typeof actual.pbkdf2Sync>) => {
+      const [password, ...rest] = derive;
+      return actual.pbkdf2Sync(collision.phrase ?? password, ...rest);
     },
   };
 });
 
 /**
  * The master fingerprint and the first receiving BIP84 address (m/84'/0'/0'/0/0) of the phrase of
- * sskrSetVector, computed with an independent Python implementation of BIP39, BIP32 and BIP84
+ * SSKR_SET_VECTOR, computed with an independent Python implementation of BIP39, BIP32 and BIP84
  * that first reproduces the published BIP84 vector of "abandon … about".
  */
 const SET_FINGERPRINT = "05d027a5";
@@ -81,7 +78,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  collision.on = false;
+  collision.phrase = undefined;
   await rm(directory, { recursive: true, force: true });
 });
 
@@ -109,22 +106,22 @@ function phrasePlaces(): number[] {
 
 describe("sskr-combine with a wallet", () => {
   it("says once, after the phrase, that the fingerprint that matched it is only a filter", async () => {
-    await combine(sskrSetVector.shares, { "master-fingerprint": SET_FINGERPRINT });
-    expect(seen.out).toContain(sskrSetVector.phrase);
+    await combine(SSKR_SET_VECTOR.shares, { "master-fingerprint": SET_FINGERPRINT });
+    expect(seen.out).toContain(SSKR_SET_VECTOR.phrase);
     expect(warningPlaces()).toHaveLength(1);
     expect(warningPlaces()[0]).toBeGreaterThan(Math.max(...phrasePlaces()));
   });
 
   it("says nothing of a filter where an address matched", async () => {
-    await combine(sskrSetVector.shares, { "bitcoin-address": SET_ADDRESS });
-    expect(seen.out).toContain(sskrSetVector.phrase);
+    await combine(SSKR_SET_VECTOR.shares, { "bitcoin-address": SET_ADDRESS });
+    expect(seen.out).toContain(SSKR_SET_VECTOR.phrase);
     expect(warningPlaces()).toEqual([]);
   });
 
   it("says it once, after all the phrases that a fingerprint matched", async () => {
     const masked = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]).shiftedEnglish.join(" ");
     const shares = await splitSskrMnemonic(masked, 2, 3);
-    collision.on = true;
+    collision.phrase = TEST_PHRASE;
     // Every date of the search gives a phrase that the fingerprint matches, each on a screen of
     // its own, the next on Enter.
     terminal.answers = [
@@ -135,7 +132,8 @@ describe("sskr-combine with a wallet", () => {
     ];
     terminal.choices = ["fingerprint"];
     await runSskrCombine({ "ask-secrets": true, mode: "seedshift" });
-    expect(phrasePlaces().length).toBeGreaterThan(1);
+    // Each of the ten dates gave a phrase that the fingerprint matched.
+    expect(seen.out.filter((line) => line.startsWith("Original seed phrase"))).toHaveLength(10);
     expect(warningPlaces()).toHaveLength(1);
     expect(warningPlaces()[0]).toBeGreaterThan(Math.max(...phrasePlaces()));
   });
@@ -145,7 +143,7 @@ describe("sskr-export with a wallet", () => {
   /** Exports `shares` from a share file to a file of their own, with `options`. */
   async function exportShares(
     options: ParsedArguments,
-    shares: readonly string[] = sskrSetVector.shares,
+    shares: readonly string[] = SSKR_SET_VECTOR.shares,
   ): Promise<string> {
     terminal.privateScreen = false;
     const path = join(directory, "shares.txt");
@@ -158,7 +156,7 @@ describe("sskr-export with a wallet", () => {
   it("says once, after the shares are saved, that the fingerprint that chose them is a filter", async () => {
     const output = await exportShares({ "master-fingerprint": SET_FINGERPRINT });
     expect((await readFile(output, "utf8")).trim().split("\n")).toHaveLength(
-      sskrSetVector.shares.length,
+      SSKR_SET_VECTOR.shares.length,
     );
     expect(warningPlaces()).toHaveLength(1);
     expect(warningPlaces()[0]).toBe(printed.length - 1);
@@ -173,14 +171,13 @@ describe("sskr-export with a wallet", () => {
     // A second set beside the one that the repair of the marked share finds: public shares of the
     // test phrase. No two sets of real shares pass both the CRC-32 and the digest, so the step is
     // given a second, which the fingerprint matches too, as 32 bits let a wrong set do.
-    const others = (await splitSskrMnemonic(TEST_PHRASE, 2, 3)).slice(0, 2);
-    const other = { mnemonic: TEST_PHRASE, shares: others.map(unrepairedShare), unsettled: [] };
+    const other = await testPhraseSet();
     const phrases = ShareRestore.phrases.bind(ShareRestore);
     vi.spyOn(ShareRestore, "phrases").mockImplementation(async (unmasking, sets, places, run) =>
       phrases(unmasking, [...sets, other], places, run),
     );
-    collision.on = true;
-    const [first, second] = sskrSetVector.shares;
+    collision.phrase = SSKR_SET_VECTOR.phrase;
+    const [first, second] = SSKR_SET_VECTOR.shares;
     const output = await exportShares({ "master-fingerprint": SET_FINGERPRINT }, [
       String(first),
       markUnits(String(second), "colors", [5]),

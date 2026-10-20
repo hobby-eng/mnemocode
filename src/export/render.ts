@@ -2,7 +2,6 @@ import { ExportDetails } from "./export-details.js";
 import { checkedCardPresentation } from "./card-copy.js";
 import {
   assertPageSettings,
-  assertSheetQr,
   isCardPageSize,
   assertSeparateCardSize,
   SHEET_PAGE_SIZE,
@@ -14,6 +13,7 @@ import type { CardDrawing, CardTemplate } from "./templates.js";
 import { separateCardName } from "./card-codes.js";
 import { joinedDocuments, savedWithoutMetadata, type NamedDocument } from "./pdf-documents.js";
 import { assertColorCardContent, EMPTY_CARD_COLLECTION } from "./card-content.js";
+import { assertSheetQr } from "./content-kinds.js";
 import { withPlannedDecoys } from "./card-plan.js";
 import { keptIndividualCards } from "./card-decoys.js";
 import { SHEETS_ONLY, sheetsOnly } from "./template-catalog.js";
@@ -49,6 +49,14 @@ export interface CardJob {
 /** A separate card, named by its position and the reference it prints. */
 export type RenderedCard = NamedDocument;
 
+/** The card outputs of a save: sheets (renderCards) and separate cards (renderIndividualCards). */
+export interface CardOutputs {
+  /** Sheets of cards, in a PDF or as page images. */
+  readonly sheets: boolean;
+  /** Separate cards, one file for each card. */
+  readonly cards: boolean;
+}
+
 /**
  * `content` with the decoys that `template` plans for it (withPlannedDecoys): for `separate`
  * cards, or for its sheet. A design that a host made without a sheet shape adds none.
@@ -67,7 +75,10 @@ function plannedContent(
 /**
  * `job` with the decoys that its template plans (plannedContent): for separate cards where its
  * page has a card size. A host that saves one export in several files, such as a PDF and its page
- * images, plans it once and passes it to each, so that every file shows the same cards.
+ * images, plans it once and passes it to each, so that every file shows the same cards. Refuses a
+ * page size or an orientation of none (export.card-settings.page-size,
+ * export.card-settings.orientation), and what withPlannedDecoys refuses, such as cards that no
+ * sheet holds (export.collection-layout.no-room).
  */
 export async function plannedCardJob(drawing: CardDrawing, job: CardJob): Promise<CardJob> {
   assertPageSettings(job.content);
@@ -91,7 +102,7 @@ export class PlannedCards extends Redacted implements Disposable {
     this.#content = content;
   }
 
-  /** The cards of `job`, planned with the services of `drawing`. */
+  /** The cards of `job`, planned with the services of `drawing`; refused as plannedCardJob is. */
   static async plan(drawing: CardDrawing, job: CardJob): Promise<PlannedCards> {
     const planned = await plannedCardJob(drawing, job);
     return new PlannedCards(planned.template, new OwnedCardContent(planned.content));
@@ -116,7 +127,8 @@ export class PlannedCards extends Redacted implements Disposable {
 /**
  * `job`, planned for a sheet (plannedCardJob), as separate cards draw it: every real code and one
  * decoy kept, its orientation the one the person gave, never the one the sheet plan chose, which turns a
- * sheet, not the page of one card (AUD-022-FUN002).
+ * sheet, not the page of one card (AUD-022-FUN002). Refuses a count of decoys that is no whole
+ * number below the cards (export.card-decoys.decoy-cards-whole-number-fewer-than-cards).
  */
 export function separateCardJob(job: CardJob, orientation: CardOrientation | undefined): CardJob {
   const { orientation: _planned, ...content } = job.content;
@@ -128,7 +140,15 @@ export function separateCardJob(job: CardJob, orientation: CardOrientation | und
 /**
  * Preview and encode share this path; no simplified preview renderer exists.
  * A sheet size gives one page per template. A card size gives one page per card. Every card is
- * drawn with `drawing`, the host's CardRenderer.
+ * drawn with `drawing`, the host's CardRenderer. Refuses no job at all
+ * (export.render.no-cards-to-render); before any choice is made, a page setting that no card family
+ * prints (assertPageSettings) and a design without separate cards for colour cards of a card size
+ * (export.render.assert-individual-template-refused); a design of another kind than its content
+ * (export.render.template-does-not-support); a QR code on separate cards
+ * (export.content-kinds.qr-code-printed-on-sheet-only-choose-size); texts of the design that
+ * checkedCardPresentation refuses; and a design that draws no page
+ * (export.render.template-rendered-empty-document). What a design refuses passes on, such as
+ * content that assertColorCardContent refuses.
  */
 export async function renderCards(
   drawing: CardDrawing,
@@ -194,8 +214,8 @@ const NO_INDIVIDUAL_CARDS = "Only color codes are drawn as individual business c
 
 /**
  * Refuses a template that draws no separate cards, such as a design printed on sheets only
- * (SHEETS_ONLY): also before any content exists. `named`: the design is one of several drawn
- * together, and the refusal names it.
+ * (SHEETS_ONLY; export.render.assert-individual-template-refused): also before any content exists.
+ * `named`: the design is one of several drawn together, and the refusal names it.
  */
 export function assertIndividualTemplate(template: CardTemplate, named = false): void {
   if (!template.renderIndividual)
@@ -205,11 +225,14 @@ export function assertIndividualTemplate(template: CardTemplate, named = false):
 }
 
 /**
- * Refuses what cannot be drawn as separate cards: content that is no colors, or whose colors are
- * not the backup that its QR code holds (assertColorCardContent), a template without separate
- * cards, no card at all, a page setting that no card family prints, or a sheet size. The export
- * of a folder of cards checks it before any file is touched, and the drawing of the cards again
- * (AUD-012-ARC007).
+ * Refuses what cannot be drawn as separate cards: a template without separate cards
+ * (export.render.assert-individual-template-refused), content that is no colors
+ * (export.render.no-individual-cards), no card at all (export.render.empty-card-collection),
+ * colors that are not the backup that its QR code holds (assertColorCardContent), a page setting
+ * that no card family prints (export.card-settings.page-size, export.card-settings.orientation),
+ * or a sheet size (export.card-settings.separate-cards-business-size-choose-business-size-leave).
+ * The export of a folder of cards checks it before any file is touched, and the drawing of the
+ * cards again (AUD-012-ARC007).
  */
 export function assertIndividualCards(template: CardTemplate, content: CardContent): void {
   assertIndividualTemplate(template);
@@ -220,7 +243,11 @@ export function assertIndividualCards(template: CardTemplate, content: CardConte
   assertSeparateCardSize(content.pageSize);
 }
 
-/** One document per card, all sharing one identity, drawn with `drawing`. */
+/**
+ * One document per card, all sharing one identity, drawn with `drawing`. Refuses what
+ * assertIndividualCards refuses, before any choice is made; what the design refuses passes on,
+ * and so does a card name that ExportFileName refuses (export.file-name.invalid-component).
+ */
 export async function renderIndividualCards(
   drawing: CardDrawing,
   template: CardTemplate,

@@ -12,7 +12,7 @@
 
 import { expectRefused, expectRefusedLater, expectSame } from "../core/self-test-check.js";
 import { JointRepair, searchOnce } from "./joint-repair.js";
-import { sskrSetVector, sskrVector } from "./known-answers.js";
+import { SSKR_SET_VECTOR, SSKR_VECTOR } from "./known-answers.js";
 import {
   MAX_LISTED_FREE_BITS,
   MAX_MARKED_ELEMENTS,
@@ -33,15 +33,15 @@ const ERRORS = new ErrorCatalog("sskr.repair-self-test", {
 });
 
 /** The first share of the official vector in colors, Unicode codes and word numbers. */
-const OFFICIAL_COLORS = sskrVector.firstShareColors.join(" ");
+const OFFICIAL_COLORS = SSKR_VECTOR.firstShareColors.join(" ");
 /** The same share's colors as Color Unicode codes, four digits each (core/colors.ts). */
 const OFFICIAL_COLOR_CODES = textPieces(
-  colorsToUnicode(sskrVector.firstShareColors),
+  colorsToUnicode(SSKR_VECTOR.firstShareColors),
   UNICODE_CODE_DIGITS,
 );
-const OFFICIAL_UNICODE = sskrVector.firstShareUnicode;
-const OFFICIAL_NUMBERS = sskrVector.firstShareNumbers;
-const { shares: SET_SHARES, colors: SET_COLORS, phrase: SET_PHRASE } = sskrSetVector;
+const OFFICIAL_UNICODE = SSKR_VECTOR.firstShareUnicode;
+const OFFICIAL_NUMBERS = SSKR_VECTOR.firstShareNumbers;
+const { shares: SET_SHARES, colors: SET_COLORS, phrase: SET_PHRASE } = SSKR_SET_VECTOR;
 
 /** `text` with the element written `element` marked as `mark`. */
 function marked(text: string, element: string, mark = "?"): string {
@@ -73,7 +73,7 @@ function checkRepair(text: string, ur: string, filled: string, name: string): vo
  */
 export function checkShareRepairStartup(): void {
   expectRefused(
-    () => repairCandidates(sskrVector.shares[0], MAX_LISTED_FREE_BITS + 1),
+    () => repairCandidates(SSKR_VECTOR.shares[0], MAX_LISTED_FREE_BITS + 1),
     /freeBits must be a whole number/u,
     "An excessive single-share listing budget",
   );
@@ -83,7 +83,7 @@ export function checkShareRepairStartup(): void {
     "6:#1F9121",
     "Marked share before a trailing decoy",
   );
-  const official = sskrVector.shares[0];
+  const official = SSKR_VECTOR.shares[0];
   checkRepair(
     marked(marked(OFFICIAL_COLORS, "#EE44D3"), "#E75FF8", "#E7?FF?"),
     official,
@@ -109,7 +109,9 @@ export function checkShareRepairStartup(): void {
   checkRepair(
     digits.join(" "),
     official,
-    `2:${codes[2]}${codes[3]} 6:${codes[10]}${codes[11]}`,
+    // #42D1F0 and #E75FF8 as Color Unicode, computed apart from the code under test: 0xE000 plus
+    // the quotient and 0xE000 plus the remainder of the RGB value divided by 0x1900.
+    "2:E2ACE5F0 6:E941E6F8",
     "Color Unicode codes with two digits marked",
   );
   expectRefused(
@@ -117,7 +119,7 @@ export function checkShareRepairStartup(): void {
     /No valid share fits/u,
     "A marked share with an unmarked error",
   );
-  const sevenUnread = sskrVector.firstShareColors.map((color, place) =>
+  const sevenUnread = SSKR_VECTOR.firstShareColors.map((color, place) =>
     place < MAX_MARKED_ELEMENTS + 1 ? "?" : color,
   );
   expectRefused(

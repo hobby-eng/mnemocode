@@ -60,10 +60,10 @@ describe("a typed answer leaves only its line in the record of answers", () => {
     // Everything written, decoded: a byte that is no UTF-8 would show as U+FFFD.
     const written: string[] = [];
     const toScreen = process.stderr.write.bind(process.stderr);
-    process.stderr.write = ((chunk: string | Uint8Array) => {
+    process.stderr.write = (chunk: string | Uint8Array) => {
       written.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
       return toScreen(chunk);
-    }) as typeof process.stderr.write;
+    };
     const shown: string[][] = [];
     terminal.onFirstKey = () => shown.push(screen.lines());
     // é from a terminal set to Latin-1 between a and b, then Left, which draws the answer again
@@ -278,10 +278,10 @@ describe("going back from an entry of the start menu", () => {
       const screen = watchScreen(columns);
       const written: string[] = [];
       const write = process.stderr.write.bind(process.stderr);
-      vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string | Uint8Array) => {
+      vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => {
         written.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
         return write(chunk);
-      }) as typeof process.stderr.write);
+      });
       const keys = [
         String(MENU_ENTRY_NAMES.recover.digit),
         `${DOWN.repeat(2)}${ENTER}`,
@@ -603,19 +603,38 @@ describe("what the menu does when a command cannot run or stops", () => {
     });
   });
 
-  it("offers no entry that asks for a secret when the self-test fails", async () => {
+  it("offers only the self-test, the help and Quit when the self-test fails, and says so", async () => {
     terminal.selfTestFails = true;
     const { asked, shown } = await menuWith([ESCAPE]);
-    expect(asked[0]!.labels).toEqual(
-      MENU_ENTRIES.filter((entry) => entry.asksSecrets !== true).map((entry) => entry.label),
-    );
-    expect(shown[0]!.join("\n")).toContain("CRITICAL: MnemoCode core self-test failed.");
+    const unchecked = [
+      MENU_ENTRY_NAMES.selfTest.label,
+      MENU_ENTRY_NAMES.help.label,
+      MENU_ENTRY_NAMES.quit.label,
+    ];
+    expect(asked[0]!.labels).toEqual(unchecked);
+    // The heading's lines as one text: a notice wraps at the width of running text.
+    const heading = shown[0]!.join(" ").replace(/\s+/gu, " ");
+    expect(heading).toContain("CRITICAL: MnemoCode core self-test failed.");
+    expect(heading).toContain("the other entries stay closed after a failed self-test.");
     // The self-test's entry failing has the same effect for the rest of the session.
     terminal.selfTestFails = false;
     terminal.exit = async () => 1;
     const after = await menuWith([String(MENU_ENTRY_NAMES.selfTest.digit), ENTER, ESCAPE]);
     expect(after.asked[0]!.labels).toHaveLength(MENU_ENTRIES.length);
-    expect(after.asked[1]!.labels).toEqual(asked[0]!.labels);
+    expect(after.asked[1]!.labels).toEqual(unchecked);
     expect(after.shown[1]!.join("\n")).toContain("The self-test failed.");
+  });
+
+  it("offers every entry but those that ask for a secret when only the protection fails", async () => {
+    terminal.protectionFails = true;
+    const { asked, shown } = await menuWith([ESCAPE]);
+    expect(asked[0]!.labels).toEqual(
+      MENU_ENTRIES.filter((entry) => entry.asksSecrets !== true).map((entry) => entry.label),
+    );
+    expect(asked[0]!.labels).toContain(MENU_ENTRY_NAMES.preview.label);
+    expect(asked[0]!.labels).toContain(MENU_ENTRY_NAMES.table.label);
+    const heading = shown[0]!.join(" ").replace(/\s+/gu, " ");
+    expect(heading).toContain("Core dumps could not be switched off.");
+    expect(heading).toContain("The entries that ask for a seed phrase or a share are not offered.");
   });
 });

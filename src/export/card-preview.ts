@@ -16,6 +16,7 @@ import {
   BIP39_WORD_COUNTS,
   type Bip39WordCount,
   isBip39WordCount,
+  LONGEST_WORD_COUNT,
   WORD_COUNTS_TEXT,
 } from "../core/bip39-sizes.js";
 import { parseDate } from "../core/dates.js";
@@ -27,8 +28,13 @@ import type { EncodedFormat, EncodedResult } from "../core/types.js";
 import { backupCardContent, type CardBackup, type CardContent } from "./backup-cards.js";
 import type { CardSettings } from "./card-settings.js";
 import { checkedChoice } from "./platform.js";
-import { renderCards, renderIndividualCards, type CardJob } from "./render.js";
-import { cardTemplates, selectTemplate, type CardDrawing, type CardTemplate } from "./templates.js";
+import { renderCards, renderIndividualCards, type CardJob, type CardOutputs } from "./render.js";
+import {
+  CARD_TEMPLATES,
+  selectTemplate,
+  type CardDrawing,
+  type CardTemplate,
+} from "./templates.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
@@ -46,15 +52,24 @@ export const SAMPLE_FILE_BASE = "mnemocode-preview";
 
 /** The designs of a preview: every installed one, or the one named, or the first without a name. */
 export type DesignSelection =
-  { readonly every: true } | { readonly every?: false; readonly template?: string | undefined };
+  | {
+      /** Every installed design, in the order of the list. */
+      readonly every: true;
+    }
+  | {
+      /** One design: the one named, or the first. */
+      readonly every?: false;
+      /** The design by its id or its number in the list, from 1; the first when undefined. */
+      readonly template?: string | undefined;
+    };
 
 /** Why separate sample cards of every design are refused: their folder shows one design. */
 export const ONE_DESIGN_FOR_SEPARATE_CARDS =
   "Separate sample cards show one design: choose one design.";
 /** The length of the sample phrase when none is chosen: the shortest. */
 export const DEFAULT_SAMPLE_WORDS: SampleWordCount = BIP39_WORD_COUNTS[0];
-/** The longest sample phrase: the most codes, and the most cards, that a backup prints. */
-export const LONGEST_SAMPLE_WORDS: SampleWordCount = defined(BIP39_WORD_COUNTS.at(-1));
+/** The longest sample phrase, BIP39's longest: the most codes, and cards, that a backup prints. */
+export const LONGEST_SAMPLE_WORDS: SampleWordCount = LONGEST_WORD_COUNT;
 /** The length of a sample phrase, in words: one of BIP39's. */
 export type SampleWordCount = Bip39WordCount;
 
@@ -118,7 +133,7 @@ export class CardPreview {
 
   /** The designs installed, which the sample cards can be drawn in. */
   static get templates(): readonly CardTemplate[] {
-    return cardTemplates;
+    return CARD_TEMPLATES;
   }
 
   /** What one design draws: the masked sample phrase as colours. */
@@ -126,34 +141,50 @@ export class CardPreview {
     return this.#colors;
   }
 
-  /** The design and its content, for a renderer that takes jobs (individual cards, images). */
+  /**
+   * The design and its content, for a renderer that takes jobs (individual cards, images). Refuses
+   * a `templateId` of no design as selectTemplate does
+   * (export.template-catalog.card-template-unknown-incompatible-list-available-preview-templates),
+   * and a catalog without designs (NoCardTemplateError, no-card-template).
+   */
   job(templateId?: string): CardJob {
     const template = selectTemplate(templateId);
     return { template, content: this.content(template) };
   }
 
-  /** The designs of `selection` with their content, in the order of the installed list. */
+  /**
+   * The designs of `selection` with their content, in the order of the installed list. Refuses
+   * what job refuses: a design of no name, and a catalog without designs.
+   */
   jobs(selection: DesignSelection): CardJob[] {
     if (!selection.every) return [this.job(selection.template)];
-    if (cardTemplates.length === 0) selectTemplate();
-    return cardTemplates.map((template) => ({ template, content: this.content(template) }));
+    if (CARD_TEMPLATES.length === 0) selectTemplate();
+    return CARD_TEMPLATES.map((template) => ({ template, content: this.content(template) }));
   }
 
   /**
-   * Refuses separate sample cards of every design: a folder of separate cards shows one. A host
-   * asks before it checks the folder, since the sample cards need no secret.
+   * Refuses separate sample cards of every design (export.card-preview.one-design-separate-cards):
+   * a folder of separate cards shows one. A host asks before it checks the folder, since the
+   * sample cards need no secret.
    */
   static assertOneDesign(selection: DesignSelection): void {
     if (selection.every) throw ERRORS.create("one-design-separate-cards", []);
   }
 
-  /** The one design of separate sample cards with its content (assertOneDesign). */
+  /**
+   * The one design of separate sample cards with its content; refuses every design as
+   * assertOneDesign does (export.card-preview.one-design-separate-cards).
+   */
   separateCardsJob(selection: DesignSelection): CardJob {
     CardPreview.assertOneDesign(selection);
     return defined(this.jobs(selection)[0]);
   }
 
-  /** One design, by its name or number, or the first one; as one PDF. */
+  /**
+   * One design, by its name or number, or the first one; as one PDF. Refuses what job refuses, and
+   * what renderCards refuses of the design and the settings, such as a page size or an orientation
+   * of none (export.card-settings.page-size, export.card-settings.orientation).
+   */
   render(templateId?: string): Promise<Uint8Array> {
     return renderCards(this.#drawing, [this.job(templateId)]);
   }
@@ -161,18 +192,20 @@ export class CardPreview {
   /**
    * Draws in memory the colour cards of `templateId` as a save would, its sheets or its separate
    * cards or both, and throws why they cannot be drawn; nothing is written. A host checks so,
-   * before it asks for a secret, that card settings the person typed print (Encode's dry run).
+   * before it asks for a secret, that card settings the person typed print (Encode's dry run). The
+   * refusals are those of selectTemplate for a design of no name or of another kind, and those of
+   * renderCards and renderIndividualCards for the settings and the design.
    */
-  async assertColorsPrint(
-    templateId: string | undefined,
-    what: { readonly sheets: boolean; readonly cards: boolean },
-  ): Promise<void> {
+  async assertColorsPrint(templateId: string | undefined, what: CardOutputs): Promise<void> {
     const template = selectTemplate(templateId, "colors");
     if (what.sheets) await renderCards(this.#drawing, [{ template, content: this.#colors }]);
     if (what.cards) await renderIndividualCards(this.#drawing, template, this.#colors);
   }
 
-  /** Every installed design in one PDF, one design after the other. */
+  /**
+   * Every installed design in one PDF, one design after the other. Refuses a catalog without
+   * designs (NoCardTemplateError, no-card-template), and what renderCards refuses.
+   */
   renderAll(): Promise<Uint8Array> {
     return renderCards(this.#drawing, this.jobs({ every: true }));
   }

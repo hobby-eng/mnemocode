@@ -74,7 +74,6 @@ import {
 } from "../src/core/colors.js";
 import { hexCodePoint } from "../src/core/code-text.js";
 import { parseRecord } from "../src/record.js";
-import { invalidAddress, DAMAGED, AddressRefusalError } from "../src/core/coins/coin.js";
 import { InputTooLargeError } from "../src/core/byte-units.js";
 import { RESTORED_FORM } from "../src/sskr/share-set.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
@@ -106,6 +105,7 @@ import {
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
+import { publicShare } from "./helpers/vectors.js";
 
 describe("S006: the facts of a kind of wallet evidence follow from its level", () => {
   it("tells which kinds are scanned and which are placed", async () => {
@@ -167,6 +167,37 @@ describe("S009: one look-up in the word table", () => {
     const plain = lines.map((line) => line.replace(STYLE_CODES, ""));
     expect(plain).toContain("  Unicode hex 7684");
     expect(plain).not.toContain("unicode hex: 7684");
+  });
+
+  it("on a terminal, the whole table starts with the result's heading; a pipe gets the table alone", async () => {
+    const run = async (terminal: boolean) => {
+      vi.stubEnv("CLICOLOR_FORCE", "1");
+      vi.stubEnv("NO_COLOR", "");
+      if (terminal) streamsAsTerminal();
+      const lines: string[] = [];
+      const log = vi.spyOn(console, "log").mockImplementation((line: string) => lines.push(line));
+      const write = vi.spyOn(process.stdout, "write").mockImplementation((text) => {
+        lines.push(String(text));
+        return true;
+      });
+      try {
+        await runTable({ all: true, "table-format": "english" });
+      } finally {
+        log.mockRestore();
+        write.mockRestore();
+        vi.unstubAllEnvs();
+      }
+      return lines.map((line) => line.replace(STYLE_CODES, ""));
+    };
+    const table = wordTableText("english");
+    // The pipe first: the terminal's stand-in lasts until the test ends.
+    expect(await run(false)).toEqual([table]);
+    expect(await run(true)).toEqual([
+      "\nMnemoCode · Word table",
+      "  Rows       2048",
+      "  Columns    index, english",
+      table,
+    ]);
   });
 
   it("writes the whole table with its header", () => {
@@ -315,6 +346,7 @@ describe("S022: every class that holds a secret shows only its kind", () => {
         "ReadingSpace",
         "RestoredShares",
         "SecretValue",
+        "SessionIdentity",
         "Share",
         "ShareCardSet",
         "ShareExport",
@@ -381,15 +413,16 @@ describe("S024: one order of the steps of a backup check", () => {
 describe("S025: the share check names set problems as the restore does", () => {
   it("refuses a share of another set with ShareInput's words", async () => {
     // Published fixed sets have distinct protocol identifiers; no random collision precondition.
-    const { sskrVector, sskrSetVector } = await import("../src/sskr/known-answers.js");
-    const [first, second] = [sskrVector.shares, sskrSetVector.shares];
+    const { SSKR_VECTOR, SSKR_SET_VECTOR } = await import("../src/sskr/known-answers.js");
+    const [first, second] = [SSKR_VECTOR.shares, SSKR_SET_VECTOR.shares];
     expect(Share.read(first[0]!).info.identifier).not.toBe(Share.read(second[0]!).info.identifier);
     const texts = [first[0]!, second[1]!];
     const kept = KeptShares.of(texts);
-    expect(kept.setProblem).toBe(
+    expect(kept.setProblem).toEqual(
       ShareInput.completeSetProblem(texts.map((ur, index) => ({ place: index + 1, ur }))),
     );
-    expect(kept.setProblem).toMatch(/different sets/u);
+    expect(kept.setProblem?.code).toBe("shares-of-different-sets");
+    expect(kept.setProblem?.message).toMatch(/different sets/u);
     expect(
       withoutCopies([
         { place: 1, ur: "a" },
@@ -464,7 +497,7 @@ describe("S032: one range of the Color Unicode characters", () => {
     expect(markedColorSymbols("\u{F900}")).toBeUndefined();
     expect(isColorUnicodeSymbol("\u{F0000}")).toBe(false);
     // A supplementary Private Use character is no colour code, so the reason is not about colors.
-    expect(EncodedBackup.whyUnreadable("\u{F0000}")).not.toMatch(/color/iu);
+    expect(EncodedForm.likely("\u{F0000}")).not.toMatch(/colors/u);
   });
 });
 
@@ -495,12 +528,12 @@ describe("S035: refusals told apart by their kind, not their words", () => {
     );
   });
 
-  it("gives an address refusal its reason, and too large input its own class", () => {
-    const refusal = invalidAddress(DAMAGED);
-    expect(refusal).toBeInstanceOf(AddressRefusalError);
-    expect(refusal.reason).toBe(DAMAGED);
-    expect(refusal.message).toBe(
-      "The address cannot be used for the check: its checksum or format is wrong.",
+  it("gives an address refusal the code of its condition, and too large input its own class", () => {
+    expect(() => BITCOIN.parse("bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv")).toThrow(
+      expect.objectContaining({
+        code: "core.coins.coin.address-damaged",
+        message: "The address cannot be used for the check: its checksum or format is wrong.",
+      }),
     );
     expect(new InputTooLargeError("Text input", 1024 * 1024).message).toBe(
       "Text input exceeds the 1 MiB safety limit.",
@@ -539,6 +572,7 @@ describe("S036: each form of codes knows its own facts", () => {
     expect(EncodedForm.of("unicode").writtenInColors).toBe(false);
     expect(EncodedForm.of("indexes").cardKind).toBeUndefined();
     expect(EncodedForm.of("english").alwaysMasked).toBe(true);
+    // A format that no encoded form has, given on purpose as a JavaScript host could.
     expect(() => EncodedForm.of("json" as never)).toThrow(
       expect.objectContaining({ code: "core.encoded-form.unsupported-encoded-format" }),
     );
@@ -547,10 +581,7 @@ describe("S036: each form of codes knows its own facts", () => {
 
 describe("S040: a reading owns the layout of its unknown bits", () => {
   it("names the one hole that a unit's bits change, and changes only that value", () => {
-    const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-      deterministic: { shares: string[] }[];
-    };
-    const numbers = writeShare(vectors.deterministic[0]!.shares[0]!, "indexes").split(" ");
+    const numbers = writeShare(publicShare(), "indexes").split(" ");
     numbers[2] = "?";
     numbers[7] = "?";
     const reading = MarkedReading.of(numbers.join(" ")).find(

@@ -1,4 +1,3 @@
-import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Standard input and standard error are a terminal; a Keyboard stands for the one on standard
@@ -13,6 +12,7 @@ vi.mock("node:tty", async (importOriginal) => ({
 import { clearPrivateScreen, withPrivateScreen } from "../src/cli/private-screen.js";
 import { waitForEnter } from "../src/cli/terminal-choice.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
+import { Keyboard, keyboardAsStandardInput } from "./helpers/terminal-streams.js";
 
 const ENTER = "\r";
 const ESCAPE = "\x1b";
@@ -24,39 +24,6 @@ const LEAVE_ALTERNATE_SCREEN = "\x1b[?1049l";
  * telling Escape alone from an arrow key's sequence is the longest (100 ms in terminal-input.ts).
  */
 const READING_MS = 150;
-
-/** Standard input as a terminal in raw mode. */
-class Keyboard extends EventEmitter {
-  readonly isTTY = true;
-  flowing = false;
-  /** Bytes typed while nothing reads: the terminal keeps them until a question reads again. */
-  #held: Buffer[] = [];
-
-  setRawMode(): this {
-    return this;
-  }
-
-  resume(): this {
-    this.flowing = true;
-    // A terminal gives what it kept at the next read, a moment after reading starts.
-    setImmediate(() => {
-      for (const chunk of this.#held.splice(0)) this.emit("data", chunk);
-    });
-    return this;
-  }
-
-  pause(): this {
-    this.flowing = false;
-    return this;
-  }
-
-  /** `keys` typed now, as one chunk. */
-  type(keys: string): void {
-    const chunk = Buffer.from(keys, "utf8");
-    if (this.flowing) this.emit("data", chunk);
-    else this.#held.push(chunk);
-  }
-}
 
 let keys = new Keyboard();
 /** Everything written to standard error. */
@@ -79,8 +46,7 @@ describe("waitForEnter takes only keys pressed after its message", () => {
     screen = "";
     pending = undefined;
     typedAt = undefined;
-    vi.spyOn(process, "stdin", "get").mockReturnValue(keys as unknown as typeof process.stdin);
-    vi.stubEnv("TERM", "xterm");
+    keyboardAsStandardInput(keys);
     vi.stubEnv("NO_COLOR", "1");
     vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
       screen += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");

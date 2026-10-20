@@ -31,12 +31,12 @@ import { Redacted } from "./redacted.js";
 import { SecretValue } from "./secret-value.js";
 import {
   BIP39_WORD_COUNTS,
+  assertWordCount,
   isBip39WordCount,
   WORD_COUNTS_TEXT,
   type Bip39WordCount,
 } from "./bip39-sizes.js";
 import { EncodedForm } from "./encoded-form.js";
-import { refusalMessage } from "./refusal.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog } from "./error-catalog.js";
 
@@ -62,14 +62,16 @@ export type { EncodedFormat };
 /** The start of the refusal of codes that fit no form, complete or marked (BackupReading). */
 export const FIT_NO_FORM = "These codes fit no form of an encoded seed phrase";
 
-/** The modes by the names that the menu and the help use (Masking.name). */
-export const ENCODED_MODE_NAMES: Readonly<Record<MaskingMode, string>> = Object.freeze(
-  // Masking.MODES lists every mode, so the record has every key.
-  Object.fromEntries(Masking.MODES.map((mode) => [mode, Masking.of(mode).name])) as Record<
-    MaskingMode,
-    string
-  >,
-);
+/**
+ * The modes by the names that the menu and the help use (Masking.name), each mode a key of its own:
+ * the declared type holds the keys to MaskingMode, every mode and no other.
+ */
+export const ENCODED_MODE_NAMES: Readonly<Record<MaskingMode, string>> = Object.freeze({
+  direct: Masking.of("direct").name,
+  seedshift: Masking.of("seedshift").name,
+  "seedshift-legacy": Masking.of("seedshift-legacy").name,
+  "seedshift-legacy-valid": Masking.of("seedshift-legacy-valid").name,
+} satisfies Record<MaskingMode, string>);
 
 /** What Encode makes of a seed phrase (EncodedBackup.encode), for a host to save and show. */
 export interface Encoding {
@@ -144,8 +146,8 @@ export class EncodedBackup extends Redacted {
 
   /**
    * Reads codes written in `format` as the codes of a seed phrase made with `mode`. Throws why
-   * they cannot be, naming places and counts only; MissingChecksumError for a checksum-keeping
-   * mode.
+   * they cannot be, naming places and counts only: codes that EncodedForm.read cannot read (the
+   * codes of its readers), and what `of` refuses.
    */
   static read(text: string, format: EncodedFormat, mode: MaskingMode): EncodedBackup {
     const indexes = parseInput(text, format);
@@ -158,8 +160,11 @@ export class EncodedBackup extends Redacted {
 
   /**
    * Refuses what Encode cannot make, before any secret is read: the Original Seedshift with a
-   * valid last word comes only from the Original Seedshift with its replacement (`validLastWord`),
-   * which no other mode has.
+   * valid last word comes only from the Original Seedshift with its replacement
+   * (core.encoded-backup.create-legacy-checksum-valid-record-select-legacy-seedshift), and
+   * `validLastWord` only from a mode that has the replacement
+   * (legacy-checksum-word-replacement-available-only-legacy-seedshift). A value that names no mode
+   * is refused (core.masking.unsupported-mode).
    */
   static assertEncodable(mode: MaskingMode, options: EncodeOptions = {}): void {
     const masking = Masking.of(mode);
@@ -206,23 +211,16 @@ export class EncodedBackup extends Redacted {
     };
   }
 
-  /** Codes read elsewhere, as BIP39 indexes from 0 to 2047, held to the same rules as `read`. */
+  /**
+   * Codes read elsewhere, as BIP39 indexes from 0 to 2047, held to the same rules as `read`.
+   * Refuses a mode or a format that names none (core.masking.unsupported-mode,
+   * core.encoded-form.unsupported-encoded-format), a count of codes that is no BIP39 length
+   * (core.encoded-backup.encoded-seed-phrase), and codes that `mode` cannot have written
+   * (Masking.assertCodes: core.bip39-sizes codes, and MissingChecksumError, code missing-checksum,
+   * for a mode that keeps the checksum).
+   */
   static of(indexes: readonly number[], format: EncodedFormat, mode: MaskingMode): EncodedBackup {
     return new EncodedBackup(indexes, format, mode);
-  }
-
-  /**
-   * Why codes that fit no form cannot be read: as the format that their characters most likely
-   * are, naming places or the count only.
-   */
-  static whyUnreadable(text: string): string {
-    const format = EncodedForm.likely(text);
-    try {
-      EncodedBackup.read(text, format, "direct").wipe();
-    } catch (error) {
-      return refusalMessage(error);
-    }
-    return `${FIT_NO_FORM}.`;
   }
 
   /** The same codes as made with `mode`, held to the rules of `of`. */
@@ -247,7 +245,9 @@ export class EncodedBackup extends Redacted {
 
   /** How many words the seed phrase has: one code a word, as the constructor checked. */
   get words(): Bip39WordCount {
-    return this.indexes.length as Bip39WordCount;
+    const count = this.indexes.length;
+    assertWordCount(count);
+    return count;
   }
 
   /**
@@ -280,7 +280,9 @@ export class EncodedBackup extends Redacted {
 
   /**
    * The seed phrase that the codes and the complete `dates` give, with its checksum. A mode that
-   * gives several phrases (givesSeveral) is refused: `candidates` gives them.
+   * gives several phrases (givesSeveral) is refused: `candidates` gives them
+   * (core.encoded-backup.original-seedshift-valid-last-word-gives-several-phrases). What
+   * Masking.undo refuses of the dates passes on.
    */
   decode(dates: readonly DateShiftDate[]): DecodedResult {
     if (this.givesSeveral)

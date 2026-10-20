@@ -77,7 +77,7 @@ export class TextFileInput {
  * breaks are kept for the caller to treat by its own rule. The bytes may hold a secret, such as a
  * passphrase, and are wiped once decoded, also when they are refused.
  */
-export function decodedText(bytes: Buffer, what: string): string {
+function decodedText(bytes: Buffer, what: string): string {
   try {
     return strictUtf8Text(bytes, what);
   } finally {
@@ -111,13 +111,7 @@ export function readBoundedTextFile(
   regularOnly = false,
 ): string {
   return decodedText(
-    readFileOrRefuse(
-      path,
-      MAX_TEXT_INPUT_BYTES,
-      inputName,
-      `${inputName} could not be read. Check that the file exists and is readable.`,
-      regularOnly,
-    ),
+    readFileOrRefuse(path, MAX_TEXT_INPUT_BYTES, inputName, regularOnly),
     inputName,
   );
 }

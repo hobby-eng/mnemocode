@@ -6,7 +6,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSessionIdentity,
   listFileLock,
@@ -43,8 +43,8 @@ vi.mock("../src/cli/bounded-read.js", async (importOriginal) => {
           ? Buffer.from(standardInput)
           : original.readBoundedDescriptor(descriptor, limit, what),
       ),
-    readFileOrRefuse: (path: string, limit: number, what: string, unreadable: string): Buffer =>
-      kept(original.readFileOrRefuse(path, limit, what, unreadable)),
+    readFileOrRefuse: (...args: Parameters<typeof original.readFileOrRefuse>): Buffer =>
+      kept(original.readFileOrRefuse(...args)),
   };
 });
 
@@ -66,6 +66,7 @@ describe("AUD-014-SEC001: only the three known protections, none only when chose
   it("refuses the audit's misspelt, unknown and missing kinds before any list is written", () => {
     for (const kind of ["passpharse", "unknown", undefined])
       expect(
+        // A kind that no type allows, fed on purpose as a JavaScript host could.
         () => protectionFor({ kind, passphrase: LIST_PASSPHRASE } as never),
         String(kind),
       ).toThrow(
@@ -102,12 +103,13 @@ describe("AUD-014-SEC001: only the three known protections, none only when chose
     for (const choice of malformed) {
       let refusal: unknown;
       try {
+        // A choice that no type allows, fed on purpose as a JavaScript host could.
         protectionFor(choice as ListProtectionChoice);
       } catch (error) {
         refusal = error;
       }
-      expect(refusal, JSON.stringify(choice)).toBeInstanceOf(TypeError);
-      expect((refusal as Error).message).not.toContain(LIST_PASSPHRASE);
+      assert.instanceOf(refusal, TypeError, JSON.stringify(choice));
+      expect(refusal.message).not.toContain(LIST_PASSPHRASE);
     }
   });
 

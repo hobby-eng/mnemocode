@@ -82,6 +82,73 @@ describe("DatesAnswer", () => {
     expect(() => DatesAnswer.of([], wide)).toThrow("exceeds the safety limit");
   });
 
+  it("refuses more dates than the longest phrase takes before it reads one (AUD-037, CORE-50)", () => {
+    // About 1 MiB of lone ?, each of which stands for every year from 0001 to 9999: reading them
+    // one by one took minutes and gigabytes before the limit refused them; counting them does not.
+    const started = performance.now();
+    expect(() => DatesAnswer.parse("? ".repeat(512 * 1024), { patterns: true })).toThrow(
+      expect.objectContaining({ code: "core.date-search.too-many-dates" }),
+    );
+    expect(performance.now() - started).toBeLessThan(2_000);
+    // Without the phrase's length, the longest phrase's eight dates are the limit.
+    const nine = Array.from({ length: 9 }, (_, index) => `0${index + 1}-01-2020`);
+    expect(DatesAnswer.parse(nine.slice(1).join(" "), { patterns: false }).count).toBe(8);
+    expect(() => DatesAnswer.parse(nine.join(" "), { patterns: false })).toThrow(
+      expect.objectContaining({
+        code: "core.date-search.too-many-dates",
+        message: "24-word phrases support at most 8 dates.",
+      }),
+    );
+    expect(() => DatesAnswer.of(nine.map((date) => parseDate(date)))).toThrow(
+      expect.objectContaining({ code: "core.date-search.too-many-dates" }),
+    );
+    // With it, its own limit, as before, and a search of that phrase refuses the same condition by
+    // the same code.
+    const fourAtMost = {
+      code: "core.date-search.too-many-dates",
+      message: "12-word phrases support at most 4 dates.",
+    };
+    expect(() => dates(nine.slice(4).join(" "))).toThrow(expect.objectContaining(fourAtMost));
+    using five = DatesAnswer.parse(nine.slice(4).join(" "), { patterns: false });
+    expect(() => new DateSearch({ indexes: MASKED, dates: five, mode: "seedshift" })).toThrow(
+      expect.objectContaining(fourAtMost),
+    );
+  });
+
+  it("refuses more dates with ? than a search takes before it reads one (AUD-037, CORE-50)", () => {
+    // The fifth date is no calendar date: the count is refused before any date is read.
+    expect(() => DatesAnswer.parse("? ? ? ? 31-02-2026", { patterns: true })).toThrow(
+      expect.objectContaining({
+        code: "core.date-search.date-recovery-supports-at-most-incomplete-dates",
+      }),
+    );
+    // Where ? is not allowed, the first date with ? is refused for that, as before.
+    expect(() => DatesAnswer.parse("? ? ? ?", { patterns: false })).toThrow(
+      expect.objectContaining({
+        code: "core.date-search.stand-what-forgotten-only-where-mnemo-code-can",
+      }),
+    );
+    expect(dates("? 0?-01-2020 ?1-01-2021").patterns).toHaveLength(3);
+  });
+
+  it("reads a date of thousands of alternatives in bounded time, each once (AUD-037, CORE-50)", () => {
+    // The years 1000 to 3999, each written twice, and 1?00, whose ? stands for every digit: trying
+    // each of the 9,999 years against each alternative took about a millisecond per alternative.
+    const years = Array.from({ length: 3000 }, (_, index) => `${1000 + index}`);
+    const typed = `01-01-${[...years, ...years, "1?00"].join("|")}`;
+    const started = performance.now();
+    const [pattern] = dates(typed).patterns;
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(pattern?.years).toHaveLength(3000);
+    expect([pattern?.years[0], pattern?.years.at(-1)]).toEqual([1000, 3999]);
+    expect([pattern?.months, pattern?.days]).toEqual([[1], [1]]);
+    // A ? stands for each digit, and a value outside its part, such as day 00, for none.
+    expect(dates("0?-01-2020").patterns[0]?.days).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(dates("01-01-?000|0000").patterns[0]?.years).toEqual(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9].map((thousands) => thousands * 1000),
+    );
+  });
+
   it("counts up to one more than the hard limit", () => {
     const answer = dates("??-??-2026 ??-??-2027");
     expect(answer.combinations).toBe(365 * 365);
@@ -158,6 +225,7 @@ describe("DateSearch", () => {
         new DateSearch({
           indexes: MASKED,
           dates: answer,
+          // A mode that no type allows here, fed on purpose as a JavaScript host could.
           mode: "direct" as unknown as "seedshift",
         }),
     ).toThrow("Unsupported Seedshift mode.");
@@ -165,6 +233,7 @@ describe("DateSearch", () => {
     expect(() => new DateSearch({ indexes: MASKED, dates: five, mode: "seedshift" })).toThrow(
       "12-word phrases support at most 4 dates.",
     );
+    // Dates that are no DatesAnswer, fed on purpose as a JavaScript host could.
     const plain = { known: answer.known, patterns: answer.patterns } as unknown as DatesAnswer;
     expect(() => new DateSearch({ indexes: MASKED, dates: plain, mode: "seedshift" })).toThrow(
       "The dates must be a DatesAnswer.",

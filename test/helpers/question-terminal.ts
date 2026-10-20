@@ -7,32 +7,56 @@
 // vi.mock factories replace each module with what is here; so this module imports no module that a
 // test replaces.
 
+import type * as FileSystem from "node:fs/promises";
 import type * as Tty from "node:tty";
+import { inspect } from "node:util";
 import { afterEach, beforeEach, expect, vi } from "vitest";
+import type { Choice, ChooseOptions } from "../../src/cli/terminal-choice.js";
+import { CANCELLED, type Cancelled } from "../../src/cli/terminal-keys.js";
 
 type PrivateScreen = typeof import("../../src/cli/private-screen.js");
 type TerminalChoice = typeof import("../../src/cli/terminal-choice.js");
 type TerminalInput = typeof import("../../src/cli/terminal-input.js");
 
 /** What the replaced terminal answers, and what it was asked. */
-export const terminal = {
-  answers: [] as string[],
-  choices: [] as unknown[],
-  questions: [] as string[],
+interface QuestionTerminal {
+  /** The lines typed at the questions that read a line, in turn. */
+  answers: string[];
+  /**
+   * The answers of the list questions in turn: the value of an entry, byLabel, undefined for
+   * Escape or CANCELLED for Ctrl+C, or a promise of one of them.
+   */
+  choices: unknown[];
+  questions: string[];
   /** The labels of each list question, in order. */
-  labels: [] as string[][],
+  labels: string[][];
   /** The notes of each list question's entries, in order. */
-  notes: [] as (string | undefined)[][],
+  notes: (string | undefined)[][];
   /** What Escape does at each list question, as its key hint says. */
-  escapes: [] as (string | undefined)[],
+  escapes: (string | undefined)[];
   /**
    * In order: each list question, "drop" for each drop of the keys typed ahead, and "answered"
    * after each answer read.
    */
-  events: [] as string[],
-  /** Saves that fail, as on a full disk, before one succeeds (failingSave). */
-  saveFailures: 0,
+  events: string[];
+  /** Writes of a file that fail, as on a full disk, before one succeeds (replacedFiles). */
+  saveFailures: number;
   /** The errno code of those failures: ENOSPC, a full disk, unless a test names another. */
+  saveFailureCode: string;
+  stdoutTerminal: boolean;
+  privateScreen: boolean;
+}
+
+/** What the replaced terminal answers, and what it was asked. */
+export const terminal: QuestionTerminal = {
+  answers: [],
+  choices: [],
+  questions: [],
+  labels: [],
+  notes: [],
+  escapes: [],
+  events: [],
+  saveFailures: 0,
   saveFailureCode: "ENOSPC",
   stdoutTerminal: false,
   privateScreen: true,
@@ -55,13 +79,18 @@ function isByLabel(answer: unknown): answer is ByLabel {
 }
 
 /** What the questions wrote: the private screen (standard error), and the lines of each stream. */
-export const seen = {
-  screen: "",
+interface Seen {
+  screen: string;
   /** The lines of standard output. */
-  out: [] as string[],
+  out: string[];
   /** The lines of console.error: the notices. */
-  notices: [] as string[],
-};
+  notices: string[];
+  /** What the parser of each answer refused threw, in order, before its warning was shown. */
+  refusals: unknown[];
+}
+
+/** What the questions wrote: the private screen (standard error), and the lines of each stream. */
+export const seen: Seen = { screen: "", out: [], notices: [], refusals: [] };
 
 /** node:tty, where only standard output may be a terminal (`terminal.stdoutTerminal`). */
 export function replacedTty(actual: typeof Tty): typeof Tty {
@@ -75,19 +104,19 @@ export function replacedPrivateScreen(actual: PrivateScreen): PrivateScreen {
 
 /** The terminal's input, which reads `terminal.answers` and watches no Ctrl-C. */
 export function replacedTerminalInput(actual: TerminalInput): TerminalInput {
-  return {
-    ...actual,
-    terminalAvailable: () => true,
-    dropTypedAhead: async () => {
+  class AnsweredKeys extends actual.TerminalKeys {
+    static override async dropTypedAhead(): Promise<undefined> {
       terminal.events.push("drop");
-    },
+      return undefined;
+    }
+
     // An answer arrives at once, as a paste does: a line break with more after it is inside it.
-    withRawTerminal: async <T>(
+    static override async withRawMode<T>(
       body: (
         next: () => Promise<number | undefined>,
         moreWithin: () => Promise<boolean>,
       ) => Promise<T>,
-    ) => {
+    ): Promise<T> {
       const bytes = Array.from(Buffer.from(terminal.answers.shift() ?? "", "utf8"));
       const result = await body(
         async () => bytes.shift(),
@@ -95,26 +124,38 @@ export function replacedTerminalInput(actual: TerminalInput): TerminalInput {
       );
       terminal.events.push("answered");
       return result;
+    }
+  }
+  // The searches watch no terminal here.
+  class UnwatchedSearch extends actual.CtrlCWatch {
+    static override during<T>(search: (signal: AbortSignal) => Promise<T>): Promise<T> {
+      return search(new AbortController().signal);
+    }
+  }
+  return {
+    ...actual,
+    terminalAvailable: () => true,
+    TerminalKeys: AnsweredKeys,
+    CtrlCWatch: UnwatchedSearch,
+    refusal: (error: unknown) => {
+      seen.refusals.push(error);
+      return actual.refusal(error);
     },
-    // The searches watch no terminal here.
-    withCtrlCWatch: <T>(search: (signal: AbortSignal) => Promise<T>) =>
-      search(new AbortController().signal),
   };
 }
 
-/** The list questions, which record what they ask and answer with `terminal.choices`. */
+/**
+ * The list questions, which record what they ask and answer with `terminal.choices`: the entry of
+ * that value or label, Escape or Ctrl+C. An answer that is no entry of the question fails.
+ */
 export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
   return {
     ...actual,
-    choose: (async (
+    choose: async <T>(
       question: string,
-      choices: readonly {
-        readonly label: string;
-        readonly note?: string;
-        readonly value: unknown;
-      }[],
-      options?: { readonly quit?: string },
-    ) => {
+      choices: readonly Choice<T>[],
+      options: ChooseOptions,
+    ): Promise<T | undefined | Cancelled> => {
       // Loaded here, once the replaced modules are in place: it measures with terminal-choice.
       const { recordCutNotes } = await import("./cut-notes.js");
       recordCutNotes(question, choices);
@@ -122,27 +163,39 @@ export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
       terminal.events.push(question);
       terminal.labels.push(choices.map((choice) => choice.label));
       terminal.notes.push(choices.map((choice) => choice.note));
-      terminal.escapes.push(options?.quit);
-      const answer = terminal.choices.shift();
-      if (!isByLabel(answer)) return answer;
-      const entry = choices.find((choice) => choice.label === answer[LABEL]);
-      if (entry === undefined) throw new Error(`No entry ${answer[LABEL]} at ${question}`);
+      terminal.escapes.push(options.quit);
+      // A test may give an answer that comes later, as a promise.
+      const answer: unknown = await terminal.choices.shift();
+      if (answer === undefined || answer === CANCELLED) return answer;
+      const entry = isByLabel(answer)
+        ? choices.find((choice) => choice.label === answer[LABEL])
+        : choices.find((choice) => Object.is(choice.value, answer));
+      if (entry === undefined) {
+        const named = isByLabel(answer) ? answer[LABEL] : inspect(answer);
+        throw new Error(`No entry ${named} at ${question}`);
+      }
       return entry.value;
-    }) as TerminalChoice["choose"],
+    },
   };
 }
 
 /**
- * `save`, unless `terminal.saveFailures` says that it fails first, with the errno code
- * `terminal.saveFailureCode`, as the file system reports it.
+ * node:fs/promises, the program's edge, whose next `terminal.saveFailures` writes of a file fail
+ * with the errno code `terminal.saveFailureCode`, as the file system reports it; every save of the
+ * program writes its file so. Everything else is the real file system.
  */
-export async function failingSave<T>(save: () => Promise<T>): Promise<T> {
-  if (terminal.saveFailures > 0) {
-    terminal.saveFailures -= 1;
-    const code = terminal.saveFailureCode;
-    throw Object.assign(new Error(`${code}: the save failed, write`), { code });
-  }
-  return save();
+export function replacedFiles(actual: typeof FileSystem): typeof FileSystem {
+  return {
+    ...actual,
+    writeFile: async (...write: Parameters<typeof actual.writeFile>) => {
+      if (terminal.saveFailures > 0) {
+        terminal.saveFailures -= 1;
+        const code = terminal.saveFailureCode;
+        throw Object.assign(new Error(`${code}: the save failed, write`), { code });
+      }
+      return actual.writeFile(...write);
+    },
+  };
 }
 
 /** Gives standard error the size of a terminal window, as a test of what fits on it needs. */
@@ -169,10 +222,10 @@ export function questionsOnPrivateScreen(): void {
       stdoutTerminal: false,
       privateScreen: true,
     });
-    Object.assign(seen, { screen: "", out: [], notices: [] });
+    Object.assign(seen, { screen: "", out: [], notices: [], refusals: [] });
     vi.stubEnv("NO_COLOR", "1");
     vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      seen.screen += Buffer.from(chunk as Uint8Array).toString("utf8");
+      seen.screen += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
       return true;
     });
     vi.spyOn(console, "log").mockImplementation((...line: unknown[]) => {

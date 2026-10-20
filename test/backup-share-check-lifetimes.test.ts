@@ -5,6 +5,7 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareCombineRefusalError } from "../src/sskr/share-platform.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { deferred } from "./helpers/deferred.js";
 
 // Public bip39-128-2-of-3 shares and independently specified phrase from sskr-v1.json.
 const SHARES = [
@@ -18,14 +19,6 @@ const DATE = { year: 2026, month: 9, day: 23 };
 const TEXTS = { decodeEntry: "Decode" };
 const WIPED_CODE = "core.secret-value.wiped";
 let maskedShares: readonly string[] = [];
-
-function deferredTurn(): { promise: Promise<void>; release: () => void } {
-  let release: (() => void) | undefined;
-  const promise = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  return { promise, release: () => release!() };
-}
 
 function observeSets() {
   // Both public factories keep their real implementations and return their actual promises.
@@ -56,8 +49,8 @@ describe("A share backup check across an awaited host recovery", () => {
   ] as const)(
     "refuses late %s publication when the disposed check's host completes with %s",
     async (operation, outcome) => {
-      const entered = deferredTurn();
-      const gate = deferredTurn();
+      const entered = deferred();
+      const gate = deferred();
       const setPromises = observeSets();
       const published = vi.spyOn(RestoredShares, "of");
       const check = new ShareBackupCheck(

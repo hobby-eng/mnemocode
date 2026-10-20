@@ -2,18 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 import { choose } from "../src/cli/terminal-choice.js";
 
-const keyboard = vi.hoisted(() => ({ bytes: [] as number[] }));
-vi.mock("../src/cli/terminal-input.js", async (original) => ({
-  ...(await original<typeof import("../src/cli/terminal-input.js")>()),
-  dropTypedAhead: async () => undefined,
-  withRawTerminal: async <T>(
-    body: (next: () => Promise<number | undefined>, more: () => Promise<boolean>) => Promise<T>,
-  ) =>
-    body(
-      async () => keyboard.bytes.shift(),
-      async () => keyboard.bytes.length > 0,
-    ),
-}));
+const typing = await vi.hoisted(async () => import("./helpers/typed-keys.js"));
+vi.mock("../src/cli/terminal-input.js", async (original) =>
+  typing.replacedTerminalInput(await original()),
+);
+const { keyboard } = typing;
 
 // The step screens of the private screen: what each step's screen draws again under its title.
 

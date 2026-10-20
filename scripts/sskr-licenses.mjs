@@ -13,7 +13,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { MEBIBYTE } from "../src/core/byte-units.ts";
 import { ErrorCatalog } from "../src/core/error-catalog.ts";
+import { ruledTitle } from "./executable-notices.mjs";
 
 const ERRORS = new ErrorCatalog("scripts.sskr-licenses", {
   /**
@@ -27,6 +29,11 @@ const CRATE = join(root, "sskr-wasm", "rust");
 const OUTPUT = join(root, "sskr-wasm", "LINKED_LICENSES.txt");
 /** The target that the engine is built for. */
 const TARGET = "wasm32-unknown-unknown";
+/**
+ * The most output `cargo metadata` may give before execFileSync refuses it: 64 MiB, far above the
+ * metadata of the engine's dependency tree, which takes about half a megabyte.
+ */
+const METADATA_BYTES = 64 * MEBIBYTE;
 /** The files of a crate that hold its license or its notices. */
 const LICENSE_FILE = /^(?:licen[cs]e|copying|notice)(?:[-.][\w.-]*)?$/iu;
 /**
@@ -43,7 +50,7 @@ function linkedCrates() {
     execFileSync(
       "cargo",
       ["metadata", "--locked", "--format-version", "1", "--filter-platform", TARGET],
-      { cwd: CRATE, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+      { cwd: CRATE, encoding: "utf8", maxBuffer: METADATA_BYTES },
     ),
   );
   const packages = new Map(metadata.packages.map((item) => [item.id, item]));
@@ -134,7 +141,6 @@ function licensesOf(crate) {
 /** The text of LINKED_LICENSES.txt. */
 function notices() {
   const crates = linkedCrates();
-  const rule = "=".repeat(78);
   const parts = [
     "Licenses of the crates linked into the SSKR engine (sskr-wasm)",
     "",
@@ -149,7 +155,7 @@ function notices() {
     if (texts.length === 0 && crate.license === "CC0-1.0") continue;
     if (texts.length === 0)
       throw ERRORS.create("crate-holds-no-license-file", [`${crate.name} ${crate.version}`]);
-    parts.push("", rule, `${crate.name} ${crate.version}: ${licensesOf(crate)}`, rule);
+    parts.push("", ruledTitle(`${crate.name} ${crate.version}: ${licensesOf(crate)}`));
     for (const { file, text } of texts) parts.push("", `--- ${file}`, "", text);
   }
   return `${parts.join("\n")}\n`;

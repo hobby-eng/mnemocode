@@ -4,7 +4,7 @@ import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { releaseRead, ShareRestore } from "../src/sskr/share-restore.js";
 import { JointRepair } from "../src/sskr/joint-repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { questionsOnPrivateScreen, seen } from "./helpers/question-terminal.js";
 import { endLifetimeIfPresent } from "./helpers/owner-lifetime.js";
 import { marked, SHARES } from "./helpers/share-questions.js";
@@ -15,22 +15,25 @@ vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOr
 vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
   harness.replacedPrivateScreen(await importOriginal()),
 );
-vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
-  ...harness.replacedTerminalInput(await importOriginal()),
-  withCtrlCWatch: async <T>(step: (signal: AbortSignal) => Promise<T>): Promise<T> => {
-    const controller = new AbortController();
-    const result = await step(controller.signal);
-    if (watch.cancelAfterAssessment) controller.abort();
-    return result;
-  },
-}));
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
+  const input = harness.replacedTerminalInput(await importOriginal());
+  class CancellingWatch extends input.CtrlCWatch {
+    static override async during<T>(step: (signal: AbortSignal) => Promise<T>): Promise<T> {
+      const controller = new AbortController();
+      const result = await step(controller.signal);
+      if (watch.cancelAfterAssessment) controller.abort();
+      return result;
+    }
+  }
+  return { ...input, CtrlCWatch: CancellingWatch };
+});
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
   harness.replacedTerminalChoice(await importOriginal()),
 );
 
 questionsOnPrivateScreen();
 
-describe("Marked assessment ownership at the terminal boundary", () => {
+describe("Marked assessment ownership where terminal output fails", () => {
   it("releases the new marked plan when printing its assessment fails", async () => {
     using shares = new TypedShares();
     const records = [SHARES[0], marked([5])];
@@ -88,7 +91,7 @@ describe("Marked assessment ownership at the terminal boundary", () => {
       expect(found.kind).toBe("sets");
       if (found.kind !== "sets")
         throw new Error("The public fixture must restore its known phrase.");
-      expect(found.sets.map(({ mnemonic }) => mnemonic)).toEqual([sskrSetVector.phrase]);
+      expect(found.sets.map(({ mnemonic }) => mnemonic)).toEqual([SSKR_SET_VECTOR.phrase]);
       expect(shares.input.texts()).toEqual(records);
     } finally {
       for (const result of reads.mock.results)

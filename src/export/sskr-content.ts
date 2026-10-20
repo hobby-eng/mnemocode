@@ -19,7 +19,10 @@ export const SSKR_CARD_LAYOUTS = Object.freeze(["qr", "collection", "individual"
 /** A layout of share cards (SSKR_CARD_LAYOUTS). */
 export type SskrCardLayout = (typeof SSKR_CARD_LAYOUTS)[number];
 
-/** `value` as a layout of share cards; undefined stays undefined, for the page size to decide. */
+/**
+ * `value` as a layout of share cards; undefined stays undefined, for the page size to decide.
+ * Refuses a name of no layout, naming those there are (export.sskr-content.card-layout-one).
+ */
 export function parseSskrLayout(value: string | undefined): SskrCardLayout | undefined {
   if (value === undefined) return undefined;
   if (!isOneOf(SSKR_CARD_LAYOUTS, value))
@@ -29,7 +32,10 @@ export function parseSskrLayout(value: string | undefined): SskrCardLayout | und
 /**
  * The page size decides the layout, as for ordinary cards: a sheet size gives one
  * collection sheet per share, a card size gives separate numbered cards. A QR card
- * holds one whole share and is available in every size.
+ * holds one whole share and is available in every size. Refuses a collection sheet of the
+ * business size (export.sskr-content.business-page-size-gives-separate-cards-choose-size), and
+ * separate cards of a sheet size
+ * (export.card-settings.separate-cards-business-size-choose-business-size-leave).
  */
 export function resolveSskrLayout(
   requested: SskrCardLayout | undefined,
@@ -73,6 +79,9 @@ export interface SskrCardContent extends CardSettings {
   readonly collectionReference: string;
   /** Whether its sheet carries a QR code of the whole share (the qr layout); none when absent. */
   readonly qrCard?: boolean;
-  /** The title that the frame of its sheet names; the studio's name when absent. */
-  readonly title?: string;
+  /**
+   * The title that the frame of its sheet names, a text of a card (cardTitle); the studio's name
+   * when absent.
+   */
+  readonly title?: string | undefined;
 }

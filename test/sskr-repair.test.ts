@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -17,14 +16,11 @@ import { crc32 } from "../src/sskr/checksum.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { combineSskrShares } from "../src/sskr/shares.js";
 import { shareBackupVerdict } from "./helpers/share-backup-check.js";
-import { joinUnits, markUnits, shareUnits } from "./helpers/shares.js";
+import { joinUnits, markDigits, markUnits, shareUnits } from "./helpers/shares.js";
+import { sskrVectors } from "./helpers/vectors.js";
+import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-) as {
-  deterministic: { name: string; entropy: string; shares: string[] }[];
-  official: { shares: string[] };
-};
+const vectors = sskrVectors();
 const FORMATS: readonly ShareFormat[] = SHARE_FORMATS;
 
 describe("One explicit unreadable SSKR element", () => {
@@ -204,64 +200,45 @@ describe("Several unreadable SSKR elements", () => {
     }
   });
 
-  it("lets the secret digest pick among variants when the phrase is restored", async () => {
-    const vector = vectors.deterministic[4]!;
-    const expected = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
-    for (const format of ["indexes", "unicode", "colors", "colors-unicode"] as const) {
-      const first = shareUnits(vector.shares[0]!, format);
-      const second = shareUnits(vector.shares[1]!, format);
-      // Colors take 24 bits each: two of them; the 11-bit forms three, in both shares.
-      const places = format.startsWith("colors") ? [3, 6] : [2, 8, 14];
-      for (const place of places) {
-        first[place] = "?";
-        second[place] = "?";
+  it(
+    "lets the secret digest pick among variants when the phrase is restored",
+    async () => {
+      const vector = vectors.deterministic[4]!;
+      const expected = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
+      for (const format of ["indexes", "unicode", "colors", "colors-unicode"] as const) {
+        const first = shareUnits(vector.shares[0]!, format);
+        const second = shareUnits(vector.shares[1]!, format);
+        // Colors take 24 bits each: two of them; the 11-bit forms three, in both shares.
+        const places = format.startsWith("colors") ? [3, 6] : [2, 8, 14];
+        for (const place of places) {
+          first[place] = "?";
+          second[place] = "?";
+        }
+        const restore = format.startsWith("colors")
+          ? [joinUnits(first, format), vector.shares[1]!]
+          : [joinUnits(first, format), joinUnits(second, format)];
+        expect(await combineSskrShares(restore), format).toBe(expected);
       }
-      const restore = format.startsWith("colors")
-        ? [joinUnits(first, format), vector.shares[1]!]
-        : [joinUnits(first, format), joinUnits(second, format)];
-      expect(await combineSskrShares(restore), format).toBe(expected);
-    }
-  }, 120_000);
+    },
+    LONG_TEST_TIME_LIMIT_MS,
+  );
 });
 
 const vector = vectors.deterministic[0]!;
 const share = vector.shares[0]!;
 
-/** The share in `format` with the elements at `places` marked whole. */
-function wholeMarks(format: ShareFormat, places: readonly number[]): string {
-  const parts = shareUnits(share, format);
-  for (const place of places) parts[place] = "?";
-  return joinUnits(parts, format);
-}
-
-/**
- * The share in `format` with the digits at `digits` (from 0, after any #) of each element
- * unreadable.
- */
-function markDigits(format: ShareFormat, marks: Record<number, readonly number[]>): string {
-  const parts = shareUnits(share, format);
-  for (const [place, digits] of Object.entries(marks)) {
-    const part = parts[Number(place)]!;
-    const prefix = part.startsWith("#") ? "#" : "";
-    const symbols = Array.from(part.slice(prefix.length));
-    for (const digit of digits) symbols[digit] = "?";
-    parts[Number(place)] = prefix + symbols.join("");
-  }
-  return joinUnits(parts, format);
-}
-
 describe("Unreadable digits inside a color or a Unicode code", () => {
   it("uses the digits read of colors: three colors missing two digits each are settled", () => {
     const colors = shareUnits(share, "colors");
     // Places 4 to 6 hold only the secret, which nothing but the checksum settles.
-    const typed = markDigits("colors", { 4: [4, 5], 5: [0, 3], 6: [1, 2] });
+    const typed = markDigits(share, "colors", { 4: [4, 5], 5: [0, 3], 6: [1, 2] });
     const read = readRepairableShare(typed);
     expect(read.ur).toBe(share);
     expect(read.filled).toEqual(
       [4, 5, 6].map((place) => ({ position: place + 1, value: colors[place] })),
     );
     // The same colors marked whole leave too many open bits for one share alone.
-    expect(() => readRepairableShare(wholeMarks("colors", [4, 5, 6]))).toThrow(
+    expect(() => readRepairableShare(markUnits(share, "colors", [4, 5, 6]))).toThrow(
       /Too many|shares fit/u,
     );
     // A lone ?, ?????? and #? are each the whole color.
@@ -297,14 +274,14 @@ describe("Unreadable digits inside a color or a Unicode code", () => {
 
   it("tries the words whose Unicode code fits the digits read", () => {
     const codes = shareUnits(share, "unicode");
-    const typed = markDigits("unicode", { 4: [3], 7: [2], 9: [1], 12: [3], 15: [2] });
+    const typed = markDigits(share, "unicode", { 4: [3], 7: [2], 9: [1], 12: [3], 15: [2] });
     const read = readRepairableShare(typed);
     expect(read.ur).toBe(share);
     expect(read.filled.map((element) => element.value)).toEqual(
       [4, 7, 9, 12, 15].map((place) => codes[place]),
     );
     // Five whole codes are more than six marks' worth of checks alone can settle without variants.
-    expect(() => readRepairableShare(wholeMarks("unicode", [4, 7, 9, 12, 15]))).toThrow(
+    expect(() => readRepairableShare(markUnits(share, "unicode", [4, 7, 9, 12, 15]))).toThrow(
       expect.objectContaining({ code: "sskr.repair.too-many-marks-for-form" }),
     );
   });

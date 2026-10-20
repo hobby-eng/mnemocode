@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { askSecretUntil } from "../src/cli/ask.js";
 import { runDecode } from "../src/cli/decode-command.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
-import { runSskrCombine } from "../src/cli/sskr-command.js";
+import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { encodeMnemonic, formatEncoded, parseDate } from "../src/core.js";
 import { ENCODED_FORMATS } from "../src/core/types.js";
 import { serializeRecord } from "../src/record.js";

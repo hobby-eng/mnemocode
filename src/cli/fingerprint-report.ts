@@ -26,7 +26,7 @@ export const FINGERPRINTS_HINT = `BIP32 fingerprints above use an ${FINGERPRINT_
  * What a phrase whose BIP39 checksum fails says: its dates or its codes are probably wrong. One
  * text, on a terminal and in plain lines.
  */
-export const CHECKSUM_INVALID = "invalid — dates or input may be wrong";
+const CHECKSUM_INVALID = "invalid — dates or input may be wrong";
 
 /**
  * A fingerprint as a plain line: of the original seed phrase, or of the encoded one, which is the

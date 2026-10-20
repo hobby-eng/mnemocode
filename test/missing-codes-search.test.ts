@@ -88,6 +88,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     );
     const three = MissingCodes.read(digits.join(" "), "indexes", "seedshift");
     expect(MissingCodesSearch.placesText(three)).toBe("Codes 2, 6 and 9");
+    // A missing fingerprint, which no type allows, fed on purpose as a JavaScript host could.
     expect(() => new MissingCodesSearch(plain, undefined as never)).toThrow(TypeError);
   });
 

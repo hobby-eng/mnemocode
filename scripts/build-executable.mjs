@@ -45,6 +45,7 @@ import {
   SSKR_MANIFEST,
 } from "../src/bundled-file-paths.ts";
 import { ERRORS, PublicationRollbackError } from "./executable-build-errors.mjs";
+import { afterFailure } from "../src/core/refusal.ts";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const output = resolve(process.argv[2] ?? join(root, RELEASE_FOLDER));
@@ -89,6 +90,25 @@ mkdirSync(output, { recursive: true });
 let work;
 let staging;
 let keepStaging = false;
+const removeWork = () => {
+  if (work !== undefined) rmSync(work, { recursive: true, force: true });
+};
+// The staging folder stays where it holds the last copies after a failed rollback.
+const removeStaging = () => {
+  if (staging !== undefined && !keepStaging) rmSync(staging, { recursive: true, force: true });
+};
+/**
+ * Removes both temporary folders, each whatever happens to the other: a failure to remove the
+ * staging folder is named beside one to remove the work folder, never in its place (CORE-22).
+ */
+async function removeFolders() {
+  try {
+    removeWork();
+  } catch (error) {
+    throw await afterFailure(error, removeStaging);
+  }
+  removeStaging();
+}
 try {
   // Allocation itself can fail; every successfully allocated directory is covered by cleanup.
   work = mkdtempSync(join(tmpdir(), "mnemocode-executable-build-"));
@@ -192,10 +212,9 @@ try {
     throw error;
   }
   for (const line of lines) console.log(line);
-} finally {
-  try {
-    if (work !== undefined) rmSync(work, { recursive: true, force: true });
-  } finally {
-    if (staging !== undefined && !keepStaging) rmSync(staging, { recursive: true, force: true });
-  }
+} catch (error) {
+  // A folder that cannot be removed is named beside the failure, such as a
+  // PublicationRollbackError, never in its place (CORE-22).
+  throw await afterFailure(error, removeFolders);
 }
+await removeFolders();

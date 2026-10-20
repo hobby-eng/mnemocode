@@ -3,22 +3,22 @@ import { readFileSync } from "node:fs";
 import { businessOptions } from "../src/cli/business-options.js";
 import { parseArguments } from "../src/cli/arguments.js";
 import {
-  cardFooters,
-  cardSlogans,
-  cardSubtitles,
-  studioNames,
+  CARD_FOOTERS,
+  CARD_SLOGANS,
+  CARD_SUBTITLES,
+  STUDIO_NAMES,
   resolveCardPresentation,
 } from "../src/export/card-copy.js";
 
 describe("export-level card presentation", () => {
   it("keeps the deduplicated union and the complete independent text pools", () => {
-    expect(studioNames).toHaveLength(37);
-    expect(new Set(studioNames).size).toBe(37);
-    expect(studioNames).toContain("Alder & Vale");
-    expect(studioNames).toContain("Fallow & Reed");
-    expect(cardSlogans).toHaveLength(29);
-    expect(cardSubtitles).toHaveLength(5);
-    expect(cardFooters).toHaveLength(6);
+    expect(STUDIO_NAMES).toHaveLength(37);
+    expect(new Set(STUDIO_NAMES).size).toBe(37);
+    expect(STUDIO_NAMES).toContain("Alder & Vale");
+    expect(STUDIO_NAMES).toContain("Fallow & Reed");
+    expect(CARD_SLOGANS).toHaveLength(29);
+    expect(CARD_SUBTITLES).toHaveLength(5);
+    expect(CARD_FOOTERS).toHaveLength(6);
   });
   it("is counted in docs/card-identities.md as the pools are (AUD-022-DOC002)", () => {
     const text = readFileSync("docs/card-identities.md", "utf8");
@@ -27,10 +27,10 @@ describe("export-level card presentation", () => {
       const written = new RegExp(`(\\d+|five|six) ${what}`, "u").exec(text)?.[1];
       return written === undefined ? undefined : (numbers[written] ?? Number(written));
     };
-    expect(counted("studio names")).toBe(studioNames.length);
-    expect(counted("slogans")).toBe(cardSlogans.length);
-    expect(counted("subtitles")).toBe(cardSubtitles.length);
-    expect(counted("footers")).toBe(cardFooters.length);
+    expect(counted("studio names")).toBe(STUDIO_NAMES.length);
+    expect(counted("slogans")).toBe(CARD_SLOGANS.length);
+    expect(counted("subtitles")).toBe(CARD_SUBTITLES.length);
+    expect(counted("footers")).toBe(CARD_FOOTERS.length);
   });
   it("draws the sheet copy in its order, one choice for each text", () => {
     const choose = vi
@@ -43,9 +43,9 @@ describe("export-level card presentation", () => {
     expect(choose.mock.calls).toEqual([[37], [29], [5], [6]]);
     expect(presentation).toEqual({
       studioName: "Alder & Vale",
-      slogan: cardSlogans[28],
-      subtitle: cardSubtitles[4],
-      footer: cardFooters[5],
+      slogan: CARD_SLOGANS[28],
+      subtitle: CARD_SUBTITLES[4],
+      footer: CARD_FOOTERS[5],
       referenceLabel: "Ref.",
     });
   });

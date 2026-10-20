@@ -1,14 +1,26 @@
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { scriptExports } from "./helpers/script-exports.js";
 
 // scripts/verify-markdown.mjs refuses a key document that shows another fingerprint than the
 // release key. It finds them with shownFingerprints (scripts/release-key.mjs), which must find a
 // fingerprint in every form a person may paste, or a wrong key would pass unreported.
 
-const script = new URL("../scripts/release-key.mjs", import.meta.url).href;
-const { SIGNING_KEY, shownFingerprints } = (await import(script)) as {
+/** The part of scripts/release-key.mjs that this test uses; the script has no types. */
+interface ReleaseKey {
+  readonly KEY_DOCUMENTS: readonly string[];
   readonly SIGNING_KEY: string;
   readonly shownFingerprints: (text: string) => string[];
-};
+}
+
+const { KEY_DOCUMENTS, SIGNING_KEY, shownFingerprints } = await scriptExports<ReleaseKey>(
+  "scripts/release-key.mjs",
+  { KEY_DOCUMENTS: "object", SIGNING_KEY: "string", shownFingerprints: "function" },
+);
+
+/** The frozen records of their releases and audits, which no check of the key reads. */
+const FROZEN_RECORDS = /^(?:CHANGELOG\.md$|docs\/releases\/|docs\/audits\/)/u;
 
 /** `fingerprint` as `gpg --fingerprint` prints it: groups of four, two spaces in the middle. */
 function gnupgForm(fingerprint: string): string {
@@ -42,5 +54,16 @@ describe("the fingerprints that a key document shows", () => {
     // A SHA-256 checksum has 64 digits, and 39 digits are too few.
     expect(shownFingerprints(`${SIGNING_KEY}${SIGNING_KEY.slice(0, 24)}`)).toEqual([]);
     expect(shownFingerprints(SIGNING_KEY.slice(1))).toEqual([]);
+  });
+
+  it("is checked in every document that shows it, but the frozen records", () => {
+    const listing = execFileSync("git", ["ls-files", "-z", "--", "*.md"], { encoding: "utf8" });
+    const documents = listing
+      .split("\0")
+      .filter((path) => path !== "" && !FROZEN_RECORDS.test(path));
+    const showing = documents.filter((path) =>
+      shownFingerprints(readFileSync(path, "utf8")).includes(SIGNING_KEY),
+    );
+    expect(showing.sort()).toEqual([...KEY_DOCUMENTS].sort());
   });
 });

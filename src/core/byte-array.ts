@@ -19,8 +19,10 @@ export class ByteArray {
       if (ARRAY_NAME.call(value) !== "Uint8Array") return undefined;
       // Creating the intrinsic iterator validates attachment without reading or copying bytes.
       Reflect.apply(VALUES, value, []);
-      // The intrinsic getter on the admitted storage returns its numeric length, not an own field.
-      return BYTE_LENGTH.call(value) as number;
+      // The intrinsic getter on the admitted storage returns its numeric length, not an own field;
+      // the standard library types it as any, so the number is checked rather than assumed.
+      const length: unknown = BYTE_LENGTH.call(value);
+      return typeof length === "number" ? length : undefined;
     } catch {
       return undefined;
     }

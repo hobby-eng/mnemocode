@@ -37,7 +37,7 @@ const LIBRARY_ROWS = [
 ];
 /** The rows that need the host's SSKR library throughout, left out without it. */
 const SHARE_ONLY_ROWS = new Set(["SSKR integrity", "Share split and restore"]);
-/** The features that the command line builds in, and their rows. */
+/** Four of the features that the command line builds in (cli/self-test.ts), and their rows. */
 const FEATURES = [
   WALLET_EVIDENCE_SELF_TEST,
   COIN_ADDRESS_SELF_TEST,
@@ -87,6 +87,25 @@ describe("The self-test as a library (core/self-test.ts)", () => {
     expect(detail("Backup check")).not.toContain("shares");
   });
 
+  it("times each check and the whole self-test by the host's clock", async () => {
+    // A clock that moves only while the host's own checks run: 1.5 s first, 0.25 s last.
+    let time = 0;
+    const report = await new MnemoCodeSelfTest({
+      fingerprint: (mnemonic) => fingerprints.fingerprint(mnemonic),
+      publicVectors,
+      now: () => time,
+      before: [{ name: "Host first", detail: "", run: () => void (time += 1_500) }],
+      after: [{ name: "Host last", detail: "", run: () => void (time += 250) }],
+    }).run();
+    const library = LIBRARY_ROWS.filter((name) => !SHARE_ONLY_ROWS.has(name));
+    expect(report.rows.map((row) => row.milliseconds)).toEqual([
+      1_500,
+      ...library.map(() => 0),
+      250,
+    ]);
+    expect(report.milliseconds).toBe(1_750);
+  });
+
   it("stops at the first check that fails, and refuses a damaged vectors file", async () => {
     const failing = new MnemoCodeSelfTest({
       fingerprint: () => "00000000",
@@ -98,6 +117,7 @@ describe("The self-test as a library (core/self-test.ts)", () => {
       publicVectors: { version: 1, vectors: [] },
     });
     await expect(empty.run()).rejects.toThrow(/missing required vector/u);
+    // Options without the host's fingerprint, given on purpose as a JavaScript host could.
     expect(() => new MnemoCodeSelfTest({ publicVectors } as never)).toThrow(TypeError);
   });
 
@@ -139,6 +159,7 @@ describe("The self-test as a library (core/self-test.ts)", () => {
         (await import("./src/core/coins-self-test.ts")).COIN_ADDRESS_SELF_TEST,
         (await import("./src/export/heir-sheet-self-test.ts")).heirSheetSelfTest(renderer),
         (await import("./src/export/sskr-render-self-test.ts")).shareCardsSelfTest(renderer),
+        (await import("./src/export/card-sets-self-test.ts")).cardSetsSelfTest(renderer),
       ];
       MnemoCodeSelfTest.core(features);
       console.log("quick checks passed");

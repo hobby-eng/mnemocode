@@ -3,13 +3,15 @@
 // it is never reported as a failed save, nor left unmentioned. Only the removal of the staging
 // folder is made to fail; the file and its bytes are real. Public test data only.
 
-import { mkdtemp, readFile, readdir } from "node:fs/promises";
-import * as actualFs from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ failCleanup: false, failLink: false, notices: [] as string[] }));
+const state = vi.hoisted((): { failCleanup: boolean; failLink: boolean; notices: string[] } => ({
+  failCleanup: false,
+  failLink: false,
+  notices: [],
+}));
 vi.mock("node:fs/promises", async (original) => {
   const fs = await original<typeof import("node:fs/promises")>();
   return {
@@ -26,29 +28,31 @@ vi.mock("node:fs/promises", async (original) => {
     },
   };
 });
-vi.mock("../src/cli/terminal.js", async (original) => ({
-  ...(await original<typeof import("../src/cli/terminal.js")>()),
-  terminalNotice: (text: string) => state.notices.push(text),
-}));
-
 import { LeftStagingCopyError, publishNewPrivateFile } from "../src/export/private-file.js";
 import { writeSaved } from "../src/cli/save-retry.js";
 import { saveQrBeside, saveQrInside } from "../src/cli/qr-export.js";
+import { testPath } from "./helpers/test-folders.js";
 
 const BYTES = new TextEncoder().encode("public fixture");
-const folders: string[] = [];
 
-afterEach(async () => {
+// The notices are read where the command line writes them, on standard error, as the person reads
+// them; standard error is no terminal here, so each is one plain line.
+beforeEach(() => {
+  vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
+    state.notices.push(line.join(" "));
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
   state.failCleanup = false;
   state.failLink = false;
   state.notices = [];
-  for (const path of folders.splice(0)) await actualFs.rm(path, { recursive: true, force: true });
 });
 
+/** A new path in a folder of its own, which the test removes. */
 async function newPath(): Promise<string> {
-  const folder = await mkdtemp(join(tmpdir(), "mnemocode-aud014-staging-"));
-  folders.push(folder);
-  return join(folder, "public-output.bin");
+  return testPath("mnemocode-aud014-staging-", "public-output.bin");
 }
 
 describe("a staging copy left after a complete save", () => {
@@ -56,9 +60,9 @@ describe("a staging copy left after a complete save", () => {
     const path = await newPath();
     state.failCleanup = true;
     const failure = await publishNewPrivateFile(path, BYTES).catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(LeftStagingCopyError);
-    expect((failure as LeftStagingCopyError).saved).toBe(path);
-    expect((failure as LeftStagingCopyError).message).toMatch(/^Saved .*delete it\.$/u);
+    assert.instanceOf(failure, LeftStagingCopyError);
+    expect(failure.saved).toBe(path);
+    expect(failure.message).toMatch(/^Saved .*delete it\.$/u);
     expect(await readFile(path, "utf8")).toBe("public fixture");
   });
 

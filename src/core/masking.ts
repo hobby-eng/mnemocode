@@ -257,13 +257,9 @@ export class Masking {
   /** Every mode, in the order the menu and the help name them. */
   static readonly MODES: readonly MaskingMode[] = MODES;
 
-  /** The one value of each mode. */
-  static readonly #values: Readonly<Record<MaskingMode, Masking>> = Object.freeze(
-    // MODES is MASKING_MODES: the map gives an entry for every mode, so the record has every key.
-    Object.fromEntries(MODES.map((mode) => [mode, new Masking(mode)])) as Record<
-      MaskingMode,
-      Masking
-    >,
+  /** The one value of each mode, made from MODES, which is MASKING_MODES: every mode. */
+  static readonly #values: ReadonlyMap<MaskingMode, Masking> = new Map(
+    MODES.map((mode) => [mode, new Masking(mode)]),
   );
 
   /** Whether `value` names a mode; a JavaScript host or a parsed file may pass anything. */
@@ -271,10 +267,10 @@ export class Masking {
     return isMaskingMode(value);
   }
 
-  /** The masking of `mode`; refuses a value that names none. */
+  /** The masking of `mode`; refuses a value that names none (core.masking.unsupported-mode). */
   static of(mode: MaskingMode): Masking {
     if (!Masking.isMode(mode)) throw ERRORS.create("unsupported-mode", []);
-    return Masking.#values[mode];
+    return defined(Masking.#values.get(mode));
   }
 
   /** This mode's stable record and command-line identifier. */
@@ -293,10 +289,11 @@ export class Masking {
   }
 
   /**
-   * Refuses `count` dates where the mode takes none, and none where it needs them, unless they are
-   * asked later (`askedLater`), on the private screen, in the command's `words`. Every command
-   * checks the dates it was given with it before it reads a secret; the shifts refuse a masking
-   * without dates again (deriveShifts).
+   * Refuses `count` dates where the mode takes none (core.masking.assert-takes-dates-refused), and
+   * none where it needs them (assert-date-count-refused), unless they are asked later
+   * (`askedLater`), on the private screen, in the command's `words`. Every command checks the dates
+   * it was given with it before it reads a secret; the shifts refuse a masking without dates again
+   * (deriveShifts).
    */
   assertDateCount(
     count: number,
@@ -383,8 +380,9 @@ export class Masking {
   }
 
   /**
-   * Refuses a value that names no mode with dates: a JavaScript host may pass any value, and
-   * another mode would silently decode another way. The guard of every date search.
+   * Refuses a value that names no mode with dates (core.masking.unsupported-mode): a JavaScript
+   * host may pass any value, and another mode would silently decode another way. The guard of every
+   * date search.
    */
   static assertMaskedMode(mode: unknown): asserts mode is MaskedMode {
     if (!Masking.isMaskedMode(mode)) throw ERRORS.create("unsupported-mode", []);
@@ -395,7 +393,7 @@ export class Masking {
     return Masking.isMode(mode) && VARIANTS[mode].capabilities.split;
   }
 
-  /** Refuses a mode in which no shares are made (SPLIT_MODES_ONLY). */
+  /** Refuses a mode in which no shares are made (core.masking.split-modes-only). */
   static assertSplitMode(mode: unknown): asserts mode is SplitMode {
     if (!Masking.isSplitMode(mode)) throw ERRORS.create("split-modes-only", []);
   }
@@ -405,7 +403,10 @@ export class Masking {
     return Masking.isMode(mode) && VARIANTS[mode].capabilities.heirSheet;
   }
 
-  /** Refuses a mode for which no sheet for heirs can be made: only a search finds its phrase. */
+  /**
+   * Refuses a mode for which no sheet for heirs can be made: only a search finds its phrase
+   * (core.masking.sheet-heirs-cannot-made-only-search-finds-seed).
+   */
   static assertHeirSheetMode(mode: unknown): asserts mode is HeirSheetMode {
     if (!Masking.isHeirSheetMode(mode))
       throw ERRORS.create("sheet-heirs-cannot-made-only-search-finds-seed", [
@@ -413,7 +414,14 @@ export class Masking {
       ]);
   }
 
-  /** The codes of `mnemonic` masked with `dates` in this mode; no dates without Seedshift. */
+  /**
+   * The codes of `mnemonic` masked with `dates` in this mode. Refuses dates given to a mode without
+   * Seedshift (core.masking.assert-takes-dates-refused), a phrase that validatedEnglishWords
+   * refuses (core.words.enter-english-bip39-words, unknown-english-bip39-word-at-position,
+   * words-fail-bip39-checksum-check-each-word-their), and, in a masked mode, dates that
+   * deriveShifts refuses (core.dates.no-date, derive-shifts-refused and the calendar checks it
+   * names).
+   */
   encode(mnemonic: string, dates: readonly DateShiftDate[]): EncodedResult {
     this.#assertTakesDates(dates.length);
     return this.#variant.encode(mnemonic, dates);
@@ -421,7 +429,9 @@ export class Masking {
 
   /**
    * The phrase that a backup made of `mnemonic` in this mode holds, in its shares or its codes:
-   * the seed phrase itself, or the phrase that Seedshift masks it as with `dates`.
+   * the seed phrase itself, or the phrase that Seedshift masks it as with `dates`. Refuses what
+   * encode refuses (core.masking.assert-takes-dates-refused, the core.words checks of the phrase,
+   * core.dates.no-date and the other refusals of deriveShifts).
    */
   held(mnemonic: string, dates: readonly DateShiftDate[]): string {
     return this.encode(mnemonic, dates).shiftedEnglish.join(" ");
@@ -429,8 +439,10 @@ export class Masking {
 
   /**
    * Every phrase that `indexes`, BIP39 indexes from 0 to 2047, and the complete `dates` give: one,
-   * unless givesSeveral. Throws when the codes cannot be undone in this mode, and for dates
-   * without Seedshift.
+   * unless givesSeveral. Throws when the codes cannot be undone in this mode (assertCodes), for
+   * dates without Seedshift (core.masking.assert-takes-dates-refused), and, in a masked mode, for
+   * dates that deriveShifts refuses (core.dates.no-date, derive-shifts-refused and the calendar
+   * checks it names).
    */
   undo(indexes: readonly number[], dates: readonly DateShiftDate[]): DecodedResult[] {
     this.#assertTakesDates(dates.length);
@@ -439,8 +451,10 @@ export class Masking {
   }
 
   /**
-   * Refuses codes that this mode cannot have written: a phrase's count and BIP39 indexes, and,
-   * where the mode keeps the checksum (keepsChecksum), a valid one (MissingChecksumError).
+   * Refuses codes that this mode cannot have written: a phrase's count and BIP39 indexes
+   * (assertPhraseIndexes: core.bip39-sizes.expected-word-indexes, assert-word-indexes-refused),
+   * and, where the mode keeps the checksum (keepsChecksum), a valid one (MissingChecksumError,
+   * code missing-checksum).
    */
   assertCodes(indexes: readonly number[]): void {
     // Checked before the words are looked up, which would report a bad index as a bad checksum.
@@ -451,7 +465,9 @@ export class Masking {
 
   /**
    * The checksum-valid phrases, so the wallet checks, that one date combination of a search gives
-   * on average for a phrase of `wordCount` words, from the checksum bits of the phrase.
+   * on average for a phrase of `wordCount` words, from the checksum bits of the phrase. Refuses a
+   * count of words that no BIP39 phrase has (assertWordCount:
+   * core.bip39-sizes.expected-word-indexes).
    */
   checksPerCombination(wordCount: number): number {
     assertWordCount(wordCount);
@@ -462,7 +478,8 @@ export class Masking {
    * The wallet checks that decoding one set of codes with complete dates gives on average, for a
    * phrase of `wordCount` words: its one phrase without Seedshift, and with it as many as one
    * date combination gives (checksPerCombination), 128 for a 12-word phrase whose last word was
-   * replaced.
+   * replaced. In a masked mode it refuses a count of words that no BIP39 phrase has
+   * (core.bip39-sizes.expected-word-indexes, as checksPerCombination); an unmasked mode gives 1.
    */
   checksPerDecoding(wordCount: number): number {
     return this.masked ? this.checksPerCombination(wordCount) : 1;
@@ -471,7 +488,9 @@ export class Masking {
   /**
    * The shifts of one date combination as this mode applies them: each word number moves modulo
    * the 2,048 words, and the last word modulo what this mode adds its shift to (lastShift), so
-   * that two combinations with the same effective shifts give the same phrases.
+   * that two combinations with the same effective shifts give the same phrases. Refuses a count of
+   * shifts that is no phrase's count of words (core.bip39-sizes.expected-word-indexes,
+   * lastShiftModulus).
    */
   effectiveShifts(shifts: readonly number[]): number[] {
     const last = this.lastShiftModulus(shifts.length);
@@ -480,7 +499,11 @@ export class Masking {
     );
   }
 
-  /** What the shift of the last word of a `wordCount`-word phrase is taken modulo in this mode. */
+  /**
+   * What the shift of the last word of a `wordCount`-word phrase is taken modulo in this mode.
+   * Refuses a count of words that no BIP39 phrase has (assertWordCount:
+   * core.bip39-sizes.expected-word-indexes).
+   */
   lastShiftModulus(wordCount: number): number {
     assertWordCount(wordCount);
     return this.#variant.lastShift(wordCount);
@@ -515,7 +538,13 @@ export class MissingChecksumError extends Error {
 
 // The low-level decoders of the public API, each through Masking so that each holds its rules.
 
-/** MnemoCode Seedshift undone: the seed phrase of `indexes` with `dates`. */
+/**
+ * MnemoCode Seedshift undone: the seed phrase of `indexes` with `dates`. Refuses what Masking#undo
+ * refuses in that mode: indexes that are no phrase (core.bip39-sizes.expected-word-indexes,
+ * assert-word-indexes-refused), codes without their checksum (MissingChecksumError,
+ * missing-checksum), and dates that deriveShifts refuses (core.dates.no-date,
+ * derive-shifts-refused and the calendar checks it names).
+ */
 export function decodeIndexes(
   indexes: readonly number[],
   dates: readonly DateShiftDate[],
@@ -523,7 +552,13 @@ export function decodeIndexes(
   return defined(Masking.of("seedshift").undo(indexes, dates)[0]);
 }
 
-/** The Original Seedshift with a valid last word undone: every phrase it may have been. */
+/**
+ * The Original Seedshift with a valid last word undone: every phrase it may have been. Refuses
+ * what Masking#undo refuses in that mode: indexes that are no phrase
+ * (core.bip39-sizes.expected-word-indexes, assert-word-indexes-refused), codes without their
+ * checksum (MissingChecksumError, missing-checksum), and dates that deriveShifts refuses
+ * (core.dates.no-date, derive-shifts-refused and the calendar checks it names).
+ */
 export function decodeIndexesLegacyValid(
   indexes: readonly number[],
   dates: readonly DateShiftDate[],
@@ -534,6 +569,10 @@ export function decodeIndexesLegacyValid(
 /**
  * MnemoCode Seedshift undone from codes written in `format`. A compatibility entry kept for
  * existing callers; new code reads codes of any mode with EncodedBackup.read(text, format, mode).
+ * Refuses what parseInput refuses (a `format` that names no form,
+ * core.encoded-form.unsupported-encoded-format, and codes that do not read in it), then what
+ * decodeIndexes refuses (core.bip39-sizes.expected-word-indexes, assert-word-indexes-refused,
+ * missing-checksum, core.dates.no-date and the other refusals of deriveShifts).
  */
 export function decodeInput(
   value: string,

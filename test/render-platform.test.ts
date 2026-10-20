@@ -4,8 +4,8 @@ import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CardRenderer,
-  cardTemplates,
-  renderAssets,
+  CARD_TEMPLATES,
+  RENDER_ASSETS,
   renderCards,
   renderIndividualCards,
   selectTemplate,
@@ -66,7 +66,7 @@ describe("platform-neutral card rendering", () => {
   });
 
   it("lists exactly the bundled files the renderers can request", () => {
-    for (const path of renderAssets) expect(existsSync(join(assets, path)), path).toBe(true);
+    for (const path of RENDER_ASSETS) expect(existsSync(join(assets, path)), path).toBe(true);
     const requested = new Set<string>();
     for (const file of importGraph("cards.ts").keys()) {
       // platform.ts only passes on the paths its callers ask for (BundledAssetCache.get), which
@@ -104,7 +104,7 @@ describe("platform-neutral card rendering", () => {
         new RegExp(`^${path.replace(/\$\{[^}]+\}/gu, "[a-z0-9-]+").replace(/\./gu, "\\.")}$`, "u"),
     );
     expect(patterns.length).toBeGreaterThan(0);
-    for (const path of renderAssets)
+    for (const path of RENDER_ASSETS)
       expect(
         patterns.some((pattern) => pattern.test(path)),
         path,
@@ -166,7 +166,7 @@ describe("platform-neutral card rendering", () => {
   });
 
   it("offers every template to a host", () => {
-    expect(cardTemplates).toHaveLength(13);
-    expect(new Set(cardTemplates.map((template) => template.id)).size).toBe(13);
+    expect(CARD_TEMPLATES).toHaveLength(13);
+    expect(new Set(CARD_TEMPLATES.map((template) => template.id)).size).toBe(13);
   });
 });

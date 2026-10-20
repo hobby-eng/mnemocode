@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -30,6 +30,15 @@ const GATE = [
 const PYTHON = spawnSync("python3", ["--version"]).status === 0;
 
 /**
+ * This process's environment without Git's own variables, such as GIT_DIR and GIT_INDEX_FILE that
+ * a Git hook sets: Git run in a temporary tree, by a test or by the gate, then finds that tree's
+ * repository or none, never the one that runs the tests.
+ */
+const WITHOUT_GIT_VARIABLES = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+);
+
+/**
  * The gate run over BASE with `files` added (a null removes one), after `prepare` has had the
  * tree: its exit code and its lines.
  */
@@ -52,6 +61,7 @@ function codeRules(
     prepare?.(root);
     const run = spawnSync(process.execPath, [join(root, "scripts", "verify-code-rules.mjs")], {
       encoding: "utf8",
+      env: WITHOUT_GIT_VARIABLES,
     });
     return { status: run.status, problems: run.stderr };
   } finally {
@@ -78,6 +88,15 @@ function repeated(count: number, line: string): string {
 function rulesBroken(files: Readonly<Record<string, string | null>>): string[] {
   const { problems } = codeRules(files);
   return [...new Set([...problems.matchAll(/^\S+:\d+ (\S+) /gmu)].map((match) => match[1]!))];
+}
+
+/** Runs Git in `root` with `arguments_`, `input` on its standard input; its output. */
+function git(root: string, arguments_: readonly string[], input = ""): string {
+  return execFileSync("git", ["-C", root, ...arguments_], {
+    encoding: "utf8",
+    env: WITHOUT_GIT_VARIABLES,
+    input,
+  });
 }
 
 describe("the code rules of the coding guide", () => {
@@ -155,6 +174,11 @@ describe("the code rules of the coding guide", () => {
       expect(rulesBroken({ "crate/Cargo.toml": manifest })).toEqual([]);
     expect(rulesBroken({ "package-lock.json": "{}" })).toEqual(["TOOL-05"]);
     expect(rulesBroken({ "pnpm-lock.yaml": null })).toEqual(["TOOL-05"]);
+    // packageManager names pnpm at one exact version; this gate is the only check of it.
+    for (const packageManager of ["pnpm@12", "pnpm@^12.8.1", "npm@11.0.0", undefined])
+      expect(rulesBroken({ "package.json": JSON.stringify({ packageManager }) })).toEqual([
+        "TOOL-05",
+      ]);
   });
 });
 
@@ -481,6 +505,23 @@ describe("the TypeScript and markup rules of the coding guide", () => {
     expect(rulesBroken({ "src/cli/a.ts": "const flags = { private: true };\n" })).toEqual([]);
   });
 
+  it("refuse a lint exception without its rule and reason, and a handler in markup", () => {
+    const bare = "// oxlint-disable-next-line max-lines-per-function\nfunction f() {}\n";
+    expect(rulesBroken({ "src/cli/a.ts": bare })).toEqual(["TS-12"]);
+    const reasoned =
+      "// oxlint-disable-next-line max-lines-per-function -- one table of every code\nfunction f() {}\n";
+    expect(rulesBroken({ "src/cli/a.ts": reasoned })).toEqual([]);
+    expect(rulesBroken({ "page.html": '<button onclick="go()">Go</button>\n' })).toEqual([
+      "WEB-01",
+    ]);
+    // A tag written over several lines.
+    expect(
+      rulesBroken({ "page.html": '<button\n  type="button"\n  onclick="go()">Go</button>\n' }),
+    ).toEqual(["WEB-01"]);
+  });
+});
+
+describe("the doc comments of a library module (TS-11)", () => {
   it("refuse an export of a library module without a doc comment, not of the command line", () => {
     const bare = "export const LIMIT = 3;\n";
     expect(rulesBroken({ "src/core/a.ts": bare })).toEqual(["TS-11"]);
@@ -566,19 +607,108 @@ describe("the TypeScript and markup rules of the coding guide", () => {
     ]);
     expect(problemsOf({ "src/cli/a.ts": bare })).toEqual([]);
   });
+});
 
-  it("refuse a lint exception without its rule and reason, and a handler in markup", () => {
-    const bare = "// oxlint-disable-next-line max-lines-per-function\nfunction f() {}\n";
-    expect(rulesBroken({ "src/cli/a.ts": bare })).toEqual(["TS-12"]);
-    const reasoned =
-      "// oxlint-disable-next-line max-lines-per-function -- one table of every code\nfunction f() {}\n";
-    expect(rulesBroken({ "src/cli/a.ts": reasoned })).toEqual([]);
-    expect(rulesBroken({ "page.html": '<button onclick="go()">Go</button>\n' })).toEqual([
-      "WEB-01",
+describe("the doc comments of the object types of a library module's type aliases (TS-11)", () => {
+  it("refuse a member of an object type of an exported type alias without a doc comment", () => {
+    const source = [
+      "/** What a search gives. */",
+      "export type Found =",
+      "  | {",
+      "      /** It was found. */",
+      '      readonly kind: "found";',
+      "      /** Where: a pattern in type arguments, whose kind needs no comment. */",
+      '      readonly at: Extract<Place, { kind: "word" }>;',
+      "      /** The places, a list whose brackets start no member. */",
+      "      readonly places: { readonly index: number }[];",
+      "    }",
+      '  | { /** None. */ readonly kind: "none"; /** Why. */ readonly why: string };',
+      "/** A check that is wiped after use. */",
+      "export type Check = ((phrase: { words: string[] }) => boolean) & {",
+      "  /** Erases it. */",
+      "  readonly wipe: () => void;",
+      "} & (",
+      "  | {",
+      "      /** It is ready. */",
+      "      readonly ready: true;",
+      "      /** Its words, whose own members need no comment, as in an interface. */",
+      "      readonly words: {",
+      "        readonly first: string;",
+      "      };",
+      "    }",
+      "  | {",
+      "      /** It is not ready. */",
+      "      readonly ready: false;",
+      "    }",
+      ");",
+      "/** The kinds that name a word: a mapped type, which has no members. */",
+      "export type WordKind = {",
+      '  [K in keyof Kinds]: Kinds[K] extends "word" ? K : never;',
+      "}[keyof Kinds];",
+      "/** What a box holds: the types in its parameters and after extends are patterns. */",
+      "export type Inside<T extends { inside: unknown }> = T extends { inside: infer I } ? I : never;",
+      "/** Runs a step: the types of a function's signature are its own. */",
+      "export type Watch = <T>(step: (signal: { aborted: boolean }) => T) => { value: T };",
+      "/** A count that a host defines. */",
+      "export declare type Count = {",
+      "  /** How many. */",
+      "  readonly total: number;",
+      "};",
+      'export type { Found as Result } from "./b.js";',
+    ].join("\n");
+    expect(problemsOf({ "src/core/a.ts": source })).toEqual([]);
+    // Without the members' comments: the exports' own comments start their lines.
+    const bare = source
+      .split("\n")
+      .filter((line) => !/^ +\/\*\*/u.test(line))
+      .map((line) => line.replaceAll(/ \/\*\*[^*]*\*\//gu, ""))
+      .join("\n");
+    expect(problemsOf({ "src/core/a.ts": bare })).toEqual([
+      "src/core/a.ts:4 TS-11",
+      "src/core/a.ts:5 TS-11",
+      "src/core/a.ts:6 TS-11",
+      // Both members of the arm written on one line.
+      "src/core/a.ts:8 TS-11",
+      "src/core/a.ts:8 TS-11",
+      "src/core/a.ts:11 TS-11",
+      "src/core/a.ts:14 TS-11",
+      "src/core/a.ts:15 TS-11",
+      "src/core/a.ts:20 TS-11",
+      "src/core/a.ts:33 TS-11",
     ]);
-    // A tag written over several lines.
-    expect(
-      rulesBroken({ "page.html": '<button\n  type="button"\n  onclick="go()">Go</button>\n' }),
-    ).toEqual(["WEB-01"]);
+    expect(problemsOf({ "src/cli/a.ts": bare })).toEqual([]);
+  });
+});
+
+describe("the files of a Git checkout, as Git lists them (git-top-level.mjs)", () => {
+  it("name a file in a merge conflict once, though Git lists it once for each stage", () => {
+    const files = {
+      "scripts/run.sh": "#!/usr/bin/env bash\nset -u\necho\n",
+      "notes.md": "line\n".repeat(801),
+    };
+    const problems = problemsOf(files, (root) => {
+      git(root, ["init", "--quiet"]);
+      // The script in stages 1 to 3 of the index, its common ancestor and both sides, as a merge
+      // leaves a file that both sides changed; 100644 is Git's mode of a file that does not run.
+      const blob = git(root, ["hash-object", "-w", "--", "scripts/run.sh"]).trim();
+      const stages = [1, 2, 3].map((stage) => `100644 ${blob} ${stage}\tscripts/run.sh\n`);
+      git(root, ["update-index", "--index-info"], stages.join(""));
+      // Git's own list of what it leaves out, which no walk of the files outside a checkout reads:
+      // a problem of notes.md would show that the gate never read Git's list.
+      mkdirSync(join(root, ".git", "info"), { recursive: true });
+      writeFileSync(join(root, ".git", "info", "exclude"), "notes.md\n");
+    });
+    expect(problems).toEqual(["scripts/run.sh:2 TOOL-02"]);
+  });
+
+  it("leave out a file that the index holds and the work tree no longer has", () => {
+    const run = codeRules({ "docs/gone.md": "Gone.\n" }, (root) => {
+      git(root, ["init", "--quiet"]);
+      git(root, ["add", "--", "docs/gone.md"]);
+      rmSync(join(root, "docs", "gone.md"));
+    });
+    // Reading a file that is not there would end the gate with ENOENT, which no problem line
+    // names: its exit code and its whole output are compared.
+    expect(run).toEqual({ status: 0, problems: "" });
   });
 });

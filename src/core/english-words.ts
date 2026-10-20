@@ -82,7 +82,10 @@ export function wordsOfIndexes(indexes: readonly number[]): string[] {
   return indexes.map((index) => defined(englishWordlist[index]));
 }
 
-/** The BIP39 indexes, counted from 0, of English words; refuses a word that is not in the list. */
+/**
+ * The BIP39 indexes, counted from 0, of English words; refuses a word that is not in the list
+ * (core.english-words.word-not-english-bip39-list).
+ */
 export function indexesOfWords(words: readonly string[]): number[] {
   return words.map((word) => {
     const index = ENGLISH_INDEX.get(word);

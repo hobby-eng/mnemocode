@@ -1,6 +1,6 @@
 // The share values used by a written-backup check. They own only the data needed for their
 // comparisons, independently of borrowed input arrays, a ShareSet and one another.
-import { ShareInput, type TypedShare } from "../sskr/share-input.js";
+import { ShareInput, type SetTrouble, type TypedShare } from "../sskr/share-input.js";
 import type { ShareSet, PlacedShare } from "../sskr/share-set.js";
 import { readShare } from "../sskr/transport.js";
 import { isMarked } from "../sskr/repair-units.js";
@@ -66,9 +66,10 @@ export class KeptShares extends Redacted implements Disposable {
 
   /**
    * Why complete shares do not belong together, or are too few where no marked share can complete
-   * them. Refused after disposal; every comparison uses fresh views of this owner's shares.
+   * them, with the code of its condition (SetTrouble); undefined when neither. Refused after
+   * disposal; every comparison uses fresh views of this owner's shares.
    */
-  get setProblem(): string | undefined {
+  get setProblem(): SetTrouble | undefined {
     const typed = this.texts.map((text, index) => ({ place: defined(this.#places[index]), text }));
     const complete = completeOf(typed);
     return ShareInput.completeSetProblem(complete, complete.length < typed.length);

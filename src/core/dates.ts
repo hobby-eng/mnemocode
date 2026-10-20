@@ -2,6 +2,7 @@ import type { DateShiftDate, DatePattern, Bip39WordCount } from "./types.js";
 import { inWholeRange, integerRefusal, type WholeRange } from "./typed-number.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
+import { keptCount } from "./search-turns.js";
 
 const ERRORS = new ErrorCatalog("core.dates", {
   "there-no-month": () => "There is no such calendar month.",
@@ -99,10 +100,13 @@ export function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
-/** The days of `month` of `year`; refused for a month that is not 1 to 12. */
+/**
+ * The days of `month` of `year`; refused for a month that is not 1 to 12
+ * (core.dates.there-no-month).
+ */
 export function daysInMonth(year: number, month: number): number {
   if (!inWholeRange(month, DATE_PARTS.month)) throw ERRORS.create("there-no-month", []);
-  if (month === 2) return isLeapYear(year) ? 29 : 28;
+  if (month === FEBRUARY) return isLeapYear(year) ? 29 : 28;
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
 
@@ -129,8 +133,10 @@ function assertCalendarDate(date: DateShiftDate): void {
 }
 
 /**
- * The date that `value` writes as DD-MM-YYYY; refuses another layout and a date that the calendar
- * does not have.
+ * The date that `value` writes as DD-MM-YYYY; refuses another layout
+ * (core.dates.use-four-digit-year-example-23-09-2026) and a date that the calendar does not have:
+ * a year or a month out of range (assert-calendar-date-refused, assert-calendar-date-refused-2) or
+ * a day that its month does not have (day-outside-selected-calendar-month).
  */
 export function parseDate(value: string): DateShiftDate {
   const date = readDateParts(value.trim(), (part, width) =>
@@ -145,14 +151,20 @@ export function parseDate(value: string): DateShiftDate {
 /**
  * A copy of `date` that nothing can change, checked as parseDate checks a typed date: an object
  * that keeps a date must not share it with its caller, who could change it after it was checked
- * (AUD-009-FUN001), and a day the calendar does not have is refused (AUD-009-API001).
+ * (AUD-009-FUN001), and a day the calendar does not have is refused (AUD-009-API001). Refuses
+ * what ownedDate refuses (core.dates.date-year-month-day and the others it names).
  */
 export function ownedDates(dates: readonly DateShiftDate[]): readonly DateShiftDate[] {
   // Array.from reads a hole of a sparse list as a date, which ownedDate refuses; map would keep it.
   return Object.freeze(Array.from(dates, ownedDate));
 }
 
-/** A date held to the rules of a date, copied (ownedDate's rule for each of `dates` above). */
+/**
+ * A date held to the rules of a date, copied (ownedDate's rule for each of `dates` above). Refuses
+ * a value that is no object (core.dates.date-year-month-day), a year or a month out of range
+ * (assert-calendar-date-refused, assert-calendar-date-refused-2), and a day that its month does
+ * not have (day-outside-selected-calendar-month).
+ */
 export function ownedDate(date: DateShiftDate): DateShiftDate {
   // A hole of a sparse list reaches here as undefined.
   if (typeof date !== "object" || date === null) throw ERRORS.create("date-year-month-day", []);
@@ -177,6 +189,9 @@ function ownedPart(values: readonly number[], part: WholeRange, name: string) {
 /**
  * A copy of `pattern` that nothing can change, held to the rules of parseDatePattern: every part
  * has values a date can have, and at least one real calendar date fits (AUD-009-FUN001, API001).
+ * Refuses a value that is no object (core.dates.date-pattern-years-months-days), a part without a
+ * value or with one out of its range (date-pattern-cannot-match-valid), and parts that give no
+ * calendar date together (date-pattern-cannot-match-real-calendar-date).
  */
 export function ownedPattern(pattern: DatePattern): DatePattern {
   // A hole of a sparse list reaches here as undefined, as for ownedDate.
@@ -223,10 +238,11 @@ export const KEY_CONFLICT = "A date pattern has the key of an earlier one that a
 export const NO_DATE = "Type at least one date.";
 
 /**
- * Patterns that nothing can change, each held to ownedPattern, and refused when a key stands for
- * patterns that allow other dates (conflictingPatternKey). Every count and search of patterns
- * takes them through it, so that a host's own patterns are held to the rules of parsed ones
- * (AUD-012-API004).
+ * Patterns that nothing can change, each held to ownedPattern
+ * (core.dates.date-pattern-years-months-days and the others it names), and refused when a key
+ * stands for patterns that allow other dates (conflictingPatternKey, key-conflict). Every count and
+ * search of patterns takes them through it, so that a host's own patterns are held to the rules of
+ * parsed ones (AUD-012-API004).
  */
 export function ownedPatterns(patterns: readonly DatePattern[]): readonly DatePattern[] {
   const owned = Array.from(patterns, ownedPattern);
@@ -234,7 +250,11 @@ export function ownedPatterns(patterns: readonly DatePattern[]): readonly DatePa
   return Object.freeze(owned);
 }
 
-/** `date` written as DD-MM-YYYY, with leading zeros. */
+/**
+ * `date` written as DD-MM-YYYY, with leading zeros. Refuses a date that the calendar does not have
+ * (core.dates.assert-calendar-date-refused, assert-calendar-date-refused-2,
+ * day-outside-selected-calendar-month).
+ */
 export function formatDate(date: DateShiftDate): string {
   assertCalendarDate(date);
   return WRITTEN_ORDER.map((name) => String(date[name]).padStart(widthOf(name), "0")).join(
@@ -249,7 +269,10 @@ export function sortDates(dates: readonly DateShiftDate[]): DateShiftDate[] {
 
 /**
  * The shifts of the words of a phrase of `wordCount` words that `dates` give, in calendar order of
- * the dates; refuses no date and more than the phrase takes.
+ * the dates; refuses no date (core.dates.no-date), more than the phrase takes
+ * (derive-shifts-refused), and a date that the calendar does not have
+ * (assert-calendar-date-refused, assert-calendar-date-refused-2,
+ * day-outside-selected-calendar-month).
  */
 export function deriveShifts(dates: readonly DateShiftDate[], wordCount: Bip39WordCount): number[] {
   if (dates.length === 0) throw ERRORS.create("no-date", []);
@@ -285,19 +308,22 @@ export function isDatePattern(value: string): boolean {
 }
 
 /**
- * The masks of one part of a date: its values joined by |, each with ? for a forgotten digit; a
- * lone ? is the whole part, such as the month of 15-?-2025.
+ * The masks of one part of a date: its values joined by |, each with ? for a forgotten digit, and
+ * each once; a lone ? is the whole part, such as the month of 15-?-2025. A mask given again would
+ * only be tried again: one typed date may hold the whole input of a command (CORE-50).
  */
 function partMasks(part: string, width: number): string[] | undefined {
-  const masks = part.split("|").map((mask) => (mask === "?" ? "?".repeat(width) : mask));
-  return masks.every((mask) => new RegExp(`^[0-9?]{${width}}$`, "u").test(mask))
-    ? masks
-    : undefined;
+  const form = new RegExp(`^[0-9?]{${width}}$`, "u");
+  const masks = new Set(part.split("|").map((mask) => (mask === "?" ? "?".repeat(width) : mask)));
+  return [...masks].every((mask) => form.test(mask)) ? [...masks] : undefined;
 }
 
 /**
  * The dates that `value` stands for, written as DD-MM-YYYY with ? for a digit that is forgotten, or
- * ? for a whole date; refuses a pattern that no date fits.
+ * ? for a whole date; refuses another layout
+ * (core.dates.use-each-forgotten-digit-values-joined-by-such), a date with nothing forgotten
+ * (recovery-pattern-contain-digit-values-joined-by), and a pattern that no date fits
+ * (ownedPattern: date-pattern-cannot-match-valid, date-pattern-cannot-match-real-calendar-date).
  */
 export function parseDatePattern(value: string): DatePattern {
   const typed = value.trim();
@@ -318,18 +344,31 @@ export function parseDatePattern(value: string): DatePattern {
   });
 }
 
-/** The values that `part` takes and one of `masks` allows, each once, in order. */
+/**
+ * The values that `part` takes and one of `masks` allows, each once, in order. Each mask writes its
+ * own values, so that the work is the values the masks write, not every value of the part for each
+ * mask: at most 20^4 for the distinct masks of a year, each digit written or forgotten (CORE-50).
+ */
 function matchingDateParts(masks: readonly string[], part: WholeRange): number[] {
-  const expressions = masks.map((mask) => ({
-    width: mask.length,
-    expression: new RegExp(`^${mask.replaceAll("?", "[0-9]")}$`, "u"),
-  }));
-  return Array.from({ length: part.max - part.min + 1 }, (_, index) => index + part.min).filter(
-    (value) =>
-      expressions.some(({ width, expression }) =>
-        expression.test(String(value).padStart(width, "0")),
-      ),
+  const allowed = new Set(
+    masks.flatMap((mask) => maskValues(mask)).filter((value) => inWholeRange(value, part)),
   );
+  return [...allowed].sort((left, right) => left - right);
+}
+
+/** The base of the numbers a date is written in. */
+const DECIMAL_BASE = 10;
+/** The values of a decimal digit, 0 to 9: a mask's ? stands for each of them. */
+const DIGIT_VALUES = Object.freeze(Array.from({ length: DECIMAL_BASE }, (_, digit) => digit));
+
+/** The numbers that `mask`, decimal digits with ? for a forgotten one, writes: 10^(its ?) of them. */
+function maskValues(mask: string): number[] {
+  let values = [0];
+  for (const character of mask) {
+    const digits = character === "?" ? DIGIT_VALUES : [Number(character)];
+    values = values.flatMap((value) => digits.map((digit) => value * DECIMAL_BASE + digit));
+  }
+  return values;
 }
 
 /** The dates that `pattern` allows, in ascending order; refused unless it holds (ownedPattern). */
@@ -376,18 +415,26 @@ function countOf(pattern: DatePattern): number {
   return count;
 }
 
-/** How many combinations of dates `patterns` give together, counted no further than `stopAfter`. */
+/**
+ * How many combinations of dates `patterns` give together, counted no further than `stopAfter`, a
+ * whole number of combinations, by default Number.MAX_SAFE_INTEGER: a count above it returns
+ * stopAfter + 1. Refuses a `stopAfter` that is no whole number of 0 or more, as a RangeError
+ * (core.search-turns.whole-number-more), and patterns that ownedPatterns refuses
+ * (core.dates.date-pattern-years-months-days, date-pattern-cannot-match-valid,
+ * date-pattern-cannot-match-real-calendar-date, key-conflict).
+ */
 export function datePatternCombinationCount(
   patterns: readonly DatePattern[],
-  stopAfter = Number.MAX_SAFE_INTEGER,
+  stopAfter?: number,
 ): number {
+  const stop = keptCount(stopAfter, Number.MAX_SAFE_INTEGER, "stopAfter");
   const groups = new Map<string, { readonly pattern: DatePattern; count: number }>();
   for (const pattern of ownedPatterns(patterns)) {
     const group = groups.get(pattern.key);
     groups.set(pattern.key, { pattern, count: (group?.count ?? 0) + 1 });
   }
   let total = 1n;
-  const limit = BigInt(stopAfter);
+  const limit = BigInt(stop);
   for (const { pattern, count } of groups.values()) {
     const candidateCount = countOf(pattern);
     if (candidateCount === 0) return 0;
@@ -396,7 +443,7 @@ export function datePatternCombinationCount(
       combinations = (combinations * BigInt(candidateCount + index - 1)) / BigInt(index);
     }
     total *= combinations;
-    if (total > limit) return stopAfter + 1;
+    if (total > limit) return stop + 1;
   }
   return Number(total);
 }
@@ -421,7 +468,9 @@ export function sameKeyPredecessors(
  * Every combination of the dates that `patterns` allow, the dates of one key in ascending order
  * only (sameKeyPredecessors), so that each set of dates comes once. They come place by place in
  * the order of compareDates: the date search of earlier shifts (EarlierShifts, date-recovery.ts)
- * relies on it, and test/date-recovery-dedupe.test.ts keeps the two in step.
+ * relies on it, and test/date-recovery-dedupe.test.ts keeps the two in step. Refuses, at the call,
+ * patterns that ownedPatterns refuses (core.dates.date-pattern-years-months-days,
+ * date-pattern-cannot-match-valid, date-pattern-cannot-match-real-calendar-date, key-conflict).
  */
 export function datePatternCombinations(
   patterns: readonly DatePattern[],
@@ -454,7 +503,11 @@ export function compareDates(left: DateShiftDate, right: DateShiftDate): number 
   return left.year - right.year || left.month - right.month || left.day - right.day;
 }
 
-/** Every date that `pattern` stands for, in calendar order. */
+/**
+ * Every date that `pattern` stands for, in calendar order; refused unless it holds (ownedPattern:
+ * core.dates.date-pattern-years-months-days, date-pattern-cannot-match-valid,
+ * date-pattern-cannot-match-real-calendar-date).
+ */
 export function expandDatePattern(pattern: DatePattern): DateShiftDate[] {
   return [...datePatternCandidates(pattern)];
 }

@@ -6,6 +6,11 @@ import { TEST_PHRASE } from "./helpers/test-phrase.js";
 import type { Cancelled } from "../src/cli/terminal-keys.js";
 import { TypedAnswer } from "../src/cli/typed-answer.js";
 
+/**
+ * The limit of the test of a long answer typed key by key: an echo whose work for each key does not
+ * grow with the answer ends in about a second, one that counted the whole answer again took minutes.
+ */
+const LINEAR_ECHO_TIME_LIMIT_MS = 20_000;
 const LEFT = "\x1b[D";
 const HOME = "\x1b[H";
 const END = "\x1b[F";
@@ -37,7 +42,7 @@ async function showTyping(
   process.stderr.columns = columns;
   const written: Buffer[] = [];
   vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-    written.push(Buffer.from(chunk as Uint8Array));
+    written.push(Buffer.from(chunk));
     return true;
   });
   const keys = keyboard(text);
@@ -106,8 +111,9 @@ WIDTHS.set("\u0300", 0);
 class Screen {
   /** The cells of each row: a character, "" for the second half of a wide one, or nothing. */
   readonly #cells: (string | undefined)[][] = [[]];
-  row = 0;
-  column = 0;
+  /** Where the cursor is: its row and column, counted from 0. */
+  #row = 0;
+  #column = 0;
   #pending = false;
 
   readonly #columns: number;
@@ -126,11 +132,11 @@ class Screen {
         while (/[0-9;]/u.test(characters[index]!)) parameter += characters[index++];
         this.#control(characters[index]!, parameter === "" ? 1 : Number(parameter));
       } else if (character === "\r") {
-        this.column = 0;
+        this.#column = 0;
         this.#pending = false;
       } else if (character === "\n") {
-        this.row += 1;
-        this.column = 0;
+        this.#row += 1;
+        this.#column = 0;
         this.#pending = false;
       } else this.#put(character, WIDTHS.get(character) ?? 1);
     }
@@ -138,38 +144,38 @@ class Screen {
 
   #control(final: string, count: number): void {
     this.#pending = false;
-    if (final === "A") this.row = Math.max(0, this.row - count);
-    else if (final === "B") this.row += count;
+    if (final === "A") this.#row = Math.max(0, this.#row - count);
+    else if (final === "B") this.#row += count;
     else if (final === "m") return;
-    else if (final === "C") this.column = Math.min(this.#columns - 1, this.column + count);
+    else if (final === "C") this.#column = Math.min(this.#columns - 1, this.#column + count);
     else if (final === "J") {
-      this.#cells[this.row]?.splice(this.column);
-      this.#cells.splice(this.row + 1);
+      this.#cells[this.#row]?.splice(this.#column);
+      this.#cells.splice(this.#row + 1);
     } else throw new Error(`unexpected control sequence ${final}`);
   }
 
   #put(character: string, width: number): void {
     if (width === 0) {
-      const previous = this.#pending ? this.column : this.column - 1;
-      const row = this.#cells[this.row];
+      const previous = this.#pending ? this.#column : this.#column - 1;
+      const row = this.#cells[this.#row];
       if (previous >= 0 && row?.[previous] !== undefined) row[previous] += character;
       return;
     }
     if (this.#pending) {
-      this.row += 1;
-      this.column = 0;
+      this.#row += 1;
+      this.#column = 0;
       this.#pending = false;
     }
-    if (width === 2 && this.column === this.#columns - 1) {
-      this.row += 1;
-      this.column = 0;
+    if (width === 2 && this.#column === this.#columns - 1) {
+      this.#row += 1;
+      this.#column = 0;
     }
-    const row = (this.#cells[this.row] ??= []);
-    row[this.column] = character;
-    if (width === 2) row[this.column + 1] = "";
-    this.column += width;
-    if (this.column >= this.#columns) {
-      this.column = this.#columns - 1;
+    const row = (this.#cells[this.#row] ??= []);
+    row[this.#column] = character;
+    if (width === 2) row[this.#column + 1] = "";
+    this.#column += width;
+    if (this.#column >= this.#columns) {
+      this.#column = this.#columns - 1;
       this.#pending = true;
     }
   }
@@ -199,7 +205,7 @@ class Screen {
 
   /** Where the cursor is: a cursor waiting at the right edge has not wrapped yet. */
   cursor(): readonly [number, number] {
-    return this.#pending ? [this.row, this.#columns] : [this.row, this.column];
+    return this.#pending ? [this.#row, this.#columns] : [this.#row, this.#column];
   }
 }
 
@@ -227,7 +233,7 @@ async function typeOnScreen(keys: readonly string[], columns: number, promptWidt
   process.stderr.columns = columns;
   const screen = new Screen(columns);
   vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-    screen.write(Buffer.from(chunk as Uint8Array).toString("utf8"));
+    screen.write(Buffer.from(chunk).toString("utf8"));
     return true;
   });
   const prompt = "P".repeat(promptWidth);
@@ -382,19 +388,23 @@ describe("visible answer on the terminal", () => {
     expect(back.screen).toBe(ended.screen);
   });
 
-  it("takes the same time for each key however long the answer is", async () => {
-    // Counting the whole answer again for each key took minutes for this many bytes.
-    process.stderr.columns = 80;
-    let shown = 0;
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      shown += Buffer.byteLength(chunk as Uint8Array);
-      return true;
-    });
-    const text = "abandon 的 ".repeat(20_000);
-    const keys = keyboard(`${text}\r`);
-    expect(await readLine(keys.next, { echo: true })).toBe(text);
-    expect(shown).toBeGreaterThan(Buffer.byteLength(text));
-  }, 20_000);
+  it(
+    "takes the same time for each key however long the answer is",
+    async () => {
+      // Counting the whole answer again for each key took minutes for this many bytes.
+      process.stderr.columns = 80;
+      let shown = 0;
+      vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+        shown += Buffer.byteLength(chunk);
+        return true;
+      });
+      const text = "abandon 的 ".repeat(20_000);
+      const keys = keyboard(`${text}\r`);
+      expect(await readLine(keys.next, { echo: true })).toBe(text);
+      expect(shown).toBeGreaterThan(Buffer.byteLength(text));
+    },
+    LINEAR_ECHO_TIME_LIMIT_MS,
+  );
 
   it.each([
     [5, 0],
@@ -476,7 +486,8 @@ describe("visible answer on the terminal", () => {
     expect(terminalColumns()).toBe(33);
     process.stderr.columns = 0;
     expect(terminalColumns()).toBe(80);
-    (process.stderr as { columns?: number | undefined }).columns = undefined;
+    // A stream that does not say its width, as a pipe or an old terminal.
+    Reflect.set(process.stderr, "columns", undefined);
     expect(terminalColumns()).toBe(80);
   });
 });
@@ -490,7 +501,7 @@ async function typeWithHints(keys: readonly string[], columns: number, promptWid
   process.stderr.columns = columns;
   const screen = new Screen(columns);
   vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-    screen.write(Buffer.from(chunk as Uint8Array).toString("utf8"));
+    screen.write(Buffer.from(chunk).toString("utf8"));
     return true;
   });
   screen.write("P".repeat(promptWidth));
@@ -561,7 +572,7 @@ describe("hints below a visible answer, as in mhfe", () => {
     process.stderr.columns = 80;
     const written: string[] = [];
     vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      written.push(Buffer.from(chunk as Uint8Array).toString("utf8"));
+      written.push(Buffer.from(chunk).toString("utf8"));
       return true;
     });
     const keys = keyboard("abandon\tabandon ab");

@@ -42,4 +42,6 @@ export interface TopicHelp {
   summary: string;
   sections: readonly TopicSection[];
   examples?: readonly HelpRow[];
+  /** Closing paragraphs, grey after the examples, as a command's notes are. */
+  notes?: readonly string[];
 }

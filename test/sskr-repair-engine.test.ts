@@ -4,7 +4,6 @@
 // the library's own entry, and shares named by the place they were typed at. Public SSKR vectors
 // and public test phrases only.
 
-import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -45,10 +44,9 @@ import {
 } from "../src/sskr/transport.js";
 import { markUnits, shareUnits } from "./helpers/shares.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
-const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-  deterministic: { entropy: string; shares: string[] }[];
-};
+const vectors = sskrVectors();
 const VECTOR = vectors.deterministic[0]!;
 const SHARES = VECTOR.shares;
 const SHARE = SHARES[0]!;
@@ -99,13 +97,13 @@ describe("S038: one codec of units for every share form", () => {
   });
 
   it("repairs a share written with every separator that its reader takes", () => {
-    const separators: Partial<Record<ShareFormat, readonly string[]>> = {
-      indexes: [" ", ",", ";", ", ", "\n"],
-      unicode: [" ", ",", ";", ", ", "\n"],
-      colors: [" ", ",", ";", ", ", "\n"],
-      words: [" ", "-", "\n"],
-    };
-    for (const [format, list] of Object.entries(separators) as [ShareFormat, string[]][])
+    const separators: readonly (readonly [ShareFormat, readonly string[]])[] = [
+      ["indexes", [" ", ",", ";", ", ", "\n"]],
+      ["unicode", [" ", ",", ";", ", ", "\n"]],
+      ["colors", [" ", ",", ";", ", ", "\n"]],
+      ["words", [" ", "-", "\n"]],
+    ];
+    for (const [format, list] of separators)
       for (const separator of list) {
         const units = shareUnits(SHARE, format);
         expect(readShare(units.join(separator)).ur, `${format} ${separator}`).toBe(SHARE);
@@ -117,13 +115,13 @@ describe("S038: one codec of units for every share form", () => {
   it("reads, unmarked, every share text that the repair takes, with every separator", () => {
     // The reverse of the case before (final review R1): the look of each form splits elements
     // as code-text does, so that a text the repair takes is not turned away by a look.
-    const separators: Partial<Record<ShareFormat, readonly string[]>> = {
-      indexes: [" ", ",", ";", "#", " # ", "\n"],
-      unicode: [" ", ",", ";", "#", " # ", "\n"],
-      colors: [" ", ",", ";", "#", ", ", "\n"],
-      "colors-unicode": ["", " ", ",", ";", "#"],
-    };
-    for (const [format, list] of Object.entries(separators) as [ShareFormat, string[]][])
+    const separators: readonly (readonly [ShareFormat, readonly string[]])[] = [
+      ["indexes", [" ", ",", ";", "#", " # ", "\n"]],
+      ["unicode", [" ", ",", ";", "#", " # ", "\n"]],
+      ["colors", [" ", ",", ";", "#", ", ", "\n"]],
+      ["colors-unicode", ["", " ", ",", ";", "#"]],
+    ];
+    for (const [format, list] of separators)
       for (const separator of list) {
         const units = shareUnits(SHARE, format, "colors");
         const marks = [...units];
@@ -416,10 +414,16 @@ describe("S120: one wording for each refusal, and shares named by their places",
     input.add([mine[0]!, mine[0]!, mine[1]!, other[2]!, other[3]!]);
     const { outcome, copies } = await input.restoreComplete(nodeSharePlatform);
     expect(copies.map((copy) => copy.place)).toEqual([2]);
-    // No share left out mends the others, so the set's own refusal is given, by place.
-    expect(outcome).toEqual({
+    // No share left out mends the others, so the set's own refusal is given, by place, with the
+    // refusal of the shares as its cause.
+    expect(outcome).toMatchObject({
       kind: "trouble",
-      trouble: { kind: "refused", message: misfitMessage(4) },
+      trouble: {
+        kind: "refused",
+        code: "shares-do-not-restore",
+        message: misfitMessage(4),
+        cause: { code: "sskr.complete-shares.share-does-not-fit", message: misfitMessage(4) },
+      },
     });
   });
 
@@ -430,6 +434,7 @@ describe("S120: one wording for each refusal, and shares named by their places",
     ]);
     expect(trouble).toEqual({
       kind: "refused",
+      code: "shares-of-different-sets",
       message: `Shares 1 and 2 ${SET_CONFLICT_TEXTS.set.between}, and nothing tells which is right.`,
     });
   });

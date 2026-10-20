@@ -15,7 +15,7 @@ import {
 } from "../core/code-text.js";
 import { CHECKSUM_BYTES, type ShareFormat } from "./transport.js";
 import { ownUnitCount, SHARE_HEADER_BYTES, type MixedForm } from "./mixed-layout.js";
-import { bytewordUnits, SHARE_UNITS, UR_SSKR_START } from "./share-units.js";
+import { bytewordUnits, SHARE_FORMATS, SHARE_UNITS, UR_SSKR_START } from "./share-units.js";
 import { unicodeCodesFitting } from "../core/words.js";
 import {
   COLOR_UNICODE_BASE,
@@ -168,21 +168,27 @@ function addModel(
   addUnitModel(models, { format, values });
 }
 
-/** Every way that `text` can be read as a share in one form, with marked elements. */
+/**
+ * Every way that `text` can be read as a share in one form, with marked elements, the forms in
+ * their order (RepairForm order). A text that a form claims, a UR by its prefix, is read in that
+ * form alone.
+ */
 export function unitModels(text: string): UnitModel[] {
   const models: UnitModel[] = [];
-  const prefix = UR_SSKR_START.exec(text)?.[0];
-  if (prefix !== undefined) {
-    addModel(models, "ur", urPairs(text.slice(prefix.length).toLowerCase()));
-    return models;
-  }
-  addModel(models, "indexes", codeTokens(text));
-  addModel(models, "words", bytewordUnits(text));
-  addUnicodeModel(models, text);
-  addColorModel(models, text);
-  addColorUnicodeModels(models, text);
-  addColorUnicodeDigitModel(models, text);
+  const claimed = MODEL_ORDER.find((format) => REPAIR_FORMS[format].claims?.test(text) === true);
+  const forms =
+    claimed === undefined
+      ? MODEL_ORDER.filter((format) => REPAIR_FORMS[format].claims === undefined)
+      : [claimed];
+  for (const format of forms) REPAIR_FORMS[format].addModels(models, text);
   return models;
+}
+
+/** A UR after its prefix: its pairs of letters, each a lone ? where it cannot be read. */
+function addUrModel(models: UnitModel[], text: string): void {
+  const prefix = UR_SSKR_START.exec(text)?.[0];
+  if (prefix !== undefined)
+    addModel(models, "ur", urPairs(text.slice(prefix.length).toLowerCase()));
 }
 
 /**
@@ -565,32 +571,91 @@ export interface CodeForm {
   readonly reads: (token: string) => boolean;
 }
 
+/** What the repair knows of one share form (REPAIR_FORMS). */
+interface RepairForm {
+  /**
+   * Its place among the ways to read a marked share, the lowest first (unitModels): the order in
+   * which their readings are solved and the shares they give are listed.
+   */
+  readonly order: number;
+  /** A text that starts so is read in this form alone (unitModels). */
+  readonly claims?: RegExp;
+  /** Adds every way to read `text` as a share in this form, with marked elements. */
+  readonly addModels: (models: UnitModel[], text: string) => void;
+  /**
+   * Its codes written apart, as markProblem tells them by the codes that can be read; none for a
+   * form that is not written in such codes, Bytewords and the UR.
+   */
+  readonly codes?: CodeForm;
+}
+
 /**
- * The forms written as codes apart, as markProblem tells them by the codes that can be read:
- * colors, the Unicode codes of words and Color Unicode codes take a ? for a digit; word numbers
- * only for a whole number.
+ * What the repair knows of every share form. A new form is one more variant here, one in
+ * SHARE_UNITS and one in SHARE_FORMS (transport.ts), and the compiler asks for each; unitModels
+ * and the forms of codes (CODE_FORMS) ask the form. Colors, the Unicode codes of words and Color
+ * Unicode codes take a ? for a digit; word numbers only for a whole number.
  */
-export const CODE_FORMS: readonly CodeForm[] = [
-  {
-    name: "color",
-    plural: "colors",
-    digits: COLOR_DIGITS,
-    reads: (token) => SHARE_UNITS.colors.valueOf(token) !== undefined,
+const REPAIR_FORMS: Readonly<Record<ShareFormat, RepairForm>> = Object.freeze({
+  ur: { order: 0, claims: UR_SSKR_START, addModels: addUrModel },
+  indexes: {
+    order: 1,
+    addModels: (models, text) => addModel(models, "indexes", codeTokens(text)),
+    codes: {
+      name: "word number",
+      plural: "word numbers",
+      reads: (token) => SHARE_UNITS.indexes.valueOf(token) !== undefined,
+    },
   },
-  {
-    name: "code",
-    plural: "Unicode codes",
-    digits: CODE_DIGITS,
-    reads: (token) => SHARE_UNITS.unicode.valueOf(token) !== undefined,
+  words: { order: 2, addModels: (models, text) => addModel(models, "words", bytewordUnits(text)) },
+  unicode: {
+    order: 3,
+    addModels: addUnicodeModel,
+    codes: {
+      name: "code",
+      plural: "Unicode codes",
+      digits: CODE_DIGITS,
+      reads: (token) => SHARE_UNITS.unicode.valueOf(token) !== undefined,
+    },
   },
-  // Their digits are no bits of a color, but they narrow it (addColorUnicodeDigitModel).
-  { name: "code", plural: "Color Unicode codes", digits: CODE_DIGITS, reads: COLOR_UNICODE_CODE },
-  {
-    name: "word number",
-    plural: "word numbers",
-    reads: (token) => SHARE_UNITS.indexes.valueOf(token) !== undefined,
+  colors: {
+    order: 4,
+    addModels: addColorModel,
+    codes: {
+      name: "color",
+      plural: "colors",
+      digits: COLOR_DIGITS,
+      reads: (token) => SHARE_UNITS.colors.valueOf(token) !== undefined,
+    },
   },
-];
+  "colors-unicode": {
+    order: 5,
+    addModels: (models, text) => {
+      addColorUnicodeModels(models, text);
+      addColorUnicodeDigitModel(models, text);
+    },
+    // Their digits are no bits of a color, but they narrow it (addColorUnicodeDigitModel).
+    codes: {
+      name: "code",
+      plural: "Color Unicode codes",
+      digits: CODE_DIGITS,
+      reads: COLOR_UNICODE_CODE,
+    },
+  },
+});
+
+/** The share forms in the order that unitModels reads a marked share in them (RepairForm order). */
+const MODEL_ORDER: readonly ShareFormat[] = Object.freeze(
+  [...SHARE_FORMATS].sort((a, b) => REPAIR_FORMS[a].order - REPAIR_FORMS[b].order),
+);
+
+/**
+ * The forms written as codes apart (RepairForm codes), as markProblem tells them by the codes that
+ * can be read. No code of one is a code of another, so the first that every code read fits is the
+ * only one.
+ */
+export const CODE_FORMS: readonly CodeForm[] = Object.freeze(
+  MODEL_ORDER.flatMap((format) => REPAIR_FORMS[format].codes ?? []),
+);
 
 /** The widths of the codes in which a ? may stand for one digit (CODE_FORMS): six and four. */
 export const DIGIT_MARKED_WIDTHS: readonly number[] = CODE_FORMS.flatMap(

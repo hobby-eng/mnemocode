@@ -22,7 +22,7 @@ import {
   type SelfTestFeature,
 } from "./self-test-check.js";
 import {
-  bitcoinProfiles,
+  BITCOIN_PROFILES,
   isPlacedKind,
   parseBitcoinAddress,
   WalletEvidenceCheck,
@@ -193,22 +193,22 @@ const MATCHES: readonly (readonly [string, WalletEvidence, string, string?])[] =
   ],
   [
     "Legacy address",
-    located("address", KEYS.address44, bitcoinProfiles),
+    located("address", KEYS.address44, BITCOIN_PROFILES),
     "matched at m/44'/0'/0'/0/0",
   ],
   [
     "Nested SegWit address",
-    located("address", KEYS.address49, bitcoinProfiles),
+    located("address", KEYS.address49, BITCOIN_PROFILES),
     "matched at m/49'/0'/0'/0/0",
   ],
   [
     "Native SegWit address",
-    located("address", KEYS.address84, bitcoinProfiles),
+    located("address", KEYS.address84, BITCOIN_PROFILES),
     "matched at m/84'/0'/0'/0/0",
   ],
   [
     "Taproot address",
-    located("address", KEYS.address86, bitcoinProfiles),
+    located("address", KEYS.address86, BITCOIN_PROFILES),
     "matched at m/86'/0'/0'/0/0",
   ],
   [
@@ -222,7 +222,7 @@ const MATCHES: readonly (readonly [string, WalletEvidence, string, string?])[] =
     "matched at m/84'/0'/0'/0/0",
   ],
   ["WIF", located("wif", KEYS.wif84, ["native-segwit"]), "matched at m/84'/0'/0'/0/0"],
-  ["Another WIF", located("wif", KEY_ONE_WIF, bitcoinProfiles), "not matched"],
+  ["Another WIF", located("wif", KEY_ONE_WIF, BITCOIN_PROFILES), "not matched"],
   [
     "Address with the passphrase TREZOR",
     located("address", KEYS.trezorAddress84, ["native-segwit"]),

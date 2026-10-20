@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { expect, it } from "vitest";
+import { TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
 it("refuses invalid signing arguments without echoing them or performing a release operation", () => {
   const code = String.raw`
@@ -35,7 +36,7 @@ console.log("Signing parser refusals and compatibility passed; no release operat
       "-e",
       code,
     ],
-    { encoding: "utf8", timeout: 10_000, env: { ...process.env, NO_COLOR: "1" } },
+    { encoding: "utf8", timeout: TEST_TIME_LIMIT_MS, env: { ...process.env, NO_COLOR: "1" } },
   );
   expect(output.trim()).toBe(
     "Signing parser refusals and compatibility passed; no release operation ran.",

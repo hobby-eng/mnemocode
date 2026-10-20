@@ -31,6 +31,7 @@ import {
 } from "../export/heir-sheet.js";
 import { askOutputFile } from "./output-questions.js";
 import { askCards } from "./card-questions.js";
+import { assertColorCardsFit, assertShareCardsFit } from "./cards-fit.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ORIGINAL_COPY_FORMS, type OriginalCopyForm } from "./encode-report.js";
 
@@ -101,7 +102,7 @@ function formChoices(): Choice<EncodedFormat>[] {
   return withSamples(
     ENCODED_FORMATS.map((value) => ({
       ...FORM_TEXTS[value],
-      ...(value === "english" ? {} : { example: example(value) }),
+      ...(EncodedForm.of(value).writtenInWords ? {} : { example: example(value) }),
       value,
     })),
   );
@@ -249,7 +250,8 @@ async function askResultDestination(
   choices.push(everyPlace(["a record file", "a QR code", ...(withCards ? ["cards"] : [])]));
   const destination = await choose("Where should the result go?", choices, { label: "Output" });
   if (destination === undefined || destination === CANCELLED) return destination;
-  const cards = () => askCards("mnemocode-cards", false);
+  const cards = () =>
+    askCards("mnemocode-cards", false, (options) => assertColorCardsFit(options, form));
   // The questions of each answer: none for the screen, all of them for All of these.
   const asks = {
     screen: [],
@@ -289,7 +291,8 @@ export async function askEncoding(): Promise<string[] | undefined | Cancelled> {
   const run =
     set === null ? await askCopyDestination(form, mode) : await askSharesRun(set, form, mode);
   if (run === undefined || run === CANCELLED) return run;
-  if (mode !== "direct" && (set !== null || form !== "english")) {
+  // Codes in words show the masked words already (writtenInWords); shares never do.
+  if (Masking.of(mode).masked && (set !== null || !EncodedForm.of(form).writtenInWords)) {
     const showWords = await choose(
       "Also show the Seedshift phrase as English words?",
       [
@@ -480,7 +483,8 @@ export async function askShares(
     if (path === undefined || path === CANCELLED) return path;
     return ["--output", path];
   };
-  const cards = () => askCards("mnemocode-share-cards", true);
+  const cards = () =>
+    askCards("mnemocode-share-cards", true, (options) => assertShareCardsFit(options, shareFormat));
   // The questions of each answer: none for the screen, all of them for All of these.
   const asks = { screen: [], file: [file], cards: [cards], all: [file, cards] }[destination];
   const outputs = await eachAsked(asks);

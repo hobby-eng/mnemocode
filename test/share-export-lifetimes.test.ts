@@ -4,7 +4,7 @@ import { ShareInput } from "../src/sskr/share-input.js";
 import { ShareExport, type WrittenShare } from "../src/sskr/share-set.js";
 import { ShareRestore } from "../src/sskr/share-restore.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import type { RepairedShares } from "../src/sskr/joint-results.js";
 import { endLifetimeIfPresent } from "./helpers/owner-lifetime.js";
 import { sskrVectors } from "./helpers/vectors.js";
@@ -46,7 +46,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("Temporary exports and transferred export owners", () => {
   it("disposes its temporary export while returning independent repaired share views", async () => {
     using input = new ShareInput({ decodeEntry: "The Decode tab" });
-    input.add([sskrSetVector.shares[0]]);
+    input.add([SSKR_SET_VECTOR.shares[0]]);
     const observed = observeExports();
     try {
       const result = await new ShareRestore(nodeSharePlatform).repair({

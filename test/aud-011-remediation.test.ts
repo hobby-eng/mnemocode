@@ -72,7 +72,7 @@ import { collectionPayload, collectionSeries } from "../src/export/collection-sh
 import type { ShareInfo } from "../src/sskr/transport.js";
 import { COLOR_FORMAT_NUMBERS, formatLegend } from "../src/cli/format-numbers.js";
 import { HEIR_MENU } from "../src/cli/heir-sheet.js";
-import { topicHelp } from "../src/cli/help-pages.js";
+import { TOPIC_HELP } from "../src/cli/help-pages.js";
 
 /** The public phrase masked with 23-09-2026 (vectors/mnemocode-v1.json), as word numbers. */
 const MASKED_NUMBERS = "2027 10 24 2027 10 24 2027 10 24 2027 10 377";
@@ -345,7 +345,7 @@ describe("AUD-011-ARC018, ARC037: one list of forms and modes, and their numbers
   });
 
   it("names each form in the help by the number --format takes", () => {
-    const rows = topicHelp.formats!.sections[0]!.rows!.map(([name]) => name);
+    const rows = TOPIC_HELP.formats!.sections[0]!.rows!.map(([name]) => name);
     expect(rows).toEqual([
       "1  english",
       "2  indexes",

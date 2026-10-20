@@ -1,14 +1,23 @@
 import { WALLET_EVIDENCE_OPTIONS } from "./bitcoin-options.js";
-import { businessOptionNames } from "./business-options.js";
+import { BUSINESS_OPTION_NAMES } from "./business-options.js";
 import { ENCODE_OPTIONS } from "./encode-option-groups.js";
 import { CANDIDATE_LIST_OPTIONS } from "./candidates-file.js";
 import { DRAWING_OPTIONS } from "./output-options.js";
-import { sskrExportOptions, sskrInputOptions } from "./sskr-command.js";
+import { SSKR_EXPORT_OPTIONS } from "./sskr-output.js";
+import { SSKR_INPUT_OPTIONS } from "./sskr-restore-command.js";
 import { asksNewBackup, RE_ENCODE_OPTIONS } from "./re-encode-options.js";
 import type { ParsedArguments } from "./arguments.js";
 
 // Recognized parser keys, including legacy material keys that the argv policy refuses first.
 // Help names those refused forms explicitly, and a test keeps every recognized option documented.
+
+/** A flag in its short and its long form. */
+interface FlagPair {
+  /** The short form, such as "-h". */
+  readonly short: string;
+  /** The long form, such as "--help". */
+  readonly long: string;
+}
 
 /** The flags that ask for help: the short one for a summary, the long one for everything. */
 export const HELP_FLAGS = Object.freeze({ short: "-h", long: "--help" } as const);
@@ -16,19 +25,16 @@ export const HELP_FLAGS = Object.freeze({ short: "-h", long: "--help" } as const
 export const VERSION_FLAGS = Object.freeze({ short: "-V", long: "--version" } as const);
 
 /** "-h, --help": both flags as the help names them. */
-export function flagPair(flags: { readonly short: string; readonly long: string }): string {
+export function flagPair(flags: FlagPair): string {
   return `${flags.short}, ${flags.long}`;
 }
 
 /** Whether `argument` is one of `flags`. */
-export function isFlagOf(
-  flags: { readonly short: string; readonly long: string },
-  argument: string | undefined,
-): boolean {
+export function isFlagOf(flags: FlagPair, argument: string | undefined): boolean {
   return argument === flags.short || argument === flags.long;
 }
 
-export const commandOptions = {
+export const COMMAND_OPTIONS = {
   encode: [...ENCODE_OPTIONS],
   decode: [
     "mode",
@@ -78,7 +84,7 @@ export const commandOptions = {
     "mode",
     "date",
     "dates-file",
-    ...sskrInputOptions,
+    ...SSKR_INPUT_OPTIONS,
     "max-tries",
     "max-candidates",
     ...CANDIDATE_LIST_OPTIONS,
@@ -95,8 +101,8 @@ export const commandOptions = {
     "output",
     "pdf",
     ...DRAWING_OPTIONS,
-    ...sskrInputOptions,
-    ...sskrExportOptions,
+    ...SSKR_INPUT_OPTIONS,
+    ...SSKR_EXPORT_OPTIONS,
   ],
   "sskr-split": [
     "mode",
@@ -114,7 +120,7 @@ export const commandOptions = {
     "heir-sheet-size",
     "backup-check",
     ...DRAWING_OPTIONS,
-    ...sskrExportOptions,
+    ...SSKR_EXPORT_OPTIONS,
   ],
   preview: [
     "list",
@@ -125,7 +131,7 @@ export const commandOptions = {
     "title",
     "words",
     ...DRAWING_OPTIONS,
-    ...businessOptionNames,
+    ...BUSINESS_OPTION_NAMES,
   ],
   table: [
     "index",
@@ -140,7 +146,7 @@ export const commandOptions = {
   "self-test": [],
 } as const satisfies Record<string, readonly string[]>;
 
-export type CommandName = keyof typeof commandOptions;
+export type CommandName = keyof typeof COMMAND_OPTIONS;
 
 /** What the command line must know of a command before it runs it. */
 export interface CommandFacts {
@@ -193,5 +199,5 @@ export const PRIVATE_SCREEN_COMMANDS: ReadonlySet<string> = new Set(
 );
 
 export function isCommandName(name: string): name is CommandName {
-  return Object.hasOwn(commandOptions, name);
+  return Object.hasOwn(COMMAND_OPTIONS, name);
 }

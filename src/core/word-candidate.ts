@@ -1,7 +1,13 @@
 // A caller-owned word candidate, with mutable byte storage for its retained word indexes.
-import { BIP39_INDEX_BITS, phraseOfIndexes } from "./words.js";
-import { areWordIndexes, entropyBytes, isBip39WordCount, WORD_COUNTS_TEXT } from "./bip39-sizes.js";
-import { BITS_PER_BYTE, lastWordChecksumBits } from "./bits.js";
+import { phraseOfIndexes } from "./words.js";
+import {
+  areWordIndexes,
+  assertWordCount,
+  entropyBytes,
+  isBip39WordCount,
+  WORD_COUNTS_TEXT,
+} from "./bip39-sizes.js";
+import { lastWordChecksumBits, packWordIndexes } from "./bits.js";
 import { Redacted } from "./redacted.js";
 import { SecretValue } from "./secret-value.js";
 import { inWholeRange, wholeNumbersFrom } from "./typed-number.js";
@@ -22,25 +28,17 @@ const CANDIDATE_NUMBERS = wholeNumbersFrom(1);
 export type CandidateWords = readonly number[];
 
 /**
- * The BIP39 entropy that the words carry, without their checksum bits. A deliberate fast path of
- * bits.ts's bitsOfIndexes and bitsToBytes, packed in a number rather than a string because the
- * word search calls it for every combination; test/candidates.test.ts keeps it in step with
- * @scure/bip39's own checksum. The returned bytes belong to the caller, who wipes them.
+ * The BIP39 entropy that the words carry, without their checksum bits, which are left over when
+ * bits.ts's packWordIndexes fills the entropy's bytes; test/candidates.test.ts and
+ * test/word-packing.test.ts keep it in step with @scure/bip39. The returned bytes belong to the
+ * caller, who wipes them. Refuses a count of words that no phrase has
+ * (core.bip39-sizes.expected-word-indexes), then a value that is no word index
+ * (core.bip39-sizes.assert-word-indexes-refused), as assertPhraseIndexes does.
  */
 export function entropyOfWords(words: CandidateWords): Uint8Array {
+  assertWordCount(words.length);
   const entropy = new Uint8Array(entropyBytes(words.length));
-  let buffer = 0;
-  let bits = 0;
-  let filled = 0;
-  for (const word of words) {
-    buffer = (buffer << BIP39_INDEX_BITS) | word;
-    bits += BIP39_INDEX_BITS;
-    while (bits >= BITS_PER_BYTE && filled < entropy.length) {
-      bits -= BITS_PER_BYTE;
-      entropy[filled++] = (buffer >>> bits) & 0xff;
-    }
-    buffer &= (1 << bits) - 1;
-  }
+  packWordIndexes(words, entropy);
   return entropy;
 }
 

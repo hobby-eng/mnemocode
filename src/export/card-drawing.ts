@@ -184,7 +184,7 @@ const HEXADECIMAL = 16;
 const GLYPH_TEXT = /^<([0-9A-Fa-f]*)>$/u;
 
 /** The letters of one embedded font, each outline read once. */
-class LetterFont {
+class LetterFont implements Disposable {
   readonly #program: ReturnType<typeof fontkit.create>;
   readonly #bytes: Uint8Array;
   readonly #letters = new Map<number, Letter>();
@@ -206,9 +206,15 @@ class LetterFont {
     }
   }
 
+  /** Overwrites the font's bytes with zeros and forgets its letters. */
   wipe(): void {
     this.#bytes.fill(0);
     this.#letters.clear();
+  }
+
+  /** Wipes the font (wipe). */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 
   /**
@@ -352,7 +358,7 @@ function readGraphicsState(state: PDFDict): GraphicsSettings {
 }
 
 /** The fonts, images and graphics states of one document, each read once for all its pages. */
-class DocumentObjects {
+class DocumentObjects implements Disposable {
   readonly #document: PDFDocument;
   readonly #fonts = new Map<string, LetterFont>();
   readonly #images = new Map<string, CardImage>();
@@ -387,6 +393,10 @@ class DocumentObjects {
     this.#images.clear();
   }
 
+  /**
+   * Overwrites the decoded images, whose artwork follows a backup's colours, and the fonts with
+   * zeros, and forgets them.
+   */
   wipe(): void {
     for (const image of this.#images.values()) {
       image.data.fill(0);
@@ -395,6 +405,11 @@ class DocumentObjects {
     for (const font of this.#fonts.values()) font.wipe();
     this.#images.clear();
     this.#fonts.clear();
+  }
+
+  /** Wipes the images and fonts (wipe). */
+  [Symbol.dispose](): void {
+    this.wipe();
   }
 
   graphicsState(reference: PDFObject): GraphicsSettings {
@@ -703,23 +718,37 @@ export class CardPdfReader implements Disposable {
     this.#objects = new DocumentObjects(document);
   }
 
-  /** Reads the PDF `pdf`, such as one that a card renderer returned. */
+  /**
+   * Reads the PDF `pdf`, such as one that a card renderer returned. Bytes that are no PDF are
+   * refused with pdf-lib's own error; what the cards may not hold is refused when the pages are
+   * read (pages).
+   */
   static async load(pdf: Uint8Array): Promise<CardPdfReader> {
     return new CardPdfReader(await PDFDocument.load(pdf));
   }
 
-  /** Number of pages; refuses access after this reader is wiped. */
+  /** Number of pages; refused after this reader is wiped (export.card-drawing.reader-wiped). */
   get pageCount(): number {
     return this.#live().document.getPageCount();
   }
 
-  /** Drawing steps in page order; image bytes are borrowed until wipe(). */
+  /**
+   * Drawing steps in page order; image bytes are borrowed until wipe(). Refuses a page that holds
+   * anything the card renderers never write, such as a moved or turned page, another command
+   * (ACCEPTED_OPERATORS), blend mode, graphics setting, image format or font
+   * (export.card-drawing.save-cards-as-pdf), and a reader that was wiped
+   * (export.card-drawing.reader-wiped); a font program that fontkit cannot read fails with
+   * fontkit's own error.
+   */
   pages(): CardPageDrawing[] {
     const { document, objects } = this.#live();
     return document.getPages().map((page) => this.#page(page, objects));
   }
 
-  /** Transfers image storage to the caller and ends this reader; caller wipes those images. */
+  /**
+   * Transfers image storage to the caller and ends this reader; caller wipes those images. Refuses
+   * what pages refuses, and ends the reader then too.
+   */
   takePages(): CardPageDrawing[] {
     try {
       const pages = this.pages();
@@ -763,6 +792,8 @@ export class CardPdfReader implements Disposable {
 /**
  * Drawing steps of every page, with image bytes transferred to the caller. The temporary reader
  * ends before return; caller wipes each image's data/alpha after painting, once per shared image.
+ * Refuses what CardPdfReader.load and pages refuse, such as a page that holds what the card
+ * renderers never write (export.card-drawing.save-cards-as-pdf).
  */
 export async function readCardPages(pdf: Uint8Array): Promise<CardPageDrawing[]> {
   using reader = await CardPdfReader.load(pdf);

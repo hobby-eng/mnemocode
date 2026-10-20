@@ -20,6 +20,16 @@ import { equalBytes } from "../bits.js";
 import { ErrorCatalog, suppliedMessage } from "../error-catalog.js";
 
 const ERRORS = new ErrorCatalog("core.coins.coin", {
+  "address-damaged": () => addressRefusal("its checksum or format is wrong"),
+  "address-mixed-case": (form: string) =>
+    addressRefusal(`it mixes capital and small letters, which ${form} does not allow`),
+  "address-wrong-length": () => addressRefusal("it has the wrong length"),
+  "address-not-this-coin": (name: string, forms: string) =>
+    addressRefusal(`it is not an address of ${name} (${forms})`),
+  "address-not-single-key": (forms: string) =>
+    addressRefusal(`it is not the address of a single key; only ${forms} can be checked`),
+  "address-shielded": (instead: string) =>
+    addressRefusal(`it is shielded; use ${instead} address of the same wallet`),
   "assert-address-location-refused": suppliedMessage,
   "coins-wallet-check-coins-core-coins": {
     kind: "type",
@@ -94,54 +104,29 @@ const TESTNET_COIN_TYPE = 1;
 /** BIP44: the first step of the paths of legacy single-key addresses. */
 const BIP44_PURPOSE = 44;
 
-/** Why an address is refused, as the reasons below say it. */
-export function invalidAddress(
-  reason: string,
-  kind: AddressRefusalKind = "other",
-): AddressRefusalError {
-  return new AddressRefusalError(reason, kind);
+/**
+ * The message of a refused address, `reason` ending the sentence "The address cannot be used for
+ * the check:": the one wording of every address refusal, a family's own included, each of which
+ * has its own code (core.coins.coin.address-damaged and the codes after it, and a family's).
+ */
+export function addressRefusal(reason: string): string {
+  return `The address cannot be used for the check: ${reason}.`;
 }
 
 /**
- * What an address refusal is about: an address of a script or of several keys; text that this
- * coin cannot read, which parse calls another coin's address when it is written as one; or another.
+ * The refusals of text that a coin cannot read, damaged or in a case that its form does not allow:
+ * parse makes them the refusal of another coin's address where the text is written as one.
  */
-export type AddressRefusalKind = "not-single-key" | "unreadable" | "other";
+const UNREADABLE = ["address-damaged", "address-mixed-case"] as const;
 
 /**
- * The refusal of an address, with its `reason`, one of the reasons below or a family's own, so
- * that a caller tells the reasons apart by it and never by the words of the message.
+ * Whether `error` is the refusal of an address that no single key gives, such as a script's
+ * (core.coins.coin.address-not-single-key): the Bitcoin evidence passes that refusal on as the
+ * coin words it, and words the others its own way (wallet-evidence.ts).
  */
-export class AddressRefusalError extends Error {
-  /** Human-readable explanation; callers distinguish refusal categories with code instead. */
-  readonly reason: string;
-  /** Stable category identifying the refused address form or unreadable input. */
-  readonly code: AddressRefusalKind;
-
-  /**
-   * A refusal for `reason`, the end of the sentence "The address cannot be used for the check:",
-   * of the kind `code`, "other" by default.
-   */
-  constructor(reason: string, code: AddressRefusalKind = "other") {
-    super(`The address cannot be used for the check: ${reason}.`);
-    this.name = "AddressRefusalError";
-    this.reason = reason;
-    this.code = code;
-  }
+export function isNotSingleKeyRefusal(error: unknown): boolean {
+  return ERRORS.matches(error, ["address-not-single-key"]);
 }
-
-/** The reasons that several families give. */
-export const DAMAGED = "its checksum or format is wrong";
-
-/**
- * A refusal of text that this coin cannot read, damaged (`reason` DAMAGED) or of a form it does not
- * allow: parse makes it the address of another coin where the text is written as one.
- */
-export function unreadableAddress(reason: string = DAMAGED): AddressRefusalError {
-  return invalidAddress(reason, "unreadable");
-}
-/** The reason of a refusal of an address with the wrong length, which several families give. */
-export const WRONG_LENGTH = "it has the wrong length";
 
 /**
  * A coin whose single-key receiving addresses can be compared with a phrase's keys. A class
@@ -225,7 +210,11 @@ export abstract class Coin implements CoinDescription {
     return testnet ? [TESTNET_COIN_TYPE] : this.coinTypes;
   }
 
-  /** The paths of the branch at `location` for addresses of `type`, one for each coin type. */
+  /**
+   * The paths of the branch at `location` for addresses of `type`, one for each coin type. Refuses
+   * a location outside the BIP32 ranges, each of account, branch and index from 0 through 2^31 - 1
+   * (checkedAddressLocation: core.coins.coin.assert-address-location-refused).
+   */
   branchPathsOf(type: AddressType, testnet: boolean, location: AddressLocation): string[] {
     const owned = checkedAddressLocation(location);
     return this.coinTypesOn(testnet).map((coinType) => this.branchPathOf(type, coinType, owned));
@@ -243,8 +232,10 @@ export abstract class Coin implements CoinDescription {
 
   /**
    * `text` as a single-key receiving address of this coin; refused, naming why, when it belongs
-   * to another coin, to a script or to several keys, is damaged, or is out of reach (shielded).
-   * A host checks an answer with it at once: no secret is needed.
+   * to another coin (core.coins.coin.address-not-this-coin), to a script or to several keys
+   * (address-not-single-key), is damaged (address-damaged, address-mixed-case,
+   * address-wrong-length, or a family's own code, such as core.coins.ethereum's), or is out of
+   * reach (address-shielded). A host checks an answer with it at once: no secret is needed.
    */
   parse(text: string): CoinAddress {
     const trimmed = trimWhiteSpace(text);
@@ -254,8 +245,7 @@ export abstract class Coin implements CoinDescription {
       // What this coin cannot read but is valid in another coin's form is that coin's address;
       // with this coin's own prefix it is this coin's, damaged.
       if (
-        error instanceof AddressRefusalError &&
-        error.code === "unreadable" &&
+        ERRORS.matches(error, UNREADABLE) &&
         !startsWithAny(trimmed, this.ownPrefixes) &&
         writtenAsAnAddress(trimmed)
       )
@@ -282,7 +272,22 @@ export abstract class Coin implements CoinDescription {
 
   /** The refusal of a shielded address, which no key of the wallet's paths gives: use `instead`. */
   protected shielded(instead: string): Error {
-    return invalidAddress(`it is shielded; use ${instead} address of the same wallet`);
+    return ERRORS.create("address-shielded", [instead]);
+  }
+
+  /** The refusal of text whose checksum or format is wrong, which this coin cannot read. */
+  protected damaged(): Error {
+    return ERRORS.create("address-damaged", []);
+  }
+
+  /** The refusal of text in mixed case, which `form`, such as CashAddr, does not allow. */
+  protected mixedCase(form: string): Error {
+    return ERRORS.create("address-mixed-case", [form]);
+  }
+
+  /** The refusal of an address that commits to a hash or a key of the wrong length. */
+  protected wrongLength(): Error {
+    return ERRORS.create("address-wrong-length", []);
   }
 
   /** Reads the trimmed `text`, as the family writes its addresses. */
@@ -300,7 +305,7 @@ export abstract class Coin implements CoinDescription {
 
   /** The refusal of an address that is not this coin's. */
   protected notOurs(): Error {
-    return invalidAddress(`it is not an address of ${this.name} (${this.addressForms})`);
+    return ERRORS.create("address-not-this-coin", [this.name, this.addressForms]);
   }
 
   /** The forms of the coin's addresses of one key, which singleKeyOnly names: its address forms. */
@@ -313,10 +318,7 @@ export abstract class Coin implements CoinDescription {
    * wording for every coin and every entry, with the coin's own forms of one key.
    */
   protected singleKeyOnly(): Error {
-    return invalidAddress(
-      `it is not the address of a single key; only ${this.singleKeyForms} can be checked`,
-      "not-single-key",
-    );
+    return ERRORS.create("address-not-single-key", [this.singleKeyForms]);
   }
 }
 
@@ -324,17 +326,14 @@ export abstract class Coin implements CoinDescription {
  * A receiving address reduced to what identifies it: its coin, whether it is a test network
  * address, its type, and the 20-byte hash or 32-byte Taproot key it commits to, which stays inside.
  * Made by a coin's parse, which refuses everything else, so it always names a real single-key
- * address.
+ * address. What the parse read is private and read through getters, as a Coin's facts are, so that
+ * its paths, its description and its check of a key keep to it.
  */
 export class CoinAddress {
-  /** The coin whose address rules and derivation paths describe this value. */
-  readonly coin: Coin;
-  /** The single-key address form interpreted by this coin. */
-  readonly type: AddressType;
-  /** A Bitcoin testnet or signet address, or a Dash Platform testnet one: coin type 1. */
-  readonly testnet: boolean;
-  /** The address in its standard form, such as lower case for Bech32 and EIP-55 for Ethereum. */
-  readonly text: string;
+  readonly #coin: Coin;
+  readonly #type: AddressType;
+  readonly #testnet: boolean;
+  readonly #text: string;
   readonly #commitment: Uint8Array;
 
   /**
@@ -348,11 +347,31 @@ export class CoinAddress {
     text: string,
     testnet: boolean,
   ) {
-    this.coin = coin;
-    this.type = type;
+    this.#coin = coin;
+    this.#type = type;
     this.#commitment = Uint8Array.from(commitment);
-    this.text = text;
-    this.testnet = testnet;
+    this.#text = text;
+    this.#testnet = testnet;
+  }
+
+  /** The coin whose address rules and derivation paths describe this value. */
+  get coin(): Coin {
+    return this.#coin;
+  }
+
+  /** The single-key address form interpreted by this coin. */
+  get type(): AddressType {
+    return this.#type;
+  }
+
+  /** A Bitcoin testnet or signet address, or a Dash Platform testnet one: coin type 1. */
+  get testnet(): boolean {
+    return this.#testnet;
+  }
+
+  /** The address in its standard form, such as lower case for Bech32 and EIP-55 for Ethereum. */
+  get text(): string {
+    return this.#text;
   }
 
   /**
@@ -360,14 +379,15 @@ export class CoinAddress {
    * Taproot (BIP86)", "Platform payment (DIP17)" or, for Zcash, "transparent".
    */
   get description(): string | undefined {
-    const kind = this.coin.describe(this.type);
-    return kind === undefined || !this.testnet ? kind : `testnet, ${kind}`;
+    const kind = this.#coin.describe(this.#type);
+    return kind === undefined || !this.#testnet ? kind : `testnet, ${kind}`;
   }
 
   /**
    * The paths where wallets put it at `location`: one for each coin type of its coin, or coin
    * type 1 on a test network. Every step down to the account is hardened, and on DIP17 the key
-   * class too.
+   * class too. Refuses a location outside the BIP32 ranges, each of account, branch and index from
+   * 0 through 2^31 - 1 (checkedAddressLocation: core.coins.coin.assert-address-location-refused).
    */
   pathsAt(location: AddressLocation): string[] {
     const owned = checkedAddressLocation(location);
@@ -377,28 +397,32 @@ export class CoinAddress {
   /**
    * The paths of the branch that holds the address at `location`, as pathsAt gives them without
    * the last step: the index, which is never hardened, so that the addresses that follow it are
-   * derived from the branch's key one step each.
+   * derived from the branch's key one step each. Refuses a location outside the BIP32 ranges, as
+   * Coin#branchPathsOf does (core.coins.coin.assert-address-location-refused).
    */
   branchPathsAt(location: AddressLocation): string[] {
-    return this.coin.branchPathsOf(this.type, this.testnet, location);
+    return this.#coin.branchPathsOf(this.#type, this.#testnet, location);
   }
 
   /** Whether `publicKey`, a compressed secp256k1 key, is the key of this address. */
   isAddressOf(publicKey: Uint8Array): boolean {
-    const derived = this.coin.commitmentOf(this.type, publicKey);
+    const derived = this.#coin.commitmentOf(this.#type, publicKey);
     return equalBytes(derived, this.#commitment);
   }
 }
 
 /**
  * Refuses a location that names no BIP32 path: each of its numbers is an index below 2^31, which
- * the path hardens itself where it must.
+ * the path hardens itself where it must (core.coins.coin.assert-address-location-refused).
  */
 export function assertAddressLocation(location: AddressLocation): void {
   checkedAddressLocation(location);
 }
 
-/** Captures each location field once, refuses invalid indexes, and returns an owned snapshot. */
+/**
+ * Captures each location field once, refuses invalid indexes, and returns an owned snapshot; the
+ * refusal names the field (core.coins.coin.assert-address-location-refused).
+ */
 export function checkedAddressLocation(location: AddressLocation): AddressLocation {
   const { account, branch, index } = location;
   const owned = { account, branch, index };
@@ -424,7 +448,11 @@ export { asciiLowercase, asciiUppercase, trimWhiteSpace } from "../white-space.j
 export class CoinList {
   readonly #coins: readonly Coin[];
 
-  /** Refuses anything that is not a coin of this folder, and a coin given twice. */
+  /**
+   * Refuses anything that is not a coin of this folder
+   * (core.coins.coin.coins-wallet-check-coins-core-coins), and a coin given twice
+   * (coins-wallet-check-each-given-once).
+   */
   constructor(coins: readonly Coin[]) {
     const owned = Array.from(coins);
     if (!owned.every((coin) => coin instanceof Coin))
@@ -434,14 +462,9 @@ export class CoinList {
     this.#coins = Object.freeze(owned);
   }
 
-  /** The coins, in the order given. */
-  get all(): readonly Coin[] {
-    return this.#coins;
-  }
-
   /**
    * The coin whose identifier is `id`, such as "bitcoin-cash", in either case; refused, naming the
-   * coins there are, when none has it.
+   * coins there are, when none has it (core.coins.coin.unknown-coin-coins).
    */
   byId(id: string): Coin {
     const wanted = typeof id === "string" ? asciiLowercase(trimWhiteSpace(id)) : undefined;

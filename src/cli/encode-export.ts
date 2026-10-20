@@ -12,7 +12,7 @@ import { cardTemplate, ENCODE_CARD_SETTINGS } from "./card-options.js";
 import { businessOptions } from "./business-options.js";
 import { indexesToColors } from "../core.js";
 import { type ParsedArguments, value } from "./arguments.js";
-import { colorCards, printableText, terminalNotice, terminalWork } from "./terminal.js";
+import { colorCards, printableText, terminalSaved, terminalWork } from "./terminal.js";
 import { exportQrPayload } from "../export/qr-image.js";
 import type { EncodeOutcome } from "./encode-types.js";
 import { SecretValue } from "../core/secret-value.js";
@@ -145,14 +145,14 @@ export async function saveEncodeResult(
     await wipedAfterAsync(Buffer.from(`${backup.record()}\n`, "utf8"), (record) =>
       publishNewPrivateFile(outputPath, record),
     );
-    terminalNotice(`Saved MnemoCode record: ${printableText(outputPath)}`, "success");
+    terminalSaved(`Saved MnemoCode record: ${printableText(outputPath)}`);
   }
   if (arguments_.cards === true) {
     console.error(colorCards(indexesToColors(backup.indexes)));
   }
   if (pdfPath !== undefined) {
     await exportCards([await plannedCards.job()], pdfPath);
-    terminalNotice(`Saved PDF: ${printableText(pdfPath)}`, "success");
+    terminalSaved(`Saved PDF: ${printableText(pdfPath)}`);
   }
   if (imageDirectory !== undefined) {
     // The rendered cards show the backup: wiped once their images are written.
@@ -170,14 +170,11 @@ export async function saveEncodeResult(
       cardDirectory,
       cardFileFormat(arguments_),
     );
-    terminalNotice(
-      `Saved ${count} individual card files to: ${printableText(cardDirectory)}`,
-      "success",
-    );
+    terminalSaved(`Saved ${count} individual card files to: ${printableText(cardDirectory)}`);
   }
   const qrPath = value(arguments_, "qr");
   if (qrPath !== undefined) {
     await exportQrPayload(backup.text(), qrPath);
-    terminalNotice(`Saved QR code (${format}): ${printableText(qrPath)}`, "success");
+    terminalSaved(`Saved QR code (${format}): ${printableText(qrPath)}`);
   }
 }

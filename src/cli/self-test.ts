@@ -23,7 +23,7 @@ import { cardSetsSelfTest } from "../export/card-sets-self-test.js";
 import { heirSheetSelfTest } from "../export/heir-sheet-self-test.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
 import { shareCardsSelfTest } from "../export/sskr-render-self-test.js";
-import { sskrVector } from "../sskr/known-answers.js";
+import { SSKR_VECTOR } from "../sskr/known-answers.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
 import { exportQrPayload } from "../export/qr-image.js";
@@ -31,9 +31,9 @@ import { assertProtected, permissionSummary, sandboxReport } from "./protection.
 import { nodeSharePlatform } from "../sskr/share-platform-node.js";
 import { MNEMOCODE_VERSION } from "../version.js";
 import { readBundledFile } from "../bundled-files.js";
-import { headingLine } from "./terminal-style.js";
+import { besideMark, headingLine } from "./terminal-style.js";
 import { PUBLIC_VECTORS_FILE } from "../bundled-file-paths.js";
-import { describeError } from "../core/refusal.js";
+import { afterFailure, describeError } from "../core/refusal.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 import { TextFileInput } from "./text-file.js";
 import { MASKED_DATE, PUBLIC_MNEMONIC } from "../core/self-test-vectors.js";
@@ -47,6 +47,33 @@ const ERRORS = new ErrorCatalog("cli.self-test", {
 
 /** The column of the names of the checks, as wide as the longest name with room to spare. */
 const CHECK_NAME_WIDTH = 24;
+/** The mark before a check's name on a terminal, and its space. */
+const CHECK_MARK = "✓ ";
+/** Where a check's detail starts on a terminal: after its mark, its name's column and a space. */
+const DETAIL_COLUMN = CHECK_MARK.length + CHECK_NAME_WIDTH + 1;
+/** What stands before the summary on a terminal. */
+const PASSED = "✓ Passed:";
+
+/** Holds a time and its unit together while a line is broken at spaces (besideMark). */
+const NO_BREAK_SPACE = "\u00a0";
+/** A time in milliseconds as the report writes it, "74.5 ms": the space before its unit. */
+const TIME_UNIT = /(?<=\d) (?=ms\b)/gu;
+
+/**
+ * A line of the report on a terminal: `text` beside `mark`, which is `indent` characters wide,
+ * wrapped as running text under its own column (besideMark), each line in `style`; a time stays
+ * whole on its line.
+ */
+function reportLine(
+  mark: string,
+  indent: number,
+  text: string,
+  style: (line: string) => string = (line) => line,
+): string {
+  const kept = text.replace(TIME_UNIT, NO_BREAK_SPACE);
+  const restored = (line: string): string => style(line.replaceAll(NO_BREAK_SPACE, " "));
+  return besideMark(mark, indent, kept, restored).join("\n");
+}
 
 /** The features the command line builds in beside the library, with their checks. */
 const FEATURES: readonly SelfTestFeature[] = [
@@ -77,8 +104,8 @@ export function assertCoreSelfTest(): void {
 /** Inline input stays inline and remote file links fail before any user text is read. */
 function checkTextFileInputStartup(): void {
   expectSame(
-    TextFileInput.read(sskrVector.shares[0], "The test file"),
-    sskrVector.shares[0],
+    TextFileInput.read(SSKR_VECTOR.shares[0], "The test file"),
+    SSKR_VECTOR.shares[0],
     "An inline UR is no file path",
   );
   expectRefused(
@@ -94,10 +121,9 @@ export const TEXT_FILE_INPUT_CHECK: SelfTestCheck = {
   detail: "local UTF-8 file, share lines retained, missing file refused",
   run: async () => {
     checkTextFileInputStartup();
-    const directory = await mkdtemp(join(tmpdir(), "mnemocode-file-check-"));
-    try {
+    await withTemporaryFolder(async (directory) => {
       const path = join(directory, "public shares.txt");
-      const text = `${sskrVector.shares[0]}\n${sskrVector.shares[2]}\n`;
+      const text = `${SSKR_VECTOR.shares[0]}\n${SSKR_VECTOR.shares[2]}\n`;
       await writeFile(path, text, { mode: 0o600 });
       expectSame(TextFileInput.read(`"${path}"`, "The test file"), text, "All share file lines");
       expectRefused(
@@ -105,20 +131,24 @@ export const TEXT_FILE_INPUT_CHECK: SelfTestCheck = {
         /could not be read/u,
         "A missing text file",
       );
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
+    });
   },
 };
 
-/** Runs `check` in a new temporary folder, which is removed afterwards whatever happens. */
+/**
+ * Runs `check` in a new temporary folder, which is removed afterwards whatever happens. A removal
+ * that fails after the check failed is kept beside the check's failure (afterFailure), which the
+ * report names first.
+ */
 async function withTemporaryFolder(check: (directory: string) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "mnemocode-self-test-"));
+  const remove = (): Promise<void> => rm(directory, { recursive: true, force: true });
   try {
     await check(directory);
-  } finally {
-    await rm(directory, { recursive: true, force: true });
+  } catch (error) {
+    throw await afterFailure(error, remove);
   }
+  await remove();
 }
 
 async function checkQrRoundTrip(): Promise<void> {
@@ -146,7 +176,7 @@ const QR_CHECK: SelfTestCheck = {
  * back as the first share of the official SSKR vector; an empty one refused.
  */
 async function checkQrBesideSheets(): Promise<void> {
-  const payload = sskrVector.firstShareColors.join(" ");
+  const payload = SSKR_VECTOR.firstShareColors.join(" ");
   await withTemporaryFolder(async (directory) => {
     const sheet = join(directory, "cards.pdf");
     const beside = await saveQrBeside(payload, sheet);
@@ -215,11 +245,11 @@ export async function runSelfTest(): Promise<void> {
     // The terminal look of the bip_tools tools: a title line, a ✓ per check, grey details.
     const paint = (code: string, text: string): string => terminalPaint("stdout", code, text);
     console.log(`\n${headingLine(process.stdout, `Self-test ${MNEMOCODE_VERSION}`)}`);
-    for (const [name, detail] of rows)
-      console.log(
-        `${paint(STYLE.good, "✓")} ${name.padEnd(CHECK_NAME_WIDTH)} ${paint(STYLE.muted, detail)}`,
-      );
-    console.log(`${paint(STYLE.good, "✓ Passed:")} ${summary}`);
+    for (const [name, detail] of rows) {
+      const mark = `${paint(STYLE.good, CHECK_MARK)}${name.padEnd(CHECK_NAME_WIDTH)} `;
+      console.log(reportLine(mark, DETAIL_COLUMN, detail, (line) => paint(STYLE.muted, line)));
+    }
+    console.log(reportLine(`${paint(STYLE.good, PASSED)} `, PASSED.length + 1, summary));
     return;
   }
   console.log(`MnemoCode ${MNEMOCODE_VERSION} self-test`);

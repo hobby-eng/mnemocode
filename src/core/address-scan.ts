@@ -61,6 +61,10 @@ export function parsePlaceNumber(answer: string): number {
 /**
  * How many addresses are compared, as typed: a whole number from 1 through MAX_ADDRESS_COUNT,
  * leading zeros allowed, which from `first` on stays below the hardened indexes (addressCount).
+ * Refuses text that is no whole number in that range (typedWholeNumber:
+ * core.typed-number.typed-whole-number-refused), a `first` that is no index below the hardened
+ * ones (core.address-scan.first-index-refused), and a count that would pass the last of them
+ * (core.address-scan.addresses-compared-would-pass-index).
  */
 export function parseAddressCount(answer: string, first = 0): number {
   return addressCount(typedWholeNumber(answer, ADDRESS_COUNT_RANGE), first);
@@ -87,8 +91,10 @@ export interface AddressRange {
 
 /**
  * How many addresses are compared from `first` on: `requested`, or one when it is left out;
- * refused unless it is a whole number from 1 through MAX_ADDRESS_COUNT that ends at an index of
- * BIP32 that is not hardened.
+ * refused unless `first` is an index of BIP32 that is not hardened
+ * (core.address-scan.first-index-refused) and `requested` a whole number from 1 through
+ * MAX_ADDRESS_COUNT (address-count-refused) that ends at such an index too
+ * (addresses-compared-would-pass-index).
  */
 export function addressCount(requested: number | undefined, first: number): number {
   if (!inWholeRange(first, NORMAL_INDEX_RANGE))
@@ -105,7 +111,11 @@ export function addressCount(requested: number | undefined, first: number): numb
   return requested;
 }
 
-/** The key at `path` compared by `matchOf`; it is wiped once compared. */
+/**
+ * The key at `path` compared by `matchOf`; it is wiped once compared. Fails as deriveWiping fails,
+ * and where the key has no public key (core.address-scan.unable-derive-public-key); what `matchOf`
+ * throws passes on.
+ */
 export function matchAtPath(root: HDKey, path: string, matchOf: KeyMatch): FoundKey | undefined {
   const derived = matchWiping(deriveWiping(root, path), matchOf);
   return derived === undefined ? undefined : { derived, path };
@@ -123,7 +133,10 @@ function matchWiping(node: HDKey, matchOf: KeyMatch): string | undefined {
 /**
  * The first of the addresses in `range` below the branch at `branchPath` that `matchOf` matches.
  * The branch's key is derived once and each address's key from it in one step; every key is wiped
- * once compared, and the branch's at the end.
+ * once compared, and the branch's at the end. Refuses a range that addressCount refuses
+ * (core.address-scan.first-index-refused and the others it names), and fails as deriveWiping
+ * fails and where a key has no public key (unable-derive-public-key); what `matchOf` throws passes
+ * on.
  */
 export function scanBranch(
   root: HDKey,
@@ -148,9 +161,11 @@ export function scanBranch(
 /**
  * The node at `path`, a path such as m/84'/0'/0'/0/0, below `root`. Each node on the way is wiped
  * as soon as its child exists: HDKey.derive keeps them, the account's private key among them,
- * until they are collected. The caller wipes the node returned, and the root.
+ * until they are collected. The caller wipes the node returned, and the root. Where a step gives
+ * no child, a key BIP32 calls invalid (about one index in 2^127) or a step that is no index,
+ * @scure/bip32's error passes on, after the node reached is wiped.
  */
-export function deriveWiping(root: HDKey, path: string): HDKey {
+function deriveWiping(root: HDKey, path: string): HDKey {
   let node = root;
   try {
     for (const step of path.split("/").slice(1)) {

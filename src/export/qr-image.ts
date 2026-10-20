@@ -15,8 +15,10 @@ const ERRORS = new ErrorCatalog("export.qr-image", {
 const QR_IMAGE_PIXELS = 720;
 
 /**
- * Saves `payload` as a QR code image, a new private file at `path`; refuses an empty payload. The
- * image shows the payload, so its bytes are wiped once saved or refused.
+ * Saves `payload` as a QR code image, a new private file at `path`; refuses an empty payload
+ * (export.qr-image.qr-payload-not-empty). The image shows the payload, so its bytes are wiped once
+ * saved or refused. A file that exists already, or a staging folder that stays, is refused as
+ * publishNewPrivateFile refuses it.
  */
 export async function exportQrPayload(payload: string, path: string): Promise<void> {
   if (payload.length === 0) throw ERRORS.create("qr-payload-not-empty", []);

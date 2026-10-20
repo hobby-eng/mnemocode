@@ -155,11 +155,17 @@ describe("patterns that a host builds itself", () => {
   });
 });
 
+/** Whether `value` is V8's garbage collector, a function that --expose-gc gives a new context. */
+function isCollector(value: unknown): value is () => void {
+  return typeof value === "function";
+}
+
 describe("date recovery keeps nothing for each combination (AUD-010-FUN002)", () => {
   it("holds no more memory after 50,000 more combinations", () => {
     // A set of every shift tried held about 95 bytes a combination and failed past 2^24 of them.
     setFlagsFromString("--expose-gc");
-    const collect = runInNewContext("gc") as () => void;
+    const collect: unknown = runInNewContext("gc");
+    if (!isCollector(collect)) throw new Error("Expected V8's gc, which --expose-gc gives.");
     const heldAfter = (count: number, generator: Iterator<unknown>): number => {
       for (let index = 0; index < count; index += 1) generator.next();
       collect();

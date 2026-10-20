@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { RELEASE_FOLDER, executableName, noticesName } from "./executable-files.mjs";
 import { ASSETS_FOLDER } from "../src/bundled-file-paths.ts";
 import { ErrorCatalog } from "../src/core/error-catalog.ts";
+import { afterFailure } from "../src/core/refusal.ts";
 
 const ERRORS = new ErrorCatalog("scripts.verify-executable", {
   /**
@@ -66,6 +67,7 @@ const TEST_PHRASE =
 const SHIFTED = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
 
 const folder = mkdtempSync(join(tmpdir(), "mnemocode-executable-"));
+const removeFolder = () => rmSync(folder, { recursive: true, force: true });
 const run = (...arguments_) =>
   execFileSync(executable, arguments_, {
     cwd: folder,
@@ -159,6 +161,8 @@ try {
     ["Pieter Wuille", "Dominik Spicher", "Steven Fackler"].every((holder) => text.includes(holder)),
     "names the holders of every license that the SSKR engine links",
   );
-} finally {
-  rmSync(folder, { recursive: true, force: true });
+} catch (error) {
+  // A folder that cannot be removed is named beside the failure, never in its place (CORE-22).
+  throw await afterFailure(error, removeFolder);
 }
+removeFolder();

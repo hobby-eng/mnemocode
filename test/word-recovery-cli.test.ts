@@ -1,8 +1,6 @@
-import { execFile } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -11,23 +9,12 @@ import { EncodedForm } from "../src/core/encoded-form.js";
 import { createSessionIdentity, decryptCandidates } from "../src/core/candidate-encryption.js";
 import { containing } from "./helpers/matchers.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
-import { PublicCliFiles } from "./helpers/public-cli-files.js";
+import { runBuiltCli as run } from "./helpers/built-cli.js";
 
-const execFileAsync = promisify(execFile);
-const cli = join(process.cwd(), "dist", "mnemocode.js");
 const incomplete =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ?";
 const invalidLegacy =
   "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
-
-async function run(arguments_: readonly string[]) {
-  using material = new PublicCliFiles(arguments_);
-  return await execFileAsync(process.execPath, [cli, ...material.arguments], {
-    cwd: process.cwd(),
-    env: process.env,
-    maxBuffer: 1024 * 1024,
-  });
-}
 
 describe("recover-word CLI", () => {
   it("points codes typed in place of words to Decode, which reads them with ?", async () => {
@@ -57,14 +44,14 @@ describe("recover-word CLI", () => {
   it("saves every candidate as an encrypted list, record N for candidate N", async () => {
     const dir = mkdtempSync(join(tmpdir(), "mnc-candidates-"));
     try {
-      const session = await createSessionIdentity();
+      using session = await createSessionIdentity();
       const path = join(dir, "candidates.age");
       const save = (file: string, ...protection: string[]) =>
         run(["recover-word", "--mnemonic", incomplete, "--candidates-file", file, ...protection]);
       const result = await save(path, "--candidates-key", session.recipient);
       const rows = result.stdout.trim().split("\n").slice(1);
       const list = decodeCandidateList(
-        await decryptCandidates(readFileSync(path), { identity: session.identity }),
+        await decryptCandidates(readFileSync(path), { identity: session }),
       );
       expect(list.records.map((record) => entropyToMnemonic(record.entropy, wordlist))).toEqual(
         rows.map((row) => row.split("\t").at(-1)),

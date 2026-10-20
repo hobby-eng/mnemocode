@@ -29,7 +29,12 @@ import {
   KEY_CONFLICT,
   NO_DATE,
 } from "./dates.js";
-import { BIP39_WORD_COUNTS, assertWordIndexes, isBip39WordCount } from "./bip39-sizes.js";
+import {
+  BIP39_WORD_COUNTS,
+  LONGEST_WORD_COUNT,
+  assertWordIndexes,
+  isBip39WordCount,
+} from "./bip39-sizes.js";
 import { dateRecoveryCandidates, type SeedshiftMode } from "./date-recovery.js";
 import { Masking, type MaskingMode } from "./masking.js";
 import { placesNamed } from "./places.js";
@@ -62,13 +67,12 @@ const ERRORS = new ErrorCatalog("core.date-search", {
   "date-patterns-produce-more-than-combinations-which-exceeds": (value0: string) =>
     `The date patterns produce more than ${value0} combinations, which exceeds the safety limit. Narrow at least one pattern.`,
   "no-date": () => NO_DATE,
-  "parse-refused": suppliedMessage,
+  "too-many-dates": suppliedMessage,
   "stand-what-forgotten-only-where-mnemo-code-can": () =>
     "? and | stand for what is forgotten only where MnemoCode can search dates; type every date in full.",
   "at-least-one-date-contain-forgotten-digit-represented": () =>
     "At least one date must contain a forgotten digit represented by ?.",
   "dates-dates-answer": { kind: "type", text: () => "The dates must be a DatesAnswer." },
-  "operation-refused": suppliedMessage,
 });
 
 export type { WalletCheck, WalletMatch } from "./wallet-check.js";
@@ -142,6 +146,21 @@ function phraseLength(wordCount: number | undefined): Bip39WordCount | undefined
   return wordCount !== undefined && isBip39WordCount(wordCount) ? wordCount : undefined;
 }
 
+/**
+ * Refuses more dates than a phrase of `words` words takes (too-many-dates), and more dates with ?
+ * than one search takes (date-recovery-supports-at-most-incomplete-dates). parse asks it with the
+ * counts of what was typed before it reads a date: a lone ? stands for every year from 0001 to
+ * 9999, and reading thousands of them took minutes and gigabytes before the limit refused them.
+ */
+function assertDateCounts(dates: number, incomplete: number, words: Bip39WordCount): void {
+  if (dates > maximumDates(words))
+    throw ERRORS.create("too-many-dates", [tooManyDatesMessage(words)]);
+  if (incomplete > MAX_INCOMPLETE_DATES)
+    throw ERRORS.create("date-recovery-supports-at-most-incomplete-dates", [
+      `${MAX_INCOMPLETE_DATES}`,
+    ]);
+}
+
 /** `message` from the core after the place of the date it is about: "Date 2: the day ...". */
 function atPlace(place: number, message: string): string {
   return afterPlace("Date", place, message);
@@ -198,10 +217,7 @@ export class DatesAnswer extends Redacted {
     super("DatesAnswer");
     // The limits are checked here, not only in parse and of: a private constructor is private to
     // TypeScript alone, and a JavaScript host can call it (AUD-009-FUN001).
-    if (patterns.length > MAX_INCOMPLETE_DATES)
-      throw ERRORS.create("date-recovery-supports-at-most-incomplete-dates", [
-        `${MAX_INCOMPLETE_DATES}`,
-      ]);
+    assertDateCounts(known.length + patterns.length, patterns.length, LONGEST_WORD_COUNT);
     // Copied and frozen, date by date: a caller that kept a date or a pattern could otherwise
     // change it after the limits were checked (AUD-009-FUN001). Array.from reads a hole of a
     // sparse list as undefined, which is refused; map would keep it.
@@ -239,14 +255,25 @@ export class DatesAnswer extends Redacted {
 
   /**
    * Reads the dates of one answer, as a person types them in one line. The messages name a wrong
-   * date by its place and never repeat it.
+   * date by its place and never repeat it. Refuses an answer with no date
+   * (core.date-search.no-date). Before it reads a date, it refuses more dates than the phrase
+   * takes, or the longest phrase when its length is not given (too-many-dates), and more dates
+   * with ? than a search takes (date-recovery-supports-at-most-incomplete-dates). Then it refuses
+   * a date with ? where `rules` allow none (stand-what-forgotten-only-where-mnemo-code-can), a
+   * date or a pattern that parseDate or parseDatePattern refuses, named by its place
+   * (at-place-refused, its cause the core.dates code), and more combinations than
+   * HARD_MAX_COMBINATIONS (date-patterns-produce-more-than-combinations-which-exceeds).
    */
   static parse(line: string, rules: DatesRules): DatesAnswer {
     const typed = line.split(DATE_SEPARATORS).filter(Boolean);
     if (typed.length === 0) throw ERRORS.create("no-date", []);
-    const words = phraseLength(rules.wordCount);
-    if (words !== undefined && typed.length > maximumDates(words))
-      throw ERRORS.create("parse-refused", [tooManyDatesMessage(words)]);
+    // Where ? is not allowed, the first date with it is refused below, by its own code.
+    const withForgotten = rules.patterns ? typed.filter((text) => isDatePattern(text)).length : 0;
+    assertDateCounts(
+      typed.length,
+      withForgotten,
+      phraseLength(rules.wordCount) ?? LONGEST_WORD_COUNT,
+    );
     const known: DateShiftDate[] = [];
     const patterns: DatePattern[] = [];
     const incompletePlaces: number[] = [];
@@ -266,11 +293,17 @@ export class DatesAnswer extends Redacted {
 
   /**
    * The answer of dates read elsewhere, such as complete dates given as command-line options or
-   * typed into separate fields, held to the same limits as `parse`. The dates with ? count as
-   * typed after the complete ones.
+   * typed into separate fields, held to the same limits as `parse` without a phrase's length. The
+   * dates with ? count as typed after the complete ones. Refuses no date (core.date-search.no-date),
+   * more dates than the longest phrase takes (too-many-dates), more with ? than a search takes
+   * (date-recovery-supports-at-most-incomplete-dates), a date or a pattern that ownedDate or
+   * ownedPattern refuses, named by its place (at-place-refused, its cause the core.dates code), a
+   * key of patterns that allow other dates (assert-keys-fit-refused), and more combinations than
+   * HARD_MAX_COMBINATIONS (date-patterns-produce-more-than-combinations-which-exceeds).
    */
   static of(known: readonly DateShiftDate[], patterns: readonly DatePattern[] = []): DatesAnswer {
     if (known.length + patterns.length === 0) throw ERRORS.create("no-date", []);
+    assertDateCounts(known.length + patterns.length, patterns.length, LONGEST_WORD_COUNT);
     // Each date is checked as parse checks a typed one, and named by its place (AUD-009-API001).
     // Array.from, not map: a hole of a sparse list is then a date that is refused, not skipped.
     const ownKnown = Array.from(known, (date, index) =>
@@ -317,7 +350,11 @@ export class DatesAnswer extends Redacted {
     return this.#patternKeys.value.length > 0;
   }
 
-  /** Standalone date recovery needs a pattern; combined code recovery also accepts known dates. */
+  /**
+   * Standalone date recovery needs a pattern; combined code recovery also accepts known dates.
+   * Refuses an answer without a date with ?
+   * (core.date-search.at-least-one-date-contain-forgotten-digit-represented).
+   */
   assertIncomplete(): void {
     if (!this.hasForgottenDigits)
       throw ERRORS.create("at-least-one-date-contain-forgotten-digit-represented", []);
@@ -511,7 +548,7 @@ export class DateSearch extends Redacted {
    * (core.bip39-sizes.assert-word-indexes-refused), a mode that does not mask with dates, such as
    * direct, or a value that names no mode (core.masking.unsupported-mode), dates that are not a
    * DatesAnswer (core.date-search.dates-dates-answer) or more than the phrase takes
-   * (core.date-search.operation-refused), and a count that is not a whole number
+   * (core.date-search.too-many-dates), and a count that is not a whole number
    * (core.search-turns.whole-number-more).
    */
   constructor(options: DateSearchOptions) {
@@ -527,7 +564,7 @@ export class DateSearch extends Redacted {
       Masking.assertMaskedMode(mode);
       if (!(inputDates instanceof DatesAnswer)) throw ERRORS.create("dates-dates-answer", []);
       if (!inputDates.fitsPhrase(words))
-        throw ERRORS.create("operation-refused", [tooManyDatesMessage(words)]);
+        throw ERRORS.create("too-many-dates", [tooManyDatesMessage(words)]);
       const shown = keptCount(maxShown, MAX_SHOWN_MATCHES, "maxShown");
       const kept = keptCount(keep, 0, "keep");
       const dates = inputDates.copy();
@@ -596,18 +633,15 @@ export class DateSearch extends Redacted {
    */
   async pace(now?: MonotonicClock): Promise<SearchPace> {
     this.#indexes.assertLive();
+    const words = this.#indexes.value.length;
+    // Narrowed by the constructor's own check, which refused any other count already.
+    assertWordCount(words);
     return {
       perCheck:
         this.#walletCheck === undefined
           ? 0
           : await DateSearch.secondsPerCheck(this.#walletCheck, now),
-      perCombination: DateSearch.secondsPerCombination(
-        this.#mode,
-        this.#dates,
-        // The constructor checked the count of the indexes (assertWordCount).
-        this.#indexes.value.length as Bip39WordCount,
-        now,
-      ),
+      perCombination: DateSearch.secondsPerCombination(this.#mode, this.#dates, words, now),
     };
   }
 

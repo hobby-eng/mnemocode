@@ -71,6 +71,7 @@ export class ExportDetails {
    * export's first design, whose employer suits it (sectorForStyle); without one the employer is of
    * any sector. Asked again for the same settings, whatever the style, it gives the same details:
    * one export prints one person. The texts are chosen before the person, as `drawn` does.
+   * Refuses what `drawn` refuses, for the texts and the person's details of `settings`.
    */
   static of(choose: UniformChoice, settings: CardSettings, style?: string): ExportDetails {
     return ExportDetails.#settledFrom(choose, settings, style, false);
@@ -107,7 +108,11 @@ export class ExportDetails {
   /**
    * New details: the person's details `supplied` and the texts `copy`, each given in place of the
    * one chosen at random (a "-" in `copy` hides its line), and the rest chosen with `choose`. The
-   * employer suits `style` as in `of`.
+   * employer suits `style` as in `of`. Refuses a text or a detail that is no text on one line
+   * (export.card-settings.card-non-empty-text-on-one-line) or is longer than MAX_CARD_TEXT_LENGTH
+   * (export.card-settings.card-too-long-maximum-characters), a name not in Latin letters
+   * (export.card-settings.card-name-use-latin-letters-only-spaces-apostrophes), and a choice of
+   * `choose` that is no whole number below its limit (export.platform.checked-choice-refused).
    */
   static drawn(
     choose: UniformChoice,

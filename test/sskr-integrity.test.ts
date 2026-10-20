@@ -9,14 +9,21 @@ import { SskrRuntime } from "../src/sskr/runtime.js";
 import { readBundledFile } from "../src/bundled-files.js";
 import { bytesOfHex } from "../src/core/bits.js";
 import { PROTECTION_FLAGS } from "../src/cli/protection.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { PublicCliFiles } from "./helpers/public-cli-files.js";
+import { UNREACHED_FAULT_EXIT } from "./helpers/unreached-fault.js";
+import { RUN_OUTPUT_BYTES } from "./helpers/limits.js";
+// The SHA-256 digest of each pinned file of the bridge, by its path.
+import pins from "../sskr-wasm/integrity.json" with { type: "json" };
 
 const execute = promisify(execFile);
 const bridge = resolve("sskr-wasm");
 const ENGINE_FILES = ["generated/recovery_sskr_wasm_bg.wasm", "generated/recovery_sskr_wasm.js"];
 const INTEGRITY_MESSAGE = "SSKR dependency integrity check failed. No secret was processed.";
-const CLI_OUTPUT_BYTES = 256 * 1024;
+/**
+ * The most one protected run of the CLI may take: it reads two shares and ends in about a second.
+ * A run that hangs is killed and reported as such, before Vitest's limit for the whole test.
+ */
 const CLI_TIMEOUT_MS = 10_000;
 
 // A child-process filesystem adapter: the checkout and imported JS are never modified or copied.
@@ -43,9 +50,8 @@ files.readFile = async (path, ...options) => {
 };
 syncBuiltinESMExports();
 // A different exit from both application success and refusal exposes a missed interception.
-const UNREACHED_READER_EXIT = 97;
 process.on("exit", () => {
-  if (targetReads === 0) process.exitCode = UNREACHED_READER_EXIT;
+  if (targetReads === 0) process.exitCode = ${UNREACHED_FAULT_EXIT};
 });
 `;
 
@@ -83,7 +89,7 @@ async function protectedCli(
           MNEMOCODE_TEST_CORRUPT_ENGINE: engineFile,
           MNEMOCODE_TEST_ENGINE_MUTATE: mutate ? "1" : "0",
         },
-        maxBuffer: CLI_OUTPUT_BYTES,
+        maxBuffer: RUN_OUTPUT_BYTES,
         timeout: CLI_TIMEOUT_MS,
       },
     );
@@ -105,13 +111,6 @@ async function protectedCli(
       throw error;
     return { code, signal, killed, stdout, stderr };
   }
-}
-
-async function manifest(): Promise<Record<string, string>> {
-  return JSON.parse(await readFile(join(bridge, "integrity.json"), "utf8")) as Record<
-    string,
-    string
-  >;
 }
 
 async function filesBelow(folder: string): Promise<string[]> {
@@ -142,9 +141,9 @@ describe("SSKR integrity (AUD-005-BLD005)", () => {
       const pending = runtime.load();
       expect(runtime.load()).toBe(pending);
       const engine = await pending;
-      const secret = engine.recover_sskr_shares(sskrSetVector.shares.slice(0, 2).join("\n"));
+      const secret = engine.recover_sskr_shares(SSKR_SET_VECTOR.shares.slice(0, 2).join("\n"));
       try {
-        expect(secret).toEqual(bytesOfHex(sskrSetVector.entropy));
+        expect(secret).toEqual(bytesOfHex(SSKR_SET_VECTOR.entropy));
       } finally {
         secret.fill(0);
       }
@@ -182,9 +181,9 @@ describe("SSKR integrity (AUD-005-BLD005)", () => {
       const pending = runtime.load();
       expect(runtime.load()).toBe(pending);
       const engine = await pending;
-      const secret = engine.recover_sskr_shares(sskrSetVector.shares.slice(0, 2).join("\n"));
+      const secret = engine.recover_sskr_shares(SSKR_SET_VECTOR.shares.slice(0, 2).join("\n"));
       try {
-        expect(secret).toEqual(bytesOfHex(sskrSetVector.entropy));
+        expect(secret).toEqual(bytesOfHex(SSKR_SET_VECTOR.entropy));
       } finally {
         secret.fill(0);
       }
@@ -192,7 +191,6 @@ describe("SSKR integrity (AUD-005-BLD005)", () => {
   );
 
   it("pins every bridge source, build and generated file with its current hash", async () => {
-    const pins = await manifest();
     for (const [path, digest] of Object.entries(pins)) {
       const bytes = await readFile(join(bridge, path));
       expect(createHash("sha256").update(bytes).digest("hex"), path).toBe(digest);
@@ -243,9 +241,9 @@ describe("SSKR integrity (AUD-005-BLD005)", () => {
   it.each(ENGINE_FILES)(
     "restores the public phrase with the healthy protected CLI reader for %s",
     async (engineFile) => {
-      const result = await protectedCli(engineFile, false, sskrSetVector.shares.slice(0, 2));
+      const result = await protectedCli(engineFile, false, SSKR_SET_VECTOR.shares.slice(0, 2));
       expect(result).toMatchObject({ code: 0, signal: null, killed: false });
-      expect(result.stdout.split(/\r?\n/u)).toContain(sskrSetVector.phrase);
+      expect(result.stdout.split(/\r?\n/u)).toContain(SSKR_SET_VECTOR.phrase);
       expect(result.stderr).not.toContain(INTEGRITY_MESSAGE);
     },
   );

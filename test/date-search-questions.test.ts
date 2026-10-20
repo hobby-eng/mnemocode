@@ -3,7 +3,7 @@
 // `terminal.stdoutTerminal`; the private screen then shows what fits in the window, which windowOf
 // sets.
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -15,6 +15,7 @@ import { writeShare } from "../src/sskr/transport.js";
 import { MASKED } from "./helpers/phrase-questions.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { publicShare } from "./helpers/vectors.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -138,10 +139,7 @@ describe("recover-date on the private screen", () => {
   });
 
   it("says that a Shamir share is no encoded seed phrase, and which entry reads it", async () => {
-    const vectors = JSON.parse(
-      await readFile(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-    ) as { deterministic: { shares: string[] }[] };
-    const share = writeShare(vectors.deterministic[0]!.shares[0]!, "indexes");
+    const share = writeShare(publicShare(), "indexes");
     terminal.answers = [`${share}\r`, `${MASKED}\r`, "2?-09-2026\r"];
     await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
     expect(seen.notices).toContain(
@@ -389,11 +387,11 @@ describe("recover-date on the private screen", () => {
     const shownAt = vi
       .mocked(console.error)
       .mock.calls.findIndex((line) => line.join(" ") === encoded);
-    const askedAt = vi.mocked(process.stderr).write.mock.calls.findIndex(([chunk]) =>
-      Buffer.from(chunk as Uint8Array)
-        .toString("utf8")
-        .includes(DATES_PROMPT),
-    );
+    const askedAt = vi
+      .mocked(process.stderr)
+      .write.mock.calls.findIndex(([chunk]) =>
+        Buffer.from(chunk).toString("utf8").includes(DATES_PROMPT),
+      );
     expect(vi.mocked(console.error).mock.invocationCallOrder[shownAt]).toBeLessThan(
       vi.mocked(process.stderr).write.mock.invocationCallOrder[askedAt]!,
     );

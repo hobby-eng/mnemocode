@@ -37,13 +37,27 @@ export const REPAIR_ANCHOR = "damaged-shares";
  */
 export type ReportLine =
   | {
+      /** Tells a status from the other lines of a report. */
       readonly kind: "status";
+      /** What the status is of, ending in a colon, such as "Open combinations:". */
       readonly label: string;
+      /** The status itself, such as "settled by the shares together". */
       readonly value: string;
+      /** Whether the status is good news: a host marks it as a success, or else as a warning. */
       readonly good: boolean;
     }
-  | { readonly kind: "hint" | "notice" | "warning"; readonly text: string }
-  | { readonly kind: "more"; readonly anchor: string };
+  | {
+      /** A hint that can be passed over, a notice, or a warning, each in a host's own style. */
+      readonly kind: "hint" | "notice" | "warning";
+      /** The line, for the person. */
+      readonly text: string;
+    }
+  | {
+      /** Tells a pointer to the documentation from the other lines of a report. */
+      readonly kind: "more";
+      /** The anchor of the README section pointed to, such as REPAIR_ANCHOR. */
+      readonly anchor: string;
+    };
 
 /** What a repair filled in at one element that ? marked. */
 export interface RepairedElement {
@@ -123,7 +137,11 @@ export class RepairReport {
   readonly #triesPerSecond: number;
   readonly #places: readonly number[] | undefined;
 
-  /** `places` names each share by its place among those typed, by its index in the plan. */
+  /**
+   * `triesPerSecond` is the pace of this machine, in tries per second; a pace that is not more
+   * than 0 is refused (sskr.repair-report.repair-report-positive-pace). `places` names each share
+   * by its place among those typed, by its index in the plan.
+   */
   constructor(assessment: JointAssessment, triesPerSecond: number, places?: readonly number[]) {
     if (!(triesPerSecond > 0)) throw ERRORS.create("repair-report-positive-pace", []);
     this.#assessment = ownedAssessment(assessment);
@@ -194,11 +212,6 @@ export class RepairReport {
   /** Report-owned frozen assessment snapshot, independent of the constructor's caller input. */
   get assessment(): JointAssessment {
     return this.#assessment;
-  }
-
-  /** Digest checks per second on this machine. */
-  get triesPerSecond(): number {
-    return this.#triesPerSecond;
   }
 
   /** Digest checks of the search. */

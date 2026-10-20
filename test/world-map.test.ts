@@ -1,6 +1,13 @@
+import { spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { graticule, robinson, WORLD_MAP_HEIGHT, WORLD_MAP_WIDTH } from "../src/export/world-map.js";
 import { WORLD_MAP_LAND } from "../src/export/world-map-data.js";
+
+/** The generated land shapes, as the repository keeps them. */
+const WORLD_MAP_DATA = "src/export/world-map-data.ts";
 
 describe("world map behind a collection sheet", () => {
   it("projects the equator and the edges of the world onto the map box", () => {
@@ -24,6 +31,21 @@ describe("world map behind a collection sheet", () => {
         expect(Number(x)).toBeLessThanOrEqual(WORLD_MAP_WIDTH);
         expect(Number(y)).toBeLessThanOrEqual(WORLD_MAP_HEIGHT);
       }
+    }
+  });
+
+  it("keeps the land shapes byte for byte as scripts/build-world-map.mjs writes them", async () => {
+    // The script projects with the build (dist/export/world-map.js), as it does for a maintainer.
+    const folder = await mkdtemp(join(tmpdir(), "mnemocode-world-map-"));
+    try {
+      const written = join(folder, "world-map-data.ts");
+      const run = spawnSync(process.execPath, ["scripts/build-world-map.mjs", written], {
+        encoding: "utf8",
+      });
+      expect(run.status, run.stderr).toBe(0);
+      expect(await readFile(written, "utf8")).toBe(await readFile(WORLD_MAP_DATA, "utf8"));
+    } finally {
+      await rm(folder, { recursive: true, force: true });
     }
   });
 

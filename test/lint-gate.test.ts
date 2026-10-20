@@ -1,8 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import manifest from "../package.json" with { type: "json" };
 
 // The lint gate of the coding guide as the repository configures it (.oxlintrc.json and the lint
 // script of package.json), run over one small file in a temporary folder.
@@ -11,9 +12,7 @@ const CONFIG = resolve(".oxlintrc.json");
 /** Oxlint's script, run with this Node.js: the shims in node_modules/.bin do not start on Windows. */
 const OXLINT = resolve("node_modules", "oxlint", "bin", "oxlint");
 /** The lint script of package.json, whose flags decide what fails. */
-const LINT_SCRIPT = (
-  JSON.parse(readFileSync("package.json", "utf8")) as { scripts: { lint: string } }
-).scripts.lint;
+const LINT_SCRIPT = manifest.scripts.lint;
 const STALE_SEVERITY = "--report-unused-disable-directives-severity=error";
 
 /** The exit code and output of the lint gate's configuration over a file holding `text`. */

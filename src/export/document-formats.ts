@@ -92,7 +92,7 @@ export function isImageFormat(value: unknown): value is ImageFormat {
 
 /**
  * `value` as an image format, jpeg as jpg; undefined gives the default, png. Refuses any other,
- * naming those there are (image-format-one-accepted-as-alias).
+ * naming those there are (export.document-formats.image-format-one-accepted-as-alias).
  */
 export function parseImageFormat(value: string | undefined): ImageFormat {
   if (value === undefined) return DEFAULT_IMAGE_FORMAT;
@@ -107,7 +107,7 @@ export function parseImageFormat(value: string | undefined): ImageFormat {
 
 /**
  * `value` as the format of the files of cards: none, or an empty one, gives the PDF. Refuses any
- * other, naming those there are (select-as-file-format).
+ * other, naming those there are (export.document-formats.select-as-file-format).
  */
 export function parseDocumentFormat(value: string | undefined): DocumentFormat {
   if (value === undefined || value === "" || value === "pdf") return DEFAULT_DOCUMENT_FORMAT;

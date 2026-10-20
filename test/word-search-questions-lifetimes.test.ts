@@ -15,16 +15,19 @@ vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
   harness.replacedTerminalChoice(await importOriginal()),
 );
-vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
-  ...harness.replacedTerminalInput(await importOriginal()),
-  withCtrlCWatch: async <Value>(
-    search: (signal: AbortSignal) => Promise<Value>,
-  ): Promise<Value> => {
-    const result = await search(new AbortController().signal);
-    if (watchEdge.failure !== undefined) throw watchEdge.failure;
-    return result;
-  },
-}));
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
+  const input = harness.replacedTerminalInput(await importOriginal());
+  class FailingWatch extends input.CtrlCWatch {
+    static override async during<Value>(
+      search: (signal: AbortSignal) => Promise<Value>,
+    ): Promise<Value> {
+      const result = await search(new AbortController().signal);
+      if (watchEdge.failure !== undefined) throw watchEdge.failure;
+      return result;
+    }
+  }
+  return { ...input, CtrlCWatch: FailingWatch };
+});
 
 questionsOnPrivateScreen();
 

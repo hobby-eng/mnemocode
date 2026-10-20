@@ -1,19 +1,19 @@
 import { imageFormat, cardFileFormat, savedPagesNotice } from "./image-options.js";
 import { writeSaved } from "./save-retry.js";
 import { exportPageImages } from "../export/image-export.js";
-import { printableText, terminalNotice, terminalResultHeader } from "./terminal.js";
+import { printableText, terminalPaint, terminalResultHeader, terminalSaved } from "./terminal.js";
+import { STYLE, TEXT_WIDTH, wrapText } from "./terminal-style.js";
 import { exportIndividualCards } from "../export/individual-cards.js";
 import { validateCardOptions } from "./card-options.js";
-import { businessOptions, businessOptionNames } from "./business-options.js";
+import { businessOptions, BUSINESS_OPTION_NAMES } from "./business-options.js";
 import { exportCards, renderCards } from "../export/pdf.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
-import { cardTemplates } from "../export/templates.js";
+import { CARD_TEMPLATES } from "../export/templates.js";
 import { CardPreview, type DesignSelection } from "../export/card-preview.js";
 import { value, type ParsedArguments, integerOption } from "./arguments.js";
 import { preflightOutputs } from "./output-saving.js";
-import { BIP39_WORD_COUNTS } from "../core/bip39-sizes.js";
+import { WORD_COUNT_RANGE } from "../core/bip39-sizes.js";
 import { CARD_FORMAT_NUMBERS } from "./format-numbers.js";
-import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.preview-command", {
@@ -25,6 +25,37 @@ const ERRORS = new ErrorCatalog("cli.preview-command", {
     "Choose either all templates or one specific template, not both.",
   "provide-mnemonic-word-count-only-once": () => "Provide the mnemonic word count only once.",
 });
+
+/**
+ * The card templates, each with its number, which --template takes as well as the id
+ * (findTemplate). At a terminal the description is running text, wrapped on lines of its own under
+ * the id (CORE-36); a file or a pipe gets one line per template.
+ */
+function printTemplateList(): void {
+  // Every design prints the codes of each form that has cards, so the forms are named once.
+  const terminal = terminalResultHeader("Card templates", [
+    ["Installed", String(CARD_TEMPLATES.length)],
+    ["Prints", `format ${CARD_FORMAT_NUMBERS}`],
+  ]);
+  if (!CARD_TEMPLATES.length) console.log("No card designs are installed.");
+  const numberWidth = String(CARD_TEMPLATES.length).length;
+  const idWidth = Math.max(...CARD_TEMPLATES.map((template) => template.id.length));
+  const nameWidth = Math.max(...CARD_TEMPLATES.map((template) => template.name.length));
+  // The description starts under the id: after the number and the two spaces that follow it.
+  const indent = " ".repeat(numberWidth + 2);
+  for (const [index, template] of CARD_TEMPLATES.entries()) {
+    const number = String(index + 1).padStart(numberWidth);
+    if (!terminal) {
+      console.log(
+        `${number}  ${template.id.padEnd(idWidth)}   ${template.name.padEnd(nameWidth)}   ${template.description}`,
+      );
+      continue;
+    }
+    console.log(`${number}  ${template.id.padEnd(idWidth)}   ${template.name}`);
+    for (const line of wrapText(template.description, TEXT_WIDTH - indent.length))
+      console.log(`${indent}${terminalPaint("stdout", STYLE.muted, line)}`);
+  }
+}
 
 export async function runPreview(args: ParsedArguments): Promise<void> {
   const path = value(args, "pdf");
@@ -41,25 +72,11 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
       args.all === true ||
       value(args, "title") !== undefined ||
       args.words !== undefined ||
-      businessOptionNames.some((key) => args[key] !== undefined)
+      BUSINESS_OPTION_NAMES.some((key) => args[key] !== undefined)
     ) {
       throw ERRORS.create("template-listing-cannot-combined-preview-output-settings", []);
     }
-    // Every design prints the codes of each form that has cards, so the forms are named once.
-    terminalResultHeader("Card templates", [
-      ["Installed", String(cardTemplates.length)],
-      ["Prints", `format ${CARD_FORMAT_NUMBERS}`],
-    ]);
-    if (!cardTemplates.length) console.log("No card designs are installed.");
-    // Each with its number, which --template takes as well as the id (findTemplate).
-    const numberWidth = String(cardTemplates.length).length;
-    const idWidth = Math.max(...cardTemplates.map((template) => template.id.length));
-    const nameWidth = Math.max(...cardTemplates.map((template) => template.name.length));
-    for (const [index, template] of cardTemplates.entries()) {
-      console.log(
-        `${String(index + 1).padStart(numberWidth)}  ${template.id.padEnd(idWidth)}   ${template.name.padEnd(nameWidth)}   ${template.description}`,
-      );
-    }
+    printTemplateList();
     return;
   }
   if (!path && !directory && !images)
@@ -78,13 +95,7 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
   // Read only as a whole number here; which lengths a sample may have, and its default, are the
   // library's (CardPreview).
   const words =
-    value(args, "words") === undefined
-      ? undefined
-      : integerOption(args, "words", {
-          min: BIP39_WORD_COUNTS[0],
-          max: defined(BIP39_WORD_COUNTS.at(-1)),
-          label: "mnemonic word count",
-        });
+    value(args, "words") === undefined ? undefined : integerOption(args, "words", WORD_COUNT_RANGE);
   // The sample cards themselves come from the library (export/card-preview.ts), which a page
   // uses too; this command only reads the options and saves the files.
   const preview = new CardPreview(nodeCardRenderer, {
@@ -101,16 +112,12 @@ export async function runPreview(args: ParsedArguments): Promise<void> {
       directory,
       cardFileFormat(args),
     );
-    terminalNotice(
-      `Saved ${count} individual card preview files to: ${printableText(directory)}`,
-      "success",
-    );
+    terminalSaved(`Saved ${count} individual card preview files to: ${printableText(directory)}`);
   }
   if (path !== undefined) {
     await writeSaved(() => exportCards(jobs, path));
-    terminalNotice(
+    terminalSaved(
       `Saved preview PDF (${jobs.length} ${jobs.length === 1 ? "template" : "templates"}): ${printableText(path)}`,
-      "success",
     );
   }
   if (images !== undefined) {

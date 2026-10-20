@@ -9,13 +9,13 @@ import {
   validLastWordIndexes,
 } from "./words.js";
 import {
-  entropyBits,
   lastWordEntropyBits,
   lastWordEntropyValues,
   assertPhraseIndexes,
   assertWordCount,
 } from "./bip39-sizes.js";
-import { bitsOf, bitsOfIndexes, modulo, bytesToBits, bitsToBytes } from "./bits.js";
+import { bitsOf, bitsOfIndexes, modulo, bytesToBits, bitsToBytes, wipedAfter } from "./bits.js";
+import { entropyOfWords } from "./word-candidate.js";
 import { sortDates, deriveShifts } from "./dates.js";
 import { resultFromIndexes, parseInput } from "./representations.js";
 import type { EncodedResult, DecodedResult, DateShiftDate, EncodedFormat } from "./types.js";
@@ -85,11 +85,16 @@ function shiftedEntropyBits(
   return bitsOfIndexes(shiftedIndexes(chunks, shifts, direction)) + bitsOf(movedTail, tailWidth);
 }
 
+/** Dates sorted in calendar order, and the shifts that they give a phrase. */
+interface DatedShifts {
+  /** The dates, earliest first. */
+  readonly sortedDates: DateShiftDate[];
+  /** The shift of each word, in word order. */
+  readonly shifts: number[];
+}
+
 /** The dates sorted, and the shifts that they give a phrase of `wordCount` words. */
-function datedShifts(
-  dates: readonly DateShiftDate[],
-  wordCount: number,
-): { readonly sortedDates: DateShiftDate[]; readonly shifts: number[] } {
+function datedShifts(dates: readonly DateShiftDate[], wordCount: number): DatedShifts {
   // The callers checked the count already; this narrows it, and costs nothing.
   assertWordCount(wordCount);
   const sortedDates = sortDates(dates);
@@ -108,9 +113,14 @@ function noShifts(wordCount: number): number[] {
 }
 
 /**
- * Shift entropy chunks, not checksum bits. The final chunk is shorter because
- * BIP39 appends its checksum to the last word. entropyToMnemonic recomputes it.
- * Modular addition is reversible even when several dates produce the same shifts.
+ * The MnemoCode Seedshift record of `mnemonic` under `dates`, the shifted word numbers of a phrase
+ * that keeps a valid checksum. It shifts the entropy chunks, not the checksum bits: the final chunk
+ * is shorter because BIP39 appends its checksum to the last word, and entropyToMnemonic recomputes
+ * it. Modular addition is reversible even when several dates produce the same shifts. Refuses a
+ * phrase that validatedEnglishWords refuses (core.words.enter-english-bip39-words,
+ * unknown-english-bip39-word-at-position, words-fail-bip39-checksum-check-each-word-their) and
+ * dates that deriveShifts refuses (core.dates.no-date, derive-shifts-refused and the calendar
+ * checks it names).
  */
 export function encodeMnemonic(mnemonic: string, dates: readonly DateShiftDate[]): EncodedResult {
   const { words, sortedDates, shifts } = datedPhrase(mnemonic, dates);
@@ -124,7 +134,14 @@ export function encodeMnemonic(mnemonic: string, dates: readonly DateShiftDate[]
   return resultFromIndexes(words, indexesOfWords(shiftedWords), sortedDates, shifts);
 }
 
-/** Original Seedshift transformation, retained for compatibility with existing records. */
+/**
+ * The Original Seedshift record of `mnemonic` under `dates`, each word number moved by its shift
+ * modulo 2,048, retained for compatibility with existing records. Refuses what encodeMnemonic
+ * refuses: a phrase that validatedEnglishWords refuses (core.words.enter-english-bip39-words,
+ * unknown-english-bip39-word-at-position, words-fail-bip39-checksum-check-each-word-their) and
+ * dates that deriveShifts refuses (core.dates.no-date, derive-shifts-refused and the calendar
+ * checks it names).
+ */
 export function encodeMnemonicLegacy(
   mnemonic: string,
   dates: readonly DateShiftDate[],
@@ -140,14 +157,14 @@ export function encodeMnemonicLegacy(
 
 /**
  * Replaces only the derived checksum bits of a legacy result, preserving its visible entropy
- * prefix.
+ * prefix. Refuses shifted indexes that are no phrase, as entropyOfWords does: their count
+ * (core.bip39-sizes.expected-word-indexes), then an index above 2047
+ * (core.bip39-sizes.assert-word-indexes-refused), which would shift every later bit of the entropy.
  */
 export function legacyChecksumValidResult(result: EncodedResult): EncodedResult {
-  const indexes = result.shiftedIndexes;
-  // An index above 2047 would write more than 11 bits and shift every later bit of the entropy.
-  assertPhraseIndexes(indexes);
-  const entropyLength = entropyBits(indexes.length);
-  const checksumValid = mnemonicFromEntropyBits(bitsOfIndexes(indexes).slice(0, entropyLength));
+  const checksumValid = wipedAfter(entropyOfWords(result.shiftedIndexes), (entropy) =>
+    entropyToMnemonic(entropy, englishWordlist),
+  );
   return resultFromIndexes(
     result.sourceMnemonic.split(" "),
     indexesOfWords(checksumValid.split(" ")),
@@ -156,7 +173,11 @@ export function legacyChecksumValidResult(result: EncodedResult): EncodedResult 
   );
 }
 
-/** Represents a valid mnemonic without applying any date shift. */
+/**
+ * The record of `mnemonic` without any date shift: its own word numbers, words and Unicode codes.
+ * Refuses a phrase that validatedEnglishWords refuses (core.words.enter-english-bip39-words,
+ * unknown-english-bip39-word-at-position, words-fail-bip39-checksum-check-each-word-their).
+ */
 export function representMnemonic(mnemonic: string): EncodedResult {
   const words = validatedEnglishWords(mnemonic);
   return resultFromIndexes(words, indexesOfWords(words), [], noShifts(words.length));
@@ -166,10 +187,7 @@ export function representMnemonic(mnemonic: string): EncodedResult {
  * The dates of a record of `indexes`, checked as every decoder checks them, sorted, and the shifts
  * that they give: the indexes are a phrase's count of whole numbers from 0 through 2047.
  */
-function datedRecord(
-  indexes: readonly number[],
-  dates: readonly DateShiftDate[],
-): { readonly sortedDates: DateShiftDate[]; readonly shifts: number[] } {
+function datedRecord(indexes: readonly number[], dates: readonly DateShiftDate[]): DatedShifts {
   assertPhraseIndexes(indexes);
   return datedShifts(dates, indexes.length);
 }
@@ -195,8 +213,12 @@ function decodedResult(
 }
 
 /**
- * Subtract in the same per-chunk moduli used by encodeMnemonic. The codes must keep the BIP39
- * checksum, which Masking checks before (Masking.assertCodes); call it through Masking.
+ * The phrase that encodeMnemonic masked into `indexes` under `dates`: the shifts are subtracted in
+ * the same per-chunk moduli. The codes must keep the BIP39 checksum, which Masking checks before
+ * (Masking.assertCodes); call it through Masking. Refuses indexes that are no phrase
+ * (assertPhraseIndexes: core.bip39-sizes.expected-word-indexes, assert-word-indexes-refused) and
+ * dates that deriveShifts refuses (core.dates.no-date, derive-shifts-refused and the calendar
+ * checks it names).
  */
 export function undoSeedshift(
   indexes: readonly number[],
@@ -210,7 +232,13 @@ export function undoSeedshift(
   return decodedResult(indexesOfWords(recoveredMnemonic.split(" ")), sortedDates, shifts);
 }
 
-/** Reverses an original Seedshift record whose shifted words need not have a valid checksum. */
+/**
+ * The phrase of an Original Seedshift record, `indexes` under `dates`, whose shifted words need not
+ * have a valid checksum; the result says whether the phrase has one. Refuses indexes that are no
+ * phrase (assertPhraseIndexes: core.bip39-sizes.expected-word-indexes,
+ * assert-word-indexes-refused) and dates that deriveShifts refuses (core.dates.no-date,
+ * derive-shifts-refused and the calendar checks it names).
+ */
 export function decodeIndexesLegacy(
   indexes: readonly number[],
   dates: readonly DateShiftDate[],
@@ -220,10 +248,13 @@ export function decodeIndexesLegacy(
 }
 
 /**
- * Recovers every possible original mnemonic after a legacy shifted final word was
- * replaced by a checksum-valid decoy word. The replacement discards information,
- * so independent evidence is needed to select a candidate. The codes must keep the BIP39 checksum,
- * which Masking checks before (Masking.assertCodes); call it through Masking.
+ * Recovers every possible original mnemonic after a legacy shifted final word was replaced by a
+ * checksum-valid decoy word. The replacement discards information, so independent evidence is
+ * needed to select a candidate. The codes must keep the BIP39 checksum, which Masking checks before
+ * (Masking.assertCodes); call it through Masking. Refuses indexes that are no phrase
+ * (assertPhraseIndexes: core.bip39-sizes.expected-word-indexes, assert-word-indexes-refused) and
+ * dates that deriveShifts refuses (core.dates.no-date, derive-shifts-refused and the calendar
+ * checks it names).
  */
 export function undoLegacyValid(
   indexes: readonly number[],
@@ -243,7 +274,11 @@ export function undoLegacyValid(
 
 /**
  * The Original Seedshift undone from codes written in `format`. A compatibility entry kept for
- * existing callers; new code uses EncodedBackup.read(text, format, mode).
+ * existing callers; new code uses EncodedBackup.read(text, format, mode). Refuses what parseInput
+ * refuses (a `format` that names no form, core.encoded-form.unsupported-encoded-format, and codes
+ * that do not read in it), then what decodeIndexesLegacy refuses
+ * (core.bip39-sizes.expected-word-indexes, assert-word-indexes-refused, core.dates.no-date,
+ * derive-shifts-refused and the calendar checks deriveShifts names).
  */
 export function decodeInputLegacy(
   value: string,
@@ -253,7 +288,11 @@ export function decodeInputLegacy(
   return decodeIndexesLegacy(parseInput(value, format), dates);
 }
 
-/** The mnemonic of indexes that were written without date shifting: the words themselves. */
+/**
+ * The mnemonic of indexes that were written without date shifting: the words themselves. Refuses
+ * indexes that are no phrase (assertPhraseIndexes: core.bip39-sizes.expected-word-indexes,
+ * assert-word-indexes-refused).
+ */
 export function decodeIndexesDirect(indexes: readonly number[]): DecodedResult {
   assertPhraseIndexes(indexes);
   return decodedResult([...indexes], [], noShifts(indexes.length));
@@ -262,7 +301,9 @@ export function decodeIndexesDirect(indexes: readonly number[]): DecodedResult {
 /**
  * Recovers a mnemonic from a direct representation that was created without date shifting. A
  * compatibility entry kept for existing callers; new code uses EncodedBackup.read(text, format,
- * "direct").
+ * "direct"). Refuses what parseInput refuses (a `format` that names no form,
+ * core.encoded-form.unsupported-encoded-format, and codes that do not read in it), then indexes
+ * that are no phrase (core.bip39-sizes.expected-word-indexes, assert-word-indexes-refused).
  */
 export function decodeInputDirect(value: string, format: EncodedFormat): DecodedResult {
   return decodeIndexesDirect(parseInput(value, format));

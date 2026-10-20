@@ -7,6 +7,7 @@
 // with, the QR matrix of a sheet's code and the random decoys.
 
 import {
+  hasCountedDecoys,
   ownCards,
   withDecoyPool,
   keptCards,
@@ -31,6 +32,10 @@ export type SheetShaper = (
  * `cards` with their decoys, drawn with `random`, and for a sheet the orientation of its plan
  * where none was given. Sheets fill rows through `shaper`; separate cards keep one decoy without
  * a sheet layout or QR code. Existing plans keep their real codes and first decoy unchanged.
+ * Refuses a count of decoys that is no whole number below the cards
+ * (export.card-decoys.decoy-cards-whole-number-fewer-than-cards), what withDecoyPool refuses, and
+ * a sheet that planCollectionSheet refuses, such as one with no room for the cards
+ * (export.collection-layout.no-room); a failure of `shaper` or of the host's QR codes passes on.
  */
 export async function withPlannedDecoys<T extends ColorCards>(
   shaper: SheetShaper,
@@ -40,10 +45,9 @@ export async function withPlannedDecoys<T extends ColorCards>(
   random: UniformChoice = drawing.randomInt,
 ): Promise<WithDecoys<T>> {
   // Checked as every count of decoys is (assertDecoys), before the cards are used as they are.
-  if (cards.decoys !== undefined) {
+  if (hasCountedDecoys(cards)) {
     ownCards(cards);
-    // The test above and ownCards checked that the count of decoys is defined and valid.
-    if (!separate) return cards as WithDecoys<T>;
+    if (!separate) return cards;
     if (cards.decoys > 0) return keptIndividualCards(cards);
   }
   const pool = withDecoyPool(cards, random);
@@ -62,7 +66,6 @@ export async function withPlannedDecoys<T extends ColorCards>(
     shape,
     payload === undefined ? undefined : drawing.qrModules(payload),
   );
-  const kept = keptCards(pool, plan.count);
-  // A spread of a generic loses its type in TypeScript; the cards are kept's, turned.
-  return { ...kept, orientation: plan.orientation } as WithDecoys<T>;
+  // keptCards gives a new object of its own, which takes the plan's orientation.
+  return Object.assign(keptCards(pool, plan.count), { orientation: plan.orientation });
 }

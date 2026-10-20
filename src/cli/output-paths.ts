@@ -3,9 +3,10 @@ import { access, lstat, realpath, stat } from "node:fs/promises";
 import { entryAt } from "../export/private-file.js";
 import { basename, dirname, extname, resolve, sep } from "node:path";
 import { pathsOverlap } from "./path-within.js";
+import { unreadableFile } from "./bounded-read.js";
 import { value, values, type ParsedArguments } from "./arguments.js";
 import { optionLabel } from "./option-copy.js";
-import { printableText, terminalNotice } from "./terminal.js";
+import { printableText, terminalLastingWarning } from "./terminal.js";
 import { FILE_INPUTS, FILE_OUTPUTS, FOLDER_OUTPUTS, SAVED_OPTIONS } from "./output-options.js";
 import { DOCUMENT_EXTENSIONS } from "../export/document-formats.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -22,8 +23,6 @@ const ERRORS = new ErrorCatalog("cli.output-paths", {
   "folder-unwritable": () => FOLDER_UNWRITABLE,
   "file-stands-where-folder-name-should-choose-another": () =>
     "A file stands where a folder of this name should be; choose another name.",
-  "could-not-read-check-file-exists-readable": (value0: string) =>
-    `The ${value0} could not be read. Check that the file exists and is readable.`,
   "use-separate-non-overlapping-paths": (value0: string, value1: string) =>
     `The ${value0} and ${value1} must use separate, non-overlapping paths.`,
   "not-overlap": (value0: string, value1: string) =>
@@ -40,9 +39,6 @@ const ERRORS = new ErrorCatalog("cli.output-paths", {
 
 /** More numbered copies of one name than this are surely a mistake. */
 const MAX_COPY_NUMBER = 999;
-
-/** Results saved under another name: the name used, and the name given. */
-const renamedOutputs = new Map<string, string>();
 
 /**
  * Whether `path`, given for an output, names none: a blank one, which as a path would be the
@@ -103,49 +99,59 @@ async function firstFreeNumberedName(path: string, folder: boolean): Promise<str
 }
 
 /**
- * Nothing is ever saved over a file or a folder: when the name given for a result is taken, the
- * result gets the first free numbered name, and reportRenamedOutputs says so after saving. This
- * runs before any secret is asked, so that a taken name never stops a command halfway. A folder
- * given for a file, and an input of the command itself, are left alone for the checks that refuse
- * them (preflightFileDestination, validateOutputPaths): a result named like its own input is a
- * mistake, not a copy.
+ * The results of a command saved under another name. Nothing is ever saved over a file or a
+ * folder: when the name given for a result is taken, the result gets the first free numbered name
+ * (settle), and report says so after saving, once for each, unless the result was not saved after
+ * all (discard). One record for the process, which runs one command.
  */
-export async function settleOutputPaths(args: ParsedArguments): Promise<void> {
-  const inputs = new Set<string>();
-  for (const key of FILE_INPUTS)
-    for (const source of values(args, key))
-      if (source !== "-") inputs.add(await realpath(resolve(source)).catch(() => resolve(source)));
-  for (const [keys, folder] of [
-    [FILE_OUTPUTS, false],
-    [FOLDER_OUTPUTS, true],
-  ] as const) {
-    for (const key of keys) {
-      const path = value(args, key);
-      if (path === undefined || isUnusableOutputPath(path)) continue;
-      const taken = await entryAt(path);
-      if (taken === "none" || (taken === "folder" && !folder)) continue;
-      // A dangling or looping link is a taken name like any other.
-      if (inputs.has(await realpath(resolve(path)).catch(() => resolve(path)))) continue;
-      const free = await firstFreeNumberedName(path, folder);
-      renamedOutputs.set(free, path);
-      args[key] = free;
+export class RenamedOutputs {
+  /** The name used for each renamed result, and the name given. */
+  static readonly #renamed = new Map<string, string>();
+
+  /**
+   * Gives each output of `args` whose name is taken the first free numbered name, in `args`. This
+   * runs before any secret is asked, so that a taken name never stops a command halfway. A folder
+   * given for a file, and an input of the command itself, are left alone for the checks that
+   * refuse them (preflightFileDestination, validateOutputPaths): a result named like its own input
+   * is a mistake, not a copy.
+   */
+  static async settle(args: ParsedArguments): Promise<void> {
+    const inputs = new Set<string>();
+    for (const key of FILE_INPUTS)
+      for (const source of values(args, key))
+        if (source !== "-")
+          inputs.add(await realpath(resolve(source)).catch(() => resolve(source)));
+    for (const [keys, folder] of [
+      [FILE_OUTPUTS, false],
+      [FOLDER_OUTPUTS, true],
+    ] as const) {
+      for (const key of keys) {
+        const path = value(args, key);
+        if (path === undefined || isUnusableOutputPath(path)) continue;
+        const taken = await entryAt(path);
+        if (taken === "none" || (taken === "folder" && !folder)) continue;
+        // A dangling or looping link is a taken name like any other.
+        if (inputs.has(await realpath(resolve(path)).catch(() => resolve(path)))) continue;
+        const free = await firstFreeNumberedName(path, folder);
+        RenamedOutputs.#renamed.set(free, path);
+        args[key] = free;
+      }
     }
   }
-}
 
-/** For a result that was not saved after all: its numbered name is not reported. */
-export function discardRenamedOutput(path: string): void {
-  renamedOutputs.delete(path);
-}
+  /** For a result at `path` that was not saved after all: its numbered name is not reported. */
+  static discard(path: string): void {
+    RenamedOutputs.#renamed.delete(path);
+  }
 
-/** After saving: one warning for each result saved under a numbered name. */
-export function reportRenamedOutputs(): void {
-  for (const [used, given] of renamedOutputs)
-    terminalNotice(
-      `${printableText(given)} already exists: saved as ${printableText(used)} instead.`,
-      "warning",
-    );
-  renamedOutputs.clear();
+  /** After saving: one warning for each result saved under a numbered name, then none are left. */
+  static report(): void {
+    for (const [used, given] of RenamedOutputs.#renamed)
+      terminalLastingWarning(
+        `${printableText(given)} already exists: saved as ${printableText(used)} instead.`,
+      );
+    RenamedOutputs.#renamed.clear();
+  }
 }
 
 async function effectiveOutputPath(path: string): Promise<string> {
@@ -213,8 +219,8 @@ export async function preflightFolderDestination(path: string): Promise<void> {
 async function effectiveSourcePath(path: string, key: string): Promise<string> {
   try {
     return await realpath(resolve(path));
-  } catch {
-    throw ERRORS.create("could-not-read-check-file-exists-readable", [`${optionLabel(key)}`]);
+  } catch (error) {
+    throw unreadableFile(`The ${optionLabel(key)}`, error);
   }
 }
 

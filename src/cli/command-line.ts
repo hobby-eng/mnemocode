@@ -22,7 +22,7 @@ import { runPreview } from "./preview-command.js";
 import { helpNames, printCommandHelp, printNamedHelp, printUsage } from "./usage.js";
 import {
   COMMAND_FACTS,
-  commandOptions,
+  COMMAND_OPTIONS,
   HELP_FLAGS,
   isCommandName,
   isFlagOf,
@@ -31,8 +31,10 @@ import {
   type CommandName,
 } from "./command-options.js";
 import { MNEMOCODE_VERSION } from "../version.js";
-import { runSskrSplit, runSskrCombine, runSskrExport } from "./sskr-command.js";
-import { reportRenamedOutputs, settleOutputPaths } from "./output-paths.js";
+import { runSskrSplit } from "./sskr-split-command.js";
+import { runSskrCombine } from "./sskr-restore-command.js";
+import { runSskrExport } from "./sskr-export-command.js";
+import { RenamedOutputs } from "./output-paths.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
@@ -116,7 +118,7 @@ export async function runCommandLine(argv: readonly string[]): Promise<CommandEn
   const facts = COMMAND_FACTS[command];
   // Before anything is read: what this command does not need is given up for good.
   dropUnneeded(facts.alwaysWrites, arguments_, facts.asksOutputs?.(arguments_) === true);
-  assertAllowedArguments(arguments_, command, commandOptions[command]);
+  assertAllowedArguments(arguments_, command, COMMAND_OPTIONS[command]);
   assertPrivateFileSources(arguments_);
   if (facts.coreSelfTest) assertCoreSelfTest();
   const run = async (): Promise<CommandEnd> => (await HANDLERS[command](arguments_)) ?? undefined;
@@ -127,15 +129,15 @@ export async function runCommandLine(argv: readonly string[]): Promise<CommandEn
 
 /**
  * Runs a command with the outputs that its options name: a taken name numbered first
- * (settleOutputPaths), and each numbered one reported after it ran, unless it was cancelled.
+ * (RenamedOutputs.settle), and each numbered one reported after it ran, unless it was cancelled.
  */
 async function withOutputs(
   args: ParsedArguments,
   run: () => Promise<CommandEnd>,
 ): Promise<CommandEnd> {
-  await settleOutputPaths(args);
+  await RenamedOutputs.settle(args);
   if ((await run()) === CANCELLED) return CANCELLED;
-  reportRenamedOutputs();
+  RenamedOutputs.report();
   return undefined;
 }
 

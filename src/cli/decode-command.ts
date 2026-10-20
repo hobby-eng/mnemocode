@@ -20,14 +20,15 @@ import {
   type WalletEvidence,
 } from "../bitcoin-evidence.js";
 import { type ParsedArguments, value } from "./arguments.js";
-import { commandOptions } from "./command-options.js";
+import { COMMAND_OPTIONS } from "./command-options.js";
 import {
   reportFound,
   searchMissingCodes,
   type MissingCodesAnswers,
 } from "./missing-codes-search.js";
-import { restoreFromShare } from "./sskr-command.js";
-import { askAfterFailure, askWalletEvidence, WHAT_NOW } from "./ask.js";
+import { restoreFromShare } from "./sskr-restore-command.js";
+import { askAfterFailure, WHAT_NOW } from "./ask.js";
+import { askWalletEvidence } from "./wallet-question.js";
 import { searchLimit } from "./share-repair.js";
 import { WALLET_EVIDENCE_OPTIONS, type WalletPlace, givenWallet } from "./bitcoin-options.js";
 import {
@@ -60,14 +61,17 @@ import {
   transformMode,
 } from "./input.js";
 import { clearPrivateScreen, onPrivateScreen } from "./private-screen.js";
-import { PrivateSteps } from "./private-steps.js";
 import {
   type Channel,
   terminalLine,
   terminalResultHeader,
   terminalNotice,
+  terminalPart,
+  terminalPhrase,
   FINGERPRINT_DISCLOSURE,
+  FINGERPRINT_NOTE,
 } from "./terminal.js";
+import { factLine, hintLines, wrapText } from "./terminal-style.js";
 import type { Choice, Explanation } from "./terminal-choice.js";
 import { reportChecksumAndFingerprint, showOriginalPhrase } from "./fingerprint-report.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
@@ -114,7 +118,8 @@ async function decodeFromOptions(arguments_: ParsedArguments): Promise<Cancelled
   if (read === CANCELLED) return CANCELLED;
   using backup = read.backup;
   const enteredDates = read.dates;
-  if (backup.givesSeveral) showLegacyValidCandidates(backup.candidates(enteredDates));
+  if (backup.givesSeveral)
+    showLegacyValidCandidates(backup.candidates(enteredDates), backup.mode, backup.format);
   else {
     const result = backup.decode(enteredDates);
     showRecovered(result, backup.mode, backup.format);
@@ -164,27 +169,19 @@ function reportShorterPhrases(backup: EncodedBackup, dates: readonly DateShiftDa
 }
 
 /**
- * Every phrase that a record with a replaced last word may hold, each with its fingerprint: on the
- * private screen one candidate after another, which the page shows by pages when they do not fit
- * (PrivatePage), and elsewhere one row each, for a script.
+ * Every phrase that a record with a replaced last word may hold, each with its fingerprint, from
+ * the record in `mode` and `format`: on the private screen as a result (showCandidateParts), which
+ * the page shows by pages when it does not fit (PrivatePage), and elsewhere one row each, for a
+ * script.
  */
-function showLegacyValidCandidates(candidates: readonly DecodedResult[]): void {
+function showLegacyValidCandidates(
+  candidates: readonly DecodedResult[],
+  mode: MaskingMode,
+  format: EncodedFormat,
+): void {
   const summary = `Recovered ${candidates.length} checksum-valid candidates for ${PHRASE_WORDS.original}.`;
   if (onPrivateScreen() && process.stdout.isTTY === true) {
-    PrivateSteps.showResult();
-    for (const line of [
-      summary,
-      "Original BIP32 master fingerprints use an empty BIP39 passphrase.",
-      FINGERPRINT_DISCLOSURE,
-      "",
-      ...candidates.flatMap((candidate, index) => [
-        `Candidate ${index + 1} of ${candidates.length}`,
-        candidate.recoveredMnemonic,
-        `Fingerprint: ${masterFingerprint(candidate.recoveredMnemonic)}`,
-        "",
-      ]),
-    ])
-      console.log(line);
+    showCandidateParts(candidates, summary, mode, format);
     return;
   }
   for (const [index, candidate] of candidates.entries())
@@ -194,6 +191,35 @@ function showLegacyValidCandidates(candidates: readonly DecodedResult[]): void {
   console.error(
     `${summary} The final column is the original BIP32 master fingerprint for an empty BIP39 passphrase. ${FINGERPRINT_DISCLOSURE}`,
   );
+}
+
+/**
+ * The candidates on the private screen, as a result is shown (CORE-36): its heading with the mode,
+ * the format and the count; `summary` and what the fingerprints are, wrapped; then each candidate
+ * numbered for writing down, as a phrase is shown, with its fingerprint under a grey label.
+ */
+function showCandidateParts(
+  candidates: readonly DecodedResult[],
+  summary: string,
+  mode: MaskingMode,
+  format: EncodedFormat,
+): void {
+  terminalResultHeader("Recovered candidates", [
+    ["Mode", mode],
+    ["Input format", format],
+    ["Candidates", String(candidates.length)],
+  ]);
+  console.log("");
+  for (const line of wrapText(summary)) console.log(line);
+  const label = PHRASE_WORDS.originalFingerprint;
+  const note = `Each ${label.toLowerCase()} uses an ${FINGERPRINT_NOTE}. ${FINGERPRINT_DISCLOSURE}`;
+  for (const line of hintLines(process.stdout, note)) console.log(line);
+  for (const [index, candidate] of candidates.entries()) {
+    terminalPart(`Candidate ${index + 1} of ${candidates.length}`, true);
+    if (!terminalPhrase(candidate.recoveredMnemonic)) console.log(candidate.recoveredMnemonic);
+    const fingerprint = masterFingerprint(candidate.recoveredMnemonic);
+    console.log(factLine(process.stdout, label, fingerprint, label.length));
+  }
 }
 
 /** The recovered seed phrase, its checksum and, when the checksum is valid, its fingerprint. */
@@ -236,19 +262,19 @@ function showRecoveredPlain(result: DecodedResult, channel: Channel): void {
  * Why the wallet is asked for before a search, shown with the question. Where the checksum leaves
  * only some dates, the wallet is optional, as the menu asks it for recover-date.
  */
-function decodeWalletExplanation(mode: MaskingMode, passphrase: string): Explanation {
-  return walletExplanation(mode, [comparedPassphrase("Decode", passphrase)]);
+function decodeWalletExplanation(mode: MaskingMode, withPassphrase: boolean): Explanation {
+  return walletExplanation(mode, [comparedPassphrase("Decode", withPassphrase)]);
 }
 
 /**
  * The line of a wallet question that says which BIP39 passphrase `tool` compares the wallet with:
- * none, or that of --bip39-passphrase-file, as `passphrase` is empty or not. A wallet made with
- * another one does not match, whatever the dates.
+ * that of --bip39-passphrase-file when `withPassphrase` (GivenWallet.withPassphrase), otherwise
+ * none. A wallet made with another one does not match, whatever the dates.
  */
-export function comparedPassphrase(tool: string, passphrase: string): string {
-  return passphrase === ""
-    ? `${tool} compares it without a BIP39 passphrase.`
-    : `${tool} compares it with the BIP39 passphrase of --bip39-passphrase-file.`;
+export function comparedPassphrase(tool: string, withPassphrase: boolean): string {
+  return withPassphrase
+    ? `${tool} compares it with the BIP39 passphrase of --bip39-passphrase-file.`
+    : `${tool} compares it without a BIP39 passphrase.`;
 }
 
 /** What is asked or done next on the private screen. */
@@ -285,7 +311,9 @@ const DECODE: DecodeUse = {
   searches: true,
   stop: { label: "Done", note: "keep this result", value: "done" },
   async several(backup, dates) {
-    showLegacyValidCandidates(backup.candidates(dates));
+    // The result is a step of its own: the questions are cleared away.
+    clearPrivateScreen();
+    showLegacyValidCandidates(backup.candidates(dates), backup.mode, backup.format);
     return "done";
   },
   decoded: async () => "done",
@@ -295,6 +323,8 @@ const DECODE: DecodeUse = {
 /** The answers that decode's options give its questions on the private screen. */
 interface GivenAnswers extends MissingCodesAnswers {
   readonly place: WalletPlace;
+  /** Whether a BIP39 passphrase was given (GivenWallet.withPassphrase). */
+  readonly withPassphrase: boolean;
   /** The most matches of a date search shown. */
   readonly maxResults: number;
 }
@@ -305,7 +335,7 @@ interface GivenAnswers extends MissingCodesAnswers {
  * fingerprint, whether to list the candidates, and the limits.
  */
 function givenAnswers(args: ParsedArguments): GivenAnswers {
-  const { evidence, place, passphrase } = givenWallet(args);
+  const { evidence, place, passphrase, withPassphrase } = givenWallet(args);
   // Read only by a restore from shares, after a share typed here: checked now all the same.
   searchLimit(args);
   const list = args["list-candidates"] === true;
@@ -316,6 +346,7 @@ function givenAnswers(args: ParsedArguments): GivenAnswers {
     evidence,
     place,
     passphrase,
+    withPassphrase,
     encodedFingerprint: fingerprint === undefined ? undefined : parseMasterFingerprint(fingerprint),
     list,
     maxCandidates: maxCandidatesOf(args),
@@ -325,7 +356,7 @@ function givenAnswers(args: ParsedArguments): GivenAnswers {
 
 /** Decode's options that the restore from shares takes too, for a share typed for the codes. */
 function handedToRestore(args: ParsedArguments): ParsedArguments {
-  const taken = new Set<string>(commandOptions["sskr-combine"]);
+  const taken = new Set<string>(COMMAND_OPTIONS["sskr-combine"]);
   return Object.fromEntries(Object.entries(args).filter(([key]) => taken.has(key)));
 }
 
@@ -494,7 +525,7 @@ async function askedWallet(
     return { ...known, step: "search" };
   const answer = await askWalletEvidence({
     optional: !needed,
-    explanation: decodeWalletExplanation(backup.mode, given.passphrase),
+    explanation: decodeWalletExplanation(backup.mode, given.withPassphrase),
     place: given.place,
   });
   if (answer === CANCELLED) return CANCELLED;
@@ -577,7 +608,10 @@ async function searchAndShow(
     mode,
     maxResults,
     again: backupChoice(backupArgs),
-    wallet: { explanation: decodeWalletExplanation(mode, given.passphrase), place: given.place },
+    wallet: {
+      explanation: decodeWalletExplanation(mode, given.withPassphrase),
+      place: given.place,
+    },
   });
   if (next === CANCELLED) return CANCELLED;
   return typeof next === "string"

@@ -1,7 +1,7 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { listedFiles } from "./git-top-level.mjs";
 import { KEY_DOCUMENTS, shownFingerprints, SIGNING_KEY } from "./release-key.mjs";
 
 // GitHub renders a Markdown list "loose", as separate paragraphs with wider spacing than every
@@ -10,12 +10,16 @@ import { KEY_DOCUMENTS, shownFingerprints, SIGNING_KEY } from "./release-key.mjs
 // (.prettierignore, such as the frozen audit records and the SSKR bridge's notices) are left out
 // here too.
 //
-// The rule is a deliberate copy of the workspace's shared formatting rule, which another
-// repository checks too: the repositories are separate, so neither can import the other. Keep the
-// copies in step; each reports every loose line.
-//
 // The documents that show the release key's fingerprint are also checked to show that one
 // (release-key.mjs).
+//
+// Deliberate copy: LIST_ITEM, CODE_FENCE, INDENTED_TEXT and looseListLines copy the check of the
+// same rule (DOC-01 of the workspace's coding guide) in the multi-chain wallet tools,
+// looseListLine and its patterns in tooling/verify-project-facts.mjs. It is copied because
+// MnemoCode is a program of its own that imports nothing from another project of the workspace
+// (AGENTS.md). No check here can keep the two in step, as this repository does not read the
+// other: a change to either is made to both by hand. Both find the same loose lines, though this
+// one reports every loose line and the other stops at the first.
 const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s/u;
 const CODE_FENCE = /^\s*(?:```|~~~)/u;
 const INDENTED_TEXT = /^\s{2,}\S/u;
@@ -57,13 +61,9 @@ function looseListLines(lines) {
   return found;
 }
 
-/** The paths that `git ls-files` lists with `options`, Markdown files only. */
+/** The Markdown files that `git ls-files` lists with `options` (listedFiles). */
 function listed(...options) {
-  const listing = execFileSync("git", ["ls-files", "-z", ...options, "--", "*.md"], {
-    cwd: root,
-    encoding: "utf8",
-  });
-  return listing.split("\0").filter((path) => path !== "");
+  return listedFiles(root, options, ["*.md"]);
 }
 
 /**
@@ -73,12 +73,10 @@ function listed(...options) {
  */
 function markdownFiles() {
   const ignored = new Set(listed("--cached", "--ignored", "--exclude-from=.prettierignore"));
-  // A file with a merge conflict is listed once per stage, and a deleted one is still in the index.
-  const paths = new Set([
+  return [
     ...listed("--cached").filter((path) => !ignored.has(path)),
     ...listed("--others", "--exclude-standard", "--exclude-from=.prettierignore"),
-  ]);
-  return [...paths].filter((path) => existsSync(resolve(root, path))).sort();
+  ].sort();
 }
 
 const checked = markdownFiles();

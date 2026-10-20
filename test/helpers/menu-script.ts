@@ -6,33 +6,54 @@
 // this module in vi.hoisted, and its vi.mock factories replace each module with what is here; so
 // this module imports no module that a test replaces.
 
-import type { LineQuestion } from "../../src/cli/terminal-choice.js";
+import type { Choice, ChooseOptions, LineQuestion } from "../../src/cli/terminal-choice.js";
 
+type CardsFit = typeof import("../../src/cli/cards-fit.js");
 type ImageExport = typeof import("../../src/export/image-export.js");
 type TerminalChoice = typeof import("../../src/cli/terminal-choice.js");
 type TerminalInput = typeof import("../../src/cli/terminal-input.js");
 
 /** What the script answers, and what the questions asked. */
-export const script = {
-  answers: [] as number[],
-  asked: [] as {
-    question: string;
-    count: number;
-    labels: string[];
-    warning?: string | undefined;
-  }[],
-  lists: [] as string[][],
-  explanations: [] as string[][],
-  labels: [] as string[],
-  typed: {} as Record<string, string[]>,
-  usual: {} as Record<string, string>,
-  lines: [] as { question: string; warning?: string | undefined }[],
+interface MenuScript {
+  /** The place of the answer to each list question in turn; the first entry where none is left. */
+  answers: number[];
+  asked: { question: string; count: number; labels: string[]; warning?: string | undefined }[];
+  lists: string[][];
+  explanations: string[][];
+  labels: string[];
+  /** The answers typed at each typed question in turn, by the question. */
+  typed: Record<string, string[]>;
+  /** The answer typed at a question once its `typed` ones are used up, by the question. */
+  usual: Record<string, string>;
+  lines: { question: string; warning?: string | undefined }[];
   /** Notes and examples longer than their list's room, which the list would cut. */
-  cutNotes: [] as string[],
+  cutNotes: string[];
   /** Whether pdftocairo, which images need, is missing. */
-  noImages: false,
+  noImages: boolean;
+  /**
+   * Whether typed card details are checked by drawing the cards (cards-fit.ts). A render takes
+   * seconds, and the walk through every path types details on many, so only a test of the check
+   * turns it on.
+   */
+  fitCards: boolean;
   /** The value and the key of each answer, by the question last asked with them. */
-  digits: {} as Record<string, { value: unknown; digit?: number | undefined }[]>,
+  digits: Record<string, { value: unknown; digit?: number | null | undefined }[]>;
+}
+
+/** What the script answers, and what the questions asked. */
+export const script: MenuScript = {
+  answers: [],
+  asked: [],
+  lists: [],
+  explanations: [],
+  labels: [],
+  typed: {},
+  usual: {},
+  lines: [],
+  cutNotes: [],
+  noImages: false,
+  fitCards: false,
+  digits: {},
 };
 
 /** Width checks need each distinct screen once; the exhaustive walk otherwise retains gigabytes. */
@@ -49,28 +70,22 @@ function keepScreen(screens: string[][], lines: string[]): void {
 export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
   return {
     ...actual,
-    choose: (async (
-      question: string,
-      choices: readonly { label: string; value: unknown }[],
-      options: { readonly label: string; readonly explanation?: never; readonly warning?: string },
-    ) => {
+    choose: async <T>(question: string, choices: readonly Choice<T>[], options: ChooseOptions) => {
       if (!script.labels.includes(options.label)) script.labels.push(options.label);
       keepScreen(script.explanations, actual.explanationLines(options.explanation));
       const place = script.answers[script.asked.length] ?? 0;
       const labels = choices.map((choice) => choice.label);
       script.asked.push({ question, count: choices.length, labels, warning: options.warning });
-      keepScreen(script.lists, actual.listLines(choices as never, place));
-      script.digits[question] = (choices as readonly { value: unknown; digit?: number }[]).map(
-        ({ value, digit }) => ({ value, digit }),
-      );
-      const room = actual.notesRoom(choices as never);
-      for (const choice of choices as readonly { label: string; note?: string; example?: string }[])
+      keepScreen(script.lists, actual.listLines(choices, place));
+      script.digits[question] = choices.map(({ value, digit }) => ({ value, digit }));
+      const room = actual.notesRoom(choices);
+      for (const choice of choices)
         for (const text of [choice.note, choice.example])
           if (text !== undefined && Array.from(text).length > room)
             script.cutNotes.push(`${question} ${choice.label}: ${text}`);
       return choices[place]!.value;
-    }) as TerminalChoice["choose"],
-    askLine: (async (question: string, label: string, given?: LineQuestion) => {
+    },
+    askLine: async (question: string, label: string, given?: LineQuestion) => {
       const options = given ?? {};
       if (!script.labels.includes(label)) script.labels.push(label);
       for (let warning = options.warning; ;) {
@@ -83,19 +98,37 @@ export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
           if (answer === undefined) throw new Error(`Type ${options.what ?? "an answer"}.`);
           return options.check === undefined ? answer : await options.check(answer);
         } catch (error) {
-          warning = (error as Error).message;
+          warning = error instanceof Error ? error.message : String(error);
           // Without a further answer the walk would ask for ever.
           if (queued === undefined || queued.length === 0)
             throw new Error(`"${question}" refused "${answer}": ${warning}`);
         }
       }
-    }) as TerminalChoice["askLine"],
+    },
+  };
+}
+
+/** The checks of typed card details, which draw the cards only where `script.fitCards` says so. */
+export function replacedCardsFit(actual: CardsFit): CardsFit {
+  return {
+    ...actual,
+    assertColorCardsFit: async (options, form) => {
+      if (script.fitCards) await actual.assertColorCardsFit(options, form);
+    },
+    assertShareCardsFit: async (options, shareFormat) => {
+      if (script.fitCards) await actual.assertShareCardsFit(options, shareFormat);
+    },
   };
 }
 
 /** The terminal's input, which has nothing typed ahead to drop. */
 export function replacedTerminalInput(actual: TerminalInput): TerminalInput {
-  return { ...actual, dropTypedAhead: async () => undefined };
+  class ScriptKeys extends actual.TerminalKeys {
+    static override async dropTypedAhead(): Promise<undefined> {
+      return undefined;
+    }
+  }
+  return { ...actual, TerminalKeys: ScriptKeys };
 }
 
 /** The images of cards, whose renderer is missing when `script.noImages` says so. */

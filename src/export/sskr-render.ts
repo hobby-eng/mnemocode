@@ -18,13 +18,15 @@ import {
   assertShareFormatHasCards,
   shareFormatHasCards,
 } from "../sskr/transport.js";
-import { sskrLongVector } from "../sskr/known-answers.js";
+import { IDENTIFIER_BYTES } from "../sskr/share-layout.js";
+import { SSKR_LONG_VECTOR } from "../sskr/known-answers.js";
 import { refusalMessage } from "../core/refusal.js";
 import { ExportDetails } from "./export-details.js";
 import {
   type CardSettings,
   assertPageSettings,
   assertSeparateCardSize,
+  cardTitle,
   SEPARATE_CARD_SIZE,
   SHEET_PAGE_SIZE,
 } from "./card-settings.js";
@@ -50,12 +52,14 @@ import { withPlannedDecoys, type SheetShaper } from "./card-plan.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 import { Redacted } from "../core/redacted.js";
 import { defined } from "../core/defined.js";
+import { HEX_DIGITS_PER_BYTE } from "../core/bits.js";
+import { LONGEST_WORD_COUNT } from "../core/bip39-sizes.js";
 import { OwnedCardContent } from "./card-values.js";
 
 const ERRORS = new ErrorCatalog("export.sskr-render", {
   "unsupported-sskr-card-style": () => "Unsupported SSKR card style.",
   "share-cards-cannot-printed-every-seed-phrase-longest": (value0: string) =>
-    `These share cards cannot be printed for every seed phrase, the longest of 24 words included: ${value0}`,
+    `These share cards cannot be printed for every seed phrase, the longest of ${LONGEST_WORD_COUNT} words included: ${value0}`,
   "there-no-share-at-place-set": () => "There is no share at that place in the set.",
   "qr-cards-cannot-become-fragments": () =>
     "A whole-share QR card cannot become individual fragments. Start with a collection sheet.",
@@ -84,6 +88,11 @@ export interface SskrRenderOptions extends CardSettings {
    * Word numbers, Bytewords and the UR have no cards (shareFormatHasCards).
    */
   readonly shareFormat?: ShareFormat;
+  /**
+   * The title of each share's sheet, where a design shows one, in place of the studio name: a text
+   * of a card, refused as the title of a sheet (cardTitle) before anything is chosen.
+   */
+  readonly title?: string | undefined;
 }
 
 /** One share of the set, as its cards are made. */
@@ -151,10 +160,18 @@ export class ShareCardSet extends Redacted implements Disposable {
   }
 
   /**
-   * Checks the layout, the style and the shares, settles the details of the cards, which are drawn
-   * with `drawing`, the host's CardRenderer, and plans the decoys after each share's codes
-   * (withPlannedDecoys). The decoys come from `randomInt`, the renderer's random integers below a
-   * limit unless a host, such as its self-test, gives its own.
+   * Checks the layout, the title (cardTitle), the style and the shares, settles the details of the
+   * cards, which are drawn with `drawing`, the host's CardRenderer, and plans the decoys after each
+   * share's codes (withPlannedDecoys). The decoys come from `randomInt`, the renderer's random
+   * integers below a limit unless a host, such as its self-test, gives its own. Refuses, before any
+   * choice is made, a layout of none (export.sskr-content.card-layout-one), a title that cardTitle
+   * refuses, a form of no shares (sskr.transport.share-format-one) or of shares without cards
+   * (sskr.transport.shares-written-as-no-cards-cards-print-shares), a layout that the page size
+   * does not give (resolveSskrLayout), a style of no design
+   * (export.sskr-render.unsupported-sskr-card-style) and separate cards of a design printed on
+   * sheets only (export.template-catalog.sheets-only); then details that ExportDetails refuses,
+   * shares that Share.readSet refuses, which asks here for no quorum, and a plan that
+   * withPlannedDecoys refuses.
    */
   static async create(
     drawing: CardDrawing,
@@ -163,6 +180,8 @@ export class ShareCardSet extends Redacted implements Disposable {
     randomInt: UniformChoice = drawing.randomInt,
   ): Promise<ShareCardSet> {
     parseSskrLayout(requested.layout);
+    // As it is drawn, and refused before any choice is made, as the cards of a backup refuse it.
+    const title = requested.title === undefined ? undefined : cardTitle(requested.title);
     // Checked before any choice is made: another value would print the colors silently
     // (AUD-012-FUN007).
     const suppliedFormat = requested.shareFormat;
@@ -203,6 +222,7 @@ export class ShareCardSet extends Redacted implements Disposable {
           cardQr: options.layout === "qr" || options.cardQr === true,
           presentation,
           profile,
+          ...(title === undefined ? {} : { title }),
         };
         const content = await withPlannedDecoys(shaper, drawing, cards, separate, randomInt);
         const name = `collection-${reference}`;
@@ -227,8 +247,14 @@ export class ShareCardSet extends Redacted implements Disposable {
    * A retained collection or individual set as separate business cards: every real code and its
    * first decoy, with the same colors, identities and share references. Only the requested page
    * size (business by default) and orientation apply; the sheet's orientation is not inherited.
-   * Refuses QR cards, sheet-only designs or invalid page settings. Draws nothing, chooses nothing
-   * and leaves this set unchanged; no separate card carries a whole-share QR code.
+   * Refuses a set that was wiped (core.secret-value.wiped), settings that are no object
+   * (export.sskr-render.individual-settings-object), QR cards
+   * (export.sskr-render.qr-cards-cannot-become-fragments), sheet-only designs
+   * (export.template-catalog.sheets-only), a page setting of none (export.card-settings.page-size,
+   * export.card-settings.orientation) or a sheet size
+   * (export.card-settings.separate-cards-business-size-choose-business-size-leave). Draws
+   * nothing, chooses nothing and leaves this set unchanged; no separate card carries a whole-share
+   * QR code.
    */
   forIndividualCards(requested: Pick<CardSettings, "pageSize" | "orientation"> = {}): ShareCardSet {
     this.#assertLive();
@@ -284,7 +310,7 @@ export class ShareCardSet extends Redacted implements Disposable {
    * The QR codes that the sheets print, one for each share in the order given: its reference and
    * the text the code holds, the share in its written form. A host may also save each as an image
    * where the cards go, which a restore reads back. None for separate cards, which never carry
-   * one, nor for sheets without a QR code.
+   * one, nor for sheets without a QR code. Refused once the set is wiped (core.secret-value.wiped).
    */
   get qrCodes(): readonly ShareQrCode[] {
     this.#assertLive();
@@ -302,19 +328,30 @@ export class ShareCardSet extends Redacted implements Disposable {
 
   /**
    * What the cards of the share at `place` (counted from 0) print, in order, one code to a card:
-   * the hex codes of its colors, or its Unicode codes, then the decoys.
+   * the hex codes of its colors, or its Unicode codes, then the decoys. Refuses a place of no share
+   * (export.sskr-render.there-no-share-at-place-set), and a set that was wiped
+   * (core.secret-value.wiped).
    */
   printedCodes(place: number): readonly string[] {
     const content = contentOf(this.#member(place));
     return content.colors.map((_, index) => printedCode(content, index));
   }
 
-  /** How many cards of the share at `place` print the share's own codes, before the decoys. */
+  /**
+   * How many cards of the share at `place` print the share's own codes, before the decoys. Refuses
+   * a place of no share (export.sskr-render.there-no-share-at-place-set), and a set that was wiped
+   * (core.secret-value.wiped).
+   */
   ownCodes(place: number): number {
     return ownCards(contentOf(this.#member(place)));
   }
 
-  /** The documents of the share at `place` (counted from 0), rendered one at a time, in order. */
+  /**
+   * The documents of the share at `place` (counted from 0), rendered one at a time, in order.
+   * Refuses a place of no share (export.sskr-render.there-no-share-at-place-set), and a set wiped
+   * before or while a document is rendered (core.secret-value.wiped), whose rendered bytes are
+   * wiped then; a refusal of the design passes on.
+   */
   async *documents(place: number): AsyncGenerator<ShareCardDocument> {
     const member = this.#member(place);
     for (let index = 0; index < member.share.documents; index++) {
@@ -333,14 +370,16 @@ export class ShareCardSet extends Redacted implements Disposable {
 
   /**
    * Refuses `requested` where the cards of a share of the longest secret, 32 bytes for a 24-word
-   * phrase (sskrLongVector, public), cannot be drawn: a typed detail too long for its card, or a
+   * phrase (SSKR_LONG_VECTOR, public), cannot be drawn: a typed detail too long for its card, or a
    * material with fewer distinct samples than such a share has codes. A host asks it before any
    * secret is asked, so that it refuses then, not after the shares are made (AUD-022-FUN004).
-   * Nothing is kept; the render takes about a second.
+   * Every refusal, of the settings or of the drawing, is one
+   * (export.sskr-render.share-cards-cannot-printed-every-seed-phrase-longest), which ends with
+   * the refusal's own text. Nothing is kept; the render takes about a second.
    */
   static async assertPrintable(drawing: CardDrawing, requested: SskrRenderOptions): Promise<void> {
     try {
-      using set = await ShareCardSet.create(drawing, [...sskrLongVector.shares], requested);
+      using set = await ShareCardSet.create(drawing, [...SSKR_LONG_VECTOR.shares], requested);
       (await set.renderShare(0)).fill(0);
     } catch (error) {
       throw ERRORS.create("share-cards-cannot-printed-every-seed-phrase-longest", [
@@ -349,12 +388,19 @@ export class ShareCardSet extends Redacted implements Disposable {
     }
   }
 
-  /** One PDF with every page of the share at `place` and of no other share. */
+  /**
+   * One PDF with every page of the share at `place` and of no other share. Refuses a place of no
+   * share (export.sskr-render.there-no-share-at-place-set), and a set wiped before or while it is
+   * rendered (core.secret-value.wiped).
+   */
   async renderShare(place: number): Promise<Uint8Array> {
     return this.#combined([this.#member(place)]);
   }
 
-  /** One PDF with every page of every share, in the order they were given. */
+  /**
+   * One PDF with every page of every share, in the order they were given. Refuses a set wiped
+   * before or while it is rendered (core.secret-value.wiped).
+   */
   async renderAll(): Promise<Uint8Array> {
     return this.#combined(this.#members);
   }
@@ -440,7 +486,8 @@ export class ShareCardSet extends Redacted implements Disposable {
 
 /**
  * How many cards of `record`, a share, print its own codes in `format`, before the decoys: what
- * the sheet for heirs tells (HeirBackup codes); undefined where the form has no cards.
+ * the sheet for heirs tells (HeirBackup codes); undefined where the form has no cards. Refuses a
+ * form of no shares (sskr.transport.share-format-one) and a record that Share.read refuses.
  */
 export function ownShareCards(record: string, format: ShareFormat): number | undefined {
   if (!shareFormatHasCards(format)) return undefined;
@@ -448,17 +495,22 @@ export function ownShareCards(record: string, format: ShareFormat): number | und
   return shareCardFace(share, format).colors.length;
 }
 
+/** The hexadecimal digits of a set's identifier in a reference, two for each of its bytes. */
+const IDENTIFIER_DIGITS = IDENTIFIER_BYTES * HEX_DIGITS_PER_BYTE;
+
 /** The reference that the cards of `share` print: its set, group and member, such as 4BBF-1-2. */
 export function shareReference(share: Share): string {
   const { identifier, groupIndex, memberIndex } = share.info;
-  return `${identifier.toString(16).padStart(4, "0")}-${groupIndex + 1}-${memberIndex + 1}`.toUpperCase();
+  const set = identifier.toString(16).padStart(IDENTIFIER_DIGITS, "0");
+  return `${set}-${groupIndex + 1}-${memberIndex + 1}`.toUpperCase();
 }
 
 /**
  * What the cards of a share in `format` print, before their decoys: its colors, which are the
  * share, in a color form; in Unicode codes its codes, one to a card, with a color for each
  * distinct code that only decorates it (codeColors). The QR code holds the share as written, so
- * that a share read from it comes back as it was.
+ * that a share read from it comes back as it was. Refuses a form of no shares
+ * (sskr.transport.share-format-one) and a share that was wiped (core.secret-value.wiped).
  */
 export function shareCardFace(
   share: Share,
@@ -482,7 +534,9 @@ export interface ShareQrCode {
 
 /**
  * Each page belongs to one share; the combined file contains the complete supplied set, drawn with
- * `drawing`, the host's CardRenderer.
+ * `drawing`, the host's CardRenderer. Refuses what ShareCardSet.create refuses of the shares and
+ * of `options`, such as a style of no design (export.sskr-render.unsupported-sskr-card-style), and
+ * a refusal of the design passes on.
  */
 export async function renderSskrPdf(
   drawing: CardDrawing,

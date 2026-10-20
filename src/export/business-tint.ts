@@ -47,8 +47,9 @@ const TYPICAL_PIXEL = Object.freeze({ saturation: 0.9, value: 0.85 });
 export type Hsv = readonly [hue: number, saturation: number, value: number];
 
 /**
- * The factor of the artwork's brightness for the reference `hex`: BRIGHTNESS_FLOOR for black, 1
- * for a colour with a full channel.
+ * The factor of the artwork's brightness for the reference `hex`, a #RRGGBB or RRGGBB colour:
+ * BRIGHTNESS_FLOOR for black, 1 for a colour with a full channel. Refuses any other text, as
+ * rgbBytes refuses it (core.colors.invalid-rgb-reference).
  */
 export function artworkBrightness(hex: string): number {
   const peak = Math.max(...rgbChannels(hex));
@@ -65,7 +66,10 @@ export class ReferenceTint {
   readonly #brightness: number;
   readonly #grey: boolean;
 
-  /** The tint of `hex`, a #RRGGBB or RRGGBB colour. */
+  /**
+   * The tint of `hex`, a #RRGGBB or RRGGBB colour. Refuses any other text, as rgbBytes refuses it
+   * (core.colors.invalid-rgb-reference).
+   */
   constructor(hex: string) {
     const [hue, saturation] = hueAndSaturation(hex);
     this.#hue = hue;

@@ -5,7 +5,7 @@
 import { designTexts, resolveCardPresentation } from "../export/card-copy.js";
 import {
   profileFieldLabel,
-  profileFields,
+  PROFILE_FIELDS,
   validateProfile,
   pageSizeLabel,
   SEPARATE_CARD_SIZE,
@@ -24,7 +24,7 @@ import {
   DOCUMENT_FORMATS,
   type DocumentFormat,
 } from "../export/document-formats.js";
-import { cardTemplates } from "../export/templates.js";
+import { CARD_TEMPLATES } from "../export/templates.js";
 import { askLine, choose, type Choice, type Explanation } from "./terminal-choice.js";
 import { refusal } from "./terminal-input.js";
 import { readmeLink } from "./terminal.js";
@@ -47,9 +47,9 @@ export async function askDesign(
   withEveryDesign: boolean,
   separateCards = false,
 ): Promise<string | undefined | Cancelled> {
-  const designs: Choice<string>[] = cardTemplates
-    .filter((template) => !separateCards || template.renderIndividual !== undefined)
-    .map((template) => ({ label: template.name, note: template.id, value: template.id }));
+  const designs: Choice<string>[] = CARD_TEMPLATES.filter(
+    (template) => !separateCards || template.renderIndividual !== undefined,
+  ).map((template) => ({ label: template.name, note: template.id, value: template.id }));
   if (withEveryDesign)
     designs.unshift({ label: "Every design", note: "all in one PDF", value: "" });
   return choose("Which card design?", designs, { label: "Design" });
@@ -215,8 +215,11 @@ const PERSON_QUESTIONS: Readonly<Record<ProfileField, string>> = {
   location: "Location",
 };
 
-/** The details of the person, which every design may print, checked as the command checks them. */
-const PERSON_DETAILS: readonly CardDetail[] = profileFields.map((field) => ({
+/**
+ * The details of the person, which every design may print, each checked as the command checks it.
+ * Whether they fit on the cards is checked once they are all typed (askCardDetails).
+ */
+const PERSON_DETAILS: readonly CardDetail[] = PROFILE_FIELDS.map((field) => ({
   option: profileOption(field),
   question: PERSON_QUESTIONS[field],
   label: profileFieldLabel(field),
@@ -252,17 +255,50 @@ const TEXT_DETAILS: Readonly<Record<CopyField, CardDetail>> = {
 };
 
 /**
- * The details on the cards: random, as the commands invent them, or typed one by one, where Enter
- * keeps a detail random. They are a decoy, no secret, and go on the command line.
+ * Refuses, as the command does before it asks a secret, cards that the card options of the
+ * command line could not print, such as with a detail too long for its card: `options` are
+ * --template, how the cards are saved and the details (cards-fit.ts). It shows nothing.
  */
-async function askCardDetails(sheets: boolean): Promise<string[] | undefined | Cancelled> {
+export type CardsFit = (options: readonly string[]) => Promise<void>;
+
+/**
+ * The details on the cards: random, as the commands invent them, or typed one by one, where Enter
+ * keeps a detail random. They are a decoy, no secret, and go on the command line. Typed details
+ * that the cards with the options `chosen` cannot print (`fit`) are explained in one warning line
+ * and asked for again, from the question whether to type them, with every other answer kept
+ * (CORE-42).
+ */
+async function askCardDetails(
+  sheets: boolean,
+  chosen: readonly string[],
+  fit: CardsFit,
+): Promise<string[] | undefined | Cancelled> {
+  let warning: string | undefined;
+  for (;;) {
+    const details = await askDetailsOnce(sheets, warning);
+    // Random details fit every design: only a typed one may not.
+    if (details === undefined || details === CANCELLED || details.length === 0) return details;
+    try {
+      await fit([...chosen, ...details]);
+      return details;
+    } catch (error) {
+      warning = refusal(error);
+    }
+  }
+}
+
+/** One asking of askCardDetails, with `warning` above its first question. */
+async function askDetailsOnce(
+  sheets: boolean,
+  warning: string | undefined,
+): Promise<string[] | undefined | Cancelled> {
   const own = await choose(
     "Type your own details for the cards?",
     [
       { label: "No, random", note: "invented names and contacts", value: false },
       { label: "Yes", note: "Enter on a detail keeps it random", value: true },
     ],
-    { label: "Details", explanation: DETAILS_EXPLANATION },
+    { label: "Details", explanation: DETAILS_EXPLANATION, warning },
   );
   if (own === undefined || own === CANCELLED) return own;
   if (!own) return [];
@@ -282,12 +318,13 @@ async function askCardDetails(sheets: boolean): Promise<string[] | undefined | C
 /**
  * Printable cards, after "Also as printable cards": how the cards are saved in files named after
  * `base` (the kind of file, then the layout), the design, a QR code on each sheet, and the details
- * on them. Separate business cards
- * never carry a QR code. `shares`: the cards of Shamir shares, one set per share.
+ * on them, which `fit` checks as the command will (askCardDetails). Separate business cards never
+ * carry a QR code. `shares`: the cards of Shamir shares, one set per share.
  */
 export async function askCards(
   base: string,
   shares: boolean,
+  fit: CardsFit,
 ): Promise<string[] | undefined | Cancelled> {
   // How the cards are saved comes first, then their design.
   const files = await askCardFiles(base, shares);
@@ -309,7 +346,8 @@ export async function askCards(
       )
     : false;
   if (qr === undefined || qr === CANCELLED) return qr;
-  const details = await askCardDetails(files.sheets);
+  const chosen = ["--template", design, ...files.options, ...(qr ? ["--card-qr"] : [])];
+  const details = await askCardDetails(files.sheets, chosen, fit);
   if (details === undefined || details === CANCELLED) return details;
-  return ["--template", design, ...files.options, ...(qr ? ["--card-qr"] : []), ...details];
+  return [...chosen, ...details];
 }

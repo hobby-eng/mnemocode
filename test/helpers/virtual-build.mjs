@@ -4,6 +4,7 @@ import promises from "node:fs/promises";
 import { registerHooks, syncBuiltinESMExports } from "node:module";
 import { isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { UNREACHED_FAULT_EXIT } from "./unreached-fault.ts";
 
 const configPath = process.env.MNEMOCODE_TEST_BUILD_OVERLAY;
 if (configPath === undefined) throw new Error("A virtual-build test needs its overlay manifest.");
@@ -61,6 +62,6 @@ registerHooks({
 process.on("exit", () => {
   if ([...patches.keys()].some((key) => !reached.has(key))) {
     console.error("The declared virtual-build fault was not reached.");
-    process.exitCode = 97;
+    process.exitCode = UNREACHED_FAULT_EXIT;
   }
 });

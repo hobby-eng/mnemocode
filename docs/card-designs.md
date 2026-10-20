@@ -32,7 +32,7 @@ Images of cards and materials are stored in the program; the colour of a materia
 
 ## Example titles
 
-`--title` accepts any text, for example:
+`--title` takes one line of text that is not blank and has no control or format characters: at most 100 characters once spaces at either end are left out. For example:
 
 - The Studio Edit
 - The Psychology of Color

@@ -3,7 +3,6 @@
 // shares as typed (share-input.ts) and the report of a repair (repair-report.ts). Public test data
 // only: the "abandon … about" phrase and vectors/sskr-v1.json, whose deterministic shares come
 // from fixed test-only seeds.
-import { readFileSync } from "node:fs";
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
@@ -20,31 +19,15 @@ import { SHARE_FORMAT_NAMES, ShareExport, ShareSet } from "../src/sskr/share-set
 import { ShareSplit } from "../src/sskr/split.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { counted, duration } from "../src/core/search-plan.js";
-import { markUnits, wrongValue } from "./helpers/shares.js";
+import { wrongValue } from "./helpers/shares.js";
+import { marked, OTHER_SET_SHARE, PHRASE, SHARES } from "./helpers/share-questions.js";
 import { matching } from "./helpers/matchers.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { hexBytes, sskrVectors } from "./helpers/vectors.js";
 
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-) as {
-  deterministic: {
-    entropy: string;
-    testOnlySeed: string;
-    groups: { threshold: number; count: number }[];
-    shares: string[];
-  }[];
-};
-const bytes = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
-/** A 2-of-3 set of a 12-word phrase, and a share of a set of a 15-word one. */
-const SHARES = vectors.deterministic[0]!.shares as [string, string, string];
-const PHRASE = entropyToMnemonic(bytes(vectors.deterministic[0]!.entropy), wordlist);
-const OTHER_SET_SHARE = vectors.deterministic[1]!.shares[0]!;
+const vectors = sskrVectors();
 /** The host's reader of an encoded seed phrase, which a phrase typed as a share is sent to. */
 const TEXTS = { decodeEntry: "The Decode tab" };
-/** The second share in colours with the elements at `marks` unreadable. */
-function marked(marks: readonly number[]): string {
-  return markUnits(SHARES[1], "colors", marks);
-}
 
 /** The Node.js platform, counting what is asked of it. */
 function countingPlatform(): SharePlatform & { combined: number; created: number } {
@@ -71,10 +54,10 @@ describe("ShareSplit", () => {
       let given: Uint8Array | undefined;
       const split = new ShareSplit(nodeSharePlatform, (seed) => {
         given = seed;
-        seed.set(bytes(vector.testOnlySeed));
+        seed.set(hexBytes(vector.testOnlySeed));
       });
       const shares = await split.split(
-        entropyToMnemonic(bytes(vector.entropy), wordlist),
+        entropyToMnemonic(hexBytes(vector.entropy), wordlist),
         threshold,
         count,
       );
@@ -206,6 +189,7 @@ describe("ShareSet", () => {
     // What the set hands out cannot change it: it is a frozen copy.
     const handed = taken.toRepairedSet();
     expect(Object.isFrozen(handed) && Object.isFrozen(handed.shares)).toBe(true);
+    // Writes that the readonly types forbid, tried on purpose as a JavaScript host could.
     expect(() => ((handed as { mnemonic: string }).mnemonic = TEST_PHRASE)).toThrow(TypeError);
     expect(() => (taken.shares as unknown[]).pop()).toThrow(TypeError);
     expect(() => (handed.shares[1]!.filled as unknown[]).pop()).toThrow(TypeError);
@@ -341,16 +325,21 @@ describe("ShareInput", () => {
       "This is a seed phrase in words, not a Shamir share: The Decode tab reads a masked one.",
     );
     expect(() => input.sharesOfAnswer(" ; ")).toThrow("Type at least one share.");
-    expect(input.readProblem(2, "1 1 1 1 1 1 1 1 1 1 1 4")).toBe(
-      "Share 2 is an encoded seed phrase, not a Shamir share: The Decode tab reads it.",
-    );
+    expect(input.readProblem(2, "1 1 1 1 1 1 1 1 1 1 1 4")).toEqual({
+      kind: "unreadable",
+      code: "encoded-seed-phrase",
+      place: 2,
+      message: "Share 2 is an encoded seed phrase, not a Shamir share: The Decode tab reads it.",
+    });
+    expect(input.readProblem(1, SHARES[0])).toBeUndefined();
     // A share per line, as a page's field holds them.
     expect(input.sharesOfAnswer(`${SHARES[0]}\n${SHARES[1]}\r\n${SHARES[2]}`)).toEqual([
       SHARES[0],
       SHARES[1],
       SHARES[2],
     ]);
-    // The host names its own reader; there is no command-line name by default.
+    // The host names its own reader; there is no command-line name by default. Texts left out
+    // and a blank name, the first given on purpose as a JavaScript host could, are refused.
     expect(() => new ShareInput(undefined as never)).toThrow(TypeError);
     expect(() => new ShareInput({ decodeEntry: " " })).toThrow(TypeError);
   });
@@ -369,6 +358,7 @@ describe("ShareInput", () => {
     expect(() => input.replace(2, SHARES[1])).toThrow("No share was typed at place 2.");
     // The list handed out is a copy that nothing changes: the places stay the object's own.
     const list = input.list;
+    // Changes that the readonly types forbid, tried on purpose as a JavaScript host could.
     expect(() => (list as TypedShare[]).push({ place: 9, text: SHARES[0] })).toThrow(TypeError);
     expect(() => ((list[0] as { text: string }).text = SHARES[1])).toThrow(TypeError);
     expect(input.texts()).toEqual([SHARES[0], SHARES[2], SHARES[1]]);
@@ -397,6 +387,7 @@ describe("ShareInput", () => {
       kind: "trouble",
       trouble: {
         kind: "odd",
+        code: "share-does-not-fit",
         place: 3,
         message:
           "Share 3 does not fit with the others: with it they give another phrase or none. Leave it out, or check it.",
@@ -415,6 +406,7 @@ describe("ShareInput", () => {
       kind: "trouble",
       trouble: {
         kind: "refused",
+        code: "shares-of-different-sets",
         message: "Shares 1 and 2 are of different sets, and nothing tells which is right.",
       },
     });
@@ -422,7 +414,11 @@ describe("ShareInput", () => {
     input.leaveOut(1);
     expect((await input.restoreComplete(platform)).outcome).toEqual({
       kind: "trouble",
-      trouble: { kind: "few", message: "One share is not enough: this set needs 2." },
+      trouble: {
+        kind: "few",
+        code: "too-few-for-threshold",
+        message: "One share is not enough: this set needs 2.",
+      },
     });
     expect(
       ShareInput.looseSetTrouble([
@@ -431,7 +427,12 @@ describe("ShareInput", () => {
         { place: 3, ur: OTHER_SET_SHARE },
         { place: 4, ur: SHARES[1] },
       ]),
-    ).toEqual({ kind: "odd", place: 3, message: "Share 3 is of another set than share 1." });
+    ).toEqual({
+      kind: "odd",
+      code: "share-of-another-set",
+      place: 3,
+      message: "Share 3 is of another set than share 1.",
+    });
   });
 
   it("repairs each share alone, and names the first that cannot be, or fits several ways", () => {
@@ -465,11 +466,13 @@ describe("ShareInput", () => {
     const plan = await planJointRepair(input.texts(), { platform: nodeSharePlatform });
     expect(input.assessmentTrouble(plan.assessment)).toEqual({
       kind: "few",
+      code: "too-few-for-threshold",
       message: "Too few shares: the threshold of this set needs more of them.",
     });
     input.add([Array.from({ length: 65 }, () => "?").join(" ")]);
     expect(input.firstUnreadable()).toEqual({
       kind: "unreadable",
+      code: "too-many-marks",
       place: 3,
       message: "Share 3: mark at most 64 unreadable elements with ?.",
     });

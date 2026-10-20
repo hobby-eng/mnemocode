@@ -1,9 +1,10 @@
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { InputTooLargeError, MEBIBYTE } from "../core/byte-units.js";
-import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+import { type CodedFailure, ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.bounded-read", {
-  "read-file-refuse-refused": suppliedMessage,
+  "file-unreadable": (what: string) =>
+    `${what} could not be read. Check that the file exists and is readable.`,
   "regular-file-required": (what: string) => `${what} must be a regular text file.`,
 });
 
@@ -77,20 +78,30 @@ export function readBoundedFile(
 }
 
 /**
- * readBoundedFile, where every other failure, a file missing or unreadable, is refused with
- * `unreadable`, which names no system detail; too large is said as such.
+ * The refusal of the file named `what`, at the start of a sentence, that is missing or cannot be
+ * read: it names no system detail, which stays in `cause`.
+ */
+export function unreadableFile(
+  what: string,
+  cause: unknown,
+): CodedFailure<"cli.bounded-read.file-unreadable"> {
+  return ERRORS.create("file-unreadable", [what], { cause });
+}
+
+/**
+ * readBoundedFile, where every other failure, a file missing or unreadable, is refused as
+ * unreadableFile; too large is said as such.
  */
 export function readFileOrRefuse(
   path: string,
   limit: number,
   what: string,
-  unreadable: string,
   regularOnly = false,
 ): Buffer {
   try {
     return readBoundedFile(path, limit, what, regularOnly);
   } catch (error) {
     if (error instanceof InputTooLargeError) throw error;
-    throw ERRORS.create("read-file-refuse-refused", [unreadable], { cause: error });
+    throw unreadableFile(what, error);
   }
 }

@@ -26,6 +26,8 @@ const GIVEN: CardPresentation = {
 /** The presentation that an export settles from `presentation`. */
 function settled(presentation: unknown): CardPresentation {
   return ExportDetails.of(nodeRenderPlatform.randomInt, {
+    // Some presentations below have a type that none allows, such as a missing text: fed on
+    // purpose as a JavaScript host could.
     presentation: presentation as CardPresentation,
   }).presentation;
 }
@@ -71,6 +73,7 @@ describe("a presentation given by the host", () => {
 
   it("is none where a JavaScript host gives null, as where it gives none", () => {
     const first = () => 0;
+    // A null presentation, which no type allows, fed on purpose as a JavaScript host could.
     expect(
       ExportDetails.of(first, { presentation: null as unknown as CardPresentation }).presentation,
     ).toEqual(ExportDetails.of(first, {}).presentation);
@@ -80,6 +83,7 @@ describe("a presentation given by the host", () => {
     const colors = indexesToColors(Array.from({ length: 12 }, (_, index) => index * 7));
     const content: CardContent = { kind: "colors", colors, payload: colors.join(" ") };
     const template = selectTemplate("business-it", "colors");
+    // A null presentation, which no type allows, fed on purpose as a JavaScript host could.
     const later = { ...content, presentation: null as unknown as CardPresentation };
     const pdf = await renderCards(nodeCardRenderer, [
       { template, content },

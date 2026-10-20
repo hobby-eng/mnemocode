@@ -1,23 +1,21 @@
 import { Masking } from "../core/masking.js";
 import { type ParsedArguments, value } from "./arguments.js";
 import { assertDateInputMode, encodeFormat, transformMode, phraseAndDates } from "./input.js";
-import { validateCardOptions, cardOutputs } from "./card-options.js";
-import { businessOptions, TYPED_CARD_TEXT_OPTIONS } from "./business-options.js";
-import { type CardSettings, assertSheetQr } from "../export/card-settings.js";
-import { reportRenamedOutputs } from "./output-paths.js";
-import { prepareSskrSplit } from "./sskr-command.js";
+import { validateCardOptions } from "./card-options.js";
+import { colorCardsFit } from "./cards-fit.js";
+import { RenamedOutputs } from "./output-paths.js";
+import { prepareSskrSplit } from "./sskr-split-command.js";
 import { printEncodeResult, maskedWordsRequested } from "./encode-report.js";
 import { backupCheckAnswer, offerEncodedCheck } from "./backup-check.js";
 import { EncodeCardExport, saveEncodeResult } from "./encode-export.js";
 import { optionLabel } from "./option-copy.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
-import { printableText, terminalNotice, terminalWork } from "./terminal.js";
+import { printableText, terminalSaved, terminalWork } from "./terminal.js";
+import { clearPrivateScreen } from "./private-screen.js";
 import { EncodedBackup } from "../core/encoded-backup.js";
 import { COLOR_FORMAT_NUMBERS } from "./format-numbers.js";
 import { preflightOutputs, saveHeirSheetOutput, saveOutput } from "./output-saving.js";
 import { EncodedForm } from "../core/encoded-form.js";
-import { CardPreview, LONGEST_SAMPLE_WORDS } from "../export/card-preview.js";
-import { nodeCardRenderer } from "../export/platform-node.js";
 import { ENCODE_SSKR_ONLY_OPTIONS } from "./encode-option-groups.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
 import { defined } from "../core/defined.js";
@@ -77,13 +75,16 @@ async function createOutcome(
   return { encoding, mode, enteredDates };
 }
 
-/** Encode's results that go to a file or a new folder, in the order saveEncodeResult saves them. */
+/**
+ * Encode's results that go to a file or a new folder, in the order saveEncodeResult saves them,
+ * each with its name in a sentence (ResultName).
+ */
 const SAVED_RESULTS = [
-  ["output", "The record"],
-  ["pdf", "The PDF"],
-  ["images-dir", "The images"],
-  ["cards-dir", "The card files"],
-  ["qr", "The QR code"],
+  ["output", { what: "The record" }],
+  ["pdf", { what: "The PDF" }],
+  ["images-dir", { what: "The images", plural: true }],
+  ["cards-dir", { what: "The card files", plural: true }],
+  ["qr", { what: "The QR code" }],
 ] as const;
 
 /** The options of every result that saveEncodeResult saves, and of the colour cards it shows. */
@@ -101,42 +102,6 @@ function onlyResult(saving: ParsedArguments, key: string, path: string | true): 
   return saving;
 }
 
-/** The card options whose text the person writes: the details, the card copy and the heading. */
-const TYPED_CARD_TEXTS = [...TYPED_CARD_TEXT_OPTIONS, "title"] as const;
-
-/**
- * Whether the card options may keep the cards from being printed, after refusing at once a QR code
- * on separate cards (assertSheetQr, the renderers' own rule). Random card details come from lists
- * that fit every design (test/card-identities.test.ts); what can fail is a text the person typed.
- */
-function cardsMayFail(saving: ParsedArguments, settings: CardSettings): boolean {
-  assertSheetQr({ ...settings, kind: "colors" });
-  return TYPED_CARD_TEXTS.some((key) => saving[key] !== undefined);
-}
-
-/**
- * Draws in memory the colour cards that the options ask for, with a sample phrase of the longest
- * length, drawn at random as for every preview (CardPreview), in `format` and with the card
- * details of `saving` (CardPreview.assertColorsPrint), where the options may keep them from being
- * printed (cardsMayFail): a detail too long for its card is so refused before a secret is asked,
- * not after the result is shown. A render takes seconds, so it is not made where nothing can fail.
- * Nothing is written.
- */
-async function assertCardsPrintable(saving: ParsedArguments, format: EncodedFormat): Promise<void> {
-  if (!EncodedForm.of(format).writtenInColors) return;
-  const { sheets, cards } = cardOutputs(saving);
-  const settings = businessOptions(saving);
-  if ((!sheets && !cards) || !cardsMayFail(saving, settings)) return;
-  const preview = new CardPreview(nodeCardRenderer, {
-    words: LONGEST_SAMPLE_WORDS,
-    settings,
-    title: value(saving, "title"),
-    colorForm: format,
-  });
-  terminalWork("Checking that the cards can be printed…");
-  await preview.assertColorsPrint(value(saving, "template"), { sheets, cards });
-}
-
 /**
  * Saves every result of Encode that the options name, each on its own (saveOutput), with `saving`,
  * the run's one object of options (onlyResult), and one retained library card plan. CANCELLED when
@@ -149,8 +114,8 @@ async function saveResults(
 ): Promise<Cancelled | undefined> {
   const saved = new Map<string, string>();
   using cards = new EncodeCardExport(saving, outcome);
-  for (const [key, what] of SAVED_RESULTS) {
-    const path = await saveOutput(args, key, what, (path) =>
+  for (const [key, name] of SAVED_RESULTS) {
+    const path = await saveOutput(args, key, name, (path) =>
       saveEncodeResult(onlyResult(saving, key, path), outcome, cards),
     );
     if (path === CANCELLED) return CANCELLED;
@@ -183,7 +148,7 @@ async function saveSheetQr(
       : await saveQrBeside(backup.text(), pdf);
   if (path === CANCELLED) return CANCELLED;
   if (path !== undefined)
-    terminalNotice(`Saved the QR code of the sheet as an image: ${printableText(path)}`, "success");
+    terminalSaved(`Saved the QR code of the sheet as an image: ${printableText(path)}`);
 }
 
 export async function runEncode(args: ParsedArguments): Promise<Cancelled | undefined> {
@@ -201,7 +166,13 @@ export async function prepareEncode(args: ParsedArguments): Promise<PreparedEnco
   const { mode, format } = await validateEncodeOptions(args);
   const checkAnswer = backupCheckAnswer(args);
   const saving: ParsedArguments = { ...args };
-  if (args["ask-secrets"] === true) await assertCardsPrintable(saving, format);
+  // A detail too long for its card is refused before a secret is asked, not after the result is
+  // shown.
+  const fit = args["ask-secrets"] === true ? colorCardsFit(saving, format) : undefined;
+  if (fit !== undefined) {
+    terminalWork("Checking that the cards can be printed…");
+    await fit();
+  }
   return (known) => encodeChecked(args, saving, { mode, format, checkAnswer }, known);
 }
 
@@ -223,6 +194,8 @@ async function encodeChecked(
   if (outcome === CANCELLED) return CANCELLED;
   using backup = outcome.encoding.backup;
   const show = (): void => printEncodeResult(outcome, maskedWordsRequested(args, mode));
+  // The result is a step of its own: the questions are cleared away (CORE-39).
+  clearPrivateScreen();
   show();
   if ((await saveResults(args, saving, outcome)) === CANCELLED) return CANCELLED;
   const { result } = outcome.encoding;
@@ -235,7 +208,7 @@ async function encodeChecked(
       })
     : undefined;
   if (sheet === CANCELLED) return CANCELLED;
-  reportRenamedOutputs();
+  RenamedOutputs.report();
   return await offerEncodedCheck(
     {
       mnemonic: result.sourceMnemonic,

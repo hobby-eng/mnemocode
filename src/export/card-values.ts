@@ -1,6 +1,6 @@
 // The retained codes of a card plan. Settings and public share references stay with the plan;
 // decoded code views belong to the caller and cannot be recalled after they have been returned.
-import { SecretValue } from "../core/secret-value.js";
+import { bytesWhileLive, SecretValue } from "../core/secret-value.js";
 import { Redacted } from "../core/redacted.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -59,20 +59,20 @@ export class CardValues extends Redacted implements Disposable {
     return new CardValues(this.view);
   }
 
-  /** Refuses new work or late publication after the containing plan was disposed. */
+  /**
+   * Refuses new work or late publication after the containing plan was disposed
+   * (core.secret-value.wiped).
+   */
   assertLive(): void {
     this.#texts.assertLive();
   }
 
-  /** Transfers fresh rendered bytes only while live; a late owned result is wiped and refused. */
+  /**
+   * Transfers fresh rendered bytes only while live; a late owned result is wiped and refused
+   * (core.secret-value.wiped).
+   */
   checkedBytes(bytes: Uint8Array): Uint8Array {
-    try {
-      this.assertLive();
-      return bytes;
-    } catch (error) {
-      bytes.fill(0);
-      throw error;
-    }
+    return bytesWhileLive(bytes, () => this.assertLive());
   }
 
   /** Overwrites retained code units as far as the runtime permits; repeat calls are harmless. */
@@ -115,7 +115,10 @@ export class OwnedCardContent<Content extends CardValueView> implements Disposab
     return this.#settings;
   }
 
-  /** The content again, with fresh views of its codes; refused once its codes are wiped. */
+  /**
+   * The content again, with fresh views of its codes; refused once its codes are wiped
+   * (core.secret-value.wiped).
+   */
   get content(): Omit<Content, keyof CardValueView> & ContentCodes {
     const { colors, labels, payload } = this.values.view;
     return { ...this.#settings, colors, payload, ...(labels === undefined ? {} : { labels }) };

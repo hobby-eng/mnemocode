@@ -4,15 +4,15 @@
 // with a wallet that is not theirs, told as such; and one share alone, too few
 // (AUD-037-FUN005). It answers later, so core/self-test.ts runs it only in the full self-test.
 //
-// From the host it needs its SharePlatform (sskr/share-platform.ts). It holds public test data, no
-// secret.
+// From the host it needs its ShareRepairPlatform (sskr/share-platform.ts). It holds public test
+// data, no secret.
 //
 // Host-neutral: it imports only core modules and other host-neutral sskr modules.
 
 import { expectSame } from "../core/self-test-check.js";
-import { sskrSetVector } from "./known-answers.js";
+import { SSKR_SET_VECTOR } from "./known-answers.js";
 import { ShareInput } from "./share-input.js";
-import type { SharePlatform } from "./share-platform.js";
+import type { ShareRepairPlatform } from "./share-platform.js";
 import { ShareRestore } from "./share-restore.js";
 import { writeShare } from "./transport.js";
 
@@ -28,15 +28,15 @@ function typed(shares: readonly string[]): ShareInput {
 
 /** The second share of the published set as colours, its sixth colour unread. */
 function markedSecond(): string {
-  const colors = writeShare(sskrSetVector.shares[1], "colors").split(" ");
+  const colors = writeShare(SSKR_SET_VECTOR.shares[1], "colors").split(" ");
   colors[5] = "?";
   return colors.join(" ");
 }
 
 /** A restore of marked shares, one with a wallet not theirs, and one of too few shares. */
-export async function checkShareRestore(platform: SharePlatform): Promise<void> {
+export async function checkShareRestore(platform: ShareRepairPlatform): Promise<void> {
   const restore = new ShareRestore(platform);
-  const shares = [sskrSetVector.shares[0], markedSecond()];
+  const shares = [SSKR_SET_VECTOR.shares[0], markedSecond()];
   {
     using input = typed(shares);
     const restored = await restore.restore({ input, mode: "direct", confirmed: true });
@@ -44,7 +44,7 @@ export async function checkShareRestore(platform: SharePlatform): Promise<void> 
     if (restored.kind === "phrases")
       expectSame(
         restored.phrases.map((phrase) => phrase.mnemonic).join("|"),
-        sskrSetVector.phrase,
+        SSKR_SET_VECTOR.phrase,
         "Shares restored: phrase",
       );
   }
@@ -58,7 +58,7 @@ export async function checkShareRestore(platform: SharePlatform): Promise<void> 
     });
     expectSame(other.kind, "trouble", "Shares of another wallet");
   }
-  using one = typed([sskrSetVector.shares[0]]);
+  using one = typed([SSKR_SET_VECTOR.shares[0]]);
   expectSame(
     (await restore.restore({ input: one, mode: "direct", confirmed: true })).kind,
     "few",

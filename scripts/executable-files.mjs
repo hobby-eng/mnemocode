@@ -17,6 +17,16 @@ export const RELEASE_FOLDER = "release";
 /** "linux-x64", "win-x64", "macos-arm64": the names Node.js uses for its own downloads. */
 const SYSTEM_NAMES = { linux: "linux", win32: "win", darwin: "macos" };
 
+/** The files of a release for each system: its executable and that executable's notices. */
+const FILES_PER_SYSTEM = 2;
+
+/**
+ * The most files that SHA256SUMS of a release lists: the release workflow
+ * (.github/workflows/executable.yml) builds one executable for each system of SYSTEM_NAMES, and
+ * each comes with its license notices.
+ */
+export const RELEASE_FILES_MAX = Object.keys(SYSTEM_NAMES).length * FILES_PER_SYSTEM;
+
 /** What every file of a release of `version` starts with: mnemocode-<version>-. */
 export function releaseFilePrefix(version) {
   return `mnemocode-${version}-`;

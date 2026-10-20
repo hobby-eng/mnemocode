@@ -1,22 +1,14 @@
-import { spawnSync } from "node:child_process";
 import { expect, it } from "vitest";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
-import { PublicCliFiles } from "./helpers/public-cli-files.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
+import { runBuiltCliSync } from "./helpers/built-cli.js";
 import { wrongValue } from "./helpers/shares.js";
 
 it("reports a damaged minimum quorum as invalid shares through the real CLI", () => {
-  const records = [wrongValue(sskrSetVector.shares[0]!), sskrSetVector.shares[1]!];
-  using material = new PublicCliFiles([
+  const records = [wrongValue(SSKR_SET_VECTOR.shares[0]!), SSKR_SET_VECTOR.shares[1]!];
+  const result = runBuiltCliSync([
     "sskr-combine",
     ...records.flatMap((share) => ["--share", share]),
   ]);
-  const result = spawnSync(process.execPath, ["dist/mnemocode.js", ...material.arguments], {
-    encoding: "utf8",
-    env: { ...process.env, NO_COLOR: "1" },
-    timeout: 10_000,
-    maxBuffer: 256 * 1024,
-  });
-  if (result.error) throw result.error;
   expect(result.status, result.stderr).toBe(1);
   expect(result.signal).toBeNull();
   expect(result.stdout).toBe("");

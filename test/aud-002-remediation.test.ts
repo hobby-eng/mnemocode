@@ -10,7 +10,7 @@ import { readBoundedTextFile } from "../src/cli/text-file.js";
 import { validateOutputPaths } from "../src/cli/output-paths.js";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
-import { runSskrSplit } from "../src/cli/sskr-command.js";
+import { runSskrSplit } from "../src/cli/sskr-split-command.js";
 import { TypedShares } from "../src/cli/share-repair.js";
 import { runTable } from "../src/cli/table-command.js";
 
@@ -158,7 +158,8 @@ describe("AUD-002-API002 stable validation errors and paths", () => {
       try {
         matchBitcoinEvidence(publicMnemonic, testCase.evidence);
       } catch (error) {
-        message = (error as Error).message;
+        if (!(error instanceof Error)) throw error;
+        message = error.message;
       }
       expect(message).toBe(testCase.message);
       expect(message).not.toContain(testCase.evidence.value);
@@ -190,9 +191,10 @@ describe("AUD-002-API002 stable validation errors and paths", () => {
           output: join(directory, "result.txt"),
           "mnemonic-file": join(directory, "missing.txt"),
         }),
-      ).rejects.toThrow(
-        "The mnemonic file could not be read. Check that the file exists and is readable.",
-      );
+      ).rejects.toMatchObject({
+        code: "cli.bounded-read.file-unreadable",
+        message: "The mnemonic file could not be read. Check that the file exists and is readable.",
+      });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -230,6 +232,9 @@ describe("AUD-002-API003 PNG structure validation", () => {
   it("returns a stable error for a missing PNG path", async () => {
     await expect(
       decodeQrPngFile(join(tmpdir(), "mnemocode-qr-that-does-not-exist.png")),
-    ).rejects.toThrow("The QR PNG input could not be read.");
+    ).rejects.toMatchObject({
+      code: "cli.bounded-read.file-unreadable",
+      message: "The QR PNG input could not be read. Check that the file exists and is readable.",
+    });
   });
 });

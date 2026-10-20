@@ -92,14 +92,25 @@ describe("the self-test rows of composed features", () => {
     );
   });
 
-  it("fail on an engine whose shares are of another seed", async () => {
+  it("fail on an engine that splits with a seed of its own, not the one it is given", async () => {
     await expect(
       checkShareSplit({
         ...nodeSharePlatform,
         createShares: (secret, threshold, count, seed) =>
           nodeSharePlatform.createShares(secret, threshold, count, seed.fill(1)),
       }),
-    ).rejects.toThrow("Split known answer mismatch.");
+    ).rejects.toThrow("Split with another seed mismatch.");
+  });
+
+  it("fail on a split whose shares hold other entropy than the phrase's", async () => {
+    await expect(
+      checkShareSplit({
+        ...nodeSharePlatform,
+        // The entropy is changed where the split keeps it too, so the split's own restore agrees.
+        createShares: (secret, threshold, count, seed) =>
+          nodeSharePlatform.createShares(secret.fill(7), threshold, count, seed),
+      }),
+    ).rejects.toThrow("Split restored by every two shares mismatch.");
   });
 
   it("fail on a split that takes a threshold of 1", async () => {
@@ -107,6 +118,12 @@ describe("the self-test rows of composed features", () => {
     await expect(checkShareSplit(nodeSharePlatform)).rejects.toThrow(
       "A split with a threshold of 1 was accepted.",
     );
+  });
+
+  it("restore shares with a host that only restores them and makes no shares", async () => {
+    // A ShareRepairPlatform, without createShares: the restore needs nothing more (CORE-08).
+    const { combineShares, hmacSha256 } = nodeSharePlatform;
+    await checkShareRestore({ combineShares, hmacSha256 });
   });
 
   it("fail on an engine that restores nothing", async () => {
@@ -128,7 +145,11 @@ describe("the self-test rows of composed features", () => {
       const read = await restoreComplete.call(this, platform);
       const { outcome } = read;
       if (outcome.kind !== "trouble" || outcome.trouble.kind !== "few") return read;
-      const trouble = { kind: "refused", message: outcome.trouble.message } as const;
+      const trouble = {
+        kind: "refused",
+        code: "shares-of-different-sets",
+        message: outcome.trouble.message,
+      } as const;
       return { ...read, outcome: { kind: "trouble", trouble } };
     });
     await expect(checkShareRestore(nodeSharePlatform)).rejects.toThrow(

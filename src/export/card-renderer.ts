@@ -38,7 +38,7 @@ const PLATFORM_SERVICES: Readonly<Record<keyof RenderPlatform, true>> = Object.f
  * public artwork.
  */
 export class CardRenderer implements CardDrawing {
-  /** The platform's readAsset: the bytes of one bundled file of renderAssets. */
+  /** The platform's readAsset: the bytes of one bundled file of RENDER_ASSETS. */
   readonly readAsset: (path: RenderAsset) => Promise<Uint8Array>;
   /** The platform's randomInt, callable detached: a whole number from 0 to below the limit. */
   readonly randomInt: UniformChoice;

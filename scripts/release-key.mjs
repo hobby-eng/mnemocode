@@ -9,7 +9,7 @@ export const SIGNING_KEY = "28FC51B1DB80DF2101128CB30EDD4814591DD095";
  * The documents that show the fingerprint. The changelog and the release notes are frozen records
  * of their releases and are not checked.
  */
-export const KEY_DOCUMENTS = Object.freeze(["README.md", "docs/RELEASING.md"]);
+export const KEY_DOCUMENTS = Object.freeze(["README.md", "docs/CLI.md", "docs/RELEASING.md"]);
 
 /**
  * A fingerprint of an OpenPGP v4 key: 40 hexadecimal digits in either case, maybe in groups of

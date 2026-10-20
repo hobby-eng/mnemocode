@@ -27,7 +27,7 @@ import { drawCollectionStudy } from "./collection-sheet.js";
 import { MAX_SHEET_CARDS, type SheetShape } from "./collection-layout.js";
 import {
   chooseMaterialSamples,
-  materialArtwork,
+  MATERIAL_ARTWORK,
   TINT_OPACITY,
   type MaterialArtwork,
   type MaterialFinish,
@@ -145,8 +145,15 @@ type MaterialRenderContext = Awaited<ReturnType<typeof createRenderContext>>;
 type MaterialDrawing = Pick<CardDrawing, "readAsset" | "qrModules" | "randomInt">;
 
 /**
- * A collection study of ordered exact references, with its QR code where asked: a material design
- * is printed on sheets only (drawsSeparateCards).
+ * A collection study of ordered exact references, with its QR code where asked, as the bytes of a
+ * PDF: a material design is printed on sheets only (drawsSeparateCards). Refuses content that
+ * colour cards cannot draw, as assertColorCards refuses it
+ * (export.content-kinds.cards-draw-color-references, and what assertColorCardContent refuses), no
+ * colour at all (export.material-cards.empty-card-collection), more than MAX_SHEET_CARDS colours
+ * (export.material-cards.material-cards-support-at-most-references), a page size of none
+ * (export.card-settings.page-size), details that ExportDetails.of refuses, and colours that
+ * chooseMaterialSamples refuses. Then what drawCollectionStudy refuses for the sheet passes on,
+ * and so does a failure of `drawing` to read the font or the photograph.
  */
 export async function renderMaterialCard(
   drawing: MaterialDrawing,
@@ -169,7 +176,7 @@ async function createRenderContext(
     throw ERRORS.create("material-cards-support-at-most-references", [`${MAX_SHEET_CARDS}`]);
   // A material design is printed on sheets only: A6 unless another size is asked for.
   const size = parsePageSize(content.pageSize);
-  const artwork = materialArtwork[style];
+  const artwork = MATERIAL_ARTWORK[style];
   // Through an export the content carries the details settled for it, which come back unchanged.
   // A material card suits an employer of any sector.
   const { profile, presentation } = ExportDetails.of(drawing.randomInt, content);
@@ -221,8 +228,11 @@ async function embeddedPhotograph(
 /**
  * The shape of a sheet of `pageSize` with the samples of `content` in `style`, which a plan of its
  * decoys lays out (planCollectionSheet): the shape of a sample, and the captions of the first
- * cards, whose samples are chosen for those cards alone, as their sheet chooses them. A material
- * with fewer samples than the distinct codes refuses them.
+ * cards, whose samples are chosen for those cards alone, as their sheet chooses them. Its captions
+ * refuse more distinct codes than the material has samples
+ * (export.material-artwork.material-offers-only-distinct-samples) and a code that is no colour
+ * (export.material-artwork.material-reference-contain-exactly-six-hexadecimal-digits); a failure
+ * of `drawing` to read the font or the photograph passes on.
  */
 export async function materialSheetShape(
   drawing: MaterialDrawing,
@@ -235,7 +245,7 @@ export async function materialSheetShape(
   const compact = isCardPageSize(pageSize);
   return {
     font,
-    aspect: cropAspect(image, defined(materialArtwork[style].finishes[0])),
+    aspect: cropAspect(image, defined(MATERIAL_ARTWORK[style].finishes[0])),
     captions: (count) => {
       const samples = chooseMaterialSamples(style, content.colors.slice(0, count));
       return studyCaptions(content, samples, compact, count);

@@ -2,7 +2,10 @@
 // its units as a form writes them, some marked with ? as unreadable. One copy for every test file,
 // so that each damages a share the same way. Public test data only: the shares come from the tests.
 
-import { MINIMAL_BYTEWORDS } from "../../src/sskr/bytewords-list.js";
+import type { RepairedSet } from "../../src/sskr/joint-results.js";
+import { MINIMAL_BYTEWORD_LETTERS } from "../../src/sskr/bytewords-list.js";
+import { unrepairedShare } from "../../src/sskr/repair.js";
+import { splitSskrMnemonic } from "../../src/sskr/shares.js";
 import { crc32 } from "../../src/sskr/checksum.js";
 import {
   CHECKSUM_BYTES,
@@ -16,6 +19,7 @@ import {
   COLOR_UNICODE_CODE_POINT_DIGITS,
   COLOR_UNICODE_POINTS_PER_COLOR,
 } from "../../src/core/colors.js";
+import { TEST_PHRASE } from "./test-phrase.js";
 
 /** A byte of the share value: the header, identifier and member numbers come before it. */
 export const VALUE_BYTE = 10;
@@ -32,7 +36,7 @@ export function wrongValue(share: string): string {
 }
 
 /** The letters of one byte in a UR: a minimal Byteword (BCR-2020-012). */
-const UR_BYTE = new RegExp(`.{${MINIMAL_BYTEWORDS[0]!.length}}`, "gu");
+const UR_BYTE = new RegExp(`.{${MINIMAL_BYTEWORD_LETTERS}}`, "gu");
 /** One code point of Color Unicode, as its hexadecimal digits. */
 const COLOR_UNICODE_CODE = new RegExp(`.{${COLOR_UNICODE_CODE_POINT_DIGITS}}`, "gu");
 /** One color of Color Unicode: its code points together. */
@@ -77,4 +81,33 @@ export function markUnits(
   const units = shareUnits(share, format, cut);
   for (const place of places) units[place] = "?";
   return joinUnits(units, format);
+}
+
+/**
+ * `share` in `format` with ? at some digits of some elements: for each place of `marks`, the
+ * digits it lists, counted from 0 after any #.
+ */
+export function markDigits(
+  share: string,
+  format: ShareFormat,
+  marks: Readonly<Record<number, readonly number[]>>,
+): string {
+  const units = shareUnits(share, format);
+  for (const [place, digits] of Object.entries(marks)) {
+    const unit = units[Number(place)]!;
+    const prefix = unit.startsWith("#") ? "#" : "";
+    const symbols = Array.from(unit.slice(prefix.length));
+    for (const digit of digits) symbols[digit] = "?";
+    units[Number(place)] = prefix + symbols.join("");
+  }
+  return joinUnits(units, format);
+}
+
+/**
+ * Two shares of a new 2-of-3 split of TEST_PHRASE, read as typed: a second set beside another,
+ * where a test needs two sets that fit.
+ */
+export async function testPhraseSet(): Promise<RepairedSet> {
+  const shares = (await splitSskrMnemonic(TEST_PHRASE, 2, 3)).slice(0, 2);
+  return { mnemonic: TEST_PHRASE, shares: shares.map(unrepairedShare), unsettled: [] };
 }

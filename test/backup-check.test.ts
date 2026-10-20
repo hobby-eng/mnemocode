@@ -1,44 +1,27 @@
-import { readFileSync } from "node:fs";
 import { inspect } from "node:util";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-// The check on the private screen runs with the terminal replaced, as in
+// The check on the private screen runs with the terminal replaced, by
 // test/helpers/question-terminal.ts: each question that reads a line takes the next of
 // `terminal.answers`, and each list question the next of `terminal.choices`.
-const terminal = vi.hoisted(() => ({ answers: [] as string[], choices: [] as unknown[] }));
-vi.mock("node:tty", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("node:tty")>()),
-  isatty: () => false,
-}));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/private-screen.js")>()),
-  onPrivateScreen: () => true,
-}));
-vi.mock("../src/cli/terminal-input.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/terminal-input.js")>()),
-  terminalAvailable: () => true,
-  withRawTerminal: async <T>(
-    body: (
-      next: () => Promise<number | undefined>,
-      moreWithin: () => Promise<boolean>,
-    ) => Promise<T>,
-  ) => {
-    const bytes = [...Buffer.from(terminal.answers.shift() ?? "", "utf8")];
-    return body(
-      async () => bytes.shift(),
-      async () => bytes.length > 0,
-    );
-  },
-}));
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/terminal-choice.js")>()),
-  choose: async () => terminal.choices.shift(),
-}));
+const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
+vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
+vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
+  harness.replacedPrivateScreen(await importOriginal()),
+);
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
+  harness.replacedTerminalInput(await importOriginal()),
+);
+vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
+  harness.replacedTerminalChoice(await importOriginal()),
+);
 
 import { offerShareCheck } from "../src/cli/backup-check.js";
+import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import { shareBackupVerdict } from "./helpers/share-backup-check.js";
+import { sskrVectors } from "./helpers/vectors.js";
 import {
   EncodedBackupCheck,
   KeptShares,
@@ -69,9 +52,7 @@ const PHRASE =
 const DATE = "23-09-2026";
 const OTHER_DATE = "24-09-2026";
 const LATER_DATE = "01-10-2026";
-const vectors = JSON.parse(
-  readFileSync(new URL("../vectors/sskr-v1.json", import.meta.url), "utf8"),
-) as { deterministic: { entropy: string; shares: string[] }[] };
+const vectors = sskrVectors();
 
 /** The result that Encode shows for PHRASE with `dates` (none without Seedshift). */
 function encoded(dates: readonly string[], format: EncodedOriginal["format"]): EncodedOriginal {
@@ -406,7 +387,7 @@ describe("checking written-down Shamir shares", () => {
     expect((await check.check({ backup: PHRASE })).message).toBe(
       "This is a seed phrase in words, not a Shamir share: The Decode tab reads a masked one.",
     );
-    // At most as many marks as a repair takes (JointRepair.MAX_MARKED_ELEMENTS).
+    // At most as many marks as a repair takes (MAX_JOINT_MARKED_ELEMENTS).
     const many = Array.from({ length: 70 }, () => "?").join(" ");
     expect((await check.check({ backup: `${shares[0]};${many}` })).message).toBe(
       "Share 2: mark at most 64 unreadable elements with ?.",
@@ -508,21 +489,7 @@ describe("what a backup check hands out", () => {
 });
 
 describe("the share check on the private screen", () => {
-  let notices: string[];
-  beforeEach(() => {
-    terminal.answers = [];
-    terminal.choices = [];
-    notices = [];
-    vi.stubEnv("NO_COLOR", "1");
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
-      notices.push(line.join(" "));
-    });
-  });
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-  });
+  questionsOnPrivateScreen();
 
   it("uses a copy of a share once, with a note, and asks again when too few are left", async () => {
     const shares = await splitSskrMnemonic(PHRASE, 2, 3);
@@ -532,7 +499,7 @@ describe("the share check on the private screen", () => {
     ];
     terminal.choices = ["yes"];
     await offerShareCheck(PHRASE, "direct", 2, () => undefined, undefined);
-    expect(notices.filter((line) => line !== "")).toEqual([
+    expect(seen.notices.filter((line) => line !== "")).toEqual([
       "Share 2 is a copy of share 1: it is used once.",
       "Once the copies are left out, one share is left; type 2 different shares.",
       "Share 2 is a copy of share 1: it is used once.",

@@ -249,7 +249,7 @@ With no known reference, save candidates using `--candidates-file candidates.age
 
 ## Self-tests and public vectors
 
-The startup self-test, quick known-answer and refusal checks, runs before secret operations; a failure stops the operation. Share operations also check the SSKR engine against published answers. These checks do not replace verifying a download or the stored backup.
+The startup self-test, quick known-answer and refusal checks, runs before secret operations; a failure stops the operation, and the menu then offers only the self-test, the help and Quit. Share operations also check the SSKR engine against published answers. These checks do not replace verifying a download or the stored backup.
 
 `mnemocode self-test` runs the full self-test, the startup self-test and more, including PDF and QR rendering, and can take longer. [Check coverage](docs/CLI.md#installation-checks) lists what it exercises; [public vectors](vectors/mnemocode-v1.json) are available for independent verification.
 

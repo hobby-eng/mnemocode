@@ -3,12 +3,13 @@
 // them takes it here, so that SSKR, candidate lists and the fingerprint check load no word list.
 //
 // Host-neutral: it imports only whole-number rules (typed-number.ts), how lists are written
-// (places.ts), the guard of a list's values (one-of.ts) and the catalog of its error codes
-// (error-catalog.ts).
+// (places.ts), the guard of a list's values (one-of.ts), the guard of a value that must be there
+// (defined.ts) and the catalog of its error codes (error-catalog.ts).
 
 import { isOneOf } from "./one-of.js";
 import { listInWords } from "./places.js";
 import { inWholeRange, integerRefusal, rangeText, type WholeRange } from "./typed-number.js";
+import { defined } from "./defined.js";
 import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
 
 const ERRORS = new ErrorCatalog("core.bip39-sizes", {
@@ -20,6 +21,16 @@ const ERRORS = new ErrorCatalog("core.bip39-sizes", {
 export const BIP39_WORD_COUNTS = Object.freeze([12, 15, 18, 21, 24] as const);
 /** A BIP39 phrase length, in words. */
 export type Bip39WordCount = (typeof BIP39_WORD_COUNTS)[number];
+/** The longest BIP39 phrase, in words: 24, the last of BIP39_WORD_COUNTS. */
+export const LONGEST_WORD_COUNT: Bip39WordCount = defined(BIP39_WORD_COUNTS.at(-1));
+/**
+ * The span of BIP39's phrase lengths, in words: 12 through 24. Not every number in it is a length
+ * (isBip39WordCount); an option reads its number in this span before the length is checked.
+ */
+export const WORD_COUNT_RANGE: WholeRange = Object.freeze({
+  min: BIP39_WORD_COUNTS[0],
+  max: LONGEST_WORD_COUNT,
+});
 
 /** Whether a phrase of `count` words has a BIP39 length. */
 export function isBip39WordCount(count: number): count is Bip39WordCount {
@@ -33,6 +44,8 @@ export const WORD_COUNTS_LESS_ONE_TEXT = listInWords(
   BIP39_WORD_COUNTS.map((count) => count - 1),
   "or",
 );
+/** The span of the lengths as the help and the sheet for heirs name it: "12 to 24". */
+export const WORD_COUNT_RANGE_TEXT = rangeText(WORD_COUNT_RANGE, "to");
 
 /** Each word stands for 11 bits: an index into the 2,048 words. */
 export const BIP39_INDEX_BITS = 11;
@@ -44,7 +57,7 @@ export const BIP39_DICTIONARY_SIZE = 2 ** BIP39_INDEX_BITS;
  */
 export const WORD_NUMBER_RANGE: WholeRange = Object.freeze({ min: 1, max: BIP39_DICTIONARY_SIZE });
 /** The word indexes, counted from 0 as BIP39 counts them: 0 through 2,047. */
-export const WORD_INDEX_RANGE: WholeRange = Object.freeze({
+const WORD_INDEX_RANGE: WholeRange = Object.freeze({
   min: 0,
   max: BIP39_DICTIONARY_SIZE - 1,
 });
@@ -129,28 +142,43 @@ export function areWordIndexes(indexes: readonly unknown[]): indexes is readonly
   return Array.from(indexes).every(isWordIndex);
 }
 
+/** The refusal of a value that is no word index, in a list or alone: one condition, one code. */
+function wordIndexRefusal() {
+  return ERRORS.create("assert-word-indexes-refused", [
+    integerRefusal("Every BIP39 index", WORD_INDEX_RANGE),
+  ]);
+}
+
 /**
- * Refuses `indexes` unless each is a word index (areWordIndexes). Every decoder, the colors, the
- * backup of codes and the date search check the codes they are given with it.
+ * Refuses `indexes` unless each is a word index (areWordIndexes;
+ * core.bip39-sizes.assert-word-indexes-refused). Every decoder, the colors, the backup of codes and
+ * the date search check the codes they are given with it.
  */
 export function assertWordIndexes(
   indexes: readonly unknown[],
 ): asserts indexes is readonly number[] {
-  if (!areWordIndexes(indexes))
-    throw ERRORS.create("assert-word-indexes-refused", [
-      integerRefusal("Every BIP39 index", WORD_INDEX_RANGE),
-    ]);
+  if (!areWordIndexes(indexes)) throw wordIndexRefusal();
 }
 
-/** Refuses a count of words that no BIP39 phrase has. */
+/**
+ * Refuses `value` unless it is a word index (isWordIndex), as assertWordIndexes refuses a list that
+ * holds it (core.bip39-sizes.assert-word-indexes-refused): for a packing that checks each value as
+ * it reads it (packWordIndexes in bits.ts), so that a list read once is the list checked.
+ */
+export function assertWordIndex(value: unknown): asserts value is number {
+  if (!isWordIndex(value)) throw wordIndexRefusal();
+}
+
+/** Refuses a count of words that no BIP39 phrase has (core.bip39-sizes.expected-word-indexes). */
 export function assertWordCount(count: number): asserts count is Bip39WordCount {
   if (!isBip39WordCount(count))
     throw ERRORS.create("expected-word-indexes", [`${WORD_COUNTS_TEXT}`]);
 }
 
 /**
- * Refuses indexes that are no phrase: their count first, then each index, so that an index outside
- * the list is named as such and never as a bad checksum.
+ * Refuses indexes that are no phrase: their count first (core.bip39-sizes.expected-word-indexes),
+ * then each index (assert-word-indexes-refused), so that an index outside the list is named as such
+ * and never as a bad checksum.
  */
 export function assertPhraseIndexes(indexes: readonly unknown[]): void {
   assertWordCount(indexes.length);

@@ -3,8 +3,9 @@ import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import * as raw from "../sskr-wasm/generated/recovery_sskr_wasm.js";
 import { CheckedSskrBridge, type SskrBridge } from "../src/sskr/bridge.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { bytesOfHex } from "../src/core/bits.js";
+import { refusalOf } from "./helpers/refusals.js";
 
 raw.initSync({
   module: await readFile(
@@ -15,22 +16,11 @@ const checked = new CheckedSskrBridge(raw);
 const TOKEN = "private-user-token";
 const SAFE_MESSAGE = "The SSKR share could not be decoded.";
 
-function caught(action: () => unknown): Error {
-  try {
-    action();
-  } catch (error) {
-    // A refusal that is no Error fails the test, thrown again; each test pins the code of an Error.
-    if (error instanceof Error) return error;
-    throw error;
-  }
-  throw new Error("The malformed public fixture must be refused.");
-}
-
 describe.each([
   ["raw", raw],
   ["checked", checked],
 ] as const)("SSKR %s decode refusals", (_label, bridge: SskrBridge) => {
-  const share = sskrSetVector.shares[0];
+  const share = SSKR_SET_VECTOR.shares[0];
   const wrongType = share.replace("ur:sskr/", "ur:" + TOKEN + "/");
   const badChecksum = share.slice(0, -2) + "ae";
   it.each([
@@ -49,7 +39,7 @@ describe.each([
         ),
     ],
   ] as const)("keeps the stable safe error for %s", (_kind, action) => {
-    const error = caught(action);
+    const error = refusalOf(action);
     expect(error.message).toBe(SAFE_MESSAGE);
     expect(Reflect.get(error, "code")).toBe("sskr.engine.decode");
     expect(error.cause).toBeUndefined();
@@ -65,7 +55,7 @@ describe.each([
 
   it("still recovers the exact public entropy", () => {
     const actual = bridge.recover_sskr_shares(
-      [sskrSetVector.shares[0], sskrSetVector.shares[2]].join("\n"),
+      [SSKR_SET_VECTOR.shares[0], SSKR_SET_VECTOR.shares[2]].join("\n"),
     );
     try {
       expect(actual).toEqual(bytesOfHex("000102030405060708090a0b0c0d0e0f"));

@@ -21,7 +21,11 @@ const ERRORS = new ErrorCatalog("sskr.bridge", {
   "member-quorum": () => "The SSKR member threshold and count must form a valid quorum.",
 });
 
-/** The host's narrow share engine contract, independent of its generated files or loader. */
+/**
+ * The host's narrow share engine contract, independent of its generated files or loader. Its member
+ * names are the exports of the generated glue (sskr-wasm/generated), which runtime.ts passes as a
+ * bridge as it is, so they keep the glue's names rather than camelCase.
+ */
 export interface SskrBridge {
   /** Numeric encodings and their reverse names; values come from the engine, never this adapter. */
   readonly ShareEncoding: Readonly<{
@@ -32,16 +36,16 @@ export interface SskrBridge {
   /** Compact-UR shares; refuses invalid groups, secrets or random seeds. */
   create_sskr_shares(
     secret: Uint8Array,
-    group_threshold: number,
-    group_specs: Uint8Array,
-    random_seed: Uint8Array,
+    groupThreshold: number,
+    groupSpecs: Uint8Array,
+    randomSeed: Uint8Array,
   ): string;
   /** Shares in the chosen engine encoding, with the same ownership and refusal contract. */
   create_sskr_shares_formatted(
     secret: Uint8Array,
-    group_threshold: number,
-    group_specs: Uint8Array,
-    random_seed: Uint8Array,
+    groupThreshold: number,
+    groupSpecs: Uint8Array,
+    randomSeed: Uint8Array,
     encoding: number,
   ): string;
   /** Restores newline-separated compact-UR shares to a fresh owned secret buffer. */
@@ -96,11 +100,11 @@ export class CheckedSskrBridge implements SskrBridge {
    */
   create_sskr_shares(
     secret: Uint8Array,
-    group_threshold: number,
-    group_specs: Uint8Array,
-    random_seed: Uint8Array,
+    groupThreshold: number,
+    groupSpecs: Uint8Array,
+    randomSeed: Uint8Array,
   ): string {
-    return this.#create(secret, group_threshold, group_specs, random_seed);
+    return this.#create(secret, groupThreshold, groupSpecs, randomSeed);
   }
 
   /**
@@ -109,13 +113,13 @@ export class CheckedSskrBridge implements SskrBridge {
    */
   create_sskr_shares_formatted(
     secret: Uint8Array,
-    group_threshold: number,
-    group_specs: Uint8Array,
-    random_seed: Uint8Array,
+    groupThreshold: number,
+    groupSpecs: Uint8Array,
+    randomSeed: Uint8Array,
     encoding: number,
   ): string {
     this.#assertEncoding(encoding);
-    return this.#create(secret, group_threshold, group_specs, random_seed, encoding);
+    return this.#create(secret, groupThreshold, groupSpecs, randomSeed, encoding);
   }
 
   /**

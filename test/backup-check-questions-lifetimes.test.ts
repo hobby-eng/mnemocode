@@ -26,17 +26,17 @@ vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
 );
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   const input = harness.replacedTerminalInput(await importOriginal());
-  return {
-    ...input,
-    // Observe the next terminal read, keeping the existing terminal fixture and real parsers.
-    withRawTerminal: async <T>(
+  // Observe the next terminal read, keeping the existing terminal fixture and real parsers.
+  class ObservedKeys extends input.TerminalKeys {
+    static override async withRawMode<T>(
       body: (next: NextByte, moreWithin: MoreWithin) => Promise<T>,
-    ): Promise<T> => {
+    ): Promise<T> {
       edges.reads += 1;
       edges.beforeRead?.(edges.reads);
-      return input.withRawTerminal(body);
-    },
-  };
+      return super.withRawMode(body);
+    }
+  }
+  return { ...input, TerminalKeys: ObservedKeys };
 });
 vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
   harness.replacedTerminalChoice(await importOriginal()),

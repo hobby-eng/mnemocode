@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { transformSync } from "esbuild";
 import { describe, expect, it } from "vitest";
+// The package manifest, typed as its own JSON gives it.
+import manifest from "../package.json" with { type: "json" };
 
 // The modules that another host, such as the Wallet Deriver of the multi-chain wallet tools,
 // compiles unchanged (docs/ARCHITECTURE.md, "Modules for other hosts"). Each is checked imported
@@ -336,6 +338,11 @@ const PARTS: Readonly<Record<string, Part>> = {
     uses: ["src/export/card-drawing.ts", "src/export/cards-self-test.ts"],
     packages: PDF_PACKAGES,
   },
+  // The check of the card sets, which a host that offers cards adds to its self-test.
+  "src/export/card-sets-self-test.ts": {
+    uses: CARD_RENDERER_PARTS,
+    packages: PDF_PACKAGES,
+  },
   // The words of the sheet name the share forms (ShareFormat) by their looks; the modes it takes
   // are Masking's.
   "src/export/heir-sheet-text.ts": {
@@ -594,7 +601,7 @@ function expectHostNeutral(entry: string, modules: Map<string, Module>): void {
 
 describe("Parts for other hosts, each imported alone", () => {
   for (const [part, { uses }] of Object.entries(PARTS))
-    it(part, () => {
+    it(`${part} reaches its packages and parts only, no Node.js, command line or core.ts`, () => {
       const modules = reachable(part);
       expectHostNeutral(part, modules);
       const allowed = packagesAllowed(part);
@@ -642,9 +649,7 @@ describe("Parts for other hosts, each imported alone", () => {
   });
 
   it("each have a package export of their own, and the package exports no other module", () => {
-    const { exports } = JSON.parse(readFileSync("package.json", "utf8")) as {
-      exports: Record<string, { types: string; import: string }>;
-    };
+    const { exports } = manifest;
     const expected = Object.fromEntries(
       [...Object.keys(PARTS), ...PUBLIC_MODULES.map((name) => `src/${name}.ts`)].map((part) => {
         const path = part.replace(/^src\//u, "").replace(/\.ts$/u, "");
@@ -678,7 +683,7 @@ describe("Ethereum for a host of Ethereum alone", () => {
 
 describe("Shared modules for other hosts, each imported alone", () => {
   for (const [module, packages] of Object.entries(SHARED_MODULES))
-    it(module, () => {
+    it(`${module} reaches its packages only, and no Node.js or command line`, () => {
       const modules = reachable(module);
       expectHostNeutral(module, modules);
       const allowed = new Set([...BIP39_PACKAGES, ...packages]);

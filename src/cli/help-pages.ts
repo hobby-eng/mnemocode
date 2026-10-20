@@ -10,9 +10,11 @@ import { COLOR_FORMAT_NUMBERS, formatNumber, FORMAT_NUMBER_RANGE } from "./forma
 import {
   WORD_NUMBERS,
   BIP39_WORD_COUNTS,
+  LONGEST_WORD_COUNT,
   WORD_COUNTS_LESS_ONE_TEXT,
   BIP39_DICTIONARY_SIZE,
   checksumBits,
+  lastWordEntropyValues,
 } from "../core/bip39-sizes.js";
 import { listInWords } from "../core/places.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
@@ -30,54 +32,53 @@ import { MAX_SEARCH_COMBINATIONS, MAX_SHOWN_CANDIDATES } from "../core/candidate
 import { QUESTION_HOURS } from "../core/search-turns.js";
 import { numberWord } from "../core/prose.js";
 import { COINS } from "../core/coins.js";
-import { defined } from "../core/defined.js";
 import { type CommandHelp, type TopicHelp } from "./help-types.js";
 import { FINGERPRINT_DISCLOSURE } from "./terminal.js";
 import {
-  askSecrets,
-  candidateListGroup,
-  cardQr,
-  cardsDir,
-  dates,
-  datesFile,
-  decodeFormat,
-  decodeMode,
-  encodedFile,
-  encodedQr,
+  ASK_SECRETS,
+  CANDIDATE_LIST_GROUP,
+  CARD_QR,
+  CARDS_DIR,
+  DATES,
+  DATES_FILE,
+  DECODE_FORMAT,
+  DECODE_MODE,
+  ENCODED_FILE,
+  ENCODED_QR,
   encodedQrOf,
-  encodedText,
-  encodeFormat,
-  encodeLegacyValidLastWord,
-  encodeMode,
-  encodeOutputGroups,
-  evidenceGroup,
+  ENCODED_TEXT,
+  ENCODE_FORMAT,
+  ENCODE_LEGACY_VALID_LAST_WORD,
+  ENCODE_MODE,
+  ENCODE_OUTPUT_GROUPS,
+  EVIDENCE_GROUP,
   FORMAT_DESCRIPTIONS,
-  identityGroup,
-  imageFormat,
-  imagesDir,
+  IDENTITY_GROUP,
+  IMAGE_FORMAT,
+  IMAGES_DIR,
   legacyValidCandidates,
-  legacyValidLastWord,
-  lastWordInputs,
+  LEGACY_VALID_LAST_WORD,
+  LAST_WORD_INPUTS,
   LIST_PASSPHRASE_ASK,
   MASKED_MODES,
-  maxCandidates,
-  maxTries,
-  mnemonicFile,
-  mnemonicText,
-  orientation,
-  pageSize,
-  pdf,
-  phraseWords,
+  MAX_CANDIDATES,
+  MAX_TRIES,
+  MNEMONIC_FILE,
+  MNEMONIC_TEXT,
+  ORIENTATION,
+  PAGE_SIZE,
+  PDF,
+  PHRASE_WORDS_OPTION,
   recordFormatOf,
   TABLE_COLUMN,
-  template,
+  TEMPLATE,
   TEST_FINGERPRINT,
   TEST_PHRASE_VARIABLE,
-  title,
+  TITLE,
 } from "./help-options.js";
 import { SHARE_COMMAND_HELP } from "./help-share-pages.js";
 
-export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
+export const COMMAND_HELP: Readonly<Record<CommandName, CommandHelp>> = {
   encode: {
     summary: "Write a phrase in another form, masked with dates if given",
     about: [
@@ -88,17 +89,17 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       {
         heading: "The phrase and the transformation:",
         options: [
-          askSecrets,
-          mnemonicFile,
-          mnemonicText,
-          encodeMode,
-          dates,
-          datesFile,
-          encodeFormat,
-          encodeLegacyValidLastWord,
+          ASK_SECRETS,
+          MNEMONIC_FILE,
+          MNEMONIC_TEXT,
+          ENCODE_MODE,
+          DATES,
+          DATES_FILE,
+          ENCODE_FORMAT,
+          ENCODE_LEGACY_VALID_LAST_WORD,
         ],
       },
-      ...encodeOutputGroups,
+      ...ENCODE_OUTPUT_GROUPS,
     ],
     asks: [
       ["Phrase", "English BIP39 words"],
@@ -150,14 +151,14 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     notes: [
       `Fingerprints are calculated for an empty BIP39 passphrase. ${FINGERPRINT_DISCLOSURE} A legacy result is a valid phrase only by chance; when it is not, only the original fingerprint is shown.`,
       "Note the encoded fingerprint too: decode, recover-date and sskr-combine show it again on the private screen once the codes or shares are read, before the dates, so that a code written or typed wrongly shows before the dates are typed.",
-      "Individual cards are not Shamir sharing: every card is needed, and each reveals a part of the encoded phrase.",
+      "Individual cards are not Shamir sharing: every real card is needed, and each reveals a part of the encoded phrase; the decoy cards after them, one on separate cards, are not needed.",
     ],
   },
 
   decode: {
     summary: "Turn an encoded record back into the phrase",
     about: [
-      `Reads a record in any of the ${numberWord(ENCODED_FORMATS.length)} formats, from text, a file or a QR code, and prints the phrase with its fingerprint. A masked record needs the same dates. A seedshift-legacy-valid record gives every possible last word, each with its fingerprint: ${legacyValidCandidates(BIP39_WORD_COUNTS[0])} candidates for ${BIP39_WORD_COUNTS[0]} words, ${legacyValidCandidates(defined(BIP39_WORD_COUNTS.at(-1)))} for ${defined(BIP39_WORD_COUNTS.at(-1))}.`,
+      `Reads a record in any of the ${numberWord(ENCODED_FORMATS.length)} formats, from text, a file or a QR code, and prints the phrase with its fingerprint. A masked record needs the same dates. A seedshift-legacy-valid record gives every possible last word, each with its fingerprint: ${legacyValidCandidates(BIP39_WORD_COUNTS[0])} candidates for ${BIP39_WORD_COUNTS[0]} words, ${legacyValidCandidates(LONGEST_WORD_COUNT)} for ${LONGEST_WORD_COUNT}.`,
       "With --ask-secrets the record is checked before the dates are asked for. Codes without an MNC1 header do not say how they were made: without --mode, MnemoCode asks whether Seedshift was used, and which. Where the codes of a masked record form a valid BIP39 phrase, their encoded fingerprint is shown before the dates, to compare with the one encode showed.",
       "A date may then hold ? for each forgotten digit, as in recover-date: the dates are searched, and the matches listed as recover-date lists them. Before the search the wallet's fingerprint or one of its first receiving addresses, of Bitcoin or another coin, is asked for. It is needed where every date gives a valid phrase, as in seedshift mode; with seedshift-legacy, whose checksum sorts out most dates, it may be left out.",
       "On the private screen the codes may hold ? where one cannot be read: a word number, a word, a Unicode code or a whole color, narrowed by a few letters (ab*), words joined by |, or a ? for one digit. The right codes are told by the encoded fingerprint that encode showed, by the wallet with the dates, which may hold ? too, or by a list where they are few. A Shamir share typed in place of the codes, or read from a QR code, leads to the restore from shares, the share kept as the first; after a share from a QR code the next can be read from another.",
@@ -167,15 +168,15 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       {
         heading: "Options:",
         options: [
-          askSecrets,
-          encodedFile,
-          encodedQr,
-          encodedText,
-          dates,
-          datesFile,
-          decodeMode,
-          decodeFormat,
-          phraseWords,
+          ASK_SECRETS,
+          ENCODED_FILE,
+          ENCODED_QR,
+          ENCODED_TEXT,
+          DATES,
+          DATES_FILE,
+          DECODE_MODE,
+          DECODE_FORMAT,
+          PHRASE_WORDS_OPTION,
         ],
       },
       {
@@ -205,7 +206,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             ],
           },
           {
-            ...maxCandidates,
+            ...MAX_CANDIDATES,
             summary:
               "Most combinations a search of codes marked with ? or of dates tries without asking",
             details: [
@@ -218,13 +219,13 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             summary: `Most date matches shown; default ${MAX_SHOWN_MATCHES}`,
           },
           {
-            ...maxTries,
+            ...MAX_TRIES,
             summary: "Combinations a share repair may try without asking, after a share typed here",
           },
         ],
       },
       {
-        ...evidenceGroup,
+        ...EVIDENCE_GROUP,
         heading: "Wallet check (for dates, codes with ?, and shares typed here):",
       },
     ],
@@ -285,17 +286,17 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       {
         heading: "The old backup:",
         options: [
-          askSecrets,
-          encodedFile,
+          ASK_SECRETS,
+          ENCODED_FILE,
           encodedQrOf("--old-mode"),
-          encodedText,
+          ENCODED_TEXT,
           {
-            ...dates,
+            ...DATES,
             flag: "--old-dates",
             summary: "Refused material argument; use --old-dates-file or --ask-secrets",
           },
           {
-            ...datesFile,
+            ...DATES_FILE,
             flag: "--old-dates-file",
             summary: "Read the old backup's dates from a file or -",
           },
@@ -311,15 +312,15 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             "--old-format",
             `The format of the old backup, ${FORMAT_NUMBER_RANGE} or its name; usually found automatically`,
           ),
-          phraseWords,
-          ...lastWordInputs,
+          PHRASE_WORDS_OPTION,
+          ...LAST_WORD_INPUTS,
         ],
       },
       {
         heading: "The new backup (else --ask-secrets asks for it once the phrase is confirmed):",
-        options: [encodeMode, dates, datesFile, encodeFormat, encodeLegacyValidLastWord],
+        options: [ENCODE_MODE, DATES, DATES_FILE, ENCODE_FORMAT, ENCODE_LEGACY_VALID_LAST_WORD],
       },
-      ...encodeOutputGroups,
+      ...ENCODE_OUTPUT_GROUPS,
       {
         heading: "Confirmation of the seed phrase of the old backup:",
         options: [
@@ -333,7 +334,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         ],
       },
       {
-        ...evidenceGroup,
+        ...EVIDENCE_GROUP,
         heading: "Wallet check that the seed phrase of the old backup must match:",
       },
     ],
@@ -381,7 +382,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
     summary: "Find a forgotten digit of a date",
     about: [
       `Tries every date that fits one to ${numberWord(MAX_INCOMPLETE_DATES)} incomplete dates, where each forgotten digit is written as ?, and lists the candidates that pass a recovery check. Every check is local and offline.`,
-      `In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of ${checksumBits(BIP39_WORD_COUNTS[0])} to ${checksumBits(defined(BIP39_WORD_COUNTS.at(-1)))} bits.`,
+      `In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of ${checksumBits(BIP39_WORD_COUNTS[0])} to ${checksumBits(LONGEST_WORD_COUNT)} bits.`,
       "With --ask-secrets the encoded fingerprint of the codes is shown once they are read, before the dates, as decode shows it, so that a code typed wrongly shows before a long search.",
     ],
     usage: "[OPTIONS] (--ask-secrets | --dates-file <PATH>) [<RECOVERY CHECK>]",
@@ -389,32 +390,32 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
       {
         heading: "The record and the dates:",
         options: [
-          askSecrets,
-          encodedFile,
-          encodedQr,
-          encodedText,
+          ASK_SECRETS,
+          ENCODED_FILE,
+          ENCODED_QR,
+          ENCODED_TEXT,
           {
-            ...dates,
+            ...DATES,
             value: "PATTERN ...",
             summary: "Refused material argument; put patterns in --dates-file or use --ask-secrets",
           },
           {
-            ...datesFile,
+            ...DATES_FILE,
             summary: "Read dates with ? for forgotten digits from a file or -",
             details: [
               "?3-09-2026 tries days ending in 3, 0?-09-2026 days 1 to 9, 05|15-09-2026 day 5 or 15, 15-?-2025 the 15th of every month, ?-?-2026 every date in 2026, a lone ? every supported date. One to three dates may be incomplete; two identical patterns are tried once.",
             ],
           },
-          { ...decodeMode, summary: listInWords(MASKED_MODES, "or") },
-          decodeFormat,
-          phraseWords,
+          { ...DECODE_MODE, summary: listInWords(MASKED_MODES, "or") },
+          DECODE_FORMAT,
+          PHRASE_WORDS_OPTION,
         ],
       },
-      evidenceGroup,
+      EVIDENCE_GROUP,
       {
         heading: "Search limits:",
         options: [
-          maxCandidates,
+          MAX_CANDIDATES,
           {
             flag: "--max-results",
             value: "N",
@@ -427,7 +428,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           },
         ],
       },
-      candidateListGroup,
+      CANDIDATE_LIST_GROUP,
     ],
     asks: [
       ["Encoded record", "unless --input-file or --qr-file gives it"],
@@ -461,16 +462,16 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   "recover-word": {
     summary: "Find forgotten words of a phrase",
     about: [
-      `Put ? in place of each forgotten word, ab* for a word that starts with ab, or rich|rice for one of a few words. MnemoCode tries every combination, up to ${counting(MAX_SEARCH_COMBINATIONS)}, and lists those that pass the checksum test: for one forgotten word about 128 in a 12-word phrase, about 8 in 24 words. With one forgotten word each row shows the word, its number in the BIP39 list, the checksum bits and the whole phrase. A recovery check marks the matching rows; the other candidates are still shown. More than ${counting(MAX_SHOWN_CANDIDATES)} candidates are not shown: save them with --candidates-file, or check them against the wallet.`,
+      `Put ? in place of each forgotten word, ab* for a word that starts with ab, or rich|rice for one of a few words. MnemoCode tries every combination, up to ${counting(MAX_SEARCH_COMBINATIONS)}, and lists those that pass the checksum test: for one forgotten word about ${lastWordEntropyValues(BIP39_WORD_COUNTS[0])} in a ${BIP39_WORD_COUNTS[0]}-word phrase, about ${lastWordEntropyValues(LONGEST_WORD_COUNT)} in ${LONGEST_WORD_COUNT} words. With one forgotten word each row shows the word, its number in the BIP39 list, the checksum bits and the whole phrase. A recovery check marks the matching rows; the other candidates are still shown. More than ${counting(MAX_SHOWN_CANDIDATES)} candidates are not shown: save them with --candidates-file, or check them against the wallet.`,
     ],
     usage: "[OPTIONS] (--ask-secrets | --mnemonic-file <PATH>)",
     groups: [
       {
         heading: "The phrase:",
         options: [
-          askSecrets,
-          mnemonicFile,
-          mnemonicText,
+          ASK_SECRETS,
+          MNEMONIC_FILE,
+          MNEMONIC_TEXT,
           {
             flag: "--missing-word",
             summary: "One word is missing, and where is not known",
@@ -479,7 +480,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             ],
           },
           {
-            ...legacyValidLastWord,
+            ...LEGACY_VALID_LAST_WORD,
             summary: "List the valid last words of a whole seedshift-legacy phrase",
             details: [
               "For an old seedshift-legacy phrase whose last word fails the checksum. Give the whole phrase without ?. Every valid last word is listed; the row marked preserved keeps the data bits of the old word, the word legacy encoding suggests. Recover the original wallet phrase from it with the dates.",
@@ -487,8 +488,8 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           },
         ],
       },
-      evidenceGroup,
-      candidateListGroup,
+      EVIDENCE_GROUP,
+      CANDIDATE_LIST_GROUP,
     ],
     asks: [
       ["Phrase", "with ? in place of each forgotten word"],
@@ -533,7 +534,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
         heading: "Options:",
         options: [
           { flag: "--list", summary: "List the installed designs with their numbers" },
-          { ...template, summary: "The design to draw, by name or number" },
+          { ...TEMPLATE, summary: "The design to draw, by name or number" },
           {
             flag: "--all",
             summary: "Draw every design",
@@ -544,17 +545,17 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
             value: BIP39_WORD_COUNTS.join("|"),
             summary: `Length of the sample phrase; default ${DEFAULT_SAMPLE_WORDS}`,
           },
-          pdf,
-          cardsDir,
-          imagesDir,
-          imageFormat,
-          pageSize,
-          orientation,
-          cardQr,
-          title,
+          PDF,
+          CARDS_DIR,
+          IMAGES_DIR,
+          IMAGE_FORMAT,
+          PAGE_SIZE,
+          ORIENTATION,
+          CARD_QR,
+          TITLE,
         ],
       },
-      identityGroup,
+      IDENTITY_GROUP,
     ],
     examples: [
       ["mnemocode preview --list", "List the designs"],
@@ -658,7 +659,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   },
 };
 
-export const topicHelp: Readonly<Record<string, TopicHelp>> = {
+export const TOPIC_HELP: Readonly<Record<string, TopicHelp>> = {
   modes: {
     summary: "Transformation modes: direct, seedshift and the legacy modes",
     sections: [
@@ -725,12 +726,6 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
           FORMAT_DESCRIPTIONS[format],
         ]),
       },
-      {
-        heading: "Notes:",
-        paragraphs: [
-          "Every format is a representation, not encryption. For decode and recover-date the format is found automatically when exactly one fits; otherwise the terminal asks, and a script must pass --format. A record file names its format.",
-        ],
-      },
     ],
     examples: [
       [
@@ -741,6 +736,9 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
         "mnemocode table --word abandon",
         `One word in formats ${formatNumber("english")} to ${formatNumber("unicode")}`,
       ],
+    ],
+    notes: [
+      "Every format is a representation, not encryption. For decode and recover-date the format is found automatically when exactly one fits; otherwise the terminal asks, and a script must pass --format. A record file names its format.",
     ],
   },
 
@@ -758,7 +756,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "In the menu:",
         paragraphs: [
-          `After "Also as printable cards", the menu asks about the files: which kind of file, PDF, PNG or JPEG (images need pdftocairo); how the cards are laid out, on ${SHEET_SIZES_TEXT} sheets in one PDF or as images of the sheets, or as separate business cards of ${pageSizeLabel(SEPARATE_CARD_SIZE)}, one file each in a new folder; for sheets, how they are turned, landscape, portrait or whichever fills the sheet best (${SHEET_PLAN_TEXT}); and the name of the PDF or of the folder. Then it asks for the design, for sheets whether to add a QR code with ${SHEET_QR_HOLDS}, and last, for every way of saving, whether to type your own details; Enter on a detail keeps it random.`,
+          `After "Also as printable cards", the menu asks about the files: which kind of file, PDF, PNG or JPEG (images need pdftocairo); how the cards are laid out, on ${SHEET_SIZES_TEXT} sheets in one PDF or as images of the sheets, or as separate business cards of ${pageSizeLabel(SEPARATE_CARD_SIZE)}, one file each in a new folder; for sheets, how they are turned, landscape, portrait or whichever fills the sheet best (${SHEET_PLAN_TEXT}); and the name of the PDF or of the folder. Then it asks for the design, for sheets whether to add a QR code with ${SHEET_QR_HOLDS}, and last, for every way of saving, whether to type your own details; Enter on a detail keeps it random. Typed details that do not fit on the cards are refused at once, and the details are asked again with every other answer kept.`,
         ],
       },
       {
@@ -776,7 +774,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "Separate cards:",
         paragraphs: [
-          "Every card prints one code. Separate cards never carry a QR code. Every card is needed to recover the phrase, and each reveals part of it: this is not Shamir sharing.",
+          "Every card prints one code. Separate cards never carry a QR code. Every real card is needed to recover the phrase, and each reveals part of it; the last card is a decoy and may be left out. This is not Shamir sharing.",
         ],
       },
     ],

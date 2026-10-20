@@ -6,15 +6,72 @@
 import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { printableText } from "./terminal-style.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
+
+const ERRORS = new ErrorCatalog("cli.swap-check", {
+  "swap-table-unreadable": () => "The table of swap areas does not have the form Linux writes.",
+});
 
 /** The dm uuid of a dm-crypt device starts with this (cryptsetup). */
 const CRYPT_UUID_PREFIX = "CRYPT-";
 
-/** /proc/swaps writes a space in a path as \040, and other special bytes in octal too. */
+/**
+ * The columns of /proc/swaps, which its first line names, and which each area's line fills
+ * (Linux, mm/swapfile.c, swap_show).
+ */
+const SWAP_COLUMNS = ["Filename", "Type", "Size", "Used", "Priority"] as const;
+/** The types of swap area that /proc/swaps names: a block device, or a file on one. */
+const SWAP_TYPES: ReadonlySet<string> = new Set(["partition", "file"]);
+/**
+ * /proc/swaps writes a space, a tab, a line break and a backslash in a path as a backslash and
+ * three octal digits (\040, \011, \012, \134; Linux, mangle_path): an ASCII character.
+ */
+const PROC_ESCAPE = /\\([0-7]{3})/gu;
+/** The highest code of an ASCII character, the most that an escape of /proc/swaps stands for. */
+const MAX_ASCII = 0x7f;
+
+/** Refuses a table of swap areas that does not have the form of /proc/swaps. */
+function unreadableTable(): Error {
+  return ERRORS.create("swap-table-unreadable", []);
+}
+
+/** A path as /proc/swaps writes it, its escapes undone; refused when one is not an escape. */
 function unescapeProcPath(path: string): string {
-  return path.replace(/\\([0-7]{3})/gu, (_, octal: string) =>
-    String.fromCharCode(parseInt(octal, 8)),
-  );
+  const unescaped = path.replace(PROC_ESCAPE, (_, octal: string) => {
+    const code = parseInt(octal, 8);
+    if (code > MAX_ASCII) throw unreadableTable();
+    return String.fromCharCode(code);
+  });
+  // Every backslash starts an escape, as the kernel writes a backslash itself as one.
+  if (path.replace(PROC_ESCAPE, "").includes("\\")) throw unreadableTable();
+  return unescaped;
+}
+
+/** A swap area as /proc/swaps lists it: its path, and whether it is a file. */
+interface SwapArea {
+  readonly path: string;
+  readonly file: boolean;
+}
+
+/**
+ * The swap areas that the text of /proc/swaps lists, refused as a whole where the text does not
+ * have its form: a first line other than its columns, or a line of an area that does not fill them
+ * or names another type, such as a line cut short. Nothing in such a table can be trusted, and an
+ * area left out would leave out its warning.
+ */
+function swapAreas(table: string): SwapArea[] {
+  const lines = table.split("\n");
+  // The table ends with a line break, after which nothing follows.
+  if (lines.at(-1) === "") lines.pop();
+  const [header, ...areas] = lines.map((line) => line.trim().split(/\s+/u));
+  if (header?.join(" ") !== SWAP_COLUMNS.join(" ")) throw unreadableTable();
+  return areas.map((fields) => {
+    const [path, type] = fields;
+    if (fields.length !== SWAP_COLUMNS.length || path === undefined || type === undefined)
+      throw unreadableTable();
+    if (!SWAP_TYPES.has(type)) throw unreadableTable();
+    return { path: unescapeProcPath(path), file: type === "file" };
+  });
 }
 
 /** The kernel name of a block device, such as dm-0 or sda2, from its path in /dev. */
@@ -68,19 +125,15 @@ const SWAP_RISK = "Swap may write this memory to the disk unencrypted";
  * The swap areas that are not encrypted, or of which MnemoCode cannot tell, by their path in
  * /proc/swaps; empty without swap and on other systems. `root` is the file-system root, so that
  * tests can give a /proc and /sys of their own. Throws when /proc/swaps cannot be read, as under a
- * permission model that denies it: then nothing is known about swap, which is not the same as no
- * swap (swapWarning, AUD-014-SEC002).
+ * permission model that denies it, or does not have its form (swap-table-unreadable): then
+ * nothing is known about swap, which is not the same as no swap (swapWarning, AUD-014-SEC002).
  */
 export function unencryptedSwap(root = "/"): string[] {
   if (root === "/" && process.platform !== "linux") return [];
   const table = readFileSync(join(root, SWAP_TABLE), "utf8");
   const risky: string[] = [];
-  // The first line names the columns: Filename Type Size Used Priority.
-  for (const line of table.split("\n").slice(1)) {
-    const [rawPath, type] = line.trim().split(/\s+/u);
-    if (rawPath === undefined || rawPath === "" || type === undefined) continue;
-    const path = unescapeProcPath(rawPath);
-    const name = type === "file" ? deviceOfFile(root, path) : deviceName(root, path);
+  for (const { path, file } of swapAreas(table)) {
+    const name = file ? deviceOfFile(root, path) : deviceName(root, path);
     if (name === undefined || !encrypted(root, name)) risky.push(path);
   }
   return risky;
@@ -88,9 +141,9 @@ export function unencryptedSwap(root = "/"): string[] {
 
 /**
  * The warning about swap that comes before a secret: the areas that may write memory to a disk
- * unencrypted, or that MnemoCode cannot tell at all because it cannot read /proc/swaps; undefined
- * when there is no swap or all of it is safe. Any failure to read the table warns: a warning too
- * many is safe, a missing one is not.
+ * unencrypted, or that MnemoCode cannot tell at all because it cannot read /proc/swaps or its
+ * form; undefined when there is no swap or all of it is safe. Any failure to read the table warns:
+ * a warning too many is safe, a missing one is not.
  */
 export function swapWarning(root = "/"): string | undefined {
   let risky: string[];

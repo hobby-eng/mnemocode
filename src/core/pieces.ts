@@ -29,11 +29,17 @@ function assertWholePieces(length: number, width: number): void {
     throw ERRORS.create("length-no-whole-number-pieces", [`${length}`, `${width}`]);
 }
 
-/** `text` cut into pieces of `width` characters (UTF-16 code units), in order. */
+/**
+ * `text` cut into pieces of `width` characters (UTF-16 code units), in order. Refuses a width below
+ * 1 (core.pieces.piece-whole-width-at-least-1) and a length that is no whole number of pieces
+ * (core.pieces.length-no-whole-number-pieces).
+ */
 export function textPieces(text: string, width: number): string[];
 /**
- * `text` cut into pieces of `width` characters, each read by `read` as it is cut: one array, for
- * the paths that a search runs for every candidate.
+ * `text` cut into pieces of `width` characters (UTF-16 code units), each read by `read` as it is
+ * cut: one array, for the paths that a search runs for every candidate. Refuses a width below 1
+ * (core.pieces.piece-whole-width-at-least-1) and a length that is no whole number of pieces
+ * (core.pieces.length-no-whole-number-pieces).
  */
 export function textPieces<T>(text: string, width: number, read: (piece: string) => T): T[];
 export function textPieces<T>(
@@ -48,7 +54,11 @@ export function textPieces<T>(
   });
 }
 
-/** `items` cut into pieces of `width` items, in order. */
+/**
+ * `items` cut into pieces of `width` items, in order. Refuses a width below 1
+ * (core.pieces.piece-whole-width-at-least-1) and a count of items that is no whole number of
+ * pieces (core.pieces.length-no-whole-number-pieces).
+ */
 export function listPieces<T>(items: readonly T[], width: number): T[][] {
   assertWholePieces(items.length, width);
   return Array.from({ length: items.length / width }, (_, index) =>

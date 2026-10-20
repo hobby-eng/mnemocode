@@ -7,7 +7,7 @@
 
 import { CANCELLED_EXIT_CODE, CANCELLED_MESSAGE } from "./exit-codes.js";
 import { printableText, terminalHint, terminalNotice } from "./terminal.js";
-import { removeLeftFolders } from "../export/temporary-folders.js";
+import { TemporaryFolders } from "../export/temporary-folders.js";
 
 /** What must be undone on the terminal before the process ends, the innermost last. */
 const undoing: (() => void)[] = [];
@@ -38,7 +38,7 @@ export async function interruptible<T>(body: () => Promise<T>, undo?: () => void
 
 function interrupted(): void {
   for (const step of [...undoing].reverse()) step();
-  const left = removeLeftFolders();
+  const left = TemporaryFolders.removeLeft();
   endCancelled();
   for (const folder of left)
     terminalNotice(

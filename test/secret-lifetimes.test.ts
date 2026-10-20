@@ -3,7 +3,7 @@ import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { ReEncoding } from "../src/core/re-encoding.js";
 import { PassphraseProtection } from "../src/core/candidate-encryption.js";
 import { Share } from "../src/sskr/transport.js";
-import { sskrSetVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { SecretValue } from "../src/core/secret-value.js";
 import { CandidateListWriter } from "../src/core/candidate-list-writer.js";
 import { NoProtection } from "../src/core/candidate-encryption.js";
@@ -25,6 +25,7 @@ describe("Exact retained UTF-16 keys", () => {
     owner.wipe();
     expect(copy.value).toEqual(["", ...values.slice(1)]);
     expect(() => owner.value).toThrow("has been wiped");
+    // A list that holds no text, given on purpose as a JavaScript host could.
     expect(() => SecretValue.utf16Texts([undefined] as never)).toThrow("needs text");
   });
 });
@@ -77,6 +78,7 @@ describe("Retained secret lifetimes", () => {
     expect(numbers.value).toEqual([[0, 2047], [], [9999, 0.125]]);
     expect(texts.value).toEqual(["public", "", "test text"]);
     expect(() => SecretValue.numbers([NaN])).toThrow("finite numbers");
+    // Values of the wrong type, given on purpose as a JavaScript host could.
     expect(() => SecretValue.numberLists([undefined] as never)).toThrow("finite numbers");
     expect(() => SecretValue.texts("test" as never)).toThrow("needs text");
   });
@@ -141,8 +143,8 @@ describe("Retained secret lifetimes", () => {
   });
 
   it("drops a share's retained text when disposed", () => {
-    const share = Share.read(sskrSetVector.shares[0]);
-    expect(share.ur).toBe(sskrSetVector.shares[0]);
+    const share = Share.read(SSKR_SET_VECTOR.shares[0]);
+    expect(share.ur).toBe(SSKR_SET_VECTOR.shares[0]);
     share[Symbol.dispose]();
     share.wipe();
     expect(() => share.ur).toThrow("has been wiped");
@@ -154,10 +156,10 @@ describe("Retained secret lifetimes", () => {
     const allocations: Uint8Array[] = [];
     vi.spyOn(TextEncoder.prototype, "encode").mockImplementation((text) => {
       const bytes = encode(text);
-      if (text === sskrSetVector.shares[0]) allocations.push(bytes);
+      if (text === SSKR_SET_VECTOR.shares[0]) allocations.push(bytes);
       return bytes;
     });
-    expect(() => Share.readSet([sskrSetVector.shares[0], "invalid public fixture"])).toThrow(
+    expect(() => Share.readSet([SSKR_SET_VECTOR.shares[0], "invalid public fixture"])).toThrow(
       expect.objectContaining({ code: "sskr.transport.decoded-bytes-refused" }),
     );
     expect(allocations).toHaveLength(1);

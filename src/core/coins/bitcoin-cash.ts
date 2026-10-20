@@ -10,7 +10,7 @@ import { HASH160_BYTES } from "./address-types.js";
 import { Base58Coin } from "./base58.js";
 import { checkedData } from "./base58-check.js";
 import { CASHADDR_CHECKSUM_GROUPS } from "./other-forms.js";
-import { asciiLowercase, asciiUppercase, type CoinAddress, unreadableAddress } from "./coin.js";
+import { asciiLowercase, asciiUppercase, type CoinAddress } from "./coin.js";
 import { BECH32_ALPHABET } from "./bech32.js";
 import { BITCOIN_P2PKH_VERSION, BITCOIN_P2SH_VERSION } from "./bitcoin-versions.js";
 
@@ -58,18 +58,17 @@ class BitcoinCashCoin extends Base58Coin {
     if (groups.includes(-1)) throw this.notOurs();
     // Only what could be a CashAddr is held to its rule of one case; an address of another coin,
     // such as an XRP or EIP-55 one whose letters all fit the alphabet, is not this coin's.
-    if (lowercase !== text && asciiUppercase(text) !== text)
-      throw unreadableAddress("it mixes capital and small letters, which CashAddr does not allow");
+    if (lowercase !== text && asciiUppercase(text) !== text) throw this.mixedCase("CashAddr");
     // The prefix enters the checksum as the low five bits of each character, then a zero.
     const prefixGroups = Array.from(CASHADDR_PREFIX, (character) => character.charCodeAt(0) & 0x1f);
     if (
       groups.length <= CASHADDR_CHECKSUM_GROUPS ||
       polymod([...prefixGroups, 0, ...groups]) !== 0n
     )
-      throw unreadableAddress();
+      throw this.damaged();
     // Strict: the padding must be zero and shorter than a group.
     const data = bech32.fromWordsUnsafe(groups.slice(0, -CASHADDR_CHECKSUM_GROUPS));
-    if (!data) throw unreadableAddress();
+    if (!data) throw this.damaged();
     const [version, ...hash] = data;
     if (version !== P2PKH_160_VERSION || hash.length !== HASH160_BYTES) throw this.singleKeyOnly();
     return this.address("p2pkh", Uint8Array.from(hash), `${CASHADDR_PREFIX}:${payload}`);

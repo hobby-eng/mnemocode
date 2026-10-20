@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
+import { scriptExports } from "./helpers/script-exports.js";
 
 // scripts/verify-audit-privacy.mjs keeps the machine owner's names and local times out of the
 // published audit files (AUD-022-SEC002). Fixtures only: the owner is a made-up name.
 
-const script = new URL("../scripts/verify-audit-privacy.mjs", import.meta.url).href;
-const { auditTextProblems, ownerNames } = (await import(script)) as {
+/** The part of scripts/verify-audit-privacy.mjs that this test uses; the script has no types. */
+interface AuditPrivacy {
   readonly auditTextProblems: (text: string, path: string, owners: readonly string[]) => string[];
   readonly ownerNames: (account?: { readonly username: string; readonly home: string }) => string[];
-};
+}
+
+const { auditTextProblems, ownerNames } = await scriptExports<AuditPrivacy>(
+  "scripts/verify-audit-privacy.mjs",
+  { auditTextProblems: "function", ownerNames: "function" },
+);
 
 const OWNER = ["janeexample"];
 const problems = (text: string, path = "docs/audits/AUD-099-harnesses/x.py") =>

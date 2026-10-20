@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { EncodedBackupCheck, ShareBackupCheck } from "../src/core/backup-check.js";
@@ -24,15 +23,12 @@ import { pageOperators } from "./helpers/pdf-content.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { holes, withHoles } from "./helpers/holes.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { sskrVectors } from "./helpers/vectors.js";
 
 // Public data only: the all-zero entropy's phrase, synthetic dates, and the public SSKR vectors.
 const TEXTS = { decodeEntry: "Decode" };
 const DATE = { year: 2026, month: 9, day: 23 };
-const SHARES = (
-  JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
-    readonly deterministic: readonly { readonly shares: readonly string[] }[];
-  }
-).deterministic[0]!.shares;
+const SHARES: readonly string[] = sskrVectors().deterministic[0]!.shares;
 /** A class whose constructor TypeScript calls private, as a JavaScript host can still call it. */
 type Constructible<T> = new (...args: unknown[]) => T;
 
@@ -55,6 +51,7 @@ describe("AUD-009-FUN001: objects own the dates they were given", () => {
       mode: "seedshift",
     });
     const before = search.combinations;
+    // Readonly arrays changed on purpose, as JavaScript can: the frozen arrays refuse it.
     expect(() => (answer.patterns[0]!.years as number[]).push(2025)).toThrow(TypeError);
     expect(() => (answer.patterns[0]!.days as number[]).push(1)).toThrow(TypeError);
     // A pattern given to `of` is copied, so the caller's array may grow without effect.
@@ -128,6 +125,7 @@ describe("AUD-009-API002: EncodedBackup.of refuses index arrays with holes", () 
     for (const indexes of [
       holes<number>(12),
       partly,
+      // An undefined index, which no type allows, fed on purpose as a JavaScript host could.
       [...dense.slice(0, 11), undefined as unknown as number],
       [...dense.slice(0, 11), 2048],
     ])
@@ -209,6 +207,7 @@ describe("AUD-009 follow-up: every DatesAnswer holds the limits it was checked a
   });
 
   it("holds the limits when its private constructor is called, as JavaScript can", () => {
+    // The private constructor, called on purpose as a JavaScript host could.
     const Raw = DatesAnswer as unknown as Constructible<DatesAnswer>;
     const wide = { key: "????-??-??", years: days(9999), months: days(12), days: days(31) };
     // Before: an answer of 10,000,001 combinations, whose search started.
@@ -234,6 +233,7 @@ describe("AUD-009 follow-up: codes are checked before an object holds them", () 
   });
 
   it("checks the codes in EncodedBackup's constructor, which JavaScript can call", () => {
+    // The private constructor, called on purpose as a JavaScript host could.
     const Raw = EncodedBackup as unknown as Constructible<EncodedBackup>;
     expect(() => new Raw(holes<number>(12), "indexes", "direct")).toThrow(/integer from 0/u);
     expect(() => new Raw(zeros(), "indexes", "seedshift")).toThrow(/lack the BIP39 checksum/u);
@@ -287,6 +287,7 @@ describe("AUD-009 follow-up: a backup check says restores only after a real reco
       expect(
         () =>
           new ShareBackupCheck(
+            // Modes that shares do not allow, fed on purpose as a JavaScript host could.
             { mnemonic: `${"zoo ".repeat(11)}wrong`, mode: mode as "seedshift", threshold: 2 },
             nodeSharePlatform,
             TEXTS,
@@ -323,7 +324,8 @@ describe("AUD-009 follow-up: nothing a library object hands out changes it", () 
     const typed = `${"abandon ".repeat(11)}?`;
     const search = parseUnknownWords(typed);
     if (search.kind !== "unknown-words") throw new Error("Expected unknown words.");
-    // Before: the pop took zoo from every later search with ?.
+    // Before: the pop took zoo from every later search with ?. A readonly array changed on
+    // purpose, as JavaScript can: the frozen array refuses it.
     expect(() => (search.places[11] as number[]).pop()).toThrow(TypeError);
     expect(WordCandidateSearch.parse(typed, "unknown-words").combinations).toBe(2048);
   });
@@ -341,6 +343,7 @@ describe("AUD-009 follow-up: nothing a library object hands out changes it", () 
   it("keeps the shares of an export as settled, and refuses places with holes", async () => {
     const set = (await ShareSet.restore(SHARES.slice(0, 2), nodeSharePlatform)).toRepairedSet();
     const written = ShareExport.of(set, [1, 2]);
+    // Readonly arrays changed on purpose, as JavaScript can: the frozen arrays refuse it.
     expect(() => (written.shown as unknown[]).pop()).toThrow(TypeError);
     expect(() => Object.assign(written.shown[0]!, { number: 9 })).toThrow(TypeError);
     expect(() => (written.leftOut as number[]).push(9)).toThrow(TypeError);

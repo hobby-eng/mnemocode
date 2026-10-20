@@ -41,6 +41,10 @@
       "types": "./dist/export/card-drawing-self-test.d.ts",
       "import": "./dist/export/card-drawing-self-test.js"
     },
+    "./export/card-sets-self-test": {
+      "types": "./dist/export/card-sets-self-test.d.ts",
+      "import": "./dist/export/card-sets-self-test.js"
+    },
     "./core/master-fingerprint": {
       "types": "./dist/core/master-fingerprint.d.ts",
       "import": "./dist/core/master-fingerprint.js"

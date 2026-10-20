@@ -18,9 +18,14 @@ import { wipedAfterAsync } from "../core/bits.js";
 import { ShareCardSet, type SskrRenderOptions } from "./sskr-render.js";
 import { DEFAULT_IMAGE_FORMAT } from "./document-formats.js";
 
-// Kept for the callers that import them from here.
-
-/** The cards of `records` in the Node.js renderer (ShareCardSet), for every file of one export. */
+/**
+ * The cards of `records`, existing shares, drawn with the Node.js renderer (ShareCardSet), for
+ * every file of one export. Refuses what ShareCardSet.create refuses: a layout of none or one that
+ * the page size does not give, a title that cardTitle refuses, a share form of none or without
+ * cards, a style of no design, separate cards of a design printed on sheets only, details that
+ * ExportDetails refuses, shares of `records` that Share.readSet refuses, and a plan of decoys that
+ * withPlannedDecoys refuses.
+ */
 export function nodeShareCards(
   records: readonly string[],
   options: SskrRenderOptions,
@@ -41,7 +46,12 @@ export interface SskrExportOptions extends SskrRenderOptions {
 
 /**
  * Saves the documents of `cards` in a new folder `directory`, each share in its own file or, for
- * separate cards, its own folder, as PDF or images of `format`. Each file contains one share.
+ * separate cards, its own folder, as PDF or images of `format`; returns how many files it wrote.
+ * Each file contains one share, and its bytes are wiped once written. Refuses a folder that exists
+ * already (CARD_FOLDER_TAKEN, export.private-file.absent-path-refused) or is blank
+ * (export.private-file.new-folder-path-empty-one-refused), as claimCardFolder refuses it, before
+ * anything is drawn. Then what ShareCardSet.documents and writeRenderedDocument refuse passes on,
+ * and so do the other failures of NewFolder.publish.
  */
 export async function exportSskrCards(
   cards: ShareCardSet,
@@ -65,14 +75,26 @@ export async function exportSskrCards(
   });
 }
 
-/** Saves every page of `cards` in one new PDF at `path`. */
+/**
+ * Saves every page of `cards` in one new PDF at `path`, whose bytes are wiped once written. What
+ * ShareCardSet.renderAll refuses passes on; a path that exists already fails with the file
+ * system's own error (EEXIST), as publishNewPrivateFile fails, with its other failures.
+ */
 export async function exportSskrPdf(cards: ShareCardSet, path: string): Promise<void> {
   await wipedAfterAsync(await cards.renderAll(), (document) =>
     publishNewPrivateFile(path, document),
   );
 }
 
-/** Saves every page of `cards` as an image of `format` in a new folder `directory`. */
+/**
+ * Saves every page of `cards` as an image of `format` in a new folder `directory`; returns how
+ * many image files it wrote. The PDF of the pages is wiped once its images are written. What
+ * ShareCardSet.renderAll refuses passes on, then what exportPageImages refuses: a computer
+ * without the local image renderer
+ * (export.image-export.png-jpeg-export-requires-local-poppler-pdftocairo-program), and a folder
+ * that exists already (IMAGE_FOLDER_TAKEN, export.private-file.absent-path-refused) or is blank
+ * (export.private-file.new-folder-path-empty-one-refused).
+ */
 export async function exportSskrImages(
   cards: ShareCardSet,
   directory: string,

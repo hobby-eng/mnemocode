@@ -14,5 +14,5 @@ export const SSKR_MANIFEST = "integrity.json";
 export const SSKR_BRIDGE = "generated/recovery_sskr_wasm.js";
 /** The engine's WebAssembly, by the name the manifest gives it. */
 export const SSKR_BINARY = "generated/recovery_sskr_wasm_bg.wasm";
-/** The folder of the files that the card renderers read (export/platform.ts renderAssets). */
+/** The folder of the files that the card renderers read (export/platform.ts RENDER_ASSETS). */
 export const ASSETS_FOLDER = "assets/";

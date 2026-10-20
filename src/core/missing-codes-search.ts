@@ -128,14 +128,32 @@ export interface MissingCodesFound {
 /** What one way found. */
 export type MissingCodesResult =
   | MissingCodesFound
-  /** Every candidate, for the person to compare. */
-  | { readonly kind: "list"; readonly rows: readonly MissingCodesRow[] }
-  /** No codes fit: `message` says what to check. */
-  | { readonly kind: "none"; readonly message: string }
-  /** Several sets fit, which a fingerprint leaves only by chance: the wallet tells them apart. */
-  | { readonly kind: "several"; readonly count: number; readonly message: string }
-  /** The host stopped the search (SearchRun.signal): nothing found is told (CORE-22). */
-  | { readonly kind: "stopped" };
+  | {
+      /** Every candidate, for the person to compare. */
+      readonly kind: "list";
+      /** A row for each phrase the codes and dates give, MissingCodesSearch.MAX_LISTED at most. */
+      readonly rows: readonly MissingCodesRow[];
+    }
+  | {
+      /** No codes fit. */
+      readonly kind: "none";
+      /** What to check, as the way says it, such as MISSING_CODES_TEXTS.noneByWallet. */
+      readonly message: string;
+    }
+  | {
+      /**
+       * Several sets fit, which a fingerprint leaves only by chance: the wallet tells them apart.
+       */
+      readonly kind: "several";
+      /** How many sets of codes, or of codes and dates, fit: 2 or more. */
+      readonly count: number;
+      /** That they fit and that the wallet tells which is the person's, with their count. */
+      readonly message: string;
+    }
+  | {
+      /** The host stopped the search (SearchRun.signal): nothing found is told (CORE-22). */
+      readonly kind: "stopped";
+    };
 
 /** The result of a way that the host stopped. */
 const STOPPED: MissingCodesResult = { kind: "stopped" };
@@ -461,7 +479,11 @@ export class MissingCodesSearch {
     return Masking.of(this.#codes.mode).masked;
   }
 
-  /** The codes whose own fingerprint is `fingerprint`, the encoded one that Encode showed. */
+  /**
+   * The codes whose own fingerprint is `fingerprint`, the encoded one that Encode showed, read as
+   * parseMasterFingerprint reads it. Refuses one that is not eight hexadecimal characters
+   * (core.wallet-check.master-fingerprint-eight-hexadecimal-characters).
+   */
   byEncodedFingerprint(fingerprint: string): MissingCodesWaySearch {
     return new EncodedFingerprintWay(this.#codes, this.#fingerprint, fingerprint);
   }

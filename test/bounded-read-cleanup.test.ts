@@ -117,7 +117,7 @@ it("keeps the safe text-input refusal and its cause after retiring an unreturned
   const allocations = vi.spyOn(Buffer, "concat");
   try {
     expect(() => readInputTextFile(path)).toThrow(
-      expect.objectContaining({ code: "cli.bounded-read.read-file-refuse-refused", cause: error }),
+      expect.objectContaining({ code: "cli.bounded-read.file-unreadable", cause: error }),
     );
     expect(edge.closed).toBe(1);
     expect(allocations.mock.results).toHaveLength(1);

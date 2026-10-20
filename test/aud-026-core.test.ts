@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { runInNewContext } from "node:vm";
 import { ByteArray } from "../src/core/byte-array.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
@@ -14,6 +14,7 @@ const ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 
 describe("AUD-026 selector privacy and owned address locations", () => {
   it("refuses selectors without repeating or coercing supplied text", async () => {
+    // Selectors that no type allows, fed on purpose as a JavaScript host could.
     const refusals: readonly (readonly [() => unknown, string])[] = [
       [() => EncodedForm.of(PHRASE as never), "core.encoded-form.unsupported-encoded-format"],
       [() => coinById(PHRASE), "core.coins.coin.unknown-coin-coins"],
@@ -40,10 +41,10 @@ describe("AUD-026 selector privacy and owned address locations", () => {
         await action();
         expect.fail("A selector must be refused");
       } catch (error) {
-        expect(error).toBeInstanceOf(Error);
+        assert.instanceOf(error, Error);
         // expect.fail's own error has no code, so a selector that is not refused fails here too.
         expect(error, code).toMatchObject({ code });
-        expect((error as Error).message).not.toContain(PHRASE);
+        expect(error.message).not.toContain(PHRASE);
       }
     }
     const supplied = {
@@ -51,6 +52,7 @@ describe("AUD-026 selector privacy and owned address locations", () => {
         throw Error("coercion must not run");
       },
     };
+    // An object that no type allows, fed on purpose as a JavaScript host could.
     expect(() => EncodedForm.of(supplied as never)).toThrow("Unsupported encoded format.");
     expect(() => coinById(supplied as never)).toThrow("Unknown coin");
     expect(() => resolveTemplateId(supplied as never)).toThrow("unknown or incompatible");

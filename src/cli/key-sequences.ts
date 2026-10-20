@@ -2,7 +2,13 @@
 // one is taken for a key of its own, also when a slow link splits a sequence from its Escape; and
 // the editing keys that a visible answer takes from them (terminal-input.ts).
 
-import { ESCAPE_DELAY_MS, type MoreWithin, type NextByte, PASTE_GAP_MS } from "./terminal-keys.js";
+import {
+  ESCAPE_DELAY_MS,
+  KEY,
+  type MoreWithin,
+  type NextByte,
+  PASTE_GAP_MS,
+} from "./terminal-keys.js";
 import { InputBytes } from "./input-bytes.js";
 import { defined } from "../core/defined.js";
 
@@ -166,19 +172,19 @@ const WORD_MODIFIERS = new Set(["3", "5"]);
  */
 export function editKeyOf(introducer: number, parameters: string, final: number): EditKey {
   if (introducer === SS3_INTRODUCER) {
-    if (final === 0x43) return "right";
-    if (final === 0x44) return "left";
-    if (final === 0x48) return "home";
-    if (final === 0x46) return "end";
+    if (final === KEY.ARROW_RIGHT) return "right";
+    if (final === KEY.ARROW_LEFT) return "left";
+    if (final === KEY.HOME) return "home";
+    if (final === KEY.END) return "end";
     return "other";
   }
   const [code, modifier] = parameters.split(";");
   const word = modifier !== undefined && WORD_MODIFIERS.has(modifier);
-  if (final === 0x43) return word ? "word-right" : "right";
-  if (final === 0x44) return word ? "word-left" : "left";
-  if (final === 0x48) return "home";
-  if (final === 0x46) return "end";
-  if (final === 0x7e) {
+  if (final === KEY.ARROW_RIGHT) return word ? "word-right" : "right";
+  if (final === KEY.ARROW_LEFT) return word ? "word-left" : "left";
+  if (final === KEY.HOME) return "home";
+  if (final === KEY.END) return "end";
+  if (final === KEY.SEQUENCE_TILDE) {
     if (code === "1" || code === "7") return "home";
     if (code === "4" || code === "8") return "end";
     if (code === "3") return "delete";

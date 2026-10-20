@@ -21,7 +21,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tokensOf } from "./source-tokens.mjs";
+import { MEMBER_MODIFIERS, tokensOf } from "./source-tokens.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
@@ -93,18 +93,6 @@ const DECLARING = new Set([
   "type",
   "enum",
 ]);
-/** The modifiers that TypeScript allows before the name of a class or type member. */
-const MEMBER_MODIFIERS = [
-  "public",
-  "protected",
-  "private",
-  "readonly",
-  "static",
-  "declare",
-  "abstract",
-  "override",
-  "accessor",
-];
 /**
  * The tokens after which a word followed by `:` or `?:` is a key, a type member, a label or a
  * parameter, never the export of the same name: the start of an item, or a modifier of a member.

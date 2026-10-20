@@ -83,11 +83,6 @@ export class ShareValues extends Redacted implements Disposable {
     );
   }
 
-  /** Refuses new secret reads after this owner ends, including across an awaited operation. */
-  assertLive(): void {
-    this.#texts.assertLive();
-  }
-
   /** Overwrites retained text buffers as far as the JavaScript runtime permits; idempotent. */
   wipe(): void {
     this.#texts.wipe();

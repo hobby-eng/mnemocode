@@ -15,10 +15,11 @@ export {
   DEFAULT_ADDRESS_COUNT,
   MAX_ADDRESS_COUNT,
   defaultAddressCount,
-  bitcoinProfiles,
+  BITCOIN_PROFILES,
   checkedBitcoinProfiles,
   isBitcoinNetwork,
   isBitcoinProfile,
+  isPlacedEvidence,
   isPlacedKind,
   isScannedEvidence,
   isScannedKind,
@@ -103,6 +104,10 @@ export function masterFingerprint(mnemonic: string, passphrase = ""): string {
  */
 export type OwnedWalletCheck = ((mnemonic: string) => EvidenceMatch) &
   Disposable & {
+    /**
+     * Erases the retained passphrase and evidence, as disposal does; a call of the check afterwards
+     * is refused with core.secret-value.wiped.
+     */
     readonly wipe: () => void;
   };
 

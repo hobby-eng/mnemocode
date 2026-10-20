@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { shareKeepingNote } from "../src/export/sskr-keeping-text.js";
-import { sskrSetVector, sskrVector } from "../src/sskr/known-answers.js";
+import { SSKR_SET_VECTOR, SSKR_VECTOR } from "../src/sskr/known-answers.js";
 import { PHRASE_WORDS } from "../src/core/masking.js";
 import { defined } from "../src/core/defined.js";
 import { wrongValue } from "./helpers/shares.js";
 
 describe("Keeping distinct SSKR members", () => {
-  const [first, second, third] = sskrSetVector.shares;
+  const [first, second, third] = SSKR_SET_VECTOR.shares;
 
   it("counts two prints of one member as fewer shares than the threshold", () => {
     expect(shareKeepingNote([first, first], "files", false)).toBe(
@@ -30,19 +30,20 @@ describe("Keeping distinct SSKR members", () => {
     expect(shareKeepingNote([first, first], "pages", true)).toContain(
       `fewer than the 2 needed to restore ${PHRASE_WORDS.masked}`,
     );
-    expect(shareKeepingNote(sskrVector.shares, "file", false)).toBe(
+    expect(shareKeepingNote(SSKR_VECTOR.shares, "file", false)).toBe(
       "These shares belong to 2 groups, each needing enough of its own for recovery; the file holds every share. Store the shares apart.",
     );
   });
 
   it("refuses shares of different sets and a packaging it does not name (AUD-037-API007)", () => {
-    expect(() => shareKeepingNote([first, defined(sskrVector.shares[0])], "files", false)).toThrow(
+    expect(() => shareKeepingNote([first, defined(SSKR_VECTOR.shares[0])], "files", false)).toThrow(
       expect.objectContaining({ code: "export.sskr-keeping-text.shares-of-different-sets" }),
     );
     // Two different shares of one member are no copies: no quorum holds for them.
     expect(() => shareKeepingNote([first, wrongValue(first), second], "files", false)).toThrow(
       expect.objectContaining({ code: "export.sskr-keeping-text.member-given-twice" }),
     );
+    // Packagings that the note does not name, given on purpose as a JavaScript host could.
     for (const packaging of ["boxes", "toString"])
       expect(() => shareKeepingNote([first, second], packaging as never, false)).toThrow(
         expect.objectContaining({ code: "export.sskr-keeping-text.packaging-unknown" }),

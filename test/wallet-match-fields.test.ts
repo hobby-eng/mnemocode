@@ -35,6 +35,7 @@ describe("a wallet's match", () => {
 
   it("is refused with a warning of null before a search shows it", async () => {
     const search = WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words");
+    // A warning of null, which no WalletMatch has, given on purpose as a JavaScript host could.
     const walletCheck = (phrase: string) =>
       ({ matched: phrase === TEST_PHRASE, warning: null }) as unknown as WalletMatch;
     await expect(search.run({ walletCheck })).rejects.toThrow(

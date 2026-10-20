@@ -2,8 +2,9 @@
 // saved where the options say (sskr-output.ts).
 
 import { terminalNotice, terminalResultHeader } from "./terminal.js";
+import { clearPrivateScreen } from "./private-screen.js";
 import { ownShareCards } from "../export/sskr-render.js";
-import { reportRenamedOutputs } from "./output-paths.js";
+import { RenamedOutputs } from "./output-paths.js";
 import {
   assertSingleValues,
   integerOption,
@@ -17,6 +18,7 @@ import { masterFingerprint } from "../bitcoin-evidence.js";
 import { splitSskrBackup } from "../sskr/shares.js";
 import { ShareSetChoice } from "../core/backup-options.js";
 import { EncodedBackup } from "../core/encoded-backup.js";
+import { EncodedForm } from "../core/encoded-form.js";
 import { assertSskrSelfTest } from "../sskr/self-test.js";
 import { DEFAULT_SHARE_FORMAT, type ShareFormat } from "../sskr/transport.js";
 import { optionLabel } from "./option-copy.js";
@@ -171,6 +173,9 @@ async function splitChecked(
     threshold,
     count,
   });
+  // The result is a step of its own: the questions are cleared away (CORE-39), before the saves,
+  // whose notices belong to it.
+  clearPrivateScreen();
   // A save that fails is offered again or skipped (saveWithRetry): the shares are shown below
   // either way, and only once every save is settled, so that none is lost to a failure.
   if (
@@ -184,7 +189,7 @@ async function splitChecked(
     dates: dateValues.length,
   });
   if (sheet === CANCELLED) return CANCELLED;
-  reportRenamedOutputs();
+  RenamedOutputs.report();
   if (
     !terminalResultHeader("SSKR export", [
       ["Threshold", `${threshold} of ${count}`],
@@ -207,12 +212,16 @@ async function splitChecked(
       "warning",
     );
   }
+  // A complete backup in codes that are words (writtenInWords), shown above with --format alone,
+  // shows the masked words already.
+  const wordsShown =
+    representation !== undefined &&
+    originalCopy === undefined &&
+    EncodedForm.of(representation).writtenInWords;
   // The optional original copy comes last, so it remains in view after long share blocks.
   const show = (): void => {
     printShares(inForm(shares, format), undefined, Masking.of(mode).holds);
-    // An English complete backup was already shown by the older --format-only form.
-    if (maskedWords && !(originalCopy === undefined && representation === "english"))
-      printMaskedWords(held, mode);
+    if (maskedWords && !wordsShown) printMaskedWords(held, mode);
     if (originalCopy !== undefined) printOriginalCopy(original, originalCopy, representation);
   };
   show();

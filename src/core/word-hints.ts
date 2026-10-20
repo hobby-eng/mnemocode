@@ -29,16 +29,33 @@ export const LIST_FROM_LETTERS = 2;
 
 /** What a front end shows below a word being typed. */
 export type WordHint =
-  /**
-   * Nothing: no word is being typed, or the list has it whole and no longer word begins with it.
-   */
-  | { readonly kind: "nothing" }
-  /** One letter typed: how many words of the list begin with it, as `text` says. */
-  | { readonly kind: "count"; readonly count: number; readonly text: string }
-  /** LIST_FROM_LETTERS letters or more: the words that begin with them, in list order. */
-  | { readonly kind: "words"; readonly words: readonly string[] }
-  /** No word of the list begins with what is typed, as `text` says. */
-  | { readonly kind: "no-word"; readonly text: string };
+  | {
+      /**
+       * Nothing: no word is being typed, or the list has it whole and no longer word begins with
+       * it.
+       */
+      readonly kind: "nothing";
+    }
+  | {
+      /** Fewer letters typed than LIST_FROM_LETTERS: how many words of the list begin with them. */
+      readonly kind: "count";
+      /** How many words of the list begin with the letters typed: 1 or more. */
+      readonly count: number;
+      /** The count as a front end shows it, such as "12 words begin with this letter". */
+      readonly text: string;
+    }
+  | {
+      /** LIST_FROM_LETTERS letters or more: the words that begin with them. */
+      readonly kind: "words";
+      /** The words of the list that begin with the letters typed, in list order: 1 or more. */
+      readonly words: readonly string[];
+    }
+  | {
+      /** No word of the list begins with what is typed. */
+      readonly kind: "no-word";
+      /** That no word begins so, as a front end shows it, such as "No word begins like this.". */
+      readonly text: string;
+    };
 
 /** What Tab adds to the word being typed. */
 export interface WordCompletion {
@@ -101,8 +118,10 @@ export class WordList implements WordHints {
 
   /**
    * The list `words`, in lower case and in alphabetical order, which the search relies on, and
-   * how they stand in a line (`spacing`); any other list is refused, and so is a length of words
-   * run together that some word lacks.
+   * how they stand in a line (`spacing`); any other list is refused: a word of other characters
+   * (core.word-hints.word-list-holds-lower-case-letters-hyphens-only) or out of order
+   * (word-list-alphabetical-order-without-repeats). So is a length of words run together that some
+   * word lacks (words-run-together-all-same-length).
    */
   constructor(names: WordNames, words: readonly string[], spacing: WordSpacing = {}) {
     const admitted = Array.from(words);

@@ -24,18 +24,24 @@ import {
 import { onPrivateScreen } from "./private-screen.js";
 import { PrivateSteps } from "./private-steps.js";
 import type { MissingCodes } from "../core/missing-codes.js";
-import { askAfterFailure, askValueUntil, askWalletEvidence, WHAT_NOW } from "./ask.js";
+import { askAfterFailure, askValueUntil, WHAT_NOW } from "./ask.js";
+import { askWalletEvidence } from "./wallet-question.js";
 import { askDates } from "./date-search.js";
 import { choose } from "./terminal-choice.js";
 import { askToSearch } from "./search-consent.js";
-import { withCtrlCWatch, nodeTurn } from "./terminal-input.js";
+import { CtrlCWatch, nodeTurn } from "./terminal-input.js";
 import {
   FINGERPRINT_DISCLOSURE,
   ProgressLine,
   terminalHint,
+  terminalLastingWarning,
+  terminalLayout,
   terminalNotice,
+  terminalPart,
+  terminalResultHeader,
   terminalStatus,
 } from "./terminal.js";
+import { factLine } from "./terminal-style.js";
 import { counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
@@ -99,40 +105,51 @@ export function reportFound(codes: MissingCodes, found: MissingCodesFound): void
   terminalStatus(`${MissingCodesSearch.placesText(codes)} found:`, found.backup.text());
   if (found.foundDates !== undefined) terminalStatus("Dates found:", found.foundDates);
   // A fingerprint is only a filter (AUD-037-SEC004).
-  if (found.warning !== undefined) terminalNotice(found.warning, "warning");
+  if (found.warning !== undefined) terminalLastingWarning(found.warning);
   // Other codes with other dates give the same phrase: those found need not be those written.
-  if (found.others !== undefined) terminalNotice(foundAmongOthers(found.others), "warning");
+  if (found.others !== undefined) terminalLastingWarning(foundAmongOthers(found.others));
   else terminalHint(MISSING_CODES_TEXTS.correct);
 }
 
+/** A search that is made, with the notice of its time to show over its progress, if any. */
+interface Started {
+  readonly notice: string | undefined;
+}
+
 /**
- * Whether `way` is searched: at once, its time said from a minute, or, when the plan asks for it,
- * only when the person chooses it (askToSearch).
+ * Whether `way` is searched: at once, its time to be said from a minute, or, when the plan asks
+ * for it, only when the person chooses it (askToSearch), whose question said its time.
  */
 async function started(
   way: MissingCodesWaySearch,
   limit: number | undefined,
-): Promise<"yes" | "no" | Cancelled> {
+): Promise<Started | "no" | Cancelled> {
   const plan = await way.plan(limit);
-  if (plan.ask)
-    return askToSearch(plan.question(), { note: "choose another way", quit: "goes back" });
-  if (plan.tell) terminalNotice(plan.notice());
-  return "yes";
+  if (!plan.ask) return { notice: plan.tell ? plan.notice() : undefined };
+  const start = await askToSearch(plan.question(), {
+    note: "choose another way",
+    quit: "goes back",
+  });
+  return start === "yes" ? { notice: undefined } : start;
 }
 
 /** What a way that ran gave: its result, or CANCELLED when Ctrl+C stopped it. */
 type RanResult = Exclude<MissingCodesResult, { readonly kind: "stopped" }> | Cancelled;
 
 /**
- * Runs `way` while Ctrl+C is read as a key, with its progress on one line; a search that Ctrl+C
- * stopped cancels the command.
+ * Runs `way` while Ctrl+C is read as a key, on a step screen of its own, with `notice` first, if
+ * any, and its progress on one line; a search that Ctrl+C stopped cancels the command.
  */
-async function ran(way: MissingCodesWaySearch): Promise<RanResult> {
+async function ran(way: MissingCodesWaySearch, notice?: string): Promise<RanResult> {
+  // The search is a step of its own: its screen shows the title and the search, no longer the
+  // question answered before it (CORE-39).
+  PrivateSteps.begin();
+  if (notice !== undefined) terminalNotice(notice);
   const progress = new ProgressLine(PROGRESS_SECONDS);
   let owned: MissingCodesResult | undefined;
   try {
     try {
-      await withCtrlCWatch(async (signal) => {
+      await CtrlCWatch.during(async (signal) => {
         owned = await way.run({
           signal,
           turn: nodeTurn,
@@ -252,8 +269,9 @@ async function searched(
   limit: number | undefined,
 ): Promise<MissingOutcome | undefined | Cancelled> {
   const start = await started(way, limit);
-  if (start !== "yes") return start === "no" ? undefined : start;
-  const result = await ran(way);
+  if (start === "no") return undefined;
+  if (start === CANCELLED) return CANCELLED;
+  const result = await ran(way, start.notice);
   return result === CANCELLED ? CANCELLED : outcomeOf(search, result);
 }
 
@@ -280,25 +298,32 @@ async function askWallet(
   return answer.kind === "wallet" ? answer.evidence : undefined;
 }
 
+/** A listed candidate's facts on the private screen, each a label and its value, in order. */
+function candidateFacts({ codes, phrase, fingerprint }: MissingCodesRow): [string, string][] {
+  return [
+    ["Codes", codes],
+    ["Phrase", phrase],
+    ["Fingerprint", fingerprint],
+  ];
+}
+
 /**
- * The candidates of a listed search: on the private screen one after another, which the page shows
- * by pages when they do not fit (PrivatePage), and elsewhere one row each, for a script.
+ * The candidates of a listed search: on the private screen a result, "MnemoCode · Candidates" with
+ * their number, then each candidate as a part of its own with its facts as grey labels (CORE-36),
+ * which the page shows by pages when they do not fit (PrivatePage); elsewhere one row each, for a
+ * script.
  */
 function showCandidates(rows: readonly MissingCodesRow[]): void {
-  if (onPrivateScreen() && process.stdout.isTTY === true) {
-    PrivateSteps.showResult();
-    for (const line of [
-      FINGERPRINT_DISCLOSURE,
-      "",
-      ...rows.flatMap(({ codes, phrase, fingerprint }, index) => [
-        `Candidate ${index + 1}`,
-        `Codes: ${codes}`,
-        `Phrase: ${phrase}`,
-        `Fingerprint: ${fingerprint}`,
-        "",
-      ]),
-    ])
-      console.log(line);
+  if (onPrivateScreen() && terminalLayout("stdout")) {
+    terminalResultHeader("Candidates", [["Found", String(rows.length)]]);
+    terminalHint(FINGERPRINT_DISCLOSURE);
+    for (const [index, row] of rows.entries()) {
+      terminalPart(`Candidate ${index + 1}`);
+      const facts = candidateFacts(row);
+      const width = Math.max(...facts.map(([label]) => label.length));
+      for (const [label, value] of facts)
+        console.log(factLine(process.stdout, label, value, width));
+    }
     return;
   }
   rows.forEach(({ codes, phrase, fingerprint }, index) =>
