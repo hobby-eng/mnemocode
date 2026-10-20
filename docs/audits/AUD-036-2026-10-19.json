@@ -8328,5 +8328,160 @@
     "scope": "Document-only integration of qualified partial browser evidence; no production/test/native/dependency changes and no new runtime replay.",
     "codeAndRuntimeInputsChanged": false,
     "qualification": "Original runtime snapshot and findings remain historical. Its 649-row manifest predates three root prose updates. The signed code checkpoint and subsequent fresh executable checks bind unchanged production, test, native, dependency and build inputs; no full-suite replay after prose changes is implied."
-  }
+  },
+  "documentationCorrections": [
+    {
+      "date": "2026-10-20",
+      "finding": "AUD-037-DOC015",
+      "kind": "Documentation edit, not a new audit execution",
+      "checksRerun": false,
+      "historicalTextPreserved": true,
+      "checkDoc003": {
+        "checkIndex": 31,
+        "finalOutcome": "qualified",
+        "markdownLedgerValue": "in-progress",
+        "correction": "The Markdown coverage ledger kept a value from before the receipts were final. The final outcome and assessment are those of this check in the JSON; the dated Markdown correction repeats them as a ledger row.",
+        "limit": "That reconciliation did not catch the disagreement on this check, the three title wordings or the run-together words listed here, so qualified does not cover them."
+      },
+      "outcomeTerms": {
+        "guideOutcomes": [
+          "passed",
+          "failed",
+          "blocked",
+          "skipped",
+          "not-run",
+          "not-applicable"
+        ],
+        "qualified": "The check ran within the scope its assessment states, with the limits named there; it is not a full pass.",
+        "retained-exact": "The check was not run again in this review; an earlier result is kept because its inputs are byte for byte the same."
+      },
+      "title": {
+        "full": "Precommit code-quality review and local release-verification follow-up",
+        "markdownH1": "Precommit CODE review and release follow-up",
+        "note": "The Markdown H1 is a short form, and CODE there stands for code quality. The Scope cell of the audit index describes the review in its own words; it is not a third title. The Markdown headings of AUD-036-DOC001 and AUD-036-UI001 likewise shorten the titles that this JSON gives in full."
+      },
+      "runTogetherWords": {
+        "rule": "Some strings lose the space between a word and a number, or between two words. Read the listed fragments as given; an ellipsis joins two fragments of one string. No number, hash or name changes.",
+        "markdown": "The dated Markdown correction lists its own lines.",
+        "json": [
+          {
+            "path": ".scope.codeReview",
+            "readAs": "exact 20-file original disclosure correction, 8-file final record/harness capsule"
+          },
+          {
+            "path": ".checks[4].assessment",
+            "readAs": "Fresh 18 native tests pass"
+          },
+          {
+            "path": ".checks[12].assessment",
+            "readAs": "Fresh native 18, independent official-plus-five-set oracle"
+          },
+          {
+            "path": ".checks[15].assessment",
+            "readAs": "Fresh source and executable PTY; 132 current nearest tests"
+          },
+          {
+            "path": ".checks[17].assessment",
+            "readAs": "all 35 canonical native files unchanged"
+          },
+          {
+            "path": ".checks[21].assessment",
+            "readAs": "All 35 current capsule files match"
+          },
+          {
+            "path": ".checks[22].assessment",
+            "readAs": "Fresh Linux SEA/empty-folder/PTY checks pass"
+          },
+          {
+            "path": ".checks[24].assessment",
+            "readAs": "two 40/80-column record cases"
+          },
+          {
+            "path": ".checks[27].assessment",
+            "readAs": "No copies of 50 tokens or more in 306 src/scripts files"
+          },
+          {
+            "path": ".checks[28].assessment",
+            "readAs": "current 132 nearest tests"
+          },
+          {
+            "path": ".findings[0].evidence",
+            "readAs": "final exact 20-file follow-up"
+          },
+          {
+            "path": ".findings[0].requiredVerification",
+            "readAs": "exact 128-row legacy output"
+          },
+          {
+            "path": ".remediation[1].qualification",
+            "readAs": "Same two forced-color 40/80-column cases fail before the one-line muted-note correction and pass afterwards. 29 filtered cases are not full-suite skips."
+          },
+          {
+            "path": ".helperDiagnostics[3]",
+            "readAs": "Supplement v3 had stale gitStatusPaths"
+          },
+          {
+            "path": ".helperDiagnostics[4]",
+            "readAs": "Original final candidate suite intentionally stopped after 83 green files to implement confirmed DOC05 before new complete run; exit 143 is controlled interruption"
+          },
+          {
+            "path": ".helperDiagnostics[5]",
+            "readAs": "first captioned 239 but verified 240 manifest entries; corrected separate record distinguishes 239 producer-selected triples"
+          },
+          {
+            "path": ".helperDiagnostics[6]",
+            "readAs": "Actual complete 211-run failed the new 44-character fingerprint label against the unchanged 11-column assertion"
+          },
+          {
+            "path": ".helperDiagnostics[8]",
+            "readAs": "Actual source PTY failed ... Full source PTY repeated successfully"
+          },
+          {
+            "path": ".historicalEvidence.partialRun",
+            "readAs": "stopped after 83 successful files ... Exit 143 is a controlled interruption"
+          },
+          {
+            "path": ".historicalEvidence.suiteTotals",
+            "readAs": "Earlier 2974/209, 46 focused and current complete run must never be added."
+          },
+          {
+            "path": ".historicalEvidence.earlierResults",
+            "readAs": "Earlier 2974/209, 46-targeted and old 144-reference/31-targeted results ... None is added to current 132 or the final complete total."
+          },
+          {
+            "path": ".runtime.fixtureOnlyDelta",
+            "readAs": "changed from 9ade4a source/gates/build/self-test to current a01fe1 source ... source PTY repeated successfully"
+          },
+          {
+            "path": ".runtime.native.toolchain",
+            "readAs": "Rust 1.99.0, locked/offline/workspace/all-targets/jobs 1"
+          },
+          {
+            "path": ".artifacts.native.canonical",
+            "readAs": "all 35 capsule files unchanged; 32 pins/four outputs"
+          },
+          {
+            "path": ".artifacts.linux.sourceRelationship",
+            "readAs": "empty-folder, actual PTY and damaged-minimum-negative checks pass"
+          },
+          {
+            "path": ".resources.heavyChecks",
+            "readAs": "Reviewers static 128 MiB; main check RSS 1152 MiB/heap 256 MiB"
+          },
+          {
+            "path": ".toolsAndSkills.existing[0]",
+            "readAs": "Pinned Node 26.10.0, pnpm 12.8.1, TypeScript 7.0.2, Vitest 5.0.3, oxlint 1.88.0, Rust 1.99.0"
+          },
+          {
+            "path": ".host.claimsReview.source",
+            "readAs": "source thread 01a13ecf-e5ab-72b2-9887-78aa986141b4"
+          },
+          {
+            "path": ".host.claimsReview.reportedVerdict",
+            "readAs": "scoped ACCEPTED 2/2"
+          }
+        ]
+      }
+    }
+  ]
 }

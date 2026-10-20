@@ -201,3 +201,52 @@ acceptance. It writes local `report-validation.json`. After that command ends, c
 completed validation receipt/log and excluding only the checksum file itself.
 Exit 0 validates the audit record, not a passing release: the two mandatory regressions remain
 open, and full host/browser and Windows/macOS release execution remain unverified.
+
+## Addendum 2026-10-20: inputs a reader cannot obtain
+
+This documentation-only addendum answers AUD-037-DOC002; the scripts are unchanged. The AUD-032
+JSON binds the original bytes of this README in `ownHarnessInputs` (SHA-256
+`82e7d686bddc31ec06f8077948007ec7f2b7b9ef1a602bf946baf7155915292e`), so the binding check of
+`validate.mjs` no longer matches this file.
+`git show 4978a62:docs/audits/AUD-032-harnesses/README.md` prints the original bytes.
+
+Most scripts read files that are not published. These inputs exist only on the maintainer's
+machine, so a reader cannot rerun the scripts that need them:
+
+- `capture.mjs` and `contracts.mjs` load the workspace's scratch TypeScript parser, version 5.9.3,
+  from `../tmp/cancel-check/node_modules/typescript` beside the repository. The workspace
+  repository ignores that folder, and it was installed from the range `^5.9.3`. `capture.mjs` also
+  hashes the workspace's instruction files from the private workspace repository, and it refuses to
+  run once an audit after AUD-031 exists.
+- `admit-prior.mjs` reads AUD-031's machine-local final source manifest
+  `docs/audits/AUD-031-evidence/r47-current-source.json` and its remediation dossiers.
+- `remediation.mjs`, which the sections above do not describe, records the dated remediation
+  addendum of the AUD-032 report pair. Run without arguments, it writes that addendum into the pair
+  from the accepted baseline; with `--check` it compares the pair with the addendum. It reads
+  AUD-033's machine-local `docs/audits/AUD-033-evidence/snapshot.json` (AUD-033 is withheld; see
+  its [summary](../README.md#aud-033-withheld-report)), this audit's own local
+  `remediation-review.json`, `accepted-baseline-AUD-032-2026-10-16.md` and `.json` and five
+  `remediation-*` receipts and logs, and the local executable
+  `release/aud032-fixed/mnemocode-0.1.0-linux-x64`.
+- `admit-prior.mjs`, `contracts.mjs`, `history.mjs`, `coverage.mjs`, `suite.mjs`, `artifacts.mjs`,
+  `package-review.mjs`, `report.mjs` and `validate.mjs` read this audit's own machine-local
+  evidence in `docs/audits/AUD-032-evidence/`, starting with the `snapshot.json` that
+  `capture.mjs` wrote.
+- `history.mjs` and `validate.mjs` run Python code that imports `jsonschema`. No requirements file
+  sits beside them, so they do not meet TOOL-03, and the version this audit used was not recorded.
+  The [AUD-030 requirements file](../AUD-030-harnesses/requirements.md) pins a `jsonschema`
+  environment by hash: jsonschema 4.19.2, attrs 25.4.0, jsonschema-specifications 2023.12.1,
+  referencing 0.36.2, rpds-py 0.27.1 and typing-extensions 4.15.0. Install it in an audit
+  environment with
+  `python3 -m pip install --require-hashes -r docs/audits/AUD-030-harnesses/requirements.md`.
+  Both scripts also read the schema from the neighbouring `multi-chain-wallet-tools` checkout.
+
+A reader can still run these commands from a clean checkout with the pinned tools and a build.
+They read only published files; `media.mjs` and `legacy-control.mjs` write into an ignored
+`docs/audits/AUD-032-evidence/` folder, which must exist first:
+
+- `run.mjs`, the command recorder;
+- `reproduce-regressions.mjs`; both tests pass in the complete runs from `4978a62` on, because
+  both findings are fixed;
+- `media.mjs` (needs Poppler) and `legacy-control.mjs`;
+- `reproduce-sskr.mjs` (needs Docker).

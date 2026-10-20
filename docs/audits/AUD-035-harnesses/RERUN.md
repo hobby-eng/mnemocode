@@ -73,3 +73,9 @@ and negative controls for real source filenames versus private/output folders.
 No package input or production assertion was weakened. Use a new dry-run label
 and result filename when repeating the final package-path check; original
 results are never overwritten.
+
+Addendum 2026-10-20: several scripts read unpublished files, such as other
+audits' machine-local evidence and the workspace's scratch TypeScript parser,
+and the Python validators import `jsonschema` without an adjacent hash-pinned
+requirements file. The dated addendum of [README.md](README.md) lists every
+such input and the commands that a reader can still run.

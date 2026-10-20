@@ -84,3 +84,41 @@ artifact; the second must pass on the corrected one. Preserve both binaries'
 hashes and each actual receipt. These checks supplement the earlier full-run
 evidence; their totals must not be added to it or presented as a repeated full
 suite on the changed bytes.
+
+## Addendum 2026-10-20: reviewed commit and local inputs
+
+This documentation-only addendum answers AUD-037-DOC002; the scripts are
+unchanged. The corrections that these helpers checked were made in the
+uncommitted working tree above commit
+`261aaedaedeb17ac1e32cd31371c850f740d2ba5`, which stayed HEAD during the whole
+remediation. The first complete run after the corrections had the 647-input
+source fingerprint
+`314ca1bb9ba69896dac5e9167596554f1f08cbed84a5fd5c8cb9976f1ac61ff`. After the
+minimum-quorum follow-up, the status reconciliation of 2026-10-19 matched all
+648 non-audit inputs to the accepted fingerprint
+`e14058722c713600607845159ba456feb8ddb39f93e1be70fcaa4c99c219c4b0`. The
+corrections entered the history in `4978a620d43a8571b89ccfc01f3b5a58b3a8c421`,
+together with the AUD-036 corrections. The
+[register](../../REMEDIATION.md#standard-statuses-2026-10-20) gives the status
+and commits of each correction.
+
+Some inputs are not published:
+
+- The receipts and results live in the machine-local folder
+  `docs/audits/AUD-035-evidence/remediation-2026-10-19/`. `run.mjs` creates it
+  on a first run; `suite.mjs` needs it to exist before it starts.
+- The old and new artifact comparison needs two retained local executables:
+  `release/aud035-remediated/mnemocode-0.1.0-linux-x64` (SHA-256
+  `6520c57450f91ad992dd7560386b07931e0ef7a49008b80ccf21ae8299c7444d`) and
+  `release/aud035-quorum-fixed/mnemocode-0.1.0-linux-x64` (SHA-256
+  `abc8351632094f9c1312e70b1d2026b126efafcc5bf0abbdb4b5994fd28e85e1`). They are
+  not published, so a reader cannot repeat the failing half of that comparison.
+- `build-native.mjs` needs Docker and, as above, the owner's authorization for
+  a native rebuild.
+
+The helpers need no third-party Python package: the reused AUD-026 recorder
+uses the standard library only. A reader can still run `run.mjs` with the
+example commands above, `suite.mjs` after creating its folder, and
+`minimum-quorum-cli.mjs` against an executable built with
+`node scripts/build-executable.mjs FOLDER`. Their results describe the source
+they run on.

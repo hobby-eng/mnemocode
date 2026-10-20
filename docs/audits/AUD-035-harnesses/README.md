@@ -183,3 +183,59 @@ and corrected without changing package inputs or product assertions.
 See [RERUN.md](RERUN.md) for additional resource/history qualifications. Nothing
 here tags, signs, uploads, commits, pushes, publishes or regenerates canonical
 SSKR artifacts. Current browser-host and Windows/macOS acceptance is separate.
+
+## Addendum 2026-10-20: inputs a reader cannot obtain
+
+This documentation-only addendum answers AUD-037-DOC002; the scripts are
+unchanged. "All inputs are public fixtures" under "Prerequisites and inputs"
+is true of the data that the probes use, but not of every input. Several
+scripts also read files that are not published. These files exist only on the
+maintainer's machine, so a reader cannot rerun the scripts that need them:
+
+- `capture.mjs` reads AUD-032's machine-local
+  `docs/audits/AUD-032-evidence/coverage.json` and five machine-local AUD-033
+  files under `docs/audits/AUD-033-evidence/`:
+  `remediation/REMEDIATION-2026-10-16.json`,
+  `arc002-2026-10-18/ARC002-CLOSURE-2026-10-18.json`, `protocol-review.json`,
+  `interface-review.json` and `core-rule-dispositions.json`. It also hashes the
+  procedure files of the neighbouring `multi-chain-wallet-tools` checkout and
+  the workspace's instruction files from the private workspace repository.
+- `inventory.mjs`, `structure.mjs` and `date-preservation.mjs` load the
+  workspace's scratch TypeScript parser, version 5.9.3, from
+  `../tmp/cancel-check/node_modules/typescript` beside the repository. The
+  workspace repository ignores that folder, and it was installed from the
+  range `^5.9.3`.
+- `inventory.mjs` also reads AUD-033's machine-local
+  `remediation/initial-snapshot.json`, every file in `remediation/` and
+  `arc002-2026-10-18/ARC002-CLOSURE-2026-10-18.json`, and AUD-034's
+  machine-local `docs/audits/AUD-034-evidence/snapshot.json`.
+- `coverage.mjs` and `coverage-v2.mjs` read AUD-034's machine-local
+  `file-coverage.json`; `ledgers.mjs` reads its `rule-coverage.json`; and
+  `date-preservation.mjs` reads its `date-gap-2026-10-18/before.json`.
+- `checks.mjs` verifies the local executable
+  `release/aud034-fixed/mnemocode-0.1.0-linux-x64` from the AUD-034 follow-up.
+- `summarize.mjs`, `adjudicate.mjs`, `operations.mjs`, `ledgers.mjs`,
+  `report.mjs`, `validate.py`, `package-review.mjs`, `probe-bindings.mjs`,
+  `finish-checks.mjs`, `finish-resume.mjs` and the `dependency-*.mjs` scripts
+  read this audit's own machine-local evidence in
+  `docs/audits/AUD-035-evidence/`. `validate.py` also requires HEAD and every
+  source file to equal the frozen snapshot.
+- `validate.py` and `history.mjs` import the Python package `jsonschema` and
+  read the schema from the neighbouring checkout. No requirements file sits
+  beside them, so they do not meet TOOL-03, and the version this audit used was
+  not recorded. The [AUD-030 requirements file](../AUD-030-harnesses/requirements.md)
+  pins a `jsonschema` environment by hash; install it in an audit environment
+  with `python3 -m pip install --require-hashes -r docs/audits/AUD-030-harnesses/requirements.md`.
+  `history.mjs` also expects exactly the report pairs published then, AUD-001
+  to AUD-034 without AUD-023 and AUD-033, so it fails once later reports exist.
+
+AUD-033 is withheld; its [summary](../README.md#aud-033-withheld-report) lists
+the findings that these AUD-033 files belong to.
+
+A reader can still run these commands from a clean checkout with the pinned
+tools and a build. They read only published files: `run.mjs`, the command
+recorder; `suite.mjs` and `startup.mjs`, after creating the ignored
+`docs/audits/AUD-035-evidence/` folder; the five counterexample probes above
+with unused result paths; and the AUD-034 close-error probe. Their results
+describe the source they run on. At the corrected source some counterexample
+assertions fail by design, as "Reproduce the concrete counterexamples" says.
