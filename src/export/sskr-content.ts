@@ -6,6 +6,7 @@ import {
   assertSeparateCardSize,
 } from "./card-settings.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { isOneOf } from "../core/one-of.js";
 
 const ERRORS = new ErrorCatalog("export.sskr-content", {
   "card-layout-one": (value0: string) => `The card layout must be one of: ${value0}.`,
@@ -21,9 +22,9 @@ export type SskrCardLayout = (typeof SSKR_CARD_LAYOUTS)[number];
 /** `value` as a layout of share cards; undefined stays undefined, for the page size to decide. */
 export function parseSskrLayout(value: string | undefined): SskrCardLayout | undefined {
   if (value === undefined) return undefined;
-  if (!(SSKR_CARD_LAYOUTS as readonly string[]).includes(value))
+  if (!isOneOf(SSKR_CARD_LAYOUTS, value))
     throw ERRORS.create("card-layout-one", [`${SSKR_CARD_LAYOUTS.join(", ")}`]);
-  return value as SskrCardLayout;
+  return value;
 }
 /**
  * The page size decides the layout, as for ordinary cards: a sheet size gives one

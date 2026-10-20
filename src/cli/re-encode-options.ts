@@ -8,6 +8,7 @@ import { WALLET_EVIDENCE_OPTIONS } from "./bitcoin-options.js";
 import { ENCODE_OPTIONS } from "./encode-option-groups.js";
 import { PHRASE_SECRET_OPTIONS } from "./input.js";
 import { OLD_DATES_KEY, type ParsedArguments } from "./arguments.js";
+import { isOneOf } from "../core/one-of.js";
 
 /**
  * The option that answers the question below the phrase shown, as "Yes, I recognise it" does: the
@@ -46,7 +47,7 @@ export const OLD_BACKUP_OPTIONS: Readonly<Record<string, string>> = Object.freez
 export const RE_ENCODE_OPTIONS = Object.freeze([
   ...Object.keys(OLD_BACKUP_OPTIONS),
   RECOGNISED_OPTION,
-  ...ENCODE_OPTIONS.filter((key) => !(PHRASE_SECRET_OPTIONS as readonly string[]).includes(key)),
+  ...ENCODE_OPTIONS.filter((key) => !isOneOf(PHRASE_SECRET_OPTIONS, key)),
 ]);
 
 /**

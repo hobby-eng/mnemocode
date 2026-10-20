@@ -17,6 +17,7 @@ import {
 } from "./output-paths.js";
 import { saveWithRetry } from "./save-retry.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { isOneOf } from "../core/one-of.js";
 
 type FolderOutput = (typeof FOLDER_OUTPUTS)[number];
 type SavedOutput = (typeof FILE_OUTPUTS)[number] | FolderOutput;
@@ -40,7 +41,7 @@ export async function claimOutputFolder(key: FolderOutput, path: string): Promis
 }
 
 function isFolderOutput(key: SavedOutput): key is FolderOutput {
-  return (FOLDER_OUTPUTS as readonly string[]).includes(key);
+  return isOneOf(FOLDER_OUTPUTS, key);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { defined } from "../core/defined.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+import { isOneOf } from "../core/one-of.js";
 
 const ERRORS = new ErrorCatalog("export.platform", {
   "unknown-card-asset": () => "Unknown card asset.",
@@ -105,7 +106,7 @@ export type RenderAsset = (typeof renderAssets)[number];
 
 /** Whether `path` is a bundled file that a renderer may ask for. */
 export function isRenderAsset(path: string): path is RenderAsset {
-  return (renderAssets as readonly string[]).includes(path);
+  return isOneOf(renderAssets, path);
 }
 
 /** The bundled file `path` from `source`, refused when it is none of renderAssets. */

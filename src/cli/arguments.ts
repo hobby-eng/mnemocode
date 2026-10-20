@@ -5,6 +5,7 @@ import { SHARE_SOURCE_OPTIONS } from "./share-options.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 import { STDIN_INPUT_OPTIONS } from "./output-options.js";
+import { isOneOf } from "../core/one-of.js";
 
 const ERRORS = new ErrorCatalog("cli.arguments", {
   "command-does-not-accept-unnamed-value-use-appropriate": () =>
@@ -165,9 +166,9 @@ export function choiceOption<Choice extends string>(
 ): Choice | undefined {
   const given = value(arguments_, key);
   if (given === undefined) return undefined;
-  if (!(choices as readonly string[]).includes(given))
+  if (!isOneOf(choices, given))
     throw ERRORS.create("refused", [`${key}`, `${listInWords(choices, "or")}`]);
-  return given as Choice;
+  return given;
 }
 
 export function values(arguments_: ParsedArguments, key: string): string[] {

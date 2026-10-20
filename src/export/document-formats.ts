@@ -10,6 +10,7 @@ import { listInWords } from "../core/places.js";
 import { POINTS_PER_INCH } from "./page-units.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { isOneOf } from "../core/one-of.js";
 
 const ERRORS = new ErrorCatalog("export.document-formats", {
   "image-format-one-accepted-as-alias": (value0: string, value1: string) =>
@@ -85,7 +86,7 @@ export const DOCUMENT_EXTENSIONS: readonly string[] = Object.freeze([
 
 /** Whether `value` names an image format of IMAGE_FORMATS. */
 export function isImageFormat(value: unknown): value is ImageFormat {
-  return (IMAGE_FORMATS as readonly unknown[]).includes(value);
+  return isOneOf(IMAGE_FORMATS, value);
 }
 
 /**

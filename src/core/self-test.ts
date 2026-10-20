@@ -70,6 +70,7 @@ import { Masking, decodeInput } from "./masking.js";
 import { isFingerprintText, type PhraseFingerprint } from "./wallet-check.js";
 import { ErrorCatalog } from "./error-catalog.js";
 import { MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC } from "./self-test-vectors.js";
+import { isOneOf } from "./one-of.js";
 
 const ERRORS = new ErrorCatalog("core.self-test", {
   "checksum-valid-seedshift-produced-invalid-bip39-checksum": () =>
@@ -214,7 +215,7 @@ const VECTOR_MODES = Object.freeze(["direct", "seedshift", "seedshift-legacy"] a
 type VectorMode = (typeof VECTOR_MODES)[number];
 
 function isVectorMode(mode: string): mode is VectorMode {
-  return (VECTOR_MODES as readonly string[]).includes(mode);
+  return isOneOf(VECTOR_MODES, mode);
 }
 
 interface PublicVector {

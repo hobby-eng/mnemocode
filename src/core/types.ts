@@ -1,5 +1,7 @@
 /** Shared contracts; importing types never loads renderers or platform adapters. */
 
+import { isOneOf } from "./one-of.js";
+
 // The phrase lengths belong to the sizes of BIP39, which load no word list.
 export { BIP39_WORD_COUNTS, type Bip39WordCount } from "./bip39-sizes.js";
 
@@ -19,7 +21,7 @@ export type EncodedFormat = (typeof ENCODED_FORMATS)[number];
 
 /** Whether `value` names a form of codes; a record, an option or a host may pass anything. */
 export function isEncodedFormat(value: unknown): value is EncodedFormat {
-  return (ENCODED_FORMATS as readonly unknown[]).includes(value);
+  return isOneOf(ENCODED_FORMATS, value);
 }
 /** What encode writes: codes in one of their forms, or JSON with every form and the shifts. */
 export type OutputFormat = EncodedFormat | "json";
@@ -40,7 +42,7 @@ export type MaskingMode = (typeof MASKING_MODES)[number];
 
 /** Whether `value` names a transformation mode; a record, an option or a host may pass anything. */
 export function isMaskingMode(value: unknown): value is MaskingMode {
-  return (MASKING_MODES as readonly unknown[]).includes(value);
+  return isOneOf(MASKING_MODES, value);
 }
 
 /** A date of the calendar, as Seedshift takes it: year, month from 1 and day from 1. */

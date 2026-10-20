@@ -125,6 +125,7 @@ export {
   WORD_VERSION,
   wordIndexesToBytes,
 } from "./mixed-layout.js";
+import { isOneOf } from "../core/one-of.js";
 const MAX_COLOR_TEXT_LENGTH = 1024;
 /** The shares of one set at most: every member of every group. */
 const MAX_SET_SHARES = MAX_GROUPS * MAX_GROUP_MEMBERS;
@@ -364,7 +365,7 @@ export const DEFAULT_SHARE_FORMAT: ShareFormat = SHARE_FORMATS[0];
 
 /** Whether `value` names a form of shares; an option or a host may pass anything. */
 export function isShareFormat(value: unknown): value is ShareFormat {
-  return (SHARE_FORMATS as readonly unknown[]).includes(value);
+  return isOneOf(SHARE_FORMATS, value);
 }
 
 /**

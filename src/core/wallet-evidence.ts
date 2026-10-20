@@ -68,6 +68,7 @@ import { listInWords } from "./places.js";
 import { defined } from "./defined.js";
 import { ERRORS } from "./wallet-evidence-errors.js";
 import { PreparedWalletEvidence } from "./wallet-evidence-owner.js";
+import { isOneOf } from "./one-of.js";
 
 // What every caller of this module used here before the split keeps working.
 export { parseMasterFingerprint, type Pbkdf2HmacSha512 };
@@ -95,12 +96,12 @@ export type BitcoinProfile = (typeof bitcoinProfiles)[number];
 
 /** Whether `value` names a network that the evidence is compared on. A host words its refusal. */
 export function isBitcoinNetwork(value: unknown): value is BitcoinNetworkName {
-  return (BITCOIN_NETWORKS as readonly unknown[]).includes(value);
+  return isOneOf(BITCOIN_NETWORKS, value);
 }
 
 /** Whether `value` names one of the four profiles. A host words its refusal. */
 export function isBitcoinProfile(value: unknown): value is BitcoinProfile {
-  return typeof value === "string" && (bitcoinProfiles as readonly string[]).includes(value);
+  return isOneOf(bitcoinProfiles, value);
 }
 
 /**
