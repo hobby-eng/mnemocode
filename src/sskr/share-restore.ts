@@ -690,6 +690,9 @@ export class ShareRestore {
       request.now,
     );
     try {
+      // The read awaited the host's turns and clock: an input ended there is told before a stop
+      // of the host, as restore promises (AUD-037-API001).
+      request.input.assertLive();
       if (read.kind === "stopped") return read;
       if (read.kind === "trouble")
         return {

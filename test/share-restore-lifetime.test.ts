@@ -23,6 +23,21 @@ function inputOf(marked: boolean): ShareInput {
   return input;
 }
 
+/**
+ * A host run whose first turn ends `input` and stops the run, as a Ctrl+C may during the
+ * assessment of marked shares, which takes its turns before any search.
+ */
+function endingRun(input: ShareInput): { signal: AbortSignal; turn: () => Promise<void> } {
+  const controller = new AbortController();
+  return {
+    signal: controller.signal,
+    turn: async () => {
+      input.wipe();
+      controller.abort();
+    },
+  };
+}
+
 describe("a restore whose input ends while a host step is awaited", () => {
   it("publishes no phrase of complete shares after the wallet check", async () => {
     const input = inputOf(false);
@@ -87,6 +102,29 @@ describe("a restore whose input ends while a host step is awaited", () => {
         input.wipe();
         return { matched: true };
       },
+    });
+    await expect(repairing).rejects.toMatchObject(WIPED);
+  });
+
+  it("says no stop of marked shares whose input ended as the host stopped their assessment", async () => {
+    const input = inputOf(true);
+    const restoring = new ShareRestore(nodeSharePlatform).restore({
+      input,
+      mode: "direct",
+      confirmed: true,
+      ...endingRun(input),
+    });
+    await expect(restoring).rejects.toMatchObject(WIPED);
+  });
+
+  it("says no stop of a repair whose input ended as the host stopped the assessment", async () => {
+    const input = inputOf(true);
+    const repairing = new ShareRestore(nodeSharePlatform).repair({
+      input,
+      mode: "direct",
+      confirmed: true,
+      fingerprintOf: masterFingerprint,
+      ...endingRun(input),
     });
     await expect(repairing).rejects.toMatchObject(WIPED);
   });
