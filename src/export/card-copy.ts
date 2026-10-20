@@ -142,12 +142,18 @@ function copyValue(value: string | undefined, fallback: () => string, label: str
   if (value === "-") return "";
   return cardText(value, label, "; use - to hide it.");
 }
+
 /**
  * A presentation that a host gives whole, as one settled already: each text checked by the rule
  * of card text (cardText), and "" where its line is hidden. A text that is missing or breaks the
- * rule is refused before anything is drawn, as a given profile is (AUD-037-API006).
+ * rule is refused before anything is drawn, as a given profile is (AUD-037-API006). None is given
+ * where `given` is undefined, or null from a JavaScript host: then it returns undefined.
  */
-export function checkedCardPresentation(given: CardPresentation): CardPresentation {
+export function checkedCardPresentation(
+  given: CardPresentation | undefined,
+): CardPresentation | undefined {
+  // A null is no presentation, as it was when a host's presentation was taken with `??`.
+  if (given === undefined || given === null) return undefined;
   return Object.freeze(
     Object.fromEntries(
       COPY_FIELDS.map((field) => {

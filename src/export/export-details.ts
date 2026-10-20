@@ -133,9 +133,7 @@ export class ExportDetails {
     return ExportDetails.#once(settings, () => {
       // Both orders evaluate the same two rules; only which one runs first differs.
       const texts = (): CardPresentation =>
-        settings.presentation === undefined
-          ? resolveCardPresentation(choose)
-          : checkedCardPresentation(settings.presentation);
+        checkedCardPresentation(settings.presentation) ?? resolveCardPresentation(choose);
       const person = (): Required<CardProfile> =>
         ExportDetails.#person(choose, settings.profile, style);
       if (personFirst) {

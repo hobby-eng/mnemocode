@@ -206,19 +206,25 @@ export function parseOrientation(value: string | undefined): CardOrientation | u
 export const MAX_CARD_TEXT_LENGTH = 100;
 
 /**
- * A text of a card, trimmed and in NFC: refused unless it is text on one line without control
- * characters, and no longer than MAX_CARD_TEXT_LENGTH. The refusal of a blank one says "Card
- * <label> must be non-empty text on one line" and then `blankEnding`, the caller's own rule.
+ * A text of a card as it is drawn, in NFC and trimmed: refused unless it is text on one line
+ * without control characters, and no longer than MAX_CARD_TEXT_LENGTH once drawn. The refusal of
+ * a blank one says "Card <label> must be non-empty text on one line" and then `blankEnding`, the
+ * caller's own rule. A text that it returned, given again, is returned the same.
  */
 export function cardText(text: unknown, label: string, blankEnding: string): string {
-  if (typeof text !== "string" || !text.trim() || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(text))
+  // Measured as drawn: NFC may make a text longer, such as U+0344 two code points, or shorter,
+  // and a text settled once must pass again as it is (AUD-037-API006). NFC keeps every control
+  // character, and the check of the whole text refuses one at either end too.
+  const normalized = typeof text === "string" ? text.normalize("NFC") : "";
+  const drawn = normalized.trim();
+  if (drawn === "" || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(normalized))
     throw ERRORS.create("card-non-empty-text-on-one-line", [`${label}`, `${blankEnding}`]);
-  if (Array.from(text).length > MAX_CARD_TEXT_LENGTH)
+  if (Array.from(drawn).length > MAX_CARD_TEXT_LENGTH)
     throw ERRORS.create("card-too-long-maximum-characters", [
       `${label}`,
       `${MAX_CARD_TEXT_LENGTH}`,
     ]);
-  return text.trim().normalize("NFC");
+  return drawn;
 }
 
 /**
