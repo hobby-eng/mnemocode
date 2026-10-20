@@ -110,7 +110,7 @@ describe("Retained secret lifetimes", () => {
     reencoding[Symbol.dispose]();
     reencoding.wipe();
     expect(() => reencoding.phrase).toThrow("has been wiped");
-    expect(() => reencoding.confirmedPhrase()).toThrow();
+    expect(() => reencoding.confirmedPhrase()).toThrow("has been wiped");
     expect(backup.text()).toBe(TEST_PHRASE);
     backup.wipe();
   });
@@ -157,7 +157,9 @@ describe("Retained secret lifetimes", () => {
       if (text === sskrSetVector.shares[0]) allocations.push(bytes);
       return bytes;
     });
-    expect(() => Share.readSet([sskrSetVector.shares[0], "invalid public fixture"])).toThrow();
+    expect(() => Share.readSet([sskrSetVector.shares[0], "invalid public fixture"])).toThrow(
+      expect.objectContaining({ code: "sskr.transport.decoded-bytes-refused" }),
+    );
     expect(allocations).toHaveLength(1);
     expect(allocations[0]!.every((byte) => byte === 0)).toBe(true);
   });

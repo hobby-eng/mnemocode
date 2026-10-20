@@ -63,8 +63,19 @@
     },
     {
       "files": ["test/**"],
+      // The Vitest plugin for require-to-throw-message: a test of a refusal names the error it
+      // expects (CORE-28). The plugin brings its other correctness rules as well; the six below
+      // that the present tests break, in about 360 places, are off: each is a decision of its own.
+      "plugins": ["vitest"],
       "rules": {
-        "typescript/no-non-null-assertion": "off"
+        "typescript/no-non-null-assertion": "off",
+        "vitest/require-to-throw-message": "error",
+        "vitest/expect-expect": "off",
+        "vitest/no-conditional-expect": "off",
+        "vitest/no-standalone-expect": "off",
+        "vitest/require-mock-type-parameters": "off",
+        "vitest/valid-expect": "off",
+        "vitest/valid-title": "off"
       }
     }
   ]

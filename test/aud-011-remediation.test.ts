@@ -86,8 +86,17 @@ describe("AUD-011-ARC001: one reader of a known word number", () => {
       ["2048", 2047],
     ] as const)
       expect(wordIndexOfNumber(token), token).toBe(index);
-    for (const token of ["0", "2049", "-1", "1.0", "", "x"])
-      expect(() => wordIndexOfNumber(token), token).toThrow();
+    const range = { code: "core.words.indexes-use-seedshift-compatible-numbering-from" };
+    const integer = { code: "core.words.indexes-decimal-integers-from" };
+    for (const [token, refusal] of [
+      ["0", range],
+      ["2049", range],
+      ["-1", integer],
+      ["1.0", integer],
+      ["", integer],
+      ["x", integer],
+    ] as const)
+      expect(() => wordIndexOfNumber(token), token).toThrow(expect.objectContaining(refusal));
     // A padded known number beside a ? was refused, though complete codes read it.
     const padded = MASKED_NUMBERS.replace(/^2027 10/u, "2027 0010").replace(/377$/u, "?");
     expect(parseInput(MASKED_NUMBERS.replace(/^2027 10/u, "2027 0010"), "indexes")[1]).toBe(9);
@@ -740,9 +749,12 @@ describe("AUD-011-ARC049, ARC054: one rule for a whole number in a range, whatev
     ] as const) {
       const option = () => scanGapOf({ "scan-gap": String(count) });
       const typed = () => parseAddressCount(String(count), 0);
-      for (const read of [option, typed])
+      for (const [read, code] of [
+        [option, "cli.arguments.base-10-integer-from"],
+        [typed, "core.typed-number.typed-whole-number-refused"],
+      ] as const)
         if (accepted) expect(read()).toBe(count);
-        else expect(read).toThrow();
+        else expect(read).toThrow(expect.objectContaining({ code }));
     }
   });
 
@@ -752,7 +764,9 @@ describe("AUD-011-ARC049, ARC054: one rule for a whole number in a range, whatev
       "must be a base-10 integer from 1 through 2048",
     );
     for (const wrong of ["4e1", "+42", "42.0", " 42", "9".repeat(400)]) {
-      expect(() => integerOption({ index: wrong }, "index", WORD_NUMBER_RANGE)).toThrow();
+      expect(() => integerOption({ index: wrong }, "index", WORD_NUMBER_RANGE)).toThrow(
+        expect.objectContaining({ code: "cli.arguments.base-10-integer-from" }),
+      );
       expect(() => typedWholeNumber(wrong, WORD_NUMBER_RANGE, refuse)).toThrow(refuse);
     }
   });

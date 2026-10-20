@@ -201,6 +201,8 @@ const LONG_HELP_OPTION: HelpOption = {
 
 /** `mnemocode`, `mnemocode --help` and `mnemocode help`. */
 export function printUsage(): void {
+  // commandHelp is a Record<CommandName, CommandHelp> literal, and SHARE_COMMAND_HELP, which it
+  // spreads, a Record of three of them, so Object.keys gives exactly the CommandNames.
   const commands: HelpRow[] = (Object.keys(commandHelp) as CommandName[])
     .filter((name) => COMMAND_FACTS[name].listed)
     .map((name) => [name, commandHelp[name].summary]);

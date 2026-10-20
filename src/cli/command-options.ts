@@ -187,7 +187,9 @@ export const COMMAND_FACTS: Readonly<Record<CommandName, CommandFacts>> = Object
 
 /** The commands that take a secret or show one; at a terminal they run on the private screen. */
 export const PRIVATE_SCREEN_COMMANDS: ReadonlySet<string> = new Set(
-  (Object.keys(COMMAND_FACTS) as CommandName[]).filter((name) => COMMAND_FACTS[name].secret),
+  Object.entries(COMMAND_FACTS)
+    .filter(([, facts]) => facts.secret)
+    .map(([name]) => name),
 );
 
 export function isCommandName(name: string): name is CommandName {

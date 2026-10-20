@@ -60,6 +60,11 @@ const EVIDENCE_OPTIONS = Object.freeze({
   wif: "wif-file",
 } as const) satisfies Readonly<Record<WalletEvidence["kind"], string>>;
 
+/** Whether `key` is one of EVIDENCE_OPTIONS's own keys: a kind of evidence that an option gives. */
+function isEvidenceKind(key: string): key is keyof typeof EVIDENCE_OPTIONS {
+  return Object.hasOwn(EVIDENCE_OPTIONS, key);
+}
+
 /**
  * The options that place a wallet in its account: what a master key, which has no place, refuses.
  */
@@ -162,9 +167,10 @@ export function walletEvidenceArguments(evidence: WalletEvidence): string[] {
  * a WIF is compared with the first 20 addresses from --index on, or as many as --scan-gap says.
  */
 export function walletEvidence(arguments_: ParsedArguments): WalletEvidence | undefined {
-  const items = (Object.keys(EVIDENCE_OPTIONS) as WalletEvidence["kind"][]).map(
-    (kind) => [kind, value(arguments_, EVIDENCE_OPTIONS[kind])] as const,
-  );
+  // Every key passes the guard, which gives each its kind's type without an assertion (TS-04).
+  const items = Object.keys(EVIDENCE_OPTIONS)
+    .filter(isEvidenceKind)
+    .map((kind) => [kind, value(arguments_, EVIDENCE_OPTIONS[kind])] as const);
   const supplied = items.filter(([, item]) => item !== undefined);
   const coin = value(arguments_, "coin");
   if (coin !== undefined && value(arguments_, "coin-address") === undefined)

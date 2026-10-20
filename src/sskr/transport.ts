@@ -415,7 +415,7 @@ export type ColorShareFormat = (typeof COLOR_SHARE_FORMATS)[number];
 
 /** Whether a share in `format` is its colors: its cards print them, not codes beside them. */
 export function isColorShareFormat(format: ShareFormat): format is ColorShareFormat {
-  return (COLOR_SHARE_FORMATS as readonly ShareFormat[]).includes(format);
+  return isOneOf(COLOR_SHARE_FORMATS, format);
 }
 
 /**

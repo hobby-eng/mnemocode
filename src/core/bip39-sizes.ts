@@ -2,9 +2,11 @@
 // the entropy and checksum bits that follow from a word count. Every module that needs one of
 // them takes it here, so that SSKR, candidate lists and the fingerprint check load no word list.
 //
-// Host-neutral: it imports only whole-number rules (typed-number.ts) and how lists are written
-// (places.ts).
+// Host-neutral: it imports only whole-number rules (typed-number.ts), how lists are written
+// (places.ts), the guard of a list's values (one-of.ts) and the catalog of its error codes
+// (error-catalog.ts).
 
+import { isOneOf } from "./one-of.js";
 import { listInWords } from "./places.js";
 import { inWholeRange, integerRefusal, rangeText, type WholeRange } from "./typed-number.js";
 import { ErrorCatalog, suppliedMessage } from "./error-catalog.js";
@@ -21,7 +23,7 @@ export type Bip39WordCount = (typeof BIP39_WORD_COUNTS)[number];
 
 /** Whether a phrase of `count` words has a BIP39 length. */
 export function isBip39WordCount(count: number): count is Bip39WordCount {
-  return (BIP39_WORD_COUNTS as readonly number[]).includes(count);
+  return isOneOf(BIP39_WORD_COUNTS, count);
 }
 
 /** The lengths as the messages name them: "12, 15, 18, 21 or 24". */

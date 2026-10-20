@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { markCount, markProblem, placesWithin, readRepairableShare } from "../src/sskr/repair.js";
+import { MAX_REPAIR_TEXT_LENGTH } from "../src/sskr/repair-units.js";
 import {
   readShare,
   writeShare,
@@ -140,11 +141,21 @@ describe("One explicit unreadable SSKR element", () => {
       for (const index of [2, 3, 4, 5, 6, 7, 8]) parts[index] = "?";
       expect(() => readRepairableShare(joinUnits(parts, format))).toThrow(/at most 6/u);
     }
-    expect(() => readRepairableShare("?".repeat(2049))).toThrow();
+    // One mark, and spaces between two words: read at the longest text a repair reads, refused
+    // one character over it, with the refusal of too many marks, which bounds the text too
+    // (exceedsMarks).
+    const marked = markUnits(share, "words", [3]);
+    const spaced = (length: number) => marked.replace(" ", " ".repeat(length - marked.length + 1));
+    expect(readRepairableShare(spaced(MAX_REPAIR_TEXT_LENGTH)).ur).toBe(share);
+    expect(() => readRepairableShare(spaced(MAX_REPAIR_TEXT_LENGTH + 1))).toThrow(
+      expect.objectContaining({ code: "sskr.repair.each-at-place" }),
+    );
     expect(() => readRepairableShare("? not a share")).toThrow(/No valid share/u);
     const numbers = shareUnits(share, "indexes");
     numbers[8] = numbers[8] === "1" ? "2" : "1";
-    expect(() => readRepairableShare(numbers.join(" "))).toThrow();
+    expect(() => readRepairableShare(numbers.join(" "))).toThrow(
+      expect.objectContaining({ code: "sskr.transport.sskr-transport-checksum-does-not-match" }),
+    );
   });
 
   it("does not accept an extra wrong element merely because one hole is marked", () => {
@@ -344,7 +355,7 @@ describe("Unreadable digits inside a color or a Unicode code", () => {
     expect(markCount(codes.map((code, i) => (i === 3 ? digit(code, 2) : code)).join(" "))).toBe(1);
     expect(() =>
       readRepairableShare(codes.map((code, i) => (i === 3 ? "1?00" : code)).join(" ")),
-    ).toThrow();
+    ).toThrow(expect.objectContaining({ code: "sskr.repair.no-share-fits-marks" }));
   });
 
   it("says what a ? means in codes run together where it marks a digit", () => {

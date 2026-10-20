@@ -234,7 +234,12 @@ describe("WordCandidateSearch", () => {
   it("makes a candidate only of BIP39 indexes, numbered from 1", () => {
     const words = Array.from({ length: 12 }, () => 0);
     expect(new WordCandidate(1, words).phrase).toBe(`${ELEVEN}abandon`);
-    expect(() => new WordCandidate(0, words)).toThrow(RangeError);
+    expect(() => new WordCandidate(0, words)).toThrow(
+      expect.objectContaining({
+        name: "RangeError",
+        code: "core.candidates.candidate-s-number-counts-from-1",
+      }),
+    );
     expect(() => new WordCandidate(1, words.slice(1))).toThrow(/BIP39 indexes/u);
     expect(() => new WordCandidate(1, [...words.slice(1), 2048])).toThrow(/BIP39 indexes/u);
   });
@@ -281,7 +286,11 @@ describe("Candidate lists", () => {
   it("refuse what no list may hold", () => {
     const entropy = new Uint8Array(16);
     expect(() => encodeCandidateList({ records: [] })).toThrow(/1 to/u);
-    expect(() => encodeCandidateList({ records: [{ entropy: new Uint8Array(15) }] })).toThrow();
+    expect(() => encodeCandidateList({ records: [{ entropy: new Uint8Array(15) }] })).toThrow(
+      expect.objectContaining({
+        code: "core.candidate-list.every-candidate-bip39-entropy-one-length-16-32",
+      }),
+    );
     expect(() =>
       encodeCandidateList({ records: [{ entropy }, { entropy: new Uint8Array(32) }] }),
     ).toThrow(/one length/u);

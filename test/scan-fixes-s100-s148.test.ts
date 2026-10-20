@@ -407,7 +407,8 @@ describe("S126: one module names the files of a release", () => {
 describe("S128: one reading of what a thrown value says, and rules in the library", () => {
   it("tells a refusal from a fault, and says what any thrown value is", () => {
     expect(refusalMessage(new Error("No."))).toBe("No.");
-    expect(() => refusalMessage("fault")).toThrow();
+    // The fault passes through as it was thrown: the string itself, not an Error that wraps it.
+    expect(() => refusalMessage("fault")).toThrow(expect.stringMatching(/^fault$/u));
     expect(describeError(new Error("No."))).toBe("No.");
     expect(describeError(42)).toBe("42");
   });

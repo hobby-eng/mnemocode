@@ -298,27 +298,79 @@ describe("the host's PBKDF2", () => {
     expect(() => check.fingerprint(publicMnemonic, "\ud800")).toThrow(/well-formed/u);
     expect(() => check.fingerprint(`${publicMnemonic}\udc00`)).toThrow(/well-formed/u);
     for (const passphrase of [null, 123, false, [], {}])
-      expect(() => check.fingerprint(publicMnemonic, passphrase as never)).toThrow(TypeError);
-    expect(() => check.fingerprint(null as never)).toThrow(TypeError);
+      expect(() => check.fingerprint(publicMnemonic, passphrase as never)).toThrow(
+        expect.objectContaining({
+          name: "TypeError",
+          code: "core.master-fingerprint.expected-string-passphrase",
+        }),
+      );
+    expect(() => check.fingerprint(null as never)).toThrow(
+      expect.objectContaining({
+        name: "TypeError",
+        code: "core.master-fingerprint.expected-string",
+      }),
+    );
     expect(calls).toEqual([]);
   });
 
   it("is not called for evidence that no wallet can match", () => {
     const { check, calls } = recordingHost();
-    const refused: readonly BitcoinEvidence[] = [
-      located("address", "tb1qfm7ydz3n82zjh8m223yr6y6un0arn82u8w7a4r", ["native-segwit"]),
-      located("wif", "L1-invalid-value", ["native-segwit"]),
-      located("compressed-public-key", `02${"ff".repeat(32)}`, ["native-segwit"]),
-      located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"]),
-      located("address", BIP84.firstReceiving, []),
-      located("address", BIP84.firstReceiving, ["native-segwit"], { ...mainnet, index: -1 }),
-      { kind: "master-fingerprint", value: "73c5da0", network: "mainnet" },
-      { kind: "master-xpub", value: BIP84.accountZpub.replace("zpub", "zprv"), network: "mainnet" },
-      { kind: "address-typo", value: "x" } as unknown as BitcoinEvidence,
+    const evidenceCode = (code: string) => ({ code: `core.wallet-evidence.${code}` });
+    const refused: readonly (readonly [BitcoinEvidence, { code: string; message?: string }])[] = [
+      [
+        located("address", "tb1qfm7ydz3n82zjh8m223yr6y6un0arn82u8w7a4r", ["native-segwit"]),
+        evidenceCode("address-not-valid-bitcoin"),
+      ],
+      [
+        located("wif", "L1-invalid-value", ["native-segwit"]),
+        evidenceCode("wif-not-valid-bitcoin"),
+      ],
+      [
+        located("compressed-public-key", `02${"ff".repeat(32)}`, ["native-segwit"]),
+        evidenceCode("compressed-public-key-not-point-secp256k1-curve"),
+      ],
+      [
+        located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"]),
+        evidenceCode("extended-key-prefix-does-not-match-selected-bitcoin"),
+      ],
+      [
+        located("address", BIP84.firstReceiving, []),
+        evidenceCode("at-least-one-bitcoin-address-profile-selected"),
+      ],
+      [
+        located("address", BIP84.firstReceiving, ["native-segwit"], { ...mainnet, index: -1 }),
+        // The account, the branch and the index share this code; the message names the index.
+        {
+          code: "core.coins.coin.assert-address-location-refused",
+          message: "index must be an integer from 0 through 2147483647.",
+        },
+      ],
+      [
+        { kind: "master-fingerprint", value: "73c5da0", network: "mainnet" },
+        { code: "core.wallet-check.master-fingerprint-eight-hexadecimal-characters" },
+      ],
+      [
+        {
+          kind: "master-xpub",
+          value: BIP84.accountZpub.replace("zpub", "zprv"),
+          network: "mainnet",
+        },
+        evidenceCode("unsupported-extended-key-prefix-supported-public-forms-include"),
+      ],
+      [
+        // A kind that no evidence has, as a JavaScript host may pass: assertBitcoinEvidence's
+        // check of the kind is what this case tests.
+        { kind: "address-typo", value: "x" } as unknown as BitcoinEvidence,
+        evidenceCode("unsupported-bitcoin-evidence-kind"),
+      ],
     ];
-    for (const evidence of refused) {
-      expect(() => check.match(publicMnemonic, evidence)).toThrow();
-      expect(() => assertBitcoinEvidence(evidence)).toThrow();
+    for (const [evidence, refusal] of refused) {
+      expect(() => check.match(publicMnemonic, evidence), refusal.code).toThrow(
+        expect.objectContaining(refusal),
+      );
+      expect(() => assertBitcoinEvidence(evidence), refusal.code).toThrow(
+        expect.objectContaining(refusal),
+      );
     }
     expect(calls).toEqual([]);
   });
@@ -329,8 +381,18 @@ describe("the host's PBKDF2", () => {
     expect(() => check.fingerprint(publicMnemonic)).toThrow("gave 32 bytes, not 64");
     expect(short.every((byte) => byte === 0)).toBe(true);
     const text = new WalletEvidenceCheck((() => "seed") as unknown as Pbkdf2HmacSha512, [BITCOIN]);
-    expect(() => text.fingerprint(publicMnemonic)).toThrow(TypeError);
-    expect(() => new WalletEvidenceCheck(undefined as never, [BITCOIN])).toThrow(TypeError);
+    expect(() => text.fingerprint(publicMnemonic)).toThrow(
+      expect.objectContaining({
+        name: "TypeError",
+        code: "core.master-fingerprint.host-s-pbkdf2-gave-no-bytes",
+      }),
+    );
+    expect(() => new WalletEvidenceCheck(undefined as never, [BITCOIN])).toThrow(
+      expect.objectContaining({
+        name: "TypeError",
+        code: "core.master-fingerprint.wallet-check-host-s-pbkdf2-hmac-sha512-function",
+      }),
+    );
   });
 
   it("can be node:crypto's, with the same result", () => {
@@ -515,7 +577,9 @@ describe("several addresses in a row, from the location's index on", () => {
     expect(parseBitcoinAddress(`\u0085${BIP84.firstReceiving}`, "mainnet")).toBe(
       BIP84.firstReceiving,
     );
-    expect(() => parseBitcoinAddress(`\ufeff${BIP84.firstReceiving}`, "mainnet")).toThrow();
+    expect(() => parseBitcoinAddress(`\ufeff${BIP84.firstReceiving}`, "mainnet")).toThrow(
+      expect.objectContaining({ code: "core.wallet-evidence.address-not-valid-bitcoin" }),
+    );
   });
 
   it("refuses a number that is no count, or that would pass the last index", () => {

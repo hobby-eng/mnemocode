@@ -30,8 +30,17 @@ describe("business card collections", () => {
   });
 
   it("rejects silent fallbacks for invalid or repeated options and requires a PDF", () => {
-    for (const name of ["", "  ", "x\ny", "\x1b[0m", "x".repeat(101)])
-      expect(() => validateProfile({ name })).toThrow();
+    const oneLine = "export.card-settings.card-non-empty-text-on-one-line";
+    for (const [name, code] of [
+      ["", oneLine],
+      ["  ", oneLine],
+      ["x\ny", oneLine],
+      ["\x1b[0m", oneLine],
+      ["x".repeat(101), "export.card-settings.card-too-long-maximum-characters"],
+    ] as const)
+      expect(() => validateProfile({ name }), JSON.stringify(name)).toThrow(
+        expect.objectContaining({ code }),
+      );
     expect(() => parsePageSize("wallet")).toThrow("a6, a5, a4 or business");
     expect(parsePageSize("business")).toBe("business");
     expect(() =>
@@ -91,9 +100,16 @@ describe("business card collections", () => {
   it("fails on mismatched QR data and unprintable personal fields before returning a PDF", async () => {
     const template = selectTemplate("business-it");
     const content = { kind: "colors" as const, colors, payload: colors.join(" ") };
+    // Colors, but not all that the cards print: the QR code holds other references.
+    await expect(
+      template.render(nodeCardRenderer, { ...content, payload: colors.slice(1).join(" ") }),
+    ).rejects.toMatchObject({
+      code: "export.card-content.collection-qr-does-not-match-printed-references",
+    });
+    // Text that is no colors is read as Color Unicode, which refuses it as such.
     await expect(
       template.render(nodeCardRenderer, { ...content, payload: "MNC1:secret" }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "core.colors.codes-all" });
     await expect(
       template.render(nodeCardRenderer, { ...content, profile: { company: "🛸" } }),
     ).rejects.toThrow("not supported");

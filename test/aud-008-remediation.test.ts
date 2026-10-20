@@ -116,17 +116,34 @@ describe("AUD-008-API002: key evidence that no wallet can match is refused", () 
 
 describe("AUD-008-API003: a word search that could not end is refused", () => {
   const known = (count: number) => Array.from({ length: count }, () => [0] as readonly number[]);
+  // Each search breaks the shape of a WordSearch on purpose, as a JavaScript host may: the cast
+  // hands it to the check that refuses it. One code for every place that holds no BIP39 indexes
+  // in ascending order.
+  const places = "every-place-one-more-bip39-indexes-ascending-order";
   it.each([
-    ["an empty place", { kind: "unknown-words", places: [...known(11), []] }],
-    ["eleven places", { kind: "unknown-words", places: known(11) }],
-    ["an index out of the list", { kind: "unknown-words", places: [...known(11), [2048]] }],
-    ["an index that is no integer", { kind: "unknown-words", places: [...known(11), [0.5]] }],
-    ["indexes out of order", { kind: "unknown-words", places: [...known(11), [3, 1]] }],
-    ["an unknown kind", { kind: "every-word", places: known(12) }],
-    ["a missing word of a wrong length", { kind: "missing-word", written: [0, 0, 0] }],
-  ])("%s", (_, search) => {
-    expect(() => searchCombinations(search as WordSearch)).toThrow();
-    expect(() => searchCandidates(search as WordSearch).next()).toThrow();
+    ["an empty place", { kind: "unknown-words", places: [...known(11), []] }, places],
+    ["eleven places", { kind: "unknown-words", places: known(11) }, "word-search-places"],
+    ["an index out of the list", { kind: "unknown-words", places: [...known(11), [2048]] }, places],
+    [
+      "an index that is no integer",
+      { kind: "unknown-words", places: [...known(11), [0.5]] },
+      places,
+    ],
+    ["indexes out of order", { kind: "unknown-words", places: [...known(11), [3, 1]] }, places],
+    ["an unknown kind", { kind: "every-word", places: known(12) }, "unknown-search-kind"],
+    [
+      "a missing word of a wrong length",
+      { kind: "missing-word", written: [0, 0, 0] },
+      "missing-word-search-one-word-fewer-than-valid",
+    ],
+  ])("%s", (_, search, code) => {
+    const refusal = { code: `core.candidates.${code}` };
+    expect(() => searchCombinations(search as WordSearch)).toThrow(
+      expect.objectContaining(refusal),
+    );
+    expect(() => searchCandidates(search as WordSearch).next()).toThrow(
+      expect.objectContaining(refusal),
+    );
   });
 });
 
@@ -148,7 +165,12 @@ describe("AUD-008-API004: an unknown Seedshift mode is refused", () => {
 
 describe("AUD-008-API005: a BIP39 passphrase must be text", () => {
   it.each([null, 123, false, [], {}])("refuses %j", (passphrase) => {
-    expect(() => masterFingerprint(publicMnemonic, passphrase as never)).toThrow(TypeError);
+    expect(() => masterFingerprint(publicMnemonic, passphrase as never)).toThrow(
+      expect.objectContaining({
+        name: "TypeError",
+        code: "core.master-fingerprint.expected-string-passphrase",
+      }),
+    );
   });
   it("keeps the default and string passphrases", () => {
     expect(masterFingerprint(publicMnemonic)).toBe("73c5da0a");

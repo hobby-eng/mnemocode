@@ -89,15 +89,18 @@ describe("Published SSKR v1 vectors", () => {
   );
   it("rejects bad CBOR metadata even with an intact CRC", () => {
     const body = urToTransport(vectors.official.shares[0]!).slice(0, -CHECKSUM_BYTES);
-    for (const [offset, value] of [
-      [0, 0x80],
-      [3, 0xf0],
-      [4, 0xf1],
-      [5, 0x10],
-    ]) {
+    // The first byte is the CBOR header of the byte string; the others are the share's metadata.
+    for (const [offset, value, code] of [
+      [0, 0x80, "sskr.transport.invalid-sskr-share-byte-string"],
+      [3, 0xf0, "sskr.transport.invalid-sskr-share-metadata"],
+      [4, 0xf1, "sskr.transport.invalid-sskr-share-metadata"],
+      [5, 0x10, "sskr.transport.invalid-sskr-share-metadata"],
+    ] as const) {
       const changed = body.slice();
-      changed[offset!] = value!;
-      expect(() => shareInfo(recheck(changed))).toThrow();
+      changed[offset] = value;
+      expect(() => shareInfo(recheck(changed)), String(offset)).toThrow(
+        expect.objectContaining({ code }),
+      );
     }
     const badTag = Uint8Array.from([0xd9, 0, 1, ...body]);
     expect(() => shareInfo(recheck(badTag))).toThrow(/tag/u);
@@ -115,8 +118,14 @@ describe("Published SSKR v1 vectors", () => {
     );
     // A color after the share's own length, such as a decoy of its cards, belongs to no share.
     expect(colorsToShare([...codes, "#000000"].join(" "))).toBe(colorsToShare(codes.join(" ")));
-    for (const input of ["ur:sskr/1-2/abcd", "ur:sskr/zz", "tuna unknown", "", "#A11A5"])
-      expect(() => normalizeShare(input)).toThrow();
+    for (const [input, code] of [
+      ["ur:sskr/1-2/abcd", "sskr.transport.expected-single-part-ur-sskr-record"],
+      ["ur:sskr/zz", "sskr.transport.decoded-bytes-refused"],
+      ["tuna unknown", "sskr.transport.decoded-bytes-refused"],
+      ["", "sskr.transport.not-sskr-share"],
+      ["#A11A5", "sskr.transport.invalid-sskr-rgb-codes-preserve-their-printed-order"],
+    ] as const)
+      expect(() => normalizeShare(input), input).toThrow(expect.objectContaining({ code }));
   });
 });
 

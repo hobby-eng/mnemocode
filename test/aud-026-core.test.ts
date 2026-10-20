@@ -14,27 +14,35 @@ const ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 
 describe("AUD-026 selector privacy and owned address locations", () => {
   it("refuses selectors without repeating or coercing supplied text", async () => {
-    for (const action of [
-      () => EncodedForm.of(PHRASE as never),
-      () => coinById(PHRASE),
-      () => parseBitcoinAddress(ADDRESS, PHRASE as never),
-      () => resolveTemplateId(PHRASE),
-      () =>
-        readRenderAsset(
-          {
-            readAsset: async () => {
-              throw Error("host must not run");
+    const refusals: readonly (readonly [() => unknown, string])[] = [
+      [() => EncodedForm.of(PHRASE as never), "core.encoded-form.unsupported-encoded-format"],
+      [() => coinById(PHRASE), "core.coins.coin.unknown-coin-coins"],
+      [() => parseBitcoinAddress(ADDRESS, PHRASE as never), "core.wallet-evidence.bitcoin-network"],
+      [
+        () => resolveTemplateId(PHRASE),
+        "export.template-catalog.card-template-unknown-incompatible-list-available-preview-templates",
+      ],
+      [
+        () =>
+          readRenderAsset(
+            {
+              readAsset: async () => {
+                throw Error("host must not run");
+              },
             },
-          },
-          PHRASE,
-        ),
-    ]) {
+            PHRASE,
+          ),
+        "export.platform.unknown-card-asset",
+      ],
+    ];
+    for (const [action, code] of refusals) {
       try {
         await action();
         expect.fail("A selector must be refused");
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
-        expect(error).toHaveProperty("code");
+        // expect.fail's own error has no code, so a selector that is not refused fails here too.
+        expect(error, code).toMatchObject({ code });
         expect((error as Error).message).not.toContain(PHRASE);
       }
     }

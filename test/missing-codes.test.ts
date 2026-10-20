@@ -166,7 +166,13 @@ describe("dates with what is forgotten (core/dates.ts)", () => {
   it("refuses what no date can be, and dates of a phrase where nothing is searched", () => {
     expect(() => parse("? ?")).toThrow("exceeds the safety limit");
     expect(() => parse("15-12-25")).toThrow("four-digit year");
-    expect(() => parse("05|1-09-2026")).toThrow();
+    // A value of one digit is no day of two: refused by the pattern's syntax, at its date.
+    const syntax: unknown = expect.objectContaining({
+      code: "core.dates.use-each-forgotten-digit-values-joined-by-such",
+    });
+    expect(() => parse("05|1-09-2026")).toThrow(
+      expect.objectContaining({ code: "core.date-search.at-place-refused", cause: syntax }),
+    );
     expect(() => DatesAnswer.parse("?", { wordCount: 12, patterns: false })).toThrow(
       "? and | stand for what is forgotten",
     );

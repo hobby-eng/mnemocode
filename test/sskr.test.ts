@@ -79,9 +79,12 @@ describe("Standalone SSKR", () => {
     [2.5, 3],
     [NaN, 3],
   ])("rejects threshold %s / count %s", async (threshold, count) => {
+    // The split's own rule refuses each, before the SSKR engine would.
     await expect(
       splitSskrMnemonic("abandon ".repeat(11) + "about", threshold, count),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      code: "sskr.split.split-threshold-from-number-shares-at-most-shares",
+    });
   });
 
   it("rejects an invalid BIP39 source and restores a date-shifted source in two stages", async () => {
