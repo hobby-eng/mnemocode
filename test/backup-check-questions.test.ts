@@ -8,6 +8,8 @@ import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { runEncode } from "../src/cli/encode-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
+import { ShareCombineRefusalError } from "../src/sskr/share-platform.js";
+import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { matching } from "./helpers/matchers.js";
 import { DATE, MASKED, masked, original, promptsShown } from "./helpers/phrase-questions.js";
@@ -28,6 +30,18 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
 
 /** The start of a share as a UR, before its minimal bytewords. */
 const SSKR_UR_PREFIX = "ur:sskr/";
+
+/**
+ * The Node.js platform's restore of shares, failing with `failure` where the records hold one of
+ * `typed`: the startup check of the engine restores as it does.
+ */
+function failingRestoreOf(typed: readonly string[], failure: Error): void {
+  const combine = nodeSharePlatform.combineShares;
+  vi.spyOn(nodeSharePlatform, "combineShares").mockImplementation(async (records) => {
+    if (records.some((record) => typed.includes(record))) throw failure;
+    return combine(records);
+  });
+}
 
 questionsOnPrivateScreen();
 
@@ -220,6 +234,38 @@ describe("encode, decode and the backup check on the private screen", () => {
       expect(seen.notices).toContain(
         "These shares restore another seed phrase: they are not of this backup.",
       );
+    });
+
+    it("lets a fault of the host's SSKR library through instead of asking for the shares again (AUD-037-API002)", async () => {
+      const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
+      const fault = new Error("The host's SSKR library stopped.");
+      failingRestoreOf(shares, fault);
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${shares[0]};${shares[1]}\r`];
+      terminal.choices = ["yes"];
+      await expect(
+        offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [parseDate(DATE)]),
+      ).rejects.toBe(fault);
+      expect(promptsShown("shares as written down")).toHaveLength(1);
+    });
+
+    it("asks for the shares again after the engine refused to combine them (AUD-037-API002)", async () => {
+      const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
+      // The engine refuses the shares with share 2, as for a wrong share; other ones restore.
+      failingRestoreOf([shares[1]!], new ShareCombineRefusalError());
+      terminal.answers = [
+        `${shares[0]};${shares[1]}\r`,
+        `${shares[0]};${shares[2]}\r`,
+        `${DATE}\r`,
+      ];
+      terminal.choices = ["yes"];
+      await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
+        parseDate(DATE),
+      ]);
+      expect(promptsShown("shares as written down")).toHaveLength(2);
+      expect(seen.notices.filter((line) => line !== "")).toEqual([
+        "These shares do not restore a secret: check them, and that all belong to one set.",
+        "The backup restores this seed phrase.",
+      ]);
     });
   });
 });
