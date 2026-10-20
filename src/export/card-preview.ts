@@ -1,8 +1,9 @@
 // Sample cards: every card design drawn with a sample phrase, so that a person can see the designs
 // before writing a real backup. The phrase is new for each preview, its entropy drawn with the
-// host's randomness, so that its colours vary as a real backup's do, and it is masked with four
-// fixed public dates. A host whose randomness always answers 0, as a test's may, gets the public
-// phrase of all-zero entropy ("abandon … about" for 12 words).
+// host's randomness, each byte checked as every random choice of the cards is (checkedChoice), so
+// that its colours vary as a real backup's do, and it is masked with four fixed public dates. A
+// host whose randomness always answers 0, as a test's may, gets the public phrase of all-zero
+// entropy ("abandon … about" for 12 words).
 //
 // From the host it needs its CardRenderer (card-renderer.ts), which the cards are drawn with. It
 // returns PDF bytes and writes no file. A host also draws the colour cards of a save in memory
@@ -25,6 +26,7 @@ import { encodeMnemonic } from "../core/seedshift.js";
 import type { EncodedFormat, EncodedResult } from "../core/types.js";
 import { backupCardContent, type CardBackup, type CardContent } from "./backup-cards.js";
 import type { CardSettings } from "./card-settings.js";
+import { checkedChoice } from "./platform.js";
 import { renderCards, renderIndividualCards, type CardJob } from "./render.js";
 import { cardTemplates, selectTemplate, type CardDrawing, type CardTemplate } from "./templates.js";
 import { defined } from "../core/defined.js";
@@ -58,6 +60,8 @@ export type SampleWordCount = Bip39WordCount;
 
 /** The fixed public dates that the sample phrase is masked with. */
 const SAMPLE_DATES = ["31-10-2008", "03-01-2009", "12-01-2009", "22-05-2010"].map(parseDate);
+/** Why a byte of the sample phrase that the host's randomness gave is refused. */
+const RANDOM_BYTE_REFUSAL = "The random source of the sample phrase gave a byte out of range.";
 
 /** What a set of sample cards is drawn with. */
 export interface CardPreviewOptions {
@@ -90,7 +94,9 @@ export class CardPreview {
    * and builds its cards, drawn later with `drawing`. Throws
    * export.card-preview.preview-mnemonic-contain-words for a length that BIP39 lacks,
    * export.card-preview.colour-cards-not-written-as for a form that colour cards do not print,
-   * and core.encoded-form.unsupported-encoded-format for a colorForm that names no form.
+   * core.encoded-form.unsupported-encoded-format for a colorForm that names no form, and
+   * export.platform.checked-choice-refused for a byte of the phrase, drawn with the randomness of
+   * `drawing`, that is no whole number from 0 to 255.
    */
   constructor(drawing: CardDrawing, options: CardPreviewOptions = {}) {
     this.#drawing = drawing;
@@ -100,7 +106,11 @@ export class CardPreview {
     const colorForm = options.colorForm ?? "colors";
     if (EncodedForm.of(colorForm).cardKind !== "colors")
       throw ERRORS.create("colour-cards-not-written-as", [`${colorForm}`]);
-    const result = encodeMnemonic(phraseOfRandomEntropy(words, drawing.randomInt), SAMPLE_DATES);
+    // Each byte is checked as it is drawn: a Uint8Array would wrap 256 to 0 or cut 0.5 to 0, and
+    // the cards would show a phrase that the host's randomness did not give.
+    const randomByte = (limit: number): number =>
+      checkedChoice(drawing.randomInt, limit, RANDOM_BYTE_REFUSAL);
+    const result = encodeMnemonic(phraseOfRandomEntropy(words, randomByte), SAMPLE_DATES);
     const { settings, title } = options;
     // The cards of a backup, built as a save builds them (backupCardContent).
     this.#colors = backupCardContent(sampleBackup(result, colorForm), { settings, title });

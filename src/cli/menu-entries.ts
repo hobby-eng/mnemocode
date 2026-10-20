@@ -17,7 +17,7 @@ export const MENU_ENTRY_NAMES = {
   split: { digit: 4, label: "Split a seed phrase into standard Shamir shares" },
   restore: { digit: 5, label: "Restore a seed phrase from Shamir shares" },
   recover: { digit: 6, label: "Find a forgotten word, code, date digit or share code" },
-  preview: { digit: 7, label: "Print sample cards with a test seed phrase" },
+  preview: { digit: 7, label: "Print sample cards with a random sample phrase" },
   table: { digit: 8, label: "Look up a seed word, its number or its Unicode code" },
   // As the self-test is named in mhfe too, so that the tools read alike (owner, 2026-10-13).
   selfTest: { digit: 9, label: "Run the self-test" },

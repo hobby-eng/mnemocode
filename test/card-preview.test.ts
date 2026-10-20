@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { CardPreview } from "../src/export/card-preview.js";
+import { CardRenderer } from "../src/export/card-renderer.js";
 import { phraseOfRandomEntropy } from "../src/core/english-words.js";
 
 describe("Sample cards as a library (export/card-preview.ts)", () => {
@@ -16,16 +17,37 @@ describe("Sample cards as a library (export/card-preview.ts)", () => {
     expect(all.getPageCount()).toBe(CardPreview.templates.length);
   }, 120_000);
 
-  it("draws a sample phrase of its own for each preview, with the host's randomness", () => {
+  it("draws a sample phrase of its own for each preview with the host's randomInt, a byte at a time", () => {
     const colorsOf = (preview: CardPreview): unknown => {
       const template = CardPreview.templates.find((design) => design.kind === "colors")!;
       const content = preview.content(template);
       return content.kind === "colors" ? content.payload : undefined;
     };
-    const first = colorsOf(new CardPreview(nodeCardRenderer));
-    expect(first).toEqual(expect.any(String));
-    // Two phrases of 128 random bits alike would be a fault of the randomness, not chance.
-    expect(colorsOf(new CardPreview(nodeCardRenderer))).not.toBe(first);
+    // The phrases of entropy bytes all 0x7f ("legal winner thank year wave sausage worth useful
+    // legal winner thank yellow") and all 0x00 ("abandon … about"), masked with the four sample
+    // dates. The colours come from an independent Python oracle of docs/SEEDSHIFT_CONSTRUCTION.md,
+    // BIP39 with hashlib and the documented BIP39Colors layout, not from this code.
+    const answers = [
+      [0x7f, "#017EE4 #22833E #4016B7 #688BD1 #7D1C97 #9BCED8 #BA1FB9 #E446DA"],
+      [0x00, "#0310C4 #203250 #401A28 #5BDBA4 #7D2328 #98E4AD #BA2C8C #D68B50"],
+    ] as const;
+    let byte = 0;
+    const asked: number[] = [];
+    // One host for both previews, so that each preview must ask it for entropy of its own.
+    const renderer = new CardRenderer({
+      ...nodeRenderPlatform,
+      randomInt: (upperExclusive) => {
+        asked.push(upperExclusive);
+        return byte;
+      },
+    });
+    for (const [answer, colors] of answers) {
+      byte = answer;
+      asked.length = 0;
+      expect(colorsOf(new CardPreview(renderer))).toBe(colors);
+      // 16 bytes for 12 words, each drawn from the 256 values of a byte.
+      expect(asked).toEqual(Array<number>(16).fill(256));
+    }
   });
 
   it("makes a sample phrase from entropy drawn byte by byte", () => {
@@ -52,6 +74,20 @@ describe("Sample cards as a library (export/card-preview.ts)", () => {
     }
     expect(phraseOfRandomEntropy(24, () => 0).split(" ")).toHaveLength(24);
   });
+
+  it.each([256, -1, 0.5, Number.NaN])(
+    "refuses a host's random byte %s out of range for the sample phrase, as for every card choice",
+    (byte) => {
+      // Faulty for the 256 values of a byte alone, so that no other choice refuses it.
+      const drawing = new CardRenderer({
+        ...nodeRenderPlatform,
+        randomInt: (limit) => (limit === 256 ? byte : 0),
+      });
+      expect(() => new CardPreview(drawing)).toThrow(
+        expect.objectContaining({ code: "export.platform.checked-choice-refused" }),
+      );
+    },
+  );
 
   it("refuses a phrase length BIP39 does not have", () => {
     expect(() => new CardPreview(nodeCardRenderer, { words: 13 })).toThrow(/12, 15, 18, 21 or 24/u);

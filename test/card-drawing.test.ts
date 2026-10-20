@@ -42,8 +42,8 @@ import { SHARE_FORMATS, shareFormatHasCards } from "../src/sskr/transport.js";
 // card renderer, and each page must be read: a renderer that writes a PDF command outside the
 // accepted list fails here, not in a browser's image export. Bounded: each drawing path once, not
 // every combination (orientation swaps the width and height of the page, and A4 uses the same
-// renderers). Public test data only: the BIP39 test phrase of CardPreview and the public SSKR
-// vectors.
+// renderers). Synthetic and public test data only: the random sample phrase of CardPreview, masked
+// with public dates, and the public SSKR vectors.
 
 const vectors = JSON.parse(readFileSync("vectors/sskr-v1.json", "utf8")) as {
   readonly deterministic: readonly { readonly shares: readonly string[] }[];

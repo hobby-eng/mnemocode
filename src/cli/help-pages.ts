@@ -525,7 +525,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   preview: {
     summary: "Print card designs with a random sample phrase",
     about: [
-      "Draws a template exactly as encode does, with a public test phrase and test dates, never with a real secret. Use it to choose a design and check the details printed on it.",
+      "Draws a template exactly as encode does, with a sample phrase drawn at random for each run and masked with public dates, never with a secret you typed. Use it to choose a design and check the details printed on it.",
     ],
     usage: "(--list | --template <ID> | --all) [OPTIONS]",
     groups: [

@@ -115,11 +115,12 @@ function cardsMayFail(saving: ParsedArguments, settings: CardSettings): boolean 
 }
 
 /**
- * Draws in memory the colour cards that the options ask for, with the longest public sample phrase
- * in `format` and the card details of `saving` (CardPreview.assertColorsPrint), where the options
- * may keep them from being printed (cardsMayFail): a detail too long for its card is so refused
- * before a secret is asked, not after the result is shown. A render takes seconds, so it is not
- * made where nothing can fail. Nothing is written.
+ * Draws in memory the colour cards that the options ask for, with a sample phrase of the longest
+ * length, drawn at random as for every preview (CardPreview), in `format` and with the card
+ * details of `saving` (CardPreview.assertColorsPrint), where the options may keep them from being
+ * printed (cardsMayFail): a detail too long for its card is so refused before a secret is asked,
+ * not after the result is shown. A render takes seconds, so it is not made where nothing can fail.
+ * Nothing is written.
  */
 async function assertCardsPrintable(saving: ParsedArguments, format: EncodedFormat): Promise<void> {
   if (!EncodedForm.of(format).writtenInColors) return;

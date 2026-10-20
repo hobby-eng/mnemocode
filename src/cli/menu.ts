@@ -505,7 +505,7 @@ const MENU_ASKER: WalletValueAsker = {
   backLeaves: true,
 };
 
-/** Entry 7: card designs drawn with the public test phrase. */
+/** Entry 7: card designs drawn with a random sample phrase. */
 async function previewAction(): Promise<Action> {
   const design = await askDesign(true);
   if (design === undefined || design === CANCELLED) return design;

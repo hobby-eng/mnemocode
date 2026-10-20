@@ -321,7 +321,7 @@ const PARTS: Readonly<Record<string, Part>> = {
   "src/export/card-drawing.ts": { uses: [], packages: PDF_PACKAGES },
   // How saved share cards are kept, without PDF: what the shares restore and where each one is.
   "src/export/sskr-keeping-text.ts": { uses: ["src/core/masking.ts", "src/sskr/transport.ts"] },
-  // Sample cards drawn with the public test phrase.
+  // Sample cards drawn with a random sample phrase, masked with public dates.
   "src/export/card-preview.ts": {
     uses: CARD_RENDERER_PARTS,
     packages: PDF_PACKAGES,
