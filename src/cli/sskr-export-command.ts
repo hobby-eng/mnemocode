@@ -51,7 +51,6 @@ const ERRORS = new ErrorCatalog("cli.sskr-export-command", {
   "no-share-settled": () => NO_SHARE_SETTLED,
   "repair-each-refused": suppliedMessage,
   "few-export-refused": suppliedMessage,
-  "export-decision-refused": suppliedMessage,
   "run-sskr-export-refused": suppliedMessage,
 });
 
@@ -209,14 +208,13 @@ function showVariants(
 /**
  * After too few shares to restore the phrase that the wallet given is checked against: on the
  * private screen more shares, the export without the wallet check, or Stop, which cancels;
- * otherwise an error. Escape and the end of the input are Stop (askAfterFailure), so that the
- * check asked for is dropped only when the person chooses so.
+ * otherwise "few" with the wallet kept, which the export decision refuses (exportOnce). Escape and
+ * the end of the input are Stop (askAfterFailure), so that the check asked for is dropped only
+ * when the person chooses so.
  */
 async function fewForExport(r: Recovery): Promise<"again" | "few" | Cancelled> {
-  if (r.evidence === undefined) return "few";
-  const message = WALLET_CHECK_NEEDS_THRESHOLD;
-  if (!r.interactive) throw ERRORS.create("few-export-refused", [message]);
-  terminalNotice(message, "warning");
+  if (r.evidence === undefined || !r.interactive) return "few";
+  terminalNotice(WALLET_CHECK_NEEDS_THRESHOLD, "warning");
   const next = await askOrCancel(WHAT_NOW, [
     addMoreShares("more" as const),
     {
@@ -289,8 +287,9 @@ async function exportOnce(
   )
     return "changed";
   const decision = ShareRestore.exportDecision(restored, r.evidence !== undefined);
-  if (decision.kind === "trouble")
-    throw ERRORS.create("export-decision-refused", [decision.message]);
+  // The one trouble left here: fewer shares than the threshold with the wallet kept, off the
+  // private screen (fewForExport). Where no phrase fits, restorePhrases refused or asked again.
+  if (decision.kind === "trouble") throw ERRORS.create("few-export-refused", [decision.message]);
   if (decision.kind === "each") {
     // Without the wallet check complete shares are only written again (rewritesOnly), above.
     // Fewer shares than the threshold restore no phrase; each is then repaired on its own.

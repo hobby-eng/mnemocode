@@ -36,4 +36,19 @@ describe("a restore that no SSKR digest checks (AUD-037-API004)", () => {
     expect(restored.uncheckedNote()).toBeUndefined();
     expect(await restoreShareSet(shares.slice(0, 2))).not.toHaveProperty("digestUnchecked");
   });
+
+  it("counts copies of one share as one member, which completes no group", async () => {
+    const shares = await nodeSharePlatform.createShares(SECRET, 2, 3, SEED.slice());
+    using restored = await ShareSet.restore(shares.slice(0, 2), nodeSharePlatform);
+    const set = restored.toRepairedSet();
+    // A host's set of two members of a group whose threshold is 2: its digest checked the phrase.
+    using members = ShareSet.of(set);
+    expect(members.digestChecked).toBe(true);
+    // Two copies of the first share are one member: the group is not complete, and no digest
+    // checked the phrase.
+    const copy = defined(set.shares[0]);
+    using copies = ShareSet.of({ ...set, shares: [copy, copy] });
+    expect(copies.digestChecked).toBe(false);
+    expect(copies.uncheckedNote()).toMatch(/^No SSKR digest checked this phrase/u);
+  });
 });

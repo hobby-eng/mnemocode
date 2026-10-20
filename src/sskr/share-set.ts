@@ -17,7 +17,12 @@ import { wordCountOfEntropy, WORD_NUMBERS_SPAN } from "../core/bip39-sizes.js";
 import { fingerprintOfValidPhrase } from "../core/english-words.js";
 import type { EncodedFormat } from "../core/types.js";
 import { JointRepair, searchOnce } from "./joint-repair.js";
-import { type MarkedElement, type RepairedSet, type RepairedShares } from "./joint-results.js";
+import {
+  type JointAssessment,
+  type MarkedElement,
+  type RepairedSet,
+  type RepairedShares,
+} from "./joint-results.js";
 import type { ReadRepairableShare } from "./repair.js";
 import { NO_PHRASE_FITS } from "./repair-report.js";
 import {
@@ -52,11 +57,19 @@ import { SecretValue } from "../core/secret-value.js";
 import { ShareValues } from "./share-values.js";
 import { inWholeRange, wholeNumbersFrom } from "../core/typed-number.js";
 
+/** What combine says of more combinations than it tries (MAX_LIBRARY_TRIES). */
+const TOO_MANY_OPEN =
+  "Too many combinations are open: read more of the marked elements, or add a share.";
+
+// A plan that combine does not search is refused with one code for each condition
+// (combineRefusal), worded by JointRepair's reason where it gives one (AUD-037-API009).
 const ERRORS = new ErrorCatalog("sskr.share-set", {
   "share-set-at-least-one-share": () => "A share set has at least one share.",
-  "combine-refused": suppliedMessage,
-  "too-many-combinations-open": () =>
-    "Too many combinations are open: read more of the marked elements, or add a share.",
+  "more-shares-needed": suppliedMessage,
+  "share-unreadable": suppliedMessage,
+  "several-groups": suppliedMessage,
+  "shares-do-not-fit": suppliedMessage,
+  "too-many-combinations-open": (reason = TOO_MANY_OPEN) => reason,
   "no-phrase-fits": () => NO_PHRASE_FITS,
   "more-than-one-phrase-fits-shares-read-more": () =>
     "More than one phrase fits these shares: read more of the marked elements, or add a share.",
@@ -220,13 +233,11 @@ export class ShareSet extends Redacted implements Disposable {
     if (!records.some(isMarked)) return ShareSet.restore(records, platform, places);
     assertShareCount(records.length);
     const plan = await new JointRepair(platform).plan(records, { places });
-    const { assessment } = plan;
-    if (assessment.reason !== undefined || assessment.combinations > MAX_LIBRARY_TRIES) {
+    const refusal = combineRefusal(plan.assessment);
+    if (refusal !== undefined) {
       // A plan that is not searched is wiped here; searchOnce wipes the one that is.
       plan.wipe();
-      throw assessment.reason === undefined
-        ? ERRORS.create("too-many-combinations-open", [])
-        : ERRORS.create("combine-refused", [assessment.reason]);
+      throw refusal;
     }
     // Searched without a signal: nothing stops it.
     const { sets: found } = await searchOnce(plan);
@@ -454,19 +465,40 @@ function frozenSet(set: RepairedSet): RepairedSet {
 }
 
 /**
+ * The refusal of a plan of marked shares that combine does not search, one code for each condition
+ * (AUD-037-API009): too few shares; shares that do not fit, by the code of JointRepair's condition
+ * (NoFitKind): a share that no reading fits, shares of a set of several groups, or shares that are
+ * not of one set; or too much left open, whether more combinations than a combine tries
+ * (MAX_LIBRARY_TRIES) or more than JointRepair searches at all. Undefined for a plan that combine
+ * searches.
+ */
+function combineRefusal(assessment: JointAssessment): Error | undefined {
+  const { verdict, reason, noFit, combinations } = assessment;
+  // First: past a combine's own limit, a reason of JointRepair would name its larger limit.
+  if (combinations > MAX_LIBRARY_TRIES) return ERRORS.create("too-many-combinations-open", []);
+  if (reason === undefined) return undefined;
+  if (verdict === "not-enough") return ERRORS.create("more-shares-needed", [reason]);
+  // JointRepair gives every "no-fit" its condition: no English reason is read for it.
+  if (verdict === "no-fit") return ERRORS.create(defined(noFit), [reason]);
+  // "too-uncertain" before any combination is counted: too many forms, ways or member numbers. No
+  // assessment of combine is "stopped": it gives JointRepair no signal.
+  return ERRORS.create("too-many-combinations-open", [reason]);
+}
+
+/**
  * Whether an SSKR digest can check what the shares of `infos` restore: by their group threshold
- * and the member thresholds of the groups they complete (digestChecks).
+ * and the member thresholds of the groups they complete (SetTopology.complete, digestChecks). Each
+ * member counts once, by its first share: copies of one share are one member, which the topology
+ * of `infos` as given would count twice and call checked (AUD-037-API004).
  */
 function digestChecksShares(infos: readonly ShareInfo[]): boolean {
-  const members = new Map<number, Set<number>>();
+  const members = new Map<string, ShareInfo>();
   for (const info of infos)
-    members.set(info.groupIndex, (members.get(info.groupIndex) ?? new Set()).add(info.memberIndex));
-  const complete = infos.filter(
-    (info) => defined(members.get(info.groupIndex)).size >= info.memberThreshold,
-  );
+    if (!members.has(SetTopology.memberOf(info))) members.set(SetTopology.memberOf(info), info);
+  const topology = new SetTopology([...members.values()]);
   return digestChecks(
     defined(infos[0]).groupThreshold,
-    complete.map((info) => info.memberThreshold),
+    topology.complete.map((group) => topology.thresholdOf(group)),
   );
 }
 

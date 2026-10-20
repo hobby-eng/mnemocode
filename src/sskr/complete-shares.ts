@@ -15,13 +15,18 @@ import { Share } from "./transport.js";
 import { equalBytes } from "../core/bits.js";
 import { placeOf } from "../core/places.js";
 import { defined } from "../core/defined.js";
-import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
+import { ErrorCatalog } from "../core/error-catalog.js";
 
+// Shares that disagree with the reference take one code for each condition (AUD-037-API009): a
+// group, or a surplus member, named where a digest checked the reference; without a digest, the
+// disagreement alone, since nothing tells which share is wrong.
 const ERRORS = new ErrorCatalog("sskr.complete-shares", {
   "no-secret": () => NO_SECRET,
   "too-many-failing": () => TOO_MANY_FAILING,
   "recovered-sskr-secret-not-bip39-entropy": () => "Recovered SSKR secret is not BIP39 entropy.",
-  "operation-refused": suppliedMessage,
+  "group-does-not-fit": otherGroupMismatch,
+  "share-does-not-fit": misfitMessage,
+  "unchecked-disagreement": () => UNCHECKED_DISAGREEMENT,
 });
 
 /**
@@ -36,9 +41,17 @@ const NO_SECRET =
 const TOO_MANY_FAILING =
   "Too many combinations of these groups fail to restore a secret: leave out the groups you doubt, or check them.";
 
-/** Only a completed negative share-set result, not a host failure or exhausted search budget. */
+/**
+ * Only a completed negative share-set result, not a host failure or exhausted search budget: no
+ * secret, a group or a share that does not fit, or shares that disagree where no digest tells.
+ */
 export function isCompleteShareRefusal(error: unknown): boolean {
-  return ERRORS.matches(error, ["no-secret", "operation-refused"]);
+  return ERRORS.matches(error, [
+    "no-secret",
+    "group-does-not-fit",
+    "share-does-not-fit",
+    "unchecked-disagreement",
+  ]);
 }
 
 /** A restore whose shares hold a secret of a length that no BIP39 phrase has. */
@@ -76,16 +89,23 @@ function* choicesOf<T>(items: readonly T[], count: number, from = 0): Generator<
     for (const rest of choicesOf(items, count - 1, at + 1)) yield [defined(items[at]), ...rest];
 }
 
+/** Whether the digest of the groups checks any choice of `groupThreshold` groups: 2 or more. */
+function groupsCheckChoice(groupThreshold: number): boolean {
+  return groupThreshold >= MIN_DIGEST_THRESHOLD;
+}
+
+/** Whether a complete group of `memberThreshold` checks itself, by its own digest: 2 or more. */
+function groupChecksItself(memberThreshold: number): boolean {
+  return memberThreshold >= MIN_DIGEST_THRESHOLD;
+}
+
 /**
  * Whether an SSKR digest checks a secret restored under `groupThreshold` from complete groups of
  * `memberThresholds`: the digest of the groups checks any choice of a group threshold of 2 or more;
  * with 1, a group checks itself when its member threshold is 2 or more (AUD-037-API004).
  */
 export function digestChecks(groupThreshold: number, memberThresholds: readonly number[]): boolean {
-  return (
-    groupThreshold >= MIN_DIGEST_THRESHOLD ||
-    memberThresholds.some((threshold) => threshold >= MIN_DIGEST_THRESHOLD)
-  );
+  return groupsCheckChoice(groupThreshold) || memberThresholds.some(groupChecksItself);
 }
 
 /**
@@ -104,17 +124,15 @@ async function referenceOf(
   restore: (groups: readonly Group[]) => Promise<Uint8Array | undefined>,
   assertLive?: () => void,
 ): Promise<Reference> {
-  const checkable = complete.filter((group) => memberThreshold(group) >= MIN_DIGEST_THRESHOLD);
   if (!digestChecks(groupThreshold, complete.map(memberThreshold))) {
     const entropy = await restore(complete.slice(0, 1));
     assertEntropyLive(entropy, assertLive);
     if (entropy === undefined) throw ERRORS.create("no-secret", []);
     return { groups: complete.slice(0, 1), entropy, checked: false };
   }
-  const choices =
-    groupThreshold >= MIN_DIGEST_THRESHOLD
-      ? choicesOf(complete, groupThreshold)
-      : checkable.map((group) => [group]);
+  const choices = groupsCheckChoice(groupThreshold)
+    ? choicesOf(complete, groupThreshold)
+    : complete.filter((group) => groupChecksItself(memberThreshold(group))).map((group) => [group]);
   let tries = 0;
   for (const groups of choices) {
     if (tries === MAX_REFERENCE_TRIES) throw ERRORS.create("too-many-failing", []);
@@ -249,20 +267,18 @@ export async function restoreCompleteShares(
         }
       };
       // Without a digest, a disagreement shows only that some share is wrong, not which one.
-      const refuse = (message: string): never => {
-        throw ERRORS.create("operation-refused", [
-          reference.checked ? message : UNCHECKED_DISAGREEMENT,
-        ]);
-      };
+      const disagreement = (named: Error): Error =>
+        reference.checked ? named : ERRORS.create("unchecked-disagreement", []);
       for (const group of complete) {
         const first = firstMembers(group);
         const groupFits = used.includes(group) || (await agrees(group, first));
         assertLive?.();
-        if (!groupFits) refuse(otherGroupMismatch(first, places));
+        if (!groupFits) throw disagreement(ERRORS.create("group-does-not-fit", [first, places]));
         for (const member of group.slice(first.length)) {
           const memberFits = await agrees(group, surplusWindow(first, member));
           assertLive?.();
-          if (!memberFits) refuse(misfitMessage(placeOf(places, member + 1)));
+          if (!memberFits)
+            throw disagreement(ERRORS.create("share-does-not-fit", [placeOf(places, member + 1)]));
         }
       }
       return {

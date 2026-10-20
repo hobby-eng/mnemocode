@@ -54,6 +54,7 @@ import { placeOf } from "../core/places.js";
 import { defined } from "../core/defined.js";
 import {
   type JointAssessment,
+  type NoFitKind,
   type RepairedSet,
   type RepairSearch,
   type ShareAssessment,
@@ -92,6 +93,7 @@ export type {
   ElementHelp,
   JointAssessment,
   MarkedElement,
+  NoFitKind,
   RepairedSet,
   RepairedShares,
   RepairSearch,
@@ -280,11 +282,21 @@ function spacesFrom(
   }
 }
 
+/** The verdicts of an assessment that plans no search, each said with its reason. */
+type RefusedVerdict = Exclude<JointAssessment["verdict"], "determined" | "search">;
+
+/**
+ * Which condition a "no-fit" refusal is, and the share that no reading fits when that is the
+ * condition: the fields of the assessment that say it (JointAssessment.noFit, unfit).
+ */
+type NoFit = Pick<JointAssessment, "noFit" | "unfit">;
+
+/** The plan of an assessment that refuses with `verdict`, as `reason` says: nothing to search. */
 function refusal(
   shares: readonly ShareAssessment[],
-  verdict: JointAssessment["verdict"],
+  verdict: RefusedVerdict,
   reason: string,
-  unfit?: number,
+  noFit?: NoFit,
 ): JointPlan {
   return new OwnedJointPlan({
     shares,
@@ -296,7 +308,7 @@ function refusal(
     helps: [],
     verdict,
     reason,
-    ...(unfit === undefined ? {} : { unfit }),
+    ...noFit,
   });
 }
 
@@ -341,8 +353,8 @@ function unreadableShareMessage(name: number, marks: number, text: string): stri
 interface Solved extends SolvedWays {
   /** Some length of the secret is one that every share can be read in. */
   readonly sameLength: boolean;
-  /** Why the shares cannot be assessed at all, when they cannot. */
-  readonly refused?: { readonly verdict: JointAssessment["verdict"]; readonly reason: string };
+  /** Why the shares cannot be assessed at all: too many forms, ways or member numbers fit. */
+  readonly refused?: { readonly verdict: "too-uncertain"; readonly reason: string };
 }
 
 /**
@@ -549,12 +561,16 @@ async function assessReadings(
     forms: [...new Set(spaces.map((space) => space.reading.format))],
     openAlone: spaces.length === 0 ? 0 : Math.min(...spaces.map((space) => space.basis.length)),
   }));
-  const refuse = (
-    verdict: JointAssessment["verdict"],
-    reason: string,
-    unfit?: number,
-  ): Assessed => ({
-    plan: refusal(shares, verdict, reason, unfit),
+  const refuse = (verdict: Exclude<RefusedVerdict, "no-fit">, reason: string): Assessed => ({
+    plan: refusal(shares, verdict, reason),
+    kept: [],
+  });
+  /**
+   * Shares that do not fit, by the code of the condition, as `reason` says it, with the share
+   * `unfit` that no reading fits for "share-unreadable".
+   */
+  const misfit = (noFit: NoFitKind, reason: string, unfit?: number): Assessed => ({
+    plan: refusal(shares, "no-fit", reason, { noFit, ...(unfit === undefined ? {} : { unfit }) }),
     kept: [],
   });
   const plan = async (branches: readonly Branch[]): Promise<Assessed> => {
@@ -572,11 +588,11 @@ async function assessReadings(
       defined(shares[unfit]).marks,
       defined(texts[unfit]),
     );
-    return refuse("no-fit", message, unfit + 1);
+    return misfit("share-unreadable", message, unfit + 1);
   }
   if (spacesOf.some(severalGroups))
-    return refuse(
-      "no-fit",
+    return misfit(
+      "several-groups",
       "These shares belong to a set of several groups; only sets of one group are repaired.",
     );
   const solved = await solveReadings(spacesOf, turns, secrets);
@@ -593,13 +609,13 @@ async function assessReadings(
     return plan(tried);
   }
   if (!solved.sameLength)
-    return refuse("no-fit", "These shares are of different lengths: not of one set.");
+    return misfit("shares-do-not-fit", "These shares are of different lengths: not of one set.");
   if (solved.branches.length === 0) {
     // No reading fits: the common rows fail for shares of another set, or for a misread
     // identifier or threshold, and more shares would not help.
     if (!solved.needsMore)
-      return refuse(
-        "no-fit",
+      return misfit(
+        "shares-do-not-fit",
         "These shares do not fit together: check the marks, and that all belong to one set.",
       );
     return refuse(

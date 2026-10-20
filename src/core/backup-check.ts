@@ -43,6 +43,8 @@ import { SecretValue } from "./secret-value.js";
 // Keep the established host entry points while the two value owners live beside this module.
 export { KeptShares, RestoredShares };
 
+// shares-do-not-restore is one condition, a refusal of ShareSet.combine, whose own coded refusal is
+// its cause: the code of that cause tells which (ShareBackupCheck.restore, AUD-037-API009).
 const ERRORS = new ErrorCatalog("core.backup-check", {
   uncheckable: () => UNCHECKABLE,
   "share-check-whole-threshold-at-least": (value0: string) =>
@@ -643,7 +645,9 @@ export class ShareBackupCheck implements BackupCheck {
 
   /**
    * Whether `error`, thrown by restore, says why the shares typed cannot be restored, after which
-   * they are typed again; any other failure is a fault that passes through (AUD-037-API002).
+   * they are typed again; any other failure is a fault that passes through (AUD-037-API002). For
+   * core.backup-check.shares-do-not-restore, the refusal's `cause` tells the condition by its own
+   * code (restore).
    */
   static isRestoreRefusal(error: unknown): boolean {
     return ERRORS.matches(error, [
@@ -657,7 +661,14 @@ export class ShareBackupCheck implements BackupCheck {
   /**
    * Restores the shares kept (ShareSet.combine); throws why they cannot be, after which they are
    * all typed again (isRestoreRefusal), or a fault of the host, which passes through. The set names
-   * each share by its place among those typed.
+   * each share by its place among those typed. Its refusals, all core.backup-check: too-few-shares,
+   * fewer shares than the threshold; too-few-after-copies, as few once copies are left out;
+   * shares-not-restorable-together, what sskr-combine says of the complete shares before it tries
+   * (ShareInput.completeSetProblem): shares of different sets, a member given twice, a group given
+   * different thresholds, or, where no marked share may complete them, too few for the quorum that
+   * they record, each in its own words; and shares-do-not-restore, a refusal of ShareSet.combine
+   * (ShareSet.isRefusal) in its own words, which is kept as the error's `cause`, whose code tells
+   * its condition, such as sskr.complete-shares.no-secret or sskr.share-set.several-groups.
    */
   async restore(kept: KeptShares): Promise<RestoredShares> {
     this.#secrets.assertLive();
@@ -667,7 +678,8 @@ export class ShareBackupCheck implements BackupCheck {
       throw kept.notes.length === 0
         ? ERRORS.create("too-few-shares", [tooFewShares(count, this.threshold)])
         : ERRORS.create("too-few-after-copies", [`${count}`, `${this.threshold}`]);
-    // Shares of another set, or a repeated member, are named as sskr-combine names them.
+    // Shares that do not belong together, or are too few for their set, are named as sskr-combine
+    // names them.
     const problem = kept.setProblem;
     if (problem !== undefined) throw ERRORS.create("shares-not-restorable-together", [problem]);
     let set: ShareSet;

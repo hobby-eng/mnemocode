@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { planJointRepair, searchOnce } from "../src/sskr/joint-repair.js";
+import { sskrLongVector, sskrSetVector, sskrVector } from "../src/sskr/known-answers.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
@@ -246,6 +247,37 @@ describe("Joint repair of the shares of one set", () => {
     });
     expect(plan.assessment.verdict).toBe("no-fit");
     expect(plan.assessment.reason).toMatch(/one set/u);
+    expect(plan.assessment.noFit).toBe("shares-do-not-fit");
+  });
+
+  it("names each condition of shares that do not fit by a code of its own", async () => {
+    const assessed = async (typed: readonly string[]) =>
+      (await planJointRepair(typed, { platform: nodeSharePlatform })).assessment;
+    const [first, second] = sskrSetVector.shares;
+    // A share that no reading fits, by its place.
+    expect(await assessed(["not a share at all", markUnits(second, "colors", [5])])).toMatchObject({
+      verdict: "no-fit",
+      noFit: "share-unreadable",
+      unfit: 1,
+    });
+    // Shares of the official vector, a set of several groups.
+    const [grouped, otherGrouped] = sskrVector.shares;
+    const several = await assessed([markUnits(grouped, "colors", [5]), otherGrouped]);
+    expect(several).toMatchObject({ verdict: "no-fit", noFit: "several-groups" });
+    expect(several.reason).toMatch(/several groups/u);
+    // A share of a phrase of 24 words beside one of 12: not of one set.
+    const lengths = await assessed([markUnits(first, "colors", [5]), sskrLongVector.shares[1]]);
+    expect(lengths).toMatchObject({ verdict: "no-fit", noFit: "shares-do-not-fit" });
+    expect(lengths.reason).toMatch(/different lengths/u);
+    // Only a share that no reading fits is named.
+    for (const assessment of [several, lengths]) expect(assessment).not.toHaveProperty("unfit");
+    // The other verdicts are no "no-fit": they give no such code.
+    const few = await assessed([markUnits(first, "colors", [5])]);
+    expect(few.verdict).toBe("not-enough");
+    expect(few).not.toHaveProperty("noFit");
+    const found = await assessed([markUnits(first, "colors", [5]), second]);
+    expect(found.verdict).toBe("determined");
+    expect(found).not.toHaveProperty("noFit");
   });
 
   it("counts the search over all ways to read the shares against its limit", async () => {

@@ -28,6 +28,15 @@ export interface ElementHelp extends MarkedElement {
   readonly openBits: number;
 }
 
+/**
+ * Which condition refuses shares that do not fit (verdict "no-fit"), one code for each, by which a
+ * host words it without reading `reason` (AUD-037-API009): "share-unreadable", a share that no
+ * reading fits (JointAssessment.unfit); "several-groups", shares of a set of several groups, which
+ * a joint repair does not take; "shares-do-not-fit", shares that are not of one set as read, of
+ * different lengths or not fitting together.
+ */
+export type NoFitKind = "share-unreadable" | "several-groups" | "shares-do-not-fit";
+
 /** What the shares are together, before any search. */
 export interface JointAssessment {
   /** Each share on its own, in the order the shares were given. */
@@ -50,6 +59,8 @@ export interface JointAssessment {
   readonly helps: readonly ElementHelp[];
   /** The share, counted from 1, that no reading fits: the one that a "no-fit" refusal names. */
   readonly unfit?: number;
+  /** Which condition a "no-fit" refusal is (NoFitKind); present with that verdict only. */
+  readonly noFit?: NoFitKind;
   /**
    * "determined": no bit is open, and the search checks one candidate per way to read the shares;
    * "search": the digest decides among `combinations`; "stopped": the host stopped the assessment,
