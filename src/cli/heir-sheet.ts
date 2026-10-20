@@ -44,7 +44,7 @@ const ERRORS = new ErrorCatalog("cli.heir-sheet", {
   "heir-sheet-size-heir-sheet": () => "--heir-sheet-size needs --heir-sheet.",
 });
 
-export type { HeirBackup, HeirSheetFacts } from "../export/heir-sheet-text.js";
+export type { HeirSheetFacts } from "../export/heir-sheet-text.js";
 
 /**
  * The menu entries, questions and answers that the steps name, the entries as menu-entries.ts

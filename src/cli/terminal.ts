@@ -9,7 +9,6 @@ import {
   failureLine,
   hintLines as styledHintLines,
   markedLines as styledMarkedLines,
-  NOTICE_TEXT_WIDTH,
   noticeLines as styledNoticeLines,
   type NoticeKind,
   paint,
@@ -23,7 +22,6 @@ import {
 } from "./terminal-style.js";
 import { rgbBytes } from "../export/color-math.js";
 import { MILLISECONDS_PER_SECOND } from "../core/search-turns.js";
-import { capitalized } from "../core/prose.js";
 import { compactCode } from "../core/code-text.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import type { EncodedFormat } from "../core/types.js";
@@ -33,7 +31,7 @@ import { PrivateSteps } from "./private-steps.js";
 export { STYLE, printableText };
 
 // The running text and its width are terminal-style's, which a maintainer script takes too.
-export { TEXT_WIDTH, NOTICE_TEXT_WIDTH, wrapText, type NoticeKind };
+export { TEXT_WIDTH, wrapText, type NoticeKind };
 
 /**
  * Clears the screen and moves to its top left (VT100 "erase in display" and "home"). Written raw,
@@ -178,10 +176,6 @@ const WORDS_PER_ROW = 4;
 const LONGEST_WORD = 8;
 /** Spaces between two words of a row. */
 const WORD_GAP = 3;
-
-// The rule is the library's (core/prose.ts); here too for the front ends that take it with the
-// rest.
-export { capitalized };
 
 /**
  * The label of one part of a result, after a blank line: bold for the part that matters most, grey

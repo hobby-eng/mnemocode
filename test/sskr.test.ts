@@ -8,7 +8,7 @@ import {
   shareToColors,
   validateShareSet,
 } from "../src/sskr/transport.js";
-import { sskrVector } from "../src/sskr/self-test.js";
+import { sskrVector } from "../src/sskr/known-answers.js";
 import { encodeMnemonic, decodeInput, parseDate } from "../src/core.js";
 
 describe("Standalone SSKR", () => {

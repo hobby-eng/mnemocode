@@ -1,6 +1,6 @@
 // The tokens of TypeScript and JavaScript source, read with a small tokenizer of its own, so that
-// the checks that read code need no package: the copy check (verify-no-copies.mjs) and the code
-// rules (verify-code-rules.mjs). Not a full parser of TypeScript, but the same code always gives
+// the checks that read code need no package: the copy check (verify-no-copies.mjs), the code
+// rules (verify-code-rules.mjs) and the check of dead exports (verify-dead-exports.mjs). Not a full parser of TypeScript, but the same code always gives
 // the same tokens, and strings, templates, regular expressions and comments are told apart from
 // code. afterGroup finds a closing bracket in these tokens and in any others with a `key`, such as
 // the Rust tokens of lines-of-code.mjs.

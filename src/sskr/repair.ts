@@ -36,7 +36,7 @@ import type { ReadRepairableShare } from "./repair-types.js";
 /** Owned reading APIs, kept available through the original repair entry point. */
 export { MarkedReading, ReadingSpace, everyPick } from "./repair-owners.js";
 /** Repair result shapes shared through a leaf module without an owner import cycle. */
-export type { FilledElement, ReadRepairableShare } from "./repair-types.js";
+export type { ReadRepairableShare } from "./repair-types.js";
 
 const ERRORS = new ErrorCatalog("sskr.repair", {
   "each-at-place": (value0: string) => `${value0}, each at its place.`,

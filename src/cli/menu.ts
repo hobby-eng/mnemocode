@@ -65,7 +65,7 @@ import { REPAIR_ANCHOR } from "../sskr/repair-report.js";
 import { walletNeeded } from "../core/date-search.js";
 import { walletExplanation } from "./date-search.js";
 import { WordList, type WordHints } from "../core/word-hints.js";
-import { commandDisplay, typedCommand } from "./shell-command.js";
+import { commandDisplay } from "./shell-command.js";
 import { runCommand } from "./menu-runner.js";
 import { walletEvidenceArguments } from "./bitcoin-options.js";
 import { headingLine } from "./terminal-style.js";
@@ -658,10 +658,6 @@ export const MENU_ENTRIES: readonly Entry[] = [
 ];
 
 const paint = (code: string, text: string): string => terminalPaint("stderr", code, text);
-
-// The command lines as typed are shown by shell-command.ts; here too for the tests that take them
-// with the menu.
-export { commandDisplay, typedCommand };
 
 /**
  * Why no command may ask for a secret here, or undefined: this process could not switch off core

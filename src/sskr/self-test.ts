@@ -4,9 +4,6 @@
 import { checkSskrKnownAnswers } from "./known-answers.js";
 import { nodeSharePlatform } from "./share-platform-node.js";
 
-// The vector stays reachable here for the callers that took it from this module.
-export { sskrVector } from "./known-answers.js";
-
 let passed = false;
 /**
  * Runs the known answers of the share engine once a process (checkSskrKnownAnswers); refuses where

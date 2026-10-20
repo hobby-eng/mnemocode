@@ -22,6 +22,10 @@ const ERRORS = new ErrorCatalog("core.address-scan", {
   "unable-derive-public-key": () => "Unable to derive the public key.",
 });
 
+/**
+ * The last index that is not hardened, the bound of every place of an address (bip32-limits.ts).
+ * For other hosts: a page's fields of the place take it here, with the scan's other limits.
+ */
 export { LAST_NORMAL_INDEX };
 
 /**

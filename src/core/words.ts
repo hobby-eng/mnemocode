@@ -1,6 +1,5 @@
 import { entropyToMnemonic } from "@scure/bip39";
 import { completeHexUnits, fitsPattern, UNICODE_CODE_DIGITS } from "./code-text.js";
-import { wordlist as traditionalChineseWordlist } from "@scure/bip39/wordlists/traditional-chinese.js";
 import {
   BIP39_DICTIONARY_SIZE,
   BIP39_INDEX_BITS,
@@ -21,7 +20,6 @@ import {
   phraseOfIndexes,
   wordsOfIndexes,
   indexesOfWords,
-  fingerprintOfValidPhrase,
 } from "./english-words.js";
 import { bitsOf, bitsOfIndexes, bitsToBytes, lastWordChecksumBits } from "./bits.js";
 import type { MappingRow, MissingWordCandidate } from "./types.js";
@@ -55,16 +53,9 @@ const ERRORS = new ErrorCatalog("core.words", {
     "This mode needs the exact old final word: ? stands for no word here.",
 });
 
-export { englishWordlist, traditionalChineseWordlist };
-// The English words alone belong to english-words.ts; here too for the modules that take both.
-export {
-  englishTokens,
-  ENGLISH_INDEX,
-  fingerprintOfValidPhrase,
-  phraseChecksumValid,
-  phraseOfIndexes,
-  wordsOfIndexes,
-};
+// The English words belong to english-words.ts; here too for the modules that take them with the
+// rest of this module.
+export { englishTokens, englishWordlist, ENGLISH_INDEX, phraseOfIndexes, wordsOfIndexes };
 
 // The sizes of a phrase belong to bip39-sizes.ts, which loads no word list; here too for the
 // modules that already take the words.

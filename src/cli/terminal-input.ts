@@ -114,9 +114,6 @@ export function terminalsAttached(): boolean {
   return isatty(0) && isatty(2);
 }
 
-// The rule is terminal-style's, which colour asks too; here for the modules that take it here.
-export { dumbTerminal };
-
 /** Whether terminals are attached that say they cannot clear the screen (TERM=dumb). */
 export function terminalTooDumb(): boolean {
   return terminalsAttached() && dumbTerminal();

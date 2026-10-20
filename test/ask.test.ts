@@ -42,7 +42,7 @@ import {
   droppedPath,
 } from "../src/cli/ask.js";
 import { assertWalletPlaceUsed, walletPlaceOf } from "../src/cli/bitcoin-options.js";
-import { LAST_NORMAL_INDEX } from "../src/core/address-scan.js";
+import { LAST_NORMAL_INDEX } from "../src/core/bip32-limits.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";

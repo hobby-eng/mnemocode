@@ -4,8 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeMnemonic, encodeMnemonicLegacy, parseDate } from "../src/core.js";
-import { HARD_MAX_COMBINATIONS, reportDateMatches, searchDates } from "../src/cli/date-search.js";
-import { DatesAnswer, DateSearch, type DateSearchResult } from "../src/core/date-search.js";
+import { reportDateMatches, searchDates } from "../src/cli/date-search.js";
+import {
+  DatesAnswer,
+  DateSearch,
+  HARD_MAX_COMBINATIONS,
+  type DateSearchResult,
+} from "../src/core/date-search.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 

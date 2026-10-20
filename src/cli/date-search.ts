@@ -74,13 +74,8 @@ import { numberWord } from "../core/prose.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { fromFile } from "./backup-questions.js";
 
-// The core's limits, rule and types, under the names that the commands and their tests use.
-export {
-  HARD_MAX_COMBINATIONS,
-  MAX_INCOMPLETE_DATES,
-  walletNeeded,
-  walletReason,
-} from "../core/date-search.js";
+// The core's reason why a date search needs a wallet, which decode-command.ts says as well.
+export { walletReason } from "../core/date-search.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 
@@ -98,8 +93,6 @@ export function walletExplanation(
 ): Explanation {
   return { lines: [walletReason(mode), ...extraLines], more: [readmeLink("date-recovery-helper")] };
 }
-
-export type { DateMatch, DateSearchResult, DatesRules } from "../core/date-search.js";
 
 /**
  * --max-candidates: how many combinations a search may try without asking, the dates times the

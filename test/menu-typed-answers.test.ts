@@ -7,7 +7,7 @@ import { truncate, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { SHARE_SEEDSHIFT_QUESTION } from "../src/cli/seedshift-choices.js";
-import { commandDisplay, typedCommand } from "../src/cli/menu.js";
+import { commandDisplay, typedCommand } from "../src/cli/shell-command.js";
 import { MENU_ENTRY_NAMES as ENTRY } from "../src/cli/menu-entries.js";
 import {
   answeredByScript,

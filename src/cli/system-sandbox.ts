@@ -15,13 +15,7 @@ import { MacSandbox } from "./sandbox-macos.js";
 import type { CoreDumps, SystemAccess, SystemSandbox } from "./sandbox-record.js";
 import { WindowsSandbox } from "./sandbox-windows.js";
 
-export type {
-  CoreDumps,
-  NodeFfi,
-  SandboxNeeds,
-  SystemAccess,
-  SystemSandbox,
-} from "./sandbox-record.js";
+export type { SandboxNeeds, SystemAccess, SystemSandbox } from "./sandbox-record.js";
 
 /** Where MnemoCode knows no sandbox: nothing is enforced beyond the permission model. */
 class NoSandbox implements SystemSandbox {

@@ -8,8 +8,8 @@ import { type RepairedSet } from "./joint-results.js";
 import { ShareSet } from "./share-set.js";
 // The Node.js platform and randomness that the functions below pass to the share modules.
 import { nodeFillRandom, nodeSharePlatform } from "./share-platform-node.js";
-import { type BackupSplit, type BackupSplitRequest, MAX_SHARES, ShareSplit } from "./split.js";
-import { assertShareCount, normalizeShare } from "./transport.js";
+import { type BackupSplit, type BackupSplitRequest, ShareSplit } from "./split.js";
+import { assertShareCount } from "./transport.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("sskr.shares", {
@@ -18,8 +18,6 @@ const ERRORS = new ErrorCatalog("sskr.shares", {
   "no-digest-checked-phrase": () =>
     "No SSKR digest checks the phrase of these shares: each group that restores it takes one share. Use combineSskrShareSet, whose result says so, or restore on the command line.",
 });
-
-export { MAX_SHARES };
 
 /**
  * Refuses a threshold and a count of shares that SSKR does not take together
@@ -90,5 +88,3 @@ export async function combineSskrShares(records: readonly string[]): Promise<str
     throw ERRORS.create("some-shares-repaired-elements-could-not-checked-use", []);
   return restored.mnemonic;
 }
-
-export { normalizeShare };

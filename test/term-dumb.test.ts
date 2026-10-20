@@ -10,8 +10,8 @@ vi.mock("node:tty", async (original) => ({
 }));
 
 const { askSecretUntil } = await import("../src/cli/ask.js");
-const { dumbTerminal, terminalAvailable, terminalsAttached } =
-  await import("../src/cli/terminal-input.js");
+const { dumbTerminal } = await import("../src/cli/terminal-style.js");
+const { terminalAvailable, terminalsAttached } = await import("../src/cli/terminal-input.js");
 
 describe("a terminal that says TERM=dumb (AUD-010-UI003)", () => {
   afterEach(() => vi.unstubAllEnvs());

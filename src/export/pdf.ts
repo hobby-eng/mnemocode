@@ -3,7 +3,7 @@ import { publishNewPrivateFile } from "./private-file.js";
 import { wipedAfterAsync } from "../core/bits.js";
 import { renderCards, type CardJob } from "./render.js";
 
-export { renderCards, type CardJob } from "./render.js";
+export { renderCards } from "./render.js";
 
 /**
  * Renders `jobs` as one PDF and publishes it as a new private file at `path`, never over anything

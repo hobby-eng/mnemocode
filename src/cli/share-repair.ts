@@ -84,8 +84,6 @@ const SOURCE_ERRORS = new ErrorCatalog("cli.sskr-restore-command", {
 /** The restore of shares with Node's SSKR library: it keeps nothing of a restore. */
 const SHARE_RESTORE = new ShareRestore(nodeSharePlatform);
 
-export type { DateWork, ShareTrouble, TypedShare };
-
 /** How shares are typed in one answer, which every question for shares says. */
 const SHARE_SEPARATOR_HINT = `separate shares with ${SHARE_SEPARATOR}`;
 /** How shares are typed in one answer, with the marks of what cannot be read. */
