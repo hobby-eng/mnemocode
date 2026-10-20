@@ -14,6 +14,7 @@ import {
   type RestoredPhrase,
   type RestoredPhrases,
   type SearchLimits,
+  matchWarnings,
 } from "../sskr/share-restore.js";
 import { clearPrivateScreen } from "./private-screen.js";
 import {
@@ -626,7 +627,7 @@ export async function runSskrCombine(
       reported.add(phrase.set);
       shown += 1;
     }
-    if (r.evidence !== undefined) reportWalletWarnings(phrases.slice(0, shown));
+    reportWalletWarnings(phrases.slice(0, shown));
     return await target?.savePhrases(restored.listed, r.passphrase);
   } finally {
     r.dates?.wipe();
@@ -697,12 +698,13 @@ function numberedOf(place: RestoredPlace): string {
 }
 
 /**
- * What the wallet check said of the matches of the phrases `shown`, such as that a fingerprint is
- * only a filter (AUD-037-SEC004): each warning once, after the phrases, however many it matched.
+ * What the wallet check said of the matches of `phrases`, such as that a fingerprint is only a
+ * filter (AUD-037-SEC004): each warning once, however many phrases it matched, said after them:
+ * after the phrases shown (sskr-combine), or after the shares that the wallet chose or every set
+ * that it matched alike (sskr-export). Nothing without a wallet, whose check says nothing.
  */
-function reportWalletWarnings(shown: readonly RestoredPhrase[]): void {
-  const warnings = new Set(shown.map(({ warning }) => warning));
-  for (const warning of warnings) if (warning !== undefined) terminalNotice(warning, "warning");
+export function reportWalletWarnings(phrases: readonly RestoredPhrase[]): void {
+  for (const warning of matchWarnings(phrases)) terminalNotice(warning, "warning");
 }
 
 /** "matches the address at m/84'/0'/0'/0/3", for the wallet fact. */

@@ -121,7 +121,7 @@ describe("shares on the private screen", () => {
       // "It cannot" at the wallet that would tell the right set.
       terminal.choices = ["none"];
       await runSskrExport({ "ask-secrets": true, format: "ur" });
-      expect(seen.notices).toContain(variantsMessage(2));
+      expect(seen.notices).toContain(variantsMessage(2, false));
       expect(seen.out).toContain(
         `Variant 1 of 2, original fingerprint ${masterFingerprint(PHRASE)}:`,
       );

@@ -37,6 +37,7 @@ import {
 import {
   type Recovery,
   recoverySettings,
+  reportWalletWarnings,
   restorePhrases,
   typedShares,
 } from "./sskr-restore-command.js";
@@ -171,18 +172,20 @@ async function repairEach(
 
 /**
  * Shows every set that fits, `sets` of `phrases`, with the fingerprint of the phrase it holds,
- * its shares named by `places`; none is saved.
+ * its shares named by `places`; none is saved. `walletGiven` says that each matched the wallet
+ * given, which then cannot tell them apart.
  */
 function showVariants(
   phrases: readonly RestoredPhrase[],
   sets: readonly RepairedSet[],
   places: readonly number[],
   given: ShareFormat | undefined,
+  walletGiven: boolean,
 ): void {
   // Each with the wallet's own fingerprint, of the phrase after the dates (ShareRestore.variants),
   // in the order of their sets, which say what a repair filled in.
   const variants = ShareRestore.variants(phrases, places, given, masterFingerprint);
-  terminalNotice(variantsMessage(variants.length), "warning");
+  terminalNotice(variantsMessage(variants.length, walletGiven), "warning");
   terminalHint(
     `Each fingerprint is that of the phrase the shares hold, with an empty passphrase. ${FINGERPRINT_DISCLOSURE}`,
   );
@@ -298,15 +301,12 @@ async function exportOnce(
   }
   const { sets, places, phrases } = decision.found;
   if (decision.kind === "variants") {
-    showVariants(phrases, sets, places, given);
+    showVariants(phrases, sets, places, given, r.evidence !== undefined);
+    reportWalletWarnings(phrases);
     return undefined;
   }
   const exported = settled(await exportSet(r, decision.set, places, given, checked, args));
-  // The wallet chose the set that was written: what its check said of the match, such as that a
-  // fingerprint is only a filter, is said once, after it (AUD-037-SEC004).
-  if (exported === undefined)
-    for (const warning of new Set(phrases.map((phrase) => phrase.warning)))
-      if (warning !== undefined) terminalNotice(warning, "warning");
+  if (exported === undefined) reportWalletWarnings(phrases);
   return exported;
 }
 

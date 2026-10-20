@@ -62,9 +62,15 @@ export function severalSetsNote(sets: number): string {
   return `${sets} sets of shares fit; the wallet tells yours.`;
 }
 
-/** Why several sets of repaired shares are shown, none written: their fingerprints tell. */
-export function variantsMessage(sets: number): string {
-  return `${sets} sets of shares fit. The original fingerprint of each, the wallet's own, tells the right one; give it, or an address, to have that set written.`;
+/**
+ * Why `sets` sets of repaired shares are shown, none written: without a wallet, their fingerprints
+ * tell; with one that `walletGiven` says each matched, such as a fingerprint that is only 32 bits,
+ * an address of it tells.
+ */
+export function variantsMessage(sets: number, walletGiven: boolean): string {
+  return walletGiven
+    ? `${sets} sets of shares fit, and the wallet given matches each of them. An address of the wallet tells the right one; give it instead to have that set written.`
+    : `${sets} sets of shares fit. The original fingerprint of each, the wallet's own, tells the right one; give it, or an address, to have that set written.`;
 }
 
 /**
@@ -367,23 +373,48 @@ export interface ShareRepairRequest extends Omit<ShareRestoreRequest, "keep"> {
   readonly fingerprintOf: (mnemonic: string) => string;
 }
 
-/** What a repair of marked shares ends with: stopped, or the shares found, or why none was. */
+/**
+ * What a repair of marked shares ends with: stopped, or the shares found, or why none was. Where
+ * the wallet chose the shares, or matched every set shown, the outcome says what its check said of
+ * the match (`warning`), as sskr-export does after them (AUD-037-SEC004).
+ */
 export type ShareRepairOutcome =
   | ShareStop
   | {
+      /** Tells the shares written again from the other outcomes of a repair. */
       readonly kind: "shares";
+      /** The shares written again, by their places, copies given once. */
       readonly shares: readonly RepairedShare[];
       /** The one form every share is written in; undefined when they keep different forms. */
       readonly form: ShareFormat | undefined;
+      /** What the repair filled in, share by share. */
       readonly repairs: readonly ShareRepairs[];
+      /** The lines of the report, said before the shares. */
       readonly lines: readonly ReportLine[];
+      /** The notes said with the shares, such as of shares left out or of copies. */
       readonly notes: readonly string[];
+      /**
+       * What the wallet check said of the match that chose these shares, such as that a master
+       * fingerprint is only a filter: its warnings (matchWarnings), joined by a space; absent
+       * without a wallet, or where it said nothing.
+       */
+      readonly warning?: string | undefined;
     }
   | {
+      /** Tells the sets shown, none written, from the other outcomes of a repair. */
       readonly kind: "variants";
+      /** Why the sets are shown and none is written (variantsMessage), for the person. */
       readonly message: string;
+      /** Every set that fits, each with its fingerprint. */
       readonly variants: readonly ShareVariant[];
+      /** The lines of the report, said before the sets. */
       readonly lines: readonly ReportLine[];
+      /**
+       * What the wallet check said of its match with every set shown, such as that a master
+       * fingerprint is only a filter: its warnings (matchWarnings), joined by a space; absent
+       * without a wallet, or where it said nothing.
+       */
+      readonly warning?: string | undefined;
     };
 
 /** The sets of `phrases`, each once, in their order. */
@@ -399,6 +430,16 @@ function repairedShare(
 ): RepairedShare {
   const format = form ?? share.format;
   return { number, text: writeShare(share.ur, format), format, record: share.ur };
+}
+
+/**
+ * What the wallet check said of the matches of `phrases` (UnmaskedPhrase.warning), such as that a
+ * master fingerprint is only a filter (AUD-037-SEC004): each warning once, however many phrases it
+ * matched, in their order; empty where it said nothing, as without a wallet. A repair's outcome
+ * carries them (`warning`), and the command line says each after the phrases or shares.
+ */
+export function matchWarnings(phrases: readonly UnmaskedPhrase[]): string[] {
+  return [...new Set(phrases.flatMap((phrase) => phrase.warning ?? []))];
 }
 
 /** A note as a line of the report. */
@@ -648,14 +689,26 @@ export class ShareRestore {
     if (decision.kind === "each")
       return ShareRestore.#repairEach(input, form, decision.few.message);
     const { found } = decision;
+    // The wallet chose the set written, or matched every set shown: what its check said of the
+    // match is said with them (AUD-037-SEC004).
+    const warnings = matchWarnings(found.phrases);
+    const warning = warnings.length === 0 ? {} : { warning: warnings.join(" ") };
     if (decision.kind === "variants")
       return {
         kind: "variants",
-        message: variantsMessage(found.sets.length),
+        message: variantsMessage(found.sets.length, walletGiven),
         variants: ShareRestore.variants(found.phrases, found.places, form, request.fingerprintOf),
         lines: found.lines,
+        ...warning,
       };
-    return ShareRestore.#exportOutcome(decision.set, found.places, form, found.lines, found.notes);
+    const exported = ShareRestore.#exportOutcome(
+      decision.set,
+      found.places,
+      form,
+      found.lines,
+      found.notes,
+    );
+    return exported.kind === "shares" ? { ...exported, ...warning } : exported;
   }
 
   /**
