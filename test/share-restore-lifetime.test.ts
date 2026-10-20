@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
+import { DatesAnswer } from "../src/core/date-search.js";
 import { sskrSetVector } from "../src/sskr/known-answers.js";
 import { ShareInput } from "../src/sskr/share-input.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
@@ -48,7 +49,34 @@ describe("a restore whose input ends while a host step is awaited", () => {
     await expect(restoring).rejects.toMatchObject(WIPED);
   });
 
-  it("writes no repaired shares after the search", async () => {
+  it("publishes no Seedshift phrase after the wallet check of its date search", async () => {
+    const input = inputOf(false);
+    const restoring = new ShareRestore(nodeSharePlatform).restore({
+      input,
+      mode: "seedshift",
+      confirmed: true,
+      dates: DatesAnswer.parse("23-09-202?", { patterns: true }),
+      walletCheck: async () => {
+        input.wipe();
+        return { matched: false };
+      },
+    });
+    await expect(restoring).rejects.toMatchObject(WIPED);
+  });
+
+  it("writes no repaired shares after their search", async () => {
+    const input = inputOf(true);
+    const repairing = new ShareRestore(nodeSharePlatform).repair({
+      input,
+      mode: "direct",
+      confirmed: true,
+      fingerprintOf: masterFingerprint,
+      onProgress: () => input.wipe(),
+    });
+    await expect(repairing).rejects.toMatchObject(WIPED);
+  });
+
+  it("writes no repaired shares after the wallet check", async () => {
     const input = inputOf(true);
     const repairing = new ShareRestore(nodeSharePlatform).repair({
       input,

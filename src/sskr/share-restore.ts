@@ -478,7 +478,9 @@ export class ShareRestore {
    * as a set, marked ones repaired together, then unmasked with the dates, searched where a date
    * holds ?, and compared with the wallet if one is given. A long search waits for the person's
    * yes; several sets that fit are all given, with a note that the wallet tells them apart.
-   * Refused with core.secret-value.wiped when the input ends while a host step is awaited.
+   * Refused with core.secret-value.wiped when the input ends while a host step is awaited, also
+   * where the host stopped the run as well: once the input has ended, nothing is told, not even
+   * that the run stopped.
    */
   async restore(request: ShareRestoreRequest): Promise<ShareRestoreOutcome> {
     const { dates, walletCheck } = request;
