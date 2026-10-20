@@ -69,6 +69,7 @@ import { hexOfBytes } from "./bits.js";
 import { Masking, decodeInput } from "./masking.js";
 import { isFingerprintText, type PhraseFingerprint } from "./wallet-check.js";
 import { ErrorCatalog } from "./error-catalog.js";
+import { MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC } from "./self-test-vectors.js";
 
 const ERRORS = new ErrorCatalog("core.self-test", {
   "checksum-valid-seedshift-produced-invalid-bip39-checksum": () =>
@@ -97,11 +98,7 @@ const ERRORS = new ErrorCatalog("core.self-test", {
 
 export type { SelfTestCheck, SelfTestFeature };
 
-const PUBLIC_MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-const CHECKSUM_VALID_DATE = [parseDate("23-09-2026")];
-const CHECKSUM_VALID_ENGLISH =
-  "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
+const CHECKSUM_VALID_DATE = [parseDate(MASKED_DATE)];
 const LEGACY_SOURCE =
   "oppose duck hello neglect reveal key humor mosquito road evoke flock hedgehog";
 const LEGACY_DATES = ["10-07-1963", "27-04-1956", "31-01-1994"].map(parseDate);
@@ -191,15 +188,11 @@ function runCoreChecks(): void {
   );
 
   const shifted = encodeMnemonic(PUBLIC_MNEMONIC, CHECKSUM_VALID_DATE);
-  equal(
-    shifted.shiftedEnglish.join(" "),
-    CHECKSUM_VALID_ENGLISH,
-    "Checksum-valid Seedshift vector",
-  );
+  equal(shifted.shiftedEnglish.join(" "), MASKED_ENGLISH, "Checksum-valid Seedshift vector");
   if (!phraseChecksumValid(shifted.shiftedEnglish.join(" ")))
     throw ERRORS.create("checksum-valid-seedshift-produced-invalid-bip39-checksum", []);
   equal(
-    decodeInput(CHECKSUM_VALID_ENGLISH, "english", CHECKSUM_VALID_DATE).recoveredMnemonic,
+    decodeInput(MASKED_ENGLISH, "english", CHECKSUM_VALID_DATE).recoveredMnemonic,
     PUBLIC_MNEMONIC,
     "Checksum-valid Seedshift reverse vector",
   );
@@ -360,7 +353,7 @@ async function checkPublicVectors(host: SelfTestHost): Promise<number> {
 /** Every phrase length in every form and mode, forward and back; gives the round trips made. */
 function checkAllLengthsAndFormats(): number {
   const entropySizes = BIP39_ENTROPY_BYTES;
-  const dates = [parseDate("23-09-2026"), parseDate("08-08-1988"), parseDate("07-11-1951")];
+  const dates = [parseDate(MASKED_DATE), parseDate("08-08-1988"), parseDate("07-11-1951")];
   let count = 0;
   for (const entropySize of entropySizes) {
     const mnemonic = entropyToMnemonic(
@@ -393,7 +386,7 @@ function checkAllLengthsAndFormats(): number {
 }
 
 function checkDateOrdering(): void {
-  const first = [parseDate("23-09-2026"), parseDate("08-08-1988"), parseDate("07-11-1951")];
+  const first = [parseDate(MASKED_DATE), parseDate("08-08-1988"), parseDate("07-11-1951")];
   const reversed = [...first].reverse();
   equal(
     formatEncoded(encodeMnemonic(PUBLIC_MNEMONIC, first), "indexes"),

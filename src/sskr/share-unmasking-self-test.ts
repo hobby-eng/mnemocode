@@ -20,22 +20,23 @@ import { SEED_BYTES, type SharePlatform } from "./share-platform.js";
 import { ShareUnmasking } from "./share-unmasking.js";
 import { writeShare } from "./transport.js";
 import { fingerprintWalletCheck, type PhraseFingerprint } from "../core/wallet-check.js";
+import {
+  MASKED_DATE,
+  MASKED_ENGLISH,
+  PUBLIC_FINGERPRINT,
+  PUBLIC_MNEMONIC,
+} from "../core/self-test-vectors.js";
 
-const PUBLIC_MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-/** Its master fingerprint (vectors/mnemocode-v1.json, direct-12, sourceFingerprint). */
-const PUBLIC_FINGERPRINT = "73c5da0a";
 /**
  * A set of shares as restored, holding the public phrase masked with MnemoCode Seedshift and
  * 23-09-2026 (vectors/mnemocode-v1.json, checksum-valid-seedshift-12): the phrase is all that the
  * unmasking reads of it.
  */
 const MASKED_SET: RepairedSet = Object.freeze({
-  mnemonic: "wool abuse actual wool abuse actual wool abuse actual wool abuse congress",
+  mnemonic: MASKED_ENGLISH,
   shares: [],
   unsettled: [],
 });
-const MASKED_DATE = "23-09-2026";
 /** Five dates: a phrase of twelve words takes four, one for every three words. */
 const FIVE_DATES = "01-01-2001 02-01-2001 03-01-2001 04-01-2001 05-01-2001";
 

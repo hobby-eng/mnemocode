@@ -12,11 +12,8 @@
 //
 // Host-neutral: it imports only core/wallet-evidence.ts and other self-test modules.
 
-import {
-  PUBLIC_MNEMONIC,
-  PUBLIC_PHRASE_SEEDS,
-  VECTOR_PASSPHRASE,
-} from "./master-fingerprint-self-test.js";
+import { PUBLIC_PHRASE_SEEDS, VECTOR_PASSPHRASE } from "./master-fingerprint-self-test.js";
+import { PUBLIC_FINGERPRINT, PUBLIC_MNEMONIC } from "./self-test-vectors.js";
 import { BITCOIN } from "./coins/bitcoin-like.js";
 import {
   expectRefused,
@@ -44,7 +41,7 @@ import {
  * plain secp256k1, which first reproduce all of the published ones.
  */
 const KEYS = {
-  fingerprint: "73c5da0a",
+  fingerprint: PUBLIC_FINGERPRINT,
   rootXpub:
     "xpub661MyMwAqRbcFkPHucMnrGNzDwb6teAX1RbKQmqtEF8kK3Z7LZ59qafCjB9eCRLiTVG3uxBxgKvRgbubRhqSKXnGGb1aoaqLrpMBDrVxga8",
   rootYpub:

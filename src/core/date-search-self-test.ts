@@ -16,18 +16,15 @@ import { formatDate } from "./dates.js";
 import { expectRefused, expectSame } from "./self-test-check.js";
 import { fingerprintWalletCheck, type PhraseFingerprint } from "./wallet-check.js";
 import { defined } from "./defined.js";
+import {
+  MASKED_DATE,
+  MASKED_NUMBERS,
+  PUBLIC_FINGERPRINT,
+  PUBLIC_MNEMONIC,
+} from "./self-test-vectors.js";
 
-const PUBLIC_MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-/** Its master fingerprint (vectors/mnemocode-v1.json, direct-12, sourceFingerprint). */
-const PUBLIC_FINGERPRINT = "73c5da0a";
-/**
- * The public phrase masked with MnemoCode Seedshift and 23-09-2026, as word numbers counted from 1
- * (vectors/mnemocode-v1.json, checksum-valid-seedshift-12).
- */
-const MASKED_NUMBERS = [2027, 10, 24, 2027, 10, 24, 2027, 10, 24, 2027, 10, 377] as const;
-const MASKED_INDEXES = MASKED_NUMBERS.map((number) => number - 1);
-const MASKED_DATE = "23-09-2026";
+/** The masked phrase's word indexes, counted from 0. */
+const MASKED_INDEXES = MASKED_NUMBERS.split(" ").map((number) => Number(number) - 1);
 /** The masked phrase's date with its last digit forgotten. */
 const FORGOTTEN_LAST_DIGIT = "23-09-202?";
 /** A phrase of twelve words takes four dates, one for every three words. */

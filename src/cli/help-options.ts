@@ -56,6 +56,7 @@ import {
 import { defined } from "../core/defined.js";
 import { ORIGINAL_COPY_FORMS } from "./encode-report.js";
 import { type HelpGroup, type HelpOption, type HelpRow } from "./help-types.js";
+import { PUBLIC_FINGERPRINT } from "../core/self-test-vectors.js";
 
 /** The dates of a lone ?, every supported date: the attempts of one such date. */
 const EVERY_DATE_COMBINATIONS = datePatternCandidateCount(parseDatePattern(WHOLE_DATE));
@@ -94,7 +95,7 @@ export const FORMAT_DESCRIPTIONS: Readonly<Record<EncodedFormat, string>> = {
 export const TEST_PHRASE = zeroEntropyPhrase(BIP39_WORD_COUNTS[0]);
 export const TEST_PHRASE_VARIABLE = '"$TEST_PHRASE"';
 /** The BIP32 master fingerprint of TEST_PHRASE with an empty passphrase. */
-export const TEST_FINGERPRINT = "73c5da0a";
+export const TEST_FINGERPRINT = PUBLIC_FINGERPRINT;
 
 // Options that several commands share.
 

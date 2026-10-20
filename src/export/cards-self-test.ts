@@ -18,14 +18,12 @@ import {
   WIDTH_TOLERANCE_POINTS,
 } from "./self-test-cards.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { PUBLIC_MNEMONIC } from "../core/self-test-vectors.js";
 
 const ERRORS = new ErrorCatalog("export.cards-self-test", {
   "a6-page-count-mismatch": (value0: string) => `${value0} A6 page count mismatch.`,
   "a6-dimensions-mismatch": (value0: string) => `${value0} A6 dimensions mismatch.`,
 });
-
-const PUBLIC_MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 /**
  * The PDF of `template` drawn with `drawing` from the public test phrase, on one A6 page: local

@@ -13,9 +13,8 @@ import { wipeAll } from "./bits.js";
 import { WordCandidateSearch, type WordSearch } from "./candidates.js";
 import { expectRefused, expectSame, hexOfBytes } from "./self-test-check.js";
 import { fingerprintWalletCheck, type PhraseFingerprint } from "./wallet-check.js";
+import { PUBLIC_FINGERPRINT } from "./self-test-vectors.js";
 
-/** The master fingerprint of the public phrase (vectors/mnemocode-v1.json, direct-12). */
-const PUBLIC_FINGERPRINT = "73c5da0a";
 const ABANDON_ELEVEN = Array<string>(11).fill("abandon").join(" ");
 
 /** One search and what it finds: candidate N is the same in every host (docs/CANDIDATES.md). */

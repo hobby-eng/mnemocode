@@ -36,6 +36,7 @@ import { PUBLIC_VECTORS_FILE } from "../bundled-file-paths.js";
 import { describeError } from "../core/refusal.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 import { TextFileInput } from "./text-file.js";
+import { MASKED_DATE, PUBLIC_MNEMONIC } from "../core/self-test-vectors.js";
 
 const ERRORS = new ErrorCatalog("cli.self-test", {
   "qr-image-not-saved": () => "QR image was not saved.",
@@ -43,9 +44,6 @@ const ERRORS = new ErrorCatalog("cli.self-test", {
     `CRITICAL: MnemoCode core self-test failed.\nNo mnemonic data was processed.\n${value0}`,
   "qr-write-read-round-trip-mismatch": () => "QR write/read round trip mismatch.",
 });
-
-const PUBLIC_MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 /** The column of the names of the checks, as wide as the longest name with room to spare. */
 const CHECK_NAME_WIDTH = 24;
@@ -125,7 +123,7 @@ async function withTemporaryFolder(check: (directory: string) => Promise<void>):
 
 async function checkQrRoundTrip(): Promise<void> {
   const payload = formatEncoded(
-    encodeMnemonic(PUBLIC_MNEMONIC, [parseDate("23-09-2026")]),
+    encodeMnemonic(PUBLIC_MNEMONIC, [parseDate(MASKED_DATE)]),
     "unicode",
   );
   await withTemporaryFolder(async (directory) => {

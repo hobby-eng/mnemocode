@@ -15,16 +15,13 @@ import { sskrSetVector } from "../sskr/known-answers.js";
 import { EncodedBackupCheck, ShareBackupCheck, type BackupResult } from "./backup-check.js";
 import { parseDate } from "./dates.js";
 import { expectSame } from "./self-test-check.js";
+import {
+  MASKED_DATE,
+  MASKED_ENGLISH,
+  MASKED_NUMBERS,
+  PUBLIC_MNEMONIC,
+} from "./self-test-vectors.js";
 
-const PUBLIC_MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-/**
- * The public phrase masked with MnemoCode Seedshift and 23-09-2026 (vectors/mnemocode-v1.json,
- * checksum-valid-seedshift-12), in English words and word numbers counted from 1.
- */
-const MASKED_ENGLISH = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
-const MASKED_NUMBERS = [2027, 10, 24, 2027, 10, 24, 2027, 10, 24, 2027, 10, 377] as const;
-const MASKED_DATE = "23-09-2026";
 /**
  * Two shares of another set of vectors/sskr-v1.json, "bip39-160-2-of-3": they restore the phrase
  * of the entropy 000102…13, not that of the set checked.
@@ -51,7 +48,7 @@ export function checkBackupCheckStartup(): void {
     mnemonic: PUBLIC_MNEMONIC,
     format: "english",
     mode: "seedshift",
-    codes: MASKED_NUMBERS.map((number) => number - 1),
+    codes: MASKED_NUMBERS.split(" ").map((number) => Number(number) - 1),
     dates: [parseDate(MASKED_DATE)],
   });
   const right = check.checkNow({ backup: MASKED_ENGLISH, dates: MASKED_DATE });

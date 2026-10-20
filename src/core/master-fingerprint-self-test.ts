@@ -17,15 +17,13 @@ import {
   hexOfBytes,
 } from "./self-test-check.js";
 import { ErrorCatalog } from "./error-catalog.js";
+import { PUBLIC_MNEMONIC } from "./self-test-vectors.js";
 
 const ERRORS = new ErrorCatalog("core.master-fingerprint-self-test", {
   "bip39-seed-was-asked-other-parameters": () =>
     "The BIP39 seed was asked for with other parameters.",
 });
 
-/** The public test phrase of all-zero entropy, the first BIP39 vector. */
-export const PUBLIC_MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 /** The passphrase of every BIP39 vector (trezor/python-mnemonic, vectors.json). */
 export const VECTOR_PASSPHRASE = "TREZOR";
 /**

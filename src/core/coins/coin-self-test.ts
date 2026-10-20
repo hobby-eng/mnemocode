@@ -19,7 +19,8 @@
 // Host-neutral: it imports only core/coin-address-evidence.ts and other self-test modules.
 
 import { CoinAddressCheck } from "../coin-address-evidence.js";
-import { PUBLIC_MNEMONIC, PUBLIC_PHRASE_SEEDS } from "../master-fingerprint-self-test.js";
+import { PUBLIC_PHRASE_SEEDS } from "../master-fingerprint-self-test.js";
+import { PUBLIC_MNEMONIC } from "../self-test-vectors.js";
 import {
   expectRefused,
   expectSame,
