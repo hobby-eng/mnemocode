@@ -42,6 +42,29 @@ export function zeroEntropyPhrase(wordCount: Bip39WordCount): string {
   return entropyToMnemonic(new Uint8Array(entropyBytes(wordCount)), englishWordlist);
 }
 
+/** The values of a byte, from 0 up to but not including this. */
+const BYTE_VALUES = 256;
+
+/**
+ * A phrase of `wordCount` words whose entropy `randomInt` draws byte by byte, each a whole number
+ * from 0 to 255: a sample phrase, such as the sample cards draw, with words as varied as a real
+ * one's. The entropy is wiped once the phrase is made. A `randomInt` that always answers 0 gives
+ * zeroEntropyPhrase.
+ */
+export function phraseOfRandomEntropy(
+  wordCount: Bip39WordCount,
+  randomInt: (upperExclusive: number) => number,
+): string {
+  const entropy = Uint8Array.from({ length: entropyBytes(wordCount) }, () =>
+    randomInt(BYTE_VALUES),
+  );
+  try {
+    return entropyToMnemonic(entropy, englishWordlist);
+  } finally {
+    entropy.fill(0);
+  }
+}
+
 /**
  * The fingerprint of `phrase` by the host's `fingerprintOf`, or undefined when it is no valid BIP39
  * phrase: the codes of an encoded seed phrase and the phrase of a share set are fingerprinted

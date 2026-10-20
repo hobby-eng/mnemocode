@@ -523,7 +523,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
   ...SHARE_COMMAND_HELP,
 
   preview: {
-    summary: "Print card designs with a public test phrase",
+    summary: "Print card designs with a random sample phrase",
     about: [
       "Draws a template exactly as encode does, with a public test phrase and test dates, never with a real secret. Use it to choose a design and check the details printed on it.",
     ],
@@ -542,7 +542,7 @@ export const commandHelp: Readonly<Record<CommandName, CommandHelp>> = {
           {
             flag: "--words",
             value: BIP39_WORD_COUNTS.join("|"),
-            summary: `Length of the test phrase; default ${DEFAULT_SAMPLE_WORDS}`,
+            summary: `Length of the sample phrase; default ${DEFAULT_SAMPLE_WORDS}`,
           },
           pdf,
           cardsDir,

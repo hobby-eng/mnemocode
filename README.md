@@ -126,7 +126,7 @@ A QR code contains only the real codes: **no mode, format header or dates**. `--
 
 Files and folders are not overwritten; taken names receive a number. Folder exports are prepared privately, but interruption while publishing can leave partial output or a private temporary copy. See [export precautions](SECURITY.md#secret-lifecycle-and-local-boundaries).
 
-[Card designs](docs/card-designs.md), [identity defaults](docs/card-identities.md) and [card options](docs/CLI.md#card-options) describe customization. `preview` uses a public test phrase, so you can try a design without entering a secret.
+[Card designs](docs/card-designs.md), [identity defaults](docs/card-identities.md) and [card options](docs/CLI.md#card-options) describe customization. `preview` draws a random sample phrase, so you can try a design without entering a secret.
 
 ### Individual business cards
 

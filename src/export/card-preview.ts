@@ -1,6 +1,8 @@
-// Sample cards: every card design drawn with a public test phrase, so that a person can see the
-// designs before writing a real backup. The phrase is the public one of all-zero entropy
-// ("abandon … about" for 12 words), masked with four fixed public dates.
+// Sample cards: every card design drawn with a sample phrase, so that a person can see the designs
+// before writing a real backup. The phrase is new for each preview, its entropy drawn with the
+// host's randomness, so that its colours vary as a real backup's do, and it is masked with four
+// fixed public dates. A host whose randomness always answers 0, as a test's may, gets the public
+// phrase of all-zero entropy ("abandon … about" for 12 words).
 //
 // From the host it needs its CardRenderer (card-renderer.ts), which the cards are drawn with. It
 // returns PDF bytes and writes no file. A host also draws the colour cards of a save in memory
@@ -16,7 +18,7 @@ import {
   WORD_COUNTS_TEXT,
 } from "../core/bip39-sizes.js";
 import { parseDate } from "../core/dates.js";
-import { zeroEntropyPhrase } from "../core/english-words.js";
+import { phraseOfRandomEntropy } from "../core/english-words.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import { formatEncoded } from "../core/representations.js";
 import { encodeMnemonic } from "../core/seedshift.js";
@@ -69,11 +71,6 @@ export interface CardPreviewOptions {
   readonly colorForm?: EncodedFormat;
 }
 
-/** The sample phrase of `words` words. */
-function samplePhrase(words: SampleWordCount): string {
-  return zeroEntropyPhrase(words);
-}
-
 /** The sample codes in `format`, as cards take a backup (CardBackup). */
 function sampleBackup(result: EncodedResult, format: EncodedFormat): CardBackup {
   return { format, indexes: result.shiftedIndexes, text: () => formatEncoded(result, format) };
@@ -82,14 +79,15 @@ function sampleBackup(result: EncodedResult, format: EncodedFormat): CardBackup 
 /**
  * Sample cards of the installed designs. A class because the masked sample phrase and the card
  * contents are worked out once and then drawn, with the host's `drawing`, for one design or for
- * all of them. It holds public test data only.
+ * all of them. It holds only a sample phrase made for it, masked with public dates.
  */
 export class CardPreview {
   readonly #drawing: CardDrawing;
   readonly #colors: CardContent;
 
   /**
-   * Masks the sample phrase of `options` and builds its cards, drawn later with `drawing`. Throws
+   * Draws a sample phrase of the length of `options` with the randomness of `drawing`, masks it
+   * and builds its cards, drawn later with `drawing`. Throws
    * export.card-preview.preview-mnemonic-contain-words for a length that BIP39 lacks,
    * export.card-preview.colour-cards-not-written-as for a form that colour cards do not print,
    * and core.encoded-form.unsupported-encoded-format for a colorForm that names no form.
@@ -102,7 +100,7 @@ export class CardPreview {
     const colorForm = options.colorForm ?? "colors";
     if (EncodedForm.of(colorForm).cardKind !== "colors")
       throw ERRORS.create("colour-cards-not-written-as", [`${colorForm}`]);
-    const result = encodeMnemonic(samplePhrase(words), SAMPLE_DATES);
+    const result = encodeMnemonic(phraseOfRandomEntropy(words, drawing.randomInt), SAMPLE_DATES);
     const { settings, title } = options;
     // The cards of a backup, built as a save builds them (backupCardContent).
     this.#colors = backupCardContent(sampleBackup(result, colorForm), { settings, title });
