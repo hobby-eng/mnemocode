@@ -8,7 +8,8 @@ import {
   tintedLook,
   type MaterialStyle,
 } from "../src/export/material-artwork.js";
-import { renderMaterialCard, type MaterialPageSize } from "../src/export/material-cards.js";
+import { renderMaterialCard } from "../src/export/material-cards.js";
+import type { CardPageSize } from "../src/export/card-settings.js";
 import { renderIndividualCards } from "../src/export/render.js";
 import { cardTemplates, renderCatalogDesign } from "../src/export/templates.js";
 import { drawsSeparateCards, findTemplate, SHEETS_ONLY } from "../src/export/template-catalog.js";
@@ -191,7 +192,7 @@ describe("material selection cards", () => {
   it.each(["business", "a6", "a5", "a4"] as const)(
     "honors both orientations for %s",
     async (size) => {
-      const expected: Record<MaterialPageSize, [number, number]> = {
+      const expected: Record<CardPageSize, [number, number]> = {
         business: [90, 50],
         a6: [148, 105],
         a5: [210, 148],

@@ -3,7 +3,6 @@ import {
   type PDFFont,
   type PDFImage,
   type PDFPage,
-  type RGB,
   popGraphicsState,
   pushGraphicsState,
   moveTo,
@@ -14,7 +13,6 @@ import {
   endPath,
 } from "pdf-lib";
 import { MM, type MmRect } from "./business-layout.js";
-import { rgbChannels } from "./color-math.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
@@ -86,11 +84,6 @@ export function pdfRect(page: PDFPage, rect: MmRect) {
  */
 export function pdfPoint(page: PDFPage, x: number, top: number): { x: number; y: number } {
   return { x: x * MM, y: page.getHeight() - top * MM };
-}
-
-/** A color #RRGGBB or RRGGBB as pdf-lib draws it. */
-export function pdfColor(color: string): RGB {
-  return rgb(...rgbChannels(color));
 }
 
 /**

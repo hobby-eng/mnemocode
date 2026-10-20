@@ -19,7 +19,6 @@ import {
   ShareBackupCheck,
   type BackupFinding,
   type BackupPart,
-  type BackupVerdict,
   type EncodedOriginal,
   type RestoredShares,
   nextFinding,
@@ -54,37 +53,6 @@ const ERRORS = new ErrorCatalog("cli.backup-check", {
 
 /** A seed phrase typed in place of the shares is sent to the menu's entry that decodes it. */
 const SHARE_CHECK_TEXTS = { decodeEntry: MENU_ENTRY_NAMES.decode.label };
-
-/**
- * What a backup typed again turned out to be, as checkShareBackup tells it without asking
- * anything: the verdict of the library's whole check, which the AUD-008 reproduction and
- * regression tests pin.
- */
-export type CheckResult = BackupVerdict;
-
-/**
- * Whether the shares typed again, separated by semicolons, restore `original` with the dates. Any
- * refusal on the way counts as unreadable. The shares are not counted against a threshold here:
- * the restore asks for the quorum that they record.
- */
-export async function checkShareBackup(
-  original: string,
-  typed: string,
-  mode: SplitMode,
-  dateLine: string,
-): Promise<CheckResult> {
-  try {
-    await assertSskrSelfTest();
-    using check = new ShareBackupCheck(
-      { mnemonic: original, mode, threshold: 1 },
-      nodeSharePlatform,
-      SHARE_CHECK_TEXTS,
-    );
-    return (await check.check({ backup: typed, dates: dateLine })).verdict;
-  } catch {
-    return "unreadable";
-  }
-}
 
 /** The answer that types a part of the backup again. */
 const AGAIN: Readonly<Record<BackupPart, string>> = {

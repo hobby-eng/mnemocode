@@ -12,10 +12,5 @@
 
 export { sskrExportOptions } from "./sskr-output.js";
 export { prepareSskrSplit, runSskrSplit } from "./sskr-split-command.js";
-export {
-  givenShares,
-  restoreFromShare,
-  runSskrCombine,
-  sskrInputOptions,
-} from "./sskr-restore-command.js";
+export { restoreFromShare, runSskrCombine, sskrInputOptions } from "./sskr-restore-command.js";
 export { runSskrExport } from "./sskr-export-command.js";

@@ -52,7 +52,7 @@ import {
   PRIVATE_SCREEN_COMMANDS,
 } from "../src/cli/command-options.js";
 import { optionLabel } from "../src/cli/option-copy.js";
-import { givenShares } from "../src/cli/sskr-restore-command.js";
+import { TypedShares } from "../src/cli/share-repair.js";
 import { SHARE_ANSWER_HINT, addMoreShares } from "../src/cli/share-repair.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { nodeSharePlatform, nodeFillRandom } from "../src/sskr/share-platform-node.js";
@@ -266,16 +266,16 @@ describe("S072: a share file reads as a typed answer does", () => {
       const wrapped = join(directory, "wrapped.txt");
       const cut = Math.floor(third.length / 2);
       await writeFile(wrapped, `${third.slice(0, cut)}\n${third.slice(cut)}\n`);
-      const read = await givenShares({ "share-file": [joined, wrapped] });
+      const read = await TypedShares.given({ "share-file": [joined, wrapped] });
       expect(read.texts()).toEqual([first, second, third]);
       const phrase = join(directory, "phrase.txt");
       await writeFile(phrase, `${"abandon\n".repeat(11)}about\n`);
-      await expect(givenShares({ "share-file": phrase })).rejects.toThrow(
+      await expect(TypedShares.given({ "share-file": phrase })).rejects.toThrow(
         "The file holds a seed phrase in words, not a Shamir share",
       );
       const blank = join(directory, "blank.txt");
       await writeFile(blank, " \n;\n");
-      await expect(givenShares({ "share-file": blank })).rejects.toThrow(
+      await expect(TypedShares.given({ "share-file": blank })).rejects.toThrow(
         "Provide at least one complete share",
       );
     } finally {

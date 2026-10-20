@@ -5,7 +5,7 @@ import { combineSskrShares, combineSskrShareSet, restoreShareSet } from "../src/
 import { sskrEngine } from "../src/sskr/runtime.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { wrongValue } from "./helpers/shares.js";
-import { checkShareBackup } from "../src/cli/backup-check.js";
+import { shareBackupVerdict } from "./helpers/share-backup-check.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
@@ -31,11 +31,11 @@ describe("AUD-008-FUN001: incomplete-group disclosure", () => {
     expect(await restoreShareSet(given)).toMatchObject({ mnemonic: PHRASE, unchecked: [3] });
     expect(await combineSskrShareSet(given)).toMatchObject({ mnemonic: PHRASE, unchecked: [3] });
     await expect(combineSskrShares(given)).rejects.toThrow("could not be checked");
-    expect(await checkShareBackup(PHRASE, given.join(";"), "direct", "")).toBe("unchecked");
+    expect(await shareBackupVerdict(PHRASE, given.join(";"), "direct", "")).toBe("unchecked");
     const other = entropyToMnemonic(new Uint8Array(16).fill(1), wordlist);
-    expect(await checkShareBackup(other, given.join(";"), "direct", "")).toBe("differs");
+    expect(await shareBackupVerdict(other, given.join(";"), "direct", "")).toBe("differs");
     expect(await combineSskrShares(given.slice(0, 2))).toBe(PHRASE);
-    expect(await checkShareBackup(PHRASE, given.slice(0, 2).join(";"), "direct", "")).toBe(
+    expect(await shareBackupVerdict(PHRASE, given.slice(0, 2).join(";"), "direct", "")).toBe(
       "restores",
     );
   });
@@ -65,6 +65,6 @@ describe("AUD-008-FUN001: incomplete-group disclosure", () => {
     expect(restored.unsettled.length).toBeGreaterThan(0);
     expect(restored.unsettled.every((element) => element.share === 3)).toBe(true);
     await expect(combineSskrShares(given)).rejects.toThrow("could not be checked");
-    expect(await checkShareBackup(expected, given.join(";"), "direct", "")).toBe("unchecked");
+    expect(await shareBackupVerdict(expected, given.join(";"), "direct", "")).toBe("unchecked");
   });
 });

@@ -93,9 +93,6 @@ export const FORMAT_DESCRIPTIONS: Readonly<Record<EncodedFormat, string>> = {
 /** The public BIP39 test phrase of the examples, set once above them as a shell variable. */
 export const TEST_PHRASE = zeroEntropyPhrase(BIP39_WORD_COUNTS[0]);
 export const TEST_PHRASE_VARIABLE = '"$TEST_PHRASE"';
-/** TEST_PHRASE masked with the date 23-09-2026 in seedshift mode. */
-export const SHIFTED_TEST_PHRASE =
-  "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
 /** The BIP32 master fingerprint of TEST_PHRASE with an empty passphrase. */
 export const TEST_FINGERPRINT = "73c5da0a";
 

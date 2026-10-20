@@ -22,7 +22,7 @@ import {
   type SelfTestFeature,
 } from "../core/self-test-check.js";
 import { artworkBrightness } from "./business-tint.js";
-import { codeColors } from "./card-palette.js";
+import { closestPair, codeColors } from "./card-palette.js";
 import { assertColorCardContent, type ColorCardContent } from "./card-content.js";
 import {
   keptCards,
@@ -42,6 +42,11 @@ const ERRORS = new ErrorCatalog("export.card-sets-self-test", {
   "set-cards-no-decoy": () => "A set of cards has no decoy.",
 });
 
+/**
+ * The least distance, in millionths of OKLab units, between the two closest colours of 40 codes:
+ * more than this, no design shows two of them alike.
+ */
+const MIN_APART = 60_000;
 /**
  * The first colours of every set of cards that print codes, as the independent reference
  * scripts/card-palette-reference.py prints them.
@@ -71,6 +76,9 @@ function checkCardSetsStartup(): void {
   const codes = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"];
   expectSame(codeColors(codes).join(" "), FIRST_COLORS, "Colors of the codes of a set");
   expectSame(codeColors(["C1", "C2", "C1"]).join(" "), "#468080 #060680 #468080", "Same code");
+  // The closest two colours of 40 codes, apart on every design (test/card-sets.test.ts).
+  const forty = codeColors(Array.from({ length: 40 }, (_, index) => String(index)));
+  expectSame(closestPair(forty) > MIN_APART, true, "Colors of a set apart");
   // 0.35 for black, 1 for a full channel, 0.35 + 0.65 * 0x99 / 255 for #336699.
   expectSame(
     ["#000000", "#FFFFFF", "#336699"].map(artworkBrightness).join(" "),

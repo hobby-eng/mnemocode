@@ -15,7 +15,7 @@ import {
 import { crc32 } from "../src/sskr/checksum.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { combineSskrShares } from "../src/sskr/shares.js";
-import { checkShareBackup } from "../src/cli/backup-check.js";
+import { shareBackupVerdict } from "./helpers/share-backup-check.js";
 import { joinUnits, markUnits, shareUnits } from "./helpers/shares.js";
 
 const vectors = JSON.parse(
@@ -165,7 +165,7 @@ describe("One explicit unreadable SSKR element", () => {
     await expect(combineSskrShares([])).rejects.toThrow(/between 1 and 256/u);
     await expect(combineSskrShares(Array(257).fill(first))).rejects.toThrow(/between 1 and 256/u);
     await expect(combineSskrShares([first, vector.shares[0]!])).rejects.toThrow(/more than once/u);
-    expect(await checkShareBackup(expected, `${first};${second}`, "direct", "")).toBe("restores");
+    expect(await shareBackupVerdict(expected, `${first};${second}`, "direct", "")).toBe("restores");
   });
 });
 

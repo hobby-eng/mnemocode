@@ -19,7 +19,6 @@ import { ShareCardSet, type SskrRenderOptions } from "./sskr-render.js";
 import { DEFAULT_IMAGE_FORMAT } from "./document-formats.js";
 
 // Kept for the callers that import them from here.
-export { renderSskrPdf, type SskrRenderOptions } from "./sskr-render.js";
 
 /** The cards of `records` in the Node.js renderer (ShareCardSet), for every file of one export. */
 export function nodeShareCards(

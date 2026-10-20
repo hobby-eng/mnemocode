@@ -95,17 +95,6 @@ const ERRORS = new ErrorCatalog("cli.sskr-restore-command", {
 export const sskrInputOptions = [...SHARE_SOURCE_OPTIONS, "ask-secrets"] as const;
 
 /**
- * The shares given with the options, each in the form it was written in: each --share; the shares
- * of each --share-file, read as a typed answer is (ShareInput.sharesOfText), so that a share
- * wrapped over lines or shares joined with ; read alike from a file; and the share of each
- * --share-qr image. Each is counted against the shares a set may have as it is added.
- * --ask-secrets asks for them on the private screen instead (TypedShares).
- */
-export async function givenShares(args: ParsedArguments): Promise<TypedShares> {
-  return TypedShares.given(args);
-}
-
-/**
  * The shares: asked on the private screen with --ask-secrets, or read from the options; CANCELLED
  * when the person cancelled.
  */

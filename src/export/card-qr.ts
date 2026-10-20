@@ -14,12 +14,8 @@ const ERRORS = new ErrorCatalog("export.card-qr", {
 });
 
 const QUIET_MODULES = 4;
-const MIN_MODULE_MM = 0.4;
-
-/** Physical size of the code `qr` includes a white quiet zone on all four sides. */
-export function qrSizeMm(qr: QrModules, minimum = 28): number {
-  return qrSizeForModuleMm(qr, minimum, MIN_MODULE_MM);
-}
+/** The smallest module that a printed code keeps, in millimetres. */
+export const MIN_MODULE_MM = 0.4;
 
 /**
  * The side of the QR code `qr`, quiet zone included, in millimetres for modules `moduleMm` wide,

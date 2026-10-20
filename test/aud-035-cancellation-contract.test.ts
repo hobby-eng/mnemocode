@@ -1,11 +1,15 @@
 import { expect, it } from "vitest";
-import { planShareRepair } from "../src/sskr/shares.js";
+import { planJointRepair } from "../src/sskr/joint-repair.js";
+import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { sskrSetVector } from "../src/sskr/known-answers.js";
 
 it("returns a stopped public repair plan when its signal is already aborted", async () => {
   const abort = new AbortController();
   abort.abort(new Error("Synthetic requested stop."));
-  const plan = await planShareRepair(sskrSetVector.shares, { signal: abort.signal });
+  const plan = await planJointRepair(sskrSetVector.shares, {
+    platform: nodeSharePlatform,
+    signal: abort.signal,
+  });
   try {
     expect(plan.assessment.verdict).toBe("stopped");
   } finally {

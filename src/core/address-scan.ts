@@ -47,7 +47,8 @@ export function defaultAddressCount(first: number): number {
 
 /**
  * An account, a branch or an index as typed: a whole number from 0 through LAST_NORMAL_INDEX,
- * leading zeros allowed; otherwise refused with a line that says what fits.
+ * leading zeros allowed; otherwise refused with a line that says what fits. For other hosts: a
+ * page's fields read the place of an address through it.
  */
 export function parsePlaceNumber(answer: string): number {
   return typedWholeNumber(answer, NORMAL_INDEX_RANGE);

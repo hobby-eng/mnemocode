@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PDFDocument } from "pdf-lib";
 import jsQRModule from "jsqr";
-import { drawCollectionQr, qrSizeMm } from "../src/export/card-qr.js";
+import { drawCollectionQr, MIN_MODULE_MM, qrSizeForModuleMm } from "../src/export/card-qr.js";
 import { MM } from "../src/export/business-layout.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
 
@@ -27,7 +27,7 @@ describe("Printable card QR", () => {
       const rectangles = vi.spyOn(page, "drawRectangle");
       // The matrix the Node.js platform makes, which every host's qrModules gives too.
       const code = nodeRenderPlatform.qrModules(payload);
-      drawCollectionQr(page, code, 5, 5, qrSizeMm(code, minimum));
+      drawCollectionQr(page, code, 5, 5, qrSizeForModuleMm(code, minimum, MIN_MODULE_MM));
 
       // Small independent raster of the actual PDF drawing calls. The real method
       // still runs. Full PDF rasterization is covered by check-card-output.mjs.
@@ -61,8 +61,12 @@ describe("Printable card QR", () => {
     const rectangles = vi.spyOn(page, "drawRectangle");
     const code = nodeRenderPlatform.qrModules("public transport data ".repeat(10));
     expect(() => drawCollectionQr(page, code, 1, 1, 5)).toThrow("too small");
-    expect(() => drawCollectionQr(page, code, -1, 1, qrSizeMm(code))).toThrow("does not fit");
-    expect(() => drawCollectionQr(page, code, 80, 1, qrSizeMm(code))).toThrow("does not fit");
+    expect(() =>
+      drawCollectionQr(page, code, -1, 1, qrSizeForModuleMm(code, 28, MIN_MODULE_MM)),
+    ).toThrow("does not fit");
+    expect(() =>
+      drawCollectionQr(page, code, 80, 1, qrSizeForModuleMm(code, 28, MIN_MODULE_MM)),
+    ).toThrow("does not fit");
     expect(rectangles).not.toHaveBeenCalled();
   });
 });

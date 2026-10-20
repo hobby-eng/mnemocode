@@ -8,9 +8,6 @@ import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { HEX_ACCOUNT_BYTES } from "./address-sizes.js";
 
-// The size of an account is address-sizes.ts's; here under its name of the hash that gives it.
-export { HEX_ACCOUNT_BYTES as KECCAK_ACCOUNT_BYTES };
-
 /** The last 20 bytes of Keccak-256 of the 64 bytes of the uncompressed key, without its 04 byte. */
 export function keccakAccount(publicKey: Uint8Array): Uint8Array {
   const uncompressed = secp256k1.Point.fromBytes(publicKey).toBytes(false);

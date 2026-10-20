@@ -14,7 +14,7 @@ import { encodeMnemonic, parseDate, parseDatePattern } from "../src/core.js";
 import { dateRecoveryCandidates } from "../src/core/date-recovery.js";
 import { searchCandidates, searchCombinations, type WordSearch } from "../src/core/candidates.js";
 import { rowsOf } from "../src/cli/terminal-choice.js";
-import { checkShareBackup } from "../src/cli/backup-check.js";
+import { shareBackupVerdict } from "./helpers/share-backup-check.js";
 import { crc32 } from "../src/sskr/checksum.js";
 import { readRepairableShare } from "../src/sskr/repair.js";
 import { planJointRepair } from "../src/sskr/joint-repair.js";
@@ -175,7 +175,7 @@ describe("AUD-008-FUN001: every share given must agree with the restored secret"
       await expect(combineSskrShares(order)).rejects.toThrow(/does not fit|do not restore/u);
     }
     await expect(combineSskrShares([a, b, wrong])).rejects.toThrow(/Share 3 does not fit/u);
-    expect(await checkShareBackup(expected, [a, b, wrong].join(";"), "direct", "")).toBe(
+    expect(await shareBackupVerdict(expected, [a, b, wrong].join(";"), "direct", "")).toBe(
       "unreadable",
     );
   });

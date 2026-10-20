@@ -49,8 +49,6 @@ const ERRORS = new ErrorCatalog("export.material-cards", {
     `Material cards support at most ${value0} references.`,
 });
 
-/** The sizes of a material card's page: those of every card (CardPageSize). */
-export type MaterialPageSize = CardPageSize;
 // The tint layer keeps the photograph's light, texture and highlights ("Color" blend) and takes
 // the hue and saturation of the catalogue colour of the sample. It covers only the object in the
 // photograph, inside the material's outline; the backdrop, shadows and screws keep their colour.

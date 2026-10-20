@@ -37,7 +37,8 @@ vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
   choose: async () => terminal.choices.shift(),
 }));
 
-import { checkShareBackup, offerShareCheck } from "../src/cli/backup-check.js";
+import { offerShareCheck } from "../src/cli/backup-check.js";
+import { shareBackupVerdict } from "./helpers/share-backup-check.js";
 import {
   EncodedBackupCheck,
   KeptShares,
@@ -334,16 +335,16 @@ const dates: readonly DateShiftDate[] = [parseDate(DATE)];
 describe("checking written-down Shamir shares", () => {
   it("accepts enough shares, in any written form, with the dates", async () => {
     const shares = await splitSskrMnemonic(PHRASE, 2, 3);
-    expect(await checkShareBackup(PHRASE, `${shares[0]};${shares[2]}`, "direct", "")).toBe(
+    expect(await shareBackupVerdict(PHRASE, `${shares[0]};${shares[2]}`, "direct", "")).toBe(
       "restores",
     );
     const words = `${urToBytewords(shares[1]!)};${urToBytewords(shares[2]!)}`;
-    expect(await checkShareBackup(PHRASE, words, "direct", "")).toBe("restores");
+    expect(await shareBackupVerdict(PHRASE, words, "direct", "")).toBe("restores");
     const maskedShares = await splitSskrMnemonic(masked, 2, 3);
     const typed = `${maskedShares[0]};${maskedShares[1]}`;
-    expect(await checkShareBackup(PHRASE, typed, "seedshift", DATE)).toBe("restores");
-    expect(await checkShareBackup(PHRASE, typed, "seedshift", OTHER_DATE)).toBe("differs");
-    expect(await checkShareBackup(PHRASE, shares[0]!, "direct", "")).toBe("unreadable");
+    expect(await shareBackupVerdict(PHRASE, typed, "seedshift", DATE)).toBe("restores");
+    expect(await shareBackupVerdict(PHRASE, typed, "seedshift", OTHER_DATE)).toBe("differs");
+    expect(await shareBackupVerdict(PHRASE, shares[0]!, "direct", "")).toBe("unreadable");
   });
 
   it("leaves out an exact copy of a share once, as sskr-combine does", async () => {
@@ -363,7 +364,7 @@ describe("checking written-down Shamir shares", () => {
       notes: ["Share 2 is a copy of share 1: it is used once."],
     });
     expect(
-      await checkShareBackup(PHRASE, `${shares[2]};${shares[0]};${shares[2]}`, "direct", ""),
+      await shareBackupVerdict(PHRASE, `${shares[2]};${shares[0]};${shares[2]}`, "direct", ""),
     ).toBe("restores");
     const alone = await check.check({ backup: `${shares[1]};${shares[1]}` });
     expect(alone).toMatchObject({

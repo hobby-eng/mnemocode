@@ -16,7 +16,6 @@ import {
   DOCUMENT_FORMAT_FACTS,
   IMAGE_DPI,
   IMAGE_FORMATS,
-  isImageFormat,
   parseImageFormat,
   type DocumentFormat,
   type ImageFormat,
@@ -34,14 +33,7 @@ const ERRORS = new ErrorCatalog("export.image-export", {
 
 // The formats and the drawing rules are document-formats.ts's, which a page takes too; here too
 // for the modules of the command line that take them from here.
-export {
-  DEFAULT_DOCUMENT_FORMAT,
-  IMAGE_FORMATS,
-  isImageFormat,
-  parseImageFormat,
-  type DocumentFormat,
-  type ImageFormat,
-};
+export { DEFAULT_DOCUMENT_FORMAT, parseImageFormat, type DocumentFormat, type ImageFormat };
 const execute = promisify(execFile);
 /** The file of one page that the renderer writes, in any image format. */
 const PAGE_FILE = new RegExp(`^page-\\d+\\.(?:${IMAGE_FORMATS.join("|")})$`, "u");

@@ -4,7 +4,6 @@
 // JointRepair (joint-repair.ts).
 
 import { assertSskrSelfTest } from "./self-test.js";
-import { planJointRepair, type JointPlan } from "./joint-repair.js";
 import { type RepairedSet } from "./joint-results.js";
 import { ShareSet } from "./share-set.js";
 // The Node.js platform and randomness that the functions below pass to the share modules.
@@ -63,21 +62,6 @@ export async function restoreShareSet(records: readonly string[]): Promise<Repai
   await assertCheckedRecords(records);
   using set = await ShareSet.restore(records, nodeSharePlatform);
   return set.toRepairedSet();
-}
-
-/**
- * Assesses shares with elements marked with ? where unreadable, all together (joint-repair.ts).
- * The search of a plan that can be searched finds every phrase they can restore; that of one which
- * refused is refused (JointPlan.search). `signal` stops the assessment, which can
- * take a while for many marks; it then returns a plan with a `stopped` assessment. Cancellation
- * does not bypass the initial record-count and SSKR self-test checks.
- */
-export async function planShareRepair(
-  records: readonly string[],
-  options: { readonly signal?: AbortSignal } = {},
-): Promise<JointPlan> {
-  await assertCheckedRecords(records);
-  return planJointRepair(records, { ...options, platform: nodeSharePlatform });
 }
 
 /**
