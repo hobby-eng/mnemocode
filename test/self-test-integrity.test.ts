@@ -241,7 +241,7 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
   },
   {
     name: "encoded fingerprint",
-    file: "dist/core/backup-reading-self-test.js",
+    file: "dist/core/self-test-vectors.js",
     from: '"0d05289e"',
     to: '"0d05289f"',
     module: "core/backup-reading-self-test.js",
