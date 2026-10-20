@@ -15,6 +15,7 @@ import {
   makeTemporaryFolder,
   removeLeftFolders,
   removeTemporaryFolder,
+  sameFolder,
 } from "../src/export/temporary-folders.js";
 
 // The temporary folders of exports (temporary-folders.ts), which a process stopped at once
@@ -51,6 +52,21 @@ describe("the temporary folders of exports", () => {
     expect(existsSync(staging)).toBe(true);
     removeLeftFolders();
     expect(existsSync(staging)).toBe(false);
+  });
+
+  it("are told apart by their device and inode, whatever their times say", () => {
+    const made = lstatSync(root);
+    // On some systems a birth time is the change time, which filling the folder changes.
+    const filled = {
+      ...made,
+      birthtimeMs: made.birthtimeMs + 1000,
+      ctimeMs: made.ctimeMs + 1000,
+      mtimeMs: made.mtimeMs + 1000,
+    };
+    expect(sameFolder(filled, made)).toBe(true);
+    expect(sameFolder({ dev: made.dev, ino: made.ino + 1 }, made)).toBe(false);
+    expect(sameFolder({ dev: made.dev + 1, ino: made.ino }, made)).toBe(false);
+    expect(sameFolder(undefined, made)).toBe(false);
   });
 
   it("remove an output folder left part filled, while it is the one made", () => {
