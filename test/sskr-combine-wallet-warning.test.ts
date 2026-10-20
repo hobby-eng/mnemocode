@@ -4,12 +4,13 @@
 // (test/helpers/question-terminal.ts). Public test data only: the shares of vectors/sskr-v1.json
 // ("bip39-128-2-of-3") and the "abandon … about" phrase masked with a public date.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParsedArguments } from "../src/cli/arguments.js";
 import { runSskrCombine } from "../src/cli/sskr-command.js";
+import { runSskrExport } from "../src/cli/sskr-export-command.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
 import { sskrSetVector } from "../src/sskr/known-answers.js";
@@ -132,5 +133,31 @@ describe("sskr-combine with a wallet", () => {
     expect(phrasePlaces().length).toBeGreaterThan(1);
     expect(warningPlaces()).toHaveLength(1);
     expect(warningPlaces()[0]).toBeGreaterThan(Math.max(...phrasePlaces()));
+  });
+});
+
+describe("sskr-export with a wallet", () => {
+  /** Exports `shares` from a share file to a file of their own, with `options`. */
+  async function exportShares(options: ParsedArguments): Promise<string> {
+    terminal.privateScreen = false;
+    const path = join(directory, "shares.txt");
+    const output = join(directory, "exported.txt");
+    await writeFile(path, `${sskrSetVector.shares.join("\n")}\n`);
+    await runSskrExport({ "share-file": path, output, ...options });
+    return output;
+  }
+
+  it("says once, after the shares are saved, that the fingerprint that chose them is a filter", async () => {
+    const output = await exportShares({ "master-fingerprint": SET_FINGERPRINT });
+    expect((await readFile(output, "utf8")).trim().split("\n")).toHaveLength(
+      sskrSetVector.shares.length,
+    );
+    expect(warningPlaces()).toHaveLength(1);
+    expect(warningPlaces()[0]).toBe(printed.length - 1);
+  });
+
+  it("says nothing of a filter where an address chose them", async () => {
+    await exportShares({ "bitcoin-address": SET_ADDRESS });
+    expect(warningPlaces()).toEqual([]);
   });
 });

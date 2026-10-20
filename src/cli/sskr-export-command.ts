@@ -301,7 +301,13 @@ async function exportOnce(
     showVariants(phrases, sets, places, given);
     return undefined;
   }
-  return settled(await exportSet(r, decision.set, places, given, checked, args));
+  const exported = settled(await exportSet(r, decision.set, places, given, checked, args));
+  // The wallet chose the set that was written: what its check said of the match, such as that a
+  // fingerprint is only a filter, is said once, after it (AUD-037-SEC004).
+  if (exported === undefined)
+    for (const warning of new Set(phrases.map((phrase) => phrase.warning)))
+      if (warning !== undefined) terminalNotice(warning, "warning");
+  return exported;
 }
 
 /** What exportSet gave, as exportOnce ends: undefined once the shares were exported. */
