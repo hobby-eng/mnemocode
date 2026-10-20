@@ -5,9 +5,9 @@
   "rust/rust-toolchain.toml": "58036485dea1e5bb8ccb7ca06d881ac7ea052a17e3c5b879a70259292c036797",
   "generated/recovery_sskr_wasm_bg.wasm.d.ts": "1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04",
   "generated/recovery_sskr_wasm.d.ts": "4fe377e3834fbd460e5aeaa668cd16c343c50bd50606cf9390a2491797bdb2ac",
-  "generated/recovery_sskr_wasm_bg.wasm": "72568bea563b383718960a3b1ebfed6aa15a86019858ad10750f5dac82f13eee",
+  "generated/recovery_sskr_wasm_bg.wasm": "8eeebcccd164d974ac32facf68a7b3ace9d6c863e573dce17fde8bbea066150f",
   "generated/recovery_sskr_wasm.js": "e1b79a3c40e92704034b8bb72c4f8dff54746c53219d93eb01f952909f6c0f2c",
-  "rust/src/lib.rs": "5189fdfe651832e12d32bbe6881aa255fa0c0874fbc0bc7c43e57dc54528b1d7",
+  "rust/src/lib.rs": "5030feaa3eeb9ad7e129159e8b882ed4200b4962511a5469c88d5f97323f07dd",
   "rust/src/refusal.rs": "e360e6ae6e0bbb272aea03965686ca8efe1bf817bbb25b2b1c4d28744e3d8060",
   "rust/vendor/sskr-0.12.0/Cargo.toml": "d3208e6da5126544ae50a4f657e178d6662c87a7f18cdcbe61c0e75b968cdeb7",
   "rust/vendor/sskr-0.12.0/LICENSE.md": "d2c043c3d4bfc59d9898cc60366d4a8d26a677d152148859477dd02be24d2acc",
@@ -31,5 +31,5 @@
   "rust/vendor/bc-shamir-0.13.0/src/lib.rs": "8da1461a0526add4864754a5a342d1a4b8f1371f0ce7baf84c54fba0ea064b1a",
   "rust/vendor/bc-shamir-0.13.0/src/recovery_secret.rs": "bdc3e1c0d72ffb6411c6720e4cf163d508e77a0decc728cab273f3bee27aa0b9",
   "rust/vendor/bc-shamir-0.13.0/src/shamir.rs": "a3c0327301038028c1523466ec432ca9493c0fdde1cacde9625893e062681de6",
-  "rust/src/share_text.rs": "ced8c1282137b2707a0c770ff8ea879ac9eea6e276767b55630e85e30fb5c16f"
+  "rust/src/share_text.rs": "53d64477167bb335d7c40ec8c0bdafc4984102994503a70c6959212c6b0cb30b"
 }

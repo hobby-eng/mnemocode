@@ -20,9 +20,9 @@ mod share_text;
 pub use refusal::Refusal;
 
 /// The bytes of the stack below an entry's frame that scrub_stack overwrites once the SSKR library
-/// has returned: far more than the deepest that a split or a restore goes, which the memory test
-/// would show (AUD-037-SEC005).
-const STACK_SCRUB_BYTES: usize = 64 * 1024;
+/// has returned: more than five times the deepest that a split or a restore was measured to go,
+/// 2,936 bytes, which test/sskr-engine-memory.test.ts would show (AUD-037-SEC005).
+const STACK_SCRUB_BYTES: usize = 16 * 1024;
 
 /// Overwrites with zeros the stack below its caller, where the SSKR library and its dependencies
 /// leave what they do not wipe, such as the message of the HMAC that checks a restored secret: a
@@ -271,6 +271,23 @@ mod tests {
                 Err(Refusal::Combine(_))
             ));
         }
+    }
+
+    #[test]
+    fn refuses_a_share_with_bytes_after_it_rather_than_restoring_a_longer_secret() {
+        let records = create_sskr_shares(vec![0x42; 16], 1, vec![1, 1], vec![7; 32]).unwrap();
+        let payload = decode_share(&records, ShareEncoding::CompactUr).unwrap();
+        let mut cbor = vec![0x55];
+        cbor.extend_from_slice(&payload);
+        cbor.extend_from_slice(&[0, 0]);
+        let longer = format!(
+            "ur:sskr/{}",
+            bc_ur::bytewords::encode(&cbor, bc_ur::bytewords::Style::Minimal)
+        );
+        assert_eq!(
+            combine(&longer, ShareEncoding::CompactUr as u8),
+            Err(Refusal::Decode)
+        );
     }
 
     #[test]

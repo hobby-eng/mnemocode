@@ -3,11 +3,18 @@
 //! and read back. It is written here rather than through the CBOR values of dcbor and the decoder of
 //! bc-ur, which keep copies of a share's bytes in memory that nothing wipes: every buffer here that
 //! holds a share's bytes is made at its full size at once, so that no smaller one is left behind,
-//! and is wiped when it is dropped (AUD-037-SEC006). From bc-ur it takes only the encoder of
-//! Bytewords, which reads the bytes without copying them, and the list of the words.
+//! and is wiped when it is dropped (AUD-037-SEC006). The text is written letter by letter into one
+//! string of its full size: bc-ur's encoder of Bytewords lists a reference to the word of each
+//! byte first, and that freed list would name the bytes of the share. From bc-ur it takes only the
+//! list of the words.
+//!
+//! A compact UR is read in ASCII alone, in either case, as BCR-2020-005 writes one: bc-ur read it
+//! after Unicode's lower case, which took U+212A KELVIN SIGN for k; a host canonicalises a typed
+//! share first (readShare). The CRC-32 and the search of a word branch on the bytes of a share: a
+//! time that depends on them, of no use to anyone but the person at the computer.
 
 use crate::Refusal;
-use bc_ur::bytewords::{self, Style, BYTEWORDS};
+use bc_ur::bytewords::BYTEWORDS;
 use zeroize::Zeroizing;
 
 /// The start of a share's compact UR, its type in lower case.
@@ -16,8 +23,9 @@ const UR_PREFIX: &str = "ur:sskr/";
 const SHARE_TAG: u64 = bc_tags::TAG_SSKR_SHARE;
 /// The tag of the first version of SSKR, which earlier standard Bytewords carry and are read with.
 const SHARE_TAG_V1: u64 = bc_tags::TAG_SSKR_SHARE_V1;
-/// The CBOR major types of a share's encoding.
+/// The CBOR major type of a byte string, which holds the share.
 const BYTE_STRING: u8 = 2;
+/// The CBOR major type of a tag, which the standard Bytewords of a share carry before it.
 const TAG: u8 = 6;
 /// The bits of a CBOR head's first byte that hold its major type.
 const MAJOR_SHIFT: u8 = 5;
@@ -97,21 +105,49 @@ fn share_cbor(payload: &[u8], tagged: bool) -> Zeroizing<Vec<u8>> {
     cbor
 }
 
+/// The letters of a word of Bytewords, four of them.
+const WORD_LETTERS: usize = 4;
+
+/// The length of the Bytewords of `count` bytes: two letters each in `minimal`, otherwise words
+/// with a space between two of them.
+fn bytewords_length(count: usize, minimal: bool) -> usize {
+    if minimal {
+        2 * count
+    } else {
+        (WORD_LETTERS + 1) * count - 1
+    }
+}
+
+/// `cbor` and its CRC-32 as Bytewords after `prefix`: in `minimal` the first and last letters of
+/// each word, run together, otherwise the words apart. Written into one string made at its full
+/// size, with no list of the words, whose freed memory would name the bytes.
+fn bytewords_text(prefix: &str, cbor: &[u8], minimal: bool) -> String {
+    let checksum = crc32(cbor).to_be_bytes();
+    let length = prefix.len() + bytewords_length(cbor.len() + CHECKSUM_BYTES, minimal);
+    let mut text = String::with_capacity(length);
+    text.push_str(prefix);
+    for (place, byte) in cbor.iter().chain(checksum.iter()).enumerate() {
+        let word = BYTEWORDS[usize::from(*byte)];
+        if minimal {
+            text.extend(word.chars().take(1).chain(word.chars().last()));
+        } else {
+            if place > 0 {
+                text.push(' ');
+            }
+            text.push_str(word);
+        }
+    }
+    text
+}
+
 /// The compact UR of the share `payload`: its untagged CBOR in minimal Bytewords.
 pub(crate) fn compact_ur(payload: &[u8]) -> String {
-    let body = Zeroizing::new(bytewords::encode(
-        share_cbor(payload, false).as_slice(),
-        Style::Minimal,
-    ));
-    let mut record = String::with_capacity(UR_PREFIX.len() + body.len());
-    record.push_str(UR_PREFIX);
-    record.push_str(&body);
-    record
+    bytewords_text(UR_PREFIX, &share_cbor(payload, false), true)
 }
 
 /// The standard Bytewords of the share `payload`: its tagged CBOR, words apart.
 pub(crate) fn standard_bytewords(payload: &[u8]) -> String {
-    bytewords::encode(share_cbor(payload, true).as_slice(), Style::Standard)
+    bytewords_text("", &share_cbor(payload, true), false)
 }
 
 /// The CRC-32 of `data`, the checksum that ends the bytes of Bytewords.
@@ -194,8 +230,9 @@ fn payload_of(cbor: &[u8], tags: &[u64]) -> Result<Zeroizing<Vec<u8>>, Refusal> 
     Ok(Zeroizing::new(payload.to_vec()))
 }
 
-/// The share that the compact UR `record` holds, its type and Bytewords in either case, as bc-ur
-/// reads a UR: its body is the share's CBOR without a tag.
+/// The share that the compact UR `record` holds, its type and Bytewords in either ASCII case: its
+/// body is the share's CBOR without a tag. Any other character is refused, U+212A KELVIN SIGN too,
+/// which bc-ur's Unicode lower case took for k.
 pub(crate) fn read_compact_ur(record: &str) -> Result<Zeroizing<Vec<u8>>, Refusal> {
     let lower = Zeroizing::new(record.to_ascii_lowercase());
     let body = lower.strip_prefix(UR_PREFIX).ok_or(Refusal::Decode)?;
@@ -205,7 +242,7 @@ pub(crate) fn read_compact_ur(record: &str) -> Result<Zeroizing<Vec<u8>>, Refusa
 /// The standard Bytewords of the share `payload` without its tag, as earlier backups wrote it.
 #[cfg(test)]
 pub(crate) fn untagged_standard_bytewords(payload: &[u8]) -> String {
-    bytewords::encode(share_cbor(payload, false).as_slice(), Style::Standard)
+    bytewords_text("", &share_cbor(payload, false), false)
 }
 
 /// The share that the standard Bytewords `record` hold: the share's CBOR with its tag, or, for
@@ -217,6 +254,7 @@ pub(crate) fn read_standard_bytewords(record: &str) -> Result<Zeroizing<Vec<u8>>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bc_ur::bytewords::{self, Style};
 
     #[test]
     fn writes_and_reads_cbor_heads_in_their_fewest_bytes() {
@@ -261,6 +299,103 @@ mod tests {
         assert_eq!(
             read_compact_ur(&record.to_ascii_uppercase()).map(|share| share.to_vec()),
             Ok(vec![0x42; 21])
+        );
+    }
+
+    /// The published BCR-2020-011 share, whose CBOR is the head 0x55 and 21 bytes.
+    const SHARE: &str = "ur:sskr/gogrrsbyadaefmnlbnctaaecvoqdfnjpbzecstfgaxtifpsskbfw";
+
+    /// The 21 bytes of SHARE, read with bc-ur, as an expected value made apart from this module.
+    fn published_payload() -> Vec<u8> {
+        let body = SHARE.strip_prefix("ur:sskr/").unwrap_or_default();
+        let cbor = bytewords::decode(body, Style::Minimal).unwrap_or_default();
+        cbor.get(1..).map(<[u8]>::to_vec).unwrap_or_default()
+    }
+
+    /// `cbor`, written as bc-ur writes it: a compact UR, or standard Bytewords.
+    fn written(cbor: &[u8], compact: bool) -> String {
+        if compact {
+            format!("ur:sskr/{}", bytewords::encode(cbor, Style::Minimal))
+        } else {
+            bytewords::encode(cbor, Style::Standard)
+        }
+    }
+
+    /// The share read back from `cbor` written in either encoding.
+    fn read(cbor: &[u8], compact: bool) -> Result<Vec<u8>, Refusal> {
+        let text = written(cbor, compact);
+        let share = if compact {
+            read_compact_ur(&text)
+        } else {
+            read_standard_bytewords(&text)
+        };
+        share.map(|payload| payload.to_vec())
+    }
+
+    #[test]
+    fn writes_the_texts_that_bc_ur_writes_in_one_string_of_their_size() {
+        let payload = published_payload();
+        let mut cbor = vec![0x55];
+        cbor.extend_from_slice(&payload);
+        let record = compact_ur(&payload);
+        assert_eq!(record, SHARE);
+        assert_eq!(record.capacity(), record.len());
+        let mut tagged = vec![0xd9, 0x9d, 0x75];
+        tagged.extend_from_slice(&cbor);
+        let words = standard_bytewords(&payload);
+        assert_eq!(words, written(&tagged, false));
+        assert_eq!(words.capacity(), words.len());
+    }
+
+    #[test]
+    fn refuses_a_byte_after_the_share_and_a_share_shorter_than_its_head_in_both_encodings() {
+        let payload = published_payload();
+        for compact in [true, false] {
+            let mut longer = vec![0x55];
+            longer.extend_from_slice(&payload);
+            longer.push(0);
+            assert_eq!(read(&longer, compact), Err(Refusal::Decode));
+            let mut shorter = vec![0x56];
+            shorter.extend_from_slice(&payload);
+            assert_eq!(read(&shorter, compact), Err(Refusal::Decode));
+        }
+    }
+
+    #[test]
+    fn reads_standard_bytewords_with_either_tag_or_none_and_refuses_another_tag() {
+        let payload = published_payload();
+        for tag in [&[0xd9, 0x9d, 0x75][..], &[0xd9, 0x01, 0x35], &[]] {
+            let mut cbor = tag.to_vec();
+            cbor.push(0x55);
+            cbor.extend_from_slice(&payload);
+            assert_eq!(read(&cbor, false), Ok(payload.clone()));
+        }
+        for tag in [&[0xd9, 0x9d, 0x74][..], &[0xda, 0x00, 0x00, 0x9d, 0x75]] {
+            let mut cbor = tag.to_vec();
+            cbor.push(0x55);
+            cbor.extend_from_slice(&payload);
+            assert_eq!(read(&cbor, false), Err(Refusal::Decode));
+        }
+    }
+
+    #[test]
+    fn refuses_a_compact_ur_whose_share_carries_a_tag() {
+        let payload = published_payload();
+        for tag in [[0xd9, 0x9d, 0x75], [0xd9, 0x01, 0x35]] {
+            let mut cbor = tag.to_vec();
+            cbor.push(0x55);
+            cbor.extend_from_slice(&payload);
+            assert_eq!(read(&cbor, true), Err(Refusal::Decode));
+        }
+    }
+
+    #[test]
+    fn refuses_an_empty_share_and_a_kelvin_sign() {
+        assert_eq!(read_compact_ur("ur:sskr/"), Err(Refusal::Decode));
+        assert_eq!(read_standard_bytewords(""), Err(Refusal::Decode));
+        assert_eq!(
+            read_compact_ur(&SHARE.replacen("sskr", "ss\u{212A}r", 1)),
+            Err(Refusal::Decode)
         );
     }
 }
