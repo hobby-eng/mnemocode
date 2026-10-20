@@ -72,6 +72,20 @@ afterEach(() => {
   fault.shiftRead = false;
 });
 
+/**
+ * The engine's own refusal of a share of another UR type, which it cannot decode: an error coded
+ * sskr.engine.decode, as every host's engine gives one.
+ */
+async function engineDecodeRefusal(): Promise<unknown> {
+  const other = sskrVector.shares[0].replace("ur:sskr/", "ur:other/");
+  const refusal = await nodeSharePlatform.combineShares([other]).then(
+    (restored) => restored.fill(0),
+    (error: unknown) => error,
+  );
+  expect(refusal).toMatchObject({ code: "sskr.engine.decode" });
+  return refusal;
+}
+
 /** The public vectors of vectors/mnemocode-v1.json by name. */
 function publicVector(name: string): MnemocodeVector {
   return mnemocodeVectors().vectors.find((item) => item.name === name)!;
@@ -204,6 +218,16 @@ describe("SSKR quick and feature-first-use checks", () => {
   });
 });
 
+/**
+ * The combinations that the SSKR startup check expects the engine to refuse, each told by its
+ * number of records among the calls that the real engine refuses: the vectors' restores are not.
+ */
+const REFUSED_COMBINATIONS = [
+  ["SSKR engine incomplete quorum", sskrVector.shares.length - 1],
+  ["SSKR engine damaged value", sskrVector.shares.length],
+  ["SSKR engine impossible group index", 2],
+] as const;
+
 describe("SSKR quick and feature-first-use checks", () => {
   it("fails on an engine that accepts an insufficient grouped quorum", async () => {
     const accepted: Uint8Array[] = [];
@@ -255,20 +279,36 @@ describe("SSKR quick and feature-first-use checks", () => {
     ).rejects.toThrow("SSKR engine impossible group index was accepted.");
   });
 
-  it("fails on a host whose refusal is no refusal of the combination (AUD-037-BLD007)", async () => {
-    await expect(
-      checkSskrKnownAnswers({
-        ...nodeSharePlatform,
-        combineShares: async (records) => {
-          try {
-            return await nodeSharePlatform.combineShares(records);
-          } catch {
-            throw new Error("The host's SSKR library stopped.");
-          }
-        },
-      }),
-    ).rejects.toThrow("SSKR engine incomplete quorum was refused for another reason.");
-  });
+  it.each(
+    REFUSED_COMBINATIONS.flatMap(([refused, records]) =>
+      ["the engine's decoding error", "a failure without a code"].map((reason) => ({
+        refused,
+        records,
+        reason,
+      })),
+    ),
+  )(
+    "fails when the $refused is refused by $reason (AUD-037-BLD007)",
+    async ({ refused, records, reason }) => {
+      const failure =
+        reason === "a failure without a code"
+          ? new Error("The host's SSKR library stopped.")
+          : await engineDecodeRefusal();
+      await expect(
+        checkSskrKnownAnswers({
+          ...nodeSharePlatform,
+          combineShares: async (given) => {
+            try {
+              return await nodeSharePlatform.combineShares(given);
+            } catch (error) {
+              // The other refusals stay the engine's own.
+              throw given.length === records ? failure : error;
+            }
+          },
+        }),
+      ).rejects.toThrow(`${refused} was refused for another reason.`);
+    },
+  );
 
   it("wipes creation inputs when the host throws before returning shares", async () => {
     const owned: Uint8Array[] = [];
