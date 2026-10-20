@@ -127,7 +127,7 @@ function wordsOf(entry: CatalogEntry): Pick<CardTemplate, "name" | "description"
     case "material":
       return {
         name: `${capitalized(entry.style)} finish selection`,
-        description: `Photographic material samples with finish names and exact references; optional collection QR. ${SHEET_SIZES_TEXT} sheets.`,
+        description: `Photo-realistic material samples with finish names and exact references; optional collection QR. ${SHEET_SIZES_TEXT} sheets.`,
       };
   }
 }

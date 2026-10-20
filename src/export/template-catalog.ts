@@ -33,7 +33,7 @@ export type BusinessStyle = (typeof BUSINESS_STYLES)[number];
 /** The business designs that have artwork of their own: all but "mixed". */
 export type PhysicalBusinessStyle = Exclude<BusinessStyle, "mixed">;
 
-/** Approved photographic finishes, in their order (material-artwork.ts draws them). */
+/** Approved finishes, each with its image, in their order (material-artwork.ts draws them). */
 export const MATERIAL_STYLES = Object.freeze([
   "vehicle",
   "enclosure",
