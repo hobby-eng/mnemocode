@@ -477,7 +477,8 @@ export interface PlanOptions extends SearchRun {
 /**
  * Assesses the shares as typed, with ? for each unreadable element, and returns a plan whose search
  * finds every phrase they can restore, where its verdict lets it be searched; the search of a plan
- * that refused is refused (JointPlan.search). Nothing is tried before `search` is called. The run's
+ * that refused is refused, and that of a plan whose assessment the host stopped finds nothing and
+ * says it was stopped (JointPlan.search). Nothing is tried before `search` is called. The run's
  * signal stops the assessment, which can take a while for many marks, and its turn lets the host
  * run now and then (SearchTurns).
  */
