@@ -61,8 +61,9 @@ describe("writing codes", () => {
         [...phrase.slice(1), -1],
         [...phrase.slice(1), 1.5],
         [...phrase.slice(1), Number.NaN],
-        // An index left undefined is refused, as a hole is.
+        // An index left undefined is refused, and so is a hole.
         Object.assign([...phrase], { 11: undefined }) as unknown as number[],
+        Object.assign(phrase.slice(1), { length: phrase.length }),
         phrase.slice(1),
         [...phrase, 0],
         [],
