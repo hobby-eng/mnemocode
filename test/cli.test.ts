@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
+import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { describe, expect, it } from "vitest";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { containing, matching } from "./helpers/matchers.js";
@@ -127,7 +128,8 @@ describe("CLI records", () => {
     );
     // The names start in one column; the forms that every design prints are named once, above.
     expect(new Set(rows.map((row) => row.search(/(?<=\S {3,})\S/u))).size).toBe(1);
-    // On a terminal only, as every result's facts (terminalResultHeader).
+    // The facts above the list on a terminal only, as every result's (terminalResultHeader): a pipe
+    // keeps the plain list, also with colour forced (AUD-037-UI006).
     const colored = Object.entries(process.env).filter(
       ([name]) => !["NO_COLOR", "FORCE_COLOR", "CLICOLOR"].includes(name),
     );
@@ -135,7 +137,8 @@ describe("CLI records", () => {
       ...Object.fromEntries(colored),
       CLICOLOR_FORCE: "1",
     });
-    expect(shown.stdout).toMatch(/Prints.*format 3, 4 or 5/u);
+    expect(shown.stdout).not.toMatch(/Prints/u);
+    expect(shown.stdout.replace(STYLE_CODES, "")).toBe(listed.stdout);
     await expect(
       run(["preview", "--all", "--template", "1", "--pdf", "unused.pdf"]),
     ).rejects.toMatchObject({

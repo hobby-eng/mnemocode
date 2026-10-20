@@ -17,7 +17,11 @@ from terminal_session import (
     assert_kept_private,
     assert_private_result_visible,
     line_starting,
+    terminal_size,
 )
+
+# Rows that hold an encoded result with its shares, headings and fingerprints on one screen.
+ROWS_FOR_A_SPLIT = 100
 from terminal_answers import (
     ASKED_AGAIN,
     CANCELLED,
@@ -127,39 +131,53 @@ def check_marked_codes_result():
 
 
 def check_encode_result_visible():
-    """A screen-only backup stays visible while its optional check is offered and declined."""
-    for mode in ("direct", "seedshift"):
-        for shares in (False, True):
-            arguments = ["encode", "--ask-secrets", "--mode", mode, "--format", "2"]
+    """A screen-only backup stays visible while its optional check is offered and declined, on a
+    terminal tall enough for the result with its headings, which a shorter one shows by pages."""
+    with terminal_size(ROWS_FOR_A_SPLIT):
+        for mode in ("direct", "seedshift"):
+            check_encode_result_visible_in(mode)
+
+
+def check_encode_result_visible_in(mode):
+    """check_encode_result_visible for `mode`, without and with shares."""
+    for shares in (False, True):
+        arguments = ["encode", "--ask-secrets", "--mode", mode, "--format", "2"]
+        if shares:
+            arguments += ["--sskr", "--threshold", "2", "--shares", "3"]
+        session = Session(arguments=arguments)
+        try:
+            session.wait_for("Seed phrase (English BIP39 words):")
+            session.type(TEST_PHRASE + ENTER)
+            if mode == "seedshift":
+                session.wait_for("Dates (")
+                session.type(MASK_DATE + ENTER)
+            session.wait_for("Check the backup now?")
+            session.wait_for("Esc skips the check")
+            codes = MASKED_WORD_NUMBERS if mode == "seedshift" else WORD_NUMBERS
+            markers = [codes]
             if shares:
-                arguments += ["--sskr", "--threshold", "2", "--shares", "3"]
-            session = Session(arguments=arguments)
-            try:
-                session.wait_for("Seed phrase (English BIP39 words):")
-                session.type(TEST_PHRASE + ENTER)
-                if mode == "seedshift":
-                    session.wait_for("Dates (")
-                    session.type(MASK_DATE + ENTER)
-                session.wait_for("Check the backup now?")
-                session.wait_for("Esc skips the check")
-                codes = MASKED_WORD_NUMBERS if mode == "seedshift" else WORD_NUMBERS
-                markers = [codes]
-                if shares:
-                    markers += [f"SSKR share {number} of 3" for number in (1, 2, 3)]
-                assert_private_result_visible(session, markers)
-                session.type("2")
-                session.wait_for(CLEAR_PROMPT)
-                assert_private_result_visible(session, markers)
-                session.type(ENTER)
-                assert session.wait_for_exit() == 0
-                assert_kept_private(session, (TEST_PHRASE, MASK_DATE, codes))
-            finally:
-                session.close()
-            print(f"encode {mode}, shares={shares}: result visible before and after declining check")
+                markers += [f"SSKR share {number} of 3" for number in (1, 2, 3)]
+            assert_private_result_visible(session, markers)
+            session.type("2")
+            session.wait_for(CLEAR_PROMPT)
+            assert_private_result_visible(session, markers)
+            session.type(ENTER)
+            assert session.wait_for_exit() == 0
+            assert_kept_private(session, (TEST_PHRASE, MASK_DATE, codes))
+        finally:
+            session.close()
+        print(f"encode {mode}, shares={shares}: result visible before and after declining check")
 
 
 def check_phrase_display_choices():
-    """Optional original and masked words remain visible on the private result, then disappear."""
+    """Optional original and masked words remain visible on the private result, then disappear, on
+    a terminal tall enough for the result with its headings."""
+    with terminal_size(ROWS_FOR_A_SPLIT):
+        check_phrase_display_choices_on_screen()
+
+
+def check_phrase_display_choices_on_screen():
+    """check_phrase_display_choices on the terminal it is run on."""
     masked = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress"
     original_codes = "#000064 #1EAB91 #3D0964 #5BB491 #7A1264 #98BD91 #B71B64 #D5C694"
     for copy in (None, "words", "codes", "both"):
@@ -487,7 +505,8 @@ def check_restore_share_asked_again():
         session.type(FORGOTTEN_DIGIT + ENTER)
         answer_fingerprint(session)
         session.wait_for("found 1 match.")
-        session.wait_for(f"(dates {MASK_DATE})")
+        # Among the facts of the restored phrase, as a terminal shows them (AUD-037-UI006).
+        session.wait_for(f"Dates      {MASK_DATE}")
         session.wait_for(TEST_PHRASE)
         session.wait_for(CLEAR_PROMPT)
         session.type(ENTER)

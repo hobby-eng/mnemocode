@@ -90,14 +90,23 @@ export function terminalColor(channel: Channel): boolean {
   return streamGetsColor(process[channel]);
 }
 
+/**
+ * Whether `channel` is shown as a person's terminal: one that can redraw, not TERM=dumb
+ * (streamCanRedraw), whatever NO_COLOR, CLICOLOR or CLICOLOR_FORCE say, which decide its colour
+ * alone; a file, a pipe and TERM=dumb take the plain form of a script (AUD-037-UI006).
+ */
+export function terminalLayout(channel: Channel): boolean {
+  return streamCanRedraw(process[channel]);
+}
+
 export function terminalPaint(channel: Channel, code: string, text: string): string {
   return paint(process[channel], code, text);
 }
 
 /**
  * The heading of a result, "MnemoCode · <title>", and its facts as grey labels with their values,
- * like the summary of `mhfe`, on `channel`. Returns false without printing when it has no colour;
- * the caller then prints its plain form.
+ * like the summary of `mhfe`, on `channel`. Returns false without printing when it is no terminal
+ * (terminalLayout); the caller then prints its plain form.
  */
 export function terminalResultHeader(
   title: string,
@@ -111,15 +120,15 @@ export function terminalResultHeader(
 }
 
 /**
- * The lines that terminalResultHeader prints, a blank line first, or none when `channel` has no
- * colour: what a check of the room on the screen measures.
+ * The lines that terminalResultHeader prints, a blank line first, or none when `channel` is no
+ * terminal: what a check of the room on the screen measures.
  */
 export function resultHeaderLines(
   title: string,
   rows: readonly [string, string][],
   channel: Channel = "stdout",
 ): string[] {
-  return terminalColor(channel) ? resultLines(process[channel], title, rows) : [];
+  return terminalLayout(channel) ? resultLines(process[channel], title, rows) : [];
 }
 
 /**
@@ -194,7 +203,8 @@ const ROW_INDENT = "  ";
 /**
  * `items` numbered from 1, `perRow` to a row, the numbers grey and the items bold, each padded to
  * `width` to line up the next; then `copy` on one plain line, for copying, on `channel`. Returns
- * false without printing when it has no colour; the caller then prints its plain form.
+ * false without printing when it is no terminal (terminalLayout); the caller then prints its plain
+ * form.
  */
 function terminalNumbered(
   items: readonly string[],
@@ -203,7 +213,7 @@ function terminalNumbered(
   copy: string,
   channel: Channel,
 ): boolean {
-  if (!terminalColor(channel)) return false;
+  if (!terminalLayout(channel)) return false;
   for (let start = 0; start < items.length; start += perRow) {
     const row = items.slice(start, start + perRow);
     const cells = row.map((item, column) => {
@@ -225,7 +235,7 @@ function terminalNumbered(
 
 /**
  * A seed phrase for a person to write down, as `mhfe` shows one: numbered, four words to a row;
- * then on one plain line, for copying (terminalNumbered). False without colour.
+ * then on one plain line, for copying (terminalNumbered). False when it is no terminal.
  */
 export function terminalPhrase(phrase: string, channel: Channel = "stdout"): boolean {
   return terminalNumbered(phrase.split(" "), LONGEST_WORD, WORDS_PER_ROW, phrase, channel);
@@ -247,7 +257,7 @@ function joinedCodeLines(codes: readonly string[], joined: string): string[] {
 /** The exact lines printCodes writes, including the separated and joined terminal views. */
 export function codeLines(text: string, format: EncodedFormat): string[] {
   const apart = EncodedForm.of(format).apartCodes(text);
-  return apart === undefined || !terminalColor("stdout")
+  return apart === undefined || !terminalLayout("stdout")
     ? [text]
     : joinedCodeLines(apart, compactCode(text));
 }

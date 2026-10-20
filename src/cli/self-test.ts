@@ -5,7 +5,7 @@
 // It prints the report in the tools' terminal look.
 
 import { masterFingerprint, nodePbkdf2HmacSha512 } from "../bitcoin-evidence.js";
-import { STYLE, terminalColor, terminalPaint } from "./terminal.js";
+import { STYLE, terminalLayout, terminalPaint } from "./terminal.js";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -211,7 +211,7 @@ export async function runSelfTest(): Promise<void> {
     (row) => [row.name, `${row.detail} (${row.milliseconds.toFixed(1)} ms)`] as const,
   );
   const summary = `${report.publicVectors} public vectors; ${report.roundTrips} representation round trips; ${report.milliseconds.toFixed(1)} ms total.`;
-  if (terminalColor("stdout")) {
+  if (terminalLayout("stdout")) {
     // The terminal look of the bip_tools tools: a title line, a ✓ per check, grey details.
     const paint = (code: string, text: string): string => terminalPaint("stdout", code, text);
     console.log(`\n${headingLine(process.stdout, `Self-test ${MNEMOCODE_VERSION}`)}`);

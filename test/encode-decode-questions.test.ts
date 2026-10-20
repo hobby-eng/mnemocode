@@ -26,6 +26,7 @@ import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { DATE, MASKED, promptsShown } from "./helpers/phrase-questions.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -710,6 +711,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("shows the encoded fingerprint as encode does on a colour terminal", async () => {
       vi.stubEnv("NO_COLOR", "");
       vi.stubEnv("CLICOLOR_FORCE", "1");
+      streamsAsTerminal();
       terminal.answers = [`${MASKED}\r`, `${DATE}\r`];
       await runDecode({ "ask-secrets": true, mode: "seedshift" });
       const plain = seen.notices.map((line) => line.replace(STYLE_CODES, ""));
@@ -724,6 +726,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("shows the decoded phrase numbered, and its fingerprint apart, on a colour terminal", async () => {
       vi.stubEnv("NO_COLOR", "");
       vi.stubEnv("CLICOLOR_FORCE", "1");
+      streamsAsTerminal();
       terminal.answers = [`${MASKED}\r`, `${DATE}\r`];
       await runDecode({ "ask-secrets": true, mode: "seedshift" });
       const shown = seen.out.map((line) => line.replace(STYLE_CODES, ""));

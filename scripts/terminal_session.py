@@ -10,6 +10,7 @@ import shutil
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -34,6 +35,19 @@ UP, DOWN, ENTER, CTRL_UP, ESCAPE = "\x1b[A", "\x1b[B", "\r", "\x1b[1;5A", "\x1b"
 HOME, END, DELETE = "\x1b[H", "\x1b[F", "\x1b[3~"
 BACKSPACE, CTRL_U, CTRL_C, CTRL_D = "\x7f", "\x15", "\x03", "\x04"
 ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN = "\x1b[?1049h", "\x1b[?1049l"
+
+
+@contextmanager
+def terminal_size(rows, columns=None):
+    """The size of the pseudo-terminals that sessions start with inside it, `columns` unchanged
+    unless given: for a check whose result must fit on one screen."""
+    global TERMINAL_ROWS, TERMINAL_COLUMNS
+    previous = TERMINAL_ROWS, TERMINAL_COLUMNS
+    TERMINAL_ROWS, TERMINAL_COLUMNS = rows, TERMINAL_COLUMNS if columns is None else columns
+    try:
+        yield
+    finally:
+        TERMINAL_ROWS, TERMINAL_COLUMNS = previous
 
 
 class Session:

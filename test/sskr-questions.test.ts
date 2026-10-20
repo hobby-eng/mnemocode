@@ -24,6 +24,7 @@ import {
   SHARES_PROMPT,
 } from "./helpers/share-questions.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -378,6 +379,7 @@ describe("shares on the private screen", () => {
   it("lists what a repair filled in as a table on a colour terminal", async () => {
     vi.stubEnv("NO_COLOR", "");
     vi.stubEnv("CLICOLOR_FORCE", "1");
+    streamsAsTerminal();
     terminal.answers = [`${SHARES[0]};${marked([5])}\r`];
     await combine();
     const plain = seen.notices.map(withoutColour);
@@ -436,6 +438,7 @@ describe("shares on the private screen", () => {
     it("shows each part of the result apart on a colour terminal, each phrase with its fingerprint", async () => {
       vi.stubEnv("NO_COLOR", "");
       vi.stubEnv("CLICOLOR_FORCE", "1");
+      streamsAsTerminal();
       terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
       await combine({ mode: "seedshift" });
       const shown = seen.out.map(withoutColour);
@@ -460,6 +463,7 @@ describe("shares on the private screen", () => {
     it("shows the encoded fingerprint as a status line in colour", async () => {
       vi.stubEnv("NO_COLOR", "");
       vi.stubEnv("CLICOLOR_FORCE", "1");
+      streamsAsTerminal();
       terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
       await combine({ mode: "seedshift" });
       const plain = seen.notices.map((line) => line.replace(STYLE_CODES, ""));

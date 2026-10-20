@@ -2,7 +2,7 @@ import { masterFingerprint } from "../bitcoin-evidence.js";
 import { EncodedBackup } from "../core/encoded-backup.js";
 import {
   printCodes,
-  terminalColor,
+  terminalLayout,
   terminalHint,
   terminalMore,
   terminalResultHeader,
@@ -80,7 +80,7 @@ export function printOriginalCopy(
 /**
  * The two fingerprints under a result made in `mode`: the original seed phrase's, the wallet's,
  * and the encoded one's, undefined where the codes have none (the Original Seedshift's checksum
- * usually fails). On a terminal in colour as labelled facts, otherwise as plain lines. Encode and
+ * usually fails). On a terminal as labelled facts, otherwise as plain lines. Encode and
  * the split into shares show them so.
  */
 export function printFingerprints(
@@ -89,7 +89,7 @@ export function printFingerprints(
   encoded: string | undefined,
 ): void {
   const masking = Masking.of(mode);
-  if (terminalColor("stderr")) {
+  if (terminalLayout("stderr")) {
     console.error("");
     terminalStatus(PHRASE_WORDS.originalFingerprint, original);
     if (encoded === undefined)

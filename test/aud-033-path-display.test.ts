@@ -11,6 +11,7 @@ import { LeftStagingCopyError } from "../src/export/private-file.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 import { terminalFailure } from "../src/cli/terminal.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const keyboard = vi.hoisted(() => ({ bytes: [] as number[] }));
 vi.mock("node:tty", async (original) => ({
@@ -162,6 +163,7 @@ it.each(CONTROLS)(
   (_, raw, shown) => {
     vi.stubEnv("NO_COLOR", undefined);
     vi.stubEnv("CLICOLOR_FORCE", "1");
+    streamsAsTerminal();
     terminalFailure(`The file public-${raw}-record.txt could not be read.`);
     expect(output.join(" ")).toContain("\x1b[1;31m");
     expect(output.join(" ")).not.toContain(raw);
@@ -205,7 +207,8 @@ it("keeps ordinary path spelling and the established save-failure text", async (
       throw new Error("Skipping must not ask for another path.");
     },
   });
-  expect(output).toContain(
+  // On a terminal the notice is wrapped beside its mark (AUD-037-UI006): read as one text.
+  expect(output.join(" ").replace(/\s+/gu, " ")).toContain(
     "The record could not be saved as public ordinary.txt: there is no permission to write there.",
   );
 });

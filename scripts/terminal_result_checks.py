@@ -161,8 +161,9 @@ def read_share_set(session, mode, count, colour):
         terminal.assert_private_result_visible(session, ("Enter selects",))
     shown += " " + terminal.private_frame(session)
     titles = (f"share {number} of {count}" for number in range(1, int(count) + 1))
-    # The heading of the export, or without colour its plain line, and the wallet's fingerprint.
-    wanted = ["SSKR export" if colour else "shares required", FINGERPRINT, *titles]
+    # The heading of the export, which a terminal shows with colour or without (AUD-037-UI006),
+    # and the wallet's fingerprint.
+    wanted = ["SSKR export", FINGERPRINT, *titles]
     for marker in wanted:
         assert marker in shown, f"{marker!r} was neither on the screen nor on a page"
     session.type("2")

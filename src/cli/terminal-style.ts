@@ -133,9 +133,12 @@ const NOTICE_MARKS = {
   warning: { mark: "!", code: STYLE.warning },
 } as const;
 
-/** Advice that can be read and passed over: grey and wrapped with colour, otherwise as it is. */
+/**
+ * Advice that can be read and passed over: on a terminal wrapped, and grey where it gets colour;
+ * for a file, a pipe or TERM=dumb as it is.
+ */
 export function hintLines(stream: ColorStream, message: string): string[] {
-  if (!streamGetsColor(stream)) return [message];
+  if (!streamCanRedraw(stream)) return [message];
   return wrapText(message).map((line) => paint(stream, STYLE.muted, line));
 }
 
@@ -157,11 +160,12 @@ export function markedLines(
 }
 
 /**
- * The lines of a notice: without colour the message as it is, one line for a file or a pipe; in
- * colour news as a hint, a success or a warning after its mark (markedLines).
+ * The lines of a notice: for a file, a pipe or TERM=dumb the message as it is, one line; on a
+ * terminal news as a hint, a success or a warning after its mark (markedLines), with colour where
+ * it gets colour. NO_COLOR and CLICOLOR take only the colour away (AUD-037-UI006).
  */
 export function noticeLines(stream: ColorStream, message: string, kind: NoticeKind): string[] {
-  if (!streamGetsColor(stream)) return [message];
+  if (!streamCanRedraw(stream)) return [message];
   return kind === "info" ? hintLines(stream, message) : markedLines(stream, message, kind);
 }
 
@@ -171,9 +175,12 @@ export function statusLine(stream: ColorStream, label: string, value: string, go
   return `${mark} ${label} ${paint(stream, STYLE.strong, value)}`;
 }
 
-/** An error after a red "✗ Error:", or after "`program`:" on a stream without colour. */
+/**
+ * An error after "✗ Error:" on a terminal, red where it gets colour, or after "`program`:" for a
+ * file, a pipe or TERM=dumb.
+ */
 export function failureLine(stream: ColorStream, program: string, message: string): string {
   const text = printableText(message);
-  if (!streamGetsColor(stream)) return `${program}: ${text}`;
+  if (!streamCanRedraw(stream)) return `${program}: ${text}`;
   return `${paint(stream, STYLE.bad, "✗ Error:")} ${text}`;
 }

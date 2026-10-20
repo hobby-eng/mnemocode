@@ -19,7 +19,7 @@ import { clearPrivateScreen } from "./private-screen.js";
 import {
   FINGERPRINT_NOTE,
   printCodes,
-  terminalColor,
+  terminalLayout,
   terminalFingerprint,
   terminalNotice,
   terminalPart,
@@ -662,7 +662,7 @@ interface RestoredPlace {
  * under its own label, the phrase numbered for writing down; elsewhere the plain lines.
  */
 function showRestored(phrase: RestoredPhrase, mode: SplitMode, place: RestoredPlace): void {
-  if (terminalColor("stdout")) showRestoredParts(phrase, mode, place);
+  if (terminalLayout("stdout")) showRestoredParts(phrase, mode, place);
   else showRestoredPlain(phrase, mode, place);
 }
 
@@ -753,7 +753,7 @@ function showRestoredParts(phrase: RestoredPhrase, mode: SplitMode, place: Resto
   showOriginalPhrase(phrase.mnemonic);
 }
 
-/** A restored phrase as plain lines, for a file, a pipe or a terminal without colour. */
+/** A restored phrase as plain lines, for a file, a pipe or TERM=dumb. */
 function showRestoredPlain(phrase: RestoredPhrase, mode: SplitMode, place: RestoredPlace): void {
   reportSet(phrase, place, false);
   reportWalletWarning(phrase, place);

@@ -1,5 +1,5 @@
-// The fingerprints of a result as the command line shows them: on a terminal in colour as labelled
-// facts with a grey note, otherwise as plain lines for a file or a pipe. Every command builds them
+// The fingerprints of a result as the command line shows them: on a terminal as labelled facts with
+// a note, grey where it gets colour, otherwise as plain lines for a file or a pipe. Every command builds them
 // from these pieces, so that the labels, the notes and the plain lines read alike everywhere.
 
 import { masterFingerprint } from "../bitcoin-evidence.js";
@@ -9,7 +9,7 @@ import {
   FINGERPRINT_NOTE,
   FINGERPRINT_DISCLOSURE,
   type Channel,
-  terminalColor,
+  terminalLayout,
   terminalLine,
   terminalFingerprint,
   terminalHint,
@@ -18,13 +18,13 @@ import {
   terminalStatus,
 } from "./terminal.js";
 
-/** The note under one fingerprint shown in colour. */
+/** The note under one fingerprint shown on a terminal. */
 export const FINGERPRINT_HINT = `Fingerprint uses an ${FINGERPRINT_NOTE}.`;
-/** The note under the two fingerprints of a backup shown in colour. */
+/** The note under the two fingerprints of a backup shown on a terminal. */
 export const FINGERPRINTS_HINT = `BIP32 fingerprints above use an ${FINGERPRINT_NOTE}.`;
 /**
  * What a phrase whose BIP39 checksum fails says: its dates or its codes are probably wrong. One
- * text, in colour and in plain lines.
+ * text, on a terminal and in plain lines.
  */
 export const CHECKSUM_INVALID = "invalid — dates or input may be wrong";
 
@@ -43,11 +43,11 @@ export function plainFingerprintLine(
 }
 
 /**
- * One fingerprint under a result: in colour as `label` and `value` with FINGERPRINT_HINT,
+ * One fingerprint under a result: on a terminal as `label` and `value` with FINGERPRINT_HINT,
  * otherwise as `plainLine` (plainFingerprintLine).
  */
 export function reportFingerprint(label: string, value: string, plainLine: string): void {
-  if (terminalColor("stderr")) {
+  if (terminalLayout("stderr")) {
     terminalStatus(label, value);
     terminalHint(FINGERPRINT_HINT);
   } else console.error(plainLine);

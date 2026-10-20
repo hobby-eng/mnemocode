@@ -497,7 +497,8 @@ describe("AUD-012-ARC014: the script and the command line paint one way", () => 
   it("writes the same bytes with colour and the plain form without", () => {
     vi.stubEnv("NO_COLOR", "");
     vi.stubEnv("CLICOLOR_FORCE", "1");
-    const stream = {};
+    vi.stubEnv("TERM", "xterm");
+    const stream = { isTTY: true };
     expect(resultLines(stream, "Signed", [["Tag", "v1"]])).toEqual([
       "\n\x1b[1;36mMnemoCode\x1b[0m \x1b[90m·\x1b[0m \x1b[1mSigned\x1b[0m",
       "  \x1b[90mTag       \x1b[0m v1",
@@ -506,8 +507,10 @@ describe("AUD-012-ARC014: the script and the command line paint one way", () => 
       "\x1b[1;32m✓\x1b[0m Checked \x1b[1mSHA256SUMS\x1b[0m",
     );
     expect(failureLine(stream, "sign-release", "bad")).toBe("\x1b[1;31m✗ Error:\x1b[0m bad");
+    // Without colour a terminal keeps its form (AUD-037-UI006); a pipe gets the script's.
     vi.stubEnv("NO_COLOR", "1");
-    expect(failureLine(stream, "sign-release", "bad")).toBe("sign-release: bad");
+    expect(failureLine(stream, "sign-release", "bad")).toBe("✗ Error: bad");
+    expect(failureLine({}, "sign-release", "bad")).toBe("sign-release: bad");
     expect(statusLine(stream, "Checked", "x", false)).toBe("! Checked x");
   });
 });

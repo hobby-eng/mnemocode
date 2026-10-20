@@ -63,7 +63,7 @@ import { clearPrivateScreen, onPrivateScreen } from "./private-screen.js";
 import { PrivateSteps } from "./private-steps.js";
 import {
   type Channel,
-  terminalColor,
+  terminalLayout,
   terminalLine,
   terminalResultHeader,
   terminalNotice,
@@ -233,7 +233,7 @@ function showRecoveredParts(result: DecodedResult, channel: Channel): void {
 /** The phrase on one line, then its checksum and fingerprint, for a file or a pipe. */
 function showRecoveredPlain(result: DecodedResult, channel: Channel): void {
   terminalLine(channel, result.recoveredMnemonic);
-  if (terminalColor("stderr")) {
+  if (terminalLayout("stderr")) {
     console.error("");
     terminalStatus(
       "BIP39 checksum",

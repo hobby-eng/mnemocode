@@ -55,7 +55,7 @@ import {
   SEARCH_PROGRESS_SECONDS,
   STYLE,
   TEXT_WIDTH,
-  terminalColor,
+  terminalLayout,
   terminalHint,
   terminalMore,
   terminalNotice,
@@ -593,7 +593,7 @@ export async function searchShareRepair(
  */
 export function reportRepairs(set: RepairedShares, places?: readonly number[]): void {
   const repairs = RepairReport.repairs(set, places);
-  if (repairs.length === 0 || !terminalColor("stderr")) {
+  if (repairs.length === 0 || !terminalLayout("stderr")) {
     printLines(RepairReport.repairLines(set, places));
     return;
   }

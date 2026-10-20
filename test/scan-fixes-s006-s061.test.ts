@@ -105,6 +105,7 @@ import {
 } from "../src/core/white-space.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 describe("S006: the facts of a kind of wallet evidence follow from its level", () => {
   it("tells which kinds are scanned and which are placed", async () => {
@@ -153,6 +154,7 @@ describe("S009: one look-up in the word table", () => {
 
   it("with colour, a lookup's facts are grey labels under the result's heading", async () => {
     vi.stubEnv("CLICOLOR_FORCE", "1");
+    streamsAsTerminal();
     vi.stubEnv("NO_COLOR", "");
     const lines: string[] = [];
     const log = vi.spyOn(console, "log").mockImplementation((line: string) => lines.push(line));

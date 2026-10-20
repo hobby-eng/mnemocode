@@ -103,6 +103,7 @@ import { validCharacters, characterLength, isContinuation } from "../src/cli/utf
 import { characterSize } from "../src/cli/terminal-geometry.js";
 import { assertColorCards } from "../src/export/card-content.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 describe("S059: the menu's wallet answer is the command line that gives the same evidence", () => {
   it("reads back every way of the wallet question, and a place that is not the first", () => {
@@ -512,6 +513,7 @@ describe("S087: the rows around a result are measured as they are printed", () =
     expect(listQuestionRows(WHAT_NOW, three, "stops")).toBe(8);
     expect(closingRows()).toBe(2);
     vi.stubEnv("CLICOLOR_FORCE", "1");
+    streamsAsTerminal();
     vi.stubEnv("NO_COLOR", "");
     // A blank line, the title and three facts: the hand count left out one of them.
     expect(

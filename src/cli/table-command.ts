@@ -21,7 +21,7 @@ const ERRORS = new ErrorCatalog("cli.table-command", {
     "--table-format requires --all; --output requires --all or --recovery-guide.",
 });
 
-/** One row of the table: grey labels under the result's heading, or plain lines without colour. */
+/** One row of the table: grey labels under the result's heading, or plain lines for a script. */
 function printRow(row: ReturnType<typeof WordTable.row>): void {
   const facts: [string, string][] = [
     ["Index", `${row.index}`],
