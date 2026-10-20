@@ -15,7 +15,7 @@ Thirteen templates are included; `mnemocode preview --list` prints their numbers
 - A sheet shows the studio name and the line `DESIGN STUDY / FOR SELECTION` centred at the top, numbered samples with their references, and one line at the bottom with the slogan and the series reference.
 - Every row of samples is full. A sheet has at least three rows where they fit, rather than two long ones, with the largest samples the page allows, and of samples about as large the most of them, so that they fill the page in height and width. The rows share the height evenly, above, between and below them. Without `--orientation` the sheet is turned the way that gives such a sheet.
 - Business cards lie on a dark page with a world map. Material samples lie on a backdrop of their own setting, whose panels, tiles or planks are laid out around the samples: their joints run between them, and each sample sits in the middle of a panel or tile of its own.
-- The object of a material photograph, such as a tile or a switch plate, sits in the middle of its sample.
+- The object of a material image, such as a tile or a switch plate, sits in the middle of its sample.
 - Each Shamir share has its own sheet and its own series reference.
 - Material sheets also show names of finishes, which are decoration. Two different codes never get the same sample on one sheet.
 - A name that does not fit beside its sample at the sheet's size takes two lines rather than smaller letters. The line with the number and the code is never split.
@@ -28,7 +28,7 @@ Thirteen templates are included; `mnemocode preview --list` prints their numbers
 
 ## Artwork
 
-Photographs of cards and materials are stored in the program; the colour of a material sample is laid over its photograph. Page backdrops, text, reference codes and the QR code are drawn as shapes, not as pixels, so they stay sharp in print.
+Images of cards and materials are stored in the program; the colour of a material sample is laid over its image. They were made for MnemoCode with OpenAI's image generation and are distributed under MnemoCode's MIT license; [their notice](../assets/images/NOTICE) says how they were made and lists each image with its SHA-256. Page backdrops, text, reference codes and the QR code are drawn as shapes, not as pixels, so they stay sharp in print.
 
 ## Example titles
 

@@ -21,6 +21,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { RELEASE_FOLDER, executableName, noticesName } from "./executable-files.mjs";
+import { ASSETS_FOLDER } from "../src/bundled-file-paths.ts";
 import { ErrorCatalog } from "../src/core/error-catalog.ts";
 
 const ERRORS = new ErrorCatalog("scripts.verify-executable", {
@@ -144,9 +145,12 @@ try {
   check(run("encode", "--help").includes("Usage: mnemocode encode"), "prints the help");
   const notices = join(dirname(executable), noticesName(basename(executable)));
   const text = existsSync(notices) ? readFileSync(notices, "utf8") : "";
+  // The notice of the card images, whole (AUD-037-DOC017): its first line, "Card artwork", is a
+  // heading of THIRD_PARTY_NOTICES.md too.
+  const artwork = readFileSync(join(root, ASSETS_FOLDER, "images", "NOTICE"), "utf8");
   check(
-    ["MnemoCode", `Node.js ${process.version}`, "npm package", "SSKR engine"].every((part) =>
-      text.includes(part),
+    ["MnemoCode", `Node.js ${process.version}`, "npm package", "SSKR engine", artwork].every(
+      (part) => text.includes(part),
     ),
     "has its license notices next to it",
   );

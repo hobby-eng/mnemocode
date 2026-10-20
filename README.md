@@ -113,7 +113,7 @@ mnemocode decode --input-file direct-unicode.txt --ask-secrets
 
 ## Cards and QR codes
 
-Cards print the recoverable codes. Photographs, decorative colors and personal details do not carry the phrase. Thirteen designs are available; `mnemocode preview --list` lists them. Cards require format 3, 4 or 5.
+Cards print the recoverable codes. Images, decorative colors and personal details do not carry the phrase. Thirteen designs are available; `mnemocode preview --list` lists them. Cards require format 3, 4 or 5.
 
 ```bash
 mnemocode encode --mode seedshift --ask-secrets --format 5 \

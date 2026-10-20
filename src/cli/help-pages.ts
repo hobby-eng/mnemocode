@@ -752,7 +752,7 @@ export const topicHelp: Readonly<Record<string, TopicHelp>> = {
         paragraphs: [
           `In formats ${COLOR_FORMAT_NUMBERS} the phrase is a short list of color codes, in format ${formatNumber("unicode")} one Unicode code a word. A template places them into a familiar document, such as a print studio proposal with sample business cards. Each card shows one code: a color and its code, such as Ref. 01AB63, or a Unicode code in a color that only decorates it, the same color for the same code. The printed codes are the whole value: decode turns them back into the phrase.`,
           "A set ends with a few random codes that belong to nothing: on a sheet at least one, so that every row is full and the cards are as large as the page allows; separate cards end with exactly one, after all real codes. No card says how many cards there are. The QR code holds only the real codes, and the sheet for heirs says how many words the phrase has: decode --words reads only the codes of so many words.",
-          "The names, companies and contact details are a decoy that makes the cards look ordinary, invented at random unless given with --card-name and the other details. Like the photographs, they are not needed for recovery.",
+          "The names, companies and contact details are a decoy that makes the cards look ordinary, invented at random unless given with --card-name and the other details. Like the images, they are not needed for recovery.",
         ],
       },
       {
