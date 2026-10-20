@@ -104,8 +104,10 @@ export class CandidateEncryptionChecks {
    */
   static async symmetric(): Promise<void> {
     // Python cryptography/OpenSSL first reproduces RFC 7748, then independently checks this age
-    // fixture's X25519/HKDF wrapping, header MAC and ChaCha20-Poly1305 payload. AUD-033 evidence:
-    // remediation/age-symmetric-oracle.py and .json. Only public test material is used here.
+    // fixture's X25519/HKDF wrapping, header MAC and ChaCha20-Poly1305 payload: the oracle is
+    // remediation/age-symmetric-oracle.py and .json in the maintainer's machine-local AUD-033
+    // evidence, which is not published (docs/audits/README.md, "AUD-033 withheld report"). Only
+    // public test material is used here.
     const key = bytesOfHex(SYMMETRIC_FILE_KEY_HEX);
     const file = bytesOfHex(TO_THE_SESSION_KEY);
     const decrypter = new Decrypter();
