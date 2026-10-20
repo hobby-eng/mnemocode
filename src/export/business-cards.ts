@@ -12,7 +12,7 @@ import {
 import { PDFDocument, rgb, type PDFFont, type PDFPage, type PDFImage } from "pdf-lib";
 import { clearDocumentMetadata } from "./document-metadata.js";
 import type { CardContent } from "./backup-cards.js";
-import type { CardDrawing } from "./templates.js";
+import type { CardDrawing } from "./drawing-sources.js";
 import type { SskrCardContent } from "./sskr-content.js";
 import { MM, separateCardPage, type CardBox } from "./business-layout.js";
 import { drawCollectionStudy, separateCardIndex } from "./collection-sheet.js";

@@ -22,7 +22,12 @@
         "skipComments": true
       }
     ],
-    "import/no-cycle": "error",
+    "import/no-cycle": [
+      "error",
+      {
+        "ignoreTypes": false
+      }
+    ],
     "import/no-default-export": "error",
     "unicorn/filename-case": [
       "error",

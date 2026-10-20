@@ -31,9 +31,9 @@ import {
   assertShareFormat,
   Share,
   type ShareFormat,
-  type ShareInfo,
   MIRRORED_FORM,
 } from "./transport.js";
+import type { ShareInfo } from "./share-layout.js";
 import { copiesAmong, SetTopology, type PlacedShare, withoutCopies } from "./set-topology.js";
 import {
   digestChecks,

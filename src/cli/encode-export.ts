@@ -14,7 +14,7 @@ import { indexesToColors } from "../core.js";
 import { type ParsedArguments, value } from "./arguments.js";
 import { colorCards, printableText, terminalNotice, terminalWork } from "./terminal.js";
 import { exportQrPayload } from "../export/qr-image.js";
-import type { EncodeOutcome } from "./encode-command.js";
+import type { EncodeOutcome } from "./encode-types.js";
 import { SecretValue } from "../core/secret-value.js";
 import { Redacted } from "../core/redacted.js";
 import { defined } from "../core/defined.js";

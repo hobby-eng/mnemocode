@@ -19,7 +19,7 @@ import {
   type PDFImage,
 } from "pdf-lib";
 import type { CardContent } from "./backup-cards.js";
-import type { CardDrawing } from "./templates.js";
+import type { CardDrawing } from "./drawing-sources.js";
 import type { SskrCardContent } from "./sskr-content.js";
 import { ExportDetails } from "./export-details.js";
 import { clearDocumentMetadata } from "./document-metadata.js";

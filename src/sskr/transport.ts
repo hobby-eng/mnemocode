@@ -36,6 +36,7 @@ import {
   SSKR_CBOR_TAGS,
   storedCount,
   tagBytes,
+  type ShareInfo,
 } from "./share-layout.js";
 import { checksumAt, CRC32_BYTES, crc32 } from "./checksum.js";
 import { SET_CONFLICT_CODES, SET_CONFLICT_TEXTS, SetTopology } from "./set-topology.js";
@@ -179,19 +180,8 @@ function sharePayload(transport: Uint8Array): Uint8Array {
   return cbor.subarray(offset);
 }
 
-/**
- * The metadata of a share: its identifier, its group and member, the thresholds and counts, and the
- * length of its secret in bytes.
- */
-export interface ShareInfo {
-  readonly identifier: number;
-  readonly groupThreshold: number;
-  readonly groupCount: number;
-  readonly groupIndex: number;
-  readonly memberThreshold: number;
-  readonly memberIndex: number;
-  readonly secretLength: number;
-}
+// The metadata of a share, which shareInfo reads, as the layout of a share names it.
+export type { ShareInfo };
 
 /** Thresholds and group count are stored minus one; member/group indexes are zero-based. */
 export function shareInfo(transport: Uint8Array): ShareInfo {

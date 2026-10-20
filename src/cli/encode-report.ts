@@ -12,7 +12,7 @@ import {
   FINGERPRINT_DISCLOSURE,
 } from "./terminal.js";
 import { encodedOutputLabel } from "./input.js";
-import type { EncodeOutcome } from "./encode-command.js";
+import type { EncodeOutcome } from "./encode-types.js";
 import { Masking, PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
 import type { EncodedFormat } from "../core/types.js";
 import { FINGERPRINTS_HINT, plainFingerprintLine } from "./fingerprint-report.js";

@@ -4,9 +4,9 @@
 // the restore of complete shares and the reading of typed shares each answer a conflict in their
 // own way: a refusal, or a question that names the shares by their places.
 //
-// Needs from the host: nothing. Imports only the type of a share's metadata (transport.ts).
+// Needs from the host: nothing. Imports only the type of a share's metadata (share-layout.ts).
 
-import type { ShareInfo } from "./transport.js";
+import type { ShareInfo } from "./share-layout.js";
 import { defined } from "../core/defined.js";
 
 /** Two shares that cannot both be right: `at`, and `with`, which came first. */

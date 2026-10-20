@@ -19,25 +19,13 @@ import {
 } from "./card-settings.js";
 import type { SheetShape } from "./collection-layout.js";
 import { capitalized } from "../core/prose.js";
-import type { BusinessArtwork } from "./business-artwork.js";
-import type { AssetSource, QrSource, RandomSource } from "./platform.js";
+import type { CardDrawing } from "./drawing-sources.js";
 import type { CardContent } from "./backup-cards.js";
 import type { ColorCards } from "./card-content.js";
 import { defined } from "../core/defined.js";
 
-// The kinds of cards are the core's (core/types.ts).
-export type { CardKind };
-
-/**
- * What the card renderers draw with: the host's platform, through the parts each family uses (its
- * bundled files, random choices and QR matrices), and the artwork prepared with it. A CardRenderer
- * (card-renderer.ts) is one; every render is given it, and each family asks only for the parts it
- * uses. The renderers pass `randomInt` on alone, so a host's own CardDrawing gives one that is
- * called detached (RandomSource).
- */
-export interface CardDrawing extends AssetSource, RandomSource, QrSource {
-  readonly businessArtwork: BusinessArtwork;
-}
+// The kinds of cards are the core's (core/types.ts); what the renderers draw with is a leaf's.
+export type { CardDrawing, CardKind };
 
 /**
  * An installed card design: its id, the kind of codes it draws, its style and family, its name and

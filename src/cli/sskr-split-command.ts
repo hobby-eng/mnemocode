@@ -41,9 +41,7 @@ import {
 } from "./sskr-output.js";
 import { ENCODE_PLAIN_ONLY_OPTIONS } from "./encode-option-groups.js";
 import type { EncodedFormat } from "../core/types.js";
-// The type alone: encode-command.ts runs this module for --sskr, and a value import would be a
-// cycle.
-import type { PreparedEncode } from "./encode-command.js";
+import type { PreparedEncode } from "./encode-types.js";
 import { defined } from "../core/defined.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";

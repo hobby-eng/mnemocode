@@ -34,8 +34,8 @@ import {
   shareCountProblem,
   type ShareFormat,
   Share,
-  type ShareInfo,
 } from "./transport.js";
+import type { ShareInfo } from "./share-layout.js";
 import {
   SET_CONFLICT_TEXTS,
   SetTopology,

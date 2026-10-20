@@ -1,6 +1,9 @@
-// Joint solves marked shares together over GF(2), including their set and polynomial equations.
-// Branch owns each solution's computed state and active digest work; Joint borrows spaces from
-// their assessment or selected plan (joint-repair.ts).
+// The solution of marked shares of one set together (joint-repair.ts): one reading of every share
+// (Joint), its equations over GF(2) with those of the set and its polynomial, and each solved way
+// to read the shares (Branch), whose open bits the 32-bit digest decides. A Branch owns what it
+// computes, the arrays of the secret it holds and the digest work under way, and wipes them; a
+// Joint borrows the readings of the shares (ReadingSpace) from the assessment or the plan that
+// owns them.
 
 import { BITS_PER_BYTE, xorInto } from "../core/bits.js";
 import { SearchTurns, type TurnState } from "../core/search-turns.js";
@@ -136,7 +139,14 @@ interface BranchParts {
   readonly secretAndDigest: Uint8Array;
 }
 
-/** Owns one solved branch's affine coordinates, (S, D) buffers and active work; borrows its spaces. */
+/**
+ * A solved way to read the shares: a threshold, a member number for each share, and the affine
+ * space of the joint points that fit them, split into the directions that the digest decides and
+ * those that it does not. A class because it owns a share's part of the secret, its (S, D) and the
+ * changes to them, which it names for wiping (secretArrays), and the digest work under way, while
+ * it borrows the joint and its readings; and because every question of the plan and its search
+ * about one way to read the shares is answered by it.
+ */
 export class Branch implements Disposable {
   readonly #parts: Omit<BranchParts, "particular" | "visible" | "hidden">;
   readonly #coordinates: SecretValue<readonly bigint[]>;
@@ -266,8 +276,10 @@ export class Branch implements Disposable {
   }
 
   /**
-   * Tries digest candidates in Gray-code order and confirms matches through the SSKR library.
-   * Calls tried after each check, awaiting its returned turn before continuing.
+   * Tries every open combination of this branch against the digest, in Gray code order so that
+   * each step adds one known change to (S, D); each candidate that passes is read and restored by
+   * the SSKR library (#confirm), and given to `found`. `tried` is told of every try; it may return
+   * a promise, such as a turn of the host, which is awaited before the next try.
    */
   async searchDigest(
     platform: ShareRepairPlatform,
@@ -336,7 +348,12 @@ export class Branch implements Disposable {
     return shares;
   }
 
-  /** Confirms a digest match while owning active coordinates, share views and entropy buffers. */
+  /**
+   * Reads the shares of a candidate that passed the digest and restores the phrase, owning the
+   * candidate's point, the shares read and the secrets restored until it returns. Undetermined
+   * elements do not change the phrase; the first of their values with which every share reads are
+   * taken, and they are reported as unsettled.
+   */
   async #confirm(z: bigint, platform: ShareRepairPlatform): Promise<RepairedSet | undefined> {
     using point = SecretValue.bigints([z]);
     z = 0n;
@@ -402,8 +419,13 @@ export class Branch implements Disposable {
 }
 
 /**
- * Owns unique spaces, branches and their legacy arrays during assessment (AUD-012-SEC004).
- * Disposes unselected state; selected branches transfer with every borrowed space they need.
+ * The owners of a share's part of the secret made while the shares are assessed: the readings of
+ * the shares (ReadingSpace), each once, and the branches, with the arrays that each names
+ * (secretArrays). A class because one owner gathers them wherever they are made, so that once the
+ * plan is made everything that its search does not keep is wiped: the readings and branches that
+ * a better reading replaced, those of a refusal or of an assessment too open to search, and all of
+ * them when the assessment is stopped (AUD-012-SEC004). The branches kept pass to the plan with
+ * every reading they borrow.
  */
 export class AssessmentSecrets {
   readonly #made = new Set<Uint8Array>();
@@ -421,7 +443,7 @@ export class AssessmentSecrets {
     for (const array of branch.secretArrays()) this.#made.add(array);
   }
 
-  /** Releases unselected owners and arrays; selected branches transfer with their unique spaces. */
+  /** Wipes every owner and array made but `kept`, the branches of the plan's search, and theirs. */
   wipeAllBut(kept: readonly Branch[]): void {
     const owners = new Set<ReadingSpace | Branch>([
       ...kept,
@@ -773,7 +795,12 @@ function lowestBit(value: number): number {
   return 31 - Math.clz32(low & -low);
 }
 
-/** Restores each distinct share through complete-shares; undefined for a live set's refusal. */
+/**
+ * Restores the phrase from the shares read, as complete shares are restored (complete-shares.ts):
+ * each copy once, every surplus member checked against the others, two different shares of one
+ * member refused. Undefined when the shares do not restore one phrase; a stop of the host or an
+ * ended input is thrown (assertLive).
+ */
 async function restore(
   shares: readonly ReadRepairableShare[],
   platform: ShareCombiner,

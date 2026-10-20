@@ -273,7 +273,7 @@ export class WalletEvidenceCheck {
    * An independently owned comparison retained across many phrases. Dispose it after its final
    * awaited use; it owns the parsed evidence and passphrase, and borrows this service's seed rule.
    */
-  prepare(evidence: WalletEvidence, passphrase = ""): PreparedWalletEvidence {
+  prepare(evidence: WalletEvidence, passphrase = ""): PreparedWalletEvidence<EvidenceMatch> {
     const expected = evidenceOf(evidence, this.#coins);
     return new PreparedWalletEvidence(
       this.#seed,

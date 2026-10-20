@@ -1,4 +1,3 @@
-import { type DateShiftDate } from "../core.js";
 import { Masking } from "../core/masking.js";
 import { type ParsedArguments, value } from "./arguments.js";
 import { assertDateInputMode, encodeFormat, transformMode, phraseAndDates } from "./input.js";
@@ -13,7 +12,7 @@ import { EncodeCardExport, saveEncodeResult } from "./encode-export.js";
 import { optionLabel } from "./option-copy.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
 import { printableText, terminalNotice, terminalWork } from "./terminal.js";
-import { EncodedBackup, type Encoding } from "../core/encoded-backup.js";
+import { EncodedBackup } from "../core/encoded-backup.js";
 import { COLOR_FORMAT_NUMBERS } from "./format-numbers.js";
 import { preflightOutputs, saveHeirSheetOutput, saveOutput } from "./output-saving.js";
 import { EncodedForm } from "../core/encoded-form.js";
@@ -23,6 +22,7 @@ import { ENCODE_SSKR_ONLY_OPTIONS } from "./encode-option-groups.js";
 import type { MaskingMode, EncodedFormat } from "../core/types.js";
 import { defined } from "../core/defined.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import type { EncodeOutcome, PreparedEncode } from "./encode-types.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.encode-command", {
@@ -31,15 +31,6 @@ const ERRORS = new ErrorCatalog("cli.encode-command", {
   "terminal-color-cards-available-only-rgb-color-formats": (value0: string) =>
     `Terminal color cards are available only for RGB color formats ${value0}.`,
 });
-
-/** What Encode made: the library's encoding, with the mode as asked and the dates as typed. */
-export interface EncodeOutcome {
-  /** The codes and the mode their record names, as EncodedBackup.encode made them. */
-  readonly encoding: Encoding;
-  /** The mode as asked, before any replacement of the last word (Encoding.replaced). */
-  readonly mode: MaskingMode;
-  readonly enteredDates: readonly DateShiftDate[];
-}
 
 async function validateEncodeOptions(
   args: ParsedArguments,
@@ -193,13 +184,6 @@ async function saveSheetQr(
   if (path !== undefined)
     terminalNotice(`Saved the QR code of the sheet as an image: ${printableText(path)}`, "success");
 }
-
-/**
- * Encode once its options are checked: it asks for the phrase, or reads it, unless it is `known`,
- * which Re-encode decoded and confirmed, then its dates, and makes and saves the backup.
- * CANCELLED when the person cancelled it.
- */
-export type PreparedEncode = (known?: string) => Promise<Cancelled | undefined>;
 
 export async function runEncode(args: ParsedArguments): Promise<Cancelled | undefined> {
   const encode = await prepareEncode(args);

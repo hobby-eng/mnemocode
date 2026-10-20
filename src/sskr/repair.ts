@@ -14,8 +14,9 @@
 // words whose code fits are its candidates: a solution must be one of them (fits), and where that
 // shortens the search they are tried one by one, each as the code's bits (withValues).
 //
-// MarkedReading and ReadingSpace are the classes of the repair: a way to read a marked text, and
-// the solutions of that reading on its own, which owns the share's secret arrays and wipes them.
+// MarkedReading and ReadingSpace (repair-owners.ts) are the classes of the repair: a way to read a
+// marked text, and the solutions of that reading on its own, which owns the share's secret arrays
+// and wipes them.
 // The units of each form are read and written through share-units.ts and the mixed layout through
 // mixed-layout.ts, as the reader of shares reads them (transport.ts). The structures of a share's
 // bytes are repair-units.ts, and the ways to read a marked share as units of a form, which a

@@ -51,7 +51,8 @@ import {
   showRecovered,
   type AfterDecoded,
 } from "./decode-command.js";
-import { prepareEncode, type PreparedEncode } from "./encode-command.js";
+import { prepareEncode } from "./encode-command.js";
+import type { PreparedEncode } from "./encode-types.js";
 import { askEncoding } from "./encode-questions.js";
 import { forgetClaimedOutputs } from "./output-questions.js";
 import { reportChecksumAndFingerprint } from "./fingerprint-report.js";

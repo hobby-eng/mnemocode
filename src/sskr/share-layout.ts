@@ -128,3 +128,17 @@ export const MIN_DIGEST_THRESHOLD = 2;
 export const SHARE_LENGTHS: ReadonlySet<number> = new Set(
   BIP39_ENTROPY_BYTES.map((bytes) => bytes + SHARE_METADATA_BYTES),
 );
+
+/**
+ * The metadata of a share: its identifier, its group and member, the thresholds and counts, and the
+ * length of its secret in bytes.
+ */
+export interface ShareInfo {
+  readonly identifier: number;
+  readonly groupThreshold: number;
+  readonly groupCount: number;
+  readonly groupIndex: number;
+  readonly memberThreshold: number;
+  readonly memberIndex: number;
+  readonly secretLength: number;
+}
