@@ -47,6 +47,7 @@ import { AMBIGUOUS_MARK_WIDTHS, AmbiguousMarksError } from "./repair-models.js";
 import { MAX_PARTIAL_UNIT_CANDIDATES } from "./repair-units.js";
 import type { ShareRepairPlatform } from "./share-platform.js";
 import { assertShareCount } from "./transport.js";
+import { digestField } from "./complete-shares.js";
 import { SHARE_METADATA_BYTES } from "./share-layout.js";
 import { afterPlace } from "../core/prose.js";
 import { placeOf } from "../core/places.js";
@@ -701,7 +702,8 @@ async function searchBranches(
 
 /**
  * One phrase from two candidates, such as a share all marked read with two member numbers: the
- * shares of the first are kept, and the elements in which the two differ are unsettled.
+ * shares of the first are kept, the elements in which the two differ are unsettled, and what
+ * either left unchecked stays unchecked.
  */
 function merged(first: RepairedSet, other: RepairedSet): RepairedSet {
   const differing = first.shares.flatMap((share, index) => {
@@ -721,9 +723,14 @@ function merged(first: RepairedSet, other: RepairedSet): RepairedSet {
       element,
     ]),
   );
+  const unchecked = [...new Set([...(first.unchecked ?? []), ...(other.unchecked ?? [])])].sort(
+    (a, b) => a - b,
+  );
   return {
     ...first,
     unsettled: [...unsettled.values()].sort((a, b) => a.share - b.share || a.position - b.position),
+    ...(unchecked.length === 0 ? {} : { unchecked }),
+    ...digestField(first.digestUnchecked !== true && other.digestUnchecked !== true),
   };
 }
 

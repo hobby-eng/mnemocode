@@ -22,6 +22,10 @@ describe("a restore that no SSKR digest checks (AUD-037-API004)", () => {
     // The plain results say so too, for a caller that reports their limits.
     expect(await restoreShareSet([defined(one)])).toMatchObject({ digestUnchecked: true });
     expect(await combineSskrShareSet([defined(one)])).toMatchObject({ digestUnchecked: true });
+    // A host's set that leaves the field out is not called checked: the shares say it too.
+    const { digestUnchecked: _, ...silent } = alone.toRepairedSet();
+    using hosted = ShareSet.of(silent);
+    expect(hosted.digestChecked).toBe(false);
   });
 
   it("calls a restore that the digest checked checked", async () => {

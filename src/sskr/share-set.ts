@@ -35,7 +35,12 @@ import {
   MIRRORED_FORM,
 } from "./transport.js";
 import { copiesAmong, SetTopology, type PlacedShare, withoutCopies } from "./set-topology.js";
-import { digestField, restoreCompleteShares, uncheckedField } from "./complete-shares.js";
+import {
+  digestChecks,
+  digestField,
+  restoreCompleteShares,
+  uncheckedField,
+} from "./complete-shares.js";
 import { Redacted } from "../core/redacted.js";
 import { counted } from "../core/search-plan.js";
 import { placeOf } from "../core/places.js";
@@ -147,7 +152,8 @@ export class ShareSet extends Redacted implements Disposable {
       this.#mnemonic = mnemonic;
       this.#unsettled = copy.unsettled;
       this.#unchecked = copy.unchecked;
-      this.#digestUnchecked = copy.digestUnchecked === true;
+      // A set that says nothing of its digest is called checked only where the shares can be.
+      this.#digestUnchecked = copy.digestUnchecked === true || !digestChecksShares(this.#infos);
     } catch (error) {
       mnemonic.wipe();
       throw error;
@@ -437,6 +443,23 @@ function frozenSet(set: RepairedSet): RepairedSet {
         }),
     ...(set.digestUnchecked === true ? { digestUnchecked: true as const } : {}),
   });
+}
+
+/**
+ * Whether an SSKR digest can check what the shares of `infos` restore: by their group threshold
+ * and the member thresholds of the groups they complete (digestChecks).
+ */
+function digestChecksShares(infos: readonly ShareInfo[]): boolean {
+  const members = new Map<number, Set<number>>();
+  for (const info of infos)
+    members.set(info.groupIndex, (members.get(info.groupIndex) ?? new Set()).add(info.memberIndex));
+  const complete = infos.filter(
+    (info) => defined(members.get(info.groupIndex)).size >= info.memberThreshold,
+  );
+  return digestChecks(
+    defined(infos[0]).groupThreshold,
+    complete.map((info) => info.memberThreshold),
+  );
 }
 
 /**

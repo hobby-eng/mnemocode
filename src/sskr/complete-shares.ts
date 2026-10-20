@@ -72,6 +72,18 @@ function* choicesOf<T>(items: readonly T[], count: number, from = 0): Generator<
 }
 
 /**
+ * Whether an SSKR digest checks a secret restored under `groupThreshold` from complete groups of
+ * `memberThresholds`: the digest of the groups checks any choice of a group threshold of 2 or more;
+ * with 1, a group checks itself when its member threshold is 2 or more (AUD-037-API004).
+ */
+export function digestChecks(groupThreshold: number, memberThresholds: readonly number[]): boolean {
+  return (
+    groupThreshold >= MIN_DIGEST_THRESHOLD ||
+    memberThresholds.some((threshold) => threshold >= MIN_DIGEST_THRESHOLD)
+  );
+}
+
+/**
  * The groups whose secret every other share is compared with: the first choice, in input order,
  * that a digest checks and that restores. A digest must check it: otherwise a wrong share that
  * comes first would be trusted, the right ones blamed, and leaving those out would restore a wrong
@@ -88,7 +100,7 @@ async function referenceOf(
   assertLive?: () => void,
 ): Promise<Reference> {
   const checkable = complete.filter((group) => memberThreshold(group) >= MIN_DIGEST_THRESHOLD);
-  if (groupThreshold < MIN_DIGEST_THRESHOLD && checkable.length === 0) {
+  if (!digestChecks(groupThreshold, complete.map(memberThreshold))) {
     const entropy = await restore(complete.slice(0, 1));
     assertEntropyLive(entropy, assertLive);
     if (entropy === undefined) throw ERRORS.create("no-secret", []);
