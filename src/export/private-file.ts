@@ -228,8 +228,12 @@ export async function publishNewFolder<T>(
   } catch (error) {
     const thrown = await afterFailedSave(staging, error);
     if (reservation !== undefined) {
-      if (sameFolder(await lstat(target), reservation))
-        await rm(target, { recursive: true, force: true });
+      // A reservation already gone leaves nothing to remove, and the failure stays the one thrown.
+      const now = await lstat(target).catch((missing: unknown) => {
+        if (errorCode(missing) === "ENOENT") return undefined;
+        throw missing;
+      });
+      if (sameFolder(now, reservation)) await rm(target, { recursive: true, force: true });
     }
     throw thrown;
   } finally {
