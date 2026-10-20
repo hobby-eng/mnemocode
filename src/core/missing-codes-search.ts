@@ -535,17 +535,20 @@ class EncodedFingerprintWay implements MissingCodesWaySearch {
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
     const codes = this.#input.codes;
     const walletCheck = fingerprintWalletCheck(defined(this.#fingerprintOf), this.#fingerprint);
+    // What the match says: the fingerprint of the codes is only a filter too (AUD-037-SEC004).
+    let warning: string | undefined;
     using found = await searched(
       codes,
       async (indexes) => {
         const answer = await this.#input.checked(() => walletCheck(phraseOfIndexes(indexes)));
+        if (answer.matched) warning ??= answer.warning;
         return answer.matched;
       },
       run,
     );
     this.#input.assertLive();
     // The codes are found without dates, which are asked afterwards as for complete codes.
-    return foundOne(found, MISSING_CODES_TEXTS.noneByFingerprint, undefined, run);
+    return foundOne(found, MISSING_CODES_TEXTS.noneByFingerprint, undefined, run, warning);
   }
 
   wipe(): void {

@@ -10,6 +10,14 @@ import { ErrorCatalog } from "./error-catalog.js";
 
 const ERRORS = new ErrorCatalog("core.wallet-check", {
   "malformed-wallet-answer": { kind: "type", text: () => MALFORMED_WALLET_ANSWER },
+  "malformed-wallet-path": {
+    kind: "type",
+    text: () => "The wallet check must answer the path where the wallet matched as text, or none.",
+  },
+  "malformed-wallet-warning": {
+    kind: "type",
+    text: () => "The wallet check must answer a warning of its match as text, or none.",
+  },
   "master-fingerprint-eight-hexadecimal-characters": () =>
     "A master fingerprint must be eight hexadecimal characters.",
 });
@@ -46,6 +54,11 @@ function readOnce(answer: unknown): Readonly<Record<keyof WalletMatch, unknown>>
   if (typeof answer !== "object" || answer === null) return undefined;
   const { matched, path, warning } = answer as Readonly<Record<keyof WalletMatch, unknown>>;
   return { matched, path, warning };
+}
+
+/** Whether `value`, an optional field of a WalletMatch, is text or absent. */
+function isOptionalText(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
 }
 
 /**
@@ -88,8 +101,9 @@ function ownedAnswer(given: object, read: Readonly<Record<keyof WalletMatch, unk
  * What the host's `check` says of `mnemonic`, held to the WalletMatch contract. A JavaScript host
  * may answer anything, and a search that read undefined or { matched: "false" } as a match would
  * report a recovery that no wallet confirmed (AUD-014-API001): such an answer is refused, and only
- * matched === true counts. Every search asks the host's check through it; whether the search may
- * still publish what it found is asked when it does (search-turns.ts, stillRunning).
+ * matched === true counts. A path or a warning other than text is refused too, each by its own
+ * code: a host shows them as they are. Every search asks the host's check through it; whether the
+ * search may still publish what it found is asked when it does (search-turns.ts, stillRunning).
  */
 export async function askWallet<M extends WalletMatch>(
   check: WalletCheck<M>,
@@ -100,6 +114,9 @@ export async function askWallet<M extends WalletMatch>(
   // owned data, while getters/methods keep the host's receiver and private brand (AUD-016-API001).
   const read = readOnce(given);
   if (typeof read?.matched !== "boolean") throw ERRORS.create("malformed-wallet-answer", []);
+  // A JavaScript host's null or number would be printed as it is (AUD-037-SEC004).
+  if (!isOptionalText(read.path)) throw ERRORS.create("malformed-wallet-path", []);
+  if (!isOptionalText(read.warning)) throw ERRORS.create("malformed-wallet-warning", []);
   return ownedAnswer(given as object, read) as M;
 }
 

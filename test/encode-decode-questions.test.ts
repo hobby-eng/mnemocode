@@ -23,6 +23,7 @@ import { promptedEncodeInputs } from "../src/cli/input.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { STYLE_CODES } from "../src/cli/terminal-style.js";
+import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
 import { DATE, MASKED, promptsShown } from "./helpers/phrase-questions.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
@@ -291,6 +292,35 @@ describe("encode, decode and the backup check on the private screen", () => {
       ]);
       expect(seen.notices).toContain(`✓ Dates found: ${DATE}`);
       expect(seen.out).toEqual([TEST_PHRASE]);
+    });
+
+    it("says after the codes that a fingerprint found that it is only a filter (AUD-037-SEC004)", async () => {
+      const codes = MASKED.split(" ");
+      codes[5] = "?";
+      // By the wallet's fingerprint, with the dates, and by the encoded fingerprint, without.
+      for (const [answers, way] of [
+        [
+          ["2?-09-2026", TEST_FINGERPRINT],
+          ["wallet", "fingerprint"],
+        ],
+        [[ENCODED_FINGERPRINT, DATE], ["encoded"]],
+      ] as const) {
+        seen.notices = [];
+        terminal.answers = [codes.join(" "), ...answers].map((answer) => `${answer}\r`);
+        terminal.choices = [...way];
+        await runDecode({ "ask-secrets": true, mode: "seedshift" });
+        expect(seen.out.at(-1)).toBe(TEST_PHRASE);
+        const placesOf = (wanted: string): number[] =>
+          seen.notices.flatMap((line, place) => (line === wanted ? [place] : []));
+        // The codes found are said when found and again with the result, each time with it after.
+        const found = placesOf(`✓ Code 6 found: ${MASKED}`);
+        const warned = placesOf(FINGERPRINT_WARNING);
+        expect(found).toHaveLength(2);
+        expect(warned).toHaveLength(2);
+        expect(warned[0]).toBeGreaterThan(found[0]!);
+        expect(warned[0]).toBeLessThan(found[1]!);
+        expect(warned[1]).toBeGreaterThan(found[1]!);
+      }
     });
 
     it("sends a Shamir share typed for the codes to the restore, the share kept", async () => {

@@ -603,6 +603,7 @@ export async function runSskrCombine(
         "warning",
       );
     const reported = new Set<RepairedSet>();
+    let shown = 0;
     for (const [index, phrase] of phrases.entries()) {
       // The private screen keeps no scrollback: there each phrase has a screen of its own, the next
       // shown on Enter, so that none scrolls out of reach.
@@ -623,7 +624,9 @@ export async function runSskrCombine(
         ...(r.evidence === undefined ? {} : { evidence: evidenceLabel(r.evidence) }),
       });
       reported.add(phrase.set);
+      shown += 1;
     }
+    if (r.evidence !== undefined) reportWalletWarnings(phrases.slice(0, shown));
     return await target?.savePhrases(restored.listed, r.passphrase);
   } finally {
     r.dates?.wipe();
@@ -694,12 +697,12 @@ function numberedOf(place: RestoredPlace): string {
 }
 
 /**
- * What the wallet check said of the phrase's match, such as that a fingerprint is only a filter
- * (AUD-037-SEC004), where a wallet was given.
+ * What the wallet check said of the matches of the phrases `shown`, such as that a fingerprint is
+ * only a filter (AUD-037-SEC004): each warning once, after the phrases, however many it matched.
  */
-function reportWalletWarning(phrase: RestoredPhrase, place: RestoredPlace): void {
-  if (place.evidence !== undefined && phrase.warning !== undefined)
-    terminalNotice(phrase.warning, "warning");
+function reportWalletWarnings(shown: readonly RestoredPhrase[]): void {
+  const warnings = new Set(shown.map(({ warning }) => warning));
+  for (const warning of warnings) if (warning !== undefined) terminalNotice(warning, "warning");
 }
 
 /** "matches the address at m/84'/0'/0'/0/3", for the wallet fact. */
@@ -724,7 +727,6 @@ function showRestoredParts(phrase: RestoredPhrase, mode: SplitMode, place: Resto
     ...(wallet === undefined ? [] : ([["Wallet", wallet]] as [string, string][])),
   ]);
   reportSet(phrase, place, true);
-  reportWalletWarning(phrase, place);
   const backup = restoredBackup(phrase, mode);
   if (backup !== undefined) {
     terminalPart(backup.label);
@@ -745,7 +747,6 @@ function showRestoredParts(phrase: RestoredPhrase, mode: SplitMode, place: Resto
 /** A restored phrase as plain lines, for a file, a pipe or TERM=dumb. */
 function showRestoredPlain(phrase: RestoredPhrase, mode: SplitMode, place: RestoredPlace): void {
   reportSet(phrase, place, false);
-  reportWalletWarning(phrase, place);
   const { mnemonic } = phrase;
   const ordinal = place.of > 1 ? `phrase ${place.index + 1} of ${place.of}` : undefined;
   const backup = restoredBackup(phrase, mode);
