@@ -22,24 +22,10 @@ import { textPieces } from "./pieces.js";
 import { UNICODE_CODE_DIGITS } from "./code-text.js";
 import { assertWordCount } from "./bip39-sizes.js";
 import { defined } from "./defined.js";
+import { ENCODED_FINGERPRINT, MASKED_ENGLISH, MASKED_NUMBERS } from "./self-test-vectors.js";
 
-/**
- * The public phrase masked with MnemoCode Seedshift and 23-09-2026 (vectors/mnemocode-v1.json,
- * checksum-valid-seedshift-12), in English words, word numbers and colors.
- */
-const MASKED_ENGLISH = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
+/** The masked phrase of the Seedshift vector in colors (MASKED_ENGLISH, MASKED_NUMBERS). */
 const MASKED_COLORS = "#0317CC #200B38 #4020CC #5D1438 #7D29CC #9A1D38 #BA32CC #D72799";
-/**
- * The masked phrase in word numbers, as the search of codes marked with ? finds it too
- * (missing-codes-search-self-test.ts).
- */
-export const MASKED_NUMBERS = "2027 10 24 2027 10 24 2027 10 24 2027 10 377";
-/**
- * The master fingerprint of the masked phrase, the encoded fingerprint that Encode shows: computed
- * independently with Python's hashlib and a plain secp256k1, which first reproduce the published
- * keys of BIP84 and BIP86.
- */
-export const ENCODED_FINGERPRINT = "0d05289e";
 
 /** A marked backup, and what its marks leave, counted independently with Python's hashlib. */
 interface MarkedCase {

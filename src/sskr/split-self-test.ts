@@ -15,12 +15,7 @@ import { sskrSetVector } from "./known-answers.js";
 import type { SharePlatform } from "./share-platform.js";
 import { ShareSet } from "./share-set.js";
 import { ShareSplit } from "./split.js";
-
-const PUBLIC_MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-/** It masked with MnemoCode Seedshift and 23-09-2026 (vectors/mnemocode-v1.json). */
-const MASKED_ENGLISH = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
-const MASKED_DATE = "23-09-2026";
+import { MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC } from "../core/self-test-vectors.js";
 
 /** A split that takes the published test-only seed of the engine in place of randomness. */
 function seededSplit(platform: SharePlatform): ShareSplit {

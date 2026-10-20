@@ -9,20 +9,20 @@
 //
 // Host-neutral: it imports only core modules.
 
-import { ENCODED_FINGERPRINT, MASKED_NUMBERS } from "./backup-reading-self-test.js";
 import { DatesAnswer } from "./date-search.js";
 import { parseDate } from "./dates.js";
 import { MissingCodes } from "./missing-codes.js";
 import { MissingCodesSearch, type MissingCodesRow } from "./missing-codes-search.js";
 import { expectRefused, expectSame } from "./self-test-check.js";
 import { fingerprintWalletCheck, type PhraseFingerprint } from "./wallet-check.js";
+import {
+  ENCODED_FINGERPRINT,
+  MASKED_DATE,
+  MASKED_NUMBERS,
+  PUBLIC_FINGERPRINT,
+  PUBLIC_MNEMONIC,
+} from "./self-test-vectors.js";
 
-const PUBLIC_MNEMONIC =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-/** Its master fingerprint (vectors/mnemocode-v1.json, direct-12, sourceFingerprint). */
-const PUBLIC_FINGERPRINT = "73c5da0a";
-/** The date that MASKED_NUMBERS is masked with (vectors/mnemocode-v1.json). */
-const MASKED_DATE = "23-09-2026";
 /** The last digit of codes 2 and 3 unread: a hundred combinations, few of them candidates. */
 const MARKED = "2027 1? 2? 2027 10 24 2027 10 24 2027 10 377";
 /**
