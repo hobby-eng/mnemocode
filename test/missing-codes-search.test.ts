@@ -196,10 +196,33 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     codes[3] = `${defined(codes[3]).slice(0, -1)}?`;
     using read = MissingCodes.read(codes.join(" "), "indexes", "seedshift-legacy-valid");
     const search = new MissingCodesSearch(read, fingerprint);
-    expect(search.unreadable).toMatch(/candidates?, which give about [\d,]+ phrases\.$/u);
+    expect(search.unreadable).toBe(
+      "Code 4 cannot be read: 10 combinations, about 1 candidate, which gives about 128 phrases.",
+    );
     expect(search.whyNot("list")).toMatch(
       /^A list holds at most 16 phrases; these codes give about [\d,]+ phrases\.$/u,
     );
+  });
+
+  it("names the phrases where more fit than a list holds, which the estimate offered (AUD-037-FUN002)", async () => {
+    // 24 words: each set of codes gives 8 phrases. With the last digit of codes 1 and 12 unread,
+    // the estimate is one set, 8 phrases, but 3 sets fit, which give 24.
+    const encoded = legacyChecksumValidResult(
+      encodeMnemonicLegacy(`${"abandon ".repeat(23)}art`, [parseDate(DATE)]),
+    );
+    const codes = formatEncoded(encoded, "indexes").split(" ");
+    for (const place of [0, 11]) codes[place] = `${defined(codes[place]).slice(0, -1)}?`;
+    using read = MissingCodes.read(codes.join(" "), "indexes", "seedshift-legacy-valid");
+    const search = new MissingCodesSearch(read, fingerprint);
+    expect(search.unreadable).toBe(
+      "Codes 1 and 12 cannot be read: 100 combinations, about 1 candidate, which gives about 8 phrases.",
+    );
+    expect(search.fits("list")).toBe(true);
+    const listing = search.listed([parseDate(DATE)]).run();
+    await expect(listing).rejects.toMatchObject({
+      code: "core.missing-codes-search.list-overflow",
+    });
+    await expect(listing).rejects.toThrow(/^More than 16 phrases fit these codes and dates\./u);
   });
 
   it("finds one phrase that several sets of codes and dates give, and says so", async () => {

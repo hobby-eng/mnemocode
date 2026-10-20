@@ -49,8 +49,8 @@ const ERRORS = new ErrorCatalog("core.missing-codes-search", {
     "Codes that were not masked have no dates to search.",
   "dates-found-do-not-decode-codes-wallet-matched": () =>
     "The dates found do not decode the codes to the wallet that matched.",
-  "list-overflow": () =>
-    `More than ${MAX_LISTED} candidates fit these codes and dates. Narrow the codes or use a wallet check instead of listing them.`,
+  "list-overflow": (rows: string) =>
+    `More than ${MAX_LISTED} ${rows} fit these codes and dates. Narrow the codes or use a wallet check instead of listing them.`,
   "way-wiped": () => "This prepared code search has been wiped.",
   "operation-refused": suppliedMessage,
 });
@@ -242,18 +242,29 @@ function listedRows(codes: MissingCodes): number {
 }
 
 /**
- * The rows of a list of `codes` in words: candidates, each a set of codes with its phrase, or the
- * phrases where one set gives several. A candidate stays a set of codes in every text.
+ * What a row of a list of `codes` is: a candidate, a set of codes with its phrase, or a phrase
+ * where one set gives several. A candidate stays a set of codes in every text.
  */
+function listedRow(codes: MissingCodes): "candidate" | "phrase" {
+  return Masking.of(codes.mode).givesSeveral ? "phrase" : "candidate";
+}
+
+/** The rows of a list of `codes` in words, such as "about 24 phrases" (listedRow). */
 function listedText(codes: MissingCodes): string {
-  const several = Masking.of(codes.mode).givesSeveral;
-  return counted(listedRows(codes), several ? "phrase" : "candidate");
+  return counted(listedRows(codes), listedRow(codes));
 }
 
 /** Why a list cannot tell `codes`: it holds at most MAX_LISTED rows (listedText). */
 function tooManyToList(codes: MissingCodes): string {
-  const unit = Masking.of(codes.mode).givesSeveral ? "phrases" : "candidates";
-  return `A list holds at most ${MAX_LISTED} ${unit}; these codes give about ${listedText(codes)}.`;
+  return `A list holds at most ${MAX_LISTED} ${listedRow(codes)}s; these codes give about ${listedText(codes)}.`;
+}
+
+/**
+ * The refusal of a list of `codes` that more rows fit than it holds, which the estimate allowed;
+ * the rows named as the list names them (listedRow): phrases where one set of codes gives several.
+ */
+function listOverflow(codes: MissingCodes): Error {
+  return ERRORS.create("list-overflow", [`${listedRow(codes)}s`]);
 }
 
 /** The phrases that `backup` gives with `dates` and that pass their own checksum. */
@@ -352,8 +363,9 @@ export class MissingCodesSearch {
   get unreadable(): string {
     const codes = this.#codes;
     // Where one set of codes gives several phrases, those too (AUD-037-FUN002).
+    const gives = codes.expected === 1 ? "gives" : "give";
     const phrases = Masking.of(codes.mode).givesSeveral
-      ? `, which give about ${listedText(codes)}`
+      ? `, which ${gives} about ${listedText(codes)}`
       : "";
     return `${MissingCodesSearch.placesText(codes)} cannot be read: ${counted(codes.combinations, "combination")}, about ${counted(codes.expected, "candidate")}${phrases}.`;
   }
@@ -770,17 +782,19 @@ class ListWay implements MissingCodesWaySearch {
   }
 
   async run(run: MissingCodesRun = {}): Promise<MissingCodesResult> {
-    using result = await searched(this.#input.codes, () => true, run, MAX_LISTED);
+    const { codes } = this.#input;
+    using result = await searched(codes, () => true, run, MAX_LISTED);
     this.#input.assertLive();
     const { found, passed, stopped } = result;
     if (stopped || !stillRunning(run)) return STOPPED;
-    // expected is an average; passed counts every candidate even when storage is capped.
-    if (passed > MAX_LISTED) throw ERRORS.create("list-overflow", []);
+    // expected is an average; passed counts every candidate even when storage is capped. Where
+    // one set gives several phrases, more sets than the list holds give more phrases too.
+    if (passed > MAX_LISTED) throw listOverflow(codes);
     const rows: MissingCodesRow[] = [];
     for (const backup of found)
       for (const phrase of phrasesOf(backup, this.#input.dates)) {
         // One set of legacy valid-last-word codes may decode to several phrases.
-        if (rows.length === MAX_LISTED) throw ERRORS.create("list-overflow", []);
+        if (rows.length === MAX_LISTED) throw listOverflow(codes);
         const fingerprint = await this.#input.checked(() => defined(this.#fingerprintOf)(phrase));
         if (!stillRunning(run)) return STOPPED;
         rows.push({
