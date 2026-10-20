@@ -156,25 +156,31 @@ describe("single-page design studies", () => {
     expect(new Set(labels.filter((label) => label.includes("Series "))).size).toBe(3);
   });
 
-  it.each(["business-it", "material-kitchen"])(
-    "%s keeps artwork and QR together at every supported size and orientation",
-    async (id) => {
+  // Every supported size and orientation, each a test of its own: all twelve sheets in one test
+  // took over half a minute and ran out of time beside the rest of the suite.
+  const SHEETS = ["business-it", "material-kitchen"].flatMap((id) =>
+    (["business", "a6", "a4"] as const).flatMap((pageSize) =>
+      (["landscape", "portrait"] as const).map(
+        (orientation) => [id, pageSize, orientation] as const,
+      ),
+    ),
+  );
+  it.each(SHEETS)(
+    "%s keeps artwork and QR together on a %s sheet, %s",
+    async (id, pageSize, orientation) => {
       const template = cardTemplates.find((item) => item.id === id)!;
-      for (const pageSize of ["business", "a6", "a4"] as const)
-        for (const orientation of ["landscape", "portrait"] as const) {
-          const document = await PDFDocument.load(
-            await template.render(nodeCardRenderer, {
-              kind: "colors",
-              colors,
-              payload,
-              presentation,
-              cardQr: true,
-              pageSize,
-              orientation,
-            }),
-          );
-          expect(document.getPageCount()).toBe(1);
-        }
+      const document = await PDFDocument.load(
+        await template.render(nodeCardRenderer, {
+          kind: "colors",
+          colors,
+          payload,
+          presentation,
+          cardQr: true,
+          pageSize,
+          orientation,
+        }),
+      );
+      expect(document.getPageCount()).toBe(1);
     },
   );
 

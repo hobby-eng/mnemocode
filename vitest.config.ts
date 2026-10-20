@@ -7,6 +7,12 @@ import { defineConfig } from "vitest/config";
  * runners need several times longer than a developer machine.
  */
 const TEST_TIME_LIMIT_MS = 60_000;
+/**
+ * Test files run at once: half the processors. Many files start the built CLI, which starts more
+ * processes, and the card and repair tests are heavy; one file for every processor overloaded the
+ * machine until those tests ran out of time, while they pass alone in seconds.
+ */
+const PARALLEL_FILES = "50%";
 
 // oxlint-disable-next-line import/no-default-export -- Vitest reads its configuration from it
 export default defineConfig({
@@ -15,5 +21,6 @@ export default defineConfig({
     include: ["test/**/*.test.ts"],
     testTimeout: TEST_TIME_LIMIT_MS,
     hookTimeout: TEST_TIME_LIMIT_MS,
+    maxWorkers: PARALLEL_FILES,
   },
 });

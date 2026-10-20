@@ -346,7 +346,9 @@ describe("Joint repair with digits read in part", () => {
     // The first sixteen codes of all three shares of a 24-word set, each missing its last digit,
     // took minutes when every word was tried (AUD review of the digit marks).
     const long = vectors.deterministic[4]!;
-    const started = Date.now();
+    // Measured as the processor time of this process, which the load of the machine leaves as it
+    // is, where the time on the clock grows with every other test that runs beside it.
+    const started = process.cpuUsage();
     const many = await planJointRepair(
       long.shares.map((share) =>
         markDigits(
@@ -358,7 +360,8 @@ describe("Joint repair with digits read in part", () => {
       ),
       { platform: nodeSharePlatform },
     );
-    expect(Date.now() - started).toBeLessThan(15_000);
+    const used = process.cpuUsage(started);
+    expect((used.user + used.system) / 1000).toBeLessThan(15_000);
     expect(many.assessment.verdict).not.toBe("no-fit");
   }, 120_000);
 

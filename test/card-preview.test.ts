@@ -6,10 +6,12 @@ import { CardPreview } from "../src/export/card-preview.js";
 
 describe("Sample cards as a library (export/card-preview.ts)", () => {
   it("draws one design, or every design in one PDF, from the public test phrase", async () => {
-    const preview = new CardPreview(nodeCardRenderer, { words: 24 });
-    const one = await PDFDocument.load(await preview.render());
+    // One design with the longest phrase; every design with the default, which draws half the
+    // cards: every design at 24 words took a minute alone and ran out of time in the full suite.
+    const longest = new CardPreview(nodeCardRenderer, { words: 24 });
+    const one = await PDFDocument.load(await longest.render());
     expect(one.getPageCount()).toBe(1);
-    const all = await PDFDocument.load(await preview.renderAll());
+    const all = await PDFDocument.load(await new CardPreview(nodeCardRenderer).renderAll());
     expect(all.getPageCount()).toBe(CardPreview.templates.length);
   }, 120_000);
 
