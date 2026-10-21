@@ -49,7 +49,7 @@ First release of MnemoCode. The last two sections, "Toolchain and dependencies" 
 - Each question on the private screen has a screen of its own. The lines it needs stay above it until it is answered: the encoded fingerprint, so that a mistyped code shows before any date is typed, the reason of the Seedshift question, the form detected, re-encode's heading and confirmation of the new backup, and the Protection line.
 - Encode shows its result on a screen of its own, without the questions answered before it.
 - On the private screen, a search of forgotten words, of dates, or of codes or shares marked with `?` has a step screen of its own, so that what was typed is no longer shown while it runs; its notices and its progress are shown there.
-- Encoded backups, Shamir shares and re-encode's confirmation stay on the private screen while the questions after them are asked. The screen is cleared only for another page or for the check of a written backup.
+- Encoded backups, Shamir shares and re-encode's confirmation stay on the private screen while their follow-up questions are asked. Typing codes or dates again, or starting another wallet search, clears the previous result from the next step's screen. The legacy last-word recovery starts its search on a fresh screen too.
 - A warning about unencrypted swap or a cloud folder stays on every step screen of the command, with its link. A cloud folder is warned of once, and only for a file that is saved: re-encode warns of the new backup's folder on the screen of its result.
 - Every wallet fingerprint shown comes with one sentence: "They do not reveal the phrase." The menu shows its short label with that explanation in grey, also on narrow screens.
 - While cards are checked and drawn on the private screen, a line names the step, such as "Checking that the cards can be printed…".
@@ -293,6 +293,12 @@ First release of MnemoCode. The last two sections, "Toolchain and dependencies" 
 - `checkedExportFileName` of `export/file-name.ts` replaces `ExportFileName.checked`. `SSKR_LAYOUT_RULES` of `export/sskr-content.ts` states what each layout of share cards decides, and `resolveSskrLayout` refuses a layout that is none of them (`export.sskr-content.card-layout-one`).
 - Members that only their own class or only tests used are private or gone: `CoinAddress.pathsAt` (use `branchPathsAt` and the index), `Share.sameAs` (compare `ur`), `Coin.coinTypes`, `DatesAnswer.incompletePlaces` and `ShareSet.backupForm` (use `backup(mode)?.form`); `Coin` no longer implements `CoinDescription`.
 - The numbered dictionaries of `WordTable.text` line their columns up with spaces, the Chinese word last, for a person to read and print; with no format, the original table stays tab-separated.
+- `byteArrayLength(value)` and `isByteArray(value)` of `core/byte-array.ts` replace `ByteArray.length` and `ByteArray.is`, with the same checks of attached byte arrays across realms.
+- `matchCounts(options)` and `MatchCounts` of `core/date-search.ts` share the limits of `maxShown` and `keep`. `new ShareUnmasking(options)` refuses either count unless it is a whole number of 0 or more, in every mode, with `core.search-turns.whole-number-more`.
+- `validLastWordIndexes` refuses a prefix whose length cannot end a BIP39 phrase, and `EncodedForm.elements` refuses indexes whose count cannot make one (`core.bip39-sizes.expected-word-indexes`). Both refuse an element that is no word index (`core.bip39-sizes.assert-word-indexes-refused`).
+- `PUBLIC_MNEMONIC_24` and `SEEDSHIFT_DATES` of `core/self-test-vectors.ts` name the shared public self-test phrase of 24 words and the three dates of the Seedshift vectors.
+- `MISSING_CODES_WAYS` lists the supported ways to tell marked codes. `MissingCodesSearch.whyNot` refuses an unknown way with `core.missing-codes-search.unknown-way`; the encoded-fingerprint way refuses codes that keep no checksum with `core.missing-codes-search.codes-keep-no-checksum`.
+- Test-only members are gone: `Masking.MODES` (import `MASKING_MODES`), `MissingCodes.missingPlaces` (use `placements`, preserving alternative placements), `MissingCodesSearch.fits` (use `whyNot`) and `MAX_LISTED` (ask `many` or `whyNot`), and `CardPdfReader.pageCount` (count the pages returned by `pages()`).
 
 ### Toolchain and dependencies
 
@@ -309,6 +315,7 @@ First release of MnemoCode. The last two sections, "Toolchain and dependencies" 
 - `pnpm check` fails on a name in `.git-blame-ignore-revs` that is not a commit of the history, on an export that no code path reaches or that only tests use, and on an import cycle, of types too.
 - The gates of the coding guide count lines of code only, and refuse an error made without a stable code. A lint exception that silences nothing fails. `pnpm check:rust` also runs the doctests of the vendored crates and checks that `sskr-wasm/LINKED_LICENSES.txt` is current.
 - `pnpm check` refuses a public member of a library module without a doc comment: in an exported class or interface, and in each object type that an exported type alias is made of, the arms of a union or an intersection included.
+- `pnpm check:python-docs`, part of `pnpm check`, refuses a Python module or public declaration without a docstring, and a comment or docstring over 72 columns. The words and the rest of Python's style still need review.
 - `pnpm test:coverage` writes V8 coverage reports. Vitest runs test files on half the processors.
 - Regression tests cover wallet details, numeric options, size limits of secret files, missing and nested paths, and malformed PNG files.
 - The pseudo-terminal checks read the current frame of the screen, at normal and narrow sizes and in colour, and close their descriptors.
