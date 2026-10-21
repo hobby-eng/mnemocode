@@ -4,8 +4,9 @@ MnemoCode's SSKR engine is the Rust source in `rust/src/` (`lib.rs`,
 `share_text.rs`, `refusal.rs`). `Dockerfile.sskr` (`pnpm build:sskr`) builds it into the
 JavaScript/WASM adapter in `generated/`. The bridge was written for
 multi-chain-wallet-tools and taken from its revision `a0dad9e`; it is kept and
-built here now. Bridge package: `recovery-sskr-wasm` 0.1.9. The retained bridge
-copyright and MIT terms are in [LICENSE](LICENSE). File hashes are in
+built here now. Bridge package: `recovery-sskr-wasm` 0.1.9. The bridge is
+licensed under MIT or Apache-2.0 at your option, as MnemoCode and its
+`rust/Cargo.toml`: [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE). File hashes are in
 `integrity.json`.
 
 Since 0.1.9 the bridge writes and reads the text of a share itself, in buffers

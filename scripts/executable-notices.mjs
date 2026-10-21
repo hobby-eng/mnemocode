@@ -21,12 +21,16 @@ const ERRORS = new ErrorCatalog("scripts.executable-notices", {
 /** File names that hold a package's license or notice text. */
 const LICENSE_FILE = /^(licen[cs]e|copying|notice)(\.(md|txt))?$/iu;
 
-const PROJECT_FILES = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"];
+const PROJECT_FILES = ["LICENSE-MIT", "LICENSE-APACHE", "NOTICE", "THIRD_PARTY_NOTICES.md"];
 // The notices of the SSKR engine and of the bundled assets, in the folders that the executable
 // embeds them from (bundled-file-paths.ts), as build-executable.mjs reads them.
-const SSKR_FILES = ["LICENSE", "NOTICE.md", "UPSTREAM_NOTICES.md", "LINKED_LICENSES.txt"].map(
-  (file) => `${SSKR_ENGINE_FOLDER}${file}`,
-);
+const SSKR_FILES = [
+  "LICENSE-MIT",
+  "LICENSE-APACHE",
+  "NOTICE.md",
+  "UPSTREAM_NOTICES.md",
+  "LINKED_LICENSES.txt",
+].map((file) => `${SSKR_ENGINE_FOLDER}${file}`);
 const ASSET_FILES = ["fonts/DejaVuSans-NOTICE", "maps/NOTICE", "images/NOTICE"].map(
   (file) => `${ASSETS_FOLDER}${file}`,
 );

@@ -352,7 +352,8 @@
     "vectors",
     "README.md",
     "SECURITY.md",
-    "LICENSE",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
     "sskr-wasm",
@@ -419,5 +420,5 @@
   "engines": {
     "node": ">=26.10.0"
   },
-  "license": "MIT"
+  "license": "MIT OR Apache-2.0"
 }

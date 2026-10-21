@@ -12,7 +12,8 @@ The license texts of every crate that the WebAssembly links, with their copyrigh
 
 The bridge source is included in `rust/src/` (`lib.rs`, `share_text.rs`, `refusal.rs`), with its
 manifest and lockfile.
-The MIT copyright and license for the bridge are retained in [LICENSE](LICENSE).
+The bridge's copyright and its licenses, MIT or Apache-2.0 at your option, are in
+[LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE).
 `integrity.json` pins the source, manifests and generated JS/WASM files.
 
 ## Locked packages

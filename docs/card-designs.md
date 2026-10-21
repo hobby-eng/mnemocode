@@ -28,7 +28,7 @@ Thirteen templates are included; `mnemocode preview --list` prints their numbers
 
 ## Artwork
 
-Images of cards and materials are stored in the program; the colour of a material sample is laid over its image. They were made for MnemoCode with OpenAI's image generation and are distributed under MnemoCode's MIT license; [their notice](../assets/images/NOTICE) says how they were made and lists each image with its SHA-256. Page backdrops, text, reference codes and the QR code are drawn as shapes, not as pixels, so they stay sharp in print.
+Images of cards and materials are stored in the program; the colour of a material sample is laid over its image. They were made for MnemoCode with OpenAI's image generation and are distributed under MnemoCode's license, MIT or Apache-2.0 at your option; [their notice](../assets/images/NOTICE) says how they were made and lists each image with its SHA-256. Page backdrops, text, reference codes and the QR code are drawn as shapes, not as pixels, so they stay sharp in print.
 
 ## Example titles
 

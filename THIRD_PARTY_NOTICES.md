@@ -67,7 +67,7 @@ The world map on collection sheets is drawn from the Natural Earth land polygons
 
 ## Card artwork
 
-The images of the card designs in `assets/images` were made for MnemoCode with OpenAI's image generation in ChatGPT, from prompts that asked for images like reference photographs found on the web; no reference image is included. MnemoCode distributes them under its MIT license; `assets/images/NOTICE` lists each image with its SHA-256.
+The images of the card designs in `assets/images` were made for MnemoCode with OpenAI's image generation in ChatGPT, from prompts that asked for images like reference photographs found on the web; no reference image is included. MnemoCode distributes them under its license, MIT or Apache-2.0 at your option; `assets/images/NOTICE` lists each image with its SHA-256.
 
 ## PDF export dependencies
 

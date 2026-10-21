@@ -3,8 +3,8 @@ Card artwork
 The twelve images of the card designs in this folder were made for MnemoCode
 with OpenAI's image generation in ChatGPT, from prompts that asked for images
 like reference photographs found on the web; no reference image is included.
-MnemoCode distributes them under its MIT license (LICENSE at the root of the
-repository).
+MnemoCode distributes them under its license, MIT or Apache-2.0 at your
+option (LICENSE-MIT and LICENSE-APACHE at the root of the repository).
 
 SHA-256 of each image:
   4bfddabbf33c260f6e03c422ae4ff199a9a894d97c40d3e7d070b53807c5d481  business-architect-v1.png
