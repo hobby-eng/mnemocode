@@ -14,14 +14,15 @@ export function checkWordTableStartup(): void {
     );
   const answers: readonly [WordTableFormat | undefined, string, string, string][] = [
     [undefined, "index\tenglish\tunicode_hex", "1\tabandon\t7684", "2048\tzoo\t6B47"],
-    ["english", "index\tenglish", "1\tabandon", "2048\tzoo"],
-    ["chinese", "index\tchinese", "1\t的", "2048\t歇"],
-    ["unicode", "index\tchinese\tunicode_hex", "1\t的\t7684", "2048\t歇\t6B47"],
+    // The numbered dictionaries line their columns up with spaces, the Chinese word last.
+    ["english", "index  english", "    1  abandon", " 2048  zoo"],
+    ["chinese", "index  chinese", "    1  的", " 2048  歇"],
+    ["unicode", "index  unicode_hex  chinese", "    1  7684         的", " 2048  6B47         歇"],
     [
       "mapping",
-      "index\tenglish\tchinese\tunicode_hex",
-      "1\tabandon\t的\t7684",
-      "2048\tzoo\t歇\t6B47",
+      "index  english   unicode_hex  chinese",
+      "    1  abandon   7684         的",
+      " 2048  zoo       6B47         歇",
     ],
   ];
   for (const [format, header, first, last] of answers) {

@@ -246,10 +246,10 @@ def check_table_exports():
     prefix = "mnemocode-dictionaries-"
     with tempfile.TemporaryDirectory(prefix=prefix) as folder:
         for choice, name, header in (
-            ("1", "english", "index\tenglish"),
-            ("2", "chinese", "index\tchinese"),
-            ("3", "unicode", "index\tchinese\tunicode_hex"),
-            ("4", "mapping", "index\tenglish\tchinese\tunicode_hex"),
+            ("1", "english", "index  english"),
+            ("2", "chinese", "index  chinese"),
+            ("3", "unicode", "index  unicode_hex  chinese"),
+            ("4", "mapping", "index  english   unicode_hex  chinese"),
             ("5", "guide", "# MnemoCode: recovery without MnemoCode"),
             ("6", "set", None),
         ):
@@ -282,7 +282,7 @@ def check_table_exports():
                 mapping = path.joinpath("bip39-mapping.txt").read_text(
                     encoding="utf-8"
                 )
-                assert mapping.splitlines()[-1].startswith("2048\tzoo\t")
+                assert mapping.splitlines()[-1].startswith(" 2048  zoo ")
                 guide = path.joinpath("manual-recovery.md").read_text(
                     encoding="utf-8"
                 )
@@ -296,8 +296,8 @@ def check_table_exports():
             else:
                 lines = text.splitlines()
                 assert len(lines) == 2049
-                assert lines[1].startswith("1\t")
-                assert lines[-1].startswith("2048\t")
+                assert lines[1].startswith("    1  ")
+                assert lines[-1].startswith(" 2048  ")
     print(
         "menu export: all four complete numbered dictionaries and standalone "
         "guide"

@@ -1,5 +1,5 @@
 import { printableText, terminalResultHeader, terminalSaved } from "./terminal.js";
-import { WordTable, WORD_TABLE_FORMATS } from "../core/word-table.js";
+import { WordTable, WORD_TABLE_FORMATS, type WordTableFormat } from "../core/word-table.js";
 import { WORD_NUMBER_RANGE } from "../core/bip39-sizes.js";
 import { choiceOption, integerOption, type ParsedArguments, value } from "./arguments.js";
 import { defined } from "../core/defined.js";
@@ -35,15 +35,14 @@ function printRow(row: ReturnType<typeof WordTable.row>): void {
 }
 
 /**
- * The heading of the whole table on a terminal (CORE-36), with its rows and its columns read from
- * the table's own text. A file or a pipe gets the plain table alone: terminalResultHeader prints
- * nothing there.
+ * The heading of the whole table of `format` on a terminal (CORE-36), with its rows and the
+ * columns that the table names. A file or a pipe gets the plain table alone: terminalResultHeader
+ * prints nothing there.
  */
-function wordTableHeading(text: string): void {
-  const [columns = "", ...rows] = text.trimEnd().split("\n");
+function wordTableHeading(format: WordTableFormat | undefined): void {
   terminalResultHeader("Word table", [
-    ["Rows", `${rows.length}`],
-    ["Columns", columns.split("\t").join(", ")],
+    ["Rows", `${WordTable.rows().length}`],
+    ["Columns", WordTable.columns(format).join(", ")],
   ]);
 }
 
@@ -95,7 +94,7 @@ export async function runTable(arguments_: ParsedArguments): Promise<void> {
       : WordTable.text(format);
     if (output === undefined) {
       // The recovery guide is a document with a heading of its own.
-      if (!guide) wordTableHeading(text);
+      if (!guide) wordTableHeading(format);
       process.stdout.write(text);
     } else {
       await writeSaved(() => publishNewPrivateFile(output, Buffer.from(text, "utf8")));

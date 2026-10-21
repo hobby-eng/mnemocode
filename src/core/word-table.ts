@@ -40,12 +40,18 @@ const COLUMNS = {
   chinese: (row: MappingRow) => String.fromCodePoint(Number.parseInt(row.unicodeHex, 16)),
   unicode_hex: (row: MappingRow) => row.unicodeHex,
 };
+/**
+ * The columns of each numbered dictionary, which a person reads and prints. The Chinese word comes
+ * last: a font draws it as wide as it likes, so a column after it would not line up.
+ */
 const LAYOUTS: Readonly<Record<WordTableFormat, readonly (keyof typeof COLUMNS)[]>> = {
   english: ["index", "english"],
   chinese: ["index", "chinese"],
-  unicode: ["index", "chinese", "unicode_hex"],
-  mapping: ["index", "english", "chinese", "unicode_hex"],
+  unicode: ["index", "unicode_hex", "chinese"],
+  mapping: ["index", "english", "unicode_hex", "chinese"],
 };
+/** What stands between two columns of a numbered dictionary. */
+const COLUMN_GAP = "  ";
 // UTF-16 surrogate code points are code units, never Unicode scalar values.
 const SURROGATE_CODE_POINTS = { min: 0xd800, max: 0xdfff } as const;
 
@@ -153,14 +159,47 @@ export class WordTable {
   }
 
   /**
-   * Every word as numbered TSV with a header; the legacy mapping by default, unknown formats
-   * refused (core.words.word-table-format).
+   * The names of the columns of the numbered dictionary `format`, in their order, as its header
+   * names them; with no format, those of the original table. Refuses another format
+   * (core.words.word-table-format).
    */
-  static text(format?: WordTableFormat): string {
+  static columns(format?: WordTableFormat): readonly string[] {
+    return WordTable.#layout(format);
+  }
+
+  /** The columns of `format`, or of the original table; refuses another format. */
+  static #layout(format: WordTableFormat | undefined): readonly (keyof typeof COLUMNS)[] {
     if (format !== undefined && !WORD_TABLE_FORMATS.includes(format))
       throw ERRORS.create("word-table-format", []);
-    const columns = format === undefined ? HEADER : LAYOUTS[format];
-    const rows = WordTable.#rows.map((row) => columns.map((column) => COLUMNS[column](row)));
-    return [columns, ...rows].map((cells) => cells.join("\t") + "\n").join("");
+    return format === undefined ? HEADER : LAYOUTS[format];
+  }
+
+  /**
+   * Every word under a header, numbered from 1. With no format, the original table of number,
+   * English word and Unicode code, tab-separated, for a script. With a format, the columns of that
+   * numbered dictionary (LAYOUTS) lined up with spaces, for a person to read and print: the number
+   * on the right of its column, the other columns on the left, each as wide as its widest cell.
+   * Refuses another format (core.words.word-table-format).
+   */
+  static text(format?: WordTableFormat): string {
+    const columns = WordTable.#layout(format);
+    const rows = [
+      [...columns],
+      ...WordTable.#rows.map((row) => columns.map((column) => String(COLUMNS[column](row)))),
+    ];
+    if (format === undefined) return rows.map((cells) => `${cells.join("\t")}\n`).join("");
+    // The last column, which may be the Chinese word, is not padded: nothing follows it.
+    const widths = columns.map((_, at) => Math.max(...rows.map((cells) => cells[at]?.length ?? 0)));
+    const aligned = (cells: readonly string[]) =>
+      cells
+        .map((cell, at) =>
+          at === cells.length - 1
+            ? cell
+            : columns[at] === "index"
+              ? cell.padStart(widths[at] ?? 0)
+              : cell.padEnd(widths[at] ?? 0),
+        )
+        .join(COLUMN_GAP);
+    return rows.map((cells) => `${aligned(cells)}\n`).join("");
   }
 }

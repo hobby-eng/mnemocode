@@ -45,16 +45,18 @@ describe("numbered BIP39 exports", () => {
   });
   it("keeps every English/Traditional Chinese/code correspondence in published word-list order", () => {
     const rows = wordTableText("mapping").trimEnd().split("\n");
-    expect(rows.shift()).toBe("index\tenglish\tchinese\tunicode_hex");
+    expect(rows.shift()).toBe("index  english   unicode_hex  chinese");
     expect(rows).toHaveLength(2048);
     for (const [index, line] of rows.entries()) {
       const point = chinese[index]!;
-      expect(line.split("\t")).toEqual([
+      expect(line.trim().split(/ +/u)).toEqual([
         String(index + 1),
         wordlist[index],
-        point,
         point.codePointAt(0)!.toString(16).toUpperCase(),
+        point,
       ]);
+      // Every column starts where its header does, the longest English words included.
+      expect([line.indexOf(wordlist[index]!), line.lastIndexOf(point)]).toEqual([7, 30]);
     }
     expect(wordTableText()).toMatch(/^index\tenglish\tunicode_hex\n1\tabandon\t7684\n/u);
     expect(() => checkWordTableStartup()).not.toThrow();

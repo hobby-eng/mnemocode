@@ -88,7 +88,7 @@ mnemocode table --word-lists-dir output/recovery-pack
 
 In the word lookup entry, Enter after a result asks for another value of the same kind; Escape returns to the main menu. **Export word lists and guide** saves the English list, the Traditional Chinese list, Unicode characters with their codes, the full correspondence table, or the [manual recovery guide](MANUAL_RECOVERY.md).
 
-Every dictionary has 2,048 rows numbered from 1, with a header and tab-separated UTF-8 columns. `table --all --table-format english|chinese|unicode|mapping` selects the columns; `--output PATH` saves them instead of printing them. With no `--table-format`, the original number/English/Unicode-code table is unchanged. Existing files are kept and the new file receives a numbered name.
+Every dictionary has 2,048 rows numbered from 1 under a header, in UTF-8. `table --all --table-format english|chinese|unicode|mapping` selects the columns, lined up with spaces for reading and printing, the Chinese character last so that no column after it depends on how wide a font draws it; `--output PATH` saves them instead of printing them. With no `--table-format`, the original number/English/Unicode-code table is unchanged, its columns separated by tabs for a script. Existing files are kept and the new file receives a numbered name.
 
 **Full set**, or `table --word-lists-dir PATH`, saves all four numbered tables and `manual-recovery.md` together in a new folder. An existing folder is kept; MnemoCode chooses a numbered folder name.
 

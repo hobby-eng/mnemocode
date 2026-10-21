@@ -43,7 +43,16 @@ describe("The independent BIP39 word table", () => {
       unicodeHex: "6B47",
     });
     expect(WordTable.lookup("unicode", "6b47")).toEqual(WordTable.row(2048));
-    expect(WordTable.text("chinese").split("\n").slice(0, 2)).toEqual(["index\tchinese", "1\t的"]);
+    expect(WordTable.columns("mapping")).toEqual(["index", "english", "unicode_hex", "chinese"]);
+    expect(WordTable.columns()).toEqual(["index", "english", "unicode_hex"]);
+    // No format's name, fed on purpose as a JavaScript host could, is refused.
+    expect(() => WordTable.columns("pdf" as never)).toThrow(
+      expect.objectContaining({ code: "core.words.word-table-format" }),
+    );
+    expect(WordTable.text("chinese").split("\n").slice(0, 2)).toEqual([
+      "index  chinese",
+      "    1  的",
+    ]);
   });
 
   it("keeps its dictionaries unchanged when a caller alters returned rows", () => {
