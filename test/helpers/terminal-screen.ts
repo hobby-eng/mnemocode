@@ -67,6 +67,16 @@ export class Screen {
     return [this.#row, this.#column];
   }
 
+  /**
+   * Forgets the rows above the last `count`, as a terminal's scrollback holds rows that no program
+   * reaches any more; never the row of the cursor. Only for rows that no cursor move goes back to.
+   */
+  keepLast(count: number): void {
+    const forgotten = Math.min(this.#row, Math.max(0, this.#rows.length - count));
+    this.#rows.splice(0, forgotten);
+    this.#row -= forgotten;
+  }
+
   #moveTo(row: number, column: number): void {
     this.#row = Math.max(0, row);
     this.#column = Math.min(this.#columns - 1, column);
@@ -199,7 +209,7 @@ export function keyedQuestions(): void {
     terminal.asked = [];
     terminal.onFirstKey = () => undefined;
     terminal.exit = async () => 130;
-    terminal.selfTestFails = false;
+    terminal.wordListDamaged = false;
     terminal.protectionFails = false;
     terminal.atTerminal = false;
     terminal.events = [];

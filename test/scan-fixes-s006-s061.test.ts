@@ -106,6 +106,7 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 import { publicShare } from "./helpers/vectors.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("S006: the facts of a kind of wallet evidence follow from its level", () => {
   it("tells which kinds are scanned and which are placed", async () => {
@@ -558,7 +559,7 @@ describe("S037: one list of share forms and one pairing with the forms of a phra
 
 describe("S036: each form of codes knows its own facts", () => {
   it("reads back what it writes, and is guessed from its characters", () => {
-    const result = encodeMnemonic("abandon ".repeat(11) + "about", [parseDate("01-01-2000")]);
+    const result = encodeMnemonic(TEST_PHRASE, [parseDate("01-01-2000")]);
     for (const format of ENCODED_FORMATS) {
       const form = EncodedForm.of(format);
       expect(form.read(form.write(result))).toEqual(result.shiftedIndexes);

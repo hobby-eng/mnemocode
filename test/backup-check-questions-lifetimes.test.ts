@@ -21,9 +21,6 @@ interface ReadEdges {
 const edges = vi.hoisted((): ReadEdges => ({ reads: 0, beforeRead: undefined }));
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   const input = harness.replacedTerminalInput(await importOriginal());
   // Observe the next terminal read, keeping the existing terminal fixture and real parsers.
@@ -38,9 +35,6 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   }
   return { ...input, TerminalKeys: ObservedKeys };
 });
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
-);
 
 // Independent checksum-valid-seedshift-12 literals from vectors/mnemocode-v1.json.
 const MASKED_PHRASE = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
@@ -132,18 +126,22 @@ describe("Backup-check children through the public terminal questions", () => {
         `${OTHER_DATE}\r`,
         `${DATE_LINE}\r`,
       ];
-      terminal.choices = ["again", "again"];
+      terminal.choices = [
+        kind === "codes" ? "Type the codes again" : "Type the shares again",
+        "Type the dates again",
+      ];
+      // Reads 2 and 5 are the questions "What now?", 3 and 6 the answers typed again.
       edges.beforeRead = (read) => {
-        if (read === 2) {
+        if (read === 3) {
           expect(observed.written(kind)).toHaveLength(1);
           expectClosed(observed.written(kind)[0]);
         }
-        if (read === 3) {
+        if (read === 4) {
           expect(observed.written(kind)).toHaveLength(2);
           expectLive(observed.written(kind)[1]);
           expect(observed.dates()).toHaveLength(0);
         }
-        if (read === 4) {
+        if (read === 6) {
           expect(observed.written(kind)).toHaveLength(2);
           expectLive(observed.written(kind)[1]);
           expect(observed.dates()).toHaveLength(1);
@@ -151,7 +149,7 @@ describe("Backup-check children through the public terminal questions", () => {
         }
       };
       await expect(offer(kind)).resolves.toBeUndefined();
-      expect(edges.reads).toBe(4);
+      expect(edges.reads).toBe(6);
       expect(observed.written(kind)).toHaveLength(2);
       expect(observed.dates()).toHaveLength(2);
       expect(terminal.questions).toEqual(["What now?", "What now?"]);

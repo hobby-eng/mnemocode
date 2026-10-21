@@ -6,12 +6,10 @@ import { describe, expect, it } from "vitest";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { containing, matching } from "./helpers/matchers.js";
 import { runBuiltCli as run } from "./helpers/built-cli.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The limit of the one test that starts the command line fifteen times. */
 const FIFTEEN_STARTS_TIME_LIMIT_MS = 300_000;
-
-const mnemonic =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 describe("CLI records", () => {
   it("reports the package version through both CLI forms", async () => {
@@ -59,7 +57,7 @@ describe("CLI records", () => {
         "--mode",
         "direct",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--format",
         "3",
         "--output",
@@ -67,7 +65,7 @@ describe("CLI records", () => {
       ]);
       expect(await readFile(path, "utf8")).toMatch(/^MNC1:direct:unicode:/u);
       const decoded = await run(["decode", "--input-file", path]);
-      expect(decoded.stdout.trim()).toBe(mnemonic);
+      expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
       expect(decoded.stderr).toContain("BIP39 checksum: valid");
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -81,17 +79,17 @@ describe("CLI records", () => {
       const encoded = await run([
         "encode",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--format",
         "1",
         "--output",
         path,
       ]);
       expect(encoded.stdout).toContain("English BIP39 words of");
-      expect(encoded.stdout).toContain(mnemonic);
+      expect(encoded.stdout).toContain(TEST_PHRASE);
       expect(await readFile(path, "utf8")).toMatch(/^MNC1:direct:english:/u);
       await expect(
-        run(["encode", "--mnemonic", mnemonic, "--format", "1", "--output"]),
+        run(["encode", "--mnemonic", TEST_PHRASE, "--format", "1", "--output"]),
       ).rejects.toMatchObject({
         stderr: containing("output record file setting requires a value"),
       });
@@ -163,7 +161,7 @@ describe("CLI records", () => {
           "--mode",
           "seedshift",
           "--mnemonic",
-          mnemonic,
+          TEST_PHRASE,
           "--dates",
           "23-09-2026",
           "--format",
@@ -201,7 +199,7 @@ describe("CLI records", () => {
         "--mode",
         "seedshift",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--dates",
         "23-09-2026",
         "--format",
@@ -215,7 +213,7 @@ describe("CLI records", () => {
       expect(qr).not.toContain("MNC1");
       expect(qr).not.toContain("seedshift");
       const decoded = await run(["decode", "--qr-file", path, "--dates", "23-09-2026"]);
-      expect(decoded.stdout.trim()).toBe(mnemonic);
+      expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
       expect(decoded.stderr).toContain("Detected input format: colors.");
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -228,7 +226,7 @@ describe("CLI records", () => {
       "--mode",
       "seedshift",
       "--mnemonic",
-      mnemonic,
+      TEST_PHRASE,
       "--dates",
       "10-07-1963",
       "--format",
@@ -246,7 +244,7 @@ describe("CLI records", () => {
       "--format",
       "2",
     ]);
-    expect(decoded.stdout.trim()).toBe(mnemonic);
+    expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
   });
 });
 
@@ -269,13 +267,13 @@ describe("CLI records", () => {
           "--mode",
           "direct",
           "--mnemonic",
-          mnemonic,
+          TEST_PHRASE,
           "--format",
           number,
         ]);
         const raw = encoded.stdout.trim().split("\n").at(-1)!;
         const decoded = await run(["decode", "--mode", "direct", "--input", raw]);
-        expect(decoded.stdout.trim()).toBe(mnemonic);
+        expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
         expect(decoded.stderr).toContain(`Detected input format: ${format}.`);
         const explicit = await run([
           "decode",
@@ -286,10 +284,10 @@ describe("CLI records", () => {
           "--format",
           format,
         ]);
-        expect(explicit.stdout.trim()).toBe(mnemonic);
+        expect(explicit.stdout.trim()).toBe(TEST_PHRASE);
       }
       await expect(
-        run(["encode", "--mode", "direct", "--mnemonic", mnemonic, "--format", "6"]),
+        run(["encode", "--mode", "direct", "--mnemonic", TEST_PHRASE, "--format", "6"]),
       ).rejects.toMatchObject({
         stderr: containing("The representation format must be one of"),
       });
@@ -303,7 +301,7 @@ describe("CLI records", () => {
       "--mode",
       "direct",
       "--mnemonic",
-      mnemonic,
+      TEST_PHRASE,
       "--format",
       "2",
     ]);
@@ -317,7 +315,7 @@ describe("CLI records", () => {
       "--format",
       "indexes",
     ]);
-    expect(decoded.stdout.trim()).toBe(mnemonic);
+    expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
     expect(decoded.stderr).not.toContain("Detected input format:");
   });
 
@@ -348,7 +346,7 @@ describe("CLI records", () => {
         "--mode",
         "direct",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--format",
         "3",
         "--output",
@@ -371,7 +369,7 @@ describe("CLI records", () => {
 
   it("trusts an MNC1 format header only after the declared payload parser validates it", async () => {
     await expect(
-      run(["decode", "--input", `MNC1:direct:unicode:${mnemonic}`]),
+      run(["decode", "--input", `MNC1:direct:unicode:${TEST_PHRASE}`]),
     ).rejects.toMatchObject({
       // The one message of the Unicode reader (S011).
       stderr: containing("Unicode codes have four hexadecimal digits each"),
@@ -387,7 +385,7 @@ describe("CLI records", () => {
       "--mode",
       "seedshift-legacy",
       "--mnemonic",
-      mnemonic,
+      TEST_PHRASE,
       "--dates",
       "10-07-1963",
       "--format",
@@ -408,7 +406,7 @@ describe("CLI records", () => {
       "1000",
     ]);
     expect(recovered.stderr).toContain("Detected input format: colors.");
-    expect(recovered.stdout).toContain(`10-07-1963\t${mnemonic}`);
+    expect(recovered.stdout).toContain(`10-07-1963\t${TEST_PHRASE}`);
   });
 });
 
@@ -422,7 +420,7 @@ describe("CLI records", () => {
         "--mode",
         "seedshift-legacy",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--dates",
         "23-09-2026",
         "--format",
@@ -435,7 +433,7 @@ describe("CLI records", () => {
         "seedshift-legacy",
         "--legacy-valid-last-word",
         "--mnemonic",
-        mnemonic,
+        TEST_PHRASE,
         "--dates",
         "23-09-2026",
         "--format",
@@ -445,7 +443,7 @@ describe("CLI records", () => {
       ]);
       expect(await readFile(path, "utf8")).toMatch(/^MNC1:seedshift-legacy-valid:english:/u);
       const recovered = await run(["decode", "--input-file", path, "--dates", "23-09-2026"]);
-      expect(recovered.stdout).toContain(mnemonic);
+      expect(recovered.stdout).toContain(TEST_PHRASE);
       expect(recovered.stderr).toContain("128 checksum-valid candidates");
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -464,7 +462,7 @@ describe("CLI records", () => {
           "--mode",
           "direct",
           "--mnemonic",
-          mnemonic,
+          TEST_PHRASE,
           "--format",
           format,
           "--pdf",

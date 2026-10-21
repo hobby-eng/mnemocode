@@ -128,10 +128,11 @@ describe("cards of a share set, for any host", () => {
   });
 
   it("checks the layout, the style and the shares before anything is rendered", async () => {
-    // A layout and a style that no card has, given on purpose as a JavaScript host could.
+    // A layout that no card has, given on purpose as a JavaScript host could.
     await expect(
       ShareCardSet.create(nodeCardRenderer, SHARES, { style: "it", layout: "bad" as never }),
     ).rejects.toThrow("The card layout must be one of: qr, collection, individual.");
+    // A style that no card has, given on purpose too.
     await expect(
       ShareCardSet.create(nodeCardRenderer, SHARES, { style: "nonsense" as never }),
     ).rejects.toThrow("Unsupported SSKR card style.");

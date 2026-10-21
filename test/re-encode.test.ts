@@ -217,7 +217,7 @@ describe("re-encode CLI", () => {
     expect(result.stdout).not.toContain("abandon");
     expect(result.stdout).toContain(UNICODE);
     expect(result.stderr).toContain(
-      "Original BIP32 master fingerprint (empty BIP39 passphrase): 73c5da0a",
+      `Original BIP32 master fingerprint (empty BIP39 passphrase): ${TEST_FINGERPRINT}`,
     );
     expect(result.stderr).toContain(
       "The fingerprint matches: the seed phrase is accepted, not proven.",

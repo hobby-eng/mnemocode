@@ -16,9 +16,7 @@ import {
 import { matching } from "./helpers/matchers.js";
 import { runBuiltCli as run } from "./helpers/built-cli.js";
 import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
-
-const publicMnemonic =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("date recovery patterns", () => {
   it("supports partial digits and several forgotten components", () => {
@@ -58,7 +56,7 @@ describe("date recovery patterns", () => {
   it("finds the forgotten digits in the core, once per combination, without the command line", () => {
     const known = parseDate("10-07-1963");
     const forgotten = parseDate("23-09-2026");
-    const encoded = encodeMnemonic(publicMnemonic, [known, forgotten]);
+    const encoded = encodeMnemonic(TEST_PHRASE, [known, forgotten]);
     const patterns = [parseDatePattern("2?-09-2026")];
     const steps = [
       ...dateRecoveryCandidates(encoded.shiftedIndexes, [known], patterns, "seedshift"),
@@ -68,19 +66,19 @@ describe("date recovery patterns", () => {
     const found = steps.flat();
     // Checksum-valid Seedshift gives a valid phrase for every date; the wallet tells them apart.
     expect(found).toHaveLength(steps.length);
-    const right = found.filter((candidate) => candidate.mnemonic === publicMnemonic);
+    const right = found.filter((candidate) => candidate.mnemonic === TEST_PHRASE);
     expect(right.map((candidate) => candidate.dates.map(formatDate))).toEqual([["23-09-2026"]]);
   });
 
   it("tries a shift once: a year 2,048 years later gives the same phrase, which is found once", () => {
     // Two dates, one with a forgotten year and one with a forgotten digit of its month.
     const dates = [parseDate("10-01-2010"), parseDate("15-10-2025")];
-    const encoded = encodeMnemonic(publicMnemonic, dates);
+    const encoded = encodeMnemonic(TEST_PHRASE, dates);
     const patterns = [parseDatePattern("15-10-?"), parseDatePattern("10-?1-2010")];
     const steps = [...dateRecoveryCandidates(encoded.shiftedIndexes, [], patterns, "seedshift")];
     expect(steps).toHaveLength(datePatternCombinationCount(patterns));
     // 2025, 4073, 6121 and 8169 shift every word alike: only the earliest year is tried.
-    const right = steps.flat().filter((candidate) => candidate.mnemonic === publicMnemonic);
+    const right = steps.flat().filter((candidate) => candidate.mnemonic === TEST_PHRASE);
     expect(right.map((candidate) => candidate.dates.map(formatDate))).toEqual([
       ["10-01-2010", "15-10-2025"],
     ]);
@@ -95,7 +93,7 @@ describe("date recovery patterns", () => {
     "finds no phrase twice and the right one once, in every mode, length and forgotten part",
     () => {
       const phrases = {
-        12: publicMnemonic,
+        12: TEST_PHRASE,
         24: entropyToMnemonic(
           Uint8Array.from({ length: 32 }, (_, index) => index),
           wordlist,
@@ -154,7 +152,7 @@ describe("date recovery patterns", () => {
       "--mode",
       "seedshift-legacy",
       "--mnemonic",
-      publicMnemonic,
+      TEST_PHRASE,
       "--dates",
       "10-07-1963",
       "23-09-2026",
@@ -175,7 +173,7 @@ describe("date recovery patterns", () => {
       "100",
     ]);
     expect(recovered.stderr).toContain("Recovery search contains 30 date combinations.");
-    expect(recovered.stdout).toContain(`10-07-1963 23-09-2026\t${publicMnemonic}`);
+    expect(recovered.stdout).toContain(`10-07-1963 23-09-2026\t${TEST_PHRASE}`);
   });
 });
 
@@ -186,7 +184,7 @@ describe("date recovery patterns", () => {
       "--mode",
       "seedshift-legacy",
       "--mnemonic",
-      publicMnemonic,
+      TEST_PHRASE,
       "--dates",
       "10-07-1963",
       "--format",

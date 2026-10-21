@@ -3,7 +3,7 @@
 // Public test data only: the "abandon … about" phrase, its fingerprint 73c5da0a, and
 // vectors/sskr-v1.json.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -28,14 +28,8 @@ import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 vi.mock("node:fs/promises", async (importOriginal) =>
   harness.replacedFiles(await importOriginal()),
@@ -54,7 +48,7 @@ describe("shares on the private screen", () => {
   describe("exporting", () => {
     it("goes on without the wallet check when too few shares were typed for it", async () => {
       terminal.answers = [`${SHARES[0]}\r`];
-      terminal.choices = ["without"];
+      terminal.choices = ["Go on without the wallet check"];
       await runSskrExport({
         "ask-secrets": true,
         "master-fingerprint": TEST_FINGERPRINT,
@@ -88,7 +82,7 @@ describe("shares on the private screen", () => {
 
     it("shows the variants of a share that fits several ways, and lets it be typed again", async () => {
       terminal.answers = [`${ambiguous()}\r`, `${writeShare(SHARES[0], "indexes")}\r`];
-      terminal.choices = ["again"];
+      terminal.choices = ["Type share 1 again"];
       await runSskrExport({ "ask-secrets": true, format: "indexes" });
       expect(seen.notices).toContain(
         "Share 1 fits 4 ways, so nothing is saved: use another copy of it, or more shares.",
@@ -101,10 +95,11 @@ describe("shares on the private screen", () => {
     });
 
     it("shows each set that fits with its fingerprint when no wallet tells them apart", async () => {
-      // A second set beside the one the search finds: public shares of the test phrase. No two
-      // sets of real shares pass both the CRC-32 and the digest, so the step is given a second.
+      // A second set beside the one the search finds: public shares of the test phrase.
       const other = await testPhraseSet();
       const phrases = ShareRestore.phrases.bind(ShareRestore);
+      // Fault: the phrase step finds a second set, which no shares typed can give: no two sets of
+      // real shares pass both the CRC-32 and the digest.
       vi.spyOn(ShareRestore, "phrases").mockImplementation(async (...args) => {
         const found = await phrases(...args);
         if (found.kind !== "phrases") return found;
@@ -113,7 +108,7 @@ describe("shares on the private screen", () => {
       });
       terminal.answers = [`${SHARES[0]};${marked([5])}\r`];
       // "It cannot" at the wallet that would tell the right set.
-      terminal.choices = ["none"];
+      terminal.choices = ["It cannot"];
       await runSskrExport({ "ask-secrets": true, format: "ur" });
       expect(seen.notices).toContain(variantsMessage(2, false));
       expect(seen.out).toContain(
@@ -131,7 +126,7 @@ describe("shares on the private screen", () => {
   describe("exporting", () => {
     it("saves nothing when the variants are left as they are", async () => {
       terminal.answers = [`${ambiguous()}\r`];
-      terminal.choices = ["done"];
+      terminal.choices = ["Done"];
       await runSskrExport({ "ask-secrets": true });
       expect(seen.out).toHaveLength(4);
     });
@@ -141,7 +136,7 @@ describe("shares on the private screen", () => {
       try {
         const pdf = join(folder, "shares.pdf");
         terminal.answers = [`${SHARES[0]};${writeShare(SHARES[2], "colors")}\r`];
-        terminal.choices = ["stop"];
+        terminal.choices = ["Stop"];
         expect(await runSskrExport({ "ask-secrets": true, pdf })).toBe(CANCELLED);
         expect(terminal.questions).toEqual([
           "The shares are written in different forms. Which form should the cards show?",
@@ -159,7 +154,7 @@ describe("shares on the private screen", () => {
 
     it("names shares of different sets before writing anything", async () => {
       terminal.answers = [`${SHARES[0]};${OTHER_SET_SHARE}\r`, `${SHARES[2]}\r`];
-      terminal.choices = ["one", 2];
+      terminal.choices = ["Type one share again", "Share 2"];
       await runSskrExport({ "ask-secrets": true, format: "indexes" });
       expect(seen.notices).toContain(
         "Shares 1 and 2 are of different sets, and nothing tells which is right.",
@@ -191,7 +186,7 @@ describe("shares on the private screen", () => {
     it("tries a failed save again and shows the shares", async () => {
       const output = join(folder, "shares.txt");
       terminal.saveFailures = 1;
-      terminal.choices = ["again"];
+      terminal.choices = ["Try again"];
       await split(output);
       expect(seen.notices).toContain(
         `The file of the shares could not be saved as ${output}: the disk is full.`,
@@ -206,7 +201,7 @@ describe("shares on the private screen", () => {
       const output = join(folder, "shares.txt");
       const other = join(folder, "other.txt");
       terminal.saveFailures = 1;
-      terminal.choices = ["other"];
+      terminal.choices = ["Another file name"];
       terminal.answers = [`${other}\r`];
       await split(output);
       expect(existsSync(output)).toBe(false);
@@ -219,26 +214,27 @@ describe("shares on the private screen", () => {
     it("goes back to the choice, writing nothing, when no new name is given", async () => {
       const output = join(folder, "shares.txt");
       terminal.saveFailures = 1;
-      terminal.choices = ["other", "skip"];
+      terminal.choices = ["Another file name", "Skip"];
       // Escape at the new name.
       terminal.answers = ["\x1b"];
       await split(output);
       expect(seen.screen).toContain("New name for the file of the shares:");
-      expect(
-        seen.notices.filter((line) => line.startsWith("The file of the shares could not be saved")),
-      ).toHaveLength(1);
+      expect(seen.notices).toContain(
+        `The file of the shares could not be saved as ${output}: the disk is full.`,
+      );
       expect(terminal.labels.slice(0, 2)).toEqual([
         ["Try again", "Another file name", "Skip"],
         ["Try again", "Another file name", "Skip"],
       ]);
-      expect(existsSync(output)).toBe(false);
+      // Nothing was written after the failure, under the name or any other.
+      expect(readdirSync(folder)).toEqual([]);
       expect(seen.out.filter((line) => line.startsWith("ur:sskr/"))).toHaveLength(3);
     });
 
     it("offers the sheet for heirs again too, and still shows the shares", async () => {
       const sheet = join(folder, "heirs.pdf");
       terminal.saveFailures = 1;
-      terminal.choices = ["skip"];
+      terminal.choices = ["Skip"];
       await runSskrSplit({
         mnemonic: TEST_PHRASE,
         threshold: "2",
@@ -256,7 +252,7 @@ describe("shares on the private screen", () => {
     it("shows the shares when the save is skipped", async () => {
       const output = join(folder, "shares.txt");
       terminal.saveFailures = 1;
-      terminal.choices = ["skip"];
+      terminal.choices = ["Skip"];
       await split(output);
       expect(existsSync(output)).toBe(false);
       expect(seen.notices).toContain("The file of the shares was not saved.");

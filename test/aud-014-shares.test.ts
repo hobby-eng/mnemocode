@@ -173,14 +173,14 @@ describe("AUD-014-API008: the bridge's narrowed arguments are checked first", ()
   /** A secret that records whether the glue began to copy it: it reads the length first. */
   function watchedSecret(): { secret: Uint8Array; read: () => boolean } {
     let touched = false;
-    // An object that is no Uint8Array, fed on purpose: the glue must refuse before it reads it.
-    const secret = {
+    const watched = {
       get length() {
         touched = true;
         return 16;
       },
-    } as unknown as Uint8Array;
-    return { secret, read: () => touched };
+    };
+    // An object that is no Uint8Array, fed on purpose: the glue must refuse before it reads it.
+    return { secret: watched as unknown as Uint8Array, read: () => touched };
   }
 
   it("refuses an encoding that the glue would alias, before it copies the secret", async () => {

@@ -4,6 +4,7 @@ import jsQRModule from "jsqr";
 import { drawCollectionQr, MIN_MODULE_MM, qrSizeForModuleMm } from "../src/export/card-qr.js";
 import { MM } from "../src/export/business-layout.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** jsQR's scanner (jsqr/dist/index.d.ts): the parts of its options and result read here. */
 type Scanner = (
@@ -28,7 +29,7 @@ if (!isScanner(jsQR)) throw new Error("jsQR's default export is no function.");
 describe("Printable card QR", () => {
   it.each([
     ["#01AB63 #225531 #3E8775 #613911 #7C5809 #98BDC1 #B8E412 #E3AFE8", 28],
-    ["MNC1:direct:english:" + "abandon ".repeat(11) + "about", 28],
+    [`MNC1:direct:english:${TEST_PHRASE}`, 28],
     ["\ue001\ue002".repeat(16), 28],
     ["#01AB63", 15],
   ] as const)(

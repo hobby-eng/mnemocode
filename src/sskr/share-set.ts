@@ -218,7 +218,12 @@ export class ShareSet extends Redacted implements Disposable {
    * searched with it (JointRepair). A repair that needs a long search, or that more than one
    * phrase passes, is refused; a host that shows the assessment and asks first uses JointRepair
    * and ShareSet.of for each phrase found. A refusal names each share by its place in `places`,
-   * as restore does.
+   * as restore does. Refuses complete shares as restore does, and marked ones as assertShareCount
+   * and JointRepair.plan do; then too few shares (sskr.share-set.more-shares-needed), shares that
+   * do not fit, by JointRepair's NoFitKind (sskr.share-set.share-unreadable, several-groups,
+   * shares-do-not-fit), too much left open (sskr.share-set.too-many-combinations-open), no phrase
+   * that fits (sskr.share-set.no-phrase-fits) and more than one
+   * (sskr.share-set.more-than-one-phrase-fits-shares-read-more).
    */
   static async combine(
     records: readonly string[],

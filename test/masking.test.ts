@@ -116,7 +116,7 @@ describe("Masking", () => {
 });
 
 describe("EncodedBackup writes its codes back", () => {
-  it("in every form that encode writes, and as an MNC1 record", () => {
+  it("writes them in every form that encode writes and as an MNC1 record, in no other", () => {
     for (const format of ["english", "indexes", "unicode", "colors", "colors-unicode"] as const) {
       const backup = EncodedBackup.of(MASKED.shiftedIndexes, format, "seedshift");
       expect(backup.text()).toBe(formatEncoded(MASKED, format));

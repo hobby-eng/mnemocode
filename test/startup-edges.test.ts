@@ -17,6 +17,8 @@ const fault = vi.hoisted((): Faults => ({
   shiftWrite: false,
   shiftRead: false,
 }));
+// Fault: the encoder writes the form `fault.write` wrongly, and the word-number parser takes a
+// zero (`fault.acceptZero`), which the representation startup check must catch.
 vi.mock("../src/core/representations.js", async (original) => {
   const actual = await original<typeof import("../src/core/representations.js")>();
   return {
@@ -29,6 +31,8 @@ vi.mock("../src/core/representations.js", async (original) => {
         : actual.parseInput(...args),
   };
 });
+// Fault: the direct decoder reads the form `fault.read` wrongly, and Seedshift masks with a date
+// fewer (`fault.shiftWrite`), which the representation startup check must catch.
 vi.mock("../src/core/seedshift.js", async (original) => {
   const actual = await original<typeof import("../src/core/seedshift.js")>();
   return {
@@ -44,6 +48,8 @@ vi.mock("../src/core/seedshift.js", async (original) => {
       actual.encodeMnemonic(args[0], fault.shiftWrite ? args[1].slice(1) : args[1]),
   };
 });
+// Fault: the Seedshift decoder unmasks a wrong phrase (`fault.shiftRead`), which the
+// representation startup check must catch.
 vi.mock("../src/core/masking.js", async (original) => {
   const actual = await original<typeof import("../src/core/masking.js")>();
   return {

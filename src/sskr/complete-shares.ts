@@ -204,6 +204,12 @@ export interface CompleteRestore {
  * shares of a group with fewer members than its threshold take no part and cannot be checked: they
  * are returned, counted from 0. A refusal names each share by its place in `places`, by its index;
  * by its index, counted from 1, without them.
+ * Refuses what Share.readSet refuses; shares that restore no secret
+ * (sskr.complete-shares.no-secret), or none in the first MAX_REFERENCE_TRIES choices of groups
+ * (sskr.complete-shares.too-many-failing); a secret of a length that no BIP39 phrase has
+ * (sskr.complete-shares.recovered-sskr-secret-not-bip39-entropy); a group or a surplus share that
+ * gives another secret (sskr.complete-shares.group-does-not-fit, share-does-not-fit), or, where
+ * no digest checked the reference, either of them (sskr.complete-shares.unchecked-disagreement).
  * An optional internal assertLive guard refuses work after disposal at async handoffs and before
  * further host calls. It throws the owning operation's refusal; late entropy is wiped first.
  * Existing callers need no guard. Hosts declare expected invalid-quorum refusals through the

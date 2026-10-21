@@ -139,7 +139,7 @@ describe("hints of words run together", () => {
 });
 
 describe("self-test of the hints", () => {
-  it("passes", async () => {
+  it("passes at startup and in the full self-test", async () => {
     expect(() => WORD_HINTS_SELF_TEST.startup()).not.toThrow();
     await expect(Promise.resolve(WORD_HINTS_SELF_TEST.check.run())).resolves.toBeUndefined();
   });

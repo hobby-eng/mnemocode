@@ -22,7 +22,7 @@ export {
   type CardTemplate,
 } from "./export/templates.js";
 export type { CardContent } from "./export/backup-cards.js";
-export { CardSession, createCardSession } from "./export/card-session.js";
+export { CardSession } from "./export/card-session.js";
 export {
   DEFAULT_SHARE_TEMPLATE_ID,
   DEFAULT_TEMPLATE_ID,

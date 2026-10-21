@@ -76,31 +76,30 @@ afterEach(() => {
 
 describe("AUD-029-SEC001: recovery follow-up lifetimes", () => {
   it("ends every classifier root reading while independent child readings stay live", () => {
-    const roots: MarkedReading[] = [];
-    const children: { reading: MarkedReading; before: readonly (number | undefined)[] }[] = [];
-    const factory = MarkedReading.of.bind(MarkedReading);
-    vi.spyOn(MarkedReading, "of").mockImplementation((text) => {
-      const readings = factory(text);
-      roots.push(...readings);
-      // Observe the actual roots unchanged, with separate caller-owned child controls.
-      for (const root of readings) {
-        const reading = root.copy();
-        children.push({ reading, before: reading.values });
-      }
-      return readings;
+    // Watched only: the root readings that the classifier makes.
+    const factory = vi.spyOn(MarkedReading, "of");
+    expect(BackupReading.shareKind(ONE_MARK)).toBe("share");
+    const roots = factory.mock.results.flatMap((result) =>
+      result.type === "return" ? result.value : [],
+    );
+    // The same roots, made here: a child copy of each, which their end must leave live.
+    const own = MarkedReading.of(ONE_MARK);
+    const children = own.map((root) => {
+      const reading = root.copy();
+      return { reading, before: reading.values };
     });
     try {
-      expect(BackupReading.shareKind(ONE_MARK)).toBe("share");
       expect(roots.length).toBeGreaterThan(0);
+      for (const root of roots)
+        expect(() => root.values).toThrow(expect.objectContaining({ code: WIPED_CODE }));
+      for (const root of own) root.wipe();
       expect(children).toHaveLength(roots.length);
       const color = children.find(({ reading }) => reading.format === "colors");
       expect(color).toBeDefined();
       expect(color!.reading.values[0]).toBe(0x8b0c06);
       for (const { reading, before } of children) expect(reading.values).toEqual(before);
-      for (const root of roots)
-        expect(() => root.values).toThrow(expect.objectContaining({ code: WIPED_CODE }));
     } finally {
-      for (const root of roots) root.wipe();
+      for (const root of [...roots, ...own]) root.wipe();
       for (const { reading } of children) reading.wipe();
     }
   });

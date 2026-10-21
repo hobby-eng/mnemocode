@@ -69,7 +69,11 @@ export const UNSUPPORTED_GROUP_THRESHOLD = `The SSKR group threshold must be a w
  * place (SskrBridge): an unchecked entry is not reachable through it.
  */
 export class CheckedSskrBridge implements SskrBridge {
-  /** A group's checked threshold/count bytes; never silently narrows host-supplied numbers. */
+  /**
+   * A group's checked threshold/count bytes; never silently narrows host-supplied numbers. Throws
+   * sskr.bridge.member-quorum when `threshold` of `count` shares is no quorum a recorded group can
+   * have (isRecordedQuorum).
+   */
   static groupSpecifications(threshold: number, count: number): Uint8Array {
     if (!isRecordedQuorum(threshold, count)) throw ERRORS.create("member-quorum", []);
     return Uint8Array.of(threshold, count);

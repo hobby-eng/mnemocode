@@ -8,12 +8,12 @@ import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import { createSessionIdentity, decryptCandidates } from "../src/core/candidate-encryption.js";
 import { containing } from "./helpers/matchers.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { runBuiltCli as run } from "./helpers/built-cli.js";
 
-const incomplete =
+const INCOMPLETE_PHRASE =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ?";
-const invalidLegacy =
+const INVALID_LEGACY_PHRASE =
   "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
 
 describe("recover-word CLI", () => {
@@ -30,14 +30,12 @@ describe("recover-word CLI", () => {
   });
 
   it("prints every checksum-valid candidate with word and checksum metadata", async () => {
-    const result = await run(["recover-word", "--mnemonic", incomplete]);
+    const result = await run(["recover-word", "--mnemonic", INCOMPLETE_PHRASE]);
     const lines = result.stdout.trim().split("\n");
 
     expect(lines).toHaveLength(129);
     expect(lines[0]).toBe("candidate\tword\tword-index\tchecksum-bits\tmnemonic");
-    expect(lines).toContain(
-      "1\tabout\t4\t0011\tabandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-    );
+    expect(lines).toContain(`1\tabout\t4\t0011\t${TEST_PHRASE}`);
     expect(result.stderr).toContain("Every combination was checked");
   });
 
@@ -47,7 +45,14 @@ describe("recover-word CLI", () => {
       using session = await createSessionIdentity();
       const path = join(dir, "candidates.age");
       const save = (file: string, ...protection: string[]) =>
-        run(["recover-word", "--mnemonic", incomplete, "--candidates-file", file, ...protection]);
+        run([
+          "recover-word",
+          "--mnemonic",
+          INCOMPLETE_PHRASE,
+          "--candidates-file",
+          file,
+          ...protection,
+        ]);
       const result = await save(path, "--candidates-key", session.recipient);
       const rows = result.stdout.trim().split("\n").slice(1);
       const list = decodeCandidateList(
@@ -97,9 +102,9 @@ describe("recover-word CLI", () => {
       const result = await run([
         "recover-word",
         "--mnemonic",
-        incomplete,
+        INCOMPLETE_PHRASE,
         "--master-fingerprint",
-        "73c5da0a",
+        TEST_FINGERPRINT,
         "--candidates-file",
         path,
         "--candidates-passphrase-file",
@@ -120,7 +125,7 @@ describe("recover-word CLI", () => {
           "recover-word",
           "--legacy-valid-last-word",
           "--mnemonic",
-          invalidLegacy,
+          INVALID_LEGACY_PHRASE,
           "--candidates-file",
           join(dir, "legacy.age"),
           "--plaintext-candidates",
@@ -155,9 +160,9 @@ describe("recover-word CLI", () => {
     const result = await run([
       "recover-word",
       "--mnemonic",
-      incomplete,
+      INCOMPLETE_PHRASE,
       "--master-fingerprint",
-      "73c5da0a",
+      TEST_FINGERPRINT,
     ]);
     const lines = result.stdout.trim().split("\n");
 
@@ -172,7 +177,7 @@ describe("recover-word CLI", () => {
       "recover-word",
       "--legacy-valid-last-word",
       "--mnemonic",
-      invalidLegacy,
+      INVALID_LEGACY_PHRASE,
     ]);
     const lines = result.stdout.trim().split("\n");
     expect(lines).toHaveLength(129);
@@ -185,7 +190,7 @@ describe("recover-word CLI", () => {
 describe("recover-word CLI", () => {
   it("rejects input without a placeholder, and searches that are too large", async () => {
     await expect(
-      run(["recover-word", "--mnemonic", incomplete.replace("?", "about")]),
+      run(["recover-word", "--mnemonic", INCOMPLETE_PHRASE.replace("?", "about")]),
     ).rejects.toMatchObject({ stderr: containing("Mark each forgotten word") });
     await expect(
       run(["recover-word", "--mnemonic", `? ? ${"abandon ".repeat(9)}?`]),

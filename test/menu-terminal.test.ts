@@ -11,7 +11,8 @@ import { MENU_ENTRIES, runMenu } from "../src/cli/menu.js";
 import { askLine, choose, waitForEnter } from "../src/cli/terminal-choice.js";
 import { ErrorCatalog } from "../src/core/error-catalog.js";
 import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
-import { terminal, type Question } from "./helpers/keyed-terminal.js";
+import { terminal } from "./helpers/keyed-terminal.js";
+import type { DrawnQuestion } from "./helpers/drawn-question.js";
 import { ENCODE_FORM_LABELS } from "./helpers/encode-form-cases.js";
 import {
   answer,
@@ -28,6 +29,7 @@ import {
   screenOf,
   stopWatching,
   watchScreen,
+  type Screen,
 } from "./helpers/terminal-screen.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/keyed-terminal.js"));
@@ -37,14 +39,11 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
 vi.mock("node:child_process", async (importOriginal) =>
   harness.replacedChildProcess(await importOriginal()),
 );
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
-);
 vi.mock("../src/cli/protection.js", async (importOriginal) =>
   harness.replacedProtection(await importOriginal()),
 );
-vi.mock("../src/cli/self-test.js", async (importOriginal) =>
-  harness.replacedSelfTest(await importOriginal()),
+vi.mock("@scure/bip39/wordlists/english.js", async (importOriginal) =>
+  harness.replacedEnglishWords(await importOriginal()),
 );
 vi.mock("../src/export/image-export.js", async (importOriginal) =>
   harness.replacedImageExport(await importOriginal()),
@@ -75,17 +74,45 @@ describe("a typed answer leaves only its line in the record of answers", () => {
     expect(shown[1]!.slice(1, -1)).toEqual(["", "! The answer is not valid UTF-8 text."]);
   });
 
+  const ONLY_ESCAPE = { onlyEscapeLeaves: true };
   it.each([
-    ["q, Q and Ctrl+D, then Enter", `qQ${CTRL_D}word${ENTER}`, {}, "escape"],
-    ["q, Q and Ctrl+D, then Enter", `qQ${CTRL_D}word${ENTER}`, { onlyEscapeLeaves: true }, "enter"],
-    ["a word, then Escape", `query${ESCAPE}`, { onlyEscapeLeaves: true }, "escape"],
+    {
+      typed: "q, Q and Ctrl+D, then Enter",
+      keys: `qQ${CTRL_D}word${ENTER}`,
+      options: {},
+      entered: "escape",
+      leaving: "q, Q and Ctrl+D leave too",
+    },
+    {
+      typed: "q, Q and Ctrl+D, then Enter",
+      keys: `qQ${CTRL_D}word${ENTER}`,
+      options: ONLY_ESCAPE,
+      entered: "enter",
+      leaving: "only Escape leaves",
+    },
+    {
+      typed: "a word, then Escape",
+      keys: `query${ESCAPE}`,
+      options: ONLY_ESCAPE,
+      entered: "escape",
+      leaving: "only Escape leaves",
+    },
     // A function key whose sequence ends in a letter that alone would leave.
-    ["F2 (ESC O Q), then Enter", `\x1bOQ${ENTER}`, { onlyEscapeLeaves: true }, "enter"],
-  ])("waits for Enter after %s with %j", async (_, keys, options, entered) => {
-    watchScreen(80);
-    terminal.keysFor = () => keys;
-    expect(await waitForEnter("Press Enter.", options)).toBe(entered);
-  });
+    {
+      typed: "F2 (ESC O Q), then Enter",
+      keys: `\x1bOQ${ENTER}`,
+      options: ONLY_ESCAPE,
+      entered: "enter",
+      leaving: "only Escape leaves",
+    },
+  ] as const)(
+    "ends the wait for Enter with $entered after $typed where $leaving",
+    async ({ keys, options, entered }) => {
+      watchScreen(80);
+      terminal.keysFor = () => keys;
+      expect(await waitForEnter("Press Enter.", options)).toBe(entered);
+    },
+  );
 
   it("leaves out an optional answer at Enter and records what that means", async () => {
     const result = await answer(ENTER, 80, { optional: "random" });
@@ -181,6 +208,9 @@ function asAnEarlierEntry(labels: readonly string[], place: number): boolean {
   return label === "A4 sheets";
 }
 
+/** What Enter alone gives a detail of the cards: it is left random. */
+const RANDOM_DETAIL = "random";
+
 /**
  * The keys of the answers that a question is given, so that every path through the questions is
  * taken. Answers that lead to the same questions are given once: the first card design, the first
@@ -188,7 +218,7 @@ function asAnEarlierEntry(labels: readonly string[], place: number): boolean {
  * random. A count of shares is also answered with 1 where it is first asked, which SSKR
  * refuses: it is then asked again (`again`), with a warning, and given 7.
  */
-function answersOf(question: Question, again: boolean, path: readonly number[]): string[] {
+function answersOf(question: DrawnQuestion, again: boolean, path: readonly number[]): string[] {
   const walked = (): boolean => {
     const first = firstPath.get(question.question) ?? path.join(",");
     firstPath.set(question.question, first);
@@ -197,15 +227,15 @@ function answersOf(question: Question, again: boolean, path: readonly number[]):
   if (question.kind === "choose") {
     if (SAME_QUESTIONS.has(question.question)) return [ENTER];
     if (WALKED_ONCE.has(question.question) && !walked()) return [ENTER];
-    const labels = question.labels!;
+    const { labels } = question;
     return labels.flatMap((_, place) =>
       asAnEarlierEntry(labels, place) ? [] : [`${DOWN.repeat(place)}${ENTER}`],
     );
   }
-  // Enter takes the first 20 addresses; every other fallback is a file name.
-  if (question.question === ADDRESS_COUNT) return [ENTER];
-  if (question.fallback !== undefined) return [`${longFileName(question.fallback)}${ENTER}`];
-  if (question.optional !== undefined) return [ENTER];
+  // Enter takes the first 20 addresses, or leaves a detail random; every other answer that Enter
+  // gives is a file name.
+  if (question.question === ADDRESS_COUNT || question.enter === RANDOM_DETAIL) return [ENTER];
+  if (question.enter !== undefined) return [`${longFileName(question.enter)}${ENTER}`];
   if (question.question === SHARE_COUNT)
     return again || !walked() ? [`7${ENTER}`] : [`7${ENTER}`, `1${ENTER}`];
   const typed = TYPED[question.question];
@@ -215,42 +245,86 @@ function answersOf(question: Question, again: boolean, path: readonly number[]):
 
 /** One asking of a question: the question, and whether it is asked again after a refusal. */
 interface Asking {
-  readonly question: Question;
+  readonly question: DrawnQuestion;
   readonly again: boolean;
 }
 
-interface MenuRun {
-  readonly screen: { lines: string[]; cursor: readonly number[] };
-  /** What each showing of the menu had above it. */
-  readonly above: string[][];
-  /** Each asking of the entry's questions, and the screen once each of them was drawn. */
+/** The menu as it shows: the screen above its question, and its rows and cursor from there. */
+interface MenuView {
+  readonly above: readonly string[];
+  readonly rows: number;
+  readonly cursor: readonly number[];
+}
+
+/** One path through an entry's questions, as the menu ran it. */
+interface Path {
+  /** The places of the answers given to the askings (answersOf), before Escape at the next. */
+  readonly answers: readonly number[];
   readonly askings: Asking[];
+  /** The screen once each asking was drawn, where the walk keeps it (walkEntry). */
   readonly shown: string[][];
+  /** The menu before the entry was chosen, then when it showed again. */
+  readonly menu: MenuView[];
 }
 
 /**
- * Runs the menu: chooses the entry with `digit`, gives the askings of the entry's questions
- * `answers` (places in answersOf), goes back with Escape at the next one, after typing a little
- * at a typed one, and quits with Escape when the menu shows again.
+ * The rows that a walk keeps at the end of its screen between two paths: the menu, the heading or
+ * what the last command printed above it, and room besides. Going back from an entry reaches no
+ * higher than the menu's own question; only the rows above are forgotten, so that the screen of a
+ * walk of thousands of paths stays small.
  */
-async function runEntry(digit: number | undefined, answers: readonly number[]): Promise<MenuRun> {
+const KEPT_ROWS = 100;
+
+/** The menu on `screen` as it shows at its question. */
+function menuView(screen: Screen): MenuView {
+  const lines = screen.lines();
+  const at = lines.indexOf(MENU_QUESTION);
+  const [row, column] = screen.cursor();
+  return { above: lines.slice(0, at), rows: lines.length - at, cursor: [row - at, column] };
+}
+
+/**
+ * Runs the menu once, on a screen of COLUMNS: for each path whose answers `next` gives, chooses
+ * the entry with `digit`, gives the askings of the entry's questions the answers (places in
+ * answersOf), and goes back with Escape at the next one, after typing a little at a typed one;
+ * `ended` hears each path once the menu shows again. It quits with Escape where `next` gives none.
+ * The menu runs its core self-test once, at its start, as it does for a person. The screen at each
+ * asking is kept only where `keepShown` says so: a walk of every path asks too often.
+ */
+async function walkEntry(
+  digit: number,
+  next: () => readonly number[] | undefined,
+  ended: (path: Path) => void,
+  keepShown = false,
+): Promise<void> {
   terminal.asked = [];
   const screen = watchScreen(COLUMNS);
-  const above: string[][] = [];
-  const askings: Asking[] = [];
-  const shown: string[][] = [];
-  terminal.onFirstKey = () => {
-    const lines = screen.lines();
-    if (terminal.asked.at(-1)!.question === MENU_QUESTION)
-      above.push(lines.slice(0, lines.indexOf(MENU_QUESTION)));
-    else shown.push(lines);
-  };
+  let path: Path | undefined;
   terminal.keysFor = () => {
     const question = terminal.asked.at(-1)!;
-    if (question.question === MENU_QUESTION)
-      return above.length === 0 && digit !== undefined ? String(digit) : ESCAPE;
-    // A typed question asked again after a refusal is the same question, asked once more.
-    const again = askings.at(-1)?.question === question;
+    if (question.question === MENU_QUESTION) {
+      // Each path needs only its own questions.
+      terminal.asked = [];
+      screen.keepLast(KEPT_ROWS);
+      const view = menuView(screen);
+      if (path !== undefined) {
+        path.menu.push(view);
+        ended(path);
+      }
+      const answers = next();
+      path = answers === undefined ? undefined : { answers, askings: [], shown: [], menu: [view] };
+      return path === undefined ? ESCAPE : String(digit);
+    }
+    if (path === undefined) throw new Error(`"${question.question}" was asked outside an entry`);
+    if (keepShown) path.shown.push(screen.lines());
+    // A typed question asked again after a refusal is the same question, asked once more, with
+    // the reason above it.
+    const before = path.askings.at(-1)?.question;
+    const again =
+      question.kind === "line" &&
+      before?.question === question.question &&
+      question.warning !== undefined;
+    const { askings, answers } = path;
     askings.push({ question, again });
     const place = askings.length - 1;
     if (place < answers.length)
@@ -260,7 +334,6 @@ async function runEntry(digit: number | undefined, answers: readonly number[]): 
   };
   await runMenu();
   stopWatching();
-  return { screen: { lines: screen.lines(), cursor: screen.cursor() }, above, askings, shown };
 }
 
 describe("going back from an entry of the start menu", () => {
@@ -335,30 +408,30 @@ describe("going back from an entry of the start menu", () => {
       : [{ label: entry.label, entry, prefix: [], firstOnly: false }],
   );
   it.each(walks)(
-    "$label: Escape at any question shows the menu under the same record",
+    "shows the menu under the same record after Escape at any question of $label",
     async ({ entry, prefix, firstOnly }) => {
       firstPath.clear();
-      const quit = await runEntry(undefined, []);
-      expect(quit.above).toHaveLength(1);
-      const pending: number[][] = [[...prefix]];
+      const pending: (readonly number[])[] = [[...prefix]];
       let backs = 0;
-      while (pending.length > 0) {
-        const answers = pending.pop()!;
-        const run = await runEntry(entry.digit ?? undefined, answers);
-        if (entry.digit === MENU_ENTRY_NAMES.encode.digit)
-          expect(run.askings[0]?.question.labels).toEqual(ENCODE_FORM_LABELS);
-        // The entry built its command line before a question for Escape came: nothing to check.
-        if (run.askings.length <= answers.length) continue;
-        backs += 1;
-        const path = run.askings.map((asking) => asking.question.question).join(" / ");
-        // No line of the task or of its answers is left above the menu, nor below it at the end.
-        expect(run.above, path).toEqual([quit.above[0], quit.above[0]]);
-        expect(run.screen, path).toEqual(quit.screen);
-        if (firstOnly) continue;
-        const next = run.askings[answers.length]!;
-        const count = answersOf(next.question, next.again, answers).length;
-        for (let place = 0; place < count; place += 1) pending.push([...answers, place]);
-      }
+      await walkEntry(
+        entry.digit!,
+        () => pending.pop(),
+        ({ answers, askings, menu }) => {
+          if (entry.digit === MENU_ENTRY_NAMES.encode.digit)
+            expect(askings[0]?.question.labels).toEqual(ENCODE_FORM_LABELS);
+          // The entry built its command line before a question for Escape came: nothing to check.
+          // The menu shows again under what the command printed.
+          if (askings.length <= answers.length) return;
+          backs += 1;
+          const path = askings.map((asking) => asking.question.question).join(" / ");
+          // No line of the task or of its answers is left above the menu, nor below it.
+          expect(menu[1], path).toEqual(menu[0]);
+          if (firstOnly) return;
+          const next = askings[answers.length]!;
+          const count = answersOf(next.question, next.again, answers).length;
+          for (let place = 0; place < count; place += 1) pending.push([...answers, place]);
+        },
+      );
       expect(backs).toBeGreaterThan(0);
     },
   );
@@ -366,15 +439,23 @@ describe("going back from an entry of the start menu", () => {
   it("asks only the refused number of shares again, without it in the record", async () => {
     // Encode: word numbers, MnemoCode Seedshift, Other, then 1 share in all, which SSKR refuses.
     firstPath.clear();
-    const run = await runEntry(1, [0, 0, 2, 1, 0]);
-    expect(run.askings[4]).toMatchObject({ question: { question: SHARE_COUNT }, again: true });
-    const lines = run.shown[4]!;
+    const paths: (readonly number[])[] = [[0, 0, 2, 1, 0]];
+    const runs: Path[] = [];
+    await walkEntry(
+      MENU_ENTRY_NAMES.encode.digit!,
+      () => paths.pop(),
+      (path) => runs.push(path),
+      true,
+    );
+    const [run] = runs;
+    expect(run!.askings[4]).toMatchObject({ question: { question: SHARE_COUNT }, again: true });
+    const lines = run!.shown[4]!;
     expect(lines).toContain("  Shares      Other");
     expect(lines.filter((line) => /^ {2}(In all|Restore) /u.test(line))).toEqual([]);
     expect(lines).toContain("! Choose 2 to 16 shares.");
     // The threshold comes next, under the count that was taken.
-    expect(run.askings[5]!.question.question).toBe("How many of them restore the seed phrase?");
-    expect(run.shown[5]).toContain("  In all      7");
+    expect(run!.askings[5]!.question.question).toBe("How many of them restore the seed phrase?");
+    expect(run!.shown[5]).toContain("  In all      7");
   });
 });
 
@@ -474,7 +555,7 @@ describe("what the menu does when a command cannot run or stops", () => {
    * Runs the menu with `keys` for its questions in turn, on a screen of 80 columns; returns the
    * questions asked and the screen as each of them first showed it.
    */
-  async function menuWith(keys: string[]): Promise<{ asked: Question[]; shown: string[][] }> {
+  async function menuWith(keys: string[]): Promise<{ asked: DrawnQuestion[]; shown: string[][] }> {
     terminal.asked = [];
     const screen = watchScreen(80);
     const shown: string[][] = [];
@@ -604,7 +685,8 @@ describe("what the menu does when a command cannot run or stops", () => {
   });
 
   it("offers only the self-test, the help and Quit when the self-test fails, and says so", async () => {
-    terminal.selfTestFails = true;
+    // A damaged English word list, whose SHA-256 the core self-test refuses at the start.
+    terminal.wordListDamaged = true;
     const { asked, shown } = await menuWith([ESCAPE]);
     const unchecked = [
       MENU_ENTRY_NAMES.selfTest.label,
@@ -617,7 +699,7 @@ describe("what the menu does when a command cannot run or stops", () => {
     expect(heading).toContain("CRITICAL: MnemoCode core self-test failed.");
     expect(heading).toContain("the other entries stay closed after a failed self-test.");
     // The self-test's entry failing has the same effect for the rest of the session.
-    terminal.selfTestFails = false;
+    terminal.wordListDamaged = false;
     terminal.exit = async () => 1;
     const after = await menuWith([String(MENU_ENTRY_NAMES.selfTest.digit), ENTER, ESCAPE]);
     expect(after.asked[0]!.labels).toHaveLength(MENU_ENTRIES.length);

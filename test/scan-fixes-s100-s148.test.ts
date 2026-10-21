@@ -115,6 +115,7 @@ import { shareKeepingNote } from "../src/export/sskr-keeping-text.js";
 import { POINTS_PER_INCH } from "../src/export/document-formats.js";
 import { publicShare, sskrVectors } from "./helpers/vectors.js";
 import { scriptExports } from "./helpers/script-exports.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("S100: the default page sizes are named once", () => {
   it("resolves a sheet's and a separate card's size and refuses a sheet size for separate cards", () => {
@@ -494,9 +495,7 @@ describe("S132: the scaffolding of the self-tests in one place each", () => {
   });
 
   it("gives the public phrase of all-zero entropy of every length", () => {
-    expect(zeroEntropyPhrase(12)).toBe(
-      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-    );
+    expect(zeroEntropyPhrase(12)).toBe(TEST_PHRASE);
     expect(zeroEntropyPhrase(24).split(" ")).toHaveLength(24);
     expect(zeroEntropyPhrase(24).endsWith(" art")).toBe(true);
   });

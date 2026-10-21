@@ -14,7 +14,7 @@ import { runSskrSplit } from "../src/cli/sskr-split-command.js";
 import { recoverySettings } from "../src/cli/sskr-restore-command.js";
 import { exportColorPalette } from "../src/color-export.js";
 import { decodeCandidateList, MAX_PASSPHRASE_BYTES } from "../src/core/candidate-list.js";
-import { CandidateListWriter, type CandidateListFile } from "../src/core/candidate-list-writer.js";
+import { CandidateListWriter } from "../src/core/candidate-list-writer.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { runEncode } from "../src/cli/encode-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
@@ -93,25 +93,20 @@ describe("CC-01: a saved candidate list leaves no copy of the entropies", () => 
   });
 
   it("wipes the bytes of a list without encryption once they are written", async () => {
-    // oxlint-disable-next-line typescript/unbound-method -- the spy calls it on its own instance
-    const write = CandidateListWriter.prototype.write;
-    let made: CandidateListFile | undefined;
-    vi.spyOn(CandidateListWriter.prototype, "write").mockImplementation(async function (
-      this: CandidateListWriter,
-      entropies,
-    ) {
-      const outcome = await write.call(this, entropies);
-      if (outcome.kind === "list") made = outcome.list;
-      return outcome;
-    });
+    // Watched only: the list that the writer made.
+    const write = vi.spyOn(CandidateListWriter.prototype, "write");
     const path = join(directory, "open.mncl");
     const target = await CandidatesFile.of({
       "candidates-file": path,
       "plaintext-candidates": true,
     });
     await target!.savePhrases([TEST_PHRASE]);
-    expect(made!.encrypted).toBe(false);
-    expect(made!.bytes.every((byte) => byte === 0)).toBe(true);
+    const [written] = write.mock.settledResults;
+    const outcome = written?.type === "fulfilled" ? written.value : undefined;
+    expect(outcome?.kind).toBe("list");
+    if (outcome?.kind !== "list") return;
+    expect(outcome.list.encrypted).toBe(false);
+    expect(outcome.list.bytes.every((byte) => byte === 0)).toBe(true);
     // The file was written before the wipe.
     const saved = decodeCandidateList(new Uint8Array(await readFile(path)));
     expect(saved.records.map((record) => [...record.entropy])).toEqual([
@@ -163,14 +158,17 @@ describe("CC-06: the date counts of shares in the words they always had", () => 
   it.each([
     [["--mode", "seedshift"], "Seedshift recovery requires its original dates."],
     [["--mode", "direct", "--date", "23-09-2026"], "Direct mode does not accept dates."],
-  ])("restore and export from shares: %j", async (options, message) => {
-    await expect(recoverySettings(parseArguments(options))).rejects.toThrow(message);
-  });
+  ])(
+    "refuses %j in a restore or an export from shares in the words it always had",
+    async (options, message) => {
+      await expect(recoverySettings(parseArguments(options))).rejects.toThrow(message);
+    },
+  );
 
   it.each([
     [["--mode", "seedshift"], "Seedshift requires at least one date."],
     [["--mode", "direct", "--date", "23-09-2026"], "Direct mode does not accept dates."],
-  ])("a split into shares: %j", async (options, message) => {
+  ])("refuses %j in a split into shares in the words it always had", async (options, message) => {
     const args = ["--threshold", "2", "--shares", "3", "--mnemonic", TEST_PHRASE, ...options];
     await expect(runSskrSplit(parseArguments(args))).rejects.toThrow(message);
   });
@@ -195,7 +193,7 @@ describe("CC-07: decode refuses a wrong date count before the form is settled", 
   it.each([
     [["--mode", "direct", "--date", "23-09-2026"], "Dates cannot be used in direct mode."],
     [["--mode", "seedshift"], "seedshift requires at least one date."],
-  ])("%j", async (options, message) => {
+  ])("refuses %j before the form is settled", async (options, message) => {
     await expect(runDecode(parseArguments(["--input", AMBIGUOUS, ...options]))).rejects.toThrow(
       message,
     );

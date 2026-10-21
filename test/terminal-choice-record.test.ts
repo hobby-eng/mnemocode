@@ -32,42 +32,27 @@ const harness = await vi.hoisted(async () => import("./helpers/keyed-terminal.js
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
 );
-vi.mock("node:child_process", async (importOriginal) =>
-  harness.replacedChildProcess(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
-);
-vi.mock("../src/cli/protection.js", async (importOriginal) =>
-  harness.replacedProtection(await importOriginal()),
-);
-vi.mock("../src/cli/self-test.js", async (importOriginal) =>
-  harness.replacedSelfTest(await importOriginal()),
-);
-vi.mock("../src/export/image-export.js", async (importOriginal) =>
-  harness.replacedImageExport(await importOriginal()),
-);
 
 keyedQuestions();
 
 describe("a typed answer leaves only its line in the record of answers", () => {
   it.each([
-    ["Enter", ""],
-    ["Enter after Home", HOME],
-    ["Enter after Ctrl+A", CTRL_A],
-    ["Enter after Left", LEFT.repeat(5)],
-  ])("%s, after a long answer", async (_, moved) => {
+    ["typing it", ""],
+    ["Home", HOME],
+    ["Ctrl+A", CTRL_A],
+    ["Left", LEFT.repeat(5)],
+  ])("takes a long answer whole at Enter after %s, leaving only its line", async (_, moved) => {
     const result = await answer(`${LONG_ANSWER}${moved}${ENTER}`, 20);
     expect(result.answer).toBe(LONG_ANSWER);
     expectScreen(result.screen, screenOf(20, BEFORE + answerLine("Word", LONG_ANSWER)));
   });
 
   it.each([
-    ["Escape", ""],
-    ["Escape after Home", HOME],
-    ["Escape after Left", LEFT.repeat(5)],
-    ["Escape after Ctrl+U", CTRL_U],
-  ])("%s, after a long answer", async (_, moved) => {
+    ["typing it", ""],
+    ["Home", HOME],
+    ["Left", LEFT.repeat(5)],
+    ["Ctrl+U", CTRL_U],
+  ])("leaves no trace of a long answer at Escape after %s", async (_, moved) => {
     const result = await answer(`${LONG_ANSWER}${moved}${ESCAPE}`, 20);
     expect(result.answer).toBeUndefined();
     expectScreen(result.screen, screenOf(20, BEFORE));
@@ -82,22 +67,25 @@ describe("a typed answer leaves only its line in the record of answers", () => {
     // The prompt alone ends at the right edge, and Enter takes the fallback.
     [21, 1],
     [7, 3],
-  ])("an answer that ends at the right edge of %i columns on row %i", async (columns, rows) => {
-    const promptWidth = displayWidth("Word (Enter: about): ");
-    const typed = "abandon".repeat(columns).slice(0, columns * rows - promptWidth);
-    const result = await answer(`${typed}${ENTER}`, columns, { fallback: "about" });
-    const given = typed === "" ? "about" : typed;
-    expect(result.answer).toBe(given);
-    expectScreen(result.screen, screenOf(columns, BEFORE + answerLine("Word", given)));
-    // And the same left with Escape.
-    const left = await answer(`${typed}${ESCAPE}`, columns, { fallback: "about" });
-    expectScreen(left.screen, screenOf(columns, BEFORE));
-  });
+  ])(
+    "erases an answer that ends at the right edge of %i columns on row %i",
+    async (columns, rows) => {
+      const promptWidth = displayWidth("Word (Enter: about): ");
+      const typed = "abandon".repeat(columns).slice(0, columns * rows - promptWidth);
+      const result = await answer(`${typed}${ENTER}`, columns, { fallback: "about" });
+      const given = typed === "" ? "about" : typed;
+      expect(result.answer).toBe(given);
+      expectScreen(result.screen, screenOf(columns, BEFORE + answerLine("Word", given)));
+      // And the same left with Escape.
+      const left = await answer(`${typed}${ESCAPE}`, columns, { fallback: "about" });
+      expectScreen(left.screen, screenOf(columns, BEFORE));
+    },
+  );
 
   // A wide character, such as a word of a Chinese file name, that reaches the last column does not
   // fit there: the terminal leaves the column empty and puts it whole on the next row.
   it.each([7, 9, 13, 21, 33])(
-    "an answer with wide characters at the right edge of %i columns",
+    "erases an answer whose wide characters reach the right edge of %i columns",
     async (columns) => {
       const promptWidth = displayWidth("Word: ");
       for (const narrow of [1, 2, 3].map((left) => columns - left - (promptWidth % columns))) {
@@ -202,7 +190,7 @@ describe("a typed answer leaves only its line in the record of answers", () => {
   it.each([
     ["Ctrl+D", CTRL_D],
     ["Ctrl+D after a long answer and Ctrl+U", `${LONG_ANSWER}${CTRL_U}${CTRL_D}`],
-  ])("%s at a prompt wider than the terminal goes back without a trace", async (_, keys) => {
+  ])("goes back without a trace at %s on a prompt wider than the terminal", async (_, keys) => {
     // "Word (Enter: about): " takes 21 columns: one more than the screen has.
     const result = await answer(keys, 20, { fallback: "about" });
     expect(result.answer).toBeUndefined();

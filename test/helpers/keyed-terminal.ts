@@ -1,31 +1,37 @@
 // The questions run as they do at a terminal, with their keys typed by the tests: `keysFor` gives
-// the keys of each question in turn, and every question asked is recorded in `asked` first. A
-// typed question that is asked again, after an answer it refused, asks `keysFor` again. The menu
-// runs no command: each one ends as `terminal.exit` says, cancelled by default. A test file loads
-// this module in vi.hoisted, and its vi.mock factories replace each module with what is here; so
-// this module imports no module that a test replaces.
+// the keys of each question in turn, and every question of choose or askLine is recorded in `asked`
+// first, as it showed on standard error (drawn-question.ts). A typed question that is asked again,
+// after an answer it refused, is drawn again and asks `keysFor` again. Only the program's edges are
+// replaced here: its terminal's input (raw-mode-keys.ts), stty (node:child_process), the protection
+// of its process, pdftocairo, and the English word list of @scure/bip39 as installed; the menu runs
+// no command: each one ends as `terminal.exit` says, cancelled by default. A test file loads this
+// module in vi.hoisted, and its vi.mock factories replace each module with what is here; so this
+// module imports no module that a test replaces.
 
 import type * as ChildProcess from "node:child_process";
-import type { Choice, ChooseOptions, LineQuestion } from "../../src/cli/terminal-choice.js";
-import type { MoreWithin, NextByte } from "../../src/cli/terminal-keys.js";
+import { drawnQuestion, type DrawnQuestion } from "./drawn-question.js";
+import { keyedTerminalKeys } from "./raw-mode-keys.js";
 
+type EnglishWords = typeof import("@scure/bip39/wordlists/english.js");
 type ImageExport = typeof import("../../src/export/image-export.js");
 type Protection = typeof import("../../src/cli/protection.js");
-type SelfTest = typeof import("../../src/cli/self-test.js");
-type TerminalChoice = typeof import("../../src/cli/terminal-choice.js");
 type TerminalInput = typeof import("../../src/cli/terminal-input.js");
 
 /** What the tests type, what the questions asked, and what the menu's commands give. */
 interface KeyedTerminal {
   /** The keys typed at the question asked now. */
   keysFor: () => string | Buffer;
-  /** Called once a question is drawn, when it reads its first key. */
+  /** Called once a question is drawn, when it reads its first key, after `keysFor`. */
   onFirstKey: () => void;
-  asked: Question[];
+  /** The questions of choose and askLine, each asking as it showed. */
+  asked: DrawnQuestion[];
   /** What each command run by the menu gives: its exit code, or an error that stops its start. */
   exit: () => Promise<number>;
-  /** Whether the core self-test fails at the start of the menu. */
-  selfTestFails: boolean;
+  /**
+   * Whether the English word list is damaged, as in a damaged copy of its package: one word is
+   * changed, so that the core self-test refuses it at the start of the menu.
+   */
+  wordListDamaged: boolean;
   /** Whether this process cannot be protected (assertProtected) at the start of the menu. */
   protectionFails: boolean;
   /** Whether standard input and standard error are taken for a terminal (terminalAvailable). */
@@ -42,49 +48,29 @@ export const terminal: KeyedTerminal = {
   onFirstKey: () => undefined,
   asked: [],
   exit: async () => 130,
-  selfTestFails: false,
+  wordListDamaged: false,
   protectionFails: false,
   atTerminal: false,
   events: [],
 };
 
-/** A question as it was asked. */
-export interface Question {
-  readonly kind: "choose" | "line";
-  readonly question: string;
-  /** The labels of the entries of a list. */
-  readonly labels?: readonly string[];
-  readonly fallback?: string | undefined;
-  readonly optional?: string | undefined;
-  readonly warning?: string | undefined;
-}
-
-/** The terminal's input, which reads the keys of `terminal.keysFor`. */
+/**
+ * The terminal's input: each question records what it asked in `terminal.asked`, then reads the
+ * keys of `terminal.keysFor`.
+ */
 export function replacedTerminalInput(actual: TerminalInput): TerminalInput {
-  class KeyedKeys extends actual.TerminalKeys {
-    static override async withRawMode<T>(
-      body: (next: NextByte, moreWithin: MoreWithin) => Promise<T>,
-    ): Promise<T> {
+  const TerminalKeys = keyedTerminalKeys(actual, {
+    keysFor: (drawn) => {
+      const question = drawnQuestion(drawn);
+      if (question !== undefined) terminal.asked.push(question);
       const keys = terminal.keysFor();
-      const bytes = typeof keys === "string" ? Buffer.from(keys, "utf8") : keys;
-      let read = 0;
-      const next: NextByte = async () => {
-        if (read === 0) terminal.onFirstKey();
-        if (read === bytes.length) throw new Error("the question read more keys than were typed");
-        return bytes[read++];
-      };
-      // A final Escape is Escape alone: no byte follows it.
-      return body(next, async () => read < bytes.length);
-    }
-
-    // Nothing is typed ahead here: every question gets the keys given for it.
-    static override async dropTypedAhead(): Promise<undefined> {
-      return undefined;
-    }
-  }
+      terminal.onFirstKey();
+      return keys;
+    },
+  });
   return {
     ...actual,
-    TerminalKeys: KeyedKeys,
+    TerminalKeys,
     // Not the test runner's own standard input, which may or may not be a terminal.
     terminalAvailable: () => terminal.atTerminal,
   };
@@ -104,28 +90,6 @@ export function replacedChildProcess(actual: typeof ChildProcess) {
   };
 }
 
-/** The questions as they are, each recorded in `terminal.asked` first. */
-export function replacedTerminalChoice(actual: TerminalChoice): TerminalChoice {
-  return {
-    ...actual,
-    choose: <T>(question: string, choices: readonly Choice<T>[], options: ChooseOptions) => {
-      const labels = choices.map((choice) => choice.label);
-      terminal.asked.push({ kind: "choose", question, labels, warning: options.warning });
-      return actual.choose(question, choices, options);
-    },
-    askLine: (question: string, label: string, options?: LineQuestion) => {
-      terminal.asked.push({
-        kind: "line",
-        question,
-        fallback: options?.fallback,
-        optional: options?.optional,
-        warning: options?.warning,
-      });
-      return actual.askLine(question, label, options);
-    },
-  };
-}
-
 /**
  * The protection of a command, which runs none: each ends as `terminal.exit` says. The process
  * is protected unless `terminal.protectionFails` says so.
@@ -141,17 +105,21 @@ export function replacedProtection(actual: Protection): Protection {
   };
 }
 
-/** The core self-test, which fails when `terminal.selfTestFails` says so. */
-export function replacedSelfTest(actual: SelfTest): SelfTest {
-  return {
-    ...actual,
-    assertCoreSelfTest: () => {
-      if (terminal.selfTestFails) throw new Error("CRITICAL: MnemoCode core self-test failed.");
-    },
-  };
-}
-
 /** The images of cards, whose renderer is there. */
 export function replacedImageExport(actual: ImageExport): ImageExport {
   return { ...actual, assertImageRenderer: async () => undefined };
+}
+
+/**
+ * The English word list of @scure/bip39, as installed: damaged while `terminal.wordListDamaged`
+ * says so. Read at each use, so that the program's modules, which run as they are, see it change.
+ */
+export function replacedEnglishWords(actual: EnglishWords): EnglishWords {
+  // Its first word changed, as a damaged copy of the package could give it.
+  const damaged = ["abandons", ...actual.wordlist.slice(1)];
+  return {
+    get wordlist() {
+      return terminal.wordListDamaged ? damaged : actual.wordlist;
+    },
+  };
 }

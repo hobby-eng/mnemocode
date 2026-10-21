@@ -8,14 +8,8 @@ const harness = await vi.hoisted(async () => import("./helpers/question-terminal
 /** How many links of a QR image to its name fail yet, as on a full disk. */
 const faults = vi.hoisted(() => ({ qrFailures: 0 }));
 vi.mock("node:tty", async (original) => harness.replacedTty(await original()));
-vi.mock("../src/cli/private-screen.js", async (original) =>
-  harness.replacedPrivateScreen(await original()),
-);
 vi.mock("../src/cli/terminal-input.js", async (original) =>
   harness.replacedTerminalInput(await original()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (original) =>
-  harness.replacedTerminalChoice(await original()),
 );
 // The files are the program's edge: the link that gives a finished QR image its name fails while
 // a case asks it to. Every rendering, save and other link is the real one.
@@ -38,6 +32,7 @@ import { runTable } from "../src/cli/table-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 import { testFolder } from "./helpers/test-folders.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The first bytes of every PDF file (ISO 32000-1, 7.5.2). */
 const PDF_SIGNATURE = "%PDF-";
@@ -48,11 +43,11 @@ afterEach(() => {
   PrivateSteps.close();
 });
 
-it.each(["again", "skip", CANCELLED])(
+it.each(["Try again", "Skip", CANCELLED] as const)(
   "keeps the saved primary file when an automatic QR fails (%s)",
   async (choice) => {
     const folder = await testFolder("mnemocode-aud026-cli-");
-    terminal.answers = ["abandon ".repeat(11) + "about\r"];
+    terminal.answers = [`${TEST_PHRASE}\r`];
     terminal.choices = [choice];
     faults.qrFailures = 1;
     const result = await runEncode({
@@ -65,7 +60,7 @@ it.each(["again", "skip", CANCELLED])(
     const pdf = await readFile(join(folder, "sheet.pdf"));
     expect(pdf.subarray(0, PDF_SIGNATURE.length).toString("latin1")).toBe(PDF_SIGNATURE);
     expect(terminal.questions).toContain("What now?");
-    expect(existsSync(join(folder, "sheet-qr.png"))).toBe(choice === "again");
+    expect(existsSync(join(folder, "sheet-qr.png"))).toBe(choice === "Try again");
     expect(result).toBe(choice === CANCELLED ? CANCELLED : undefined);
   },
 );

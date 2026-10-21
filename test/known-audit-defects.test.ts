@@ -25,8 +25,7 @@ import { pathToFileURL } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { sskrVectors } from "./helpers/vectors.js";
-
-const publicMnemonic = "abandon ".repeat(11) + "about";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("AUD-001 regression contracts", () => {
   it("AUD-001-SEC002: protects input through an alias of its parent directory", async () => {
@@ -37,7 +36,7 @@ describe("AUD-001 regression contracts", () => {
       await symlink(real, join(directory, "alias"), "junction");
       const source = join(real, "input.txt");
       const dateFile = join(directory, "public-dates.txt");
-      await writeFile(source, publicMnemonic);
+      await writeFile(source, TEST_PHRASE);
       await writeFile(dateFile, "23-09-2026", "utf8");
       const result = await promisify(execFile)(process.execPath, [
         resolve("dist/mnemocode.js"),
@@ -54,7 +53,7 @@ describe("AUD-001 regression contracts", () => {
         () => 0,
         (error: { code: number }) => error.code,
       );
-      expect(await readFile(source, "utf8")).toBe(publicMnemonic);
+      expect(await readFile(source, "utf8")).toBe(TEST_PHRASE);
       expect(result).not.toBe(0);
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -63,7 +62,7 @@ describe("AUD-001 regression contracts", () => {
 
   it("AUD-001-FUN001: accepts a valid uppercase BIP84 address", () => {
     expect(
-      matchBitcoinEvidence(publicMnemonic, {
+      matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
         value: "BC1QCR8TE4KR609GCAWUTMRZA0J4XV80JY8Z306FYU",
         profiles: ["native-segwit"],
@@ -76,7 +75,7 @@ describe("AUD-001 regression contracts", () => {
 
   it("AUD-001-API001: rejects an unknown input format at the JavaScript boundary", () => {
     // A format that no type allows, fed on purpose as a JavaScript host could.
-    expect(() => parseInput(publicMnemonic, "misspelled" as EncodedFormat)).toThrow(
+    expect(() => parseInput(TEST_PHRASE, "misspelled" as EncodedFormat)).toThrow(
       expect.objectContaining(unsupportedFormat),
     );
   });
@@ -84,29 +83,30 @@ describe("AUD-001 regression contracts", () => {
   it("AUD-001-API001: rejects an unknown output format at the JavaScript boundary", () => {
     expect(() =>
       // A format that no type allows, fed on purpose as a JavaScript host could.
-      formatEncoded(representMnemonic(publicMnemonic), "misspelled" as OutputFormat),
+      formatEncoded(representMnemonic(TEST_PHRASE), "misspelled" as OutputFormat),
     ).toThrow(expect.objectContaining(unsupportedFormat));
   });
 
   it("AUD-001-API001: cannot serialize an unreadable record format", () => {
     expect(() =>
       // A format that no type allows, fed on purpose as a JavaScript host could.
-      serializeRecord("direct", "misspelled" as EncodedFormat, publicMnemonic),
+      serializeRecord("direct", "misspelled" as EncodedFormat, TEST_PHRASE),
     ).toThrow(expect.objectContaining({ code: "record.unsupported-format" }));
   });
 });
 
 describe("AUD-004 regression contracts", () => {
   it("AUD-004-API001: rejects an unknown evidence kind instead of reporting a non-match", () => {
-    expect(() =>
-      // A kind that no type allows, fed on purpose as a JavaScript host could.
-      matchBitcoinEvidence(publicMnemonic, {
-        kind: "address-typo",
-        value: "irrelevant",
-        profiles: ["native-segwit"],
-        location: { network: "mainnet", account: 0, branch: 0, index: 0 },
-      } as unknown as Parameters<typeof matchBitcoinEvidence>[1]),
-    ).toThrow("Unsupported Bitcoin evidence kind.");
+    const typo = {
+      kind: "address-typo",
+      value: "irrelevant",
+      profiles: ["native-segwit"],
+      location: { network: "mainnet", account: 0, branch: 0, index: 0 },
+    };
+    // A kind that no type allows, fed on purpose as a JavaScript host could.
+    expect(() => matchBitcoinEvidence(TEST_PHRASE, typo as never)).toThrow(
+      "Unsupported Bitcoin evidence kind.",
+    );
   });
 
   it("AUD-004-API001: rejects evidence that is no object as of an unknown kind", () => {
@@ -276,9 +276,9 @@ describe("AUD-004 regression contracts", () => {
 
 describe("AUD-005 regression contracts", () => {
   it("AUD-005-API001: reads only the canonical record version", () => {
-    const payload = `direct:english:${publicMnemonic}`;
-    expect(parseRecord(`MNC1:${payload}`)?.payload).toBe(publicMnemonic);
-    expect(parseRecord(serializeRecord("direct", "english", publicMnemonic))?.version).toBe(1);
+    const payload = `direct:english:${TEST_PHRASE}`;
+    expect(parseRecord(`MNC1:${payload}`)?.payload).toBe(TEST_PHRASE);
+    expect(parseRecord(serializeRecord("direct", "english", TEST_PHRASE))?.version).toBe(1);
     for (const header of ["MNC01", "MNC0001", "MNC0"])
       expect(() => parseRecord(`${header}:${payload}`)).toThrow(
         "Malformed MnemoCode record header.",

@@ -9,14 +9,8 @@ import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-ter
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 
 // Public test data only: the BIP39 test phrase masked with 23-09-2026 by the Original Seedshift
@@ -69,7 +63,7 @@ describe("re-encode on the private screen, for a backup with a valid last word",
       `${DATE}\r`,
       `${LAST_WORD}\r`,
     ];
-    terminal.choices = ["dates", "person"];
+    terminal.choices = ["Type the dates again", "Yes, I recognise it"];
     await runReEncode({ ...ARGS });
     expect(seen.notices).toContain(NO_SUCH_LAST_WORD);
     expect(terminal.questions).toEqual(["What now?", ...CONFIRMED]);
@@ -83,7 +77,7 @@ describe("re-encode on the private screen, for a backup with a valid last word",
 
   it("asks for a mistyped last word again, keeping the codes and the dates", async () => {
     terminal.answers = [`${LEGACY_VALID}\r`, `${DATE}\r`, `${NOT_A_LAST_WORD}\r`, `${LAST_WORD}\r`];
-    terminal.choices = ["word", "person"];
+    terminal.choices = ["Type the last word again", "Yes, I recognise it"];
     await runReEncode({ ...ARGS });
     expect(seen.notices).toContain(NO_SUCH_LAST_WORD);
     expect(terminal.questions).toEqual(["What now?", ...CONFIRMED]);
@@ -104,7 +98,11 @@ describe("re-encode on the private screen, for a backup with a valid last word",
       `${DATE}\r`,
       `${LAST_WORD}\r`,
     ];
-    terminal.choices = ["backup", "dates", "person"];
+    terminal.choices = [
+      "Type the encoded seed phrase again",
+      "Type the dates again",
+      "Yes, I recognise it",
+    ];
     await runReEncode({ ...ARGS });
     expect(terminal.questions).toEqual(["What now?", "What now?", ...CONFIRMED]);
     expect(seen.out).toContain(UNICODE);
@@ -127,7 +125,7 @@ describe("re-encode on the private screen, for a backup with a valid last word",
       process.stderr.isTTY = stderrTerminal;
       try {
         terminal.answers = [`${LEGACY_VALID}\r`, `${DATE}\r`, `${LAST_WORD}\r`];
-        terminal.choices = ["person"];
+        terminal.choices = ["Yes, I recognise it"];
         await runReEncode({ ...ARGS });
       } finally {
         process.stderr.isTTY = wasTerminal;

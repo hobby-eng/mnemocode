@@ -4,65 +4,87 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Standard input and standard error are a terminal, and a Keyboard stands for the one on standard
-// input, which records the raw modes asked for in `rawModes`. A question (askSecretUntil) records
-// the raw modes until then and gives the next of `answers` that its check takes. The assessment
-// (planJointRepair) records the signal it is given, the raw modes until then and how it ended, and
-// runs `atAssessment` first and `afterAssessment` once it has ended, before its caller goes on.
+// input, which records the raw modes asked for in `rawModes`. A question is answered once its
+// prompt shows, with the raw modes until then recorded. The terminal's edge (terminal-input.ts)
+// runs as it is, observed: its watch of a long search records each work it watches (`watches`),
+// the first of a command being the assessment of the shares, and runs `atAssessment` as that
+// work begins and `afterAssessment` once it has ended, while still watched; and the turns of the
+// event loop that a search takes fail with `turnFailure` where a test gives one.
+interface Watched {
+  /** The raw modes asked for until the watched work began. */
+  readonly modes: boolean[];
+  readonly signal: AbortSignal;
+  /** The verdict of the plan that the work gave, where it assessed marked shares. */
+  verdict: string | undefined;
+  /** What the work failed with; undefined where it did not fail. */
+  error: unknown;
+}
 interface Terminal {
   rawModes: boolean[];
-  answers: string[];
+  /** The answer typed at each prompt, in turn, once the prompt shows. */
+  answers: { readonly prompt: string; readonly typed: string }[];
   modesAtQuestions: boolean[][];
-  modesAtAssessments: boolean[][];
-  signals: (AbortSignal | undefined)[];
-  assessmentErrors: unknown[];
-  assessmentVerdicts: string[];
+  watches: Watched[];
   atAssessment: (() => void) | undefined;
   afterAssessment: (() => void) | undefined;
+  turnFailure: Error | undefined;
 }
 const terminal = vi.hoisted((): Terminal => ({
   rawModes: [],
   answers: [],
   modesAtQuestions: [],
-  modesAtAssessments: [],
-  signals: [],
-  assessmentErrors: [],
-  assessmentVerdicts: [],
+  watches: [],
   atAssessment: undefined,
   afterAssessment: undefined,
+  turnFailure: undefined,
 }));
 vi.mock("node:tty", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:tty")>()),
   isatty: () => true,
 }));
-vi.mock("../src/cli/ask.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/ask.js")>()),
-  askSecretUntil: async <T>(_prompt: string, check: (answer: string) => T | Promise<T>) => {
-    terminal.modesAtQuestions.push([...terminal.rawModes]);
-    const answer = terminal.answers.shift();
-    if (answer === undefined) throw new Error("No answer was expected.");
-    return check(answer);
-  },
-}));
-vi.mock("../src/sskr/joint-repair.js", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../src/sskr/joint-repair.js")>();
-  // The restore assesses through JointRepair (sskr/share-restore.ts); its plan is watched here.
-  class JointRepair extends original.JointRepair {
-    override plan(records: readonly string[], options: { readonly signal?: AbortSignal } = {}) {
-      terminal.signals.push(options.signal);
-      terminal.modesAtAssessments.push([...terminal.rawModes]);
-      terminal.atAssessment?.();
-      const plan = super.plan(records, options);
-      plan.then(
-        (made) => {
-          terminal.assessmentVerdicts.push(made.assessment.verdict);
-          terminal.afterAssessment?.();
-        },
-        (error: unknown) => terminal.assessmentErrors.push(error),
-      );
-      return plan;
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/cli/terminal-input.js")>();
+  /** The verdict of `made`, where it is a plan of marked shares, which has an assessment. */
+  const verdictOf = (made: unknown): string | undefined => {
+    if (typeof made !== "object" || made === null || !("assessment" in made)) return undefined;
+    const { assessment } = made;
+    if (typeof assessment !== "object" || assessment === null || !("verdict" in assessment))
+      return undefined;
+    return typeof assessment.verdict === "string" ? assessment.verdict : undefined;
+  };
+  class RecordedWatch extends actual.CtrlCWatch {
+    static override during<T>(this: void, search: (signal: AbortSignal) => Promise<T>): Promise<T> {
+      return actual.CtrlCWatch.during(async (signal) => {
+        const watched: Watched = {
+          modes: [...terminal.rawModes],
+          signal,
+          verdict: undefined,
+          error: undefined,
+        };
+        terminal.watches.push(watched);
+        // Only the first work of a command is the assessment.
+        const assessment = terminal.watches.length === 1;
+        if (assessment) terminal.atAssessment?.();
+        try {
+          const made = await search(signal);
+          watched.verdict = verdictOf(made);
+          if (assessment) terminal.afterAssessment?.();
+          return made;
+        } catch (error) {
+          watched.error = error;
+          throw error;
+        }
+      });
     }
   }
-  return { ...original, JointRepair };
+  return {
+    ...actual,
+    CtrlCWatch: RecordedWatch,
+    nodeTurn: async () => {
+      if (terminal.turnFailure !== undefined) throw terminal.turnFailure;
+      return actual.nodeTurn();
+    },
+  };
 });
 
 import { runSskrExport } from "../src/cli/sskr-export-command.js";
@@ -70,6 +92,7 @@ import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { SHARE_SEPARATOR } from "../src/sskr/share-input.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import {
   expectTerminalGivenBack,
@@ -85,6 +108,9 @@ const RAW_SESSION = process.platform === "win32" ? [false, true] : [true, false]
 const CTRL_C = "\x03";
 /** Any date: the Seedshift test only needs the question for it asked. */
 const TEST_DATE = "23-09-2026";
+/** The beginnings of the questions for the shares and for the dates, as the restore asks them. */
+const SHARES_QUESTION = "Shamir shares or text file path";
+const DATES_QUESTION = "Dates (";
 /**
  * Unreadable colours of the second share. One is settled by the assessment alone, which then takes
  * a single turn; two leave 65,536 combinations, and the assessment takes a turn for each share
@@ -95,7 +121,6 @@ const OPEN_MARKS = [5, 7];
 
 let keys = new Keyboard(terminal);
 
-/** Expects an idle terminal with no listeners, retaining raw mode only on Windows. */
 /** Two shares of a 2-of-3 set, the second in colours with the elements at `marks` unreadable. */
 function markedShares(marks: readonly number[]): [string, string] {
   const [first, second] = sskrVectors().deterministic[0]!.shares;
@@ -110,21 +135,30 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     terminal.rawModes = [];
     terminal.answers = [];
     terminal.modesAtQuestions = [];
-    terminal.modesAtAssessments = [];
-    terminal.signals = [];
-    terminal.assessmentErrors = [];
-    terminal.assessmentVerdicts = [];
+    terminal.watches = [];
     terminal.atAssessment = undefined;
     terminal.afterAssessment = undefined;
+    terminal.turnFailure = undefined;
     keyboardAsStandardInput(keys);
-    // The assessment, progress and results are not looked at here.
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    // The assessment, progress and results are not looked at here; a prompt is answered once it
+    // shows, as a person answers it.
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      const next = terminal.answers[0];
+      const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+      if (next !== undefined && text.includes(next.prompt)) {
+        terminal.answers.shift();
+        terminal.modesAtQuestions.push([...terminal.rawModes]);
+        setImmediate(() => keys.type(`${next.typed}\r`));
+      }
+      return true;
+    });
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(console, "log").mockImplementation(() => undefined);
   });
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    expect(terminal.answers, "a question that was not asked").toEqual([]);
   });
 
   it.each([
@@ -134,13 +168,12 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     // Typed once the assessment has begun: it arrives at the assessment's first turn.
     terminal.atAssessment = () => setTimeout(() => keys.type(CTRL_C), 0);
     expect(await run({ share: markedShares(OPEN_MARKS) })).toBe(CANCELLED);
-    // The watch ran during the assessment, gave it its signal, and the assessment stopped.
-    expect(terminal.modesAtAssessments).toEqual([RAW_ENTRY]);
-    expect(terminal.signals).toHaveLength(1);
-    expect(terminal.signals[0]?.aborted).toBe(true);
-    // A stop is no failure of the assessment (CORE-22): it ends with the verdict "stopped".
-    expect(terminal.assessmentErrors).toEqual([]);
-    expect(terminal.assessmentVerdicts).toEqual(["stopped"]);
+    // The watch ran during the assessment, gave it its signal, and the assessment stopped. A stop
+    // is no failure of the assessment (CORE-22): it ends with the verdict "stopped".
+    expect(terminal.watches).toHaveLength(1);
+    const [assessment] = terminal.watches;
+    expect(assessment).toMatchObject({ modes: RAW_ENTRY, verdict: "stopped", error: undefined });
+    expect(assessment!.signal.aborted).toBe(true);
     expect(terminal.rawModes).toEqual(RAW_SESSION);
     expectTerminalGivenBack(keys);
     // Nothing is shown or saved.
@@ -152,24 +185,28 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     terminal.afterAssessment = () => keys.type(CTRL_C);
     expect(await runSskrCombine({ share: markedShares(SETTLED_MARK) })).toBe(CANCELLED);
     // The assessment ended without hearing it; the check after it did.
-    expect(terminal.signals).toHaveLength(1);
-    expect(terminal.signals[0]?.aborted).toBe(true);
-    expect(terminal.assessmentVerdicts).toHaveLength(1);
-    expect(terminal.assessmentVerdicts).not.toContain("stopped");
-    expect(terminal.assessmentErrors).toEqual([]);
+    expect(terminal.watches).toHaveLength(1);
+    const [assessment] = terminal.watches;
+    expect(assessment!.signal.aborted).toBe(true);
+    expect(assessment!.verdict).toBeDefined();
+    expect(assessment!.verdict).not.toBe("stopped");
+    expect(assessment!.error).toBeUndefined();
     expect(terminal.rawModes).toEqual(RAW_SESSION);
     expectTerminalGivenBack(keys);
     expect(console.log).not.toHaveBeenCalled();
   });
 
   it("stops watching when the assessment fails", async () => {
-    terminal.atAssessment = () => {
-      throw new Error("The assessment failed.");
-    };
-    await expect(runSskrCombine({ share: markedShares(SETTLED_MARK) })).rejects.toThrow(
-      "The assessment failed.",
-    );
-    expect(terminal.modesAtAssessments).toEqual([RAW_ENTRY]);
+    // The turn that the assessment takes fails, as a broken event loop would.
+    const failure = new Error("The assessment failed.");
+    terminal.turnFailure = failure;
+    await expect(runSskrCombine({ share: markedShares(SETTLED_MARK) })).rejects.toBe(failure);
+    expect(terminal.watches).toHaveLength(1);
+    expect(terminal.watches[0]).toMatchObject({
+      modes: RAW_ENTRY,
+      verdict: undefined,
+      error: failure,
+    });
     expect(terminal.rawModes).toEqual(RAW_SESSION);
     expectTerminalGivenBack(keys);
   });
@@ -180,19 +217,32 @@ describe("Ctrl+C during the assessment of marked shares", () => {
     await expect(runSskrCombine({ share: [first, unreadable] })).rejects.toThrow(
       `Share 2: mark at most ${MAX_JOINT_MARKED_ELEMENTS} unreadable elements with ?.`,
     );
-    expect(terminal.modesAtAssessments).toEqual([]);
+    expect(terminal.watches).toEqual([]);
     expect(terminal.rawModes).toEqual([]);
   });
 
   it("asks for the dates only after the watch of the assessment has stopped", async () => {
-    terminal.answers = [markedShares(SETTLED_MARK).join(";"), TEST_DATE];
+    terminal.answers = [
+      { prompt: SHARES_QUESTION, typed: markedShares(SETTLED_MARK).join(SHARE_SEPARATOR) },
+      { prompt: DATES_QUESTION, typed: TEST_DATE },
+    ];
     await runSskrCombine({ mode: "seedshift", "ask-secrets": true });
-    // The shares are asked before the assessment, the dates after it; neither while it is watched.
-    expect(terminal.modesAtQuestions).toEqual([[], RAW_SESSION]);
-    expect(terminal.modesAtAssessments).toEqual([RAW_ENTRY]);
-    expect(terminal.signals[0]?.aborted).toBe(false);
+    // The shares are asked before the assessment, the dates after it; neither while it is watched:
+    // each question takes raw mode itself, after the watch has given it back.
+    expect(terminal.modesAtQuestions).toEqual([
+      RAW_ENTRY,
+      [...RAW_SESSION, ...RAW_SESSION, ...RAW_ENTRY],
+    ]);
+    const [assessment] = terminal.watches;
+    expect(assessment!.modes).toEqual([...RAW_SESSION, ...RAW_ENTRY]);
+    expect(assessment!.signal.aborted).toBe(false);
     // Then the search is watched on its own (share-repair.ts).
-    expect(terminal.rawModes).toEqual([...RAW_SESSION, ...RAW_SESSION]);
+    expect(terminal.rawModes).toEqual([
+      ...RAW_SESSION,
+      ...RAW_SESSION,
+      ...RAW_SESSION,
+      ...RAW_SESSION,
+    ]);
     expectTerminalGivenBack(keys);
     expect(console.log).toHaveBeenCalled();
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CardSession, createCardSession } from "../src/cards.js";
+import { CardSession } from "../src/cards.js";
 import type { UniformChoice } from "../src/export/platform.js";
 
 const FIRST_CHOICE: UniformChoice = () => 0;
@@ -66,9 +66,5 @@ describe("card session", () => {
     // Supplying details does not disturb what the session remembers.
     expect(session.settingsFor("business-it")).toEqual(invented);
     expect(() => session.settingsFor("business-it", { name: "1234" })).toThrow("Latin letters");
-  });
-
-  it("is made by the package entry's factory too", () => {
-    expect(createCardSession(FIRST_CHOICE)).toBeInstanceOf(CardSession);
   });
 });

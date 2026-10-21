@@ -159,7 +159,7 @@ describe("AUD-008 follow-up: the reference is checked by a digest, and restores"
       ],
     ],
   ])(
-    "group threshold %i, groups %j: following the refusals reaches the phrase, never another",
+    "follows the refusals to the phrase, never another, at group threshold %i with groups %j",
     async (groupThreshold, layout) => {
       const shares = await sharesOf(groupThreshold, layout);
       const groupOf = layout.flatMap(([, count], group) => Array<number>(count!).fill(group));
@@ -318,14 +318,11 @@ describe("AUD-008 follow-up: a sparse word search is refused", () => {
       { kind: "unknown-words", places: withHoles([...known(11), [0, 1]], 3) },
       PLACES,
     ],
-  ])("%s", (_, search, code) => {
+  ])("refuses a search with %s by the code for that hole", (_, search, code) => {
     // Each search breaks the shape of a WordSearch on purpose, as a JavaScript host could.
-    expect(() => searchCombinations(search as WordSearch)).toThrow(
-      expect.objectContaining({ code }),
-    );
-    expect(() => searchCandidates(search as WordSearch).next()).toThrow(
-      expect.objectContaining({ code }),
-    );
+    const broken = search as WordSearch;
+    expect(() => searchCombinations(broken)).toThrow(expect.objectContaining({ code }));
+    expect(() => searchCandidates(broken).next()).toThrow(expect.objectContaining({ code }));
   });
 
   it("keeps a dense search", () => {

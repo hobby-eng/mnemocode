@@ -11,28 +11,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { decryptCandidates } from "../src/core/candidate-encryption.js";
 import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
+import { PrivateSteps } from "../src/cli/private-steps.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { matching } from "./helpers/matchers.js";
-import {
-  byLabel,
-  questionsOnPrivateScreen,
-  seen,
-  terminal,
-  windowOf,
-} from "./helpers/question-terminal.js";
+import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
 import { TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 vi.mock("node:fs/promises", async (importOriginal) =>
   harness.replacedFiles(await importOriginal()),
@@ -129,7 +118,7 @@ describe("recover-word on the private screen", () => {
 
   it("offers to type the words again when no phrase fits them", async () => {
     terminal.answers = [`${ELEVEN}abandon|ability\r`, `${LAST_FORGOTTEN}\r`];
-    terminal.choices = [byLabel("Type the words again")];
+    terminal.choices = ["Type the words again"];
     await recover({});
     expect(seen.notices).toContain(
       "No valid phrase fits these words: check them, their order and the ? places.",
@@ -153,7 +142,7 @@ describe("recover-word on the private screen", () => {
 describe("recover-word on the private screen", () => {
   it("offers a wallet check when the candidates are too many to show", async () => {
     terminal.answers = [`a* ${"abandon ".repeat(10)}?\r`];
-    terminal.choices = [byLabel("Done")];
+    terminal.choices = ["Done"];
     await recover({});
     expect(seen.notices.some((line) => line.includes("candidates are too many to show"))).toBe(
       true,
@@ -168,7 +157,7 @@ describe("recover-word on the private screen", () => {
     terminal.stdoutTerminal = true;
     windowOf(40, 80);
     terminal.answers = [`${"abandon ".repeat(10)}about\r`, `${TEST_FINGERPRINT}\r`];
-    terminal.choices = [byLabel("Check them against the wallet"), byLabel("Fingerprint")];
+    terminal.choices = ["Check them against the wallet", "Fingerprint"];
     await recover({ "missing-word": true });
     expect(seen.notices).toContain(
       "1,497 candidates do not fit on this screen: check them against the wallet's fingerprint or an address, or give a few letters of the words.",
@@ -192,7 +181,7 @@ describe("recover-word on the private screen", () => {
     seen.out = [];
     windowOf(40, 80);
     terminal.answers = [`${LAST_FORGOTTEN}\r`];
-    terminal.choices = [byLabel("Done")];
+    terminal.choices = ["Done"];
     await recover({});
     expect(seen.out).toEqual([]);
     expect(terminal.questions).toEqual(["What now?"]);
@@ -236,7 +225,7 @@ describe("recover-word on the private screen", () => {
 
   it("lets the wallet change when none of the candidates matched it", async () => {
     terminal.answers = [`${LAST_FORGOTTEN}\r`, `${TEST_FINGERPRINT}\r`];
-    terminal.choices = [byLabel("Change the wallet"), byLabel("Fingerprint")];
+    terminal.choices = ["Change the wallet", "Fingerprint"];
     await recover({ "master-fingerprint": "00000000" });
     expect(seen.notices).toEqual(
       expect.arrayContaining([
@@ -251,7 +240,7 @@ describe("recover-word on the private screen", () => {
     // Another wallet: the same candidates, saved once after the search that matched.
     const path = join(directory, "list.mncl");
     terminal.answers = [`${LAST_FORGOTTEN}\r`, `${TEST_FINGERPRINT}\r`];
-    terminal.choices = [byLabel("Change the wallet"), byLabel("Fingerprint")];
+    terminal.choices = ["Change the wallet", "Fingerprint"];
     const wrongWallet = { "plaintext-candidates": true, "master-fingerprint": "00000000" };
     await recover({ "candidates-file": path, ...wrongWallet });
     const saved = (line: string) => line.startsWith("Saved ");
@@ -268,7 +257,7 @@ describe("recover-word on the private screen", () => {
     terminal.questions = [];
     const other = join(directory, "other.mncl");
     terminal.answers = [`${LAST_FORGOTTEN}\r`, `${ELEVEN}about|abandon\r`];
-    terminal.choices = [byLabel("Type the words again")];
+    terminal.choices = ["Type the words again"];
     await recover({ "candidates-file": other, ...wrongWallet });
     expect(seen.notices.filter(saved)).toEqual([
       `Saved 1 candidate phrase, NOT encrypted: ${other} (record N is candidate N).`,
@@ -286,7 +275,7 @@ describe("recover-word on the private screen", () => {
     terminal.saveFailures = 1;
     terminal.saveFailureCode = "EACCES";
     terminal.answers = [`${LAST_FORGOTTEN}\r`, `${other}\r`];
-    terminal.choices = [byLabel("Another file name")];
+    terminal.choices = ["Another file name"];
     await recover({ "candidates-file": path, "plaintext-candidates": true });
     expect(seen.notices).toEqual(
       expect.arrayContaining([
@@ -300,7 +289,7 @@ describe("recover-word on the private screen", () => {
     terminal.saveFailures = 2;
     terminal.saveFailureCode = "ENOSPC";
     terminal.answers = [`${LAST_FORGOTTEN}\r`];
-    terminal.choices = [byLabel("Try again"), byLabel("Skip")];
+    terminal.choices = ["Try again", "Skip"];
     await recover({
       "candidates-file": join(directory, "skipped.mncl"),
       "plaintext-candidates": true,
@@ -309,7 +298,7 @@ describe("recover-word on the private screen", () => {
     expect(seen.out.filter((line) => line.startsWith("candidate\t"))).toHaveLength(2);
 
     // Off the private screen the failure ends the command, as before.
-    terminal.privateScreen = false;
+    PrivateSteps.close();
     terminal.saveFailures = 1;
     terminal.saveFailureCode = "EPERM";
     await expect(

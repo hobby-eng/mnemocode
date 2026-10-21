@@ -144,9 +144,12 @@ describe("AUD-015-API002: a split is made of one request", () => {
 });
 
 describe("AUD-015-UI001: option labels never resolve inherited fields", () => {
-  it.each(["__proto__", "constructor", "toString", "hasOwnProperty"])("labels %s", (key) => {
-    expect(optionLabel(key)).toBe("unknown option");
-  });
+  it.each(["__proto__", "constructor", "toString", "hasOwnProperty"])(
+    "labels the inherited name %s as an unknown option",
+    (key) => {
+      expect(optionLabel(key)).toBe("unknown option");
+    },
+  );
 
   it("keeps known labels and conceals unknown names", () => {
     expect(optionLabel("word")).toBe("BIP39 word");
@@ -207,7 +210,7 @@ describe("AUD-015-SEC001: the share readers wipe the bytes they only borrow", ()
 });
 
 describe("AUD-001-API001: the share form that mirrors a form of codes refuses one that names none", () => {
-  it.each(["typo", null, 5])("refuses %s", (form) => {
+  it.each(["typo", null, 5])("refuses %s as a form of codes", (form) => {
     // A form that no type allows, fed on purpose as a JavaScript host could.
     expect(() => shareFormatMirroring(form as never)).toThrow("Unsupported encoded format");
   });

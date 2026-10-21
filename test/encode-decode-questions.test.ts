@@ -31,14 +31,8 @@ import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 vi.mock("node:fs/promises", async (importOriginal) =>
   harness.replacedFiles(await importOriginal()),
@@ -113,7 +107,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         terminal.answers = [`${TEST_PHRASE}\r`, `${DATE}\r`, ESCAPE, `'${other}'\r`];
         // Try again (it fails again), another name, Escape there (back to the choice, nothing is
         // saved), another name again; the backup check is not wanted.
-        terminal.choices = ["again", "other", "other"];
+        terminal.choices = ["Try again", "Another file name", "Another file name"];
         await runEncode({
           "ask-secrets": true,
           mode: "seedshift",
@@ -152,7 +146,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       try {
         terminal.saveFailures = 1;
         terminal.answers = [`${TEST_PHRASE}\r`];
-        terminal.choices = ["skip"];
+        terminal.choices = ["Skip"];
         await runEncode({
           "ask-secrets": true,
           mode: "direct",
@@ -265,7 +259,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const codes = MASKED.split(" ");
       codes[5] = "?";
       terminal.answers = [`${codes.join(" ")}\r`, `${ENCODED_FINGERPRINT}\r`, `${DATE}\r`];
-      terminal.choices = ["encoded"];
+      terminal.choices = ["Encoded fingerprint"];
       await runDecode({ "ask-secrets": true, mode: "seedshift" });
       expect(terminal.questions).toEqual(["How can MnemoCode tell the right codes?"]);
       expect(terminal.labels[0]).toEqual(["Encoded fingerprint", "The wallet"]);
@@ -280,7 +274,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const codes = MASKED.split(" ");
       codes[5] = "?";
       terminal.answers = [`${codes.join(" ")}\r`, "2?-09-2026\r", `${TEST_FINGERPRINT}\r`];
-      terminal.choices = ["wallet", "fingerprint"];
+      terminal.choices = ["The wallet", "Fingerprint"];
       await runDecode({ "ask-secrets": true, mode: "seedshift" });
       expect(terminal.questions).toEqual([
         "How can MnemoCode tell the right codes?",
@@ -297,9 +291,9 @@ describe("encode, decode and the backup check on the private screen", () => {
       for (const [answers, way] of [
         [
           ["2?-09-2026", TEST_FINGERPRINT],
-          ["wallet", "fingerprint"],
+          ["The wallet", "Fingerprint"],
         ],
-        [[ENCODED_FINGERPRINT, DATE], ["encoded"]],
+        [[ENCODED_FINGERPRINT, DATE], ["Encoded fingerprint"]],
       ] as const) {
         seen.notices = [];
         terminal.answers = [codes.join(" "), ...answers].map((answer) => `${answer}\r`);
@@ -347,7 +341,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         await exportQrPayload(writeShare(shares[0]!, "indexes"), first!);
         await exportQrPayload(writeShare(shares[1]!, "indexes"), second!);
         terminal.answers = [`'${second}'\r`, `${DATE}\r`];
-        terminal.choices = ["qr"];
+        terminal.choices = ["Read another QR code image"];
         await runDecode({ "ask-secrets": true, mode: "seedshift", "qr-file": first! });
         expect(terminal.questions).toEqual(["The next share?"]);
         expect(terminal.labels[0]).toEqual(["Read another QR code image", "Type the shares"]);
@@ -479,7 +473,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
       // Escape at "Was Seedshift used before it was split?" asks for the codes again.
       terminal.answers = [`${writeShare(shares[0]!, "indexes")}\r`, `${MASKED}\r`, `${DATE}\r`];
-      terminal.choices = [undefined, "seedshift"];
+      terminal.choices = [undefined, "MnemoCode Seedshift"];
       await runDecode({ "ask-secrets": true });
       expect(terminal.questions[0]).toBe("Was Seedshift used before it was split?");
       expect(seen.out).toEqual([TEST_PHRASE]);
@@ -490,7 +484,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       seen.notices = [];
       terminal.questions = [];
       terminal.answers = [`${codes.join(" ")}\r`, `${ENCODED_FINGERPRINT}\r`, `${DATE}\r`];
-      terminal.choices = ["encoded"];
+      terminal.choices = ["Encoded fingerprint"];
       await runDecode({ "ask-secrets": true, mode: "seedshift", "list-candidates": true });
       expect(seen.notices).toContain(
         "--list-candidates: a list holds at most 16 candidates; these codes give about 128 candidates.",
@@ -499,7 +493,7 @@ describe("encode, decode and the backup check on the private screen", () => {
 
     it("searches dates with ?, asking for the wallet first when the mode needs it", async () => {
       terminal.answers = [`${MASKED}\r`, "2?-09-2026\r", `${TEST_FINGERPRINT}\r`];
-      terminal.choices = ["fingerprint"];
+      terminal.choices = ["Fingerprint"];
       await runDecode({ "ask-secrets": true, mode: "seedshift" });
       expect(terminal.questions).toEqual([WALLET_QUESTION]);
       // Every guessed date gives a valid phrase: only the wallet tells the right one.
@@ -511,7 +505,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("offers the wallet to the Original Seedshift's search, and lists every candidate without", async () => {
       windowOf(TERMINAL_ROWS, TERMINAL_COLUMNS);
       terminal.answers = [`${LEGACY}\r`, "2?-09-2026\r"];
-      terminal.choices = ["none"];
+      terminal.choices = ["It cannot"];
       await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
       // The checksum leaves only some dates: the wallet may be left out, as for recover-date.
       expect(terminal.questions).toEqual([WALLET_QUESTION]);
@@ -521,7 +515,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       // With the wallet, only the phrase of the wallet is shown.
       seen.out = [];
       terminal.answers = [`${LEGACY}\r`, "2?-09-2026\r", `${TEST_FINGERPRINT}\r`];
-      terminal.choices = ["fingerprint"];
+      terminal.choices = ["Fingerprint"];
       await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
       expect(seen.out).toEqual([`${DATE}\t${TEST_PHRASE}\tmatched at m`]);
     });
@@ -531,7 +525,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       windowOf(TERMINAL_ROWS, TERMINAL_COLUMNS);
       // Dates with three ?, as the final review typed them: 893 date combinations.
       terminal.answers = [`${LEGACY}\r`, "2?-0?-202?\r", `${TEST_FINGERPRINT}\r`];
-      terminal.choices = ["none", "wallet", "fingerprint"];
+      terminal.choices = ["It cannot", "Check them against the wallet", "Fingerprint"];
       await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
       expect(seen.notices).toContain("Recovery search contains 893 date combinations.");
       expect(terminal.questions).toEqual([
@@ -555,7 +549,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       terminal.stdoutTerminal = false;
       terminal.questions = [];
       terminal.answers = [`${LEGACY}\r`, "2?-0?-202?\r"];
-      terminal.choices = ["none"];
+      terminal.choices = ["It cannot"];
       await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
       expect(terminal.questions).toEqual([WALLET_QUESTION]);
     });
@@ -568,7 +562,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       terminal.stdoutTerminal = true;
       windowOf(TERMINAL_ROWS, TERMINAL_COLUMNS);
       terminal.answers = [`${LEGACY}\r`, "2?-0?-202?\r", "2?-09-2026\r"];
-      terminal.choices = ["none", "dates"];
+      terminal.choices = ["It cannot", "Change the dates"];
       await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
       // The wallet is not asked again for the new dates, and their candidates fit.
       expect(terminal.questions).toEqual([
@@ -582,7 +576,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("offers the dates or the codes again after a result without a valid checksum", async () => {
       // A wrong date gives the Original Seedshift's phrase an invalid checksum.
       terminal.answers = [`${LEGACY}\r`, "24-09-2026\r", `${DATE}\r`];
-      terminal.choices = ["dates"];
+      terminal.choices = ["Type the dates again"];
       await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
       expect(terminal.questions).toEqual(["What now?"]);
       expect(terminal.labels[0]).toEqual([
@@ -599,7 +593,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("keeps the dates when the codes are typed again, and ends when the person is done", async () => {
       const wrong = LEGACY.replace(/^\d+/u, (first) => String((Number(first) % 2048) + 1));
       terminal.answers = [`${wrong}\r`, `${DATE}\r`, `${LEGACY}\r`];
-      terminal.choices = ["backup"];
+      terminal.choices = ["Type the encoded seed phrase again"];
       await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
       expect(seen.out.at(-1)).toBe(TEST_PHRASE);
       expect(promptsShown(DECODE_DATES_PROMPT)).toHaveLength(1);
@@ -617,7 +611,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         await writeFile(file, `MNC1:seedshift-legacy:indexes:${LEGACY}\n`);
         // A wrong date, then the codes typed without the header, then the right date.
         terminal.answers = ["24-09-2026\r", `${LEGACY}\r`, `${DATE}\r`];
-        terminal.choices = ["backup", "dates"];
+        terminal.choices = ["Type the encoded seed phrase", "Type the dates again"];
         await runDecode({ "ask-secrets": true, "input-file": file });
         expect(terminal.labels).toEqual([
           ["Type the dates again", "Type the encoded seed phrase", "Done"],
@@ -673,7 +667,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       // The Original Seedshift's codes, said to be not masked: the checksum fails, and the codes
       // typed again are asked about again rather than read as not masked once more.
       terminal.answers = [`${LEGACY}\r`, `${LEGACY}\r`, `${DATE}\r`];
-      terminal.choices = ["direct", "backup", "seedshift-legacy"];
+      terminal.choices = ["No", "Type the encoded seed phrase again", "Original Seedshift"];
       await runDecode({ "ask-secrets": true });
       expect(terminal.questions).toEqual([seedshift, "What now?", seedshift]);
       expect(seen.out.at(-1)).toBe(TEST_PHRASE);
@@ -685,7 +679,12 @@ describe("encode, decode and the backup check on the private screen", () => {
       seen.screen = "";
       terminal.questions = [];
       terminal.answers = [`${typo}\r`, `${DATE}\r`, `${MASKED}\r`];
-      terminal.choices = ["seedshift", "legacy", "backup", "seedshift"];
+      terminal.choices = [
+        "MnemoCode Seedshift",
+        "It was the Original Seedshift",
+        "Type the encoded seed phrase again",
+        "MnemoCode Seedshift",
+      ];
       await runDecode({ "ask-secrets": true });
       expect(terminal.questions).toEqual([
         seedshift,
@@ -774,7 +773,7 @@ describe("encode, decode and the backup check on the private screen", () => {
 
     it("asks whether Seedshift was used for typed codes without --mode", async () => {
       terminal.answers = [`${MASKED}\r`, `${DATE}\r`];
-      terminal.choices = ["seedshift"];
+      terminal.choices = ["MnemoCode Seedshift"];
       await runDecode({ "ask-secrets": true });
       expect(terminal.questions).toEqual(["Was Seedshift used when it was encoded?"]);
       expect(terminal.labels[0]).toEqual(["No", "MnemoCode Seedshift", "Original Seedshift"]);
@@ -785,7 +784,7 @@ describe("encode, decode and the backup check on the private screen", () => {
 
       // No reads them as the words themselves; --mode direct, as the menu passes it, asks nothing.
       for (const [options, choices] of [
-        [{}, ["direct"]],
+        [{}, ["No"]],
         [{ mode: "direct" }, []],
       ] as const) {
         seen.out = [];

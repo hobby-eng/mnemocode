@@ -65,7 +65,7 @@ describe("a presentation given by the host", () => {
     ["a line separator", { ...GIVEN, slogan: "One two" }, "card-non-empty-text-on-one-line"],
     ["a soft hyphen", { ...GIVEN, subtitle: "Proof­set" }, "card-non-empty-text-on-one-line"],
     ["too long a text", { ...GIVEN, footer: "x".repeat(101) }, "card-too-long-maximum-characters"],
-  ])("refuses %s", (_, presentation, code) => {
+  ])("is refused with %s", (_, presentation, code) => {
     expect(() => settled(presentation)).toThrow(
       expect.objectContaining({ code: `export.card-settings.${code}` }),
     );
@@ -97,7 +97,7 @@ describe("a card text, measured as it is drawn", () => {
   it.each([
     ["--card-subtitle", (settings: CardSettings) => settings.presentation?.subtitle],
     ["--card-company", (settings: CardSettings) => settings.profile?.company],
-  ])("in NFC, where %s gives it", (option, drawn) => {
+  ])("is counted in NFC where %s gives it", (option, drawn) => {
     expect(() => options(option, `${"b".repeat(99)}${LONGER_IN_NFC}`)).toThrow(
       expect.objectContaining({ code: TOO_LONG }),
     );

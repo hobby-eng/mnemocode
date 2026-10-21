@@ -1,12 +1,13 @@
 // The command lines that the start menu builds, walked with the questions answered by a script
 // (menu-script.ts): every path through an entry's questions, the line of given answers, and the
-// checks that the commands make of the options of cards. Public test data only.
+// checks that the commands make of the options of cards. The questions draw on standard error, in
+// colour, which only the script reads. Public test data only.
 
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { parseArguments, value } from "../../src/cli/arguments.js";
 import { businessOptions } from "../../src/cli/business-options.js";
 import { validateCardOptions } from "../../src/cli/card-options.js";
@@ -14,6 +15,7 @@ import { imageFormat } from "../../src/cli/image-options.js";
 import { MENU_ENTRIES } from "../../src/cli/menu.js";
 import { MENU_ENTRY_NAMES as ENTRY, type MenuEntryName } from "../../src/cli/menu-entries.js";
 import { encodeFormat } from "../../src/cli/input.js";
+import { AnswerRecord } from "../../src/cli/terminal-choice.js";
 import { parseSskrLayout, resolveSskrLayout } from "../../src/export/sskr-content.js";
 import { COIN_ADDRESS_ANSWERS } from "./coin-addresses.js";
 import { script } from "./menu-script.js";
@@ -32,7 +34,12 @@ const TAKEN_ONCE = new Set([
   "How should the sheets be turned?",
 ]);
 
-/** The usual answer of each typed question without a fallback, as public test data. */
+/**
+ * The usual answer of each typed question without a fallback, as public test data. The details
+ * of the cards are left random (Enter): Encode draws its cards to check a detail typed for them
+ * (cards-fit.ts), which takes seconds, so only the tests of typed details type them
+ * (typedCardDetails).
+ */
 const USUAL: Readonly<Record<string, string>> = {
   Word: "abandon",
   "Word number": "1",
@@ -47,7 +54,10 @@ const USUAL: Readonly<Record<string, string>> = {
   ...COIN_ADDRESS_ANSWERS,
   // A public test key: the recipient of a key that is thrown away.
   "Scanner key": "age12d86zp9uj65df2snvl656uewdl82zrdfya8a2zgxu5rauaw7fsaqrr6w3x",
-  // Invented details for the cards, as the decoy that they are.
+};
+
+/** Invented details for the cards, as the decoy that they are, by their question. */
+const CARD_DETAILS: Readonly<Record<string, string>> = {
   "Name, in Latin letters": "Ann Lee",
   Role: "Architect",
   Company: "Example Studio",
@@ -62,12 +72,31 @@ const USUAL: Readonly<Record<string, string>> = {
   "Label before each code": "No.",
 };
 
+/**
+ * Every detail of the cards (CARD_DETAILS) typed each of `times` times that it is asked, as the
+ * typed answers of runOf.
+ */
+export function typedCardDetails(times = 1): Record<string, string[]> {
+  return Object.fromEntries(
+    Object.entries(CARD_DETAILS).map(([question, answer]) => [
+      question,
+      Array<string>(times).fill(answer),
+    ]),
+  );
+}
+
 /** A folder of files for the questions that read one: a record and a QR code image. */
 export let files = "";
 
+/** The writer of standard error, which answeredByScript replaces while a test runs. */
+// oxlint-disable-next-line typescript/unbound-method -- kept to be put back on process.stderr
+const originalWrite = process.stderr.write;
+
 /**
  * Before the tests, the folder of `files` and the usual answers; before each, no typed answers
- * and no lines asked; after them, the folder removed.
+ * and no lines asked, and standard error a terminal in colour that no one reads: the colour tells
+ * the label of each line of the record of answers (recordLabel); after each, standard error and
+ * the colour settings put back; after them, the folder removed.
  */
 export function answeredByScript(): void {
   beforeAll(async () => {
@@ -88,30 +117,70 @@ export function answeredByScript(): void {
     script.typed = {};
     script.lines = [];
     script.noImages = false;
-    script.fitCards = false;
+    vi.stubEnv("CLICOLOR_FORCE", "1");
+    vi.stubEnv("NO_COLOR", undefined);
+    // Replaced by hand, not with vi.spyOn: a spy keeps every call it sees, and the walk through
+    // every path writes so much that the kept calls would take gigabytes.
+    process.stderr.write = () => true;
+  });
+  afterEach(() => {
+    process.stderr.write = originalWrite;
+    vi.unstubAllEnvs();
   });
 }
 
-/** Every command line after a fixed answer prefix, or the whole entry when it is empty. */
+/** Runs `entry` as the menu does a task, with a record of answers of its own. */
+function runTask(entry: (typeof MENU_ENTRIES)[number]): ReturnType<typeof entry.action> {
+  AnswerRecord.start();
+  return entry.action();
+}
+
+/**
+ * One of `of` parts of a walk (everyPath), so that a walk too long for one test is several: the
+ * paths whose first PART_ANSWERS answers after the walk's prefix add up to `part`, modulo `of`.
+ */
+export interface WalkPart {
+  readonly part: number;
+  readonly of: number;
+}
+
+/**
+ * How many answers after its prefix put a path in its part of a walk. A path that ends before
+ * them goes on with first answers, which add nothing, but may lead to paths of any part: every
+ * part takes it.
+ */
+const PART_ANSWERS = 3;
+
+/**
+ * Every command line after a fixed answer prefix, or the whole entry when it is empty; in `share`
+ * only its part of them (WalkPart), every part by default.
+ */
 export async function everyPath(
   entry: (typeof MENU_ENTRIES)[number],
   prefix: readonly number[] = [],
+  share: WalkPart = { part: 0, of: 1 },
 ): Promise<string[][]> {
   const runs: string[][] = [];
   const pending: number[][] = [[...prefix]];
   const taken = new Set<string>();
+  const decided = prefix.length + PART_ANSWERS;
+  const inPart = (answers: readonly number[]): boolean =>
+    answers.length < decided ||
+    answers.slice(prefix.length, decided).reduce((sum, answer) => sum + answer, 0) % share.of ===
+      share.part;
   while (pending.length > 0) {
     script.answers = pending.pop()!;
     script.asked = [];
-    const action = await entry.action();
+    const action = await runTask(entry);
     if (typeof action === "object" && action !== null) runs.push([...action.run]);
     // Every other answer to a question asked after the scripted ones is a path of its own.
     for (let index = script.answers.length; index < script.asked.length; index += 1) {
-      const { question, count } = script.asked[index]!;
+      const { question, labels } = script.asked[index]!;
       if (SAME_SHAPE.has(question) || taken.has(question)) continue;
       if (TAKEN_ONCE.has(question)) taken.add(question);
       const before = script.asked.slice(0, index).map((_, place) => script.answers[place] ?? 0);
-      for (let other = 1; other < count; other += 1) pending.push([...before, other]);
+      for (let other = 1; other < labels.length; other += 1)
+        if (inPart([...before, other])) pending.push([...before, other]);
     }
   }
   return runs;
@@ -143,7 +212,7 @@ export async function runOf(
   script.answers = answers;
   script.asked = [];
   script.typed = typed;
-  const action = await MENU_ENTRIES.find((shown) => shown.digit === entry.digit)!.action();
+  const action = await runTask(MENU_ENTRIES.find((shown) => shown.digit === entry.digit)!);
   return typeof action === "object" ? action.run : undefined;
 }
 

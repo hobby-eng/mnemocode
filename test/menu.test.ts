@@ -16,9 +16,7 @@ import { MENU_ENTRIES } from "../src/cli/menu.js";
 import { typedCommand } from "../src/cli/shell-command.js";
 import { MENU_ENTRY_NAMES as ENTRY } from "../src/cli/menu-entries.js";
 import { formatNumber } from "../src/cli/format-numbers.js";
-import { isEncodedFormat } from "../src/core/types.js";
 import { anyOf, containing } from "./helpers/matchers.js";
-import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import {
   answeredByScript,
   assertCardOptions,
@@ -28,31 +26,39 @@ import {
   runOf,
   SHARES,
   SINGLE,
+  typedCardDetails,
   warningsAt,
 } from "./helpers/menu-paths.js";
 import { script } from "./helpers/menu-script.js";
+import { takeCutNotes } from "./helpers/cut-notes.js";
 import { ENCODE_FORM_LABELS } from "./helpers/encode-form-cases.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/menu-script.js"));
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
 );
 vi.mock("../src/export/image-export.js", async (importOriginal) =>
   harness.replacedImageExport(await importOriginal()),
 );
-vi.mock("../src/cli/cards-fit.js", async (importOriginal) =>
-  harness.replacedCardsFit(await importOriginal()),
-);
 
 answeredByScript();
+
+/** The parts of each Encode form's walk: its paths through the real questions take seconds. */
+const ENCODE_WALK_PARTS = 5;
 
 /** The options that `command` accepts; the test fails on a name that is no command. */
 function optionsOf(command: string): readonly string[] {
   if (!isCommandName(command)) throw new Error(`No command is named ${command}.`);
   return COMMAND_OPTIONS[command];
+}
+
+/** Checks `run` as its command checks its options before it asks for a secret. */
+function assertAccepted(run: readonly string[]): void {
+  const [command, ...rest] = run;
+  expect(isCommandName(command!), typedCommand(run)).toBe(true);
+  const parsed = parseArguments(rest);
+  assertAllowedArguments(parsed, command!, optionsOf(command!));
+  assertCardOptions(command!, parsed);
 }
 
 describe("start menu", () => {
@@ -69,30 +75,31 @@ describe("start menu", () => {
     ]);
   });
 
-  // Split the large Encode product at its first answer, keeping every later path and the same
-  // 60-second limit per test. No fixture or validation is removed on slower hosted runners.
+  // Split the large Encode product at its first answer, and each form's walk into parts by the
+  // answers after it (WalkPart), keeping every later path and the same 60-second limit per test.
+  // No fixture or validation is removed on slower hosted runners.
   const walks = MENU_ENTRIES.flatMap((entry) =>
     entry.digit === ENTRY.encode.digit
-      ? ENCODE_FORM_LABELS.map((form, index) => ({
-          label: `${entry.label}: ${form}`,
-          entry,
-          prefix: [index],
-        }))
-      : [{ label: entry.label, entry, prefix: [] }],
+      ? ENCODE_FORM_LABELS.flatMap((form, index) =>
+          Array.from({ length: ENCODE_WALK_PARTS }, (_, part) => ({
+            label: `${entry.label}: ${form}, part ${part + 1} of ${ENCODE_WALK_PARTS}`,
+            entry,
+            prefix: [index],
+            share: { part, of: ENCODE_WALK_PARTS },
+          })),
+        )
+      : [{ label: entry.label, entry, prefix: [], share: { part: 0, of: 1 } }],
   );
   it.each(walks)(
-    "$label: every answer builds a command line that MnemoCode accepts",
-    async ({ entry, prefix }) => {
-      script.lists = [];
-      script.explanations = [];
+    "builds a command line that MnemoCode accepts from every answer of $label",
+    async ({ entry, prefix, share }) => {
+      script.drawnLines = new Set();
       script.labels = [];
-      script.cutNotes = [];
-      for (const run of await everyPath(entry, prefix)) {
+      takeCutNotes();
+      for (const run of await everyPath(entry, prefix, share)) {
+        assertAccepted(run);
         const [command, ...rest] = run;
-        expect(isCommandName(command!), typedCommand(run)).toBe(true);
         const parsed = parseArguments(rest);
-        assertAllowedArguments(parsed, command!, optionsOf(command!));
-        assertCardOptions(command!, parsed);
         // A secret never goes on the command line: a command that takes one asks for it.
         const secret = [
           "encode",
@@ -106,11 +113,16 @@ describe("start menu", () => {
       }
       if (entry.digit === ENTRY.encode.digit)
         expect(script.asked[0]?.labels).toEqual(ENCODE_FORM_LABELS);
-      // Lists and explanations fit a terminal of 80 columns unwrapped (TEXT_WIDTH), and no note of
-      // a list is cut to fit.
-      for (const line of [...script.lists.flat(), ...script.explanations.flat()])
+      // An entry that asks something draws its lists and writes its lines in the record.
+      if (script.asked.length > 0) {
+        expect(script.drawnLines.size).toBeGreaterThan(0);
+        expect(script.labels).not.toEqual([]);
+      }
+      // Lists, their explanations and questions fit a terminal of 80 columns unwrapped
+      // (TEXT_WIDTH), and no note of a list is cut to fit (cut-notes.ts).
+      for (const line of script.drawnLines)
         expect(Array.from(line).length, line).toBeLessThanOrEqual(TEXT_WIDTH);
-      expect([...new Set(script.cutNotes)]).toEqual([]);
+      expect([...new Set(takeCutNotes())]).toEqual([]);
       // Every question names its line in the record of answers, within the label column.
       for (const label of script.labels)
         expect(label.length, label).toBeLessThanOrEqual(ANSWER_LABEL_WIDTH);
@@ -239,14 +251,14 @@ describe("start menu", () => {
     // English words, listed first, are answered with 1 and are --format 1 of the command built.
     const run = (await runOf(ENTRY.encode, [0, 1, 0])) ?? [];
     expect(run[run.indexOf("--format") + 1]).toBe(String(formatNumber("english")));
-    const forms = script.digits["Which form should the seed phrase take?"]!;
-    expect(forms.map(({ digit }) => digit)).toEqual(forms.map(() => undefined));
-    const list = script.lists[0]!.map((line) => line.replace(STYLE_CODES, ""));
-    const places = list.map((line) => line.match(/^[›\s]\s(\d)\s/u)?.[1]).filter(Boolean);
-    expect(places).toEqual(["1", "2", "3", "4", "5"]);
-    // Each form's place is its number (owner, 2026-10-20).
-    const numbers = forms.map(({ value }) => (isEncodedFormat(value) ? formatNumber(value) : 0));
-    expect(numbers).toEqual([1, 2, 3, 4, 5]);
+    const forms = script.asked[0]!.list!.entries;
+    expect(forms.map(({ digit }) => digit)).toEqual([1, 2, 3, 4, 5]);
+    // Each form's place is its number (owner, 2026-10-20): the form chosen at each place, with the
+    // first answer to every later question, is the --format of that number.
+    for (const [place, { digit }] of forms.entries()) {
+      const formRun = (await runOf(ENTRY.encode, [place])) ?? [];
+      expect(formRun[formRun.indexOf("--format") + 1], forms[place]!.label).toBe(String(digit));
+    }
   });
 
   it("always masks word numbers and words, and calls an unmasked copy weak", async () => {
@@ -257,10 +269,10 @@ describe("start menu", () => {
       expect(questions).toContain("Which Seedshift?");
     }
     // Unicode codes may stay unmasked, but the answer says how weak that is.
-    script.lists = [];
     await runOf(ENTRY.encode, [2]);
     expect(script.asked[1]!.question).toBe("Use Seedshift?");
-    expect(script.lists[1]!.join(" ")).toContain("weak: only disguised");
+    const notes = script.asked[1]!.list!.entries.flatMap(({ note, example }) => [note, example]);
+    expect(notes.join(" ")).toContain("weak: only disguised");
   });
 
   it("has the entries, questions and answers that the sheet for heirs names", async () => {
@@ -526,6 +538,7 @@ describe("start menu", () => {
         "--card-footer",
         "Printed with care",
       ]);
+      assertAccepted(run);
       expect(warningsAt("Name, in Latin letters")).toEqual([
         undefined,
         "Card name must use Latin letters only (spaces, apostrophes and hyphens are allowed).",
@@ -538,7 +551,8 @@ describe("start menu", () => {
       // A sheet shows no label before the codes; a separate business card does.
       expect(warningsAt("Label before each code")).toEqual([]);
       script.lines = [];
-      await runOf(ENTRY.encode, [...SINGLE, 0, 3, 0, 1], {});
+      // Every detail of separate business cards typed, which the command takes.
+      assertAccepted((await runOf(ENTRY.encode, [...SINGLE, 0, 3, 0, 1], typedCardDetails()))!);
       expect(script.lines.map((line) => line.question)).toEqual([
         "Name of the new folder",
         "Name, in Latin letters",
@@ -554,11 +568,12 @@ describe("start menu", () => {
   });
 
   it("asks the card details again, keeping every other answer, when the cards cannot print them", async () => {
-    script.fitCards = true;
     // 84 Latin letters and spaces: a name the details take, too long for its line on the card.
     const long =
       "Maximilian Alexander Konstantin Wolfgang Bartholomew Fitzgerald Montgomery Vanderbi";
     const run = (await runOf(ENTRY.encode, [...SINGLE, 0, 0, 2, 0, 0, 1, 1], {
+      // Every detail typed again where the details are asked again.
+      ...typedCardDetails(2),
       "Name, in Latin letters": [long, "Ann Lee"],
     }))!;
     const details = "Type your own details for the cards?";
@@ -588,13 +603,16 @@ describe("start menu", () => {
     ]);
     expect(run[run.indexOf("--card-name") + 1]).toBe("Ann Lee");
     expect(run).not.toContain(long);
+    // Every detail of a sheet typed, which the command takes.
+    assertAccepted(run);
   });
 
   it("asks the details of share cards again when the cards cannot print them", async () => {
-    script.fitCards = true;
     const long =
       "Maximilian Alexander Konstantin Wolfgang Bartholomew Fitzgerald Montgomery Vanderbi";
     const run = (await runOf(ENTRY.encode, [...SHARES, 0, 0, 2, 0, 0, 1, 1], {
+      // Every detail typed again where the details are asked again.
+      ...typedCardDetails(2),
       "Name, in Latin letters": [long, "Ann Lee"],
     }))!;
     const details = "Type your own details for the cards?";
@@ -602,6 +620,7 @@ describe("start menu", () => {
       script.asked.filter((asked) => asked.question === details).map((asked) => asked.warning),
     ).toEqual([undefined, expect.stringContaining("too long to fit legibly on the card")]);
     expect(run[run.indexOf("--card-name") + 1]).toBe("Ann Lee");
+    assertAccepted(run);
   });
 
   it("finds a code of an encoded seed phrase as Decode does, from the Find entry", async () => {

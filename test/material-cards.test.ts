@@ -19,7 +19,7 @@ import { nodeCardRenderer } from "../src/export/platform-node.js";
 const colors = indexesToColors(Array.from({ length: 24 }, (_, i) => i * 73 + 1));
 const presentation = resolveCardPresentation(() => 0, { studioName: "NORTHLINE STUDIO" });
 // The recipient name is otherwise chosen randomly for every export.
-const content = {
+const CONTENT = {
   kind: "colors" as const,
   colors,
   payload: colors.join(" "),
@@ -27,7 +27,7 @@ const content = {
   profile: { name: "Alex Morgan" },
 };
 afterEach(() => vi.restoreAllMocks());
-const styles = ["kitchen", "vehicle", "enclosure", "tile", "switch"] as const;
+const STYLES = ["kitchen", "vehicle", "enclosure", "tile", "switch"] as const;
 // The most references a card holds.
 const MAX_REFERENCES = 16;
 // CIE76 distance from which two samples side by side read as different colours, not as one colour
@@ -81,7 +81,7 @@ describe("material selection cards", () => {
       );
   });
 
-  it.each(styles)("offers %s samples that all look different from each other", (style) => {
+  it.each(STYLES)("offers %s samples that all look different from each other", (style) => {
     const samples = materialSamples(style);
     expect(samples.length).toBeGreaterThanOrEqual(MAX_REFERENCES + 8);
     expect(new Set(samples.map((sample) => sample.label)).size).toBe(samples.length);
@@ -99,7 +99,7 @@ describe("material selection cards", () => {
     }
   });
 
-  it.each(styles)("never gives two different %s references the same sample", (style) => {
+  it.each(STYLES)("never gives two different %s references the same sample", (style) => {
     let seed = 7;
     const random = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31);
     for (let sheet = 0; sheet < 200; sheet++) {
@@ -137,7 +137,7 @@ describe("material selection cards", () => {
       "#1F08F3": 302,
       "#9C2FB5": 316,
     };
-    for (const style of styles) {
+    for (const style of STYLES) {
       const samples = chooseMaterialSamples(style, Object.keys(references));
       for (const [i, hue] of Object.values(references).entries()) {
         const [, a, b] = lab(samples[i]!.look);
@@ -156,7 +156,7 @@ describe("material selection cards", () => {
     // little beyond some of them, such as the shadow line under a kitchen front, hence the margin.
     // The box of the enclosure runs off its photograph.
     const tolerance = 0.02;
-    for (const style of styles.filter((style) => style !== "enclosure")) {
+    for (const style of STYLES.filter((style) => style !== "enclosure")) {
       const { finishes, catalogue } = MATERIAL_ARTWORK[style];
       const [ring] = catalogue.outline;
       for (const { name, outlineFit } of finishes.filter((finish) => finish.surface)) {
@@ -175,7 +175,7 @@ describe("material selection cards", () => {
     const blend = async (style: MaterialStyle) =>
       (
         await PDFDocument.load(
-          await renderMaterialCard(nodeCardRenderer, style, { ...content, pageSize: "a4" }),
+          await renderMaterialCard(nodeCardRenderer, style, { ...CONTENT, pageSize: "a4" }),
         )
       ).context
         .enumerateIndirectObjects()
@@ -183,10 +183,10 @@ describe("material selection cards", () => {
           ([, object]) =>
             object instanceof PDFDict && object.get(PDFName.of("BM")) === PDFName.of("Color"),
         );
-    for (const style of styles) expect(await blend(style)).toBe(true);
+    for (const style of STYLES) expect(await blend(style)).toBe(true);
     // The outline is a clipping path: every tinted sample draws one before its tint.
     const pdf = await PDFDocument.load(
-      await renderMaterialCard(nodeCardRenderer, "enclosure", { ...content, pageSize: "a4" }),
+      await renderMaterialCard(nodeCardRenderer, "enclosure", { ...CONTENT, pageSize: "a4" }),
     );
     const tints = chooseMaterialSamples("enclosure", colors).filter((s) => s.tint).length;
     expect((operators(pdf)[0]!.match(/\nW\*\nn\n/gu) ?? []).length).toBe(tints);
@@ -204,7 +204,7 @@ describe("material selection cards", () => {
       for (const orientation of ["landscape", "portrait"] as const) {
         const pdf = await PDFDocument.load(
           await renderMaterialCard(nodeCardRenderer, "vehicle", {
-            ...content,
+            ...CONTENT,
             orientation,
             pageSize: size,
           }),
@@ -226,7 +226,7 @@ describe("material selection cards", () => {
     const texts = textSpy();
     const pdf = await PDFDocument.load(
       await renderMaterialCard(nodeCardRenderer, "vehicle", {
-        ...content,
+        ...CONTENT,
         cardQr: true,
         pageSize: "a6",
         presentation: resolveCardPresentation(() => 0, { studioName: "AURORA STUDIO" }),
@@ -248,7 +248,7 @@ describe("material selection cards", () => {
 
   it("prints a sheet of A6 where no page size is given, as every other design does", async () => {
     for (const template of CARD_TEMPLATES.filter((item) => item.family === "material")) {
-      const pdf = await PDFDocument.load(await template.render(nodeCardRenderer, content));
+      const pdf = await PDFDocument.load(await template.render(nodeCardRenderer, CONTENT));
       const [page] = pdf.getPages();
       expect((page!.getWidth() * 25.4) / 72, template.id).toBeCloseTo(148, 3);
       expect((page!.getHeight() * 25.4) / 72, template.id).toBeCloseTo(105, 3);
@@ -258,12 +258,12 @@ describe("material selection cards", () => {
   it("draws no separate cards: a material design is printed on sheets only", async () => {
     for (const template of CARD_TEMPLATES.filter((item) => item.family === "material")) {
       expect(template.renderIndividual, template.id).toBeUndefined();
-      await expect(renderIndividualCards(nodeCardRenderer, template, content)).rejects.toThrow(
+      await expect(renderIndividualCards(nodeCardRenderer, template, CONTENT)).rejects.toThrow(
         SHEETS_ONLY,
       );
     }
     const entry = findTemplate("material-switch")!;
-    await expect(renderCatalogDesign(entry, nodeCardRenderer, content, 2)).rejects.toThrow(
+    await expect(renderCatalogDesign(entry, nodeCardRenderer, CONTENT, 2)).rejects.toThrow(
       SHEETS_ONLY,
     );
     // The business card designs keep theirs.
@@ -275,7 +275,7 @@ describe("material selection cards", () => {
   it("rejects mismatched QR data", async () => {
     await expect(
       renderMaterialCard(nodeCardRenderer, "tile", {
-        ...content,
+        ...CONTENT,
         // The colors of other word numbers: a readable QR code of other references.
         payload: indexesToColors(Array.from({ length: 24 }, (_, i) => i * 73 + 2)).join(" "),
       }),

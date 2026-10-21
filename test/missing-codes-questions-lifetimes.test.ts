@@ -10,9 +10,6 @@ import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 const watchEdge = vi.hoisted((): { failure: Error | undefined } => ({ failure: undefined }));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   const input = harness.replacedTerminalInput(await importOriginal());
   class FailingWatch extends input.CtrlCWatch {
@@ -26,9 +23,6 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   }
   return { ...input, CtrlCWatch: FailingWatch };
 });
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
-);
 
 questionsOnPrivateScreen();
 
@@ -67,7 +61,7 @@ describe("The found backup lifetime through terminal reporting", () => {
   it.each(["report", "progress", "watch"] as const)(
     "clears a found backup when its final %s output fails before handoff",
     async (edge) => {
-      using codes = MissingCodes.read("abandon ".repeat(11) + "about|actual", "english", "direct");
+      using codes = MissingCodes.read(`${TEST_PHRASE}|actual`, "english", "direct");
       const made = vi.spyOn(EncodedBackup, "of");
       const failure = new Error("Synthetic terminal output failure.");
       const tty = Object.getOwnPropertyDescriptor(process.stderr, "isTTY");
@@ -103,7 +97,7 @@ describe("The found backup lifetime through terminal reporting", () => {
   );
 
   it("transfers the successfully reported backup to the decode caller", async () => {
-    using codes = MissingCodes.read("abandon ".repeat(11) + "about|actual", "english", "direct");
+    using codes = MissingCodes.read(`${TEST_PHRASE}|actual`, "english", "direct");
     const result = await searchMissingCodes(codes, ANSWERS);
     expect(result).toHaveProperty("kind", "found");
     if (typeof result === "symbol" || result.kind !== "found")

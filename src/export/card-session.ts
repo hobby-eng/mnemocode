@@ -101,12 +101,3 @@ export class CardSession {
     return { profile: details.profile, presentation: details.presentation };
   }
 }
-
-/**
- * A new CardSession that chooses with `choose`, as `new CardSession(choose)` makes it. For other
- * hosts: the package entry (src/cards.ts) gives it beside the class, for the hosts that make their
- * sessions with it.
- */
-export function createCardSession(choose: UniformChoice): CardSession {
-  return new CardSession(choose);
-}

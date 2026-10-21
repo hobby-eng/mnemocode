@@ -7,6 +7,7 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { WalletEvidenceCheck } from "../src/core/wallet-evidence.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The fingerprint from @scure/bip39's own seed, which bitcoin-evidence.ts computes natively. */
 function scureFingerprint(mnemonic: string, passphrase: string): string {
@@ -22,7 +23,7 @@ const pageCheck = new WalletEvidenceCheck(
 
 describe("BIP39 seed from Node's PBKDF2", () => {
   it("gives the seed of @scure/bip39 for every length and for Unicode passphrases", () => {
-    expect(masterFingerprint("abandon ".repeat(11) + "about")).toBe("73c5da0a");
+    expect(masterFingerprint(TEST_PHRASE)).toBe(TEST_FINGERPRINT);
     // "caf\u00e9" composed and "cafe\u0301" decomposed: both must give the NFKD salt.
     const passphrases = ["", "TREZOR", "caf\u00e9", "cafe\u0301", "ﾊﾟｽﾜｰﾄﾞ", "😀 two words"];
     for (const strength of [128, 160, 192, 224, 256])
@@ -42,12 +43,8 @@ describe("BIP39 seed from Node's PBKDF2", () => {
 
   it("refuses what @scure/bip39 refuses", () => {
     expect(() => masterFingerprint("abandon about")).toThrow(/Invalid mnemonic/u);
-    expect(() => masterFingerprint("abandon ".repeat(11) + "about", "\ud800")).toThrow(
-      /well-formed/u,
-    );
-    expect(() => scureFingerprint("abandon ".repeat(11) + "about", "\ud800")).toThrow(
-      /well-formed/u,
-    );
+    expect(() => masterFingerprint(TEST_PHRASE, "\ud800")).toThrow(/well-formed/u);
+    expect(() => scureFingerprint(TEST_PHRASE, "\ud800")).toThrow(/well-formed/u);
     expect(() => pageCheck.fingerprint("abandon about")).toThrow(/Invalid mnemonic/u);
   });
 });

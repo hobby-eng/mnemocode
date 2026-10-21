@@ -12,9 +12,6 @@ import { marked, SHARES } from "./helpers/share-questions.js";
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 const watch = vi.hoisted(() => ({ cancelAfterAssessment: false }));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   const input = harness.replacedTerminalInput(await importOriginal());
   class CancellingWatch extends input.CtrlCWatch {
@@ -27,9 +24,6 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   }
   return { ...input, CtrlCWatch: CancellingWatch };
 });
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
-);
 
 questionsOnPrivateScreen();
 

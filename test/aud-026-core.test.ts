@@ -8,19 +8,23 @@ import { isPlacedKind, isScannedKind, parseBitcoinAddress } from "../src/core/wa
 import { encodeCandidateList, OpenedCandidateList } from "../src/core/candidate-list.js";
 import { resolveTemplateId } from "../src/export/template-catalog.js";
 import { readRenderAsset } from "../src/export/platform.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const PHRASE = "abandon ".repeat(11) + "about";
 const ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 
 describe("AUD-026 selector privacy and owned address locations", () => {
   it("refuses selectors without repeating or coercing supplied text", async () => {
     // Selectors that no type allows, fed on purpose as a JavaScript host could.
     const refusals: readonly (readonly [() => unknown, string])[] = [
-      [() => EncodedForm.of(PHRASE as never), "core.encoded-form.unsupported-encoded-format"],
-      [() => coinById(PHRASE), "core.coins.coin.unknown-coin-coins"],
-      [() => parseBitcoinAddress(ADDRESS, PHRASE as never), "core.wallet-evidence.bitcoin-network"],
+      [() => EncodedForm.of(TEST_PHRASE as never), "core.encoded-form.unsupported-encoded-format"],
+      [() => coinById(TEST_PHRASE), "core.coins.coin.unknown-coin-coins"],
+      // A network that no type allows, fed on purpose.
       [
-        () => resolveTemplateId(PHRASE),
+        () => parseBitcoinAddress(ADDRESS, TEST_PHRASE as never),
+        "core.wallet-evidence.bitcoin-network",
+      ],
+      [
+        () => resolveTemplateId(TEST_PHRASE),
         "export.template-catalog.card-template-unknown-incompatible-list-available-preview-templates",
       ],
       [
@@ -31,7 +35,7 @@ describe("AUD-026 selector privacy and owned address locations", () => {
                 throw Error("host must not run");
               },
             },
-            PHRASE,
+            TEST_PHRASE,
           ),
         "export.platform.unknown-card-asset",
       ],
@@ -44,7 +48,7 @@ describe("AUD-026 selector privacy and owned address locations", () => {
         assert.instanceOf(error, Error);
         // expect.fail's own error has no code, so a selector that is not refused fails here too.
         expect(error, code).toMatchObject({ code });
-        expect(error.message).not.toContain(PHRASE);
+        expect(error.message).not.toContain(TEST_PHRASE);
       }
     }
     const supplied = {
@@ -145,7 +149,7 @@ describe("AUD-026 attached byte arrays and terminal candidate disposal", () => {
           records: [{ entropy: new Uint8Array(16), ...(perRecord ? { passphrase } : {}) }],
         }),
       );
-      expect(list.candidates()).toEqual([{ phrase: PHRASE, passphrase }]);
+      expect(list.candidates()).toEqual([{ phrase: TEST_PHRASE, passphrase }]);
       list.wipe();
       expect(() => list.candidates()).toThrow("has been wiped");
       expect(list.count).toBe(1);

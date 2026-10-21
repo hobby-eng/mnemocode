@@ -23,6 +23,8 @@ const GATE = [
   "shell-source.mjs",
   "source-cursor.mjs",
   "source-tokens.mjs",
+  "source-declarations.mjs",
+  "typescript-rules.mjs",
   "git-top-level.mjs",
 ];
 
@@ -109,7 +111,7 @@ describe("the code rules of the coding guide", () => {
           ]);
     expect(rulesBroken({ "test/a.test.ts": 'throw new Error("Synthetic fault.");\n' })).toEqual([]);
     expect(rulesBroken({ "src/cli/a.ts": '// new Error("A comment.")\n' })).toEqual([]);
-    expect(rulesBroken({ "src/cli/a.ts": 'const hint = "new Error()";\n' })).toEqual([]);
+    expect(rulesBroken({ "src/cli/a.ts": 'const HINT = "new Error()";\n' })).toEqual([]);
     expect(rulesBroken({ "src/cli/a.ts": 'throw ERRORS.create("refused", []);\n' })).toEqual([]);
   });
 
@@ -502,7 +504,7 @@ describe("the TypeScript and markup rules of the coding guide", () => {
     const factory = "class A {\n  #x = 1;\n  private constructor() {}\n  static of() {}\n}\n";
     expect(rulesBroken({ "src/cli/a.ts": factory })).toEqual([]);
     // A property named private is no keyword.
-    expect(rulesBroken({ "src/cli/a.ts": "const flags = { private: true };\n" })).toEqual([]);
+    expect(rulesBroken({ "src/cli/a.ts": "const FLAGS = { private: true };\n" })).toEqual([]);
   });
 
   it("refuse a lint exception without its rule and reason, and a handler in markup", () => {
@@ -677,6 +679,118 @@ describe("the doc comments of the object types of a library module's type aliase
       "src/core/a.ts:33 TS-11",
     ]);
     expect(problemsOf({ "src/cli/a.ts": bare })).toEqual([]);
+  });
+});
+
+describe("the rules that read TypeScript and the tests (typescript-rules.mjs)", () => {
+  it("refuse a type assertion without a comment, not `as const` or a renamed import (TS-04)", () => {
+    const parsed = "const parsed = JSON.parse(text) as Shape;\n";
+    expect(rulesBroken({ "src/cli/a.ts": parsed })).toEqual(["TS-04"]);
+    expect(rulesBroken({ "src/cli/a.ts": `// Checked by isShape above.\n${parsed}` })).toEqual([]);
+    expect(rulesBroken({ "test/a.test.ts": "const wrong = 1 as unknown as string;\n" })).toEqual([
+      "TS-04",
+    ]);
+    expect(
+      rulesBroken({
+        "src/cli/a.ts":
+          'const KINDS = ["a", "b"] as const;\nimport { a as b } from "./b.js";\n' +
+          'import * as c from "./c.js";\nexport { b as d, c };\n',
+      }),
+    ).toEqual([]);
+  });
+
+  it("refuse a lower-case name for a constant with a fixed meaning, not for state (TS-09)", () => {
+    for (const fixed of [
+      'const stem = "recovery";',
+      "const table = { a: 1, b: [2, -3] };",
+      'const kinds = Object.freeze(["a", "b"]);',
+      "export const pattern = /^[a-z]+$/u;",
+    ])
+      expect(rulesBroken({ "scripts/a.mjs": `${fixed}\n` })).toEqual(["TS-09"]);
+    for (const kept of [
+      'const STEM = "recovery";',
+      "const filled = [];",
+      "const state = { answers: [], last: undefined };",
+      'const root = resolve("..");',
+      "const square = (x) => x * x;",
+      'function f() {\n  const local = "a";\n  return local;\n}',
+    ])
+      expect(rulesBroken({ "scripts/a.mjs": `${kept}\n` })).toEqual([]);
+  });
+
+  it("refuse a test's fake of the program's own module, not of its edge (CORE-32)", () => {
+    const backup = 'import { EncodedBackup } from "../src/core/encoded-backup.js";\n';
+    for (const fake of [
+      'vi.mock("../src/cli/terminal-choice.js");',
+      'vi.mock(import("../src/core/seedshift.js"), () => ({}));',
+      'import * as choice from "../src/cli/terminal-choice.js";\nvi.spyOn(choice, "choose").mockReturnValue(1);',
+      `${backup}vi.spyOn(EncodedBackup.prototype, "decode").mockImplementation(() => undefined);`,
+      `${backup}const of = vi.spyOn(EncodedBackup, "of");\nexpect(1).toBe(1);\nof.mockReturnValueOnce(none);`,
+    ])
+      expect(rulesBroken({ "test/a.test.ts": `${fake}\n` })).toEqual(["CORE-32"]);
+    expect(rulesBroken({ "test/helpers/a.ts": 'vi.mock("../../src/cli/ask.js");\n' })).toEqual([
+      "CORE-32",
+    ]);
+    for (const kept of [
+      'vi.mock("../src/cli/terminal-input.js");\nvi.mock("node:tty");\nvi.mock("pngjs");',
+      // A spy that only watches the calls lets the module run as it is.
+      `${backup}const of = vi.spyOn(EncodedBackup, "of");\nexpect(of.mock.calls).toHaveLength(1);`,
+      'import * as choice from "../src/cli/terminal-choice.js";\nvi.spyOn(choice, "choose");',
+    ])
+      expect(rulesBroken({ "test/a.test.ts": `${kept}\n` })).toEqual([]);
+  });
+
+  it("take a fake of the program's own module as a fault named in a comment (CORE-32)", () => {
+    const mock = 'vi.mock("../src/core/seedshift.js", () => ({}));\n';
+    const named = "// Fault: the encoder writes a wrong code, which the self-test must catch.\n";
+    expect(rulesBroken({ "test/a.test.ts": `${named}${mock}` })).toEqual([]);
+    expect(
+      rulesBroken({ "test/a.test.ts": `// The encoder writes a wrong code.\n${mock}` }),
+    ).toEqual(["CORE-32"]);
+    // The comment ends at most three lines above the fake.
+    expect(rulesBroken({ "test/a.test.ts": `${named}\n\n\n\n${mock}` })).toEqual(["CORE-32"]);
+    const spy =
+      'import { ShareSet } from "../src/sskr/share-set.js";\n' +
+      'const combine = vi.spyOn(ShareSet, "combine");\ncombine.mockRejectedValueOnce(failure);\n';
+    expect(rulesBroken({ "test/a.test.ts": spy })).toEqual(["CORE-32"]);
+    expect(rulesBroken({ "test/a.test.ts": `${named}${spy}` })).toEqual([]);
+  });
+
+  it("refuse a test named by the value of its case or in fewer than three words (CORE-34)", () => {
+    for (const name of [
+      'it("%s", () => {});',
+      'it.each(CASES)("$name", () => {});',
+      'it("passes", () => {});',
+      'it.skipIf(slow)("%j: refused", () => {});',
+    ])
+      expect(rulesBroken({ "test/a.test.ts": `${name}\n` })).toEqual(["CORE-34"]);
+    for (const name of [
+      'it("keeps the phrase private", () => {});',
+      'it.each(CASES)("refuses %s with its code", () => {});',
+    ])
+      expect(rulesBroken({ "test/a.test.ts": `${name}\n` })).toEqual([]);
+  });
+
+  it("refuse a doc comment of a library function that leaves out a code it creates (CORE-20)", () => {
+    const catalog = 'const ERRORS = new ErrorCatalog("core.a", { refused: () => "Refused." });\n';
+    const read = (doc: string) =>
+      `${catalog}/** ${doc} */\nexport function read(text: string): string {\n` +
+      '  if (text === "") throw ERRORS.create("refused", []);\n  return text;\n}\n';
+    expect(rulesBroken({ "src/core/a.ts": read("Reads a text.") })).toEqual(["CORE-20"]);
+    expect(rulesBroken({ "src/cli/a.ts": read("Reads a text.") })).toEqual([]);
+    expect(
+      rulesBroken({
+        "src/core/a.ts": read("Reads a text; an empty one is refused (core.a.refused)."),
+      }),
+    ).toEqual([]);
+    const reader = (doc: string) =>
+      `${catalog}/** A reader. */\nexport class Reader {\n  /** ${doc} */\n` +
+      '  read(text: string): string {\n    if (text === "") throw ERRORS.create("refused", []);\n' +
+      "    return text;\n  }\n}\n";
+    expect(rulesBroken({ "src/core/a.ts": reader("Reads a text.") })).toEqual(["CORE-20"]);
+    expect(
+      rulesBroken({ "src/core/a.ts": reader("Reads; refuses an empty text (refused).") }),
+    ).toEqual([]);
   });
 });
 

@@ -31,10 +31,10 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { joinUnits } from "./helpers/shares.js";
 import { sskrVectors } from "./helpers/vectors.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const publicMnemonic = "abandon ".repeat(11) + "about";
 const vectors = sskrVectors();
-const location = { network: "mainnet" as const, account: 0, branch: 0, index: 0 };
+const MAINNET_LOCATION = { network: "mainnet" as const, account: 0, branch: 0, index: 0 };
 
 /** `body` followed by its CRC32, as a share's transport bytes end. */
 function withCrc(body: Uint8Array): Uint8Array {
@@ -74,20 +74,17 @@ describe("AUD-008-API002: key evidence that no wallet can match is refused", () 
     kind,
     value,
     profiles: ["native-segwit"],
-    location,
+    location: MAINNET_LOCATION,
   });
 
   it("refuses an x at or above p, and a point off the curve", () => {
     expect(() =>
-      matchBitcoinEvidence(
-        publicMnemonic,
-        evidence("compressed-public-key", `02${"ff".repeat(32)}`),
-      ),
+      matchBitcoinEvidence(TEST_PHRASE, evidence("compressed-public-key", `02${"ff".repeat(32)}`)),
     ).toThrow(/secp256k1/u);
     // x = 5 gives x^3 + 7 = 132, which has no square root modulo p.
     expect(() =>
       matchBitcoinEvidence(
-        publicMnemonic,
+        TEST_PHRASE,
         evidence("compressed-public-key", `02${"00".repeat(31)}05`),
       ),
     ).toThrow(/secp256k1/u);
@@ -96,14 +93,14 @@ describe("AUD-008-API002: key evidence that no wallet can match is refused", () 
   it("refuses WIF scalars 0 and n and above, and still matches the real key", () => {
     for (const value of [0n, order, order + 1n])
       expect(() =>
-        matchBitcoinEvidence(publicMnemonic, evidence("wif", wifOf(scalar(value)))),
+        matchBitcoinEvidence(TEST_PHRASE, evidence("wif", wifOf(scalar(value)))),
       ).toThrow(/secp256k1/u);
     // The public phrase's first native SegWit key, m/84'/0'/0'/0/0.
     const valid = "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d";
-    expect(matchBitcoinEvidence(publicMnemonic, evidence("wif", valid)).matched).toBe(true);
+    expect(matchBitcoinEvidence(TEST_PHRASE, evidence("wif", valid)).matched).toBe(true);
     expect(
       matchBitcoinEvidence(
-        publicMnemonic,
+        TEST_PHRASE,
         evidence(
           "compressed-public-key",
           "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c",
@@ -134,22 +131,19 @@ describe("AUD-008-API003: a word search that could not end is refused", () => {
       { kind: "missing-word", written: [0, 0, 0] },
       "missing-word-search-one-word-fewer-than-valid",
     ],
-  ])("%s", (_, search, code) => {
+  ])("refuses a search with %s by its own code", (_, search, code) => {
     const refusal = { code: `core.candidates.${code}` };
     // The cast hands each broken search, on purpose, to the check that refuses it.
-    expect(() => searchCombinations(search as WordSearch)).toThrow(
-      expect.objectContaining(refusal),
-    );
-    expect(() => searchCandidates(search as WordSearch).next()).toThrow(
-      expect.objectContaining(refusal),
-    );
+    const broken = search as WordSearch;
+    expect(() => searchCombinations(broken)).toThrow(expect.objectContaining(refusal));
+    expect(() => searchCandidates(broken).next()).toThrow(expect.objectContaining(refusal));
   });
 });
 
 describe("AUD-008-API004: an unknown Seedshift mode is refused", () => {
-  const encoded = encodeMnemonic(publicMnemonic, [parseDate("23-09-2026")]);
+  const encoded = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]);
   const patterns = [parseDatePattern("?3-09-2026")];
-  it.each(["seedshift-typo", "direct", undefined, null])("%s", (mode) => {
+  it.each(["seedshift-typo", "direct", undefined, null])("refuses the mode %s", (mode) => {
     // A mode that no type allows, fed on purpose as a JavaScript host could.
     expect(() => [
       ...dateRecoveryCandidates(encoded.shiftedIndexes, [], patterns, mode as never),
@@ -164,9 +158,9 @@ describe("AUD-008-API004: an unknown Seedshift mode is refused", () => {
 });
 
 describe("AUD-008-API005: a BIP39 passphrase must be text", () => {
-  it.each([null, 123, false, [], {}])("refuses %j", (passphrase) => {
+  it.each([null, 123, false, [], {}])("refuses %j as a BIP39 passphrase", (passphrase) => {
     // A passphrase that no type allows, fed on purpose as a JavaScript host could.
-    expect(() => masterFingerprint(publicMnemonic, passphrase as never)).toThrow(
+    expect(() => masterFingerprint(TEST_PHRASE, passphrase as never)).toThrow(
       expect.objectContaining({
         name: "TypeError",
         code: "core.master-fingerprint.expected-string-passphrase",
@@ -174,9 +168,9 @@ describe("AUD-008-API005: a BIP39 passphrase must be text", () => {
     );
   });
   it("keeps the default and string passphrases", () => {
-    expect(masterFingerprint(publicMnemonic)).toBe("73c5da0a");
-    expect(masterFingerprint(publicMnemonic, undefined)).toBe("73c5da0a");
-    expect(masterFingerprint(publicMnemonic, "")).toBe("73c5da0a");
+    expect(masterFingerprint(TEST_PHRASE)).toBe(TEST_FINGERPRINT);
+    expect(masterFingerprint(TEST_PHRASE, undefined)).toBe(TEST_FINGERPRINT);
+    expect(masterFingerprint(TEST_PHRASE, "")).toBe(TEST_FINGERPRINT);
   });
 });
 
@@ -258,7 +252,7 @@ describe("AUD-008-API006: every share layout that is read whole is also repaired
     ["UR with the earlier tag 309", tagged([0xd9, 0x01, 0x35])],
   ];
 
-  it.each(layouts)("%s, one element marked at the start, middle and end", (_, text) => {
+  it.each(layouts)("repairs %s with one element marked at the start, middle or end", (_, text) => {
     const isUr = text.startsWith("ur:");
     const units = isUr ? text.slice(UR_SSKR_PREFIX.length).match(/../gu)! : text.split(" ");
     for (const place of [1, Math.floor(units.length / 2), units.length - 2]) {

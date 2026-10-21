@@ -5,53 +5,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Standard input and standard error are a terminal while `terminal.present` is set, and a Keyboard
 // stands for the one on standard input, which records the raw modes asked for in `rawModes` and
-// refuses raw mode while `refusesRawMode` is set. A question on the private screen is answered
-// with Yes and records the raw modes until then.
+// refuses raw mode while `refusesRawMode` is set.
 interface Terminal {
   present: boolean;
-  privateScreen: boolean;
   refusesRawMode: boolean;
   rawModes: boolean[];
-  modesAtQuestions: boolean[][];
 }
 const terminal = vi.hoisted((): Terminal => ({
   present: true,
-  privateScreen: false,
   refusesRawMode: false,
   rawModes: [],
-  modesAtQuestions: [],
 }));
 vi.mock("node:tty", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:tty")>()),
   isatty: () => terminal.present,
 }));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/private-screen.js")>()),
-  onPrivateScreen: () => terminal.privateScreen,
-}));
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/terminal-choice.js")>()),
-  choose: async () => {
-    terminal.modesAtQuestions.push([...terminal.rawModes]);
-    return "yes";
-  },
-}));
 
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
+import { withPrivateScreen } from "../src/cli/private-screen.js";
 import { searchShareRepair } from "../src/cli/share-repair.js";
 import { CtrlCWatch } from "../src/cli/terminal-input.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { drawnList, keysOfAnswer } from "./helpers/drawn-list.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import {
   expectTerminalGivenBack,
   Keyboard,
   keyboardAsStandardInput,
 } from "./helpers/terminal-streams.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const TEST_PHRASE =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 // Windows deliberately keeps raw mode between reads so that ConPTY cannot lose Ctrl+C.
 // Pausing and removing listeners still ends the watch; Unix also restores line mode immediately.
 const RAW_ENTRY = process.platform === "win32" ? [false, true] : [true];
@@ -67,10 +52,8 @@ let keys = new Keyboard(terminal);
 beforeEach(() => {
   keys = new Keyboard(terminal);
   terminal.present = true;
-  terminal.privateScreen = false;
   terminal.refusesRawMode = false;
   terminal.rawModes = [];
-  terminal.modesAtQuestions = [];
   keyboardAsStandardInput(keys);
   // Progress and notices are not looked at here.
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -223,21 +206,36 @@ describe("Ctrl+C during a long search", () => {
     if (read.kind !== "marked") throw new Error("The shares were not read as marked.");
     expect(read.plan.assessment.verdict).toBe("search");
     expect(read.plan.assessment.combinations).toBe(2 ** 16);
-    // Longer than allowed without a question, on the private screen: Yes is chosen.
-    terminal.privateScreen = true;
-    const search = searchShareRepair(read, { shares: 1 });
-    // Typed once the question is answered: a Ctrl+C typed before it would cancel at the drop of
-    // the keys typed ahead, before the question is asked.
-    const typeAfterQuestion = (): void => {
-      if (terminal.modesAtQuestions.length === 0) setTimeout(typeAfterQuestion, 1);
+    // Longer than allowed without a question, on the private screen, which asks it: Yes is chosen
+    // once the question shows, with the raw modes until then.
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let drawn = "";
+    const modesAtQuestions: boolean[][] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      drawn += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+      const question = drawnList(drawn);
+      if (question !== undefined) {
+        drawn = "";
+        modesAtQuestions.push([...terminal.rawModes]);
+        setImmediate(() => keys.type(keysOfAnswer(question, "Yes")));
+      }
+      return true;
+    });
+    const search = withPrivateScreen(() => searchShareRepair(read, { shares: 1 }));
+    // Typed once the watch has taken the terminal, after the drop of the keys typed ahead and the
+    // question, each of which took it and left it: a Ctrl+C typed before the question would cancel
+    // at that drop, before the question is asked.
+    const watched = 2 * RAW_SESSION.length + RAW_ENTRY.length;
+    const typeOnceWatched = (): void => {
+      if (terminal.rawModes.length < watched) setTimeout(typeOnceWatched, 1);
       else setTimeout(() => keys.type(CTRL_C), 0);
     };
-    typeAfterQuestion();
+    typeOnceWatched();
     expect(await search).toBe(CANCELLED);
-    // The question drops the keys typed ahead itself (choose, replaced here); the watch takes raw
-    // mode only after it.
-    expect(terminal.modesAtQuestions).toEqual([[]]);
-    expect(terminal.rawModes).toEqual(RAW_SESSION);
+    // The question drops the keys typed ahead itself, then reads its own; the watch takes raw mode
+    // only after it.
+    expect(modesAtQuestions).toEqual([[...RAW_SESSION, ...RAW_ENTRY]]);
+    expect(terminal.rawModes).toEqual([...RAW_SESSION, ...RAW_SESSION, ...RAW_SESSION]);
     expectTerminalGivenBack(keys);
   });
 });

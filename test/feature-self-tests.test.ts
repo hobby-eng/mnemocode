@@ -26,6 +26,8 @@ import { checkShareSplit } from "../src/sskr/split-self-test.js";
 function searchListing(list: (listed: () => MissingCodesWaySearch) => MissingCodesWaySearch): void {
   // oxlint-disable-next-line typescript/unbound-method -- the spy calls it on its own instance
   const listed = MissingCodesSearch.prototype.listed;
+  // Fault: MnemoCode's search lists the marked codes as `list` says, with a row more or a refusal
+  // of another kind, which the self-test of the search must catch.
   vi.spyOn(MissingCodesSearch.prototype, "listed").mockImplementation(function (
     this: MissingCodesSearch,
     dates,
@@ -38,6 +40,8 @@ function searchListing(list: (listed: () => MissingCodesWaySearch) => MissingCod
 function readerReading(read: (pages: () => CardPageDrawing[]) => CardPageDrawing[]): void {
   // oxlint-disable-next-line typescript/unbound-method -- the spy calls it on its own instance
   const pages = CardPdfReader.prototype.pages;
+  // Fault: MnemoCode's reader of card PDFs reads them as `read` says: a page of another size, a
+  // drawing step left out, or a PDF in a standard font taken, which the drawing check must catch.
   vi.spyOn(CardPdfReader.prototype, "pages").mockImplementation(function (this: CardPdfReader) {
     return read(() => pages.call(this));
   });
@@ -114,6 +118,7 @@ describe("the self-test rows of composed features", () => {
   });
 
   it("fail on a split that takes a threshold of 1", async () => {
+    // Fault: the split's check of its threshold takes 1, which the split's self-test must refuse.
     vi.spyOn(ShareSplit, "validateThreshold").mockImplementation(() => undefined);
     await expect(checkShareSplit(nodeSharePlatform)).rejects.toThrow(
       "A split with a threshold of 1 was accepted.",
@@ -138,6 +143,8 @@ describe("the self-test rows of composed features", () => {
   it("fail on a restore that tells too few shares as another trouble", async () => {
     // oxlint-disable-next-line typescript/unbound-method -- the spy calls it on its own instance
     const restoreComplete = ShareInput.prototype.restoreComplete;
+    // Fault: the restore tells too few shares as shares of different sets, which the restore's
+    // self-test must catch.
     vi.spyOn(ShareInput.prototype, "restoreComplete").mockImplementation(async function (
       this: ShareInput,
       platform,
@@ -158,6 +165,7 @@ describe("the self-test rows of composed features", () => {
   });
 
   it("fail on a writer that writes no list", async () => {
+    // Fault: the candidate list writer writes no list, which its self-test must catch.
     vi.spyOn(CandidateListWriter.prototype, "write").mockResolvedValue({ kind: "empty" });
     await expect(checkCandidateListWriter()).rejects.toThrow("Candidate list written mismatch.");
   });
@@ -169,6 +177,8 @@ describe("the self-test rows of composed features", () => {
   });
 
   it("fail on a writer that takes a passphrase longer than a list stores", async () => {
+    // Fault: the check of a list's BIP39 passphrase takes one longer than a list stores, which the
+    // writer's self-test must catch.
     vi.spyOn(candidateList, "assertListPassphrase").mockImplementation(() => undefined);
     await expect(checkCandidateListWriter()).rejects.toThrow(
       "A BIP39 passphrase longer than a list stores was accepted.",
@@ -176,6 +186,7 @@ describe("the self-test rows of composed features", () => {
   });
 
   it("fail on a reader that reads no page", async () => {
+    // Fault: the reader of card PDFs reads no page, which the drawing check must catch.
     vi.spyOn(CardPdfReader.prototype, "pages").mockReturnValue([]);
     await expect(cardDrawingCheck(nodeCardRenderer).run()).rejects.toThrow(
       /drawing steps mismatch\./u,

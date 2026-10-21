@@ -33,7 +33,7 @@ describe("run-owned code candidates", () => {
   it.each(["success", "failure", "stopped", "disposed"] as const)(
     "retires borrowed candidate storage after a %s callback without recalling owned outputs",
     async (outcome) => {
-      using search = MissingCodes.read("abandon ".repeat(11) + "about|actual", "english", "direct");
+      using search = MissingCodes.read(`${TEST_PHRASE}|actual`, "english", "direct");
       const separate = search.candidates();
       const first = separate.next();
       if (first.done) throw new Error("The public fixture must have a candidate.");

@@ -13,9 +13,9 @@ import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { runSskrSplit } from "../src/cli/sskr-split-command.js";
 import { TypedShares } from "../src/cli/share-repair.js";
 import { runTable } from "../src/cli/table-command.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const publicMnemonic = "abandon ".repeat(11) + "about";
-const location = { network: "mainnet" as const, account: 0, branch: 0, index: 0 };
+const MAINNET_LOCATION = { network: "mainnet" as const, account: 0, branch: 0, index: 0 };
 
 async function runWithStdin(arguments_: readonly string[], input: Uint8Array) {
   return new Promise<{ code: number | null; stderr: string }>((resolvePromise, reject) => {
@@ -131,7 +131,7 @@ describe("AUD-002-API002 stable validation errors and paths", () => {
           kind: "address" as const,
           value: "bc1q-private-invalid-value",
           profiles: ["native-segwit" as const],
-          location,
+          location: MAINNET_LOCATION,
         },
         message: "The address is not valid for Bitcoin mainnet.",
       },
@@ -140,7 +140,7 @@ describe("AUD-002-API002 stable validation errors and paths", () => {
           kind: "wif" as const,
           value: "L1-private-invalid-value",
           profiles: ["legacy" as const],
-          location,
+          location: MAINNET_LOCATION,
         },
         message: "The WIF is not valid for Bitcoin mainnet.",
       },
@@ -156,7 +156,7 @@ describe("AUD-002-API002 stable validation errors and paths", () => {
     for (const testCase of cases) {
       let message = "";
       try {
-        matchBitcoinEvidence(publicMnemonic, testCase.evidence);
+        matchBitcoinEvidence(TEST_PHRASE, testCase.evidence);
       } catch (error) {
         if (!(error instanceof Error)) throw error;
         message = error.message;

@@ -12,14 +12,8 @@ const harness = await vi.hoisted(async () => import("./helpers/question-terminal
 /** The paths, by prefix, whose removal fails as a busy file system's does. */
 const faults = vi.hoisted((): { stuck: string[] } => ({ stuck: [] }));
 vi.mock("node:tty", async (original) => harness.replacedTty(await original()));
-vi.mock("../src/cli/private-screen.js", async (original) =>
-  harness.replacedPrivateScreen(await original()),
-);
 vi.mock("../src/cli/terminal-input.js", async (original) =>
   harness.replacedTerminalInput(await original()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (original) =>
-  harness.replacedTerminalChoice(await original()),
 );
 // The files are the program's edge: a file system without hard links, where a file is published
 // by reserving its name and renaming the finished file into it; every rename finds the disk full,
@@ -44,14 +38,19 @@ vi.mock("node:fs/promises", async (original) => {
 
 import { saveWithRetry } from "../src/cli/save-retry.js";
 import { publishNewFolder, publishNewPrivateFile } from "../src/export/private-file.js";
-import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
+import {
+  keptAbove,
+  questionsOnPrivateScreen,
+  seen,
+  terminal,
+} from "./helpers/question-terminal.js";
 
 questionsOnPrivateScreen();
 let root: string;
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "mnemocode-save-reservation-"));
   // Skip at "What now?": the notices of the one failure are all there is to read.
-  terminal.choices = ["skip"];
+  terminal.choices = ["Skip"];
 });
 afterEach(() => {
   faults.stuck = [];
@@ -69,11 +68,12 @@ it("says why a file was not saved, then the empty file that reserved its name, t
     checkName: async () => undefined,
   });
   expect(saved).toBeUndefined();
-  expect(seen.notices).toEqual([
+  const failure = [
     `The record could not be saved as ${path}: the disk is full.`,
     `The empty file ${path}, made to reserve its name, could not be removed: delete it.`,
-    "The record was not saved.",
-  ]);
+  ];
+  // Said, then kept above "What now?".
+  expect(seen.notices).toEqual([...keptAbove(failure, 1), "The record was not saved."]);
 });
 
 it("names the new folder and the staging folder when a folder save left both", async () => {
@@ -92,7 +92,7 @@ it("names the new folder and the staging folder when a folder save left both", a
     checkName: async () => undefined,
   });
   expect(saved).toBeUndefined();
-  const [why, folder, staging, skipped] = seen.notices;
+  const [why, folder, staging] = seen.notices;
   expect(why).toBe(`The card files could not be saved as ${path}: the disk is full.`);
   expect(folder).toBe(
     `The new folder ${path}, which may hold some of its files, could not be removed: delete it.`,
@@ -100,7 +100,9 @@ it("names the new folder and the staging folder when a folder save left both", a
   expect(staging).toMatch(
     /^Its private staging folder .*\.card-collection-\S*, which may hold a copy, could not be removed: delete it\.$/u,
   );
-  // Several things: "were" (Saving.plural).
-  expect(skipped).toBe("The card files were not saved.");
-  expect(seen.notices).toHaveLength(4);
+  // The three kept above "What now?", then the skip, of several things: "were" (Saving.plural).
+  expect(seen.notices).toEqual([
+    ...keptAbove([why, folder, staging], 1),
+    "The card files were not saved.",
+  ]);
 });

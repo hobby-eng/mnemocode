@@ -28,7 +28,7 @@ import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { repairCandidates } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { writeShare, type ShareFormat } from "../src/sskr/transport.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { runBuiltCli } from "./helpers/built-cli.js";
 import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 import { sskrVectors } from "./helpers/vectors.js";
@@ -65,6 +65,8 @@ describe("AUD-022-ARC002: PNG admission has quick known answers that can fail", 
 
   it("fails on a wrong budget", () => {
     const read = PngAdmission.read.bind(PngAdmission);
+    // Fault: the PNG reader counts one filtered byte more than an image has, which the self-test's
+    // known budget must refuse.
     vi.spyOn(PngAdmission, "read").mockImplementation((bytes) => {
       const admitted = read(bytes);
       // An object made on the admitted result, which it differs from in one field: no
@@ -80,6 +82,8 @@ describe("AUD-022-ARC002: PNG admission has quick known answers that can fail", 
     const read = PngAdmission.read.bind(PngAdmission);
     // A valid 1x1 image, which a lenient reader returns for every image it should refuse.
     const valid = read(pngImage(pngHeader(1, 1, 8, 0), pngChunk("IDAT", [0])));
+    // Fault: the PNG reader refuses nothing, so it takes an image with a second IHDR, which the
+    // self-test must refuse.
     vi.spyOn(PngAdmission, "read").mockImplementation((bytes) => {
       try {
         return read(bytes);
@@ -93,8 +97,8 @@ describe("AUD-022-ARC002: PNG admission has quick known answers that can fail", 
   it("fails on a reader that takes a whole chunk after IEND", () => {
     const read = PngAdmission.read.bind(PngAdmission);
     const iend = pngChunk("IEND", []);
-    // A reader without the end check: it still refuses bytes after IEND too short for a chunk
-    // (an empty chunk is as long as IEND), and takes a whole chunk there.
+    // Fault: the PNG reader lacks its end check and takes a whole chunk after IEND; it still
+    // refuses bytes there too short for a chunk (an empty chunk is as long as IEND).
     vi.spyOn(PngAdmission, "read").mockImplementation((bytes) => {
       const end = Buffer.from(bytes).indexOf(iend) + iend.length;
       return bytes.length - end >= iend.length ? read(bytes.subarray(0, end)) : read(bytes);
@@ -105,6 +109,7 @@ describe("AUD-022-ARC002: PNG admission has quick known answers that can fail", 
   it("fails on a reader that takes 16-bit samples", () => {
     const read = PngAdmission.read.bind(PngAdmission);
     const valid = read(pngImage(pngHeader(1, 1, 8, 0), pngChunk("IDAT", [0])));
+    // Fault: the PNG reader takes 16-bit samples, which the self-test must refuse.
     vi.spyOn(PngAdmission, "read").mockImplementation((bytes) => {
       try {
         return read(bytes);
@@ -156,7 +161,7 @@ describe("AUD-022-ARC001: the library words how a phrase was confirmed", () => {
 
   it("says accepted, not proven, for any match that came with a warning", async () => {
     const reEncoding = ReEncoding.of(backup(), []);
-    await reEncoding.confirmByWallet(() => fingerprintMatch("73c5da0a", "73c5da0a"));
+    await reEncoding.confirmByWallet(() => fingerprintMatch(TEST_FINGERPRINT, TEST_FINGERPRINT));
     expect(reEncoding.confirmation).toMatchObject({ warning: FINGERPRINT_WARNING });
     expect(reEncoding.confirmationLine("fingerprint")).toBe(
       "The fingerprint matches: the seed phrase is accepted, not proven.",

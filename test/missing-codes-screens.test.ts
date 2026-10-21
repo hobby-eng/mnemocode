@@ -5,27 +5,21 @@ import { STYLE, STYLE_CODES } from "../src/cli/terminal-style.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { questionsOnPrivateScreen, seen } from "./helpers/question-terminal.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
-import { TEST_FINGERPRINT } from "./helpers/test-phrase.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // The screens of Decode's search for codes marked with ?: the search has a step screen of its own
 // (CORE-39), and the candidates it lists are a result, with its heading and grey labels (CORE-36).
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 
 questionsOnPrivateScreen();
 
 /** The public test phrase with its last word marked: about or actual. */
-const MARKED = `${"abandon ".repeat(11)}about|actual`;
+const MARKED = `${TEST_PHRASE}|actual`;
 
 /** Decode's answers to the search: no wallet, no list, unless a test gives them. */
 const ANSWERS = { place: undefined, passphrase: "", list: false };

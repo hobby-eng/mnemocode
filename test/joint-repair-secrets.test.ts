@@ -1,7 +1,7 @@
 // AUD-012-SEC004: the assessment of shares wipes every array that holds a share's part of the
 // secret, except those that the plan's search keeps. Public SSKR vectors only.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { planJointRepair, searchOnce } from "../src/sskr/joint-repair.js";
@@ -10,13 +10,8 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
-/** Every reading that the assessment solves, and what runs after each is solved. */
-const solved: { spaces: ReadingSpace[]; after: (() => void) | undefined } = {
-  spaces: [],
-  after: undefined,
-};
-/** The solver itself, which the spy below watches: every reading is solved through it. */
-const solve = ReadingSpace.solve.bind(ReadingSpace);
+/** The solver, watched only: every reading of the assessment is solved through it (beforeEach). */
+let solve: MockInstance<typeof ReadingSpace.solve>;
 
 const vector = sskrVectors().deterministic[0]!;
 
@@ -27,23 +22,23 @@ function marked(share: string, places: readonly number[]): string {
   return words.join(" ");
 }
 
+/** Every reading that the assessment solved so far, as the solver returned it. */
+function solvedSpaces(): ReadingSpace[] {
+  return solve.mock.results.flatMap((result) =>
+    result.type === "return" && result.value !== undefined ? [result.value] : [],
+  );
+}
+
 /** Whether every array of every reading solved so far is all zero. */
 function allWiped(): boolean {
-  return solved.spaces
+  return solvedSpaces()
     .flatMap((space) => space.secretArrays())
     .every((array) => array.every((byte) => byte === 0));
 }
 
 describe("AUD-012-SEC004: an assessment keeps only what its search needs", () => {
   beforeEach(() => {
-    solved.spaces = [];
-    solved.after = undefined;
-    vi.spyOn(ReadingSpace, "solve").mockImplementation((reading) => {
-      const space = solve(reading);
-      if (space !== undefined) solved.spaces.push(space);
-      solved.after?.();
-      return space;
-    });
+    solve = vi.spyOn(ReadingSpace, "solve");
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -76,20 +71,23 @@ describe("AUD-012-SEC004: an assessment keeps only what its search needs", () =>
     const typed = marked(vector.shares[0]!, [3]);
     const plan = await planJointRepair([typed, typed], { platform: nodeSharePlatform });
     expect(["search", "determined"]).not.toContain(plan.assessment.verdict);
-    expect(solved.spaces.length).toBeGreaterThan(0);
+    expect(solvedSpaces().length).toBeGreaterThan(0);
     expect(allWiped()).toBe(true);
   });
 
   it("wipes what it read when it is stopped between two shares", async () => {
     const stop = new AbortController();
-    solved.after = () => stop.abort();
+    // The host stops at its turn once a share is read: the turn between the first two shares.
+    const turn = async () => {
+      if (solve.mock.calls.length > 0) stop.abort();
+    };
     // A stop is a result, not an error (CORE-22): the plan says "stopped" and keeps nothing.
     const plan = await planJointRepair(
       vector.shares.map((share) => marked(share, [4])),
-      { platform: nodeSharePlatform, signal: stop.signal },
+      { platform: nodeSharePlatform, signal: stop.signal, turn },
     );
     expect(plan.assessment.verdict).toBe("stopped");
-    expect(solved.spaces.length).toBeGreaterThan(0);
+    expect(solvedSpaces().length).toBeGreaterThan(0);
     expect(allWiped()).toBe(true);
   });
 });

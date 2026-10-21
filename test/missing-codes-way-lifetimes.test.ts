@@ -142,7 +142,7 @@ describe("Results of an owned marked-code search", () => {
   it.each(["encoded", "list"] as const)(
     "refuses a late %s fingerprint and releases its temporary backups",
     async (kind) => {
-      using codes = MissingCodes.read("abandon ".repeat(11) + "about|actual", "english", "direct");
+      using codes = MissingCodes.read(`${TEST_PHRASE}|actual`, "english", "direct");
       let finish: ((value: string) => void) | undefined;
       const fingerprint = () =>
         new Promise<string>((resolve) => {

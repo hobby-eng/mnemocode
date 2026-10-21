@@ -20,7 +20,7 @@
   "rust/vendor/sskr-0.12.0/src/share.rs": "4615fd979e15998397e209ddb08c3209f43ed08a4d284c0fa19a397be913b01a",
   "rust/vendor/sskr-0.12.0/src/spec.rs": "bdeb4fab24e8c833ec0436064898fc828d1e2ae384be7374518a96c24b94634c",
   "../Dockerfile.sskr": "4c7b34897a3d66becdf026914b9b0f1ef43301f06ec494495fe42db13ad93c77",
-  "../scripts/build-sskr-wasm.mjs": "56b75e3d8312603df26defcb196faa64fdac05f22698791b04023b64478f4d78",
+  "../scripts/build-sskr-wasm.mjs": "5c55c6f0c0fdaff7db8e9ace85b0a59a1bc50590a857b7acdddf538064a2b590",
   "rust/vendor/bc-shamir-0.13.0/Cargo.toml": "d4b81944f361426ae6ab38407390b766352cde931ae99e060acc395d7d81137d",
   "rust/vendor/bc-shamir-0.13.0/LICENSE.md": "d2c043c3d4bfc59d9898cc60366d4a8d26a677d152148859477dd02be24d2acc",
   "rust/vendor/bc-shamir-0.13.0/UPSTREAM.json": "996ebde76d57cd133df132911f4e244be0f8e97ee213228fa13b4e207daa61fb",

@@ -19,14 +19,8 @@ import { publicShare } from "./helpers/vectors.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 
 const FOUND = `23-09-2026\t${TEST_PHRASE}\tmatched at m`;
@@ -64,7 +58,7 @@ describe("recover-date on the private screen", () => {
       "zz\r",
       `${TEST_FINGERPRINT}\r`,
     ];
-    terminal.choices = ["fingerprint"];
+    terminal.choices = ["Fingerprint"];
     await recover({ mode: "seedshift" });
     expect(seen.out).toEqual([FOUND]);
     expect(seen.notices).toEqual(
@@ -90,7 +84,7 @@ describe("recover-date on the private screen", () => {
 
   it("offers the record's mode when it differs from the one given", async () => {
     terminal.answers = [`MNC1:seedshift:indexes:${MASKED}\r`, "2?-09-2026\r"];
-    terminal.choices = ["record"];
+    terminal.choices = ["As the record says"];
     await recover({ mode: "seedshift-legacy", "master-fingerprint": TEST_FINGERPRINT });
     expect(terminal.questions).toEqual([
       "The record was made with MnemoCode Seedshift, not with the Original Seedshift.",
@@ -153,7 +147,7 @@ describe("recover-date on the private screen", () => {
   it("offers the Original Seedshift when the codes lack MnemoCode Seedshift's checksum", async () => {
     terminal.answers = [`${MASKED.replace(/377$/u, "378")}\r`, "2?-09-2026\r"];
     // The original Seedshift then; nothing fits, and Escape at "What now?" stops.
-    terminal.choices = ["legacy"];
+    terminal.choices = ["It was the Original Seedshift"];
     await recover({ mode: "seedshift" });
     expect(terminal.questions).toEqual([
       "These codes lack the BIP39 checksum that MnemoCode Seedshift gives them.",
@@ -164,7 +158,7 @@ describe("recover-date on the private screen", () => {
 
   it("says that none matched the wallet and lets the wallet change", async () => {
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r", `${TEST_FINGERPRINT}\r`];
-    terminal.choices = ["change-wallet", "fingerprint"];
+    terminal.choices = ["Change the wallet", "Fingerprint"];
     await recover({ mode: "seedshift", "master-fingerprint": "00000000" });
     expect(seen.out).toEqual([
       "None of the 10 checksum-valid candidates matched the requested master fingerprint.",
@@ -179,7 +173,7 @@ describe("recover-date on the private screen", () => {
     // The original Seedshift lists checksum-valid candidates without a wallet. Asked for one to
     // check those not shown, "It cannot" would run the same search again.
     terminal.answers = [`${MASKED}\r`, "??-??-2026\r", `${TEST_FINGERPRINT}\r`];
-    terminal.choices = ["wallet", "fingerprint"];
+    terminal.choices = ["Check them against the wallet", "Fingerprint"];
     await recover({ mode: "seedshift-legacy", "max-results": "1" });
     expect(terminal.questions.slice(0, 2)).toEqual([
       "Not every candidate is shown. What now?",
@@ -195,7 +189,7 @@ describe("recover-date on the private screen", () => {
     terminal.questions = [];
     terminal.labels = [];
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r"];
-    terminal.choices = ["change-wallet", "none"];
+    terminal.choices = ["Change the wallet", "It cannot"];
     await recover({ mode: "seedshift-legacy", "master-fingerprint": "00000000" });
     expect(terminal.questions.slice(0, 2)).toEqual([
       "What now?",
@@ -211,7 +205,7 @@ describe("recover-date on the private screen", () => {
     terminal.stdoutTerminal = true;
     windowOf(40, 80);
     terminal.answers = [`${LEGACY}\r`, "2?-0?-202?\r", `${TEST_FINGERPRINT}\r`];
-    terminal.choices = ["wallet", "fingerprint"];
+    terminal.choices = ["Check them against the wallet", "Fingerprint"];
     await recover({ mode: "seedshift-legacy" });
     expect(terminal.questions).toEqual([
       "Not every candidate fits on the screen. What now?",
@@ -245,7 +239,7 @@ describe("recover-date on the private screen", () => {
   it("keeps the dates and the wallet when the encoded phrase is typed again", async () => {
     const other = formatEncoded(encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2025")]), "indexes");
     terminal.answers = [`${other}\r`, "2?-09-2026\r", `${MASKED}\r`];
-    terminal.choices = ["backup"];
+    terminal.choices = ["Type the encoded seed phrase again"];
     await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
     expect(seen.out).toEqual([
       "None of the 10 checksum-valid candidates matched the requested master fingerprint.",
@@ -261,7 +255,7 @@ describe("recover-date on the private screen", () => {
   it("searches more than --max-candidates only when the person chooses it", async () => {
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r", "2?-09-2026\r"];
     // No types the dates again; the same search is then asked for once more, and made.
-    terminal.choices = ["no", "yes"];
+    terminal.choices = ["No", "Yes"];
     await recover({
       mode: "seedshift",
       "master-fingerprint": TEST_FINGERPRINT,
@@ -285,7 +279,7 @@ describe("recover-date on the private screen", () => {
       const plain = join(directory, "codes.txt");
       await writeFile(plain, `${MASKED}\n`);
       terminal.answers = ["2?-09-2026\r", `${TEST_FINGERPRINT}\r`];
-      terminal.choices = ["seedshift", "fingerprint"];
+      terminal.choices = ["MnemoCode Seedshift", "Fingerprint"];
       await recover({ "input-file": plain });
       expect(terminal.questions).toEqual([
         "Which Seedshift was used?",
@@ -298,7 +292,7 @@ describe("recover-date on the private screen", () => {
       seen.out = [];
       terminal.questions = [];
       terminal.answers = [`'${plain}'\r`, "2?-09-2026\r"];
-      terminal.choices = ["file"];
+      terminal.choices = ["Read another file"];
       await recover({
         "input-file": bad,
         mode: "seedshift",
@@ -310,7 +304,7 @@ describe("recover-date on the private screen", () => {
       expect(seen.out).toEqual([FOUND]);
 
       // Stop at "What now?" cancels.
-      terminal.choices = ["stop"];
+      terminal.choices = ["Stop"];
       expect(
         await recover({
           "input-file": bad,
@@ -341,7 +335,7 @@ describe("recover-date on the private screen", () => {
     try {
       const plain = join(directory, "codes.txt");
       await writeFile(plain, `${MASKED}\n`);
-      terminal.choices = ["seedshift"];
+      terminal.choices = ["MnemoCode Seedshift"];
       expect((await decoding({ "input-file": plain })).backup.mode).toBe("seedshift");
       expect(terminal.questions).toEqual(["Was Seedshift used when it was encoded?"]);
       expect(terminal.labels[0]).toEqual(["No", "MnemoCode Seedshift", "Original Seedshift"]);
@@ -354,7 +348,7 @@ describe("recover-date on the private screen", () => {
       await writeFile(bad, "no codes here\n");
       terminal.questions = [];
       terminal.answers = [`${MASKED}\r`];
-      terminal.choices = ["typed", "direct"];
+      terminal.choices = ["Type the encoded seed phrase", "No"];
       expect((await decoding({ "input-file": bad })).backup.mode).toBe("direct");
       expect(terminal.questions).toEqual(["What now?", "Was Seedshift used when it was encoded?"]);
 
@@ -368,7 +362,7 @@ describe("recover-date on the private screen", () => {
 
       // Typed codes without --mode do not say how they were made either: they are asked about.
       terminal.answers = [`${MASKED}\r`];
-      terminal.choices = ["seedshift"];
+      terminal.choices = ["MnemoCode Seedshift"];
       expect((await decoding({})).backup.mode).toBe("seedshift");
       expect(terminal.questions).toEqual(["Was Seedshift used when it was encoded?"]);
     } finally {
@@ -404,7 +398,7 @@ describe("recover-date on the private screen", () => {
 
   it("asks which Seedshift for typed codes without --mode", async () => {
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r"];
-    terminal.choices = ["seedshift"];
+    terminal.choices = ["MnemoCode Seedshift"];
     await recover({ "master-fingerprint": TEST_FINGERPRINT });
     expect(terminal.questions).toEqual(["Which Seedshift was used?"]);
     // A date search needs Seedshift: there is no No.

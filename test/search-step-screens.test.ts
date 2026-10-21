@@ -16,14 +16,8 @@ import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 
 questionsOnPrivateScreen();
@@ -75,7 +69,7 @@ describe("the searches of sskr-combine", () => {
 
   it("says the time of a date search on its own step screen, after the wallet", async () => {
     terminal.answers = [`${shares[0]};${shares[2]}\r`, "23-09-202?\r", `${TEST_FINGERPRINT}\r`];
-    terminal.choices = ["fingerprint"];
+    terminal.choices = ["Fingerprint"];
     await runSskrCombine({ "ask-secrets": true, mode: "seedshift" });
     expect(screenOf("The search tries 10 date combinations:")).toBe(SEARCH_SCREEN);
     expect(seen.out).toContain(TEST_PHRASE);
@@ -85,7 +79,7 @@ describe("the searches of sskr-combine", () => {
     // One unreadable colour of the second share, which the shares settle together.
     const marked = markUnits(shares[1]!, "colors", [5]);
     terminal.answers = [`${shares[0]};${marked}\r`, "?3-09-2026\r", `${TEST_FINGERPRINT}\r`];
-    terminal.choices = ["fingerprint"];
+    terminal.choices = ["Fingerprint"];
     await runSskrCombine({ "ask-secrets": true, mode: "seedshift" });
     expect(screenOf("The search tries 1 share combination, then 3 date combinations")).toBe(
       SEARCH_SCREEN,

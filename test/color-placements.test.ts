@@ -11,13 +11,14 @@ import { encodeMnemonic, parseDate } from "../src/core.js";
 import { DatesAnswer } from "../src/core/date-search.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // Colors with an unread one whose order tags start later than 0, as older records may
 // (AUD-037-FUN004): every placement that the tags read allow is searched, and colors typed in the
 // order of their tags tell it. Public data: the phrases of zero entropy, masked with one date.
 
 const PHRASES = [
-  `${"abandon ".repeat(11)}about`,
+  TEST_PHRASE,
   `${"abandon ".repeat(14)}address`,
   `${"abandon ".repeat(17)}agent`,
   `${"abandon ".repeat(20)}admit`,

@@ -240,7 +240,9 @@ function decodedBytes(tokens: readonly string[], units: ShareUnits, unknown: str
 
 /**
  * The bytes of the share `value` written as a UR, its checksum checked; refuses a text that is no
- * UR of a share, too long or with a wrong checksum.
+ * single-part UR of a share or too long (sskr.transport.expected-single-part-ur-sskr-record), a
+ * pair of letters of no byte (sskr.transport.decoded-bytes-refused), and bytes of no share, such
+ * as a wrong checksum (shareInfo).
  */
 export function urToTransport(value: string): Uint8Array {
   const match = UR_SSKR.exec(value.trim());
@@ -321,8 +323,9 @@ export function urToBytewords(ur: string): string {
 }
 
 /**
- * The share of `value` written in Bytewords, as a UR; refuses words that are no Bytewords, too many
- * and a wrong checksum.
+ * The share of `value` written in Bytewords, as a UR; refuses too many words
+ * (sskr.transport.sskr-record-too-long), words that are no Bytewords
+ * (sskr.transport.decoded-bytes-refused) and a wrong checksum, as transportToUr does.
  */
 export function bytewordsToUr(value: string): string {
   const words = bytewordUnits(value);
@@ -393,8 +396,9 @@ export function isShareFormat(value: unknown): value is ShareFormat {
 }
 
 /**
- * Refuses `value` unless it names a form of shares, with the list of them: an option, a host or an
- * untyped caller of a writer may pass anything, such as a typo, null or a number.
+ * Refuses `value` unless it names a form of shares, with the list of them
+ * (sskr.transport.share-format-one): an option, a host or an untyped caller of a writer may pass
+ * anything, such as a typo, null or a number.
  */
 export function assertShareFormat(value: unknown): asserts value is ShareFormat {
   if (!isShareFormat(value))
@@ -621,7 +625,11 @@ export function shareFormatHasCards(format: ShareFormat): boolean {
   return EncodedForm.of(SHARE_FORMS[format].mirrored).cardKind !== undefined;
 }
 
-/** Refuses cards of shares written in `format` where it has none (shareFormatHasCards). */
+/**
+ * Refuses cards of shares written in `format` where it has none (shareFormatHasCards):
+ * sskr.transport.shares-written-as-no-cards-cards-print-shares, or a format that names none, as
+ * assertShareFormat refuses it.
+ */
 export function assertShareFormatHasCards(format: ShareFormat): void {
   if (!shareFormatHasCards(format))
     throw ERRORS.create("shares-written-as-no-cards-cards-print-shares", [`${format}`]);
@@ -682,7 +690,8 @@ export function normalizeShare(value: string): string {
 /**
  * Refuses a share QR code that holds another share than the cards beside it print: the share of
  * the colors, or, where the cards print `labels`, the share's codes in another form, the share
- * that those spell.
+ * that those spell (sskr.transport.share-qr-does-not-match-printed-references). Colors, labels or
+ * a payload that is no share are refused as colorsToShare and readShare refuse them.
  */
 export function assertShareQr(
   colors: readonly string[],

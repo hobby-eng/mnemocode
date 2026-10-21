@@ -178,7 +178,7 @@ describe("AUD-021-FUN002: marked SSKR prefixes with card decoys, readings that d
   });
 
   for (const vector of shareVectors.deterministic) {
-    it.each(MIXED_FORMATS)(`${vector.name}: repairs known and marked headers in %s`, (format) => {
+    it.each(MIXED_FORMATS)(`repairs known and marked headers of ${vector.name} in %s`, (format) => {
       const ur = vector.shares[0]!;
       const units = shareUnits(ur, format, "colors");
       const form = SHARE_UNITS[format].mixed!;

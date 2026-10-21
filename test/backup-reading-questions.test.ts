@@ -6,14 +6,8 @@ import { questionsOnPrivateScreen, terminal } from "./helpers/question-terminal.
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 
 questionsOnPrivateScreen();
@@ -50,7 +44,8 @@ describe("Backup reading lifetime across an asynchronous question", () => {
         refuse!(failure);
         await expect(pending).rejects.toBe(failure);
       } else {
-        accept!(outcome === "cancelled" ? CANCELLED : "direct");
+        // No, Seedshift was not used: the codes are read as they are.
+        accept!(outcome === "cancelled" ? CANCELLED : "No");
         const read = await pending;
         if (outcome === "cancelled") expect(read).toBe(CANCELLED);
         else {

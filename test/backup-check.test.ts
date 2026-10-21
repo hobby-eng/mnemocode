@@ -5,21 +5,20 @@ import { describe, expect, it, vi } from "vitest";
 
 // The check on the private screen runs with the terminal replaced, by
 // test/helpers/question-terminal.ts: each question that reads a line takes the next of
-// `terminal.answers`, and each list question the next of `terminal.choices`.
+// `terminal.answers`, and each list question the entry labelled as the next of `terminal.choices`.
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
 );
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
-);
 
 import { offerShareCheck } from "../src/cli/backup-check.js";
-import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
+import {
+  keptAbove,
+  questionsOnPrivateScreen,
+  seen,
+  terminal,
+} from "./helpers/question-terminal.js";
 import { shareBackupVerdict } from "./helpers/share-backup-check.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import {
@@ -42,24 +41,24 @@ import { serializeRecord } from "../src/record.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { urToBytewords, writeShare } from "../src/sskr/transport.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The host's reader of an encoded seed phrase, which a phrase typed as shares is sent to. */
 const TEXTS = { decodeEntry: "The Decode tab" };
 
 // The public BIP39 test phrase and public dates of the examples.
-const PHRASE =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 const DATE = "23-09-2026";
 const OTHER_DATE = "24-09-2026";
 const LATER_DATE = "01-10-2026";
 const vectors = sskrVectors();
 
-/** The result that Encode shows for PHRASE with `dates` (none without Seedshift). */
+/** The result that Encode shows for TEST_PHRASE with `dates` (none without Seedshift). */
 function encoded(dates: readonly string[], format: EncodedOriginal["format"]): EncodedOriginal {
   const parsed = dates.map(parseDate);
-  const result = parsed.length === 0 ? representMnemonic(PHRASE) : encodeMnemonic(PHRASE, parsed);
+  const result =
+    parsed.length === 0 ? representMnemonic(TEST_PHRASE) : encodeMnemonic(TEST_PHRASE, parsed);
   return {
-    mnemonic: PHRASE,
+    mnemonic: TEST_PHRASE,
     format,
     mode: parsed.length === 0 ? "direct" : "seedshift",
     codes: result.shiftedIndexes,
@@ -70,7 +69,9 @@ function encoded(dates: readonly string[], format: EncodedOriginal["format"]): E
 /** The codes of `original` as written down, in its own form. */
 function written(original: EncodedOriginal): string {
   return formatEncoded(
-    original.mode === "direct" ? representMnemonic(PHRASE) : encodeMnemonic(PHRASE, original.dates),
+    original.mode === "direct"
+      ? representMnemonic(TEST_PHRASE)
+      : encodeMnemonic(TEST_PHRASE, original.dates),
     original.format,
   );
 }
@@ -111,7 +112,7 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
 
   it("places a code as typed in Color Unicode, two codes to a colour, and counts them so", () => {
     for (const [phrase, last] of [
-      [PHRASE, 16],
+      [TEST_PHRASE, 16],
       [`${"abandon ".repeat(23)}art`, 32],
     ] as const) {
       const masked = encodeMnemonic(phrase, [parseDate(DATE)]);
@@ -213,7 +214,7 @@ describe("checking a written-down encoded seed phrase", () => {
   });
 
   it("undoes the Original Seedshift too", async () => {
-    const legacy = encodeMnemonicLegacy(PHRASE, [parseDate(DATE)]);
+    const legacy = encodeMnemonicLegacy(TEST_PHRASE, [parseDate(DATE)]);
     const check = new EncodedBackupCheck({
       ...encoded([DATE], "indexes"),
       mode: "seedshift-legacy",
@@ -271,7 +272,7 @@ describe("checking a written-down encoded seed phrase", () => {
   it("reads a record in its own form, and names a record of another mode", async () => {
     const original = encoded([DATE], "indexes");
     const check = new EncodedBackupCheck(original);
-    const colors = formatEncoded(encodeMnemonic(PHRASE, original.dates), "colors");
+    const colors = formatEncoded(encodeMnemonic(TEST_PHRASE, original.dates), "colors");
     const record = serializeRecord("seedshift", "colors", colors);
     expect((await check.check({ backup: record, dates: DATE })).verdict).toBe("restores");
     const legacy = serializeRecord("seedshift-legacy", "indexes", written(original));
@@ -310,28 +311,28 @@ describe("checking a written-down encoded seed phrase", () => {
   });
 });
 
-const masked = encodeMnemonic(PHRASE, [parseDate(DATE)]).shiftedEnglish.join(" ");
+const masked = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]).shiftedEnglish.join(" ");
 const dates: readonly DateShiftDate[] = [parseDate(DATE)];
 
 describe("checking written-down Shamir shares", () => {
   it("accepts enough shares, in any written form, with the dates", async () => {
-    const shares = await splitSskrMnemonic(PHRASE, 2, 3);
-    expect(await shareBackupVerdict(PHRASE, `${shares[0]};${shares[2]}`, "direct", "")).toBe(
+    const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
+    expect(await shareBackupVerdict(TEST_PHRASE, `${shares[0]};${shares[2]}`, "direct", "")).toBe(
       "restores",
     );
     const words = `${urToBytewords(shares[1]!)};${urToBytewords(shares[2]!)}`;
-    expect(await shareBackupVerdict(PHRASE, words, "direct", "")).toBe("restores");
+    expect(await shareBackupVerdict(TEST_PHRASE, words, "direct", "")).toBe("restores");
     const maskedShares = await splitSskrMnemonic(masked, 2, 3);
     const typed = `${maskedShares[0]};${maskedShares[1]}`;
-    expect(await shareBackupVerdict(PHRASE, typed, "seedshift", DATE)).toBe("restores");
-    expect(await shareBackupVerdict(PHRASE, typed, "seedshift", OTHER_DATE)).toBe("differs");
-    expect(await shareBackupVerdict(PHRASE, shares[0]!, "direct", "")).toBe("unreadable");
+    expect(await shareBackupVerdict(TEST_PHRASE, typed, "seedshift", DATE)).toBe("restores");
+    expect(await shareBackupVerdict(TEST_PHRASE, typed, "seedshift", OTHER_DATE)).toBe("differs");
+    expect(await shareBackupVerdict(TEST_PHRASE, shares[0]!, "direct", "")).toBe("unreadable");
   });
 
   it("leaves out an exact copy of a share once, as sskr-combine does", async () => {
-    const shares = await splitSskrMnemonic(PHRASE, 2, 3);
+    const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
     const check = new ShareBackupCheck(
-      { mnemonic: PHRASE, mode: "direct", threshold: 2 },
+      { mnemonic: TEST_PHRASE, mode: "direct", threshold: 2 },
       nodeSharePlatform,
       TEXTS,
     );
@@ -345,7 +346,7 @@ describe("checking written-down Shamir shares", () => {
       notes: ["Share 2 is a copy of share 1: it is used once."],
     });
     expect(
-      await shareBackupVerdict(PHRASE, `${shares[2]};${shares[0]};${shares[2]}`, "direct", ""),
+      await shareBackupVerdict(TEST_PHRASE, `${shares[2]};${shares[0]};${shares[2]}`, "direct", ""),
     ).toBe("restores");
     const alone = await check.check({ backup: `${shares[1]};${shares[1]}` });
     expect(alone).toMatchObject({
@@ -356,9 +357,9 @@ describe("checking written-down Shamir shares", () => {
   });
 
   it("names a share that cannot be read by its place", async () => {
-    const shares = await splitSskrMnemonic(PHRASE, 2, 3);
+    const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
     const check = new ShareBackupCheck(
-      { mnemonic: PHRASE, mode: "direct", threshold: 2 },
+      { mnemonic: TEST_PHRASE, mode: "direct", threshold: 2 },
       nodeSharePlatform,
       TEXTS,
     );
@@ -371,9 +372,9 @@ describe("checking written-down Shamir shares", () => {
   });
 
   it("reads the shares by the rules of the restore: line breaks, wrapped shares, phrases, marks", async () => {
-    const shares = await splitSskrMnemonic(PHRASE, 2, 3);
+    const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
     const check = new ShareBackupCheck(
-      { mnemonic: PHRASE, mode: "direct", threshold: 2 },
+      { mnemonic: TEST_PHRASE, mode: "direct", threshold: 2 },
       nodeSharePlatform,
       TEXTS,
     );
@@ -384,7 +385,7 @@ describe("checking written-down Shamir shares", () => {
     const wrapped = `${words.slice(0, 8).join(" ")};${words.slice(8).join(" ")}`;
     expect((await check.check({ backup: `${shares[0]};${wrapped}` })).verdict).toBe("restores");
     // A seed phrase typed in place of the shares is named as one, with the host's reader.
-    expect((await check.check({ backup: PHRASE })).message).toBe(
+    expect((await check.check({ backup: TEST_PHRASE })).message).toBe(
       "This is a seed phrase in words, not a Shamir share: The Decode tab reads a masked one.",
     );
     // At most as many marks as a repair takes (MAX_JOINT_MARKED_ELEMENTS).
@@ -398,7 +399,7 @@ describe("checking written-down Shamir shares", () => {
 describe("checking written-down Shamir shares", () => {
   it("tells shares of another phrase from a wrong date", async () => {
     const check = new ShareBackupCheck(
-      { mnemonic: PHRASE, mode: "seedshift", threshold: 2, dates },
+      { mnemonic: TEST_PHRASE, mode: "seedshift", threshold: 2, dates },
       nodeSharePlatform,
       TEXTS,
     );
@@ -412,7 +413,7 @@ describe("checking written-down Shamir shares", () => {
       places: [1],
       message: "Date 1 is not one of the dates of this backup.",
     });
-    const others = await splitSskrMnemonic(PHRASE, 2, 3);
+    const others = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
     expect(
       (await check.check({ backup: `${others[0]};${others[1]}`, dates: DATE })).finding,
     ).toEqual({
@@ -423,7 +424,7 @@ describe("checking written-down Shamir shares", () => {
     });
     // Without the dates of the result, a wrong date gives another seed phrase.
     const unknown = new ShareBackupCheck(
-      { mnemonic: PHRASE, mode: "seedshift", threshold: 2 },
+      { mnemonic: TEST_PHRASE, mode: "seedshift", threshold: 2 },
       nodeSharePlatform,
       TEXTS,
     );
@@ -467,14 +468,14 @@ describe("what a backup check hands out", () => {
   it("shows no code, share or phrase through toString, toJSON or inspect", async () => {
     const original = encoded([DATE], "indexes");
     const codes = new EncodedBackupCheck(original).readCodes(written(original));
-    const shares = await splitSskrMnemonic(PHRASE, 2, 3);
+    const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
     const kept = KeptShares.of([shares[0]!, shares[1]!]);
     const restored = await new ShareBackupCheck(
-      { mnemonic: PHRASE, mode: "direct", threshold: 2 },
+      { mnemonic: TEST_PHRASE, mode: "direct", threshold: 2 },
       nodeSharePlatform,
       TEXTS,
     ).restore(kept);
-    expect(restored.holds(PHRASE)).toBe(true);
+    expect(restored.holds(TEST_PHRASE)).toBe(true);
     for (const [value, label] of [
       [codes, "WrittenCodes"],
       [kept, "KeptShares"],
@@ -492,16 +493,20 @@ describe("the share check on the private screen", () => {
   questionsOnPrivateScreen();
 
   it("uses a copy of a share once, with a note, and asks again when too few are left", async () => {
-    const shares = await splitSskrMnemonic(PHRASE, 2, 3);
+    const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
     terminal.answers = [
       `${shares[1]};${urToBytewords(shares[1]!)}\r`,
       `${shares[0]};${shares[0]};${shares[2]}\r`,
     ];
-    terminal.choices = ["yes"];
-    await offerShareCheck(PHRASE, "direct", 2, () => undefined, undefined);
+    terminal.choices = ["Yes"];
+    await offerShareCheck(TEST_PHRASE, "direct", 2, () => undefined, undefined);
     expect(seen.notices.filter((line) => line !== "")).toEqual([
       "Share 2 is a copy of share 1: it is used once.",
-      "Once the copies are left out, one share is left; type 2 different shares.",
+      // Said, then kept above the shares asked again.
+      ...keptAbove(
+        ["Once the copies are left out, one share is left; type 2 different shares."],
+        1,
+      ),
       "Share 2 is a copy of share 1: it is used once.",
       RESTORES_MESSAGE,
     ]);

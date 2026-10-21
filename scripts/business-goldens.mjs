@@ -13,7 +13,7 @@ const moduleRoot = resolve(process.argv[2] ?? ".");
 const destination = resolve(process.argv[3] ?? "goldens/after");
 const renderer = await loadCardRenderer(moduleRoot);
 const ordinary = (bytes, pageSize) => ordinaryContent(renderer, bytes, pageSize);
-const profile = {
+const PROFILE = {
   name: "Alex Morgan",
   company: "Northline",
   role: "Property Consultant",
@@ -27,7 +27,7 @@ const presentation = {
   slogan: "Print, done properly.",
   ...REVIEW_TEXTS,
 };
-const fixed = (content) => ({ ...content, profile, presentation });
+const fixed = (content) => ({ ...content, profile: PROFILE, presentation });
 /**
  * Each card's file name, design, content and, for a single card, its index.
  * @type {readonly [string, string, unknown, number?][]}

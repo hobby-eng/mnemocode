@@ -49,7 +49,8 @@ function gfInverse(a: number): number {
 /**
  * The Lagrange coefficients l_i(at) for the points `xs`: the value at `at` of the polynomial of
  * lowest degree through them is the sum of l_i(at) times the value at xs[i]. Equal points would
- * make bc-shamir divide by zero silently; here they are refused.
+ * make bc-shamir divide by zero silently; here they are refused
+ * (sskr.gf256.shamir-points-distinct).
  */
 export function lagrangeCoefficients(xs: readonly number[], at: number): number[] {
   if (new Set(xs).size !== xs.length) throw ERRORS.create("shamir-points-distinct", []);

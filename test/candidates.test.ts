@@ -60,7 +60,7 @@ const LIST_PASSPHRASE = "public candidate test passphrase";
 
 describe("Candidate searches", () => {
   it.each(vectors.searches.map((search) => [search.name, search] as const))(
-    "%s: counts the combinations and yields the vectors' numbered candidates, valid and once each",
+    "counts the combinations of %s and yields the numbered candidates, valid and once each",
     (_, search) => {
       const parsed = parse(searchKind(search.kind), search.text);
       expect(searchCombinations(parsed)).toBe(search.combinations);
@@ -119,7 +119,7 @@ const LONG_SEARCH = 100_000;
 
 describe("WordCandidateSearch", () => {
   it.each(vectors.searches.map((search) => [search.name, search] as const))(
-    "%s: tells the count before the search, and numbers the candidates of the vectors",
+    "tells the count of %s before the search, and numbers the candidates of the vectors",
     (_, search) => {
       const parsed = WordCandidateSearch.parse(search.text, searchKind(search.kind));
       expect(parsed.combinations).toBe(search.combinations);
@@ -233,7 +233,7 @@ describe("Candidate lists", () => {
   );
 
   it.each(vectors.lists.map((list) => [list.name, list] as const))(
-    "%s: written byte for byte, and read back",
+    "are written byte for byte and read back, with %s",
     (_, vector) => {
       const list: CandidateList = {
         ...(vector.passphrase === undefined ? {} : { passphrase: vector.passphrase }),

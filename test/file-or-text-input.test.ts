@@ -21,14 +21,8 @@ import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 
 questionsOnPrivateScreen();
@@ -178,7 +172,7 @@ it("replaces one unreadable share from a single-share file and refuses a whole s
     `${await file(`${SHARES[1]}\n${SHARES[2]}`, "whole-set.txt")}\r`,
     `${await file(SHARES[2], "single-share.txt")}\r`,
   ];
-  terminal.choices = ["again"];
+  terminal.choices = ["Type share 2 again"];
   expect(await runSskrCombine({ "ask-secrets": true })).toBeUndefined();
   expect(seen.notices).toContain("Give one share here, or a text file containing just that share.");
   expect(seen.out).toContain(PHRASE);

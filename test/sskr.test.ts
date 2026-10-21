@@ -11,6 +11,7 @@ import {
 } from "../src/sskr/transport.js";
 import { SSKR_SET_VECTOR, SSKR_VECTOR } from "../src/sskr/known-answers.js";
 import { encodeMnemonic, decodeInput, parseDate } from "../src/core.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("Standalone SSKR", () => {
   it.each([16, 20, 24, 28, 32])(
@@ -84,20 +85,17 @@ describe("Standalone SSKR", () => {
     [NaN, 3],
   ])("rejects threshold %s / count %s", async (threshold, count) => {
     // The split's own rule refuses each, before the SSKR engine would.
-    await expect(
-      splitSskrMnemonic("abandon ".repeat(11) + "about", threshold, count),
-    ).rejects.toMatchObject({
+    await expect(splitSskrMnemonic(TEST_PHRASE, threshold, count)).rejects.toMatchObject({
       code: "sskr.split.split-threshold-from-number-shares-at-most-shares",
     });
   });
 
   it("rejects an invalid BIP39 source and restores a date-shifted source in two stages", async () => {
     await expect(splitSskrMnemonic("abandon ".repeat(12), 2, 3)).rejects.toThrow(/checksum/u);
-    const source = "abandon ".repeat(11) + "about";
     const dates = [parseDate("23-09-2026")];
-    const shifted = encodeMnemonic(source, dates).shiftedEnglish.join(" ");
+    const shifted = encodeMnemonic(TEST_PHRASE, dates).shiftedEnglish.join(" ");
     const shares = await splitSskrMnemonic(shifted, 2, 3);
     const restored = await combineSskrShares(shares.slice(0, 2));
-    expect(decodeInput(restored, "english", dates).recoveredMnemonic).toBe(source);
+    expect(decodeInput(restored, "english", dates).recoveredMnemonic).toBe(TEST_PHRASE);
   });
 });

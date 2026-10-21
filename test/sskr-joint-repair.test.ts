@@ -11,9 +11,9 @@ import { matching } from "./helpers/matchers.js";
 import { joinUnits, markDigits, markUnits, shareUnits } from "./helpers/shares.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const vectors = sskrVectors();
-const publicMnemonic = "abandon ".repeat(11) + "about";
 
 function mnemonicOf(vector: { entropy: string }): string {
   return entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
@@ -24,7 +24,7 @@ function mnemonicOf(vector: { entropy: string }): string {
 async function twinSets(): Promise<[string[], string[]]> {
   const split = new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7));
   const other = "zoo ".repeat(11) + "wrong";
-  return [await split.split(publicMnemonic, 2, 3), await split.split(other, 2, 3)];
+  return [await split.split(TEST_PHRASE, 2, 3), await split.split(other, 2, 3)];
 }
 
 describe("Joint repair of the shares of one set", () => {
@@ -156,7 +156,7 @@ describe("Joint repair of the shares of one set", () => {
     const kept = (
       await searchOnce(await planJointRepair(typed.slice(0, 2), { platform: nodeSharePlatform }))
     ).sets;
-    expect(kept.map((set) => set.mnemonic)).toEqual([publicMnemonic]);
+    expect(kept.map((set) => set.mnemonic)).toEqual([TEST_PHRASE]);
   });
 
   it("refuses two copies of one member that read as different shares (S013)", async () => {
@@ -173,12 +173,12 @@ describe("Joint repair of the shares of one set", () => {
   });
 
   it("works for a 3-of-5 set and says how many more shares would settle it", async () => {
-    const shares = await splitSskrMnemonic(publicMnemonic, 3, 5);
+    const shares = await splitSskrMnemonic(TEST_PHRASE, 3, 5);
     const all = shares.map((share, index) => markUnits(share, "indexes", [2 + index, 9 + index]));
     const plan = await planJointRepair(all, { platform: nodeSharePlatform });
     expect(plan.assessment.threshold).toBe(3);
     expect(plan.assessment.verdict).toBe("determined");
-    expect((await plan.search()).sets.map((set) => set.mnemonic)).toEqual([publicMnemonic]);
+    expect((await plan.search()).sets.map((set) => set.mnemonic)).toEqual([TEST_PHRASE]);
     // Three shares, one of them with many marks: the digest has to decide, and help is named.
     const three = [
       shares[0]!,
@@ -192,7 +192,7 @@ describe("Joint repair of the shares of one set", () => {
     expect(open.assessment.moreShares).toBe(1);
     expect(open.assessment.helps.length).toBeGreaterThan(0);
     const found = (await open.search()).sets;
-    expect(found.map((set) => set.mnemonic)).toContain(publicMnemonic);
+    expect(found.map((set) => set.mnemonic)).toContain(TEST_PHRASE);
   });
 
   it("refuses marks at wrong places instead of giving a wrong phrase", async () => {
@@ -247,7 +247,7 @@ describe("Joint repair of the shares of one set", () => {
     // one in 65,536 runs, and the vectors all share one. These two fixed fillings give two, which
     // is checked first, so that the test never passes on two splits that look like one set.
     const splitOf = (byte: number) =>
-      new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(byte)).split(publicMnemonic, 2, 3);
+      new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(byte)).split(TEST_PHRASE, 2, 3);
     const first = await splitOf(1);
     const second = await splitOf(2);
     expect(Share.read(first[0]!).info.identifier).not.toBe(Share.read(second[0]!).info.identifier);

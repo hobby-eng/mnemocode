@@ -161,7 +161,8 @@ export class CandidateEncryptionChecks {
    * X25519 known answers and admission/refusal cases; no scrypt work is performed. Fails at the
    * first difference (core.self-test-check.mismatch, was-accepted, was-refused-another-reason,
    * the last also where WebCrypto is missing), and with the cipher's own refusal of a published
-   * file that it must open.
+   * file that it must open. A refusal of a malformed identity that shows the identity or carries a
+   * cause fails too (core.candidate-encryption-self-test.malformed-identity-reached-diagnostics).
    */
   static async quick(): Promise<void> {
     // Independent Python arithmetic: maximum MNCL v1 bytes plus the age v1 STREAM framing.

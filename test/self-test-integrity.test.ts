@@ -8,9 +8,9 @@ import { pathToFileURL } from "node:url";
 import { PROTECTION_FLAGS } from "../src/cli/protection.js";
 import { UNREACHED_FAULT_EXIT } from "./helpers/unreached-fault.js";
 import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const execute = promisify(execFile);
-const publicMnemonic = "abandon ".repeat(11) + "about";
 
 /** Declared file-read faults only; the real installation is neither copied nor modified. */
 async function withVirtualBuild(check: (directory: string) => Promise<void>): Promise<void> {
@@ -20,7 +20,7 @@ async function withVirtualBuild(check: (directory: string) => Promise<void>): Pr
       join(directory, "overlay.json"),
       JSON.stringify({ root: resolve("."), files: {} }),
     );
-    await writeFile(join(directory, "public-mnemonic.txt"), publicMnemonic);
+    await writeFile(join(directory, "public-mnemonic.txt"), TEST_PHRASE);
     await check(directory);
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -111,7 +111,7 @@ describe("Self-test integrity under child-only faults", () => {
       expect(result.code).not.toBe(0);
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("CRITICAL: MnemoCode core self-test failed.");
-      expect(result.stderr).not.toContain(publicMnemonic);
+      expect(result.stderr).not.toContain(TEST_PHRASE);
       expect(await readFile(resolve(module), "utf8")).toBe(source);
     });
   });
@@ -523,7 +523,7 @@ describe("Each self-test check can fail", () => {
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("CRITICAL: MnemoCode core self-test failed.");
       expect(result.stderr).toContain("BIP84 address path mismatch.");
-      expect(result.stderr).not.toContain(publicMnemonic);
+      expect(result.stderr).not.toContain(TEST_PHRASE);
     });
   });
 });

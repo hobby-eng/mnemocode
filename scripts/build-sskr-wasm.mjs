@@ -34,7 +34,7 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const bridge = join(root, "sskr-wasm");
 const generated = join(bridge, "generated");
 const manifestPath = join(bridge, "integrity.json");
-const stem = "recovery_sskr_wasm";
+const GLUE_STEM = "recovery_sskr_wasm";
 // Compact-UR and explicitly formatted recovery each return an owned secret buffer.
 const RECOVERY_ENTRY_POINTS = 2;
 // Compact-UR and formatted creation each return a String containing secret shares.
@@ -43,7 +43,7 @@ const checkOnly = process.argv.includes("--check");
 
 // The style that the generated declarations were first written in, kept so that a rebuild writes
 // the same bytes (integrity.json).
-const declarationStyle = {
+const DECLARATION_STYLE = {
   parser: "typescript",
   singleQuote: true,
   semi: true,
@@ -152,13 +152,16 @@ async function build(output) {
   );
   const read = (name) => readFileSync(join(output, name));
   return {
-    [`${stem}_bg.wasm`]: read(`${stem}_bg.wasm`),
-    [`${stem}.js`]: Buffer.from(offlineGlue(read(`${stem}.js`).toString("utf8"))),
-    [`${stem}.d.ts`]: Buffer.from(
-      await format(offlineDeclarations(read(`${stem}.d.ts`).toString("utf8")), declarationStyle),
+    [`${GLUE_STEM}_bg.wasm`]: read(`${GLUE_STEM}_bg.wasm`),
+    [`${GLUE_STEM}.js`]: Buffer.from(offlineGlue(read(`${GLUE_STEM}.js`).toString("utf8"))),
+    [`${GLUE_STEM}.d.ts`]: Buffer.from(
+      await format(
+        offlineDeclarations(read(`${GLUE_STEM}.d.ts`).toString("utf8")),
+        DECLARATION_STYLE,
+      ),
     ),
-    [`${stem}_bg.wasm.d.ts`]: Buffer.from(
-      await format(read(`${stem}_bg.wasm.d.ts`).toString("utf8"), declarationStyle),
+    [`${GLUE_STEM}_bg.wasm.d.ts`]: Buffer.from(
+      await format(read(`${GLUE_STEM}_bg.wasm.d.ts`).toString("utf8"), DECLARATION_STYLE),
     ),
   };
 }

@@ -495,7 +495,11 @@ export interface PlanOptions extends SearchRun {
  * that refused is refused, and that of a plan whose assessment the host stopped finds nothing and
  * says it was stopped (JointPlan.search). Nothing is tried before `search` is called. The run's
  * signal stops the assessment, which can take a while for many marks, and its turn lets the host
- * run now and then (SearchTurns).
+ * run now and then (SearchTurns). Refuses a platform without hmacSha256 or combineShares
+ * (sskr.joint-repair.share-repair-host-s-share-platform, a TypeError), a count of shares that
+ * assertShareCount refuses, a share with more marks than a joint repair takes
+ * (sskr.joint-repair.plan-joint-repair-refused, with the text of jointMarkLimitProblem) and one
+ * whose marks fit too many ways (sskr.joint-repair.readings-refused).
  */
 export async function planJointRepair(
   records: readonly string[],

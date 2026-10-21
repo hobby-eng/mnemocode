@@ -25,7 +25,7 @@ const FORMATS: readonly ShareFormat[] = SHARE_FORMATS;
 
 describe("One explicit unreadable SSKR element", () => {
   for (const vector of vectors.deterministic) {
-    it.each(FORMATS)(`${vector.name}: repairs first, middle and last %s units`, (format) => {
+    it.each(FORMATS)(`repairs the first, middle and last %s units of ${vector.name}`, (format) => {
       const share = vector.shares[0]!;
       const length = shareUnits(share, format).length;
       for (const index of [0, Math.floor(length / 2), length - 1])

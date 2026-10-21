@@ -73,6 +73,7 @@ import type { ShareInfo } from "../src/sskr/transport.js";
 import { COLOR_FORMAT_NUMBERS, formatLegend } from "../src/cli/format-numbers.js";
 import { HEIR_MENU } from "../src/cli/heir-sheet.js";
 import { TOPIC_HELP } from "../src/cli/help-pages.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The public phrase masked with 23-09-2026 (vectors/mnemocode-v1.json), as word numbers. */
 const MASKED_NUMBERS = "2027 10 24 2027 10 24 2027 10 24 2027 10 377";
@@ -175,9 +176,6 @@ describe("AUD-011-ARC002, ARC003, ARC020: the color form has one decoder and der
   });
 });
 
-/** BIP39's public test phrase, "abandon" eleven times and "about". */
-const PUBLIC_PHRASE = "abandon ".repeat(11) + "about";
-
 /**
  * The address at m/purpose'/coin'/0'/0/0 of each profile, written by @scure/btc-signer: an
  * implementation independent of Bitcoin's coin, which the evidence now reads addresses with.
@@ -189,7 +187,7 @@ function independentAddress(
   const purposes = { legacy: 44, "nested-segwit": 49, "native-segwit": 84, taproot: 86 };
   const parameters = network === "mainnet" ? NETWORK : TEST_NETWORK;
   const path = `m/${purposes[profile]}'/${network === "mainnet" ? 0 : 1}'/0'/0/0`;
-  const key = HDKey.fromMasterSeed(mnemonicToSeedSync(PUBLIC_PHRASE)).derive(path).publicKey!;
+  const key = HDKey.fromMasterSeed(mnemonicToSeedSync(TEST_PHRASE)).derive(path).publicKey!;
   const address =
     profile === "legacy"
       ? p2pkh(key, parameters).address!
@@ -209,7 +207,7 @@ describe("AUD-011-ARC014, ARC015, ARC016, ARC022: Bitcoin evidence reads through
     for (const network of ["mainnet", "testnet"] as const)
       for (const profile of PROFILES) {
         const { address, path } = independentAddress(profile, network);
-        const match = matchWalletEvidence(PUBLIC_PHRASE, {
+        const match = matchWalletEvidence(TEST_PHRASE, {
           kind: "address",
           value: address,
           profiles: PROFILES,
@@ -224,7 +222,7 @@ describe("AUD-011-ARC014, ARC015, ARC016, ARC022: Bitcoin evidence reads through
         // In a profile of another kind the same address is never found.
         const others = PROFILES.filter((other) => other !== profile);
         expect(
-          matchWalletEvidence(PUBLIC_PHRASE, {
+          matchWalletEvidence(TEST_PHRASE, {
             kind: "address",
             value: address,
             profiles: others,
@@ -290,9 +288,9 @@ describe("AUD-011-ARC017: one comparison of master fingerprints", () => {
     const check = new MasterFingerprintCheck((password, salt, rounds, bytes) =>
       Uint8Array.from(pbkdf2Sync(password, salt, rounds, bytes, "sha512")),
     );
-    for (const expected of ["73c5da0a", "00000000"]) {
-      const direct = check.match(PUBLIC_PHRASE, expected);
-      const evidence = matchWalletEvidence(PUBLIC_PHRASE, {
+    for (const expected of [TEST_FINGERPRINT, "00000000"]) {
+      const direct = check.match(TEST_PHRASE, expected);
+      const evidence = matchWalletEvidence(TEST_PHRASE, {
         kind: "master-fingerprint",
         value: expected,
         network: "mainnet",
@@ -300,11 +298,11 @@ describe("AUD-011-ARC017: one comparison of master fingerprints", () => {
       expect(evidence).toEqual({
         ...direct,
         kind: "master-fingerprint",
-        derived: "73c5da0a",
+        derived: TEST_FINGERPRINT,
       });
       expect(direct.warning).toBe(FINGERPRINT_WARNING);
     }
-    expect(Object.isFrozen(fingerprintMatch("73c5da0a", "73c5da0a"))).toBe(true);
+    expect(Object.isFrozen(fingerprintMatch(TEST_FINGERPRINT, TEST_FINGERPRINT))).toBe(true);
   });
 });
 
@@ -650,20 +648,20 @@ describe("Encode's rule in the library: the replaced last word of the Original S
 
   it("writes the codes and the record mode as the command line always did", () => {
     for (const format of ENCODED_FORMATS) {
-      const masked = EncodedBackup.encode(PUBLIC_PHRASE, date, format, "seedshift");
+      const masked = EncodedBackup.encode(TEST_PHRASE, date, format, "seedshift");
       expect(masked.backup.mode).toBe("seedshift");
       expect(masked.backup.text()).toBe(formatEncoded(masked.result, format));
       expect(masked.result).toBe(masked.base);
       expect(masked.validLastWord).toBeUndefined();
     }
-    const base = encodeMnemonicLegacy(PUBLIC_PHRASE, date);
+    const base = encodeMnemonicLegacy(TEST_PHRASE, date);
     const alternative = legacyChecksumValidResult(base);
     const changed = alternative.shiftedIndexes.at(-1) !== base.shiftedIndexes.at(-1);
-    const kept = EncodedBackup.encode(PUBLIC_PHRASE, date, "english", "seedshift-legacy");
+    const kept = EncodedBackup.encode(TEST_PHRASE, date, "english", "seedshift-legacy");
     expect(kept.backup.mode).toBe("seedshift-legacy");
     expect(kept.result.shiftedIndexes).toEqual(base.shiftedIndexes);
     expect(kept.lastWordChanged).toBe(changed);
-    const replaced = EncodedBackup.encode(PUBLIC_PHRASE, date, "english", "seedshift-legacy", {
+    const replaced = EncodedBackup.encode(TEST_PHRASE, date, "english", "seedshift-legacy", {
       validLastWord: true,
     });
     expect(replaced.backup.mode).toBe(changed ? "seedshift-legacy-valid" : "seedshift-legacy");
@@ -672,7 +670,7 @@ describe("Encode's rule in the library: the replaced last word of the Original S
     );
     // The phrase comes back from the record, among the candidates where the word was replaced.
     expect(replaced.backup.candidates(date).map((found) => found.recoveredMnemonic)).toContain(
-      PUBLIC_PHRASE,
+      TEST_PHRASE,
     );
   });
 });

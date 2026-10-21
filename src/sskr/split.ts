@@ -90,7 +90,8 @@ export class ShareSplit {
 
   /**
    * Refuses a threshold and share count that SSKR cannot split into: a quorum that recorded shares
-   * may have (isRecordedQuorum), with a split's own least threshold, MIN_THRESHOLD.
+   * may have (isRecordedQuorum), with a split's own least threshold, MIN_THRESHOLD
+   * (sskr.split.split-threshold-from-number-shares-at-most-shares).
    */
   static validateThreshold(threshold: number, count: number): void {
     if (!isRecordedQuorum(threshold, count) || threshold < MIN_THRESHOLD)

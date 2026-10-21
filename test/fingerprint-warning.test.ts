@@ -59,7 +59,7 @@ describe("the warning of a fingerprint's match", () => {
   });
 
   it("comes with the codes that the wallet found, with or without forgotten digits of dates", async () => {
-    using direct = MissingCodes.read(`${"abandon ".repeat(11)}about|actual`, "english", "direct");
+    using direct = MissingCodes.read(`${TEST_PHRASE}|actual`, "english", "direct");
     const plain = await new MissingCodesSearch(direct, masterFingerprint).byWallet(wallet).run();
     expect(plain).toMatchObject({ kind: "found", warning: FINGERPRINT_WARNING });
     if (plain.kind === "found") plain.backup.wipe();

@@ -9,40 +9,27 @@ import { runEncode } from "../src/cli/encode-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { errorCode } from "../src/core/refusal.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
-import { ShareCombineRefusalError } from "../src/sskr/share-platform.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { matching } from "./helpers/matchers.js";
-import { DATE, MASKED, masked, original, promptsShown } from "./helpers/phrase-questions.js";
-import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
+import { DATE, MASKED, masked, ORIGINAL, promptsShown } from "./helpers/phrase-questions.js";
+import {
+  keptAbove,
+  questionsOnPrivateScreen,
+  seen,
+  terminal,
+} from "./helpers/question-terminal.js";
+import { wrongValue } from "./helpers/shares.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 
 /** The start of a share as a UR, before its minimal bytewords. */
 const SSKR_UR_PREFIX = "ur:sskr/";
-
-/**
- * The Node.js platform's restore of shares, failing with `failure` where the records hold one of
- * `typed`: the startup check of the engine restores as it does.
- */
-function failingRestoreOf(typed: readonly string[], failure: Error): void {
-  const combine = nodeSharePlatform.combineShares;
-  vi.spyOn(nodeSharePlatform, "combineShares").mockImplementation(async (records) => {
-    if (records.some((record) => typed.includes(record))) throw failure;
-    return combine(records);
-  });
-}
 
 questionsOnPrivateScreen();
 
@@ -53,7 +40,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const wrong = direct.replace(/^\d+/u, "2");
       const encode = vi.spyOn(EncodedBackup, "encode");
       terminal.answers = [`${TEST_PHRASE}\r`, `${wrong}\r`];
-      terminal.choices = ["yes", "show", "no"];
+      terminal.choices = ["Yes", "Show the result again", "No"];
       await expect(
         runEncode({ "ask-secrets": true, mode: "direct", format: "indexes" }),
       ).resolves.toBeUndefined();
@@ -75,14 +62,16 @@ describe("encode, decode and the backup check on the private screen", () => {
         "24-09-2026\r",
         `${DATE}\r`,
       ];
-      terminal.choices = ["yes", "again", "again"];
-      await offerEncodedCheck(original, () => undefined, undefined);
+      terminal.choices = ["Yes", "Type the codes again", "Type the dates again"];
+      await offerEncodedCheck(ORIGINAL, () => undefined, undefined);
       expect(seen.notices).toEqual([
         "",
         "Type the codes you wrote down, or press Ctrl+C to stop.",
         "These are 3 word numbers; an encoded seed phrase has 12, 15, 18, 21 or 24.",
-        "The word number at place 3 differs from the result.",
-        "Date 1 is not one of the dates of this backup.",
+        // Each part that differs is said, then kept above "What now?" and above that part asked
+        // again, each on a screen of its own (PrivateSteps).
+        ...keptAbove(["The word number at place 3 differs from the result."], 2),
+        ...keptAbove(["Date 1 is not one of the dates of this backup."], 2),
         "The backup restores this seed phrase.",
       ]);
       expect(terminal.labels[1]).toEqual([
@@ -96,7 +85,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("names the dates in the offer only where the backup has them, and Escape skips it", async () => {
-      await offerEncodedCheck(original, () => undefined, undefined);
+      await offerEncodedCheck(ORIGINAL, () => undefined, undefined);
       const direct = representMnemonic(TEST_PHRASE).shiftedIndexes;
       await offerEncodedCheck(
         { mnemonic: TEST_PHRASE, format: "indexes", mode: "direct", codes: direct, dates: [] },
@@ -117,11 +106,11 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("takes the answer of --backup-check: no leaves the check out, yes starts it at once", async () => {
-      await offerEncodedCheck(original, () => undefined, "no");
+      await offerEncodedCheck(ORIGINAL, () => undefined, "no");
       await offerShareCheck(TEST_PHRASE, "direct", 2, () => undefined, "no");
       expect(terminal.notes).toEqual([]);
       terminal.answers = [`${MASKED}\r`, `${DATE}\r`];
-      await offerEncodedCheck(original, () => undefined, "yes");
+      await offerEncodedCheck(ORIGINAL, () => undefined, "yes");
       expect(seen.notices).toContain("The backup restores this seed phrase.");
       // Only the first offer was answered; none was asked.
       expect(terminal.notes).toEqual([]);
@@ -150,7 +139,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       const wrong = direct.replace(/^\d+/u, "2");
       const show = vi.fn();
       terminal.answers = [`${wrong}\r`, `${direct}\r`];
-      terminal.choices = ["yes", "show", "yes"];
+      terminal.choices = ["Yes", "Show the result again", "Yes"];
       await offerEncodedCheck(
         {
           mnemonic: TEST_PHRASE,
@@ -181,15 +170,16 @@ describe("encode, decode and the backup check on the private screen", () => {
         "24-09-2026\r",
         `${DATE}\r`,
       ];
-      terminal.choices = ["yes", "again"];
+      terminal.choices = ["Yes", "Type the dates again"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
         parseDate(DATE),
       ]);
       expect(seen.notices.filter((line) => line !== "")).toEqual([
         "This is one share; type 2, separated by ;.",
+        // Said, kept above the share asked again, and said again for the share typed again.
+        ...keptAbove([matching(/^Share 2 cannot be read: /u)], 1),
         matching(/^Share 2 cannot be read: /u),
-        matching(/^Share 2 cannot be read: /u),
-        "Date 1 is not one of the dates of this backup.",
+        ...keptAbove(["Date 1 is not one of the dates of this backup."], 2),
         "The backup restores this seed phrase.",
       ]);
       expect(promptsShown("Share 2 as written down:")).toHaveLength(2);
@@ -204,7 +194,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         `${shares[2]}\r`,
         `${DATE}\r`,
       ];
-      terminal.choices = ["yes"];
+      terminal.choices = ["Yes"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
         parseDate(DATE),
       ]);
@@ -225,12 +215,12 @@ describe("encode, decode and the backup check on the private screen", () => {
       const other = MINIMAL_BYTEWORDS.find((word) => word !== pair)!;
       const changed = `${SSKR_UR_PREFIX}${body.slice(0, at)}${other}${body.slice(at + 2)}`;
       terminal.answers = [`${shares[0]};${changed}\r`, `${shares[1]}\r`, `${DATE}\r`];
-      terminal.choices = ["yes"];
+      terminal.choices = ["Yes"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
         parseDate(DATE),
       ]);
       expect(seen.notices.filter((line) => line !== "")).toEqual([
-        "Share 2 cannot be read: SSKR transport checksum does not match.",
+        ...keptAbove(["Share 2 cannot be read: SSKR transport checksum does not match."], 1),
         "The backup restores this seed phrase.",
       ]);
     });
@@ -238,17 +228,20 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("tells shares of another phrase from wrong dates without the dates of the result", async () => {
       const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
       terminal.answers = [`${shares[0]};${shares[1]}\r`, "24-09-2026\r", `${DATE}\r`];
-      terminal.choices = ["yes", "again"];
+      terminal.choices = ["Yes", "Type the dates again"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined);
       expect(seen.notices.filter((line) => line !== "")).toEqual([
-        "The shares with these dates give another seed phrase: check the dates and the shares.",
+        ...keptAbove(
+          ["The shares with these dates give another seed phrase: check the dates and the shares."],
+          2,
+        ),
         "The backup restores this seed phrase.",
       ]);
 
       const others = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
       seen.notices = [];
       terminal.answers = [`${others[0]};${others[1]}\r`];
-      terminal.choices = ["yes"];
+      terminal.choices = ["Yes"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
         parseDate(DATE),
       ]);
@@ -260,9 +253,15 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("lets a fault of the host's SSKR library through instead of asking for the shares again (AUD-037-API002)", async () => {
       const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
       const fault = new Error("The host's SSKR library stopped.");
-      failingRestoreOf(shares, fault);
+      const combine = nodeSharePlatform.combineShares;
+      // Fault: the host's SSKR library stops with an error of its own at the shares typed, not a
+      // refusal of them, which no shares can cause; the startup check of the engine still passes.
+      vi.spyOn(nodeSharePlatform, "combineShares").mockImplementation(async (records) => {
+        if (records.some((record) => shares.includes(record))) throw fault;
+        return combine(records);
+      });
       terminal.answers = [`${shares[0]};${shares[1]}\r`, `${shares[0]};${shares[1]}\r`];
-      terminal.choices = ["yes"];
+      terminal.choices = ["Yes"];
       await expect(
         offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [parseDate(DATE)]),
       ).rejects.toBe(fault);
@@ -271,20 +270,22 @@ describe("encode, decode and the backup check on the private screen", () => {
 
     it("asks for the shares again after the engine refused to combine them (AUD-037-API002)", async () => {
       const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
-      // The engine refuses the shares with share 2, as for a wrong share; other ones restore.
-      failingRestoreOf([shares[1]!], new ShareCombineRefusalError());
+      // Share 2 with a wrong value whose checksum holds: the engine's digest refuses the pair.
       terminal.answers = [
-        `${shares[0]};${shares[1]}\r`,
+        `${shares[0]};${wrongValue(shares[1]!)}\r`,
         `${shares[0]};${shares[2]}\r`,
         `${DATE}\r`,
       ];
-      terminal.choices = ["yes"];
+      terminal.choices = ["Yes"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
         parseDate(DATE),
       ]);
       expect(promptsShown("shares as written down")).toHaveLength(2);
       expect(seen.notices.filter((line) => line !== "")).toEqual([
-        "These shares do not restore a secret: check them, and that all belong to one set.",
+        ...keptAbove(
+          ["These shares do not restore a secret: check them, and that all belong to one set."],
+          1,
+        ),
         "The backup restores this seed phrase.",
       ]);
     });
@@ -295,8 +296,8 @@ describe("encode, decode and the backup check on the private screen", () => {
   describe("the backup check", () => {
     it("stops at Ctrl+C inside the check", async () => {
       terminal.answers = ["12\x03"];
-      terminal.choices = ["yes"];
-      expect(await offerEncodedCheck(original, () => undefined, undefined)).toBe(CANCELLED);
+      terminal.choices = ["Yes"];
+      expect(await offerEncodedCheck(ORIGINAL, () => undefined, undefined)).toBe(CANCELLED);
     });
   });
 });

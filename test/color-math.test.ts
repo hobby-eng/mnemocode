@@ -29,7 +29,7 @@ const READERS: readonly (readonly [string, (color: string) => unknown])[] = [
 ];
 
 describe("color readers of the card exports", () => {
-  it.each(READERS)("%s refuses every text that is no color as an RGB reference", (_, read) => {
+  it.each(READERS)("refuses every text that is no color as an RGB reference in %s", (_, read) => {
     for (const text of NOT_COLORS)
       expect(() => read(text)).toThrow(
         expect.objectContaining({ code: "core.colors.invalid-rgb-reference" }),

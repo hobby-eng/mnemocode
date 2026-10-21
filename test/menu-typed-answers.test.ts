@@ -20,17 +20,11 @@ import {
 import { script } from "./helpers/menu-script.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/menu-script.js"));
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
 );
 vi.mock("../src/export/image-export.js", async (importOriginal) =>
   harness.replacedImageExport(await importOriginal()),
-);
-vi.mock("../src/cli/cards-fit.js", async (importOriginal) =>
-  harness.replacedCardsFit(await importOriginal()),
 );
 
 answeredByScript();
@@ -81,7 +75,7 @@ describe("start menu", () => {
         ),
       ).toEqual([
         undefined,
-        "Type the eight characters of the fingerprint.",
+        "Type the eight characters of the fingerprint, or press Esc to go back.",
         "A master fingerprint must be eight hexadecimal characters.",
       ]);
       const address = "Bitcoin address (one of the first receiving ones)";

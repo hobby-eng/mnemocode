@@ -455,7 +455,7 @@ describe("the date search", () => {
           "--dates",
           "2?-09-2026",
           "--master-fingerprint",
-          "73c5da0a",
+          TEST_FINGERPRINT,
           "--scan-gap",
           "5",
         ]),
@@ -478,7 +478,7 @@ describe("the date search", () => {
         ]),
       );
     // A master key has no place in an account.
-    await expect(search("--master-fingerprint", "73c5da0a", "--index", "7")).rejects.toThrow(
+    await expect(search("--master-fingerprint", TEST_FINGERPRINT, "--index", "7")).rejects.toThrow(
       "--index places an address, a key or a WIF; a master key has no place.",
     );
     // Without a wallet, from the command line as on the screen.

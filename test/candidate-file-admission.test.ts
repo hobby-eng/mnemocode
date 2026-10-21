@@ -38,11 +38,15 @@ function announcedBytes(bytes: Uint8Array, length: number): Uint8Array {
 
 describe("Candidate file admission", () => {
   it("fails the startup check if the plaintext ceiling refusal is lost", () => {
+    // Fault: the size check of a plaintext list refuses nothing, which the startup check of the
+    // candidate list must catch.
     vi.spyOn(OpenedCandidateList, "assertSize").mockImplementation(() => undefined);
     expect(() => checkCandidateListStartup()).toThrow("An oversized candidate list was accepted");
   });
 
   it("fails the quick startup check if the encrypted ceiling refusal is lost", async () => {
+    // Fault: the size check of an encrypted file refuses nothing, which the quick startup check of
+    // candidate encryption must catch.
     vi.spyOn(CandidateFileAdmission, "assertSize").mockImplementation(() => undefined);
     await expect(checkCandidateEncryptionQuick()).rejects.toThrow(
       "An oversized encrypted candidate file was accepted",

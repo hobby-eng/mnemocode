@@ -293,9 +293,11 @@ export interface ReadingOutcome {
 /**
  * The shares that the readings of the marked share `text` gave, each once, by their outcomes. A
  * capped reading of the whole text keeps uniqueness from being established, since the cap stops
- * its remaining filters: it refuses with "Too many elements" whatever the others solved. One that
- * takes decoy cards after a prefix is only one hypothesis more and leaves a solved reading
- * standing (AUD-022-FUN001). Without a share, the refusal says why.
+ * its remaining filters: it refuses with "Too many elements" whatever the others solved
+ * (sskr.repair.too-many-marks-for-form). One that takes decoy cards after a prefix is only one
+ * hypothesis more and leaves a solved reading standing (AUD-022-FUN001); without a share, a capped
+ * one of them refuses the same way. Without a share and without a cap, the refusal says why
+ * (sskr.repair.no-share-fits-marks).
  */
 export function sharesOfReadings(
   outcomes: readonly ReadingOutcome[],

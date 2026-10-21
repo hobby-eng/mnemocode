@@ -11,14 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (original) => harness.replacedTty(await original()));
-vi.mock("../src/cli/private-screen.js", async (original) =>
-  harness.replacedPrivateScreen(await original()),
-);
 vi.mock("../src/cli/terminal-input.js", async (original) =>
   harness.replacedTerminalInput(await original()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (original) =>
-  harness.replacedTerminalChoice(await original()),
 );
 vi.mock("node:fs/promises", async (original) => harness.replacedFiles(await original()));
 
@@ -135,7 +129,7 @@ describe("the summary left on the main screen after the private screen", () => {
   it("says that card files that were skipped were not saved", async () => {
     terminal.saveFailures = 1;
     terminal.answers = [`${TEST_PHRASE}${ENTER}`, ENTER];
-    terminal.choices = ["skip"];
+    terminal.choices = ["Skip"];
     const cards = join(directory, "cards");
     expect(
       await encodeOnPrivateScreen(encodeArguments({ format: "5", "cards-dir": cards })),

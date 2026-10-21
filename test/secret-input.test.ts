@@ -6,11 +6,6 @@ const terminal = vi.hoisted(() => ({
   available: true,
   answers: "",
   switched: 0,
-  privateScreen: false,
-}));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/private-screen.js")>()),
-  onPrivateScreen: () => terminal.privateScreen,
 }));
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/cli/terminal-input.js")>();
@@ -46,13 +41,13 @@ import { parseArguments } from "../src/cli/arguments.js";
 import { runDecode } from "../src/cli/decode-command.js";
 import { askSecretUntil } from "../src/cli/ask.js";
 import { datesPrompt } from "../src/cli/input.js";
+import { withPrivateScreen } from "../src/cli/private-screen.js";
+import { ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN } from "../src/cli/terminal.js";
 
 /** The answer as typed: the secret questions take a reading of it, here none. */
 const typed = (answer: string) => answer;
 import { CANCELLED, type MoreWithin, type NextByte } from "../src/cli/terminal-keys.js";
-
-const TEST_PHRASE =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 let written: string[];
 
@@ -60,7 +55,6 @@ beforeEach(() => {
   terminal.available = true;
   terminal.answers = "";
   terminal.switched = 0;
-  terminal.privateScreen = false;
   written = [];
   vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
     written.push(String(chunk));
@@ -77,12 +71,21 @@ describe("secret input", () => {
   });
 
   it("shows the answer as it is typed on the private screen, which is cleared afterwards", async () => {
-    terminal.privateScreen = true;
-    terminal.answers = "test onlz\x7fy\r";
-    expect(await askSecretUntil("Seed phrase:", typed)).toBe("test only");
+    // The heading of the private screen and the summary left after it.
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // The answer, then Enter, which clears the private screen.
+    terminal.answers = "test onlz\x7fy\r\r";
+    expect(await withPrivateScreen(() => askSecretUntil("Seed phrase:", typed))).toBe("test only");
     // Backspace redraws the answer after the prompt (13 columns): back to its start, cleared,
     // written again; then y is added.
-    expect(written.join("")).toBe("Seed phrase: test onlz\r\x1b[13C\x1b[Jtest onl\r\x1b[21Cy\n");
+    const echo = "Seed phrase: test onlz\r\x1b[13C\x1b[Jtest onl\r\x1b[21Cy\n";
+    const shown = written.join("");
+    expect(shown).toContain(echo);
+    // Shown on the private screen, which is left once Enter was pressed.
+    expect(shown.indexOf(ENTER_ALTERNATE_SCREEN)).toBeGreaterThanOrEqual(0);
+    expect(shown.indexOf(ENTER_ALTERNATE_SCREEN)).toBeLessThan(shown.indexOf(echo));
+    expect(shown.lastIndexOf(LEAVE_ALTERNATE_SCREEN)).toBeGreaterThan(shown.indexOf(echo));
+    expect(terminal.answers).toBe("");
   });
 
   it("works the same on every system: no system program is asked", async () => {

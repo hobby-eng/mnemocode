@@ -1,68 +1,88 @@
 // AUD-021-FUN003: exercise runEncode's real destination and retry loops with the library planner,
 // which plans the sheet with the real font. Every exporter draws and saves as it is, into a folder
-// of the test's own, and the job of each is noted on its way through. What crosses the program's
-// edge is replaced: the files, where the name of a destination cannot be made, as on a full disk,
-// where a test asks; pdftocairo, a fake on PATH that answers each page with a few bytes, which
-// Windows, looking for pdftocairo.exe, does not take, so the file is skipped there; the terminal
-// answers; the host's randomness, which is counted; and the font's read, which is counted and
-// fails where a test asks.
+// of the test's own, and each save is seen where it crosses the program's edge: the texts that
+// pdf-lib was asked to draw for it, and the publish of its file or folder, with the random choices
+// made until then. What crosses the edge is replaced: the files, where the name of a destination
+// cannot be made, as on a full disk, where a test asks; pdftocairo, a fake on PATH that answers
+// each page with a few bytes, which Windows, looking for pdftocairo.exe, does not take, so the
+// file is skipped there; the terminal, whose questions are answered as they show
+// (question-terminal.ts); the host's randomness, which is counted; and the font's read, which is
+// counted and fails where a test asks.
 import { existsSync } from "node:fs";
-import { chmod, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { PDFPage } from "pdf-lib";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParsedArguments } from "../src/cli/arguments.js";
-import type { AnswerParser } from "../src/cli/ask.js";
-import { separateCardJob, type CardJob } from "../src/export/render.js";
 import type { EncodedFormat } from "../src/core/types.js";
+import { fakeImageRenderer, numberedCodes, PAGE_IMAGES } from "./helpers/drawn-cards.js";
 import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
+import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import { testFolder } from "./helpers/test-folders.js";
 
 type Destination = "pdf" | "images" | "cards";
-interface Attempt {
+
+/** One save of a destination, as the files saw it publish its file or folder. */
+interface Save {
   readonly destination: Destination;
-  readonly job: CardJob;
+  /** The texts that pdf-lib was asked to draw since the save before. */
+  readonly texts: readonly string[];
+  /** The random choices of the card renderer and of the export's details made until then. */
   readonly randomChoices: number;
   readonly identityChoices: number;
 }
 
-/** What the exporters and the stand-ins saw, and what a test asks of them. */
+/** What the stand-ins at the edge saw, and what a test asks of them. */
 interface Observed {
-  attempts: Attempt[];
+  saves: Save[];
+  /** The destination of each path that a save publishes. */
+  destinations: Map<string, Destination>;
+  /** Every text that pdf-lib was asked to draw so far, in order. */
+  drawn: () => readonly string[];
+  /** How many of them the saves recorded so far have taken. */
+  taken: number;
   /** How many times making each path fails, as on a full disk, before it succeeds. */
   failures: Map<string, number>;
   randomChoices: number;
   identityChoices: number;
   fontReads: number;
   fontFailures: number;
-  privateScreen: boolean;
-  choices: ("again" | "other" | "skip")[];
-  questions: string[];
-  names: string[];
-  nameQuestions: string[];
-  notices: string[];
 }
 
 const observed = vi.hoisted((): Observed => ({
-  attempts: [],
+  saves: [],
+  destinations: new Map(),
+  drawn: () => [],
+  taken: 0,
   failures: new Map(),
   randomChoices: 0,
   identityChoices: 0,
   fontReads: 0,
   fontFailures: 0,
-  privateScreen: false,
-  choices: [],
-  questions: [],
-  names: [],
-  nameQuestions: [],
-  notices: [],
 }));
 
-// The files: a new file is given its name with link, a new folder with mkdir; either fails for a
-// path of `observed.failures` as often as it says.
+const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
+vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
+vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
+  harness.replacedTerminalInput(await importOriginal()),
+);
+// The files: a new file is given its name with link, a new folder with mkdir, each a save of the
+// destination of that path; either fails for a path of `observed.failures` as often as it says.
 vi.mock("node:fs/promises", async (original) => {
   const actual = await original<typeof import("node:fs/promises")>();
-  const fullAt = (path: unknown): void => {
+  const publishing = (path: unknown): void => {
+    const destination = typeof path === "string" ? observed.destinations.get(path) : undefined;
+    if (destination !== undefined) {
+      const drawn = observed.drawn();
+      observed.saves.push({
+        destination,
+        texts: drawn.slice(observed.taken),
+        randomChoices: observed.randomChoices,
+        identityChoices: observed.identityChoices,
+      });
+      observed.taken = drawn.length;
+    }
     const left = typeof path === "string" ? (observed.failures.get(path) ?? 0) : 0;
     if (left === 0) return;
     observed.failures.set(String(path), left - 1);
@@ -71,11 +91,11 @@ vi.mock("node:fs/promises", async (original) => {
   return {
     ...actual,
     link: async (...made: Parameters<typeof actual.link>) => {
-      fullAt(made[1]);
+      publishing(made[1]);
       return actual.link(...made);
     },
     mkdir: async (...made: Parameters<typeof actual.mkdir>) => {
-      fullAt(made[0]);
+      publishing(made[0]);
       return actual.mkdir(...made);
     },
   };
@@ -108,62 +128,12 @@ vi.mock("../src/export/platform-node.js", async (original) => {
     },
   };
 });
-// The exporters, each noted with its job before it draws and saves as it is.
-vi.mock("../src/export/pdf.js", async (original) => {
-  const actual = await original<typeof import("../src/export/pdf.js")>();
-  return {
-    ...actual,
-    exportCards: async (...draw: Parameters<typeof actual.exportCards>) => {
-      observe("pdf", draw[0][0]!);
-      return actual.exportCards(...draw);
-    },
-    renderCards: async (...draw: Parameters<typeof actual.renderCards>) => {
-      observe("images", draw[1][0]!);
-      return actual.renderCards(...draw);
-    },
-  };
-});
-vi.mock("../src/export/individual-cards.js", async (original) => {
-  const actual = await original<typeof import("../src/export/individual-cards.js")>();
-  return {
-    ...actual,
-    exportIndividualCards: async (...draw: Parameters<typeof actual.exportIndividualCards>) => {
-      const [template, content] = draw;
-      observe("cards", { template, content });
-      return actual.exportIndividualCards(...draw);
-    },
-  };
-});
-vi.mock("../src/cli/private-screen.js", async (original) => ({
-  ...(await original<typeof import("../src/cli/private-screen.js")>()),
-  onPrivateScreen: () => observed.privateScreen,
-}));
-vi.mock("../src/cli/terminal-input.js", async (original) => ({
-  ...(await original<typeof import("../src/cli/terminal-input.js")>()),
-  terminalAvailable: () => true,
-}));
-vi.mock("../src/cli/terminal-choice.js", async (original) => ({
-  ...(await original<typeof import("../src/cli/terminal-choice.js")>()),
-  choose: async (question: string) => {
-    observed.questions.push(question);
-    return observed.choices.shift();
-  },
-}));
-vi.mock("../src/cli/ask.js", async (original) => ({
-  ...(await original<typeof import("../src/cli/ask.js")>()),
-  // Name validation remains the real save-retry/checkOutputName path.
-  askValueUntil: async <T>(question: string, parse: AnswerParser<T>) => {
-    observed.nameQuestions.push(question);
-    const name = observed.names.shift();
-    if (name === undefined) throw new Error("No synthetic output name was supplied.");
-    return parse(name);
-  },
-}));
 
 import { runEncode } from "../src/cli/encode-command.js";
+import { PrivateSteps } from "../src/cli/private-steps.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { backupCardContent } from "../src/export/backup-cards.js";
-import { assertColorCardContent } from "../src/export/card-content.js";
+import { separateCardName } from "../src/export/card-codes.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 let folder: string;
@@ -180,27 +150,10 @@ function saved(): Destination[] {
   );
 }
 
-/** A fake pdftocairo in `bin`: it reads a page's PDF and answers with a few bytes. */
-async function fakeImageRenderer(bin: string): Promise<void> {
-  const program = join(bin, "pdftocairo");
-  await writeFile(
-    program,
-    `#!${process.execPath}
-if (process.argv.includes("-v")) process.exit(0);
-process.stdin.resume();
-process.stdin.on("end", () => process.stdout.write("public fake page image"));
-`,
-  );
-  await chmod(program, 0o700);
-}
-
-function observe(destination: Destination, job: CardJob): void {
-  observed.attempts.push({
-    destination,
-    job,
-    randomChoices: observed.randomChoices,
-    identityChoices: observed.identityChoices,
-  });
+/** Takes each destination of argumentsFor in `folder` for a save of it. */
+function watchDestinations(): void {
+  for (const destination of ["pdf", "images", "cards"] as const)
+    observed.destinations.set(pathOf(destination), destination);
 }
 
 function argumentsFor(format: EncodedFormat = "colors-unicode"): ParsedArguments {
@@ -221,31 +174,34 @@ function failOnce(destination: Destination): void {
   observed.failures.set(pathOf(destination), 1);
 }
 
-function expectSameCollection(attempts: readonly Attempt[], format: EncodedFormat): void {
-  expect(attempts.length).toBeGreaterThan(1);
-  // The plan as the sheets and page images take it; separate cards take it without its page turn.
-  const first = attempts.find((attempt) => attempt.destination !== "cards")!;
-  const content = first.job.content;
+/**
+ * Expects `saves` to show one plan of the cards of the test phrase in `format`: every sheet, its
+ * PDF or its page images, retries included, drew the same texts, the backup's codes first, then at
+ * least one decoy; every save of separate cards drew the same cards, the backup's codes and a decoy
+ * of the sheet's; and no save came after a random choice that the first did not.
+ */
+function expectSameCollection(saves: readonly Save[], format: EncodedFormat): void {
+  expect(saves.length).toBeGreaterThan(1);
+  const [sheet, ...sheets] = saves.filter(({ destination }) => destination !== "cards");
   const own = backupCardContent(EncodedBackup.encode(TEST_PHRASE, [], format, "direct").backup);
-  expect(content.decoys).toBeGreaterThan(0);
-  expect(content.colors.length).toBe(own.colors.length + content.decoys!);
-  expect(content.colors.slice(0, own.colors.length)).toEqual(own.colors);
-  expect(content.labels?.slice(0, own.colors.length)).toEqual(own.labels);
-  expect(content.payload).toBe(own.payload);
-  assertColorCardContent(content);
-  for (const attempt of attempts) {
-    // Compare the full collection, including the trailing decoys, labels, profile and copy.
-    // Separate cards keep the person's page turn, not the one the plan chose for its sheets
-    // (AUD-022-FUN002).
-    if (attempt.destination === "cards") {
-      expect(attempt.job.content).toEqual(separateCardJob(first.job, undefined).content);
-    } else {
-      // Each save borrows fresh decoded views of the same byte-owned plan.
-      expect(attempt.job.content).toEqual(content);
-    }
-    expect(attempt.job.template).toBe(first.job.template);
-    expect(attempt.randomChoices).toBe(first.randomChoices);
-    expect(attempt.identityChoices).toBe(first.identityChoices);
+  const codes = own.colors.map((_, index) => separateCardName(own, index));
+  const drawn = numberedCodes(sheet!.texts);
+  expect(drawn.slice(0, codes.length)).toEqual(codes);
+  expect(drawn.length).toBeGreaterThan(codes.length);
+  // Each save draws fresh views of the same byte-owned plan, details and decoys included.
+  for (const save of sheets) expect(save.texts).toEqual(sheet!.texts);
+  const [cards, ...retries] = saves.filter(({ destination }) => destination === "cards");
+  if (cards !== undefined) {
+    for (const save of retries) expect(save.texts).toEqual(cards.texts);
+    // Separate cards keep every real code and a decoy of the plan (AUD-022-FUN002).
+    const separate = numberedCodes(cards.texts);
+    expect(separate.slice(0, codes.length)).toEqual(codes);
+    expect(separate.length).toBeGreaterThan(codes.length);
+    expect(drawn).toEqual(expect.arrayContaining(separate));
+  }
+  for (const save of saves) {
+    expect(save.randomChoices).toBe(saves[0]!.randomChoices);
+    expect(save.identityChoices).toBe(saves[0]!.identityChoices);
   }
 }
 
@@ -259,35 +215,22 @@ afterAll(async () => {
   await rm(bin, { recursive: true, force: true });
 });
 
+questionsOnPrivateScreen();
 beforeEach(async () => {
   folder = await testFolder("mnemocode-aud021-export-");
   vi.stubEnv("PATH", `${bin}${delimiter}${process.env["PATH"] ?? ""}`);
-  observed.attempts = [];
+  observed.saves = [];
+  observed.destinations = new Map();
+  observed.taken = 0;
   observed.failures = new Map();
   observed.randomChoices = 0;
   observed.identityChoices = 0;
   observed.fontReads = 0;
   observed.fontFailures = 0;
-  observed.privateScreen = false;
-  observed.choices = [];
-  observed.questions = [];
-  observed.names = [];
-  observed.nameQuestions = [];
-  observed.notices = [];
-  vi.stubEnv("NO_COLOR", "1");
-  vi.spyOn(console, "log").mockImplementation(() => undefined);
-  vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
-    observed.notices.push(line.join(" "));
-  });
+  watchDestinations();
+  const drawText = vi.spyOn(PDFPage.prototype, "drawText");
+  observed.drawn = () => drawText.mock.calls.map(([text]) => text);
 });
-
-afterEach(() => {
-  vi.restoreAllMocks();
-  vi.unstubAllEnvs();
-});
-
-/** Whether the fake pdftocairo can stand in for the real one here. */
-const PAGE_IMAGES = process.platform !== "win32";
 
 describe.runIf(PAGE_IMAGES)(
   "AUD-021-FUN003: one card plan through the production Encode dispatcher",
@@ -295,18 +238,19 @@ describe.runIf(PAGE_IMAGES)(
     it.each(["colors-unicode", "colors", "unicode"] as const)(
       "shares every real code and decorative decoy across all destinations for %s",
       async (format) => {
+        PrivateSteps.close();
         await runEncode(argumentsFor(format));
-        expect(observed.attempts.map(({ destination }) => destination)).toEqual([
+        expect(observed.saves.map(({ destination }) => destination)).toEqual([
           "pdf",
           "images",
           "cards",
         ]);
-        expectSameCollection(observed.attempts, format);
+        expectSameCollection(observed.saves, format);
         expect(observed.randomChoices).toBeGreaterThan(0);
         expect(observed.identityChoices).toBeGreaterThan(0);
         const pages = (await readdir(pathOf("images"))).length;
-        const cards = observed.attempts[0]!.job.content.colors.length;
-        expect(observed.notices.filter((line) => line.startsWith("Saved"))).toEqual([
+        const cards = numberedCodes(observed.saves[0]!.texts).length;
+        expect(seen.notices.filter((line) => line.startsWith("Saved"))).toEqual([
           `Saved PDF: ${pathOf("pdf")}`,
           `Saved ${pages} PNG pages to: ${pathOf("images")}`,
           `Saved ${cards} individual card files to: ${pathOf("cards")}`,
@@ -319,11 +263,10 @@ describe.runIf(PAGE_IMAGES)(
     it(
       "keeps the completed plan while each destination retries its own save failure",
       async () => {
-        observed.privateScreen = true;
         for (const destination of ["pdf", "images", "cards"] as const) failOnce(destination);
-        observed.choices = ["again", "again", "again"];
+        terminal.choices = ["Try again", "Try again", "Try again"];
         await runEncode(argumentsFor());
-        expect(observed.attempts.map(({ destination }) => destination)).toEqual([
+        expect(observed.saves.map(({ destination }) => destination)).toEqual([
           "pdf",
           "pdf",
           "images",
@@ -331,15 +274,15 @@ describe.runIf(PAGE_IMAGES)(
           "cards",
           "cards",
         ]);
-        expectSameCollection(observed.attempts, "colors-unicode");
+        expectSameCollection(observed.saves, "colors-unicode");
         expect(saved()).toEqual(["pdf", "images", "cards"]);
-        expect(observed.questions).toEqual([
+        expect(terminal.questions).toEqual([
           "What now?",
           "What now?",
           "What now?",
           "Check the backup now?",
         ]);
-        expect(observed.notices.filter((line) => line.includes("could not be saved"))).toEqual([
+        expect(seen.notices.filter((line) => line.includes("could not be saved"))).toEqual([
           `The PDF could not be saved as ${pathOf("pdf")}: the disk is full.`,
           `The images could not be saved as ${pathOf("images")}: the disk is full.`,
           `The card files could not be saved as ${pathOf("cards")}: the disk is full.`,
@@ -351,15 +294,14 @@ describe.runIf(PAGE_IMAGES)(
     it(
       "keeps the same plan for the remaining destinations after the PDF is skipped",
       async () => {
-        observed.privateScreen = true;
         failOnce("pdf");
-        observed.choices = ["skip"];
+        terminal.choices = ["Skip"];
         await runEncode(argumentsFor());
-        expectSameCollection(observed.attempts, "colors-unicode");
+        expectSameCollection(observed.saves, "colors-unicode");
         expect(saved()).toEqual(["images", "cards"]);
-        expect(observed.notices).toContain("The PDF was not saved.");
-        expect(observed.notices.some((line) => line.startsWith("Saved PDF:"))).toBe(false);
-        expect(observed.questions).toEqual(["What now?", "Check the backup now?"]);
+        expect(seen.notices).toContain("The PDF was not saved.");
+        expect(seen.notices.some((line) => line.startsWith("Saved PDF:"))).toBe(false);
+        expect(terminal.questions).toEqual(["What now?", "Check the backup now?"]);
       },
       LONG_TEST_TIME_LIMIT_MS,
     );
@@ -372,19 +314,19 @@ describe.runIf(PAGE_IMAGES)(
     it(
       "keeps the card plan when a failed PDF is saved under another checked name",
       async () => {
-        observed.privateScreen = true;
         failOnce("pdf");
-        observed.choices = ["other"];
+        terminal.choices = ["Another file name"];
         const other = join(folder, "other.pdf");
-        observed.names = [other];
+        observed.destinations.set(other, "pdf");
+        terminal.answers = [`${other}\r`];
         const args = argumentsFor();
         await runEncode(args);
-        expectSameCollection(observed.attempts, "colors-unicode");
+        expectSameCollection(observed.saves, "colors-unicode");
         expect(existsSync(other)).toBe(true);
         expect(saved()).toEqual(["images", "cards"]);
         expect(args.pdf).toBe(other);
-        expect(observed.nameQuestions).toEqual(["New name for the PDF:"]);
-        expect(observed.notices).toContain(`Saved PDF: ${other}`);
+        expect(seen.screen.match(/New name for the PDF: /gu)).toHaveLength(1);
+        expect(seen.notices).toContain(`Saved PDF: ${other}`);
       },
       LONG_TEST_TIME_LIMIT_MS,
     );
@@ -392,32 +334,33 @@ describe.runIf(PAGE_IMAGES)(
     it(
       "allows a failed library plan to be retried inside the destination's save loop",
       async () => {
-        observed.privateScreen = true;
         observed.fontFailures = 1;
-        observed.choices = ["again"];
+        terminal.choices = ["Try again"];
         const args = argumentsFor();
         args["page-size"] = "a6";
         delete args["cards-dir"];
         await runEncode(args);
-        expectSameCollection(observed.attempts, "colors-unicode");
+        expectSameCollection(observed.saves, "colors-unicode");
         expect(saved()).toEqual(["pdf", "images"]);
-        expect(observed.notices).toContain(
+        expect(seen.notices).toContain(
           `The PDF could not be saved as ${pathOf("pdf")}: synthetic font read failure.`,
         );
-        expect(observed.questions).toEqual(["What now?", "Check the backup now?"]);
+        expect(terminal.questions).toEqual(["What now?", "Check the backup now?"]);
       },
       LONG_TEST_TIME_LIMIT_MS,
     );
 
     it("propagates a save error outside the private screen without saving later destinations", async () => {
+      PrivateSteps.close();
       failOnce("pdf");
       await expect(runEncode(argumentsFor())).rejects.toMatchObject({ code: "ENOSPC" });
-      expect(observed.attempts.map(({ destination }) => destination)).toEqual(["pdf"]);
+      expect(observed.saves.map(({ destination }) => destination)).toEqual(["pdf"]);
       expect(saved()).toEqual([]);
-      expect(observed.questions).toEqual([]);
+      expect(terminal.questions).toEqual([]);
     });
 
     it("does not plan cards for a record and standalone QR output", async () => {
+      PrivateSteps.close();
       const record = join(folder, "public.txt");
       const qr = join(folder, "public.png");
       await runEncode({
@@ -431,21 +374,23 @@ describe.runIf(PAGE_IMAGES)(
       expect(observed.fontReads).toBe(0);
       expect(observed.randomChoices).toBe(0);
       expect(observed.identityChoices).toBe(0);
-      expect(observed.attempts).toEqual([]);
+      expect(observed.saves).toEqual([]);
+      expect(observed.drawn()).toEqual([]);
     });
 
     it(
       "starts a fresh plan for the next Encode run",
       async () => {
-        const args = argumentsFor();
-        await runEncode(args);
-        const first = observed.attempts.splice(0);
+        PrivateSteps.close();
+        await runEncode(argumentsFor());
+        const first = observed.saves.splice(0);
         // The second run saves to new names: the first run's are taken.
         folder = await testFolder("mnemocode-aud021-export-");
+        watchDestinations();
         await runEncode(argumentsFor());
         expectSameCollection(first, "colors-unicode");
-        expectSameCollection(observed.attempts, "colors-unicode");
-        expect(observed.attempts[0]!.job.content.colors).not.toEqual(first[0]!.job.content.colors);
+        expectSameCollection(observed.saves, "colors-unicode");
+        expect(numberedCodes(observed.saves[0]!.texts)).not.toEqual(numberedCodes(first[0]!.texts));
       },
       LONG_TEST_TIME_LIMIT_MS,
     );

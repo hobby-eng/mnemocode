@@ -3,47 +3,24 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Standard input and standard error are a terminal; a Keyboard stands for the one on standard
-// input. What is typed while no question reads it stays in the Keyboard, as in a terminal's own
-// buffer, and arrives once a question reads again. A list question (choose) is answered from
-// `terminal.choices`, and Escape when none is left.
-const terminal = vi.hoisted(() => {
-  const choices: unknown[] = [];
-  const questions: { question: string; quit: string | undefined }[] = [];
-  /** The entries of each list question, in order. */
-  const lists: unknown[] = [];
-  return { privateScreen: false, choices, questions, lists };
-});
+// input, which the program's own reader reads. What is typed while no question reads it stays in
+// the Keyboard, as in a terminal's own buffer, and arrives once a question reads again. Each
+// question is answered once it shows on standard error, as a person answers what the screen shows:
+// a typed question by its prompt, a list question by its entries as drawn (drawn-list.ts).
 vi.mock("node:tty", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:tty")>()),
   isatty: () => true,
 }));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/private-screen.js")>()),
-  onPrivateScreen: () => terminal.privateScreen,
-}));
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/terminal-choice.js")>()),
-  // The real choose gets its entries in the shape that recordCutNotes reads.
-  choose: async (
-    question: string,
-    choices: Parameters<typeof recordCutNotes>[1],
-    options: { quit?: string },
-  ) => {
-    recordCutNotes(question, choices);
-    terminal.questions.push({ question, quit: options.quit });
-    terminal.lists.push(choices);
-    return terminal.choices.shift();
-  },
-}));
 
-import { coinById, COINS } from "../src/core/coins.js";
+import { COINS } from "../src/core/coins.js";
 import { BITCOIN_PROFILES, type BitcoinEvidence } from "../src/bitcoin-evidence.js";
 import { askAfterFailure, askSecretUntil, askValueUntil, droppedPath } from "../src/cli/ask.js";
 import { askWalletEvidence } from "../src/cli/wallet-question.js";
 import { assertWalletPlaceUsed, walletPlaceOf } from "../src/cli/bitcoin-options.js";
 import { LAST_NORMAL_INDEX } from "../src/core/bip32-limits.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
-import { recordCutNotes, takeCutNotes } from "./helpers/cut-notes.js";
+import { recordDrawnCuts, takeCutNotes } from "./helpers/cut-notes.js";
+import { drawnList, keysOfAnswer, type DrawnList, type ListAnswer } from "./helpers/drawn-list.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 import { Keyboard, keyboardAsStandardInput } from "./helpers/terminal-streams.js";
 
@@ -54,46 +31,79 @@ const TESTNET_ADDRESS = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx";
 const CTRL_C = "\x03";
 const CTRL_D = "\x04";
 const ESCAPE = "\x1b";
+/** The list questions of the wallet, as askWalletEvidence asks them. */
+const WALLET_QUESTION = "How can MnemoCode recognise the wallet?";
+const COIN_QUESTION = "Which coin is the address for?";
 
-let keys = new Keyboard();
-/** Everything written to standard error, and the answers to type at each prompt. */
+/** A question to answer once it shows: a typed one by its prompt, a list one by its question. */
+type AwaitedQuestion =
+  | { readonly kind: "line"; readonly prompt: string; readonly keys: string | Buffer }
+  | { readonly kind: "list"; readonly question: string; readonly answer: ListAnswer };
+
+let keyboard = new Keyboard();
+/** Everything written to standard error. */
 let screen = "";
-/** Where the prompt last answered ends in `screen`: a later one is looked for after it. */
+/** Where the question last answered ends in `screen`: a later one is looked for after it. */
 let seen = 0;
-let prompts: { readonly prompt: string; readonly keys: string | Buffer }[] = [];
+/** The questions to answer, in the order they are asked. */
+let awaited: AwaitedQuestion[] = [];
+/** The list questions asked, as they showed. */
+let asked: DrawnList[] = [];
 /** The warnings and other lines of console.error. */
 let notices: string[] = [];
 
 /** Types `typed` once `prompt` is drawn, after the answers given before it. */
 function at(prompt: string, typed: string | Buffer): void {
-  prompts.push({ prompt, keys: typed });
+  awaited.push({ kind: "line", prompt, keys: typed });
 }
 
-/** Bitcoin, as the question which coin an address is for gives it. */
-const BITCOIN = coinById("bitcoin");
+/**
+ * Picks the entry labelled `answer` once the list question `question` is drawn, after the answers
+ * given before it, with the keys a person would press; undefined presses Escape.
+ */
+function pick(question: string, answer: ListAnswer): void {
+  awaited.push({ kind: "list", question, answer });
+}
+
+/**
+ * The keys that answer the next awaited question, once `screen` shows it after `seen`: a typed
+ * question's once its prompt is drawn, a list question's once its key hint is, the list recorded
+ * in `asked` and its notes cut to fit in cut-notes.ts. None while it does not show yet.
+ */
+function keysOfShownQuestion(): string | Buffer | undefined {
+  const next = awaited[0];
+  if (next === undefined) return undefined;
+  if (next.kind === "line") {
+    const found = screen.indexOf(`${next.prompt} `, seen);
+    if (found < 0) return undefined;
+    seen = found + next.prompt.length + 1;
+    awaited.shift();
+    return next.keys;
+  }
+  const found = screen.indexOf(`\n${next.question}\n`, seen);
+  const list = found < 0 ? undefined : drawnList(screen.slice(found));
+  if (list === undefined) return undefined;
+  seen = screen.length;
+  awaited.shift();
+  asked.push(list);
+  recordDrawnCuts(list);
+  return keysOfAnswer(list, next.answer);
+}
 
 beforeEach(() => {
-  keys = new Keyboard();
+  keyboard = new Keyboard();
   screen = "";
   seen = 0;
-  prompts = [];
+  awaited = [];
+  asked = [];
   notices = [];
-  terminal.privateScreen = false;
-  terminal.choices = [];
-  terminal.questions = [];
-  terminal.lists = [];
-  keyboardAsStandardInput(keys);
+  keyboardAsStandardInput(keyboard);
   vi.stubEnv("NO_COLOR", "1");
   vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
     screen += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
-    const next = prompts[0];
-    const found = next === undefined ? -1 : screen.indexOf(`${next.prompt} `, seen);
-    if (next !== undefined && found >= 0) {
-      seen = found + next.prompt.length + 1;
-      prompts.shift();
-      // Typed once the prompt shows, as a person would.
-      setImmediate(() => keys.type(next.keys));
-    }
+    const keys = keysOfShownQuestion();
+    // Typed once the question shows, as a person would.
+    if (keys !== undefined) setImmediate(() => keyboard.type(keys));
     return true;
   });
   vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
@@ -103,6 +113,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  expect(awaited, "a question that was not asked").toEqual([]);
   expect(takeCutNotes(), "a note cut to fit its list").toEqual([]);
 });
 
@@ -147,11 +158,11 @@ describe("questions asked again until the answer can be used", () => {
 
   it("drops what was typed before the question showed, and cancels at a Ctrl+C among it", async () => {
     // A second Enter and the rest of a paste, typed while nothing read the terminal.
-    keys.type("\rleft over\r");
+    keyboard.type("\rleft over\r");
     at("Dates:", "23-09-2026\r");
     expect(await askSecretUntil("Dates:", (answer) => answer)).toBe("23-09-2026");
     expect(notices).toEqual([]);
-    keys.type(`typed ahead${CTRL_C}`);
+    keyboard.type(`typed ahead${CTRL_C}`);
     expect(await askSecretUntil("Dates:", (answer) => answer)).toBe(CANCELLED);
   });
 
@@ -211,19 +222,21 @@ describe("questions asked again until the answer can be used", () => {
       { label: "Change the dates", value: "dates" },
       { label: "Stop", value: "stop" },
     ];
-    terminal.choices = ["dates"];
+    pick("What now?", "Change the dates");
     expect(await askAfterFailure("What now?", choices)).toBe("dates");
+    pick("What now?", undefined);
     expect(await askAfterFailure("What now?", choices, { escape: "stops here" })).toBe("stop");
-    expect(terminal.questions).toEqual([
-      { question: "What now?", quit: "stops" },
-      { question: "What now?", quit: "stops here" },
+    // What Escape does, as each key hint says.
+    expect(asked.map(({ question, escape }) => ({ question, escape }))).toEqual([
+      { question: "What now?", escape: "stops" },
+      { question: "What now?", escape: "stops here" },
     ]);
   });
 });
 
 describe("questions asked again until the answer can be used", () => {
   it("asks for the wallet and checks each value at once, as bitcoin-evidence.ts does", async () => {
-    terminal.choices = ["fingerprint"];
+    pick(WALLET_QUESTION, "Fingerprint");
     at(
       "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
       "zz\r",
@@ -238,7 +251,8 @@ describe("questions asked again until the answer can be used", () => {
     });
     expect(notices).toEqual(["A master fingerprint must be eight hexadecimal characters."]);
     notices = [];
-    terminal.choices = ["address", BITCOIN];
+    pick(WALLET_QUESTION, "Address");
+    pick(COIN_QUESTION, "Bitcoin");
     at("Bitcoin address (one of the first receiving ones):", `${TESTNET_ADDRESS}\r`);
     at("Bitcoin address (one of the first receiving ones):", `${FIRST_ADDRESS}\r`);
     // How many of the first addresses it is compared with: Enter takes the first 20.
@@ -257,7 +271,8 @@ describe("questions asked again until the answer can be used", () => {
       "The address is not valid for Bitcoin mainnet; it is a testnet address.",
     ]);
     notices = [];
-    terminal.choices = ["address", BITCOIN];
+    pick(WALLET_QUESTION, "Address");
+    pick(COIN_QUESTION, "Bitcoin");
     at("Bitcoin address (one of the first receiving ones):", `${FIRST_ADDRESS}\r`);
     at("Compare with how many addresses from the first (Enter: 20):", "0\r");
     at("Compare with how many addresses from the first (Enter: 20):", "1001\r");
@@ -271,7 +286,8 @@ describe("questions asked again until the answer can be used", () => {
     ]);
     notices = [];
     // --scan-gap answers the count, which is then not asked.
-    terminal.choices = ["address", BITCOIN];
+    pick(WALLET_QUESTION, "Address");
+    pick(COIN_QUESTION, "Bitcoin");
     at("Bitcoin address (one of the first 5 receiving ones):", `${FIRST_ADDRESS}\r`);
     expect(
       await askWalletEvidence({
@@ -280,13 +296,14 @@ describe("questions asked again until the answer can be used", () => {
       }),
     ).toMatchObject({ evidence: { kind: "address", addresses: 5 } });
     // Escape at the value goes back to the list; Escape there goes back from the question.
-    terminal.choices = ["fingerprint"];
+    pick(WALLET_QUESTION, "Fingerprint");
     at(
       "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
       ESCAPE,
     );
+    pick(WALLET_QUESTION, undefined);
     expect(await askWalletEvidence({ optional: true })).toEqual({ kind: "back" });
-    terminal.choices = ["none"];
+    pick(WALLET_QUESTION, "It cannot");
     expect(await askWalletEvidence({ optional: true })).toEqual({ kind: "none" });
   });
 
@@ -297,7 +314,8 @@ describe("questions asked again until the answer can be used", () => {
       branch: 0,
       index: LAST_NORMAL_INDEX,
     };
-    terminal.choices = ["address", BITCOIN];
+    pick(WALLET_QUESTION, "Address");
+    pick(COIN_QUESTION, "Bitcoin");
     at(
       `Bitcoin address (one of the addresses from m/.../0'/0/${LAST_NORMAL_INDEX}):`,
       `${FIRST_ADDRESS}\r`,
@@ -319,21 +337,22 @@ describe("questions asked again until the answer can be used", () => {
       location: { network: "testnet", account: 1, branch: 0, index: 5 },
       addresses: 1,
     };
-    terminal.choices = ["address", BITCOIN];
+    pick(WALLET_QUESTION, "Address");
+    pick(COIN_QUESTION, "Bitcoin");
     at("Bitcoin address (m/.../1'/0/5):", `${TESTNET_ADDRESS}\r`);
     expect(await askWalletEvidence({ optional: false, place: walletPlaceOf(given, {}) })).toEqual({
       kind: "wallet",
       evidence: given,
     });
-    expect(terminal.lists[0]).toContainEqual(
-      expect.objectContaining({ note: "its address at m/.../1'/0/5" }),
+    expect(asked[0]!.entries).toContainEqual(
+      expect.objectContaining({ label: "Address", note: "its address at m/.../1'/0/5" }),
     );
     // Every coin in one list, as mhfe asks it; Bitcoin with the forms of the place's network.
-    expect(terminal.questions[1]!.question).toBe("Which coin is the address for?");
-    expect(terminal.lists[1]).toContainEqual(
+    expect(asked[1]!.question).toBe(COIN_QUESTION);
+    expect(asked[1]!.entries).toContainEqual(
       expect.objectContaining({ label: "Bitcoin", note: "m…, n…, 2…, tb1q… or tb1p…" }),
     );
-    expect(terminal.lists[1]).toHaveLength(COINS.length);
+    expect(asked[1]!.entries.map(({ label }) => label)).toEqual(COINS.map(({ name }) => name));
     // A fingerprint keeps the network; an address after it is the first receiving one there.
     const fingerprint: BitcoinEvidence = {
       kind: "master-fingerprint",
@@ -344,7 +363,7 @@ describe("questions asked again until the answer can be used", () => {
       location: { network: "testnet", account: 0, branch: 0, index: 0 },
       profiles: BITCOIN_PROFILES,
     });
-    terminal.choices = ["fingerprint"];
+    pick(WALLET_QUESTION, "Fingerprint");
     at(
       "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
       "73c5da0a\r",
@@ -389,9 +408,9 @@ describe("questions asked again until the answer can be used", () => {
 describe("questions asked again until the answer can be used", () => {
   // Last: the end of the input stays for every later question of this file.
   it("ends as a cancel when the input ends, without asking again and again", async () => {
-    const asked = askSecretUntil("Phrase:", (answer) => answer);
-    setTimeout(() => keys.emit("end"), 30);
-    expect(await asked).toBe(CANCELLED);
+    const question = askSecretUntil("Phrase:", (answer) => answer);
+    setTimeout(() => keyboard.emit("end"), 30);
+    expect(await question).toBe(CANCELLED);
     expect(screen.match(/Phrase: /gu)).toHaveLength(1);
     // The end stays: a later question cancels at once.
     expect(await askSecretUntil("Again:", (answer) => answer)).toBe(CANCELLED);

@@ -262,7 +262,11 @@ async function expectRestored(
 
 /**
  * Compares the colour transport and the host's SSKR library with the known answers; throws, before
- * any secret is touched, at the first difference.
+ * any secret is touched, at the first difference: a colour known answer
+ * (sskr.known-answers.sskr-color-known-answer-self-test-failed-no), a share that its colours do not
+ * give back (sskr.known-answers.sskr-color-self-test-failed-no-secret-was), a vector that the host
+ * restores to another secret (sskr.known-answers.self-test-failed-no-secret-was-processed), and
+ * core.self-test-check.mismatch, was-accepted or was-refused-another-reason for the other checks.
  */
 export async function checkSskrKnownAnswers(platform: ShareSplitPlatform): Promise<void> {
   checkSskrTransportStartup();

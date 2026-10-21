@@ -15,7 +15,7 @@ export const MASKED = "2027 10 24 2027 10 24 2027 10 24 2027 10 377";
 export const masked = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
 
 /** The backup that MASKED is: what a check of it compares with. */
-export const original = {
+export const ORIGINAL = {
   mnemonic: TEST_PHRASE,
   format: "indexes" as const,
   mode: "seedshift" as const,

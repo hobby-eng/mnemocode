@@ -115,6 +115,7 @@ describe("bundled artwork", () => {
       "Card rendering needs the host's RenderPlatform.",
     );
     const { qrModules: _left, ...partial } = nodeRenderPlatform;
+    // A platform without its QR modules, a wrong type on purpose: refused as a TypeError.
     expect(() => new CardRenderer(partial as RenderPlatform)).toThrow(TypeError);
   });
 });

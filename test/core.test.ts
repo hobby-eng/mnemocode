@@ -30,10 +30,11 @@ import { wordlist as englishWordlist } from "@scure/bip39/wordlists/english.js";
 import { parseRecord, serializeRecord } from "../src/record.js";
 import { assertCoreSelfTest } from "../src/cli/self-test.js";
 import { MNEMOCODE_VERSION } from "../src/index.js";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const source = "oppose duck hello neglect reveal key humor mosquito road evoke flock hedgehog";
+const SOURCE = "oppose duck hello neglect reveal key humor mosquito road evoke flock hedgehog";
 const dates = ["10-07-1963", "27-04-1956", "31-01-1994"].map(parseDate);
-const expected = "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
+const EXPECTED = "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
 
 describe("startup core self-test", () => {
   it("exports the package version", () => {
@@ -74,8 +75,8 @@ describe("original Seedshift compatibility mode", () => {
   });
 
   it("reproduces the documented Seedshift example", () => {
-    const result = encodeMnemonicLegacy(source, dates);
-    expect(formatEncoded(result, "english")).toBe(expected);
+    const result = encodeMnemonicLegacy(SOURCE, dates);
+    expect(formatEncoded(result, "english")).toBe(EXPECTED);
     expect(formatEncoded(result, "indexes")).toBe(
       "1153 547 882 1100 1483 987 835 1154 1527 533 719 880",
     );
@@ -85,23 +86,23 @@ describe("original Seedshift compatibility mode", () => {
   });
 
   it("recovers the original words from the documented Seedshift example", () => {
-    const result = decodeInputLegacy(expected, "english", dates);
-    expect(result.recoveredMnemonic).toBe(source);
+    const result = decodeInputLegacy(EXPECTED, "english", dates);
+    expect(result.recoveredMnemonic).toBe(SOURCE);
     expect(result.checksumValid).toBe(true);
   });
 
   it("round-trips the continuous Unicode code-point representation", () => {
-    const encoded = encodeMnemonicLegacy(source, dates);
+    const encoded = encodeMnemonicLegacy(SOURCE, dates);
     const decoded = decodeInputLegacy(formatEncoded(encoded, "unicode"), "unicode", dates);
-    expect(decoded.recoveredMnemonic).toBe(source);
+    expect(decoded.recoveredMnemonic).toBe(SOURCE);
   });
 
   it("keeps a date’s order independent of command-line order", () => {
     const ordered = encodeMnemonicLegacy(
-      source,
+      SOURCE,
       [...dates].sort((left, right) => left.year - right.year),
     );
-    expect(formatEncoded(encodeMnemonicLegacy(source, dates), "unicode")).toBe(
+    expect(formatEncoded(encodeMnemonicLegacy(SOURCE, dates), "unicode")).toBe(
       formatEncoded(ordered, "unicode"),
     );
   });
@@ -132,22 +133,20 @@ describe("legacy checksum-word replacement", () => {
 });
 
 describe("checksum-valid Seedshift mode", () => {
-  const publicMnemonic =
-    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
   const oneDate = [parseDate("23-09-2026")];
 
   it("reproduces the explained twelve-word checksum-valid example", () => {
-    const encoded = encodeMnemonic(publicMnemonic, oneDate);
+    const encoded = encodeMnemonic(TEST_PHRASE, oneDate);
     expect(encoded.shiftedEnglish.join(" ")).toBe(
       "wool abuse actual wool abuse actual wool abuse actual wool abuse congress",
     );
     expect(
       decodeInput(encoded.shiftedEnglish.join(" "), "english", oneDate).recoveredMnemonic,
-    ).toBe(publicMnemonic);
+    ).toBe(TEST_PHRASE);
   });
 
   it("always emits a valid BIP39 phrase and wrong dates yield a different valid phrase", () => {
-    const encoded = encodeMnemonic(publicMnemonic, oneDate);
+    const encoded = encodeMnemonic(TEST_PHRASE, oneDate);
     expect(representMnemonic(encoded.shiftedEnglish.join(" ")).sourceMnemonic).toBe(
       encoded.shiftedEnglish.join(" "),
     );
@@ -155,39 +154,39 @@ describe("checksum-valid Seedshift mode", () => {
       parseDate("24-09-2026"),
     ]);
     expect(wrong.checksumValid).toBe(true);
-    expect(wrong.recoveredMnemonic).not.toBe(publicMnemonic);
+    expect(wrong.recoveredMnemonic).not.toBe(TEST_PHRASE);
   });
 });
 
 describe("direct representation mode", () => {
   it("round-trips a mnemonic through the Unicode code-point representation without dates", () => {
-    const encoded = representMnemonic(source);
+    const encoded = representMnemonic(SOURCE);
     expect(encoded.dates).toEqual([]);
     expect(encoded.shifts).toEqual(Array.from({ length: 12 }, () => 0));
     const continuous = formatEncoded(encoded, "unicode");
     const decoded = decodeInputDirect(continuous, "unicode");
-    expect(decoded.recoveredMnemonic).toBe(source);
+    expect(decoded.recoveredMnemonic).toBe(SOURCE);
     expect(decoded.checksumValid).toBe(true);
     const spaced = continuous.match(/.{4}/gu)!.join(" ");
-    expect(decodeInputDirect(spaced, "unicode").recoveredMnemonic).toBe(source);
+    expect(decodeInputDirect(spaced, "unicode").recoveredMnemonic).toBe(SOURCE);
   });
 
   it("round-trips a mnemonic through the color representation without dates", () => {
-    const encoded = representMnemonic(source);
+    const encoded = representMnemonic(SOURCE);
     const decoded = decodeInputDirect(formatEncoded(encoded, "colors"), "colors");
-    expect(decoded.recoveredMnemonic).toBe(source);
+    expect(decoded.recoveredMnemonic).toBe(SOURCE);
     expect(decoded.checksumValid).toBe(true);
   });
 
   it("prints portable color Unicode code points and still reads legacy Private Use symbols", () => {
-    const portable = formatEncoded(representMnemonic(source), "colors-unicode");
+    const portable = formatEncoded(representMnemonic(SOURCE), "colors-unicode");
     expect(portable).toMatch(/^(?:[0-9A-F]{4})+$/u);
     const legacySymbols = portable
       .match(/.{4}/gu)!
       .map((point) => String.fromCodePoint(Number.parseInt(point, 16)))
       .join("");
-    expect(decodeInputDirect(portable, "colors-unicode").recoveredMnemonic).toBe(source);
-    expect(decodeInputDirect(legacySymbols, "colors-unicode").recoveredMnemonic).toBe(source);
+    expect(decodeInputDirect(portable, "colors-unicode").recoveredMnemonic).toBe(SOURCE);
+    expect(decodeInputDirect(legacySymbols, "colors-unicode").recoveredMnemonic).toBe(SOURCE);
   });
 });
 
@@ -221,12 +220,12 @@ describe("raw input format detection", () => {
   const formats = ["english", "indexes", "unicode", "colors", "colors-unicode"] as const;
   for (const format of formats) {
     it(`recognizes ${format} without a format flag`, () => {
-      const encoded = formatEncoded(representMnemonic(source), format);
+      const encoded = formatEncoded(representMnemonic(SOURCE), format);
       expect(detectInputFormats(encoded)).toEqual([format]);
     });
 
     it(`ignores surrounding whitespace while recognizing ${format}`, () => {
-      const encoded = formatEncoded(representMnemonic(source), format);
+      const encoded = formatEncoded(representMnemonic(SOURCE), format);
       expect(detectInputFormats(` \n${encoded}\t `)).toEqual([format]);
     });
   }
@@ -255,7 +254,7 @@ describe("raw input format detection", () => {
 
 describe("versioned records", () => {
   it("carries mode and format while preserving the raw payload", () => {
-    const raw = formatEncoded(encodeMnemonic(source, dates), "unicode");
+    const raw = formatEncoded(encodeMnemonic(SOURCE, dates), "unicode");
     const record = serializeRecord("seedshift", "unicode", raw);
     expect(parseRecord(record)).toEqual({
       version: 1,
@@ -277,7 +276,7 @@ describe("versioned records", () => {
   });
 
   it("accepts file whitespace around a record but preserves its payload exactly", () => {
-    const raw = formatEncoded(representMnemonic(source), "colors-unicode");
+    const raw = formatEncoded(representMnemonic(SOURCE), "colors-unicode");
     expect(
       parseRecord(`\ufeff  ${serializeRecord("direct", "colors-unicode", raw)}\n`)?.payload,
     ).toBe(raw);
@@ -352,13 +351,11 @@ describe("palette QR input adapter", () => {
 });
 
 describe("local Bitcoin recovery evidence", () => {
-  const vectorMnemonic =
-    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
   const location = { network: "mainnet" as const, account: 0, branch: 0, index: 0 };
 
   it("matches a documented BIP84 receiving address and rejects a different valid address", () => {
     expect(
-      matchBitcoinEvidence(vectorMnemonic, {
+      matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
         value: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
         profiles: ["native-segwit"],
@@ -366,7 +363,7 @@ describe("local Bitcoin recovery evidence", () => {
       }).matched,
     ).toBe(true);
     expect(
-      matchBitcoinEvidence(vectorMnemonic, {
+      matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
         value: "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g",
         profiles: ["native-segwit"],
@@ -377,7 +374,7 @@ describe("local Bitcoin recovery evidence", () => {
 
   it("rejects checksum-invalid Bitcoin addresses instead of treating them as non-matches", () => {
     expect(() =>
-      matchBitcoinEvidence(vectorMnemonic, {
+      matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
         value: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyq",
         profiles: ["native-segwit"],
@@ -388,7 +385,7 @@ describe("local Bitcoin recovery evidence", () => {
 
   it("normalizes an uppercase BIP86 address and rejects mixed case", () => {
     expect(
-      matchBitcoinEvidence(vectorMnemonic, {
+      matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
         value: "BC1P5CYXNUXMEUWUVKWFEM96LQZSZD02N6XDCJRS20CAC6YQJJWUDPXQKEDRCR",
         profiles: ["taproot"],
@@ -396,7 +393,7 @@ describe("local Bitcoin recovery evidence", () => {
       }).matched,
     ).toBe(true);
     expect(() =>
-      matchBitcoinEvidence(vectorMnemonic, {
+      matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
         value: "bc1P5CYXNUXMEUWUVKWFEM96LQZSZD02N6XDCJRS20CAC6YQJJWUDPXQKEDRCR",
         profiles: ["taproot"],
@@ -407,7 +404,7 @@ describe("local Bitcoin recovery evidence", () => {
 
   it("rejects an address for a different Bitcoin network with a stable error", () => {
     expect(() =>
-      matchBitcoinEvidence(vectorMnemonic, {
+      matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
         value: "tb1qfm7ydz3n82zjh8m223yr6y6un0arn82u8w7a4r",
         profiles: ["native-segwit"],
@@ -417,9 +414,9 @@ describe("local Bitcoin recovery evidence", () => {
   });
 
   it("treats the known BIP39 master fingerprint as a matchable but weak filter", () => {
-    const result = matchBitcoinEvidence(vectorMnemonic, {
+    const result = matchBitcoinEvidence(TEST_PHRASE, {
       kind: "master-fingerprint",
-      value: "73c5da0a",
+      value: TEST_FINGERPRINT,
       network: "mainnet",
     });
     expect(result.matched).toBe(true);

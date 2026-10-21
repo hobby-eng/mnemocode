@@ -6,8 +6,7 @@ import { runCommandLine } from "../src/cli/command-line.js";
 import { parseArguments, assertAllowedArguments } from "../src/cli/arguments.js";
 import { optionLabel } from "../src/cli/option-copy.js";
 import { refusalOf } from "./helpers/refusals.js";
-
-const PUBLIC_PHRASE = "abandon ".repeat(11) + "about";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** Calls a typed seam as an untyped host, keeping Reflect's result unknown. */
 function callUntyped(fn: unknown, parameters: readonly unknown[]): unknown {
@@ -18,13 +17,13 @@ function callUntyped(fn: unknown, parameters: readonly unknown[]): unknown {
 
 describe("secret-safe selector refusals", () => {
   it.each([
-    [PUBLIC_PHRASE, "indexes"],
-    ["direct", PUBLIC_PHRASE],
+    [TEST_PHRASE, "indexes"],
+    ["direct", TEST_PHRASE],
   ])("conceals an invalid record mode or format", (mode, format) => {
     const error = refusalOf(() =>
       callUntyped(serializeRecord, [mode, format, "synthetic-payload"]),
     );
-    expect(error.message).not.toContain(PUBLIC_PHRASE);
+    expect(error.message).not.toContain(TEST_PHRASE);
     expect(error).toMatchObject({
       code: mode === "direct" ? "record.unsupported-format" : "record.unsupported-mode",
     });
@@ -35,7 +34,7 @@ describe("secret-safe selector refusals", () => {
     const selector = {
       toString: () => {
         coercions += 1;
-        return PUBLIC_PHRASE;
+        return TEST_PHRASE;
       },
     };
     const error = refusalOf(() =>
@@ -46,24 +45,24 @@ describe("secret-safe selector refusals", () => {
   });
 
   it("conceals text passed where a month number was expected", () => {
-    const error = refusalOf(() => callUntyped(daysInMonth, [2026, PUBLIC_PHRASE]));
+    const error = refusalOf(() => callUntyped(daysInMonth, [2026, TEST_PHRASE]));
     expect(error.message).toBe("There is no such calendar month.");
   });
 
-  for (const argv of [[PUBLIC_PHRASE], ["help", PUBLIC_PHRASE]])
+  for (const argv of [[TEST_PHRASE], ["help", TEST_PHRASE]])
     it("conceals an unknown command or help topic", async () => {
-      await expect(runCommandLine(argv)).rejects.not.toThrow(PUBLIC_PHRASE);
+      await expect(runCommandLine(argv)).rejects.not.toThrow(TEST_PHRASE);
       await expect(runCommandLine(argv)).rejects.toThrow("There is no such command");
     });
 
   it("conceals an unknown option in labels, missing values and unsupported settings", () => {
-    expect(optionLabel(PUBLIC_PHRASE)).toBe("unknown option");
+    expect(optionLabel(TEST_PHRASE)).toBe("unknown option");
     for (const action of [
-      () => parseArguments([`--${PUBLIC_PHRASE}`]),
-      () => assertAllowedArguments(parseArguments([`--${PUBLIC_PHRASE}`, "x"]), "table", ["word"]),
+      () => parseArguments([`--${TEST_PHRASE}`]),
+      () => assertAllowedArguments(parseArguments([`--${TEST_PHRASE}`, "x"]), "table", ["word"]),
     ]) {
       const error = refusalOf(action);
-      expect(error.message).not.toContain(PUBLIC_PHRASE);
+      expect(error.message).not.toContain(TEST_PHRASE);
       expect(error.message).toContain("unknown option");
     }
   });

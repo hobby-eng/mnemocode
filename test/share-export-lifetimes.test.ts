@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { ShareInput } from "../src/sskr/share-input.js";
-import { ShareExport, type WrittenShare } from "../src/sskr/share-set.js";
+import { ShareExport } from "../src/sskr/share-set.js";
 import { ShareRestore } from "../src/sskr/share-restore.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
@@ -13,25 +13,28 @@ import { sskrVectors } from "./helpers/vectors.js";
 const FIRST_SHARE = "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf";
 const WIPED_CODE = "core.secret-value.wiped";
 
+/** An export that ShareExport.of made, with the shares and places it was made of. */
 interface ObservedExport {
   readonly owner: ShareExport;
-  readonly earlier: readonly WrittenShare[];
+  readonly given: RepairedShares;
+  readonly places: readonly number[];
 }
 
-function observeExports(): ObservedExport[] {
-  const observed: ObservedExport[] = [];
-  const create = ShareExport.of.bind(ShareExport);
-  // Observe actual owners without replacing validation, results or their lifetime methods.
-  vi.spyOn(ShareExport, "of").mockImplementation((...args) => {
-    const owner = create(...args);
-    observed.push({ owner, earlier: owner.shown });
-    return owner;
-  });
-  return observed;
+/**
+ * The exports that ShareExport.of makes from now on, as the function returned lists them: its spy
+ * only watches, so that validation, results and their lifetime methods stay the real ones.
+ */
+function observeExports(): () => ObservedExport[] {
+  const of = vi.spyOn(ShareExport, "of");
+  return () =>
+    of.mock.results.flatMap((result, index) => {
+      const [given, places] = of.mock.calls[index]!;
+      return result.type === "return" ? [{ owner: result.value, given, places }] : [];
+    });
 }
 
-function closeObserved(observed: readonly ObservedExport[]): void {
-  for (const { owner } of observed) endLifetimeIfPresent(owner);
+function closeObserved(observed: () => ObservedExport[]): void {
+  for (const { owner } of observed()) endLifetimeIfPresent(owner);
 }
 
 function publicShares(uris: readonly string[]): RepairedShares {
@@ -64,9 +67,10 @@ describe("Temporary exports and transferred export owners", () => {
         lines: [],
         notes: [],
       });
-      expect(observed.length).toBeGreaterThan(0);
-      for (const { owner, earlier } of observed) {
-        expect(earlier).toEqual([{ ur: FIRST_SHARE, format: "ur", number: 1 }]);
+      expect(observed().length).toBeGreaterThan(0);
+      for (const { owner, given, places } of observed()) {
+        expect(given.shares.map(({ ur }) => ur)).toEqual([FIRST_SHARE]);
+        expect(places).toEqual([1]);
         expect(() => owner.shown).toThrow(expect.objectContaining({ code: WIPED_CODE }));
         expect(() => owner.saved).toThrow(expect.objectContaining({ code: WIPED_CODE }));
       }
@@ -88,8 +92,8 @@ describe("Temporary exports and transferred export owners", () => {
         }),
       );
       // Validation before allocation is safe too; only owners actually created must be closed.
-      for (const { owner, earlier } of observed) {
-        expect(earlier.map(({ ur }) => ur)).toEqual([FIRST_SHARE, "ur:bytes/aa"]);
+      for (const { owner, given: made } of observed()) {
+        expect(made.shares.map(({ ur }) => ur)).toEqual([FIRST_SHARE, "ur:bytes/aa"]);
         expect(() => owner.shown).toThrow(expect.objectContaining({ code: WIPED_CODE }));
         expect(() => owner.saved).toThrow(expect.objectContaining({ code: WIPED_CODE }));
       }

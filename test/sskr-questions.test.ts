@@ -9,6 +9,7 @@ import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
 import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
+import { errorCode } from "../src/core/refusal.js";
 import { JointRepair } from "../src/sskr/joint-repair.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
@@ -28,14 +29,8 @@ import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 
 const TEST_DATE = "23-09-2026";
@@ -80,7 +75,7 @@ describe("shares on the private screen", () => {
     const wrong = misread(SHARES[1]);
     // A ; at the end leaves an empty part, which is no share.
     terminal.answers = [`${SHARES[0]};${wrong};\r`, `${SHARES[2]}\r`];
-    terminal.choices = ["again"];
+    terminal.choices = ["Type share 2 again"];
     await combine();
     expect(seen.out).toContain(PHRASE);
     expect(seen.notices).toContain(
@@ -96,7 +91,7 @@ describe("shares on the private screen", () => {
     const colors = writeShare(SHARES[1], "colors").split(" ");
     colors[2] = `${colors[2]!.slice(0, 5)}?`;
     terminal.answers = [`${SHARES[0]};${colors.join(" ")}\r`, `${SHARES[1]}\r`];
-    terminal.choices = ["again"];
+    terminal.choices = ["Type share 2 again"];
     await combine();
     expect(seen.notices).toContain(
       "Share 2: color 3 has 5 of 6 symbols: write a ? for each digit that cannot be read, or a lone ? for the whole color.",
@@ -117,10 +112,13 @@ describe("shares on the private screen", () => {
   it("lets a pasted line that is no share be left out, also after it was typed again", async () => {
     // A heading copied with the shares, then typed again as something that is still no share.
     terminal.answers = [`${SHARES[0]}\n${SHARES[2]}\nSSKR share 3 of 3\r`, "nothing\r"];
-    terminal.choices = ["again", "out"];
+    terminal.choices = ["Type share 3 again", "Leave share 3 out"];
     await combine();
+    // Said each time the line cannot be read, twice, and kept above the questions that follow
+    // until it is typed again or left out: "What now?", the share asked again and "What now?",
+    // each on a screen of its own (PrivateSteps).
     expect(seen.notices.filter((line) => line.startsWith("Share 3 cannot be read: "))).toHaveLength(
-      2,
+      5,
     );
     expect(terminal.labels).toEqual([
       ["Leave share 3 out", "Type share 3 again"],
@@ -191,7 +189,7 @@ describe("shares on the private screen", () => {
 
   it("leaves out a share of another set when the person chooses it", async () => {
     terminal.answers = [`${SHARES[0]};${OTHER_SET_SHARE};${SHARES[1]}\r`];
-    terminal.choices = ["out"];
+    terminal.choices = ["Leave share 2 out"];
     await combine();
     expect(seen.notices).toContain("Share 2 is of another set than share 1.");
     expect(terminal.labels).toEqual([["Leave share 2 out", "Type share 2 again"]]);
@@ -201,7 +199,7 @@ describe("shares on the private screen", () => {
   it("lets either share be changed when nothing tells which set is right", async () => {
     // The wrong share first: one share of each set, so neither is named alone.
     terminal.answers = [`${OTHER_SET_SHARE};${SHARES[0]}\r`, `${SHARES[2]}\r`];
-    terminal.choices = ["out", 1];
+    terminal.choices = ["Leave a share out", "Share 1"];
     await combine();
     expect(seen.notices).toContain(
       "Shares 1 and 2 are of different sets, and nothing tells which is right.",
@@ -227,7 +225,7 @@ describe("shares on the private screen", () => {
   it("names both shares that are the same member but differ, and lets either go", async () => {
     // A wrong copy of the first share typed before the right one.
     terminal.answers = [`${wrongValue(SHARES[0])};${SHARES[0]};${SHARES[1]}\r`];
-    terminal.choices = ["out", 1];
+    terminal.choices = ["Leave a share out", "Share 1"];
     await combine();
     expect(seen.notices).toContain(
       "Shares 1 and 2 are the same member of the set but differ, and nothing tells which is right.",
@@ -256,7 +254,7 @@ describe("shares on the private screen", () => {
 
   it("offers to leave out a surplus share that gives another phrase", async () => {
     terminal.answers = [`${SHARES[0]};${SHARES[1]};${wrongValue(SHARES[2])}\r`];
-    terminal.choices = ["out"];
+    terminal.choices = ["Leave share 3 out"];
     await combine();
     expect(seen.notices).toContain(
       "Share 3 does not fit with the others: with it they give another phrase or none. Leave it out, or check it.",
@@ -270,7 +268,7 @@ describe("shares on the private screen", () => {
   it("asks which shares to change after a refusal of the assessment", async () => {
     // A marked share of a 12-word set beside a share of a 15-word set.
     terminal.answers = [`${OTHER_SET_SHARE};${marked([5])}\r`, `${SHARES[0]};${SHARES[1]}\r`];
-    terminal.choices = ["all"];
+    terminal.choices = ["Type every share again"];
     await combine();
     expect(seen.notices).toContain("These shares are of different lengths: not of one set.");
     expect(terminal.labels[0]).toEqual([
@@ -289,7 +287,7 @@ describe("shares on the private screen", () => {
     const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 5);
     const typed = [shares[0], shares[1], wrongValue(shares[2]!), wrongValue(shares[3]!)];
     terminal.answers = [`${typed.join(";")}\r`];
-    terminal.choices = ["out", 3, "out"];
+    terminal.choices = ["Leave a share out", "Share 3", "Leave share 4 out"];
     await combine();
     expect(terminal.labels).toEqual([
       [
@@ -312,7 +310,7 @@ describe("shares on the private screen", () => {
   it("goes back to the shares when the search is not wanted", async () => {
     // Two unreadable colours leave 65,536 combinations, more than --max-tries 1 allows.
     terminal.answers = [`${SHARES[0]};${marked([5, 7])}\r`, `${SHARES[1]}\r`];
-    terminal.choices = ["no", "one", 2];
+    terminal.choices = ["No", "Type one share again", "Share 2"];
     await combine({ "max-tries": "1" });
     expect(terminal.questions[0]).toMatch(/^Search 65,536 combinations, .+\?$/u);
     // Keys typed during the assessment do not answer it: choose drops them
@@ -324,34 +322,40 @@ describe("shares on the private screen", () => {
   });
 
   it("wipes the plan of a search not made before the shares are typed again", async () => {
-    // Each wipe of a plan of marked shares is told among the questions and answers.
-    // oxlint-disable-next-line typescript/unbound-method -- the spy calls it on its own instance
-    const plan = JointRepair.prototype.plan;
-    vi.spyOn(JointRepair.prototype, "plan").mockImplementation(async function (
-      this: JointRepair,
-      ...args: Parameters<typeof plan>
-    ) {
-      const made = await plan.apply(this, args);
-      return {
-        ...made,
-        wipe: () => {
-          terminal.events.push("wipe");
-          made.wipe();
-        },
-      };
-    });
+    // Watched only: the plan of the marked shares that the assessment makes.
+    const plans = vi.spyOn(JointRepair.prototype, "plan");
+    // Whether that plan is wiped, as its search tells: a search whose stop is given before it
+    // starts ends at once on a live plan, and is refused on a wiped one.
+    const planWiped = async (): Promise<boolean> => {
+      const [made] = plans.mock.settledResults;
+      if (made?.type !== "fulfilled") throw new Error("No plan of the marked shares was made.");
+      return made.value.search({ signal: AbortSignal.abort() }).then(
+        () => false,
+        (error: unknown) => errorCode(error) === "sskr.joint-repair.plan-wiped",
+      );
+    };
+    const wiped: boolean[] = [];
     terminal.answers = [`${SHARES[0]};${marked([5, 7])}\r`, `${SHARES[0]};${SHARES[1]}\r`];
-    // No to the search, then "Type every share again".
-    terminal.choices = ["no", "all"];
+    // No to the search, then "Type every share again", each after a look at the plan.
+    terminal.choices = [
+      async () => {
+        wiped.push(await planWiped());
+        return "No";
+      },
+      async () => {
+        wiped.push(await planWiped());
+        return "Type every share again";
+      },
+    ];
     await combine({ "max-tries": "1" });
     expect(seen.out).toContain(PHRASE);
-    const wipes = terminal.events.flatMap((event, at) => (event === "wipe" ? [at] : []));
-    const answers = terminal.events.flatMap((event, at) => (event === "answered" ? [at] : []));
-    // Once: after the search question, and before the person is asked what to change.
-    expect(wipes).toHaveLength(1);
-    expect(wipes[0]).toBeGreaterThan(terminal.events.indexOf(terminal.questions[0]!));
-    expect(wipes[0]).toBeLessThan(terminal.events.indexOf("Which shares to change?"));
-    expect(wipes[0]).toBeLessThan(answers[1]!);
+    expect(terminal.questions.slice(0, 2)).toEqual([
+      expect.stringMatching(/^Search 65,536 combinations, .+\?$/u),
+      "Which shares to change?",
+    ]);
+    // Live while the search is asked for, and wiped once it is declined, before the person is
+    // asked what to change.
+    expect(wiped).toEqual([false, true]);
   });
 });
 
@@ -359,7 +363,7 @@ describe("shares on the private screen", () => {
   it("goes back from the share question to the one after a wallet that nothing matched", async () => {
     terminal.answers = [`${SHARES[0]};${SHARES[1]}\r`, `${masterFingerprint(PHRASE)}\r`];
     // "Change a share", Escape at the share question, then "Change the wallet".
-    terminal.choices = ["shares", undefined, "wallet", "fingerprint"];
+    terminal.choices = ["Change a share", undefined, "Change the wallet", "Fingerprint"];
     await combine({ "master-fingerprint": TEST_FINGERPRINT });
     expect(seen.notices).toContain(
       "The phrase that these shares restore does not match the wallet given.",
@@ -395,7 +399,7 @@ describe("shares on the private screen", () => {
 
   it("stops when the person chooses Stop", async () => {
     terminal.answers = [`${SHARES[0]};${marked([5, 7])}\r`];
-    terminal.choices = ["no", "stop"];
+    terminal.choices = ["No", "Stop"];
     expect(await combine({ "max-tries": "1" })).toBe(CANCELLED);
     expect(seen.out).toEqual([]);
   });
@@ -416,7 +420,12 @@ describe("shares on the private screen", () => {
           "Date 1: use DD-MM-YYYY with a four-digit year, for example 23-09-2026.",
         ),
       );
-      expect(seen.notices.filter((line) => line.startsWith("Encoded BIP32"))).toHaveLength(1);
+      // Drawn once, then kept above the dates each time they are asked, on a screen of its own
+      // (PrivateSteps).
+      const datesAsked = promptsShown().filter((prompt) => prompt === DATES_PROMPT).length;
+      expect(seen.notices.filter((line) => line.startsWith("Encoded BIP32"))).toHaveLength(
+        1 + datesAsked,
+      );
       expect(seen.out).toContain(TEST_PHRASE);
     });
 
@@ -475,7 +484,7 @@ describe("shares on the private screen", () => {
 
     it("finds a forgotten digit of a date with the wallet asked for after the dates", async () => {
       terminal.answers = [`${shares[0]};${shares[2]}\r`, "23-09-202?\r", `${TEST_FINGERPRINT}\r`];
-      terminal.choices = ["fingerprint"];
+      terminal.choices = ["Fingerprint"];
       await combine({ mode: "seedshift" });
       expect(promptsShown()).toEqual([
         SHARES_PROMPT,
@@ -497,7 +506,7 @@ describe("shares on the private screen", () => {
 
     it("asks for a date search beyond --max-candidates, and starts one within it", async () => {
       terminal.answers = [`${shares[0]};${shares[2]}\r`, "23-09-202?\r"];
-      terminal.choices = ["no"];
+      terminal.choices = ["No"];
       // The answers of the menu's wallet question are given as options: only the search is asked.
       expect(
         await combine({
@@ -522,7 +531,7 @@ describe("shares on the private screen", () => {
       // One unreadable colour of the second share, which the shares settle together.
       const marked = markUnits(shares[1]!, "colors", [5]);
       terminal.answers = [`${shares[0]};${marked}\r`, "?3-09-2026\r", `${TEST_FINGERPRINT}\r`];
-      terminal.choices = ["fingerprint"];
+      terminal.choices = ["Fingerprint"];
       await combine({ mode: "seedshift" });
       expect(
         seen.notices.some((line) =>
@@ -554,7 +563,7 @@ describe("shares on the private screen", () => {
         `${TEST_FINGERPRINT}\r`,
         "23-09-202?\r",
       ];
-      terminal.choices = ["fingerprint", "dates"];
+      terminal.choices = ["Fingerprint", "Change the dates"];
       await combine({ mode: "seedshift" });
       expect(seen.notices).toContain("None of the 10 date combinations gives the wallet given.");
       expect(terminal.labels[1]).toEqual([
@@ -584,7 +593,7 @@ describe("shares on the private screen", () => {
 
     it("takes Seedshift when the wallet shows that the phrase was masked with it", async () => {
       terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
-      terminal.choices = ["mode"];
+      terminal.choices = ["It was masked with Seedshift"];
       await combine({ "master-fingerprint": TEST_FINGERPRINT });
       expect(seen.notices).toContain(
         "The phrase that these shares restore does not match the wallet given.",
@@ -604,7 +613,7 @@ describe("shares on the private screen", () => {
     it("leaves Seedshift when the wallet shows that the phrase was not masked", async () => {
       const plain = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
       terminal.answers = [`${plain[0]};${plain[2]}\r`, `${TEST_DATE}\r`];
-      terminal.choices = ["mode"];
+      terminal.choices = ["It was not masked with Seedshift"];
       await combine({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
       expect(terminal.labels[0]).toEqual([
         "Change the dates",

@@ -8,8 +8,7 @@ import { wrongValue } from "./helpers/shares.js";
 import { shareBackupVerdict } from "./helpers/share-backup-check.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { sskrVectors } from "./helpers/vectors.js";
-
-const PHRASE = "abandon ".repeat(11) + "about";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("AUD-008-FUN001: incomplete-group disclosure", () => {
   it("exposes unchecked members through the package API and warns when checking the backup", async () => {
@@ -28,14 +27,17 @@ describe("AUD-008-FUN001: incomplete-group disclosure", () => {
     }
     // Corrupt an incomplete group's value but keep its unkeyed transport checksum valid.
     const given = [shares[0]!, shares[1]!, wrongValue(shares[3]!)];
-    expect(await restoreShareSet(given)).toMatchObject({ mnemonic: PHRASE, unchecked: [3] });
-    expect(await combineSskrShareSet(given)).toMatchObject({ mnemonic: PHRASE, unchecked: [3] });
+    expect(await restoreShareSet(given)).toMatchObject({ mnemonic: TEST_PHRASE, unchecked: [3] });
+    expect(await combineSskrShareSet(given)).toMatchObject({
+      mnemonic: TEST_PHRASE,
+      unchecked: [3],
+    });
     await expect(combineSskrShares(given)).rejects.toThrow("could not be checked");
-    expect(await shareBackupVerdict(PHRASE, given.join(";"), "direct", "")).toBe("unchecked");
+    expect(await shareBackupVerdict(TEST_PHRASE, given.join(";"), "direct", "")).toBe("unchecked");
     const other = entropyToMnemonic(new Uint8Array(16).fill(1), wordlist);
     expect(await shareBackupVerdict(other, given.join(";"), "direct", "")).toBe("differs");
-    expect(await combineSskrShares(given.slice(0, 2))).toBe(PHRASE);
-    expect(await shareBackupVerdict(PHRASE, given.slice(0, 2).join(";"), "direct", "")).toBe(
+    expect(await combineSskrShares(given.slice(0, 2))).toBe(TEST_PHRASE);
+    expect(await shareBackupVerdict(TEST_PHRASE, given.slice(0, 2).join(";"), "direct", "")).toBe(
       "restores",
     );
   });

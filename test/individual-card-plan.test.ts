@@ -93,6 +93,7 @@ describe("converting a retained share sheet to individual cards", () => {
       expect(() => cards.forIndividualCards({ orientation: "diagonal" as never })).toThrow(
         "Orientation must be portrait or landscape.",
       );
+      // Settings that are no object, and a page size that is none, fed on purpose too.
       for (const settings of [null, [], true])
         expect(() => cards.forIndividualCards(settings as never)).toThrow("must be an object");
       expect(() => cards.forIndividualCards({ pageSize: null as never })).toThrow("Page size");

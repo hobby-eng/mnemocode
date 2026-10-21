@@ -601,7 +601,7 @@ function expectHostNeutral(entry: string, modules: Map<string, Module>): void {
 
 describe("Parts for other hosts, each imported alone", () => {
   for (const [part, { uses }] of Object.entries(PARTS))
-    it(`${part} reaches its packages and parts only, no Node.js, command line or core.ts`, () => {
+    it(`keeps ${part} to its packages and parts, with no Node.js, command line or core.ts`, () => {
       const modules = reachable(part);
       expectHostNeutral(part, modules);
       const allowed = packagesAllowed(part);
@@ -683,7 +683,7 @@ describe("Ethereum for a host of Ethereum alone", () => {
 
 describe("Shared modules for other hosts, each imported alone", () => {
   for (const [module, packages] of Object.entries(SHARED_MODULES))
-    it(`${module} reaches its packages only, and no Node.js or command line`, () => {
+    it(`keeps ${module} to its packages, with no Node.js or command line`, () => {
       const modules = reachable(module);
       expectHostNeutral(module, modules);
       const allowed = new Set([...BIP39_PACKAGES, ...packages]);

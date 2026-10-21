@@ -121,7 +121,7 @@ describe("cloud folders", () => {
     ["/home/test/Library/Mobile Documents/com~apple~CloudDocs/a.pdf", "iCloud Drive"],
     ["/home/test/Library/CloudStorage/GoogleDrive-a@example.org/My Drive/a.pdf", "Google Drive"],
     ["/home/test/Library/CloudStorage/Box-Box/a.pdf", "Box"],
-  ])("recognises %s", (path, service) => {
+  ])("recognises %s as a folder of %s", (path, service) => {
     expect(cloudServiceOf(path, {}, home)).toBe(service);
   });
 

@@ -5,16 +5,11 @@ import { describe, expect, it, vi } from "vitest";
 import { WordCandidateSearch } from "../src/core/candidates.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
 import { questionsOnPrivateScreen, terminal, seen } from "./helpers/question-terminal.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 const watchEdge = vi.hoisted((): { failure: Error | undefined } => ({ failure: undefined }));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   const input = harness.replacedTerminalInput(await importOriginal());
   class FailingWatch extends input.CtrlCWatch {
@@ -36,7 +31,7 @@ describe("The word-search result handoff through the terminal watch", () => {
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-watch-owner-"));
     const run = vi.spyOn(WordCandidateSearch.prototype, "run");
     const failure = new Error("Synthetic terminal finalization failure.");
-    terminal.answers = ["abandon ".repeat(11) + "about|actual\r"];
+    terminal.answers = [`${TEST_PHRASE}|actual\r`];
     watchEdge.failure = failure;
     try {
       await expect(
@@ -64,10 +59,8 @@ describe("The word-search result handoff through the terminal watch", () => {
   });
 
   it("keeps the successful candidate display usable until the command ends", async () => {
-    terminal.answers = ["abandon ".repeat(11) + "about|actual\r"];
+    terminal.answers = [`${TEST_PHRASE}|actual\r`];
     await runRecoverWord({ "ask-secrets": true });
-    expect(seen.out.join("\n")).toContain(
-      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-    );
+    expect(seen.out.join("\n")).toContain(TEST_PHRASE);
   });
 });

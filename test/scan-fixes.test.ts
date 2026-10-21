@@ -82,23 +82,21 @@ describe("S003: codes given with the options are read as typed ones are", () => 
 });
 
 describe("S005: the candidate list is written by one library writer", () => {
-  const PHRASE = "abandon ".repeat(11) + "about";
-
   it("writes a list, tells an empty and a full one, and wipes every entropy", async () => {
     const { CandidateListWriter } = await import("../src/core/candidate-list-writer.js");
     const { NoProtection } = await import("../src/core/candidate-encryption.js");
     const { decodeCandidateList, LIST_KEEP, MAX_CANDIDATE_RECORDS, candidateListHolds } =
       await import("../src/core/candidate-list.js");
     const writer = new CandidateListWriter(new NoProtection(), "TREZOR");
-    const made = await writer.writePhrases([PHRASE]);
+    const made = await writer.writePhrases([TEST_PHRASE]);
     expect(made.kind).toBe("list");
     if (made.kind !== "list") return;
     expect(decodeCandidateList(made.list.bytes)).toMatchObject({ passphrase: "TREZOR" });
     expect(made.list.records).toBe(1);
     expect((await writer.writePhrases([])).kind).toBe("empty");
-    expect((await writer.writePhrases(Array.from({ length: LIST_KEEP }, () => PHRASE))).kind).toBe(
-      "full",
-    );
+    expect(
+      (await writer.writePhrases(Array.from({ length: LIST_KEEP }, () => TEST_PHRASE))).kind,
+    ).toBe("full");
     expect(candidateListHolds(MAX_CANDIDATE_RECORDS)).toBe(true);
     expect(candidateListHolds(LIST_KEEP)).toBe(false);
     const entropy = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
@@ -167,7 +165,7 @@ describe("S010: complete and marked codes are read with the same separators", ()
 
   it("reads the codes of a phrase with the same separators", async () => {
     const { parseInput, formatEncoded, representMnemonic } = await import("../src/core.js");
-    const result = representMnemonic("abandon ".repeat(11) + "about");
+    const result = representMnemonic(TEST_PHRASE);
     for (const format of ["indexes", "unicode", "colors"] as const) {
       const written = formatEncoded(result, format);
       const elements = format === "unicode" ? written.match(/.{4}/gu)! : written.split(" ");

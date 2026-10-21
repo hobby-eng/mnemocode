@@ -75,7 +75,6 @@ import {
   type StudyBox,
   type StudyLayout,
 } from "../src/export/collection-layout.js";
-import * as cardQrModule from "../src/export/card-qr.js";
 import { renderBusinessCards } from "../src/export/business-cards.js";
 import { MAX_DECOYS } from "../src/export/card-decoys.js";
 import { separateCardPage } from "../src/export/business-layout.js";
@@ -107,6 +106,7 @@ import { SSKR_ENGINE_FOLDER, SSKR_BRIDGE } from "../src/bundled-file-paths.js";
 import { CardRenderer } from "../src/export/card-renderer.js";
 import { A6, renderHeirSheet } from "../src/export/heir-sheet.js";
 import type { RenderAsset, RenderPlatform } from "../src/export/platform.js";
+import { recordingQr } from "./helpers/recording-qr.js";
 import { publicShare, sskrVectors } from "./helpers/vectors.js";
 import { matching } from "./helpers/matchers.js";
 // The public lists of candidates and the age files that hold them, typed as their JSON gives them.
@@ -542,23 +542,17 @@ describe("S096: one rule decides between a separate card and a sheet", () => {
   });
 
   it("draws the whole-share QR sheet in every family, also when a card is asked for", async () => {
-    const qr = vi.spyOn(cardQrModule, "drawCollectionQr");
-    // The payload of each code drawn, as the renderer is asked for its matrix (S108).
-    const payloads: string[] = [];
-    const renderer = new CardRenderer({
-      ...nodeRenderPlatform,
-      qrModules: (text) => {
-        payloads.push(text);
-        return nodeRenderPlatform.qrModules(text);
-      },
-    });
+    // The payload of each code, as the renderer is asked for its matrix (S108), and the modules
+    // of it that a drawing read.
+    const { renderer, payloads, reads, modules } = recordingQr();
     const sheets = [
       await renderBusinessCards(renderer, "it", share, 0),
       // A material design draws its sheet only (drawsSeparateCards).
       await renderMaterialCard(renderer, "tile", share),
     ];
-    expect(qr).toHaveBeenCalledTimes(2);
     expect(payloads).toEqual(Array(2).fill(share.payload));
+    // Each sheet draws its code whole, once.
+    expect(reads).toEqual(modules);
     for (const bytes of sheets) {
       const { width, height } = (await ScanPdfDocument.load(bytes)).getPage(0).getSize();
       expect([width, height].map((side) => Math.round(side / LAYOUT_MM))).toEqual(

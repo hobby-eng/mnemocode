@@ -22,9 +22,8 @@ import {
 } from "../src/bitcoin-evidence.js";
 import { locationOf } from "../src/core/coins/coin-self-test.js";
 import { matching } from "./helpers/matchers.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-/** The public BIP39 test phrase of BIP84, BIP86 and many wallets. */
-const ABANDON = "abandon ".repeat(11) + "about";
 /** The BIP39 test vector of entropy ff…ff: another wallet. */
 const ZOO = "zoo ".repeat(11) + "wrong";
 
@@ -157,7 +156,7 @@ describe("the coins that a host offers (a host of one coin family)", () => {
     expect(() => assertWalletEvidence(evidence, [coinById("bitcoin")])).toThrow("Unknown coin");
     const offered = [coinById("bitcoin"), coinById("ethereum")];
     expect(
-      new WalletEvidenceCheck(nodePbkdf2, offered).match(ABANDON, evidence, ethereum[1]),
+      new WalletEvidenceCheck(nodePbkdf2, offered).match(TEST_PHRASE, evidence, ethereum[1]),
     ).toMatchObject({
       matched: true,
       path: ethereum[2],
@@ -189,7 +188,7 @@ describe("addresses of every coin, where the wallets of the public phrase put th
     "matches %s with passphrase %j at %s to %s",
     (coin, passphrase, path, address) => {
       const evidence = coinAddress(coin, address, locationOf(path));
-      expect(check.match(ABANDON, evidence, passphrase)).toEqual({
+      expect(check.match(TEST_PHRASE, evidence, passphrase)).toEqual({
         matched: true,
         kind: "coin-address",
         derived: address,
@@ -202,14 +201,14 @@ describe("addresses of every coin, where the wallets of the public phrase put th
     const [coin, , path, address] = ADDRESSES[34]!;
     const evidence = coinAddress(coin, address, locationOf(path));
     const expected = { matched: true, kind: "coin-address", derived: address, path };
-    expect(matchBitcoinEvidence(ABANDON, evidence)).toEqual(expected);
+    expect(matchBitcoinEvidence(TEST_PHRASE, evidence)).toEqual(expected);
     using ownedCheck = walletCheckOf(evidence)!;
-    expect(ownedCheck(ABANDON)).toEqual(expected);
+    expect(ownedCheck(TEST_PHRASE)).toEqual(expected);
     const later = new WalletEvidenceCheck(
       async (...parameters) => nodePbkdf2(...parameters),
       COINS,
     );
-    await expect(later.matchAsync(ABANDON, evidence)).resolves.toEqual(expected);
+    await expect(later.matchAsync(TEST_PHRASE, evidence)).resolves.toEqual(expected);
   });
 
   it("include Dash Platform testnet addresses, on coin type 1", () => {
@@ -234,24 +233,25 @@ describe("addresses of every coin, where the wallets of the public phrase put th
       branch: 1,
       index: 19,
     });
-    expect(check.match(ABANDON, evidence).path).toBe("m/84'/0'/2'/1/19");
+    expect(check.match(TEST_PHRASE, evidence).path).toBe("m/84'/0'/2'/1/19");
   });
 
   it("are found among several addresses in a row, from the location's index on", () => {
     // The DIP17/DIP18 vector of the second receiving key, and the one deep in account 2 above.
     const platform = "dash1kzjl7qzxy9lar37j8r37z3kvt07epqe20ckxfezw";
     const first = { account: 0, branch: 0, index: 0 };
-    expect(check.match(ABANDON, coinAddress("dash", platform, first)).matched).toBe(false);
+    expect(check.match(TEST_PHRASE, coinAddress("dash", platform, first)).matched).toBe(false);
     expect(
-      check.match(ABANDON, { ...coinAddress("dash", platform, first), addresses: 20 }).path,
+      check.match(TEST_PHRASE, { ...coinAddress("dash", platform, first), addresses: 20 }).path,
     ).toBe("m/9'/5'/17'/0'/0'/1");
     const deep = "bc1q4du7e3vw34vsflf76xf9h8gktms9wzqcl7vlh5";
     const account2 = { account: 2, branch: 1, index: 0 };
     expect(
-      check.match(ABANDON, { ...coinAddress("bitcoin", deep, account2), addresses: 20 }).path,
+      check.match(TEST_PHRASE, { ...coinAddress("bitcoin", deep, account2), addresses: 20 }).path,
     ).toBe("m/84'/0'/2'/1/19");
     expect(
-      check.match(ABANDON, { ...coinAddress("bitcoin", deep, account2), addresses: 19 }).matched,
+      check.match(TEST_PHRASE, { ...coinAddress("bitcoin", deep, account2), addresses: 19 })
+        .matched,
     ).toBe(false);
     expect(() =>
       assertWalletEvidence({ ...coinAddress("bitcoin", deep, account2), addresses: 0 }, COINS),
@@ -269,8 +269,8 @@ describe("addresses of every coin, where the wallets of the public phrase put th
       { ...first, branch: 1 },
       { ...first, account: 1 },
     ])
-      expect(check.match(ABANDON, coinAddress("bitcoin", address, location))).toEqual(notFound);
-    expect(check.match(ABANDON, coinAddress("bitcoin", address, first), "TREZOR")).toEqual(
+      expect(check.match(TEST_PHRASE, coinAddress("bitcoin", address, location))).toEqual(notFound);
+    expect(check.match(TEST_PHRASE, coinAddress("bitcoin", address, first), "TREZOR")).toEqual(
       notFound,
     );
     for (const [coin, , path, text] of ADDRESSES.filter(([, passphrase]) => passphrase === ""))
@@ -319,8 +319,8 @@ describe("the comparison", () => {
       coinAddress("dash", platformAddress, locationOf(platformPath)),
     ];
     for (const each of evidence) {
-      expect(now.match(ABANDON, each).matched).toBe(true);
-      expect((await later.matchAsync(ABANDON, each)).matched).toBe(true);
+      expect(now.match(TEST_PHRASE, each).matched).toBe(true);
+      expect((await later.matchAsync(TEST_PHRASE, each)).matched).toBe(true);
     }
     const nodes = [...roots.mock.results, ...children.mock.results].map((result) => {
       if (result.type !== "return") throw new Error("Expected every derivation to return a key.");
@@ -378,7 +378,7 @@ describe("the comparison", () => {
       ],
     ];
     for (const [evidence, reason, code] of refused) {
-      expect(refusal(() => recording.match(ABANDON, evidence))).toContain(reason);
+      expect(refusal(() => recording.match(TEST_PHRASE, evidence))).toContain(reason);
       for (const check of [
         () => assertWalletEvidence(evidence, COINS),
         () => assertBitcoinEvidence(evidence),
@@ -575,7 +575,7 @@ describe("the case of an address", () => {
     );
     const first = { account: 0, branch: 0, index: 0 };
     for (const text of [withoutPrefix, "1mW6fDEMjKrDHvLvoEsaeLxSCzZBf3Bfg"])
-      expect(check.match(ABANDON, coinAddress("bitcoin-cash", text, first)).path).toBe(
+      expect(check.match(TEST_PHRASE, coinAddress("bitcoin-cash", text, first)).path).toBe(
         "m/44'/145'/0'/0/0",
       );
   });

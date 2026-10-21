@@ -67,9 +67,8 @@ import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import { holes } from "./helpers/holes.js";
 import { refusalOf } from "./helpers/refusals.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-/** BIP39's public test phrase, "abandon" eleven times and "about". */
-const PUBLIC_PHRASE = "abandon ".repeat(11) + "about";
 /**
  * The most the search of two dates over the public phrase may take: it finds the phrase in well
  * under a second, and a search stopped at this limit fails the test with its own result.
@@ -84,12 +83,12 @@ describe("AUD-012-FUN001: codes and dates found together decode to the wallet th
     ["seedshift-legacy", encodeMnemonicLegacy],
   ] as const)
     it(`returns the known dates with the guessed ones (${mode})`, async () => {
-      const tokens = formatEncoded(encode(PUBLIC_PHRASE, [known, guessed]), "indexes").split(" ");
+      const tokens = formatEncoded(encode(TEST_PHRASE, [known, guessed]), "indexes").split(" ");
       tokens[3] = `${tokens[3]!.slice(0, -1)}?`;
       const codes = MissingCodes.read(tokens.join(" "), "indexes", mode);
       const answer = DatesAnswer.parse("01-01-2025 23-09-202?", { wordCount: 12, patterns: true });
       const check = async (mnemonic: string) => ({
-        matched: mnemonic === PUBLIC_PHRASE,
+        matched: mnemonic === TEST_PHRASE,
         path: "m",
       });
       const result = await new MissingCodesSearch(codes, () => "00000000")
@@ -100,7 +99,7 @@ describe("AUD-012-FUN001: codes and dates found together decode to the wallet th
       expect(result.dates!.map(formatDate)).toEqual(["01-01-2025", "23-09-2026"]);
       // What the search found, as it is shown: the guessed date alone.
       expect(result.foundDates).toBe("23-09-2026");
-      expect(result.backup.decode(result.dates!).recoveredMnemonic).toBe(PUBLIC_PHRASE);
+      expect(result.backup.decode(result.dates!).recoveredMnemonic).toBe(TEST_PHRASE);
     });
 });
 
@@ -117,7 +116,7 @@ describe("AUD-012-FUN002: the plan of codes with complete dates counts the check
 
   it("plans 128 checks for each candidate of a 12-word phrase whose last word was replaced", async () => {
     const date = [parseDate("23-09-2026")];
-    const { backup } = EncodedBackup.encode(PUBLIC_PHRASE, date, "indexes", "seedshift-legacy", {
+    const { backup } = EncodedBackup.encode(TEST_PHRASE, date, "indexes", "seedshift-legacy", {
       validLastWord: true,
     });
     expect(backup.mode).toBe("seedshift-legacy-valid");

@@ -9,9 +9,8 @@ import { CoinAddressCheck, type CoinAddressEvidence } from "../src/core/coin-add
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
 import { DASH } from "../src/core/coins/dash.js";
 import type { Pbkdf2HmacSha512 } from "../src/core/master-fingerprint.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
-/** The public BIP39 test phrase of BIP84 and DIP17. */
-const ABANDON = "abandon ".repeat(11) + "about";
 /** BIP84's first receiving address, m/84'/0'/0'/0/0. */
 const RECEIVING_0 = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 /** BIP84's second receiving address, m/84'/0'/0'/0/1. */
@@ -30,8 +29,8 @@ const laterPbkdf2: Pbkdf2HmacSha512 = async (...parameters) => nodePbkdf2(...par
 /** The comparisons of `evidence` with a PBKDF2 that answers at once and with one that answers later. */
 async function bothMatches(evidence: CoinAddressEvidence): Promise<unknown[]> {
   return [
-    new CoinAddressCheck(nodePbkdf2).match(ABANDON, evidence),
-    await new CoinAddressCheck(laterPbkdf2).matchAsync(ABANDON, evidence),
+    new CoinAddressCheck(nodePbkdf2).match(TEST_PHRASE, evidence),
+    await new CoinAddressCheck(laterPbkdf2).matchAsync(TEST_PHRASE, evidence),
   ];
 }
 
@@ -66,7 +65,7 @@ describe("an address of one coin", () => {
 
   it("is not compared by match with a PBKDF2 that answers later", () => {
     expect(() =>
-      new CoinAddressCheck(laterPbkdf2).match(ABANDON, {
+      new CoinAddressCheck(laterPbkdf2).match(TEST_PHRASE, {
         coin: BITCOIN,
         value: RECEIVING_0,
         location: FIRST,
@@ -109,8 +108,8 @@ describe("an address of one coin", () => {
     ];
     for (const [evidence, code] of refused) {
       const refusal: unknown = expect.objectContaining({ code });
-      expect(() => recording.match(ABANDON, evidence)).toThrow(refusal);
-      await expect(recording.matchAsync(ABANDON, evidence)).rejects.toThrow(refusal);
+      expect(() => recording.match(TEST_PHRASE, evidence)).toThrow(refusal);
+      await expect(recording.matchAsync(TEST_PHRASE, evidence)).rejects.toThrow(refusal);
     }
     expect(calls).toEqual([]);
   });

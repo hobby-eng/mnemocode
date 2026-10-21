@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParsedArguments } from "../src/cli/arguments.js";
+import { PrivateSteps } from "../src/cli/private-steps.js";
 import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { runSskrExport } from "../src/cli/sskr-export-command.js";
 import { encodeMnemonic, parseDate } from "../src/core.js";
@@ -24,14 +25,8 @@ import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
-vi.mock("../src/cli/private-screen.js", async (importOriginal) =>
-  harness.replacedPrivateScreen(await importOriginal()),
-);
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
-);
-vi.mock("../src/cli/terminal-choice.js", async (importOriginal) =>
-  harness.replacedTerminalChoice(await importOriginal()),
 );
 // The host's PBKDF2, the seed function of the wallet check (src/bitcoin-evidence.ts): where
 // `collision.phrase` is set, it gives every phrase the seed of that one, so that a fingerprint of
@@ -82,9 +77,9 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
-/** Runs sskr-combine from the options, with `shares` in a share file. */
+/** Runs sskr-combine from the options, with `shares` in a share file, off the private screen. */
 async function combine(shares: readonly string[], options: ParsedArguments): Promise<void> {
-  terminal.privateScreen = false;
+  PrivateSteps.close();
   const path = join(directory, "shares.txt");
   await writeFile(path, `${shares.join("\n")}\n`);
   await runSskrCombine({ "share-file": path, ...options });
@@ -130,7 +125,7 @@ describe("sskr-combine with a wallet", () => {
       `${TEST_FINGERPRINT}\r`,
       ...Array.from({ length: 10 }, () => "\r"),
     ];
-    terminal.choices = ["fingerprint"];
+    terminal.choices = ["Fingerprint"];
     await runSskrCombine({ "ask-secrets": true, mode: "seedshift" });
     // Each of the ten dates gave a phrase that the fingerprint matched.
     expect(seen.out.filter((line) => line.startsWith("Original seed phrase"))).toHaveLength(10);
@@ -140,12 +135,15 @@ describe("sskr-combine with a wallet", () => {
 });
 
 describe("sskr-export with a wallet", () => {
-  /** Exports `shares` from a share file to a file of their own, with `options`. */
+  /**
+   * Exports `shares` from a share file to a file of their own, with `options`, off the private
+   * screen.
+   */
   async function exportShares(
     options: ParsedArguments,
     shares: readonly string[] = SSKR_SET_VECTOR.shares,
   ): Promise<string> {
-    terminal.privateScreen = false;
+    PrivateSteps.close();
     const path = join(directory, "shares.txt");
     const output = join(directory, "exported.txt");
     await writeFile(path, `${shares.join("\n")}\n`);
@@ -169,10 +167,11 @@ describe("sskr-export with a wallet", () => {
 
   it("says once, after the sets that a fingerprint matched alike, that it is a filter", async () => {
     // A second set beside the one that the repair of the marked share finds: public shares of the
-    // test phrase. No two sets of real shares pass both the CRC-32 and the digest, so the step is
-    // given a second, which the fingerprint matches too, as 32 bits let a wrong set do.
+    // test phrase, which the fingerprint matches too, as 32 bits let a wrong set do.
     const other = await testPhraseSet();
     const phrases = ShareRestore.phrases.bind(ShareRestore);
+    // Fault: the repair gives the phrase step a second set, which no shares typed can give: no two
+    // sets of real shares pass both the CRC-32 and the digest.
     vi.spyOn(ShareRestore, "phrases").mockImplementation(async (unmasking, sets, places, run) =>
       phrases(unmasking, [...sets, other], places, run),
     );

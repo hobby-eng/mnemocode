@@ -29,8 +29,7 @@ import {
   assertBitcoinEvidence,
 } from "../src/bitcoin-evidence.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
-
-const publicMnemonic = "abandon ".repeat(11) + "about";
+import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The pure JavaScript PBKDF2 that @scure/bip39 uses, as a page passes it. */
 const noblePbkdf2 = ((password, salt, rounds, bytes) =>
@@ -90,14 +89,19 @@ function inForm(key: HDKey, prefix: string): string {
   }).publicExtendedKey;
 }
 
-const mainnet: DerivationLocation = { network: "mainnet", account: 0, branch: 0, index: 0 };
-const testnet: DerivationLocation = { ...mainnet, network: "testnet" };
+const MAINNET_LOCATION: DerivationLocation = {
+  network: "mainnet",
+  account: 0,
+  branch: 0,
+  index: 0,
+};
+const TESTNET_LOCATION: DerivationLocation = { ...MAINNET_LOCATION, network: "testnet" };
 
 function located(
   kind: "address" | "compressed-public-key" | "wif" | "account-xpub",
   value: string,
   profiles: readonly BitcoinProfile[],
-  location: DerivationLocation = mainnet,
+  location: DerivationLocation = MAINNET_LOCATION,
 ): BitcoinEvidence {
   return { kind, value, profiles, location };
 }
@@ -122,7 +126,7 @@ const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
     {
       matched: true,
       kind: "master-fingerprint",
-      derived: "73c5da0a",
+      derived: TEST_FINGERPRINT,
       path: "m",
       warning: "A master fingerprint is only 32 bits and is a filter, not proof of recovery.",
     },
@@ -164,7 +168,7 @@ const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
   ],
   [
     "a change address on branch 1",
-    located("address", BIP84.firstChange, ["native-segwit"], { ...mainnet, branch: 1 }),
+    located("address", BIP84.firstChange, ["native-segwit"], { ...MAINNET_LOCATION, branch: 1 }),
     { matched: true, kind: "address", derived: BIP84.firstChange, path: "m/84'/0'/0'/1/0" },
   ],
   [
@@ -192,7 +196,7 @@ const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
   ],
   [
     "a nested SegWit address on testnet",
-    located("address", BIP49_TESTNET.firstReceiving, ["nested-segwit"], testnet),
+    located("address", BIP49_TESTNET.firstReceiving, ["nested-segwit"], TESTNET_LOCATION),
     {
       matched: true,
       kind: "address",
@@ -202,7 +206,7 @@ const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
   ],
   [
     "a testnet account upub",
-    located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"], testnet),
+    located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"], TESTNET_LOCATION),
     {
       matched: true,
       kind: "account-xpub",
@@ -212,13 +216,13 @@ const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
   ],
   [
     "an address of another index",
-    located("address", BIP84.firstReceiving, ["native-segwit"], { ...mainnet, index: 1 }),
+    located("address", BIP84.firstReceiving, ["native-segwit"], { ...MAINNET_LOCATION, index: 1 }),
     { matched: false, kind: "address" },
   ],
   [
     "a key at another account",
     located("compressed-public-key", BIP84.firstReceivingPublicKey, ["native-segwit"], {
-      ...mainnet,
+      ...MAINNET_LOCATION,
       account: 1,
     }),
     { matched: false, kind: "compressed-public-key" },
@@ -227,9 +231,9 @@ const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
 
 describe("every kind of wallet evidence, with a page's PBKDF2", () => {
   it.each(cases)("gives the declared wallet-check result for %s", (_, evidence, expected) => {
-    expect(browserCheck.match(publicMnemonic, evidence)).toEqual(expected);
+    expect(browserCheck.match(TEST_PHRASE, evidence)).toEqual(expected);
     // The Node.js module gives the same result from node:crypto.
-    expect(matchBitcoinEvidence(publicMnemonic, evidence)).toEqual(expected);
+    expect(matchBitcoinEvidence(TEST_PHRASE, evidence)).toEqual(expected);
   });
 
   it("compares a master key in every form, on its own network", () => {
@@ -248,13 +252,13 @@ describe("every kind of wallet evidence, with a page's PBKDF2", () => {
     ] as const) {
       const value = inForm(root, prefix);
       expect(value.startsWith(prefix)).toBe(true);
-      const result = browserCheck.match(publicMnemonic, { kind: "master-xpub", value, network });
+      const result = browserCheck.match(TEST_PHRASE, { kind: "master-xpub", value, network });
       expect(result.matched, prefix).toBe(true);
       expect(result.derived).toBe(inForm(root, network === "mainnet" ? "xpub" : "tpub"));
       // The other network's form is refused, not compared.
       const other = network === "mainnet" ? "testnet" : "mainnet";
       expect(() =>
-        browserCheck.match(publicMnemonic, { kind: "master-xpub", value, network: other }),
+        browserCheck.match(TEST_PHRASE, { kind: "master-xpub", value, network: other }),
       ).toThrow("The extended-key prefix does not match the selected Bitcoin network.");
     }
   });
@@ -266,12 +270,12 @@ describe("every kind of wallet evidence, with a page's PBKDF2", () => {
       value: root.publicExtendedKey,
       network: "mainnet",
     };
-    expect(browserCheck.match(publicMnemonic, evidence, "TREZOR").matched).toBe(true);
-    expect(browserCheck.match(publicMnemonic, evidence).matched).toBe(false);
+    expect(browserCheck.match(TEST_PHRASE, evidence, "TREZOR").matched).toBe(true);
+    expect(browserCheck.match(TEST_PHRASE, evidence).matched).toBe(false);
     const fingerprint = root.fingerprint.toString(16).padStart(8, "0");
-    expect(browserCheck.fingerprint(publicMnemonic, "TREZOR")).toBe(fingerprint);
-    expect(masterFingerprint(publicMnemonic, "TREZOR")).toBe(fingerprint);
-    expect(browserCheck.fingerprint(publicMnemonic)).toBe("73c5da0a");
+    expect(browserCheck.fingerprint(TEST_PHRASE, "TREZOR")).toBe(fingerprint);
+    expect(masterFingerprint(TEST_PHRASE, "TREZOR")).toBe(fingerprint);
+    expect(browserCheck.fingerprint(TEST_PHRASE)).toBe(TEST_FINGERPRINT);
   });
 });
 
@@ -280,16 +284,16 @@ describe("the host's PBKDF2", () => {
     const { check, calls } = recordingHost();
     // A composed e-acute (U+00E9) in the passphrase and a no-break space (U+00A0) in the phrase:
     // NFKD decomposes the one and makes the other a space.
-    check.fingerprint(publicMnemonic.replace(" ", "\u00a0"), "caf\u00e9");
+    check.fingerprint(TEST_PHRASE.replace(" ", "\u00a0"), "caf\u00e9");
     expect(calls).toEqual([
-      { password: publicMnemonic, salt: "mnemoniccafe\u0301", rounds: 2048, bytes: 64 },
+      { password: TEST_PHRASE, salt: "mnemoniccafe\u0301", rounds: 2048, bytes: 64 },
     ]);
   });
 
   it("gives seeds that are wiped before the check returns", () => {
     const { check, seeds } = recordingHost();
-    check.fingerprint(publicMnemonic);
-    check.match(publicMnemonic, located("wif", BIP84.firstReceivingWif, ["native-segwit"]));
+    check.fingerprint(TEST_PHRASE);
+    check.match(TEST_PHRASE, located("wif", BIP84.firstReceivingWif, ["native-segwit"]));
     expect(seeds).toHaveLength(2);
     for (const seed of seeds) expect(seed.every((byte) => byte === 0)).toBe(true);
   });
@@ -297,16 +301,17 @@ describe("the host's PBKDF2", () => {
   it("is not called for text that BIP39 refuses (AUD-008-API005)", () => {
     const { check, calls } = recordingHost();
     expect(() => check.fingerprint("abandon about")).toThrow(/Invalid mnemonic/u);
-    expect(() => check.fingerprint(publicMnemonic, "\ud800")).toThrow(/well-formed/u);
-    expect(() => check.fingerprint(`${publicMnemonic}\udc00`)).toThrow(/well-formed/u);
+    expect(() => check.fingerprint(TEST_PHRASE, "\ud800")).toThrow(/well-formed/u);
+    expect(() => check.fingerprint(`${TEST_PHRASE}\udc00`)).toThrow(/well-formed/u);
     // Passphrases and a phrase that are no text, given on purpose as a JavaScript host could.
     for (const passphrase of [null, 123, false, [], {}])
-      expect(() => check.fingerprint(publicMnemonic, passphrase as never)).toThrow(
+      expect(() => check.fingerprint(TEST_PHRASE, passphrase as never)).toThrow(
         expect.objectContaining({
           name: "TypeError",
           code: "core.master-fingerprint.expected-string-passphrase",
         }),
       );
+    // A phrase that is no text, given on purpose too.
     expect(() => check.fingerprint(null as never)).toThrow(
       expect.objectContaining({
         name: "TypeError",
@@ -341,7 +346,10 @@ describe("the host's PBKDF2", () => {
         evidenceCode("at-least-one-bitcoin-address-profile-selected"),
       ],
       [
-        located("address", BIP84.firstReceiving, ["native-segwit"], { ...mainnet, index: -1 }),
+        located("address", BIP84.firstReceiving, ["native-segwit"], {
+          ...MAINNET_LOCATION,
+          index: -1,
+        }),
         // The account, the branch and the index share this code; the message names the index.
         {
           code: "core.coins.coin.assert-address-location-refused",
@@ -368,7 +376,7 @@ describe("the host's PBKDF2", () => {
       ],
     ];
     for (const [evidence, refusal] of refused) {
-      expect(() => check.match(publicMnemonic, evidence), refusal.code).toThrow(
+      expect(() => check.match(TEST_PHRASE, evidence), refusal.code).toThrow(
         expect.objectContaining(refusal),
       );
       expect(() => assertBitcoinEvidence(evidence), refusal.code).toThrow(
@@ -381,17 +389,17 @@ describe("the host's PBKDF2", () => {
   it("must give 64 bytes", () => {
     const short = new Uint8Array(32).fill(1);
     const check = new WalletEvidenceCheck(() => short, [BITCOIN]);
-    expect(() => check.fingerprint(publicMnemonic)).toThrow("gave 32 bytes, not 64");
+    expect(() => check.fingerprint(TEST_PHRASE)).toThrow("gave 32 bytes, not 64");
     expect(short.every((byte) => byte === 0)).toBe(true);
-    // A host function that gives text and then none at all, given on purpose as a JavaScript host
-    // could.
+    // A host function that gives text, given on purpose as a JavaScript host could.
     const text = new WalletEvidenceCheck((() => "seed") as unknown as Pbkdf2HmacSha512, [BITCOIN]);
-    expect(() => text.fingerprint(publicMnemonic)).toThrow(
+    expect(() => text.fingerprint(TEST_PHRASE)).toThrow(
       expect.objectContaining({
         name: "TypeError",
         code: "core.master-fingerprint.host-s-pbkdf2-gave-no-bytes",
       }),
     );
+    // No host function at all, given on purpose too.
     expect(() => new WalletEvidenceCheck(undefined as never, [BITCOIN])).toThrow(
       expect.objectContaining({
         name: "TypeError",
@@ -407,8 +415,8 @@ describe("the host's PBKDF2", () => {
       [BITCOIN],
     );
     for (const passphrase of ["", "TREZOR", "😀 two words"])
-      expect(node.fingerprint(publicMnemonic, passphrase)).toBe(
-        browserCheck.fingerprint(publicMnemonic, passphrase),
+      expect(node.fingerprint(TEST_PHRASE, passphrase)).toBe(
+        browserCheck.fingerprint(TEST_PHRASE, passphrase),
       );
   });
 });
@@ -430,25 +438,25 @@ describe("a PBKDF2 that answers later, as WebCrypto's does", () => {
   const webCheck = new WalletEvidenceCheck(webCryptoPbkdf2, [BITCOIN]);
 
   it("matches and fingerprints with matchAsync and fingerprintAsync, as the synchronous forms do", async () => {
-    await expect(webCheck.fingerprintAsync(publicMnemonic)).resolves.toBe("73c5da0a");
+    await expect(webCheck.fingerprintAsync(TEST_PHRASE)).resolves.toBe(TEST_FINGERPRINT);
     const evidence: BitcoinEvidence = {
       kind: "address",
       value: BIP84.firstReceiving,
       profiles: ["native-segwit"],
       location: { network: "mainnet", account: 0, branch: 0, index: 0 },
     };
-    await expect(webCheck.matchAsync(publicMnemonic, evidence)).resolves.toEqual(
-      browserCheck.match(publicMnemonic, evidence),
+    await expect(webCheck.matchAsync(TEST_PHRASE, evidence)).resolves.toEqual(
+      browserCheck.match(TEST_PHRASE, evidence),
     );
-    await expect(webCheck.fingerprintAsync(publicMnemonic, "TREZOR")).resolves.toBe(
-      browserCheck.fingerprint(publicMnemonic, "TREZOR"),
+    await expect(webCheck.fingerprintAsync(TEST_PHRASE, "TREZOR")).resolves.toBe(
+      browserCheck.fingerprint(TEST_PHRASE, "TREZOR"),
     );
     // The synchronous forms of the page's own PBKDF2 answer in the same way.
-    await expect(browserCheck.fingerprintAsync(publicMnemonic)).resolves.toBe("73c5da0a");
+    await expect(browserCheck.fingerprintAsync(TEST_PHRASE)).resolves.toBe(TEST_FINGERPRINT);
   });
 
   it("is refused by the synchronous forms, with a line that names the forms to use", () => {
-    expect(() => webCheck.fingerprint(publicMnemonic)).toThrow(
+    expect(() => webCheck.fingerprint(TEST_PHRASE)).toThrow(
       "The host's PBKDF2 answers later: use matchAsync or fingerprintAsync with it.",
     );
   });
@@ -460,7 +468,7 @@ describe("a PBKDF2 that answers later, as WebCrypto's does", () => {
     ).rejects.toThrow("Invalid mnemonic");
     expect(pbkdf2Spy).not.toHaveBeenCalled();
     const short = new WalletEvidenceCheck(async () => new Uint8Array(32), [BITCOIN]);
-    await expect(short.fingerprintAsync(publicMnemonic)).rejects.toThrow(
+    await expect(short.fingerprintAsync(TEST_PHRASE)).rejects.toThrow(
       "The host's PBKDF2 gave 32 bytes, not 64.",
     );
   });
@@ -509,7 +517,7 @@ describe("the validators, which need no phrase", () => {
     ).not.toThrow();
     expect(() =>
       assertBitcoinEvidence(
-        located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"], testnet),
+        located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"], TESTNET_LOCATION),
       ),
     ).not.toThrow();
   });
@@ -573,7 +581,7 @@ describe("several addresses in a row, from the location's index on", () => {
   const SECOND_RECEIVING = "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g";
   const second = (
     addresses: number | undefined,
-    location: DerivationLocation = mainnet,
+    location: DerivationLocation = MAINNET_LOCATION,
   ): BitcoinEvidence => ({
     kind: "address",
     value: SECOND_RECEIVING,
@@ -583,10 +591,10 @@ describe("several addresses in a row, from the location's index on", () => {
   });
 
   it("finds an address among them, at its own path, and only there", () => {
-    expect(browserCheck.match(publicMnemonic, second(undefined)).matched).toBe(false);
-    expect(browserCheck.match(publicMnemonic, second(1)).matched).toBe(false);
+    expect(browserCheck.match(TEST_PHRASE, second(undefined)).matched).toBe(false);
+    expect(browserCheck.match(TEST_PHRASE, second(1)).matched).toBe(false);
     for (const addresses of [2, DEFAULT_ADDRESS_COUNT])
-      expect(browserCheck.match(publicMnemonic, second(addresses))).toEqual({
+      expect(browserCheck.match(TEST_PHRASE, second(addresses))).toEqual({
         matched: true,
         kind: "address",
         derived: SECOND_RECEIVING,
@@ -594,13 +602,15 @@ describe("several addresses in a row, from the location's index on", () => {
       });
     // From the third address on, the second is not among them.
     expect(
-      browserCheck.match(publicMnemonic, second(DEFAULT_ADDRESS_COUNT, { ...mainnet, index: 2 }))
-        .matched,
+      browserCheck.match(
+        TEST_PHRASE,
+        second(DEFAULT_ADDRESS_COUNT, { ...MAINNET_LOCATION, index: 2 }),
+      ).matched,
     ).toBe(false);
   });
 
   it("compares a public key and a WIF the same way", () => {
-    const later = { ...mainnet, index: 0 };
+    const later = { ...MAINNET_LOCATION, index: 0 };
     const profiles: readonly BitcoinProfile[] = ["native-segwit"];
     const wide: readonly BitcoinEvidence[] = [
       {
@@ -613,16 +623,17 @@ describe("several addresses in a row, from the location's index on", () => {
       { kind: "wif", value: BIP84.firstReceivingWif, profiles, location: later, addresses: 5 },
     ];
     for (const evidence of wide)
-      expect(browserCheck.match(publicMnemonic, evidence).path).toBe("m/84'/0'/0'/0/0");
+      expect(browserCheck.match(TEST_PHRASE, evidence).path).toBe("m/84'/0'/0'/0/0");
   });
 
   it("refuses a count on evidence that names no address, and trims as the coin checks do", () => {
-    // Counts on kinds that take none, given on purpose as a JavaScript host could.
-    for (const evidence of [
+    const counted = [
       { kind: "master-fingerprint", value: "73c5da0a", network: "mainnet", addresses: 0 },
       { kind: "master-xpub", value: BIP84.rootZpub, network: "mainnet", addresses: 2 },
       { ...located("account-xpub", BIP84.accountZpub, ["native-segwit"]), addresses: 1 },
-    ] as BitcoinEvidence[])
+    ];
+    // Counts on kinds that take none, given on purpose as a JavaScript host could.
+    for (const evidence of counted as BitcoinEvidence[])
       expect(() => assertBitcoinEvidence(evidence), evidence.kind).toThrow(
         "Only an address, an address of another coin, a compressed public key or a WIF is compared with several addresses.",
       );
@@ -642,7 +653,7 @@ describe("several addresses in a row, from the location's index on", () => {
       expect(() => assertBitcoinEvidence(second(addresses)), String(addresses)).toThrow(
         `The number of addresses compared must be an integer from 1 through ${MAX_ADDRESS_COUNT}.`,
       );
-    const last = { ...mainnet, index: 0x7fffffff };
+    const last = { ...MAINNET_LOCATION, index: 0x7fffffff };
     expect(() => assertBitcoinEvidence(second(1, last))).not.toThrow();
     expect(() => assertBitcoinEvidence(second(2, last))).toThrow("would pass index 2147483647");
   });
@@ -673,8 +684,8 @@ describe("the keys that a comparison derives", () => {
       located("wif", BIP84.firstReceivingWif, ["native-segwit"]),
     ];
     for (const each of evidence) {
-      expect(browserCheck.match(publicMnemonic, each).matched).toBe(true);
-      expect((await later.matchAsync(publicMnemonic, each)).matched).toBe(true);
+      expect(browserCheck.match(TEST_PHRASE, each).matched).toBe(true);
+      expect((await later.matchAsync(TEST_PHRASE, each)).matched).toBe(true);
     }
     const nodes = returnedKeys([...roots.mock.results, ...children.mock.results]);
     // Each comparison twice: a root and 4 × 5 steps, a root and 4 × 3, a root and 5.
@@ -689,10 +700,10 @@ describe("the keys that a comparison derives", () => {
       kind: "wif",
       value: BIP84.firstReceivingWif,
       profiles: ["legacy"],
-      location: mainnet,
+      location: MAINNET_LOCATION,
       addresses: 3,
     };
-    expect(browserCheck.match(publicMnemonic, evidence).matched).toBe(false);
+    expect(browserCheck.match(TEST_PHRASE, evidence).matched).toBe(false);
     const nodes = returnedKeys([...roots.mock.results, ...children.mock.results]);
     // A root, 4 steps down to the branch, and 3 addresses below it.
     expect(nodes).toHaveLength(1 + 4 + 3);

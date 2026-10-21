@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { recoverLegacyValidLastWords } from "../src/core.js";
 import { WordCandidateSearch } from "../src/core/candidates.js";
 import { matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /**
  * The candidates for `text`, a phrase with ? for one forgotten word, as the word search finds them:
@@ -20,9 +21,6 @@ function forgotten(text: string) {
     checksumBits: candidate.checksumBits,
   }));
 }
-
-const zeroMnemonic =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 describe("forgotten BIP39 word recovery", () => {
   it.each([16, 20, 24, 28, 32])(
@@ -70,19 +68,19 @@ describe("forgotten BIP39 word recovery", () => {
   );
 
   it("reports the word index and exact checksum bits for the public zero vector", () => {
-    const candidates = forgotten(zeroMnemonic.replace(/about$/u, "?"));
+    const candidates = forgotten(TEST_PHRASE.replace(/about$/u, "?"));
     expect(candidates).toHaveLength(128);
     expect(candidates).toContainEqual({
       position: 12,
       word: "about",
       wordIndex: 4,
-      mnemonic: zeroMnemonic,
+      mnemonic: TEST_PHRASE,
       checksumBits: "0011",
     });
   });
 
   it("identifies only the public zero vector from its BIP44 legacy address", () => {
-    const candidates = forgotten(zeroMnemonic.replace(/about$/u, "?"));
+    const candidates = forgotten(TEST_PHRASE.replace(/about$/u, "?"));
     const matches = candidates.filter(
       (candidate) =>
         matchBitcoinEvidence(candidate.mnemonic, {
@@ -92,7 +90,7 @@ describe("forgotten BIP39 word recovery", () => {
           location: { network: "mainnet", account: 0, branch: 0, index: 0 },
         }).matched,
     );
-    expect(matches.map((candidate) => candidate.mnemonic)).toEqual([zeroMnemonic]);
+    expect(matches.map((candidate) => candidate.mnemonic)).toEqual([TEST_PHRASE]);
   });
 
   it("enumerates valid legacy final-word replacements and marks the entropy-preserving one", () => {
@@ -112,7 +110,7 @@ describe("forgotten BIP39 word recovery", () => {
 
   it("rejects an unknown known word by its place", () => {
     expect(() =>
-      forgotten(zeroMnemonic.replace("abandon", "notaword").replace("about", "?")),
+      forgotten(TEST_PHRASE.replace("abandon", "notaword").replace("about", "?")),
     ).toThrow(/place 1/u);
   });
 

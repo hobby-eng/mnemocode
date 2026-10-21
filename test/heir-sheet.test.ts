@@ -216,11 +216,11 @@ describe("instructions for heirs", () => {
     expect(() => instructions.text({ ...facts, mode: "seedshift-legacy" })).toThrow(
       "Shares are made without Seedshift or with MnemoCode Seedshift.",
     );
-    // A mode for which no sheet is made, which no type allows here, fed on purpose as a JavaScript
-    // host could: refused at run time too.
     expect(() =>
       instructions.text({
         ...facts,
+        // A mode for which no sheet is made, which no type allows here, fed on purpose as a
+        // JavaScript host could: refused at run time too.
         mode: "seedshift-legacy-valid" as never,
         backup: { kind: "encoded", format: "english", words: 12 },
       }),

@@ -21,9 +21,6 @@ const harness = await vi.hoisted(async () => import("./helpers/keyed-terminal.js
 vi.mock("../src/cli/terminal-input.js", async (original) =>
   harness.replacedTerminalInput(await original()),
 );
-vi.mock("../src/cli/terminal-choice.js", async (original) =>
-  harness.replacedTerminalChoice(await original()),
-);
 
 keyedQuestions();
 beforeEach(() => {
@@ -43,31 +40,30 @@ afterEach(() => {
 });
 
 describe("Encode result visibility while the real backup question waits", () => {
-  it.each([false, true])(
-    "shows the Seedshift words only when requested, shares=%s",
-    async (sskr) => {
-      const maskedWords =
-        "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
-      for (const show of [false, true]) {
-        const screen = watchScreen(120);
-        vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
-          screen.write(format(...parts) + "\n");
-        });
-        const answers = [TEST_PHRASE + "\r", DATE + "\r", "2"];
-        terminal.keysFor = () => answers.shift()!;
-        await runEncode({
-          "ask-secrets": true,
-          mode: "seedshift",
-          format: "5",
-          ...(sskr ? { sskr: true, threshold: "2", shares: "3", "share-format": "colors" } : {}),
-          ...(show ? { "show-masked-words": true } : {}),
-        });
-        const visible = screen.lines().join("\n");
-        expect(visible.includes(maskedWords)).toBe(show);
-        expect(visible).not.toContain(TEST_PHRASE);
-      }
-    },
-  );
+  it.each([
+    ["one encoded copy", false],
+    ["shares", true],
+  ])("shows the Seedshift words beside %s only when they are requested", async (_, sskr) => {
+    const maskedWords = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
+    for (const show of [false, true]) {
+      const screen = watchScreen(120);
+      vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+        screen.write(format(...parts) + "\n");
+      });
+      const answers = [TEST_PHRASE + "\r", DATE + "\r", "2"];
+      terminal.keysFor = () => answers.shift()!;
+      await runEncode({
+        "ask-secrets": true,
+        mode: "seedshift",
+        format: "5",
+        ...(sskr ? { sskr: true, threshold: "2", shares: "3", "share-format": "colors" } : {}),
+        ...(show ? { "show-masked-words": true } : {}),
+      });
+      const visible = screen.lines().join("\n");
+      expect(visible.includes(maskedWords)).toBe(show);
+      expect(visible).not.toContain(TEST_PHRASE);
+    }
+  });
 
   it.each(["direct", "seedshift"] as const)(
     "shows only the requested forms of the original phrase with %s shares",
@@ -189,43 +185,46 @@ describe("Optional phrase copies stay apart from exported shares", () => {
 
 describe("Encode result stays on the private screen through follow-up questions", () => {
   it.each([
-    { mode: "direct", shares: false },
-    { mode: "seedshift", shares: false },
-    { mode: "direct", shares: true },
-    { mode: "seedshift", shares: true },
-  ] as const)("keeps $mode output visible with shares=$shares", async ({ mode, shares }) => {
-    const screen = watchScreen(120);
-    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
-      screen.write(format(...parts) + "\n");
-    });
-    const answers = [TEST_PHRASE + "\r", ...(mode === "direct" ? [] : [DATE + "\r"]), "2"];
-    terminal.keysFor = () => answers.shift()!;
-    let atCheck: string | undefined;
-    terminal.onFirstKey = () => {
-      if (terminal.asked.at(-1)?.question === "Check the backup now?")
-        atCheck = screen.lines().join("\n");
-    };
-    expect(
-      await runEncode({
-        "ask-secrets": true,
-        mode,
-        format: "2",
-        ...(shares ? { sskr: true, threshold: "2", shares: "3" } : {}),
-      }),
-    ).toBeUndefined();
-    expect(atCheck).toContain("Check the backup now?");
-    expect(atCheck).toContain(mode === "direct" ? "1 1 1 1 1 1 1 1 1 1 1 4" : MASKED);
-    // The result is a step of its own (CORE-39): the secret prompts, and the dates typed at one,
-    // were cleared away before it.
-    expect(atCheck).not.toContain("Seed phrase (English BIP39 words):");
-    expect(atCheck).not.toContain("Dates (");
-    expect(atCheck).not.toContain(DATE);
-    if (shares)
-      for (const number of [1, 2, 3]) expect(atCheck).toContain(`SSKR share ${number} of 3`);
-    expect(screen.lines().join("\n")).toContain(
-      mode === "direct" ? "1 1 1 1 1 1 1 1 1 1 1 4" : MASKED,
-    );
-  });
+    { mode: "direct", shares: false, result: "one encoded copy" },
+    { mode: "seedshift", shares: false, result: "one encoded copy" },
+    { mode: "direct", shares: true, result: "shares" },
+    { mode: "seedshift", shares: true, result: "shares" },
+  ] as const)(
+    "keeps $result of mode $mode visible while it asks to check the backup",
+    async ({ mode, shares }) => {
+      const screen = watchScreen(120);
+      vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+        screen.write(format(...parts) + "\n");
+      });
+      const answers = [TEST_PHRASE + "\r", ...(mode === "direct" ? [] : [DATE + "\r"]), "2"];
+      terminal.keysFor = () => answers.shift()!;
+      let atCheck: string | undefined;
+      terminal.onFirstKey = () => {
+        if (terminal.asked.at(-1)?.question === "Check the backup now?")
+          atCheck = screen.lines().join("\n");
+      };
+      expect(
+        await runEncode({
+          "ask-secrets": true,
+          mode,
+          format: "2",
+          ...(shares ? { sskr: true, threshold: "2", shares: "3" } : {}),
+        }),
+      ).toBeUndefined();
+      expect(atCheck).toContain("Check the backup now?");
+      expect(atCheck).toContain(mode === "direct" ? "1 1 1 1 1 1 1 1 1 1 1 4" : MASKED);
+      // The result is a step of its own (CORE-39): the secret prompts, and the dates typed at one,
+      // were cleared away before it.
+      expect(atCheck).not.toContain("Seed phrase (English BIP39 words):");
+      expect(atCheck).not.toContain("Dates (");
+      expect(atCheck).not.toContain(DATE);
+      if (shares)
+        for (const number of [1, 2, 3]) expect(atCheck).toContain(`SSKR share ${number} of 3`);
+      expect(screen.lines().join("\n")).toContain(
+        mode === "direct" ? "1 1 1 1 1 1 1 1 1 1 1 4" : MASKED,
+      );
+    },
+  );
 
   it("shows the shares that sskr-export writes again on a screen of their own", async () => {
     const screen = watchScreen(400);
