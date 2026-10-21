@@ -69,7 +69,12 @@ import { hexOfBytes } from "./bits.js";
 import { Masking, decodeInput } from "./masking.js";
 import { isFingerprintText, type PhraseFingerprint } from "./wallet-check.js";
 import { ErrorCatalog } from "./error-catalog.js";
-import { MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC } from "./self-test-vectors.js";
+import {
+  MASKED_DATE,
+  MASKED_ENGLISH,
+  PUBLIC_MNEMONIC,
+  SEEDSHIFT_DATES,
+} from "./self-test-vectors.js";
 import { isOneOf } from "./one-of.js";
 import { MILLISECONDS_PER_SECOND, startTimer, type MonotonicClock } from "./search-turns.js";
 
@@ -368,7 +373,7 @@ async function checkPublicVectors(host: SelfTestHost): Promise<number> {
 /** Every phrase length in every form and mode, forward and back; gives the round trips made. */
 function checkAllLengthsAndFormats(): number {
   const entropySizes = BIP39_ENTROPY_BYTES;
-  const dates = [parseDate(MASKED_DATE), parseDate("08-08-1988"), parseDate("07-11-1951")];
+  const dates = SEEDSHIFT_DATES.map(parseDate);
   let count = 0;
   for (const entropySize of entropySizes) {
     const mnemonic = entropyToMnemonic(
@@ -401,7 +406,7 @@ function checkAllLengthsAndFormats(): number {
 }
 
 function checkDateOrdering(): void {
-  const first = [parseDate(MASKED_DATE), parseDate("08-08-1988"), parseDate("07-11-1951")];
+  const first = SEEDSHIFT_DATES.map(parseDate);
   const reversed = [...first].reverse();
   equal(
     formatEncoded(encodeMnemonic(PUBLIC_MNEMONIC, first), "indexes"),

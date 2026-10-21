@@ -51,6 +51,12 @@ It checks that
   the screen with every warning it gave, when no candidate matched the
   wallet and when the candidates are too many to show; a short list of
   candidates taller than the screen is read whole by pages;
+- an answer under a result that leads to another step starts a screen
+  of its own, without the old result: the dates typed again in Decode,
+  recover-date and Re-encode, and recover-date's search with another
+  wallet, which is asked under the result; the legacy replacements of
+  recover-word stand on a screen of their own, without the phrase
+  typed;
 - Re-encode keeps the heading and the notices of its confirmation on the
   screens of the new backup, the wallet warning once, and a refusal
   above the questions asked again, also after a chosen answer; the
@@ -113,6 +119,7 @@ from terminal_menu_checks import (
     check_share_word_hints,
     check_word_hints,
 )
+from terminal_step_checks import check_steps_after_result
 from terminal_summary_checks import (
     check_summary_after_cancel,
     check_summary_after_save,
@@ -172,6 +179,7 @@ def main():
     check_share_pages()
     check_word_result_under_question()
     check_word_candidate_pages()
+    check_steps_after_result()
     check_candidate_passphrase_roles()
     check_ctrl_c()
     check_ctrl_c_during_image_export()

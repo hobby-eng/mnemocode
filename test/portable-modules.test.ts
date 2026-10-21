@@ -648,7 +648,7 @@ describe("Parts for other hosts, each imported alone", () => {
     expect(documented).toEqual(expected);
   });
 
-  it("each have a package export of their own, and the package exports no other module", () => {
+  it("each have a package export of their own, beside which the package exports only the public modules and its earlier entries", () => {
     const { exports } = manifest;
     const expected = Object.fromEntries(
       [...Object.keys(PARTS), ...PUBLIC_MODULES.map((name) => `src/${name}.ts`)].map((part) => {

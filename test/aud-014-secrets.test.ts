@@ -102,6 +102,7 @@ describe("AUD-014-SEC001: only the three known protections, none only when chose
       { kind: "passphrase", passphrase: null },
       { kind: "passphrase", passphrase: LIST_PASSPHRASE, recipient: "age1" },
     ];
+    const messages = new Set<string>();
     for (const choice of malformed) {
       let refusal: unknown;
       try {
@@ -111,8 +112,11 @@ describe("AUD-014-SEC001: only the three known protections, none only when chose
         refusal = error;
       }
       assert.instanceOf(refusal, TypeError, JSON.stringify(choice));
-      expect(refusal.message).not.toContain(LIST_PASSPHRASE);
+      messages.add(refusal.message);
     }
+    // One message for every choice, so that no field of any choice is in it.
+    expect(messages.size).toBe(1);
+    expect([...messages][0]).not.toContain(LIST_PASSPHRASE);
   });
 
   it("still takes the three well-formed choices, and writes in the open only for none", async () => {

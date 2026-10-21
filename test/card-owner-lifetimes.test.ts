@@ -98,8 +98,10 @@ describe("card result owners", () => {
       expect(cards.shares).toEqual(metadata);
       expect(cards.layout).toBe("individual");
       expect(() => cards.printedCodes(0)).toThrow(expect.objectContaining(WIPED));
+      expect(() => cards.ownCodes(0)).toThrow(expect.objectContaining(WIPED));
       expect(() => cards.qrCodes).toThrow(expect.objectContaining(WIPED));
       expect(() => cards.forIndividualCards()).toThrow(expect.objectContaining(WIPED));
+      await expect(cards.renderShare(0)).rejects.toMatchObject(WIPED);
       await expect(cards.renderAll()).rejects.toMatchObject(WIPED);
       await expect(cards.documents(0).next()).rejects.toMatchObject(WIPED);
     } finally {

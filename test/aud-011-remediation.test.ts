@@ -15,6 +15,7 @@ import {
   colorsToIndexes,
   colorsToUnicode,
   indexesToColors,
+  rgbHex,
   unicodeToColors,
   wordPositionPlacements,
 } from "../src/core/colors.js";
@@ -150,11 +151,22 @@ describe("AUD-011-ARC002, ARC003, ARC020: the color form has one decoder and der
 
   it("reads colors in any order and with offset tags, complete or marked, alike", () => {
     expect(colors).toHaveLength(8);
-    expect(colorsToIndexes([...colors].reverse())).toEqual(indexes);
-    // The positions that marked reading gives are those of complete reading.
-    const [patterns = []] = wordPositionPlacements(colors);
-    expect(patterns.map(Number)).toEqual(indexes.map((index) => index + 1));
-    expect(wordPositionPlacements([undefined, ...colors.slice(1)])[0]?.[0]).toBe("????");
+    // An older record counts the tags from 1 (docs/MANUAL_RECOVERY.md): the two leading decimal
+    // digits of each color's value, the tag, are one more.
+    const offset = colors.map((color) => rgbHex(Number.parseInt(color.slice(1), 16) + 1_000_000));
+    const orders = [
+      (set: readonly string[]) => [...set],
+      (set: readonly string[]) => [...set].reverse(),
+      (set: readonly string[]) => [...set.slice(3), ...set.slice(0, 3)],
+      (set: readonly string[]) => [...set.filter((_, at) => at % 2 === 1), ...set.filter((_, at) => at % 2 === 0)],
+    ];
+    for (const set of [colors, offset]) {
+      for (const order of orders) expect(colorsToIndexes(order(set))).toEqual(indexes);
+      // The positions that marked reading gives are those of complete reading.
+      const [patterns = []] = wordPositionPlacements(set);
+      expect(patterns.map(Number)).toEqual(indexes.map((index) => index + 1));
+      expect(wordPositionPlacements([undefined, ...set.slice(1)])[0]?.[0]).toBe("????");
+    }
   });
 
   it("refuses a pair of Private Use codes that writes no #RRGGBB color, marked or not", () => {

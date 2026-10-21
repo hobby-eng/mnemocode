@@ -8,7 +8,9 @@ export { renderCards } from "./render.js";
 /**
  * Renders `jobs` as one PDF and publishes it as a new private file at `path`, never over anything
  * that is there: a name that appears after the preflight chose it is refused with EEXIST, which a
- * save on the private screen offers to answer with another name (AUD-014-FUN003).
+ * save on the private screen offers to answer with another name (AUD-014-FUN003). Refuses what
+ * renderCards refuses, such as no job at all (export.render.no-cards-to-render), before the file
+ * is opened; the other failures of the save are those that publishNewPrivateFile names.
  */
 export async function exportCards(jobs: readonly CardJob[], path: string): Promise<void> {
   // Render completely before opening the destination, including for preview --all. The cards show

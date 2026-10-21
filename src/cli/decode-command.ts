@@ -60,7 +60,9 @@ import {
   backupFromOptions,
   transformMode,
 } from "./input.js";
+import { candidateLabel } from "./candidate-view.js";
 import { clearPrivateScreen, onPrivateScreen } from "./private-screen.js";
+import { PrivateSteps } from "./private-steps.js";
 import {
   type Channel,
   terminalLine,
@@ -215,7 +217,7 @@ function showCandidateParts(
   const note = `Each ${label.toLowerCase()} uses an ${FINGERPRINT_NOTE}. ${FINGERPRINT_DISCLOSURE}`;
   for (const line of hintLines(process.stdout, note)) console.log(line);
   for (const [index, candidate] of candidates.entries()) {
-    terminalPart(`Candidate ${index + 1} of ${candidates.length}`, true);
+    terminalPart(`${candidateLabel(index + 1)} of ${candidates.length}`, true);
     if (!terminalPhrase(candidate.recoveredMnemonic)) console.log(candidate.recoveredMnemonic);
     const fingerprint = masterFingerprint(candidate.recoveredMnemonic);
     console.log(factLine(process.stdout, label, fingerprint, label.length));
@@ -320,19 +322,19 @@ const DECODE: DecodeUse = {
   show: (result, mode, format) => showRecovered(result, mode, format),
 };
 
-/** The answers that decode's options give its questions on the private screen. */
-interface GivenAnswers {
+/**
+ * The answers that decode's options give its questions on the private screen: those of the search
+ * of marked codes, which the date search takes its limit from too, and the following.
+ */
+interface GivenAnswers extends Pick<
+  MissingCodesAnswers,
+  "encodedFingerprint" | "list" | "maxCandidates"
+> {
   /**
    * The wallet of the options, where another is looked for, and the owner of its BIP39 passphrase,
    * which gives the passphrase to each search that takes it (CORE-24); the command disposes it.
    */
   readonly wallet: GivenWallet;
-  /** --encoded-fingerprint, which answers "Encoded fingerprint". */
-  readonly encodedFingerprint: string | undefined;
-  /** --list-candidates, which answers "List every candidate". */
-  readonly list: boolean;
-  /** --max-candidates: the combinations of codes and dates tried without asking. */
-  readonly maxCandidates: number | undefined;
   /** The most matches of a date search shown. */
   readonly maxResults: number;
 }
@@ -365,14 +367,13 @@ function givenAnswers(args: ParsedArguments, wallet: GivenWallet): GivenAnswers 
  * owner for that search alone.
  */
 function missingCodesAnswers(given: GivenAnswers): MissingCodesAnswers {
-  const { wallet } = given;
+  // The most matches shown is the date search's alone.
+  const { wallet, maxResults: _dateSearchOnly, ...answers } = given;
   return {
+    ...answers,
     place: wallet.place,
     evidence: wallet.evidence,
     passphrase: wallet.passphrase,
-    encodedFingerprint: given.encodedFingerprint,
-    list: given.list,
-    maxCandidates: given.maxCandidates,
   };
 }
 
@@ -436,6 +437,8 @@ export async function decodeWithQuestions(
   try {
     for (let step: Step | Cancelled = "backup"; step !== "done";) {
       if (step === CANCELLED) return CANCELLED;
+      // An answer under a result led here: this step is not drawn under it (CORE-39).
+      PrivateSteps.leaveResult();
       if (step === "backup") {
         markedCodes?.wipe();
         markedCodes = undefined;

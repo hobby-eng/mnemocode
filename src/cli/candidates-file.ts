@@ -36,6 +36,7 @@ import {
   terminalSaved,
 } from "./terminal.js";
 import { saveOutput } from "./output-saving.js";
+import type { Choice } from "./terminal-choice.js";
 import { counted } from "../core/search-plan.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
@@ -89,6 +90,14 @@ const CANDIDATE_PROTECTION_OPTIONS = [
 
 /** A candidate list for the Discovery Scanner, and its protection. */
 export const CANDIDATE_LIST_OPTIONS = ["candidates-file", ...CANDIDATE_PROTECTION_OPTIONS] as const;
+
+/**
+ * The answer, with `value`, that stops after a search that found more candidates than a list
+ * holds: the list is not saved. recover-word and recover-date offer it so.
+ */
+export function stopWithoutListAnswer<T>(value: T): Choice<T> {
+  return { label: "Stop", note: "no list is saved", value };
+}
 
 /**
  * The candidate list to save: where it goes and how it is protected, settled before any secret is

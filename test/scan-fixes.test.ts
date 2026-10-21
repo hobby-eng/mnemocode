@@ -13,7 +13,13 @@ import { Masking, SPLIT_MODES_ONLY } from "../src/core/masking.js";
 import { duration } from "../src/core/search-plan.js";
 import { markUnits } from "./helpers/shares.js";
 import { publicShare, sskrVectors } from "./helpers/vectors.js";
-import { DATE, MASKED_WORDS, OTHER_PHRASE, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  DATE_LAST_DIGIT_FORGOTTEN,
+  MASKED_WORDS,
+  OTHER_PHRASE,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 import type { MoreWithin, NextByte } from "../src/cli/terminal-keys.js";
 
 // The BIP39 library as it is, with the turning of a phrase into entropy watched: S005's case keeps
@@ -406,7 +412,7 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
     });
     const searched = new ShareUnmasking({
       mode: "seedshift",
-      dates: DatesAnswer.parse("23-09-202?", { patterns: true }),
+      dates: DatesAnswer.parse(DATE_LAST_DIGIT_FORGOTTEN, { patterns: true }),
       walletCheck: noWallet,
     });
     expect(searched.searchedCombinations).toBe(10);
@@ -669,7 +675,7 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
       await restorer.restore({
         input: inputOf(MASKED_SHARES),
         mode: "seedshift",
-        dates: DatesAnswer.parse("23-09-202?", { patterns: true }),
+        dates: DatesAnswer.parse(DATE_LAST_DIGIT_FORGOTTEN, { patterns: true }),
         confirmed: true,
       }),
     ).toEqual({ kind: "trouble", message: walletReason("seedshift"), lines: [] });

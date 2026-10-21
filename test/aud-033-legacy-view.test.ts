@@ -4,6 +4,7 @@ import { runDecode } from "../src/cli/decode-command.js";
 import { PrivatePage } from "../src/cli/private-page.js";
 import { closingRows } from "../src/cli/private-screen.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
+import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { defined } from "../src/core/defined.js";
 import { serializeRecord } from "../src/record.js";
 import { CTRL_C, END, ENTER, HOME } from "./helpers/keys.js";
@@ -64,8 +65,7 @@ describe("finite private legacy-valid candidate results", () => {
     }
     // Grey (SGR 90) labels, before the colour codes are taken out of what was written.
     expect(terminal.written).toContain("\x1b[90mOriginal fingerprint");
-    // oxlint-disable-next-line no-control-regex -- it removes the colour codes of the output
-    const lines = terminal.written.replace(/\x1b\[[0-9;]*m/gu, "").split("\n");
+    const lines = terminal.written.replace(STYLE_CODES, "").split("\n");
     expect(lines).toEqual(
       expect.arrayContaining([
         "MnemoCode · Recovered candidates",
@@ -106,6 +106,9 @@ describe("finite private legacy-valid candidate results", () => {
     keyboard.bytes = [];
     await runDecode(parseArguments(ARGS));
     expect(raw).toHaveLength(128);
+    expect(raw.map((line) => Number(line.split("\t")[0]))).toEqual(
+      Array.from({ length: 128 }, (_, place) => place + 1),
+    );
     expect(raw[0]).toMatch(new RegExp(`^1\\t${TEST_PHRASE}\\t[0-9a-f]{8}$`, "u"));
     expect(raw[127]).toMatch(new RegExp(`^128\\t${LAST_CANDIDATE}\\t[0-9a-f]{8}$`, "u"));
     expect(terminal.written).not.toContain("Home/End");

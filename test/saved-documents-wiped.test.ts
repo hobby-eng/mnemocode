@@ -2,7 +2,6 @@
 // memory once it is written or refused (wipedAfterAsync), never while it is still being written.
 // The bytes handed to the real publisher are captured. Public test data only.
 
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -19,11 +18,12 @@ vi.mock("../src/export/private-file.js", async (original) => {
   };
 });
 
+import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { wipedAfterAsync } from "../src/core/bits.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
 import { allWiped } from "./helpers/made-arrays.js";
 import { testFolder } from "./helpers/test-folders.js";
-import { TEST_NUMBERS } from "./helpers/test-phrase.js";
+import { TEST_RECORD } from "./helpers/test-phrase.js";
 
 afterEach(() => {
   captured.published.length = 0;
@@ -55,8 +55,9 @@ describe("a saved QR image of a backup", () => {
   it("is written complete, and the bytes that were written are wiped afterwards", async () => {
     const folder = await testFolder("mnemocode-saved-wiped-");
     const path = join(folder, "record-qr.png");
-    await exportQrPayload(`MNC1:direct:indexes:${TEST_NUMBERS}`, path);
-    expect((await readFile(path)).length).toBeGreaterThan(0);
+    await exportQrPayload(TEST_RECORD, path);
+    // The file holds the whole code, so the bytes were wiped only after they were written.
+    expect(await decodeQrPngFile(path)).toBe(TEST_RECORD);
     expect(captured.published).toHaveLength(1);
     expect(captured.published[0]!.length).toBeGreaterThan(0);
     expect(allWiped(captured.published)).toBe(true);

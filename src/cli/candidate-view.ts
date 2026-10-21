@@ -1,8 +1,9 @@
 // The candidates of a search on a terminal, as Decode's search of marked codes, recover-word and
 // recover-date show them: each a part of the result of its own, its facts as grey labels with
-// their values, each value wrapped at spaces under its own column (CORE-36), so that a seed phrase
-// is never broken inside a word by the terminal. A file, a pipe and TERM=dumb take each command's
-// rows for a script instead.
+// their values, each value wrapped at spaces under its own column within 78 columns (TEXT_WIDTH,
+// CORE-36), so that a terminal of 80 columns or more never breaks a seed phrase inside a word; a
+// narrower one wraps the rows again where it ends. A file, a pipe and TERM=dumb take each
+// command's rows for a script instead.
 
 import { linesFitPrivateScreen } from "./screen-fit.js";
 import { partLine } from "./terminal.js";
@@ -10,6 +11,19 @@ import { factLine, STYLE_CODES } from "./terminal-style.js";
 
 /** The facts of a candidate, each a label and its value, in the order they are shown. */
 export type CandidateFacts = readonly (readonly [string, string])[];
+
+/** The label of the part of candidate `number`, counted from 1: "Candidate 3". */
+export function candidateLabel(number: number): string {
+  return `Candidate ${number}`;
+}
+
+/**
+ * What the wallet check says of a candidate that matched: the derivation `path` at which the wallet
+ * matched, or the evidence requested where the check names no path.
+ */
+export function matchedAt(path: string | undefined): string {
+  return `matched at ${path ?? "requested evidence"}`;
+}
 
 /**
  * The lines of one candidate on standard output, as console.log writes them: its `label`, grey,

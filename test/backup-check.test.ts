@@ -41,7 +41,14 @@ import { serializeRecord } from "../src/record.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { urToBytewords, writeShare } from "../src/sskr/transport.js";
-import { DATE, MASKED_WORDS, TEST_PHRASE, WRONG_DATE } from "./helpers/test-phrase.js";
+import { SHARE_FORMATS } from "../src/sskr/share-units.js";
+import {
+  DATE,
+  MASKED_WORDS,
+  TEST_PHRASE,
+  WRONG_DATE,
+  ZERO_ENTROPY_PHRASES,
+} from "./helpers/test-phrase.js";
 
 /** The host's reader of an encoded seed phrase, which a phrase typed as shares is sent to. */
 const TEXTS = { decodeEntry: "The Decode tab" };
@@ -97,7 +104,7 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
       places: [1, 8],
       message: "The codes at places 1 and 8 differ from the result.",
     });
-    const longer = encodeMnemonic(`${"abandon ".repeat(14)}address`, [parseDate(DATE)]);
+    const longer = encodeMnemonic(ZERO_ENTROPY_PHRASES[15], [parseDate(DATE)]);
     expect(check.steps.compare(check.readCodes(formatEncoded(longer, "colors")))).toMatchObject({
       kind: "count",
       message: "The backup has 8 codes; these are 10.",
@@ -111,7 +118,7 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
   it("places a code as typed in Color Unicode, two codes to a colour, and counts them so", () => {
     for (const [phrase, last] of [
       [TEST_PHRASE, 16],
-      [`${"abandon ".repeat(23)}art`, 32],
+      [ZERO_ENTROPY_PHRASES[24], 32],
     ] as const) {
       const masked = encodeMnemonic(phrase, [parseDate(DATE)]);
       const check = new EncodedBackupCheck({
@@ -138,14 +145,14 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
       }
     }
     const check = new EncodedBackupCheck(encoded([DATE], "colors-unicode"));
-    const longer = encodeMnemonic(`${"abandon ".repeat(14)}address`, [parseDate(DATE)]);
+    const longer = encodeMnemonic(ZERO_ENTROPY_PHRASES[15], [parseDate(DATE)]);
     expect(
       check.steps.compare(check.readCodes(formatEncoded(longer, "colors-unicode")))?.message,
     ).toBe("The backup has 16 codes; these are 20.");
   });
 
   it("places colours as they were typed, in any order, also the last of 24 words", () => {
-    const phrase = `${"abandon ".repeat(23)}art`;
+    const phrase = ZERO_ENTROPY_PHRASES[24];
     const masked = encodeMnemonic(phrase, [parseDate(DATE)]);
     const check = new EncodedBackupCheck({
       mnemonic: phrase,
@@ -316,11 +323,10 @@ const dates: readonly DateShiftDate[] = [parseDate(DATE)];
 describe("checking written-down Shamir shares", () => {
   it("accepts enough shares, in any written form, with the dates", async () => {
     const shares = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
-    expect(await shareBackupVerdict(TEST_PHRASE, `${shares[0]};${shares[2]}`, "direct", "")).toBe(
-      "restores",
-    );
-    const words = `${urToBytewords(shares[1]!)};${urToBytewords(shares[2]!)}`;
-    expect(await shareBackupVerdict(TEST_PHRASE, words, "direct", "")).toBe("restores");
+    for (const format of SHARE_FORMATS) {
+      const written = `${writeShare(shares[1]!, format)};${writeShare(shares[2]!, format)}`;
+      expect(await shareBackupVerdict(TEST_PHRASE, written, "direct", ""), format).toBe("restores");
+    }
     const maskedShares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
     const typed = `${maskedShares[0]};${maskedShares[1]}`;
     expect(await shareBackupVerdict(TEST_PHRASE, typed, "seedshift", DATE)).toBe("restores");

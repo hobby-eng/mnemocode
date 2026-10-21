@@ -11,6 +11,7 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareRestore } from "../src/sskr/share-restore.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { WIPED_CODE } from "./helpers/owner-lifetime.js";
+import { DATE_LAST_DIGIT_FORGOTTEN } from "./helpers/test-phrase.js";
 
 const WIPED = { code: WIPED_CODE };
 const [FIRST, SECOND] = SSKR_SET_VECTOR.shares;
@@ -71,7 +72,7 @@ describe("a restore whose input ends while a host step is awaited", () => {
       input,
       mode: "seedshift",
       confirmed: true,
-      dates: DatesAnswer.parse("23-09-202?", { patterns: true }),
+      dates: DatesAnswer.parse(DATE_LAST_DIGIT_FORGOTTEN, { patterns: true }),
       walletCheck: async () => {
         input.wipe();
         return { matched: false };

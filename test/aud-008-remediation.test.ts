@@ -31,7 +31,13 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { joinUnits } from "./helpers/shares.js";
 import { sskrVectors } from "./helpers/vectors.js";
-import { DATE, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+  TEST_PUBLIC_KEY,
+  TEST_WIF,
+} from "./helpers/test-phrase.js";
 
 const vectors = sskrVectors();
 const MAINNET_LOCATION = { network: "mainnet" as const, account: 0, branch: 0, index: 0 };
@@ -99,16 +105,9 @@ describe("AUD-008-API002: key evidence that no wallet can match is refused", () 
         matchBitcoinEvidence(TEST_PHRASE, evidence("wif", wifOf(scalar(value)))),
       ).toThrow(/secp256k1/u);
     // The public phrase's first native SegWit key, m/84'/0'/0'/0/0.
-    const valid = "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d";
-    expect(matchBitcoinEvidence(TEST_PHRASE, evidence("wif", valid)).matched).toBe(true);
+    expect(matchBitcoinEvidence(TEST_PHRASE, evidence("wif", TEST_WIF)).matched).toBe(true);
     expect(
-      matchBitcoinEvidence(
-        TEST_PHRASE,
-        evidence(
-          "compressed-public-key",
-          "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c",
-        ),
-      ).matched,
+      matchBitcoinEvidence(TEST_PHRASE, evidence("compressed-public-key", TEST_PUBLIC_KEY)).matched,
     ).toBe(true);
   });
 });

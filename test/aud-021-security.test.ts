@@ -22,7 +22,7 @@ import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
 import { candidateVectors } from "./helpers/vectors.js";
 import { testFolder } from "./helpers/test-folders.js";
-import { TEST_NUMBERS } from "./helpers/test-phrase.js";
+import { TEST_RECORD } from "./helpers/test-phrase.js";
 
 const captured = vi.hoisted(
   (): { limits: (number | undefined)[]; compressed: Uint8Array[]; inflated: Uint8Array[] } => ({
@@ -77,9 +77,11 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
       expect(PngAdmission.hasSignature(png.subarray(0, length))).toBe(false);
     const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0]);
     expect(PngAdmission.hasSignature(jpeg)).toBe(false);
-    const wrong = Buffer.from(png);
-    wrong[0] = 0;
-    expect(PngAdmission.hasSignature(wrong)).toBe(false);
+    for (let place = 0; place < PNG_SIGNATURE.length; place += 1) {
+      const wrong = Buffer.from(png);
+      wrong[place] = wrong[place]! ^ 0xff;
+      expect(PngAdmission.hasSignature(wrong)).toBe(false);
+    }
   });
   it("refuses a second valid-CRC header before pngjs can replace the admitted dimensions", async () => {
     const decode = vi.spyOn(PNG.sync, "read");
@@ -118,7 +120,7 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
   );
 
   it("reads an actual exporter QR unchanged after admission", async () => {
-    const payload = `MNC1:direct:indexes:${TEST_NUMBERS}`;
+    const payload = TEST_RECORD;
     const path = await pathOf();
     await exportQrPayload(payload, path);
     expect(await decodeQrPngFile(path)).toBe(payload);

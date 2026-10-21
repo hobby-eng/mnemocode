@@ -6,6 +6,8 @@ import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { heirSheetText, type HeirSheetFacts } from "../src/cli/heir-sheet.js";
 import { SPLIT_MODES_ONLY } from "../src/core/masking.js";
+import { ENCODED_FORMATS } from "../src/core/types.js";
+import { SHARE_FORMATS } from "../src/sskr/share-units.js";
 import { A5, A6, renderHeirSheet } from "../src/export/heir-sheet.js";
 import { HeirInstructions, type HeirRoute } from "../src/export/heir-sheet-text.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
@@ -26,7 +28,7 @@ async function pageSize(path: string): Promise<number[]> {
 
 /** Every kind of backup the sheet describes, with the longest wording of each. */
 const EVERY_SHEET: readonly HeirSheetFacts[] = [
-  ...(["words", "ur", "colors", "unicode"] as const).flatMap((format) =>
+  ...SHARE_FORMATS.flatMap((format) =>
     (["direct", "seedshift"] as const).map((mode) => ({
       // The most codes of a share on its cards: the Unicode codes of a 24-word share.
       backup: { kind: "shares" as const, format, threshold: 16, count: 16, codes: 33 },
@@ -34,7 +36,7 @@ const EVERY_SHEET: readonly HeirSheetFacts[] = [
       dates: mode === "direct" ? 0 : MOST_DATES,
     })),
   ),
-  ...(["english", "indexes", "unicode", "colors", "colors-unicode"] as const).flatMap((format) =>
+  ...ENCODED_FORMATS.flatMap((format) =>
     (["direct", "seedshift", "seedshift-legacy"] as const).map((mode) => ({
       backup: { kind: "encoded" as const, format, words: 24 as const },
       mode,

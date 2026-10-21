@@ -10,8 +10,8 @@ import {
   encryptCandidates,
   protectionFor,
 } from "../src/core/candidate-encryption.js";
+import { ENCRYPTION_SELF_TEST_FAILED as FAILED } from "./helpers/refusals.js";
 
-const FAILED = "core.candidate-encryption.self-test-failed";
 const FAILURE = "Synthetic X25519 known-answer failure.";
 
 /** Makes every X25519 known answer fail from now on, as a broken engine would. */

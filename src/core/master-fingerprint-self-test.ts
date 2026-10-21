@@ -17,7 +17,7 @@ import {
   hexOfBytes,
 } from "./self-test-check.js";
 import { ErrorCatalog } from "./error-catalog.js";
-import { PUBLIC_FINGERPRINT, PUBLIC_MNEMONIC } from "./self-test-vectors.js";
+import { PUBLIC_FINGERPRINT, PUBLIC_MNEMONIC, PUBLIC_MNEMONIC_24 } from "./self-test-vectors.js";
 
 const ERRORS = new ErrorCatalog("core.master-fingerprint-self-test", {
   "bip39-seed-was-asked-other-parameters": () =>
@@ -99,7 +99,7 @@ const BIP39_VECTORS: readonly (readonly [string, string])[] = [
     "0cd6e5d827bb62eb8fc1e262254223817fd068a74b5b449cc2f667c3f1f985a76379b43348d952e2265b4cd129090758b3e3c2c49103b5051aac2eaeb890a528",
   ],
   [
-    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+    PUBLIC_MNEMONIC_24,
     "bda85446c68413707090a52022edd26a1c9462295029f2e60cd7c4f2bbd3097170af7a4d73245cafa9c3cca8d561a7c3de6f5d4a10be8ed2a5e608d68f92fcc8",
   ],
   [

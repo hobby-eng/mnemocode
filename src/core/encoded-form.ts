@@ -232,6 +232,16 @@ const LIKELY_ORDER = Object.freeze([
 ] as const satisfies readonly EncodedFormat[]);
 
 /**
+ * A copy of `indexes`, refused unless they are a phrase (assertPhraseIndexes): the one check of
+ * every form that writes codes from indexes, so that no form writes codes of no phrase.
+ */
+function phraseIndexes(indexes: readonly number[]): number[] {
+  const phrase = Array.from(indexes);
+  assertPhraseIndexes(phrase);
+  return phrase;
+}
+
+/**
  * One form of codes and its facts. A class, so that callers ask the form instead of switching
  * over its name: the values are made once, one for each form, and never change.
  */
@@ -303,9 +313,7 @@ export class EncodedForm {
    * assert-word-indexes-refused; AUD-037-API008), never written as text that cannot be read back.
    */
   codes(indexes: readonly number[]): string {
-    const phrase = Array.from(indexes);
-    assertPhraseIndexes(phrase);
-    return this.#variant.write(phrase);
+    return this.#variant.write(phraseIndexes(indexes));
   }
 
   /**
@@ -336,15 +344,21 @@ export class EncodedForm {
    * The codes of `indexes` one by one, as a person types them in this form: a word or its number,
    * a Unicode code, a colour, or one of the two codes of a colour in Color Unicode. Two are equal
    * only where they are the same, so that what differs between two phrases is named by the place
-   * of the code a person typed (AUD-037-FUN003).
+   * of the code a person typed (AUD-037-FUN003). Indexes that are no phrase are refused in every
+   * form, as codes refuses them (core.bip39-sizes.expected-word-indexes,
+   * assert-word-indexes-refused).
    */
   elements(indexes: readonly number[]): readonly string[] {
-    return this.#variant.codesOf?.(indexes) ?? indexes.map(String);
+    const phrase = phraseIndexes(indexes);
+    return this.#variant.codesOf?.(phrase) ?? phrase.map(String);
   }
 
   /**
    * For each of the `count` codes of `text` (elements), read in this form, its place among the
-   * codes as typed, counted from 0: colours may be typed in any order (typedPlacesOfColors).
+   * codes as typed, counted from 0: colours may be typed in any order (typedPlacesOfColors). The
+   * colour forms read `text` for it, and refuse text that is no colours as parseColors and
+   * unicodeToColors refuse it (core.colors codes); the other forms take their codes in the order
+   * typed and do not read it.
    */
   typedPlaces(text: string, count: number): readonly number[] {
     return this.#variant.typedPlaces?.(text) ?? Array.from({ length: count }, (_, place) => place);

@@ -1,6 +1,7 @@
 import { webcrypto } from "node:crypto";
 import { inspect } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { entropyToMnemonic, mnemonicToEntropy, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import {
@@ -50,6 +51,56 @@ import {
 import { hexBytes } from "./helpers/vectors.js";
 
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString("hex");
+
+/** Each word of the English list by its text. */
+const WORD_INDEXES = new Map(wordlist.map((word, index) => [word, index]));
+/**
+ * Whether `phrase` keeps its BIP39 checksum: the first words / 3 bits of the SHA-256 of its
+ * entropy end it. Worked out here with @noble/hashes, not by the code under test, and not with
+ * @scure/bip39's validateMnemonic, which looks each word up along the list and takes most of a
+ * minute for the 262,144 candidates of the largest vector; a test below holds it to
+ * validateMnemonic.
+ */
+function keepsChecksum(phrase: string): boolean {
+  const words = phrase.split(" ");
+  const checksumBits = words.length / 3;
+  const entropy = new Uint8Array((words.length * 11 - checksumBits) / 8);
+  let bit = 0;
+  let checksum = 0;
+  // The 11 bits of each word, highest first: the entropy's, then the checksum's.
+  for (const word of words) {
+    const index = WORD_INDEXES.get(word);
+    if (index === undefined) return false;
+    for (let place = 10; place >= 0; place -= 1, bit += 1) {
+      const value = (index >> place) & 1;
+      if (bit < entropy.length * 8) entropy[bit >> 3]! |= value << (7 - (bit & 7));
+      else checksum = (checksum << 1) | value;
+    }
+  }
+  return sha256(entropy)[0]! >> (8 - checksumBits) === checksum;
+}
+
+/**
+ * The count that each search of the vectors expects before it runs, where it is not exact: its
+ * combinations over 2^(words / 3), the share of phrases that keep a checksum of words / 3 bits
+ * (BIP39), worked out by hand and rounded to the nearest whole one, a half up. An exact count is
+ * the vector's own.
+ */
+const ESTIMATED_COUNTS: Readonly<Record<string, number>> = {
+  // 40 / 2^4 = 2.5
+  "a prefix and a choice of words": 3,
+  // 2,048 / 2^4
+  "a forgotten word in the middle": 128,
+  // 2,048 / 2^5
+  "one forgotten word of 15": 64,
+  // 2,048 / 2^6
+  "one forgotten word of 18": 32,
+  // 24,576 / 2^4
+  "a missing word among repeated words": 1_536,
+  // 49,152 / 2^8
+  "a missing word of 24": 192,
+};
+
 /** The kind of search that a vector names, refused when it names none. */
 function searchKind(kind: string): WordSearch["kind"] {
   if (kind === "unknown-words" || kind === "missing-word") return kind;
@@ -80,10 +131,22 @@ describe("Candidate searches", () => {
       if (search.all !== undefined) expect(phrases).toEqual(search.all);
       // Every candidate is a valid phrase, and none comes twice.
       expect(new Set(phrases).size).toBe(phrases.length);
-      for (const phrase of phrases.slice(0, 300))
-        expect(validateMnemonic(phrase, wordlist)).toBe(true);
+      expect(phrases.filter((phrase) => !keepsChecksum(phrase))).toEqual([]);
     },
   );
+
+  it("works out in the test which phrases keep their checksum as @scure/bip39 does", () => {
+    // Every last word after eleven others: 128 of the 2,048 keep the checksum.
+    const phrases = wordlist.map((word) => `${"abandon ".repeat(11)}${word}`);
+    const kept = phrases.filter((phrase) => keepsChecksum(phrase));
+    expect(kept).toHaveLength(128);
+    expect(kept).toEqual(phrases.filter((phrase) => validateMnemonic(phrase, wordlist)));
+    const longest = entropyToMnemonic(new Uint8Array(32).fill(0x7f), wordlist);
+    expect(keepsChecksum(longest)).toBe(true);
+    expect(keepsChecksum(longest.replace(/\S+$/u, "zoo"))).toBe(
+      validateMnemonic(longest.replace(/\S+$/u, "zoo"), wordlist),
+    );
+  });
 
   it("checks the checksum as @scure/bip39 does, for every length", () => {
     for (const bytes of [16, 20, 24, 28, 32]) {
@@ -136,11 +199,7 @@ describe("WordCandidateSearch", () => {
       // Exact when the last place may hold any word; otherwise one in 2^(words / 3) on average.
       const expected = parsed.expected;
       expect(expected.exact).toBe(search.kind === "unknown-words" && search.text.endsWith(" ?"));
-      expect(expected.count).toBe(
-        expected.exact
-          ? search.count
-          : Math.round(search.combinations / 2 ** (parsed.wordCount / 3)),
-      );
+      expect(expected.count).toBe(expected.exact ? search.count : ESTIMATED_COUNTS[search.name]);
       if (search.combinations > LONG_SEARCH) return;
       const phrases: string[] = [];
       for (const candidate of parsed.candidates()) {

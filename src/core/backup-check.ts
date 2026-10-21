@@ -609,8 +609,10 @@ export class ShareBackupCheck implements BackupCheck {
    * of the shares is sent to (ShareInput). Refuses a mode in which no shares are made
    * (core.masking.split-modes-only), a threshold that is not a whole number of at least
    * MIN_RECORDED_THRESHOLD (core.backup-check.share-check-whole-threshold-at-least), what
-   * BackupCheckSecrets refuses of the phrase and the dates, and a `decodeEntry` that names nothing
-   * (sskr.share-input.share-input-name-host-s-reader-seed-phrase).
+   * BackupCheckSecrets refuses of the phrase and the dates, a `decodeEntry` that names nothing
+   * (sskr.share-input.share-input-name-host-s-reader-seed-phrase), and, in a masked mode with
+   * dates, what Masking.held refuses of the phrase and the dates, such as a phrase that is not
+   * valid English BIP39 words (core.words codes).
    */
   constructor(
     original: ShareOriginal,

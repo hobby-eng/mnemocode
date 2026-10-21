@@ -62,10 +62,16 @@ def js_round(x):
 
 
 def linear(c):
+    """The linear light of an sRGB channel `c` from 0 to 1: the sRGB
+    transfer function undone.
+    """
     return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
 
 
 def oklab(r, g, b):
+    """The OKLab lightness and a and b axes of the sRGB colour whose
+    channels `r`, `g` and `b` run from 0 to 1, by Ottosson's matrices.
+    """
     r, g, b = linear(r), linear(g), linear(b)
     # The long, medium and short cone responses, named l_, m_ and s_
     # as in Ottosson's OKLab code.
@@ -80,6 +86,9 @@ def oklab(r, g, b):
 
 
 def hsv(r, g, b):
+    """The hue in turns, the saturation from 0 to 1 and the value, in
+    the unit of the channels `r`, `g` and `b`, of a colour.
+    """
     mx, mn = max(r, g, b), min(r, g, b)
     rng = mx - mn
     if rng == 0:
@@ -94,6 +103,10 @@ def hsv(r, g, b):
 
 
 def bytes_of_hsv(h, s, v):
+    """The red, green and blue bytes of the colour of hue `h` in turns
+    and saturation `s` and value `v` from 0 to 1, rounded as
+    Math.round rounds.
+    """
     sector = h * 6
     chroma = v * s
     second = chroma * (1 - abs((sector % 2) - 1))
@@ -126,6 +139,10 @@ TINTS = {
 
 
 def typical(hexcode, tint):
+    """The bytes of a typical coloured pixel of a design of `tint`,
+    "vivid" or "muted", under the reference colour `hexcode`, six hex
+    digits.
+    """
     rgb = bytes.fromhex(hexcode)
     hue, sat, _ = hsv(*rgb)
     peak = max(rgb) / CHANNEL_MAX
@@ -139,6 +156,9 @@ def typical(hexcode, tint):
 
 
 def views(hexcode):
+    """The OKLab of the colour `hexcode` in each view of it: in full,
+    then as a typical pixel of the vivid and of the muted designs.
+    """
     full = tuple(b / CHANNEL_MAX for b in bytes.fromhex(hexcode))
     typicals = (typical(hexcode, tint) for tint in ("vivid", "muted"))
     seen = [oklab(*(b / CHANNEL_MAX for b in rgb)) for rgb in typicals]
@@ -146,6 +166,10 @@ def views(hexcode):
 
 
 def distance(a, b):
+    """How far apart the views `a` and `b` of two colours are: the
+    least OKLab distance of a view to the same view, in whole
+    millionths (STEPS).
+    """
     return min(
         js_round(
             math.sqrt(sum((x - y) * (x - y) for x, y in zip(p, q))) * STEPS
@@ -155,6 +179,10 @@ def distance(a, b):
 
 
 def palette(count):
+    """The first `count` colours of a set, as #RRGGBB: the middle
+    candidate, then each time the candidate farthest from every colour
+    chosen, the first of equals.
+    """
     candidates = []
     for degrees in HUE_DEGREES:
         for s in SATURATIONS:

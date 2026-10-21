@@ -26,6 +26,9 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
 
 questionsOnPrivateScreen();
 
+/** The most candidates that a list holds, as its refusal says (MissingCodesSearch.listed). */
+const LIST_LIMIT = 16;
+
 const ANSWERS = {
   place: undefined,
   passphrase: "",
@@ -38,14 +41,14 @@ describe("A list of more candidates than it holds", () => {
     // One more valid last word than a list holds: the estimate, about one candidate, offers the
     // list, and the real search finds every one of them.
     const endings = recoverLegacyValidLastWords(TEST_PHRASE)
-      .slice(0, MissingCodesSearch.MAX_LISTED + 1)
+      .slice(0, LIST_LIMIT + 1)
       .map(({ word }) => word);
     using codes = MissingCodes.read(
       replacedAt(TEST_PHRASE, { 12: endings.join("|") }),
       "english",
       "direct",
     );
-    expect(new MissingCodesSearch(codes, () => "00000000").fits("list")).toBe(true);
+    expect(new MissingCodesSearch(codes, () => "00000000").whyNot("list")).toBeUndefined();
     const said: string[] = [];
     vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
       said.push(parts.join(" "));

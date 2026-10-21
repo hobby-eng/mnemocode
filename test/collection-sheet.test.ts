@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PDFDocument, PDFPage } from "pdf-lib";
 import {
   collectionSheetLayout,
+  MAX_SHEET_CARDS,
   MIN_SHEET_ROWS,
   SHEET_PLAN_TEXT,
 } from "../src/export/collection-layout.js";
@@ -28,18 +29,26 @@ describe("single-page design studies", () => {
   });
 
   it.each(["business", "a6", "a4"] as const)(
-    "reserves non-overlapping artwork, captions and a corner QR for every %s orientation and count",
+    "reserves non-overlapping artwork, captions and a corner QR for every %s orientation and count that fits",
     (pageSize) => {
       for (const orientation of ["portrait", "landscape"] as const)
-        for (let count = 1; count <= 16; count++)
+        for (let count = 1; count <= MAX_SHEET_CARDS; count++)
           for (const includeQr of [false, true]) {
-            const layout = collectionSheetLayout(
-              { pageSize, orientation },
-              count,
-              1.8,
-              1,
-              includeQr ? nodeRenderPlatform.qrModules(payload) : undefined,
-            );
+            let layout: ReturnType<typeof collectionSheetLayout>;
+            try {
+              layout = collectionSheetLayout(
+                { pageSize, orientation },
+                count,
+                1.8,
+                1,
+                includeQr ? nodeRenderPlatform.qrModules(payload) : undefined,
+              );
+            } catch (error) {
+              // A6 and A4 take every count; a business card no more than it has room for.
+              expect([pageSize, count > 16]).toEqual(["business", true]);
+              expect(error).toMatchObject({ code: "export.collection-layout.no-room" });
+              continue;
+            }
             expect(layout.cards.map((box) => box.index)).toEqual(
               Array.from({ length: count }, (_, i) => i),
             );

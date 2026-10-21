@@ -24,7 +24,8 @@ import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareInput } from "../src/sskr/share-input.js";
 import { ShareSet } from "../src/sskr/share-set.js";
-import { Share } from "../src/sskr/transport.js";
+import { CHECKSUM_BYTES, Share, transportToUr, urToTransport } from "../src/sskr/transport.js";
+import { recheck } from "./helpers/share-transport.js";
 import { joinUnits, markUnits, shareUnits, VALUE_BYTE, wrongValue } from "./helpers/shares.js";
 import {
   TEST_ADDRESS,
@@ -138,6 +139,14 @@ describe("the codes of refusals", () => {
     );
     expect(codeOf(() => Share.readSet([first, wrongValue(first), second], false))).toBe(
       "sskr.transport.member-given-twice",
+    );
+    // A share of the vector of several groups whose byte of group thresholds says another.
+    const [grouped, otherGrouped] = SSKR_VECTOR.shares;
+    const thresholds = urToTransport(defined(otherGrouped)).slice(0, -CHECKSUM_BYTES);
+    thresholds[4] = 2;
+    const conflicting = transportToUr(recheck(thresholds));
+    expect(codeOf(() => Share.readSet([grouped, conflicting], false))).toBe(
+      "sskr.transport.group-thresholds-conflict",
     );
   });
 

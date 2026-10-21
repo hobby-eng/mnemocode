@@ -50,5 +50,6 @@ describe("recover-word on a terminal", () => {
     expect(seen.out.some((line) => line.includes("Candidate "))).toBe(false);
     expect(seen.notices.join("\n")).toContain("8 candidates do not fit on this screen");
     expect(terminal.questions).toEqual(["What now?"]);
+    expect(terminal.labels[0]).toContain("Check them against the wallet");
   });
 });

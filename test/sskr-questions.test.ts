@@ -26,6 +26,7 @@ import {
 } from "./helpers/share-questions.js";
 import {
   DATE,
+  DATE_LAST_DIGIT_FORGOTTEN,
   ENCODED_FINGERPRINT,
   MASKED_WORDS,
   TEST_FINGERPRINT,
@@ -483,7 +484,11 @@ describe("shares on the private screen", () => {
     });
 
     it("finds a forgotten digit of a date with the wallet asked for after the dates", async () => {
-      terminal.answers = [`${shares[0]};${shares[2]}\r`, "23-09-202?\r", `${TEST_FINGERPRINT}\r`];
+      terminal.answers = [
+        `${shares[0]};${shares[2]}\r`,
+        `${DATE_LAST_DIGIT_FORGOTTEN}\r`,
+        `${TEST_FINGERPRINT}\r`,
+      ];
       terminal.choices = ["Fingerprint"];
       await combine({ mode: "seedshift" });
       expect(promptsShown()).toEqual([
@@ -505,7 +510,7 @@ describe("shares on the private screen", () => {
     splitSharesBeforeEach();
 
     it("asks for a date search beyond --max-candidates, and starts one within it", async () => {
-      terminal.answers = [`${shares[0]};${shares[2]}\r`, "23-09-202?\r"];
+      terminal.answers = [`${shares[0]};${shares[2]}\r`, `${DATE_LAST_DIGIT_FORGOTTEN}\r`];
       terminal.choices = ["No"];
       // The answers of the menu's wallet question are given as options: only the search is asked.
       expect(
@@ -517,7 +522,7 @@ describe("shares on the private screen", () => {
       ).toBe(CANCELLED);
       expect(terminal.questions[0]).toMatch(/^Search 10 date combinations, /u);
       terminal.questions = [];
-      terminal.answers = [`${shares[0]};${shares[2]}\r`, "23-09-202?\r"];
+      terminal.answers = [`${shares[0]};${shares[2]}\r`, `${DATE_LAST_DIGIT_FORGOTTEN}\r`];
       await combine({
         mode: "seedshift",
         "master-fingerprint": TEST_FINGERPRINT,
@@ -561,7 +566,7 @@ describe("shares on the private screen", () => {
         `${shares[1]};${shares[2]}\r`,
         "24-09-202?\r",
         `${TEST_FINGERPRINT}\r`,
-        "23-09-202?\r",
+        `${DATE_LAST_DIGIT_FORGOTTEN}\r`,
       ];
       terminal.choices = ["Fingerprint", "Change the dates"];
       await combine({ mode: "seedshift" });

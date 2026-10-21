@@ -773,7 +773,10 @@ export class ShareInput implements Disposable {
   /**
    * The shares of `set` to write again, named by `places`, in `form` or their own: a share that
    * nothing settles is left out, and shares repaired each on its own must still be of one set
-   * (#looseSetTrouble).
+   * (#looseSetTrouble). Refuses `places` and `form` as ShareExport.of refuses them: fewer places
+   * than shares or a place that is not a whole number from 1
+   * (sskr.share-set.each-share-place-among-typed-whole-number-from), and a form that names none
+   * (sskr.transport.share-format-one).
    */
   static checkedExport(
     set: RepairedShares,

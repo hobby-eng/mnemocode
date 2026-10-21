@@ -11,6 +11,7 @@ import { PrivateSteps } from "../src/cli/private-steps.js";
 import { runReEncode } from "../src/cli/re-encode-command.js";
 import { runSskrExport } from "../src/cli/sskr-export-command.js";
 import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
+import { WIPED_REFUSAL as WIPED } from "./helpers/owner-lifetime.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import {
   DATE,
@@ -25,8 +26,6 @@ vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOr
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
 );
-
-const WIPED = "This secret value has been wiped.";
 
 questionsOnPrivateScreen();
 

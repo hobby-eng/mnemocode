@@ -245,7 +245,7 @@ describe("AUD-015 recommendations: one rule for whole counts, one quorum owner, 
     expect(() => ShareSplit.validateThreshold(2, 16)).not.toThrow();
   });
 
-  it("counts every time limit and every length in the same units", () => {
+  it("counts a search's question and notice limits and its said length in seconds", () => {
     expect(SECONDS_PER_HOUR).toBe(3_600);
     expect(QUESTION_SECONDS).toBe(12 * SECONDS_PER_HOUR);
     expect(TELL_SECONDS).toBe(SECONDS_PER_MINUTE);

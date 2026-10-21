@@ -50,7 +50,7 @@ import {
 import { prepareEncode } from "./encode-command.js";
 import type { PreparedEncode } from "./encode-types.js";
 import { askEncoding } from "./encode-questions.js";
-import { forgetClaimedOutputs } from "./output-questions.js";
+import { ClaimedOutputs } from "./output-questions.js";
 import { reportChecksumAndFingerprint } from "./fingerprint-report.js";
 import { RenamedOutputs } from "./output-paths.js";
 import { clearPrivateScreen, showProtection } from "./private-screen.js";
@@ -443,7 +443,7 @@ async function askedNewBackup(
 ): Promise<PreparedEncode | undefined | Cancelled> {
   newBackupScreen(notices);
   if (refusal !== undefined) terminalNotice(refusal, "warning");
-  forgetClaimedOutputs();
+  ClaimedOutputs.forget();
   // Encode's command line: its name, then the options.
   const encoding = await askEncoding();
   if (encoding === undefined || encoding === CANCELLED) return encoding;

@@ -4,12 +4,17 @@ import { describe, expect, it, vi } from "vitest";
 import { nodePbkdf2HmacSha512, walletCheckOf } from "../src/bitcoin-evidence.js";
 import { WalletEvidenceCheck, type WalletEvidence } from "../src/core/wallet-evidence.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
-import { OTHER_PHRASE, TEST_ADDRESS, TEST_PHRASE as PHRASE } from "./helpers/test-phrase.js";
+import { TREZOR_ADDRESS } from "./helpers/coin-addresses.js";
+// BIP84's first receiving key for the public BIP39 test phrase as a WIF, and its public key, which
+// a match gives instead of the private key.
+import {
+  OTHER_PHRASE,
+  TEST_ADDRESS,
+  TEST_PHRASE as PHRASE,
+  TEST_PUBLIC_KEY as PUBLIC_KEY,
+  TEST_WIF as WIF,
+} from "./helpers/test-phrase.js";
 
-// BIP84's first receiving key for the public BIP39 test phrase.
-const WIF = "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d";
-// The public key of that WIF's key, which a match gives instead of the private key.
-const PUBLIC_KEY = "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c";
 const evidence = (): WalletEvidence => ({
   kind: "wif",
   value: WIF,
@@ -127,7 +132,7 @@ describe("A retained wallet comparison's lifetime", () => {
     using check = walletCheckOf(
       {
         kind: "address",
-        value: "bc1qv5rmq0kt9yz3pm36wvzct7p3x6mtgehjul0feu",
+        value: TREZOR_ADDRESS,
         profiles: ["native-segwit"],
         location: { network: "mainnet", account: 0, branch: 0, index: 0 },
       },

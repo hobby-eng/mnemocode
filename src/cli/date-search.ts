@@ -45,12 +45,12 @@ import { walletCheckOf, type WalletEvidence } from "../bitcoin-evidence.js";
 import { integerOption, type ParsedArguments } from "./arguments.js";
 import { askAfterFailure, askSecretUntil, WHAT_NOW } from "./ask.js";
 import { askWalletEvidence, changeWalletAnswer, checkWalletAnswer } from "./wallet-question.js";
-import type { CandidatesFile } from "./candidates-file.js";
+import { stopWithoutListAnswer, type CandidatesFile } from "./candidates-file.js";
 import { datesPrompt, mostDates } from "./input.js";
 import { evidenceLabel } from "./option-copy.js";
 import { onPrivateScreen, closingRows } from "./private-screen.js";
 import { PrivateSteps } from "./private-steps.js";
-import { candidateLines, candidatesFitScreen } from "./candidate-view.js";
+import { candidateLines, candidatesFitScreen, matchedAt } from "./candidate-view.js";
 import {
   ProgressLine,
   terminalLayout,
@@ -329,15 +329,13 @@ function matchFacts(result: DateSearchResult, report: MatchesReport): [string, s
 function matchLines(matches: readonly DateMatch[]): string[] {
   if (!terminalLayout("stdout"))
     return matches.map((match) => {
-      const where = match.evidence === undefined ? "" : `\tmatched at ${match.evidence}`;
+      const where = match.evidence === undefined ? "" : `\t${matchedAt(match.evidence)}`;
       return `${match.dates}\t${match.mnemonic}${where}`;
     });
   return matches.flatMap((match, index) =>
     candidateLines(`Match ${index + 1}`, [
       ["Dates", match.dates],
-      ...(match.evidence === undefined
-        ? []
-        : [["Wallet", `matched at ${match.evidence}`] as const]),
+      ...(match.evidence === undefined ? [] : [["Wallet", matchedAt(match.evidence)] as const]),
       ["Phrase", match.mnemonic],
     ]),
   );
@@ -472,7 +470,7 @@ async function afterSearchChoice(
     return askAfterFailure(WHAT_NOW, [
       { label: "Give the wallet", note: "its fingerprint or an address", value: "wallet" },
       dates,
-      { ...done, note: "no list is saved" },
+      stopWithoutListAnswer<AfterSearchChoice>("done"),
     ]);
   // A list holds every match already; with a wallet, every match is one the wallet confirmed.
   if (question.listing === true || question.evidence !== undefined) return "done";

@@ -7,6 +7,7 @@ import type { WalletCheck } from "../src/core/wallet-check.js";
 import { parseDate } from "../src/core/dates.js";
 import {
   DATE,
+  DATE_LAST_DIGIT_FORGOTTEN,
   MASKED_ONE_DIGIT_FORGOTTEN,
   MASKED_TWO_DIGITS_FORGOTTEN,
   TEST_PHRASE,
@@ -19,7 +20,7 @@ describe("The lifetime of a prepared marked-code search", () => {
     "ends the %s way without disposing borrowed codes or incomplete dates",
     async (kind) => {
       using codes = MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift");
-      using dates = DatesAnswer.parse("23-09-202?", { patterns: true, wordCount: 12 });
+      using dates = DatesAnswer.parse(DATE_LAST_DIGIT_FORGOTTEN, { patterns: true, wordCount: 12 });
       const search = new MissingCodesSearch(codes, () => "00000000");
       const way =
         kind === "encoded"
@@ -116,7 +117,7 @@ describe("Results of an owned marked-code search", () => {
     "hears cancellation between the final search await and %s result transfer",
     async (kind) => {
       using codes = MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift");
-      using dates = DatesAnswer.parse("23-09-202?", { patterns: true, wordCount: 12 });
+      using dates = DatesAnswer.parse(DATE_LAST_DIGIT_FORGOTTEN, { patterns: true, wordCount: 12 });
       using known = DatesAnswer.of([parseDate(DATE)]);
       const search = new MissingCodesSearch(codes, () => "00000000");
       using way =

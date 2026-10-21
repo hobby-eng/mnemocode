@@ -53,10 +53,89 @@ const ERRORS = new ErrorCatalog("core.missing-codes-search", {
     `More than ${MAX_LISTED} ${rows} fit these codes and dates. Narrow the codes or use a wallet check instead of listing them.`,
   "way-wiped": () => "This prepared code search has been wiped.",
   "operation-refused": suppliedMessage,
+  "codes-keep-no-checksum": () =>
+    "These codes keep no checksum, so their encoded fingerprint cannot tell them.",
+  "unknown-way": {
+    kind: "type",
+    text: () => "There is no such way to tell the codes.",
+  },
 });
 
-/** How the right codes are told. */
-export type MissingCodesWay = "encoded" | "wallet" | "list";
+/** The rules of one way to tell the right codes, which every question about the way asks. */
+interface WayRules {
+  /** The way, which one method of MissingCodesSearch prepares and its class searches. */
+  readonly way: string;
+  /** The way's name in a list of choices, such as "The wallet". */
+  readonly label: string;
+  /** What the way needs or does, for codes that were `masked` or not: "compare them yourself". */
+  readonly note: (masked: boolean) => string;
+  /** Whether the way is offered, where it fits, for codes that were `masked` or not. */
+  readonly offered: (masked: boolean) => boolean;
+  /** Why the way cannot tell `codes`, as the refusal its class gives; undefined where it can. */
+  readonly refusal: (codes: MissingCodes) => Error | undefined;
+}
+
+/**
+ * Every way to tell the right codes, in the order a host offers them, each with its rules
+ * (CORE-06): a new way is one entry here, with its class and the method that prepares it.
+ */
+const WAYS = Object.freeze([
+  {
+    way: "encoded",
+    label: "Encoded fingerprint",
+    note: () => "the one Encode showed; no dates needed",
+    // Without Seedshift it is the wallet's own fingerprint, which the wallet way takes.
+    offered: (masked) => masked,
+    refusal: (codes) =>
+      codes.checksummed ? undefined : ERRORS.create("codes-keep-no-checksum", []),
+  },
+  {
+    way: "wallet",
+    label: "The wallet",
+    note: (masked) =>
+      masked ? "its fingerprint or an address, after the dates" : "its fingerprint or an address",
+    offered: () => true,
+    refusal: () => undefined,
+  },
+  {
+    way: "list",
+    label: "List every candidate",
+    note: () => "compare them yourself",
+    offered: () => true,
+    // A listed run also checks its actual number of rows: an estimate is no bound.
+    refusal: (codes) =>
+      listHolds(codes) ? undefined : ERRORS.create("operation-refused", [tooManyToList(codes)]),
+  },
+] as const satisfies readonly WayRules[]);
+
+/** How the right codes are told: the way of one of the rules of WAYS. */
+export type MissingCodesWay = (typeof WAYS)[number]["way"];
+
+/** Every way to tell the right codes, in the order a host offers them. */
+export const MISSING_CODES_WAYS: readonly MissingCodesWay[] = Object.freeze(
+  WAYS.map(({ way }) => way),
+);
+
+/**
+ * The rules of `way`. Refuses a value that is no way, as a JavaScript host may pass one
+ * (core.missing-codes-search.unknown-way, a TypeError).
+ */
+function rulesOf(way: MissingCodesWay): WayRules {
+  const rules = WAYS.find((entry) => entry.way === way);
+  if (rules === undefined) throw ERRORS.create("unknown-way", []);
+  return rules;
+}
+
+/**
+ * Refuses to prepare `way` for `codes` where it cannot tell them, with the refusal of its rules:
+ * core.missing-codes-search.codes-keep-no-checksum for the encoded fingerprint of codes that keep
+ * no checksum, core.missing-codes-search.operation-refused for a list of more candidates than it
+ * holds.
+ */
+function assertFits(way: MissingCodesWay, codes: MissingCodes): void {
+  const refusal = rulesOf(way).refusal(codes);
+  if (refusal !== undefined) throw refusal;
+}
 
 /** A way offered for codes, with the words a host shows for it. */
 export interface MissingCodesWayChoice {
@@ -131,7 +210,7 @@ export type MissingCodesResult =
   | {
       /** Every candidate, for the person to compare. */
       readonly kind: "list";
-      /** A row for each phrase the codes and dates give, MissingCodesSearch.MAX_LISTED at most. */
+      /** A row for each phrase the codes and dates give, MAX_LISTED (16) at most. */
       readonly rows: readonly MissingCodesRow[];
     }
   | {
@@ -296,6 +375,11 @@ function listedText(codes: MissingCodes): string {
   return counted(listedRows(codes), listedRow(codes));
 }
 
+/** Whether a list holds the rows that `codes` are estimated to give: MAX_LISTED at most. */
+function listHolds(codes: MissingCodes): boolean {
+  return listedRows(codes) <= MAX_LISTED;
+}
+
 /** Why a list cannot tell `codes`: it holds at most MAX_LISTED rows (listedText). */
 function tooManyToList(codes: MissingCodes): string {
   return `A list holds at most ${MAX_LISTED} ${listedRow(codes)}s; these codes give about ${listedText(codes)}.`;
@@ -368,9 +452,6 @@ function severalSets(count: number, what: string): MissingCodesResult {
  * answers and planned before it runs.
  */
 export class MissingCodesSearch {
-  /** Candidates few enough to be listed (the way "list"). */
-  static readonly MAX_LISTED = MAX_LISTED;
-
   readonly #codes: MissingCodes;
   readonly #fingerprint: PhraseFingerprint;
 
@@ -427,51 +508,32 @@ export class MissingCodesSearch {
 
   /** Whether so many candidates are left that only a fingerprint or an address tells them. */
   get many(): boolean {
-    return listedRows(this.#codes) > MAX_LISTED;
+    return !listHolds(this.#codes);
   }
 
   /**
-   * The ways offered for the codes: the encoded fingerprint only where the codes were masked and
-   * keep a checksum (without Seedshift it is the wallet's own, which the wallet way takes), the
-   * wallet always, and the list where the candidates are few.
+   * The ways offered for the codes, in order, each where its rules offer it and it fits (whyNot):
+   * the encoded fingerprint only where the codes were masked and keep a checksum (without
+   * Seedshift it is the wallet's own, which the wallet way takes), the wallet always, and the list
+   * where the candidates are few.
    */
   get ways(): readonly MissingCodesWayChoice[] {
     const masked = Masking.of(this.#codes.mode).masked;
-    const ways: MissingCodesWayChoice[] = [];
-    if (masked && this.#codes.checksummed)
-      ways.push({
-        way: "encoded",
-        label: "Encoded fingerprint",
-        note: "the one Encode showed; no dates needed",
-      });
-    ways.push({
-      way: "wallet",
-      label: "The wallet",
-      note: masked
-        ? "its fingerprint or an address, after the dates"
-        : "its fingerprint or an address",
-    });
-    if (!this.many)
-      ways.push({ way: "list", label: "List every candidate", note: "compare them yourself" });
-    return ways;
+    return WAYS.filter(
+      (rules) => rules.offered(masked) && rules.refusal(this.#codes) === undefined,
+    ).map(({ way, label, note }) => ({ way, label, note: note(masked) }));
   }
 
   /**
-   * Whether `way` can tell these codes when the person names it ahead, as an option does: the
-   * encoded fingerprint wherever the codes keep a checksum, the wallet always, the list where the
-   * estimated candidates are few. A listed run also checks its actual result size and refuses
-   * an overflow; an estimate is not a completeness bound.
+   * Why `way` cannot tell these codes when the person names it ahead, as an option does, or
+   * undefined when it can: the encoded fingerprint wherever the codes keep a checksum, the wallet
+   * always, the list where the estimated candidates are few; the method that prepares the way
+   * refuses it so. A listed run also checks its actual result size and refuses an overflow; an
+   * estimate is not a completeness bound. Refuses a value that is no way
+   * (core.missing-codes-search.unknown-way, a TypeError).
    */
-  fits(way: MissingCodesWay): boolean {
-    return this.whyNot(way) === undefined;
-  }
-
-  /** Why `way` cannot tell these codes, or undefined when it can (fits). */
   whyNot(way: MissingCodesWay): string | undefined {
-    if (way === "encoded" && !this.#codes.checksummed)
-      return "These codes keep no checksum, so their encoded fingerprint cannot tell them.";
-    if (way === "list" && this.many) return tooManyToList(this.#codes);
-    return undefined;
+    return rulesOf(way).refusal(this.#codes)?.message;
   }
 
   /** Whether the dates of these codes are needed: they were masked. */
@@ -481,8 +543,9 @@ export class MissingCodesSearch {
 
   /**
    * The codes whose own fingerprint is `fingerprint`, the encoded one that Encode showed, read as
-   * parseMasterFingerprint reads it. Refuses one that is not eight hexadecimal characters
-   * (core.wallet-check.master-fingerprint-eight-hexadecimal-characters).
+   * parseMasterFingerprint reads it. Refuses codes that keep no checksum, as whyNot says
+   * (core.missing-codes-search.codes-keep-no-checksum), and a fingerprint that is not eight
+   * hexadecimal characters (core.wallet-check.master-fingerprint-eight-hexadecimal-characters).
    */
   byEncodedFingerprint(fingerprint: string): MissingCodesWaySearch {
     return new EncodedFingerprintWay(this.#codes, this.#fingerprint, fingerprint);
@@ -503,10 +566,11 @@ export class MissingCodesSearch {
   }
 
   /**
-   * Every candidate with its phrase, complete `dates` and fingerprint. Refuses at once codes whose
-   * estimated rows exceed MAX_LISTED, as whyNot says (core.missing-codes-search.operation-refused),
-   * and dates as ownedDates and DatesAnswer.of refuse them; its run refuses with list-overflow if
-   * the actual count exceeds MAX_LISTED, even when the estimate permitted this way.
+   * Every candidate with its phrase, complete `dates` and fingerprint, MAX_LISTED (16) rows at
+   * most. Refuses at once codes whose estimated rows exceed it, as whyNot says
+   * (core.missing-codes-search.operation-refused), and dates as ownedDates and DatesAnswer.of
+   * refuse them; its run refuses with list-overflow if the actual count exceeds MAX_LISTED, even
+   * when the estimate permitted this way.
    */
   listed(dates: readonly DateShiftDate[]): MissingCodesWaySearch {
     return new ListWay(this.#codes, this.#fingerprint, dates);
@@ -575,6 +639,7 @@ class EncodedFingerprintWay implements MissingCodesWaySearch {
   readonly #fingerprint: string;
 
   constructor(codes: MissingCodes, fingerprintOf: PhraseFingerprint, fingerprint: string) {
+    assertFits("encoded", codes);
     // Read as every fingerprint is: a wrong one is refused when the way is made.
     this.#fingerprint = parseMasterFingerprint(fingerprint);
     this.#input = new CodeSearchInput(codes);
@@ -634,6 +699,7 @@ class WalletWay implements MissingCodesWaySearch {
   #walletCheck: WalletCheck | undefined;
 
   constructor(codes: MissingCodes, walletCheck: WalletCheck, dates: readonly DateShiftDate[]) {
+    assertFits("wallet", codes);
     this.#input = new CodeSearchInput(codes, dates);
     this.#walletCheck = walletCheck;
   }
@@ -706,6 +772,7 @@ class WalletAndDatesWay implements MissingCodesWaySearch {
   #walletCheck: WalletCheck | undefined;
 
   constructor(codes: MissingCodes, walletCheck: WalletCheck, dates: DatesAnswer) {
+    assertFits("wallet", codes);
     const { mode } = codes;
     if (!Masking.isMaskedMode(mode))
       throw ERRORS.create("codes-were-not-masked-no-dates-search", []);
@@ -824,8 +891,7 @@ class ListWay implements MissingCodesWaySearch {
     fingerprintOf: PhraseFingerprint,
     dates: readonly DateShiftDate[],
   ) {
-    if (listedRows(codes) > MAX_LISTED)
-      throw ERRORS.create("operation-refused", [tooManyToList(codes)]);
+    assertFits("list", codes);
     this.#input = new CodeSearchInput(codes, dates);
     this.#fingerprintOf = fingerprintOf;
   }

@@ -10,6 +10,7 @@ import { createSessionIdentity, decryptCandidates } from "../src/core/candidate-
 import { containing } from "./helpers/matchers.js";
 import {
   LAST_WORD_FORGOTTEN,
+  LEGACY_EXAMPLE_MASKED as INVALID_LEGACY_PHRASE,
   LIST_PASSPHRASE,
   ONE_WORD_MISSING,
   replacedAt,
@@ -18,9 +19,6 @@ import {
   TEST_UNICODE,
 } from "./helpers/test-phrase.js";
 import { runBuiltCli as run } from "./helpers/built-cli.js";
-
-const INVALID_LEGACY_PHRASE =
-  "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
 
 describe("recover-word CLI", () => {
   it("points codes typed in place of words to Decode, which reads them with ?", async () => {

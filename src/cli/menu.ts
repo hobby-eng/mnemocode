@@ -89,13 +89,7 @@ import {
   type Mode,
 } from "./encode-questions.js";
 import { askDesign } from "./card-questions.js";
-import {
-  askNewFolder,
-  askOutputFile,
-  FILE_NAME_QUESTIONS,
-  forgetClaimedOutputs,
-  inputFile,
-} from "./output-questions.js";
+import { ClaimedOutputs, FILE_NAME_QUESTIONS, inputFile } from "./output-questions.js";
 import { optionLabel } from "./option-copy.js";
 import { defined } from "../core/defined.js";
 
@@ -131,7 +125,7 @@ const STANDARD_SHARES_EXPLANATION: Explanation = {
 /** `action` with no file of an earlier entry claimed. */
 function askedAfresh(action: () => Promise<Action>): () => Promise<Action> {
   return () => {
-    forgetClaimedOutputs();
+    ClaimedOutputs.forget();
     return action();
   };
 }
@@ -422,7 +416,7 @@ async function wordRecoveryAction(): Promise<Action> {
   );
   if (save === undefined || save === CANCELLED) return save;
   if (save === "no") return { run: search };
-  const path = await askOutputFile("File name", "candidates.age");
+  const path = await ClaimedOutputs.askOutputFile("File name", "candidates.age");
   if (path === undefined || path === CANCELLED) return path;
   const protection = await choose(
     "How should the list be encrypted?",
@@ -514,7 +508,10 @@ const MENU_ASKER: WalletValueAsker = {
 async function previewAction(): Promise<Action> {
   const design = await askDesign(true);
   if (design === undefined || design === CANCELLED) return design;
-  const path = await askOutputFile(FILE_NAME_QUESTIONS.pdf, `${SAMPLE_FILE_BASE}.pdf`);
+  const path = await ClaimedOutputs.askOutputFile(
+    FILE_NAME_QUESTIONS.pdf,
+    `${SAMPLE_FILE_BASE}.pdf`,
+  );
   if (path === undefined || path === CANCELLED) return path;
   return {
     run: ["preview", ...(design === "" ? ["--all"] : ["--template", design]), "--pdf", path],
@@ -592,11 +589,11 @@ async function tableExportAction(): Promise<Action> {
   );
   if (format === undefined || format === CANCELLED) return format;
   if (format === "set") {
-    const folder = await askNewFolder("mnemocode-recovery-pack");
+    const folder = await ClaimedOutputs.askNewFolder("mnemocode-recovery-pack");
     if (folder === undefined || folder === CANCELLED) return folder;
     return { run: ["table", "--word-lists-dir", folder] };
   }
-  const path = await askOutputFile(
+  const path = await ClaimedOutputs.askOutputFile(
     FILE_NAME_QUESTIONS.text,
     format === "guide" ? "mnemocode-manual-recovery.md" : `bip39-${format}.txt`,
   );

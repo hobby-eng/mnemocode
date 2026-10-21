@@ -4,7 +4,12 @@ import { describe, expect, it } from "vitest";
 import { recoverLegacyValidLastWords } from "../src/core.js";
 import { WordCandidateSearch } from "../src/core/candidates.js";
 import { matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { firstReceivingOf } from "./helpers/coin-addresses.js";
+import {
+  LAST_WORD_FORGOTTEN,
+  LEGACY_EXAMPLE_MASKED,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
 /**
  * The candidates for `text`, a phrase with ? for one forgotten word, as the word search finds them:
@@ -68,7 +73,7 @@ describe("forgotten BIP39 word recovery", () => {
   );
 
   it("reports the word index and exact checksum bits for the public zero vector", () => {
-    const candidates = forgotten(TEST_PHRASE.replace(/about$/u, "?"));
+    const candidates = forgotten(LAST_WORD_FORGOTTEN);
     expect(candidates).toHaveLength(128);
     expect(candidates).toContainEqual({
       position: 12,
@@ -80,12 +85,12 @@ describe("forgotten BIP39 word recovery", () => {
   });
 
   it("identifies only the public zero vector from its BIP44 legacy address", () => {
-    const candidates = forgotten(TEST_PHRASE.replace(/about$/u, "?"));
+    const candidates = forgotten(LAST_WORD_FORGOTTEN);
     const matches = candidates.filter(
       (candidate) =>
         matchBitcoinEvidence(candidate.mnemonic, {
           kind: "address",
-          value: "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA",
+          value: firstReceivingOf("bitcoin"),
           profiles: ["legacy"],
           location: { network: "mainnet", account: 0, branch: 0, index: 0 },
         }).matched,
@@ -94,8 +99,7 @@ describe("forgotten BIP39 word recovery", () => {
   });
 
   it("enumerates valid legacy final-word replacements and marks the entropy-preserving one", () => {
-    const legacy =
-      "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
+    const legacy = LEGACY_EXAMPLE_MASKED;
     const prefix = legacy.split(" ").slice(0, -1).join(" ");
     const candidates = recoverLegacyValidLastWords(legacy);
     expect(candidates).toHaveLength(128);

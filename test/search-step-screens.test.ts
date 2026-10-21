@@ -12,6 +12,7 @@ import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import { markUnits } from "./helpers/shares.js";
 import {
+  DATE_LAST_DIGIT_FORGOTTEN,
   LAST_WORD_FORGOTTEN,
   MASKED_WORDS,
   replacedAt,
@@ -100,7 +101,11 @@ describe("the searches of sskr-combine", () => {
   }
 
   it("says the time of a date search on its own step screen, after the wallet", async () => {
-    terminal.answers = [`${shares[0]};${shares[2]}\r`, "23-09-202?\r", `${TEST_FINGERPRINT}\r`];
+    terminal.answers = [
+      `${shares[0]};${shares[2]}\r`,
+      `${DATE_LAST_DIGIT_FORGOTTEN}\r`,
+      `${TEST_FINGERPRINT}\r`,
+    ];
     terminal.choices = ["Fingerprint"];
     await runSskrCombine({ "ask-secrets": true, mode: "seedshift" });
     expect(screenOf("The search tries 10 date combinations:")).toBe(SEARCH_SCREEN);

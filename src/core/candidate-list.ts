@@ -19,7 +19,7 @@ import { equalBytes } from "./bits.js";
 import { assertCandidateFileSize } from "./candidate-file-refusal.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog } from "./error-catalog.js";
-import { ByteArray } from "./byte-array.js";
+import { byteArrayLength } from "./byte-array.js";
 
 /** The lengths of BIP39 entropy, as a refusal names them: "16 to 32". */
 const ENTROPY_BYTES_TEXT = `${defined(BIP39_ENTROPY_BYTES[0])} to ${defined(BIP39_ENTROPY_BYTES.at(-1))}`;
@@ -220,7 +220,7 @@ export function encodeCandidateList(list: CandidateList): Uint8Array {
   // Read each host field once: a getter must not supply bytes to validation and another value
   // to serialization. Own the admitted bytes before passphrase getters can change their source.
   const entropies = records.map((record) => record?.entropy);
-  const lengths = entropies.map((bytes) => ByteArray.length(bytes));
+  const lengths = entropies.map((bytes) => byteArrayLength(bytes));
   const entropyLength = lengths[0];
   if (
     entropyLength === undefined ||

@@ -109,7 +109,7 @@ The [format table](../README.md#commands) lists names and numbers. Input syntax 
 
 Color Unicode needs no special font when written as hexadecimal text.
 
-On a terminal, codes that formats 3 and 4 write joined are shown twice, for the phrase and for its shares: apart, separated by spaces, so that each code can be told and an unreadable one replaced by `?`, and then joined on one line, for copying. The codes of formats 1, 2 and 5, which are separated by spaces already, are wrapped at those spaces, so that the terminal never breaks a word or a code in two. A file or a pipe gets the codes on one line.
+On a terminal, codes that formats 3 and 4 write joined are shown twice, for the phrase and for its shares: apart, separated by spaces, so that each code can be told and an unreadable one replaced by `?`, and then joined on one line, for copying. The codes of formats 1, 2 and 5, which are separated by spaces already, are wrapped at those spaces within 78 columns, so that a terminal of 80 columns or more never breaks a word or a code in two; a narrower one wraps the lines again where it ends. A file or a pipe gets the codes on one line.
 
 The layout follows where the output goes: a terminal gets headings, labelled facts, numbered phrases and marked notices, and a file, a pipe or `TERM=dumb` the plain lines of a script. On a terminal each candidate of `recover-word` and each match of `recover-date` is a part of its own, with the words or dates found, the wallet check and the phrase as labelled facts; a file or a pipe gets one row of tab-separated fields for each. Colour is decided apart from it: `NO_COLOR` or `CLICOLOR=0` takes the colours away and keeps the terminal layout, and `CLICOLOR_FORCE` adds colour without changing the form.
 

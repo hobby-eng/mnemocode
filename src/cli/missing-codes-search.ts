@@ -14,6 +14,7 @@ import type { DatesAnswer } from "../core/date-search.js";
 import {
   foundAmongOthers,
   MISSING_CODES_TEXTS,
+  MISSING_CODES_WAYS,
   MissingCodesSearch,
   type MissingCodesResult,
   type MissingCodesWay,
@@ -41,7 +42,7 @@ import {
   terminalResultHeader,
   terminalStatus,
 } from "./terminal.js";
-import { showCandidate } from "./candidate-view.js";
+import { candidateLabel, showCandidate } from "./candidate-view.js";
 import { counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
@@ -80,21 +81,58 @@ export interface MissingCodesAnswers {
   readonly maxCandidates?: number | undefined;
 }
 
-/** The way that the options answer, where it fits the codes; undefined asks for it. */
+/** What a way that was searched gave: an outcome, LIST_OVERFLOWED, or undefined to ask again. */
+type WayOutcome = MissingOutcome | typeof LIST_OVERFLOWED | undefined | Cancelled;
+
+/** How the command line takes a way to tell the codes. */
+interface WayOnCommandLine {
+  /**
+   * The option that names the way ahead in `answers`, as a refusal of it says; undefined where
+   * none does, and the way is asked for.
+   */
+  readonly givenBy: (answers: MissingCodesAnswers) => string | undefined;
+  /** Asks what the way needs, then searches it; `given` where the options named it. */
+  readonly search: (
+    search: MissingCodesSearch,
+    answers: MissingCodesAnswers,
+    given: boolean,
+  ) => Promise<WayOutcome>;
+}
+
+/**
+ * Each way of the core's search (MISSING_CODES_WAYS) as the command line takes it, one entry for
+ * each (CORE-06): a way without one does not compile.
+ */
+const WAYS_ON_COMMAND_LINE = Object.freeze({
+  encoded: {
+    givenBy: (answers) =>
+      answers.encodedFingerprint === undefined ? undefined : "--encoded-fingerprint",
+    search: byEncodedFingerprint,
+  },
+  wallet: {
+    givenBy: (answers) => (answers.evidence === undefined ? undefined : "The wallet option"),
+    search: byWallet,
+  },
+  list: {
+    givenBy: (answers) => (answers.list ? "--list-candidates" : undefined),
+    search: listed,
+  },
+} satisfies Readonly<Record<MissingCodesWay, WayOnCommandLine>>);
+
+/**
+ * The first way, in the core's order, that the options answer and that fits the codes; one that
+ * does not fit is said, and the next is taken. Undefined asks for it.
+ */
 function givenWay(
   search: MissingCodesSearch,
   answers: MissingCodesAnswers,
 ): MissingCodesWay | undefined {
-  if (answers.encodedFingerprint !== undefined) {
-    const refusal = search.whyNot("encoded");
-    if (refusal === undefined) return "encoded";
-    terminalNotice(`--encoded-fingerprint: ${lowerFirst(refusal)}`, "warning");
-  }
-  if (answers.evidence !== undefined) return "wallet";
-  if (answers.list) {
-    const refusal = search.whyNot("list");
-    if (refusal === undefined) return "list";
-    terminalNotice(`--list-candidates: ${lowerFirst(refusal)}`, "warning");
+  for (const way of MISSING_CODES_WAYS) {
+    const option = WAYS_ON_COMMAND_LINE[way].givenBy(answers);
+    if (option === undefined) continue;
+    const refusal = search.whyNot(way);
+    if (refusal === undefined) return way;
+    terminalNotice(`${option}: ${lowerFirst(refusal)}`, "warning");
   }
   return undefined;
 }
@@ -191,19 +229,15 @@ export async function searchMissingCodes(
   const search = new MissingCodesSearch(codes, masterFingerprint);
   terminalNotice(search.unreadable, "warning");
   if (search.many) terminalHint(MISSING_CODES_TEXTS.many);
-  // A list that held more than it can is not offered again for these codes (AUD-037-FUN002).
+  // A way that held more than it can, the list, is not offered again for these codes
+  // (AUD-037-FUN002).
   const closed = new Set<MissingCodesWay>();
   for (let given = givenWay(search, answers); ; given = undefined) {
     const way = given ?? (await askWay(search, closed));
     if (way === undefined) return { kind: "again" };
     if (way === CANCELLED) return CANCELLED;
-    const outcome =
-      way === "encoded"
-        ? await byEncodedFingerprint(search, answers, given === "encoded")
-        : way === "wallet"
-          ? await byWallet(search, answers, given === "wallet")
-          : await listed(search);
-    if (outcome === LIST_OVERFLOWED) closed.add("list");
+    const outcome = await WAYS_ON_COMMAND_LINE[way].search(search, answers, given === way);
+    if (outcome === LIST_OVERFLOWED) closed.add(way);
     else if (outcome !== undefined) return outcome;
   }
 }
@@ -321,7 +355,7 @@ function showCandidates(rows: readonly MissingCodesRow[]): void {
     terminalResultHeader("Candidates", [["Found", String(rows.length)]]);
     terminalHint(FINGERPRINT_DISCLOSURE);
     for (const [index, row] of rows.entries())
-      showCandidate(`Candidate ${index + 1}`, candidateFacts(row));
+      showCandidate(candidateLabel(index + 1), candidateFacts(row));
     return;
   }
   rows.forEach(({ codes, phrase, fingerprint }, index) =>

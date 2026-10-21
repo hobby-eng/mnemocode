@@ -1,3 +1,5 @@
+import { validateMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { describe, expect, it } from "vitest";
 import { nodePbkdf2HmacSha512 } from "../src/bitcoin-evidence.js";
 import { encodeMnemonic, formatEncoded, parseDate } from "../src/core.js";
@@ -87,7 +89,14 @@ describe("codes marked with ? (core/missing-codes.ts)", () => {
     expect(kept.combinations).toBe(2048);
     // Four checksum bits for twelve words leave one in sixteen.
     expect(kept.expected).toBe(128);
-    expect([...kept.candidates()].length).toBeGreaterThan(100);
+    // The candidates are the codes whose words keep the checksum, as @scure/bip39 tells them.
+    const keeping = wordlist.flatMap((_, word) => {
+      const codes = ENCODED.shiftedIndexes.map((code, place) => (place === 5 ? word : code));
+      const phrase = codes.map((code) => wordlist[code]).join(" ");
+      return validateMnemonic(phrase, wordlist) ? [codes] : [];
+    });
+    expect(keeping.length).toBeLessThan(2048);
+    expect([...kept.candidates()]).toEqual(keeping);
     const legacy = kept.withMode("seedshift-legacy");
     expect(legacy.checksummed).toBe(false);
     expect([...legacy.candidates()]).toHaveLength(2048);

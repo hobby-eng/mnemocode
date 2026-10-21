@@ -29,8 +29,11 @@ export function validateThreshold(threshold: number, count: number): void {
 
 /**
  * The shares of `mnemonic`, `count` of them of which any `threshold` restore it, made after the
- * engine's known answers with the system's randomness; refuses a threshold and a count that SSKR
- * does not take.
+ * engine's known answers with the system's randomness. Refuses a threshold and a count that SSKR
+ * does not take (sskr.split.split-threshold-from-number-shares-at-most-shares), first; a failed
+ * SSKR self-test (assertSskrSelfTest), before any share is made; and what ShareSplit.split
+ * refuses of the phrase and of the shares it makes, such as a phrase that is not valid English
+ * BIP39 words (core.words codes).
  */
 export async function splitSskrMnemonic(
   mnemonic: string,

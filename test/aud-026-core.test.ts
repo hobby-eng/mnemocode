@@ -1,6 +1,6 @@
 import { assert, describe, expect, it } from "vitest";
 import { runInNewContext } from "node:vm";
-import { ByteArray } from "../src/core/byte-array.js";
+import { byteArrayLength, isByteArray } from "../src/core/byte-array.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import { coinById } from "../src/core/coins.js";
 import { CoinAddressComparison } from "../src/core/coin-address-evidence.js";
@@ -128,15 +128,15 @@ describe("AUD-026 attached byte arrays and terminal candidate disposal", () => {
         throw Error("own getter");
       },
     });
-    expect(ByteArray.length(bytes)).toBe(16);
-    expect(ByteArray.is(Buffer.alloc(16))).toBe(true);
-    expect(ByteArray.is(runInNewContext("new Uint8Array(16)"))).toBe(true);
+    expect(byteArrayLength(bytes)).toBe(16);
+    expect(isByteArray(Buffer.alloc(16))).toBe(true);
+    expect(isByteArray(runInNewContext("new Uint8Array(16)"))).toBe(true);
     const wider = new Uint16Array(8);
     Object.setPrototypeOf(wider, Uint8Array.prototype);
-    expect(ByteArray.is(wider)).toBe(false);
+    expect(isByteArray(wider)).toBe(false);
     const detached = new Uint8Array(16);
     structuredClone(detached.buffer, { transfer: [detached.buffer] });
-    expect(ByteArray.is(detached)).toBe(false);
+    expect(isByteArray(detached)).toBe(false);
   });
 
   it.each([false, true])(

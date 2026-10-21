@@ -36,7 +36,8 @@ export class KeptShares extends Redacted implements Disposable {
 
   /**
    * Snapshots `texts` in their order, dropping exact copies by ShareInput's rule. Complete shares
-   * must read; the host first obtains unreadable-share findings from ShareBackupCheck.
+   * must read; the host first obtains unreadable-share findings from ShareBackupCheck. A complete
+   * share that does not read is refused as readShare refuses it.
    */
   static of(texts: readonly string[]): KeptShares {
     const typed: TypedShare[] = texts.map((text, index) => ({ place: index + 1, text }));

@@ -8,6 +8,7 @@ import {
   PassphraseProtection,
 } from "../src/core/candidate-encryption.js";
 import { WIPED_CODE } from "./helpers/owner-lifetime.js";
+import { ENCRYPTION_SELF_TEST_FAILED } from "./helpers/refusals.js";
 import { candidateVectors } from "./helpers/vectors.js";
 import { MnemoCodeSelfTest } from "../src/core/self-test.js";
 
@@ -22,10 +23,7 @@ describe("the first candidate encryption operation", () => {
     const plain = Uint8Array.of(1, 2, 3);
     const pending = encryptCandidates(plain, candidateVectors().age.recipient);
     try {
-      await expect(pending).rejects.toHaveProperty(
-        "code",
-        "core.candidate-encryption.self-test-failed",
-      );
+      await expect(pending).rejects.toHaveProperty("code", ENCRYPTION_SELF_TEST_FAILED);
       expect(writes).not.toHaveBeenCalled();
       expect([...plain]).toEqual([1, 2, 3]);
     } finally {
@@ -45,7 +43,7 @@ describe("the first candidate encryption operation", () => {
     });
     await expect(createSessionIdentity()).rejects.toHaveProperty(
       "code",
-      "core.candidate-encryption.self-test-failed",
+      ENCRYPTION_SELF_TEST_FAILED,
     );
     reads.mockClear();
     const results = await Promise.all([

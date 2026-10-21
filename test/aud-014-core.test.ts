@@ -273,7 +273,7 @@ describe("AUD-014 recommendation 4: the last word's entropy, one rule", () => {
   });
 
   it("keeps every mode's search costs and last-word modulus", () => {
-    // Fixed expected values: 2048 without a shift of the entropy alone, 2^(11 - bits) with one.
+    // Fixed known answers: 2048 without a shift of the entropy alone, 2^(11 - bits) with one.
     const table = Masking.MODES.map((mode) => {
       const masking = Masking.of(mode);
       return [

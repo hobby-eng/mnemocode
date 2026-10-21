@@ -395,19 +395,37 @@ describe("AUD-009 follow-up: nothing a library object hands out changes it", () 
       website: "synthetic.example",
       location: "International",
     };
-    const settings = { style: "it", presentation, profile } as const;
-    // The drawing of the page; the bytes of the file differ from one render to the next.
-    const drawn = async (cards: ShareCardSet) =>
-      pageOperators(await PDFDocument.load(await cards.renderShare(0)), 0);
-    const cards = await ShareCardSet.create(nodeCardRenderer, [SHARES[0]!], settings);
+    // A material design: it prints the studio name too, and draws a sheet in a hundredth of the
+    // time of a business design.
+    const settings = { style: "tile", presentation, profile } as const;
+    // The drawing of every page; the bytes of the file differ from one render to the next.
+    const drawn = async (cards: ShareCardSet) => {
+      const document = await PDFDocument.load(await cards.renderAll());
+      return document.getPages().map((_, page) => pageOperators(document, page));
+    };
+    // The same decoys in every set, so that only the texts can tell two sets apart.
+    const firstDecoys = () => 0;
+    const cards = await ShareCardSet.create(nodeCardRenderer, SHARES, settings, firstDecoys);
     const first = await drawn(cards);
+    expect(first).toHaveLength(SHARES.length);
     presentation.studioName = "Another Studio";
     // Before: the later render showed the caller's new studio name.
-    expect(await drawn(cards)).toBe(first);
-    // The name is printed: a set built with the new one draws another page.
-    expect(
-      await drawn(await ShareCardSet.create(nodeCardRenderer, [SHARES[0]!], settings)),
-    ).not.toBe(first);
+    expect(await drawn(cards)).toEqual(first);
+    // The name is printed on every card: a set built with the same one draws the same pages, and
+    // a set built with the new one draws another page for every card.
+    const builtWith = async (studioName: string) =>
+      drawn(
+        await ShareCardSet.create(
+          nodeCardRenderer,
+          SHARES,
+          { ...settings, presentation: { ...presentation, studioName } },
+          firstDecoys,
+        ),
+      );
+    expect(await builtWith("Synthetic Studio")).toEqual(first);
+    const renamed = await builtWith("Another Studio");
+    expect(renamed).toHaveLength(first.length);
+    renamed.forEach((page, place) => expect(page).not.toBe(first[place]));
   });
 
   it("hands out the details settled for an export frozen, as every page shares them", () => {

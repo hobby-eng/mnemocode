@@ -4,10 +4,11 @@
 
 import { describe, expect, it } from "vitest";
 import { coinById } from "../src/core/coins.js";
-import { TEST_ADDRESS } from "./helpers/test-phrase.js";
+import { firstReceivingOf } from "./helpers/coin-addresses.js";
+import { DAMAGED_ADDRESS } from "./helpers/test-phrase.js";
 
 /** The first legacy address of the public test phrase, at m/44'/0'/0'/0/0. */
-const ADDRESS = "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA";
+const ADDRESS = firstReceivingOf("bitcoin");
 /** Its compressed public key, from the same published derivation. */
 const PUBLIC_KEY = Buffer.from(
   "03aaeb52dd7494c361049de67cc680e83ebcbbbdbeb13637d92cd845f70308af5e",
@@ -23,7 +24,7 @@ describe("a parsed address", () => {
       ["type", "p2tr"],
       ["testnet", true],
       // The test phrase's first native SegWit address with its last letter changed.
-      ["text", `${TEST_ADDRESS.slice(0, -1)}v`],
+      ["text", DAMAGED_ADDRESS],
     ] as const;
     for (const [field, value] of writes)
       expect(Reflect.set(address, field, value), field).toBe(false);

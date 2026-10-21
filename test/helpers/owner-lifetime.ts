@@ -1,8 +1,13 @@
 // The end of an owner's lifetime as the tests of stale reads reach it, and the code of the refusal
 // that a wiped secret gives (core/secret-value.ts), written out so that a test sees a changed code.
 
+import { expect } from "vitest";
+
 /** The code of the error that a secret value refuses with once it is wiped. */
 export const WIPED_CODE = "core.secret-value.wiped";
+
+/** What the refusal of a wiped secret matches in toThrow and rejects.toThrow: its code. */
+export const WIPED_REFUSAL: unknown = expect.objectContaining({ code: WIPED_CODE });
 
 /** Reaches stale-read regressions even when the old implementation has no lifetime method. */
 export function endLifetimeIfPresent(owner: object, method: "wipe" | "dispose" = "wipe"): boolean {

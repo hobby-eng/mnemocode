@@ -592,8 +592,8 @@ def check_decode_dates_asked_again():
         session.wait_for("found 1 match.")
         session.wait_for(MASK_DATE)
         session.wait_for(CLEAR_PROMPT)
-        # The match's phrase is wrapped at its spaces (CORE-36): it is read
-        # whole on the screen.
+        # The match's phrase is wrapped at its spaces (CORE-36): it is
+        # read whole on the screen.
         assert_private_result_visible(session, (TEST_PHRASE,))
         session.type(ENTER)
         session.wait_for(MENU_SHOWN)

@@ -17,6 +17,7 @@ import { ShareSplit } from "../src/sskr/split.js";
 import { bytewordsToUr, urToBytewords, urToTransport } from "../src/sskr/transport.js";
 import {
   DATE,
+  LAST_OF_24_FORGOTTEN,
   LAST_WORD_FORGOTTEN,
   MASKED_INDEXES,
   OTHER_PHRASE,
@@ -98,7 +99,7 @@ describe("AUD-016-API001: a wallet answer is read field by field, whatever its k
 
 describe("AUD-015-API001 (AUD-016): a list of codes is not handed out after a stop", () => {
   /** The codes of a 24-word phrase without its last word: a few candidates, which a list holds. */
-  const codes = () => MissingCodes.read(`${"abandon ".repeat(23)}?`, "english", "direct");
+  const codes = () => MissingCodes.read(LAST_OF_24_FORGOTTEN, "english", "direct");
 
   it("ends as stopped, listing nothing, when the host stops while it fingerprints", async () => {
     const controller = new AbortController();

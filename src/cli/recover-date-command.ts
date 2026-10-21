@@ -45,6 +45,7 @@ import {
   transformMode,
   dateInputText,
 } from "./input.js";
+import { PrivateSteps } from "./private-steps.js";
 import { terminalNotice } from "./terminal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import type { MaskingMode } from "../core/types.js";
@@ -233,6 +234,8 @@ async function recoverWithQuestions(
   let lastMatches = 0;
   try {
     for (let step: Step = "backup"; step !== "done";) {
+      // An answer under a result led here: this step is not drawn under it (CORE-39).
+      PrivateSteps.leaveResult();
       if (step === "backup") {
         const read = await askEncodedCodes({ args: backupArgs, seedshiftOnly: true, recordMode });
         if (read === CANCELLED) return CANCELLED;

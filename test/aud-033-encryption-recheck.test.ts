@@ -10,8 +10,7 @@ import {
 import { deferred } from "./helpers/deferred.js";
 import { allWiped } from "./helpers/made-arrays.js";
 import { WIPED_CODE } from "./helpers/owner-lifetime.js";
-
-const FAILED = "core.candidate-encryption.self-test-failed";
+import { ENCRYPTION_SELF_TEST_FAILED as FAILED } from "./helpers/refusals.js";
 
 function holdSymmetricChecks(failures: readonly boolean[]) {
   const gates = failures.map((fails) => ({ entered: deferred(), held: deferred(), fails }));

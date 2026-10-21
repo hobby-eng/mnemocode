@@ -38,10 +38,9 @@ import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { readBoundedTextFile } from "../src/cli/text-file.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
 import { testPath } from "./helpers/test-folders.js";
-import { TEST_NUMBERS } from "./helpers/test-phrase.js";
+// The all-zero-entropy phrase "abandon … about" as a record of word numbers.
+import { TEST_RECORD as PUBLIC_RECORD } from "./helpers/test-phrase.js";
 
-/** The all-zero-entropy phrase "abandon … about" as a record of word numbers. */
-const PUBLIC_RECORD = `MNC1:direct:indexes:${TEST_NUMBERS}`;
 const wiped = (bytes: Uint8Array) => bytes.every((byte) => byte === 0);
 
 afterEach(() => {

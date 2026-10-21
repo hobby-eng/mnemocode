@@ -103,20 +103,23 @@ describe("EncodedBackup", () => {
   });
 
   it("refuses codes that no seed phrase has, naming the count or the place only", () => {
+    // The whole message, so that nothing typed can be in it.
+    const refusal = (message: string) => expect.objectContaining({ message });
+    const counts = "an encoded seed phrase has 12, 15, 18, 21 or 24.";
     const indexes = formatEncoded(MASKED, "indexes").split(" ");
     expect(() => EncodedBackup.read(indexes.slice(1).join(" "), "indexes", "direct")).toThrow(
-      "These are 11 word numbers; an encoded seed phrase has 12, 15, 18, 21 or 24.",
+      refusal(`These are 11 word numbers; ${counts}`),
     );
     const words = MASKED.shiftedEnglish;
     expect(() =>
       EncodedBackup.of(MASKED.shiftedIndexes.slice(1), "english", "seedshift-legacy"),
-    ).toThrow("These are 11 words;");
+    ).toThrow(refusal(`These are 11 words; ${counts}`));
     expect(() => EncodedBackup.of(MASKED.shiftedIndexes.slice(1), "unicode", "direct")).toThrow(
-      "These are 11 codes;",
+      refusal(`These are 11 codes; ${counts}`),
     );
     expect(() =>
       EncodedBackup.of([...MASKED.shiftedIndexes.slice(1), 2048], "indexes", "direct"),
-    ).toThrow("Every BIP39 index must be an integer from 0 through 2047.");
+    ).toThrow(refusal("Every BIP39 index must be an integer from 0 through 2047."));
     expect(() =>
       // A mode that no type allows, fed on purpose as a JavaScript host could.
       EncodedBackup.of(MASKED.shiftedIndexes, "indexes", "shifted" as unknown as "direct"),
@@ -124,7 +127,7 @@ describe("EncodedBackup", () => {
     // An unknown word is named by its place.
     const typo = [...words.slice(0, 2), "notaword", ...words.slice(3)].join(" ");
     expect(() => EncodedBackup.read(typo, "english", "direct")).toThrow(
-      "Unknown English BIP39 word at position 3.",
+      refusal("Unknown English BIP39 word at position 3."),
     );
   });
 

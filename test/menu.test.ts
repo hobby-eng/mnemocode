@@ -328,16 +328,27 @@ describe("start menu", () => {
       await runOf(ENTRY.encode, answers);
       return script.asked.find((asked) => asked.question.startsWith("Where should"))!.labels;
     };
-    // Word numbers, MnemoCode Seedshift, no shares: a record or a QR code, no cards.
+    // Word numbers or English words, MnemoCode Seedshift, no shares: a record or a QR code, no
+    // cards.
     expect(await destinations([1, 0, 0])).not.toContain("Also as printable cards");
-    // Colors and Unicode codes: cards too.
+    expect(await destinations([0, 0, 0])).not.toContain("Also as printable cards");
+    // Colors, colors as text and Unicode codes: cards too.
     expect(await destinations([4, 1, 0])).toContain("Also as printable cards");
+    expect(await destinations([3, 1, 0])).toContain("Also as printable cards");
     expect(await destinations([2, 1, 0])).toContain("Also as printable cards");
     // Shares of word numbers have no cards; shares of Unicode codes print their codes, with
     // colors that only decorate them, and shares of colors print their colors.
     expect(await destinations([1, 0, 1, 0])).toEqual([
       "Only on this screen",
       "Also in a text file",
+    ]);
+    // Shares of a phrase in English words have no cards either; shares of colors as text do.
+    expect(await destinations([0, 0, 1])).toEqual(["Only on this screen", "Also in a text file"]);
+    expect(await destinations([3, 1, 1, 0])).toEqual([
+      "Only on this screen",
+      "Also in a text file",
+      "Also as printable cards",
+      "All of these",
     ]);
     expect(await destinations([2, 1, 1, 0])).toEqual([
       "Only on this screen",
@@ -503,6 +514,14 @@ describe("start menu", () => {
         "png",
         "--page-size",
         "a4",
+      ]);
+      expect(await cardOptions(SINGLE, [1, 1, 2, 0, 1])).toEqual([
+        "--images-dir",
+        "mnemocode-cards-images",
+        "--image-format",
+        "png",
+        "--page-size",
+        "a5",
       ]);
       script.noImages = true;
       // PNG first, then the first choice, a PDF, when the question is asked again.

@@ -28,7 +28,7 @@ import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { repairCandidates } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { writeShare, type ShareFormat } from "../src/sskr/transport.js";
-import { DATE, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_FINGERPRINT, TEST_PHRASE, ZERO_ENTROPY_PHRASES } from "./helpers/test-phrase.js";
 import { runBuiltCli } from "./helpers/built-cli.js";
 import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 import { sskrVectors } from "./helpers/vectors.js";
@@ -202,7 +202,7 @@ describe("AUD-022-FUN002: separate cards keep their own page", () => {
     async () => {
       const folder = mkdtempSync(join(tmpdir(), "mnemocode-aud022-"));
       try {
-        const phrase = `${"abandon ".repeat(23)}art`;
+        const phrase = ZERO_ENTROPY_PHRASES[24];
         await runBuiltCli([
           "encode",
           "--mnemonic",

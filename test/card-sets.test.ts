@@ -106,8 +106,8 @@ describe("the colors of cards that print codes", () => {
     expect(codeColors(["1", "2", "3", "4", "5"]).slice(0, 3)).toEqual(small);
   });
 
-  it("keep the codes of a 24-word phrase and its decoys far apart on every design", () => {
-    // The closest two of 40 colors, in millionths of OKLab units: no design shows them alike.
+  it("keep the 40 codes of a 24-word phrase and its decoys far apart in OKLab", () => {
+    // The closest two of 40 colors, in millionths of OKLab units.
     const colors = codeColors(Array.from({ length: 40 }, (_, index) => String(index)));
     expect(new Set(colors).size).toBe(40);
     expect(closestPair(colors)).toBeGreaterThan(60_000);
@@ -149,7 +149,7 @@ describe("a sheet of cards", () => {
     expect(13 % thirteen.columns).not.toBe(0);
   });
 
-  it("is planned with at least one decoy, full rows and the largest cards", async () => {
+  it("is planned with at least one decoy and full rows, in the orientation given", async () => {
     const colors = indexesToColors(Array.from({ length: 24 }, (_, index) => index * 85));
     const content = { kind: "colors" as const, colors, payload: colors.join(" ") };
     const pool = withDecoyPool(content, () => 0);

@@ -218,6 +218,7 @@ describe("Share", () => {
       expect(share.format).toBe(form);
       expect(share.write()).toBe(writeShare(SHARE, form));
       expect(share.write("ur")).toBe(SHARE);
+      for (const other of Share.FORMATS) expect(share.write(other)).toBe(writeShare(SHARE, other));
       expect(String(share)).toBe("[Share: redacted]");
       expect(JSON.stringify({ share })).toBe('{"share":"[Share: redacted]"}');
     }

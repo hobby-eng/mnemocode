@@ -48,7 +48,7 @@ describe("help", () => {
     );
   });
 
-  it("lists every command and topic in the overview", async () => {
+  it("lists every command but sskr-split, and every topic, in the overview", async () => {
     for (const argument of [[], ["--help"], ["-h"], ["help"]]) {
       const { stdout } = await run(argument);
       expect(stdout).toContain("MnemoCode 0.1.0");
@@ -141,14 +141,17 @@ describe("help", () => {
   });
 
   it("refuses an unknown command or topic without repeating it", async () => {
-    await expect(run(["frobnicate"])).rejects.toMatchObject({
-      code: 1,
-      stderr: containing("There is no such command."),
-    });
-    await expect(run(["help", "frobnicate"])).rejects.toMatchObject({
-      code: 1,
-      stderr: containing("There is no such command or topic."),
-    });
+    for (const [typed, refusal] of [
+      [["frobnicate"], "There is no such command."],
+      [["help", "frobnicate"], "There is no such command or topic."],
+    ] as const) {
+      const failure: unknown = await run([...typed]).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      expect(failure).toMatchObject({ code: 1, stderr: containing(refusal) });
+      expect(failure).not.toMatchObject({ stderr: containing("frobnicate") });
+    }
   });
 });
 
@@ -169,12 +172,13 @@ describe("help notes and the cards they describe", () => {
     const plain = lines.map((line) => line.replace(STYLE_CODES, ""));
     const note = plain.findIndex((line) => line.startsWith("Every format is a representation"));
     expect(note).toBeGreaterThan(plain.indexOf("Examples:"));
+    expect(note).toBeLessThan(plain.findIndex((line) => line.startsWith("Recovery material:")));
     expect(plain).not.toContain("Notes:");
     // Grey, as a command's notes are (CORE-35, CORE-37).
     expect(lines[note]?.startsWith(`\x1b[${STYLE.muted}m`)).toBe(true);
   });
 
-  it("says on every page that only the real cards are needed, and that each share file holds one share", () => {
+  it("says that only the real cards are needed, on no page that every card is, and that each share file holds one share", () => {
     const lines: string[] = [];
     const log = vi.spyOn(console, "log").mockImplementation((text: string) => {
       lines.push(...text.split("\n"));

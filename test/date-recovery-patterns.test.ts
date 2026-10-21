@@ -90,7 +90,7 @@ describe("date recovery patterns", () => {
 
 describe("date recovery patterns", () => {
   it(
-    "finds no phrase twice and the right one once, in every mode, length and forgotten part",
+    "finds no phrase twice and the right one once, of 12 and 24 words, in every mode and each case it searches",
     () => {
       const phrases = {
         12: TEST_PHRASE,

@@ -81,7 +81,7 @@ describe("bundled artwork", () => {
     expect(reads).toEqual([path, path]);
   });
 
-  it("draws a business card after its artwork failed to load once", async () => {
+  it("recolours a business design's artwork after it failed to load once", async () => {
     const { platform } = failingOnce();
     const artwork = new BusinessArtwork(platform);
     await expect(artwork.recoloured("it", "#112233")).rejects.toThrow("Cannot load card artwork");

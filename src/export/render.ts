@@ -143,8 +143,10 @@ export function separateCardJob(job: CardJob, orientation: CardOrientation | und
  * drawn with `drawing`, the host's CardRenderer. Refuses no job at all
  * (export.render.no-cards-to-render); before any choice is made, a page setting that no card family
  * prints (assertPageSettings) and a design without separate cards for colour cards of a card size
- * (export.render.assert-individual-template-refused); a design of another kind than its content
- * (export.render.template-does-not-support); a QR code on separate cards
+ * (export.render.assert-individual-template-refused); before any design draws, the person's
+ * details and the texts of the first job as ExportDetails.of refuses them (export.card-settings
+ * codes, such as card-name-use-latin-letters-only-spaces-apostrophes); a design of another kind
+ * than its content (export.render.template-does-not-support); a QR code on separate cards
  * (export.content-kinds.qr-code-printed-on-sheet-only-choose-size); texts of the design that
  * checkedCardPresentation refuses; and a design that draws no page
  * (export.render.template-rendered-empty-document). What a design refuses passes on, such as
@@ -245,7 +247,9 @@ export function assertIndividualCards(template: CardTemplate, content: CardConte
 
 /**
  * One document per card, all sharing one identity, drawn with `drawing`. Refuses what
- * assertIndividualCards refuses, before any choice is made; what the design refuses passes on,
+ * assertIndividualCards refuses, before any choice is made; then, before any card is drawn, the
+ * person's details and the texts as ExportDetails.of refuses them (export.card-settings codes,
+ * such as card-name-use-latin-letters-only-spaces-apostrophes). What the design refuses passes on,
  * and so does a card name that checkedExportFileName refuses (export.file-name.invalid-component).
  */
 export async function renderIndividualCards(

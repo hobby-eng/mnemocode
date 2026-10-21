@@ -15,9 +15,16 @@ export const TEST_TIME_LIMIT_MS = 60_000;
 
 /**
  * The limit of a test that does much more than a few CLI starts: a search or a repair over many
- * candidates, drawing cards or sheets, or many CLI starts in a row. Twice TEST_TIME_LIMIT_MS.
+ * candidates, drawing cards or sheets, or several CLI starts in a row. Twice TEST_TIME_LIMIT_MS.
  */
 export const LONG_TEST_TIME_LIMIT_MS = 2 * TEST_TIME_LIMIT_MS;
+
+/**
+ * The limit of a test that starts the command line fifteen times or more in a row: every start
+ * runs the core self-test, and a process starts slowly on Windows and on a busy machine, where such
+ * a test takes minutes. Five times TEST_TIME_LIMIT_MS.
+ */
+export const MANY_STARTS_TEST_TIME_LIMIT_MS = 5 * TEST_TIME_LIMIT_MS;
 
 /**
  * The limit of a test that draws a design with its real fonts and artwork, runs the whole
@@ -28,8 +35,9 @@ export const LONG_TEST_TIME_LIMIT_MS = 2 * TEST_TIME_LIMIT_MS;
 export const LONGEST_TEST_TIME_LIMIT_MS = 3 * TEST_TIME_LIMIT_MS;
 
 /**
- * The limit of a test that renders and reads back the cards of every design or of every family,
- * which takes minutes on a loaded machine or a hosted CI runner: five times TEST_TIME_LIMIT_MS.
+ * The limit of a test that renders and reads back the cards of every design, of every family or in
+ * every card size, which takes minutes on a loaded machine or a hosted CI runner: five times
+ * TEST_TIME_LIMIT_MS.
  */
 export const DRAWING_TEST_TIME_LIMIT_MS = 5 * TEST_TIME_LIMIT_MS;
 

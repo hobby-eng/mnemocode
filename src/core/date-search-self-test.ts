@@ -22,6 +22,7 @@ import {
   MASKED_NUMBERS,
   PUBLIC_FINGERPRINT,
   PUBLIC_MNEMONIC,
+  PUBLIC_MNEMONIC_24,
 } from "./self-test-vectors.js";
 
 /** The masked phrase's word indexes, counted from 0. */
@@ -31,8 +32,6 @@ const FORGOTTEN_LAST_DIGIT = `${MASKED_DATE.slice(0, -1)}?`;
 /** A phrase of twelve words takes four dates, one for every three words. */
 const TWELVE_WORDS = { wordCount: 12, patterns: true } as const;
 
-/** The public phrase of 24 words, all-zero entropy. */
-const PUBLIC_24_WORDS = `${"abandon ".repeat(23)}art`;
 /**
  * Eight dates, the most that 24 words take, with the day of the latest forgotten: that day moves
  * only the last word, and MnemoCode Seedshift adds it to the last 3 bits of entropy alone, so
@@ -165,7 +164,7 @@ function checkShiftsTriedOnce(): void {
       combinations += 1;
       for (const candidate of candidates) {
         phrases.push(candidate.mnemonic);
-        if (candidate.mnemonic === (wordCount === 12 ? PUBLIC_MNEMONIC : PUBLIC_24_WORDS))
+        if (candidate.mnemonic === (wordCount === 12 ? PUBLIC_MNEMONIC : PUBLIC_MNEMONIC_24))
           found.push(candidate.dates.map(formatDate).join(" "));
       }
     }

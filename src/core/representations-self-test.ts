@@ -17,7 +17,13 @@ import {
 } from "./types.js";
 import { defined } from "./defined.js";
 import { EncodedForm } from "./encoded-form.js";
-import { MASKED_DATE } from "./self-test-vectors.js";
+import {
+  MASKED_DATE,
+  PUBLIC_MNEMONIC,
+  PUBLIC_MNEMONIC_24,
+  PUBLIC_UNICODE,
+  SEEDSHIFT_DATES,
+} from "./self-test-vectors.js";
 
 /** A known answer of the forms of codes: a phrase of `words` words written in every form. */
 export interface Answer {
@@ -38,15 +44,17 @@ export interface SeedshiftAnswer extends Answer {
 // Fixed answers stay independent of the encoders; constructing them by encoding would hide a
 // defect shared by the writer and reader. Repeated literals here are intentional test oracles.
 // The 12-word answers are a deliberate copy of vectors/mnemocode-v1.json's direct-12, since a
-// startup reads no file; test/startup-edges.test.ts keeps the two in step.
+// startup reads no file; test/startup-edges.test.ts keeps the two in step. The two public phrases
+// and the Unicode codes of the 12-word one are those that every self-test takes
+// (self-test-vectors.ts).
 /** The known answers of the forms of codes, a phrase of each length written in every form. */
 export const REPRESENTATION_ANSWERS: readonly Answer[] = [
   {
     words: 12,
     forms: {
-      english: `${"abandon ".repeat(11)}about`,
+      english: PUBLIC_MNEMONIC,
       indexes: "1 1 1 1 1 1 1 1 1 1 1 4",
-      unicode: "768476847684768476847684768476847684768476845728",
+      unicode: PUBLIC_UNICODE,
       colors: "#000064 #1EAB91 #3D0964 #5BB491 #7A1264 #98BD91 #B71B64 #D5C694",
       "colors-unicode": "E000E064E13AE191E271E064E3ABE191E4E2E064E61CE191E753E064E88DE194",
     },
@@ -54,7 +62,7 @@ export const REPRESENTATION_ANSWERS: readonly Answer[] = [
   {
     words: 24,
     forms: {
-      english: `${"abandon ".repeat(23)}art`,
+      english: PUBLIC_MNEMONIC_24,
       indexes: "1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 103",
       unicode: `${"7684".repeat(23)}6027`,
       colors:
@@ -66,8 +74,8 @@ export const REPRESENTATION_ANSWERS: readonly Answer[] = [
 ];
 
 // A deliberate copy of vectors/mnemocode-v1.json's checksum-valid-seedshift-15, -18 and -21, for
-// the same reason; test/startup-edges.test.ts keeps them in step too. The three share their dates.
-const SEEDSHIFT_DATES = ["07-11-1951", "08-08-1988", "23-09-2026"];
+// the same reason; test/startup-edges.test.ts keeps them in step too. The three share their dates
+// (SEEDSHIFT_DATES).
 /** The known answers of MnemoCode Seedshift with a valid checksum, for 15, 18 and 21 words. */
 export const SEEDSHIFT_ANSWERS: readonly SeedshiftAnswer[] = [
   {

@@ -670,13 +670,14 @@ export interface ReadShare {
 /**
  * A share in any form MnemoCode writes, as its UR, and the form it was written in. Refuses text
  * that is no share with the refusal of the first form it looks like (readOrder): a UR as
- * urToTransport refuses it, Bytewords as bytewordsToUr, colors as colorsToShare and Color Unicode
- * as unicodeToColorCodes and colorsToShare; word numbers that run together
+ * urToTransport refuses it; numbers, decimal digits only, as word numbers: that run together
  * (sskr.transport.word-numbers-run-together), that are no word numbers or too many
- * (word-numbers-share-whole-numbers-from), Unicode codes as unicodeIndexesOf refuses them or too
- * long (unicode-codes-share-too-long), and word numbers or Unicode codes that hold no share
- * (mixed-share-refused, or as shareInfo refuses their bytes). Blank text, which looks like no
- * form, is refused with not-sskr-share.
+ * (word-numbers-share-whole-numbers-from), or that hold no share (mixed-share-refused, or as
+ * shareInfo refuses their bytes); other hexadecimal codes, as colors, Unicode codes and Color
+ * Unicode in digits are written, as colorsToShare refuses them, since colors come first of the
+ * forms that they look like; Color Unicode in its symbols as unicodeToColorCodes and
+ * colorsToShare refuse it; and any other text as bytewordsToUr refuses it. Blank text, which
+ * looks like no form, is refused with not-sskr-share.
  */
 export function readShare(value: string): ReadShare {
   const text = value.trim();

@@ -17,7 +17,7 @@ import {
 } from "../src/cli/input.js";
 import { MAX_TEXT_INPUT_BYTES } from "../src/cli/bounded-read.js";
 import { validateOutputPaths } from "../src/cli/output-paths.js";
-import { DATE, TEST_FINGERPRINT } from "./helpers/test-phrase.js";
+import { DATE, DATE_LAST_DIGIT_FORGOTTEN, TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 
 let folder: string;
 beforeEach(async () => {
@@ -113,8 +113,8 @@ it("refuses a date-file source in direct mode before reading either backup or fi
 
 it("keeps date-pattern text intact for the existing recovery parser", async () => {
   const path = join(folder, "public-patterns.txt");
-  await writeFile(path, "23-09-202?\n", "utf8");
-  expect(dateInputText({ "dates-file": path })).toBe("23-09-202?\n");
+  await writeFile(path, `${DATE_LAST_DIGIT_FORGOTTEN}\n`, "utf8");
+  expect(dateInputText({ "dates-file": path })).toBe(`${DATE_LAST_DIGIT_FORGOTTEN}\n`);
   expect(() => dates({ "dates-file": path })).toThrow("only where MnemoCode can search dates");
 });
 
@@ -128,7 +128,7 @@ it("keeps final-word file text and refuses mixed in-process sources before readi
   expect(() => dates({ date: DATE, "dates-file": "must-not-be-read" })).toThrow("but not both");
 });
 
-it("refuses oversized and malformed UTF-8 date files through the common input boundary", async () => {
+it("refuses oversized and malformed UTF-8 date files through the common input check", async () => {
   const path = join(folder, "public-malformed.txt");
   await writeFile(path, Buffer.alloc(MAX_TEXT_INPUT_BYTES + 1, 0x20));
   expect(() => dates({ "dates-file": path })).toThrow("safety limit");

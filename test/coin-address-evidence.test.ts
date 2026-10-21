@@ -9,14 +9,13 @@ import { CoinAddressCheck, type CoinAddressEvidence } from "../src/core/coin-add
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
 import { DASH } from "../src/core/coins/dash.js";
 import type { Pbkdf2HmacSha512 } from "../src/core/master-fingerprint.js";
-import { TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  FIRST_CHANGE_ADDRESS,
+  PLATFORM_ADDRESS,
+  SECOND_RECEIVING_ADDRESS,
+} from "./helpers/coin-addresses.js";
+import { DAMAGED_ADDRESS, TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
-/** BIP84's second receiving address, m/84'/0'/0'/0/1. */
-const RECEIVING_1 = "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g";
-/** BIP84's first change address, m/84'/0'/0'/1/0. */
-const CHANGE_0 = "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el";
-/** DIP17's first Dash Platform address of key class 0', m/9'/5'/17'/0'/0'/0. */
-const PLATFORM_0 = "dash1krma5z3ttj75la4m93xcndna9ullamq9y5e9n5rs";
 const FIRST = { account: 0, branch: 0, index: 0 } as const;
 
 /** Node's PBKDF2, answering later, as WebCrypto does in a page. */
@@ -34,10 +33,10 @@ describe("an address of one coin", () => {
   it("is found at its place, with a PBKDF2 that answers at once or later", async () => {
     for (const [coin, value, path] of [
       [BITCOIN, TEST_ADDRESS, "m/84'/0'/0'/0/0"],
-      [BITCOIN, CHANGE_0, "m/84'/0'/0'/1/0"],
-      [DASH, PLATFORM_0, "m/9'/5'/17'/0'/0'/0"],
+      [BITCOIN, FIRST_CHANGE_ADDRESS, "m/84'/0'/0'/1/0"],
+      [DASH, PLATFORM_ADDRESS, "m/9'/5'/17'/0'/0'/0"],
     ] as const) {
-      const location = { ...FIRST, branch: value === CHANGE_0 ? 1 : 0 };
+      const location = { ...FIRST, branch: value === FIRST_CHANGE_ADDRESS ? 1 : 0 };
       const found = { matched: true, derived: value, path };
       expect(await bothMatches({ coin, value, location })).toEqual([found, found]);
     }
@@ -45,17 +44,20 @@ describe("an address of one coin", () => {
 
   it("is not found at another place, and is found among the addresses that follow", async () => {
     const notFound = { matched: false };
-    expect(await bothMatches({ coin: BITCOIN, value: RECEIVING_1, location: FIRST })).toEqual([
-      notFound,
-      notFound,
-    ]);
-    expect(await bothMatches({ coin: BITCOIN, value: CHANGE_0, location: FIRST })).toEqual([
-      notFound,
-      notFound,
-    ]);
-    const second = { matched: true, derived: RECEIVING_1, path: "m/84'/0'/0'/0/1" };
     expect(
-      await bothMatches({ coin: BITCOIN, value: RECEIVING_1, location: FIRST, addresses: 2 }),
+      await bothMatches({ coin: BITCOIN, value: SECOND_RECEIVING_ADDRESS, location: FIRST }),
+    ).toEqual([notFound, notFound]);
+    expect(
+      await bothMatches({ coin: BITCOIN, value: FIRST_CHANGE_ADDRESS, location: FIRST }),
+    ).toEqual([notFound, notFound]);
+    const second = { matched: true, derived: SECOND_RECEIVING_ADDRESS, path: "m/84'/0'/0'/0/1" };
+    expect(
+      await bothMatches({
+        coin: BITCOIN,
+        value: SECOND_RECEIVING_ADDRESS,
+        location: FIRST,
+        addresses: 2,
+      }),
     ).toEqual([second, second]);
   });
 
@@ -81,7 +83,7 @@ describe("an address of one coin", () => {
     });
     const refused: readonly (readonly [CoinAddressEvidence, string])[] = [
       [
-        { coin: BITCOIN, value: `${TEST_ADDRESS.slice(0, -1)}v`, location: FIRST },
+        { coin: BITCOIN, value: DAMAGED_ADDRESS, location: FIRST },
         "core.coins.coin.address-damaged",
       ],
       [

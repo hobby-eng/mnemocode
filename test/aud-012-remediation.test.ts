@@ -41,6 +41,7 @@ import {
   datePatternCombinations,
   ownedPatterns,
 } from "../src/core/dates.js";
+import { dateRecoveryCandidates } from "../src/core/date-recovery.js";
 import { checkedBitcoinProfiles } from "../src/core/wallet-evidence.js";
 import { ENGLISH_INDEX, recoverLegacyValidLastWords } from "../src/core/words.js";
 import { pathWithin } from "../src/cli/path-within.js";
@@ -67,7 +68,7 @@ import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import { holes } from "./helpers/holes.js";
 import { refusalOf } from "./helpers/refusals.js";
-import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, DATE_LAST_DIGIT_FORGOTTEN, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /**
  * The most the search of two dates over the public phrase may take: it finds the phrase in well
@@ -76,7 +77,8 @@ import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 const SEARCH_TIME_LIMIT_MS = 10_000;
 
 describe("AUD-012-FUN001: codes and dates found together decode to the wallet that matched", () => {
-  const known = parseDate("01-01-2025");
+  const knownDate = "01-01-2025";
+  const known = parseDate(knownDate);
   const guessed = parseDate(DATE);
   for (const [mode, encode] of [
     ["seedshift", encodeMnemonic],
@@ -86,7 +88,10 @@ describe("AUD-012-FUN001: codes and dates found together decode to the wallet th
       const tokens = formatEncoded(encode(TEST_PHRASE, [known, guessed]), "indexes").split(" ");
       tokens[3] = `${tokens[3]!.slice(0, -1)}?`;
       const codes = MissingCodes.read(tokens.join(" "), "indexes", mode);
-      const answer = DatesAnswer.parse("01-01-2025 23-09-202?", { wordCount: 12, patterns: true });
+      const answer = DatesAnswer.parse(`${knownDate} ${DATE_LAST_DIGIT_FORGOTTEN}`, {
+        wordCount: 12,
+        patterns: true,
+      });
       const check = async (mnemonic: string) => ({
         matched: mnemonic === TEST_PHRASE,
         path: "m",
@@ -421,9 +426,9 @@ describe("AUD-012-FUN005: a folder that cannot be made private is not published"
 });
 
 describe("AUD-012-FUN006, FUN007: card settings refuse what they cannot print", () => {
-  it("refuses an orientation that is not one, in every family's layout", () => {
+  it("refuses an orientation that is not one when it measures a page", () => {
     // Every family lays its pages out through pageDimensions, the material sheets too, since
-    // they are drawn as collection studies only.
+    // they are drawn as collection studies only; this test reaches pageDimensions alone.
     expect(pageDimensions("business")).toEqual(pageDimensions("business", "landscape"));
     expect(pageDimensions("a6", "portrait")[1]).toBeGreaterThan(
       pageDimensions("a6", "portrait")[0],
@@ -491,6 +496,11 @@ describe("AUD-012-API004, API005: date patterns are checked together and owned",
     const conflicting = [pattern("same", [2]), pattern("same", [1])];
     expect(() => [...datePatternCombinations(conflicting)]).toThrow(/key of an earlier one/u);
     expect(() => datePatternCombinationCount(conflicting)).toThrow(/key of an earlier one/u);
+    const indexes = Array.from({ length: 12 }, () => 0);
+    expect(() => [...dateRecoveryCandidates(indexes, [], conflicting, "seedshift")]).toThrow(
+      /key of an earlier one/u,
+    );
+    expect(() => DatesAnswer.of([], conflicting)).toThrow(/key of an earlier one/u);
     expect([...datePatternCombinations([pattern("a", [2]), pattern("b", [1])])]).toHaveLength(1);
   });
 

@@ -42,8 +42,9 @@ function writings(units: readonly string[]): Record<string, string> {
     commas: units.join(", "),
     lower: units.join(" ").toLowerCase(),
     lowerJoined: units.join("").toLowerCase(),
-    // A terminal that copies a wrapped row with a line break may cut a code in two.
+    // A terminal that copies a wrapped row with a line break may cut a code in two; so may a space.
     cut: [units[0]!.slice(0, 2), units[0]!.slice(2), ...units.slice(1)].join(" "),
+    broken: [`${units[0]!.slice(0, 2)}\n${units[0]!.slice(2)}`, ...units.slice(1)].join(" "),
   };
 }
 

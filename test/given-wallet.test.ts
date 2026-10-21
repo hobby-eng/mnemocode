@@ -11,12 +11,11 @@ import { inspect } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { walletCheckOf } from "../src/bitcoin-evidence.js";
 import { givenWallet } from "../src/cli/bitcoin-options.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { WIPED_REFUSAL as WIPED } from "./helpers/owner-lifetime.js";
+// BIP84's first receiving key for the public BIP39 test phrase, as a WIF.
+import { TEST_FINGERPRINT, TEST_PHRASE, TEST_WIF as WIF } from "./helpers/test-phrase.js";
 
-// BIP84's first receiving key for the public BIP39 test phrase.
-const WIF = "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d";
 const PASSPHRASE = "public synthetic passphrase";
-const WIPED = "This secret value has been wiped.";
 const REDACTED = "[GivenWallet: redacted]";
 
 let folder: string;

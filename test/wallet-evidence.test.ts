@@ -29,7 +29,19 @@ import {
   nodePbkdf2HmacSha512,
 } from "../src/bitcoin-evidence.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
-import { TEST_ADDRESS, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  FIRST_CHANGE_ADDRESS,
+  SECOND_RECEIVING_ADDRESS,
+  TAPROOT_ADDRESS,
+  TESTNET_NESTED_ADDRESS,
+} from "./helpers/coin-addresses.js";
+import {
+  TEST_ADDRESS,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+  TEST_PUBLIC_KEY,
+  TEST_WIF,
+} from "./helpers/test-phrase.js";
 
 /** The pure JavaScript PBKDF2 that @scure/bip39 uses, as a page passes it. */
 const noblePbkdf2 = ((password, salt, rounds, bytes) =>
@@ -43,21 +55,21 @@ const BIP84 = {
   accountZpub:
     "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs",
   firstReceiving: TEST_ADDRESS,
-  firstReceivingPublicKey: "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c",
-  firstReceivingWif: "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d",
-  firstChange: "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el",
+  firstReceivingPublicKey: TEST_PUBLIC_KEY,
+  firstReceivingWif: TEST_WIF,
+  firstChange: FIRST_CHANGE_ADDRESS,
 };
 /** BIP-0086, "Test vectors": account 0 and its first receiving address. */
 const BIP86 = {
   accountXpub:
     "xpub6BgBgsespWvERF3LHQu6CnqdvfEvtMcQjYrcRzx53QJjSxarj2afYWcLteoGVky7D3UKDP9QyrLprQ3VCECoY49yfdDEHGCtMMj92pReUsQ",
-  firstReceiving: "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr",
+  firstReceiving: TAPROOT_ADDRESS,
 };
 /** BIP-0049, "Test vectors", which are on testnet. */
 const BIP49_TESTNET = {
   accountUpub:
     "upub5EFU65HtV5TeiSHmZZm7FUffBGy8UKeqp7vw43jYbvZPpoVsgU93oac7Wk3u6moKegAEWtGNF8DehrnHtv21XXEMYRUocHqguyjknFHYfgY",
-  firstReceiving: "2Mww8dCYPUpKHofjgcXcBCEGmniw9CoaiD2",
+  firstReceiving: TESTNET_NESTED_ADDRESS,
 };
 /** The BIP39 vector of the public phrase with the passphrase TREZOR (trezor/python-mnemonic). */
 const TREZOR_ROOT_XPRV =
@@ -582,14 +594,12 @@ describe("evidence of a key at a place of an account", () => {
 });
 
 describe("several addresses in a row, from the location's index on", () => {
-  /** BIP-0084, "Test vectors": account 0, second receiving address, m/84'/0'/0'/0/1. */
-  const SECOND_RECEIVING = "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g";
   const second = (
     addresses: number | undefined,
     location: DerivationLocation = MAINNET_LOCATION,
   ): BitcoinEvidence => ({
     kind: "address",
-    value: SECOND_RECEIVING,
+    value: SECOND_RECEIVING_ADDRESS,
     profiles: BITCOIN_PROFILES,
     location,
     ...(addresses === undefined ? {} : { addresses }),
@@ -602,7 +612,7 @@ describe("several addresses in a row, from the location's index on", () => {
       expect(browserCheck.match(TEST_PHRASE, second(addresses))).toEqual({
         matched: true,
         kind: "address",
-        derived: SECOND_RECEIVING,
+        derived: SECOND_RECEIVING_ADDRESS,
         path: "m/84'/0'/0'/0/1",
       });
     // From the third address on, the second is not among them.

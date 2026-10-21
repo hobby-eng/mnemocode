@@ -11,6 +11,7 @@ import {
   isBip39WordCount,
   WORD_COUNTS_TEXT,
   assertWordCount,
+  assertWordIndexes,
 } from "./bip39-sizes.js";
 import {
   englishTokens,
@@ -243,10 +244,14 @@ function finalWordCandidates(words: readonly string[]): MissingWordCandidate[] {
  * The word numbers, counted from 0 and in their order, that end a phrase of `prefix` (every word
  * but the last, as BIP39 indexes) with a valid checksum: one for each value of the entropy bits
  * that the last word holds, 2^(11 − checksum bits) of them, found from the entropy rather than by
- * validating 2,048 phrases.
+ * validating 2,048 phrases. Refuses a prefix one word shorter than no BIP39 phrase
+ * (core.bip39-sizes.expected-word-indexes) and an element that is no word index
+ * (assert-word-indexes-refused), before any entropy is made.
  */
 export function validLastWordIndexes(prefix: readonly number[]): number[] {
   const wordCount = prefix.length + 1;
+  assertWordCount(wordCount);
+  assertWordIndexes(prefix);
   const tailBits = lastWordEntropyBits(wordCount);
   const knownBits = bitsOfIndexes(prefix);
   const indexes: number[] = [];

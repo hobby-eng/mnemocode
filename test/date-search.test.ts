@@ -38,6 +38,10 @@ function made(result: DateSearchResult | undefined | Cancelled): DateSearchResul
   return result;
 }
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
+import { firstReceivingOf } from "./helpers/coin-addresses.js";
+import { HDKey } from "@scure/bip32";
+import { mnemonicToSeedSync } from "@scure/bip39";
+import { p2wpkh } from "@scure/btc-signer";
 import {
   DATE,
   MASKED,
@@ -392,7 +396,7 @@ describe("the date search", () => {
         "--coin",
         "ethereum",
         "--coin-address",
-        "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+        firstReceivingOf("ethereum"),
       ]),
     );
     expect(lines).toContain(`out ${DATE}\t${TEST_PHRASE}\tmatched at m/44'/60'/0'/0/0`);
@@ -426,7 +430,7 @@ describe("the date search", () => {
           "--coin",
           "ethereum",
           "--coin-address",
-          "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+          firstReceivingOf("ethereum"),
           "--network",
           "testnet",
         ]),
@@ -440,8 +444,9 @@ describe("the date search", () => {
 
   it("compares an address with the first 20 from --index, or as many as --scan-gap says", async () => {
     const { parseArguments } = await import("../src/cli/arguments.js");
-    // BIP-0084, "Test vectors": the second receiving address of the public test phrase.
-    const second = "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g";
+    // The twentieth receiving address of BIP84, written by @scure/btc-signer: the last of the 20.
+    const key = HDKey.fromMasterSeed(mnemonicToSeedSync(TEST_PHRASE)).derive("m/84'/0'/0'/0/19");
+    const twentieth = p2wpkh(key.publicKey!).address!;
     const search = (...more: string[]) =>
       runRecoverDate(
         parseArguments([
@@ -452,17 +457,21 @@ describe("the date search", () => {
           "--dates",
           "2?-09-2026",
           "--bitcoin-address",
-          second,
+          twentieth,
           ...more,
         ]),
       );
+    const found = `out ${DATE}\t${TEST_PHRASE}\tmatched at m/84'/0'/0'/0/19`;
     await search();
-    expect(lines).toContain(`out ${DATE}\t${TEST_PHRASE}\tmatched at m/84'/0'/0'/0/1`);
+    expect(lines).toContain(found);
     lines.length = 0;
-    await search("--scan-gap", "1");
+    await search("--scan-gap", "19");
     expect(lines.filter((line) => line.startsWith("out "))).toEqual([
       "out None of the 10 checksum-valid candidates matched the requested address.",
     ]);
+    lines.length = 0;
+    await search("--index", "19", "--scan-gap", "1");
+    expect(lines).toContain(found);
     await expect(search("--scan-gap", "0")).rejects.toThrow(
       "must be a base-10 integer from 1 through 1000",
     );

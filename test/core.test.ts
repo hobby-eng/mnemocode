@@ -30,8 +30,12 @@ import { wordlist as englishWordlist } from "@scure/bip39/wordlists/english.js";
 import { parseRecord, serializeRecord } from "../src/record.js";
 import { assertCoreSelfTest } from "../src/cli/self-test.js";
 import { MNEMOCODE_VERSION } from "../src/index.js";
+import { SECOND_RECEIVING_ADDRESS } from "./helpers/coin-addresses.js";
 import {
   DATE,
+  LEGACY_EXAMPLE as SOURCE,
+  LEGACY_EXAMPLE_DATES,
+  LEGACY_EXAMPLE_MASKED,
   MASKED_WORDS,
   TEST_ADDRESS,
   TEST_FINGERPRINT,
@@ -39,9 +43,7 @@ import {
   WRONG_DATE,
 } from "./helpers/test-phrase.js";
 
-const SOURCE = "oppose duck hello neglect reveal key humor mosquito road evoke flock hedgehog";
-const dates = ["10-07-1963", "27-04-1956", "31-01-1994"].map(parseDate);
-const EXPECTED = "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
+const dates = LEGACY_EXAMPLE_DATES.map(parseDate);
 
 describe("the package entry", () => {
   it("exports the package version", () => {
@@ -58,7 +60,7 @@ describe("startup core self-test", () => {
 describe("original Seedshift compatibility mode", () => {
   it("reproduces the documented Seedshift example", () => {
     const result = encodeMnemonicLegacy(SOURCE, dates);
-    expect(formatEncoded(result, "english")).toBe(EXPECTED);
+    expect(formatEncoded(result, "english")).toBe(LEGACY_EXAMPLE_MASKED);
     expect(formatEncoded(result, "indexes")).toBe(
       "1153 547 882 1100 1483 987 835 1154 1527 533 719 880",
     );
@@ -68,7 +70,7 @@ describe("original Seedshift compatibility mode", () => {
   });
 
   it("recovers the original words from the documented Seedshift example", () => {
-    const result = decodeInputLegacy(EXPECTED, "english", dates);
+    const result = decodeInputLegacy(LEGACY_EXAMPLE_MASKED, "english", dates);
     expect(result.recoveredMnemonic).toBe(SOURCE);
     expect(result.checksumValid).toBe(true);
   });
@@ -367,7 +369,7 @@ describe("local Bitcoin recovery evidence", () => {
     expect(
       matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
-        value: "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g",
+        value: SECOND_RECEIVING_ADDRESS,
         profiles: ["native-segwit"],
         location,
       }).matched,

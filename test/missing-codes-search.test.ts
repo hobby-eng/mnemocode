@@ -22,6 +22,7 @@ import { MissingCodes } from "../src/core/missing-codes.js";
 import type { WalletCheck } from "../src/core/wallet-check.js";
 import {
   DATE,
+  DATE_LAST_DIGIT_FORGOTTEN,
   MASKED,
   MASKED_INDEXES,
   MASKED_ONE_DIGIT_FORGOTTEN,
@@ -30,6 +31,7 @@ import {
   replacedAt,
   TEST_NUMBERS,
   TEST_PHRASE,
+  ZERO_ENTROPY_PHRASES,
 } from "./helpers/test-phrase.js";
 
 // Public test data only: the phrase "abandon ... about", masked with one public date.
@@ -49,7 +51,9 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     expect(one.unreadable).toBe("Code 3 cannot be read: 2,048 combinations, about 128 candidates.");
     expect(one.many).toBe(true);
     expect(one.ways.map(({ way }) => way)).toEqual(["encoded", "wallet"]);
-    expect(one.fits("list")).toBe(false);
+    expect(one.whyNot("list")).toBe(
+      "A list holds at most 16 candidates; these codes give about 128 candidates.",
+    );
     // A forgotten digit leaves few candidates, which a list shows.
     const few = new MissingCodesSearch(
       MissingCodes.read(MASKED_TWO_DIGITS_FORGOTTEN, "indexes", "seedshift"),
@@ -60,14 +64,27 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     const plain = MissingCodes.read(replacedAt(TEST_NUMBERS, { 3: "?" }), "indexes", "direct");
     const direct = new MissingCodesSearch(plain, fingerprint);
     expect(direct.ways.map(({ way }) => way)).toEqual(["wallet"]);
-    expect(direct.fits("encoded")).toBe(true);
+    expect(direct.whyNot("encoded")).toBeUndefined();
     expect(direct.needsDates).toBe(false);
     // The Original Seedshift keeps no checksum: no fingerprint of the codes tells them.
     const legacy = new MissingCodesSearch(
       MissingCodes.read(replacedAt(MASKED, { 3: "?" }), "indexes", "seedshift-legacy"),
       fingerprint,
     );
-    expect(legacy.fits("encoded")).toBe(false);
+    expect(legacy.ways.map(({ way }) => way)).toEqual(["wallet"]);
+    expect(legacy.whyNot("encoded")).toBe(
+      "These codes keep no checksum, so their encoded fingerprint cannot tell them.",
+    );
+    // Prepared all the same, as a host that asked no question might, the way refuses them too.
+    expect(() => legacy.byEncodedFingerprint("73c5da0a")).toThrow(
+      expect.objectContaining({ code: "core.missing-codes-search.codes-keep-no-checksum" }),
+    );
+    // A way that is none, fed on purpose as a JavaScript host could, is refused, not taken as one.
+    const noWay = "no-such-way" as never;
+    expect(() => legacy.whyNot(noWay)).toThrow(
+      expect.objectContaining({ code: "core.missing-codes-search.unknown-way" }),
+    );
+    expect(() => legacy.whyNot(noWay)).toThrow(TypeError);
     // The last digit of three codes forgotten, few enough to search.
     const digits = MASKED.split(" ").map((code, place) =>
       [1, 5, 8].includes(place) ? `${code.slice(0, -1)}?` : code,
@@ -108,7 +125,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
       MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift"),
       fingerprint,
     );
-    const dates = DatesAnswer.parse("23-09-202?", { wordCount: 12, patterns: true });
+    const dates = DatesAnswer.parse(DATE_LAST_DIGIT_FORGOTTEN, { wordCount: 12, patterns: true });
     const way = search.byWallet(wallet, dates);
     const plan = await way.plan();
     expect(plan.size).toBe("1 candidate with 10 date combinations each");
@@ -140,7 +157,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
       fingerprint,
     );
     const dates = (): DatesAnswer =>
-      DatesAnswer.parse("23-09-202?", { wordCount: 12, patterns: true });
+      DatesAnswer.parse(DATE_LAST_DIGIT_FORGOTTEN, { wordCount: 12, patterns: true });
     // The phrases that the wallet is asked about, a year of the date after another.
     const asked: string[] = [];
     await search
@@ -173,10 +190,10 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
       const codes = formatEncoded(encoded, "indexes").split(" ");
       codes[3] = `${defined(codes[3]).slice(0, -1)}?`;
       const read = MissingCodes.read(codes.join(" "), "indexes", "seedshift-legacy-valid");
-      return new MissingCodesSearch(read, fingerprint).fits("list");
+      return new MissingCodesSearch(read, fingerprint).whyNot("list") === undefined;
     };
     expect(offered(TEST_PHRASE)).toBe(false);
-    expect(offered(`${"abandon ".repeat(23)}art`)).toBe(true);
+    expect(offered(ZERO_ENTROPY_PHRASES[24])).toBe(true);
     // Its texts count the sets of codes as candidates, and say the phrases they give.
     const encoded = legacyChecksumValidResult(encodeMnemonicLegacy(TEST_PHRASE, [parseDate(DATE)]));
     const codes = formatEncoded(encoded, "indexes").split(" ");
@@ -195,7 +212,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     // 24 words: each set of codes gives 8 phrases. With the last digit of codes 1 and 12 unread,
     // the estimate is one set, 8 phrases, but 3 sets fit, which give 24.
     const encoded = legacyChecksumValidResult(
-      encodeMnemonicLegacy(`${"abandon ".repeat(23)}art`, [parseDate(DATE)]),
+      encodeMnemonicLegacy(ZERO_ENTROPY_PHRASES[24], [parseDate(DATE)]),
     );
     const codes = formatEncoded(encoded, "indexes").split(" ");
     for (const place of [0, 11]) codes[place] = `${defined(codes[place]).slice(0, -1)}?`;
@@ -204,7 +221,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     expect(search.unreadable).toBe(
       "Codes 1 and 12 cannot be read: 100 combinations, about 1 candidate, which gives about 8 phrases.",
     );
-    expect(search.fits("list")).toBe(true);
+    expect(search.whyNot("list")).toBeUndefined();
     const listing = search.listed([parseDate(DATE)]).run();
     await expect(listing).rejects.toMatchObject({
       code: "core.missing-codes-search.list-overflow",

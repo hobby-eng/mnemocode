@@ -14,6 +14,8 @@ import {
   DatesAnswer,
   DateSearch,
   type DateSearchRun,
+  type MatchCounts,
+  matchCounts,
   walletNeeded,
   secondsEach,
 } from "../core/date-search.js";
@@ -111,14 +113,15 @@ export class ShareUnmasking extends Redacted {
   readonly #mode: ShareMode;
   readonly #dates: DatesAnswer | undefined;
   readonly #walletCheck: WalletCheck | undefined;
-  readonly #maxShown: number | undefined;
-  readonly #keep: number | undefined;
+  readonly #counts: MatchCounts;
 
   /**
    * Borrows the dates. Throws core.masking.split-modes-only for a mode that is not a split mode,
    * sskr.share-unmasking.seedshift-phrase-unmasked-dates-dates-answer (a TypeError) for Seedshift
-   * without a DatesAnswer, and core.masking.assert-takes-dates-refused for dates for a mode that
-   * takes none.
+   * without a DatesAnswer, core.masking.assert-takes-dates-refused for dates for a mode that takes
+   * none, and core.search-turns.whole-number-more (a RangeError) for a `maxShown` or a `keep` that
+   * matchCounts refuses: in every mode, before any work, rather than at a search after the shares
+   * are restored.
    */
   constructor(options: UnmaskingOptions) {
     super("ShareUnmasking");
@@ -127,11 +130,10 @@ export class ShareUnmasking extends Redacted {
     if (masked && !(options.dates instanceof DatesAnswer))
       throw ERRORS.create("seedshift-phrase-unmasked-dates-dates-answer", []);
     Masking.of(options.mode).assertDateCount(options.dates?.count ?? 0);
+    this.#counts = matchCounts(options);
     this.#mode = options.mode;
     this.#dates = masked ? options.dates : undefined;
     this.#walletCheck = options.walletCheck;
-    this.#maxShown = options.maxShown;
-    this.#keep = options.keep;
   }
 
   /** Whether a date holds ?, so that each phrase of the shares is searched. */
@@ -180,8 +182,12 @@ export class ShareUnmasking extends Redacted {
   /**
    * The phrases that `sets` give, in their order: each set's own phrase, or the phrases that the
    * dates unmask, searched with `run` where a date holds ?; only those of the wallet when a wallet
-   * check was given. Refused, with the line that says why, when the dates are more than a set's
-   * phrase takes.
+   * check was given. Gives the line that says why (kind "dates") when the dates are more than a
+   * set's phrase takes, and kind "stopped" when the host stopped a search. Refuses, where a date
+   * holds ?, a `run` that DateSearch.run refuses, such as a progressEvery that is no whole number
+   * of 1 or more (core.search-turns.whole-number-more), and, in a masked mode, a set whose phrase
+   * EncodedBackup.read refuses; what the wallet check throws passes on, and an answer of it that
+   * breaks the WalletMatch contract is refused as askWallet refuses it (core.wallet-check codes).
    */
   async unmask(sets: readonly RepairedSet[], run: DateSearchRun = {}): Promise<Unmasked> {
     // Snapshot every input before the first host callback can change a later set or its phrase.
@@ -212,7 +218,7 @@ export class ShareUnmasking extends Redacted {
         continue;
       }
       using backup = EncodedBackup.read(set.mnemonic, "english", mode);
-      const tooMany = this.#dates.tooManyFor(backup.indexes.length);
+      const tooMany = this.#dates.tooManyFor(backup.words);
       if (tooMany !== undefined) return { kind: "dates", message: tooMany };
       if (!this.#dates.hasForgottenDigits) {
         const mnemonic = backup.decode(this.#dates.known).recoveredMnemonic;
@@ -220,13 +226,13 @@ export class ShareUnmasking extends Redacted {
         if (match.matched) phrases.push({ set, mnemonic, ...warningField(match.warning) });
         continue;
       }
-      const keep = this.#keep ?? 0;
+      const { maxShown, keep } = this.#counts;
       using search = new DateSearch({
         indexes: backup.indexes,
         dates: this.#dates,
         mode,
         walletCheck: this.#walletCheck,
-        maxShown: this.#maxShown,
+        maxShown,
         keep,
       });
       const result = await search.run(run);

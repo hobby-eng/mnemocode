@@ -34,7 +34,7 @@ import { askAfterFailure, askSecretUntil, WHAT_NOW } from "./ask.js";
 import { askWalletEvidence, changeWalletAnswer, checkWalletAnswer } from "./wallet-question.js";
 import { type GivenWallet, type WalletPlace, givenWallet } from "./bitcoin-options.js";
 import { textInput, PHRASE_SECRET_OPTIONS } from "./input.js";
-import { candidateLines } from "./candidate-view.js";
+import { candidateLabel, candidateLines, matchedAt } from "./candidate-view.js";
 import { linesFitPrivateScreen } from "./screen-fit.js";
 import {
   ProgressLine,
@@ -49,7 +49,7 @@ import {
 } from "./terminal.js";
 import type { Choice } from "./terminal-choice.js";
 import { evidenceLabel } from "./option-copy.js";
-import { CandidatesFile } from "./candidates-file.js";
+import { CandidatesFile, stopWithoutListAnswer } from "./candidates-file.js";
 import { CtrlCWatch, nodeTurn } from "./terminal-input.js";
 import { wordNumberOf } from "../core/bip39-sizes.js";
 import { counting } from "../core/search-plan.js";
@@ -79,11 +79,16 @@ interface Column {
 }
 
 /**
- * The columns of the candidates: the number of each first, then those of its kind of search, the
- * wallet check where there is one, and the phrase last.
+ * The heading of the first column of the rows for a script: the number of each candidate, which a
+ * terminal shows as the label of its part (candidateLabel).
+ */
+const NUMBER_HEADING = "candidate";
+
+/**
+ * The columns of the candidates after their number: those of its kind of search, the wallet check
+ * where there is one, and the phrase last.
  */
 const COLUMNS = Object.freeze({
-  number: { heading: "candidate", label: "Candidate" },
   position: { heading: "position", label: "Position" },
   word: { heading: "word", label: "Word" },
   wordNumber: { heading: "word-index", label: "Word number" },
@@ -174,21 +179,33 @@ interface PhraseSearch {
 
 /**
  * The checksum-valid last words of an exact legacy Seedshift phrase (recoverLegacyValidLastWords),
- * a short fixed list, each compared with the wallet.
+ * a short fixed list, each compared with the wallet. It owns the phrase typed, as bytes (CORE-24);
+ * the replacements, each a whole phrase as a string, are found again where they are used and are
+ * not kept: a row takes its own copy as bytes.
  */
 class LegacyReplacements implements PhraseSearch {
   readonly about =
     "All checksum-valid last words; the candidate marked preserved keeps the old word's data.";
   readonly comparedWith =
     "Evidence was compared with the replacements, not with the original legacy phrases.";
-  readonly #replacements: readonly MissingWordCandidate[];
+  readonly #phrase: SecretValue<string>;
 
-  constructor(replacements: readonly MissingWordCandidate[]) {
-    this.#replacements = replacements;
+  /**
+   * Takes the phrase `text` once it gives replacements, refusing it as recoverLegacyValidLastWords
+   * does, before any further question; keeps it as bytes until wipe().
+   */
+  constructor(text: string) {
+    recoverLegacyValidLastWords(text);
+    this.#phrase = SecretValue.text(text);
+  }
+
+  /** The replacements of the phrase, which the caller uses and drops. */
+  #replacements(): MissingWordCandidate[] {
+    return recoverLegacyValidLastWords(this.#phrase.value);
   }
 
   get table(): Table {
-    const replacements = this.#replacements;
+    const replacements = this.#replacements();
     const preserving = replacements.find((candidate) => candidate.preservesLegacyEntropy);
     return {
       headerRows: [
@@ -205,7 +222,7 @@ class LegacyReplacements implements PhraseSearch {
     using walletCheck = walletCheckOf(context.evidence, context.wallet.passphrase);
     const rows: Row[] = [];
     try {
-      for (const [index, candidate] of this.#replacements.entries()) {
+      for (const [index, candidate] of this.#replacements().entries()) {
         const match = walletCheck?.(candidate.mnemonic);
         const columns = [
           candidate.word,
@@ -230,8 +247,9 @@ class LegacyReplacements implements PhraseSearch {
     }
   }
 
-  /** Nothing to erase: the replacements are strings, which JavaScript cannot erase (TS-07). */
-  wipe(): void {}
+  wipe(): void {
+    this.#phrase.wipe();
+  }
 }
 
 /**
@@ -264,9 +282,6 @@ class WordsSearch implements PhraseSearch {
    */
   async collect(context: SearchContext): Promise<Found | Cancelled> {
     using walletCheck = walletCheckOf(context.evidence, context.wallet.passphrase);
-    // The search is a step of its own: its screen shows the title and the search, no longer the
-    // words typed (CORE-39).
-    PrivateSteps.begin();
     const progress = new ProgressLine(SEARCH_PROGRESS_SECONDS);
     const rows: Row[] = [];
     let result: WordSearchResult<EvidenceMatch> | undefined;
@@ -347,7 +362,7 @@ const CODES_NOT_WORDS = `These are the codes of an encoded seed phrase, not its 
 /** The words of `text`, searched as `rules` say; throws why they cannot be. */
 function phraseOf(text: string, rules: PhraseRules): PhraseSearch {
   // recoverLegacyValidLastWords refuses a ?, which would read as an unknown word at its place.
-  if (rules.legacy) return new LegacyReplacements(recoverLegacyValidLastWords(text));
+  if (rules.legacy) return new LegacyReplacements(text);
   const search = WordCandidateSearch.parse(text, rules.missing ? "missing-word" : "unknown-words");
   try {
     const expected = search.expected;
@@ -382,9 +397,7 @@ class Row implements Disposable {
   get fields(): readonly string[] {
     const fields = this.#fields.value;
     if (this.match === undefined) return fields;
-    const checked = this.match.matched
-      ? `matched at ${this.match.path ?? "requested evidence"}`
-      : "not matched";
+    const checked = this.match.matched ? matchedAt(this.match.path) : "not matched";
     return [...fields.slice(0, -1), checked, defined(fields.at(-1))];
   }
 
@@ -480,7 +493,7 @@ export async function runRecoverWord(arguments_: ParsedArguments): Promise<Cance
       if (next === CANCELLED) return CANCELLED;
       if (next.kind === "done") return undefined;
       // The result was read: what comes next has a page of its own (CORE-39).
-      PrivateSteps.newPage();
+      PrivateSteps.leaveResult();
       if (next.kind === "phrase") {
         const typed = await read();
         if (typed === CANCELLED) return CANCELLED;
@@ -506,6 +519,9 @@ async function searchAndShow(
   asked: boolean,
 ): Promise<Next | Cancelled> {
   let found: Found | Cancelled;
+  // The search is a step of its own: its screen shows the title and the search, then the result,
+  // no longer the words typed (CORE-39).
+  PrivateSteps.begin();
   try {
     found = await phrase.collect(context);
   } catch (error) {
@@ -518,7 +534,7 @@ async function searchAndShow(
           { kind: "wallet", evidence: undefined, listed: false } as const,
           "without a list",
         ),
-        { label: "Stop", note: "no list is saved", value: DONE },
+        stopWithoutListAnswer(DONE),
       ],
       { optional: false, place: context.wallet.place },
     );
@@ -574,14 +590,14 @@ function candidateRows(rows: readonly Row[], table: Table, checked: boolean): st
   return rows.flatMap((row) => {
     const { fields } = row;
     const facts = columns.map(({ label }, index) => [label, defined(fields[index])] as const);
-    return candidateLines(`${COLUMNS.number.label} ${row.number}`, facts);
+    return candidateLines(candidateLabel(row.number), facts);
   });
 }
 
 /** `rows` as a table for a script: a heading, then one row of tab-separated fields each. */
 function tableRows(rows: readonly Row[], table: Table, checked: boolean): string[] {
-  const columns = [COLUMNS.number, ...columnsOf(table, checked)];
-  const heading = columns.map((column) => column.heading).join("\t");
+  const headings = [NUMBER_HEADING, ...columnsOf(table, checked).map((column) => column.heading)];
+  const heading = headings.join("\t");
   return [heading, ...rows.map((row) => [String(row.number), ...row.fields].join("\t"))];
 }
 

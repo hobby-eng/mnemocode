@@ -216,7 +216,11 @@ class JointPlan implements Disposable {
 
 export type { JointPlan };
 
-/** The phrases of `plan`'s one search; what the plan kept of the secret is wiped after it. */
+/**
+ * The phrases of `plan`'s one search; what the plan kept of the secret is wiped after it, also
+ * after a refusal. Refuses what JointPlan.search refuses: a plan whose assessment refused
+ * (sskr.joint-repair.plan-not-searchable) and a plan wiped before (plan-wiped).
+ */
 export async function searchOnce(plan: JointPlan, options?: SearchOptions): Promise<RepairSearch> {
   try {
     return await plan.search(options);

@@ -506,6 +506,27 @@ export interface DateSearchOptions {
   readonly keep?: number | undefined;
 }
 
+/** How many matches a date search shows and keeps, as matchCounts settles them. */
+export interface MatchCounts {
+  /** How many matches are kept to be shown. */
+  readonly maxShown: number;
+  /** How many match phrases are kept, for a candidate list; 0 keeps none. */
+  readonly keep: number;
+}
+
+/**
+ * The counts of matches that `options` ask a date search for, MAX_SHOWN_MATCHES shown and none
+ * kept where they ask none. Refuses a count that is no whole number of 0 or more
+ * (core.search-turns.whole-number-more, a RangeError): the one rule of both, which DateSearch
+ * checks and a host that builds its searches later checks before any work (ShareUnmasking).
+ */
+export function matchCounts(options: Pick<DateSearchOptions, "maxShown" | "keep">): MatchCounts {
+  return {
+    maxShown: keptCount(options.maxShown, MAX_SHOWN_MATCHES, "maxShown"),
+    keep: keptCount(options.keep, 0, "keep"),
+  };
+}
+
 /** How a search runs. */
 export interface DateSearchRun extends SearchRun {
   /**
@@ -548,7 +569,7 @@ export class DateSearch extends Redacted {
    * (core.bip39-sizes.assert-word-indexes-refused), a mode that does not mask with dates, such as
    * direct, or a value that names no mode (core.masking.unsupported-mode), dates that are not a
    * DatesAnswer (core.date-search.dates-dates-answer) or more than the phrase takes
-   * (core.date-search.too-many-dates), and a count that is not a whole number
+   * (core.date-search.too-many-dates), and a count of matches that matchCounts refuses
    * (core.search-turns.whole-number-more).
    */
   constructor(options: DateSearchOptions) {
@@ -565,8 +586,7 @@ export class DateSearch extends Redacted {
       if (!(inputDates instanceof DatesAnswer)) throw ERRORS.create("dates-dates-answer", []);
       if (!inputDates.fitsPhrase(words))
         throw ERRORS.create("too-many-dates", [tooManyDatesMessage(words)]);
-      const shown = keptCount(maxShown, MAX_SHOWN_MATCHES, "maxShown");
-      const kept = keptCount(keep, 0, "keep");
+      const counts = matchCounts({ maxShown, keep });
       const dates = inputDates.copy();
       try {
         this.#indexes = SecretValue.numbers(indexes);
@@ -577,8 +597,8 @@ export class DateSearch extends Redacted {
       }
       this.#mode = mode;
       this.#walletCheck = walletCheck;
-      this.#maxShown = shown;
-      this.#keep = kept;
+      this.#maxShown = counts.maxShown;
+      this.#keep = counts.keep;
     } finally {
       indexes.fill(0);
     }

@@ -87,6 +87,16 @@ export class PrivateSteps {
   }
 
   /**
+   * The result shown was read, and an answer to a question under it, such as "What now?", leads to
+   * another step: that step starts a new page (newPage), so that its prompt or search is not drawn
+   * under the old result (CORE-39). Without a result shown nothing changes, and the warnings of the
+   * question answered carry over to the next step screen.
+   */
+  static leaveResult(): void {
+    if (PrivateSteps.#showingResult) PrivateSteps.newPage();
+  }
+
+  /**
    * A new private page ends the result, the warnings of its steps and the contexts of the page. The
    * steps have begun with it: a warning given on the page, before any question, such as why a save
    * failed, is a warning of its step, never a startup warning drawn on every later step screen.

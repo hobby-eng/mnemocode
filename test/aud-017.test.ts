@@ -2,8 +2,8 @@
 // rendering, files, network or full-vector replay is needed.
 import { describe, expect, it } from "vitest";
 import { WordCandidateSearch } from "../src/core/candidates.js";
-import { zeroEntropyPhrase } from "../src/core/english-words.js";
 import { askWallet } from "../src/core/wallet-check.js";
+import { LAST_OF_24_FORGOTTEN, ZERO_ENTROPY_PHRASES } from "./helpers/test-phrase.js";
 
 const DERIVED = "public-address-fixture";
 
@@ -39,11 +39,8 @@ describe("AUD-016-API001 (AUD-017): host result operations retain their original
     expect(answer.derived).toBe(DERIVED);
     expect(answer.describe()).toBe(DERIVED);
 
-    const phrase = zeroEntropyPhrase(24);
-    const result = await WordCandidateSearch.parse(
-      `${"abandon ".repeat(23)}?`,
-      "unknown-words",
-    ).run({
+    const phrase = ZERO_ENTROPY_PHRASES[24];
+    const result = await WordCandidateSearch.parse(LAST_OF_24_FORGOTTEN, "unknown-words").run({
       walletCheck: (candidate) => new AddressAnswer(candidate === phrase),
     });
     const match = result.shown.find((row) => row.match?.matched)?.match;

@@ -58,7 +58,7 @@ describe("business card collections", () => {
   });
 
   it(
-    "renders both designs with real fonts/artwork, custom fields and both raw QR formats",
+    "renders the architect and IT designs with real fonts/artwork, custom fields and both raw QR formats",
     async () => {
       for (const [id, size, payload] of [
         ["business-architect", "a6", colors.join(" ")],

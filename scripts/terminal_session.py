@@ -29,8 +29,8 @@ COMMAND = [NODE, FULL_PATH] if PROGRAM.endswith(".js") else [FULL_PATH]
 WINDOWS = sys.platform == "win32"
 
 # The size of the pseudo-terminal, rows and columns, unless a check asks
-# for another (terminal_size): 40 rows of 120 columns, so that no line of
-# the menu wraps.
+# for another (terminal_size): 40 rows of 120 columns, so that no line
+# of the menu wraps.
 DEFAULT_TERMINAL_SIZE = (40, 120)
 # The size that sessions start with and that their screens are read at;
 # only terminal_size changes it.

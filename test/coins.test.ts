@@ -23,101 +23,30 @@ import {
 import { locationOf } from "../src/core/coins/coin-self-test.js";
 import { allWiped } from "./helpers/made-arrays.js";
 import { matching } from "./helpers/matchers.js";
-import { TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  ADDRESSES,
+  BITCOIN_CASH_LEGACY_ADDRESS,
+  PLATFORM_ADDRESS,
+  TAPROOT_ADDRESS,
+  TESTNET_NESTED_ADDRESS,
+  addressAt,
+  firstReceivingOf,
+} from "./helpers/coin-addresses.js";
+import { DAMAGED_ADDRESS, TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The BIP39 test vector of entropy ff…ff: another wallet. */
 const ZOO = "zoo ".repeat(11) + "wrong";
-/** TEST_ADDRESS with a changed checksum character, its last. */
-const DAMAGED_ADDRESS = `${TEST_ADDRESS.slice(0, -1)}v`;
+/**
+ * The native SegWit address of the public phrase deep in an account, m/84'/0'/2'/1/19: account 2,
+ * change branch, index 19. Computed independently with Python's hashlib.
+ */
+const DEEP_ADDRESS = "bc1q4du7e3vw34vsflf76xf9h8gktms9wzqcl7vlh5";
+/** The first legacy address of the test phrase, m/44'/0'/0'/0/0 (BIP44's vectors). */
+const LEGACY_ADDRESS = firstReceivingOf("bitcoin");
+/** The first Ethereum address of the test phrase, m/44'/60'/0'/0/0. */
+const ETHEREUM_ADDRESS = firstReceivingOf("ethereum");
 
 const check = new WalletEvidenceCheck(nodePbkdf2HmacSha512, COINS);
-
-/**
- * Where the wallets of the public test phrase put each address: coin, BIP39 passphrase, path,
- * address. The Bitcoin mainnet values at index 0 are the published vectors of BIP44, BIP49, BIP84
- * and BIP86, and the Dash Platform ones the official DIP17/DIP18 vectors, receiving key class 0'
- * and change key class 1'. The other Bitcoin values were computed independently with Python's
- * hashlib and agree with BIP49's testnet vector; the other coins were computed independently with
- * @scure/bip32, @noble/hashes, @noble/curves and @scure/base, and ethers for EIP-55, at the first
- * address and at account 3, change branch, index 7.
- */
-const ADDRESSES: readonly (readonly [CoinId, string, string, string])[] = [
-  ["bitcoin", "", "m/44'/0'/0'/0/0", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA"],
-  ["bitcoin", "", "m/49'/0'/0'/0/0", "37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf"],
-  ["bitcoin", "", "m/84'/0'/0'/0/0", TEST_ADDRESS],
-  ["bitcoin", "", "m/84'/0'/0'/0/1", "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g"],
-  ["bitcoin", "", "m/84'/0'/0'/1/0", "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el"],
-  [
-    "bitcoin",
-    "",
-    "m/86'/0'/0'/0/0",
-    "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr",
-  ],
-  [
-    "bitcoin",
-    "",
-    "m/86'/0'/0'/1/0",
-    "bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7",
-  ],
-  ["bitcoin", "", "m/44'/0'/3'/1/7", "12DCYXCcRpBJ5VoWDvSijepPu8mshEihvX"],
-  ["bitcoin", "", "m/49'/0'/3'/1/7", "3K7gGbTWfdq3kyBgkVTMbhfftnrhxB6jpW"],
-  ["bitcoin", "", "m/84'/0'/3'/1/7", "bc1q8r4wsa3nye5qypv80vpfg4sh99uf02u5mmh5ry"],
-  [
-    "bitcoin",
-    "",
-    "m/86'/0'/3'/1/7",
-    "bc1preq6saz8z9zrn3clx9eaen0dcsynwseakek7nwqlrj52wd2dsfsqlfsyut",
-  ],
-  ["bitcoin", "", "m/44'/1'/0'/0/0", "mkpZhYtJu2r87Js3pDiWJDmPte2NRZ8bJV"],
-  ["bitcoin", "", "m/49'/1'/0'/0/0", "2Mww8dCYPUpKHofjgcXcBCEGmniw9CoaiD2"],
-  ["bitcoin", "", "m/84'/1'/0'/0/0", "tb1q6rz28mcfaxtmd6v789l9rrlrusdprr9pqcpvkl"],
-  [
-    "bitcoin",
-    "",
-    "m/86'/1'/0'/0/0",
-    "tb1p8wpt9v4frpf3tkn0srd97pksgsxc5hs52lafxwru9kgeephvs7rqlqt9zj",
-  ],
-  ["bitcoin", "TREZOR", "m/84'/0'/0'/0/0", "bc1qv5rmq0kt9yz3pm36wvzct7p3x6mtgehjul0feu"],
-  ["ethereum", "", "m/44'/60'/0'/0/0", "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"],
-  ["ethereum", "", "m/44'/60'/3'/1/7", "0xc1A30611797762aea209daC2aC7E900f0cE95f9e"],
-  ["xrp", "", "m/44'/144'/0'/0/0", "rHsMGQEkVNJmpGWs8XUBoTBiAAbwxZN5v3"],
-  ["xrp", "", "m/44'/144'/3'/1/7", "rnU3BdqhZk8DL3FKjQcaAyf3DJSoUZD8eM"],
-  ["tron", "", "m/44'/195'/0'/0/0", "TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH"],
-  ["tron", "", "m/44'/195'/3'/1/7", "TTD7MudE8L26nvnrEf2LHzXm6stKRpFZH1"],
-  ["zcash", "", "m/44'/133'/0'/0/0", "t1XVXWCvpMgBvUaed4XDqWtgQgJSu1Ghz7F"],
-  ["zcash", "", "m/44'/133'/3'/1/7", "t1Pii1UXFrpcFucY5NBEFa664pymr7boHq4"],
-  ["dogecoin", "", "m/44'/3'/0'/0/0", "DBus3bamQjgJULBJtYXpEzDWQRwF5iwxgC"],
-  ["dogecoin", "", "m/44'/3'/3'/1/7", "DNuJKZiVoQ6t67t8dE4NuBDhd2FNpMBsg6"],
-  [
-    "bitcoin-cash",
-    "",
-    "m/44'/145'/0'/0/0",
-    "bitcoincash:qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6",
-  ],
-  [
-    "bitcoin-cash",
-    "",
-    "m/44'/145'/3'/1/7",
-    "bitcoincash:qrhejavdmlfh9eajjxra3s3mn8gxls9hkvsq2yd62y",
-  ],
-  ["bitcoin-cash", "", "m/44'/145'/0'/0/0", "1mW6fDEMjKrDHvLvoEsaeLxSCzZBf3Bfg"],
-  // A Bitcoin Cash wallet on Bitcoin's coin type, found on the second path.
-  ["bitcoin-cash", "", "m/44'/0'/0'/0/0", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA"],
-  ["litecoin", "", "m/44'/2'/0'/0/0", "LUWPbpM43E2p7ZSh8cyTBEkvpHmr3cB8Ez"],
-  ["litecoin", "", "m/49'/2'/0'/0/0", "M7wtsL7wSHDBJVMWWhtQfTMSYYkyooAAXM"],
-  ["litecoin", "", "m/84'/2'/3'/1/7", "ltc1qnnphcvq5zgyf4f0uepust6d7gyt2zl69vftnz2"],
-  ["ethereum-classic", "", "m/44'/61'/0'/0/0", "0xFA22515E43658ce56A7682B801e9B5456f511420"],
-  // An Ethereum Classic wallet on Ethereum's coin type, found on the second path.
-  ["ethereum-classic", "", "m/44'/60'/0'/0/0", "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"],
-  ["cosmos", "", "m/44'/118'/0'/0/0", "cosmos19rl4cm2hmr8afy4kldpxz3fka4jguq0auqdal4"],
-  ["cosmos", "", "m/44'/118'/3'/1/7", "cosmos1j8dc8g9sux68h924yj646shrsjmkd7g6fwevky"],
-  ["injective", "", "m/44'/60'/0'/0/0", "inj1npvwllfr9dqr8erajqqr6s0vxnk2ak55re90dz"],
-  ["dash", "", "m/44'/5'/0'/0/0", "XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf5"],
-  ["dash", "", "m/44'/5'/3'/1/7", "XbAei18dD6mdL9LR6sTmbFJTQAJBcpxuxL"],
-  ["dash", "", "m/9'/5'/17'/0'/0'/0", "dash1krma5z3ttj75la4m93xcndna9ullamq9y5e9n5rs"],
-  ["dash", "", "m/9'/5'/17'/0'/0'/1", "dash1kzjl7qzxy9lar37j8r37z3kvt07epqe20ckxfezw"],
-  ["dash", "", "m/9'/5'/17'/0'/1'/0", "dash1kpkeye606ez89g7lelp7hnldwwpt76va0v3j6x28"],
-];
 
 function coinAddress(
   coin: CoinId,
@@ -203,8 +132,10 @@ describe("addresses of every coin, where the wallets of the public phrase put th
   );
 
   it("are found by the Node.js module and with a PBKDF2 that answers later", async () => {
-    const [coin, , path, address] = ADDRESSES[34]!;
-    const evidence = coinAddress(coin, address, locationOf(path));
+    // An Ethereum Classic wallet on Ethereum's coin type, found on the second path.
+    const path = "m/44'/60'/0'/0/0";
+    const address = addressAt("ethereum-classic", path);
+    const evidence = coinAddress("ethereum-classic", address, locationOf(path));
     const expected = { matched: true, kind: "coin-address", derived: address, path };
     expect(matchBitcoinEvidence(TEST_PHRASE, evidence)).toEqual(expected);
     using ownedCheck = walletCheckOf(evidence)!;
@@ -232,8 +163,7 @@ describe("addresses of every coin, where the wallets of the public phrase put th
   });
 
   it("include one deep in an account: account 2, change branch, index 19", () => {
-    // Computed independently with Python's hashlib.
-    const evidence = coinAddress("bitcoin", "bc1q4du7e3vw34vsflf76xf9h8gktms9wzqcl7vlh5", {
+    const evidence = coinAddress("bitcoin", DEEP_ADDRESS, {
       account: 2,
       branch: 1,
       index: 19,
@@ -243,13 +173,13 @@ describe("addresses of every coin, where the wallets of the public phrase put th
 
   it("are found among several addresses in a row, from the location's index on", () => {
     // The DIP17/DIP18 vector of the second receiving key, and the one deep in account 2 above.
-    const platform = "dash1kzjl7qzxy9lar37j8r37z3kvt07epqe20ckxfezw";
+    const platform = addressAt("dash", "m/9'/5'/17'/0'/0'/1");
     const first = { account: 0, branch: 0, index: 0 };
     expect(check.match(TEST_PHRASE, coinAddress("dash", platform, first)).matched).toBe(false);
     expect(
       check.match(TEST_PHRASE, { ...coinAddress("dash", platform, first), addresses: 20 }).path,
     ).toBe("m/9'/5'/17'/0'/0'/1");
-    const deep = "bc1q4du7e3vw34vsflf76xf9h8gktms9wzqcl7vlh5";
+    const deep = DEEP_ADDRESS;
     const account2 = { account: 2, branch: 1, index: 0 };
     expect(
       check.match(TEST_PHRASE, { ...coinAddress("bitcoin", deep, account2), addresses: 20 }).path,
@@ -286,21 +216,14 @@ describe("addresses of every coin, where the wallets of the public phrase put th
     // The paths of the branch that holds the address at index 7.
     const paths = (coin: CoinId, text: string, location = { account: 3, branch: 1, index: 7 }) =>
       coinById(coin).parse(text).branchPathsAt(location);
-    expect(paths("bitcoin-cash", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA")).toEqual([
-      "m/44'/145'/3'/1",
-      "m/44'/0'/3'/1",
-    ]);
-    expect(paths("ethereum-classic", "0x9858EfFD232B4033E47d90003D41EC34EcaEda94")).toEqual([
+    expect(paths("bitcoin-cash", LEGACY_ADDRESS)).toEqual(["m/44'/145'/3'/1", "m/44'/0'/3'/1"]);
+    expect(paths("ethereum-classic", ETHEREUM_ADDRESS)).toEqual([
       "m/44'/61'/3'/1",
       "m/44'/60'/3'/1",
     ]);
-    expect(paths("bitcoin", "2Mww8dCYPUpKHofjgcXcBCEGmniw9CoaiD2")).toEqual(["m/49'/1'/3'/1"]);
-    expect(paths("injective", "inj1npvwllfr9dqr8erajqqr6s0vxnk2ak55re90dz")).toEqual([
-      "m/44'/60'/3'/1",
-    ]);
-    expect(paths("dash", "dash1krma5z3ttj75la4m93xcndna9ullamq9y5e9n5rs")).toEqual([
-      "m/9'/5'/17'/3'/1'",
-    ]);
+    expect(paths("bitcoin", TESTNET_NESTED_ADDRESS)).toEqual(["m/49'/1'/3'/1"]);
+    expect(paths("injective", firstReceivingOf("injective"))).toEqual(["m/44'/60'/3'/1"]);
+    expect(paths("dash", PLATFORM_ADDRESS)).toEqual(["m/9'/5'/17'/3'/1'"]);
   });
 });
 
@@ -318,11 +241,11 @@ describe("the comparison", () => {
     const later = new WalletEvidenceCheck(async (...parameters) => host(...parameters), COINS);
     const roots = vi.spyOn(HDKey, "fromMasterSeed");
     const children = vi.spyOn(HDKey.prototype, "deriveChild");
-    const [, , platformPath, platformAddress] = ADDRESSES[42]!;
+    const platformPath = "m/9'/5'/17'/0'/1'/0";
     // Found on the second of Bitcoin Cash's two paths of five steps, and on DIP17's six steps.
     const evidence = [
-      coinAddress("bitcoin-cash", ADDRESSES[29]![3], { account: 0, branch: 0, index: 0 }),
-      coinAddress("dash", platformAddress, locationOf(platformPath)),
+      coinAddress("bitcoin-cash", LEGACY_ADDRESS, { account: 0, branch: 0, index: 0 }),
+      coinAddress("dash", addressAt("dash", platformPath), locationOf(platformPath)),
     ];
     for (const each of evidence) {
       expect(now.match(TEST_PHRASE, each).matched).toBe(true);
@@ -357,23 +280,23 @@ describe("the comparison", () => {
         "core.coins.coin.unknown-coin-coins",
       ],
       [
-        coinAddress("litecoin", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA", first),
+        coinAddress("litecoin", LEGACY_ADDRESS, first),
         "it is not an address of Litecoin",
         "core.coins.coin.address-not-this-coin",
       ],
       [
-        coinAddress("bitcoin", `${address.slice(0, -1)}v`, first),
+        coinAddress("bitcoin", DAMAGED_ADDRESS, first),
         "checksum or format",
         "core.coins.coin.address-damaged",
       ],
       [coinAddress("bitcoin", address, { ...first, index: -1 }), "index must be an integer", place],
       [
-        coinAddress("dash", "XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf5", { ...first, branch: 2 ** 31 }),
+        coinAddress("dash", firstReceivingOf("dash"), { ...first, branch: 2 ** 31 }),
         "branch must be an integer from 0 through 2147483647.",
         place,
       ],
       [
-        coinAddress("ethereum", ADDRESSES[16]![3], { ...first, account: 1.5 }),
+        coinAddress("ethereum", ETHEREUM_ADDRESS, { ...first, account: 1.5 }),
         "account must be an integer from 0 through 2147483647.",
         place,
       ],
@@ -409,9 +332,8 @@ describe("addresses out of reach", () => {
       expect(refusal(() => parseCoinAddress("zcash", text))).toBe(
         "The address cannot be used for the check: it is shielded; use a transparent t1… address of the same wallet.",
       );
-    expect(parseCoinAddress("zcash", "t1XVXWCvpMgBvUaed4XDqWtgQgJSu1Ghz7F")).toBe(
-      "t1XVXWCvpMgBvUaed4XDqWtgQgJSu1Ghz7F",
-    );
+    const transparent = firstReceivingOf("zcash");
+    expect(parseCoinAddress("zcash", transparent)).toBe(transparent);
   });
 
   it("are refused for scripts and several keys, naming why", () => {
@@ -479,9 +401,9 @@ describe("addresses out of reach", () => {
     ] as const)
       expect(refusal(() => parseCoinAddress(coin, text))).toContain("checksum or format");
     // A valid account of another chain's prefix is not this coin's address.
-    expect(
-      refusal(() => parseCoinAddress("injective", "cosmos19rl4cm2hmr8afy4kldpxz3fka4jguq0auqdal4")),
-    ).toContain("it is not an address of Injective (inj1…)");
+    expect(refusal(() => parseCoinAddress("injective", firstReceivingOf("cosmos")))).toContain(
+      "it is not an address of Injective (inj1…)",
+    );
     // Valid Bech32 strings of the right prefix whose data is not a 20-byte hash.
     for (const length of [19, 21, 32]) {
       const text = bech32.encode("cosmos", bech32.toWords(new Uint8Array(length).fill(7)));
@@ -532,18 +454,18 @@ describe("addresses out of reach", () => {
   it("are refused when damaged, too short or of another coin", () => {
     for (const [coin, text] of [
       ["bitcoin", DAMAGED_ADDRESS], // checksum changed
-      ["bitcoin", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabB"], // checksum changed
+      ["bitcoin", `${LEGACY_ADDRESS.slice(0, -1)}B`], // checksum changed
       ["bitcoin", "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3"], // P2WSH
       ["bitcoin", "ltc1qcr8te4kr609gcawutmrza0j4xv80jy8zkvrefp"], // another coin
-      ["bitcoin", "LUWPbpM43E2p7ZSh8cyTBEkvpHmr3cB8Ez"], // another coin
+      ["bitcoin", firstReceivingOf("litecoin")], // another coin
       ["litecoin", TEST_ADDRESS], // another coin
-      ["tron", "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"], // another coin
-      ["ethereum", "TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH"], // another coin
-      ["ethereum", "0x9858EfFD232B4033E47d90003D41EC34EcaEda"], // too short
-      ["xrp", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA"], // another alphabet
-      ["cosmos", "inj1npvwllfr9dqr8erajqqr6s0vxnk2ak55re90dz"], // another chain
+      ["tron", ETHEREUM_ADDRESS], // another coin
+      ["ethereum", firstReceivingOf("tron")], // another coin
+      ["ethereum", ETHEREUM_ADDRESS.slice(0, -2)], // too short
+      ["xrp", LEGACY_ADDRESS], // another alphabet
+      ["cosmos", firstReceivingOf("injective")], // another chain
       ["bitcoin-cash", "bitcoincash:pqkh9ahfj069qv8l6eysyufazpe4fdjq3u4hna323j"], // P2SH
-      ["bitcoin-cash", "bitcoincash:qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q7"], // checksum changed
+      ["bitcoin-cash", `${firstReceivingOf("bitcoin-cash").slice(0, -1)}7`], // checksum changed
       ["zcash", "t3Vz22vK5z2LcKEdg16Yv4FFneEL1zg9ojd"], // P2SH
       ["dash", ""],
     ] as const)
@@ -557,11 +479,11 @@ describe("the case of an address", () => {
   it("may be all capitals for Bech32 and CashAddr, never mixed", () => {
     for (const [coin, lower] of [
       ["bitcoin", TEST_ADDRESS],
-      ["bitcoin", "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr"],
-      ["bitcoin", "tb1q6rz28mcfaxtmd6v789l9rrlrusdprr9pqcpvkl"],
-      ["litecoin", "ltc1qnnphcvq5zgyf4f0uepust6d7gyt2zl69vftnz2"],
-      ["cosmos", "cosmos19rl4cm2hmr8afy4kldpxz3fka4jguq0auqdal4"],
-      ["bitcoin-cash", "bitcoincash:qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6"],
+      ["bitcoin", TAPROOT_ADDRESS],
+      ["bitcoin", addressAt("bitcoin", "m/84'/1'/0'/0/0")],
+      ["litecoin", addressAt("litecoin", "m/84'/2'/3'/1/7")],
+      ["cosmos", firstReceivingOf("cosmos")],
+      ["bitcoin-cash", firstReceivingOf("bitcoin-cash")],
     ] as const) {
       const upper = lower.toUpperCase();
       expect(parseCoinAddress(coin, upper)).toBe(lower);
@@ -575,47 +497,49 @@ describe("the case of an address", () => {
   });
 
   it("may leave out the CashAddr prefix, for the same key as the legacy form", () => {
-    const withoutPrefix = "qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6";
-    expect(parseCoinAddress("bitcoin-cash", withoutPrefix.toUpperCase())).toBe(
-      `bitcoincash:${withoutPrefix}`,
-    );
+    const cashAddress = firstReceivingOf("bitcoin-cash");
+    const withoutPrefix = cashAddress.replace("bitcoincash:", "");
+    expect(parseCoinAddress("bitcoin-cash", withoutPrefix.toUpperCase())).toBe(cashAddress);
     const first = { account: 0, branch: 0, index: 0 };
-    for (const text of [withoutPrefix, "1mW6fDEMjKrDHvLvoEsaeLxSCzZBf3Bfg"])
+    for (const text of [withoutPrefix, BITCOIN_CASH_LEGACY_ADDRESS])
       expect(check.match(TEST_PHRASE, coinAddress("bitcoin-cash", text, first)).path).toBe(
         "m/44'/145'/0'/0/0",
       );
   });
 
   it("is checked by EIP-55 in mixed case only", () => {
-    const checksummed = "0x9858EfFD232B4033E47d90003D41EC34EcaEda94";
+    const checksummed = ETHEREUM_ADDRESS;
     for (const same of [
       checksummed.toLowerCase(),
       `0x${checksummed.slice(2).toUpperCase()}`,
       `0X${checksummed.slice(2)}`,
     ])
       expect(parseCoinAddress("ethereum", same), same).toBe(checksummed);
-    // One capital made small breaks the checksum.
-    expect(
-      refusal(() => parseCoinAddress("ethereum", "0x9858efFD232B4033E47d90003D41EC34EcaEda94")),
-    ).toContain("its EIP-55 checksum, the mix of capital and small letters, is wrong");
+    // One capital made small, the first, breaks the checksum.
+    expect(refusal(() => parseCoinAddress("ethereum", checksummed.replace("E", "e")))).toContain(
+      "its EIP-55 checksum, the mix of capital and small letters, is wrong",
+    );
   });
 });
 
 describe("parseCoinAddress", () => {
   it("gives each address in its standard form", () => {
+    const classic = firstReceivingOf("ethereum-classic");
+    const injective = firstReceivingOf("injective");
+    const xrp = firstReceivingOf("xrp");
     for (const [coin, typed, standard] of [
-      ["bitcoin", "  BC1QCR8TE4KR609GCAWUTMRZA0J4XV80JY8Z306FYU\n", ADDRESSES[2]![3]],
-      ["bitcoin", ` ${ADDRESSES[0]![3]} `, ADDRESSES[0]![3]],
-      ["ethereum-classic", "0xfa22515e43658ce56a7682b801e9b5456f511420", ADDRESSES[33]![3]],
-      ["dash", ADDRESSES[40]![3].toUpperCase(), ADDRESSES[40]![3]],
-      ["injective", ADDRESSES[37]![3].toUpperCase(), ADDRESSES[37]![3]],
-      ["xrp", `\t${ADDRESSES[18]![3]}`, ADDRESSES[18]![3]],
+      ["bitcoin", `  ${TEST_ADDRESS.toUpperCase()}\n`, TEST_ADDRESS],
+      ["bitcoin", ` ${LEGACY_ADDRESS} `, LEGACY_ADDRESS],
+      ["ethereum-classic", classic.toLowerCase(), classic],
+      ["dash", PLATFORM_ADDRESS.toUpperCase(), PLATFORM_ADDRESS],
+      ["injective", injective.toUpperCase(), injective],
+      ["xrp", `\t${xrp}`, xrp],
     ] as const)
       expect(parseCoinAddress(coin, typed)).toBe(standard);
   });
 
   it("trims Unicode white space only", () => {
-    const address = ADDRESSES[2]![3];
+    const address = TEST_ADDRESS;
     // NEL (U+0085) and the ideographic space (U+3000) are white space; a byte order mark is not.
     expect(parseCoinAddress("bitcoin", `\u0085${address}\u3000`)).toBe(address);
     for (const text of [`\ufeff${address}`, `${address}\ufeff`])
@@ -627,7 +551,7 @@ describe("parseCoinAddress", () => {
   });
 
   it("names the coin's forms when the address is another coin's", () => {
-    expect(refusal(() => parseCoinAddress("litecoin", ADDRESSES[0]![3]))).toBe(
+    expect(refusal(() => parseCoinAddress("litecoin", LEGACY_ADDRESS))).toBe(
       "The address cannot be used for the check: it is not an address of Litecoin (L…, M…, 3… or ltc1q…).",
     );
   });
@@ -636,9 +560,10 @@ describe("parseCoinAddress", () => {
     const refused: readonly (readonly [CoinId, string, string])[] = [
       // A changed checksum character.
       ["bitcoin", DAMAGED_ADDRESS, "core.coins.coin.address-damaged"],
+      // One capital, the first after the prefix.
       [
         "bitcoin-cash",
-        "bitcoincash:Qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6",
+        firstReceivingOf("bitcoin-cash").replace(":q", ":Q"),
         "core.coins.coin.address-mixed-case",
       ],
       [
@@ -646,7 +571,7 @@ describe("parseCoinAddress", () => {
         bech32.encode("cosmos", bech32.toWords(new Uint8Array(21).fill(7))),
         "core.coins.coin.address-wrong-length",
       ],
-      ["litecoin", ADDRESSES[0]![3], "core.coins.coin.address-not-this-coin"],
+      ["litecoin", LEGACY_ADDRESS, "core.coins.coin.address-not-this-coin"],
       // P2WSH, a script's.
       [
         "bitcoin",
@@ -659,15 +584,11 @@ describe("parseCoinAddress", () => {
         "core.coins.coin.address-shielded",
       ],
       // 39 digits, one short.
+      ["ethereum", ETHEREUM_ADDRESS.slice(0, -1), "core.coins.ethereum.address-not-hex-account"],
+      // One capital made small, the first.
       [
         "ethereum",
-        "0x9858EfFD232B4033E47d90003D41EC34EcaEda9",
-        "core.coins.ethereum.address-not-hex-account",
-      ],
-      // One capital made small.
-      [
-        "ethereum",
-        "0x9858efFD232B4033E47d90003D41EC34EcaEda94",
+        ETHEREUM_ADDRESS.replace("E", "e"),
         "core.coins.ethereum.address-wrong-eip55-checksum",
       ],
     ];
@@ -712,46 +633,42 @@ describe("the coins", () => {
 
   it("name the type of an address where they have several", () => {
     const described = (coin: CoinId, text: string) => coinById(coin).parse(text).description;
-    expect(described("bitcoin", "37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf")).toBe(
-      "nested SegWit (BIP49)",
-    );
-    expect(described("bitcoin", "tb1q6rz28mcfaxtmd6v789l9rrlrusdprr9pqcpvkl")).toBe(
+    const nestedSegwit = addressAt("bitcoin", "m/49'/0'/0'/0/0");
+    expect(described("bitcoin", nestedSegwit)).toBe("nested SegWit (BIP49)");
+    expect(described("bitcoin", addressAt("bitcoin", "m/84'/1'/0'/0/0"))).toBe(
       "testnet, native SegWit (BIP84)",
     );
-    expect(described("litecoin", "LUWPbpM43E2p7ZSh8cyTBEkvpHmr3cB8Ez")).toBe("legacy (BIP44)");
-    expect(described("zcash", "t1XVXWCvpMgBvUaed4XDqWtgQgJSu1Ghz7F")).toBe("transparent");
-    expect(described("ethereum", "0x9858effd232b4033e47d90003d41ec34ecaeda94")).toBeUndefined();
-    expect(described("dash", "XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf5")).toBe("Core (BIP44)");
-    expect(described("dash", "dash1krma5z3ttj75la4m93xcndna9ullamq9y5e9n5rs")).toBe(
-      "Platform payment (DIP17)",
-    );
+    expect(described("litecoin", firstReceivingOf("litecoin"))).toBe("legacy (BIP44)");
+    expect(described("zcash", firstReceivingOf("zcash"))).toBe("transparent");
+    expect(described("ethereum", ETHEREUM_ADDRESS.toLowerCase())).toBeUndefined();
+    expect(described("dash", firstReceivingOf("dash"))).toBe("Core (BIP44)");
+    expect(described("dash", PLATFORM_ADDRESS)).toBe("Platform payment (DIP17)");
   });
 });
 
 describe("an address of another coin (AUD-010-API003)", () => {
-  /** One valid address of each coin, from the coins' own self-test vectors. */
+  /**
+   * One valid address of each coin, from the coins' own self-test vectors: its first receiving
+   * address and the other forms that a coin has.
+   */
   const SAMPLES: Readonly<Record<CoinId, readonly string[]>> = {
-    bitcoin: [
-      "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA",
-      "37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf",
-      TEST_ADDRESS,
-    ],
-    "bitcoin-cash": ["bitcoincash:qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6"],
-    cosmos: ["cosmos19rl4cm2hmr8afy4kldpxz3fka4jguq0auqdal4"],
-    dash: ["XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf5", "dash1kzjl7qzxy9lar37j8r37z3kvt07epqe20ckxfezw"],
-    dogecoin: ["DBus3bamQjgJULBJtYXpEzDWQRwF5iwxgC"],
+    bitcoin: [LEGACY_ADDRESS, addressAt("bitcoin", "m/49'/0'/0'/0/0"), TEST_ADDRESS],
+    "bitcoin-cash": [firstReceivingOf("bitcoin-cash")],
+    cosmos: [firstReceivingOf("cosmos")],
+    dash: [firstReceivingOf("dash"), addressAt("dash", "m/9'/5'/17'/0'/0'/1")],
+    dogecoin: [firstReceivingOf("dogecoin")],
     ethereum: [
-      "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+      ETHEREUM_ADDRESS,
       // Mixed case whose small letters all fit CashAddr's alphabet.
       "0x7f0d20e7C84e6f66D83de2c004434D9A522A62FD",
     ],
-    "ethereum-classic": ["0xFA22515E43658ce56A7682B801e9B5456f511420"],
-    injective: ["inj1npvwllfr9dqr8erajqqr6s0vxnk2ak55re90dz"],
-    litecoin: ["LUWPbpM43E2p7ZSh8cyTBEkvpHmr3cB8Ez", "ltc1qnnphcvq5zgyf4f0uepust6d7gyt2zl69vftnz2"],
-    tron: ["TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH"],
+    "ethereum-classic": [firstReceivingOf("ethereum-classic")],
+    injective: [firstReceivingOf("injective")],
+    litecoin: [firstReceivingOf("litecoin"), addressAt("litecoin", "m/84'/2'/3'/1/7")],
+    tron: [firstReceivingOf("tron")],
     // The second fits the alphabet of CashAddr in small letters, so Bitcoin Cash met its case rule.
-    xrp: ["rHsMGQEkVNJmpGWs8XUBoTBiAAbwxZN5v3", "rwRxAXgcHjLz6exJdcQ9ugkk8xhNNvNFHP"],
-    zcash: ["t1XVXWCvpMgBvUaed4XDqWtgQgJSu1Ghz7F"],
+    xrp: [firstReceivingOf("xrp"), "rwRxAXgcHjLz6exJdcQ9ugkk8xhNNvNFHP"],
+    zcash: [firstReceivingOf("zcash")],
   };
   /**
    * Addresses that two coins share by design: Bitcoin's legacy 1… is Bitcoin Cash's too, a 3… is
@@ -777,17 +694,19 @@ describe("an address of another coin (AUD-010-API003)", () => {
   });
 
   it("is still refused as damaged where its checksum fails", () => {
-    expect(() => coinById("dash").parse("XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf6")).toThrow(
-      "its checksum or format is wrong",
-    );
+    // Dash's first address with its last character changed.
+    const damagedDash = `${firstReceivingOf("dash").slice(0, -1)}6`;
+    expect(() => coinById("dash").parse(damagedDash)).toThrow("its checksum or format is wrong");
     expect(() => coinById("xrp").parse(DAMAGED_ADDRESS)).toThrow("its checksum or format is wrong");
-    expect(() => coinById("bitcoin-cash").parse("37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf")).toThrow(
+    const nestedSegwit = addressAt("bitcoin", "m/49'/0'/0'/0/0");
+    expect(() => coinById("bitcoin-cash").parse(nestedSegwit)).toThrow(
       "it is not the address of a single key",
     );
     // Bitcoin Cash's own address with one capital is still refused for its case.
-    expect(() =>
-      coinById("bitcoin-cash").parse("bitcoincash:Qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6"),
-    ).toThrow("it mixes capital and small letters, which CashAddr does not allow");
+    const oneCapital = firstReceivingOf("bitcoin-cash").replace(":q", ":Q");
+    expect(() => coinById("bitcoin-cash").parse(oneCapital)).toThrow(
+      "it mixes capital and small letters, which CashAddr does not allow",
+    );
   });
 });
 
@@ -824,7 +743,7 @@ describe("the known answers of Ethereum alone (a host of one coin family)", () =
           coin: ethereum,
           passphrase: "",
           path: "m/44'/60'/0'/0/0",
-          address: "0xc1A30611797762aea209daC2aC7E900f0cE95f9e",
+          address: addressAt("ethereum", "m/44'/60'/3'/1/7"),
         },
       ],
       startup: [0],

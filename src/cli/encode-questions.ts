@@ -29,7 +29,7 @@ import {
   HEIR_SHEET_SIZES,
   type HeirSheetSize,
 } from "../export/heir-sheet.js";
-import { askOutputFile, FILE_NAME_QUESTIONS } from "./output-questions.js";
+import { ClaimedOutputs, FILE_NAME_QUESTIONS } from "./output-questions.js";
 import { askCards } from "./card-questions.js";
 import { assertColorCardsFit, assertShareCardsFit } from "./cards-fit.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
@@ -221,14 +221,14 @@ async function eachAsked(
 
 /** The record file of a result: --output and its name. */
 async function askRecordFile(): Promise<string[] | undefined | Cancelled> {
-  const path = await askOutputFile(FILE_NAME_QUESTIONS.record, RECORD_FILE);
+  const path = await ClaimedOutputs.askOutputFile(FILE_NAME_QUESTIONS.record, RECORD_FILE);
   if (path === undefined || path === CANCELLED) return path;
   return ["--output", path];
 }
 
 /** The QR code image of a result: --qr and its name. */
 async function askQrFile(): Promise<string[] | undefined | Cancelled> {
-  const path = await askOutputFile(FILE_NAME_QUESTIONS.qr, QR_FILE);
+  const path = await ClaimedOutputs.askOutputFile(FILE_NAME_QUESTIONS.qr, QR_FILE);
   if (path === undefined || path === CANCELLED) return path;
   return ["--qr", path];
 }
@@ -396,7 +396,7 @@ export async function askHeirSheet(mode: Mode): Promise<string[] | undefined | C
   );
   if (size === undefined || size === CANCELLED) return size;
   if (size === "") return [];
-  const path = await askOutputFile(FILE_NAME_QUESTIONS.pdf, HEIR_SHEET_FILE);
+  const path = await ClaimedOutputs.askOutputFile(FILE_NAME_QUESTIONS.pdf, HEIR_SHEET_FILE);
   if (path === undefined || path === CANCELLED) return path;
   return ["--heir-sheet", path, "--heir-sheet-size", size];
 }
@@ -485,7 +485,10 @@ export async function askShares(
   });
   if (destination === undefined || destination === CANCELLED) return destination;
   const file = async (): Promise<string[] | undefined | Cancelled> => {
-    const path = await askOutputFile(FILE_NAME_QUESTIONS.text, "mnemocode-shares.txt");
+    const path = await ClaimedOutputs.askOutputFile(
+      FILE_NAME_QUESTIONS.text,
+      "mnemocode-shares.txt",
+    );
     if (path === undefined || path === CANCELLED) return path;
     return ["--output", path];
   };

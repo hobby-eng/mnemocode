@@ -150,7 +150,7 @@ describe("material selection cards", () => {
 });
 
 describe("material selection cards", () => {
-  it("holds the object of every tinted finish in the middle of its crop", () => {
+  it("holds the object of every tinted finish but the enclosure's in the middle of its crop", () => {
     // A sample shows its whole crop: an object off its middle stood off the middle of its dark
     // square (owner, 2026-10-13). The crops were centred on the objects' sides; an outline runs a
     // little beyond some of them, such as the shadow line under a kitchen front, hence the margin.

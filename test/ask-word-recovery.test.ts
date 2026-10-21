@@ -20,6 +20,7 @@ import { WALLET_QUESTION } from "./helpers/prompts.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
 import {
   LAST_WORD_FORGOTTEN,
+  LEGACY_EXAMPLE_MASKED,
   LIST_PASSPHRASE,
   ONE_WORD_MISSING,
   replacedAt,
@@ -141,9 +142,8 @@ describe("recover-word on the private screen", () => {
   });
 
   it("says that ? is no word for the legacy last word, and asks again", async () => {
-    const legacy =
-      "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
-    terminal.answers = [`${legacy.replace(/hospital$/u, "?")}\r`, `${legacy}\r`];
+    const legacy = LEGACY_EXAMPLE_MASKED;
+    terminal.answers = [`${replacedAt(legacy, { 12: "?" })}\r`, `${legacy}\r`];
     await recover({ "legacy-valid-last-word": true });
     expect(seen.notices).toContain(
       "This mode needs the exact old final word: ? stands for no word here.",

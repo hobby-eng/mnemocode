@@ -74,14 +74,14 @@ describe("AUD-001 regression contracts", () => {
 
   const unsupportedFormat = { code: "core.encoded-form.unsupported-encoded-format" };
 
-  it("AUD-001-API001: rejects an unknown input format at the JavaScript boundary", () => {
+  it("AUD-001-API001: rejects an unknown input format from a JavaScript host", () => {
     // A format that no type allows, fed on purpose as a JavaScript host could.
     expect(() => parseInput(TEST_PHRASE, "misspelled" as EncodedFormat)).toThrow(
       expect.objectContaining(unsupportedFormat),
     );
   });
 
-  it("AUD-001-API001: rejects an unknown output format at the JavaScript boundary", () => {
+  it("AUD-001-API001: rejects an unknown output format from a JavaScript host", () => {
     expect(() =>
       // A format that no type allows, fed on purpose as a JavaScript host could.
       formatEncoded(representMnemonic(TEST_PHRASE), "misspelled" as OutputFormat),

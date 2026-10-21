@@ -12,6 +12,7 @@ from terminal_answers import (
     CANCELLED,
     CLEAR_PROMPT,
     FINGERPRINT,
+    LAST_WORD_STARTS_WITH_A,
     MASK_DATE,
     TEST_PHRASE,
     TEST_WORDS,
@@ -31,9 +32,16 @@ VT220_HOME, VT220_END = "\x1b[1~", "\x1b[4~"
 # where a result must still fit or page.
 FULL_SCREEN = (24, 80)
 NARROW_SCREEN = (12, 32)
-# A taller terminal, 80 by 30, where the eight candidates of recover-word
-# fit as one row each but not as parts of their own.
+# A taller terminal, 80 by 30, where the eight candidates of
+# recover-word fit as one row each but not as parts of their own.
 CANDIDATE_SCREEN = (30, 80)
+
+
+def size_text(*sizes):
+    """The sizes, each rows and columns, as a message names them:
+    columns by rows, such as "80x24 and 32x12".
+    """
+    return " and ".join(f"{columns}x{rows}" for rows, columns in sizes)
 
 
 def assert_closed_descriptor(descriptor):
@@ -88,10 +96,9 @@ def check_private_result_pages():
     for size in (FULL_SCREEN, NARROW_SCREEN):
         with terminal.terminal_size(*size):
             check_private_share_pages()
-        height, width = size
         print(
             "private share pages: Home/End and PageUp/PageDown at "
-            f"{width}x{height}"
+            + size_text(size)
         )
     with terminal.terminal_size(*FULL_SCREEN):
         check_private_candidate_pages()
@@ -207,8 +214,8 @@ def check_share_pages():
             finally:
                 session.close()
     print(
-        "share sets: every share on the screen or on a page, at 80x24 and "
-        "32x12"
+        "share sets: every share on the screen or on a page, at "
+        + size_text(*sizes)
     )
 
 
@@ -267,7 +274,7 @@ def check_word_result_under_question():
     cases = (
         (
             ("--master-fingerprint", "00000000"),
-            " ".join([*TEST_WORDS[:-1], "a*"]),
+            LAST_WORD_STARTS_WITH_A,
             ("Matched 0 of 8 candidates", "only 32 bits"),
         ),
         (
@@ -281,7 +288,7 @@ def check_word_result_under_question():
             check_word_result(options, words, warnings)
     print(
         "recover-word: What now? under the result and every warning, "
-        "at 80x24"
+        "at " + size_text(FULL_SCREEN)
     )
 
 
@@ -313,7 +320,7 @@ def check_word_candidate_pages():
     they fit as one row each. The wallet check is offered only for a
     longer list (check_word_result_under_question).
     """
-    words = " ".join([*TEST_WORDS[:-1], "a*"])
+    words = LAST_WORD_STARTS_WITH_A
     with terminal.terminal_size(*CANDIDATE_SCREEN):
         session = terminal.Session(("recover-word", "--ask-secrets"))
         try:
@@ -331,4 +338,7 @@ def check_word_candidate_pages():
             terminal.assert_kept_private(session, (words, "Candidate 1"))
         finally:
             session.close()
-    print("recover-word: eight candidates read by pages at 80x30")
+    print(
+        "recover-word: eight candidates read by pages at "
+        + size_text(CANDIDATE_SCREEN)
+    )

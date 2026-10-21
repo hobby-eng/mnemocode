@@ -115,7 +115,7 @@ describe("the record of a sandbox", () => {
     ]);
   });
 
-  it("holds a boundary only where its probe found it to hold", () => {
+  it("holds a protection only where its probe found it to hold", () => {
     const record = new SandboxRecord();
     record.claim("no sockets", "holds", "a socket opened");
     record.claim("no file writes", "broken", "/dev/null opened for writing");

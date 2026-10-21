@@ -6,10 +6,8 @@ import { describe, expect, it } from "vitest";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { containing, matching } from "./helpers/matchers.js";
 import { runBuiltCli as run } from "./helpers/built-cli.js";
+import { MANY_STARTS_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
-
-/** The limit of the one test that starts the command line fifteen times. */
-const FIFTEEN_STARTS_TIME_LIMIT_MS = 300_000;
 
 describe("CLI records", () => {
   it("reports the package version through both CLI forms", async () => {
@@ -249,8 +247,7 @@ describe("CLI records", () => {
 });
 
 describe("CLI records", () => {
-  // It starts the command line once per representation; process start-up is slow on Windows
-  // and on a busy or hot machine. Fifteen starts take minutes there, so it has a limit of its own.
+  // It starts the command line three times per representation, sixteen times in all.
   it(
     "auto-detects every representation that encode can produce",
     async () => {
@@ -292,7 +289,7 @@ describe("CLI records", () => {
         stderr: containing("The representation format must be one of"),
       });
     },
-    FIFTEEN_STARTS_TIME_LIMIT_MS,
+    MANY_STARTS_TEST_TIME_LIMIT_MS,
   );
 
   it("keeps an explicit raw format authoritative", async () => {

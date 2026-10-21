@@ -9,7 +9,7 @@
 // Does not: load or verify the WASM (runtime.ts), or change what the bridge returns.
 
 import { ErrorCatalog } from "../core/error-catalog.js";
-import { ByteArray } from "../core/byte-array.js";
+import { isByteArray } from "../core/byte-array.js";
 import { BYTE_MAX, wipeAll } from "../core/bits.js";
 import { isRecordedQuorum } from "./share-layout.js";
 
@@ -156,7 +156,7 @@ export class CheckedSskrBridge implements SskrBridge {
   ): string {
     CheckedSskrBridge.#assertGroupThreshold(threshold);
     for (const input of [secret, groups, seed])
-      if (!ByteArray.is(input)) throw ERRORS.create("byte-array-required", []);
+      if (!isByteArray(input)) throw ERRORS.create("byte-array-required", []);
     const owned: Uint8Array[] = [];
     try {
       for (const input of [secret, groups, seed]) owned.push(new Uint8Array(input));

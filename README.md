@@ -209,7 +209,7 @@ Word and code searches allow up to **16,777,216 combinations**. A BIP39 checksum
 
 `recover-word` takes the original English phrase with the patterns above. If one word is missing at an unknown position, use `--missing-word` with the remaining words.
 
-A wallet check marks matching candidates. Nonmatches remain visible when there are at most 2,048 candidates; checking hundreds of thousands can take minutes. With no wallet reference, use a [candidate list for discovery](#candidate-lists-for-discovery).
+A wallet check marks matching candidates. A file or a pipe gets every candidate, nonmatches too, up to 2,048; a terminal shows every candidate when they fit on the screen and otherwise only the matches ([details](docs/CLI.md#input-files-and-limits)). Checking hundreds of thousands can take minutes. With no wallet reference, use a [candidate list for discovery](#candidate-lists-for-discovery).
 
 For an invalid Original Seedshift last word, `--legacy-valid-last-word` lists valid replacement words for the **stored** phrase. The candidate marked `preserved` keeps the old data bits. Dates are still needed to recover the original phrase.
 

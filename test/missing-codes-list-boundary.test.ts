@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { recoverLegacyValidLastWords } from "../src/core/words.js";
-import { DATE, replacedAt, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, replacedAt, TEST_PHRASE, ZERO_ENTROPY_PHRASES } from "./helpers/test-phrase.js";
 import { parseDate } from "../src/core/dates.js";
 
 const ENDINGS = recoverLegacyValidLastWords(TEST_PHRASE).map(({ word }) => word);
+/** The most rows that a list of candidates holds, as its refusal says (MissingCodesSearch.listed). */
+const LIST_LIMIT = 16;
 
 describe("Actual candidate-list size after an underestimated search plan", () => {
   it.each([17, 100, 128])(
@@ -21,7 +23,7 @@ describe("Actual candidate-list size after an underestimated search plan", () =>
       const search = new MissingCodesSearch(codes, fingerprint);
       expect(codes.combinations).toBe(count);
       expect(codes.expected).toBeLessThanOrEqual(16);
-      expect(search.fits("list")).toBe(true);
+      expect(search.whyNot("list")).toBeUndefined();
       await expect(search.listed([]).run()).rejects.toMatchObject({
         code: "core.missing-codes-search.list-overflow",
       });
@@ -30,7 +32,7 @@ describe("Actual candidate-list size after an underestimated search plan", () =>
   );
 
   it("returns every candidate when the actual number equals the list limit", async () => {
-    const endings = ENDINGS.slice(0, MissingCodesSearch.MAX_LISTED);
+    const endings = ENDINGS.slice(0, LIST_LIMIT);
     const codes = MissingCodes.read(
       replacedAt(TEST_PHRASE, { 12: endings.join("|") }),
       "english",
@@ -47,20 +49,20 @@ describe("Actual candidate-list size after an underestimated search plan", () =>
   it("also bounds multiple phrases decoded from one set of legacy valid-last-word codes", async () => {
     // 24 words: each set gives 8 phrases, so that 3 sets, which the estimate takes for far fewer,
     // give 24.
-    const prefix = "abandon ".repeat(23);
-    const endings = recoverLegacyValidLastWords(`${prefix}art`).map(({ word }) => word);
+    const phrase = ZERO_ENTROPY_PHRASES[24];
+    const endings = recoverLegacyValidLastWords(phrase).map(({ word }) => word);
     const codes = MissingCodes.read(
-      prefix + endings.slice(0, 3).join("|"),
+      replacedAt(phrase, { 24: endings.slice(0, 3).join("|") }),
       "english",
       "seedshift-legacy-valid",
     );
     const fingerprint = vi.fn(() => "00000000");
     const search = new MissingCodesSearch(codes, fingerprint);
-    expect(search.fits("list")).toBe(true);
+    expect(search.whyNot("list")).toBeUndefined();
     await expect(search.listed([parseDate(DATE)]).run()).rejects.toMatchObject({
       code: "core.missing-codes-search.list-overflow",
     });
-    expect(fingerprint).toHaveBeenCalledTimes(MissingCodesSearch.MAX_LISTED);
+    expect(fingerprint).toHaveBeenCalledTimes(LIST_LIMIT);
   });
 
   it("offers no list where one set of codes gives more phrases than it holds (AUD-037-FUN002)", () => {
@@ -70,7 +72,7 @@ describe("Actual candidate-list size after an underestimated search plan", () =>
       "seedshift-legacy-valid",
     );
     const search = new MissingCodesSearch(codes, () => "00000000");
-    expect(search.fits("list")).toBe(false);
+    expect(search.whyNot("list")).toMatch(/^A list holds at most 16 phrases;/u);
     expect(() => search.listed([parseDate(DATE)])).toThrow(
       expect.objectContaining({ code: "core.missing-codes-search.operation-refused" }),
     );

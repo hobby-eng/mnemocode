@@ -26,8 +26,8 @@ import {
   MASKED,
   replacedAt,
   TEST_FINGERPRINT,
-  TEST_NUMBERS,
   TEST_PHRASE,
+  TEST_RECORD,
 } from "./helpers/test-phrase.js";
 import { publicShare } from "./helpers/vectors.js";
 
@@ -99,7 +99,7 @@ describe("recover-date on the private screen", () => {
 
   it("asks for a direct record again before the dates", async () => {
     terminal.answers = [
-      `MNC1:direct:indexes:${TEST_NUMBERS}\r`,
+      `${TEST_RECORD}\r`,
       "MNC1:seedshift:english\r",
       `${MASKED}\r`,
       "2?-09-2026\r",
@@ -120,7 +120,7 @@ describe("recover-date on the private screen", () => {
     expect(seen.out).toEqual([FOUND]);
   });
 
-  it("asks again for codes that are no phrase, naming only a count or a place", async () => {
+  it("asks again for codes that are no phrase, naming their count or the range, not the codes", async () => {
     terminal.answers = [
       `${"2027 ".repeat(10)}\r`,
       `${MASKED} 4096\r`,
@@ -134,6 +134,7 @@ describe("recover-date on the private screen", () => {
         "Indexes use Seedshift-compatible numbering from 1 through 2048.",
       ]),
     );
+    for (const notice of seen.notices) expect(notice).not.toMatch(/2027|4096/u);
     expect(seen.out).toEqual([FOUND]);
   });
 

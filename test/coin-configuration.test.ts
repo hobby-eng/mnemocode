@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { Base58Coin } from "../src/core/coins/base58.js";
 import { CoinList } from "../src/core/coins/coin.js";
 import type { AddressType } from "../src/core/coins/address-types.js";
+import { firstReceivingOf } from "./helpers/coin-addresses.js";
 
 // BIP44's first receiving address of the public abandon/about BIP39 test phrase.
-const ADDRESS = "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA";
+const ADDRESS = firstReceivingOf("bitcoin");
 const DESCRIPTION = {
   id: "bitcoin",
   name: "Bitcoin",

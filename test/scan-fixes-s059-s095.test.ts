@@ -104,6 +104,7 @@ import { entryAt, absentPath } from "../src/export/private-file.js";
 import { ValidCharacters, characterLength, isContinuation } from "../src/cli/utf8.js";
 import { characterSize } from "../src/cli/terminal-geometry.js";
 import { assertColorCards } from "../src/export/card-content.js";
+import { firstReceivingOf } from "./helpers/coin-addresses.js";
 import {
   DATE,
   ENCODED_FINGERPRINT,
@@ -137,7 +138,7 @@ describe("S059: the menu's wallet answer is the command line that gives the same
       {
         kind: "coin-address",
         coin: "ethereum",
-        value: "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+        value: firstReceivingOf("ethereum"),
         location: { account: 0, branch: 0, index: 0 },
         addresses: 5,
       },

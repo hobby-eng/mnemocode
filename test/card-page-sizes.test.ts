@@ -6,13 +6,7 @@ import { MM } from "../src/export/business-layout.js";
 import { pageOperators } from "./helpers/pdf-content.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
-import { TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
-
-/**
- * The limit of the test that draws a sheet for each share on A6 and a page for each card in every
- * card size: four times TEST_TIME_LIMIT_MS.
- */
-const SHEETS_TIME_LIMIT_MS = 4 * TEST_TIME_LIMIT_MS;
+import { DRAWING_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
 const colors = indexesToColors(Array.from({ length: 12 }, (_, index) => index * 7));
 const content: CardContent = { kind: "colors", colors, payload: colors.join(" ") };
@@ -97,7 +91,7 @@ describe("page size decides between a sheet and separate cards", () => {
   });
 
   it.each(["business-it", "business-architect"])(
-    "gives a separate %s card rounded corners and paints nothing outside them",
+    "gives a separate %s card rounded corners that clip its artwork",
     async (id) => {
       const template = selectTemplate(id, "colors");
       const document = await PDFDocument.load(
@@ -136,7 +130,8 @@ describe("page size decides the layout of Shamir share cards", () => {
 
   it(
     "prints one sheet per share on A6 and one page per card for a card size",
-    { timeout: SHEETS_TIME_LIMIT_MS },
+    // It draws a sheet for each share on A6 and a page for each card in every card size.
+    { timeout: DRAWING_TEST_TIME_LIMIT_MS },
     async () => {
       const { splitSskrMnemonic } = await import("../src/sskr/shares.js");
       const { ShareCardSet } = await import("../src/export/sskr-render.js");

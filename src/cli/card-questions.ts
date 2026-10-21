@@ -31,7 +31,7 @@ import { refusal } from "./terminal-input.js";
 import { readmeLink } from "./terminal.js";
 import { COPY_OPTIONS, profileOption } from "./business-options.js";
 import { defined } from "../core/defined.js";
-import { askNewFolder, askOutputFile, FILE_NAME_QUESTIONS } from "./output-questions.js";
+import { ClaimedOutputs, FILE_NAME_QUESTIONS } from "./output-questions.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
@@ -134,7 +134,7 @@ async function askCardFiles(
     layout === "separate" || layout === SHEET_PAGE_SIZE ? [] : ["--page-size", layout];
   const image = isImageFormat(kind) ? ["--image-format", kind] : [];
   if (layout === "separate") {
-    const folder = await askNewFolder(base);
+    const folder = await ClaimedOutputs.askNewFolder(base);
     if (folder === undefined || folder === CANCELLED) return folder;
     return {
       sheets: false,
@@ -151,11 +151,11 @@ async function askCardFiles(
   if (turn === undefined || turn === CANCELLED) return turn;
   const size = [...pageSize, ...turn];
   if (kind === "pdf") {
-    const path = await askOutputFile(FILE_NAME_QUESTIONS.pdf, `${base}.pdf`);
+    const path = await ClaimedOutputs.askOutputFile(FILE_NAME_QUESTIONS.pdf, `${base}.pdf`);
     if (path === undefined || path === CANCELLED) return path;
     return { sheets: true, options: ["--pdf", path, ...size] };
   }
-  const folder = await askNewFolder(`${base}-images`);
+  const folder = await ClaimedOutputs.askNewFolder(`${base}-images`);
   if (folder === undefined || folder === CANCELLED) return folder;
   return { sheets: true, options: ["--images-dir", folder, ...image, ...size] };
 }

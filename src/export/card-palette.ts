@@ -129,7 +129,8 @@ let farthest: FarthestColours | undefined;
 /**
  * The colour of the card of each code of `codes`, in their order: the distinct codes take the
  * colours of the one order (FarthestColours) in the order in which they first appear, and every
- * card of one code has its colour. The colours carry nothing of the codes.
+ * card of one code has its colour. The colours carry nothing of the codes. Refuses more distinct
+ * codes than the order has colours (export.card-palette.cards-print-codes-at-most-colours).
  */
 export function codeColors(codes: readonly string[]): string[] {
   const distinct = [...new Set(codes)];
@@ -142,7 +143,8 @@ export function codeColors(codes: readonly string[]): string[] {
 /**
  * The smallest distance, in millionths of OKLab units, between two of `colours` in any view: how
  * alike the two most alike of them look on some design. The tests and the self-test of cards check
- * a set by it.
+ * a set by it. Refuses a colour that is no #RRGGBB or RRGGBB colour, as ReferenceTint refuses it
+ * (core.colors.invalid-rgb-reference).
  */
 export function closestPair(colours: readonly string[]): number {
   const looks = colours.map((hex) => ({ hex, views: viewsOf(hex) }));

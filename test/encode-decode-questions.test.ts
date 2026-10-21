@@ -280,18 +280,23 @@ describe("encode, decode and the backup check on the private screen", () => {
       expect(seen.out).toEqual([TEST_PHRASE]);
     });
 
-    it("says after the codes that a fingerprint found that it is only a filter (AUD-037-SEC004)", async () => {
-      const codes = MASKED.split(" ");
-      codes[5] = "?";
-      // By the wallet's fingerprint, with the dates, and by the encoded fingerprint, without.
-      for (const [answers, way] of [
-        [
-          ["2?-09-2026", TEST_FINGERPRINT],
-          ["The wallet", "Fingerprint"],
-        ],
-        [[ENCODED_FINGERPRINT, DATE], ["Encoded fingerprint"]],
-      ] as const) {
-        seen.notices = [];
+    // By the wallet's fingerprint, with the dates typed before the search, and by the encoded
+    // fingerprint, the dates typed after it: the warning then stands above them as well, as a
+    // warning of the step before (CORE-39). Each a command of its own, on a private screen of its
+    // own.
+    it.each([
+      [
+        "the wallet's fingerprint",
+        ["2?-09-2026", TEST_FINGERPRINT],
+        ["The wallet", "Fingerprint"],
+        0,
+      ],
+      ["the encoded fingerprint", [ENCODED_FINGERPRINT, DATE], ["Encoded fingerprint"], 1],
+    ] as const)(
+      "says after the codes that %s found that it is only a filter (AUD-037-SEC004)",
+      async (_way, answers, way, aboveDates) => {
+        const codes = MASKED.split(" ");
+        codes[5] = "?";
         terminal.answers = [codes.join(" "), ...answers].map((answer) => `${answer}\r`);
         terminal.choices = [...way];
         await runDecode({ "ask-secrets": true, mode: "seedshift" });
@@ -302,12 +307,12 @@ describe("encode, decode and the backup check on the private screen", () => {
         const found = placesOf(`✓ Code 6 found: ${MASKED}`);
         const warned = placesOf(FINGERPRINT_WARNING);
         expect(found).toHaveLength(2);
-        expect(warned).toHaveLength(2);
+        expect(warned).toHaveLength(2 + aboveDates);
         expect(warned[0]).toBeGreaterThan(found[0]!);
-        expect(warned[0]).toBeLessThan(found[1]!);
-        expect(warned[1]).toBeGreaterThan(found[1]!);
-      }
-    });
+        expect(warned.at(-2)).toBeLessThan(found[1]!);
+        expect(warned.at(-1)).toBeGreaterThan(found[1]!);
+      },
+    );
 
     it("sends a Shamir share typed for the codes to the restore, the share kept", async () => {
       const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
@@ -495,7 +500,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       expect(seen.notices).toContain("Recovery search contains 10 date combinations.");
     });
 
-    it("offers the wallet to the Original Seedshift's search, and lists every candidate without", async () => {
+    it("offers the wallet to the Original Seedshift's search, and lists the right candidate without it", async () => {
       windowOf(TERMINAL_ROWS, TERMINAL_COLUMNS);
       terminal.answers = [`${LEGACY}\r`, "2?-09-2026\r"];
       terminal.choices = ["It cannot"];
